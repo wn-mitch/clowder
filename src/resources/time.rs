@@ -109,8 +109,9 @@ impl Season {
 // ---------------------------------------------------------------------------
 
 /// How many simulation ticks to advance per game-loop update.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SimSpeed {
+    #[default]
     Normal,
     Fast,
     VeryFast,
@@ -145,33 +146,17 @@ impl SimSpeed {
     }
 }
 
-impl Default for SimSpeed {
-    fn default() -> Self {
-        Self::Normal
-    }
-}
-
 // ---------------------------------------------------------------------------
 // TimeState
 // ---------------------------------------------------------------------------
 
 /// Global simulation clock. Advance `tick` each update; everything else is
 /// derived.
-#[derive(Resource, Debug, Clone)]
+#[derive(Resource, Debug, Clone, Default)]
 pub struct TimeState {
     pub tick: u64,
     pub paused: bool,
     pub speed: SimSpeed,
-}
-
-impl Default for TimeState {
-    fn default() -> Self {
-        Self {
-            tick: 0,
-            paused: false,
-            speed: SimSpeed::default(),
-        }
-    }
 }
 
 impl TimeState {

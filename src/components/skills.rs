@@ -63,19 +63,10 @@ pub struct Corruption(pub f32);
 
 /// Tracks a teaching relationship. A cat may mentor at most one apprentice
 /// and have at most one mentor at a time.
-#[derive(Component, Debug, Clone, PartialEq, Eq)]
+#[derive(Component, Debug, Clone, PartialEq, Eq, Default)]
 pub struct Training {
     pub mentor: Option<Entity>,
     pub apprentice: Option<Entity>,
-}
-
-impl Default for Training {
-    fn default() -> Self {
-        Self {
-            mentor: None,
-            apprentice: None,
-        }
-    }
 }
 
 // ---------------------------------------------------------------------------
