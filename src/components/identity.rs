@@ -5,31 +5,29 @@ use bevy_ecs::prelude::*;
 // ---------------------------------------------------------------------------
 
 /// The cat's name.
-#[derive(Component, Debug, Clone, PartialEq, Eq)]
+#[derive(Component, Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Name(pub String);
 
 // ---------------------------------------------------------------------------
 // Species
 // ---------------------------------------------------------------------------
 
-/// What kind of creature this entity is.
+/// Marker: this entity is a cat.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Species {
-    Cat,
-}
+pub struct Species;
 
 // ---------------------------------------------------------------------------
 // Age
 // ---------------------------------------------------------------------------
 
 /// Birth tick. Convert to a life stage using [`Age::stage`].
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Age {
     pub born_tick: u64,
 }
 
 /// Broad life stage derived from age.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum LifeStage {
     Kitten,
     Young,
@@ -62,7 +60,7 @@ impl Age {
 // Gender
 // ---------------------------------------------------------------------------
 
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Gender {
     Tom,
     Queen,
@@ -99,7 +97,7 @@ impl Gender {
 // Orientation
 // ---------------------------------------------------------------------------
 
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Orientation {
     Straight,
     Gay,
@@ -111,7 +109,7 @@ pub enum Orientation {
 // Appearance
 // ---------------------------------------------------------------------------
 
-#[derive(Component, Debug, Clone, PartialEq)]
+#[derive(Component, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Appearance {
     pub fur_color: String,
     pub pattern: String,

@@ -1,0 +1,113 @@
+[
+    // --- Generic forage ---
+    (
+        text: "{name} gathers a pawful of seeds.",
+        tier: Action,
+        action: Some(Forage),
+    ),
+    (
+        text: "{name} digs up edible roots.",
+        tier: Action,
+        action: Some(Forage),
+    ),
+    (
+        text: "{name} noses through the underbrush for food.",
+        tier: Action,
+        action: Some(Forage),
+    ),
+    (
+        text: "{name} turns over a rotting log, looking for grubs.",
+        tier: Action,
+        action: Some(Forage),
+    ),
+    (
+        text: "{name} pulls berries from a low bush.",
+        tier: Action,
+        action: Some(Forage),
+    ),
+    (
+        text: "{name} sniffs out a patch of wild garlic.",
+        tier: Action,
+        action: Some(Forage),
+    ),
+
+    // --- Personality-conditioned ---
+    (
+        text: "{name} methodically works through the undergrowth.",
+        tier: Action,
+        action: Some(Forage),
+        personality: [(axis: Diligence, bucket: High)],
+    ),
+    (
+        text: "{name} half-heartedly pokes at some weeds.",
+        tier: Action,
+        action: Some(Forage),
+        personality: [(axis: Diligence, bucket: Low)],
+    ),
+
+    // --- Season-conditioned ---
+    (
+        text: "{name} finds late-season berries.",
+        tier: Action,
+        action: Some(Forage),
+        season: Some(Autumn),
+    ),
+    (
+        text: "{name} picks through slim winter pickings.",
+        tier: Action,
+        action: Some(Forage),
+        season: Some(Winter),
+    ),
+    (
+        text: "{name} gathers fresh spring shoots.",
+        tier: Action,
+        action: Some(Forage),
+        season: Some(Spring),
+    ),
+    (
+        text: "{name} sifts through the downed autumn leaves for a bite",
+        tier: Action,
+        action: Some(Forage),
+        personality: [(axis: Diligence, bucket: High)],
+        season: Some(Autumn),
+    ),
+    (
+        text: "{name} collects herbs along the stream bank.",
+        tier: Action,
+        action: Some(Forage),
+        season: Some(Spring),
+        terrain: Some(Water),
+    ),
+    (
+        text: "{name} scrapes aside leaf litter to find edible roots.",
+        tier: Action,
+        action: Some(Forage),
+        season: Some(Autumn),
+    ),
+    (
+        text: "{name} digs through frost-hardened ground for anything edible.",
+        tier: Action,
+        action: Some(Forage),
+        season: Some(Winter),
+    ),
+
+    // --- Terrain-conditioned ---
+    (
+        text: "{name} finds mushrooms beneath the canopy.",
+        tier: Action,
+        action: Some(Forage),
+        terrain: Some(DenseForest),
+    ),
+    (
+        text: "{name} picks through the open meadow for seeds.",
+        tier: Action,
+        action: Some(Forage),
+        terrain: Some(Grass),
+    ),
+    (
+        text: "{name} strips bark from a fallen log, looking for grubs.",
+        tier: Action,
+        action: Some(Forage),
+        terrain: Some(LightForest),
+    ),
+]

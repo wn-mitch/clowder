@@ -1,0 +1,46 @@
+[
+    AspirationChain(
+        name: "Den Shaper",
+        domain: Building,
+        milestones: [
+            Milestone(
+                name: "First Wall",
+                condition: ActionCount(action: "Build", count: 3),
+                narrative_on_complete: "{name} sets the first stone and steps back to look.",
+            ),
+            Milestone(
+                name: "Steady Builder",
+                condition: ActionCount(action: "Build", count: 15),
+                narrative_on_complete: "{name}'s constructions stand through rain and wind.",
+            ),
+            Milestone(
+                name: "Den Shaper",
+                condition: SkillLevel(skill: "building", level: 1.0),
+                narrative_on_complete: "{name} shapes wood and stone like clay.",
+            ),
+        ],
+        completion_narrative: "{name} is the Den Shaper. The colony stands stronger because {subject} built it.",
+    ),
+    AspirationChain(
+        name: "The Architect",
+        domain: Building,
+        milestones: [
+            Milestone(
+                name: "Blueprint Mind",
+                condition: ActionCount(action: "Build", count: 5),
+                narrative_on_complete: "{name} sees the finished structure before the first beam is laid.",
+            ),
+            Milestone(
+                name: "Master Carpenter",
+                condition: ActionCount(action: "Build", count: 25),
+                narrative_on_complete: "Others bring {name} their plans. {Subject} makes them possible.",
+            ),
+            Milestone(
+                name: "The Architect",
+                condition: SkillLevel(skill: "building", level: 2.0),
+                narrative_on_complete: "{name}'s mark is on every wall that matters.",
+            ),
+        ],
+        completion_narrative: "{name} is The Architect. The colony is {possessive} monument.",
+    ),
+]

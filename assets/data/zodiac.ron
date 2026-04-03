@@ -1,0 +1,52 @@
+ZodiacData(
+    signs: {
+        LeapingFlame: SignData(
+            compatible: [StormFur, TallPine],
+            rival: [SilverPool, LongShadow],
+            domain_affinities: [Hunting, Combat],
+            lore: "Born under fire-sky. Fire runs in their paws.",
+        ),
+        SilverPool: SignData(
+            compatible: [WarmDen, LongShadow],
+            rival: [LeapingFlame, LoneThorn],
+            domain_affinities: [Herbcraft, Social],
+            lore: "Born under still water. They hear what the wind says.",
+        ),
+        StormFur: SignData(
+            compatible: [LeapingFlame, LoneThorn],
+            rival: [SwiftRiver, WarmDen],
+            domain_affinities: [Combat, Leadership],
+            lore: "Born under crackling stars. Watchers on the wall.",
+        ),
+        WarmDen: SignData(
+            compatible: [SilverPool, LongShadow],
+            rival: [LoneThorn, TallPine],
+            domain_affinities: [Social, Herbcraft],
+            lore: "Born under the gentle knot. They tend the fire, tend the family.",
+        ),
+        LoneThorn: SignData(
+            compatible: [StormFur, SwiftRiver],
+            rival: [WarmDen, SilverPool],
+            domain_affinities: [Combat, Hunting],
+            lore: "Born under a single bright star. They walk alone, and that's enough.",
+        ),
+        SwiftRiver: SignData(
+            compatible: [LoneThorn, TallPine],
+            rival: [StormFur, LongShadow],
+            domain_affinities: [Exploration, Hunting],
+            lore: "Born under the flowing streak. Never the same den twice.",
+        ),
+        TallPine: SignData(
+            compatible: [LeapingFlame, SwiftRiver],
+            rival: [WarmDen, LongShadow],
+            domain_affinities: [Leadership, Building],
+            lore: "Born under rising stars. Born looking up.",
+        ),
+        LongShadow: SignData(
+            compatible: [SilverPool, WarmDen],
+            rival: [TallPine, SwiftRiver],
+            domain_affinities: [Social, Building],
+            lore: "Born under dim watching stars. Slow warmth that outlasts storms.",
+        ),
+    }
+)

@@ -1,0 +1,58 @@
+[
+    // --- Generic farm ---
+    (
+        text: "{name} tends the garden rows.",
+        tier: Action,
+        action: Some(Farm),
+    ),
+    (
+        text: "{name} turns the soil with patient paws.",
+        tier: Action,
+        action: Some(Farm),
+    ),
+    (
+        text: "{name} coaxes a seedling out of the earth.",
+        tier: Action,
+        action: Some(Farm),
+    ),
+    (
+        text: "{name} gathers ripe herbs from the garden.",
+        tier: Action,
+        action: Some(Farm),
+    ),
+
+    // --- Personality-conditioned ---
+    (
+        text: "{name} weeds each row with obsessive care.",
+        tier: Action,
+        weight: 1.2,
+        action: Some(Farm),
+        personality: [(axis: Diligence, bucket: High)],
+    ),
+    (
+        text: "{name} sits among the plants, soaking in the quiet.",
+        tier: Action,
+        weight: 1.1,
+        action: Some(Farm),
+        personality: [(axis: Patience, bucket: High)],
+    ),
+    (
+        text: "{name} brushes frost from the seedlings at first light.",
+        tier: Action,
+        action: Some(Farm),
+        season: Some(Winter),
+        day_phase: Some(Dawn),
+    ),
+    (
+        text: "{name} checks the rain-soaked garden, pleased.",
+        tier: Action,
+        action: Some(Farm),
+        weather: Some(LightRain),
+    ),
+    (
+        text: "{name} hums while planting seeds in neat furrows.",
+        tier: Action,
+        action: Some(Farm),
+        mood: Some(Happy),
+    ),
+]

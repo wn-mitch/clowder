@@ -1,0 +1,51 @@
+[
+    AspirationChain(
+        name: "Mapmaker",
+        domain: Exploration,
+        milestones: [
+            Milestone(
+                name: "First Steps",
+                condition: ActionCount(action: "Explore", count: 3),
+                narrative_on_complete: "{name} wanders past the tree line and comes back different.",
+            ),
+            Milestone(
+                name: "Trail Finder",
+                condition: ActionCount(action: "Explore", count: 12),
+                narrative_on_complete: "{name} finds paths where others see only brambles.",
+            ),
+            Milestone(
+                name: "Cartographer",
+                condition: ActionCount(action: "Explore", count: 25),
+                narrative_on_complete: "{name} knows the land by scent, by shadow, by the angle of light.",
+            ),
+            Milestone(
+                name: "Mapmaker",
+                condition: ActionCount(action: "Explore", count: 40),
+                narrative_on_complete: "The colony's borders grow wherever {name} treads.",
+            ),
+        ],
+        completion_narrative: "{name} is the Mapmaker. The world is larger because {subject} walked it.",
+    ),
+    AspirationChain(
+        name: "Beyond the Border",
+        domain: Exploration,
+        milestones: [
+            Milestone(
+                name: "Restless Paws",
+                condition: ActionCount(action: "Wander", count: 10),
+                narrative_on_complete: "{name} always looks toward the horizon when others look toward the den.",
+            ),
+            Milestone(
+                name: "Far Walker",
+                condition: ActionCount(action: "Explore", count: 15),
+                narrative_on_complete: "{name} has been places none of them have names for.",
+            ),
+            Milestone(
+                name: "Beyond the Border",
+                condition: ActionCount(action: "Explore", count: 35),
+                narrative_on_complete: "{name} returns from beyond the border with stories no one quite believes.",
+            ),
+        ],
+        completion_narrative: "{name} has gone Beyond the Border. The unknown is just another path to {object}.",
+    ),
+]

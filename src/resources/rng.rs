@@ -6,7 +6,7 @@ use rand_chacha::rand_core::SeedableRng;
 ///
 /// All random decisions during a simulation run should draw from this single
 /// resource so that results are fully reproducible given the same seed.
-#[derive(Resource)]
+#[derive(Resource, serde::Serialize, serde::Deserialize)]
 pub struct SimRng {
     pub rng: ChaCha8Rng,
 }

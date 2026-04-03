@@ -5,7 +5,7 @@ use bevy_ecs::prelude::Resource;
 // ---------------------------------------------------------------------------
 
 /// The terrain type of a map tile.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Terrain {
     // Natural
     Grass,
@@ -21,6 +21,11 @@ pub enum Terrain {
     Stores,
     Workshop,
     Garden,
+    // Defensive
+    Watchtower,
+    WardPost,
+    Wall,
+    Gate,
     // Special
     FairyRing,
     StandingStone,
@@ -32,14 +37,15 @@ impl Terrain {
     /// Movement cost in abstract ticks. `u32::MAX` means impassable.
     pub fn movement_cost(self) -> u32 {
         match self {
-            Self::Grass | Self::Sand | Self::Den | Self::Hearth | Self::Stores | Self::Workshop => {
-                1
-            }
+            Self::Grass | Self::Sand | Self::Den | Self::Hearth | Self::Stores | Self::Workshop
+            | Self::Watchtower | Self::WardPost | Self::Gate => 1,
             Self::LightForest | Self::Mud | Self::Garden => 2,
+            Self::Wall => u32::MAX,
             Self::DenseForest => 3,
             Self::Rock => 4,
             Self::Water => u32::MAX,
             Self::FairyRing | Self::StandingStone | Self::DeepPool | Self::AncientRuin => 2,
+            // Wall handled above (u32::MAX)
         }
     }
 
@@ -58,6 +64,10 @@ impl Terrain {
             Self::Stores => 'S',
             Self::Workshop => 'W',
             Self::Garden => 'G',
+            Self::Watchtower => '^',
+            Self::WardPost => '+',
+            Self::Wall => '=',
+            Self::Gate => '|',
             Self::FairyRing => '*',
             Self::StandingStone => '!',
             Self::DeepPool => 'O',
@@ -72,6 +82,7 @@ impl Terrain {
             Self::DenseForest => 0.6,
             Self::LightForest => 0.3,
             Self::Hearth | Self::Stores | Self::Workshop => 0.8,
+            Self::Watchtower => 0.3,
             Self::AncientRuin => 0.5,
             _ => 0.0,
         }
@@ -92,6 +103,14 @@ impl Terrain {
     pub fn is_passable(self) -> bool {
         self.movement_cost() != u32::MAX
     }
+
+    /// Whether wildlife can move onto this terrain.
+    ///
+    /// Walls and gates block wildlife (gate entity state is checked separately
+    /// for open gates, but the terrain-level check blocks by default).
+    pub fn is_wildlife_passable(self) -> bool {
+        !matches!(self, Self::Wall | Self::Gate) && self.is_passable()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -99,6 +118,7 @@ impl Terrain {
 // ---------------------------------------------------------------------------
 
 /// A single cell in the world map.
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Tile {
     pub terrain: Terrain,
     /// Accumulated magical corruption in this cell (0.0 = none, 1.0 = fully corrupted).
@@ -115,6 +135,14 @@ impl Tile {
             mystery: 0.0,
         }
     }
+
+    pub fn new_with(terrain: Terrain, corruption: f32, mystery: f32) -> Self {
+        Self {
+            terrain,
+            corruption,
+            mystery,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -122,7 +150,7 @@ impl Tile {
 // ---------------------------------------------------------------------------
 
 /// The world map. Stored as a flat `Vec<Tile>` in row-major order.
-#[derive(Resource)]
+#[derive(Resource, serde::Serialize, serde::Deserialize)]
 pub struct TileMap {
     pub width: i32,
     pub height: i32,
@@ -135,6 +163,20 @@ impl TileMap {
         assert!(width > 0 && height > 0, "map dimensions must be positive");
         let capacity = (width * height) as usize;
         let tiles = (0..capacity).map(|_| Tile::new(default_terrain)).collect();
+        Self {
+            width,
+            height,
+            tiles,
+        }
+    }
+
+    /// Construct from a pre-built tile vec (used by save/load).
+    pub fn from_raw(width: i32, height: i32, tiles: Vec<Tile>) -> Self {
+        assert_eq!(
+            tiles.len(),
+            (width * height) as usize,
+            "tile count must match dimensions"
+        );
         Self {
             width,
             height,

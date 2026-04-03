@@ -1,0 +1,42 @@
+[
+    // Significant-tier fate events (assignment, awakening, death reactions) are
+    // handled by dedicated systems in fate.rs and death.rs. They fire exactly
+    // once per milestone. Do NOT add them here — the template pool runs on every
+    // action tick, which would cause massive duplication.
+
+    (
+        text: "{name} presses close to {other}, and the stars hum.",
+        tier: Action,
+        action: Some(Socialize),
+    ),
+    (
+        text: "{name} and {other} lock eyes. Neither looks away first.",
+        tier: Action,
+        action: Some(Patrol),
+    ),
+    (
+        text: "{name} catches {other}'s scent on the wind and turns toward it without thinking.",
+        tier: Action,
+        action: Some(Wander),
+    ),
+    (
+        text: "{name} grooms {other} with careful, deliberate strokes. The stars watch.",
+        tier: Action,
+        action: Some(Groom),
+    ),
+    (
+        text: "{name} hunts harder when {other} is watching.",
+        tier: Action,
+        action: Some(Hunt),
+    ),
+    (
+        text: "{name} and {other} patrol the same stretch of border, silent, shoulder to shoulder.",
+        tier: Action,
+        action: Some(Patrol),
+    ),
+    (
+        text: "In {name}'s dreams, {other} is always there -- rival or companion, it hardly matters.",
+        tier: Action,
+        action: Some(Sleep),
+    ),
+]

@@ -2,6 +2,8 @@
 
 Terminal-based colony simulation. Cats in a Redwall/Mausritter-inspired fantasy world.
 
+**Creative inspirations:** Redwall, Mausritter, Dwarf Fortress, Rimworld, Warriors (book series).
+
 ## Tech Stack
 
 - **Language:** Rust (2021 edition)
@@ -28,6 +30,9 @@ Key architectural decisions:
   relationships, and context. No behavior trees, no LLMs.
 - Maslow hierarchy needs: 5 levels (physiological → self-actualization). Lower levels
   suppress higher levels when critical.
+- Emergent complexity: when a system can tie into the narrative layer through
+  unexpected interaction, it should. Chain reactions between independent systems are
+  the joy of the simulation — design for them, not against them.
 
 ## Commands
 
@@ -47,9 +52,15 @@ Key architectural decisions:
 
 ## Code Style
 
-- Components are plain structs with `#[derive(Component)]`
+- Components are plain structs or enums with `#[derive(Component)]`
 - Resources use `#[derive(Resource)]`
 - Systems are standalone functions, registered via `app.add_systems()`
 - Group related components in `src/components/`, resources in `src/resources/`, systems in `src/systems/`
 - Prefer `Query<>` with explicit component access over broad world access
 - Keep systems focused — one responsibility per system function
+
+## Bevy ECS Guidelines
+
+- **`run_if` over early returns**: if a condition can be expressed as a `run_if` guard on the system, prefer that over an early return inside the system body. Systems gated by `run_if` skip query iteration entirely.
+- **Never `.clone()` resource data in a per-tick system.** Borrow via `as_slice()`, reference, or `Res<T>`/`ResMut<T>`. String clones for storage (e.g. copying a name into a log entry) are fine.
+- **Events are verbs**: if/when Bevy events are introduced, name them as imperative or past-tense verbs (`SpawnCat`, `CatDied`), not noun-suffix (`DeathEvent`). Define in a central module. No circular event flows.

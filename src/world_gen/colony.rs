@@ -1,8 +1,11 @@
+use bevy_ecs::prelude::World;
 use rand::Rng;
 use rand::seq::SliceRandom;
 
-use crate::components::{Appearance, Gender, Orientation, Personality, Position, Skills};
-use crate::resources::map::TileMap;
+use crate::components::building::Structure;
+use crate::components::identity::Name;
+use crate::components::{Appearance, Gender, Orientation, Personality, Position, Skills, ZodiacSign};
+use crate::resources::map::{Terrain, TileMap};
 
 /// A description of a cat to be spawned at game start.
 ///
@@ -16,7 +19,13 @@ pub struct CatBlueprint {
     pub appearance: Appearance,
     pub skills: Skills,
     pub magic_affinity: f32,
+    pub zodiac_sign: ZodiacSign,
     pub position: Position,
+    /// Tick when this cat was born. Lower values = older cats.
+    /// A `born_tick` of 0 at tick 0 means the cat is a newborn; negative
+    /// offsets (stored as large u64) are not used — instead the cat's age is
+    /// expressed as `current_tick - born_tick`.
+    pub born_tick: u64,
 }
 
 // ---------------------------------------------------------------------------
@@ -103,11 +112,19 @@ const PATTERNS: [&str; 9] = [
     "solid", "tabby", "spotted", "tuxedo", "bicolor", "van", "point", "mackerel", "ticked",
 ];
 
-/// Generate `count` starting cats with randomised attributes.
+/// Generate `count` starting cats with randomised attributes and varied ages.
+///
+/// `start_tick` is the simulation tick at which these cats are spawned.
+/// Ages are distributed so that most cats are Young/Adult with ~1 Elder.
 ///
 /// Names are unique (drawn without replacement from the pool).
 /// `count` must not exceed 30.
-pub fn generate_starting_cats(count: usize, rng: &mut impl Rng) -> Vec<CatBlueprint> {
+pub fn generate_starting_cats(
+    count: usize,
+    start_tick: u64,
+    ticks_per_season: u64,
+    rng: &mut impl Rng,
+) -> Vec<CatBlueprint> {
     assert!(count <= NAME_POOL.len(), "count exceeds name pool size");
 
     let mut names: Vec<&str> = NAME_POOL.to_vec();
@@ -116,17 +133,41 @@ pub fn generate_starting_cats(count: usize, rng: &mut impl Rng) -> Vec<CatBluepr
     names
         .into_iter()
         .take(count)
-        .map(|name| generate_cat(name.to_string(), rng))
+        .map(|name| {
+            let age_seasons = roll_age_seasons(rng);
+            let age_ticks = age_seasons * ticks_per_season;
+            let born_tick = start_tick.saturating_sub(age_ticks);
+            generate_cat(name.to_string(), born_tick, ticks_per_season, rng)
+        })
         .collect()
 }
 
-fn generate_cat(name: String, rng: &mut impl Rng) -> CatBlueprint {
+/// Roll an age in seasons with a bell curve weighted toward younger cats.
+///
+/// Distribution: ~60% Young (4-11), ~30% Adult (12-30), ~10% Elder (48-55).
+fn roll_age_seasons(rng: &mut impl Rng) -> u64 {
+    let roll: f32 = rng.random();
+    if roll < 0.10 {
+        // Elder: 48-55 seasons
+        rng.random_range(48..=55)
+    } else if roll < 0.40 {
+        // Adult: 12-30 seasons
+        rng.random_range(12..=30)
+    } else {
+        // Young: 4-11 seasons
+        rng.random_range(4..=11)
+    }
+}
+
+fn generate_cat(name: String, born_tick: u64, ticks_per_season: u64, rng: &mut impl Rng) -> CatBlueprint {
     let gender = roll_gender(rng);
     let orientation = roll_orientation(rng);
     let personality = Personality::random(rng);
     let magic_affinity = roll_magic_affinity(rng);
     let skills = roll_skills(&personality, magic_affinity, rng);
     let appearance = roll_appearance(rng);
+    let birth_season = born_tick / ticks_per_season;
+    let zodiac_sign = ZodiacSign::from_season(birth_season, rng);
 
     CatBlueprint {
         name,
@@ -136,7 +177,9 @@ fn generate_cat(name: String, rng: &mut impl Rng) -> CatBlueprint {
         appearance,
         skills,
         magic_affinity,
+        zodiac_sign,
         position: Position::new(0, 0),
+        born_tick,
     }
 }
 
@@ -211,13 +254,72 @@ fn roll_appearance(rng: &mut impl Rng) -> Appearance {
 }
 
 // ---------------------------------------------------------------------------
+// Starting buildings
+// ---------------------------------------------------------------------------
+
+/// Stamp a building's full footprint onto the terrain map.
+fn stamp_footprint(map: &mut TileMap, anchor: Position, terrain: Terrain, size: (i32, i32)) {
+    for dy in 0..size.1 {
+        for dx in 0..size.0 {
+            let x = anchor.x + dx;
+            let y = anchor.y + dy;
+            if map.in_bounds(x, y) {
+                map.set(x, y, terrain);
+            }
+        }
+    }
+}
+
+/// Place starting building terrain tiles and spawn corresponding entities.
+///
+/// Creates a Hearth at the colony center, a Den three tiles west, and Stores
+/// three tiles east. Each gets both a terrain footprint (for rendering) and an
+/// ECS entity with `Structure` + `Position` + `Name` (for mechanical effects).
+/// The anchor position is the top-left corner of the footprint.
+pub fn spawn_starting_buildings(world: &mut World, colony_site: Position, map: &mut TileMap) {
+    use crate::components::building::StructureType;
+
+    let hearth_pos = colony_site;
+    let den_size = StructureType::Den.default_size();
+    let hearth_size = StructureType::Hearth.default_size();
+    let stores_size = StructureType::Stores.default_size();
+    // Space buildings so there's a 1-tile walkable gap between footprints.
+    let den_pos = Position::new((colony_site.x - den_size.0 - 1).max(0), colony_site.y);
+    let stores_pos = Position::new(
+        (colony_site.x + hearth_size.0 + 1).min(map.width - stores_size.0),
+        colony_site.y,
+    );
+
+    // Stamp full footprints for rendering.
+    stamp_footprint(map, hearth_pos, Terrain::Hearth, hearth_size);
+    stamp_footprint(map, den_pos, Terrain::Den, den_size);
+    stamp_footprint(map, stores_pos, Terrain::Stores, stores_size);
+
+    // Spawn building entities for mechanical effects.
+    world.spawn((
+        Name("The Hearth".to_string()),
+        hearth_pos,
+        Structure::new(StructureType::Hearth),
+    ));
+    world.spawn((
+        Name("The Den".to_string()),
+        den_pos,
+        Structure::new(StructureType::Den),
+    ));
+    world.spawn((
+        Name("The Stores".to_string()),
+        stores_pos,
+        Structure::new(StructureType::Stores),
+    ));
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::resources::map::Terrain;
     use rand_chacha::ChaCha8Rng;
     use rand_chacha::rand_core::SeedableRng;
 
@@ -249,15 +351,18 @@ mod tests {
         assert_eq!(pos, Position::new(5, 5));
     }
 
+    const START_TICK: u64 = 100_000;
+    const TICKS_PER_SEASON: u64 = 2000;
+
     #[test]
     fn generate_starting_cats_correct_count() {
-        let cats = generate_starting_cats(8, &mut rng(42));
+        let cats = generate_starting_cats(8, START_TICK, TICKS_PER_SEASON, &mut rng(42));
         assert_eq!(cats.len(), 8);
     }
 
     #[test]
     fn generated_cats_have_unique_names() {
-        let cats = generate_starting_cats(10, &mut rng(7));
+        let cats = generate_starting_cats(10, START_TICK, TICKS_PER_SEASON, &mut rng(7));
         let mut names: Vec<&str> = cats.iter().map(|c| c.name.as_str()).collect();
         names.sort_unstable();
         names.dedup();
@@ -268,12 +373,86 @@ mod tests {
     fn magic_affinity_in_range() {
         let mut r = rng(99);
         for _ in 0..50 {
-            let cats = generate_starting_cats(5, &mut r);
+            let cats = generate_starting_cats(5, START_TICK, TICKS_PER_SEASON, &mut r);
             for cat in &cats {
                 assert!(
                     (0.0..=1.0).contains(&cat.magic_affinity),
                     "magic_affinity {} out of range",
                     cat.magic_affinity
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn varied_starting_ages() {
+        let cats = generate_starting_cats(8, START_TICK, TICKS_PER_SEASON, &mut rng(42));
+        // All born_ticks should be <= start_tick (born in the past).
+        for cat in &cats {
+            assert!(
+                cat.born_tick <= START_TICK,
+                "born_tick {} should not exceed start_tick {}",
+                cat.born_tick,
+                START_TICK
+            );
+        }
+        // At least two different born_ticks (ages should vary).
+        let unique_ticks: std::collections::HashSet<u64> =
+            cats.iter().map(|c| c.born_tick).collect();
+        assert!(
+            unique_ticks.len() > 1,
+            "expected varied ages but all cats have the same born_tick"
+        );
+    }
+
+    #[test]
+    fn starting_buildings_fill_footprint() {
+        use crate::components::building::StructureType;
+        let mut map = grass_map(100, 100);
+        let mut world = bevy_ecs::world::World::new();
+        let center = Position::new(50, 50);
+        spawn_starting_buildings(&mut world, center, &mut map);
+
+        // Hearth at center, 2×2.
+        let hearth_size = StructureType::Hearth.default_size();
+        for dy in 0..hearth_size.1 {
+            for dx in 0..hearth_size.0 {
+                assert_eq!(
+                    map.get(center.x + dx, center.y + dy).terrain,
+                    Terrain::Hearth,
+                    "Hearth tile at ({}, {}) not set",
+                    center.x + dx,
+                    center.y + dy,
+                );
+            }
+        }
+
+        // Den west of hearth, 2×2.
+        let den_pos = Position::new(center.x - 2 - 1, center.y);
+        let den_size = StructureType::Den.default_size();
+        for dy in 0..den_size.1 {
+            for dx in 0..den_size.0 {
+                assert_eq!(
+                    map.get(den_pos.x + dx, den_pos.y + dy).terrain,
+                    Terrain::Den,
+                    "Den tile at ({}, {}) not set",
+                    den_pos.x + dx,
+                    den_pos.y + dy,
+                );
+            }
+        }
+
+        // Stores east of hearth, 2×2.
+        let stores_pos = Position::new(center.x + hearth_size.0 + 1, center.y);
+        let stores_size = StructureType::Stores.default_size();
+        for dy in 0..stores_size.1 {
+            for dx in 0..stores_size.0 {
+                assert_eq!(
+                    map.get(stores_pos.x + dx, stores_pos.y + dy).terrain,
+                    Terrain::Stores,
+                    "Stores tile at ({}, {}) not set",
+                    stores_pos.x + dx,
+                    stores_pos.y + dy,
                 );
             }
         }

@@ -1,0 +1,67 @@
+[
+    // --- Generic coordination ---
+    (
+        text: "{name} approaches {other} with purpose.",
+        tier: Action,
+        action: Some(Coordinate),
+    ),
+    (
+        text: "{name} nudges {other} toward a task.",
+        tier: Action,
+        action: Some(Coordinate),
+    ),
+    (
+        text: "{name} assigns {other} a duty with a firm look.",
+        tier: Action,
+        action: Some(Coordinate),
+    ),
+    (
+        text: "{name} confers with {other} in low tones.",
+        tier: Action,
+        action: Some(Coordinate),
+    ),
+
+    // --- Personality-conditioned ---
+    (
+        text: "{name} commands {other} with quiet authority.",
+        tier: Action,
+        action: Some(Coordinate),
+        personality: [(axis: Boldness, bucket: High)],
+    ),
+    (
+        text: "{name} gently asks {other} for help with a colony need.",
+        tier: Action,
+        action: Some(Coordinate),
+        personality: [(axis: Warmth, bucket: High)],
+    ),
+    (
+        text: "{name} methodically explains what needs doing to {other}.",
+        tier: Action,
+        action: Some(Coordinate),
+        personality: [(axis: Diligence, bucket: High)],
+    ),
+    (
+        text: "{name} catches {other}'s eye and tilts {possessive} head toward the task.",
+        tier: Action,
+        action: Some(Coordinate),
+        personality: [(axis: Sociability, bucket: High)],
+    ),
+    (
+        text: "{name} rallies {other} with infectious energy.",
+        tier: Action,
+        action: Some(Coordinate),
+        mood: Some(Happy),
+    ),
+    (
+        text: "{name} barks an order at {other}. There's no time to waste.",
+        tier: Action,
+        action: Some(Coordinate),
+        personality: [(axis: Patience, bucket: Low)],
+    ),
+    (
+        text: "{name} walks {other} through the plan, step by step.",
+        tier: Action,
+        action: Some(Coordinate),
+        personality: [(axis: Patience, bucket: High)],
+    ),
+]

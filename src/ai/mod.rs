@@ -9,13 +9,27 @@ use crate::components::physical::Position;
 // Action
 // ---------------------------------------------------------------------------
 
-/// The discrete actions available to a cat in Phase 1.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// The discrete actions available to a cat.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Action {
     Eat,
     Sleep,
+    Hunt,
+    Forage,
     Wander,
     Idle,
+    Socialize,
+    Groom,
+    Explore,
+    Flee,
+    Fight,
+    Patrol,
+    Build,
+    Farm,
+    Herbcraft,
+    PracticeMagic,
+    Coordinate,
+    Mentor,
 }
 
 // ---------------------------------------------------------------------------
@@ -23,13 +37,19 @@ pub enum Action {
 // ---------------------------------------------------------------------------
 
 /// Tracks what a cat is currently doing and how long it will continue.
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CurrentAction {
     pub action: Action,
     /// How many simulation ticks remain for this action.
     pub ticks_remaining: u64,
     /// Optional spatial target (e.g. food source, sleeping spot).
     pub target_position: Option<Position>,
+    /// Optional entity target (e.g. cat to socialize/groom with).
+    #[serde(skip)]
+    pub target_entity: Option<Entity>,
+    /// Top-3 action scores from the last decision (post-bonus, post-suppression).
+    #[serde(skip)]
+    pub last_scores: Vec<(Action, f32)>,
 }
 
 impl Default for CurrentAction {
@@ -38,6 +58,8 @@ impl Default for CurrentAction {
             action: Action::Idle,
             ticks_remaining: 0,
             target_position: None,
+            target_entity: None,
+            last_scores: Vec::new(),
         }
     }
 }

@@ -8,7 +8,7 @@ use crate::resources::time::Season;
 // ---------------------------------------------------------------------------
 
 /// Current weather condition in the simulation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Weather {
     Clear,
     Overcast,
@@ -84,7 +84,7 @@ impl Weather {
 // ---------------------------------------------------------------------------
 
 /// ECS resource tracking current weather and when it will next change.
-#[derive(Resource)]
+#[derive(Resource, serde::Serialize, serde::Deserialize)]
 pub struct WeatherState {
     pub current: Weather,
     /// Ticks remaining before a weather transition is evaluated.

@@ -1,0 +1,82 @@
+[
+    // --- Generic (from original hardcoded set) ---
+    (
+        text: "{name} sits quietly.",
+        tier: Micro,
+        action: Some(Idle),
+    ),
+    (
+        text: "{name} grooms a paw.",
+        tier: Micro,
+        action: Some(Idle),
+    ),
+    (
+        text: "{name} watches the sky.",
+        tier: Micro,
+        action: Some(Idle),
+    ),
+
+    // --- Need-conditional (from original hardcoded set) ---
+    (
+        text: "{name}'s stomach growls.",
+        tier: Micro,
+        weight: 1.5,
+        action: Some(Idle),
+        needs: [(axis: Hunger, level: Critical)],
+    ),
+    (
+        text: "{name} yawns widely.",
+        tier: Micro,
+        weight: 1.5,
+        action: Some(Idle),
+        needs: [(axis: Energy, level: Low)],
+    ),
+
+    // --- Conditioned examples ---
+    (
+        text: "{name}'s ears swivel toward every sound.",
+        tier: Micro,
+        action: Some(Idle),
+        personality: [(axis: Anxiety, bucket: High)],
+    ),
+    (
+        text: "{name} kneads the grass, eyes half-closed.",
+        tier: Micro,
+        action: Some(Idle),
+        mood: Some(Happy),
+    ),
+    (
+        text: "{name} bats at a falling leaf.",
+        tier: Micro,
+        action: Some(Idle),
+        personality: [(axis: Playfulness, bucket: High)],
+        season: Some(Autumn),
+    ),
+    (
+        text: "{name} stares into the distance.",
+        tier: Micro,
+        action: Some(Idle),
+        mood: Some(Low),
+    ),
+    (
+        text: "{name} tucks {possessive} paws beneath {object}self.",
+        tier: Micro,
+        action: Some(Idle),
+        weather: Some(Snow),
+    ),
+
+    // --- Solitude ---
+    (
+        text: "{name} stares at nothing, ears flat.",
+        tier: Micro,
+        action: Some(Idle),
+        needs: [(axis: Social, level: Critical)],
+    ),
+    (
+        text: "{name} sits where the others used to gather.",
+        tier: Micro,
+        action: Some(Idle),
+        mood: Some(Miserable),
+        needs: [(axis: Social, level: Critical)],
+    ),
+]

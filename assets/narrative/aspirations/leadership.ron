@@ -1,0 +1,46 @@
+[
+    AspirationChain(
+        name: "Voice of the Colony",
+        domain: Leadership,
+        milestones: [
+            Milestone(
+                name: "First Direction",
+                condition: ActionCount(action: "Coordinate", count: 3),
+                narrative_on_complete: "{name} speaks and another cat listens. Something shifts.",
+            ),
+            Milestone(
+                name: "Trusted Voice",
+                condition: ActionCount(action: "Coordinate", count: 15),
+                narrative_on_complete: "When {name} calls, the colony moves.",
+            ),
+            Milestone(
+                name: "Voice of the Colony",
+                condition: ActionCount(action: "Coordinate", count: 30),
+                narrative_on_complete: "{name}'s word carries the weight of experience and trust.",
+            ),
+        ],
+        completion_narrative: "{name} is the Voice of the Colony. When {subject} speaks, the colony listens.",
+    ),
+    AspirationChain(
+        name: "The Unifier",
+        domain: Leadership,
+        milestones: [
+            Milestone(
+                name: "Bridge Builder",
+                condition: ActionCount(action: "Socialize", count: 10),
+                narrative_on_complete: "{name} connects cats who would never have spoken otherwise.",
+            ),
+            Milestone(
+                name: "Arbiter",
+                condition: ActionCount(action: "Coordinate", count: 10),
+                narrative_on_complete: "{name} settles disputes with a look. Fair, always fair.",
+            ),
+            Milestone(
+                name: "The Unifier",
+                condition: Mentor(count: 5),
+                narrative_on_complete: "Under {name}'s guidance, the colony pulls in one direction.",
+            ),
+        ],
+        completion_narrative: "{name} is The Unifier. The colony is one because {subject} made it so.",
+    ),
+]

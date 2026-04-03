@@ -1,0 +1,46 @@
+[
+    // --- Generic build ---
+    (
+        text: "{name} hammers a beam into place.",
+        tier: Action,
+        action: Some(Build),
+    ),
+    (
+        text: "{name} hauls stones to the construction site.",
+        tier: Action,
+        action: Some(Build),
+    ),
+    (
+        text: "{name} patches a crack in the wall with careful paws.",
+        tier: Action,
+        action: Some(Build),
+    ),
+    (
+        text: "{name} packs mud between the timbers.",
+        tier: Action,
+        action: Some(Build),
+    ),
+
+    // --- Personality-conditioned ---
+    (
+        text: "{name} works with quiet precision, every joint fitted tight.",
+        tier: Action,
+        weight: 1.2,
+        action: Some(Build),
+        personality: [(axis: Diligence, bucket: High)],
+    ),
+    (
+        text: "{name} slaps mortar haphazardly and wanders off.",
+        tier: Action,
+        weight: 1.1,
+        action: Some(Build),
+        personality: [(axis: Diligence, bucket: Low)],
+    ),
+    (
+        text: "{name} hums while stacking stones, pausing to admire the work.",
+        tier: Action,
+        weight: 1.1,
+        action: Some(Build),
+        personality: [(axis: Patience, bucket: High)],
+    ),
+]

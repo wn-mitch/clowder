@@ -1,0 +1,51 @@
+[
+    AspirationChain(
+        name: "Master of the Hunt",
+        domain: Hunting,
+        milestones: [
+            Milestone(
+                name: "First Blood",
+                condition: ActionCount(action: "Hunt", count: 1),
+                narrative_on_complete: "{name} catches {possessive} first prey. A hunter is born.",
+            ),
+            Milestone(
+                name: "Keen Eye",
+                condition: ActionCount(action: "Hunt", count: 10),
+                narrative_on_complete: "{name} reads the undergrowth like a story now.",
+            ),
+            Milestone(
+                name: "Shadow Stalker",
+                condition: ActionCount(action: "Hunt", count: 25),
+                narrative_on_complete: "Prey doesn't hear {name} coming anymore.",
+            ),
+            Milestone(
+                name: "Master of the Hunt",
+                condition: ActionCount(action: "Hunt", count: 50),
+                narrative_on_complete: "They will tell stories of {name}'s hunts long after {subject} is gone.",
+            ),
+        ],
+        completion_narrative: "{name} has walked the full path of the hunt. The Leaping Flame blazes bright.",
+    ),
+    AspirationChain(
+        name: "Provider of the Colony",
+        domain: Hunting,
+        milestones: [
+            Milestone(
+                name: "Shared Catch",
+                condition: ActionCount(action: "Hunt", count: 5),
+                narrative_on_complete: "{name} drops a mouse at the colony stores without a word.",
+            ),
+            Milestone(
+                name: "Reliable Paws",
+                condition: ActionCount(action: "Hunt", count: 20),
+                narrative_on_complete: "When bellies rumble, eyes turn to {name}.",
+            ),
+            Milestone(
+                name: "Provider",
+                condition: ActionCount(action: "Hunt", count: 40),
+                narrative_on_complete: "The colony has never gone hungry while {name} hunts.",
+            ),
+        ],
+        completion_narrative: "{name} is the Provider -- the one who feeds the many.",
+    ),
+]

@@ -1,0 +1,51 @@
+[
+    AspirationChain(
+        name: "Heart of the Colony",
+        domain: Social,
+        milestones: [
+            Milestone(
+                name: "First Friend",
+                condition: FormBond(bond_type: "Friends"),
+                narrative_on_complete: "{name} has found a friend. The world feels a little less large.",
+            ),
+            Milestone(
+                name: "Trusted Ear",
+                condition: ActionCount(action: "Socialize", count: 15),
+                narrative_on_complete: "Cats seek {name} out when the days are hard.",
+            ),
+            Milestone(
+                name: "Peacekeeper",
+                condition: ActionCount(action: "Socialize", count: 30),
+                narrative_on_complete: "When voices rise, {name}'s calm settles them.",
+            ),
+            Milestone(
+                name: "Heart of the Colony",
+                condition: ActionCount(action: "Socialize", count: 50),
+                narrative_on_complete: "The colony breathes easier when {name} is near.",
+            ),
+        ],
+        completion_narrative: "{name} has become the Heart of the Colony. Everyone knows {possessive} warmth.",
+    ),
+    AspirationChain(
+        name: "The Beloved",
+        domain: Social,
+        milestones: [
+            Milestone(
+                name: "Gentle Touch",
+                condition: ActionCount(action: "Groom", count: 10),
+                narrative_on_complete: "{name} grooms with the gentleness of a parent.",
+            ),
+            Milestone(
+                name: "Steady Presence",
+                condition: ActionCount(action: "Groom", count: 25),
+                narrative_on_complete: "The kits gravitate to {name} without being called.",
+            ),
+            Milestone(
+                name: "The Beloved",
+                condition: FormBond(bond_type: "Partners"),
+                narrative_on_complete: "When {name} enters a room, worry leaves it.",
+            ),
+        ],
+        completion_narrative: "{name} is The Beloved. The colony would be a colder place without {object}.",
+    ),
+]

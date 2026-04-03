@@ -1,0 +1,65 @@
+[
+    // --- Generic ---
+    (
+        text: "{name} shows {other} the basics with steady paws.",
+        tier: Action,
+        action: Some(Mentor),
+    ),
+    (
+        text: "{name} and {other} work side by side, one teaching, one learning.",
+        tier: Action,
+        action: Some(Mentor),
+    ),
+    (
+        text: "{name} corrects {other}'s stance with a gentle nudge.",
+        tier: Action,
+        action: Some(Mentor),
+    ),
+
+    // --- Personality-conditioned ---
+    (
+        text: "{name} pushes {other} hard — {subject} won't settle for less.",
+        tier: Action,
+        action: Some(Mentor),
+        personality: [(axis: Diligence, bucket: High)],
+    ),
+    (
+        text: "{name} guides {other} with patient paws and quiet encouragement.",
+        tier: Action,
+        action: Some(Mentor),
+        personality: [(axis: Warmth, bucket: High)],
+    ),
+    (
+        text: "{name} watches {other} struggle, waits, then shows the way.",
+        tier: Action,
+        action: Some(Mentor),
+        personality: [(axis: Patience, bucket: High)],
+    ),
+    (
+        text: "{name} demonstrates with a flourish, tail held high.",
+        tier: Action,
+        action: Some(Mentor),
+        personality: [(axis: Pride, bucket: High)],
+    ),
+
+    // --- Life stage ---
+    (
+        text: "{name} passes old knowledge to {other} by the firelight.",
+        tier: Action,
+        action: Some(Mentor),
+        life_stage: Some(Elder),
+    ),
+    (
+        text: "Young {other} watches {name}'s every move with wide eyes.",
+        tier: Action,
+        action: Some(Mentor),
+    ),
+
+    // --- Mood ---
+    (
+        text: "{name} teaches {other} with a lightness that makes the lesson stick.",
+        tier: Action,
+        action: Some(Mentor),
+        mood: Some(Happy),
+    ),
+]

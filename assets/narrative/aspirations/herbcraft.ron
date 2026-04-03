@@ -1,0 +1,46 @@
+[
+    AspirationChain(
+        name: "Whiskerweaver's Apprentice",
+        domain: Herbcraft,
+        milestones: [
+            Milestone(
+                name: "First Gathering",
+                condition: ActionCount(action: "Herbcraft", count: 3),
+                narrative_on_complete: "{name} learns which leaves heal and which sting.",
+            ),
+            Milestone(
+                name: "Steady Paws",
+                condition: ActionCount(action: "Herbcraft", count: 15),
+                narrative_on_complete: "{name}'s paws no longer tremble over the mortar.",
+            ),
+            Milestone(
+                name: "Whiskerweaver",
+                condition: SkillLevel(skill: "herbcraft", level: 1.0),
+                narrative_on_complete: "{name} weaves remedies from root and petal like breathing.",
+            ),
+        ],
+        completion_narrative: "{name} has earned the title Whiskerweaver. The colony's hurts mend faster for it.",
+    ),
+    AspirationChain(
+        name: "Healer's Calling",
+        domain: Herbcraft,
+        milestones: [
+            Milestone(
+                name: "First Remedy",
+                condition: ActionCount(action: "Herbcraft", count: 5),
+                narrative_on_complete: "{name} presses moss to a wound and feels purpose settle in.",
+            ),
+            Milestone(
+                name: "Night Vigil",
+                condition: ActionCount(action: "Herbcraft", count: 25),
+                narrative_on_complete: "{name} stays through the fever-watches when others sleep.",
+            ),
+            Milestone(
+                name: "Healer",
+                condition: SkillLevel(skill: "herbcraft", level: 1.5),
+                narrative_on_complete: "They bring the sick to {name} now, and {subject} sends them back whole.",
+            ),
+        ],
+        completion_narrative: "{name} has answered the Healer's Calling. {Subject} is the colony's remedy against the dark.",
+    ),
+]

@@ -1,0 +1,77 @@
+[
+    (
+        text: "{name} sets off toward the distant ridge.",
+        tier: Action,
+        action: Some(Explore),
+    ),
+    (
+        text: "{name} investigates a moss-covered stone.",
+        tier: Action,
+        action: Some(Explore),
+    ),
+    (
+        text: "{name} wanders far from the colony, curious.",
+        tier: Action,
+        action: Some(Explore),
+    ),
+    (
+        text: "{name} follows a faint trail into unfamiliar ground.",
+        tier: Action,
+        action: Some(Explore),
+    ),
+    (
+        text: "{name} scouts the edge of the territory, ears pricked.",
+        tier: Action,
+        action: Some(Explore),
+    ),
+    (
+        text: "{name} can't resist poking {possessive} nose into an old burrow.",
+        tier: Action,
+        action: Some(Explore),
+        personality: [(axis: Curiosity, bucket: High)],
+    ),
+    (
+        text: "{name} pauses atop a rise to survey the land below.",
+        tier: Action,
+        action: Some(Explore),
+    ),
+    (
+        text: "{name} discovers a patch of wildflowers no cat has seen before.",
+        tier: Action,
+        action: Some(Explore),
+        season: Some(Spring),
+    ),
+    (
+        text: "{name} pushes through the undergrowth, undeterred.",
+        tier: Action,
+        action: Some(Explore),
+        personality: [(axis: Boldness, bucket: High)],
+    ),
+    (
+        text: "{name} charts the boundary markers, memorising every scent.",
+        tier: Action,
+        action: Some(Explore),
+        personality: [(axis: Diligence, bucket: High)],
+    ),
+    (
+        text: "{name} shivers but presses on through the mist.",
+        tier: Action,
+        action: Some(Explore),
+        weather: Some(Fog),
+    ),
+
+    // --- Solitude ---
+    (
+        text: "{name} wanders far, with no one to return to.",
+        tier: Action,
+        action: Some(Explore),
+        needs: [(axis: Social, level: Critical)],
+    ),
+    (
+        text: "{name} investigates an old den, long since abandoned.",
+        tier: Action,
+        action: Some(Explore),
+        mood: Some(Low),
+        needs: [(axis: Social, level: Critical)],
+    ),
+]

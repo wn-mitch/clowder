@@ -1,0 +1,71 @@
+[
+    (
+        text: "{name} patrols the colony perimeter.",
+        tier: Action,
+        action: Some(Patrol),
+    ),
+    (
+        text: "{name} keeps watch along the edge of camp.",
+        tier: Action,
+        action: Some(Patrol),
+    ),
+    (
+        text: "{name} scans the tree line for movement.",
+        tier: Action,
+        action: Some(Patrol),
+    ),
+    (
+        text: "{name} circles the camp with practiced steps.",
+        tier: Action,
+        action: Some(Patrol),
+    ),
+    (
+        text: "{name} checks the territory markers, nose twitching.",
+        tier: Action,
+        action: Some(Patrol),
+    ),
+    (
+        text: "{name} pads along the treeline, alert.",
+        tier: Action,
+        action: Some(Patrol),
+    ),
+    (
+        text: "{name} stalks the perimeter, eyes sharp.",
+        tier: Action,
+        action: Some(Patrol),
+        personality: [(axis: Boldness, bucket: High)],
+    ),
+    (
+        text: "{name} nervously checks every shadow on {possessive} patrol.",
+        tier: Action,
+        action: Some(Patrol),
+        personality: [(axis: Anxiety, bucket: High)],
+    ),
+    (
+        text: "{name} patrols through the dawn mist.",
+        tier: Action,
+        action: Some(Patrol),
+        day_phase: Some(Dawn),
+    ),
+    (
+        text: "{name} walks the night watch, ears swiveling.",
+        tier: Action,
+        action: Some(Patrol),
+        day_phase: Some(Night),
+    ),
+
+    // --- Solitude ---
+    (
+        text: "{name} walks the perimeter, though there is no one left to guard.",
+        tier: Action,
+        action: Some(Patrol),
+        mood: Some(Low),
+        needs: [(axis: Social, level: Critical)],
+    ),
+    (
+        text: "{name} patrols out of habit, not purpose.",
+        tier: Action,
+        action: Some(Patrol),
+        mood: Some(Miserable),
+    ),
+]

@@ -1,0 +1,4 @@
+- resource tracking
+- need tab to cat in inspect view
+- animals don't show in inspect view
+- need a map key

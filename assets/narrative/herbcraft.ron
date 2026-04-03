@@ -1,0 +1,57 @@
+[
+    (
+        text: "{name} carefully harvests herbs from the undergrowth.",
+        tier: Action,
+        action: Some(Herbcraft),
+    ),
+    (
+        text: "{name} gathers a bundle of healing moss near the stream.",
+        tier: Action,
+        action: Some(Herbcraft),
+    ),
+    (
+        text: "{name} grinds herbs into a poultice with practiced paws.",
+        tier: Action,
+        action: Some(Herbcraft),
+    ),
+    (
+        text: "{name} weaves a thornward at the colony's edge.",
+        tier: Action,
+        action: Some(Herbcraft),
+    ),
+    (
+        text: "{name} plucks moonpetals by the light of dusk.",
+        tier: Action,
+        action: Some(Herbcraft),
+        conditions: [DayPhase(Dusk)],
+    ),
+    (
+        text: "{name} hums softly while preparing a tonic.",
+        tier: Action,
+        action: Some(Herbcraft),
+        personality: [(axis: Spirituality, bucket: High)],
+    ),
+    (
+        text: "{name} sorts dried herbs by scent, nose twitching.",
+        tier: Action,
+        action: Some(Herbcraft),
+        personality: [(axis: Diligence, bucket: High)],
+    ),
+    (
+        text: "{name} bandages a wound with practiced efficiency.",
+        tier: Action,
+        action: Some(Herbcraft),
+    ),
+    (
+        text: "{name} sniffs a bright mushroom, then wisely sets it aside.",
+        tier: Action,
+        action: Some(Herbcraft),
+        season: Some(Autumn),
+    ),
+    (
+        text: "{name} brews a remedy from the last of the winter stores.",
+        tier: Action,
+        action: Some(Herbcraft),
+        season: Some(Winter),
+    ),
+]

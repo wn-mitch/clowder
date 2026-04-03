@@ -1,0 +1,252 @@
+[
+    // --- Generic hunt ---
+    (
+        text: "{name} catches a vole in one clean strike.",
+        tier: Action,
+        action: Some(Hunt),
+    ),
+    (
+        text: "{name} drags back a field mouse.",
+        tier: Action,
+        action: Some(Hunt),
+    ),
+    (
+        text: "{name} snags a sparrow from the brush.",
+        tier: Action,
+        action: Some(Hunt),
+        day_phase: Some(Day),
+    ),
+    (
+        text: "{name} stalks through the undergrowth but comes back empty-pawed.",
+        tier: Action,
+        action: Some(Hunt),
+    ),
+    (
+        text: "{name} returns with a catch between {possessive} teeth.",
+        tier: Action,
+        action: Some(Hunt),
+    ),
+    (
+        text: "{name} crouches low, then strikes.",
+        tier: Action,
+        action: Some(Hunt),
+    ),
+    (
+        text: "{name} follows a scent trail into the brush.",
+        tier: Action,
+        action: Some(Hunt),
+    ),
+    (
+        text: "{name} lies in wait beside a game trail.",
+        tier: Action,
+        action: Some(Hunt),
+    ),
+    (
+        text: "{name} circles back empty-pawed after a long stalk.",
+        tier: Action,
+        action: Some(Hunt),
+    ),
+    (
+        text: "{name} brings down prey with a quick snap.",
+        tier: Action,
+        action: Some(Hunt),
+    ),
+    (
+        text: "{name} hunts along the creek bank.",
+        tier: Action,
+        action: Some(Hunt),
+        terrain: Some(Water),
+    ),
+    (
+        text: "{name} works the tall grass, ears forward.",
+        tier: Action,
+        action: Some(Hunt),
+    ),
+    (
+        text: "{name} comes back muddy but fed.",
+        tier: Action,
+        action: Some(Hunt),
+    ),
+    (
+        text: "{name} finds slim pickings today.",
+        tier: Action,
+        action: Some(Hunt),
+    ),
+
+    // --- Personality-conditioned ---
+    (
+        text: "{name} pounces without hesitation and comes back proud.",
+        tier: Action,
+        weight: 1.2,
+        action: Some(Hunt),
+        personality: [(axis: Boldness, bucket: High)],
+    ),
+    (
+        text: "{name} stalks patiently for a long, quiet minute before striking.",
+        tier: Action,
+        action: Some(Hunt),
+        personality: [(axis: Patience, bucket: High)],
+    ),
+    (
+        text: "{name} loses the trail in the tall grass.",
+        tier: Action,
+        action: Some(Hunt),
+        personality: [(axis: Boldness, bucket: Low)],
+    ),
+    (
+        text: "{name} chases an unusual scent into the brush.",
+        tier: Action,
+        action: Some(Hunt),
+        personality: [(axis: Curiosity, bucket: High)],
+    ),
+    (
+        text: "{name} charges after the first thing that moves.",
+        tier: Action,
+        action: Some(Hunt),
+        personality: [(axis: Patience, bucket: Low)],
+    ),
+    (
+        text: "{name} startles at a noise and loses the prey.",
+        tier: Action,
+        action: Some(Hunt),
+        personality: [(axis: Boldness, bucket: Low)],
+    ),
+    (
+        text: "{name} bats the catch around before bringing it back.",
+        tier: Action,
+        action: Some(Hunt),
+        personality: [(axis: Playfulness, bucket: High)],
+    ),
+
+    // --- Life stage ---
+    (
+        text: "Young {name} bounds after a mouse, all enthusiasm and no technique.",
+        tier: Action,
+        weight: 1.2,
+        action: Some(Hunt),
+        life_stage: Some(Young),
+    ),
+    (
+        text: "Young {name} brings back a mouse, beaming with pride.",
+        tier: Action,
+        action: Some(Hunt),
+        life_stage: Some(Young),
+    ),
+    (
+        text: "Young {name} fumbles the pounce but recovers with a second strike.",
+        tier: Action,
+        action: Some(Hunt),
+        life_stage: Some(Young),
+    ),
+
+    // --- Time/weather ---
+    (
+        text: "{name} hunts in the fading dusk light.",
+        tier: Action,
+        action: Some(Hunt),
+        day_phase: Some(Dusk),
+    ),
+    (
+        text: "{name} tracks prey through the rain-slick grass.",
+        tier: Action,
+        action: Some(Hunt),
+        weather: Some(LightRain),
+    ),
+    (
+        text: "{name} catches a mouse in the dark.",
+        tier: Action,
+        action: Some(Hunt),
+        day_phase: Some(Night),
+    ),
+    (
+        text: "{name} snaps up a moth mid-flight.",
+        tier: Action,
+        action: Some(Hunt),
+        day_phase: Some(Night),
+    ),
+    (
+        text: "{name} hunts in the early mist.",
+        tier: Action,
+        action: Some(Hunt),
+        day_phase: Some(Dawn),
+    ),
+    (
+        text: "{name} hunts by moonlight, pupils wide.",
+        tier: Action,
+        action: Some(Hunt),
+        day_phase: Some(Night),
+    ),
+    (
+        text: "{name} hunts in the open, bold and quick.",
+        tier: Action,
+        action: Some(Hunt),
+        day_phase: Some(Day),
+    ),
+    (
+        text: "{name} hunts under clear stars.",
+        tier: Action,
+        action: Some(Hunt),
+        day_phase: Some(Night),
+        weather: Some(Clear),
+    ),
+
+    // --- Season-conditioned ---
+    (
+        text: "{name} tracks prey through the frost.",
+        tier: Action,
+        action: Some(Hunt),
+        season: Some(Winter),
+    ),
+    (
+        text: "{name} hunts among the new growth.",
+        tier: Action,
+        action: Some(Hunt),
+        season: Some(Spring),
+    ),
+    (
+        text: "{name} hunts fat autumn mice.",
+        tier: Action,
+        action: Some(Hunt),
+        season: Some(Autumn),
+    ),
+
+    // --- Weather-conditioned ---
+    (
+        text: "{name} hunts doggedly through the rain.",
+        tier: Action,
+        action: Some(Hunt),
+        weather: Some(LightRain),
+    ),
+    (
+        text: "{name} stalks a shape in the fog.",
+        tier: Action,
+        action: Some(Hunt),
+        weather: Some(Fog),
+    ),
+    (
+        text: "{name} follows tracks in fresh snow.",
+        tier: Action,
+        action: Some(Hunt),
+        weather: Some(Snow),
+    ),
+
+    // --- Terrain-conditioned ---
+    (
+        text: "{name} stalks a mouse through the dense undergrowth.",
+        tier: Action,
+        action: Some(Hunt),
+        terrain: Some(DenseForest),
+    ),
+    (
+        text: "{name} crouches low in the tall grass, eyes fixed on something.",
+        tier: Action,
+        action: Some(Hunt),
+        terrain: Some(Grass),
+    ),
+    (
+        text: "{name} picks a careful path among the rocks, hunting lizards.",
+        tier: Action,
+        action: Some(Hunt),
+        terrain: Some(Rock),
+    ),
+]

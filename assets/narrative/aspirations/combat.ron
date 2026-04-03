@@ -1,0 +1,51 @@
+[
+    AspirationChain(
+        name: "Warrior's Path",
+        domain: Combat,
+        milestones: [
+            Milestone(
+                name: "Claws Out",
+                condition: ActionCount(action: "Fight", count: 1),
+                narrative_on_complete: "{name} bares {possessive} claws for the first time and means it.",
+            ),
+            Milestone(
+                name: "Scarred",
+                condition: ActionCount(action: "Fight", count: 10),
+                narrative_on_complete: "{name} wears {possessive} scars without shame.",
+            ),
+            Milestone(
+                name: "Battle-Tested",
+                condition: ActionCount(action: "Fight", count: 25),
+                narrative_on_complete: "The younger cats fall silent when {name} speaks of fighting.",
+            ),
+            Milestone(
+                name: "Warrior",
+                condition: ActionCount(action: "Fight", count: 50),
+                narrative_on_complete: "{name} has become the blade the colony reaches for in the dark.",
+            ),
+        ],
+        completion_narrative: "{name} has walked the Warrior's Path. Nothing enters the colony without {possessive} knowing.",
+    ),
+    AspirationChain(
+        name: "Shadow Fighter",
+        domain: Combat,
+        milestones: [
+            Milestone(
+                name: "First Watch",
+                condition: ActionCount(action: "Patrol", count: 5),
+                narrative_on_complete: "{name} volunteers for the night patrol. No one asks why.",
+            ),
+            Milestone(
+                name: "Eyes in the Dark",
+                condition: ActionCount(action: "Patrol", count: 20),
+                narrative_on_complete: "{name} hears the threats before they arrive.",
+            ),
+            Milestone(
+                name: "Shadow Fighter",
+                condition: SkillLevel(skill: "combat", level: 1.5),
+                narrative_on_complete: "{name} fights like {possessive} shadow has claws of its own.",
+            ),
+        ],
+        completion_narrative: "They call {name} the Shadow Fighter. The borders have never been safer.",
+    ),
+]

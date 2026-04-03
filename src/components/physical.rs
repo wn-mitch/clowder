@@ -5,7 +5,7 @@ use bevy_ecs::prelude::*;
 // ---------------------------------------------------------------------------
 
 /// World-space grid position.
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Position {
     pub x: i32,
     pub y: i32,
@@ -34,7 +34,7 @@ impl Position {
 // ---------------------------------------------------------------------------
 
 /// Severity of a wound.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum InjuryKind {
     Minor,
     Moderate,
@@ -42,7 +42,7 @@ pub enum InjuryKind {
 }
 
 /// A single wound record.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Injury {
     pub kind: InjuryKind,
     pub tick_received: u64,
@@ -50,7 +50,7 @@ pub struct Injury {
 }
 
 /// Health component. `current` and `max` are normalised to `[0.0, 1.0]`.
-#[derive(Component, Debug, Clone, PartialEq)]
+#[derive(Component, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Health {
     pub current: f32,
     pub max: f32,
@@ -65,6 +65,27 @@ impl Default for Health {
             injuries: Vec::new(),
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Dead
+// ---------------------------------------------------------------------------
+
+/// Cause of death for narrative purposes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum DeathCause {
+    Starvation,
+    OldAge,
+    Injury,
+}
+
+/// Marker component for dead entities. Dead cats remain in the world for a
+/// grace period (narrative, nearby reactions) before despawning.
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Dead {
+    /// Tick when death occurred.
+    pub tick: u64,
+    pub cause: DeathCause,
 }
 
 // ---------------------------------------------------------------------------
@@ -88,7 +109,7 @@ pub fn smoothstep(edge0: f32, edge1: f32, x: f32) -> f32 {
 /// means the need is fully satisfied and 0.0 means critically unmet.
 ///
 /// Default values reflect a moderately well-off cat at rest.
-#[derive(Component, Debug, Clone, PartialEq)]
+#[derive(Component, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Needs {
     // Level 1 — Physiological
     pub hunger: f32,
@@ -113,7 +134,7 @@ pub struct Needs {
 impl Default for Needs {
     fn default() -> Self {
         Self {
-            hunger: 0.8,
+            hunger: 1.0,
             energy: 0.8,
             warmth: 0.9,
             safety: 1.0,
@@ -135,7 +156,7 @@ impl Needs {
     ///
     /// Uses the *minimum* of the three needs so that one critical deficiency
     /// suppresses the whole level.
-    fn physiological_satisfaction(&self) -> f32 {
+    pub fn physiological_satisfaction(&self) -> f32 {
         let min = self.hunger.min(self.energy).min(self.warmth);
         smoothstep(0.15, 0.65, min)
     }
@@ -249,7 +270,7 @@ mod tests {
     #[test]
     fn default_needs_values() {
         let n = Needs::default();
-        assert_eq!(n.hunger, 0.8);
+        assert_eq!(n.hunger, 1.0);
         assert_eq!(n.energy, 0.8);
         assert_eq!(n.warmth, 0.9);
         assert_eq!(n.safety, 1.0);

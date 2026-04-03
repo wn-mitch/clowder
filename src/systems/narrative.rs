@@ -2,11 +2,18 @@ use bevy_ecs::prelude::*;
 use rand::Rng;
 
 use crate::ai::{Action, CurrentAction};
-use crate::components::identity::Name;
-use crate::components::physical::Needs;
+use crate::components::identity::{Age, Appearance, Gender, Name};
+use crate::components::mental::Mood;
+use crate::components::personality::Personality;
+use crate::components::physical::{Dead, Needs, Position};
+use crate::resources::map::TileMap;
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
+use crate::resources::narrative_templates::{
+    MoodBucket, TemplateContext, TemplateRegistry, VariableContext, resolve_variables,
+};
 use crate::resources::rng::SimRng;
-use crate::resources::time::TimeState;
+use crate::resources::time::{DayPhase, Season, SimConfig, TimeState};
+use crate::resources::weather::WeatherState;
 
 // ---------------------------------------------------------------------------
 // generate_narrative system
@@ -15,24 +22,111 @@ use crate::resources::time::TimeState;
 /// Emit a narrative line for each cat that is on the last tick of its current
 /// action (`ticks_remaining == 1`).
 ///
-/// Narrating at tick 1 (rather than 0) means each action produces exactly one
-/// entry as it completes, avoiding per-tick spam.
+/// When a [`TemplateRegistry`] resource is present, uses the condition-matching
+/// template engine. Otherwise falls back to hardcoded strings.
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn generate_narrative(
-    query: Query<(&Name, &CurrentAction, &Needs)>,
+    query: Query<(
+        &Name,
+        &CurrentAction,
+        &Needs,
+        &Personality,
+        &Mood,
+        &Gender,
+        &Age,
+        &Appearance,
+        &Position,
+    ), Without<Dead>>,
+    names: Query<&Name>,
+    map: Res<TileMap>,
     time: Res<TimeState>,
+    config: Res<SimConfig>,
+    weather: Res<WeatherState>,
+    registry: Option<Res<TemplateRegistry>>,
     mut log: ResMut<NarrativeLog>,
     mut rng: ResMut<SimRng>,
 ) {
     let tick = time.tick;
+    let day_phase = DayPhase::from_tick(tick, &config);
+    let season = Season::from_tick(tick, &config);
 
-    for (name, current, needs) in &query {
+    for (name, current, needs, personality, mood, gender, age, appearance, pos) in &query {
         if current.ticks_remaining != 1 {
             continue;
         }
 
-        let cat = &name.0;
+        let has_target = current.target_entity.is_some();
 
+        // Rate-limit idle narration: only 1 in 5 completions.
+        if current.action == Action::Idle {
+            let roll: u32 = rng.rng.random_range(0..5);
+            if roll != 0 {
+                continue;
+            }
+        }
+
+        // Rate-limit routine narration.
         match current.action {
+            Action::Eat | Action::Sleep => {
+                let roll: u32 = rng.rng.random_range(0..3);
+                if roll != 0 {
+                    continue;
+                }
+            }
+            Action::Groom if !has_target => {
+                let roll: u32 = rng.rng.random_range(0..2);
+                if roll != 0 {
+                    continue;
+                }
+            }
+            _ => {}
+        }
+
+        let cat = &name.0;
+        let other_name: Option<String> = current
+            .target_entity
+            .and_then(|e| names.get(e).ok())
+            .map(|n| n.0.clone());
+
+        let terrain = if map.in_bounds(pos.x, pos.y) {
+            map.get(pos.x, pos.y).terrain
+        } else {
+            crate::resources::map::Terrain::Grass
+        };
+
+        // Try the template engine first.
+        if let Some(ref reg) = registry {
+            let ctx = TemplateContext {
+                action: current.action,
+                day_phase,
+                season,
+                weather: weather.current,
+                mood_bucket: MoodBucket::from_valence(mood.valence),
+                life_stage: age.stage(tick, config.ticks_per_season),
+                has_target,
+                terrain,
+            };
+
+            if let Some(template) = reg.select(&ctx, personality, needs, &mut rng.rng) {
+                let tier = template.tier;
+                let var_ctx = VariableContext {
+                    name: cat,
+                    gender: *gender,
+                    weather: weather.current,
+                    day_phase,
+                    season,
+                    life_stage: age.stage(tick, config.ticks_per_season),
+                    fur_color: &appearance.fur_color,
+                    other: other_name.as_deref(),
+                };
+                let text = resolve_variables(&template.text, &var_ctx);
+                log.push(tick, text, tier);
+                continue;
+            }
+        }
+
+        // Fallback: hardcoded templates (for backwards compatibility / empty registry).
+        let (text, tier) = match current.action {
             Action::Eat => {
                 let options = [
                     format!("{cat} eats from the stores."),
@@ -40,7 +134,7 @@ pub fn generate_narrative(
                     format!("{cat} chews thoughtfully."),
                 ];
                 let idx = rng.rng.random_range(0..options.len());
-                log.push(tick, options[idx].clone(), NarrativeTier::Action);
+                (options[idx].clone(), NarrativeTier::Action)
             }
 
             Action::Sleep => {
@@ -50,7 +144,27 @@ pub fn generate_narrative(
                     format!("{cat} dozes off."),
                 ];
                 let idx = rng.rng.random_range(0..options.len());
-                log.push(tick, options[idx].clone(), NarrativeTier::Action);
+                (options[idx].clone(), NarrativeTier::Action)
+            }
+
+            Action::Hunt => {
+                let options = [
+                    format!("{cat} catches a vole in one clean strike."),
+                    format!("{cat} drags back a field mouse."),
+                    format!("{cat} stalks through the undergrowth but comes back empty-pawed."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
+
+            Action::Forage => {
+                let options = [
+                    format!("{cat} gathers a pawful of seeds."),
+                    format!("{cat} finds late-season berries."),
+                    format!("{cat} digs up edible roots."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
             }
 
             Action::Wander => {
@@ -60,16 +174,40 @@ pub fn generate_narrative(
                     format!("{cat} stretches and strolls."),
                 ];
                 let idx = rng.rng.random_range(0..options.len());
-                log.push(tick, options[idx].clone(), NarrativeTier::Action);
+                (options[idx].clone(), NarrativeTier::Action)
+            }
+
+            Action::Socialize => {
+                let options = [
+                    format!("{cat} chats with a companion."),
+                    format!("{cat} shares a moment with a friend."),
+                    format!("{cat} sits close to another cat."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
+
+            Action::Groom => {
+                let options = [
+                    format!("{cat} grooms carefully."),
+                    format!("{cat} smooths down ruffled fur."),
+                    format!("{cat} licks a paw clean."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Micro)
+            }
+
+            Action::Explore => {
+                let options = [
+                    format!("{cat} ventures into unfamiliar ground."),
+                    format!("{cat} scouts the perimeter."),
+                    format!("{cat} discovers something interesting."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
             }
 
             Action::Idle => {
-                // Rate-limit: narrate only 1 in 5 idle completions.
-                let roll: u32 = rng.rng.random_range(0..5);
-                if roll != 0 {
-                    continue;
-                }
-
                 let text = if needs.hunger < 0.3 {
                     format!("{cat}'s stomach growls.")
                 } else if needs.energy < 0.3 {
@@ -83,10 +221,102 @@ pub fn generate_narrative(
                     let idx = rng.rng.random_range(0..options.len());
                     options[idx].clone()
                 };
-
-                log.push(tick, text, NarrativeTier::Micro);
+                (text, NarrativeTier::Micro)
             }
-        }
+
+            Action::Flee => {
+                let options = [
+                    format!("{cat} bolts toward the den, ears flat."),
+                    format!("{cat} retreats from the undergrowth."),
+                    format!("{cat} dashes to safety."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
+
+            Action::Fight => {
+                // Combat narrative is event-driven from the combat system.
+                // Action-completion narrative is minimal.
+                (format!("{cat} disengages from the fight."), NarrativeTier::Action)
+            }
+
+            Action::Patrol => {
+                let options = [
+                    format!("{cat} patrols the colony perimeter."),
+                    format!("{cat} keeps watch along the edge of camp."),
+                    format!("{cat} scans the tree line for movement."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
+
+            Action::Build => {
+                let options = [
+                    format!("{cat} hammers a beam into place."),
+                    format!("{cat} hauls stones to the construction site."),
+                    format!("{cat} patches a crack in the wall with careful paws."),
+                    format!("{cat} packs mud between the timbers."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
+
+            Action::Farm => {
+                let options = [
+                    format!("{cat} tends the garden rows."),
+                    format!("{cat} turns the soil with patient paws."),
+                    format!("{cat} coaxes a seedling out of the earth."),
+                    format!("{cat} gathers ripe herbs from the garden."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
+
+            Action::Herbcraft => {
+                let options = [
+                    format!("{cat} carefully harvests herbs from the undergrowth."),
+                    format!("{cat} grinds herbs into a poultice with practiced paws."),
+                    format!("{cat} weaves a thornward at the colony's edge."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
+
+            Action::PracticeMagic => {
+                let options = [
+                    format!("{cat}'s eyes go distant, seeing something far away..."),
+                    format!("{cat} presses paws against the earth, whispering old words."),
+                    format!("{cat} sits before the standing stone, lost in meditation."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Significant)
+            }
+
+            Action::Coordinate => {
+                let other = other_name.as_deref().unwrap_or("a companion");
+                let options = [
+                    format!("{cat} approaches {other} with purpose."),
+                    format!("{cat} nudges {other} toward a task."),
+                    format!("{cat} assigns {other} a duty with a firm look."),
+                    format!("{cat} confers with {other} in low tones."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
+
+            Action::Mentor => {
+                let other = other_name.as_deref().unwrap_or("a younger cat");
+                let options = [
+                    format!("{cat} teaches {other} a new trick."),
+                    format!("{cat} shows {other} the finer points of the craft."),
+                    format!("{cat} guides {other} with patient paws."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
+        };
+
+        log.push(tick, text, tier);
     }
 }
 
@@ -99,34 +329,95 @@ mod tests {
     use super::*;
     use bevy_ecs::schedule::Schedule;
 
+    use crate::components::identity::{Age, Appearance, Gender, Orientation, Species};
+    use crate::components::mental::{Memory, Mood};
+    use crate::components::personality::Personality;
+    use crate::components::physical::{DeathCause, Health};
+    use crate::components::skills::{Corruption, MagicAffinity, Skills, Training};
     use crate::resources::narrative::NarrativeLog;
     use crate::resources::rng::SimRng;
-    use crate::resources::time::TimeState;
+    use crate::resources::time::{SimConfig, TimeState};
+    use crate::resources::weather::WeatherState;
 
     fn setup_world() -> (World, Schedule) {
         let mut world = World::new();
         world.insert_resource(TimeState::default());
+        world.insert_resource(SimConfig::default());
+        world.insert_resource(WeatherState::default());
         world.insert_resource(NarrativeLog::default());
         world.insert_resource(SimRng::new(42));
+        world.insert_resource(TileMap::new(20, 20, crate::resources::map::Terrain::Grass));
+        // No TemplateRegistry — tests exercise the fallback path.
         let mut schedule = Schedule::default();
         schedule.add_systems(generate_narrative);
         (world, schedule)
+    }
+
+    fn test_personality() -> Personality {
+        use rand_chacha::ChaCha8Rng;
+        use rand_chacha::rand_core::SeedableRng;
+        Personality::random(&mut ChaCha8Rng::seed_from_u64(0))
+    }
+
+    fn test_appearance() -> Appearance {
+        Appearance {
+            fur_color: "tabby".to_string(),
+            pattern: "striped".to_string(),
+            eye_color: "green".to_string(),
+            distinguishing_marks: vec![],
+        }
+    }
+
+    /// Spawn a cat with the full component set needed by generate_narrative.
+    fn spawn_cat(world: &mut World, name: &str, action: Action, ticks_remaining: u64) -> Entity {
+        spawn_cat_with_needs(world, name, action, ticks_remaining, Needs::default())
+    }
+
+    fn spawn_cat_with_needs(
+        world: &mut World,
+        name: &str,
+        action: Action,
+        ticks_remaining: u64,
+        needs: Needs,
+    ) -> Entity {
+        world
+            .spawn((
+                (
+                    Name(name.to_string()),
+                    Species,
+                    Age { born_tick: 0 },
+                    Gender::Queen,
+                    Orientation::Bisexual,
+                    test_personality(),
+                    test_appearance(),
+                ),
+                (
+                    crate::components::physical::Position::new(5, 5),
+                    Health::default(),
+                    needs,
+                    Mood::default(),
+                    Memory::default(),
+                    Skills::default(),
+                    MagicAffinity(0.0),
+                    Corruption(0.0),
+                    Training::default(),
+                    CurrentAction {
+                        action,
+                        ticks_remaining,
+                        target_position: None,
+                        target_entity: None,
+                last_scores: Vec::new(),
+                    },
+                ),
+            ))
+            .id()
     }
 
     /// An action with ticks_remaining == 1 should produce a log entry.
     #[test]
     fn narrates_on_last_tick() {
         let (mut world, mut schedule) = setup_world();
-
-        world.spawn((
-            Name("Mochi".to_string()),
-            CurrentAction {
-                action: Action::Eat,
-                ticks_remaining: 1,
-                target_position: None,
-            },
-            Needs::default(),
-        ));
+        spawn_cat(&mut world, "Mochi", Action::Eat, 1);
 
         schedule.run(&mut world);
 
@@ -143,16 +434,7 @@ mod tests {
     #[test]
     fn does_not_narrate_mid_action() {
         let (mut world, mut schedule) = setup_world();
-
-        world.spawn((
-            Name("Pepper".to_string()),
-            CurrentAction {
-                action: Action::Sleep,
-                ticks_remaining: 10,
-                target_position: None,
-            },
-            Needs::default(),
-        ));
+        spawn_cat(&mut world, "Pepper", Action::Sleep, 10);
 
         schedule.run(&mut world);
 
@@ -163,19 +445,8 @@ mod tests {
     /// Idle narration uses Micro tier (not Action).
     #[test]
     fn idle_uses_micro_tier() {
-        // Run enough times so the 1-in-5 rate limit fires at least once.
-        // With seed 42 this converges quickly; 20 runs is safe.
         let (mut world, mut schedule) = setup_world();
-
-        world.spawn((
-            Name("Dusk".to_string()),
-            CurrentAction {
-                action: Action::Idle,
-                ticks_remaining: 1,
-                target_position: None,
-            },
-            Needs::default(),
-        ));
+        spawn_cat(&mut world, "Dusk", Action::Idle, 1);
 
         // Run 20 ticks to give rate-limit at least one chance to pass.
         for _ in 0..20 {
@@ -200,22 +471,11 @@ mod tests {
     fn hungry_idle_mentions_stomach() {
         let (mut world, mut schedule) = setup_world();
 
-        // Override SimRng so roll == 0 every time (force narration).
-        // Seed 0 with random_range(0..5) → check a few outcomes. Instead,
-        // we spawn multiple cats to increase the chance one fires.
         let mut needs = Needs::default();
         needs.hunger = 0.1; // below 0.3 threshold
 
         for _ in 0..10 {
-            world.spawn((
-                Name("Pip".to_string()),
-                CurrentAction {
-                    action: Action::Idle,
-                    ticks_remaining: 1,
-                    target_position: None,
-                },
-                needs.clone(),
-            ));
+            spawn_cat_with_needs(&mut world, "Pip", Action::Idle, 1, needs.clone());
         }
 
         schedule.run(&mut world);
@@ -227,10 +487,29 @@ mod tests {
             .filter(|e| e.text.contains("stomach"))
             .collect();
 
-        // With 10 cats and 1-in-5 rate, ~2 should fire → at least one stomach line.
         assert!(
             !stomach_entries.is_empty(),
             "at least one 'stomach growls' entry expected for hungry cats"
+        );
+    }
+
+    /// Dead cats should not produce narrative entries.
+    #[test]
+    fn dead_cat_does_not_narrate() {
+        let (mut world, mut schedule) = setup_world();
+        let entity = spawn_cat(&mut world, "Ghost", Action::Eat, 1);
+        world.entity_mut(entity).insert(Dead {
+            tick: 0,
+            cause: DeathCause::Starvation,
+        });
+
+        schedule.run(&mut world);
+
+        let log = world.resource::<NarrativeLog>();
+        assert!(
+            log.entries.is_empty(),
+            "dead cat should not produce narrative; got {:?}",
+            log.entries
         );
     }
 }

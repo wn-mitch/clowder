@@ -13,7 +13,7 @@ use rand::Rng;
 ///
 /// Generated with a 2-sample average which biases values toward 0.5 while
 /// still allowing the full range.
-#[derive(Component, Debug, Clone, PartialEq)]
+#[derive(Component, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Personality {
     // --- Core Drives (8) ---
     pub boldness: f32,

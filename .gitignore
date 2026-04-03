@@ -6,6 +6,9 @@
 # Bevy
 /assets/**/*.meta
 
+# Saves
+/saves
+
 # OS
 .DS_Store
 Thumbs.db

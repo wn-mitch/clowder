@@ -1,0 +1,65 @@
+[
+    // Self-groom templates (has_target: false)
+    (
+        text: "{name} licks a paw and settles in to groom.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+    ),
+    (
+        text: "{name} smooths down ruffled fur with quick strokes.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+    ),
+    (
+        text: "{name} cleans behind {possessive} ears.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+    ),
+    (
+        text: "{name} grooms {possessive} tail meticulously.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+    ),
+    (
+        text: "{name} nibbles a burr from {possessive} flank.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+    ),
+    (
+        text: "{name} gives {possessive} paws a thorough washing.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+    ),
+    // Groom-other templates (has_target: true)
+    (
+        text: "{name} grooms behind {other}'s ears.",
+        tier: Action,
+        action: Some(Groom),
+        has_target: Some(true),
+    ),
+    (
+        text: "{name} washes {other}'s face carefully.",
+        tier: Action,
+        action: Some(Groom),
+        has_target: Some(true),
+    ),
+    (
+        text: "{name} gently licks a spot on {other}'s shoulder.",
+        tier: Action,
+        action: Some(Groom),
+        has_target: Some(true),
+    ),
+    (
+        text: "{name} smooths down {other}'s fur with patient strokes.",
+        tier: Action,
+        action: Some(Groom),
+        has_target: Some(true),
+        personality: [(axis: Warmth, bucket: High)],
+    ),
+]

@@ -6,7 +6,7 @@ use bevy_ecs::prelude::*;
 
 /// Learned ability scores. All values are `f32` with no hard upper bound, but
 /// conventionally start small and grow through use.
-#[derive(Component, Debug, Clone, PartialEq)]
+#[derive(Component, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Skills {
     pub hunting: f32,
     pub foraging: f32,
@@ -49,12 +49,12 @@ impl Skills {
 
 /// Innate magical aptitude. Higher values mean the cat learns magic faster
 /// and casts more powerfully.
-#[derive(Component, Debug, Clone, Copy, PartialEq)]
+#[derive(Component, Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct MagicAffinity(pub f32);
 
 /// Accumulated magical corruption. Excessive magic use or exposure to dark
 /// sources raises this value.
-#[derive(Component, Debug, Clone, Copy, PartialEq)]
+#[derive(Component, Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Corruption(pub f32);
 
 // ---------------------------------------------------------------------------

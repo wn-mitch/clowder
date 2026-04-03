@@ -1,0 +1,100 @@
+[
+    // --- Generic (from original hardcoded set) ---
+    (
+        text: "{name} curls up and sleeps.",
+        tier: Action,
+        action: Some(Sleep),
+    ),
+    (
+        text: "{name} naps in a quiet corner.",
+        tier: Action,
+        action: Some(Sleep),
+    ),
+    (
+        text: "{name} dozes off.",
+        tier: Action,
+        action: Some(Sleep),
+    ),
+    (
+        text: "A low purr rumbles from {name} as {subject} drifts off.",
+        tier: Action,
+        action: Some(Sleep),
+    ),
+    (
+        text: "{name} stretches out full-length and sleeps.",
+        tier: Action,
+        action: Some(Sleep),
+    ),
+    (
+        text: "{name} tucks {possessive} nose under a paw and sleeps.",
+        tier: Action,
+        action: Some(Sleep),
+    ),
+    (
+        text: "{name} finds a sheltered spot and settles in.",
+        tier: Action,
+        action: Some(Sleep),
+    ),
+
+    // --- Conditioned examples ---
+    (
+        text: "{name} curls up under the stars.",
+        tier: Action,
+        action: Some(Sleep),
+        day_phase: Some(Night),
+        weather: Some(Clear),
+    ),
+    (
+        text: "{name} naps in a sunbeam.",
+        tier: Action,
+        action: Some(Sleep),
+        day_phase: Some(Day),
+        weather: Some(Clear),
+    ),
+    (
+        text: "{name} sleeps fitfully, ears twitching.",
+        tier: Action,
+        action: Some(Sleep),
+        personality: [(axis: Anxiety, bucket: High)],
+    ),
+    (
+        text: "The old {name} sighs and settles into sleep.",
+        tier: Action,
+        action: Some(Sleep),
+        life_stage: Some(Elder),
+    ),
+    (
+        text: "{name} collapses into an exhausted sleep.",
+        tier: Action,
+        weight: 1.3,
+        action: Some(Sleep),
+        needs: [(axis: Energy, level: Critical)],
+    ),
+    (
+        text: "{name} falls asleep where {subject} stand!",
+        tier: Action,
+        action: Some(Sleep),
+        needs: [(axis: Energy, level: Critical)],
+        day_phase: Some(Day),
+    ),
+    (
+        text: "{name} dozes gently off to sleep.",
+        tier: Action,
+        action: Some(Sleep),
+        season: Some(Summer),
+    ),
+
+    // --- Solitude ---
+    (
+        text: "{name} curls up tight, tail over nose, alone.",
+        tier: Action,
+        action: Some(Sleep),
+        needs: [(axis: Social, level: Critical)],
+    ),
+    (
+        text: "{name} whimpers softly in {possessive} sleep.",
+        tier: Action,
+        action: Some(Sleep),
+        mood: Some(Miserable),
+    ),
+]

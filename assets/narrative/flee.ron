@@ -1,0 +1,41 @@
+[
+    (
+        text: "{name} bolts toward the den, ears flat.",
+        tier: Action,
+        action: Some(Flee),
+    ),
+    (
+        text: "{name} retreats from the undergrowth.",
+        tier: Action,
+        action: Some(Flee),
+    ),
+    (
+        text: "{name} dashes to safety.",
+        tier: Action,
+        action: Some(Flee),
+    ),
+    (
+        text: "{name} scrambles away, heart pounding.",
+        tier: Action,
+        action: Some(Flee),
+        personality: [(axis: Anxiety, bucket: High)],
+    ),
+    (
+        text: "{name} falls back reluctantly, glancing over {possessive} shoulder.",
+        tier: Action,
+        action: Some(Flee),
+        personality: [(axis: Boldness, bucket: Mid)],
+    ),
+    (
+        text: "{name} flees through the rain, paws slipping.",
+        tier: Action,
+        action: Some(Flee),
+        weather: Some(LightRain),
+    ),
+    (
+        text: "{name} vanishes into the darkness.",
+        tier: Action,
+        action: Some(Flee),
+        day_phase: Some(Night),
+    ),
+]

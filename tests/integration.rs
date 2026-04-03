@@ -5,11 +5,13 @@ use clowder::ai::CurrentAction;
 use clowder::components::identity::{Age, Name, Species};
 use clowder::components::mental::{Memory, Mood};
 use clowder::components::physical::{Health, Needs, Position};
+use clowder::components::magic::Inventory;
 use clowder::components::skills::{Corruption, MagicAffinity, Training};
 use clowder::resources::{
-    NarrativeLog, SimConfig, SimRng, TimeState, TileMap, Terrain, WeatherState,
+    FoodStores, NarrativeLog, Relationships, SimConfig, SimRng, TemplateRegistry, TimeState,
+    TileMap, WeatherState,
 };
-use clowder::world_gen::colony::{find_colony_site, generate_starting_cats};
+use clowder::world_gen::colony::{find_colony_site, generate_starting_cats, spawn_starting_buildings};
 use clowder::world_gen::terrain::generate_terrain;
 
 // ---------------------------------------------------------------------------
@@ -27,22 +29,34 @@ fn setup_world(seed: u64) -> World {
 
     let colony_site = find_colony_site(&map, &mut sim_rng.rng);
 
-    map.set(colony_site.x, colony_site.y, Terrain::Hearth);
-    let den_x = (colony_site.x - 2).max(0);
-    map.set(den_x, colony_site.y, Terrain::Den);
-    let stores_x = (colony_site.x + 2).min(map.width - 1);
-    map.set(stores_x, colony_site.y, Terrain::Stores);
-
-    let cat_blueprints = generate_starting_cats(8, &mut sim_rng.rng);
+    let start_tick: u64 = 100_000;
+    let cat_blueprints = generate_starting_cats(
+        8,
+        start_tick,
+        config.ticks_per_season,
+        &mut sim_rng.rng,
+    );
 
     let mut world = World::new();
-    world.insert_resource(TimeState::default());
+    spawn_starting_buildings(&mut world, colony_site, &mut map);
+    world.insert_resource(TimeState {
+        tick: start_tick,
+        paused: false,
+        speed: clowder::resources::SimSpeed::Normal,
+    });
     world.insert_resource(config);
     world.insert_resource(WeatherState::default());
     world.insert_resource(NarrativeLog::default());
+    world.insert_resource(FoodStores::default());
     world.insert_resource(map);
     world.insert_resource(sim_rng);
 
+    let template_path = std::path::Path::new("assets/narrative");
+    if let Ok(registry) = TemplateRegistry::load_from_dir(template_path) {
+        world.insert_resource(registry);
+    }
+
+    let mut entity_ids: Vec<Entity> = Vec::with_capacity(8);
     for (i, cat) in cat_blueprints.into_iter().enumerate() {
         let offset_x = (i as i32 % 5) - 2;
         let offset_y = (i as i32 / 5) - 1;
@@ -55,11 +69,11 @@ fn setup_world(seed: u64) -> World {
             )
         };
 
-        world.spawn((
+        let entity = world.spawn((
             (
                 Name(cat.name),
-                Species::Cat,
-                Age { born_tick: 0 },
+                Species,
+                Age { born_tick: cat.born_tick },
                 cat.gender,
                 cat.orientation,
                 cat.personality,
@@ -71,13 +85,28 @@ fn setup_world(seed: u64) -> World {
                 Memory::default(),
             ),
             (
+                cat.zodiac_sign,
                 cat.skills,
                 MagicAffinity(cat.magic_affinity),
                 Corruption(0.0),
                 Training::default(),
                 CurrentAction::default(),
+                Inventory::default(),
             ),
-        ));
+        )).id();
+        entity_ids.push(entity);
+    }
+
+    // Initialize relationships between all pairs.
+    {
+        let mut relationships = Relationships::default();
+        let mut rng = world.resource_mut::<SimRng>();
+        for i in 0..entity_ids.len() {
+            for j in (i + 1)..entity_ids.len() {
+                relationships.init_pair(entity_ids[i], entity_ids[j], &mut rng.rng);
+            }
+        }
+        world.insert_resource(relationships);
     }
 
     world
@@ -92,6 +121,8 @@ fn build_schedule() -> Schedule {
             clowder::systems::needs::decay_needs,
             clowder::systems::ai::evaluate_actions,
             clowder::systems::actions::resolve_actions,
+            clowder::systems::social::passive_familiarity,
+            clowder::systems::social::check_bonds,
             clowder::systems::narrative::generate_narrative,
         )
             .chain(),

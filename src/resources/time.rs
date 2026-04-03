@@ -1,12 +1,25 @@
 use bevy_ecs::prelude::Resource;
 
+use crate::resources::weather::Weather;
+
+// ---------------------------------------------------------------------------
+// TransitionTracker
+// ---------------------------------------------------------------------------
+
+/// Tracks previous-tick state so systems can detect transitions and emit
+/// narratives. `None` values on the first tick prevent spurious emissions.
+#[derive(Resource, Default)]
+pub struct TransitionTracker {
+    pub last_weather: Option<Weather>,
+}
+
 // ---------------------------------------------------------------------------
 // SimConfig
 // ---------------------------------------------------------------------------
 
 /// Simulation configuration constants. Stored as a resource; inject this into
 /// any system that needs to convert raw ticks into human-readable time.
-#[derive(Resource, Debug, Clone, PartialEq)]
+#[derive(Resource, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SimConfig {
     /// Number of ticks per day phase (Dawn / Day / Dusk / Night).
     /// Default 25 → a full day is 100 ticks.
@@ -33,7 +46,7 @@ impl Default for SimConfig {
 // ---------------------------------------------------------------------------
 
 /// The four phases of the in-game day, cycling in order.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DayPhase {
     Dawn,
     Day,
@@ -71,7 +84,7 @@ impl DayPhase {
 // ---------------------------------------------------------------------------
 
 /// The four seasons, cycling in order.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Season {
     Spring,
     Summer,
@@ -93,6 +106,18 @@ impl Season {
         }
     }
 
+    /// Foraging yield multiplier for this season.
+    ///
+    /// Spring is abundant, summer baseline, autumn declining, winter barren.
+    pub fn foraging_multiplier(self) -> f32 {
+        match self {
+            Self::Spring => 1.2,
+            Self::Summer => 1.0,
+            Self::Autumn => 0.6,
+            Self::Winter => 0.15,
+        }
+    }
+
     /// Short human-readable label.
     pub fn label(&self) -> &'static str {
         match self {
@@ -109,7 +134,7 @@ impl Season {
 // ---------------------------------------------------------------------------
 
 /// How many simulation ticks to advance per game-loop update.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub enum SimSpeed {
     #[default]
     Normal,
@@ -118,12 +143,12 @@ pub enum SimSpeed {
 }
 
 impl SimSpeed {
-    /// Ticks to advance per update at this speed.
-    pub fn ticks_per_update(self) -> u64 {
+    /// Target tick rate: how many simulation ticks per real second.
+    pub fn ticks_per_second(self) -> f64 {
         match self {
-            Self::Normal => 1,
-            Self::Fast => 5,
-            Self::VeryFast => 20,
+            Self::Normal => 1.0,
+            Self::Fast => 5.0,
+            Self::VeryFast => 20.0,
         }
     }
 
@@ -152,7 +177,7 @@ impl SimSpeed {
 
 /// Global simulation clock. Advance `tick` each update; everything else is
 /// derived.
-#[derive(Resource, Debug, Clone, Default)]
+#[derive(Resource, Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct TimeState {
     pub tick: u64,
     pub paused: bool,
@@ -174,6 +199,17 @@ impl TimeState {
     pub fn day_number(tick: u64, config: &SimConfig) -> u64 {
         let ticks_per_day = config.ticks_per_day_phase * 4;
         tick / ticks_per_day + 1
+    }
+
+    /// Progress through the current day as a fraction in `[0.0, 1.0)`.
+    pub fn day_progress(tick: u64, config: &SimConfig) -> f32 {
+        let ticks_per_day = config.ticks_per_day_phase * 4;
+        (tick % ticks_per_day) as f32 / ticks_per_day as f32
+    }
+
+    /// 1-indexed week number. Week 1 starts on day 1.
+    pub fn week_number(tick: u64, config: &SimConfig) -> u64 {
+        (Self::day_number(tick, config) - 1) / 7 + 1
     }
 }
 
@@ -223,10 +259,10 @@ mod tests {
     }
 
     #[test]
-    fn sim_speed_ticks_per_update() {
-        assert_eq!(SimSpeed::Normal.ticks_per_update(), 1);
-        assert_eq!(SimSpeed::Fast.ticks_per_update(), 5);
-        assert_eq!(SimSpeed::VeryFast.ticks_per_update(), 20);
+    fn sim_speed_ticks_per_second() {
+        assert_eq!(SimSpeed::Normal.ticks_per_second(), 1.0);
+        assert_eq!(SimSpeed::Fast.ticks_per_second(), 5.0);
+        assert_eq!(SimSpeed::VeryFast.ticks_per_second(), 20.0);
     }
 
     #[test]
@@ -237,5 +273,24 @@ mod tests {
         assert_eq!(ts.day_phase(&config), DayPhase::Night);
         assert_eq!(ts.season(&config), Season::Spring);
         assert_eq!(TimeState::day_number(ts.tick, &config), 1);
+    }
+
+    #[test]
+    fn day_progress_within_day() {
+        let config = SimConfig::default(); // 25 ticks/phase, 100 ticks/day
+        assert!((TimeState::day_progress(0, &config) - 0.0).abs() < 1e-6);
+        assert!((TimeState::day_progress(50, &config) - 0.5).abs() < 1e-6);
+        assert!((TimeState::day_progress(99, &config) - 0.99).abs() < 1e-6);
+        // Wraps at day boundary
+        assert!((TimeState::day_progress(100, &config) - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn week_number_from_tick() {
+        let config = SimConfig::default(); // 100 ticks/day
+        assert_eq!(TimeState::week_number(0, &config), 1);     // Day 1 → Week 1
+        assert_eq!(TimeState::week_number(699, &config), 1);   // Day 7 → Week 1
+        assert_eq!(TimeState::week_number(700, &config), 2);   // Day 8 → Week 2
+        assert_eq!(TimeState::week_number(1399, &config), 2);  // Day 14 → Week 2
     }
 }

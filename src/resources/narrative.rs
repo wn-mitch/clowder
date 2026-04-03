@@ -11,7 +11,7 @@ use bevy_ecs::prelude::Resource;
 /// - `Micro`       — low-salience events (idle observations, ambient colour)
 /// - `Action`      — routine actions a cat completes (eating, sleeping, wandering)
 /// - `Significant` — story-worthy moments (first fight, death, major discovery)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum NarrativeTier {
     Micro,
     Action,
@@ -23,7 +23,7 @@ pub enum NarrativeTier {
 // ---------------------------------------------------------------------------
 
 /// A single timestamped narrative line.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct NarrativeEntry {
     /// Simulation tick at which this entry was generated.
     pub tick: u64,
@@ -39,11 +39,14 @@ pub struct NarrativeEntry {
 
 /// Ring-buffer of recent narrative entries. Oldest entries are dropped once
 /// `capacity` is exceeded.
-#[derive(Resource, Debug)]
+#[derive(Resource, Debug, serde::Serialize, serde::Deserialize)]
 pub struct NarrativeLog {
     pub entries: VecDeque<NarrativeEntry>,
     /// Maximum number of entries retained.
     pub capacity: usize,
+    /// Monotonic count of entries ever pushed (survives ring-buffer eviction).
+    #[serde(default)]
+    pub total_pushed: u64,
 }
 
 impl Default for NarrativeLog {
@@ -51,6 +54,7 @@ impl Default for NarrativeLog {
         Self {
             entries: VecDeque::new(),
             capacity: 200,
+            total_pushed: 0,
         }
     }
 }
@@ -59,6 +63,7 @@ impl NarrativeLog {
     /// Append a new entry. Drops the oldest entry if capacity is exceeded.
     pub fn push(&mut self, tick: u64, text: String, tier: NarrativeTier) {
         self.entries.push_back(NarrativeEntry { tick, text, tier });
+        self.total_pushed += 1;
         while self.entries.len() > self.capacity {
             self.entries.pop_front();
         }
@@ -102,5 +107,16 @@ mod tests {
         // Oldest two dropped; first remaining is entry 2
         assert_eq!(log.entries[0].tick, 2);
         assert_eq!(log.entries[2].tick, 4);
+    }
+
+    #[test]
+    fn total_pushed_tracks_cumulative_pushes() {
+        let mut log = NarrativeLog::default();
+        log.capacity = 3;
+        for i in 0..5u64 {
+            log.push(i, format!("entry {i}"), NarrativeTier::Micro);
+        }
+        assert_eq!(log.total_pushed, 5);
+        assert_eq!(log.entries.len(), 3);
     }
 }

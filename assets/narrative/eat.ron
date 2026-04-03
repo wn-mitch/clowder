@@ -1,0 +1,238 @@
+[
+    // --- Generic (from original hardcoded set) ---
+    (
+        text: "{name} eats from the stores.",
+        tier: Action,
+        action: Some(Eat),
+    ),
+    (
+        text: "{name} has a quick meal.",
+        tier: Action,
+        action: Some(Eat),
+    ),
+    (
+        text: "{name} chews thoughtfully.",
+        tier: Action,
+        action: Some(Eat),
+    ),
+    (
+        text: "{name} crunches through a mouthful.",
+        tier: Action,
+        action: Some(Eat),
+    ),
+    (
+        text: "{name} laps up the last scraps.",
+        tier: Action,
+        action: Some(Eat),
+    ),
+    (
+        text: "{name} sits down for a proper meal.",
+        tier: Action,
+        action: Some(Eat),
+    ),
+    (
+        text: "{name} tears into a piece of dried meat.",
+        tier: Action,
+        action: Some(Eat),
+    ),
+    (
+        text: "{name} works through a pile of scraps.",
+        tier: Action,
+        action: Some(Eat),
+    ),
+    (
+        text: "{name} gulps down food between glances.",
+        tier: Action,
+        action: Some(Eat),
+    ),
+    (
+        text: "{name} eats steadily, wasting nothing.",
+        tier: Action,
+        action: Some(Eat),
+    ),
+    (
+        text: "{name} picks at {possessive} food.",
+        tier: Action,
+        action: Some(Eat),
+    ),
+    (
+        text: "{name} finishes off the last of {possessive} portion.",
+        tier: Action,
+        action: Some(Eat),
+    ),
+    (
+        text: "{name} shares a meal near the hearth.",
+        tier: Action,
+        action: Some(Eat),
+    ),
+
+    // --- Conditioned (original) ---
+    (
+        text: "{name} devours {possessive} meal with abandon.",
+        tier: Action,
+        weight: 1.2,
+        action: Some(Eat),
+        personality: [(axis: Boldness, bucket: High)],
+        needs: [(axis: Hunger, level: Critical)],
+    ),
+    (
+        text: "{name} nibbles cautiously at {possessive} food.",
+        tier: Action,
+        action: Some(Eat),
+        personality: [(axis: Boldness, bucket: Low)],
+    ),
+    (
+        text: "{name} eats quickly, glancing around between bites.",
+        tier: Action,
+        action: Some(Eat),
+        weather: Some(Storm),
+    ),
+    (
+        text: "{name} savours a dawn meal as mist rises.",
+        tier: Action,
+        action: Some(Eat),
+        day_phase: Some(Dawn),
+    ),
+    (
+        text: "{name} munches away, purring contentedly.",
+        tier: Action,
+        action: Some(Eat),
+        mood: Some(Happy),
+    ),
+    (
+        text: "{name} chows down.",
+        tier: Action,
+        action: Some(Eat),
+        needs: [(axis: Purpose, level: Moderate)],
+    ),
+    (
+        text: "{name} tucks into {possessive} dinner.",
+        tier: Action,
+        action: Some(Eat),
+        life_stage: Some(Adult),
+        day_phase: Some(Night),
+        personality: [(axis: Stubbornness, bucket: Low)],
+    ),
+
+    // --- Season-conditioned ---
+    (
+        text: "{name} scrounges together a meager winter meal.",
+        tier: Action,
+        action: Some(Eat),
+        season: Some(Winter),
+    ),
+    (
+        text: "{name} eats well from the season's plenty.",
+        tier: Action,
+        action: Some(Eat),
+        season: Some(Summer),
+    ),
+    (
+        text: "{name} tucks into the autumn stores.",
+        tier: Action,
+        action: Some(Eat),
+        season: Some(Autumn),
+    ),
+    (
+        text: "{name} nibbles on fresh spring greens.",
+        tier: Action,
+        action: Some(Eat),
+        season: Some(Spring),
+    ),
+
+    // --- Weather-conditioned ---
+    (
+        text: "{name} eats under cover, rain pattering nearby.",
+        tier: Action,
+        action: Some(Eat),
+        weather: Some(LightRain),
+    ),
+    (
+        text: "{name} wolfs down food before the storm worsens.",
+        tier: Action,
+        action: Some(Eat),
+        weather: Some(Storm),
+    ),
+    (
+        text: "{name} eats in the grey haze, barely seeing {possessive} food.",
+        tier: Action,
+        action: Some(Eat),
+        weather: Some(Fog),
+    ),
+    (
+        text: "{name} brushes snow off the stores before eating.",
+        tier: Action,
+        action: Some(Eat),
+        weather: Some(Snow),
+    ),
+
+    // --- Day phase ---
+    (
+        text: "{name} breaks fast at first light.",
+        tier: Action,
+        action: Some(Eat),
+        day_phase: Some(Dawn),
+    ),
+    (
+        text: "{name} eats a late meal as shadows lengthen.",
+        tier: Action,
+        action: Some(Eat),
+        day_phase: Some(Dusk),
+    ),
+    (
+        text: "{name} chews quietly in the dark.",
+        tier: Action,
+        action: Some(Eat),
+        day_phase: Some(Night),
+    ),
+
+    // --- Mood-conditioned ---
+    (
+        text: "{name} forces down a few bites.",
+        tier: Action,
+        action: Some(Eat),
+        mood: Some(Miserable),
+    ),
+    (
+        text: "{name} eats with obvious relish.",
+        tier: Action,
+        action: Some(Eat),
+        mood: Some(Happy),
+    ),
+    (
+        text: "{name} picks at food without much interest.",
+        tier: Action,
+        action: Some(Eat),
+        mood: Some(Low),
+    ),
+
+    // --- Personality-conditioned ---
+    (
+        text: "{name} eats slowly, savouring each bite.",
+        tier: Action,
+        action: Some(Eat),
+        personality: [(axis: Patience, bucket: High)],
+    ),
+    (
+        text: "{name} finishes every last morsel.",
+        tier: Action,
+        action: Some(Eat),
+        personality: [(axis: Diligence, bucket: High)],
+    ),
+
+    // --- Solitude ---
+    (
+        text: "{name} eats mechanically, tasting nothing.",
+        tier: Action,
+        action: Some(Eat),
+        mood: Some(Miserable),
+        needs: [(axis: Social, level: Critical)],
+    ),
+    (
+        text: "{name} sits before the food stores alone.",
+        tier: Action,
+        action: Some(Eat),
+        mood: Some(Low),
+        needs: [(axis: Social, level: Critical)],
+    ),
+]

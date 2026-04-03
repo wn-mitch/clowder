@@ -1,0 +1,79 @@
+[
+    // --- With target ---
+    (
+        text: "{name} sits beside {other} in comfortable silence.",
+        tier: Action,
+        action: Some(Socialize),
+        has_target: Some(true),
+    ),
+    (
+        text: "{name} bumps heads with {other} in greeting.",
+        tier: Action,
+        action: Some(Socialize),
+        has_target: Some(true),
+    ),
+    (
+        text: "{name} and {other} share a quiet moment by the hearth.",
+        tier: Action,
+        action: Some(Socialize),
+        has_target: Some(true),
+    ),
+    (
+        text: "{name} chats with {other} about nothing in particular.",
+        tier: Action,
+        action: Some(Socialize),
+        has_target: Some(true),
+    ),
+    (
+        text: "{name} flicks an ear toward {other}, listening intently.",
+        tier: Action,
+        action: Some(Socialize),
+        has_target: Some(true),
+    ),
+    (
+        text: "{name} stretches out beside {other} and purrs.",
+        tier: Action,
+        action: Some(Socialize),
+        has_target: Some(true),
+    ),
+    (
+        text: "{name} chatters excitedly at {other}.",
+        tier: Action,
+        action: Some(Socialize),
+        has_target: Some(true),
+        personality: [(axis: Playfulness, bucket: High)],
+    ),
+    (
+        text: "{name} settles near {other}, content with the company.",
+        tier: Action,
+        action: Some(Socialize),
+        has_target: Some(true),
+        personality: [(axis: Sociability, bucket: High)],
+    ),
+
+    // --- Solo (no target) ---
+    (
+        text: "{name} looks around for company.",
+        tier: Action,
+        action: Some(Socialize),
+        has_target: Some(false),
+    ),
+    (
+        text: "{name} wanders near the hearth, hoping for a chat.",
+        tier: Action,
+        action: Some(Socialize),
+        has_target: Some(false),
+    ),
+    (
+        text: "{name} sits alone, tail curling and uncurling.",
+        tier: Action,
+        action: Some(Socialize),
+        has_target: Some(false),
+    ),
+    (
+        text: "{name} calls out, but no one answers.",
+        tier: Action,
+        action: Some(Socialize),
+        has_target: Some(false),
+    ),
+]

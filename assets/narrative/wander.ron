@@ -1,0 +1,73 @@
+[
+    // --- Generic (from original hardcoded set) ---
+    (
+        text: "{name} wanders about.",
+        tier: Action,
+        action: Some(Wander),
+    ),
+    (
+        text: "{name} explores nearby.",
+        tier: Action,
+        action: Some(Wander),
+    ),
+    (
+        text: "{name} stretches and strolls.",
+        tier: Action,
+        action: Some(Wander),
+    ),
+
+    // --- Conditioned examples ---
+    (
+        text: "{name} prowls through the rain, undeterred.",
+        tier: Action,
+        action: Some(Wander),
+        weather: Some(LightRain),
+        personality: [(axis: Boldness, bucket: High)],
+    ),
+    (
+        text: "{name} pads through the fog, nose twitching.",
+        tier: Action,
+        action: Some(Wander),
+        weather: Some(Fog),
+    ),
+    (
+        text: "{name} trots along eagerly, peering at everything.",
+        tier: Action,
+        action: Some(Wander),
+        personality: [(axis: Curiosity, bucket: High)],
+    ),
+    (
+        text: "{name} wanders through the snow, leaving small prints.",
+        tier: Action,
+        action: Some(Wander),
+        weather: Some(Snow),
+    ),
+    (
+        text: "{name} slips out at dusk for a wander.",
+        tier: Action,
+        action: Some(Wander),
+        day_phase: Some(Dusk),
+    ),
+    (
+        text: "{name} strolls through the snow, enjoying the {weather_desc} {season} {time_desc}. {subject} relishes the moment.",
+        tier: Action,
+        action: Some(Wander),
+        season: Some(Winter),
+        weather: Some(Clear),
+        needs: [(axis: Social, level: Satisfied)],
+    ),
+
+    // --- Solitude ---
+    (
+        text: "{name} drifts through the camp like a ghost.",
+        tier: Action,
+        action: Some(Wander),
+        mood: Some(Miserable),
+    ),
+    (
+        text: "{name} paces, restless and alone.",
+        tier: Action,
+        action: Some(Wander),
+        needs: [(axis: Social, level: Critical)],
+    ),
+]

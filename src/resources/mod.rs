@@ -1,11 +1,27 @@
+pub mod aspiration_registry;
+pub mod colony_knowledge;
+pub mod colony_priority;
+pub mod event_log;
+pub mod food;
 pub mod map;
 pub mod narrative;
+pub mod narrative_templates;
+pub mod relationships;
 pub mod rng;
 pub mod time;
 pub mod weather;
+pub mod zodiac;
 
+pub use colony_knowledge::ColonyKnowledge;
+pub use colony_priority::{ColonyPriority, PriorityKind};
+pub use event_log::{EventEntry, EventKind, EventLog};
+pub use food::FoodStores;
 pub use map::{Terrain, Tile, TileMap};
 pub use narrative::{NarrativeEntry, NarrativeLog, NarrativeTier};
+pub use narrative_templates::TemplateRegistry;
+pub use relationships::{BondType, Relationship, Relationships};
 pub use rng::SimRng;
-pub use time::{DayPhase, Season, SimConfig, SimSpeed, TimeState};
+pub use time::{DayPhase, Season, SimConfig, SimSpeed, TimeState, TransitionTracker};
+pub use aspiration_registry::AspirationRegistry;
 pub use weather::{Weather, WeatherState};
+pub use zodiac::ZodiacData;
