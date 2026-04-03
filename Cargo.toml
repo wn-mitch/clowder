@@ -9,7 +9,7 @@ bevy_ecs = "0.18"
 ratatui = "0.29"
 crossterm = "0.28"
 rand = "0.9"
-rand_chacha = "0.3"
+rand_chacha = "0.9"
 noise = "0.9"
 ron = "0.8"
 serde = { version = "1", features = ["derive"] }
