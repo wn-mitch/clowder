@@ -2,30 +2,31 @@ use std::io::{self, BufRead, Write as _};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
-use crossterm::execute;
-use crossterm::terminal::{
-    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+use bevy::app::AppExit;
+use bevy::input::keyboard::KeyCode;
+use bevy::prelude::{
+    App, ButtonInput, ClearColor, Color, DefaultPlugins, MessageWriter, PluginGroup, Res, ResMut,
+    Startup, Time, Fixed, Update, Window, WindowPlugin,
 };
-use ratatui::backend::CrosstermBackend;
-use ratatui::Terminal;
+use bevy::window::WindowResolution;
 
 use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::Schedule;
 
 use clowder::ai::CurrentAction;
-use clowder::components::identity::{Age, Appearance, Name, Species};
+use clowder::components::identity::{Age, Name, Species};
 use clowder::components::mental::{Memory, Mood};
-use clowder::components::physical::{Dead, Health, Needs, Position};
+use clowder::components::physical::{Health, Needs, Position};
 use clowder::components::magic::Inventory;
 use clowder::components::skills::{Corruption, MagicAffinity, Training};
 use clowder::persistence;
+use clowder::plugins::setup::AppArgs;
+use clowder::plugins::simulation::SimulationPlugin;
 use clowder::resources::{
     EventLog, FoodStores, NarrativeLog, NarrativeTier, Relationships, SimConfig, SimRng,
     TemplateRegistry, TimeState, TileMap, WeatherState,
 };
 use clowder::resources::time::DayPhase;
-use clowder::tui::{AppView, FocusMode};
 use clowder::world_gen::colony::{find_colony_site, generate_starting_cats, spawn_starting_buildings};
 use clowder::world_gen::terrain::generate_terrain;
 
@@ -40,35 +41,77 @@ struct CliArgs {
     event_log_path: Option<PathBuf>,
 }
 
-fn main() -> io::Result<()> {
+fn main() {
     let args = parse_args();
 
     if args.headless {
-        return run_headless(args);
+        if let Err(e) = run_headless(args) {
+            eprintln!("Headless error: {e}");
+            std::process::exit(1);
+        }
+        return;
     }
 
-    // -----------------------------------------------------------------------
-    // Setup terminal
-    // -----------------------------------------------------------------------
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-    terminal.hide_cursor()?;
-
-    // Run the simulation and restore terminal even on error.
-    let result = run(&mut terminal, args);
-
-    // -----------------------------------------------------------------------
-    // Cleanup terminal
-    // -----------------------------------------------------------------------
-    disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-    terminal.show_cursor()?;
-
-    result
+    App::new()
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                title: "Clowder".into(),
+                resolution: WindowResolution::new(1280, 720),
+                ..Window::default()
+            }),
+            ..WindowPlugin::default()
+        }))
+        .insert_resource(ClearColor(Color::srgb(0.15, 0.22, 0.12)))
+        .insert_resource(AppArgs {
+            seed: args.seed,
+            load_path: args.load_path,
+            load_log_path: args.load_log_path,
+        })
+        .add_systems(
+            Startup,
+            clowder::plugins::setup::setup_world_exclusive,
+        )
+        .add_plugins(SimulationPlugin)
+        .add_systems(Update, (handle_input, sync_sim_speed))
+        .run();
 }
+
+// ---------------------------------------------------------------------------
+// Bevy systems for interactive mode
+// ---------------------------------------------------------------------------
+
+/// Basic input handling: quit, pause, speed cycle.
+fn handle_input(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut time: ResMut<TimeState>,
+    mut app_exit: MessageWriter<AppExit>,
+) {
+    if keyboard.just_pressed(KeyCode::Escape) {
+        app_exit.write(AppExit::Success);
+    }
+    if keyboard.just_pressed(KeyCode::KeyP) {
+        time.paused = !time.paused;
+    }
+    if keyboard.just_pressed(KeyCode::KeyS) {
+        time.speed = time.speed.cycle();
+    }
+}
+
+/// Keeps Bevy's FixedUpdate timestep in sync with the SimSpeed setting.
+fn sync_sim_speed(
+    time_state: Res<TimeState>,
+    mut fixed_time: ResMut<Time<Fixed>>,
+) {
+    if !time_state.is_changed() {
+        return;
+    }
+    let hz = time_state.speed.ticks_per_second();
+    fixed_time.set_timestep(Duration::from_secs_f64(1.0 / hz));
+}
+
+// ---------------------------------------------------------------------------
+// CLI parsing
+// ---------------------------------------------------------------------------
 
 fn parse_args() -> CliArgs {
     let args: Vec<String> = std::env::args().collect();
@@ -137,6 +180,10 @@ fn parse_args() -> CliArgs {
         event_log_path,
     }
 }
+
+// ---------------------------------------------------------------------------
+// Legacy code kept for headless mode and tests
+// ---------------------------------------------------------------------------
 
 const SAVE_PATH: &str = "saves/autosave.json";
 
@@ -263,506 +310,6 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
     }
 
     Ok(world)
-}
-
-fn run(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, args: CliArgs) -> io::Result<()> {
-    let mut world = setup_world(&args)?;
-    let mut schedule = build_schedule();
-
-    // -----------------------------------------------------------------------
-    // Main loop
-    // -----------------------------------------------------------------------
-    const FRAME_DURATION: Duration = Duration::from_millis(33); // ~30 fps
-    let mut tick_accumulator = Duration::ZERO;
-    let mut last_frame = Instant::now();
-    let mut focus_mode = FocusMode::None;
-
-    loop {
-        let now = Instant::now();
-        let elapsed = now - last_frame;
-        last_frame = now;
-
-        // --- Handle input (non-blocking) ------------------------------------
-        if event::poll(Duration::from_millis(0))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
-                    match &focus_mode {
-                        FocusMode::None => match key.code {
-                            KeyCode::Char('q') | KeyCode::Esc => break,
-                            KeyCode::Char('p') => {
-                                let mut time = world.resource_mut::<TimeState>();
-                                time.paused = !time.paused;
-                            }
-                            KeyCode::Char('s') => {
-                                let mut time = world.resource_mut::<TimeState>();
-                                time.speed = time.speed.cycle();
-                            }
-                            KeyCode::Char('f') | KeyCode::Char('F') => {
-                                // Enter selecting mode: collect living cats.
-                                let cats: Vec<(Entity, String)> = world
-                                    .query_filtered::<(Entity, &Name), bevy_ecs::query::Without<clowder::components::physical::Dead>>()
-                                    .iter(&world)
-                                    .map(|(e, n)| (e, n.0.clone()))
-                                    .collect();
-                                if !cats.is_empty() {
-                                    focus_mode = FocusMode::Selecting { cats, index: 0 };
-                                }
-                            }
-                            KeyCode::Char('P') => {
-                                let mut priority = world.resource_mut::<clowder::resources::ColonyPriority>();
-                                priority.active = clowder::resources::PriorityKind::cycle(priority.active);
-                            }
-                            KeyCode::Char('z') | KeyCode::Char('Z') => {
-                                let map = world.resource::<TileMap>();
-                                let cursor = Position::new(map.width / 2, map.height / 2);
-                                focus_mode = FocusMode::ZoneDesignate {
-                                    cursor,
-                                    kind: clowder::components::zone::ZoneKind::BuildHere,
-                                };
-                            }
-                            KeyCode::Char('i') | KeyCode::Char('I') => {
-                                let map = world.resource::<TileMap>();
-                                let cursor = Position::new(map.width / 2, map.height / 2);
-                                focus_mode = FocusMode::TileInspect { cursor };
-                            }
-                            _ => {}
-                        },
-                        FocusMode::Selecting { cats, index } => match key.code {
-                            KeyCode::Up => {
-                                let new_index = if *index == 0 { cats.len() - 1 } else { index - 1 };
-                                focus_mode = FocusMode::Selecting {
-                                    cats: cats.clone(),
-                                    index: new_index,
-                                };
-                            }
-                            KeyCode::Down => {
-                                let new_index = (index + 1) % cats.len();
-                                focus_mode = FocusMode::Selecting {
-                                    cats: cats.clone(),
-                                    index: new_index,
-                                };
-                            }
-                            KeyCode::Enter => {
-                                let entity = cats[*index].0;
-                                focus_mode = FocusMode::Inspecting(entity);
-                            }
-                            KeyCode::Esc | KeyCode::Char('f') | KeyCode::Char('F') => {
-                                focus_mode = FocusMode::None;
-                            }
-                            _ => {}
-                        },
-                        FocusMode::Inspecting(_) => match key.code {
-                            KeyCode::Esc | KeyCode::Char('f') | KeyCode::Char('F') => {
-                                focus_mode = FocusMode::None;
-                            }
-                            KeyCode::Char('q') => break,
-                            _ => {}
-                        },
-                        FocusMode::TileInspect { cursor } => {
-                            let map = world.resource::<TileMap>();
-                            let mut c = *cursor;
-                            match key.code {
-                                KeyCode::Up => c.y = (c.y - 1).max(0),
-                                KeyCode::Down => c.y = (c.y + 1).min(map.height - 1),
-                                KeyCode::Left => c.x = (c.x - 1).max(0),
-                                KeyCode::Right => c.x = (c.x + 1).min(map.width - 1),
-                                KeyCode::Esc | KeyCode::Char('i') | KeyCode::Char('I') => {
-                                    focus_mode = FocusMode::None;
-                                    continue;
-                                }
-                                KeyCode::Char('q') => break,
-                                _ => {}
-                            }
-                            focus_mode = FocusMode::TileInspect { cursor: c };
-                        },
-                        FocusMode::ZoneDesignate { cursor, kind } => {
-                            let map = world.resource::<TileMap>();
-                            let mut c = *cursor;
-                            let mut k = *kind;
-                            match key.code {
-                                KeyCode::Up => c.y = (c.y - 1).max(0),
-                                KeyCode::Down => c.y = (c.y + 1).min(map.height - 1),
-                                KeyCode::Left => c.x = (c.x - 1).max(0),
-                                KeyCode::Right => c.x = (c.x + 1).min(map.width - 1),
-                                KeyCode::Tab => k = k.cycle(),
-                                KeyCode::Enter => {
-                                    // Place zone marker entity.
-                                    world.spawn((
-                                        clowder::components::zone::Zone { kind: k },
-                                        c,
-                                    ));
-                                    focus_mode = FocusMode::None;
-                                    continue;
-                                }
-                                KeyCode::Esc | KeyCode::Char('z') | KeyCode::Char('Z') => {
-                                    focus_mode = FocusMode::None;
-                                    continue;
-                                }
-                                KeyCode::Char('q') => break,
-                                _ => {}
-                            }
-                            focus_mode = FocusMode::ZoneDesignate { cursor: c, kind: k };
-                        },
-                    }
-                }
-            }
-        }
-
-        // --- Tick simulation (time-accumulator based) -----------------------
-        let ticks_this_frame = {
-            let time = world.resource::<TimeState>();
-            if time.paused {
-                0
-            } else {
-                tick_accumulator += elapsed;
-                let tick_interval = Duration::from_secs_f64(1.0 / time.speed.ticks_per_second());
-                let mut count = 0u32;
-                // Cap at 10 ticks per frame to prevent spiral of death
-                while tick_accumulator >= tick_interval && count < 10 {
-                    tick_accumulator -= tick_interval;
-                    count += 1;
-                }
-                count
-            }
-        };
-        for _ in 0..ticks_this_frame {
-            schedule.run(&mut world);
-        }
-
-        // --- Build inspect data if needed -----------------------------------
-        let inspect_data = if let FocusMode::Inspecting(entity) = focus_mode {
-            use clowder::components::identity::Age;
-            use clowder::components::mental::Mood;
-            use clowder::components::skills::Skills;
-            use clowder::components::coordination::{ActiveDirective, Coordinator, DirectiveKind};
-            use clowder::components::zodiac::ZodiacSign;
-            use clowder::components::fate::{FatedLove, FatedRival};
-            use clowder::components::aspirations::{Aspirations, Preference, Preferences};
-            use clowder::tui::inspect::{build_inspect_data, AspirationDisplay, RelationshipEntry};
-
-            let config = world.resource::<SimConfig>();
-            let tick = world.resource::<TimeState>().tick;
-            let relationships = world.resource::<Relationships>();
-            let aspiration_registry = world.get_resource::<clowder::resources::AspirationRegistry>();
-
-            // Try to get the focused entity's components.
-            let data = world.get::<Name>(entity).and_then(|name| {
-                let age = world.get::<Age>(entity)?;
-                let needs = world.get::<Needs>(entity)?;
-                let mood = world.get::<Mood>(entity)?;
-                let current = world.get::<CurrentAction>(entity)?;
-                let skills = world.get::<Skills>(entity)?;
-
-                let is_coordinator = world.get::<Coordinator>(entity).is_some();
-                let active_directive = world.get::<ActiveDirective>(entity).map(|ad| {
-                    let kind_str = match ad.kind {
-                        DirectiveKind::Hunt => "Hunt",
-                        DirectiveKind::Forage => "Forage",
-                        DirectiveKind::Build => "Build",
-                        DirectiveKind::Fight => "Fight",
-                        DirectiveKind::Patrol => "Patrol",
-                        DirectiveKind::Herbcraft => "Herbcraft",
-                        DirectiveKind::SetWard => "Set Ward",
-                    };
-                    let coord_name = world
-                        .get::<Name>(ad.coordinator)
-                        .map_or("unknown".to_string(), |n| n.0.clone());
-                    format!("{kind_str} (by {coord_name})")
-                });
-
-                // Build top 3 relationships by fondness.
-                let mut rels: Vec<RelationshipEntry> = relationships
-                    .all_for(entity)
-                    .into_iter()
-                    .filter_map(|(other, rel)| {
-                        world.get::<Name>(other).map(|n| RelationshipEntry {
-                            name: n.0.clone(),
-                            fondness: rel.fondness,
-                            bond: rel.bond,
-                        })
-                    })
-                    .collect();
-                rels.sort_by(|a, b| b.fondness.partial_cmp(&a.fondness).unwrap_or(std::cmp::Ordering::Equal));
-                rels.truncate(3);
-
-                // Phase 9 data.
-                let zodiac = world.get::<ZodiacSign>(entity).map(|z| z.label().to_string());
-
-                let fated_love = world.get::<FatedLove>(entity).and_then(|fl| {
-                    world.get::<Name>(fl.partner).map(|n| (n.0.clone(), fl.awakened))
-                });
-                let fated_rival = world.get::<FatedRival>(entity).and_then(|fr| {
-                    world.get::<Name>(fr.rival).map(|n| (n.0.clone(), fr.awakened))
-                });
-
-                let (asp_display, completed_asp) = world.get::<Aspirations>(entity)
-                    .map(|asp| {
-                        let display: Vec<AspirationDisplay> = asp.active.iter().map(|a| {
-                            let (milestone_name, target) = aspiration_registry
-                                .and_then(|reg| reg.chain_by_name(&a.chain_name))
-                                .and_then(|chain| chain.milestones.get(a.current_milestone))
-                                .map(|m| {
-                                    let t = match &m.condition {
-                                        clowder::components::aspirations::MilestoneCondition::ActionCount { count, .. } => *count,
-                                        clowder::components::aspirations::MilestoneCondition::Mentor { count } => *count,
-                                        _ => 1,
-                                    };
-                                    (m.name.clone(), t)
-                                })
-                                .unwrap_or_else(|| ("???".to_string(), 1));
-                            AspirationDisplay {
-                                chain_name: a.chain_name.clone(),
-                                milestone_name,
-                                progress: a.progress,
-                                target,
-                            }
-                        }).collect();
-                        (display, asp.completed.clone())
-                    })
-                    .unwrap_or_default();
-
-                let (likes, dislikes) = world.get::<Preferences>(entity)
-                    .map(|prefs| {
-                        let l: Vec<String> = prefs.action_preferences.iter()
-                            .filter(|(_, p)| *p == Preference::Like)
-                            .map(|(a, _)| format!("{a:?}"))
-                            .collect();
-                        let d: Vec<String> = prefs.action_preferences.iter()
-                            .filter(|(_, p)| *p == Preference::Dislike)
-                            .map(|(a, _)| format!("{a:?}"))
-                            .collect();
-                        (l, d)
-                    })
-                    .unwrap_or_default();
-
-                Some(build_inspect_data(
-                    &name.0,
-                    age.stage(tick, config.ticks_per_season),
-                    needs,
-                    mood.valence,
-                    current,
-                    skills,
-                    rels,
-                    is_coordinator,
-                    active_directive,
-                    zodiac,
-                    fated_love,
-                    fated_rival,
-                    asp_display,
-                    completed_asp,
-                    likes,
-                    dislikes,
-                ))
-            });
-
-            // If entity is dead/despawned, drop out of inspect mode.
-            if data.is_none() {
-                focus_mode = FocusMode::None;
-            }
-            data
-        } else {
-            None
-        };
-
-        // --- Render TUI -----------------------------------------------------
-        terminal.draw(|frame| {
-            // Collect cat display data from ECS.
-            use clowder::tui::map::CatDisplay;
-            let time_snap = world.resource::<TimeState>();
-            let config_snap = world.resource::<SimConfig>();
-            let tick = time_snap.tick;
-            let tps = config_snap.ticks_per_season;
-            let cat_positions: Vec<CatDisplay> = world
-                .query::<(&Name, &Position, &Age, &Appearance, Option<&Dead>)>()
-                .iter(&world)
-                .map(|(name, pos, age, appearance, dead)| CatDisplay {
-                    name: name.0.clone(),
-                    pos: *pos,
-                    life_stage: age.stage(tick, tps),
-                    fur_color: appearance.fur_color.clone(),
-                    is_dead: dead.is_some(),
-                })
-                .collect();
-
-            // Collect wildlife positions with behavior state.
-            use clowder::components::wildlife::{WildAnimal, WildSpecies, WildlifeAiState};
-            use clowder::tui::map::WildlifeBehavior;
-            let wildlife_positions: Vec<(WildSpecies, Position, WildlifeBehavior)> = world
-                .query::<(&WildAnimal, &Position, &WildlifeAiState)>()
-                .iter(&world)
-                .map(|(animal, pos, ai)| {
-                    let behavior = match ai {
-                        WildlifeAiState::Patrolling { .. } | WildlifeAiState::Circling { .. } => {
-                            WildlifeBehavior::Roaming
-                        }
-                        WildlifeAiState::Waiting => WildlifeBehavior::Ambushing,
-                        WildlifeAiState::Fleeing { .. } => WildlifeBehavior::Fleeing,
-                    };
-                    (animal.species, *pos, behavior)
-                })
-                .collect();
-
-            // Collect ward and herb positions for TUI rendering.
-            use clowder::components::magic::{Ward, Herb, Harvestable};
-            use clowder::tui::map::{WardDisplay, HerbDisplay};
-            let ward_positions: Vec<WardDisplay> = world
-                .query::<(&Ward, &Position)>()
-                .iter(&world)
-                .map(|(ward, pos)| WardDisplay { pos: *pos, inverted: ward.inverted })
-                .collect();
-            let herb_positions: Vec<HerbDisplay> = world
-                .query::<(&Herb, &Position, Option<&Harvestable>)>()
-                .iter(&world)
-                .filter(|(_, _, h)| h.is_some()) // only show harvestable herbs
-                .map(|(_, pos, _)| HerbDisplay { pos: *pos })
-                .collect();
-
-            // Collect zone markers for map overlay.
-            use clowder::tui::map::ZoneDisplay;
-            let zone_positions: Vec<ZoneDisplay> = world
-                .query::<(&clowder::components::zone::Zone, &Position)>()
-                .iter(&world)
-                .map(|(z, pos)| ZoneDisplay { pos: *pos, kind: z.kind })
-                .collect();
-
-            // Query building at cursor for tile inspect display (before resource borrows).
-            let building_at_cursor = if let FocusMode::TileInspect { cursor } = &focus_mode {
-                use clowder::components::building::{Structure, ConstructionSite, CropState, GateState};
-                use clowder::tui::tile_inspect::BuildingInfo;
-
-                world
-                    .query::<(&Structure, &Position, Option<&ConstructionSite>, Option<&CropState>, Option<&GateState>)>()
-                    .iter(&world)
-                    .find(|(_, pos, _, _, _)| pos.x == cursor.x && pos.y == cursor.y)
-                    .map(|(s, _, site, crop, gate)| BuildingInfo {
-                        structure: s.clone(),
-                        construction_site: site.cloned(),
-                        crop_state: crop.cloned(),
-                        gate_state: gate.cloned(),
-                    })
-            } else {
-                None
-            };
-
-            // Collect coordinator names for status bar.
-            use clowder::components::coordination::Coordinator;
-            let coordinator_names: Vec<String> = world
-                .query_filtered::<&Name, bevy_ecs::query::With<Coordinator>>()
-                .iter(&world)
-                .map(|name| name.0.clone())
-                .collect();
-
-            // Compute colony vitals from ECS queries.
-            use clowder::tui::log::ColonyVitals;
-            use clowder::components::building::Structure;
-
-            let vitals = {
-                let mut mood_sum = 0.0_f32;
-                let mut health_sum = 0.0_f32;
-                let mut safety_sum = 0.0_f32;
-                let mut corruption_sum = 0.0_f32;
-                let mut cat_n = 0_usize;
-                let mut any_corruption = false;
-
-                for (mood, health, needs, corruption) in world
-                    .query_filtered::<(&Mood, &Health, &Needs, Option<&Corruption>), bevy_ecs::query::Without<Dead>>()
-                    .iter(&world)
-                {
-                    // Map mood valence from [-1, 1] to [0, 1]
-                    mood_sum += (mood.valence + 1.0) / 2.0;
-                    health_sum += health.current;
-                    safety_sum += needs.safety;
-                    if let Some(c) = corruption {
-                        if c.0 > 0.0 {
-                            any_corruption = true;
-                        }
-                        corruption_sum += c.0;
-                    }
-                    cat_n += 1;
-                }
-
-                let mut bldg_condition_sum = 0.0_f32;
-                let mut bldg_n = 0_usize;
-                for structure in world
-                    .query::<&Structure>()
-                    .iter(&world)
-                {
-                    bldg_condition_sum += structure.condition;
-                    bldg_n += 1;
-                }
-
-                let n = cat_n.max(1) as f32;
-                ColonyVitals {
-                    avg_mood: mood_sum / n,
-                    avg_health: health_sum / n,
-                    avg_safety: safety_sum / n,
-                    avg_bldg_condition: if bldg_n > 0 { Some(bldg_condition_sum / bldg_n as f32) } else { None },
-                    avg_bldg_cleanliness: None, // TODO: add when cleanliness is actively used
-                    avg_corruption: if any_corruption { Some(corruption_sum / n) } else { None },
-                }
-            };
-
-            // Compute activity counts for status bar.
-            use std::collections::HashMap;
-            let mut action_map: HashMap<clowder::ai::Action, usize> = HashMap::new();
-            for action in world
-                .query_filtered::<&CurrentAction, bevy_ecs::query::Without<Dead>>()
-                .iter(&world)
-            {
-                *action_map.entry(action.action).or_default() += 1;
-            }
-            let mut activity_counts: Vec<(clowder::ai::Action, usize)> = action_map.into_iter().collect();
-            activity_counts.sort_by(|a, b| b.1.cmp(&a.1));
-
-            let map = world.resource::<TileMap>();
-            let narrative = world.resource::<NarrativeLog>();
-            let time = world.resource::<TimeState>();
-            let config = world.resource::<SimConfig>();
-            let weather = world.resource::<WeatherState>();
-            let food = world.resource::<FoodStores>();
-            let cat_count = cat_positions.len();
-
-            let view = AppView {
-                map,
-                cat_positions,
-                wildlife_positions,
-                ward_positions,
-                herb_positions,
-                zone_positions,
-                narrative,
-                time,
-                config,
-                weather,
-                food,
-                cat_count,
-                focus: &focus_mode,
-                inspect_data: inspect_data.as_ref(),
-                building_at_cursor,
-                coordinator_names,
-                priority: world.get_resource::<clowder::resources::ColonyPriority>()
-                    .and_then(|cp| cp.active),
-                vitals,
-                activity_counts,
-            };
-            view.render(frame);
-        })?;
-
-        // --- Frame timing ---------------------------------------------------
-        let frame_elapsed = now.elapsed();
-        if frame_elapsed < FRAME_DURATION {
-            std::thread::sleep(FRAME_DURATION - frame_elapsed);
-        }
-    }
-
-    // -----------------------------------------------------------------------
-    // Autosave on quit
-    // -----------------------------------------------------------------------
-    let save_path = std::path::Path::new(SAVE_PATH);
-    if let Err(e) = persistence::save_to_file(&mut world, save_path) {
-        eprintln!("Warning: failed to autosave: {e}");
-    }
-
-    Ok(())
 }
 
 // ---------------------------------------------------------------------------
