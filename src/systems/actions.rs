@@ -5,7 +5,7 @@ use crate::ai::{Action, CurrentAction};
 use crate::ai::pathfinding::step_toward;
 use crate::components::coordination::{ActiveDirective, PendingDelivery};
 use crate::components::identity::{Gender, Orientation};
-use crate::components::items::{Item, ItemLocation};
+use crate::components::items::{Item, ItemKind, ItemLocation};
 use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Needs, Position};
@@ -77,6 +77,35 @@ fn approx_location_match(a: &Option<Position>, b: &Option<Position>) -> bool {
 /// Advance every in-progress cat action by one tick and apply its effect.
 ///
 /// - Decrements `ticks_remaining` first.
+// ---------------------------------------------------------------------------
+// Forage helpers
+// ---------------------------------------------------------------------------
+
+fn pick_forage_item(terrain: &crate::resources::map::Terrain, rng: &mut SimRng) -> ItemKind {
+    use crate::resources::map::Terrain;
+    let roll: f32 = rng.rng.random();
+    match terrain {
+        Terrain::LightForest | Terrain::DenseForest => {
+            if roll < 0.3 { ItemKind::Berries }
+            else if roll < 0.5 { ItemKind::Nuts }
+            else if roll < 0.7 { ItemKind::Mushroom }
+            else if roll < 0.85 { ItemKind::Moss }
+            else { ItemKind::DriedGrass }
+        }
+        Terrain::Grass => {
+            if roll < 0.4 { ItemKind::Roots }
+            else if roll < 0.6 { ItemKind::WildOnion }
+            else if roll < 0.8 { ItemKind::DriedGrass }
+            else { ItemKind::Berries }
+        }
+        _ => ItemKind::Roots, // Fallback for other terrains
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Main action resolution
+// ---------------------------------------------------------------------------
+
 /// - Then applies the per-tick effect for the action that is now in progress.
 /// - Movement actions call `step_toward` each tick to close on the target.
 /// - Hunt/Forage deposit food into `FoodStores` and grow skills.
@@ -272,6 +301,14 @@ pub fn resolve_actions(
                                 ticks_remaining: 15,
                                 source: "good foraging".to_string(),
                             });
+
+                            // Spawn a foraged item carried by this cat.
+                            if map.in_bounds(pos.x, pos.y) {
+                                let tile = map.get(pos.x, pos.y);
+                                let forage_kind = pick_forage_item(&tile.terrain, &mut rng);
+                                let quality = (0.3 + skills.foraging * 0.3).clamp(0.0, 1.0);
+                                commands.spawn(Item::new(forage_kind, quality, ItemLocation::Carried(entity)));
+                            }
                         }
 
                         // Skill growth each tick spent foraging.
