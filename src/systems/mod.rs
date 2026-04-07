@@ -13,6 +13,7 @@ pub mod memory;
 pub mod mood;
 pub mod narrative;
 pub mod needs;
+pub mod prey;
 pub mod snapshot;
 pub mod social;
 pub mod task_chains;

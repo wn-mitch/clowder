@@ -157,6 +157,8 @@ fn build_schedule() -> Schedule {
                 clowder::systems::magic::spawn_shadow_fox_from_corruption,
                 clowder::systems::wildlife::spawn_wildlife,
                 clowder::systems::wildlife::wildlife_ai,
+                clowder::systems::prey::prey_population,
+                clowder::systems::prey::prey_hunger,
                 clowder::systems::wildlife::detect_threats,
                 clowder::systems::buildings::apply_building_effects,
                 clowder::systems::buildings::decay_building_condition,
@@ -1044,6 +1046,9 @@ fn build_new_world(seed: u64) -> io::Result<World> {
 
     // Spawn initial wildlife far from the colony.
     clowder::systems::wildlife::spawn_initial_wildlife(&mut world, colony_site);
+
+    // Spawn initial prey animals across their habitats.
+    clowder::systems::prey::spawn_initial_prey(&mut world);
 
     // Spawn herbs based on terrain and current season.
     let current_season = {
