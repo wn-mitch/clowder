@@ -7,6 +7,7 @@ use crate::ai::{Action, CurrentAction};
 use crate::components::identity::Name;
 use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier};
 use crate::components::physical::{Dead, Health, Needs, Position};
+use crate::components::prey::PreyAnimal;
 use crate::components::wildlife::{BehaviorType, WildAnimal, WildSpecies, WildlifeAiState};
 use crate::resources::map::{Terrain, TileMap};
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
@@ -426,6 +427,66 @@ pub fn detect_threats(
                 };
                 log.push(time.tick, text, NarrativeTier::Action);
                 cooldowns.cat_cooldowns.insert(cat_entity, time.tick);
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Predator hunt prey system
+// ---------------------------------------------------------------------------
+
+/// Predators (fox, hawk, snake) hunt nearby prey entities.
+/// When a predator kills prey, the prey entity is despawned immediately.
+pub fn predator_hunt_prey(
+    mut commands: Commands,
+    predators: Query<(&WildAnimal, &Position), Without<PreyAnimal>>,
+    prey: Query<(Entity, &PreyAnimal, &Position)>,
+    mut rng: ResMut<SimRng>,
+    mut log: ResMut<NarrativeLog>,
+    time: Res<TimeState>,
+) {
+    for (predator, pred_pos) in predators.iter() {
+        // Only hunt sometimes (10% chance per tick).
+        if rng.rng.random::<f32>() > 0.1 {
+            continue;
+        }
+
+        let hunt_range: i32 = match predator.species {
+            WildSpecies::Fox => 3,
+            WildSpecies::Hawk => 5,
+            WildSpecies::Snake => 1, // Ambush range
+            WildSpecies::ShadowFox => 3,
+        };
+
+        // Find nearest prey in range.
+        let mut nearest: Option<(Entity, i32)> = None;
+        for (prey_entity, _prey_animal, prey_pos) in prey.iter() {
+            let dist = pred_pos.manhattan_distance(prey_pos);
+            if dist <= hunt_range {
+                if nearest.is_none() || dist < nearest.unwrap().1 {
+                    nearest = Some((prey_entity, dist));
+                }
+            }
+        }
+
+        if let Some((prey_entity, _)) = nearest {
+            if let Ok((_, prey_animal, _)) = prey.get(prey_entity) {
+                // 30% kill chance per hunt attempt.
+                if rng.rng.random::<f32>() < 0.3 {
+                    let species_name = prey_animal.species.name();
+                    let predator_name = predator.species.name();
+                    commands.entity(prey_entity).despawn();
+
+                    // Rate-limited logging: ~5% of kills produce a narrative line.
+                    if rng.rng.random::<f32>() < 0.05 {
+                        log.push(
+                            time.tick,
+                            format!("A {predator_name} snatches a {species_name} from the undergrowth."),
+                            NarrativeTier::Micro,
+                        );
+                    }
+                }
             }
         }
     }
