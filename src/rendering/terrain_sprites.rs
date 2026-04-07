@@ -44,9 +44,12 @@ pub fn cardinal_bitmask(map: &TileMap, x: i32, y: i32, group: TerrainGroup) -> u
         }
         map.get(nx, ny).terrain.group() == group
     };
-    if same(0, -1) { mask |= 0x1; } // North
+    // Note: TileMap is Y-down but bevy renders Y-up, so visual north = TileMap y-1.
+    // The Sprout Lands tiles have edges labeled in visual (Y-up) convention,
+    // so we map: visual N (y-1 in TileMap) = bit 0, visual S (y+1 in TileMap) = bit 2.
+    if same(0, -1) { mask |= 0x1; } // Visual North (TileMap y-1)
     if same(1, 0)  { mask |= 0x2; } // East
-    if same(0, 1)  { mask |= 0x4; } // South
+    if same(0, 1)  { mask |= 0x4; } // Visual South (TileMap y+1)
     if same(-1, 0) { mask |= 0x8; } // West
     mask
 }

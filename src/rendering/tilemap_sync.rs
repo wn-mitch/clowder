@@ -40,7 +40,8 @@ pub fn create_tilemap(
 
     for y in 0..map_height {
         for x in 0..map_width {
-            let tile_pos = TilePos { x, y };
+            // Flip Y: TileMap is Y-down, bevy_ecs_tilemap is Y-up.
+            let tile_pos = TilePos { x, y: map_height - 1 - y };
             let terrain = &map.get(x as i32, y as i32).terrain;
             let tile_entity = commands
                 .spawn(TileBundle {
@@ -78,7 +79,8 @@ pub fn create_tilemap(
 
     for y in 0..map_height {
         for x in 0..map_width {
-            let tile_pos = TilePos { x, y };
+            // Flip Y: TileMap is Y-down, bevy_ecs_tilemap is Y-up.
+            let tile_pos = TilePos { x, y: map_height - 1 - y };
             let terrain = &map.get(x as i32, y as i32).terrain;
 
             if !has_grass_overlay(terrain) {

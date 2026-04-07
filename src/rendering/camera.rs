@@ -1,5 +1,6 @@
 use bevy::input::mouse::MouseWheel;
 use bevy::prelude::*;
+use bevy::render::view::screenshot::{save_to_disk, Screenshot};
 
 use crate::rendering::tilemap_sync::{TILE_PX, TILE_SCALE};
 use crate::resources::map::TileMap;
@@ -23,6 +24,7 @@ pub fn setup_camera(mut commands: Commands, map: Res<TileMap>) {
 
 /// Update system: scroll wheel zooms, arrow keys / WASD pans.
 pub fn camera_controls(
+    mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut scroll_events: MessageReader<MouseWheel>,
     mut query: Query<(&mut Transform, &mut Projection), With<GameCamera>>,
@@ -71,5 +73,11 @@ pub fn camera_controls(
         direction = direction.normalize();
         transform.translation.x += direction.x * pan_speed;
         transform.translation.y += direction.y * pan_speed;
+    }
+
+    // Screenshot with F12.
+    if keyboard.just_pressed(KeyCode::F12) {
+        commands.spawn(Screenshot::primary_window())
+            .observe(save_to_disk("/tmp/clowder_screenshot.png"));
     }
 }
