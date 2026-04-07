@@ -160,6 +160,7 @@ fn build_schedule() -> Schedule {
                 clowder::systems::wildlife::detect_threats,
                 clowder::systems::buildings::apply_building_effects,
                 clowder::systems::buildings::decay_building_condition,
+                clowder::systems::items::decay_items,
             )
                 .chain(),
             // Cat needs, mood, and decision-making

@@ -215,7 +215,7 @@ mod tests {
         for _ in 0..1000 {
             assert!(!item.tick_decay(), "ShinyPebble should never decay");
         }
-        assert_eq!(item.condition, 1.0);
+        assert!((item.condition - 1.0).abs() < f32::EPSILON);
     }
 
     #[test]

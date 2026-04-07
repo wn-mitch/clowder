@@ -7,6 +7,7 @@ pub mod combat;
 pub mod coordination;
 pub mod death;
 pub mod fate;
+pub mod items;
 pub mod magic;
 pub mod memory;
 pub mod mood;
