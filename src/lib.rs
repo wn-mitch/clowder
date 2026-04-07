@@ -6,3 +6,4 @@ pub mod ai;
 pub mod tui;
 pub mod persistence;
 pub mod plugins;
+pub mod rendering;

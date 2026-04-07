@@ -22,6 +22,8 @@ use clowder::components::skills::{Corruption, MagicAffinity, Training};
 use clowder::persistence;
 use clowder::plugins::setup::AppArgs;
 use clowder::plugins::simulation::SimulationPlugin;
+use clowder::rendering;
+
 use clowder::resources::{
     EventLog, FoodStores, NarrativeLog, NarrativeTier, Relationships, SimConfig, SimRng,
     TemplateRegistry, TimeState, TileMap, WeatherState,
@@ -74,6 +76,8 @@ fn main() {
             clowder::plugins::setup::setup_world_exclusive,
         )
         .add_plugins(SimulationPlugin)
+        .add_plugins(rendering::RenderingPlugin)
+        .add_plugins(rendering::CameraPlugin)
         .add_systems(Update, (handle_input, sync_sim_speed))
         .run();
 }
@@ -94,7 +98,7 @@ fn handle_input(
     if keyboard.just_pressed(KeyCode::KeyP) {
         time.paused = !time.paused;
     }
-    if keyboard.just_pressed(KeyCode::KeyS) {
+    if keyboard.just_pressed(KeyCode::BracketRight) {
         time.speed = time.speed.cycle();
     }
 }
