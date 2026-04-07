@@ -66,8 +66,16 @@ pub fn generate_narrative(
         }
 
         // Rate-limit routine narration.
+        // Hunt/Forage/Eat get outcome-specific narrative from resolve_actions,
+        // so template narration fires less often to avoid double-entries.
         match current.action {
             Action::Eat | Action::Sleep => {
+                let roll: u32 = rng.rng.random_range(0..3);
+                if roll != 0 {
+                    continue;
+                }
+            }
+            Action::Hunt | Action::Forage => {
                 let roll: u32 = rng.rng.random_range(0..3);
                 if roll != 0 {
                     continue;
@@ -118,6 +126,9 @@ pub fn generate_narrative(
                     life_stage: age.stage(tick, config.ticks_per_season),
                     fur_color: &appearance.fur_color,
                     other: other_name.as_deref(),
+                    prey: None,
+                    item: None,
+                    quality: None,
                 };
                 let text = resolve_variables(&template.text, &var_ctx);
                 log.push(tick, text, tier);

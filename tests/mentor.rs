@@ -2,11 +2,13 @@ use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::Schedule;
 
 use clowder::ai::{Action, CurrentAction};
+use clowder::components::identity::Name;
 use clowder::components::mental::{Memory, Mood};
 use clowder::components::physical::{Needs, Position};
 use clowder::components::skills::Skills;
 use clowder::resources::food::FoodStores;
 use clowder::resources::map::{Terrain, TileMap};
+use clowder::resources::narrative::NarrativeLog;
 use clowder::resources::relationships::Relationships;
 use clowder::resources::rng::SimRng;
 use clowder::resources::time::TimeState;
@@ -20,6 +22,7 @@ fn setup_world() -> (World, Schedule) {
     world.insert_resource(TimeState::default());
     world.insert_resource(clowder::resources::time::SimConfig::default());
     world.insert_resource(Relationships::default());
+    world.insert_resource(NarrativeLog::default());
     let mut schedule = Schedule::default();
     schedule.add_systems(resolve_actions);
     (world, schedule)
@@ -44,6 +47,7 @@ fn mentoring_restores_mastery() {
         Skills::default(), // hunting defaults to 0.1
         Memory::default(),
         Mood::default(),
+        Name("Apprentice".to_string()),
     )).id();
 
     let mentor = world.spawn((
@@ -59,6 +63,7 @@ fn mentoring_restores_mastery() {
         mentor_skills,
         Memory::default(),
         Mood::default(),
+        Name("Mentor".to_string()),
     )).id();
 
     let mastery_before = world.get::<Needs>(mentor).unwrap().mastery;
@@ -89,6 +94,7 @@ fn mentoring_grows_apprentice_skill() {
         apprentice_skills,
         Memory::default(),
         Mood::default(),
+        Name("Apprentice".to_string()),
     )).id();
 
     world.spawn((
@@ -104,6 +110,7 @@ fn mentoring_grows_apprentice_skill() {
         mentor_skills,
         Memory::default(),
         Mood::default(),
+        Name("Mentor".to_string()),
     ));
 
     let hunting_before = world.get::<Skills>(apprentice).unwrap().hunting;
@@ -132,6 +139,7 @@ fn mentoring_builds_fondness() {
         Skills::default(),
         Memory::default(),
         Mood::default(),
+        Name("Apprentice".to_string()),
     )).id();
 
     let mentor = world.spawn((
@@ -147,6 +155,7 @@ fn mentoring_builds_fondness() {
         mentor_skills,
         Memory::default(),
         Mood::default(),
+        Name("Mentor".to_string()),
     )).id();
 
     // Init relationship.

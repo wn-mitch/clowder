@@ -103,6 +103,9 @@ fn main() {
             life_stage: preview_life_stage,
             fur_color: preview_fur,
             other: None,
+            prey: None,
+            item: None,
+            quality: None,
         };
 
         // Print the scenario.

@@ -6,6 +6,7 @@ description = "A terminal-based colony simulation"
 
 [dependencies]
 bevy = "0.18"
+bevy_ecs_tilemap = "0.18"
 bevy_ecs = "0.18"
 ratatui = "0.29"
 crossterm = "0.28"

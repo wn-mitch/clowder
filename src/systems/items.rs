@@ -1,14 +1,33 @@
 use bevy_ecs::prelude::*;
+use rand::Rng;
 
 use crate::components::building::{StoredItems, Structure, StructureType};
 use crate::components::items::Item;
 use crate::resources::food::FoodStores;
+use crate::resources::narrative::{NarrativeLog, NarrativeTier};
+use crate::resources::rng::SimRng;
+use crate::resources::time::TimeState;
 
 /// Advance decay on every item entity. Despawn items whose condition has
-/// reached zero or below.
-pub fn decay_items(mut commands: Commands, mut items: Query<(Entity, &mut Item)>) {
+/// reached zero or below. Narrates food spoilage at a low rate.
+pub fn decay_items(
+    mut commands: Commands,
+    mut items: Query<(Entity, &mut Item)>,
+    mut log: ResMut<NarrativeLog>,
+    mut rng: ResMut<SimRng>,
+    time: Res<TimeState>,
+) {
     for (entity, mut item) in &mut items {
         if item.tick_decay() {
+            // Narrate food spoilage (~10% of destroyed food items).
+            if item.kind.is_food() && rng.rng.random::<f32>() < 0.1 {
+                let name = item.kind.name();
+                log.push(
+                    time.tick,
+                    format!("Some {name} in the stores has gone off."),
+                    NarrativeTier::Micro,
+                );
+            }
             commands.entity(entity).despawn();
         }
     }
@@ -56,7 +75,10 @@ mod tests {
     use crate::components::items::{Item, ItemKind, ItemLocation};
 
     fn setup() -> (World, Schedule) {
-        let world = World::new();
+        let mut world = World::new();
+        world.insert_resource(NarrativeLog::default());
+        world.insert_resource(SimRng::new(42));
+        world.insert_resource(TimeState::default());
         let mut schedule = Schedule::default();
         schedule.add_systems(decay_items);
         (world, schedule)

@@ -3,16 +3,17 @@ use rand::Rng;
 
 use crate::ai::{Action, CurrentAction};
 use crate::ai::pathfinding::step_toward;
+use crate::components::building::StructureType;
 use crate::components::coordination::{ActiveDirective, PendingDelivery};
-use crate::components::identity::{Gender, Orientation};
-use crate::components::items::{Item, ItemKind, ItemLocation};
+use crate::components::identity::{Gender, Name, Orientation};
+use crate::components::items::{Item, ItemKind, ItemLocation, quality_label};
 use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Needs, Position};
 use crate::components::prey::PreyAnimal;
 use crate::components::skills::Skills;
-use crate::components::building::StructureType;
 use crate::resources::map::TileMap;
+use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::relationships::Relationships;
 use crate::resources::rng::SimRng;
 use crate::resources::time::TimeState;
@@ -119,6 +120,7 @@ pub fn resolve_actions(
         &mut Memory,
         &mut Mood,
         Option<&crate::components::aspirations::Preferences>,
+        &Name,
     ), (Without<Dead>, Without<crate::components::task_chain::TaskChain>)>,
     traits_query: Query<(&Personality, &Gender, &Orientation)>,
     pending_delivery_query: Query<&PendingDelivery>,
@@ -135,6 +137,7 @@ pub fn resolve_actions(
     time: Res<TimeState>,
     config: Res<crate::resources::time::SimConfig>,
     mut relationships: ResMut<Relationships>,
+    mut log: ResMut<NarrativeLog>,
     mut commands: Commands,
 ) {
 
@@ -155,7 +158,7 @@ pub fn resolve_actions(
     let mut coordination_deliveries: Vec<(Entity, Entity)> = Vec::new();
     let mut mentor_effects: Vec<MentorEffect> = Vec::new();
 
-    for (entity, mut current, mut needs, mut pos, mut skills, mut memory, mut mood, preferences) in &mut query {
+    for (entity, mut current, mut needs, mut pos, mut skills, mut memory, mut mood, preferences, cat_name) in &mut query {
         if current.ticks_remaining == 0 {
             continue;
         }
@@ -189,7 +192,7 @@ pub fn resolve_actions(
             Action::Eat => {
                 // Find the nearest Stores building with a food item and consume it.
                 let cat_pos = *pos;
-                let mut ate = false;
+                let mut ate_kind: Option<ItemKind> = None;
                 if let Some((store_entity, _, _, _)) = stores_query
                     .iter()
                     .filter(|(_, _, s, _)| s.kind == StructureType::Stores)
@@ -208,14 +211,25 @@ pub fn resolve_actions(
                             if let Ok(item) = items_for_eating.get(item_entity) {
                                 let food_val = item.kind.food_value();
                                 needs.hunger = (needs.hunger + food_val).min(1.0);
-                                ate = true;
+                                ate_kind = Some(item.kind);
                             }
                             stored.remove(item_entity);
                             commands.entity(item_entity).despawn();
                         }
                     }
                 }
-                if !ate {
+                if let Some(kind) = ate_kind {
+                    // Outcome narrative: what was eaten (rate-limited, ~1 in 3).
+                    if rng.rng.random_range(0u32..3) == 0 {
+                        let cat = &cat_name.0;
+                        let item_name = kind.name();
+                        log.push(
+                            time.tick,
+                            format!("{cat} eats {item_name} from the stores."),
+                            NarrativeTier::Micro,
+                        );
+                    }
+                } else {
                     // No food available — stop eating.
                     current.ticks_remaining = 0;
                 }
@@ -259,17 +273,19 @@ pub fn resolve_actions(
                                 .min_by_key(|(_, _, _, sp)| cat_pos.manhattan_distance(sp))
                                 .map(|(e, _, _, _)| e);
 
-                            if let Some(store_entity) = nearest_store {
+                            let stored_in_building = if let Some(store_entity) = nearest_store {
                                 let item_entity = commands
                                     .spawn(Item::new(item_kind, quality, ItemLocation::StoredIn(store_entity)))
                                     .id();
                                 if let Ok((_, mut stored, _, _)) = stores_query.get_mut(store_entity) {
                                     stored.add(item_entity, StructureType::Stores);
                                 }
+                                true
                             } else {
                                 // No Stores building — drop on ground.
                                 commands.spawn(Item::new(item_kind, quality, ItemLocation::OnGround));
-                            }
+                                false
+                            };
 
                             // Remember this as a good hunting spot.
                             memory.remember(MemoryEntry {
@@ -285,6 +301,17 @@ pub fn resolve_actions(
                                 ticks_remaining: 30,
                                 source: format!("caught a {}", species.name()),
                             });
+
+                            // Outcome narrative: what was caught, quality, where it went.
+                            let prey_name = species.name();
+                            let cat = &cat_name.0;
+                            let text = match (quality_label(quality), stored_in_building) {
+                                (Some(ql), true) => format!("{cat} catches a {ql} {prey_name} and carries it to the stores."),
+                                (Some(ql), false) => format!("{cat} catches a {ql} {prey_name} and drops it on the ground."),
+                                (None, true) => format!("{cat} catches a {prey_name} and carries it to the stores."),
+                                (None, false) => format!("{cat} catches a {prey_name} but has nowhere to store it."),
+                            };
+                            log.push(time.tick, text, NarrativeTier::Action);
                         } else {
                             // Skill check passed but no prey nearby — treat as failure.
                             mood.modifiers.push_back(MoodModifier {
@@ -364,6 +391,15 @@ pub fn resolve_actions(
                                     // No Stores building — drop on ground.
                                     commands.spawn(Item::new(forage_kind, quality, ItemLocation::OnGround));
                                 }
+
+                                // Outcome narrative: what was gathered.
+                                let cat = &cat_name.0;
+                                let item_name = forage_kind.name();
+                                log.push(
+                                    time.tick,
+                                    format!("{cat} gathers {item_name} and adds them to the stores."),
+                                    NarrativeTier::Micro,
+                                );
                             }
                         }
 
@@ -553,7 +589,7 @@ pub fn resolve_actions(
 
     // Apply deferred social effects to target entities.
     for delta in &social_deltas {
-        if let Ok((_, _, mut needs, _, _, _, _, _)) = query.get_mut(delta.entity) {
+        if let Ok((_, _, mut needs, _, _, _, _, _, _)) = query.get_mut(delta.entity) {
             needs.social = (needs.social + delta.social_delta).min(1.0);
             needs.warmth = (needs.warmth + delta.warmth_delta).min(1.0);
         }
@@ -592,7 +628,7 @@ pub fn resolve_actions(
         let fondness = relationships.get(pair.a, pair.b).map_or(0.0, |r| r.fondness);
 
         // Check Hearth proximity for campfire-stories bonus.
-        let near_hearth = if let (Ok((_, _, _, pos_a, _, _, _, _)), Ok((_, _, _, pos_b, _, _, _, _))) =
+        let near_hearth = if let (Ok((_, _, _, pos_a, _, _, _, _, _)), Ok((_, _, _, pos_b, _, _, _, _, _))) =
             (query.get(pair.a), query.get(pair.b))
         {
             hearth_positions.iter().any(|hp| {
@@ -604,7 +640,7 @@ pub fn resolve_actions(
         let hearth_mult = if near_hearth { 1.5 } else { 1.0 };
 
         // Read both cats' memories (immutable borrows via query.get).
-        if let (Ok((_, _, _, _, _, mem_a, _, _)), Ok((_, _, _, _, _, mem_b, _, _))) =
+        if let (Ok((_, _, _, _, _, mem_a, _, _, _)), Ok((_, _, _, _, _, mem_b, _, _, _))) =
             (query.get(pair.a), query.get(pair.b))
         {
             // A → B transmission.
@@ -665,14 +701,14 @@ pub fn resolve_actions(
 
     // Apply memory transmissions.
     for tx in memory_transmissions {
-        if let Ok((_, _, _, _, _, mut mem, _, _)) = query.get_mut(tx.receiver) {
+        if let Ok((_, _, _, _, _, mut mem, _, _, _)) = query.get_mut(tx.receiver) {
             mem.remember(tx.entry);
         }
     }
 
     // Apply mentor effects: grow apprentice's weakest skill that the mentor excels at.
     for effect in &mentor_effects {
-        if let Ok((_, _, _, _, mut app_skills, _, _, _)) = query.get_mut(effect.apprentice) {
+        if let Ok((_, _, _, _, mut app_skills, _, _, _, _)) = query.get_mut(effect.apprentice) {
             let pairs: [(f32, f32); 6] = [
                 (effect.mentor_skills.hunting, app_skills.hunting),
                 (effect.mentor_skills.foraging, app_skills.foraging),
@@ -714,7 +750,7 @@ pub fn resolve_actions(
 
         // Compute coordinator's social weight for the bonus calculation.
         // We read the coordinator's memory from the main query.
-        let coord_sw = if let Ok((_, _, _, _, _, coord_memory, _, _)) = query.get(coordinator_entity) {
+        let coord_sw = if let Ok((_, _, _, _, _, coord_memory, _, _, _)) = query.get(coordinator_entity) {
             crate::systems::coordination::social_weight(
                 coordinator_entity,
                 &relationships,
@@ -750,7 +786,7 @@ pub fn resolve_actions(
         commands.entity(coordinator_entity).remove::<PendingDelivery>();
 
         // Small social bump for the coordinator (fulfilling their role).
-        if let Ok((_, _, mut needs, _, _, _, _, _)) = query.get_mut(coordinator_entity) {
+        if let Ok((_, _, mut needs, _, _, _, _, _, _)) = query.get_mut(coordinator_entity) {
             needs.social = (needs.social + 0.05).min(1.0);
         }
     }
@@ -779,6 +815,7 @@ mod tests {
         world.insert_resource(TimeState::default());
         world.insert_resource(crate::resources::time::SimConfig::default());
         world.insert_resource(Relationships::default());
+        world.insert_resource(crate::resources::narrative::NarrativeLog::default());
         let mut schedule = Schedule::default();
         schedule.add_systems(resolve_actions);
         (world, schedule)
@@ -830,6 +867,7 @@ mod tests {
                 Skills::default(),
                 Memory::default(),
                 Mood::default(),
+                Name("Test Cat".to_string()),
             ))
             .id()
     }
@@ -1090,6 +1128,7 @@ mod tests {
             Skills::default(),
             Memory::default(),
             Mood::default(),
+            Name("Groomer".to_string()),
         )).id();
 
         schedule.run(&mut world);
@@ -1119,6 +1158,7 @@ mod tests {
             Skills::default(),
             Memory::default(),
             Mood::default(),
+            Name("Target".to_string()),
         )).id();
 
         let _cat_a = world.spawn((
@@ -1134,6 +1174,7 @@ mod tests {
             Skills::default(),
             Memory::default(),
             Mood::default(),
+            Name("Socializer".to_string()),
         )).id();
 
         schedule.run(&mut world);
@@ -1158,6 +1199,7 @@ mod tests {
             Skills::default(),
             Memory::default(),
             Mood::default(),
+            Name("Target".to_string()),
         )).id();
 
         let cat_a = world.spawn((
@@ -1173,6 +1215,7 @@ mod tests {
             Skills::default(),
             Memory::default(),
             Mood::default(),
+            Name("Socializer".to_string()),
         )).id();
 
         // Init relationship with known fondness.

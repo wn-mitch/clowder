@@ -24,7 +24,11 @@ use crate::resources::time::{Season, SimConfig, TimeState};
 
 /// Every 10 ticks, tiles with corruption > 0.3 bleed a fraction of their
 /// corruption into the 4-adjacent neighbours.
-pub fn corruption_spread(mut map: ResMut<TileMap>, time: Res<TimeState>) {
+pub fn corruption_spread(
+    mut map: ResMut<TileMap>,
+    time: Res<TimeState>,
+    mut log: ResMut<NarrativeLog>,
+) {
     if !time.tick.is_multiple_of(10) {
         return;
     }
@@ -40,6 +44,7 @@ pub fn corruption_spread(mut map: ResMut<TileMap>, time: Res<TimeState>) {
         }
     }
 
+    let mut new_tiles_corrupted = 0u32;
     let deltas: [(i32, i32); 4] = [(0, 1), (0, -1), (1, 0), (-1, 0)];
     for (sx, sy, corruption) in sources {
         let spread = corruption * 0.001;
@@ -48,9 +53,22 @@ pub fn corruption_spread(mut map: ResMut<TileMap>, time: Res<TimeState>) {
             let ny = sy + dy;
             if map.in_bounds(nx, ny) {
                 let tile = map.get_mut(nx, ny);
+                let was_clean = tile.corruption < 0.05;
                 tile.corruption = (tile.corruption + spread).min(1.0);
+                if was_clean && tile.corruption >= 0.05 {
+                    new_tiles_corrupted += 1;
+                }
             }
         }
+    }
+
+    // Narrate when corruption reaches new ground.
+    if new_tiles_corrupted > 0 {
+        log.push(
+            time.tick,
+            "Dark tendrils creep across the ground. The corruption spreads.".to_string(),
+            NarrativeTier::Action,
+        );
     }
 }
 
@@ -666,6 +684,7 @@ mod tests {
         world.insert_resource(TileMap::new(10, 10, Terrain::Grass));
         world.insert_resource(SimRng::new(42));
         world.insert_resource(Relationships::default());
+        world.insert_resource(NarrativeLog::default());
         world
     }
 

@@ -82,6 +82,32 @@ impl ItemKind {
         )
     }
 
+    /// Human-readable name for narrative output.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::RawMouse => "mouse",
+            Self::RawRat => "rat",
+            Self::RawFish => "fish",
+            Self::RawBird => "bird",
+            Self::Berries => "berries",
+            Self::Nuts => "nuts",
+            Self::Roots => "roots",
+            Self::WildOnion => "wild onion",
+            Self::Mushroom => "mushrooms",
+            Self::Moss => "moss",
+            Self::DriedGrass => "dried grass",
+            Self::Feather => "feathers",
+            Self::HerbHealingMoss => "healing moss",
+            Self::HerbMoonpetal => "moonpetal",
+            Self::HerbCalmroot => "calmroot",
+            Self::HerbThornbriar => "thornbriar",
+            Self::HerbDreamroot => "dreamroot",
+            Self::ShinyPebble => "shiny pebble",
+            Self::GlassShard => "glass shard",
+            Self::ColorfulShell => "colorful shell",
+        }
+    }
+
     /// Hunger satisfaction provided when consumed (0.0–1.0 scale).
     /// Non-food items return 0.0.
     pub fn food_value(self) -> f32 {
@@ -95,6 +121,24 @@ impl ItemKind {
             Self::Roots | Self::WildOnion | Self::Mushroom => 0.1,
             _ => 0.0,
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Quality tiers for narrative
+// ---------------------------------------------------------------------------
+
+/// Returns a narrative label for notable item quality. Common quality returns
+/// `None` — only poor and above-average items are worth mentioning.
+pub fn quality_label(quality: f32) -> Option<&'static str> {
+    if quality < 0.2 {
+        Some("poor")
+    } else if quality >= 0.8 {
+        Some("exceptional")
+    } else if quality >= 0.5 {
+        Some("fine")
+    } else {
+        None // common quality — not worth narrating
     }
 }
 

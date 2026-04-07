@@ -101,6 +101,9 @@ pub fn prey_population(
 pub fn prey_hunger(
     mut commands: Commands,
     mut query: Query<(Entity, &mut PreyAnimal, &mut Health)>,
+    mut log: ResMut<NarrativeLog>,
+    mut rng: ResMut<SimRng>,
+    time: Res<TimeState>,
 ) {
     // Count population per species first (immutable pass) to avoid a conflicting
     // second Query over PreyAnimal.
@@ -131,6 +134,15 @@ pub fn prey_hunger(
         }
 
         if health.current <= 0.0 {
+            // Narrate prey starvation (~10% of deaths).
+            if rng.rng.random::<f32>() < 0.1 {
+                let species_name = animal.species.name();
+                log.push(
+                    time.tick,
+                    format!("A {species_name} collapses from hunger."),
+                    NarrativeTier::Micro,
+                );
+            }
             commands.entity(entity).despawn();
         }
     }

@@ -464,6 +464,12 @@ pub struct VariableContext<'a> {
     pub life_stage: LifeStage,
     pub other: Option<&'a str>,
     pub fur_color: &'a str,
+    /// Prey species name (e.g. "rat", "fish") — set by action outcomes.
+    pub prey: Option<&'a str>,
+    /// Item name (e.g. "berries", "mushrooms") — set by action outcomes.
+    pub item: Option<&'a str>,
+    /// Quality tier label (e.g. "fine", "exceptional") — only set for notable quality.
+    pub quality: Option<&'a str>,
 }
 
 pub fn resolve_variables(template_text: &str, ctx: &VariableContext<'_>) -> String {
@@ -482,6 +488,9 @@ pub fn resolve_variables(template_text: &str, ctx: &VariableContext<'_>) -> Stri
         .replace("{life_stage}", life_stage_label(ctx.life_stage))
         .replace("{fur_color}", ctx.fur_color)
         .replace("{other}", ctx.other.unwrap_or("a companion"))
+        .replace("{prey}", ctx.prey.unwrap_or("prey"))
+        .replace("{item}", ctx.item.unwrap_or("something"))
+        .replace("{quality}", ctx.quality.unwrap_or(""))
 }
 
 fn capitalize(s: &str) -> String {
@@ -875,6 +884,9 @@ mod tests {
             life_stage: LifeStage::Elder,
             fur_color: "tortoiseshell",
             other: None,
+            prey: None,
+            item: None,
+            quality: None,
         };
         let result = resolve_variables(text, &ctx);
         assert_eq!(
@@ -895,6 +907,9 @@ mod tests {
             life_stage: LifeStage::Adult,
             fur_color: "grey",
             other: None,
+            prey: None,
+            item: None,
+            quality: None,
         };
         let result = resolve_variables(text, &ctx);
         assert_eq!(
@@ -915,6 +930,9 @@ mod tests {
             life_stage: LifeStage::Adult,
             fur_color: "black",
             other: None,
+            prey: None,
+            item: None,
+            quality: None,
         };
         let result = resolve_variables(text, &ctx);
         assert_eq!(result, "Moss gives {unknown_var} a fish.");
@@ -932,6 +950,9 @@ mod tests {
             life_stage: LifeStage::Adult,
             fur_color: "grey",
             other: Some("Reed"),
+            prey: None,
+            item: None,
+            quality: None,
         };
         let result = resolve_variables(text, &ctx);
         assert_eq!(result, "Fern sits beside Reed.");
@@ -949,6 +970,9 @@ mod tests {
             life_stage: LifeStage::Adult,
             fur_color: "ginger",
             other: None,
+            prey: None,
+            item: None,
+            quality: None,
         };
         let result = resolve_variables(text, &ctx);
         assert_eq!(result, "Bramble grooms carefully.");

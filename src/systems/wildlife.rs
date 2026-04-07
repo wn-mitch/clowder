@@ -478,13 +478,20 @@ pub fn predator_hunt_prey(
                     let predator_name = predator.species.name();
                     commands.entity(prey_entity).despawn();
 
-                    // Rate-limited logging: ~5% of kills produce a narrative line.
-                    if rng.rng.random::<f32>() < 0.05 {
-                        log.push(
-                            time.tick,
-                            format!("A {predator_name} snatches a {species_name} from the undergrowth."),
-                            NarrativeTier::Micro,
-                        );
+                    // Rate-limited logging: ~15% of kills produce a narrative line.
+                    if rng.rng.random::<f32>() < 0.15 {
+                        let text = match predator.species {
+                            WildSpecies::Fox | WildSpecies::ShadowFox => {
+                                format!("A {predator_name} snatches a {species_name} from the undergrowth.")
+                            }
+                            WildSpecies::Hawk => {
+                                format!("A hawk dives and plucks a {species_name} from the ground.")
+                            }
+                            WildSpecies::Snake => {
+                                format!("A snake strikes at a {species_name} in the grass.")
+                            }
+                        };
+                        log.push(time.tick, text, NarrativeTier::Micro);
                     }
                 }
             }

@@ -5,8 +5,8 @@ use std::time::{Duration, Instant};
 use bevy::app::AppExit;
 use bevy::input::keyboard::KeyCode;
 use bevy::prelude::{
-    App, ButtonInput, ClearColor, Color, DefaultPlugins, MessageWriter, PluginGroup, Res, ResMut,
-    Startup, Time, Fixed, Update, Window, WindowPlugin,
+    App, ButtonInput, ClearColor, Color, DefaultPlugins, ImagePlugin, MessageWriter, PluginGroup,
+    Res, ResMut, Startup, Time, Fixed, Update, Window, WindowPlugin,
 };
 use bevy::window::WindowResolution;
 
@@ -53,7 +53,9 @@ fn main() {
     }
 
     App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
+        .add_plugins(DefaultPlugins
+            .set(ImagePlugin::default_nearest())
+            .set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Clowder".into(),
                 resolution: WindowResolution::new(1280, 720),
