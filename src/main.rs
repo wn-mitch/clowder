@@ -157,12 +157,14 @@ fn build_schedule() -> Schedule {
                 clowder::systems::magic::spawn_shadow_fox_from_corruption,
                 clowder::systems::wildlife::spawn_wildlife,
                 clowder::systems::wildlife::wildlife_ai,
+                clowder::systems::wildlife::predator_hunt_prey,
                 clowder::systems::prey::prey_population,
                 clowder::systems::prey::prey_hunger,
                 clowder::systems::wildlife::detect_threats,
                 clowder::systems::buildings::apply_building_effects,
                 clowder::systems::buildings::decay_building_condition,
                 clowder::systems::items::decay_items,
+                clowder::systems::items::sync_food_stores,
             )
                 .chain(),
             // Cat needs, mood, and decision-making

@@ -1,6 +1,8 @@
 use bevy_ecs::prelude::*;
 
+use crate::components::building::{StoredItems, Structure, StructureType};
 use crate::components::items::Item;
+use crate::resources::food::FoodStores;
 
 /// Advance decay on every item entity. Despawn items whose condition has
 /// reached zero or below.
@@ -9,6 +11,37 @@ pub fn decay_items(mut commands: Commands, mut items: Query<(Entity, &mut Item)>
         if item.tick_decay() {
             commands.entity(entity).despawn();
         }
+    }
+}
+
+/// Recalculate `FoodStores` from actual food items in Stores buildings.
+///
+/// This keeps `FoodStores` as a derived value for TUI, scoring, and
+/// coordination while the real food economy runs on items.
+pub fn sync_food_stores(
+    mut food: ResMut<FoodStores>,
+    stores_query: Query<(&Structure, &StoredItems)>,
+    items_query: Query<&Item>,
+) {
+    let mut total_food_value = 0.0f32;
+    let mut total_capacity = 0.0f32;
+
+    for (structure, stored) in stores_query.iter() {
+        if structure.kind == StructureType::Stores {
+            total_capacity += StoredItems::capacity(StructureType::Stores) as f32;
+            for &item_entity in &stored.items {
+                if let Ok(item) = items_query.get(item_entity) {
+                    if item.kind.is_food() {
+                        total_food_value += item.kind.food_value();
+                    }
+                }
+            }
+        }
+    }
+
+    food.current = total_food_value;
+    if total_capacity > 0.0 {
+        food.capacity = total_capacity;
     }
 }
 
@@ -72,6 +105,134 @@ mod tests {
             (item.condition - expected).abs() < f32::EPSILON,
             "condition should be {expected}, got {}",
             item.condition
+        );
+    }
+
+    // --- sync_food_stores ---
+
+    fn setup_sync() -> (World, Schedule) {
+        let mut world = World::new();
+        world.insert_resource(FoodStores::new(0.0, 50.0, 0.002));
+        let mut schedule = Schedule::default();
+        schedule.add_systems(sync_food_stores);
+        (world, schedule)
+    }
+
+    #[test]
+    fn sync_food_stores_sums_food_items_in_stores() {
+        let (mut world, mut schedule) = setup_sync();
+
+        // Spawn a Stores building with two food items.
+        let store = world
+            .spawn((
+                Structure::new(StructureType::Stores),
+                StoredItems::default(),
+            ))
+            .id();
+        let mouse = world
+            .spawn(Item::new(ItemKind::RawMouse, 1.0, ItemLocation::StoredIn(store)))
+            .id();
+        let fish = world
+            .spawn(Item::new(ItemKind::RawFish, 1.0, ItemLocation::StoredIn(store)))
+            .id();
+        world
+            .entity_mut(store)
+            .get_mut::<StoredItems>()
+            .unwrap()
+            .items = vec![mouse, fish];
+
+        schedule.run(&mut world);
+
+        let food = world.resource::<FoodStores>();
+        let expected = ItemKind::RawMouse.food_value() + ItemKind::RawFish.food_value();
+        assert!(
+            (food.current - expected).abs() < f32::EPSILON,
+            "FoodStores.current should be {expected}; got {}",
+            food.current
+        );
+    }
+
+    #[test]
+    fn sync_food_stores_ignores_non_food_items() {
+        let (mut world, mut schedule) = setup_sync();
+
+        let store = world
+            .spawn((
+                Structure::new(StructureType::Stores),
+                StoredItems::default(),
+            ))
+            .id();
+        let pebble = world
+            .spawn(Item::new(ItemKind::ShinyPebble, 1.0, ItemLocation::StoredIn(store)))
+            .id();
+        world
+            .entity_mut(store)
+            .get_mut::<StoredItems>()
+            .unwrap()
+            .items = vec![pebble];
+
+        schedule.run(&mut world);
+
+        let food = world.resource::<FoodStores>();
+        assert!(
+            food.current.abs() < f32::EPSILON,
+            "non-food items should not contribute to FoodStores; got {}",
+            food.current
+        );
+    }
+
+    #[test]
+    fn sync_food_stores_ignores_non_stores_buildings() {
+        let (mut world, mut schedule) = setup_sync();
+
+        // A Den with a food item should not count.
+        let den = world
+            .spawn((
+                Structure::new(StructureType::Den),
+                StoredItems::default(),
+            ))
+            .id();
+        let mouse = world
+            .spawn(Item::new(ItemKind::RawMouse, 1.0, ItemLocation::StoredIn(den)))
+            .id();
+        world
+            .entity_mut(den)
+            .get_mut::<StoredItems>()
+            .unwrap()
+            .items = vec![mouse];
+
+        schedule.run(&mut world);
+
+        let food = world.resource::<FoodStores>();
+        assert!(
+            food.current.abs() < f32::EPSILON,
+            "food in non-Stores buildings should not count; got {}",
+            food.current
+        );
+    }
+
+    #[test]
+    fn sync_food_stores_updates_capacity_from_stores_count() {
+        let (mut world, mut schedule) = setup_sync();
+
+        // Spawn two Stores buildings.
+        world.spawn((
+            Structure::new(StructureType::Stores),
+            StoredItems::default(),
+        ));
+        world.spawn((
+            Structure::new(StructureType::Stores),
+            StoredItems::default(),
+        ));
+
+        schedule.run(&mut world);
+
+        let food = world.resource::<FoodStores>();
+        let expected_capacity = (StoredItems::capacity(StructureType::Stores) * 2) as f32;
+        assert!(
+            (food.capacity - expected_capacity).abs() < f32::EPSILON,
+            "capacity should be {expected_capacity}; got {}",
+            food.capacity
         );
     }
 }

@@ -11,7 +11,7 @@ use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Needs, Position};
 use crate::components::prey::PreyAnimal;
 use crate::components::skills::Skills;
-use crate::resources::food::FoodStores;
+use crate::components::building::StructureType;
 use crate::resources::map::TileMap;
 use crate::resources::relationships::Relationships;
 use crate::resources::rng::SimRng;
@@ -108,7 +108,7 @@ fn pick_forage_item(terrain: &crate::resources::map::Terrain, rng: &mut SimRng) 
 
 /// - Then applies the per-tick effect for the action that is now in progress.
 /// - Movement actions call `step_toward` each tick to close on the target.
-/// - Hunt/Forage deposit food into `FoodStores` and grow skills.
+/// - Hunt/Forage store food items in Stores buildings and grow skills.
 /// - Socialize/Groom effects on the *target* cat are deferred and applied after
 ///   the main iteration loop to avoid borrow conflicts.
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
@@ -128,16 +128,18 @@ pub fn resolve_actions(
     active_directive_query: Query<&ActiveDirective>,
     building_positions: Query<(&crate::components::building::Structure, &Position), Without<CurrentAction>>,
     prey_query: Query<(Entity, &PreyAnimal, &Position), Without<CurrentAction>>,
+    mut stores_query: Query<
+        (Entity, &mut crate::components::building::StoredItems, &crate::components::building::Structure, &Position),
+        (Without<CurrentAction>, Without<Dead>),
+    >,
+    items_for_eating: Query<&Item>,
     map: Res<TileMap>,
-    mut food: ResMut<FoodStores>,
     mut rng: ResMut<SimRng>,
     time: Res<TimeState>,
     config: Res<crate::resources::time::SimConfig>,
     mut relationships: ResMut<Relationships>,
     mut commands: Commands,
 ) {
-    // Apply spoilage once per tick.
-    food.spoil();
 
     let season = time.season(&config);
 
@@ -188,10 +190,36 @@ pub fn resolve_actions(
 
         match current.action {
             Action::Eat => {
-                let taken = food.withdraw(0.04);
-                needs.hunger = (needs.hunger + taken).min(1.0);
-                // If stores ran out, stop eating early.
-                if food.is_empty() {
+                // Find the nearest Stores building with a food item and consume it.
+                let cat_pos = *pos;
+                let mut ate = false;
+                if let Some((store_entity, _, _, _)) = stores_query
+                    .iter()
+                    .filter(|(_, _, s, _)| s.kind == StructureType::Stores)
+                    .min_by_key(|(_, _, _, sp)| cat_pos.manhattan_distance(sp))
+                {
+                    // We need a second pass to get mutable access.
+                    if let Ok((_, mut stored, _, _)) = stores_query.get_mut(store_entity) {
+                        // Find the first food item in this store.
+                        let food_item = stored.items.iter()
+                            .copied()
+                            .find(|&item_e| {
+                                items_for_eating.get(item_e)
+                                    .map_or(false, |item| item.kind.is_food())
+                            });
+                        if let Some(item_entity) = food_item {
+                            if let Ok(item) = items_for_eating.get(item_entity) {
+                                let food_val = item.kind.food_value();
+                                needs.hunger = (needs.hunger + food_val).min(1.0);
+                                ate = true;
+                            }
+                            stored.remove(item_entity);
+                            commands.entity(item_entity).despawn();
+                        }
+                    }
+                }
+                if !ate {
+                    // No food available — stop eating.
                     current.ticks_remaining = 0;
                 }
             }
@@ -226,11 +254,25 @@ pub fn resolve_actions(
                             // Despawn the prey entity.
                             commands.entity(prey_entity).despawn();
 
-                            // Spawn an item carried by this cat.
-                            commands.spawn(Item::new(item_kind, quality, ItemLocation::Carried(entity)));
+                            // Store the item in the nearest Stores building.
+                            let cat_pos = *pos;
+                            let nearest_store = stores_query
+                                .iter()
+                                .filter(|(_, _, s, _)| s.kind == StructureType::Stores)
+                                .min_by_key(|(_, _, _, sp)| cat_pos.manhattan_distance(sp))
+                                .map(|(e, _, _, _)| e);
 
-                            // Backward-compat: also deposit to legacy FoodStores.
-                            food.deposit(item_kind.food_value());
+                            if let Some(store_entity) = nearest_store {
+                                let item_entity = commands
+                                    .spawn(Item::new(item_kind, quality, ItemLocation::StoredIn(store_entity)))
+                                    .id();
+                                if let Ok((_, mut stored, _, _)) = stores_query.get_mut(store_entity) {
+                                    stored.add(item_entity, StructureType::Stores);
+                                }
+                            } else {
+                                // No Stores building — drop on ground.
+                                commands.spawn(Item::new(item_kind, quality, ItemLocation::OnGround));
+                            }
 
                             // Remember this as a good hunting spot.
                             memory.remember(MemoryEntry {
@@ -273,7 +315,7 @@ pub fn resolve_actions(
                             *pos = next;
                         }
                     } else {
-                        // At destination: gather food based on terrain yield.
+                        // At destination: check terrain yield.
                         let mut yielded = false;
                         if map.in_bounds(pos.x, pos.y) {
                             let tile = map.get(pos.x, pos.y);
@@ -281,12 +323,11 @@ pub fn resolve_actions(
                                 * (0.15 + skills.foraging * 0.6)
                                 * season.foraging_multiplier();
                             if yield_amount > 0.0 {
-                                food.deposit(yield_amount);
                                 yielded = true;
                             }
                         }
 
-                        // On last tick at a productive spot: remember + mood boost.
+                        // On last tick at a productive spot: spawn item, remember + mood boost.
                         if yielded && current.ticks_remaining == 0 {
                             memory.remember(MemoryEntry {
                                 event_type: MemoryType::ResourceFound,
@@ -302,12 +343,30 @@ pub fn resolve_actions(
                                 source: "good foraging".to_string(),
                             });
 
-                            // Spawn a foraged item carried by this cat.
+                            // Spawn a foraged item in the nearest Stores building.
                             if map.in_bounds(pos.x, pos.y) {
                                 let tile = map.get(pos.x, pos.y);
                                 let forage_kind = pick_forage_item(&tile.terrain, &mut rng);
                                 let quality = (0.3 + skills.foraging * 0.3).clamp(0.0, 1.0);
-                                commands.spawn(Item::new(forage_kind, quality, ItemLocation::Carried(entity)));
+
+                                let cat_pos = *pos;
+                                let nearest_store = stores_query
+                                    .iter()
+                                    .filter(|(_, _, s, _)| s.kind == StructureType::Stores)
+                                    .min_by_key(|(_, _, _, sp)| cat_pos.manhattan_distance(sp))
+                                    .map(|(e, _, _, _)| e);
+
+                                if let Some(store_entity) = nearest_store {
+                                    let item_entity = commands
+                                        .spawn(Item::new(forage_kind, quality, ItemLocation::StoredIn(store_entity)))
+                                        .id();
+                                    if let Ok((_, mut stored, _, _)) = stores_query.get_mut(store_entity) {
+                                        stored.add(item_entity, StructureType::Stores);
+                                    }
+                                } else {
+                                    // No Stores building — drop on ground.
+                                    commands.spawn(Item::new(forage_kind, quality, ItemLocation::OnGround));
+                                }
                             }
                         }
 
@@ -709,6 +768,8 @@ mod tests {
     use super::*;
     use bevy_ecs::schedule::Schedule;
 
+    use crate::components::building::{StoredItems, Structure};
+    use crate::components::items::{Item, ItemKind, ItemLocation};
     use crate::components::mental::{Memory, Mood};
     use crate::components::skills::Skills;
     use crate::resources::map::{Terrain, TileMap};
@@ -717,7 +778,6 @@ mod tests {
     fn setup_world() -> (World, Schedule) {
         let mut world = World::new();
         world.insert_resource(TileMap::new(20, 20, Terrain::Grass));
-        world.insert_resource(FoodStores::default());
         world.insert_resource(SimRng::new(42));
         world.insert_resource(TimeState::default());
         world.insert_resource(crate::resources::time::SimConfig::default());
@@ -725,6 +785,30 @@ mod tests {
         let mut schedule = Schedule::default();
         schedule.add_systems(resolve_actions);
         (world, schedule)
+    }
+
+    /// Spawn a Stores building at the given position with the given food items.
+    fn spawn_stores_with_food(world: &mut World, pos: Position, food_items: &[ItemKind]) -> Entity {
+        let store = world
+            .spawn((
+                Structure::new(StructureType::Stores),
+                StoredItems::default(),
+                pos,
+            ))
+            .id();
+
+        for &kind in food_items {
+            let item_entity = world
+                .spawn(Item::new(kind, 1.0, ItemLocation::StoredIn(store)))
+                .id();
+            world
+                .entity_mut(store)
+                .get_mut::<StoredItems>()
+                .unwrap()
+                .add(item_entity, StructureType::Stores);
+        }
+
+        store
     }
 
     fn spawn_cat(
@@ -753,19 +837,25 @@ mod tests {
             .id()
     }
 
-    /// Eating should increase hunger and deduct from food stores.
+    /// Eating should increase hunger by consuming a food item from a Stores building.
     #[test]
     fn eating_restores_hunger_and_consumes_food() {
         let (mut world, mut schedule) = setup_world();
+
+        let store = spawn_stores_with_food(
+            &mut world,
+            Position::new(5, 5),
+            &[ItemKind::RawMouse, ItemKind::RawFish],
+        );
 
         let mut needs = Needs::default();
         needs.hunger = 0.5;
 
         let entity = spawn_cat(&mut world, Action::Eat, 3, None, needs, Position::new(5, 5));
 
-        let food_before = world.resource::<FoodStores>().current;
+        let items_before = world.get::<StoredItems>(store).unwrap().items.len();
         schedule.run(&mut world);
-        let food_after = world.resource::<FoodStores>().current;
+        let items_after = world.get::<StoredItems>(store).unwrap().items.len();
 
         let n = world.get::<Needs>(entity).unwrap();
         assert!(
@@ -774,16 +864,18 @@ mod tests {
             n.hunger
         );
         assert!(
-            food_after < food_before,
-            "food stores should decrease; before={food_before}, after={food_after}"
+            items_after < items_before,
+            "stored items should decrease; before={items_before}, after={items_after}"
         );
     }
 
-    /// Eating stops early when food stores are empty.
+    /// Eating stops early when no food items are available.
     #[test]
     fn eating_stops_when_stores_empty() {
         let (mut world, mut schedule) = setup_world();
-        world.insert_resource(FoodStores::new(0.01, 50.0, 0.0));
+
+        // Stores building with no food items.
+        spawn_stores_with_food(&mut world, Position::new(5, 5), &[]);
 
         let mut needs = Needs::default();
         needs.hunger = 0.5;
@@ -795,7 +887,7 @@ mod tests {
         let ca = world.get::<CurrentAction>(entity).unwrap();
         assert_eq!(
             ca.ticks_remaining, 0,
-            "eating should stop early when food runs out"
+            "eating should stop early when no food items available"
         );
     }
 
@@ -803,6 +895,9 @@ mod tests {
     #[test]
     fn eating_clamps_hunger_at_one() {
         let (mut world, mut schedule) = setup_world();
+
+        // RawRat has food_value 0.4, hunger starts at 0.99 — should clamp to 1.0.
+        spawn_stores_with_food(&mut world, Position::new(5, 5), &[ItemKind::RawRat]);
 
         let mut needs = Needs::default();
         needs.hunger = 0.99;
@@ -944,7 +1039,7 @@ mod tests {
         schedule.run(&mut world);
 
         let n = world.get::<Needs>(entity).unwrap();
-        // Spoilage still runs, but the cat's hunger should not change from eating.
+        // The cat's hunger should not change since ticks_remaining is 0.
         assert_eq!(n.hunger, 0.5, "zero-tick action should not modify needs");
     }
 

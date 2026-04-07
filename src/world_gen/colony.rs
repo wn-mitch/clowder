@@ -2,8 +2,9 @@ use bevy_ecs::prelude::World;
 use rand::Rng;
 use rand::seq::SliceRandom;
 
-use crate::components::building::{StoredItems, Structure};
+use crate::components::building::{StoredItems, Structure, StructureType};
 use crate::components::identity::Name;
+use crate::components::items::{Item, ItemKind, ItemLocation};
 use crate::components::{Appearance, Gender, Orientation, Personality, Position, Skills, ZodiacSign};
 use crate::resources::map::{Terrain, TileMap};
 
@@ -277,8 +278,6 @@ fn stamp_footprint(map: &mut TileMap, anchor: Position, terrain: Terrain, size: 
 /// ECS entity with `Structure` + `Position` + `Name` (for mechanical effects).
 /// The anchor position is the top-left corner of the footprint.
 pub fn spawn_starting_buildings(world: &mut World, colony_site: Position, map: &mut TileMap) {
-    use crate::components::building::StructureType;
-
     let hearth_pos = colony_site;
     let den_size = StructureType::Den.default_size();
     let hearth_size = StructureType::Hearth.default_size();
@@ -306,12 +305,34 @@ pub fn spawn_starting_buildings(world: &mut World, colony_site: Position, map: &
         den_pos,
         Structure::new(StructureType::Den),
     ));
-    world.spawn((
+    let stores_entity = world.spawn((
         Name("The Stores".to_string()),
         stores_pos,
         Structure::new(StructureType::Stores),
         StoredItems::default(),
-    ));
+    )).id();
+
+    // Seed starting food supply. A mix of foraged and hunted items to give
+    // the colony a buffer while cats establish hunting/foraging routines.
+    let starting_food: &[ItemKind] = &[
+        ItemKind::RawMouse, ItemKind::RawMouse,
+        ItemKind::RawRat, ItemKind::RawRat,
+        ItemKind::RawFish, ItemKind::RawFish,
+        ItemKind::RawBird,
+        ItemKind::Berries, ItemKind::Berries, ItemKind::Berries,
+        ItemKind::Nuts, ItemKind::Nuts, ItemKind::Nuts,
+        ItemKind::Roots, ItemKind::Roots,
+    ];
+    for &kind in starting_food {
+        let item_entity = world
+            .spawn(Item::new(kind, 0.8, ItemLocation::StoredIn(stores_entity)))
+            .id();
+        world
+            .entity_mut(stores_entity)
+            .get_mut::<StoredItems>()
+            .unwrap()
+            .add(item_entity, StructureType::Stores);
+    }
 }
 
 // ---------------------------------------------------------------------------
