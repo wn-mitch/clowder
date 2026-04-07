@@ -463,10 +463,10 @@ pub fn predator_hunt_prey(
         let mut nearest: Option<(Entity, i32)> = None;
         for (prey_entity, _prey_animal, prey_pos) in prey.iter() {
             let dist = pred_pos.manhattan_distance(prey_pos);
-            if dist <= hunt_range {
-                if nearest.is_none() || dist < nearest.unwrap().1 {
-                    nearest = Some((prey_entity, dist));
-                }
+            if dist <= hunt_range
+                && (nearest.is_none() || dist < nearest.unwrap().1)
+            {
+                nearest = Some((prey_entity, dist));
             }
         }
 

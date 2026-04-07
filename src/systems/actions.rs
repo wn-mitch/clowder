@@ -74,9 +74,6 @@ fn approx_location_match(a: &Option<Position>, b: &Option<Position>) -> bool {
 // resolve_actions system
 // ---------------------------------------------------------------------------
 
-/// Advance every in-progress cat action by one tick and apply its effect.
-///
-/// - Decrements `ticks_remaining` first.
 // ---------------------------------------------------------------------------
 // Forage helpers
 // ---------------------------------------------------------------------------
@@ -205,7 +202,7 @@ pub fn resolve_actions(
                             .copied()
                             .find(|&item_e| {
                                 items_for_eating.get(item_e)
-                                    .map_or(false, |item| item.kind.is_food())
+                                    .is_ok_and(|item| item.kind.is_food())
                             });
                         if let Some(item_entity) = food_item {
                             if let Ok(item) = items_for_eating.get(item_entity) {
