@@ -22,6 +22,7 @@ pub struct AppArgs {
     pub seed: u64,
     pub load_path: Option<PathBuf>,
     pub load_log_path: Option<PathBuf>,
+    pub test_map: bool,
 }
 
 /// Exclusive startup system — has direct `&mut World` access for complex
@@ -30,6 +31,7 @@ pub fn setup_world_exclusive(world: &mut World) {
     let args_seed;
     let args_load_path;
     let args_load_log_path;
+    let args_test_map;
 
     // Extract args before mutating world.
     {
@@ -37,6 +39,7 @@ pub fn setup_world_exclusive(world: &mut World) {
         args_seed = args.seed;
         args_load_path = args.load_path.clone();
         args_load_log_path = args.load_log_path.clone();
+        args_test_map = args.test_map;
     }
 
     if let Some(ref load_path) = args_load_path {
@@ -46,11 +49,11 @@ pub fn setup_world_exclusive(world: &mut World) {
             }
             Err(e) => {
                 eprintln!("Error loading save: {e}");
-                build_new_world(world, args_seed);
+                build_new_world(world, args_seed, args_test_map);
             }
         }
     } else {
-        build_new_world(world, args_seed);
+        build_new_world(world, args_seed, args_test_map);
     }
 
     // Load template data.
@@ -91,7 +94,7 @@ pub fn setup_world_exclusive(world: &mut World) {
     }
 }
 
-fn build_new_world(world: &mut World, seed: u64) {
+fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     let config = SimConfig {
         seed,
         ..SimConfig::default()
@@ -99,7 +102,12 @@ fn build_new_world(world: &mut World, seed: u64) {
     let mut sim_rng = SimRng::new(seed);
 
     // Generate terrain.
-    let mut map = generate_terrain(80, 60, &mut sim_rng.rng);
+    let mut map = if test_map {
+        eprintln!("Using hand-crafted test map for rendering debug");
+        crate::world_gen::test_map::generate_test_map()
+    } else {
+        generate_terrain(80, 60, &mut sim_rng.rng)
+    };
 
     // Set initial corruption and mystery on special tiles.
     crate::world_gen::herbs::initialize_tile_magic(&mut map, &mut sim_rng.rng);

@@ -41,6 +41,7 @@ struct CliArgs {
     log_path: Option<PathBuf>,
     load_log_path: Option<PathBuf>,
     event_log_path: Option<PathBuf>,
+    test_map: bool,
 }
 
 fn main() {
@@ -70,6 +71,7 @@ fn main() {
             seed: args.seed,
             load_path: args.load_path,
             load_log_path: args.load_log_path,
+            test_map: args.test_map,
         })
         .add_systems(
             Startup,
@@ -129,6 +131,7 @@ fn parse_args() -> CliArgs {
     let mut log_path = None;
     let mut load_log_path = None;
     let mut event_log_path = None;
+    let mut test_map = false;
     let mut iter = args.iter().skip(1);
     while let Some(arg) = iter.next() {
         match arg.as_str() {
@@ -169,6 +172,9 @@ fn parse_args() -> CliArgs {
                     event_log_path = Some(PathBuf::from(path));
                 }
             }
+            "--test-map" => {
+                test_map = true;
+            }
             _ => {}
         }
     }
@@ -185,6 +191,7 @@ fn parse_args() -> CliArgs {
         log_path,
         load_log_path,
         event_log_path,
+        test_map,
     }
 }
 
@@ -281,7 +288,7 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
         persistence::load_world(&mut w, save);
         w
     } else {
-        build_new_world(args.seed)?
+        build_new_world(args.seed, args.test_map)?
     };
 
     load_templates(&mut world);
@@ -498,7 +505,7 @@ fn load_log_file(world: &mut World, path: &std::path::Path) -> io::Result<()> {
 // World construction helpers
 // ---------------------------------------------------------------------------
 
-fn build_new_world(seed: u64) -> io::Result<World> {
+fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
     let config = SimConfig {
         seed,
         ..SimConfig::default()
@@ -506,7 +513,11 @@ fn build_new_world(seed: u64) -> io::Result<World> {
     let mut sim_rng = SimRng::new(seed);
 
     // Generate terrain.
-    let mut map = generate_terrain(80, 60, &mut sim_rng.rng);
+    let mut map = if test_map {
+        clowder::world_gen::test_map::generate_test_map()
+    } else {
+        generate_terrain(80, 60, &mut sim_rng.rng)
+    };
 
     // Set initial corruption and mystery on special tiles.
     clowder::world_gen::herbs::initialize_tile_magic(&mut map, &mut sim_rng.rng);

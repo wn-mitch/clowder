@@ -1,7 +1,8 @@
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+use bevy::sprite::Text2d;
 
-use crate::components::identity::{Appearance, Species};
+use crate::components::identity::{Appearance, Name, Species};
 use crate::components::magic::{Herb, Harvestable, Ward};
 use crate::components::physical::{Dead, Position};
 use crate::components::prey::PreyAnimal;
@@ -38,7 +39,7 @@ pub fn attach_entity_sprites(
     white_pixel: Res<WhitePixel>,
     map: Res<TileMap>,
     cats: Query<
-        (Entity, &Position, &Appearance),
+        (Entity, &Position, &Appearance, &Name),
         (With<Species>, Without<EntitySpriteMarker>, Without<Dead>),
     >,
     dead_cats: Query<
@@ -74,10 +75,24 @@ pub fn attach_entity_sprites(
         );
     }
 
-    // Living cats — colored by fur.
-    for (entity, pos, appearance) in &cats {
+    // Living cats — colored by fur, with name label.
+    for (entity, pos, appearance, name) in &cats {
         let color = fur_color_to_bevy(&appearance.fur_color);
         let (x, y) = grid_to_world(pos, map_h, world_px);
+
+        // Name label as a child entity, offset above the sprite.
+        let label = commands
+            .spawn((
+                Text2d::new(&name.0),
+                TextFont {
+                    font_size: 10.0,
+                    ..Default::default()
+                },
+                TextColor(Color::srgb(0.95, 0.92, 0.85)),
+                Transform::from_xyz(0.0, world_px * 0.55, 1.0),
+            ))
+            .id();
+
         commands.entity(entity).insert((
             Sprite {
                 image: white_pixel.0.clone(),
@@ -88,6 +103,7 @@ pub fn attach_entity_sprites(
             Transform::from_xyz(x, y, 20.0),
             EntitySpriteMarker,
         ));
+        commands.entity(entity).add_children(&[label]);
     }
 
     // Dead cats — gray.
