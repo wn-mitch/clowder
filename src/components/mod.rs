@@ -18,7 +18,7 @@ pub use aspirations::{
     ActiveAspiration, AspirationChain, AspirationDomain, Aspirations, AspirationsInitialized,
     Milestone, MilestoneCondition, Preference, Preferences,
 };
-pub use building::{ConstructionSite, CropState, GateState, Structure, StructureType};
+pub use building::{ConstructionSite, CropState, GateState, StoredItems, Structure, StructureType};
 pub use fate::{FateAssigned, FatedLove, FatedRival};
 pub use coordination::{
     ActiveDirective, Coordinator, CoordinatorDied, Directive, DirectiveKind, DirectiveQueue,

@@ -241,6 +241,53 @@ pub struct CropState {
 }
 
 // ---------------------------------------------------------------------------
+// StoredItems component
+// ---------------------------------------------------------------------------
+
+/// Tracks items stored inside a building. Capacity depends on building type.
+#[derive(Component, Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct StoredItems {
+    #[serde(skip, default)]
+    pub items: Vec<Entity>,
+}
+
+impl StoredItems {
+    /// Maximum number of items this building type can hold.
+    pub fn capacity(kind: StructureType) -> usize {
+        match kind {
+            StructureType::Stores => 30,
+            StructureType::Den => 5,
+            StructureType::Workshop => 10,
+            _ => 0,
+        }
+    }
+
+    /// Whether this building is at capacity.
+    pub fn is_full(&self, kind: StructureType) -> bool {
+        self.items.len() >= Self::capacity(kind)
+    }
+
+    /// Attempt to add an item. Returns `false` if at capacity.
+    pub fn add(&mut self, item: Entity, kind: StructureType) -> bool {
+        if self.is_full(kind) {
+            return false;
+        }
+        self.items.push(item);
+        true
+    }
+
+    /// Remove an item by entity. Returns `false` if not found.
+    pub fn remove(&mut self, item: Entity) -> bool {
+        if let Some(pos) = self.items.iter().position(|&e| e == item) {
+            self.items.swap_remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // GateState component
 // ---------------------------------------------------------------------------
 
@@ -429,5 +476,47 @@ mod tests {
     fn gate_defaults_closed() {
         let gate = GateState::default();
         assert!(!gate.open);
+    }
+
+    // --- StoredItems ---
+
+    #[test]
+    fn stores_has_capacity_30() {
+        assert_eq!(StoredItems::capacity(StructureType::Stores), 30);
+    }
+
+    #[test]
+    fn den_has_capacity_5() {
+        assert_eq!(StoredItems::capacity(StructureType::Den), 5);
+    }
+
+    #[test]
+    fn wall_has_no_storage() {
+        assert_eq!(StoredItems::capacity(StructureType::Wall), 0);
+    }
+
+    #[test]
+    fn add_respects_capacity() {
+        use bevy_ecs::world::World;
+        let mut world = World::new();
+        let e = world.spawn_empty().id();
+
+        // Wall has 0 capacity — add should fail immediately.
+        let mut wall_storage = StoredItems::default();
+        assert!(!wall_storage.add(e, StructureType::Wall));
+
+        // Stores has 30 capacity — first add should succeed.
+        let mut stores_storage = StoredItems::default();
+        assert!(stores_storage.add(e, StructureType::Stores));
+        assert_eq!(stores_storage.items.len(), 1);
+    }
+
+    #[test]
+    fn remove_returns_false_for_missing() {
+        use bevy_ecs::world::World;
+        let mut world = World::new();
+        let e = world.spawn_empty().id();
+        let mut storage = StoredItems::default();
+        assert!(!storage.remove(e));
     }
 }

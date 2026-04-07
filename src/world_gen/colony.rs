@@ -2,7 +2,7 @@ use bevy_ecs::prelude::World;
 use rand::Rng;
 use rand::seq::SliceRandom;
 
-use crate::components::building::Structure;
+use crate::components::building::{StoredItems, Structure};
 use crate::components::identity::Name;
 use crate::components::{Appearance, Gender, Orientation, Personality, Position, Skills, ZodiacSign};
 use crate::resources::map::{Terrain, TileMap};
@@ -310,6 +310,7 @@ pub fn spawn_starting_buildings(world: &mut World, colony_site: Position, map: &
         Name("The Stores".to_string()),
         stores_pos,
         Structure::new(StructureType::Stores),
+        StoredItems::default(),
     ));
 }
 
