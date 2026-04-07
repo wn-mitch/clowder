@@ -22,11 +22,12 @@ pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
+        app.init_resource::<camera::AutoScreenshot>()
+            .add_systems(
                 Startup,
                 camera::setup_camera
                     .after(crate::plugins::setup::setup_world_exclusive),
             )
-            .add_systems(Update, camera::camera_controls);
+            .add_systems(Update, (camera::camera_controls, camera::auto_screenshot));
     }
 }

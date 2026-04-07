@@ -4,7 +4,7 @@ use bevy_ecs_tilemap::prelude::*;
 use crate::rendering::terrain_sprites::{
     base_tile_index, cardinal_bitmask, grass_overlay_atlas_index, has_grass_overlay,
 };
-use crate::resources::map::TileMap;
+use crate::resources::map::{Terrain, TileMap};
 
 /// Marker component for the base terrain layer.
 #[derive(Component)]
@@ -120,4 +120,35 @@ pub fn create_tilemap(
         },
         GrassOverlayLayer,
     ));
+
+    // Debug: dump terrain grid to /tmp for analysis.
+    dump_terrain_debug(&map);
+}
+
+fn dump_terrain_debug(map: &TileMap) {
+    use std::io::Write;
+    let Ok(mut f) = std::fs::File::create("/tmp/clowder_terrain.txt") else { return };
+    for y in 0..map.height {
+        for x in 0..map.width {
+            let t = &map.get(x, y).terrain;
+            let ch = match t {
+                Terrain::Grass => '.',
+                Terrain::LightForest => 't',
+                Terrain::DenseForest => 'T',
+                Terrain::Water => '~',
+                Terrain::Rock => '#',
+                Terrain::Mud => ',',
+                Terrain::Sand => ':',
+                Terrain::Den => 'D',
+                Terrain::Hearth => 'H',
+                Terrain::Stores => 'S',
+                Terrain::Workshop => 'W',
+                Terrain::Garden => 'G',
+                _ => '?',
+            };
+            let _ = write!(f, "{ch}");
+        }
+        let _ = writeln!(f);
+    }
+    eprintln!("Terrain dump → /tmp/clowder_terrain.txt");
 }

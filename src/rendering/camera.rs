@@ -18,6 +18,10 @@ pub fn setup_camera(mut commands: Commands, map: Res<TileMap>) {
     commands.spawn((
         Camera2d,
         Transform::from_xyz(center_x, center_y, 999.0),
+        Projection::Orthographic(OrthographicProjection {
+            scale: 0.5,
+            ..OrthographicProjection::default_2d()
+        }),
         GameCamera,
     ));
 }
@@ -75,9 +79,43 @@ pub fn camera_controls(
         transform.translation.y += direction.y * pan_speed;
     }
 
-    // Screenshot with F12.
-    if keyboard.just_pressed(KeyCode::F12) {
+    // Screenshot with F5.
+    if keyboard.just_pressed(KeyCode::F5) {
         commands.spawn(Screenshot::primary_window())
             .observe(save_to_disk("/tmp/clowder_screenshot.png"));
+    }
+}
+
+/// Resource that tracks auto-screenshot timing.
+#[derive(Resource)]
+pub struct AutoScreenshot {
+    timer: bevy::time::Timer,
+    taken: bool,
+}
+
+impl Default for AutoScreenshot {
+    fn default() -> Self {
+        Self {
+            timer: bevy::time::Timer::from_seconds(2.0, bevy::time::TimerMode::Once),
+            taken: false,
+        }
+    }
+}
+
+/// Takes a screenshot automatically after a delay (for CLI debugging).
+pub fn auto_screenshot(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut state: ResMut<AutoScreenshot>,
+) {
+    if state.taken {
+        return;
+    }
+    state.timer.tick(time.delta());
+    if state.timer.just_finished() {
+        state.taken = true;
+        commands.spawn(Screenshot::primary_window())
+            .observe(save_to_disk("/tmp/clowder_screenshot.png"));
+        eprintln!("Auto-screenshot → /tmp/clowder_screenshot.png");
     }
 }
