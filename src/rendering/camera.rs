@@ -19,7 +19,7 @@ pub fn setup_camera(mut commands: Commands, map: Res<TileMap>) {
         Camera2d,
         Transform::from_xyz(center_x, center_y, 999.0),
         Projection::Orthographic(OrthographicProjection {
-            scale: 0.5,
+            scale: 1.0,
             ..OrthographicProjection::default_2d()
         }),
         GameCamera,

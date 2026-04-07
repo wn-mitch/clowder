@@ -1,6 +1,7 @@
 pub mod terrain_sprites;
 pub mod tilemap_sync;
 pub mod camera;
+pub mod entity_sprites;
 
 use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
@@ -12,8 +13,19 @@ impl Plugin for RenderingPlugin {
         app.add_plugins(TilemapPlugin)
             .add_systems(
                 Startup,
-                tilemap_sync::create_tilemap
+                (
+                    tilemap_sync::create_tilemap,
+                    entity_sprites::create_white_pixel,
+                )
                     .after(crate::plugins::setup::setup_world_exclusive),
+            )
+            .add_systems(
+                Update,
+                (
+                    entity_sprites::attach_entity_sprites,
+                    entity_sprites::sync_entity_positions,
+                )
+                    .chain(),
             );
     }
 }
