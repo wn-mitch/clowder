@@ -61,7 +61,7 @@ impl CameraBrain {
         Self {
             mode: CameraMode::Drift,
             target: center,
-            drift_time: 0.0,
+            drift_time: 100.0, // Start away from noise origin
             perlin_x: Perlin::new(42),
             perlin_y: Perlin::new(137),
             mode_timer: 0.0,
@@ -167,14 +167,26 @@ pub fn camera_update(
     // --- Run current mode ---
     match brain.mode {
         CameraMode::Drift => {
-            brain.drift_time += dt as f64 * 0.08; // Slow progression
-            let nx = brain.perlin_x.get([brain.drift_time, 0.5]);
-            let ny = brain.perlin_y.get([0.5, brain.drift_time]);
-            // Map noise [-1,1] to map bounds with margin
-            let margin = 200.0;
-            let mid = (brain.map_min + brain.map_max) * 0.5;
-            let range = (brain.map_max - brain.map_min) * 0.5 - Vec2::splat(margin);
-            brain.target = mid + Vec2::new(nx as f32, ny as f32) * range;
+            brain.drift_time += dt as f64 * 0.15;
+
+            // Noise drives a gentle VELOCITY, not a position. The camera
+            // wanders like a leaf on water — continuous, no snapping.
+            let vx = brain.perlin_x.get([brain.drift_time, 0.5]) as f32;
+            let vy = brain.perlin_y.get([0.5, brain.drift_time]) as f32;
+            let drift_speed = world_px * 0.4; // ~0.4 tiles per second
+            brain.target.x += vx * drift_speed * dt;
+            brain.target.y += vy * drift_speed * dt;
+
+            // Soft bounce off map edges — steer back toward center when near bounds.
+            let margin = world_px * 4.0;
+            let center = (brain.map_min + brain.map_max) * 0.5;
+            let pull_strength = 0.3 * dt;
+            if brain.target.x < brain.map_min.x + margin || brain.target.x > brain.map_max.x - margin {
+                brain.target.x += (center.x - brain.target.x) * pull_strength;
+            }
+            if brain.target.y < brain.map_min.y + margin || brain.target.y > brain.map_max.y - margin {
+                brain.target.y += (center.y - brain.target.y) * pull_strength;
+            }
             brain.clamp_target();
 
             // Check for nearby interesting activity → Linger
@@ -270,9 +282,9 @@ pub fn camera_update(
     // --- Lerp camera toward target (except Override, which moves directly) ---
     if brain.mode != CameraMode::Override {
         let lerp_speed = match brain.mode {
-            CameraMode::Drift => 1.5,
-            CameraMode::Linger => 2.0,
-            CameraMode::Follow => 3.0,
+            CameraMode::Drift => 0.4,   // Very floaty — cloud on a breeze
+            CameraMode::Linger => 0.8,  // Settles gently near activity
+            CameraMode::Follow => 1.8,  // Purposeful but not jarring
             CameraMode::Override => unreachable!(),
         };
         let current = Vec2::new(transform.translation.x, transform.translation.y);
