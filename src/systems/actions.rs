@@ -5,9 +5,11 @@ use crate::ai::{Action, CurrentAction};
 use crate::ai::pathfinding::step_toward;
 use crate::components::coordination::{ActiveDirective, PendingDelivery};
 use crate::components::identity::{Gender, Orientation};
+use crate::components::items::{Item, ItemLocation};
 use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Needs, Position};
+use crate::components::prey::PreyAnimal;
 use crate::components::skills::Skills;
 use crate::resources::food::FoodStores;
 use crate::resources::map::TileMap;
@@ -96,6 +98,7 @@ pub fn resolve_actions(
     pending_delivery_query: Query<&PendingDelivery>,
     active_directive_query: Query<&ActiveDirective>,
     building_positions: Query<(&crate::components::building::Structure, &Position), Without<CurrentAction>>,
+    prey_query: Query<(Entity, &PreyAnimal, &Position), Without<CurrentAction>>,
     map: Res<TileMap>,
     mut food: ResMut<FoodStores>,
     mut rng: ResMut<SimRng>,
@@ -181,22 +184,47 @@ pub fn resolve_actions(
                 if current.ticks_remaining == 0 {
                     let success = rng.rng.random::<f32>() < 0.25 + skills.hunting * 0.55;
                     if success {
-                        let yield_amount = 1.0 + skills.hunting * 2.0;
-                        food.deposit(yield_amount);
-                        // Remember this as a good hunting spot.
-                        memory.remember(MemoryEntry {
-                            event_type: MemoryType::ResourceFound,
-                            location: current.target_position,
-                            involved: vec![],
-                            tick: time.tick,
-                            strength: 1.0,
-                            firsthand: true,
-                        });
-                        mood.modifiers.push_back(MoodModifier {
-                            amount: 0.1,
-                            ticks_remaining: 30,
-                            source: "successful hunt".to_string(),
-                        });
+                        // Find nearest prey within 3 tiles.
+                        let nearest_prey = prey_query.iter()
+                            .filter(|(_, _, prey_pos)| pos.manhattan_distance(prey_pos) <= 3)
+                            .min_by_key(|(_, _, prey_pos)| pos.manhattan_distance(prey_pos))
+                            .map(|(prey_entity, prey, _)| (prey_entity, prey.species));
+
+                        if let Some((prey_entity, species)) = nearest_prey {
+                            let item_kind = species.item_kind();
+                            let quality = (0.3 + skills.hunting * 0.4).clamp(0.0, 1.0);
+
+                            // Despawn the prey entity.
+                            commands.entity(prey_entity).despawn();
+
+                            // Spawn an item carried by this cat.
+                            commands.spawn(Item::new(item_kind, quality, ItemLocation::Carried(entity)));
+
+                            // Backward-compat: also deposit to legacy FoodStores.
+                            food.deposit(item_kind.food_value());
+
+                            // Remember this as a good hunting spot.
+                            memory.remember(MemoryEntry {
+                                event_type: MemoryType::ResourceFound,
+                                location: current.target_position,
+                                involved: vec![],
+                                tick: time.tick,
+                                strength: 1.0,
+                                firsthand: true,
+                            });
+                            mood.modifiers.push_back(MoodModifier {
+                                amount: 0.1,
+                                ticks_remaining: 30,
+                                source: format!("caught a {}", species.name()),
+                            });
+                        } else {
+                            // Skill check passed but no prey nearby — treat as failure.
+                            mood.modifiers.push_back(MoodModifier {
+                                amount: -0.05,
+                                ticks_remaining: 20,
+                                source: "hunt found nothing".to_string(),
+                            });
+                        }
                     } else {
                         mood.modifiers.push_back(MoodModifier {
                             amount: -0.05,

@@ -19,6 +19,7 @@ use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::components::skills::{MagicAffinity, Skills};
 use crate::components::identity::Name;
+use crate::components::prey::PreyAnimal;
 use crate::components::wildlife::WildAnimal;
 use crate::resources::event_log::{EventKind, EventLog};
 use crate::resources::food::FoodStores;
@@ -288,7 +289,7 @@ pub fn evaluate_actions(
         Option<&crate::components::fate::FatedLove>,
         Option<&crate::components::fate::FatedRival>,
     ), Without<Dead>>,
-    all_positions: Query<(Entity, &Position), Without<Dead>>,
+    all_positions: Query<(Entity, &Position, Option<&PreyAnimal>), Without<Dead>>,
     wildlife: Query<(Entity, &Position), With<WildAnimal>>,
     building_query: Query<(
         Entity,
@@ -313,11 +314,16 @@ pub fn evaluate_actions(
     let food_available = !food.is_empty();
     let food_fraction = food.fraction();
 
-    // Collect all living cat positions once for social target selection.
-    let cat_positions: Vec<(Entity, Position)> = all_positions
-        .iter()
-        .map(|(e, p)| (e, *p))
-        .collect();
+    // Collect all living cat positions once for social target selection,
+    // and prey positions for hunt proximity checks.
+    let mut cat_positions: Vec<(Entity, Position)> = Vec::new();
+    let mut prey_positions: Vec<Position> = Vec::new();
+    for (e, p, prey) in all_positions.iter() {
+        cat_positions.push((e, *p));
+        if prey.is_some() {
+            prey_positions.push(*p);
+        }
+    }
 
     // Snapshot wildlife positions.
     let wildlife_positions: Vec<(Entity, Position)> = wildlife
@@ -432,6 +438,11 @@ pub fn evaluate_actions(
             .iter()
             .any(|(_, hp)| pos.manhattan_distance(hp) <= 10);
 
+        // Prey proximity check — is any prey within 10 tiles?
+        let prey_nearby = prey_positions
+            .iter()
+            .any(|pp| pos.manhattan_distance(pp) <= 10);
+
         let (on_corrupted_tile, tile_corruption, on_special_terrain) = if map.in_bounds(pos.x, pos.y) {
             let tile = map.get(pos.x, pos.y);
             (
@@ -479,6 +490,7 @@ pub fn evaluate_actions(
             has_mentoring_target: has_mentoring_target(
                 entity, pos, skills, &cat_positions, &skills_query,
             ),
+            prey_nearby,
         };
         let mut scores = score_actions(&ctx, &mut rng.rng);
 

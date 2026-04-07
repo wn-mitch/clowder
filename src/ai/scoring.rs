@@ -79,6 +79,8 @@ pub struct ScoringContext<'a> {
     /// Whether a valid mentoring target exists (cat with skill < 0.3 where
     /// this cat has the same skill > 0.6).
     pub has_mentoring_target: bool,
+    /// Whether at least one prey animal is within hunting range.
+    pub prey_nearby: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -119,8 +121,8 @@ pub fn score_actions(
         scores.push((Action::Sleep, urgency + jitter(rng)));
     }
 
-    // --- Hunt (boldness-driven; requires reachable forest/grass) ---
-    if ctx.can_hunt {
+    // --- Hunt (boldness-driven; requires reachable forest/grass and nearby prey) ---
+    if ctx.can_hunt && ctx.prey_nearby {
         let food_scarcity = (1.0 - ctx.food_fraction) * 0.5;
         let urgency = ((1.0 - ctx.needs.hunger) + food_scarcity)
             * ctx.personality.boldness * 1.5
@@ -616,6 +618,7 @@ mod tests {
             is_coordinator_with_directives: false,
             pending_directive_count: 0,
             has_mentoring_target: false,
+            prey_nearby: true,
         }
     }
 
@@ -726,6 +729,7 @@ mod tests {
             is_coordinator_with_directives: false,
             pending_directive_count: 0,
             has_mentoring_target: false,
+            prey_nearby: true,
         };
         let scores = score_actions(&c, &mut rng);
         let best = select_best_action(&scores);
@@ -830,6 +834,7 @@ mod tests {
             is_coordinator_with_directives: false,
             pending_directive_count: 0,
             has_mentoring_target: false,
+            prey_nearby: true,
         };
         let scores = score_actions(&c, &mut rng);
         let socialize_score = scores.iter().find(|(a, _)| *a == Action::Socialize).unwrap().1;
@@ -1034,6 +1039,7 @@ mod tests {
             is_coordinator_with_directives: false,
             pending_directive_count: 0,
             has_mentoring_target: false,
+            prey_nearby: true,
         };
         let scores = score_actions(&c, &mut rng);
         let best = select_best_action(&scores);
@@ -1085,6 +1091,7 @@ mod tests {
             is_coordinator_with_directives: false,
             pending_directive_count: 0,
             has_mentoring_target: false,
+            prey_nearby: true,
         };
         let scores = score_actions(&c, &mut rng);
         let fight_score = scores.iter().find(|(a, _)| *a == Action::Fight).unwrap().1;
@@ -1139,6 +1146,7 @@ mod tests {
             is_coordinator_with_directives: false,
             pending_directive_count: 0,
             has_mentoring_target: false,
+            prey_nearby: true,
         };
         let scores = score_actions(&c, &mut rng);
         let actions: Vec<Action> = scores.iter().map(|(a, _)| *a).collect();
@@ -1340,6 +1348,7 @@ mod tests {
             is_coordinator_with_directives: false,
             pending_directive_count: 0,
             has_mentoring_target: false,
+            prey_nearby: true,
         };
         let scores = score_actions(&c, &mut rng);
         let wander = scores.iter().find(|(a, _)| *a == Action::Wander).unwrap().1;
@@ -1393,6 +1402,7 @@ mod tests {
             is_coordinator_with_directives: false,
             pending_directive_count: 0,
             has_mentoring_target: false,
+            prey_nearby: true,
         };
 
         let scores_full = score_actions(&base, &mut rng_full);
