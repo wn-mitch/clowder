@@ -32,9 +32,8 @@ pub fn create_tilemap(
     let grid_size = TilemapGridSize { x: TILE_PX, y: TILE_PX };
 
     // --- Base terrain layer (z=0.0) ---
-    let base_texture: Handle<Image> = asset_server.load(
-        "sprites/Sprout Lands - Sprites - premium pack/Tilesets/ground tiles/New tiles/Soil_Ground_Tiles.png",
-    );
+    let base_texture: Handle<Image> =
+        asset_server.load("sprites/base_terrain_atlas.png");
 
     let base_tilemap_entity = commands.spawn_empty().id();
     let mut base_storage = TileStorage::empty(map_size);
@@ -71,9 +70,8 @@ pub fn create_tilemap(
     ));
 
     // --- Grass overlay layer (z=1.0) ---
-    let grass_texture: Handle<Image> = asset_server.load(
-        "sprites/Sprout Lands - Sprites - premium pack/Tilesets/ground tiles/New tiles/Grass_tiles_v2.png",
-    );
+    let grass_texture: Handle<Image> =
+        asset_server.load("sprites/grass_autotile_atlas.png");
 
     let grass_tilemap_entity = commands.spawn_empty().id();
     let mut grass_storage = TileStorage::empty(map_size);

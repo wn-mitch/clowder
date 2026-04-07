@@ -10,7 +10,11 @@ pub struct RenderingPlugin;
 impl Plugin for RenderingPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(TilemapPlugin)
-            .add_systems(Startup, tilemap_sync::create_tilemap);
+            .add_systems(
+                Startup,
+                tilemap_sync::create_tilemap
+                    .after(crate::plugins::setup::setup_world_exclusive),
+            );
     }
 }
 
@@ -18,7 +22,11 @@ pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, camera::setup_camera)
+        app.add_systems(
+                Startup,
+                camera::setup_camera
+                    .after(crate::plugins::setup::setup_world_exclusive),
+            )
             .add_systems(Update, camera::camera_controls);
     }
 }
