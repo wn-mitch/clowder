@@ -9,6 +9,9 @@
 # Saves
 /saves
 
+# Logs
+/logs
+
 # OS
 .DS_Store
 Thumbs.db

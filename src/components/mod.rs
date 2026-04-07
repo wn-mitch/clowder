@@ -8,6 +8,7 @@ pub mod magic;
 pub mod mental;
 pub mod personality;
 pub mod physical;
+pub mod prey;
 pub mod skills;
 pub mod task_chain;
 pub mod wildlife;
@@ -33,6 +34,7 @@ pub use magic::{
 pub use mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier};
 pub use personality::Personality;
 pub use physical::{Dead, Health, Injury, InjuryKind, Needs, Position};
+pub use prey::{PreyAnimal, PreySpecies};
 pub use skills::{Corruption, MagicAffinity, Skills, Training};
 pub use task_chain::{FailurePolicy, Material, StepKind, StepStatus, TaskChain, TaskStep};
 pub use wildlife::{BehaviorType, WildAnimal, WildSpecies, WildlifeAiState};
