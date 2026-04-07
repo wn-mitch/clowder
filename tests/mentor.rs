@@ -5,6 +5,7 @@ use clowder::ai::{Action, CurrentAction};
 use clowder::components::identity::Name;
 use clowder::components::mental::{Memory, Mood};
 use clowder::components::physical::{Needs, Position};
+use clowder::components::magic::Inventory;
 use clowder::components::skills::Skills;
 use clowder::resources::food::FoodStores;
 use clowder::resources::map::{Terrain, TileMap};
@@ -47,6 +48,7 @@ fn mentoring_restores_mastery() {
         Skills::default(), // hunting defaults to 0.1
         Memory::default(),
         Mood::default(),
+        Inventory::default(),
         Name("Apprentice".to_string()),
     )).id();
 
@@ -63,6 +65,7 @@ fn mentoring_restores_mastery() {
         mentor_skills,
         Memory::default(),
         Mood::default(),
+        Inventory::default(),
         Name("Mentor".to_string()),
     )).id();
 
@@ -94,6 +97,7 @@ fn mentoring_grows_apprentice_skill() {
         apprentice_skills,
         Memory::default(),
         Mood::default(),
+        Inventory::default(),
         Name("Apprentice".to_string()),
     )).id();
 
@@ -110,6 +114,7 @@ fn mentoring_grows_apprentice_skill() {
         mentor_skills,
         Memory::default(),
         Mood::default(),
+        Inventory::default(),
         Name("Mentor".to_string()),
     ));
 
@@ -139,6 +144,7 @@ fn mentoring_builds_fondness() {
         Skills::default(),
         Memory::default(),
         Mood::default(),
+        Inventory::default(),
         Name("Apprentice".to_string()),
     )).id();
 
@@ -155,6 +161,7 @@ fn mentoring_builds_fondness() {
         mentor_skills,
         Memory::default(),
         Mood::default(),
+        Inventory::default(),
         Name("Mentor".to_string()),
     )).id();
 

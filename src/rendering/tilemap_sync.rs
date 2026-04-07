@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy_ecs_tilemap::prelude::*;
 
 use crate::rendering::terrain_sprites::{
     base_tile_index, blob_bitmask, grass_overlay_atlas_index_with_variant, OVERLAY_LAYERS,
@@ -20,58 +19,69 @@ pub const TILE_SCALE: f32 = 3.0;
 pub const TILE_PX: f32 = 16.0;
 
 /// Startup system: creates the multi-layer tilemap from the TileMap resource.
+///
+/// The base terrain layer uses plain Bevy Sprites (one per tile) because
+/// bevy_ecs_tilemap's texture array pipeline doesn't reliably render
+/// different TileTextureIndex values on macOS Metal. Overlay layers still
+/// use bevy_ecs_tilemap since they each use a single atlas texture (index 0
+/// works fine).
 pub fn create_tilemap(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     map: Res<TileMap>,
+    mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
 ) {
-    let map_width = map.width as u32;
-    let map_height = map.height as u32;
-    let map_size = TilemapSize { x: map_width, y: map_height };
-    let tile_size = TilemapTileSize { x: TILE_PX, y: TILE_PX };
-    let grid_size = TilemapGridSize { x: TILE_PX, y: TILE_PX };
+    let world_px = TILE_PX * TILE_SCALE;
 
-    // --- Base terrain layer (z=0.0) ---
-    let base_texture: Handle<Image> =
-        asset_server.load("sprites/base_terrain_atlas.png");
+    // --- Base terrain layer (z=0.0) — plain Bevy Sprites ---
+    let base_tile_images: Vec<Handle<Image>> = [
+        "sprites/tiles/grass.png",
+        "sprites/tiles/water.png",
+        "sprites/tiles/dirt.png",
+        "sprites/tiles/sand.png",
+        "sprites/tiles/rock.png",
+        "sprites/tiles/stone.png",
+        "sprites/tiles/building.png",
+    ]
+    .iter()
+    .map(|p| asset_server.load(*p))
+    .collect();
 
-    let base_tilemap_entity = commands.spawn_empty().id();
-    let mut base_storage = TileStorage::empty(map_size);
-
-    for y in 0..map_height {
-        for x in 0..map_width {
-            let tile_pos = TilePos { x, y: map_height - 1 - y };
-            let terrain = &map.get(x as i32, y as i32).terrain;
-            let tile_entity = commands
-                .spawn(TileBundle {
-                    position: tile_pos,
-                    texture_index: TileTextureIndex(base_tile_index(terrain)),
-                    tilemap_id: TilemapId(base_tilemap_entity),
-                    ..Default::default()
-                })
-                .id();
-            base_storage.set(&tile_pos, tile_entity);
+    for y in 0..map.height {
+        for x in 0..map.width {
+            let terrain = &map.get(x, y).terrain;
+            let idx = base_tile_index(terrain) as usize;
+            let world_x = x as f32 * world_px;
+            let world_y = (map.height as f32 - 1.0 - y as f32) * world_px;
+            commands.spawn((
+                Sprite {
+                    image: base_tile_images[idx].clone(),
+                    custom_size: Some(Vec2::splat(world_px)),
+                    ..default()
+                },
+                Transform::from_xyz(world_x, world_y, 0.0),
+                BaseTerrainLayer,
+            ));
         }
     }
 
-    commands.entity(base_tilemap_entity).insert((
-        TilemapBundle {
-            grid_size,
-            map_type: TilemapType::Square,
-            size: map_size,
-            spacing: TilemapSpacing::zero(),
-            storage: base_storage,
-            texture: TilemapTexture::Single(base_texture),
-            tile_size,
-            transform: Transform::from_scale(Vec3::splat(TILE_SCALE)),
-            ..Default::default()
-        },
-        BaseTerrainLayer,
-    ));
+    // --- Blob autotile overlay layers — plain Bevy Sprites with TextureAtlas ---
+    // (bevy_ecs_tilemap's texture_2d_array pipeline is broken on macOS Metal,
+    //  so we use Bevy's built-in sprite atlas system instead.)
 
-    // --- Blob autotile overlay layers ---
-    // Collect unique (atlas_path, z) combinations, then build each layer fully
-    // before inserting the TilemapBundle (avoids TileStorage replacement issues).
+    // Build atlas layouts (one per unique atlas image). All overlay atlases
+    // share the same 8×8 grid of 16×16 tiles.
+    let overlay_cols = 8;
+    let overlay_rows = 8;
+    let overlay_layout = TextureAtlasLayout::from_grid(
+        UVec2::splat(TILE_PX as u32),
+        overlay_cols,
+        overlay_rows,
+        None,
+        None,
+    );
+    let overlay_layout_handle = texture_atlas_layouts.add(overlay_layout);
+
     struct PendingLayer {
         atlas_path: &'static str,
         z: f32,
@@ -94,53 +104,38 @@ pub fn create_tilemap(
     }
 
     for layer in &pending {
-        let texture: Handle<Image> = asset_server.load(layer.atlas_path);
-        let tilemap_entity = commands.spawn_empty().id();
-        let mut storage = TileStorage::empty(map_size);
+        let atlas_image: Handle<Image> = asset_server.load(layer.atlas_path);
 
-        for y in 0..map_height {
-            for x in 0..map_width {
-                let terrain = &map.get(x as i32, y as i32).terrain;
+        for y in 0..map.height {
+            for x in 0..map.width {
+                let terrain = &map.get(x, y).terrain;
                 if !layer.groups.contains(&terrain.group()) {
                     continue;
                 }
 
-                let tile_pos = TilePos { x, y: map_height - 1 - y };
-                let bitmask = blob_bitmask(&map, x as i32, y as i32, terrain.group());
+                let bitmask = blob_bitmask(&map, x, y, terrain.group());
                 let atlas_index = grass_overlay_atlas_index_with_variant(
-                    bitmask, x as i32, y as i32,
+                    bitmask, x, y,
                 );
 
-                let tile_entity = commands
-                    .spawn(TileBundle {
-                        position: tile_pos,
-                        texture_index: TileTextureIndex(atlas_index),
-                        tilemap_id: TilemapId(tilemap_entity),
-                        ..Default::default()
-                    })
-                    .id();
-                storage.set(&tile_pos, tile_entity);
+                let world_x = x as f32 * world_px;
+                let world_y = (map.height as f32 - 1.0 - y as f32) * world_px;
+
+                commands.spawn((
+                    Sprite {
+                        image: atlas_image.clone(),
+                        custom_size: Some(Vec2::splat(world_px)),
+                        texture_atlas: Some(TextureAtlas {
+                            layout: overlay_layout_handle.clone(),
+                            index: atlas_index as usize,
+                        }),
+                        ..default()
+                    },
+                    Transform::from_xyz(world_x, world_y, layer.z),
+                    BlobOverlayLayer,
+                ));
             }
         }
-
-        commands.entity(tilemap_entity).insert((
-            TilemapBundle {
-                grid_size,
-                map_type: TilemapType::Square,
-                size: map_size,
-                spacing: TilemapSpacing::zero(),
-                storage,
-                texture: TilemapTexture::Single(texture),
-                tile_size,
-                transform: Transform {
-                    translation: Vec3::new(0.0, 0.0, layer.z),
-                    scale: Vec3::splat(TILE_SCALE),
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
-            BlobOverlayLayer,
-        ));
     }
 
     dump_terrain_debug(&map);

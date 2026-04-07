@@ -48,7 +48,7 @@ pub fn decay_needs(
 
     for (mut needs, personality, mut health, mut mood) in &mut query {
         // --- Level 1: Physiological ---
-        needs.hunger = (needs.hunger - 0.003).max(0.0);
+        needs.hunger = (needs.hunger - 0.002).max(0.0);
         needs.energy = (needs.energy - 0.002).max(0.0);
         needs.warmth = (needs.warmth - warmth_drain).max(0.0);
 
@@ -162,7 +162,7 @@ mod tests {
         let after = world.get::<Needs>(entity).unwrap().hunger;
 
         assert!(after < before, "hunger should decrease; before={before}, after={after}");
-        assert!((before - after - 0.003).abs() < 1e-6, "expected drain of 0.003");
+        assert!((before - after - 0.002).abs() < 1e-6, "expected drain of 0.002");
     }
 
     #[test]

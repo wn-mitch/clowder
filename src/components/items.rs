@@ -39,13 +39,13 @@ pub enum ItemKind {
 impl ItemKind {
     /// Per-tick decay rate applied to `Item::condition`.
     ///
-    /// - Raw prey: 0.01 (spoils in ~100 ticks)
-    /// - Foraged organic: 0.005 (slower, but still perishable)
+    /// - Raw prey: 0.005 (spoils in ~200 ticks)
+    /// - Foraged organic: 0.005 (same rate as raw prey)
     /// - Herbs: 0.003 (preserved longer)
     /// - Inorganic / curiosities: 0.0 (no decay)
     pub fn decay_rate(self) -> f32 {
         match self {
-            Self::RawMouse | Self::RawRat | Self::RawFish | Self::RawBird => 0.01,
+            Self::RawMouse | Self::RawRat | Self::RawFish | Self::RawBird => 0.005,
 
             Self::Berries
             | Self::Nuts
@@ -116,9 +116,10 @@ impl ItemKind {
             Self::RawMouse => 0.25,
             Self::RawFish => 0.35,
             Self::RawBird => 0.3,
-            Self::Berries => 0.1,
+            Self::Berries => 0.15,
             Self::Nuts => 0.15,
-            Self::Roots | Self::WildOnion | Self::Mushroom => 0.1,
+            Self::Roots | Self::Mushroom => 0.15,
+            Self::WildOnion => 0.1,
             _ => 0.0,
         }
     }
@@ -241,16 +242,16 @@ mod tests {
     #[test]
     fn item_decays_over_time() {
         let mut item = Item::new(ItemKind::RawFish, 1.0, ItemLocation::OnGround);
-        // RawFish decay_rate = 0.01; with f32 rounding the condition clears
-        // slightly above 100 ticks. Allow up to 110 to be float-safe.
+        // RawFish decay_rate = 0.005; with f32 rounding the condition clears
+        // slightly above 200 ticks. Allow up to 220 to be float-safe.
         let mut destroyed = false;
-        for _ in 0..110 {
+        for _ in 0..220 {
             if item.tick_decay() {
                 destroyed = true;
                 break;
             }
         }
-        assert!(destroyed, "RawFish should be destroyed within 110 ticks");
+        assert!(destroyed, "RawFish should be destroyed within 220 ticks");
     }
 
     #[test]

@@ -57,12 +57,15 @@ impl TaskStep {
 
 /// The kinds of work a step can represent.
 ///
-/// Building-related for now. Designed to grow as quests, social rituals,
-/// training arcs, and other multi-step behaviors are added.
+/// Covers building, magic, and disposition-driven behaviors (hunting, foraging,
+/// social, patrol, etc.). Dispositions create TaskChains from these steps.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum StepKind {
+    // --- Movement ---
     /// Walk to `target_position`.
     MoveTo,
+
+    // --- Building/construction ---
     /// Gather material at a resource tile. Takes ~5 ticks.
     Gather { material: Material, amount: u32 },
     /// Deposit gathered material at a construction site. Instant.
@@ -71,10 +74,14 @@ pub enum StepKind {
     Construct,
     /// Repair a damaged `Structure`.
     Repair,
+
+    // --- Farming ---
     /// Tend crops at a `Garden`, advancing `CropState.growth`.
     Tend,
     /// Harvest mature crops into `FoodStores`.
     Harvest,
+
+    // --- Magic/herbcraft ---
     /// Harvest a herb entity into the cat's inventory. ~5 ticks.
     GatherHerb,
     /// Prepare a remedy from inventory herbs. 10 ticks at workshop, 15 without.
@@ -89,6 +96,35 @@ pub enum StepKind {
     CleanseCorruption,
     /// Meditate at a special location for mood boost. 15 ticks.
     SpiritCommunion,
+
+    // --- Disposition-driven behaviors ---
+    /// Hunt prey at current location. ~10 ticks. On success, prey entity is
+    /// killed and food is picked up into inventory.
+    HuntPrey,
+    /// Forage at current terrain tile. ~8 ticks. Picks up foraged item.
+    ForageItem,
+    /// Deposit all carried food at a Stores building. Instant on arrival.
+    DepositAtStores,
+    /// Eat from Stores building. Restores hunger. ~5 ticks.
+    EatAtStores,
+    /// Sleep in place. Restores energy. Duration in ticks.
+    Sleep { ticks: u64 },
+    /// Self-groom. Restores warmth. ~8 ticks.
+    SelfGroom,
+    /// Socialize with target entity. ~10 ticks. Requires proximity.
+    Socialize,
+    /// Groom another cat. ~8 ticks. Requires proximity.
+    GroomOther,
+    /// Mentor a nearby cat (skill transfer). ~12 ticks. Requires proximity.
+    MentorCat,
+    /// Walk to position while scanning for threats. ~20 ticks.
+    PatrolTo,
+    /// Fight a wildlife threat. ~30 ticks. Requires proximity.
+    FightThreat,
+    /// Observe surroundings at current position. ~5 ticks.
+    Survey,
+    /// Deliver a coordinator directive to target cat. ~5 ticks on arrival.
+    DeliverDirective,
 }
 
 /// Materials used in construction.

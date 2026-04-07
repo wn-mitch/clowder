@@ -40,6 +40,11 @@ impl Plugin for SimulationPlugin {
                     systems::buildings::apply_building_effects,
                     systems::buildings::decay_building_condition,
                     systems::items::decay_items,
+                )
+                    .chain(),
+                // Item pruning and food sync (split to stay under chain param limit).
+                (
+                    systems::items::prune_stored_items,
                     systems::items::sync_food_stores,
                 )
                     .chain(),
@@ -81,6 +86,32 @@ impl Plugin for SimulationPlugin {
                     .chain(),
             )
                 .chain(),
+        );
+
+        // Disposition systems — ordered relative to each other but standalone.
+        // check_anxiety_interrupts → evaluate_dispositions → disposition_to_chain
+        // → resolve_disposition_chains. These query disjoint entity sets by
+        // component filter (With/Without<Disposition>) so they can't be chained
+        // via Bevy's tuple-chain due to static analysis limitations.
+        app.add_systems(
+            FixedUpdate,
+            systems::disposition::check_anxiety_interrupts,
+        );
+        app.add_systems(
+            FixedUpdate,
+            systems::disposition::evaluate_dispositions
+                .after(systems::disposition::check_anxiety_interrupts),
+        );
+        app.add_systems(
+            FixedUpdate,
+            systems::disposition::disposition_to_chain
+                .after(systems::disposition::evaluate_dispositions),
+        );
+        app.add_systems(
+            FixedUpdate,
+            systems::disposition::resolve_disposition_chains
+                .after(systems::disposition::disposition_to_chain)
+                .before(systems::task_chains::resolve_task_chains),
         );
 
         // Standalone systems — registered after the chains but unordered

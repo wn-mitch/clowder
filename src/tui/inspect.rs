@@ -1,90 +1,13 @@
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Paragraph};
 
-use crate::ai::CurrentAction;
 use crate::components::identity::LifeStage;
-use crate::components::physical::Needs;
-use crate::components::skills::Skills;
-use crate::resources::relationships::BondType;
 
-// ---------------------------------------------------------------------------
-// CatInspectData
-// ---------------------------------------------------------------------------
-
-/// Data needed to render the cat inspect panel.
-pub struct CatInspectData {
-    pub name: String,
-    pub life_stage: LifeStage,
-    pub needs: NeedsSnapshot,
-    pub mood_valence: f32,
-    pub action: String,
-    pub skills: SkillsSnapshot,
-    pub relationships: Vec<RelationshipEntry>,
-    pub is_coordinator: bool,
-    pub active_directive: Option<String>,
-    pub zodiac: Option<String>,
-    pub fated_love: Option<(String, bool)>,  // (partner name, awakened)
-    pub fated_rival: Option<(String, bool)>, // (rival name, awakened)
-    pub aspirations: Vec<AspirationDisplay>,
-    pub completed_aspirations: Vec<String>,
-    pub likes: Vec<String>,
-    pub dislikes: Vec<String>,
-}
-
-pub struct AspirationDisplay {
-    pub chain_name: String,
-    pub milestone_name: String,
-    pub progress: u32,
-    pub target: u32,
-}
-
-pub struct NeedsSnapshot {
-    pub hunger: f32,
-    pub energy: f32,
-    pub warmth: f32,
-    pub safety: f32,
-    pub social: f32,
-}
-
-pub struct SkillsSnapshot {
-    pub hunting: f32,
-    pub foraging: f32,
-    pub herbcraft: f32,
-    pub building: f32,
-    pub combat: f32,
-    pub magic: f32,
-}
-
-pub struct RelationshipEntry {
-    pub name: String,
-    pub fondness: f32,
-    pub bond: Option<BondType>,
-}
-
-impl NeedsSnapshot {
-    pub fn from_needs(needs: &Needs) -> Self {
-        Self {
-            hunger: needs.hunger,
-            energy: needs.energy,
-            warmth: needs.warmth,
-            safety: needs.safety,
-            social: needs.social,
-        }
-    }
-}
-
-impl SkillsSnapshot {
-    pub fn from_skills(skills: &Skills) -> Self {
-        Self {
-            hunting: skills.hunting,
-            foraging: skills.foraging,
-            herbcraft: skills.herbcraft,
-            building: skills.building,
-            combat: skills.combat,
-            magic: skills.magic,
-        }
-    }
-}
+// Re-export shared data types so existing TUI code continues to compile.
+pub use crate::ui_data::{
+    AspirationDisplay, CatInspectData, NeedsSnapshot, RelationshipEntry, SkillsSnapshot,
+    build_inspect_data,
+};
 
 // ---------------------------------------------------------------------------
 // Rendering
@@ -121,6 +44,8 @@ fn skill_line(label: &str, value: f32) -> Line<'static> {
 }
 
 fn relationship_line(entry: &RelationshipEntry, width: usize) -> Line<'static> {
+    use crate::resources::relationships::BondType;
+
     let bar_width: usize = 6;
     let filled = ((entry.fondness.clamp(-1.0, 1.0) + 1.0) / 2.0 * bar_width as f32).round() as usize;
     let empty = bar_width.saturating_sub(filled);
@@ -194,7 +119,13 @@ pub fn render_inspect(frame: &mut Frame, area: Rect, data: &CatInspectData) {
         )));
     }
 
-    // Current action
+    // Current action and disposition
+    if let Some(ref disp) = data.disposition {
+        lines.push(Line::from(Span::styled(
+            format!(" Disposition: {disp}"),
+            Style::default().fg(Color::LightGreen),
+        )));
+    }
     lines.push(Line::from(Span::styled(
         format!(" Action: {}", data.action),
         Style::default().fg(Color::Cyan),
@@ -312,6 +243,28 @@ pub fn render_inspect(frame: &mut Frame, area: Rect, data: &CatInspectData) {
         }
     }
 
+    // Action history
+    if !data.action_history.is_empty() {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            " Recent Actions",
+            Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+        )));
+        for entry in &data.action_history {
+            let color = match entry.outcome.as_str() {
+                "ok" => Color::DarkGray,
+                "fail" => Color::Red,
+                "interrupted" => Color::Yellow,
+                _ => Color::DarkGray,
+            };
+            lines.push(Line::from(vec![
+                Span::styled(format!("   t{}: ", entry.tick), Style::default().fg(Color::DarkGray)),
+                Span::styled(&entry.action, Style::default().fg(color)),
+                Span::styled(format!(" ({})", entry.outcome), Style::default().fg(color)),
+            ]));
+        }
+    }
+
     // Truncate to available height
     lines.truncate(inner.height as usize);
 
@@ -345,44 +298,4 @@ pub fn render_cat_list(
     lines.truncate(inner.height as usize);
     let paragraph = Paragraph::new(lines);
     frame.render_widget(paragraph, inner);
-}
-
-/// Build a `CatInspectData` from ECS components.
-#[allow(clippy::too_many_arguments)]
-pub fn build_inspect_data(
-    name: &str,
-    life_stage: LifeStage,
-    needs: &Needs,
-    mood_valence: f32,
-    current: &CurrentAction,
-    skills: &Skills,
-    relationships: Vec<RelationshipEntry>,
-    is_coordinator: bool,
-    active_directive: Option<String>,
-    zodiac: Option<String>,
-    fated_love: Option<(String, bool)>,
-    fated_rival: Option<(String, bool)>,
-    aspirations: Vec<AspirationDisplay>,
-    completed_aspirations: Vec<String>,
-    likes: Vec<String>,
-    dislikes: Vec<String>,
-) -> CatInspectData {
-    CatInspectData {
-        name: name.to_string(),
-        life_stage,
-        needs: NeedsSnapshot::from_needs(needs),
-        mood_valence,
-        action: format!("{:?}", current.action),
-        skills: SkillsSnapshot::from_skills(skills),
-        relationships,
-        is_coordinator,
-        active_directive,
-        zodiac,
-        fated_love,
-        fated_rival,
-        aspirations,
-        completed_aspirations,
-        likes,
-        dislikes,
-    }
 }

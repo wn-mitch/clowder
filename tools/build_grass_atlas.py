@@ -5,6 +5,9 @@ Build blob autotile atlases from Sprout Lands tilesets.
 All terrain tilesets (Grass, Soil, Stone) share the same 11x7 tile layout.
 This script extracts the 47 blob tiles + decorative variants into 8x8 atlases.
 
+Each tile is extruded by 1px (edge pixels duplicated outward) to prevent
+texture atlas bleeding at tile boundaries during GPU rendering.
+
 Bitmask bits (clockwise): N=1, NE=2, E=4, SE=8, S=16, SW=32, W=64, NW=128
 Diagonal bits only set when both adjacent cardinals are present.
 """
@@ -13,6 +16,8 @@ from pathlib import Path
 
 TILE = 16
 ATLAS_COLS = 8
+PADDING = 0
+STRIDE = TILE + 2 * PADDING  # 16 (no extrusion)
 
 REPO = Path(__file__).resolve().parent.parent
 SPROUT = REPO / "assets/sprites/Sprout Lands - Sprites - premium pack/Tilesets/ground tiles/New tiles"
@@ -86,29 +91,107 @@ TILESETS = [
 assert len(BLOB_TILES) == 47
 
 
+def extrude_tile(atlas, tile, ox, oy):
+    """Place a tile at (ox, oy) and extrude its edge pixels into the
+    surrounding gap. Tiles are placed at stride-aligned positions (no
+    padding offset) so bevy_ecs_tilemap UV calculations land correctly.
+    Extrusion fills the gap AFTER the tile (right/bottom) and BEFORE it
+    (left/top, clamped to atlas bounds)."""
+    w, h = atlas.size
+    atlas.paste(tile, (ox, oy))
+
+    bot_row = tile.crop((0, TILE - 1, TILE, TILE))
+    right_col = tile.crop((TILE - 1, 0, TILE, TILE))
+    top_row = tile.crop((0, 0, TILE, 1))
+    left_col = tile.crop((0, 0, 1, TILE))
+
+    for p in range(1, PADDING + 1):
+        # Right extrusion (into gap after tile)
+        rx = ox + TILE - 1 + p
+        if rx < w:
+            atlas.paste(right_col, (rx, oy))
+        # Bottom extrusion
+        by = oy + TILE - 1 + p
+        if by < h:
+            atlas.paste(bot_row, (ox, by))
+        # Left extrusion (into gap before tile, if space exists)
+        lx = ox - p
+        if lx >= 0:
+            atlas.paste(left_col, (lx, oy))
+        # Top extrusion
+        ty = oy - p
+        if ty >= 0:
+            atlas.paste(top_row, (ox, ty))
+
+    # Corners
+    tl = tile.getpixel((0, 0))
+    tr = tile.getpixel((TILE - 1, 0))
+    bl = tile.getpixel((0, TILE - 1))
+    br = tile.getpixel((TILE - 1, TILE - 1))
+    for dp in range(1, PADDING + 1):
+        for dq in range(1, PADDING + 1):
+            # Bottom-right
+            cx, cy = ox + TILE - 1 + dp, oy + TILE - 1 + dq
+            if 0 <= cx < w and 0 <= cy < h:
+                atlas.putpixel((cx, cy), br)
+            # Bottom-left
+            cx, cy = ox - dp, oy + TILE - 1 + dq
+            if 0 <= cx < w and 0 <= cy < h:
+                atlas.putpixel((cx, cy), bl)
+            # Top-right
+            cx, cy = ox + TILE - 1 + dp, oy - dq
+            if 0 <= cx < w and 0 <= cy < h:
+                atlas.putpixel((cx, cy), tr)
+            # Top-left
+            cx, cy = ox - dp, oy - dq
+            if 0 <= cx < w and 0 <= cy < h:
+                atlas.putpixel((cx, cy), tl)
+
+
 def build_atlas(name, tileset_path, include_decorative):
     src = Image.open(tileset_path).convert("RGBA")
-    atlas = Image.new("RGBA", (ATLAS_COLS * TILE, ATLAS_COLS * TILE), (0, 0, 0, 0))
+    atlas_px = ATLAS_COLS * STRIDE
+    atlas = Image.new("RGBA", (atlas_px, atlas_px), (0, 0, 0, 0))
 
     for atlas_idx, (bitmask, (sx, sy), desc) in enumerate(BLOB_TILES):
         tile = src.crop((sx * TILE, sy * TILE, (sx + 1) * TILE, (sy + 1) * TILE))
-        dx = (atlas_idx % ATLAS_COLS) * TILE
-        dy = (atlas_idx // ATLAS_COLS) * TILE
-        atlas.paste(tile, (dx, dy))
+        col = atlas_idx % ATLAS_COLS
+        row = atlas_idx // ATLAS_COLS
+        ox = col * STRIDE
+        oy = row * STRIDE
+        extrude_tile(atlas, tile, ox, oy)
 
     if include_decorative:
         for i, (sx, sy) in enumerate(DECORATIVE):
             atlas_idx = 47 + i
             tile = src.crop((sx * TILE, sy * TILE, (sx + 1) * TILE, (sy + 1) * TILE))
-            dx = (atlas_idx % ATLAS_COLS) * TILE
-            dy = (atlas_idx // ATLAS_COLS) * TILE
-            atlas.paste(tile, (dx, dy))
+            col = atlas_idx % ATLAS_COLS
+            row = atlas_idx // ATLAS_COLS
+            ox = col * STRIDE + PADDING
+            oy = row * STRIDE + PADDING
+            extrude_tile(atlas, tile, ox, oy)
 
     output = OUTPUT_DIR / f"{name}_autotile_atlas.png"
     atlas.save(output)
     n_tiles = 47 + (12 if include_decorative else 0)
-    print(f"  {name}: {output.name} ({atlas.size[0]}x{atlas.size[1]}, {n_tiles} tiles)")
+    print(f"  {name}: {output.name} ({atlas.size[0]}x{atlas.size[1]}, {n_tiles} tiles, {PADDING}px extrusion)")
     return output
+
+
+def build_base_terrain_atlas():
+    """Extrude the base terrain atlas (7 tiles in a single row).
+    Reads from the original (tightly packed) source and writes to a
+    separate extruded output so repeated runs don't corrupt the source."""
+    src_path = OUTPUT_DIR / "base_terrain_atlas.png"
+    out_path = OUTPUT_DIR / "base_terrain_atlas_extruded.png"
+    src = Image.open(src_path).convert("RGBA")
+    n_tiles = src.size[0] // TILE
+    atlas = Image.new("RGBA", (n_tiles * STRIDE, STRIDE), (0, 0, 0, 0))
+    for i in range(n_tiles):
+        tile = src.crop((i * TILE, 0, (i + 1) * TILE, TILE))
+        extrude_tile(atlas, tile, i * STRIDE, 0)
+    atlas.save(out_path)
+    print(f"  base: {out_path.name} ({atlas.size[0]}x{atlas.size[1]}, {n_tiles} tiles, {PADDING}px extrusion)")
 
 
 def build_lookup_table():
@@ -123,6 +206,9 @@ def main():
     for name, path, decorative in TILESETS:
         build_atlas(name, path, decorative)
 
+    print("Extruding base terrain atlas...")
+    build_base_terrain_atlas()
+
     # Print Rust lookup table (same for all terrain types — same atlas layout)
     table = build_lookup_table()
     print("\n// BLOB_TO_ATLAS lookup table (same for all terrain atlases):")
@@ -133,6 +219,8 @@ def main():
     print("];")
 
     print(f"\nAll atlases use same layout: 47 blob + 12 decorative = 59 tiles in 8x8 grid")
+    print(f"Tile size: {TILE}x{TILE}, stride: {STRIDE}x{STRIDE} ({PADDING}px extrusion)")
+    print(f"Set TilemapSpacing {{ x: {PADDING * 2}.0, y: {PADDING * 2}.0 }} in tilemap_sync.rs")
 
 
 if __name__ == "__main__":

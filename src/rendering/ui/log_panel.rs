@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::rendering::ui::{PANEL_BG, PANEL_BORDER, TEXT_COLOR, TEXT_DIM, TEXT_HIGHLIGHT, UiRoot};
+use crate::rendering::ui::{TEXT_COLOR, TEXT_DIM, TEXT_HIGHLIGHT, UiRoot};
 use crate::resources::{NarrativeLog, NarrativeTier, SimConfig, TimeState};
 
 /// Marker for the log panel container.
@@ -37,13 +37,13 @@ pub fn setup_log_panel(
                 width: Val::Px(380.0),
                 height: Val::Percent(70.0),
                 flex_direction: FlexDirection::Column,
-                padding: UiRect::all(Val::Px(10.0)),
+                padding: UiRect::all(Val::Px(12.0)),
                 border: UiRect::all(Val::Px(2.0)),
                 overflow: Overflow::clip_y(),
                 ..Default::default()
             },
-            BackgroundColor(PANEL_BG),
-            BorderColor::from(PANEL_BORDER),
+            BackgroundColor(crate::rendering::ui::PANEL_BG),
+            BorderColor::from(crate::rendering::ui::PANEL_BORDER),
             LogPanel,
         ))
         .id();
@@ -74,6 +74,7 @@ pub fn setup_log_panel(
                 flex_grow: 1.0,
                 ..Default::default()
             },
+            ScrollPosition::default(),
             LogContent,
             LogState { rendered_count: 0 },
         ))
@@ -89,7 +90,7 @@ pub fn update_log_panel(
     time_state: Res<TimeState>,
     config: Res<SimConfig>,
     mut header_query: Query<&mut Text, With<LogHeader>>,
-    mut content_query: Query<(Entity, &mut LogState), With<LogContent>>,
+    mut content_query: Query<(Entity, &mut LogState, &mut ScrollPosition), With<LogContent>>,
 ) {
     // Update header with current time info.
     if let Ok(mut header_text) = header_query.single_mut() {
@@ -105,7 +106,7 @@ pub fn update_log_panel(
     }
 
     // Add new log entries.
-    let Ok((content_entity, mut log_state)) = content_query.single_mut() else {
+    let Ok((content_entity, mut log_state, mut scroll)) = content_query.single_mut() else {
         return;
     };
 
@@ -145,4 +146,7 @@ pub fn update_log_panel(
     }
 
     log_state.rendered_count = narrative.total_pushed;
+
+    // Auto-scroll to bottom.
+    scroll.0.y = f32::MAX;
 }

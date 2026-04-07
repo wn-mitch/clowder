@@ -271,6 +271,23 @@ pub fn resolve_task_chains(
             | StepKind::SpiritCommunion => {
                 // Handled by systems::magic::resolve_magic_task_chains
             }
+
+            // Disposition-driven steps are resolved by the disposition system.
+            StepKind::HuntPrey
+            | StepKind::ForageItem
+            | StepKind::DepositAtStores
+            | StepKind::EatAtStores
+            | StepKind::Sleep { .. }
+            | StepKind::SelfGroom
+            | StepKind::Socialize
+            | StepKind::GroomOther
+            | StepKind::MentorCat
+            | StepKind::PatrolTo
+            | StepKind::FightThreat
+            | StepKind::Survey
+            | StepKind::DeliverDirective => {
+                // Handled by systems::disposition::resolve_disposition_chains
+            }
         }
 
         if chain.is_complete() {

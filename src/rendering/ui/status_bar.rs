@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::rendering::ui::{PANEL_BG, PANEL_BORDER, TEXT_COLOR, UiRoot};
+use crate::rendering::ui::{TEXT_COLOR, UiRoot};
 use crate::resources::{SimConfig, TimeState};
 use crate::components::identity::Species;
 use crate::components::physical::Dead;
@@ -33,8 +33,8 @@ pub fn setup_status_bar(
                 border: UiRect::top(Val::Px(1.0)),
                 ..Default::default()
             },
-            BackgroundColor(PANEL_BG),
-            BorderColor::from(PANEL_BORDER),
+            BackgroundColor(crate::rendering::ui::PANEL_BG),
+            BorderColor::from(crate::rendering::ui::PANEL_BORDER),
             StatusBar,
         ))
         .id();
@@ -71,7 +71,7 @@ pub fn update_status_bar(
     let pause_str = if time_state.paused { " ⏸ PAUSED" } else { "" };
 
     **text = format!(
-        "Day {} | {} | Speed: {} | Cats: {}{} | [P]ause []] Speed [Esc] Drift [WASD] Pan",
+        "Day {} | {} | Speed: {} | Cats: {}{} | [P]ause []] Speed [L]og [Tab] Inspect [Esc] Close",
         day, season.label(), speed_label, cat_count, pause_str,
     );
 }

@@ -1,6 +1,7 @@
 pub mod terrain_sprites;
 pub mod tilemap_sync;
 pub mod camera;
+pub mod debug_grid;
 pub mod entity_sprites;
 pub mod ui;
 
@@ -15,9 +16,13 @@ impl Plugin for RenderingPlugin {
             .add_systems(
                 Startup,
                 (
-                    tilemap_sync::create_tilemap,
-                    entity_sprites::create_white_pixel,
+                    (
+                        tilemap_sync::create_tilemap,
+                        entity_sprites::create_white_pixel,
+                    ),
+                    debug_grid::setup_grid,
                 )
+                    .chain()
                     .after(crate::plugins::setup::setup_world_exclusive),
             )
             .add_systems(
@@ -25,6 +30,8 @@ impl Plugin for RenderingPlugin {
                 (
                     entity_sprites::attach_entity_sprites,
                     entity_sprites::sync_entity_positions,
+                    debug_grid::toggle_grid,
+                    debug_grid::toggle_overlay_layers,
                 )
                     .chain(),
             );

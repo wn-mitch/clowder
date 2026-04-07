@@ -45,6 +45,16 @@ fn is_friendly(tile_group: TerrainGroup, neighbor_group: TerrainGroup) -> bool {
         // Rock and Stone blend into each other
         TerrainGroup::Rock => neighbor_group == TerrainGroup::Stone,
         TerrainGroup::Stone => neighbor_group == TerrainGroup::Rock,
+        // Grass defers to terrain that has its own overlay — no grass edge
+        // rendered toward Dirt/Sand/Rock/Stone. Grass edges still render
+        // toward Water and Building (which have no overlay).
+        TerrainGroup::Grass => matches!(
+            neighbor_group,
+            TerrainGroup::Dirt
+                | TerrainGroup::Sand
+                | TerrainGroup::Rock
+                | TerrainGroup::Stone
+        ),
         _ => false,
     }
 }
@@ -342,15 +352,27 @@ mod tests {
     }
 
     #[test]
-    fn grass_does_not_treat_dirt_as_friendly() {
-        // Grass tile next to mud should show an edge (not friendly)
+    fn grass_treats_dirt_as_friendly() {
+        // Grass defers to Dirt's own overlay — no grass edge toward mud
         let map = make_map(&[
             &[Terrain::Grass, Terrain::Grass, Terrain::Grass],
             &[Terrain::Mud,   Terrain::Grass, Terrain::Grass],
             &[Terrain::Grass, Terrain::Grass, Terrain::Grass],
         ]);
         let mask = blob_bitmask(&map, 1, 1, TerrainGroup::Grass);
-        assert_eq!(mask & 64, 0, "W should NOT be set (mud is not friendly to grass)");
+        assert_eq!(mask & 64, 64, "W should be set (grass defers to dirt's overlay)");
+    }
+
+    #[test]
+    fn grass_not_friendly_to_water() {
+        // Water has no overlay, so grass renders its own edge
+        let map = make_map(&[
+            &[Terrain::Grass, Terrain::Grass, Terrain::Grass],
+            &[Terrain::Water, Terrain::Grass, Terrain::Grass],
+            &[Terrain::Grass, Terrain::Grass, Terrain::Grass],
+        ]);
+        let mask = blob_bitmask(&map, 1, 1, TerrainGroup::Grass);
+        assert_eq!(mask & 64, 0, "W should NOT be set (water has no overlay)");
     }
 
     #[test]

@@ -1,22 +1,15 @@
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Paragraph};
 
-use crate::components::building::{ConstructionSite, CropState, GateState, Structure};
 use crate::components::physical::Position;
-use crate::resources::map::{Terrain, TileMap};
+use crate::resources::map::TileMap;
+
+// Re-export shared data types so existing TUI code continues to compile.
+pub use crate::ui_data::{terrain_label, BuildingInfo};
 
 // ---------------------------------------------------------------------------
 // Tile detail rendering
 // ---------------------------------------------------------------------------
-
-/// Render the tile inspect panel for the tile at `cursor`.
-/// Info about a building entity at the cursor, if any.
-pub struct BuildingInfo {
-    pub structure: Structure,
-    pub construction_site: Option<ConstructionSite>,
-    pub crop_state: Option<CropState>,
-    pub gate_state: Option<GateState>,
-}
 
 pub fn render_tile_inspect(
     frame: &mut Frame,
@@ -169,29 +162,4 @@ fn property_line<'a>(label: &str, value: &str) -> Line<'a> {
         Span::styled(format!("   {label:<14}"), Style::default().fg(Color::DarkGray)),
         Span::styled(value.to_string(), Style::default().fg(Color::White)),
     ])
-}
-
-fn terrain_label(terrain: Terrain) -> &'static str {
-    match terrain {
-        Terrain::Grass => "Grass",
-        Terrain::LightForest => "Light Forest",
-        Terrain::DenseForest => "Dense Forest",
-        Terrain::Water => "Water",
-        Terrain::Rock => "Rock",
-        Terrain::Mud => "Mud",
-        Terrain::Sand => "Sand",
-        Terrain::Den => "Den",
-        Terrain::Hearth => "Hearth",
-        Terrain::Stores => "Stores",
-        Terrain::Workshop => "Workshop",
-        Terrain::Garden => "Garden",
-        Terrain::Watchtower => "Watchtower",
-        Terrain::WardPost => "Ward Post",
-        Terrain::Wall => "Wall",
-        Terrain::Gate => "Gate",
-        Terrain::FairyRing => "Fairy Ring",
-        Terrain::StandingStone => "Standing Stone",
-        Terrain::DeepPool => "Deep Pool",
-        Terrain::AncientRuin => "Ancient Ruin",
-    }
 }

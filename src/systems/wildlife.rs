@@ -269,9 +269,9 @@ fn initial_ai_state(
 // ---------------------------------------------------------------------------
 
 /// Base detection range in Manhattan tiles.
-const BASE_DETECTION_RANGE: i32 = 5;
+const BASE_DETECTION_RANGE: i32 = 8;
 /// Range penalty when the cat is in forest terrain.
-const FOREST_RANGE_PENALTY: i32 = 2;
+const FOREST_RANGE_PENALTY: i32 = 1;
 
 /// Each tick, living cats scan for nearby wildlife and react with fear.
 ///
@@ -594,28 +594,28 @@ pub fn spawn_initial_wildlife(
             }
         };
 
-        // Foxes: 2-3 at forest-edge tiles, 15+ tiles from colony.
+        // Foxes: 2-3 at forest-edge tiles, 10+ tiles from colony.
         let fox_count: u32 = rng.random_range(2..=3);
         for _ in 0..fox_count {
-            if let Some(pos) = find_spawn(15, WildSpecies::Fox, rng) {
+            if let Some(pos) = find_spawn(10, WildSpecies::Fox, rng) {
                 let ai = make_ai(WildSpecies::Fox, &pos, rng);
                 spawn_positions.push((WildSpecies::Fox, pos, ai));
             }
         }
 
-        // Hawks: 1-2 at grass tiles, 15+ tiles from colony.
+        // Hawks: 1-2 at grass tiles, 10+ tiles from colony.
         let hawk_count: u32 = rng.random_range(1..=2);
         for _ in 0..hawk_count {
-            if let Some(pos) = find_spawn(15, WildSpecies::Hawk, rng) {
+            if let Some(pos) = find_spawn(10, WildSpecies::Hawk, rng) {
                 let ai = make_ai(WildSpecies::Hawk, &pos, rng);
                 spawn_positions.push((WildSpecies::Hawk, pos, ai));
             }
         }
 
-        // Snakes: 1-2 at rock/mud tiles, 10+ tiles from colony.
+        // Snakes: 1-2 at rock/mud tiles, 7+ tiles from colony.
         let snake_count: u32 = rng.random_range(1..=2);
         for _ in 0..snake_count {
-            if let Some(pos) = find_spawn(10, WildSpecies::Snake, rng) {
+            if let Some(pos) = find_spawn(7, WildSpecies::Snake, rng) {
                 let ai = make_ai(WildSpecies::Snake, &pos, rng);
                 spawn_positions.push((WildSpecies::Snake, pos, ai));
             }
@@ -799,7 +799,7 @@ mod tests {
         assert!(!positions.is_empty(), "should spawn at least some wildlife");
         for pos in &positions {
             assert!(
-                pos.manhattan_distance(&colony) >= 10,
+                pos.manhattan_distance(&colony) >= 7,
                 "wildlife at ({}, {}) is too close to colony at ({}, {})",
                 pos.x, pos.y, colony.x, colony.y
             );

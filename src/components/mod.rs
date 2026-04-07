@@ -1,6 +1,7 @@
 pub mod aspirations;
 pub mod building;
 pub mod coordination;
+pub mod disposition;
 pub mod fate;
 pub mod identity;
 pub mod items;
@@ -21,6 +22,7 @@ pub use aspirations::{
 };
 pub use building::{ConstructionSite, CropState, GateState, StoredItems, Structure, StructureType};
 pub use fate::{FateAssigned, FatedLove, FatedRival};
+pub use disposition::{ActionHistory, ActionOutcome, ActionRecord, Disposition, DispositionKind};
 pub use coordination::{
     ActiveDirective, Coordinator, CoordinatorDied, Directive, DirectiveKind, DirectiveQueue,
     PendingDelivery,

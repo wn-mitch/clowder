@@ -10,6 +10,8 @@ use bevy::prelude::{
 };
 use bevy::window::WindowResolution;
 
+use clowder::ui_data::{InspectionMode, InspectionState};
+
 use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::Schedule;
 
@@ -94,9 +96,15 @@ fn handle_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut time: ResMut<TimeState>,
     mut app_exit: MessageWriter<AppExit>,
+    mut inspection: ResMut<InspectionState>,
 ) {
     if keyboard.just_pressed(KeyCode::Escape) {
-        app_exit.write(AppExit::Success);
+        if inspection.mode != InspectionMode::None {
+            // Dismiss open panels first.
+            inspection.mode = InspectionMode::None;
+        } else {
+            app_exit.write(AppExit::Success);
+        }
     }
     if keyboard.just_pressed(KeyCode::KeyP) {
         time.paused = !time.paused;
@@ -225,6 +233,11 @@ fn build_schedule() -> Schedule {
                 clowder::systems::buildings::apply_building_effects,
                 clowder::systems::buildings::decay_building_condition,
                 clowder::systems::items::decay_items,
+            )
+                .chain(),
+            // Item pruning and food sync — split out to stay under Bevy's chain param limit.
+            (
+                clowder::systems::items::prune_stored_items,
                 clowder::systems::items::sync_food_stores,
             )
                 .chain(),

@@ -117,16 +117,18 @@ pub fn score_actions(
 
     // --- Sleep ---
     {
-        let urgency = (1.0 - ctx.needs.energy) * 2.0 * ctx.needs.level_suppression(1);
+        let urgency = (1.0 - ctx.needs.energy) * 1.2 * ctx.needs.level_suppression(1);
         scores.push((Action::Sleep, urgency + jitter(rng)));
     }
 
-    // --- Hunt (boldness-driven; requires reachable forest/grass and nearby prey) ---
-    if ctx.can_hunt && ctx.prey_nearby {
+    // --- Hunt (boldness-driven; requires reachable forest/grass) ---
+    if ctx.can_hunt {
         let food_scarcity = (1.0 - ctx.food_fraction) * 0.5;
+        let prey_bonus = if ctx.prey_nearby { 0.2 } else { 0.0 };
         let urgency = ((1.0 - ctx.needs.hunger) + food_scarcity)
-            * ctx.personality.boldness * 1.5
-            * ctx.needs.level_suppression(1);
+            * ctx.personality.boldness * 2.2
+            * ctx.needs.level_suppression(1)
+            + prey_bonus;
         scores.push((Action::Hunt, urgency + jitter(rng)));
     }
 
@@ -134,15 +136,15 @@ pub fn score_actions(
     if ctx.can_forage {
         let food_scarcity = (1.0 - ctx.food_fraction) * 0.5;
         let urgency = ((1.0 - ctx.needs.hunger) + food_scarcity)
-            * ctx.personality.diligence * 1.2
+            * ctx.personality.diligence * 2.0
             * ctx.needs.level_suppression(1);
         scores.push((Action::Forage, urgency + jitter(rng)));
     }
 
     // --- Socialize (sociability-driven; requires a visible cat) ---
     if ctx.has_social_target {
-        let score = (1.0 - ctx.needs.social) * ctx.personality.sociability * 1.5
-            * ctx.needs.level_suppression(3);
+        let score = (1.0 - ctx.needs.social) * ctx.personality.sociability * 2.0
+            * ctx.needs.level_suppression(2);
         scores.push((Action::Socialize, score + jitter(rng)));
     }
 
@@ -150,16 +152,16 @@ pub fn score_actions(
     {
         let self_groom = (1.0 - ctx.needs.warmth) * 0.8 * ctx.needs.level_suppression(1);
         let other_groom = if ctx.has_social_target {
-            ctx.personality.warmth * (1.0 - ctx.needs.social) * ctx.needs.level_suppression(3)
+            ctx.personality.warmth * (1.0 - ctx.needs.social) * ctx.needs.level_suppression(2)
         } else {
             0.0
         };
         scores.push((Action::Groom, self_groom.max(other_groom) + jitter(rng)));
     }
 
-    // --- Explore (curiosity-driven; suppressed when unsafe or hungry) ---
+    // --- Explore (curiosity-driven; suppressed by unmet physiological needs) ---
     {
-        let score = ctx.personality.curiosity * 0.6 * ctx.needs.level_suppression(3);
+        let score = ctx.personality.curiosity * 0.7 * ctx.needs.level_suppression(2);
         scores.push((Action::Explore, score + jitter(rng)));
     }
 
@@ -187,7 +189,7 @@ pub fn score_actions(
 
     // --- Patrol (proactive safety-seeking; available when safety < 0.8) ---
     if ctx.needs.safety < 0.8 {
-        let score = ctx.personality.boldness * 0.5 * (1.0 - ctx.needs.safety)
+        let score = ctx.personality.boldness * 1.5 * (1.0 - ctx.needs.safety)
             * ctx.needs.level_suppression(2);
         scores.push((Action::Patrol, score + jitter(rng)));
     }
@@ -348,7 +350,7 @@ pub fn apply_cascading_bonuses(
 ) {
     for (action, score) in scores.iter_mut() {
         if let Some(&count) = nearby_actions.get(action) {
-            *score += count as f32 * 0.15;
+            *score += count as f32 * 0.08;
         }
     }
 }
@@ -548,6 +550,131 @@ pub fn select_best_action(scores: &[(Action, f32)]) -> Action {
         .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
         .map(|(action, _)| *action)
         .unwrap_or(Action::Idle)
+}
+
+/// Select an action using softmax (Boltzmann) sampling.
+///
+/// Instead of always picking the highest score, treats scores as weights
+/// and samples probabilistically. Temperature controls variety:
+/// - T → 0: converges to argmax (deterministic)
+/// - T = 0.10: personality-primary ~45-60%, realistic secondary behaviors
+/// - T → ∞: uniform random (personality irrelevant)
+pub fn select_action_softmax(scores: &[(Action, f32)], rng: &mut impl Rng) -> Action {
+    const TEMPERATURE: f32 = 0.10;
+
+    if scores.is_empty() {
+        return Action::Idle;
+    }
+
+    let max_score = scores.iter().map(|(_, s)| *s).fold(f32::NEG_INFINITY, f32::max);
+    let weights: Vec<f32> = scores
+        .iter()
+        .map(|(_, s)| ((s - max_score) / TEMPERATURE).exp())
+        .collect();
+    let total: f32 = weights.iter().sum();
+
+    let mut roll: f32 = rng.random::<f32>() * total;
+    for (i, w) in weights.iter().enumerate() {
+        roll -= w;
+        if roll <= 0.0 {
+            return scores[i].0;
+        }
+    }
+
+    scores.last().map(|(a, _)| *a).unwrap_or(Action::Idle)
+}
+
+// ---------------------------------------------------------------------------
+// Disposition scoring (aggregate from action scores)
+// ---------------------------------------------------------------------------
+
+use crate::components::disposition::DispositionKind;
+
+/// Aggregate per-action scores into per-disposition scores.
+///
+/// For each disposition, takes the MAX score among its constituent actions.
+/// Actions not present in the score list contribute nothing (the disposition
+/// may still appear with score 0.0 if no constituent scored).
+///
+/// Groom is special: it appears in both Resting (self-groom) and Socializing
+/// (groom-other). The caller should set `self_groom_won` based on whether the
+/// self-groom sub-score beat the other-groom sub-score during action scoring.
+pub fn aggregate_to_dispositions(
+    action_scores: &[(Action, f32)],
+    self_groom_won: bool,
+) -> Vec<(DispositionKind, f32)> {
+    let mut disposition_scores: Vec<(DispositionKind, f32)> = DispositionKind::ALL
+        .iter()
+        .map(|kind| (*kind, 0.0f32))
+        .collect();
+
+    for &(action, score) in action_scores {
+        // Skip Flee and Idle — not dispositions.
+        if matches!(action, Action::Flee | Action::Idle) {
+            continue;
+        }
+
+        // Groom routes to Resting or Socializing depending on which sub-score won.
+        if action == Action::Groom {
+            let target_kind = if self_groom_won {
+                DispositionKind::Resting
+            } else {
+                DispositionKind::Socializing
+            };
+            if let Some((_, existing)) = disposition_scores
+                .iter_mut()
+                .find(|(k, _)| *k == target_kind)
+            {
+                *existing = existing.max(score);
+            }
+            continue;
+        }
+
+        if let Some(kind) = DispositionKind::from_action(action) {
+            if let Some((_, existing)) = disposition_scores
+                .iter_mut()
+                .find(|(k, _)| *k == kind)
+            {
+                *existing = existing.max(score);
+            }
+        }
+    }
+
+    // Remove dispositions with zero or negative scores (no constituent action was available).
+    disposition_scores.retain(|(_, score)| *score > 0.0);
+    disposition_scores
+}
+
+/// Select a disposition using softmax (Boltzmann) sampling.
+///
+/// Same algorithm as `select_action_softmax` but over disposition scores.
+/// Falls back to `Resting` if the slice is empty.
+pub fn select_disposition_softmax(
+    scores: &[(DispositionKind, f32)],
+    rng: &mut impl Rng,
+) -> DispositionKind {
+    const TEMPERATURE: f32 = 0.10;
+
+    if scores.is_empty() {
+        return DispositionKind::Resting;
+    }
+
+    let max_score = scores.iter().map(|(_, s)| *s).fold(f32::NEG_INFINITY, f32::max);
+    let weights: Vec<f32> = scores
+        .iter()
+        .map(|(_, s)| ((s - max_score) / TEMPERATURE).exp())
+        .collect();
+    let total: f32 = weights.iter().sum();
+
+    let mut roll: f32 = rng.random::<f32>() * total;
+    for (i, w) in weights.iter().enumerate() {
+        roll -= w;
+        if roll <= 0.0 {
+            return scores[i].0;
+        }
+    }
+
+    scores.last().map(|(k, _)| *k).unwrap_or(DispositionKind::Resting)
 }
 
 // ---------------------------------------------------------------------------
@@ -978,8 +1105,8 @@ mod tests {
 
         let hunt = scores.iter().find(|(a, _)| *a == Action::Hunt).unwrap().1;
         assert!(
-            (hunt - 1.45).abs() < 1e-5,
-            "3 nearby hunters should add 0.45; got {hunt}"
+            (hunt - 1.24).abs() < 1e-5,
+            "3 nearby hunters should add 0.24; got {hunt}"
         );
     }
 
@@ -1515,5 +1642,88 @@ mod tests {
 
         let flee = scores.iter().find(|(a, _)| *a == Action::Flee).unwrap().1;
         assert_eq!(flee, 3.0, "Flee should be exempt from survival floor");
+    }
+
+    // --- Disposition aggregation tests ---
+
+    #[test]
+    fn aggregate_maps_hunt_to_hunting() {
+        let scores = vec![
+            (Action::Hunt, 1.5),
+            (Action::Eat, 1.0),
+            (Action::Sleep, 0.8),
+        ];
+        let disp = aggregate_to_dispositions(&scores, true);
+        let hunting = disp.iter().find(|(k, _)| *k == DispositionKind::Hunting);
+        assert_eq!(hunting.unwrap().1, 1.5);
+    }
+
+    #[test]
+    fn aggregate_takes_max_of_constituent_actions() {
+        let scores = vec![
+            (Action::Patrol, 0.5),
+            (Action::Fight, 1.2),
+        ];
+        let disp = aggregate_to_dispositions(&scores, true);
+        let guarding = disp.iter().find(|(k, _)| *k == DispositionKind::Guarding);
+        assert_eq!(guarding.unwrap().1, 1.2);
+    }
+
+    #[test]
+    fn aggregate_routes_self_groom_to_resting() {
+        let scores = vec![
+            (Action::Groom, 0.9),
+            (Action::Eat, 0.5),
+        ];
+        let disp = aggregate_to_dispositions(&scores, true);
+        let resting = disp.iter().find(|(k, _)| *k == DispositionKind::Resting);
+        assert_eq!(resting.unwrap().1, 0.9);
+        // Should NOT appear under Socializing
+        let socializing = disp.iter().find(|(k, _)| *k == DispositionKind::Socializing);
+        assert!(socializing.is_none());
+    }
+
+    #[test]
+    fn aggregate_routes_other_groom_to_socializing() {
+        let scores = vec![
+            (Action::Groom, 0.9),
+            (Action::Socialize, 0.5),
+        ];
+        let disp = aggregate_to_dispositions(&scores, false);
+        let socializing = disp.iter().find(|(k, _)| *k == DispositionKind::Socializing);
+        assert_eq!(socializing.unwrap().1, 0.9);
+    }
+
+    #[test]
+    fn aggregate_excludes_flee_and_idle() {
+        let scores = vec![
+            (Action::Flee, 3.0),
+            (Action::Idle, 0.1),
+            (Action::Hunt, 1.0),
+        ];
+        let disp = aggregate_to_dispositions(&scores, true);
+        assert!(disp.iter().all(|(k, _)| *k != DispositionKind::Resting || disp.iter().find(|(dk, _)| *dk == DispositionKind::Resting).is_none()));
+        // No disposition should have the Flee score
+        assert!(disp.iter().all(|(_, s)| *s <= 1.0));
+    }
+
+    #[test]
+    fn aggregate_omits_zero_score_dispositions() {
+        let scores = vec![
+            (Action::Hunt, 1.0),
+        ];
+        let disp = aggregate_to_dispositions(&scores, true);
+        // Only Hunting should appear
+        assert_eq!(disp.len(), 1);
+        assert_eq!(disp[0].0, DispositionKind::Hunting);
+    }
+
+    #[test]
+    fn disposition_softmax_returns_resting_for_empty() {
+        let mut rng = seeded_rng(42);
+        assert_eq!(
+            select_disposition_softmax(&[], &mut rng),
+            DispositionKind::Resting,
+        );
     }
 }

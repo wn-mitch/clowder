@@ -1,6 +1,7 @@
 pub mod actions;
 pub mod ai;
 pub mod aspirations;
+pub mod disposition;
 pub mod buildings;
 pub mod colony_knowledge;
 pub mod combat;

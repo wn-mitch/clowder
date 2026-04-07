@@ -314,14 +314,19 @@ pub fn spawn_starting_buildings(world: &mut World, colony_site: Position, map: &
 
     // Seed starting food supply. A mix of foraged and hunted items to give
     // the colony a buffer while cats establish hunting/foraging routines.
+    // 30 items = Stores capacity. Prioritize high-value items for initial buffer.
     let starting_food: &[ItemKind] = &[
-        ItemKind::RawMouse, ItemKind::RawMouse,
-        ItemKind::RawRat, ItemKind::RawRat,
+        ItemKind::RawRat, ItemKind::RawRat, ItemKind::RawRat,
+        ItemKind::RawRat, ItemKind::RawRat, ItemKind::RawRat,
+        ItemKind::RawFish, ItemKind::RawFish, ItemKind::RawFish,
         ItemKind::RawFish, ItemKind::RawFish,
-        ItemKind::RawBird,
-        ItemKind::Berries, ItemKind::Berries, ItemKind::Berries,
-        ItemKind::Nuts, ItemKind::Nuts, ItemKind::Nuts,
+        ItemKind::RawBird, ItemKind::RawBird, ItemKind::RawBird,
+        ItemKind::RawMouse, ItemKind::RawMouse, ItemKind::RawMouse,
+        ItemKind::RawMouse, ItemKind::RawMouse,
+        ItemKind::Berries, ItemKind::Berries, ItemKind::Berries, ItemKind::Berries,
+        ItemKind::Nuts, ItemKind::Nuts, ItemKind::Nuts, ItemKind::Nuts,
         ItemKind::Roots, ItemKind::Roots,
+        ItemKind::WildOnion,
     ];
     for &kind in starting_food {
         let item_entity = world

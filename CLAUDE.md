@@ -7,8 +7,9 @@ Terminal-based colony simulation. Cats in a Redwall/Mausritter-inspired fantasy 
 ## Tech Stack
 
 - **Language:** Rust (2021 edition)
-- **ECS:** `bevy_ecs` (standalone, no renderer)
-- **TUI:** `ratatui` + `crossterm`
+- **Engine:** `bevy` (full — ECS, rendering, windowing, asset loading)
+- **Rendering:** Bevy `Sprite` + `TextureAtlas` (see Rendering section below)
+- **TUI:** `ratatui` + `crossterm` (headless/legacy mode)
 - **RNG:** `rand` + `rand_chacha` (deterministic, seeded)
 - **Terrain:** `noise` (Perlin)
 - **Template data:** RON files (not used yet — Phase 2)
@@ -17,9 +18,9 @@ Terminal-based colony simulation. Cats in a Redwall/Mausritter-inspired fantasy 
 
 ## Architecture
 
-bevy_ecs provides entity-component-system infrastructure. The main loop ticks the
-ECS schedule, then renders the terminal UI via ratatui. Simulation ticks and render
-frames are decoupled — the TUI renders at ~30fps regardless of sim speed.
+Bevy provides ECS, rendering, and windowing. The graphical mode uses Bevy's
+renderer with a 2D camera; headless mode still uses ratatui for terminal output.
+Simulation ticks and render frames are decoupled.
 
 Key architectural decisions:
 - ECS over agent-based: cross-cutting systems (weather, corruption) need to affect
@@ -33,6 +34,10 @@ Key architectural decisions:
 - Emergent complexity: when a system can tie into the narrative layer through
   unexpected interaction, it should. Chain reactions between independent systems are
   the joy of the simulation — design for them, not against them.
+- **Physical causality:** Objects don't teleport. Cats must physically carry items
+  (via Inventory), walk to destinations, and deposit them. Effects require physical
+  presence. Despite the world having magic, normal causality applies. Actions are
+  behavioral arcs with physical movement — not instant stat changes at a distance.
 
 ## Commands
 
@@ -64,3 +69,26 @@ Key architectural decisions:
 - **`run_if` over early returns**: if a condition can be expressed as a `run_if` guard on the system, prefer that over an early return inside the system body. Systems gated by `run_if` skip query iteration entirely.
 - **Never `.clone()` resource data in a per-tick system.** Borrow via `as_slice()`, reference, or `Res<T>`/`ResMut<T>`. String clones for storage (e.g. copying a name into a log entry) are fine.
 - **Events are verbs**: if/when Bevy events are introduced, name them as imperative or past-tense verbs (`SpawnCat`, `CatDied`), not noun-suffix (`DeathEvent`). Define in a central module. No circular event flows.
+
+## Rendering
+
+The tilemap is rendered with plain Bevy sprites — **not** bevy_ecs_tilemap's
+`TilemapBundle`. bevy_ecs_tilemap is still a dependency (for `TilePos`,
+`TileStorage` types used by the overlay toggle system) but its GPU rendering
+pipeline is not used.
+
+- **Base terrain:** One `Sprite` entity per tile with individual 16×16 PNGs
+  from `assets/sprites/tiles/`. Positioned at z=0.
+- **Autotile overlays:** `Sprite` + `TextureAtlas` referencing the 8×8 blob
+  atlas PNGs (grass, soil, stone). Positioned at z=1/2/3 by layer.
+- **F6/F7/F8** toggle overlay visibility by querying `BlobOverlayLayer`
+  entities and matching their `Transform.translation.z`.
+
+**Do not use `TilemapBundle` for rendering.** bevy_ecs_tilemap v0.18's
+`texture_2d_array` pipeline silently renders all tiles as texture index 0 on
+macOS Metal. Both the default array-texture path and the `atlas` feature path
+fail. This was debugged extensively — the data pipeline is correct at every
+step; the bug is in the GPU shader/texture binding layer. When evaluating
+tilemap rendering crates in the future, verify with a multi-texture visual
+test (render tiles with different indices, assert pixel colors) before
+building on top.

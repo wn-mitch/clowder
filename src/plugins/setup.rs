@@ -82,6 +82,7 @@ pub fn setup_world_exclusive(world: &mut World) {
     // Always insert the event log for mechanical debugging.
     world.insert_resource(EventLog::default());
 
+
     // Ensure new resources exist (may be absent from older saves).
     if !world.contains_resource::<ColonyKnowledge>() {
         world.insert_resource(ColonyKnowledge::default());
@@ -184,6 +185,7 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
                     Training::default(),
                     crate::ai::CurrentAction::default(),
                     Inventory::default(),
+                    crate::components::disposition::ActionHistory::default(),
                 ),
             ))
             .id();

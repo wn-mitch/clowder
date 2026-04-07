@@ -37,6 +37,19 @@ pub fn decay_items(
 ///
 /// This keeps `FoodStores` as a derived value for TUI, scoring, and
 /// coordination while the real food economy runs on items.
+/// Prune dead entity IDs from StoredItems so despawned items don't occupy capacity.
+pub fn prune_stored_items(
+    mut stores_query: Query<(&Structure, &mut StoredItems)>,
+    items_query: Query<&Item>,
+) {
+    for (structure, mut stored) in stores_query.iter_mut() {
+        if structure.kind == StructureType::Stores {
+            stored.items.retain(|&e| items_query.contains(e));
+        }
+    }
+}
+
+/// Recalculate FoodStores from actual food items in Stores buildings.
 pub fn sync_food_stores(
     mut food: ResMut<FoodStores>,
     stores_query: Query<(&Structure, &StoredItems)>,

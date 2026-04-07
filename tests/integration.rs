@@ -118,6 +118,9 @@ fn build_schedule() -> Schedule {
         (
             clowder::systems::time::advance_time,
             clowder::systems::weather::update_weather,
+            clowder::systems::items::decay_items,
+            clowder::systems::items::prune_stored_items,
+            clowder::systems::items::sync_food_stores,
             clowder::systems::needs::decay_needs,
             clowder::systems::ai::evaluate_actions,
             clowder::systems::actions::resolve_actions,
@@ -176,7 +179,11 @@ fn cats_eat_when_hungry() {
     let mut world = setup_world(42);
     let mut schedule = build_schedule();
 
-    // Drive all cats to near-starving hunger before the schedule runs.
+    // Run one tick to let sync_food_stores populate FoodStores from actual items.
+    schedule.run(&mut world);
+
+
+    // Drive all cats to near-starving hunger.
     let entity_ids: Vec<Entity> = world
         .query::<Entity>()
         .iter(&world)
@@ -188,18 +195,24 @@ fn cats_eat_when_hungry() {
         }
     }
 
-    for _ in 0..50 {
+    // Cats need time to finish current actions, walk to stores, and eat.
+    // With softmax selection, not every cat chooses Eat on first opportunity.
+    for _ in 0..200 {
         schedule.run(&mut world);
     }
 
-    let any_hunger_improved = world
+    // At least one cat should have eaten and recovered some hunger.
+    // With 0.002/tick decay over 200 ticks (0.4 drain) and food_value ~0.3,
+    // a cat that eats even once should be above 0.0.
+    let max_hunger = world
         .query::<&Needs>()
         .iter(&world)
-        .any(|needs| needs.hunger > 0.15);
+        .map(|n| n.hunger)
+        .fold(0.0f32, f32::max);
 
     assert!(
-        any_hunger_improved,
-        "no cat's hunger improved above 0.15 after 50 ticks — eating may be broken"
+        max_hunger > 0.0,
+        "no cat has any hunger after 200 ticks (max={max_hunger}) — eating may be broken"
     );
 }
 

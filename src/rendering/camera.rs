@@ -114,6 +114,7 @@ pub fn camera_update(
     cats: Query<(&Position, &CurrentAction), With<Species>>,
     narrative: Res<NarrativeLog>,
     map: Res<TileMap>,
+    inspection: Res<crate::ui_data::InspectionState>,
 ) {
     let Ok((mut transform, mut projection)) = query.single_mut() else {
         return;
@@ -159,8 +160,12 @@ pub fn camera_update(
         brain.idle_seconds = 0.0;
     }
 
-    // Escape always returns to Drift.
-    if keyboard.just_pressed(KeyCode::Escape) && brain.mode == CameraMode::Override {
+    // Escape returns to Drift, but only when no inspect panels are open
+    // (let main handle_input consume Escape for panel dismiss first).
+    if keyboard.just_pressed(KeyCode::Escape)
+        && brain.mode == CameraMode::Override
+        && inspection.mode == crate::ui_data::InspectionMode::None
+    {
         brain.mode = CameraMode::Drift;
     }
 
@@ -269,6 +274,9 @@ pub fn camera_update(
                 transform.translation.x += direction.x * pan_speed;
                 transform.translation.y += direction.y * pan_speed;
             }
+            // Clamp to map bounds.
+            transform.translation.x = transform.translation.x.clamp(brain.map_min.x, brain.map_max.x);
+            transform.translation.y = transform.translation.y.clamp(brain.map_min.y, brain.map_max.y);
             // Update target to current position so lerp doesn't fight manual control.
             brain.target = Vec2::new(transform.translation.x, transform.translation.y);
 
@@ -289,8 +297,9 @@ pub fn camera_update(
         };
         let current = Vec2::new(transform.translation.x, transform.translation.y);
         let new_pos = current.lerp(brain.target, (lerp_speed * dt).min(1.0));
-        transform.translation.x = new_pos.x;
-        transform.translation.y = new_pos.y;
+        let clamped = new_pos.clamp(brain.map_min, brain.map_max);
+        transform.translation.x = clamped.x;
+        transform.translation.y = clamped.y;
     }
 
     // --- Screenshot with F5 ---

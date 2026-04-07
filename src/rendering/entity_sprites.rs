@@ -192,15 +192,20 @@ pub fn attach_entity_sprites(
 /// Sync Position → Transform for all entities with both components.
 pub fn sync_entity_positions(
     map: Res<TileMap>,
-    mut query: Query<(&Position, &mut Transform), With<EntitySpriteMarker>>,
+    mut query: Query<(Entity, &Position, &mut Transform), With<EntitySpriteMarker>>,
 ) {
     let world_px = TILE_PX * TILE_SCALE;
     let map_h = map.height as f32;
 
-    for (pos, mut transform) in &mut query {
+    for (entity, pos, mut transform) in &mut query {
         let (x, y) = grid_to_world(pos, map_h, world_px);
-        transform.translation.x = x;
-        transform.translation.y = y;
+        // Small deterministic sub-tile offset so sprites on the same tile
+        // don't stack exactly and name labels stay readable.
+        let hash = entity.to_bits() as f32;
+        let offset_x = (hash * 7.3).sin() * 0.3 * world_px;
+        let offset_y = (hash * 13.7).sin() * 0.15 * world_px;
+        transform.translation.x = x + offset_x;
+        transform.translation.y = y + offset_y;
     }
 }
 

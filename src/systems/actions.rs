@@ -91,10 +91,11 @@ fn pick_forage_item(terrain: &crate::resources::map::Terrain, rng: &mut SimRng) 
             else { ItemKind::DriedGrass }
         }
         Terrain::Grass => {
-            if roll < 0.4 { ItemKind::Roots }
-            else if roll < 0.6 { ItemKind::WildOnion }
-            else if roll < 0.8 { ItemKind::DriedGrass }
-            else { ItemKind::Berries }
+            if roll < 0.35 { ItemKind::Roots }
+            else if roll < 0.55 { ItemKind::WildOnion }
+            else if roll < 0.70 { ItemKind::Mushroom }
+            else if roll < 0.95 { ItemKind::Berries }
+            else { ItemKind::DriedGrass }
         }
         _ => ItemKind::Roots, // Fallback for other terrains
     }
@@ -119,6 +120,7 @@ pub fn resolve_actions(
         &mut Skills,
         &mut Memory,
         &mut Mood,
+        &mut crate::components::magic::Inventory,
         Option<&crate::components::aspirations::Preferences>,
         &Name,
     ), (Without<Dead>, Without<crate::components::task_chain::TaskChain>)>,
@@ -158,7 +160,7 @@ pub fn resolve_actions(
     let mut coordination_deliveries: Vec<(Entity, Entity)> = Vec::new();
     let mut mentor_effects: Vec<MentorEffect> = Vec::new();
 
-    for (entity, mut current, mut needs, mut pos, mut skills, mut memory, mut mood, preferences, cat_name) in &mut query {
+    for (entity, mut current, mut needs, mut pos, mut skills, mut memory, mut mood, mut inventory, preferences, cat_name) in &mut query {
         if current.ticks_remaining == 0 {
             continue;
         }
@@ -190,48 +192,47 @@ pub fn resolve_actions(
 
         match current.action {
             Action::Eat => {
-                // Find the nearest Stores building with a food item and consume it.
-                let cat_pos = *pos;
-                let mut ate_kind: Option<ItemKind> = None;
-                if let Some((store_entity, _, _, _)) = stores_query
-                    .iter()
-                    .filter(|(_, _, s, _)| s.kind == StructureType::Stores)
-                    .min_by_key(|(_, _, _, sp)| cat_pos.manhattan_distance(sp))
-                {
-                    // We need a second pass to get mutable access.
-                    if let Ok((_, mut stored, _, _)) = stores_query.get_mut(store_entity) {
-                        // Find the first food item in this store.
-                        let food_item = stored.items.iter()
-                            .copied()
-                            .find(|&item_e| {
-                                items_for_eating.get(item_e)
-                                    .is_ok_and(|item| item.kind.is_food())
-                            });
-                        if let Some(item_entity) = food_item {
-                            if let Ok(item) = items_for_eating.get(item_entity) {
-                                let food_val = item.kind.food_value();
-                                needs.hunger = (needs.hunger + food_val).min(1.0);
-                                ate_kind = Some(item.kind);
-                            }
-                            stored.remove(item_entity);
-                            commands.entity(item_entity).despawn();
+                // Walk to the targeted Stores building, then consume one item.
+                if let Some(target) = current.target_position {
+                    if pos.manhattan_distance(&target) > 1 {
+                        // Still walking to the store.
+                        if let Some(next) = step_toward(&pos, &target, &map) {
+                            *pos = next;
                         }
+                    } else if let Some(store_entity) = current.target_entity {
+                        // Adjacent to store — eat one item and finish.
+                        let mut ate_kind: Option<ItemKind> = None;
+                        if let Ok((_, mut stored, _, _)) = stores_query.get_mut(store_entity) {
+                            let food_item = stored.items.iter()
+                                .copied()
+                                .find(|&item_e| {
+                                    items_for_eating.get(item_e)
+                                        .is_ok_and(|item| item.kind.is_food())
+                                });
+                            if let Some(item_entity) = food_item {
+                                if let Ok(item) = items_for_eating.get(item_entity) {
+                                    let food_val = item.kind.food_value();
+                                    needs.hunger = (needs.hunger + food_val).min(1.0);
+                                    ate_kind = Some(item.kind);
+                                }
+                                stored.remove(item_entity);
+                                commands.entity(item_entity).despawn();
+                            }
+                        }
+                        if let Some(kind) = ate_kind {
+                            if rng.rng.random_range(0u32..3) == 0 {
+                                let cat = &cat_name.0;
+                                let item_name = kind.name();
+                                log.push(
+                                    time.tick,
+                                    format!("{cat} eats {item_name} from the stores."),
+                                    NarrativeTier::Micro,
+                                );
+                            }
+                        }
+                        // Done eating — end action regardless of whether food was found.
+                        current.ticks_remaining = 0;
                     }
-                }
-                if let Some(kind) = ate_kind {
-                    // Outcome narrative: what was eaten (rate-limited, ~1 in 3).
-                    if rng.rng.random_range(0u32..3) == 0 {
-                        let cat = &cat_name.0;
-                        let item_name = kind.name();
-                        log.push(
-                            time.tick,
-                            format!("{cat} eats {item_name} from the stores."),
-                            NarrativeTier::Micro,
-                        );
-                    }
-                } else {
-                    // No food available — stop eating.
-                    current.ticks_remaining = 0;
                 }
             }
             Action::Sleep => {
@@ -239,96 +240,152 @@ pub fn resolve_actions(
                 needs.warmth = (needs.warmth + 0.01).min(1.0);
             }
             Action::Hunt => {
-                // Move toward hunting ground.
-                if let Some(target) = current.target_position {
-                    if pos.manhattan_distance(&target) > 1 {
-                        if let Some(next) = step_toward(&pos, &target, &map) {
-                            *pos = next;
-                        }
-                    }
-                }
+                // Check if carrying prey back to stores (post-kill carry phase).
+                let carrying_food = inventory.slots.iter().any(|s| {
+                    matches!(s, crate::components::magic::ItemSlot::Item(k) if k.is_food())
+                });
 
-                // On last tick: resolve the hunt.
-                if current.ticks_remaining == 0 {
-                    let success = rng.rng.random::<f32>() < 0.25 + skills.hunting * 0.55;
-                    if success {
-                        // Find nearest prey within 3 tiles.
-                        let nearest_prey = prey_query.iter()
-                            .filter(|(_, _, prey_pos)| pos.manhattan_distance(prey_pos) <= 3)
-                            .min_by_key(|(_, _, prey_pos)| pos.manhattan_distance(prey_pos))
-                            .map(|(prey_entity, prey, _)| (prey_entity, prey.species));
-
-                        if let Some((prey_entity, species)) = nearest_prey {
-                            let item_kind = species.item_kind();
-                            let quality = (0.3 + skills.hunting * 0.4).clamp(0.0, 1.0);
-
-                            // Despawn the prey entity.
-                            commands.entity(prey_entity).despawn();
-
-                            // Store the item in the nearest Stores building.
-                            let cat_pos = *pos;
-                            let nearest_store = stores_query
-                                .iter()
-                                .filter(|(_, _, s, _)| s.kind == StructureType::Stores)
-                                .min_by_key(|(_, _, _, sp)| cat_pos.manhattan_distance(sp))
-                                .map(|(e, _, _, _)| e);
-
-                            let stored_in_building = if let Some(store_entity) = nearest_store {
+                if carrying_food {
+                    // Carry phase: walk toward stores to deposit.
+                    if let Some(target) = current.target_position {
+                        if pos.manhattan_distance(&target) > 1 {
+                            if let Some(next) = step_toward(&pos, &target, &map) {
+                                *pos = next;
+                            }
+                        } else if let Some(store_entity) = current.target_entity {
+                            // Adjacent to stores — deposit the food item.
+                            let deposited = if let Some(idx) = inventory.slots.iter().position(|s| {
+                                matches!(s, crate::components::magic::ItemSlot::Item(k) if k.is_food())
+                            }) {
+                                let kind = match &inventory.slots[idx] {
+                                    crate::components::magic::ItemSlot::Item(k) => *k,
+                                    _ => unreachable!(),
+                                };
+                                inventory.slots.swap_remove(idx);
+                                let quality = (0.3 + skills.hunting * 0.4).clamp(0.0, 1.0);
                                 let item_entity = commands
-                                    .spawn(Item::new(item_kind, quality, ItemLocation::StoredIn(store_entity)))
+                                    .spawn(Item::new(kind, quality, ItemLocation::StoredIn(store_entity)))
                                     .id();
                                 if let Ok((_, mut stored, _, _)) = stores_query.get_mut(store_entity) {
                                     stored.add(item_entity, StructureType::Stores);
                                 }
+                                let cat = &cat_name.0;
+                                let text = format!("{cat} drops {} at the colony stores without a word.", kind.name());
+                                log.push(time.tick, text, NarrativeTier::Action);
                                 true
                             } else {
-                                // No Stores building — drop on ground.
-                                commands.spawn(Item::new(item_kind, quality, ItemLocation::OnGround));
                                 false
                             };
 
-                            // Remember this as a good hunting spot.
-                            memory.remember(MemoryEntry {
-                                event_type: MemoryType::ResourceFound,
-                                location: current.target_position,
-                                involved: vec![],
-                                tick: time.tick,
-                                strength: 1.0,
-                                firsthand: true,
-                            });
-                            mood.modifiers.push_back(MoodModifier {
-                                amount: 0.1,
-                                ticks_remaining: 30,
-                                source: format!("caught a {}", species.name()),
-                            });
-
-                            // Outcome narrative: what was caught, quality, where it went.
-                            let prey_name = species.name();
-                            let cat = &cat_name.0;
-                            let text = match (quality_label(quality), stored_in_building) {
-                                (Some(ql), true) => format!("{cat} catches a {ql} {prey_name} and carries it to the stores."),
-                                (Some(ql), false) => format!("{cat} catches a {ql} {prey_name} and drops it on the ground."),
-                                (None, true) => format!("{cat} catches a {prey_name} and carries it to the stores."),
-                                (None, false) => format!("{cat} catches a {prey_name} but has nowhere to store it."),
+                            if deposited || current.ticks_remaining == 0 {
+                                current.ticks_remaining = 0;
+                            }
+                        }
+                    }
+                    // If ticks expire before reaching stores, drop item on ground.
+                    if current.ticks_remaining == 0 && carrying_food {
+                        if let Some(idx) = inventory.slots.iter().position(|s| {
+                            matches!(s, crate::components::magic::ItemSlot::Item(k) if k.is_food())
+                        }) {
+                            let kind = match &inventory.slots[idx] {
+                                crate::components::magic::ItemSlot::Item(k) => *k,
+                                _ => unreachable!(),
                             };
-                            log.push(time.tick, text, NarrativeTier::Action);
+                            inventory.slots.swap_remove(idx);
+                            let quality = (0.3 + skills.hunting * 0.4).clamp(0.0, 1.0);
+                            commands.spawn(Item::new(kind, quality, ItemLocation::OnGround));
+                        }
+                    }
+                } else {
+                    // Hunt phase: move toward hunting ground.
+                    if let Some(target) = current.target_position {
+                        if pos.manhattan_distance(&target) > 1 {
+                            if let Some(next) = step_toward(&pos, &target, &map) {
+                                *pos = next;
+                            }
+                        }
+                    }
+
+                    // On last tick: resolve the hunt.
+                    if current.ticks_remaining == 0 {
+                        let success = rng.rng.random::<f32>() < 0.40 + skills.hunting * 0.55;
+                        if success {
+                            // Find nearest prey within 5 tiles.
+                            let nearest_prey = prey_query.iter()
+                                .filter(|(_, _, prey_pos)| pos.manhattan_distance(prey_pos) <= 5)
+                                .min_by_key(|(_, _, prey_pos)| pos.manhattan_distance(prey_pos))
+                                .map(|(prey_entity, prey, _)| (prey_entity, prey.species));
+
+                            if let Some((prey_entity, species)) = nearest_prey {
+                                let item_kind = species.item_kind();
+
+                                // Despawn the prey entity.
+                                commands.entity(prey_entity).despawn();
+
+                                // Skilled hunters butcher more usable portions from a kill.
+                                let item_count = if skills.hunting > 0.4 { 2 } else { 1 };
+                                for _ in 0..item_count {
+                                    inventory.add_item(item_kind);
+                                }
+
+                                // Remember this as a good hunting spot.
+                                memory.remember(MemoryEntry {
+                                    event_type: MemoryType::ResourceFound,
+                                    location: current.target_position,
+                                    involved: vec![],
+                                    tick: time.tick,
+                                    strength: 1.0,
+                                    firsthand: true,
+                                });
+                                mood.modifiers.push_back(MoodModifier {
+                                    amount: 0.1,
+                                    ticks_remaining: 30,
+                                    source: format!("caught a {}", species.name()),
+                                });
+
+                                // Narrative for the catch.
+                                let prey_name = species.name();
+                                let cat = &cat_name.0;
+                                let quality = (0.3 + skills.hunting * 0.4).clamp(0.0, 1.0);
+                                let text = if let Some(ql) = quality_label(quality) {
+                                    format!("{cat} catches a {ql} {prey_name}.")
+                                } else {
+                                    format!("{cat} brings down prey with a quick snap.")
+                                };
+                                log.push(time.tick, text, NarrativeTier::Action);
+
+                                // Switch to carry phase: target the nearest Stores.
+                                let cat_pos = *pos;
+                                let nearest_store = stores_query
+                                    .iter()
+                                    .filter(|(_, _, s, _)| s.kind == StructureType::Stores)
+                                    .min_by_key(|(_, _, _, sp)| cat_pos.manhattan_distance(sp));
+
+                                if let Some((se, _, _, sp)) = nearest_store {
+                                    current.target_position = Some(*sp);
+                                    current.target_entity = Some(se);
+                                    current.ticks_remaining = 15; // time to walk to stores
+                                }
+                                // If no stores, item stays in inventory and drops on ground
+                                // when ticks expire (handled by the carry phase above).
+                            } else {
+                                // Skill check passed but no prey nearby.
+                                mood.modifiers.push_back(MoodModifier {
+                                    amount: -0.05,
+                                    ticks_remaining: 20,
+                                    source: "hunt found nothing".to_string(),
+                                });
+                            }
                         } else {
-                            // Skill check passed but no prey nearby — treat as failure.
                             mood.modifiers.push_back(MoodModifier {
                                 amount: -0.05,
                                 ticks_remaining: 20,
-                                source: "hunt found nothing".to_string(),
+                                source: "failed hunt".to_string(),
                             });
                         }
-                    } else {
-                        mood.modifiers.push_back(MoodModifier {
-                            amount: -0.05,
-                            ticks_remaining: 20,
-                            source: "failed hunt".to_string(),
-                        });
+                        // Skill growth on every attempt.
+                        skills.hunting += skills.growth_rate() * 0.02;
                     }
-                    // Skill growth on every attempt (kittens learn from failure).
-                    skills.hunting += skills.growth_rate() * 0.02;
                 }
             }
             Action::Forage => {
@@ -380,16 +437,22 @@ pub fn resolve_actions(
                                     .min_by_key(|(_, _, _, sp)| cat_pos.manhattan_distance(sp))
                                     .map(|(e, _, _, _)| e);
 
+                                // Skilled foragers gather more from the same spot.
+                                let item_count = if skills.foraging > 0.4 { 2 } else { 1 };
+
                                 if let Some(store_entity) = nearest_store {
-                                    let item_entity = commands
-                                        .spawn(Item::new(forage_kind, quality, ItemLocation::StoredIn(store_entity)))
-                                        .id();
-                                    if let Ok((_, mut stored, _, _)) = stores_query.get_mut(store_entity) {
-                                        stored.add(item_entity, StructureType::Stores);
+                                    for _ in 0..item_count {
+                                        let item_entity = commands
+                                            .spawn(Item::new(forage_kind, quality, ItemLocation::StoredIn(store_entity)))
+                                            .id();
+                                        if let Ok((_, mut stored, _, _)) = stores_query.get_mut(store_entity) {
+                                            stored.add(item_entity, StructureType::Stores);
+                                        }
                                     }
                                 } else {
-                                    // No Stores building — drop on ground.
-                                    commands.spawn(Item::new(forage_kind, quality, ItemLocation::OnGround));
+                                    for _ in 0..item_count {
+                                        commands.spawn(Item::new(forage_kind, quality, ItemLocation::OnGround));
+                                    }
                                 }
 
                                 // Outcome narrative: what was gathered.
@@ -412,6 +475,9 @@ pub fn resolve_actions(
                 if let Some(target) = current.target_position {
                     if let Some(next) = step_toward(&pos, &target, &map) {
                         *pos = next;
+                    } else {
+                        // Stuck or arrived — end early so AI re-evaluates.
+                        current.ticks_remaining = 0;
                     }
                 }
             }
@@ -589,7 +655,7 @@ pub fn resolve_actions(
 
     // Apply deferred social effects to target entities.
     for delta in &social_deltas {
-        if let Ok((_, _, mut needs, _, _, _, _, _, _)) = query.get_mut(delta.entity) {
+        if let Ok((_, _, mut needs, _, _, _, _, _, _, _)) = query.get_mut(delta.entity) {
             needs.social = (needs.social + delta.social_delta).min(1.0);
             needs.warmth = (needs.warmth + delta.warmth_delta).min(1.0);
         }
@@ -628,7 +694,7 @@ pub fn resolve_actions(
         let fondness = relationships.get(pair.a, pair.b).map_or(0.0, |r| r.fondness);
 
         // Check Hearth proximity for campfire-stories bonus.
-        let near_hearth = if let (Ok((_, _, _, pos_a, _, _, _, _, _)), Ok((_, _, _, pos_b, _, _, _, _, _))) =
+        let near_hearth = if let (Ok((_, _, _, pos_a, _, _, _, _, _, _)), Ok((_, _, _, pos_b, _, _, _, _, _, _))) =
             (query.get(pair.a), query.get(pair.b))
         {
             hearth_positions.iter().any(|hp| {
@@ -640,7 +706,7 @@ pub fn resolve_actions(
         let hearth_mult = if near_hearth { 1.5 } else { 1.0 };
 
         // Read both cats' memories (immutable borrows via query.get).
-        if let (Ok((_, _, _, _, _, mem_a, _, _, _)), Ok((_, _, _, _, _, mem_b, _, _, _))) =
+        if let (Ok((_, _, _, _, _, mem_a, _, _, _, _)), Ok((_, _, _, _, _, mem_b, _, _, _, _))) =
             (query.get(pair.a), query.get(pair.b))
         {
             // A → B transmission.
@@ -701,14 +767,14 @@ pub fn resolve_actions(
 
     // Apply memory transmissions.
     for tx in memory_transmissions {
-        if let Ok((_, _, _, _, _, mut mem, _, _, _)) = query.get_mut(tx.receiver) {
+        if let Ok((_, _, _, _, _, mut mem, _, _, _, _)) = query.get_mut(tx.receiver) {
             mem.remember(tx.entry);
         }
     }
 
     // Apply mentor effects: grow apprentice's weakest skill that the mentor excels at.
     for effect in &mentor_effects {
-        if let Ok((_, _, _, _, mut app_skills, _, _, _, _)) = query.get_mut(effect.apprentice) {
+        if let Ok((_, _, _, _, mut app_skills, _, _, _, _, _)) = query.get_mut(effect.apprentice) {
             let pairs: [(f32, f32); 6] = [
                 (effect.mentor_skills.hunting, app_skills.hunting),
                 (effect.mentor_skills.foraging, app_skills.foraging),
@@ -750,7 +816,7 @@ pub fn resolve_actions(
 
         // Compute coordinator's social weight for the bonus calculation.
         // We read the coordinator's memory from the main query.
-        let coord_sw = if let Ok((_, _, _, _, _, coord_memory, _, _, _)) = query.get(coordinator_entity) {
+        let coord_sw = if let Ok((_, _, _, _, _, coord_memory, _, _, _, _)) = query.get(coordinator_entity) {
             crate::systems::coordination::social_weight(
                 coordinator_entity,
                 &relationships,
@@ -786,7 +852,7 @@ pub fn resolve_actions(
         commands.entity(coordinator_entity).remove::<PendingDelivery>();
 
         // Small social bump for the coordinator (fulfilling their role).
-        if let Ok((_, _, mut needs, _, _, _, _, _, _)) = query.get_mut(coordinator_entity) {
+        if let Ok((_, _, mut needs, _, _, _, _, _, _, _)) = query.get_mut(coordinator_entity) {
             needs.social = (needs.social + 0.05).min(1.0);
         }
     }
@@ -853,20 +919,33 @@ mod tests {
         needs: Needs,
         pos: Position,
     ) -> Entity {
+        spawn_cat_with_target_entity(world, action, ticks, target, None, needs, pos)
+    }
+
+    fn spawn_cat_with_target_entity(
+        world: &mut World,
+        action: Action,
+        ticks: u64,
+        target_pos: Option<Position>,
+        target_entity: Option<Entity>,
+        needs: Needs,
+        pos: Position,
+    ) -> Entity {
         world
             .spawn((
                 CurrentAction {
                     action,
                     ticks_remaining: ticks,
-                    target_position: target,
-                    target_entity: None,
-                last_scores: Vec::new(),
+                    target_position: target_pos,
+                    target_entity,
+                    last_scores: Vec::new(),
                 },
                 needs,
                 pos,
                 Skills::default(),
                 Memory::default(),
                 Mood::default(),
+                crate::components::magic::Inventory::default(),
                 Name("Test Cat".to_string()),
             ))
             .id()
@@ -877,16 +956,21 @@ mod tests {
     fn eating_restores_hunger_and_consumes_food() {
         let (mut world, mut schedule) = setup_world();
 
+        let store_pos = Position::new(5, 5);
         let store = spawn_stores_with_food(
             &mut world,
-            Position::new(5, 5),
+            store_pos,
             &[ItemKind::RawMouse, ItemKind::RawFish],
         );
 
         let mut needs = Needs::default();
         needs.hunger = 0.5;
 
-        let entity = spawn_cat(&mut world, Action::Eat, 3, None, needs, Position::new(5, 5));
+        // Cat is adjacent to the store and targeting it.
+        let entity = spawn_cat_with_target_entity(
+            &mut world, Action::Eat, 3, Some(store_pos), Some(store),
+            needs, Position::new(5, 6),
+        );
 
         let items_before = world.get::<StoredItems>(store).unwrap().items.len();
         schedule.run(&mut world);
@@ -904,25 +988,29 @@ mod tests {
         );
     }
 
-    /// Eating stops early when no food items are available.
+    /// Eating stops when no food items are available.
     #[test]
     fn eating_stops_when_stores_empty() {
         let (mut world, mut schedule) = setup_world();
 
-        // Stores building with no food items.
-        spawn_stores_with_food(&mut world, Position::new(5, 5), &[]);
+        let store_pos = Position::new(5, 5);
+        let store = spawn_stores_with_food(&mut world, store_pos, &[]);
 
         let mut needs = Needs::default();
         needs.hunger = 0.5;
 
-        let entity = spawn_cat(&mut world, Action::Eat, 5, None, needs, Position::new(5, 5));
+        // Cat adjacent to empty store.
+        let entity = spawn_cat_with_target_entity(
+            &mut world, Action::Eat, 5, Some(store_pos), Some(store),
+            needs, Position::new(5, 6),
+        );
 
         schedule.run(&mut world);
 
         let ca = world.get::<CurrentAction>(entity).unwrap();
         assert_eq!(
             ca.ticks_remaining, 0,
-            "eating should stop early when no food items available"
+            "eating should stop when no food items available"
         );
     }
 
@@ -931,13 +1019,17 @@ mod tests {
     fn eating_clamps_hunger_at_one() {
         let (mut world, mut schedule) = setup_world();
 
+        let store_pos = Position::new(5, 5);
         // RawRat has food_value 0.4, hunger starts at 0.99 — should clamp to 1.0.
-        spawn_stores_with_food(&mut world, Position::new(5, 5), &[ItemKind::RawRat]);
+        let store = spawn_stores_with_food(&mut world, store_pos, &[ItemKind::RawRat]);
 
         let mut needs = Needs::default();
         needs.hunger = 0.99;
 
-        let entity = spawn_cat(&mut world, Action::Eat, 2, None, needs, Position::new(5, 5));
+        let entity = spawn_cat_with_target_entity(
+            &mut world, Action::Eat, 2, Some(store_pos), Some(store),
+            needs, Position::new(5, 6),
+        );
 
         schedule.run(&mut world);
 
@@ -1128,6 +1220,7 @@ mod tests {
             Skills::default(),
             Memory::default(),
             Mood::default(),
+            crate::components::magic::Inventory::default(),
             Name("Groomer".to_string()),
         )).id();
 
@@ -1158,6 +1251,7 @@ mod tests {
             Skills::default(),
             Memory::default(),
             Mood::default(),
+            crate::components::magic::Inventory::default(),
             Name("Target".to_string()),
         )).id();
 
@@ -1174,6 +1268,7 @@ mod tests {
             Skills::default(),
             Memory::default(),
             Mood::default(),
+            crate::components::magic::Inventory::default(),
             Name("Socializer".to_string()),
         )).id();
 
@@ -1199,6 +1294,7 @@ mod tests {
             Skills::default(),
             Memory::default(),
             Mood::default(),
+            crate::components::magic::Inventory::default(),
             Name("Target".to_string()),
         )).id();
 
@@ -1215,6 +1311,7 @@ mod tests {
             Skills::default(),
             Memory::default(),
             Mood::default(),
+            crate::components::magic::Inventory::default(),
             Name("Socializer".to_string()),
         )).id();
 

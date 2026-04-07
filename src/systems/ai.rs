@@ -6,7 +6,7 @@ use rand::Rng;
 use crate::ai::scoring::{
     apply_aspiration_bonuses, apply_cascading_bonuses, apply_colony_knowledge_bonuses,
     apply_directive_bonus, apply_fated_bonuses, apply_memory_bonuses, apply_preference_bonuses,
-    apply_priority_bonus, enforce_survival_floor, score_actions, select_best_action,
+    apply_priority_bonus, enforce_survival_floor, score_actions, select_action_softmax,
     ScoringContext,
 };
 use crate::ai::{Action, CurrentAction};
@@ -288,7 +288,7 @@ pub fn evaluate_actions(
         Option<&crate::components::aspirations::Preferences>,
         Option<&crate::components::fate::FatedLove>,
         Option<&crate::components::fate::FatedRival>,
-    ), Without<Dead>>,
+    ), (Without<Dead>, Without<crate::components::disposition::Disposition>)>,
     all_positions: Query<(Entity, &Position, Option<&PreyAnimal>), Without<Dead>>,
     wildlife: Query<(Entity, &Position), With<WildAnimal>>,
     building_query: Query<(
@@ -554,7 +554,7 @@ pub fn evaluate_actions(
         // scores when physiological needs are critical.
         enforce_survival_floor(&mut scores, needs);
 
-        let chosen = select_best_action(&scores);
+        let chosen = select_action_softmax(&scores, &mut rng.rng);
 
         // Store top-3 scores for diagnostic snapshot.
         {
@@ -566,10 +566,27 @@ pub fn evaluate_actions(
 
         match chosen {
             Action::Eat => {
-                current.action = Action::Eat;
-                current.ticks_remaining = 5;
-                current.target_position = None;
-                current.target_entity = None;
+                // Walk to nearest Stores building and eat there.
+                let nearest_store = building_query
+                    .iter()
+                    .filter(|(_, s, _, _, _)| {
+                        s.kind == crate::components::building::StructureType::Stores
+                    })
+                    .min_by_key(|(_, _, bp, _, _)| pos.manhattan_distance(bp))
+                    .map(|(e, _, bp, _, _)| (e, *bp));
+
+                if let Some((store_entity, store_pos)) = nearest_store {
+                    current.action = Action::Eat;
+                    current.ticks_remaining = 10; // enough to walk + eat
+                    current.target_position = Some(store_pos);
+                    current.target_entity = Some(store_entity);
+                } else {
+                    // No Stores — fall back to idle.
+                    current.action = Action::Idle;
+                    current.ticks_remaining = 5;
+                    current.target_position = None;
+                    current.target_entity = None;
+                }
             }
             Action::Sleep => {
                 current.action = Action::Sleep;
@@ -580,7 +597,7 @@ pub fn evaluate_actions(
             Action::Hunt => {
                 let target = pick_hunt_target(pos, &map, memory, &mut rng.rng);
                 current.action = Action::Hunt;
-                current.ticks_remaining = 15;
+                current.ticks_remaining = 10;
                 current.target_position = target;
                 current.target_entity = None;
             }
@@ -659,7 +676,10 @@ pub fn evaluate_actions(
             Action::Wander => {
                 let dx: i32 = rng.rng.random_range(-5i32..=5);
                 let dy: i32 = rng.rng.random_range(-5i32..=5);
-                let target = Position::new(pos.x + dx, pos.y + dy);
+                let mut target = Position::new(pos.x + dx, pos.y + dy);
+                // Clamp to map bounds (same as Explore).
+                target.x = target.x.clamp(0, map.width - 1);
+                target.y = target.y.clamp(0, map.height - 1);
                 current.action = Action::Wander;
                 current.ticks_remaining = 10;
                 current.target_position = Some(target);
@@ -1143,7 +1163,7 @@ mod tests {
     fn setup_world() -> (World, Schedule) {
         let mut world = World::new();
         world.insert_resource(TileMap::new(20, 20, Terrain::Grass));
-        world.insert_resource(FoodStores::default());
+        world.insert_resource(FoodStores::new(10.0, 30.0, 0.002));
         world.insert_resource(SimRng::new(42));
         world.insert_resource(Relationships::default());
         let mut schedule = Schedule::default();
@@ -1221,6 +1241,15 @@ mod tests {
     fn starving_cat_chooses_eat() {
         let (mut world, mut schedule) = setup_world();
 
+        // Spawn a Stores building so evaluate_actions can target it.
+        world.spawn((
+            crate::components::building::Structure::new(
+                crate::components::building::StructureType::Stores,
+            ),
+            crate::components::building::StoredItems::default(),
+            Position::new(5, 5),
+        ));
+
         let mut needs = Needs::default();
         needs.hunger = 0.05;
         needs.energy = 0.9;
@@ -1231,7 +1260,7 @@ mod tests {
 
         let ca = world.get::<CurrentAction>(entity).unwrap();
         assert_eq!(ca.action, Action::Eat, "starving cat should choose Eat");
-        assert_eq!(ca.ticks_remaining, 5);
+        assert_eq!(ca.ticks_remaining, 10);
     }
 
     /// When food stores are empty, cat should not choose Eat.
