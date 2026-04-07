@@ -93,27 +93,42 @@ pub struct Seasonal {
 // Inventory
 // ---------------------------------------------------------------------------
 
-/// A cat's carried herb pouch. Capacity-limited.
+/// A slot in a cat's inventory — either a herb or a generic item.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum ItemSlot {
+    Herb(HerbKind),
+    Item(crate::components::items::ItemKind),
+}
+
+/// A cat's carried inventory. Capacity-limited; holds both herbs and items.
 #[derive(Component, Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct Inventory {
-    pub herbs: Vec<HerbKind>,
+    pub slots: Vec<ItemSlot>,
 }
 
 impl Inventory {
-    pub const MAX_HERBS: usize = 5;
+    pub const MAX_SLOTS: usize = 5;
 
     pub fn is_full(&self) -> bool {
-        self.herbs.len() >= Self::MAX_HERBS
+        self.slots.len() >= Self::MAX_SLOTS
     }
 
+    // --- Herb compatibility methods ---
+
     pub fn has_herb(&self, kind: HerbKind) -> bool {
-        self.herbs.contains(&kind)
+        self.slots
+            .iter()
+            .any(|s| matches!(s, ItemSlot::Herb(h) if *h == kind))
     }
 
     /// Remove one instance of `kind` from inventory. Returns true if found.
     pub fn take_herb(&mut self, kind: HerbKind) -> bool {
-        if let Some(idx) = self.herbs.iter().position(|h| *h == kind) {
-            self.herbs.swap_remove(idx);
+        if let Some(idx) = self
+            .slots
+            .iter()
+            .position(|s| matches!(s, ItemSlot::Herb(h) if *h == kind))
+        {
+            self.slots.swap_remove(idx);
             true
         } else {
             false
@@ -125,16 +140,18 @@ impl Inventory {
         if self.is_full() {
             return false;
         }
-        self.herbs.push(kind);
+        self.slots.push(ItemSlot::Herb(kind));
         true
     }
 
     /// Whether the inventory has any herb usable for a remedy.
     pub fn has_remedy_herb(&self) -> bool {
-        self.herbs.iter().any(|h| {
+        self.slots.iter().any(|s| {
             matches!(
-                h,
-                HerbKind::HealingMoss | HerbKind::Moonpetal | HerbKind::Calmroot
+                s,
+                ItemSlot::Herb(
+                    HerbKind::HealingMoss | HerbKind::Moonpetal | HerbKind::Calmroot
+                )
             )
         })
     }
@@ -142,6 +159,37 @@ impl Inventory {
     /// Whether the inventory has thornbriar for ward-setting.
     pub fn has_ward_herb(&self) -> bool {
         self.has_herb(HerbKind::Thornbriar)
+    }
+
+    // --- Item methods ---
+
+    pub fn has_item(&self, kind: crate::components::items::ItemKind) -> bool {
+        self.slots
+            .iter()
+            .any(|s| matches!(s, ItemSlot::Item(i) if *i == kind))
+    }
+
+    /// Add an item. Returns false if inventory is full.
+    pub fn add_item(&mut self, kind: crate::components::items::ItemKind) -> bool {
+        if self.is_full() {
+            return false;
+        }
+        self.slots.push(ItemSlot::Item(kind));
+        true
+    }
+
+    /// Remove one instance of `kind` from inventory. Returns true if found.
+    pub fn take_item(&mut self, kind: crate::components::items::ItemKind) -> bool {
+        if let Some(idx) = self
+            .slots
+            .iter()
+            .position(|s| matches!(s, ItemSlot::Item(i) if *i == kind))
+        {
+            self.slots.swap_remove(idx);
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -291,7 +339,7 @@ mod tests {
     #[test]
     fn inventory_full() {
         let mut inv = Inventory::default();
-        for _ in 0..Inventory::MAX_HERBS {
+        for _ in 0..Inventory::MAX_SLOTS {
             assert!(inv.add_herb(HerbKind::Calmroot));
         }
         assert!(inv.is_full());

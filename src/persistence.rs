@@ -12,7 +12,7 @@ use crate::components::building::{
     ConstructionSite, CropState, GateState, Structure,
 };
 use crate::components::identity::{Age, Appearance, Gender, Name, Orientation, Species};
-use crate::components::magic::{HerbKind, Inventory};
+use crate::components::magic::{Inventory, ItemSlot};
 use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Health, Needs, Position};
@@ -74,7 +74,7 @@ pub struct CatSnapshot {
     pub current_action: CurrentAction,
     pub dead: Option<Dead>,
     #[serde(default)]
-    pub inventory: Vec<HerbKind>,
+    pub inventory: Vec<ItemSlot>,
     #[serde(default)]
     pub is_coordinator: bool,
     #[serde(default)]
@@ -274,7 +274,7 @@ fn snapshot_cat(
         training: save_training(training, entity_map),
         current_action: current_action.clone(),
         dead: dead.cloned(),
-        inventory: inventory.map(|i| i.herbs.clone()).unwrap_or_default(),
+        inventory: inventory.map(|i| i.slots.clone()).unwrap_or_default(),
         is_coordinator,
         directive_queue,
     }
@@ -368,7 +368,7 @@ pub fn load_world(world: &mut World, save: SaveFile) {
                     Corruption(cat.corruption),
                     Training::default(),
                     cat.current_action.clone(),
-                    Inventory { herbs: cat.inventory.clone() },
+                    Inventory { slots: cat.inventory.clone() },
                 ),
             ))
             .id();

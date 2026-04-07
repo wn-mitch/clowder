@@ -473,7 +473,7 @@ pub fn evaluate_actions(
             magic_skill: skills.magic,
             herbcraft_skill: skills.herbcraft,
             has_herbs_nearby,
-            has_herbs_in_inventory: !inventory.herbs.is_empty(),
+            has_herbs_in_inventory: inventory.slots.iter().any(|s| matches!(s, crate::components::ItemSlot::Herb(_))),
             has_remedy_herbs: inventory.has_remedy_herb(),
             has_ward_herbs: inventory.has_ward_herb(),
             colony_injury_count,

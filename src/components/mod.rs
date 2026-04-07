@@ -28,8 +28,8 @@ pub use coordination::{
 pub use identity::{Age, Appearance, Gender, LifeStage, Name, Orientation, Species};
 pub use items::{Item, ItemKind, ItemLocation};
 pub use magic::{
-    Harvestable, Herb, HerbKind, Inventory, MisfireEffect, RemedyEffect, RemedyKind, Seasonal,
-    Ward, WardKind,
+    Harvestable, Herb, HerbKind, Inventory, ItemSlot, MisfireEffect, RemedyEffect, RemedyKind,
+    Seasonal, Ward, WardKind,
 };
 pub use mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier};
 pub use personality::Personality;
