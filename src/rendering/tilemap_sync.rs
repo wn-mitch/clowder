@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
 
 use crate::rendering::terrain_sprites::{
-    base_tile_index, cardinal_bitmask, grass_overlay_atlas_index, has_grass_overlay,
+    base_tile_index, blob_bitmask, grass_overlay_atlas_index_with_variant, OVERLAY_LAYERS,
 };
 use crate::resources::map::{Terrain, TileMap};
 
@@ -10,16 +10,16 @@ use crate::resources::map::{Terrain, TileMap};
 #[derive(Component)]
 pub struct BaseTerrainLayer;
 
-/// Marker component for the grass overlay layer.
+/// Marker component for a blob autotile overlay layer.
 #[derive(Component)]
-pub struct GrassOverlayLayer;
+pub struct BlobOverlayLayer;
 
 /// Tile scale factor: 16px sprites rendered at this multiplier.
 pub const TILE_SCALE: f32 = 3.0;
 /// Pixel size of each tile in the sprite sheet.
 pub const TILE_PX: f32 = 16.0;
 
-/// Startup system: creates the two-layer tilemap from the TileMap resource.
+/// Startup system: creates the multi-layer tilemap from the TileMap resource.
 pub fn create_tilemap(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -40,7 +40,6 @@ pub fn create_tilemap(
 
     for y in 0..map_height {
         for x in 0..map_width {
-            // Flip Y: TileMap is Y-down, bevy_ecs_tilemap is Y-up.
             let tile_pos = TilePos { x, y: map_height - 1 - y };
             let terrain = &map.get(x as i32, y as i32).terrain;
             let tile_entity = commands
@@ -70,58 +69,80 @@ pub fn create_tilemap(
         BaseTerrainLayer,
     ));
 
-    // --- Grass overlay layer (z=1.0) ---
-    let grass_texture: Handle<Image> =
-        asset_server.load("sprites/grass_autotile_atlas.png");
+    // --- Blob autotile overlay layers ---
+    // Collect unique (atlas_path, z) combinations, then build each layer fully
+    // before inserting the TilemapBundle (avoids TileStorage replacement issues).
+    struct PendingLayer {
+        atlas_path: &'static str,
+        z: f32,
+        groups: Vec<crate::rendering::terrain_sprites::TerrainGroup>,
+    }
 
-    let grass_tilemap_entity = commands.spawn_empty().id();
-    let mut grass_storage = TileStorage::empty(map_size);
-
-    for y in 0..map_height {
-        for x in 0..map_width {
-            // Flip Y: TileMap is Y-down, bevy_ecs_tilemap is Y-up.
-            let tile_pos = TilePos { x, y: map_height - 1 - y };
-            let terrain = &map.get(x as i32, y as i32).terrain;
-
-            if !has_grass_overlay(terrain) {
-                continue;
-            }
-
-            let bitmask = cardinal_bitmask(&map, x as i32, y as i32, terrain.group());
-            let atlas_index = grass_overlay_atlas_index(bitmask);
-
-            let tile_entity = commands
-                .spawn(TileBundle {
-                    position: tile_pos,
-                    texture_index: TileTextureIndex(atlas_index),
-                    tilemap_id: TilemapId(grass_tilemap_entity),
-                    ..Default::default()
-                })
-                .id();
-            grass_storage.set(&tile_pos, tile_entity);
+    let mut pending: Vec<PendingLayer> = Vec::new();
+    for overlay in OVERLAY_LAYERS {
+        if let Some(layer) = pending.iter_mut().find(|l| {
+            l.atlas_path == overlay.atlas_path && (l.z - overlay.z).abs() < f32::EPSILON
+        }) {
+            layer.groups.push(overlay.group);
+        } else {
+            pending.push(PendingLayer {
+                atlas_path: overlay.atlas_path,
+                z: overlay.z,
+                groups: vec![overlay.group],
+            });
         }
     }
 
-    commands.entity(grass_tilemap_entity).insert((
-        TilemapBundle {
-            grid_size,
-            map_type: TilemapType::Square,
-            size: map_size,
-            spacing: TilemapSpacing::zero(),
-            storage: grass_storage,
-            texture: TilemapTexture::Single(grass_texture),
-            tile_size,
-            transform: Transform {
-                translation: Vec3::new(0.0, 0.0, 1.0),
-                scale: Vec3::splat(TILE_SCALE),
+    for layer in &pending {
+        let texture: Handle<Image> = asset_server.load(layer.atlas_path);
+        let tilemap_entity = commands.spawn_empty().id();
+        let mut storage = TileStorage::empty(map_size);
+
+        for y in 0..map_height {
+            for x in 0..map_width {
+                let terrain = &map.get(x as i32, y as i32).terrain;
+                if !layer.groups.contains(&terrain.group()) {
+                    continue;
+                }
+
+                let tile_pos = TilePos { x, y: map_height - 1 - y };
+                let bitmask = blob_bitmask(&map, x as i32, y as i32, terrain.group());
+                let atlas_index = grass_overlay_atlas_index_with_variant(
+                    bitmask, x as i32, y as i32,
+                );
+
+                let tile_entity = commands
+                    .spawn(TileBundle {
+                        position: tile_pos,
+                        texture_index: TileTextureIndex(atlas_index),
+                        tilemap_id: TilemapId(tilemap_entity),
+                        ..Default::default()
+                    })
+                    .id();
+                storage.set(&tile_pos, tile_entity);
+            }
+        }
+
+        commands.entity(tilemap_entity).insert((
+            TilemapBundle {
+                grid_size,
+                map_type: TilemapType::Square,
+                size: map_size,
+                spacing: TilemapSpacing::zero(),
+                storage,
+                texture: TilemapTexture::Single(texture),
+                tile_size,
+                transform: Transform {
+                    translation: Vec3::new(0.0, 0.0, layer.z),
+                    scale: Vec3::splat(TILE_SCALE),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
-            ..Default::default()
-        },
-        GrassOverlayLayer,
-    ));
+            BlobOverlayLayer,
+        ));
+    }
 
-    // Debug: dump terrain grid to /tmp for analysis.
     dump_terrain_debug(&map);
 }
 

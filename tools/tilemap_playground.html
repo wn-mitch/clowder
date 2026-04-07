@@ -1,0 +1,1339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clowder — Tilemap Playground</title>
+<style>
+:root {
+  --bg-deep: #15120f;
+  --bg: #1c1917;
+  --surface: #262220;
+  --raised: #302b28;
+  --border: #3d3835;
+  --border-light: #504a44;
+  --text: #d4cfc9;
+  --text-dim: #8a8480;
+  --text-bright: #f0ece8;
+  --accent: #d4943a;
+  --accent-hover: #e8a84e;
+  --accent-dim: rgba(212, 148, 58, 0.15);
+  --accent-glow: rgba(212, 148, 58, 0.4);
+  --grass: #6b9e3a;
+  --water: #4a7fa5;
+  --dirt: #8b7355;
+  --sand: #c4a862;
+  --rock: #7a7a7a;
+  --stone: #969696;
+  --building: #7a5c3e;
+  --special: #8b5fbf;
+  --font-display: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { background: var(--bg-deep); }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  min-height: 100vh;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+canvas { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+img { image-rendering: pixelated; }
+h1 { font-family: var(--font-display); font-size: 22px; font-weight: 600; color: var(--text-bright); letter-spacing: 0.02em; }
+h2 { font-family: var(--font-display); font-size: 17px; font-weight: 600; color: var(--accent); margin-bottom: 8px; }
+h3 { font-family: var(--font-display); font-size: 14px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+
+/* Loading */
+#loading {
+  position: fixed; inset: 0; background: var(--bg); z-index: 999;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+}
+#loading h1 { font-size: 28px; }
+#loading .progress { color: var(--text-dim); font-size: 12px; }
+#loading .bar { width: 240px; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+#loading .bar-fill { height: 100%; background: var(--accent); transition: width 0.15s ease; width: 0%; }
+.hidden { display: none !important; }
+
+/* Header */
+header {
+  padding: 16px 24px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: baseline; gap: 16px;
+}
+header .subtitle { color: var(--text-dim); font-size: 11px; }
+
+/* Tabs */
+nav {
+  display: flex; gap: 0; padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.tab-btn {
+  background: none; border: none; color: var(--text-dim); cursor: pointer;
+  padding: 10px 18px; font: inherit; font-size: 12px;
+  border-bottom: 2px solid transparent; transition: all 0.15s;
+  letter-spacing: 0.03em;
+}
+.tab-btn:hover { color: var(--text); background: var(--accent-dim); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Panels */
+main { padding: 20px 24px; }
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* Checker background */
+.checker {
+  background-color: #1f1c19;
+  background-image:
+    linear-gradient(45deg, #181512 25%, transparent 25%, transparent 75%, #181512 75%),
+    linear-gradient(45deg, #181512 25%, transparent 25%, transparent 75%, #181512 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 8px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  display: inline-block;
+}
+
+/* Common controls */
+select, button {
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  padding: 6px 12px; font: inherit; font-size: 12px; border-radius: 4px; cursor: pointer;
+}
+select:hover, button:hover { border-color: var(--accent); }
+button:active { background: var(--raised); }
+.controls { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+
+/* ── Tab 1: Tileset Viewer ── */
+.viewer-layout { display: flex; gap: 20px; align-items: flex-start; }
+.viewer-main { flex: 1; min-width: 0; }
+.viewer-scroll { max-height: 75vh; overflow: auto; border-radius: 4px; }
+.viewer-side { width: 280px; flex-shrink: 0; }
+.viewer-side .checker { margin-bottom: 12px; }
+#cell-info {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+  padding: 10px 12px; font-size: 11px; line-height: 1.7;
+}
+#cell-info .label { color: var(--text-dim); }
+#cell-info .val { color: var(--accent); }
+#label-input {
+  width: 100%; background: var(--bg-deep); color: var(--text-bright); border: 1px solid var(--border);
+  padding: 6px 10px; font: 12px var(--font-mono); border-radius: 4px; margin-top: 8px;
+}
+#label-input:focus { border-color: var(--accent); outline: none; }
+#label-controls { margin-top: 6px; display: flex; gap: 6px; align-items: center; }
+#label-controls button { font-size: 11px; padding: 4px 10px; }
+.label-tag {
+  font-size: 9px; padding: 1px 4px; border-radius: 2px;
+  background: rgba(212,148,58,0.85); color: #000; font-weight: bold;
+  max-width: 88px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#role-legend { display: flex; flex-direction: column; gap: 2px; }
+.role-btn {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 3px;
+  color: var(--text); cursor: pointer; padding: 3px 8px; font: 11px var(--font-mono);
+  text-align: left; display: flex; justify-content: space-between; transition: border-color 0.1s;
+}
+.role-btn:hover { border-color: var(--accent); background: var(--accent-dim); }
+.role-btn .role-idx { color: var(--text-dim); font-size: 10px; }
+
+/* ── Tab 2: Cutout Inspector ── */
+.cutout-group { margin-bottom: 24px; }
+.cutout-grid { display: flex; flex-wrap: wrap; gap: 12px; }
+.cutout-card {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 8px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface); transition: border-color 0.15s;
+}
+.cutout-card:hover { border-color: var(--accent); }
+.cutout-card .name { font-size: 10px; color: var(--text-dim); text-align: center; }
+.cutout-card .note { font-size: 9px; color: var(--accent); }
+
+/* ── Tab 3: Bitmask Reference ── */
+.bitmask-layout { display: flex; gap: 24px; flex-wrap: wrap; }
+.bitmask-images { flex: 1; min-width: 400px; }
+.bitmask-images .checker { margin-bottom: 16px; }
+.bitmask-diagram { flex: 1; min-width: 360px; }
+.bitmask-16 { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.bm-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  padding: 8px; text-align: center; font-size: 10px;
+}
+.bm-card .bm-binary { font-size: 12px; color: var(--accent); font-weight: bold; margin-bottom: 4px; }
+.bm-card .bm-desc { color: var(--text-dim); margin-top: 4px; }
+.bm-mini { display: inline-grid; grid-template-columns: repeat(3, 18px); grid-template-rows: repeat(3, 18px); gap: 1px; margin: 4px 0; }
+.bm-cell { border-radius: 2px; background: var(--border); }
+.bm-cell.center { background: var(--grass); }
+.bm-cell.on { background: var(--grass); opacity: 0.7; }
+.bm-cell.off { background: var(--border); opacity: 0.4; }
+.bm-cell.empty { background: transparent; }
+
+/* ── Tab 4: Atlas Mapping ── */
+.atlas-layout { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }
+.atlas-left { flex-shrink: 0; }
+.atlas-right { flex: 1; min-width: 400px; }
+#mapping-table { border-collapse: collapse; width: 100%; font-size: 11px; }
+#mapping-table th {
+  text-align: left; padding: 6px 10px; color: var(--text-dim);
+  border-bottom: 1px solid var(--border); font-weight: normal; text-transform: uppercase;
+  letter-spacing: 0.06em; font-size: 10px;
+}
+#mapping-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+#mapping-table tr:hover td { background: var(--accent-dim); }
+.mapping-preview { display: inline-block; }
+#export-area { margin-top: 16px; }
+#export-area textarea {
+  width: 100%; height: 320px; background: var(--bg-deep); color: var(--text);
+  border: 1px solid var(--border); border-radius: 4px; padding: 12px;
+  font: 12px/1.5 var(--font-mono); resize: vertical;
+}
+
+/* ── Tab 5: Sandbox ── */
+.sandbox-layout { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+.sandbox-side { width: 260px; flex-shrink: 0; }
+.palette-grid { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; }
+.palette-btn {
+  width: 48px; height: 36px; border: 2px solid var(--border); border-radius: 4px;
+  cursor: pointer; font-size: 9px; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center; transition: border-color 0.1s;
+}
+.palette-btn.active { border-color: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
+.palette-btn:hover { border-color: var(--accent-hover); }
+.sandbox-tools { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.sandbox-tools button { font-size: 11px; padding: 4px 10px; }
+#sandbox-info {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+  padding: 10px 12px; font-size: 11px; line-height: 1.8; margin-top: 12px;
+}
+#sandbox-info .label { color: var(--text-dim); }
+#sandbox-info .val { color: var(--accent); }
+#sandbox-info .neighbor { display: inline-block; width: 14px; text-align: center; font-weight: bold; }
+#sandbox-info .neighbor.on { color: var(--grass); }
+#sandbox-info .neighbor.off { color: var(--text-dim); }
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading">
+  <h1>Tilemap Playground</h1>
+  <div class="progress" id="load-text">Loading sprites...</div>
+  <div class="bar"><div class="bar-fill" id="load-bar"></div></div>
+</div>
+
+<!-- App -->
+<div id="app" class="hidden">
+  <header>
+    <h1>Clowder Tilemap Playground</h1>
+    <span class="subtitle">Autotile analysis &amp; bitmask mapping</span>
+  </header>
+
+  <nav>
+    <button class="tab-btn active" data-tab="viewer">Tileset Viewer</button>
+    <button class="tab-btn" data-tab="cutouts">Cutout Inspector</button>
+    <button class="tab-btn" data-tab="bitmask">Bitmask Reference</button>
+    <button class="tab-btn" data-tab="atlas">Atlas Mapping</button>
+    <button class="tab-btn" data-tab="sandbox">Autotile Sandbox</button>
+  </nav>
+
+  <main>
+    <!-- Tab 1: Tileset Viewer -->
+    <section id="tab-viewer" class="panel active">
+      <div class="controls">
+        <select id="tileset-select"></select>
+        <button id="blob-overlay-toggle">Show Blob Proposals</button>
+        <span id="tileset-dims" style="color: var(--text-dim); font-size: 11px;"></span>
+      </div>
+      <div class="viewer-layout">
+        <div class="viewer-main">
+          <div class="viewer-scroll checker">
+            <canvas id="tileset-canvas"></canvas>
+          </div>
+        </div>
+        <div class="viewer-side">
+          <h3>Zoom (16x)</h3>
+          <div class="checker">
+            <canvas id="zoom-canvas" width="256" height="256"></canvas>
+          </div>
+          <div id="cell-info">Click a tile cell to inspect it.</div>
+          <input type="text" id="label-input" placeholder="Type a label for this cell..." disabled>
+          <div id="label-controls">
+            <button id="label-save" disabled>Save</button>
+            <button id="label-clear" disabled>Clear</button>
+            <button id="labels-export">Export All</button>
+          </div>
+          <h3 style="margin-top: 16px;">Bitmask Roles</h3>
+          <div id="role-legend"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 2: Cutout Inspector -->
+    <section id="tab-cutouts" class="panel">
+      <div id="cutout-container"></div>
+    </section>
+
+    <!-- Tab 3: Bitmask Reference -->
+    <section id="tab-bitmask" class="panel">
+      <div class="bitmask-layout">
+        <div class="bitmask-images">
+          <h3>Bitmask Ref 1 (Simple)</h3>
+          <div class="checker"><canvas id="ref1-canvas"></canvas></div>
+          <h3 style="margin-top:16px">Bitmask Ref 2 (Full)</h3>
+          <div class="checker"><canvas id="ref2-canvas"></canvas></div>
+        </div>
+        <div class="bitmask-diagram">
+          <h3>8-bit Blob System</h3>
+          <p style="color: var(--text-dim); font-size: 11px; margin-bottom: 12px;">
+            N=1 NE=2 E=4 SE=8 S=16 SW=32 W=64 NW=128<br>
+            Diagonals gated by adjacent cardinals. 47 unique tiles.
+          </p>
+          <div class="bitmask-16" id="bitmask-grid"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 4: Atlas Mapping -->
+    <section id="tab-atlas" class="panel">
+      <div class="atlas-layout">
+        <div class="atlas-left">
+          <h3>Current Atlas (8x)</h3>
+          <div class="checker"><canvas id="atlas-canvas"></canvas></div>
+        </div>
+        <div class="atlas-right">
+          <h3>Bitmask &rarr; Atlas Index</h3>
+          <table id="mapping-table">
+            <thead><tr>
+              <th>Mask</th><th>Neighbors</th><th>Idx</th><th>Tile</th><th>Description</th>
+            </tr></thead>
+            <tbody id="mapping-body"></tbody>
+          </table>
+          <div id="export-area" class="hidden">
+            <h3 style="margin-top:16px">Rust Code</h3>
+            <textarea id="export-code" readonly></textarea>
+          </div>
+          <div style="margin-top: 12px;">
+            <button id="export-btn">Export Rust Code</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 5: Autotile Sandbox -->
+    <section id="tab-sandbox" class="panel">
+      <div class="controls">
+        <span style="color: var(--text-dim); font-size: 11px;">Paint brush:</span>
+        <div class="palette-grid" id="palette"></div>
+      </div>
+      <div class="sandbox-tools">
+        <button onclick="sbClear()">Clear</button>
+        <button onclick="sbFillGrass()">Fill Grass</button>
+        <button onclick="sbCheckerboard()">Checkerboard</button>
+        <button onclick="sbRandom()">Random</button>
+      </div>
+      <div class="sandbox-layout">
+        <div class="checker">
+          <canvas id="sandbox-canvas"></canvas>
+        </div>
+        <div class="sandbox-side">
+          <h3>Cell Info</h3>
+          <div id="sandbox-info">Hover over a cell to inspect.</div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════════
+// Constants
+// ═══════════════════════════════════════════════════════════════
+
+const T = 16; // tile size in pixels
+
+const SPRITE = '../assets/sprites/';
+const SPROUT = SPRITE + 'Sprout%20Lands%20-%20Sprites%20-%20premium%20pack/Tilesets/ground%20tiles/';
+const NEW    = SPROUT + 'New%20tiles/';
+const SIMPLE = NEW + 'simpel%20versions/';
+const CUTDIR = SIMPLE + 'Grass%20tiles%20v2%20simple%20cutout/';
+
+const TILESETS = [
+  { key: 'grass',       path: NEW + 'Grass_tiles_v2.png',             label: 'Grass v2' },
+  { key: 'darkerGrass', path: NEW + 'Darker_Grass_Tiles_v2.png',      label: 'Darker Grass v2' },
+  { key: 'soil',        path: NEW + 'Soil_Ground_Tiles.png',          label: 'Soil Ground' },
+  { key: 'stone',       path: NEW + 'Stone_Ground_Tiles.png',         label: 'Stone Ground' },
+  { key: 'layers',      path: NEW + 'Grass_Tile_Layers.png',          label: 'Grass Tile Layers' },
+  { key: 'simple',      path: SIMPLE + 'Grass_tiles_v2_simple.png',   label: 'Grass Simple' },
+];
+
+const CUTOUTS = [
+  { file: 'Flat_North',        label: 'Flat North',  group: 'Flat' },
+  { file: 'Flat_South',        label: 'Flat South',  group: 'Flat' },
+  { file: 'Flat_West',         label: 'Flat West',   group: 'Flat' },
+  { file: 'Corner_NorthEast',  label: 'Corner NE',   group: 'Corner' },
+  { file: 'Corner_NortWest',   label: 'Corner NW',   group: 'Corner', note: 'typo: NortWest' },
+  { file: 'Corner_SouthEast',  label: 'Corner SE',   group: 'Corner' },
+  { file: 'Corner_SouthWest',  label: 'Corner SW',   group: 'Corner' },
+  { file: 'Edge_NorthEast',    label: 'Edge NE',     group: 'Edge' },
+  { file: 'Edge_NorthWest',    label: 'Edge NW',     group: 'Edge' },
+  { file: 'Edge_SouthEast',    label: 'Edge SE',     group: 'Edge' },
+  { file: 'Edge_SouthWest',    label: 'Edge SW',     group: 'Edge' },
+  { file: 'Mid',               label: 'Mid (center)',group: 'Mid' },
+  { file: 'Mid_Flowers1',      label: 'Flowers 1',   group: 'Mid' },
+  { file: 'Mid_Flowers2',      label: 'Flowers 2',   group: 'Mid' },
+  { file: 'Mid_Grass1',        label: 'Grass 1',     group: 'Mid' },
+  { file: 'Mid_Grass2',        label: 'Grass 2',     group: 'Mid' },
+  { file: 'mMid_Moss1',        label: 'Moss 1',      group: 'Mid', note: 'filename: mMid' },
+  { file: 'Mid_Moss2',         label: 'Moss 2',      group: 'Mid' },
+  { file: 'Mid_Moss3',         label: 'Moss 3',      group: 'Mid' },
+  { file: 'Mid_Moss4',         label: 'Moss 4',      group: 'Mid' },
+  { file: 'Mid_Sprouts1',      label: 'Sprouts 1',   group: 'Mid' },
+  { file: 'Mid_Sprouts2',      label: 'Sprouts 2',   group: 'Mid' },
+  { file: 'Mid_Sprouts3',      label: 'Sprouts 3',   group: 'Mid' },
+  { file: 'Mid_Sprouts4',      label: 'Sprouts 4',   group: 'Mid' },
+];
+
+// Terrain types for the sandbox
+const TERRAINS = [
+  { name: 'Grass',    group: 'grass',    color: '#6b9e3a' },
+  { name: 'Water',    group: 'water',    color: '#4a7fa5' },
+  { name: 'Mud',      group: 'dirt',     color: '#8b7355' },
+  { name: 'Sand',     group: 'sand',     color: '#c4a862' },
+  { name: 'Rock',     group: 'rock',     color: '#7a7a7a' },
+  { name: 'Stone',    group: 'stone',    color: '#969696' },
+  { name: 'Building', group: 'building', color: '#7a5c3e' },
+];
+const isGrassGroup = (idx) => idx === 0; // only Grass terrain index is grass-group in sandbox
+
+// 8-bit blob bitmask data: N=1, NE=2, E=4, SE=8, S=16, SW=32, W=64, NW=128
+// 47 unique reduced bitmask values, each mapping to an atlas index.
+const BITMASK_DATA = [
+  { mask:  0, idx: 0, n:0,ne:0,e:0,se:0,s:0,sw:0,w:0,nw:0, desc:'Isolated' },
+  { mask:  1, idx: 1, n:1,ne:0,e:0,se:0,s:0,sw:0,w:0,nw:0, desc:'S endcap' },
+  { mask:  4, idx: 2, n:0,ne:0,e:1,se:0,s:0,sw:0,w:0,nw:0, desc:'W endcap' },
+  { mask:  5, idx: 3, n:1,ne:0,e:1,se:0,s:0,sw:0,w:0,nw:0, desc:'SW corner+NE inner' },
+  { mask:  7, idx: 4, n:1,ne:1,e:1,se:0,s:0,sw:0,w:0,nw:0, desc:'SW corner' },
+  { mask: 16, idx: 5, n:0,ne:0,e:0,se:0,s:1,sw:0,w:0,nw:0, desc:'N endcap' },
+  { mask: 17, idx: 6, n:1,ne:0,e:0,se:0,s:1,sw:0,w:0,nw:0, desc:'N+S strip' },
+  { mask: 20, idx: 7, n:0,ne:0,e:1,se:0,s:1,sw:0,w:0,nw:0, desc:'NW corner+SE inner' },
+  { mask: 21, idx: 8, n:1,ne:0,e:1,se:0,s:1,sw:0,w:0,nw:0, desc:'W edge+both inners' },
+  { mask: 23, idx: 9, n:1,ne:1,e:1,se:0,s:1,sw:0,w:0,nw:0, desc:'W edge+SE inner' },
+  { mask: 28, idx:10, n:0,ne:0,e:1,se:1,s:1,sw:0,w:0,nw:0, desc:'NW corner' },
+  { mask: 29, idx:11, n:1,ne:0,e:1,se:1,s:1,sw:0,w:0,nw:0, desc:'W edge+NE inner' },
+  { mask: 31, idx:12, n:1,ne:1,e:1,se:1,s:1,sw:0,w:0,nw:0, desc:'W edge' },
+  { mask: 64, idx:13, n:0,ne:0,e:0,se:0,s:0,sw:0,w:1,nw:0, desc:'E endcap' },
+  { mask: 65, idx:14, n:1,ne:0,e:0,se:0,s:0,sw:0,w:1,nw:0, desc:'SE corner+NW inner' },
+  { mask: 68, idx:15, n:0,ne:0,e:1,se:0,s:0,sw:0,w:1,nw:0, desc:'E+W strip' },
+  { mask: 69, idx:16, n:1,ne:0,e:1,se:0,s:0,sw:0,w:1,nw:0, desc:'S edge+both inners' },
+  { mask: 71, idx:17, n:1,ne:1,e:1,se:0,s:0,sw:0,w:1,nw:0, desc:'S edge+NW inner' },
+  { mask: 80, idx:18, n:0,ne:0,e:0,se:0,s:1,sw:0,w:1,nw:0, desc:'NE corner+SW inner' },
+  { mask: 81, idx:19, n:1,ne:0,e:0,se:0,s:1,sw:0,w:1,nw:0, desc:'E edge+both inners' },
+  { mask: 84, idx:20, n:0,ne:0,e:1,se:0,s:1,sw:0,w:1,nw:0, desc:'N edge+both inners' },
+  { mask: 85, idx:21, n:1,ne:0,e:1,se:0,s:1,sw:0,w:1,nw:0, desc:'Cross' },
+  { mask: 87, idx:22, n:1,ne:1,e:1,se:0,s:1,sw:0,w:1,nw:0, desc:'3 inner (only NE)' },
+  { mask: 92, idx:23, n:0,ne:0,e:1,se:1,s:1,sw:0,w:1,nw:0, desc:'N edge+SW inner' },
+  { mask: 93, idx:24, n:1,ne:0,e:1,se:1,s:1,sw:0,w:1,nw:0, desc:'3 inner (only SE)' },
+  { mask: 95, idx:25, n:1,ne:1,e:1,se:1,s:1,sw:0,w:1,nw:0, desc:'SW+NW dbl inner' },
+  { mask:112, idx:26, n:0,ne:0,e:0,se:0,s:1,sw:1,w:1,nw:0, desc:'NE corner' },
+  { mask:113, idx:27, n:1,ne:0,e:0,se:0,s:1,sw:1,w:1,nw:0, desc:'E edge+NW inner' },
+  { mask:116, idx:28, n:0,ne:0,e:1,se:0,s:1,sw:1,w:1,nw:0, desc:'N edge+SE inner' },
+  { mask:117, idx:29, n:1,ne:0,e:1,se:0,s:1,sw:1,w:1,nw:0, desc:'3 inner (only SW)' },
+  { mask:119, idx:30, n:1,ne:1,e:1,se:0,s:1,sw:1,w:1,nw:0, desc:'SE+NW opp inner' },
+  { mask:124, idx:31, n:0,ne:0,e:1,se:1,s:1,sw:1,w:1,nw:0, desc:'N edge' },
+  { mask:125, idx:32, n:1,ne:0,e:1,se:1,s:1,sw:1,w:1,nw:0, desc:'NE+NW dbl inner' },
+  { mask:127, idx:33, n:1,ne:1,e:1,se:1,s:1,sw:1,w:1,nw:0, desc:'NW inner' },
+  { mask:193, idx:34, n:1,ne:0,e:0,se:0,s:0,sw:0,w:1,nw:1, desc:'SE corner' },
+  { mask:197, idx:35, n:1,ne:0,e:1,se:0,s:0,sw:0,w:1,nw:1, desc:'S edge+NE inner' },
+  { mask:199, idx:36, n:1,ne:1,e:1,se:0,s:0,sw:0,w:1,nw:1, desc:'S edge' },
+  { mask:209, idx:37, n:1,ne:0,e:0,se:0,s:1,sw:0,w:1,nw:1, desc:'E edge+SW inner' },
+  { mask:213, idx:38, n:1,ne:0,e:1,se:0,s:1,sw:0,w:1,nw:1, desc:'3 inner (only NW)' },
+  { mask:215, idx:39, n:1,ne:1,e:1,se:0,s:1,sw:0,w:1,nw:1, desc:'SE+SW dbl inner' },
+  { mask:221, idx:40, n:1,ne:0,e:1,se:1,s:1,sw:0,w:1,nw:1, desc:'NE+SW opp inner' },
+  { mask:223, idx:41, n:1,ne:1,e:1,se:1,s:1,sw:0,w:1,nw:1, desc:'SW inner' },
+  { mask:241, idx:42, n:1,ne:0,e:0,se:0,s:1,sw:1,w:1,nw:1, desc:'E edge' },
+  { mask:245, idx:43, n:1,ne:0,e:1,se:0,s:1,sw:1,w:1,nw:1, desc:'NE+SE dbl inner' },
+  { mask:247, idx:44, n:1,ne:1,e:1,se:0,s:1,sw:1,w:1,nw:1, desc:'SE inner' },
+  { mask:253, idx:45, n:1,ne:0,e:1,se:1,s:1,sw:1,w:1,nw:1, desc:'NE inner' },
+  { mask:255, idx:46, n:1,ne:1,e:1,se:1,s:1,sw:1,w:1,nw:1, desc:'Center fill' },
+];
+
+// 256-entry lookup: bitmask value -> atlas index (matches Rust BLOB_TO_ATLAS)
+const BLOB_TO_ATLAS = [
+   0, 1, 0, 0, 2, 3, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0,
+   5, 6, 0, 0, 7, 8, 0, 9, 0, 0, 0, 0,10,11, 0,12,
+   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  13,14, 0, 0,15,16, 0,17, 0, 0, 0, 0, 0, 0, 0, 0,
+  18,19, 0, 0,20,21, 0,22, 0, 0, 0, 0,23,24, 0,25,
+   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  26,27, 0, 0,28,29, 0,30, 0, 0, 0, 0,31,32, 0,33,
+   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+   0,34, 0, 0, 0,35, 0,36, 0, 0, 0, 0, 0, 0, 0, 0,
+   0,37, 0, 0, 0,38, 0,39, 0, 0, 0, 0, 0,40, 0,41,
+   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+   0,42, 0, 0, 0,43, 0,44, 0, 0, 0, 0, 0,45, 0,46,
+];
+const maskToIdx = (mask) => BLOB_TO_ATLAS[mask];
+
+// ═══════════════════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════════════════
+
+const images = {};           // key -> Image
+let currentTileset = 'grass';
+let selectedCell = null;     // { col, row }
+
+// Labels: persisted per tileset+cell in localStorage
+const LS_KEY = 'clowder_tile_labels';
+let tileLabels = {};         // { "grass_3_2": "north edge", ... }
+function loadLabels() { try { tileLabels = JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch { tileLabels = {}; } }
+function saveLabels() { localStorage.setItem(LS_KEY, JSON.stringify(tileLabels)); }
+function labelKey(col, row) { return `${currentTileset}_${col}_${row}`; }
+
+// Sandbox state
+const SB_W = 10, SB_H = 10, SB_SCALE = 5;
+let sbGrid = [];             // [y][x] = terrain index (0-6)
+let sbBrush = 0;             // current paint terrain index
+let sbPainting = false;
+
+// Blob overlay: proposed 8-bit bitmask for each tileset cell
+// Format: "col,row" → { n,ne,e,se,s,sw,w,nw, desc, confirmed }
+let showBlobOverlay = false;
+const PROPOSED_BLOBS = {
+  // ── Row 0 (top edges/corners) ──
+  '0,0': { n:0,ne:0,e:1,se:1,s:1,sw:0,w:0,nw:0, desc:'NW corner', confirmed:true },
+  '1,0': { n:0,ne:0,e:1,se:1,s:1,sw:1,w:1,nw:0, desc:'N edge', confirmed:true },
+  '2,0': { n:0,ne:0,e:0,se:0,s:1,sw:1,w:1,nw:0, desc:'NE corner', confirmed:true },
+  '3,0': { n:0,ne:0,e:0,se:0,s:1,sw:0,w:0,nw:0, desc:'N endcap', confirmed:true },
+  '4,0': { n:0,ne:0,e:1,se:0,s:1,sw:0,w:0,nw:0, desc:'NW corner+SE inner', confirmed:true },
+  '5,0': { n:0,ne:0,e:1,se:0,s:1,sw:1,w:1,nw:0, desc:'N edge+SE inner', confirmed:true },
+  '6,0': { n:0,ne:0,e:1,se:1,s:1,sw:0,w:1,nw:0, desc:'N edge+SW inner', confirmed:true },
+  '7,0': { n:0,ne:0,e:0,se:0,s:1,sw:0,w:1,nw:0, desc:'NE corner+SW inner', confirmed:true },
+  '8,0': { n:0,ne:0,e:1,se:0,s:1,sw:0,w:1,nw:0, desc:'N edge+both inners', confirmed:true },
+  '9,0': { n:1,ne:0,e:1,se:1,s:1,sw:0,w:1,nw:1, desc:'NE+SW opp inner', confirmed:false },
+  '10,0':{ n:1,ne:1,e:1,se:0,s:1,sw:1,w:1,nw:0, desc:'SE+NW opp inner', confirmed:false },
+  // ── Row 1 (middle edges/center) ──
+  '0,1': { n:1,ne:1,e:1,se:1,s:1,sw:0,w:0,nw:0, desc:'W edge', confirmed:true },
+  '1,1': { n:1,ne:1,e:1,se:1,s:1,sw:1,w:1,nw:1, desc:'Center fill', confirmed:true },
+  '2,1': { n:1,ne:0,e:0,se:0,s:1,sw:1,w:1,nw:1, desc:'E edge', confirmed:true },
+  '3,1': { n:1,ne:0,e:0,se:0,s:1,sw:0,w:0,nw:0, desc:'N+S strip', confirmed:true },
+  '4,1': { n:1,ne:1,e:1,se:0,s:1,sw:0,w:0,nw:0, desc:'W edge+SE inner', confirmed:true },
+  '5,1': { n:1,ne:1,e:1,se:0,s:1,sw:1,w:1,nw:1, desc:'SE inner', confirmed:true },
+  '6,1': { n:1,ne:1,e:1,se:1,s:1,sw:0,w:1,nw:1, desc:'SW inner', confirmed:true },
+  '7,1': { n:1,ne:0,e:0,se:0,s:1,sw:0,w:1,nw:1, desc:'E edge+SW inner', confirmed:true },
+  '8,1': { n:1,ne:1,e:1,se:0,s:1,sw:0,w:1,nw:1, desc:'SE+SW dbl inner', confirmed:true },
+  '9,1': { n:1,ne:0,e:1,se:0,s:1,sw:0,w:1,nw:1, desc:'3 inner (only NW)', confirmed:false },
+  '10,1':{ n:1,ne:1,e:1,se:0,s:1,sw:0,w:1,nw:0, desc:'3 inner (only NE)', confirmed:false },
+  // ── Row 2 (bottom edges/corners) ──
+  '0,2': { n:1,ne:1,e:1,se:0,s:0,sw:0,w:0,nw:0, desc:'SW corner', confirmed:true },
+  '1,2': { n:1,ne:1,e:1,se:0,s:0,sw:0,w:1,nw:1, desc:'S edge', confirmed:true },
+  '2,2': { n:1,ne:0,e:0,se:0,s:0,sw:0,w:1,nw:1, desc:'SE corner', confirmed:true },
+  '3,2': { n:1,ne:0,e:0,se:0,s:0,sw:0,w:0,nw:0, desc:'S endcap', confirmed:true },
+  '4,2': { n:1,ne:0,e:1,se:1,s:1,sw:0,w:0,nw:0, desc:'W edge+NE inner', confirmed:true },
+  '5,2': { n:1,ne:0,e:1,se:1,s:1,sw:1,w:1,nw:1, desc:'NE inner', confirmed:true },
+  '6,2': { n:1,ne:1,e:1,se:1,s:1,sw:1,w:1,nw:0, desc:'NW inner', confirmed:true },
+  '7,2': { n:1,ne:0,e:0,se:0,s:1,sw:1,w:1,nw:0, desc:'E edge+NW inner', confirmed:true },
+  '8,2': { n:1,ne:0,e:1,se:1,s:1,sw:1,w:1,nw:0, desc:'NE+NW dbl inner', confirmed:true },
+  '9,2': { n:1,ne:0,e:1,se:1,s:1,sw:0,w:1,nw:0, desc:'3 inner (only SE)', confirmed:false },
+  '10,2':{ n:1,ne:0,e:1,se:0,s:1,sw:1,w:1,nw:0, desc:'3 inner (only SW)', confirmed:false },
+  // ── Row 3 (strips/isolated + more inner combos) ──
+  '0,3': { n:0,ne:0,e:1,se:0,s:0,sw:0,w:0,nw:0, desc:'W endcap', confirmed:true },
+  '1,3': { n:0,ne:0,e:1,se:0,s:0,sw:0,w:1,nw:0, desc:'E+W strip', confirmed:true },
+  '2,3': { n:0,ne:0,e:0,se:0,s:0,sw:0,w:1,nw:0, desc:'E endcap', confirmed:true },
+  '3,3': { n:0,ne:0,e:0,se:0,s:0,sw:0,w:0,nw:0, desc:'Isolated', confirmed:true },
+  '4,3': { n:1,ne:0,e:1,se:0,s:0,sw:0,w:0,nw:0, desc:'SW corner+NE inner', confirmed:true },
+  '5,3': { n:1,ne:0,e:1,se:0,s:0,sw:0,w:1,nw:1, desc:'S edge+NE inner', confirmed:true },
+  '6,3': { n:1,ne:1,e:1,se:0,s:0,sw:0,w:1,nw:0, desc:'S edge+NW inner', confirmed:true },
+  '7,3': { n:1,ne:0,e:0,se:0,s:0,sw:0,w:1,nw:0, desc:'SE corner+NW inner', confirmed:true },
+  '8,3': { n:1,ne:0,e:1,se:0,s:0,sw:0,w:1,nw:0, desc:'S edge+both inners', confirmed:true },
+  // ── Row 4 (edge+both inners, cross) ──
+  '4,4': { n:1,ne:0,e:1,se:0,s:1,sw:0,w:0,nw:0, desc:'W edge+NE+SE inner', confirmed:true },
+  '5,4': { n:1,ne:0,e:1,se:0,s:1,sw:1,w:1,nw:1, desc:'NE+SE dbl inner', confirmed:true },
+  '6,4': { n:1,ne:1,e:1,se:1,s:1,sw:0,w:1,nw:0, desc:'SW+NW dbl inner', confirmed:true },
+  '7,4': { n:1,ne:0,e:0,se:0,s:1,sw:0,w:1,nw:0, desc:'E edge+both inners', confirmed:true },
+  '8,4': { n:1,ne:0,e:1,se:0,s:1,sw:0,w:1,nw:0, desc:'Cross (all inners)', confirmed:true },
+};
+
+// ═══════════════════════════════════════════════════════════════
+// Image Loading
+// ═══════════════════════════════════════════════════════════════
+
+function loadAllImages() {
+  const manifest = {};
+
+  // Tilesets
+  for (const ts of TILESETS) manifest['ts_' + ts.key] = ts.path;
+  // Bitmask refs
+  manifest.ref1 = SPROUT + 'Bitmask%20references%201.png';
+  manifest.ref2 = SPROUT + 'Bitmask%20references%202.png';
+  // Current atlases
+  manifest.atlas = SPRITE + 'grass_autotile_atlas.png';
+  manifest.baseAtlas = SPRITE + 'base_terrain_atlas.png';
+  // Cutout tiles
+  for (const c of CUTOUTS) manifest['cut_' + c.file] = CUTDIR + 'Grass_tiles_v2_' + c.file + '.png';
+
+  const keys = Object.keys(manifest);
+  const total = keys.length;
+  let loaded = 0;
+  const bar = document.getElementById('load-bar');
+  const txt = document.getElementById('load-text');
+
+  return new Promise((resolve, reject) => {
+    let failed = [];
+    for (const key of keys) {
+      const img = new Image();
+      img.onload = () => {
+        images[key] = img;
+        loaded++;
+        bar.style.width = (loaded / total * 100) + '%';
+        txt.textContent = `Loading sprites... ${loaded}/${total}`;
+        if (loaded + failed.length === total) {
+          if (failed.length) console.warn('Failed to load:', failed);
+          resolve();
+        }
+      };
+      img.onerror = () => {
+        failed.push(key);
+        loaded++;
+        bar.style.width = (loaded / total * 100) + '%';
+        if (loaded + failed.length === total) resolve();
+      };
+      img.src = manifest[key];
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Canvas Utilities
+// ═══════════════════════════════════════════════════════════════
+
+function setupCanvas(canvas, w, h) {
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  return ctx;
+}
+
+function drawScaled(ctx, img, scale, dx, dy) {
+  dx = dx || 0; dy = dy || 0;
+  ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight,
+    dx, dy, img.naturalWidth * scale, img.naturalHeight * scale);
+}
+
+function drawTile(ctx, img, srcCol, srcRow, dx, dy, scale) {
+  ctx.drawImage(img,
+    srcCol * T, srcRow * T, T, T,
+    dx, dy, T * scale, T * scale);
+}
+
+function drawGrid(ctx, cols, rows, cellPx, color) {
+  ctx.strokeStyle = color || 'rgba(255,255,255,0.18)';
+  ctx.lineWidth = 1;
+  for (let c = 0; c <= cols; c++) {
+    const x = c * cellPx + 0.5;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, rows * cellPx); ctx.stroke();
+  }
+  for (let r = 0; r <= rows; r++) {
+    const y = r * cellPx + 0.5;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cols * cellPx, y); ctx.stroke();
+  }
+}
+
+function drawCellLabels(ctx, cols, rows, cellPx) {
+  ctx.font = '10px ' + getComputedStyle(document.body).getPropertyValue('--font-mono');
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const idx = r * cols + c;
+      const x = c * cellPx + 3;
+      const y = r * cellPx + 2;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(x - 1, y - 1, 18, 13);
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.fillText(String(idx), x, y);
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Tab Switching
+// ═══════════════════════════════════════════════════════════════
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Tab 1: Tileset Viewer
+// ═══════════════════════════════════════════════════════════════
+
+const VIEW_SCALE = 6;
+
+function initViewer() {
+  loadLabels();
+  const sel = document.getElementById('tileset-select');
+  for (const ts of TILESETS) {
+    const opt = document.createElement('option');
+    opt.value = ts.key;
+    opt.textContent = ts.label;
+    sel.appendChild(opt);
+  }
+  sel.value = currentTileset;
+  sel.addEventListener('change', () => { currentTileset = sel.value; selectedCell = null; renderTileset(); clearZoom(); syncLabelInput(); });
+
+  // Blob overlay toggle
+  const blobBtn = document.getElementById('blob-overlay-toggle');
+  blobBtn.addEventListener('click', () => {
+    showBlobOverlay = !showBlobOverlay;
+    blobBtn.textContent = showBlobOverlay ? 'Hide Blob Proposals' : 'Show Blob Proposals';
+    blobBtn.style.borderColor = showBlobOverlay ? 'var(--accent)' : '';
+    renderTileset();
+  });
+
+  document.getElementById('tileset-canvas').addEventListener('click', onViewerClick);
+
+  // Label input
+  const inp = document.getElementById('label-input');
+  const saveBtn = document.getElementById('label-save');
+  const clearBtn = document.getElementById('label-clear');
+  const exportBtn = document.getElementById('labels-export');
+
+  inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveBtn.click(); });
+  saveBtn.addEventListener('click', () => {
+    if (!selectedCell) return;
+    const val = inp.value.trim();
+    const key = labelKey(selectedCell.col, selectedCell.row);
+    if (val) tileLabels[key] = val; else delete tileLabels[key];
+    saveLabels(); renderTileset();
+  });
+  clearBtn.addEventListener('click', () => {
+    if (!selectedCell) return;
+    delete tileLabels[labelKey(selectedCell.col, selectedCell.row)];
+    inp.value = '';
+    saveLabels(); renderTileset();
+  });
+  exportBtn.addEventListener('click', () => {
+    const prefix = currentTileset + '_';
+    const lines = [];
+    for (const [key, val] of Object.entries(tileLabels)) {
+      if (!key.startsWith(prefix)) continue;
+      const rest = key.slice(prefix.length);
+      const [col, row] = rest.split('_');
+      const idx = parseInt(row) * viewerCols() + parseInt(col);
+      lines.push(`idx ${String(idx).padStart(2)} (${col},${row}): ${val}`);
+    }
+    lines.sort();
+    if (!lines.length) { alert('No labels for this tileset yet.'); return; }
+    navigator.clipboard.writeText(lines.join('\n')).then(
+      () => alert('Copied ' + lines.length + ' labels to clipboard.'),
+      () => alert(lines.join('\n'))
+    );
+  });
+
+  // Build role legend — click to fill label input
+  const legend = document.getElementById('role-legend');
+  for (const d of BITMASK_DATA) {
+    const btn = document.createElement('button');
+    btn.className = 'role-btn';
+    btn.innerHTML = `${d.desc} <span class="role-idx">idx ${d.idx}</span>`;
+    btn.addEventListener('click', () => {
+      if (!selectedCell) return;
+      inp.value = d.desc;
+      saveBtn.click();
+    });
+    legend.appendChild(btn);
+  }
+
+  renderTileset();
+  syncLabelInput();
+}
+
+function syncLabelInput() {
+  const inp = document.getElementById('label-input');
+  const saveBtn = document.getElementById('label-save');
+  const clearBtn = document.getElementById('label-clear');
+  if (!selectedCell) {
+    inp.value = ''; inp.disabled = true; inp.placeholder = 'Select a cell first...';
+    saveBtn.disabled = true; clearBtn.disabled = true;
+    return;
+  }
+  inp.disabled = false; saveBtn.disabled = false; clearBtn.disabled = false;
+  inp.placeholder = `Label for (${selectedCell.col}, ${selectedCell.row})...`;
+  inp.value = tileLabels[labelKey(selectedCell.col, selectedCell.row)] || '';
+  inp.focus();
+}
+
+function viewerImg() { return images['ts_' + currentTileset]; }
+function viewerCols() { const img = viewerImg(); return img ? Math.floor(img.naturalWidth / T) : 0; }
+function viewerRows() { const img = viewerImg(); return img ? Math.floor(img.naturalHeight / T) : 0; }
+
+function renderTileset() {
+  const img = viewerImg();
+  if (!img) return;
+  const cols = viewerCols(), rows = viewerRows();
+  const cellPx = T * VIEW_SCALE;
+  const canvas = document.getElementById('tileset-canvas');
+  const ctx = setupCanvas(canvas, cols * cellPx, rows * cellPx);
+  drawScaled(ctx, img, VIEW_SCALE);
+  drawGrid(ctx, cols, rows, cellPx);
+  drawCellLabels(ctx, cols, rows, cellPx);
+
+  // Draw user labels
+  ctx.font = 'bold 10px ' + getComputedStyle(document.body).getPropertyValue('--font-mono');
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const lbl = tileLabels[`${currentTileset}_${c}_${r}`];
+      if (!lbl) continue;
+      const cx = c * cellPx + cellPx / 2;
+      const by = (r + 1) * cellPx - 3;
+      const tw = Math.min(ctx.measureText(lbl).width + 6, cellPx - 4);
+      ctx.fillStyle = 'rgba(212,148,58,0.9)';
+      ctx.fillRect(cx - tw / 2, by - 12, tw, 14);
+      ctx.fillStyle = '#000';
+      ctx.fillText(lbl, cx, by);
+    }
+  }
+
+  // Draw blob overlay diagrams
+  if (showBlobOverlay && currentTileset === 'grass') {
+    const mono = getComputedStyle(document.body).getPropertyValue('--font-mono');
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const blob = PROPOSED_BLOBS[`${c},${r}`];
+        if (!blob) continue;
+        const ox = c * cellPx;
+        const oy = r * cellPx;
+
+        // Dark backdrop
+        ctx.fillStyle = blob.confirmed ? 'rgba(15,12,10,0.5)' : 'rgba(30,10,8,0.5)';
+        ctx.fillRect(ox, oy, cellPx, cellPx);
+
+        // 3x3 diagram — large and centered
+        const s = Math.floor(cellPx / 4); // cell size
+        const gap = 2;
+        const gridW = s * 3 + gap * 2;
+        const mx = ox + Math.floor((cellPx - gridW) / 2);
+        const my = oy + 4;
+        const cells = [
+          blob.nw, blob.n, blob.ne,
+          blob.w, 2, blob.e,
+          blob.sw, blob.s, blob.se
+        ];
+        for (let i = 0; i < 9; i++) {
+          const cr = Math.floor(i / 3), cc = i % 3;
+          const val = cells[i];
+          const cx = mx + cc * (s + gap), cy = my + cr * (s + gap);
+          if (val === 2) {
+            ctx.fillStyle = '#5a9e2a';
+          } else if (val === 1) {
+            ctx.fillStyle = '#3d7a1e';
+          } else {
+            ctx.fillStyle = '#2a2220';
+          }
+          ctx.fillRect(cx, cy, s, s);
+          // Thin border on each mini-cell
+          ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(cx + 0.5, cy + 0.5, s - 1, s - 1);
+        }
+
+        // Description label at bottom
+        ctx.font = 'bold 9px ' + mono;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        const borderColor = blob.confirmed ? '#5a9e2a' : '#d44';
+        // Background bar for text
+        ctx.fillStyle = borderColor;
+        ctx.fillRect(ox + 2, oy + cellPx - 14, cellPx - 4, 13);
+        ctx.fillStyle = '#000';
+        ctx.fillText(blob.desc, ox + cellPx / 2, oy + cellPx - 2);
+
+        // Border: green=confirmed, red=proposed
+        ctx.strokeStyle = borderColor;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(ox + 1, oy + 1, cellPx - 2, cellPx - 2);
+      }
+    }
+  }
+
+  // Highlight selected
+  if (selectedCell) {
+    ctx.strokeStyle = '#d4943a';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(selectedCell.col * cellPx + 1.5, selectedCell.row * cellPx + 1.5, cellPx - 3, cellPx - 3);
+  }
+
+  document.getElementById('tileset-dims').textContent =
+    `${img.naturalWidth}x${img.naturalHeight}px \u2014 ${cols}x${rows} tiles`;
+}
+
+function onViewerClick(e) {
+  const rect = e.target.getBoundingClientRect();
+  const cellPx = T * VIEW_SCALE;
+  const col = Math.floor((e.clientX - rect.left) / cellPx);
+  const row = Math.floor((e.clientY - rect.top) / cellPx);
+  if (col < 0 || col >= viewerCols() || row < 0 || row >= viewerRows()) return;
+  selectedCell = { col, row };
+  renderTileset();
+  renderZoom();
+  syncLabelInput();
+}
+
+function renderZoom() {
+  const canvas = document.getElementById('zoom-canvas');
+  const ctx = setupCanvas(canvas, 256, 256);
+  const img = viewerImg();
+  if (!img || !selectedCell) return;
+  ctx.drawImage(img, selectedCell.col * T, selectedCell.row * T, T, T, 0, 0, 256, 256);
+  // Sub-pixel grid
+  drawGrid(ctx, T, T, 16, 'rgba(255,255,255,0.1)');
+
+  const idx = selectedCell.row * viewerCols() + selectedCell.col;
+  document.getElementById('cell-info').innerHTML =
+    `<span class="label">Cell:</span> <span class="val">(${selectedCell.col}, ${selectedCell.row})</span><br>` +
+    `<span class="label">Index:</span> <span class="val">${idx}</span><br>` +
+    `<span class="label">Source px:</span> <span class="val">(${selectedCell.col * T}, ${selectedCell.row * T})</span><br>` +
+    `<span class="label">Size:</span> <span class="val">${T}x${T}px</span>`;
+}
+
+function clearZoom() {
+  const ctx = document.getElementById('zoom-canvas').getContext('2d');
+  ctx.clearRect(0, 0, 256, 256);
+  document.getElementById('cell-info').textContent = 'Click a tile cell to inspect it.';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Tab 2: Cutout Inspector
+// ═══════════════════════════════════════════════════════════════
+
+function initCutouts() {
+  const container = document.getElementById('cutout-container');
+  const groups = {};
+  for (const c of CUTOUTS) {
+    if (!groups[c.group]) groups[c.group] = [];
+    groups[c.group].push(c);
+  }
+
+  for (const [groupName, tiles] of Object.entries(groups)) {
+    const section = document.createElement('div');
+    section.className = 'cutout-group';
+
+    const hdr = document.createElement('h2');
+    hdr.textContent = groupName;
+    if (groupName === 'Flat') hdr.textContent += ' (note: no Flat_East in source files)';
+    section.appendChild(hdr);
+
+    const grid = document.createElement('div');
+    grid.className = 'cutout-grid';
+
+    for (const tile of tiles) {
+      const card = document.createElement('div');
+      card.className = 'cutout-card';
+
+      const wrap = document.createElement('div');
+      wrap.className = 'checker';
+      const cvs = document.createElement('canvas');
+      const scale = 8;
+      const ctx = setupCanvas(cvs, T * scale, T * scale);
+      const img = images['cut_' + tile.file];
+      if (img) ctx.drawImage(img, 0, 0, T, T, 0, 0, T * scale, T * scale);
+      else { ctx.fillStyle = '#f44'; ctx.fillText('?', 4, 12); }
+      wrap.appendChild(cvs);
+      card.appendChild(wrap);
+
+      const name = document.createElement('div');
+      name.className = 'name';
+      name.textContent = tile.label;
+      card.appendChild(name);
+
+      if (tile.note) {
+        const note = document.createElement('div');
+        note.className = 'note';
+        note.textContent = tile.note;
+        card.appendChild(note);
+      }
+
+      grid.appendChild(card);
+    }
+    section.appendChild(grid);
+    container.appendChild(section);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Tab 3: Bitmask Reference
+// ═══════════════════════════════════════════════════════════════
+
+function initBitmaskRef() {
+  // Render reference images
+  for (const [id, key] of [['ref1-canvas', 'ref1'], ['ref2-canvas', 'ref2']]) {
+    const img = images[key];
+    if (!img) continue;
+    const scale = 3;
+    const cvs = document.getElementById(id);
+    const ctx = setupCanvas(cvs, img.naturalWidth * scale, img.naturalHeight * scale);
+    drawScaled(ctx, img, scale);
+  }
+
+  // Generate bitmask mini-diagrams (8-bit with diagonals)
+  const grid = document.getElementById('bitmask-grid');
+  for (const d of BITMASK_DATA) {
+    const card = document.createElement('div');
+    card.className = 'bm-card';
+
+    const bin = document.createElement('div');
+    bin.className = 'bm-binary';
+    bin.textContent = d.mask;
+    card.appendChild(bin);
+
+    // 3x3 mini grid with all 8 neighbors
+    const mini = document.createElement('div');
+    mini.className = 'bm-mini';
+    const cells = [
+      d.nw ? 'on' : 'off', d.n ? 'on' : 'off', d.ne ? 'on' : 'off',
+      d.w ? 'on' : 'off', 'center', d.e ? 'on' : 'off',
+      d.sw ? 'on' : 'off', d.s ? 'on' : 'off', d.se ? 'on' : 'off',
+    ];
+    for (const cls of cells) {
+      const cell = document.createElement('div');
+      cell.className = 'bm-cell ' + cls;
+      mini.appendChild(cell);
+    }
+    card.appendChild(mini);
+
+    const idxLabel = document.createElement('div');
+    idxLabel.style.cssText = 'font-size:10px; color: var(--text-dim);';
+    idxLabel.textContent = 'idx ' + d.idx;
+    card.appendChild(idxLabel);
+
+    const desc = document.createElement('div');
+    desc.className = 'bm-desc';
+    desc.textContent = d.desc;
+    card.appendChild(desc);
+
+    grid.appendChild(card);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Tab 4: Atlas Mapping
+// ═══════════════════════════════════════════════════════════════
+
+// Reverse lookup: atlas index -> bitmask data
+const idxToData = new Map(BITMASK_DATA.map(d => [d.idx, d]));
+
+function initAtlasMapping() {
+  const atlasImg = images.atlas;
+  if (atlasImg) {
+    const scale = 8;
+    const cvs = document.getElementById('atlas-canvas');
+    const cols = Math.floor(atlasImg.naturalWidth / T);
+    const rows = Math.floor(atlasImg.naturalHeight / T);
+    const cellPx = T * scale;
+    const ctx = setupCanvas(cvs, atlasImg.naturalWidth * scale, atlasImg.naturalHeight * scale);
+    drawScaled(ctx, atlasImg, scale);
+    drawGrid(ctx, cols, rows, cellPx);
+    drawCellLabels(ctx, cols, rows, cellPx);
+
+    // Draw description labels on each atlas cell
+    ctx.font = 'bold 10px ' + getComputedStyle(document.body).getPropertyValue('--font-mono');
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const idx = r * cols + c;
+        const data = idxToData.get(idx);
+        if (!data) continue;
+        const cx = c * cellPx + cellPx / 2;
+        const by = (r + 1) * cellPx - 3;
+        const text = data.desc;
+        const tw = Math.min(ctx.measureText(text).width + 8, cellPx - 4);
+        ctx.fillStyle = 'rgba(212,148,58,0.9)';
+        ctx.fillRect(cx - tw / 2, by - 12, tw, 14);
+        ctx.fillStyle = '#000';
+        ctx.fillText(text, cx, by);
+      }
+    }
+  }
+
+  // Build mapping table
+  const tbody = document.getElementById('mapping-body');
+  for (const d of BITMASK_DATA) {
+    const tr = document.createElement('tr');
+
+    // Mask column
+    const tdMask = document.createElement('td');
+    tdMask.style.fontWeight = 'bold';
+    tdMask.style.color = '#d4943a';
+    tdMask.textContent = d.mask;
+    tr.appendChild(tdMask);
+
+    // Mini neighbor column
+    const tdNeighbor = document.createElement('td');
+    const dirs = [
+      { ltr: 'N', on: d.n }, { ltr: 'NE', on: d.ne }, { ltr: 'E', on: d.e }, { ltr: 'SE', on: d.se },
+      { ltr: 'S', on: d.s }, { ltr: 'SW', on: d.sw }, { ltr: 'W', on: d.w }, { ltr: 'NW', on: d.nw }
+    ];
+    for (const dir of dirs) {
+      const sp = document.createElement('span');
+      sp.style.cssText = `display:inline-block; width:16px; text-align:center; font-weight:bold; color: ${dir.on ? 'var(--grass)' : 'var(--border-light)'}`;
+      sp.textContent = dir.ltr;
+      tdNeighbor.appendChild(sp);
+    }
+    tr.appendChild(tdNeighbor);
+
+    // Index column
+    const tdIdx = document.createElement('td');
+    tdIdx.textContent = d.idx;
+    tr.appendChild(tdIdx);
+
+    // Tile preview column
+    const tdTile = document.createElement('td');
+    if (atlasImg) {
+      const pvs = document.createElement('canvas');
+      const pScale = 3;
+      const pCtx = setupCanvas(pvs, T * pScale, T * pScale);
+      const srcCol = d.idx % 8;
+      const srcRow = Math.floor(d.idx / 8);
+      drawTile(pCtx, atlasImg, srcCol, srcRow, 0, 0, pScale);
+      pvs.className = 'mapping-preview';
+      pvs.style.cssText = 'image-rendering:pixelated; vertical-align:middle;';
+      tdTile.appendChild(pvs);
+    }
+    tr.appendChild(tdTile);
+
+    // Description column
+    const tdDesc = document.createElement('td');
+    tdDesc.style.color = 'var(--text-dim)';
+    tdDesc.textContent = d.desc;
+    tr.appendChild(tdDesc);
+
+    tbody.appendChild(tr);
+  }
+
+  // Export button
+  document.getElementById('export-btn').addEventListener('click', () => {
+    const area = document.getElementById('export-area');
+    area.classList.toggle('hidden');
+    if (!area.classList.contains('hidden')) {
+      const lines = ['// 8-bit blob bitmask -> atlas index (47 tiles)', '// Use BLOB_TO_ATLAS lookup table in Rust instead of match'];
+      for (const d of BITMASK_DATA) {
+        lines.push(`// mask=${String(d.mask).padStart(3)} 0b${d.mask.toString(2).padStart(8,'0')} -> idx ${String(d.idx).padStart(2)}  ${d.desc}`);
+      }
+      document.getElementById('export-code').value = lines.join('\n');
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Tab 5: Autotile Sandbox
+// ═══════════════════════════════════════════════════════════════
+
+function initSandbox() {
+  // Initialize grid with grass
+  sbGrid = [];
+  for (let y = 0; y < SB_H; y++) {
+    sbGrid[y] = [];
+    for (let x = 0; x < SB_W; x++) sbGrid[y][x] = 0; // grass
+  }
+
+  // Build palette
+  const palette = document.getElementById('palette');
+  for (let i = 0; i < TERRAINS.length; i++) {
+    const btn = document.createElement('button');
+    btn.className = 'palette-btn' + (i === sbBrush ? ' active' : '');
+    btn.style.background = TERRAINS[i].color;
+    btn.textContent = TERRAINS[i].name;
+    btn.addEventListener('click', () => {
+      sbBrush = i;
+      palette.querySelectorAll('.palette-btn').forEach((b, j) => b.classList.toggle('active', j === i));
+    });
+    palette.appendChild(btn);
+  }
+
+  // Canvas events
+  const cvs = document.getElementById('sandbox-canvas');
+  cvs.addEventListener('mousedown', (e) => { sbPainting = true; onSandboxPaint(e); });
+  cvs.addEventListener('mousemove', (e) => { onSandboxHover(e); if (sbPainting) onSandboxPaint(e); });
+  cvs.addEventListener('mouseup', () => sbPainting = false);
+  cvs.addEventListener('mouseleave', () => sbPainting = false);
+  cvs.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  renderSandbox();
+}
+
+function sbCellFromEvent(e) {
+  const rect = e.target.getBoundingClientRect();
+  const cellPx = T * SB_SCALE;
+  const col = Math.floor((e.clientX - rect.left) / cellPx);
+  const row = Math.floor((e.clientY - rect.top) / cellPx);
+  if (col < 0 || col >= SB_W || row < 0 || row >= SB_H) return null;
+  return { x: col, y: row };
+}
+
+function onSandboxPaint(e) {
+  const cell = sbCellFromEvent(e);
+  if (!cell) return;
+  // Right click erases (sets to Water)
+  const terrain = (e.buttons === 2) ? 1 : sbBrush;
+  if (sbGrid[cell.y][cell.x] !== terrain) {
+    sbGrid[cell.y][cell.x] = terrain;
+    renderSandbox();
+  }
+}
+
+function onSandboxHover(e) {
+  const cell = sbCellFromEvent(e);
+  const info = document.getElementById('sandbox-info');
+  if (!cell) { info.textContent = 'Hover over a cell to inspect.'; return; }
+
+  const ti = sbGrid[cell.y][cell.x];
+  const terrain = TERRAINS[ti];
+  let html = `<span class="label">Cell:</span> <span class="val">(${cell.x}, ${cell.y})</span><br>`;
+  html += `<span class="label">Terrain:</span> <span class="val">${terrain.name}</span><br>`;
+
+  if (isGrassGroup(ti)) {
+    const mask = blobBitmask(cell.x, cell.y);
+    const atlasIdx = maskToIdx(mask);
+    const data = BITMASK_DATA.find(d => d.mask === mask);
+    html += `<span class="label">Bitmask:</span> <span class="val">0b${mask.toString(2).padStart(8, '0')}</span> (${mask})<br>`;
+    html += `<span class="label">Atlas idx:</span> <span class="val">${atlasIdx}</span><br>`;
+    html += `<span class="label">Type:</span> <span class="val">${data ? data.desc : '?'}</span><br>`;
+    html += '<span class="label">Neighbors:</span> ';
+    const dirs = [
+      { ltr:'NW', bit:128 }, { ltr:'N', bit:1 }, { ltr:'NE', bit:2 },
+      { ltr:'W', bit:64 }, { ltr:'E', bit:4 },
+      { ltr:'SW', bit:32 }, { ltr:'S', bit:16 }, { ltr:'SE', bit:8 },
+    ];
+    for (const d of dirs) {
+      html += `<span class="neighbor ${mask & d.bit ? 'on' : 'off'}">${d.ltr}</span> `;
+    }
+  }
+  info.innerHTML = html;
+}
+
+function blobBitmask(x, y) {
+  const same = (nx, ny) => {
+    if (nx < 0 || ny < 0 || nx >= SB_W || ny >= SB_H) return true;
+    return isGrassGroup(sbGrid[ny][nx]);
+  };
+  const n = same(x, y-1), e = same(x+1, y), s = same(x, y+1), w = same(x-1, y);
+  let mask = 0;
+  if (n) mask |= 1;
+  if (n && e && same(x+1, y-1)) mask |= 2;   // NE
+  if (e) mask |= 4;
+  if (e && s && same(x+1, y+1)) mask |= 8;   // SE
+  if (s) mask |= 16;
+  if (s && w && same(x-1, y+1)) mask |= 32;  // SW
+  if (w) mask |= 64;
+  if (w && n && same(x-1, y-1)) mask |= 128;  // NW
+  return mask;
+}
+
+function renderSandbox() {
+  const cellPx = T * SB_SCALE;
+  const cvs = document.getElementById('sandbox-canvas');
+  const ctx = setupCanvas(cvs, SB_W * cellPx, SB_H * cellPx);
+  const atlasImg = images.atlas;
+  const atlasCols = atlasImg ? Math.floor(atlasImg.naturalWidth / T) : 8;
+
+  for (let y = 0; y < SB_H; y++) {
+    for (let x = 0; x < SB_W; x++) {
+      const ti = sbGrid[y][x];
+      const px = x * cellPx;
+      const py = y * cellPx;
+
+      // Base color
+      ctx.fillStyle = TERRAINS[ti].color;
+      ctx.fillRect(px, py, cellPx, cellPx);
+
+      // Grass overlay
+      if (isGrassGroup(ti) && atlasImg) {
+        const mask = blobBitmask(x, y);
+        const aidx = maskToIdx(mask);
+        const srcCol = aidx % atlasCols;
+        const srcRow = Math.floor(aidx / atlasCols);
+        drawTile(ctx, atlasImg, srcCol, srcRow, px, py, SB_SCALE);
+      }
+
+      // Bitmask label on grass cells
+      if (isGrassGroup(ti)) {
+        const mask = blobBitmask(x, y);
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.fillRect(px + 2, py + cellPx - 15, cellPx - 4, 14);
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.font = '9px ' + getComputedStyle(document.body).getPropertyValue('--font-mono');
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(mask.toString(10), px + cellPx / 2, py + cellPx - 3);
+      }
+    }
+  }
+
+  // Grid lines
+  drawGrid(ctx, SB_W, SB_H, cellPx, 'rgba(255,255,255,0.12)');
+}
+
+// Sandbox tool functions (global for onclick handlers)
+window.sbClear = function() {
+  for (let y = 0; y < SB_H; y++)
+    for (let x = 0; x < SB_W; x++) sbGrid[y][x] = 1; // water
+  renderSandbox();
+};
+window.sbFillGrass = function() {
+  for (let y = 0; y < SB_H; y++)
+    for (let x = 0; x < SB_W; x++) sbGrid[y][x] = 0; // grass
+  renderSandbox();
+};
+window.sbCheckerboard = function() {
+  for (let y = 0; y < SB_H; y++)
+    for (let x = 0; x < SB_W; x++) sbGrid[y][x] = (x + y) % 2 === 0 ? 0 : 1;
+  renderSandbox();
+};
+window.sbRandom = function() {
+  for (let y = 0; y < SB_H; y++)
+    for (let x = 0; x < SB_W; x++) sbGrid[y][x] = Math.floor(Math.random() * TERRAINS.length);
+  renderSandbox();
+};
+
+// ═══════════════════════════════════════════════════════════════
+// Initialization
+// ═══════════════════════════════════════════════════════════════
+
+loadAllImages().then(() => {
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+
+  // Tab switching
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+
+  initViewer();
+  initCutouts();
+  initBitmaskRef();
+  initAtlasMapping();
+  initSandbox();
+}).catch(err => {
+  document.getElementById('load-text').textContent = 'Error loading images. Check file paths and try from a local server.';
+  document.getElementById('load-text').style.color = '#c44';
+  console.error(err);
+});
+</script>
+</body>
+</html>

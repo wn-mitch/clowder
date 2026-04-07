@@ -40,6 +40,6 @@ impl Plugin for CameraPlugin {
                 camera::setup_camera
                     .after(crate::plugins::setup::setup_world_exclusive),
             )
-            .add_systems(Update, (camera::camera_controls, camera::auto_screenshot));
+            .add_systems(Update, (camera::camera_update, camera::auto_screenshot));
     }
 }
