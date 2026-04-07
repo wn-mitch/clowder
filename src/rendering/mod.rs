@@ -2,6 +2,7 @@ pub mod terrain_sprites;
 pub mod tilemap_sync;
 pub mod camera;
 pub mod entity_sprites;
+pub mod ui;
 
 use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;

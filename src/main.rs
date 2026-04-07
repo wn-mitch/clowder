@@ -78,6 +78,7 @@ fn main() {
         .add_plugins(SimulationPlugin)
         .add_plugins(rendering::RenderingPlugin)
         .add_plugins(rendering::CameraPlugin)
+        .add_plugins(rendering::ui::UiPlugin)
         .add_systems(Update, (handle_input, sync_sim_speed))
         .run();
 }
