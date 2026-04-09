@@ -31,6 +31,7 @@ pub enum InspectionMode {
     None,
     CatInspect(Entity),
     TileInspect { x: i32, y: i32 },
+    WildlifeInspect(Entity),
 }
 
 // ---------------------------------------------------------------------------

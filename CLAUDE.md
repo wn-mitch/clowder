@@ -64,6 +64,18 @@ Key architectural decisions:
 - Prefer `Query<>` with explicit component access over broad world access
 - Keep systems focused — one responsibility per system function
 
+## Headless Mode
+
+The headless `build_schedule()` in `src/main.rs` is a **manual mirror** of
+`SimulationPlugin::build()` in `src/plugins/simulation.rs`. When adding or
+reordering systems in the graphical plugin, you **must** update `build_schedule()`
+to match. The two diverged silently before and caused headless diagnostics to
+run stale code paths. Treat them as a pair — change one, change both.
+
+Headless CLI flags for diagnostics:
+- `--trace-positions <N>` — emit lightweight per-cat position+action traces every N ticks (1 = per-tick)
+- `--snapshot-interval <N>` — control full CatSnapshot + economy event interval (default 100)
+
 ## Bevy ECS Guidelines
 
 - **`run_if` over early returns**: if a condition can be expressed as a `run_if` guard on the system, prefer that over an early return inside the system body. Systems gated by `run_if` skip query iteration entirely.

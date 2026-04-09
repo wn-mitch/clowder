@@ -27,24 +27,27 @@ impl StructureType {
     /// Default material cost for constructing this structure.
     pub fn material_cost(self) -> Vec<(Material, u32)> {
         match self {
-            Self::Den => vec![(Material::Wood, 5), (Material::Stone, 3)],
-            Self::Hearth => vec![(Material::Stone, 5), (Material::Wood, 2)],
-            Self::Stores => vec![(Material::Wood, 4), (Material::Stone, 2)],
-            Self::Workshop => vec![(Material::Wood, 3), (Material::Herbs, 2)],
-            Self::Garden => vec![(Material::Wood, 2)],
-            Self::Watchtower => vec![(Material::Wood, 4), (Material::Stone, 4)],
+            Self::Den => vec![(Material::Wood, 10), (Material::Stone, 6)],
+            Self::Hearth => vec![(Material::Stone, 12), (Material::Wood, 5)],
+            Self::Stores => vec![(Material::Wood, 10), (Material::Stone, 5)],
+            Self::Workshop => vec![(Material::Wood, 7), (Material::Stone, 4), (Material::Herbs, 3)],
+            Self::Garden => vec![(Material::Wood, 6)],
+            Self::Watchtower => vec![(Material::Wood, 8), (Material::Stone, 8)],
             Self::WardPost => vec![(Material::Stone, 2), (Material::Herbs, 3)],
             Self::Wall => vec![(Material::Stone, 3)],
-            Self::Gate => vec![(Material::Wood, 3), (Material::Stone, 1)],
+            Self::Gate => vec![(Material::Wood, 4), (Material::Stone, 2)],
         }
     }
 
-    /// Default size in tiles.
+    /// Default size in tiles (width, height).
     pub fn default_size(self) -> (i32, i32) {
         match self {
-            Self::Den | Self::Hearth | Self::Stores | Self::Workshop => (2, 2),
-            Self::Garden => (3, 3),
-            Self::Watchtower | Self::WardPost | Self::Wall | Self::Gate => (1, 1),
+            Self::Den | Self::Workshop => (3, 3),
+            Self::Hearth | Self::Stores => (4, 3),
+            Self::Garden => (6, 5),
+            Self::Watchtower => (2, 3),
+            Self::Gate => (2, 1),
+            Self::WardPost | Self::Wall => (1, 1),
         }
     }
 
@@ -159,6 +162,14 @@ impl Structure {
         }
     }
 
+    /// Center tile position given the building's anchor (top-left) position.
+    pub fn center(&self, anchor: &Position) -> Position {
+        Position::new(
+            anchor.x + self.size.0 / 2,
+            anchor.y + self.size.1 / 2,
+        )
+    }
+
     /// Effectiveness multiplier based on condition.
     ///
     /// - condition > 0.5 → 1.0 (full effect)
@@ -255,9 +266,9 @@ impl StoredItems {
     /// Maximum number of items this building type can hold.
     pub fn capacity(kind: StructureType) -> usize {
         match kind {
-            StructureType::Stores => 30,
-            StructureType::Den => 5,
-            StructureType::Workshop => 10,
+            StructureType::Stores => 50,
+            StructureType::Den => 8,
+            StructureType::Workshop => 15,
             _ => 0,
         }
     }
@@ -318,7 +329,7 @@ mod tests {
             kind: StructureType::Den,
             condition: 0.8,
             cleanliness: 1.0,
-            size: (2, 2),
+            size: StructureType::Den.default_size(),
         };
         assert_eq!(s.effectiveness(), 1.0);
     }
@@ -329,7 +340,7 @@ mod tests {
             kind: StructureType::Den,
             condition: 0.5,
             cleanliness: 1.0,
-            size: (2, 2),
+            size: StructureType::Den.default_size(),
         };
         assert_eq!(s.effectiveness(), 1.0);
     }
@@ -340,7 +351,7 @@ mod tests {
             kind: StructureType::Den,
             condition: 0.35,
             cleanliness: 1.0,
-            size: (2, 2),
+            size: StructureType::Den.default_size(),
         };
         let expected = (0.35 - 0.2) / 0.3;
         assert!((s.effectiveness() - expected).abs() < 1e-6);
@@ -352,7 +363,7 @@ mod tests {
             kind: StructureType::Den,
             condition: 0.2,
             cleanliness: 1.0,
-            size: (2, 2),
+            size: StructureType::Den.default_size(),
         };
         assert_eq!(s.effectiveness(), 0.0);
     }
@@ -363,7 +374,7 @@ mod tests {
             kind: StructureType::Den,
             condition: 0.1,
             cleanliness: 1.0,
-            size: (2, 2),
+            size: StructureType::Den.default_size(),
         };
         assert_eq!(s.effectiveness(), 0.0);
     }
@@ -374,7 +385,7 @@ mod tests {
             kind: StructureType::Den,
             condition: 0.0,
             cleanliness: 1.0,
-            size: (2, 2),
+            size: StructureType::Den.default_size(),
         };
         assert_eq!(s.effectiveness(), 0.0);
     }
@@ -422,9 +433,9 @@ mod tests {
     #[test]
     fn deliver_fills_materials() {
         let mut site = ConstructionSite::new(StructureType::Garden);
-        // Garden needs Wood × 2
+        // Garden needs Wood × 6
         assert!(!site.materials_complete());
-        site.deliver(Material::Wood, 2);
+        site.deliver(Material::Wood, 6);
         assert!(site.materials_complete());
     }
 
@@ -432,7 +443,7 @@ mod tests {
     fn deliver_clamps_to_needed() {
         let mut site = ConstructionSite::new(StructureType::Garden);
         site.deliver(Material::Wood, 100);
-        assert_eq!(site.materials_delivered[0].1, 2); // only needed 2
+        assert_eq!(site.materials_delivered[0].1, 6); // only needed 6
     }
 
     // --- build_chain ---
@@ -481,13 +492,13 @@ mod tests {
     // --- StoredItems ---
 
     #[test]
-    fn stores_has_capacity_30() {
-        assert_eq!(StoredItems::capacity(StructureType::Stores), 30);
+    fn stores_has_capacity_50() {
+        assert_eq!(StoredItems::capacity(StructureType::Stores), 50);
     }
 
     #[test]
-    fn den_has_capacity_5() {
-        assert_eq!(StoredItems::capacity(StructureType::Den), 5);
+    fn den_has_capacity_8() {
+        assert_eq!(StoredItems::capacity(StructureType::Den), 8);
     }
 
     #[test]

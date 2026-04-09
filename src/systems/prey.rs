@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use bevy_ecs::prelude::*;
 use rand::Rng;
 
-use crate::components::physical::{Health, Position};
-use crate::components::prey::{PreyAnimal, PreySpecies};
+use crate::components::physical::{Dead, Health, Position};
+use crate::components::prey::{PreyAiState, PreyAnimal, PreySpecies};
 use crate::resources::map::{Terrain, TileMap};
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::rng::SimRng;
@@ -26,6 +26,116 @@ pub fn find_habitat_tile(species: PreySpecies, map: &TileMap, rng: &mut SimRng) 
         }
     }
     None
+}
+
+// ---------------------------------------------------------------------------
+// prey_ai system
+// ---------------------------------------------------------------------------
+
+/// Advance the AI state machine for all living prey animals.
+///
+/// States: Idle → Grazing (random wander), Fleeing (run from threat).
+/// Movement cadence and terrain checks mirror the wildlife patrol pattern.
+pub fn prey_ai(
+    mut query: Query<(&mut PreyAnimal, &mut Position), Without<Dead>>,
+    positions: Query<&Position, Without<PreyAnimal>>,
+    map: Res<TileMap>,
+    mut rng: ResMut<SimRng>,
+) {
+    for (mut animal, mut pos) in &mut query {
+        match animal.ai_state {
+            PreyAiState::Idle => {
+                // 5% chance per tick to start grazing in a random direction.
+                if rng.rng.random::<f32>() < 0.05 {
+                    let dx = rng.rng.random_range(-1i32..=1);
+                    let dy = rng.rng.random_range(-1i32..=1);
+                    if dx != 0 || dy != 0 {
+                        animal.ai_state = PreyAiState::Grazing { dx, dy, ticks: 0 };
+                    }
+                }
+            }
+
+            PreyAiState::Grazing { mut dx, mut dy, ticks } => {
+                let new_ticks = ticks + 1;
+
+                // 10% chance to jitter direction.
+                if rng.rng.random::<f32>() < 0.1 {
+                    let jdx = rng.rng.random_range(-1i32..=1);
+                    let jdy = rng.rng.random_range(-1i32..=1);
+                    if jdx != 0 || jdy != 0 {
+                        dx = jdx;
+                        dy = jdy;
+                    }
+                }
+
+                // Move 1 tile every 3 ticks.
+                if new_ticks % 3 == 0 {
+                    let nx = pos.x + dx;
+                    let ny = pos.y + dy;
+                    let habitat = animal.species.habitat();
+
+                    if map.in_bounds(nx, ny) && habitat.contains(&map.get(nx, ny).terrain) {
+                        pos.x = nx;
+                        pos.y = ny;
+                    } else {
+                        // Reverse direction.
+                        dx = -dx;
+                        dy = -dy;
+                        let rx = pos.x + dx;
+                        let ry = pos.y + dy;
+                        if map.in_bounds(rx, ry) && habitat.contains(&map.get(rx, ry).terrain) {
+                            pos.x = rx;
+                            pos.y = ry;
+                        }
+                    }
+                }
+
+                if new_ticks >= 20 {
+                    animal.ai_state = PreyAiState::Idle;
+                } else {
+                    animal.ai_state = PreyAiState::Grazing { dx, dy, ticks: new_ticks };
+                }
+            }
+
+            PreyAiState::Fleeing { from, ticks } => {
+                let new_ticks = ticks + 1;
+
+                // Check if the threat still exists and is nearby.
+                let threat_pos = positions.get(from).ok();
+                let should_stop = new_ticks >= 15
+                    || threat_pos.is_none()
+                    || threat_pos
+                        .map(|tp| pos.manhattan_distance(tp) > 10)
+                        .unwrap_or(true);
+
+                if should_stop {
+                    animal.ai_state = PreyAiState::Idle;
+                } else {
+                    let tp = threat_pos.unwrap();
+                    // Flee: move in the opposite direction of the threat.
+                    let dx = (pos.x - tp.x).signum();
+                    let dy = (pos.y - tp.y).signum();
+
+                    // Try diagonal, then cardinals.
+                    let candidates = [
+                        (pos.x + dx, pos.y + dy),
+                        (pos.x + dx, pos.y),
+                        (pos.x, pos.y + dy),
+                    ];
+
+                    for (nx, ny) in candidates {
+                        if map.in_bounds(nx, ny) && map.get(nx, ny).terrain.is_passable() {
+                            pos.x = nx;
+                            pos.y = ny;
+                            break;
+                        }
+                    }
+
+                    animal.ai_state = PreyAiState::Fleeing { from, ticks: new_ticks };
+                }
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -281,6 +391,73 @@ mod tests {
         assert!(
             count <= 30,
             "mice at cap should not exceed 30, got {count}"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // prey_ai tests
+    // -----------------------------------------------------------------------
+
+    fn setup_ai() -> (World, Schedule) {
+        let mut world = World::new();
+        let map = TileMap::new(20, 20, Terrain::Grass);
+        world.insert_resource(map);
+        world.insert_resource(SimRng::new(42));
+        let mut schedule = Schedule::default();
+        schedule.add_systems(prey_ai);
+        (world, schedule)
+    }
+
+    #[test]
+    fn prey_grazes_and_moves() {
+        let (mut world, mut schedule) = setup_ai();
+
+        let start = Position::new(10, 10);
+        let mut prey = PreyAnimal::new(PreySpecies::Mouse);
+        prey.ai_state = PreyAiState::Grazing { dx: 1, dy: 0, ticks: 0 };
+        world.spawn((prey, Health::default(), start));
+
+        for _ in 0..20 {
+            schedule.run(&mut world);
+        }
+
+        let final_pos = *world.query::<&Position>().single(&world).unwrap();
+        assert!(
+            final_pos != start,
+            "prey should have moved from {start:?} after 20 ticks of grazing, still at {final_pos:?}"
+        );
+    }
+
+    #[test]
+    fn prey_flees_from_threat() {
+        let (mut world, mut schedule) = setup_ai();
+
+        // Threat at (5, 5).
+        let threat = world.spawn(Position::new(5, 5)).id();
+
+        // Prey at (7, 7), fleeing from threat.
+        let start = Position::new(7, 7);
+        let mut prey = PreyAnimal::new(PreySpecies::Mouse);
+        prey.ai_state = PreyAiState::Fleeing { from: threat, ticks: 0 };
+        world.spawn((prey, Health::default(), start));
+
+        for _ in 0..10 {
+            schedule.run(&mut world);
+        }
+
+        let final_pos = *world
+            .query_filtered::<&Position, With<PreyAnimal>>()
+            .single(&world)
+            .unwrap();
+
+        // Prey should have moved away — its manhattan distance from the threat
+        // should be strictly greater than the starting distance of 4.
+        let threat_pos = Position::new(5, 5);
+        let start_dist = start.manhattan_distance(&threat_pos);
+        let end_dist = final_pos.manhattan_distance(&threat_pos);
+        assert!(
+            end_dist > start_dist,
+            "prey should flee away from threat: start_dist={start_dist}, end_dist={end_dist}, final_pos={final_pos:?}"
         );
     }
 }

@@ -1,9 +1,9 @@
 use bevy::prelude::*;
 
 use crate::rendering::ui::{TEXT_COLOR, UiRoot};
+use crate::resources::time::DayPhase;
+use crate::resources::weather::WeatherState;
 use crate::resources::{SimConfig, TimeState};
-use crate::components::identity::Species;
-use crate::components::physical::Dead;
 
 /// Marker for the status bar.
 #[derive(Component)]
@@ -58,20 +58,26 @@ pub fn setup_status_bar(
 pub fn update_status_bar(
     time_state: Res<TimeState>,
     config: Res<SimConfig>,
+    weather: Res<WeatherState>,
     mut text_query: Query<&mut Text, With<StatusText>>,
-    living_cats: Query<(), (With<Species>, Without<Dead>)>,
 ) {
     let Ok(mut text) = text_query.single_mut() else { return };
 
     let day = TimeState::day_number(time_state.tick, &config);
     let season = time_state.season(&config);
+    let phase = DayPhase::from_tick(time_state.tick, &config);
     let speed_label = time_state.speed.label();
-    let cat_count = living_cats.iter().count();
 
-    let pause_str = if time_state.paused { " ⏸ PAUSED" } else { "" };
+    let pause_str = if time_state.paused { " PAUSED" } else { "" };
 
     **text = format!(
-        "Day {} | {} | Speed: {} | Cats: {}{} | [P]ause []] Speed [L]og [Tab] Inspect [Esc] Close",
-        day, season.label(), speed_label, cat_count, pause_str,
+        "Day {} | {} {} | {} {} | Speed: {}{} | [P]ause []] Speed [L]og [R]oster [I]nventory [Tab] Inspect",
+        day,
+        season.label(),
+        phase.label(),
+        weather.current.symbol(),
+        weather.current.label(),
+        speed_label,
+        pause_str,
     );
 }

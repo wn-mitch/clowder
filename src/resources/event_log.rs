@@ -59,6 +59,17 @@ pub enum EventKind {
         capacity: f32,
         fraction: f32,
     },
+    PopulationSnapshot {
+        mice: usize,
+        rats: usize,
+        fish: usize,
+        birds: usize,
+    },
+    PositionTrace {
+        cat: String,
+        position: (i32, i32),
+        action: Action,
+    },
     CoordinatorElected {
         cat: String,
         social_weight: f32,

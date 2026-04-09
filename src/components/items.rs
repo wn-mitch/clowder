@@ -110,16 +110,19 @@ impl ItemKind {
 
     /// Hunger satisfaction provided when consumed (0.0–1.0 scale).
     /// Non-food items return 0.0.
+    ///
+    /// Tuned so a single hunt feeds a cat for days. Hunted prey is a real
+    /// meal (0.5–0.8); foraged plants are snacks (0.20).
     pub fn food_value(self) -> f32 {
         match self {
-            Self::RawRat => 0.4,
-            Self::RawMouse => 0.25,
-            Self::RawFish => 0.35,
-            Self::RawBird => 0.3,
-            Self::Berries => 0.15,
-            Self::Nuts => 0.15,
-            Self::Roots | Self::Mushroom => 0.15,
-            Self::WildOnion => 0.1,
+            Self::RawRat => 0.8,
+            Self::RawMouse => 0.5,
+            Self::RawFish => 0.7,
+            Self::RawBird => 0.6,
+            Self::Berries => 0.2,
+            Self::Nuts => 0.2,
+            Self::Roots | Self::Mushroom => 0.2,
+            Self::WildOnion => 0.2,
             _ => 0.0,
         }
     }

@@ -1,9 +1,12 @@
 mod cat_inspect;
+mod cat_roster;
 mod log_panel;
 pub mod panel;
+mod resource_panel;
 mod selection;
 mod status_bar;
 mod tile_inspect;
+mod wildlife_inspect;
 
 use bevy::prelude::*;
 
@@ -23,7 +26,10 @@ impl Plugin for UiPlugin {
                     log_panel::setup_log_panel,
                     status_bar::setup_status_bar,
                     cat_inspect::setup_cat_inspect_panel,
+                    cat_roster::setup_cat_roster,
                     tile_inspect::setup_tile_inspect,
+                    resource_panel::setup_resource_panel,
+                    wildlife_inspect::setup_wildlife_inspect,
                 )
                     .chain()
                     .after(crate::plugins::setup::setup_world_exclusive),
@@ -38,7 +44,11 @@ impl Plugin for UiPlugin {
                     log_panel::update_log_panel,
                     status_bar::update_status_bar,
                     cat_inspect::update_cat_inspect_panel,
+                    cat_roster::update_cat_roster,
+                    cat_roster::handle_roster_clicks,
                     tile_inspect::update_tile_inspect,
+                    resource_panel::update_resource_panel,
+                    wildlife_inspect::update_wildlife_inspect,
                 )
                     .chain(),
             );
@@ -54,6 +64,8 @@ pub struct UiRoot;
 pub struct PanelVisibility {
     pub log: bool,
     pub status_bar: bool,
+    pub roster: bool,
+    pub resource_panel: bool,
 }
 
 impl Default for PanelVisibility {
@@ -61,6 +73,8 @@ impl Default for PanelVisibility {
         Self {
             log: true,
             status_bar: true,
+            roster: true,
+            resource_panel: true,
         }
     }
 }
@@ -90,7 +104,14 @@ fn setup_ui_root(mut commands: Commands) {
 fn toggle_panel_visibility(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut panel_vis: ResMut<PanelVisibility>,
-    mut log_query: Query<&mut Visibility, With<log_panel::LogPanel>>,
+    mut log_query: Query<
+        &mut Visibility,
+        (With<log_panel::LogPanel>, Without<cat_roster::CatRoster>, Without<resource_panel::ResourcePanel>),
+    >,
+    mut roster_query: Query<
+        &mut Visibility,
+        (With<cat_roster::CatRoster>, Without<log_panel::LogPanel>, Without<resource_panel::ResourcePanel>),
+    >,
 ) {
     if keyboard.just_pressed(KeyCode::KeyL) {
         panel_vis.log = !panel_vis.log;
@@ -101,5 +122,20 @@ fn toggle_panel_visibility(
                 Visibility::Hidden
             };
         }
+    }
+
+    if keyboard.just_pressed(KeyCode::KeyR) {
+        panel_vis.roster = !panel_vis.roster;
+        for mut vis in &mut roster_query {
+            *vis = if panel_vis.roster {
+                Visibility::Inherited
+            } else {
+                Visibility::Hidden
+            };
+        }
+    }
+
+    if keyboard.just_pressed(KeyCode::KeyI) {
+        panel_vis.resource_panel = !panel_vis.resource_panel;
     }
 }

@@ -38,17 +38,19 @@ impl DispositionKind {
     /// How many sub-outcomes (deposit trips, social interactions, tiles surveyed)
     /// this disposition targets before clearing. Personality-scaled.
     pub fn target_completions(&self, personality: &Personality) -> u32 {
-        match self {
+        let base = match self {
             Self::Hunting => 1 + (personality.diligence * 2.0).round() as u32,
             Self::Foraging => 1 + (personality.diligence * 2.0).round() as u32,
             Self::Exploring => 2 + (personality.curiosity * 3.0).round() as u32,
             Self::Guarding => 1 + (personality.boldness * 2.0).round() as u32,
-            Self::Socializing => 1 + (personality.sociability * 2.0).round() as u32,
+            Self::Socializing => 1 + (personality.sociability * 2.0 + personality.playfulness * 1.0).round() as u32,
             // Chain-driven dispositions complete when their chain finishes.
             Self::Building | Self::Farming | Self::Crafting | Self::Coordinating => 1,
             // Resting completes on need thresholds, not count.
-            Self::Resting => u32::MAX,
-        }
+            Self::Resting => return u32::MAX,
+        };
+        // Patience adds to all non-Resting dispositions: patient cats commit longer.
+        base + (personality.patience * 1.0).round() as u32
     }
 
     /// Maps each action to the disposition that contains it.
@@ -178,6 +180,10 @@ pub struct ActionRecord {
 #[derive(Component, Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct ActionHistory {
     pub entries: Vec<ActionRecord>,
+    /// Tracks the last disposition narrated for this cat to suppress repeated
+    /// "heads out to hunt" messages when the same disposition is chosen again.
+    #[serde(skip, default)]
+    pub last_narrated_disposition: Option<DispositionKind>,
 }
 
 impl ActionHistory {
@@ -224,10 +230,35 @@ mod tests {
 
     #[test]
     fn target_completions_scales_with_personality() {
+        // patience=0.5 adds (0.5*1.0).round()=1 to all non-Resting dispositions.
         let lazy = Personality { diligence: 0.0, ..test_personality() };
         let diligent = Personality { diligence: 1.0, ..test_personality() };
-        assert_eq!(DispositionKind::Hunting.target_completions(&lazy), 1);
-        assert_eq!(DispositionKind::Hunting.target_completions(&diligent), 3);
+        assert_eq!(DispositionKind::Hunting.target_completions(&lazy), 2);  // 1 + patience(1)
+        assert_eq!(DispositionKind::Hunting.target_completions(&diligent), 4); // 3 + patience(1)
+    }
+
+    #[test]
+    fn patience_increases_target_completions() {
+        let impatient = Personality { patience: 0.0, ..test_personality() };
+        let patient = Personality { patience: 1.0, ..test_personality() };
+        let impatient_target = DispositionKind::Hunting.target_completions(&impatient);
+        let patient_target = DispositionKind::Hunting.target_completions(&patient);
+        assert!(
+            patient_target > impatient_target,
+            "patient cat should have more target completions; patient={patient_target}, impatient={impatient_target}"
+        );
+    }
+
+    #[test]
+    fn playfulness_increases_socializing_target() {
+        let boring = Personality { playfulness: 0.0, ..test_personality() };
+        let playful = Personality { playfulness: 1.0, ..test_personality() };
+        let boring_target = DispositionKind::Socializing.target_completions(&boring);
+        let playful_target = DispositionKind::Socializing.target_completions(&playful);
+        assert!(
+            playful_target > boring_target,
+            "playful cat should socialize longer; playful={playful_target}, boring={boring_target}"
+        );
     }
 
     #[test]

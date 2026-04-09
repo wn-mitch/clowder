@@ -163,10 +163,11 @@ fn roll_age_seasons(rng: &mut impl Rng) -> u64 {
 fn generate_cat(name: String, born_tick: u64, ticks_per_season: u64, rng: &mut impl Rng) -> CatBlueprint {
     let gender = roll_gender(rng);
     let orientation = roll_orientation(rng);
-    let personality = Personality::random(rng);
+    let mut personality = Personality::random(rng);
+    let appearance = roll_appearance(rng);
+    apply_fur_color_bias(&mut personality, &appearance.fur_color, rng);
     let magic_affinity = roll_magic_affinity(rng);
     let skills = roll_skills(&personality, magic_affinity, rng);
-    let appearance = roll_appearance(rng);
     let birth_season = born_tick / ticks_per_season;
     let zodiac_sign = ZodiacSign::from_season(birth_season, rng);
 
@@ -255,6 +256,56 @@ fn roll_appearance(rng: &mut impl Rng) -> Appearance {
 }
 
 // ---------------------------------------------------------------------------
+// Fur-color personality biases
+// ---------------------------------------------------------------------------
+
+/// Shift personality axes based on fur color, adding per-trait jitter so
+/// same-color cats aren't clones.
+fn apply_fur_color_bias(personality: &mut Personality, fur_color: &str, rng: &mut impl Rng) {
+    match fur_color {
+        "ginger" => apply_ginger_bias(personality, rng),
+        "calico" => apply_calico_bias(personality, rng),
+        "black" => apply_black_bias(personality, rng),
+        _ => {}
+    }
+}
+
+/// Per-trait jitter so same-color cats aren't personality clones.
+fn jitter(rng: &mut impl Rng) -> f32 {
+    rng.random_range(-0.05_f32..0.05)
+}
+
+/// Ginger cats: dumber and crazier — bold, impulsive, short-tempered, fearless.
+fn apply_ginger_bias(p: &mut Personality, rng: &mut impl Rng) {
+    p.patience = (p.patience - 0.15 + jitter(rng)).clamp(0.0, 1.0);
+    p.diligence = (p.diligence - 0.15 + jitter(rng)).clamp(0.0, 1.0);
+    p.boldness = (p.boldness + 0.15 + jitter(rng)).clamp(0.0, 1.0);
+    p.curiosity = (p.curiosity + 0.12 + jitter(rng)).clamp(0.0, 1.0);
+    p.playfulness = (p.playfulness + 0.15 + jitter(rng)).clamp(0.0, 1.0);
+    p.temper = (p.temper + 0.10 + jitter(rng)).clamp(0.0, 1.0);
+    p.anxiety = (p.anxiety - 0.12 + jitter(rng)).clamp(0.0, 1.0);
+}
+
+/// Calico cats: demure — warm, patient, traditional, less aggressive.
+fn apply_calico_bias(p: &mut Personality, rng: &mut impl Rng) {
+    p.warmth = (p.warmth + 0.12 + jitter(rng)).clamp(0.0, 1.0);
+    p.patience = (p.patience + 0.10 + jitter(rng)).clamp(0.0, 1.0);
+    p.tradition = (p.tradition + 0.10 + jitter(rng)).clamp(0.0, 1.0);
+    p.boldness = (p.boldness - 0.10 + jitter(rng)).clamp(0.0, 1.0);
+    p.temper = (p.temper - 0.10 + jitter(rng)).clamp(0.0, 1.0);
+    p.ambition = (p.ambition - 0.08 + jitter(rng)).clamp(0.0, 1.0);
+}
+
+/// Black cats: skittish and wiry — anxious, curious, independent, avoids crowds.
+fn apply_black_bias(p: &mut Personality, rng: &mut impl Rng) {
+    p.anxiety = (p.anxiety + 0.12 + jitter(rng)).clamp(0.0, 1.0);
+    p.curiosity = (p.curiosity + 0.10 + jitter(rng)).clamp(0.0, 1.0);
+    p.independence = (p.independence + 0.12 + jitter(rng)).clamp(0.0, 1.0);
+    p.boldness = (p.boldness - 0.10 + jitter(rng)).clamp(0.0, 1.0);
+    p.sociability = (p.sociability - 0.10 + jitter(rng)).clamp(0.0, 1.0);
+}
+
+// ---------------------------------------------------------------------------
 // Starting buildings
 // ---------------------------------------------------------------------------
 
@@ -273,10 +324,11 @@ fn stamp_footprint(map: &mut TileMap, anchor: Position, terrain: Terrain, size: 
 
 /// Place starting building terrain tiles and spawn corresponding entities.
 ///
-/// Creates a Hearth at the colony center, a Den three tiles west, and Stores
-/// three tiles east. Each gets both a terrain footprint (for rendering) and an
-/// ECS entity with `Structure` + `Position` + `Name` (for mechanical effects).
-/// The anchor position is the top-left corner of the footprint.
+/// Creates a Hearth at the colony center, a Den to its west, and Stores to
+/// its east, each separated by a 1-tile walkable gap. Each gets both a terrain
+/// footprint (for rendering) and an ECS entity with `Structure` + `Position` +
+/// `Name` (for mechanical effects). The anchor position is the top-left corner
+/// of the footprint.
 pub fn spawn_starting_buildings(world: &mut World, colony_site: Position, map: &mut TileMap) {
     let hearth_pos = colony_site;
     let den_size = StructureType::Den.default_size();
@@ -314,7 +366,7 @@ pub fn spawn_starting_buildings(world: &mut World, colony_site: Position, map: &
 
     // Seed starting food supply. A mix of foraged and hunted items to give
     // the colony a buffer while cats establish hunting/foraging routines.
-    // 30 items = Stores capacity. Prioritize high-value items for initial buffer.
+    // 30 items (~60% of Stores capacity). Prioritize high-value items.
     let starting_food: &[ItemKind] = &[
         ItemKind::RawRat, ItemKind::RawRat, ItemKind::RawRat,
         ItemKind::RawRat, ItemKind::RawRat, ItemKind::RawRat,
@@ -433,30 +485,102 @@ mod tests {
     }
 
     #[test]
+    fn ginger_cats_have_shifted_personality() {
+        let mut r = rng(42);
+        let mut bold_sum = 0.0f64;
+        let mut patience_sum = 0.0f64;
+        let n = 100;
+        for _ in 0..n {
+            let mut p = Personality::random(&mut r);
+            apply_fur_color_bias(&mut p, "ginger", &mut r);
+            bold_sum += p.boldness as f64;
+            patience_sum += p.patience as f64;
+        }
+        let bold_mean = bold_sum / n as f64;
+        let patience_mean = patience_sum / n as f64;
+        assert!(bold_mean > 0.55, "ginger boldness mean {bold_mean} should be above 0.55");
+        assert!(patience_mean < 0.45, "ginger patience mean {patience_mean} should be below 0.45");
+    }
+
+    #[test]
+    fn calico_cats_are_demure() {
+        let mut r = rng(42);
+        let mut warmth_sum = 0.0f64;
+        let mut boldness_sum = 0.0f64;
+        let n = 100;
+        for _ in 0..n {
+            let mut p = Personality::random(&mut r);
+            apply_fur_color_bias(&mut p, "calico", &mut r);
+            warmth_sum += p.warmth as f64;
+            boldness_sum += p.boldness as f64;
+        }
+        let warmth_mean = warmth_sum / n as f64;
+        let boldness_mean = boldness_sum / n as f64;
+        assert!(warmth_mean > 0.55, "calico warmth mean {warmth_mean} should be above 0.55");
+        assert!(boldness_mean < 0.45, "calico boldness mean {boldness_mean} should be below 0.45");
+    }
+
+    #[test]
+    fn black_cats_are_skittish() {
+        let mut r = rng(42);
+        let mut anxiety_sum = 0.0f64;
+        let mut sociability_sum = 0.0f64;
+        let n = 100;
+        for _ in 0..n {
+            let mut p = Personality::random(&mut r);
+            apply_fur_color_bias(&mut p, "black", &mut r);
+            anxiety_sum += p.anxiety as f64;
+            sociability_sum += p.sociability as f64;
+        }
+        let anxiety_mean = anxiety_sum / n as f64;
+        let sociability_mean = sociability_sum / n as f64;
+        assert!(anxiety_mean > 0.55, "black anxiety mean {anxiety_mean} should be above 0.55");
+        assert!(sociability_mean < 0.45, "black sociability mean {sociability_mean} should be below 0.45");
+    }
+
+    #[test]
+    fn unbiased_colors_unaffected() {
+        let mut r = rng(42);
+        let p_before = Personality::random(&mut r);
+        let mut p_after = p_before.clone();
+        apply_fur_color_bias(&mut p_after, "gray", &mut r);
+        assert_eq!(p_before, p_after, "gray cats should not have personality bias");
+    }
+
+    #[test]
     fn starting_buildings_fill_footprint() {
         use crate::components::building::StructureType;
-        let mut map = grass_map(100, 100);
+        let mut map = grass_map(120, 90);
         let mut world = bevy_ecs::world::World::new();
-        let center = Position::new(50, 50);
+        let center = Position::new(60, 45);
         spawn_starting_buildings(&mut world, center, &mut map);
 
-        // Hearth at center, 2×2.
+        let den_size = StructureType::Den.default_size();
         let hearth_size = StructureType::Hearth.default_size();
+        let stores_size = StructureType::Stores.default_size();
+
+        // Derive positions the same way spawn_starting_buildings does.
+        let hearth_pos = center;
+        let den_pos = Position::new(center.x - den_size.0 - 1, center.y);
+        let stores_pos = Position::new(
+            (center.x + hearth_size.0 + 1).min(map.width - stores_size.0),
+            center.y,
+        );
+
+        // Hearth at center.
         for dy in 0..hearth_size.1 {
             for dx in 0..hearth_size.0 {
                 assert_eq!(
-                    map.get(center.x + dx, center.y + dy).terrain,
+                    map.get(hearth_pos.x + dx, hearth_pos.y + dy).terrain,
                     Terrain::Hearth,
                     "Hearth tile at ({}, {}) not set",
-                    center.x + dx,
-                    center.y + dy,
+                    hearth_pos.x + dx,
+                    hearth_pos.y + dy,
                 );
             }
         }
 
-        // Den west of hearth, 2×2.
-        let den_pos = Position::new(center.x - 2 - 1, center.y);
-        let den_size = StructureType::Den.default_size();
+        // Den west of hearth.
         for dy in 0..den_size.1 {
             for dx in 0..den_size.0 {
                 assert_eq!(
@@ -469,9 +593,7 @@ mod tests {
             }
         }
 
-        // Stores east of hearth, 2×2.
-        let stores_pos = Position::new(center.x + hearth_size.0 + 1, center.y);
-        let stores_size = StructureType::Stores.default_size();
+        // Stores east of hearth.
         for dy in 0..stores_size.1 {
             for dx in 0..stores_size.0 {
                 assert_eq!(

@@ -1,8 +1,9 @@
 use bevy_ecs::prelude::*;
 
+use crate::components::building::StructureType;
 use crate::components::coordination::{
-    ActiveDirective, Coordinator, CoordinatorDied, Directive, DirectiveKind, DirectiveQueue,
-    PendingDelivery,
+    ActiveDirective, BuildPressure, Coordinator, CoordinatorDied, Directive, DirectiveKind,
+    DirectiveQueue, PendingDelivery,
 };
 use crate::components::identity::Name;
 use crate::components::mental::{Memory, MemoryType};
@@ -71,7 +72,8 @@ pub fn evaluate_coordinators(
         .iter()
         .map(|(entity, personality, memory, name)| {
             let sw = social_weight(entity, &relationships, memory);
-            let score = sw * personality.diligence * personality.sociability;
+            let score = sw * personality.diligence * personality.sociability
+                * (1.0 + personality.ambition * 0.3);
             (entity, score, name.0.clone())
         })
         .filter(|(_, score, _)| *score >= threshold)
@@ -92,6 +94,7 @@ pub fn evaluate_coordinators(
         if !new_set.contains(&entity) {
             commands.entity(entity).remove::<Coordinator>();
             commands.entity(entity).remove::<DirectiveQueue>();
+            commands.entity(entity).remove::<BuildPressure>();
             commands.entity(entity).remove::<PendingDelivery>();
         }
     }
@@ -103,7 +106,7 @@ pub fn evaluate_coordinators(
         if existing_coordinators.get(*entity).is_err() {
             commands
                 .entity(*entity)
-                .insert((Coordinator, DirectiveQueue::default()));
+                .insert((Coordinator, DirectiveQueue::default(), BuildPressure::default()));
             new_coordinator_names.push(name.as_str());
             if let Some(ref mut elog) = event_log {
                 elog.push(time.tick, crate::resources::event_log::EventKind::CoordinatorElected {
@@ -203,6 +206,7 @@ pub fn assess_colony_needs(
                 priority,
                 target_entity: None,
                 target_position: None,
+                blueprint: None,
             });
             // Also queue forage if food is critically low.
             if food_fraction < food_threshold * 0.5 {
@@ -211,6 +215,7 @@ pub fn assess_colony_needs(
                     priority: priority * 0.8,
                     target_entity: None,
                     target_position: None,
+                    blueprint: None,
                 });
             }
         }
@@ -222,12 +227,14 @@ pub fn assess_colony_needs(
                 priority: 0.8,
                 target_entity: None,
                 target_position: None,
+                blueprint: None,
             });
             queue.directives.push(Directive {
                 kind: DirectiveKind::Patrol,
                 priority: 0.5,
                 target_entity: None,
                 target_position: None,
+                blueprint: None,
             });
         }
 
@@ -247,6 +254,7 @@ pub fn assess_colony_needs(
                 priority,
                 target_entity: Some(build_entity),
                 target_position: Some(*build_pos),
+                blueprint: None,
             });
             let _ = structure; // used indirectly via condition filter
         }
@@ -259,6 +267,7 @@ pub fn assess_colony_needs(
                 priority,
                 target_entity: None,
                 target_position: None,
+                blueprint: None,
             });
         }
 
@@ -269,6 +278,7 @@ pub fn assess_colony_needs(
                 priority: 0.5,
                 target_entity: None,
                 target_position: None,
+                blueprint: None,
             });
         }
 
@@ -332,6 +342,170 @@ pub fn expire_directives(
         if current.action != crate::ai::Action::Coordinate {
             commands.entity(entity).remove::<PendingDelivery>();
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// accumulate_build_pressure
+// ---------------------------------------------------------------------------
+
+/// Evaluate colony infrastructure gaps and accumulate build pressure on each
+/// coordinator. When pressure exceeds the coordinator's action threshold
+/// (derived from attentiveness), issue a Build directive for new construction.
+///
+/// Runs on the same 20-tick cadence as `assess_colony_needs`.
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
+pub fn accumulate_build_pressure(
+    time: Res<TimeState>,
+    food: Res<crate::resources::food::FoodStores>,
+    mut coordinators: Query<
+        (Entity, &Name, &Personality, &Skills, &mut BuildPressure, &mut DirectiveQueue),
+        With<Coordinator>,
+    >,
+    cats: Query<(&Position, &crate::ai::CurrentAction), Without<Dead>>,
+    buildings: Query<(&crate::components::building::Structure, &Position)>,
+    stored_items_query: Query<(
+        &crate::components::building::Structure,
+        &crate::components::building::StoredItems,
+    )>,
+    wildlife: Query<&Position, With<crate::components::wildlife::WildAnimal>>,
+    mut log: ResMut<NarrativeLog>,
+) {
+    if !time.tick.is_multiple_of(20) {
+        return;
+    }
+
+    // Pre-compute colony state.
+    let has_structure = |kind: StructureType| -> bool {
+        buildings.iter().any(|(s, _)| s.kind == kind)
+    };
+
+    let stores_full = stored_items_query.iter().any(|(s, items)| {
+        s.kind == StructureType::Stores
+            && items.items.len() >= crate::components::building::StoredItems::capacity(StructureType::Stores)
+    });
+
+    // Cats sleeping without a Den nearby.
+    let unsheltered_sleepers = cats.iter().filter(|(cat_pos, action)| {
+        action.action == crate::ai::Action::Sleep
+            && !buildings.iter().any(|(s, bpos)| {
+                s.kind == StructureType::Den
+                    && cat_pos.manhattan_distance(&s.center(bpos)) <= 4
+            })
+    }).count();
+
+    let food_fraction = food.fraction();
+    let has_garden = has_structure(StructureType::Garden);
+    let has_workshop = has_structure(StructureType::Workshop);
+    let has_watchtower = has_structure(StructureType::Watchtower);
+
+    let skilled_crafters = cats.iter().count(); // simplified: count living cats as proxy
+    // Wildlife inside colony area (within ~15 tiles of any building).
+    let wildlife_breach = wildlife.iter().any(|wpos| {
+        buildings.iter().any(|(s, bpos)| {
+            wpos.manhattan_distance(&s.center(bpos)) <= 10
+        })
+    });
+
+    for (_entity, name, personality, skills, mut pressure, mut queue) in &mut coordinators {
+        let attentiveness =
+            personality.diligence * 0.5 + personality.ambition * 0.3 + (1.0 - personality.patience) * 0.2;
+        let rate = BuildPressure::BASE_RATE * attentiveness;
+        let threshold = 1.0 - attentiveness * 0.3;
+
+        // Storage pressure.
+        if stores_full {
+            pressure.storage += rate;
+        } else {
+            pressure.storage *= BuildPressure::DECAY;
+        }
+
+        // Shelter pressure.
+        if unsheltered_sleepers > 0 {
+            pressure.shelter += rate * unsheltered_sleepers as f32;
+        } else {
+            pressure.shelter *= BuildPressure::DECAY;
+        }
+
+        // Gathering pressure — low social despite Hearth existing.
+        // Simplified: if food is fine but we don't have social infrastructure.
+        // Full implementation would check avg social need of cats near hearth.
+        pressure.gathering *= BuildPressure::DECAY;
+
+        // Workshop pressure.
+        if !has_workshop && skilled_crafters >= 4 {
+            pressure.workshop += rate;
+        } else {
+            pressure.workshop *= BuildPressure::DECAY;
+        }
+
+        // Farming pressure.
+        if !has_garden && food_fraction < 0.3 {
+            pressure.farming += rate;
+        } else {
+            pressure.farming *= BuildPressure::DECAY;
+        }
+
+        // Defense pressure.
+        if wildlife_breach && !has_watchtower {
+            pressure.defense += rate;
+        } else {
+            pressure.defense *= BuildPressure::DECAY;
+        }
+
+        // Check if any pressure exceeds the action threshold.
+        if let Some(blueprint) = pressure.highest_actionable(threshold) {
+            // Only issue if there isn't already a Build directive with a blueprint
+            // in the queue (avoid spamming).
+            let already_queued = queue.directives.iter().any(|d| {
+                d.kind == DirectiveKind::Build && d.blueprint.is_some()
+            });
+            if !already_queued {
+                let priority = (0.5 + skills.building * 0.2).min(1.0);
+                queue.directives.push(Directive {
+                    kind: DirectiveKind::Build,
+                    priority,
+                    target_entity: None,
+                    target_position: None,
+                    blueprint: Some(blueprint),
+                });
+
+                log.push(
+                    time.tick,
+                    format!(
+                        "{} decides the colony needs a new {}.",
+                        name.0,
+                        structure_display_name(blueprint),
+                    ),
+                    NarrativeTier::Significant,
+                );
+
+                // Reset the channel that fired so it doesn't re-trigger next eval.
+                match blueprint {
+                    StructureType::Stores => pressure.storage = 0.0,
+                    StructureType::Den => pressure.shelter = 0.0,
+                    StructureType::Hearth => pressure.gathering = 0.0,
+                    StructureType::Workshop => pressure.workshop = 0.0,
+                    StructureType::Garden => pressure.farming = 0.0,
+                    StructureType::Watchtower => pressure.defense = 0.0,
+                    _ => {}
+                }
+            }
+        }
+    }
+}
+
+fn structure_display_name(kind: StructureType) -> &'static str {
+    match kind {
+        StructureType::Den => "den",
+        StructureType::Hearth => "hearth",
+        StructureType::Stores => "storehouse",
+        StructureType::Workshop => "workshop",
+        StructureType::Garden => "garden",
+        StructureType::Watchtower => "watchtower",
+        StructureType::WardPost => "ward post",
+        StructureType::Wall => "wall",
+        StructureType::Gate => "gate",
     }
 }
 
@@ -607,6 +781,100 @@ mod tests {
         assert!(
             unskilled_queue.directives.iter().any(|d| d.kind == DirectiveKind::Hunt),
             "unskilled coordinator should emit Hunt at 45% food"
+        );
+    }
+
+    // --- BuildPressure ---
+
+    #[test]
+    fn build_pressure_accumulates_when_signal_active() {
+        let mut pressure = BuildPressure::default();
+        let attentiveness = 0.8; // diligent, ambitious, impatient
+        let rate = BuildPressure::BASE_RATE * attentiveness;
+
+        // Simulate 50 evaluations with active storage signal.
+        for _ in 0..50 {
+            pressure.storage += rate;
+        }
+
+        assert!(
+            pressure.storage > 0.3,
+            "storage pressure should accumulate significantly after 50 evals (got {})",
+            pressure.storage,
+        );
+    }
+
+    #[test]
+    fn build_pressure_decays_when_signal_inactive() {
+        let mut pressure = BuildPressure::default();
+        pressure.storage = 0.5;
+
+        // Simulate 20 evaluations with no signal.
+        for _ in 0..20 {
+            pressure.storage *= BuildPressure::DECAY;
+        }
+
+        assert!(
+            pressure.storage < 0.2,
+            "storage pressure should decay substantially after 20 evals (got {})",
+            pressure.storage,
+        );
+    }
+
+    #[test]
+    fn attentive_coordinator_has_lower_action_threshold() {
+        let attentive = Personality {
+            diligence: 0.9,
+            ambition: 0.9,
+            patience: 0.1, // impatient → acts sooner
+            ..default_personality()
+        };
+        let inattentive = Personality {
+            diligence: 0.2,
+            ambition: 0.1,
+            patience: 0.9, // patient → deliberates longer
+            ..default_personality()
+        };
+
+        let attentive_val =
+            attentive.diligence * 0.5 + attentive.ambition * 0.3 + (1.0 - attentive.patience) * 0.2;
+        let inattentive_val =
+            inattentive.diligence * 0.5 + inattentive.ambition * 0.3 + (1.0 - inattentive.patience) * 0.2;
+
+        let attentive_threshold = 1.0 - attentive_val * 0.3;
+        let inattentive_threshold = 1.0 - inattentive_val * 0.3;
+
+        assert!(
+            attentive_threshold < inattentive_threshold,
+            "attentive coordinator threshold ({attentive_threshold}) should be lower than inattentive ({inattentive_threshold})"
+        );
+    }
+
+    #[test]
+    fn highest_actionable_returns_none_below_threshold() {
+        let pressure = BuildPressure {
+            storage: 0.3,
+            shelter: 0.2,
+            ..Default::default()
+        };
+        assert!(
+            pressure.highest_actionable(0.5).is_none(),
+            "no channel above threshold 0.5"
+        );
+    }
+
+    #[test]
+    fn highest_actionable_returns_highest_channel() {
+        let pressure = BuildPressure {
+            storage: 0.8,
+            shelter: 0.9,
+            ..Default::default()
+        };
+        let result = pressure.highest_actionable(0.5);
+        assert_eq!(
+            result,
+            Some(StructureType::Den),
+            "shelter (0.9) is highest above threshold"
         );
     }
 

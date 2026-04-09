@@ -2,11 +2,11 @@ use bevy_ecs::prelude::*;
 
 use crate::ai::pathfinding::step_toward;
 use crate::ai::CurrentAction;
-use crate::components::building::{ConstructionSite, CropState, Structure, StructureType};
+use crate::components::building::{ConstructionSite, CropState, StoredItems, Structure, StructureType};
+use crate::components::items::{Item, ItemKind, ItemLocation};
 use crate::components::physical::{Dead, Needs, Position};
 use crate::components::skills::Skills;
 use crate::components::task_chain::{StepKind, StepStatus, TaskChain};
-use crate::resources::food::FoodStores;
 use crate::resources::map::TileMap;
 use crate::resources::time::{Season, SimConfig, TimeState};
 
@@ -33,6 +33,7 @@ pub fn resolve_task_chains(
     >,
     mut buildings: Query<
         (
+            Entity,
             &mut Structure,
             Option<&mut ConstructionSite>,
             Option<&mut CropState>,
@@ -40,8 +41,8 @@ pub fn resolve_task_chains(
         ),
         Without<TaskChain>,
     >,
+    mut stored_items: Query<&mut StoredItems>,
     map: Res<TileMap>,
-    mut food: ResMut<FoodStores>,
     time: Res<TimeState>,
     config: Res<SimConfig>,
     mut commands: Commands,
@@ -67,13 +68,20 @@ pub fn resolve_task_chains(
         }
     }
 
+    // Cache stores for depositing harvested items.
+    let stores_list: Vec<(Entity, Position)> = buildings
+        .iter()
+        .filter(|(_, s, site, _, _)| s.kind == StructureType::Stores && site.is_none())
+        .map(|(e, _, _, _, pos)| (e, *pos))
+        .collect();
+
     // Cache workshop positions for skill growth bonus.
     let workshop_positions: Vec<Position> = buildings
         .iter()
-        .filter(|(s, site, _, _)| {
+        .filter(|(_, s, site, _, _)| {
             s.kind == StructureType::Workshop && s.effectiveness() > 0.0 && site.is_none()
         })
-        .map(|(_, _, _, pos)| *pos)
+        .map(|(_, _, _, _, pos)| *pos)
         .collect();
 
     let mut chains_to_remove: Vec<Entity> = Vec::new();
@@ -131,7 +139,7 @@ pub fn resolve_task_chains(
 
             StepKind::Deliver { material, amount } => {
                 if let Some(target_entity) = step.target_entity {
-                    if let Ok((_, Some(mut site), _, _)) = buildings.get_mut(target_entity) {
+                    if let Ok((_, _, Some(mut site), _, _)) = buildings.get_mut(target_entity) {
                         site.deliver(*material, *amount);
                     }
                 }
@@ -144,7 +152,7 @@ pub fn resolve_task_chains(
                     continue;
                 };
 
-                let Ok((_, maybe_site, _, building_pos)) = buildings.get_mut(target_entity) else {
+                let Ok((_, _, maybe_site, _, building_pos)) = buildings.get_mut(target_entity) else {
                     chain.fail_current("construction site not found".into());
                     continue;
                 };
@@ -190,7 +198,7 @@ pub fn resolve_task_chains(
                     continue;
                 };
 
-                let Ok((mut structure, _, _, building_pos)) = buildings.get_mut(target_entity)
+                let Ok((_, mut structure, _, _, building_pos)) = buildings.get_mut(target_entity)
                 else {
                     chain.fail_current("building not found".into());
                     continue;
@@ -217,7 +225,7 @@ pub fn resolve_task_chains(
                     continue;
                 };
 
-                let Ok((_, _, maybe_crop, garden_pos)) = buildings.get_mut(target_entity) else {
+                let Ok((_, _, _, maybe_crop, garden_pos)) = buildings.get_mut(target_entity) else {
                     chain.fail_current("garden not found".into());
                     continue;
                 };
@@ -247,13 +255,28 @@ pub fn resolve_task_chains(
                     continue;
                 };
 
-                let Ok((_, _, maybe_crop, _)) = buildings.get_mut(target_entity) else {
+                let Ok((_, _, _, maybe_crop, _)) = buildings.get_mut(target_entity) else {
                     chain.fail_current("garden not found".into());
                     continue;
                 };
 
                 if let Some(mut crop) = maybe_crop {
-                    food.deposit(3.0);
+                    // Spawn harvested food as real items in the nearest Stores.
+                    let nearest_store = stores_list
+                        .iter()
+                        .min_by_key(|(_, sp)| pos.manhattan_distance(sp))
+                        .map(|(e, _)| *e);
+                    if let Some(store_entity) = nearest_store {
+                        // Harvest produces 2 food items.
+                        for kind in [ItemKind::Berries, ItemKind::Roots] {
+                            let item_entity = commands
+                                .spawn(Item::new(kind, 0.9, ItemLocation::StoredIn(store_entity)))
+                                .id();
+                            if let Ok(mut stored) = stored_items.get_mut(store_entity) {
+                                stored.add(item_entity, StructureType::Stores);
+                            }
+                        }
+                    }
                     crop.growth = 0.0;
                     chain.advance();
                 } else {
@@ -273,8 +296,8 @@ pub fn resolve_task_chains(
             }
 
             // Disposition-driven steps are resolved by the disposition system.
-            StepKind::HuntPrey
-            | StepKind::ForageItem
+            StepKind::HuntPrey { .. }
+            | StepKind::ForageItem { .. }
             | StepKind::DepositAtStores
             | StepKind::EatAtStores
             | StepKind::Sleep { .. }
@@ -311,6 +334,7 @@ mod tests {
     use bevy_ecs::schedule::Schedule;
     use crate::ai::Action;
     use crate::components::building::StructureType;
+    use crate::resources::food::FoodStores;
     use crate::components::task_chain::{FailurePolicy, Material, TaskStep};
 
     fn test_world() -> World {
@@ -418,7 +442,7 @@ mod tests {
                     kind: StructureType::Den,
                     condition: 0.5,
                     cleanliness: 1.0,
-                    size: (2, 2),
+                    size: StructureType::Den.default_size(),
                 },
                 Position::new(5, 5),
             ))
@@ -454,7 +478,19 @@ mod tests {
 
     #[test]
     fn harvest_deposits_food() {
+        use crate::components::building::StoredItems;
+        use crate::components::items::Item;
+
         let mut world = test_world();
+
+        // A Stores building for the harvest to deposit into.
+        let store = world
+            .spawn((
+                Structure::new(StructureType::Stores),
+                StoredItems::default(),
+                Position::new(6, 5),
+            ))
+            .id();
 
         let garden = world
             .spawn((
@@ -483,17 +519,22 @@ mod tests {
             Needs::default(),
         ));
 
-        let before = world.resource::<FoodStores>().current;
-
         let mut schedule = Schedule::default();
         schedule.add_systems(resolve_task_chains);
         schedule.run(&mut world);
 
-        let after = world.resource::<FoodStores>().current;
+        // Harvest should create real food items in the store.
+        let stored = world.get::<StoredItems>(store).unwrap();
         assert!(
-            after > before,
-            "harvest should deposit food (before={before}, after={after})"
+            !stored.items.is_empty(),
+            "harvest should deposit food items in stores"
         );
+
+        // Verify the deposited items are real food.
+        for &item_entity in &stored.items {
+            let item = world.get::<Item>(item_entity).unwrap();
+            assert!(item.kind.is_food(), "harvested item should be food");
+        }
 
         let crop = world.get::<CropState>(garden).unwrap();
         assert_eq!(crop.growth, 0.0, "crop should reset after harvest");

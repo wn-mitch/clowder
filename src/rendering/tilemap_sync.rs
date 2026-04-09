@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 
+use crate::rendering::sprite_assets::SpriteAssets;
 use crate::rendering::terrain_sprites::{
     base_tile_index, blob_bitmask, grass_overlay_atlas_index_with_variant, OVERLAY_LAYERS,
 };
@@ -12,6 +13,14 @@ pub struct BaseTerrainLayer;
 /// Marker component for a blob autotile overlay layer.
 #[derive(Component)]
 pub struct BlobOverlayLayer;
+
+/// Marker for decorative tree sprites placed on forest terrain.
+#[derive(Component)]
+pub struct TreeDecoration;
+
+/// Marker for corruption haze overlay sprites.
+#[derive(Component)]
+pub struct CorruptionOverlay;
 
 /// Tile scale factor: 16px sprites rendered at this multiplier.
 pub const TILE_SCALE: f32 = 3.0;
@@ -29,6 +38,7 @@ pub fn create_tilemap(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     map: Res<TileMap>,
+    sprite_assets: Res<SpriteAssets>,
     mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
 ) {
     let world_px = TILE_PX * TILE_SCALE;
@@ -135,6 +145,64 @@ pub fn create_tilemap(
                     BlobOverlayLayer,
                 ));
             }
+        }
+    }
+
+    // --- Tree decorations on forest terrain (z=5.0) ---
+    // tree_sprites.png is 12 cols x 4 rows of 48x48 frames.
+    // Row 2 (indices 24-35): medium trees for LightForest.
+    // Row 3 (indices 36-47): full-grown trees for DenseForest.
+    for y in 0..map.height {
+        for x in 0..map.width {
+            let tile = map.get(x, y);
+            let base_index = match tile.terrain {
+                Terrain::LightForest => 24, // medium trees (row 2)
+                Terrain::DenseForest => 36, // full trees (row 3)
+                _ => continue,
+            };
+            // Deterministic per-tile variation: pick from 3 frames.
+            let variant = ((x.wrapping_mul(7) ^ y.wrapping_mul(13)) % 3) as usize;
+            let atlas_index = base_index + variant;
+
+            let world_x = x as f32 * world_px;
+            let world_y = (map.height as f32 - 1.0 - y as f32) * world_px;
+
+            commands.spawn((
+                Sprite {
+                    image: sprite_assets.trees_texture.clone(),
+                    custom_size: Some(Vec2::splat(world_px)),
+                    texture_atlas: Some(TextureAtlas {
+                        layout: sprite_assets.trees_layout.clone(),
+                        index: atlas_index,
+                    }),
+                    ..default()
+                },
+                Transform::from_xyz(world_x, world_y, 5.0),
+                TreeDecoration,
+            ));
+        }
+    }
+
+    // --- Corruption haze overlay (z=4.0) ---
+    // Semi-transparent dark magenta on tiles with corruption > 0.
+    for y in 0..map.height {
+        for x in 0..map.width {
+            let tile = map.get(x, y);
+            if tile.corruption <= 0.0 {
+                continue;
+            }
+            let world_x = x as f32 * world_px;
+            let world_y = (map.height as f32 - 1.0 - y as f32) * world_px;
+            commands.spawn((
+                Sprite {
+                    image: sprite_assets.white_pixel.clone(),
+                    color: Color::srgba(0.4, 0.0, 0.25, tile.corruption * 0.35),
+                    custom_size: Some(Vec2::splat(world_px)),
+                    ..default()
+                },
+                Transform::from_xyz(world_x, world_y, 4.0),
+                CorruptionOverlay,
+            ));
         }
     }
 

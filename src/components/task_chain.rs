@@ -98,11 +98,12 @@ pub enum StepKind {
     SpiritCommunion,
 
     // --- Disposition-driven behaviors ---
-    /// Hunt prey at current location. ~10 ticks. On success, prey entity is
-    /// killed and food is picked up into inventory.
-    HuntPrey,
-    /// Forage at current terrain tile. ~8 ticks. Picks up foraged item.
-    ForageItem,
+    /// Active hunt: scent-search → stalk → pounce. Cat moves every tick.
+    /// `patrol_dir` is the initial search direction (into the wind).
+    HuntPrey { patrol_dir: (i32, i32) },
+    /// Active forage: patrol through terrain checking each tile for yield.
+    /// `patrol_dir` is the initial movement direction.
+    ForageItem { patrol_dir: (i32, i32) },
     /// Deposit all carried food at a Stores building. Instant on arrival.
     DepositAtStores,
     /// Eat from Stores building. Restores hunger. ~5 ticks.

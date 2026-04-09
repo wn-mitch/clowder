@@ -1,6 +1,7 @@
 use bevy_ecs::prelude::*;
 
 use crate::ai::Action;
+use crate::components::building::StructureType;
 use crate::components::physical::Position;
 
 // ---------------------------------------------------------------------------
@@ -54,6 +55,8 @@ pub struct Directive {
     pub target_entity: Option<Entity>,
     /// Suggested target position.
     pub target_position: Option<Position>,
+    /// Blueprint for new construction (None = repair existing building).
+    pub blueprint: Option<StructureType>,
 }
 
 /// Queue of pending directives on a coordinator entity.
@@ -96,3 +99,51 @@ pub struct PendingDelivery(pub Directive);
 /// Inserted when a coordinator dies, triggering immediate re-evaluation.
 #[derive(Resource, Default)]
 pub struct CoordinatorDied;
+
+// ---------------------------------------------------------------------------
+// Build pressure
+// ---------------------------------------------------------------------------
+
+/// Slowly-accumulating pressure channels that track unmet colony infrastructure
+/// needs. Attached to coordinators. Each channel rises when its signal persists
+/// and decays when it doesn't. The coordinator's attentiveness (derived from
+/// personality) determines accumulation rate and action threshold.
+#[derive(Component, Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct BuildPressure {
+    /// Stores at capacity for extended period.
+    pub storage: f32,
+    /// Cats sleeping outdoors (no Den in range).
+    pub shelter: f32,
+    /// Low social satisfaction despite Hearth.
+    pub gathering: f32,
+    /// Skilled crafters with no Workshop available.
+    pub workshop: f32,
+    /// Food scarcity with no Garden.
+    pub farming: f32,
+    /// Wildlife breaching colony perimeter.
+    pub defense: f32,
+}
+
+impl BuildPressure {
+    /// Pressure accumulation base rate per evaluation cycle.
+    pub const BASE_RATE: f32 = 0.01;
+    /// Decay factor applied when the signal is inactive.
+    pub const DECAY: f32 = 0.95;
+
+    /// The structure type each pressure channel corresponds to.
+    pub fn highest_actionable(&self, threshold: f32) -> Option<StructureType> {
+        let channels = [
+            (self.shelter, StructureType::Den),
+            (self.storage, StructureType::Stores),
+            (self.gathering, StructureType::Hearth),
+            (self.workshop, StructureType::Workshop),
+            (self.farming, StructureType::Garden),
+            (self.defense, StructureType::Watchtower),
+        ];
+        channels
+            .iter()
+            .filter(|(pressure, _)| *pressure > threshold)
+            .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(_, kind)| *kind)
+    }
+}

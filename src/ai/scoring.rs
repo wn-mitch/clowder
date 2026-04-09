@@ -81,6 +81,19 @@ pub struct ScoringContext<'a> {
     pub has_mentoring_target: bool,
     /// Whether at least one prey animal is within hunting range.
     pub prey_nearby: bool,
+    // --- Personality integration fields ---
+    /// Physiological satisfaction (0.0–1.0) for temper modifiers.
+    pub phys_satisfaction: f32,
+    /// Cat's current respect need level (0.0–1.0) for pride modifiers.
+    pub respect: f32,
+    /// Whether this cat currently has an active disposition.
+    pub has_active_disposition: bool,
+    /// The current disposition kind, if any (for patience commitment bonus).
+    pub active_disposition: Option<crate::components::disposition::DispositionKind>,
+    /// Pre-computed tradition location bonus for the cat's current tile.
+    /// Set to `tradition * 0.1` by the caller if the cat's current action
+    /// matches a previously successful action at this tile, else 0.0.
+    pub tradition_location_bonus: f32,
 }
 
 // ---------------------------------------------------------------------------
@@ -143,16 +156,21 @@ pub fn score_actions(
 
     // --- Socialize (sociability-driven; requires a visible cat) ---
     if ctx.has_social_target {
+        let temper_penalty = ctx.personality.temper * 0.3 * (1.0 - ctx.phys_satisfaction);
         let score = (1.0 - ctx.needs.social) * ctx.personality.sociability * 2.0
-            * ctx.needs.level_suppression(2);
-        scores.push((Action::Socialize, score + jitter(rng)));
+            * ctx.needs.level_suppression(2)
+            - temper_penalty
+            + ctx.personality.playfulness * 0.3;
+        scores.push((Action::Socialize, score.max(0.0) + jitter(rng)));
     }
 
     // --- Groom (self or other; always available for self) ---
     {
         let self_groom = (1.0 - ctx.needs.warmth) * 0.8 * ctx.needs.level_suppression(1);
+        let temper_penalty = ctx.personality.temper * 0.3 * (1.0 - ctx.phys_satisfaction);
         let other_groom = if ctx.has_social_target {
-            ctx.personality.warmth * (1.0 - ctx.needs.social) * ctx.needs.level_suppression(2)
+            (ctx.personality.warmth * (1.0 - ctx.needs.social) * ctx.needs.level_suppression(2)
+                - temper_penalty).max(0.0)
         } else {
             0.0
         };
@@ -167,7 +185,9 @@ pub fn score_actions(
 
     // --- Wander (light movement; suppressed only by unmet physiological needs) ---
     {
-        let score = ctx.personality.curiosity * 0.4 * ctx.needs.level_suppression(2) + 0.08;
+        let score = ctx.personality.curiosity * 0.4 * ctx.needs.level_suppression(2)
+            + 0.08
+            + ctx.personality.playfulness * 0.2;
         scores.push((Action::Wander, score + jitter(rng)));
     }
 
@@ -268,19 +288,71 @@ pub fn score_actions(
     if ctx.is_coordinator_with_directives {
         let score = ctx.personality.diligence * 0.8
             * (ctx.pending_directive_count as f32 * 0.3)
-            * ctx.needs.level_suppression(4);
+            * ctx.needs.level_suppression(4)
+            + ctx.personality.ambition * 0.2 * ctx.needs.level_suppression(4);
         scores.push((Action::Coordinate, score + jitter(rng)));
     }
 
     // --- Mentor (warmth + diligence; requires valid mentoring target) ---
     if ctx.has_mentoring_target {
         let score = ctx.personality.warmth * ctx.personality.diligence * 0.5
-            * ctx.needs.level_suppression(4);
+            * ctx.needs.level_suppression(4)
+            + ctx.personality.ambition * 0.1;
         scores.push((Action::Mentor, score + jitter(rng)));
     }
 
     // --- Idle (always-available fallback; incurious cats idle more) ---
-    scores.push((Action::Idle, 0.05 + (1.0 - ctx.personality.curiosity) * 0.08 + jitter(rng)));
+    let idle_score = 0.05
+        + (1.0 - ctx.personality.curiosity) * 0.08
+        - ctx.personality.playfulness * 0.05;
+    scores.push((Action::Idle, idle_score.max(0.01) + jitter(rng)));
+
+    // --- Post-scoring personality modifiers ---
+
+    // Pride: boost status-granting actions when respect is low.
+    if ctx.respect < 0.5 {
+        let pride_bonus = ctx.personality.pride * 0.1;
+        for (action, score) in scores.iter_mut() {
+            if matches!(action, Action::Hunt | Action::Fight | Action::Patrol | Action::Build | Action::Coordinate) {
+                *score += pride_bonus;
+            }
+        }
+    }
+
+    // Independence: boost solo actions, penalize group actions.
+    {
+        let ind = ctx.personality.independence;
+        for (action, score) in scores.iter_mut() {
+            match action {
+                Action::Explore | Action::Wander | Action::Hunt => *score += ind * 0.1,
+                Action::Socialize | Action::Coordinate | Action::Mentor => {
+                    *score = (*score - ind * 0.1).max(0.0);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // Patience: commitment bonus to actions within the active disposition.
+    if let Some(active_disp) = ctx.active_disposition {
+        let patience_bonus = ctx.personality.patience * 0.15;
+        let constituent = active_disp.constituent_actions();
+        for (action, score) in scores.iter_mut() {
+            if constituent.contains(action) {
+                *score += patience_bonus;
+            }
+        }
+    }
+
+    // Tradition: location preference bonus (pre-computed by caller).
+    if ctx.tradition_location_bonus > 0.0 {
+        // Apply to whichever action the caller pre-computed the bonus for.
+        // The caller sets this based on the best-matching action at this tile.
+        // For simplicity, boost all actions — the caller already scaled by tradition.
+        for (_, score) in scores.iter_mut() {
+            *score += ctx.tradition_location_bonus;
+        }
+    }
 
     scores
 }
@@ -585,6 +657,56 @@ pub fn select_action_softmax(scores: &[(Action, f32)], rng: &mut impl Rng) -> Ac
 }
 
 // ---------------------------------------------------------------------------
+// Behavior gates
+// ---------------------------------------------------------------------------
+
+/// Apply behavior gate overrides for extreme personality values.
+///
+/// Checked after scoring, before action execution. Returns `Some(overridden)`
+/// if a gate fires, `None` if the chosen action stands.
+///
+/// Gates (from personality.md):
+/// - Boldness < 0.1: Fight → Flee (too timid)
+/// - Sociability < 0.15: Socialize → Idle (too shy)
+/// - Curiosity > 0.9: 20% chance override → Explore (compulsive explorer)
+/// - Boldness > 0.9: Flee → Fight (reckless bravery)
+/// - Compassion > 0.9 + injured nearby: override → Herbcraft (compulsive helper)
+///
+/// Stubbornness > 0.85 directive rejection is handled separately via the
+/// `DirectiveRefused` event in the personality events system.
+pub fn behavior_gate_check(
+    chosen: Action,
+    personality: &Personality,
+    has_injured_nearby: bool,
+    rng: &mut impl Rng,
+) -> Option<Action> {
+    // Too timid to fight — always flee instead.
+    if chosen == Action::Fight && personality.boldness < 0.1 {
+        return Some(Action::Flee);
+    }
+    // Too shy to socialize — skip to idle.
+    if chosen == Action::Socialize && personality.sociability < 0.15 {
+        return Some(Action::Idle);
+    }
+    // Reckless bravery — cannot flee, must fight.
+    if chosen == Action::Flee && personality.boldness > 0.9 {
+        return Some(Action::Fight);
+    }
+    // Compulsive helper — drop everything to aid an injured cat.
+    if personality.compassion > 0.9 && has_injured_nearby {
+        return Some(Action::Herbcraft);
+    }
+    // Compulsive explorer — 20% chance per tick to ignore current action.
+    if personality.curiosity > 0.9
+        && !matches!(chosen, Action::Eat | Action::Sleep | Action::Flee | Action::Explore)
+        && rng.random::<f32>() < 0.20
+    {
+        return Some(Action::Explore);
+    }
+    None
+}
+
+// ---------------------------------------------------------------------------
 // Disposition scoring (aggregate from action scores)
 // ---------------------------------------------------------------------------
 
@@ -746,6 +868,11 @@ mod tests {
             pending_directive_count: 0,
             has_mentoring_target: false,
             prey_nearby: true,
+            phys_satisfaction: needs.physiological_satisfaction(),
+            respect: needs.respect,
+            has_active_disposition: false,
+            active_disposition: None,
+            tradition_location_bonus: 0.0,
         }
     }
 
@@ -857,6 +984,11 @@ mod tests {
             pending_directive_count: 0,
             has_mentoring_target: false,
             prey_nearby: true,
+            phys_satisfaction: needs.physiological_satisfaction(),
+            respect: needs.respect,
+            has_active_disposition: false,
+            active_disposition: None,
+            tradition_location_bonus: 0.0,
         };
         let scores = score_actions(&c, &mut rng);
         let best = select_best_action(&scores);
@@ -962,6 +1094,11 @@ mod tests {
             pending_directive_count: 0,
             has_mentoring_target: false,
             prey_nearby: true,
+            phys_satisfaction: needs.physiological_satisfaction(),
+            respect: needs.respect,
+            has_active_disposition: false,
+            active_disposition: None,
+            tradition_location_bonus: 0.0,
         };
         let scores = score_actions(&c, &mut rng);
         let socialize_score = scores.iter().find(|(a, _)| *a == Action::Socialize).unwrap().1;
@@ -1167,6 +1304,11 @@ mod tests {
             pending_directive_count: 0,
             has_mentoring_target: false,
             prey_nearby: true,
+            phys_satisfaction: needs.physiological_satisfaction(),
+            respect: needs.respect,
+            has_active_disposition: false,
+            active_disposition: None,
+            tradition_location_bonus: 0.0,
         };
         let scores = score_actions(&c, &mut rng);
         let best = select_best_action(&scores);
@@ -1219,6 +1361,11 @@ mod tests {
             pending_directive_count: 0,
             has_mentoring_target: false,
             prey_nearby: true,
+            phys_satisfaction: needs.physiological_satisfaction(),
+            respect: needs.respect,
+            has_active_disposition: false,
+            active_disposition: None,
+            tradition_location_bonus: 0.0,
         };
         let scores = score_actions(&c, &mut rng);
         let fight_score = scores.iter().find(|(a, _)| *a == Action::Fight).unwrap().1;
@@ -1274,6 +1421,11 @@ mod tests {
             pending_directive_count: 0,
             has_mentoring_target: false,
             prey_nearby: true,
+            phys_satisfaction: needs.physiological_satisfaction(),
+            respect: needs.respect,
+            has_active_disposition: false,
+            active_disposition: None,
+            tradition_location_bonus: 0.0,
         };
         let scores = score_actions(&c, &mut rng);
         let actions: Vec<Action> = scores.iter().map(|(a, _)| *a).collect();
@@ -1476,6 +1628,11 @@ mod tests {
             pending_directive_count: 0,
             has_mentoring_target: false,
             prey_nearby: true,
+            phys_satisfaction: needs.physiological_satisfaction(),
+            respect: needs.respect,
+            has_active_disposition: false,
+            active_disposition: None,
+            tradition_location_bonus: 0.0,
         };
         let scores = score_actions(&c, &mut rng);
         let wander = scores.iter().find(|(a, _)| *a == Action::Wander).unwrap().1;
@@ -1530,6 +1687,11 @@ mod tests {
             pending_directive_count: 0,
             has_mentoring_target: false,
             prey_nearby: true,
+            phys_satisfaction: needs.physiological_satisfaction(),
+            respect: needs.respect,
+            has_active_disposition: false,
+            active_disposition: None,
+            tradition_location_bonus: 0.0,
         };
 
         let scores_full = score_actions(&base, &mut rng_full);
@@ -1725,5 +1887,99 @@ mod tests {
             select_disposition_softmax(&[], &mut rng),
             DispositionKind::Resting,
         );
+    }
+
+    // --- Behavior gate tests ---
+
+    #[test]
+    fn gate_timid_fight_becomes_flee() {
+        let mut p = default_personality();
+        p.boldness = 0.05;
+        let mut rng = seeded_rng(1);
+        assert_eq!(
+            behavior_gate_check(Action::Fight, &p, false, &mut rng),
+            Some(Action::Flee),
+        );
+    }
+
+    #[test]
+    fn gate_shy_socialize_becomes_idle() {
+        let mut p = default_personality();
+        p.sociability = 0.1;
+        let mut rng = seeded_rng(1);
+        assert_eq!(
+            behavior_gate_check(Action::Socialize, &p, false, &mut rng),
+            Some(Action::Idle),
+        );
+    }
+
+    #[test]
+    fn gate_reckless_flee_becomes_fight() {
+        let mut p = default_personality();
+        p.boldness = 0.95;
+        let mut rng = seeded_rng(1);
+        assert_eq!(
+            behavior_gate_check(Action::Flee, &p, false, &mut rng),
+            Some(Action::Fight),
+        );
+    }
+
+    #[test]
+    fn gate_compulsive_helper() {
+        let mut p = default_personality();
+        p.compassion = 0.95;
+        let mut rng = seeded_rng(1);
+        assert_eq!(
+            behavior_gate_check(Action::Wander, &p, true, &mut rng),
+            Some(Action::Herbcraft),
+        );
+        // No injured nearby → no override.
+        assert_eq!(
+            behavior_gate_check(Action::Wander, &p, false, &mut rng),
+            None,
+        );
+    }
+
+    #[test]
+    fn gate_no_override_for_normal_personality() {
+        let p = default_personality();
+        let mut rng = seeded_rng(1);
+        assert_eq!(
+            behavior_gate_check(Action::Hunt, &p, false, &mut rng),
+            None,
+        );
+    }
+
+    #[test]
+    fn gate_compulsive_explorer_fires_probabilistically() {
+        let mut p = default_personality();
+        p.curiosity = 0.95;
+        // Run 200 trials — expect roughly 20% to fire.
+        let mut fires = 0;
+        let mut rng = seeded_rng(42);
+        for _ in 0..200 {
+            if behavior_gate_check(Action::Patrol, &p, false, &mut rng) == Some(Action::Explore) {
+                fires += 1;
+            }
+        }
+        assert!(
+            fires > 20 && fires < 60,
+            "compulsive explorer should fire ~20% of the time; fired {fires}/200"
+        );
+    }
+
+    #[test]
+    fn gate_compulsive_explorer_does_not_override_survival() {
+        let mut p = default_personality();
+        p.curiosity = 0.95;
+        let mut rng = seeded_rng(1);
+        // Eat, Sleep, Flee should never be overridden by compulsive explorer.
+        for action in [Action::Eat, Action::Sleep, Action::Flee] {
+            assert_eq!(
+                behavior_gate_check(action, &p, false, &mut rng),
+                None,
+                "compulsive explorer should not override {action:?}"
+            );
+        }
     }
 }

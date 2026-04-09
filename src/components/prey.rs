@@ -4,6 +4,24 @@ use crate::components::items::ItemKind;
 use crate::resources::map::Terrain;
 
 // ---------------------------------------------------------------------------
+// PreyAiState
+// ---------------------------------------------------------------------------
+
+/// AI state machine for prey animals.
+#[derive(Debug, Clone, Copy)]
+pub enum PreyAiState {
+    Idle,
+    Grazing { dx: i32, dy: i32, ticks: u64 },
+    Fleeing { from: Entity, ticks: u64 },
+}
+
+impl Default for PreyAiState {
+    fn default() -> Self {
+        Self::Idle
+    }
+}
+
+// ---------------------------------------------------------------------------
 // PreySpecies
 // ---------------------------------------------------------------------------
 
@@ -38,12 +56,16 @@ impl PreySpecies {
     }
 
     /// Maximum number of individuals of this species allowed in the world.
+    ///
+    /// Tuned for a 120×90 map with ~8 cats. Enough prey that scent-based
+    /// hunting finds targets within a reasonable search, but scarce enough
+    /// that overhunting depletes an area and cats range further.
     pub fn population_cap(self) -> usize {
         match self {
-            Self::Mouse => 30,
-            Self::Rat => 50,
-            Self::Fish => 20,
-            Self::Bird => 15,
+            Self::Mouse => 12,
+            Self::Rat => 18,
+            Self::Fish => 8,
+            Self::Bird => 6,
         }
     }
 
@@ -88,6 +110,10 @@ pub struct PreyAnimal {
     pub species: PreySpecies,
     /// Hunger level: 0.0 = full, 1.0 = starving.
     pub hunger: f32,
+    /// AI state — skipped during serialization because `Fleeing` contains an
+    /// `Entity` handle that is not stable across save/load boundaries.
+    #[serde(skip, default)]
+    pub ai_state: PreyAiState,
 }
 
 impl PreyAnimal {
@@ -96,6 +122,7 @@ impl PreyAnimal {
         Self {
             species,
             hunger: 0.0,
+            ai_state: PreyAiState::Idle,
         }
     }
 }
@@ -123,8 +150,8 @@ mod tests {
             "Rat cap should exceed Mouse cap"
         );
         assert!(
-            PreySpecies::Bird.population_cap() < PreySpecies::Mouse.population_cap(),
-            "Bird cap should be below Mouse cap"
+            PreySpecies::Bird.population_cap() < PreySpecies::Rat.population_cap(),
+            "Bird cap should be below Rat cap"
         );
     }
 

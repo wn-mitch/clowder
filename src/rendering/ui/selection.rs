@@ -3,6 +3,8 @@ use bevy::window::PrimaryWindow;
 
 use crate::components::identity::Species;
 use crate::components::physical::{Dead, Position};
+use crate::components::prey::PreyAnimal;
+use crate::components::wildlife::WildAnimal;
 use crate::rendering::camera::GameCamera;
 use crate::rendering::tilemap_sync::{TILE_PX, TILE_SCALE};
 use crate::resources::map::TileMap;
@@ -53,6 +55,8 @@ pub fn handle_world_click(
     mut inspection: ResMut<InspectionState>,
     windows: Query<&Window, With<PrimaryWindow>>,
     cats: Query<(Entity, &Position), (With<Species>, Without<Dead>)>,
+    wildlife: Query<(Entity, &Position), (With<WildAnimal>, Without<Species>)>,
+    prey_q: Query<(Entity, &Position), (With<PreyAnimal>, Without<Species>, Without<WildAnimal>)>,
     map: Res<TileMap>,
 ) {
     if mouse.just_pressed(MouseButton::Right) {
@@ -76,21 +80,37 @@ pub fn handle_world_click(
         inspection.click_screen_pos = window.cursor_position().map(|p| Vec2::new(p.x, p.y));
     }
 
-    // Find nearest cat within 1.5-tile radius of click position.
-    let mut nearest: Option<(Entity, f32)> = None;
+    // Find nearest cat within 1.5-tile radius.
+    let mut nearest_cat: Option<(Entity, f32)> = None;
     for (entity, pos) in &cats {
         let dx = (pos.x - gx) as f32;
         let dy = (pos.y - gy) as f32;
         let dist = (dx * dx + dy * dy).sqrt();
-        if dist <= 1.5 && nearest.is_none_or(|(_, d)| dist < d) {
-            nearest = Some((entity, dist));
+        if dist <= 1.5 && nearest_cat.is_none_or(|(_, d)| dist < d) {
+            nearest_cat = Some((entity, dist));
         }
     }
 
-    if let Some((entity, _)) = nearest {
+    if let Some((entity, _)) = nearest_cat {
         inspection.mode = InspectionMode::CatInspect(entity);
         inspection.last_selected_cat = Some(entity);
-    } else if map.in_bounds(gx, gy) {
+        return;
+    }
+
+    // Fallback: find nearest wildlife or prey within 1.5-tile radius.
+    let mut nearest_wild: Option<(Entity, f32)> = None;
+    for (entity, pos) in wildlife.iter().chain(prey_q.iter()) {
+        let dx = (pos.x - gx) as f32;
+        let dy = (pos.y - gy) as f32;
+        let dist = (dx * dx + dy * dy).sqrt();
+        if dist <= 1.5 && nearest_wild.is_none_or(|(_, d)| dist < d) {
+            nearest_wild = Some((entity, dist));
+        }
+    }
+
+    if let Some((entity, _)) = nearest_wild {
+        inspection.mode = InspectionMode::WildlifeInspect(entity);
+    } else {
         inspection.mode = InspectionMode::TileInspect { x: gx, y: gy };
     }
 }

@@ -65,17 +65,16 @@ pub fn generate_narrative(
             }
         }
 
+        // Hunt/Forage emit event-specific narrative (scent, catch, fail)
+        // directly from resolve_disposition_chains. Skip them here to avoid
+        // duplicate ticker-tape entries.
+        if matches!(current.action, Action::Hunt | Action::Forage) {
+            continue;
+        }
+
         // Rate-limit routine narration.
-        // Hunt/Forage/Eat get outcome-specific narrative from resolve_actions,
-        // so template narration fires less often to avoid double-entries.
         match current.action {
             Action::Eat | Action::Sleep => {
-                let roll: u32 = rng.rng.random_range(0..3);
-                if roll != 0 {
-                    continue;
-                }
-            }
-            Action::Hunt | Action::Forage => {
                 let roll: u32 = rng.rng.random_range(0..3);
                 if roll != 0 {
                     continue;

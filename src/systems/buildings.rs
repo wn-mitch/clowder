@@ -40,10 +40,12 @@ pub fn apply_building_effects(
             continue;
         }
 
+        let center = structure.center(building_pos);
+
         match structure.kind {
             StructureType::Den => {
                 for (cat_pos, mut needs) in &mut cats {
-                    if cat_pos.manhattan_distance(building_pos) <= 2 {
+                    if cat_pos.manhattan_distance(&center) <= 4 {
                         needs.warmth = (needs.warmth + 0.01 * eff).min(1.0);
                         needs.safety = (needs.safety + 0.005 * eff).min(1.0);
                     }
@@ -51,7 +53,7 @@ pub fn apply_building_effects(
             }
             StructureType::Hearth => {
                 for (cat_pos, mut needs) in &mut cats {
-                    if cat_pos.manhattan_distance(building_pos) <= 3 {
+                    if cat_pos.manhattan_distance(&center) <= 5 {
                         needs.social = (needs.social + 0.01 * eff).min(1.0);
                         if is_cold {
                             needs.warmth = (needs.warmth + 0.01 * eff).min(1.0);
@@ -70,7 +72,7 @@ pub fn apply_building_effects(
         // Dirty building discomfort: mild warmth drain for nearby cats.
         if structure.cleanliness < 0.3 {
             for (cat_pos, mut needs) in &mut cats {
-                if cat_pos.manhattan_distance(building_pos) <= 2 {
+                if cat_pos.manhattan_distance(&center) <= 3 {
                     needs.warmth = (needs.warmth
                         - 0.003 * (1.0 - structure.cleanliness))
                         .max(0.0);
@@ -136,7 +138,8 @@ pub fn tidy_buildings(
             continue;
         }
         for (building_pos, mut structure) in &mut buildings {
-            if cat_pos.manhattan_distance(building_pos) <= 2 {
+            let center = structure.center(building_pos);
+            if cat_pos.manhattan_distance(&center) <= 3 {
                 structure.cleanliness = (structure.cleanliness + 0.005).min(1.0);
             }
         }
@@ -215,20 +218,20 @@ mod tests {
     fn den_provides_warmth_and_safety_within_range() {
         let mut world = test_world();
 
-        // Den at (5, 5)
+        // Den (3×3) at anchor (5, 5), center = (6, 6). Radius = 4.
         world.spawn((
             Structure::new(StructureType::Den),
             Position::new(5, 5),
         ));
 
-        // Cat within range (distance 2)
+        // Cat within range: distance 2 from center (6,6)
         let near_cat = world
-            .spawn((Position::new(6, 6), Needs::default()))
+            .spawn((Position::new(7, 7), Needs::default()))
             .id();
 
-        // Cat outside range (distance 4)
+        // Cat outside range: distance 6 from center (6,6) — well beyond radius 4
         let far_cat = world
-            .spawn((Position::new(9, 5), Needs::default()))
+            .spawn((Position::new(12, 6), Needs::default()))
             .id();
 
         let mut schedule = Schedule::default();
@@ -236,7 +239,6 @@ mod tests {
         schedule.run(&mut world);
 
         let near_needs = world.get::<Needs>(near_cat).unwrap();
-        // Default warmth is 0.9, Den adds 0.01 → 0.91
         assert!(near_needs.warmth > 0.9, "near cat should get warmth bonus");
         assert!(near_needs.safety > 1.0 - f32::EPSILON, "near cat should get safety bonus");
 
@@ -297,7 +299,7 @@ mod tests {
                 kind: StructureType::Stores,
                 condition: 0.1, // below 0.2 threshold
                 cleanliness: 1.0,
-                size: (2, 2),
+                size: StructureType::Stores.default_size(),
             },
             Position::new(5, 5),
         ));
@@ -384,7 +386,7 @@ mod tests {
                 kind: StructureType::Den,
                 condition: 0.0001,
                 cleanliness: 0.0001,
-                size: (2, 2),
+                size: StructureType::Den.default_size(),
             })
             .id();
 

@@ -44,6 +44,8 @@ struct CliArgs {
     load_log_path: Option<PathBuf>,
     event_log_path: Option<PathBuf>,
     test_map: bool,
+    trace_positions: u64,
+    snapshot_interval: u64,
 }
 
 fn main() {
@@ -132,7 +134,7 @@ fn sync_sim_speed(
 
 fn parse_args() -> CliArgs {
     let args: Vec<String> = std::env::args().collect();
-    let mut seed = 42u64;
+    let mut seed: u64 = rand::random();
     let mut load_path = None;
     let mut headless = false;
     let mut duration_secs = 60u64;
@@ -140,6 +142,8 @@ fn parse_args() -> CliArgs {
     let mut load_log_path = None;
     let mut event_log_path = None;
     let mut test_map = false;
+    let mut trace_positions = 0u64;
+    let mut snapshot_interval = 100u64;
     let mut iter = args.iter().skip(1);
     while let Some(arg) = iter.next() {
         match arg.as_str() {
@@ -183,6 +187,20 @@ fn parse_args() -> CliArgs {
             "--test-map" => {
                 test_map = true;
             }
+            "--trace-positions" => {
+                if let Some(val) = iter.next() {
+                    if let Ok(n) = val.parse::<u64>() {
+                        trace_positions = n;
+                    }
+                }
+            }
+            "--snapshot-interval" => {
+                if let Some(val) = iter.next() {
+                    if let Ok(n) = val.parse::<u64>() {
+                        snapshot_interval = n;
+                    }
+                }
+            }
             _ => {}
         }
     }
@@ -190,6 +208,8 @@ fn parse_args() -> CliArgs {
     if !headless && duration_secs != 60 {
         eprintln!("Warning: --duration has no effect without --headless");
     }
+
+    eprintln!("seed: {seed}");
 
     CliArgs {
         seed,
@@ -200,6 +220,8 @@ fn parse_args() -> CliArgs {
         load_log_path,
         event_log_path,
         test_map,
+        trace_positions,
+        snapshot_interval,
     }
 }
 
@@ -218,6 +240,7 @@ fn build_schedule() -> Schedule {
                 clowder::systems::time::advance_time
                     .run_if(clowder::systems::time::not_paused),
                 clowder::systems::weather::update_weather,
+                clowder::systems::wind::update_wind,
                 clowder::systems::time::emit_weather_transitions,
                 clowder::systems::magic::corruption_spread,
                 clowder::systems::magic::ward_decay,
@@ -229,6 +252,7 @@ fn build_schedule() -> Schedule {
                 clowder::systems::wildlife::predator_hunt_prey,
                 clowder::systems::prey::prey_population,
                 clowder::systems::prey::prey_hunger,
+                clowder::systems::prey::prey_ai,
                 clowder::systems::wildlife::detect_threats,
                 clowder::systems::buildings::apply_building_effects,
                 clowder::systems::buildings::decay_building_condition,
@@ -249,6 +273,7 @@ fn build_schedule() -> Schedule {
                 clowder::systems::memory::decay_memories,
                 clowder::systems::coordination::evaluate_coordinators,
                 clowder::systems::coordination::assess_colony_needs,
+                clowder::systems::coordination::accumulate_build_pressure,
             )
                 .chain(),
             // Action resolution (evaluate_actions added separately — exceeds chain param limit)
@@ -264,6 +289,7 @@ fn build_schedule() -> Schedule {
             // Social, combat, death, cleanup, narrative
             (
                 clowder::systems::social::passive_familiarity,
+                clowder::systems::personality_friction::personality_friction,
                 clowder::systems::social::check_bonds,
                 clowder::systems::colony_knowledge::update_colony_knowledge,
                 clowder::systems::combat::resolve_combat,
@@ -280,10 +306,49 @@ fn build_schedule() -> Schedule {
         )
             .chain(),
     );
+    // Disposition systems — must mirror SimulationPlugin ordering.
+    schedule.add_systems(clowder::systems::disposition::check_anxiety_interrupts);
+    schedule.add_systems(
+        clowder::systems::disposition::evaluate_dispositions
+            .after(clowder::systems::disposition::check_anxiety_interrupts),
+    );
+    // Flush commands so Disposition is visible to disposition_to_chain and evaluate_actions.
+    schedule.add_systems(
+        bevy_ecs::schedule::ApplyDeferred
+            .after(clowder::systems::disposition::evaluate_dispositions)
+            .before(clowder::systems::disposition::disposition_to_chain),
+    );
+    schedule.add_systems(
+        clowder::systems::disposition::disposition_to_chain
+            .after(clowder::systems::disposition::evaluate_dispositions),
+    );
+    // Flush commands so TaskChain is visible to resolve_disposition_chains.
+    schedule.add_systems(
+        bevy_ecs::schedule::ApplyDeferred
+            .after(clowder::systems::disposition::disposition_to_chain)
+            .before(clowder::systems::disposition::resolve_disposition_chains),
+    );
+    schedule.add_systems(
+        clowder::systems::disposition::resolve_disposition_chains
+            .after(clowder::systems::disposition::disposition_to_chain)
+            .before(clowder::systems::task_chains::resolve_task_chains),
+    );
+
     // These systems exceed Bevy's chain param limit — register separately.
-    schedule.add_systems(clowder::systems::ai::evaluate_actions);
+    schedule.add_systems(
+        clowder::systems::ai::evaluate_actions
+            .after(clowder::systems::disposition::disposition_to_chain),
+    );
+    schedule.add_systems(clowder::systems::personality_events::emit_personality_events);
     schedule.add_systems(clowder::systems::ai::emit_periodic_events);
-    schedule.add_systems(clowder::systems::snapshot::emit_cat_snapshots);
+    schedule.add_systems(
+        clowder::systems::snapshot::emit_cat_snapshots
+            .after(clowder::systems::actions::resolve_actions),
+    );
+    schedule.add_systems(
+        clowder::systems::snapshot::emit_position_traces
+            .after(clowder::systems::actions::resolve_actions),
+    );
     // Fate and aspiration lifecycle.
     schedule.add_systems(clowder::systems::fate::assign_fated_connections);
     schedule.add_systems(clowder::systems::fate::awaken_fated_connections);
@@ -324,6 +389,18 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
 
     // Always insert the event log for mechanical debugging.
     world.insert_resource(EventLog::default());
+
+    // Wind state for scent-based hunting.
+    if !world.contains_resource::<clowder::resources::wind::WindState>() {
+        world.insert_resource(clowder::resources::wind::WindState::default());
+    }
+
+    // Snapshot configuration (overridden by CLI flags).
+    world.insert_resource(clowder::resources::snapshot_config::SnapshotConfig {
+        full_snapshot_interval: args.snapshot_interval,
+        position_trace_interval: args.trace_positions,
+        economy_interval: args.snapshot_interval,
+    });
 
     // Ensure new resources exist (may be absent from older saves).
     if !world.contains_resource::<clowder::resources::ColonyKnowledge>() {
@@ -529,7 +606,7 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
     let mut map = if test_map {
         clowder::world_gen::test_map::generate_test_map()
     } else {
-        generate_terrain(80, 60, &mut sim_rng.rng)
+        generate_terrain(120, 90, &mut sim_rng.rng)
     };
 
     // Set initial corruption and mystery on special tiles.

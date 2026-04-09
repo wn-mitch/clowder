@@ -40,3 +40,24 @@ inspect name *ARGS:
 
 # Run all checks
 ci: check test
+
+# Build optimized release binary
+release-build:
+    cargo build --release
+
+# Tag and push a release (triggers GitHub Actions)
+release VERSION:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Bumping to {{VERSION}}..."
+    sed -i '' 's/^version = ".*"/version = "{{VERSION}}"/' Cargo.toml
+    cargo check --quiet
+    echo ""
+    echo "Update CHANGELOG.md with the release date, then press Enter."
+    read -r _
+    jj commit -m "chore: release v{{VERSION}}"
+    jj git push
+    jj git export
+    git tag "v{{VERSION}}"
+    git push origin "v{{VERSION}}"
+    echo "Pushed v{{VERSION}} — GitHub Actions will build and publish the release."

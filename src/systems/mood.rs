@@ -2,7 +2,7 @@ use bevy_ecs::prelude::*;
 
 use crate::components::mental::{Mood, MoodModifier};
 use crate::components::personality::Personality;
-use crate::components::physical::{Dead, Position};
+use crate::components::physical::{Dead, Needs, Position};
 use crate::resources::relationships::Relationships;
 
 // ---------------------------------------------------------------------------
@@ -15,9 +15,9 @@ use crate::resources::relationships::Relationships;
 /// Effective valence = personality baseline + positive modifiers +
 /// anxiety-amplified negative modifiers, clamped to [-1.0, 1.0].
 pub fn update_mood(
-    mut query: Query<(&mut Mood, &Personality), Without<Dead>>,
+    mut query: Query<(&mut Mood, &Personality, &Needs), Without<Dead>>,
 ) {
-    for (mut mood, personality) in &mut query {
+    for (mut mood, personality, needs) in &mut query {
         // Tick down and remove expired modifiers.
         mood.modifiers.retain_mut(|m| {
             m.ticks_remaining = m.ticks_remaining.saturating_sub(1);
@@ -38,9 +38,33 @@ pub fn update_mood(
             .sum();
 
         // Anxious cats feel negative events more intensely.
-        let amplified_negative = negative_sum * (1.0 + personality.anxiety * 0.5);
+        // Temper amplifies negatives when physiological needs are unmet.
+        let phys = needs.physiological_satisfaction();
+        let temper_amp = personality.temper * 0.3 * (1.0 - phys);
+        let amplified_negative = negative_sum * (1.0 + personality.anxiety * 0.5 + temper_amp);
 
         mood.valence = (baseline + positive_sum + amplified_negative).clamp(-1.0, 1.0);
+
+        // Pride: wounded pride generates per-tick negative modifier when
+        // respect is critically low.
+        if needs.respect < 0.3 && !mood.modifiers.iter().any(|m| m.source == "wounded pride") {
+            mood.modifiers.push_back(MoodModifier {
+                amount: -(personality.pride * 0.15),
+                ticks_remaining: 1,
+                source: "wounded pride".to_string(),
+            });
+        }
+    }
+}
+
+/// Extend a positive mood modifier's duration based on a cat's patience.
+///
+/// Called at modifier creation time (not per-tick). At patience=1.0, positive
+/// modifiers last 30% longer. Negative modifiers are unaffected.
+pub fn patience_extend(modifier: &mut MoodModifier, patience: f32) {
+    if modifier.amount > 0.0 {
+        let extension = (patience * modifier.ticks_remaining as f32 * 0.3).round() as u64;
+        modifier.ticks_remaining += extension;
     }
 }
 
@@ -54,16 +78,16 @@ pub fn update_mood(
 /// other. Influence scales with proximity, fondness, and the source's mood
 /// intensity. Applied as short-duration modifiers so it fades naturally.
 pub fn mood_contagion(
-    mut query: Query<(Entity, &Position, &mut Mood), Without<Dead>>,
+    mut query: Query<(Entity, &Position, &mut Mood, &Personality), Without<Dead>>,
     relationships: Res<Relationships>,
 ) {
     // Read pass: snapshot all positions and valences.
     let snapshot: Vec<(Entity, Position, f32)> = query.iter()
-        .map(|(e, p, m)| (e, *p, m.valence))
+        .map(|(e, p, m, _)| (e, *p, m.valence))
         .collect();
 
     // Write pass: apply contagion modifiers.
-    for (entity, pos, mut mood) in &mut query {
+    for (entity, pos, mut mood, personality) in &mut query {
         for &(other_entity, other_pos, other_valence) in &snapshot {
             if entity == other_entity {
                 continue;
@@ -78,7 +102,9 @@ pub fn mood_contagion(
                 .map_or(0.0, |r| r.fondness);
             let fondness_weight = (fondness + 1.0) / 2.0; // map -1..1 to 0..1
             let weight = (1.0 / dist as f32) * fondness_weight * other_valence.abs();
-            let influence = other_valence * weight * 0.02;
+            // Stubborn cats resist mood contagion.
+            let influence = other_valence * weight * 0.02
+                * (1.0 - personality.stubbornness * 0.2);
 
             mood.modifiers.push_back(MoodModifier {
                 amount: influence,
@@ -142,6 +168,7 @@ mod tests {
                     modifiers: VecDeque::from(modifiers),
                 },
                 personality,
+                Needs::default(),
             ))
             .id()
     }
@@ -324,6 +351,7 @@ mod tests {
                 modifiers: VecDeque::new(),
             },
             Position::new(5, 5),
+            default_personality(),
         )).id();
 
         // Neutral cat at (6, 5) — 1 tile away
@@ -331,6 +359,7 @@ mod tests {
             .spawn((
                 Mood::default(),
                 Position::new(6, 5),
+                default_personality(),
             ))
             .id();
 
@@ -362,6 +391,7 @@ mod tests {
                 modifiers: VecDeque::new(),
             },
             Position::new(0, 0),
+            default_personality(),
         ));
 
         // Distant cat at (4, 0) — 4 tiles away
@@ -369,6 +399,7 @@ mod tests {
             .spawn((
                 Mood::default(),
                 Position::new(4, 0),
+                default_personality(),
             ))
             .id();
 
@@ -394,10 +425,12 @@ mod tests {
         let src_h = world_high.spawn((
             Mood { valence: 0.8, modifiers: VecDeque::new() },
             Position::new(5, 5),
+            default_personality(),
         )).id();
         let rcv_h = world_high.spawn((
             Mood::default(),
             Position::new(6, 5),
+            default_personality(),
         )).id();
         world_high.resource_mut::<Relationships>()
             .get_or_insert(src_h, rcv_h).fondness = 0.9;
@@ -407,10 +440,12 @@ mod tests {
         let src_l = world_low.spawn((
             Mood { valence: 0.8, modifiers: VecDeque::new() },
             Position::new(5, 5),
+            default_personality(),
         )).id();
         let rcv_l = world_low.spawn((
             Mood::default(),
             Position::new(6, 5),
+            default_personality(),
         )).id();
         world_low.resource_mut::<Relationships>()
             .get_or_insert(src_l, rcv_l).fondness = -0.8;

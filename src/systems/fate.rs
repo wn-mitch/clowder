@@ -16,10 +16,14 @@ use crate::resources::zodiac::ZodiacData;
 // assign_fated_connections
 // ---------------------------------------------------------------------------
 
+/// Minimum ticks between fate assignments, so narrative messages don't flood.
+const FATE_ASSIGN_COOLDOWN: u64 = 50;
+
 /// Assigns fated love and fated rival connections to cats reaching Young stage.
 ///
 /// Runs every tick but only processes cats that lack the `FateAssigned` marker.
-/// Uses deferred `Commands` to insert components, so mutual pairs are safe.
+/// Throttled to assign at most one cat per `FATE_ASSIGN_COOLDOWN` ticks so
+/// narrative messages trickle in rather than arriving in a burst at game start.
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub fn assign_fated_connections(
     query: Query<
@@ -38,8 +42,14 @@ pub fn assign_fated_connections(
     mut log: ResMut<NarrativeLog>,
     mut rng: ResMut<SimRng>,
     mut commands: Commands,
+    mut last_assign_tick: Local<u64>,
 ) {
     let Some(zodiac_data) = zodiac_data else { return };
+
+    // Throttle: wait at least FATE_ASSIGN_COOLDOWN ticks between assignments.
+    if time.tick < *last_assign_tick + FATE_ASSIGN_COOLDOWN {
+        return;
+    }
 
     // Collect entities that already have fated connections to avoid double-assignment.
     let has_love: std::collections::HashSet<Entity> = existing_loves.iter().collect();
@@ -63,6 +73,8 @@ pub fn assign_fated_connections(
 
         // Mark as processed regardless of whether we find a match.
         commands.entity(entity).insert(FateAssigned);
+        // Record this tick and process only one cat per invocation.
+        *last_assign_tick = time.tick;
 
         // --- Fated love ---
         if !has_love.contains(&entity) && !love_assigned_this_tick.contains(&entity) {
@@ -161,6 +173,9 @@ pub fn assign_fated_connections(
                 );
             }
         }
+
+        // Only process one cat per invocation to stagger narrative messages.
+        break;
     }
 }
 
@@ -201,6 +216,7 @@ pub fn awaken_fated_connections(
     }
     love_pairs.sort();
     love_pairs.dedup();
+    love_pairs.truncate(1); // At most one awakening per tick.
 
     for (a, b) in &love_pairs {
         if let Ok((_, _, _, mut love_a)) = love_query.get_mut(*a) {
@@ -236,6 +252,7 @@ pub fn awaken_fated_connections(
     }
     rival_pairs.sort();
     rival_pairs.dedup();
+    rival_pairs.truncate(1); // At most one awakening per tick.
 
     for (a, b) in &rival_pairs {
         if let Ok((_, _, _, _, mut rival_a)) = rival_query.get_mut(*a) {
@@ -325,6 +342,12 @@ mod tests {
         )).id()
     }
 
+    /// Advance tick by the given amount to surpass the cooldown.
+    fn advance_tick(world: &mut World, delta: u64) {
+        let mut time = world.resource_mut::<TimeState>();
+        time.tick += delta;
+    }
+
     #[test]
     fn assigns_fated_love_to_young_cats() {
         let (mut world, mut schedule) = test_world();
@@ -333,9 +356,11 @@ mod tests {
         let _a = spawn_cat(&mut world, "Bramble", ZodiacSign::LeapingFlame, 90_000);
         let _b = spawn_cat(&mut world, "Fern", ZodiacSign::StormFur, 90_000);
 
+        // First run assigns one cat; second run (after cooldown) assigns the other.
+        schedule.run(&mut world);
+        advance_tick(&mut world, FATE_ASSIGN_COOLDOWN);
         schedule.run(&mut world);
 
-        // Both should have FateAssigned and FatedLove.
         let love_count = world.query::<&FatedLove>().iter(&world).count();
         assert_eq!(love_count, 2, "both cats should have FatedLove");
 
@@ -364,10 +389,38 @@ mod tests {
         let b = spawn_cat(&mut world, "Fern", ZodiacSign::StormFur, 90_000);
 
         schedule.run(&mut world);
+        advance_tick(&mut world, FATE_ASSIGN_COOLDOWN);
+        schedule.run(&mut world);
 
         let love_a = world.get::<FatedLove>(a).expect("A should have love");
         let love_b = world.get::<FatedLove>(b).expect("B should have love");
         assert_eq!(love_a.partner, b);
         assert_eq!(love_b.partner, a);
+    }
+
+    #[test]
+    fn fate_assignments_are_throttled() {
+        let (mut world, mut schedule) = test_world();
+
+        let _a = spawn_cat(&mut world, "Bramble", ZodiacSign::LeapingFlame, 90_000);
+        let _b = spawn_cat(&mut world, "Fern", ZodiacSign::StormFur, 90_000);
+        let _c = spawn_cat(&mut world, "Moss", ZodiacSign::WarmDen, 90_000);
+        let _d = spawn_cat(&mut world, "Reed", ZodiacSign::LoneThorn, 90_000);
+
+        // Single run should only assign one cat.
+        schedule.run(&mut world);
+        let assigned = world.query::<&FateAssigned>().iter(&world).count();
+        assert_eq!(assigned, 1, "only one cat should be assigned per tick");
+
+        // Running again without advancing tick should not assign more.
+        schedule.run(&mut world);
+        let assigned = world.query::<&FateAssigned>().iter(&world).count();
+        assert_eq!(assigned, 1, "cooldown should prevent immediate re-assignment");
+
+        // After cooldown, one more should be assigned.
+        advance_tick(&mut world, FATE_ASSIGN_COOLDOWN);
+        schedule.run(&mut world);
+        let assigned = world.query::<&FateAssigned>().iter(&world).count();
+        assert_eq!(assigned, 2, "second cat should be assigned after cooldown");
     }
 }

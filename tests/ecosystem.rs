@@ -91,8 +91,9 @@ fn rats_grow_when_unchecked() {
 #[test]
 fn population_respects_carrying_capacity() {
     let (mut world, mut schedule) = setup_ecosystem();
-    // Rat cap is 50; start at 45.
-    spawn_rats(&mut world, 45);
+    let cap = PreySpecies::Rat.population_cap();
+    // Start near cap.
+    spawn_rats(&mut world, cap - 1);
 
     for _ in 0..500 {
         schedule.run(&mut world);
@@ -100,9 +101,8 @@ fn population_respects_carrying_capacity() {
 
     let count = count_prey(&mut world, PreySpecies::Rat);
     assert!(
-        count <= PreySpecies::Rat.population_cap(),
-        "rat count {count} exceeded cap of {}",
-        PreySpecies::Rat.population_cap()
+        count <= cap,
+        "rat count {count} exceeded cap of {cap}",
     );
 }
 
@@ -110,10 +110,11 @@ fn population_respects_carrying_capacity() {
 #[test]
 fn density_pressure_logged_near_cap() {
     let (mut world, mut schedule) = setup_ecosystem();
-    // Start at 48/50 — deep in the crowded zone (density_pressure < 0.1).
+    let cap = PreySpecies::Rat.population_cap();
+    // Start deep in the crowded zone (density_pressure < 0.1).
     // Use a large log capacity so early messages aren't evicted.
     world.resource_mut::<NarrativeLog>().capacity = 5000;
-    spawn_rats(&mut world, 48);
+    spawn_rats(&mut world, cap);
 
     for _ in 0..5000 {
         schedule.run(&mut world);

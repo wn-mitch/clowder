@@ -26,6 +26,7 @@ use crate::resources::food::FoodStores;
 use crate::resources::map::{Terrain, TileMap};
 use crate::resources::relationships::Relationships;
 use crate::resources::rng::SimRng;
+use crate::resources::time::TimeState;
 
 // ---------------------------------------------------------------------------
 // Terrain helpers
@@ -247,18 +248,35 @@ fn pick_directive_target(
 // emit_periodic_events system
 // ---------------------------------------------------------------------------
 
-/// Emit periodic food-level snapshots to the event log.
+/// Emit periodic food-level and population snapshots to the event log.
 pub fn emit_periodic_events(
+    config: Res<crate::resources::snapshot_config::SnapshotConfig>,
     time: Res<crate::resources::time::TimeState>,
     food: Res<FoodStores>,
+    prey: Query<&crate::components::prey::PreyAnimal>,
     mut event_log: Option<ResMut<EventLog>>,
 ) {
+    let interval = config.economy_interval;
     if let Some(ref mut log) = event_log {
-        if time.tick.is_multiple_of(100) {
+        if interval > 0 && time.tick.is_multiple_of(interval) {
             log.push(time.tick, EventKind::FoodLevel {
                 current: food.current,
                 capacity: food.capacity,
                 fraction: food.fraction(),
+            });
+
+            use crate::components::prey::PreySpecies;
+            let (mut mice, mut rats, mut fish, mut birds) = (0, 0, 0, 0);
+            for p in &prey {
+                match p.species {
+                    PreySpecies::Mouse => mice += 1,
+                    PreySpecies::Rat => rats += 1,
+                    PreySpecies::Fish => fish += 1,
+                    PreySpecies::Bird => birds += 1,
+                }
+            }
+            log.push(time.tick, EventKind::PopulationSnapshot {
+                mice, rats, fish, birds,
             });
         }
     }
@@ -306,8 +324,7 @@ pub fn evaluate_actions(
     map: Res<TileMap>,
     food: Res<FoodStores>,
     relationships: Res<Relationships>,
-    colony_knowledge: Option<Res<crate::resources::colony_knowledge::ColonyKnowledge>>,
-    colony_priority: Option<Res<crate::resources::colony_priority::ColonyPriority>>,
+    colony: super::ColonyContext,
     mut rng: ResMut<SimRng>,
     mut commands: Commands,
 ) {
@@ -491,6 +508,11 @@ pub fn evaluate_actions(
                 entity, pos, skills, &cat_positions, &skills_query,
             ),
             prey_nearby,
+            phys_satisfaction: needs.physiological_satisfaction(),
+            respect: needs.respect,
+            has_active_disposition: false, // evaluate_actions runs for cats WITHOUT disposition
+            active_disposition: None,
+            tradition_location_bonus: 0.0, // TODO: wire up in Step 8 with LocationPreferences
         };
         let mut scores = score_actions(&ctx, &mut rng.rng);
 
@@ -498,12 +520,12 @@ pub fn evaluate_actions(
         apply_memory_bonuses(&mut scores, memory, pos);
 
         // Colony knowledge: broader awareness from shared memories.
-        if let Some(ref ck) = colony_knowledge {
+        if let Some(ref ck) = colony.knowledge {
             apply_colony_knowledge_bonuses(&mut scores, ck, pos);
         }
 
         // Player-set colony priority.
-        if let Some(ref cp) = colony_priority {
+        if let Some(ref cp) = colony.priority {
             apply_priority_bonus(&mut scores, cp.active);
         }
 
@@ -546,7 +568,8 @@ pub fn evaluate_actions(
                 * 0.5
                 * personality.diligence
                 * fondness_factor
-                * (1.0 - personality.independence * 0.3);
+                * (1.0 - personality.independence * 0.3)
+                * (1.0 - personality.stubbornness * 0.4);
             apply_directive_bonus(&mut scores, directive.kind.to_action(), bonus);
         }
 
@@ -1166,6 +1189,7 @@ mod tests {
         world.insert_resource(FoodStores::new(10.0, 30.0, 0.002));
         world.insert_resource(SimRng::new(42));
         world.insert_resource(Relationships::default());
+        world.insert_resource(TimeState::default());
         let mut schedule = Schedule::default();
         schedule.add_systems(evaluate_actions);
         (world, schedule)

@@ -81,6 +81,12 @@ pub fn setup_world_exclusive(world: &mut World) {
 
     // Always insert the event log for mechanical debugging.
     world.insert_resource(EventLog::default());
+    if !world.contains_resource::<crate::resources::snapshot_config::SnapshotConfig>() {
+        world.insert_resource(crate::resources::snapshot_config::SnapshotConfig::default());
+    }
+    if !world.contains_resource::<crate::resources::wind::WindState>() {
+        world.insert_resource(crate::resources::wind::WindState::default());
+    }
 
 
     // Ensure new resources exist (may be absent from older saves).
@@ -107,7 +113,7 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
         eprintln!("Using hand-crafted test map for rendering debug");
         crate::world_gen::test_map::generate_test_map()
     } else {
-        generate_terrain(80, 60, &mut sim_rng.rng)
+        generate_terrain(120, 90, &mut sim_rng.rng)
     };
 
     // Set initial corruption and mystery on special tiles.

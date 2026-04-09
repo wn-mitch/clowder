@@ -11,7 +11,8 @@ use crate::ai::scoring::{
     enforce_survival_floor, score_actions, select_disposition_softmax, ScoringContext,
 };
 use crate::ai::{Action, CurrentAction};
-use crate::components::building::{ConstructionSite, CropState, Structure, StructureType};
+use crate::components::building::{ConstructionSite, CropState, StoredItems, Structure, StructureType};
+use crate::components::items::{Item, ItemLocation};
 use crate::components::coordination::{
     ActiveDirective, Directive, DirectiveKind, DirectiveQueue, PendingDelivery,
 };
@@ -205,8 +206,7 @@ pub fn evaluate_dispositions(
     map: Res<TileMap>,
     food: Res<FoodStores>,
     relationships: Res<Relationships>,
-    colony_knowledge: Option<Res<crate::resources::colony_knowledge::ColonyKnowledge>>,
-    colony_priority: Option<Res<crate::resources::colony_priority::ColonyPriority>>,
+    colony: super::ColonyContext,
     mut rng: ResMut<SimRng>,
     mut commands: Commands,
 ) {
@@ -399,16 +399,21 @@ pub fn evaluate_dispositions(
                 .map_or(0, |(len, _)| *len),
             has_mentoring_target: has_mentoring_target_fn(entity, pos, skills),
             prey_nearby,
+            phys_satisfaction: needs.physiological_satisfaction(),
+            respect: needs.respect,
+            has_active_disposition: false, // evaluate_dispositions runs for cats WITHOUT disposition
+            active_disposition: None,
+            tradition_location_bonus: 0.0, // TODO: wire up with LocationPreferences
         };
 
         let mut scores = score_actions(&ctx, &mut rng.rng);
 
         // Apply all bonus layers (identical to evaluate_actions).
         apply_memory_bonuses(&mut scores, memory, pos);
-        if let Some(ref ck) = colony_knowledge {
+        if let Some(ref ck) = colony.knowledge {
             apply_colony_knowledge_bonuses(&mut scores, ck, pos);
         }
-        if let Some(ref cp) = colony_priority {
+        if let Some(ref cp) = colony.priority {
             apply_priority_bonus(&mut scores, cp.active);
         }
         let mut nearby_actions = HashMap::new();
@@ -442,7 +447,8 @@ pub fn evaluate_dispositions(
                 * 0.5
                 * personality.diligence
                 * fondness_factor
-                * (1.0 - personality.independence * 0.3);
+                * (1.0 - personality.independence * 0.3)
+                * (1.0 - personality.stubbornness * 0.4);
             apply_directive_bonus(&mut scores, directive.kind.to_action(), bonus);
         }
         enforce_survival_floor(&mut scores, needs);
@@ -457,7 +463,14 @@ pub fn evaluate_dispositions(
         let self_groom_won = self_groom_score >= other_groom_score;
 
         // Aggregate action scores to disposition scores.
-        let disposition_scores = aggregate_to_dispositions(&scores, self_groom_won);
+        let mut disposition_scores = aggregate_to_dispositions(&scores, self_groom_won);
+
+        // Independence: penalize group-oriented dispositions.
+        for (kind, score) in disposition_scores.iter_mut() {
+            if matches!(kind, DispositionKind::Coordinating | DispositionKind::Socializing) {
+                *score = (*score - personality.independence * 0.2).max(0.0);
+            }
+        }
 
         // Select disposition via softmax.
         let chosen = select_disposition_softmax(&disposition_scores, &mut rng.rng);
@@ -514,6 +527,47 @@ fn has_nearby_tile(
     predicate: impl Fn(Terrain) -> bool,
 ) -> bool {
     find_nearest_tile(from, map, radius, predicate).is_some()
+}
+
+/// Find a random tile matching `predicate` within `radius`, weighted by inverse
+/// distance so closer tiles are more likely but cats don't all converge on the
+/// same nearest tile.
+fn find_random_nearby_tile(
+    from: &Position,
+    map: &TileMap,
+    radius: i32,
+    predicate: impl Fn(Terrain) -> bool,
+    rng: &mut impl Rng,
+) -> Option<Position> {
+    let mut candidates: Vec<(Position, f32)> = Vec::new();
+    for dy in -radius..=radius {
+        for dx in -radius..=radius {
+            let p = Position::new(from.x + dx, from.y + dy);
+            if map.in_bounds(p.x, p.y) {
+                let tile = map.get(p.x, p.y);
+                if predicate(tile.terrain) {
+                    let dist = from.manhattan_distance(&p);
+                    if dist > 0 {
+                        // Weight: inverse distance squared — close tiles strongly
+                        // preferred, but not deterministically.
+                        candidates.push((p, 1.0 / (dist as f32 * dist as f32)));
+                    }
+                }
+            }
+        }
+    }
+    if candidates.is_empty() {
+        return None;
+    }
+    let total: f32 = candidates.iter().map(|(_, w)| w).sum();
+    let mut roll: f32 = rng.random::<f32>() * total;
+    for (pos, weight) in &candidates {
+        roll -= weight;
+        if roll <= 0.0 {
+            return Some(*pos);
+        }
+    }
+    Some(candidates.last().unwrap().0)
 }
 
 // ===========================================================================
@@ -581,15 +635,22 @@ pub fn disposition_to_chain(
             continue;
         }
 
+        // Pre-compute nearest Stores building for chains that need a return leg.
+        let nearest_store = building_query
+            .iter()
+            .filter(|(_, s, _, site, _)| s.kind == StructureType::Stores && site.is_none())
+            .min_by_key(|(_, _, bp, _, _)| pos.manhattan_distance(bp))
+            .map(|(e, _, bp, _, _)| (e, *bp));
+
         let chain = match disposition.kind {
             DispositionKind::Resting => {
                 build_resting_chain(needs, pos, &building_query, &map)
             }
             DispositionKind::Hunting => {
-                build_hunting_chain(pos, &memory, &map, &mut rng.rng)
+                build_hunting_chain(pos, &memory, &map, nearest_store, &mut rng.rng)
             }
             DispositionKind::Foraging => {
-                build_foraging_chain(pos, &map)
+                build_foraging_chain(pos, &map, nearest_store, &mut rng.rng)
             }
             DispositionKind::Guarding => {
                 build_guarding_chain(pos, &wildlife, &map, &mut rng.rng)
@@ -646,7 +707,7 @@ pub fn disposition_to_chain(
 fn should_complete_disposition(disposition: &Disposition, needs: &Needs) -> bool {
     match disposition.kind {
         DispositionKind::Resting => {
-            needs.hunger >= 0.85 && needs.energy >= 0.85 && needs.warmth >= 0.80
+            needs.hunger >= 0.75 && needs.energy >= 0.75 && needs.warmth >= 0.70
         }
         _ => disposition.is_count_complete(),
     }
@@ -718,54 +779,47 @@ fn build_hunting_chain(
     pos: &Position,
     memory: &Memory,
     map: &TileMap,
+    nearest_store: Option<(Entity, Position)>,
     rng: &mut impl Rng,
 ) -> Option<(TaskChain, Action)> {
-    // Pick hunt target from memory or nearest forest.
-    let remembered: Vec<&Position> = memory
-        .events
-        .iter()
-        .filter(|e| e.event_type == MemoryType::ResourceFound && e.location.is_some())
-        .filter_map(|e| e.location.as_ref())
-        .collect();
-
-    let target = if !remembered.is_empty() {
-        let idx = rng.random_range(0..remembered.len());
-        Some(*remembered[idx])
-    } else {
-        find_nearest_tile(pos, map, 15, |t| {
-            matches!(t, Terrain::DenseForest | Terrain::LightForest)
-        })
-    };
-
-    let target = target?;
-
-    // Hunt chain: walk to hunting grounds, hunt prey, walk to stores, deposit.
-    // The HuntPrey step handles the actual prey kill + inventory pickup.
-    // After the chain completes, disposition_to_chain will check completions
-    // and either create another chain or mark complete.
-    let chain = TaskChain::new(
-        vec![
-            TaskStep::new(StepKind::MoveTo).with_position(target),
-            TaskStep::new(StepKind::HuntPrey).with_position(target),
-        ],
-        FailurePolicy::AbortChain,
-    );
+    // HuntPrey handles all movement internally (scent search → stalk → pounce).
+    // No MoveTo preamble — the cat starts hunting from its current position.
+    let patrol_dir = (rng.random_range(-1i32..=1), rng.random_range(-1i32..=1));
+    let mut steps = vec![
+        TaskStep::new(StepKind::HuntPrey { patrol_dir }),
+    ];
+    if let Some((store_entity, store_pos)) = nearest_store {
+        steps.push(TaskStep::new(StepKind::MoveTo).with_position(store_pos));
+        steps.push(
+            TaskStep::new(StepKind::DepositAtStores)
+                .with_position(store_pos)
+                .with_entity(store_entity),
+        );
+    }
+    let chain = TaskChain::new(steps, FailurePolicy::AbortChain);
     Some((chain, Action::Hunt))
 }
 
 fn build_foraging_chain(
-    pos: &Position,
-    map: &TileMap,
+    _pos: &Position,
+    _map: &TileMap,
+    nearest_store: Option<(Entity, Position)>,
+    rng: &mut impl Rng,
 ) -> Option<(TaskChain, Action)> {
-    let target = find_nearest_tile(pos, map, 10, |t| t.foraging_yield() > 0.0)?;
-
-    let chain = TaskChain::new(
-        vec![
-            TaskStep::new(StepKind::MoveTo).with_position(target),
-            TaskStep::new(StepKind::ForageItem).with_position(target),
-        ],
-        FailurePolicy::AbortChain,
-    );
+    // ForageItem handles all movement internally (directional patrol + tile checks).
+    let patrol_dir = (rng.random_range(-1i32..=1), rng.random_range(-1i32..=1));
+    let mut steps = vec![
+        TaskStep::new(StepKind::ForageItem { patrol_dir }),
+    ];
+    if let Some((store_entity, store_pos)) = nearest_store {
+        steps.push(TaskStep::new(StepKind::MoveTo).with_position(store_pos));
+        steps.push(
+            TaskStep::new(StepKind::DepositAtStores)
+                .with_position(store_pos)
+                .with_entity(store_entity),
+        );
+    }
+    let chain = TaskChain::new(steps, FailurePolicy::AbortChain);
     Some((chain, Action::Forage))
 }
 
@@ -1159,6 +1213,76 @@ fn build_exploring_chain(
 }
 
 // ===========================================================================
+// Scent detection helper
+// ===========================================================================
+
+/// Check if a cat can smell prey based on wind direction and terrain.
+///
+/// The cat must be roughly downwind of the prey (scent blows from prey toward
+/// cat). Forest terrain reduces scent carry. Calm wind reduces range.
+fn can_smell_prey(
+    cat_pos: &Position,
+    prey_pos: &Position,
+    wind: &crate::resources::wind::WindState,
+    map: &TileMap,
+) -> bool {
+    let dx = (prey_pos.x - cat_pos.x) as f32;
+    let dy = (prey_pos.y - cat_pos.y) as f32;
+    let dist = cat_pos.manhattan_distance(prey_pos) as f32;
+    if dist == 0.0 {
+        return true;
+    }
+    // Normalize prey→cat vector (direction scent travels).
+    let (nx, ny) = (dx / dist, dy / dist);
+    let (wx, wy) = wind.direction();
+    // Positive dot = cat is downwind of prey.
+    let dot = wx * nx + wy * ny;
+    if dot < 0.3 {
+        return false;
+    }
+    // Terrain at prey position affects scent dispersal.
+    let terrain_mod = if map.in_bounds(prey_pos.x, prey_pos.y) {
+        match map.get(prey_pos.x, prey_pos.y).terrain {
+            Terrain::DenseForest => 0.25,
+            Terrain::LightForest => 0.5,
+            _ => 1.0,
+        }
+    } else {
+        1.0
+    };
+    let scent_range = 20.0 * wind.strength * terrain_mod;
+    dist <= scent_range
+}
+
+/// Move one tile in direction (dx, dy). If blocked, try perpendicular or
+/// reverse. Returns the new position. Guaranteed to attempt movement — never
+/// returns the original position without trying alternatives.
+fn patrol_move(
+    pos: &Position,
+    dx: i32,
+    dy: i32,
+    map: &TileMap,
+) -> Position {
+    // Primary direction.
+    let primary = Position::new(pos.x + dx, pos.y + dy);
+    if map.in_bounds(primary.x, primary.y) && map.get(primary.x, primary.y).terrain.is_passable() {
+        return primary;
+    }
+    // Try perpendicular (swap dx/dy).
+    let perp = Position::new(pos.x + dy, pos.y + dx);
+    if map.in_bounds(perp.x, perp.y) && map.get(perp.x, perp.y).terrain.is_passable() {
+        return perp;
+    }
+    // Try reverse.
+    let rev = Position::new(pos.x - dx, pos.y - dy);
+    if map.in_bounds(rev.x, rev.y) && map.get(rev.x, rev.y).terrain.is_passable() {
+        return rev;
+    }
+    // Stuck — stay put.
+    *pos
+}
+
+// ===========================================================================
 // resolve_disposition_chains
 // ===========================================================================
 
@@ -1174,33 +1298,42 @@ pub fn resolve_disposition_chains(
             &mut Position,
             &mut Skills,
             &mut Needs,
+            &mut Inventory,
+            &Personality,
             Option<&mut Disposition>,
             Option<&mut ActionHistory>,
         ),
-        (Without<Dead>, Without<Structure>),
+        (Without<Dead>, Without<Structure>, Without<PreyAnimal>),
     >,
-    prey_query: Query<(Entity, &Position), With<PreyAnimal>>,
+    mut prey_query: Query<(Entity, &Position, &mut PreyAnimal)>,
+    mut stores_query: Query<&mut StoredItems>,
+    items_query: Query<&Item>,
     map: Res<TileMap>,
-    mut food: ResMut<FoodStores>,
+    wind: Res<crate::resources::wind::WindState>,
+    mut log: ResMut<crate::resources::narrative::NarrativeLog>,
     time: Res<TimeState>,
-    _rng: ResMut<SimRng>,
+    mut rng: ResMut<SimRng>,
     mut commands: Commands,
 ) {
     let mut chains_to_remove: Vec<Entity> = Vec::new();
 
-    for (cat_entity, mut chain, mut current, mut pos, mut skills, mut needs, disposition, history) in &mut cats {
+    for (cat_entity, mut chain, mut current, mut pos, mut skills, mut needs, mut inventory, personality, disposition, history) in &mut cats {
         let Some(step) = chain.current_mut() else {
-            // Chain exhausted — handle completion.
+            // Chain exhausted — handle completion or failure.
             chains_to_remove.push(cat_entity);
             if let Some(mut disp) = disposition {
-                disp.completions += 1;
-                // Record success in history.
+                let outcome = if chain.is_succeeded() {
+                    disp.completions += 1;
+                    ActionOutcome::Success
+                } else {
+                    ActionOutcome::Failure
+                };
                 if let Some(mut hist) = history {
                     hist.record(ActionRecord {
                         action: current.action,
                         disposition: Some(disp.kind),
                         tick: time.tick,
-                        outcome: ActionOutcome::Success,
+                        outcome,
                     });
                 }
             }
@@ -1211,8 +1344,8 @@ pub fn resolve_disposition_chains(
         // Only handle disposition-specific steps; skip others.
         let is_disposition_step = matches!(
             step.kind,
-            StepKind::HuntPrey
-                | StepKind::ForageItem
+            StepKind::HuntPrey { .. }
+                | StepKind::ForageItem { .. }
                 | StepKind::DepositAtStores
                 | StepKind::EatAtStores
                 | StepKind::Sleep { .. }
@@ -1243,51 +1376,235 @@ pub fn resolve_disposition_chains(
         };
 
         match &step.kind {
-            StepKind::HuntPrey => {
-                if ticks >= 10 {
-                    // Find nearest prey and kill it.
-                    let nearest_prey = prey_query
-                        .iter()
-                        .filter(|(_, pp)| pos.manhattan_distance(pp) <= 3)
-                        .min_by_key(|(_, pp)| pos.manhattan_distance(pp));
+            StepKind::HuntPrey { patrol_dir } => {
+                // Multi-phase hunt: Search → Stalk → Pounce.
+                // Phase is implicit from step.target_entity:
+                //   None = Search (scent-based) or Approach (scent locked)
+                //   Some = Stalk/Pounce (prey visible)
+                use crate::components::magic::ItemSlot;
+                use crate::components::prey::PreyAiState;
 
-                    if let Some((prey_entity, _)) = nearest_prey {
-                        commands.entity(prey_entity).despawn();
-                        food.deposit(2.0);
-                        skills.hunting += skills.growth_rate() * 0.01;
-                        chain.advance();
+                if let Some(target_entity) = step.target_entity {
+                    // We have a locked target — check if it still exists.
+                    let Ok((_, prey_pos, _)) = prey_query.get(target_entity) else {
+                        // Prey despawned (caught by another cat or died).
+                        step.target_entity = None;
+                        continue; // Re-evaluate next tick as Search.
+                    };
+                    let prey_pos = *prey_pos;
+                    let dist = pos.manhattan_distance(&prey_pos);
+
+                    // Determine pounce range from patience.
+                    let pounce_range: i32 = if personality.patience > 0.7 {
+                        1
+                    } else if personality.patience < 0.3 {
+                        2
                     } else {
-                        // No prey found — fail step.
-                        chain.fail_current("no prey within reach".into());
+                        1
+                    };
+
+                    if dist <= pounce_range {
+                        // === POUNCE ===
+                        let distance_mod = if dist <= 1 { 1.0 } else { 0.6 };
+                        let success_chance = 0.5
+                            * (0.5 + skills.hunting * 0.5)
+                            * distance_mod;
+
+                        if rng.rng.random::<f32>() < success_chance {
+                            // Catch!
+                            let prey_data = prey_query.get(target_entity).unwrap().2;
+                            let item_kind = prey_data.species.item_kind();
+                            let species_name = prey_data.species.name();
+                            commands.entity(target_entity).despawn();
+
+                            if !inventory.is_full() {
+                                inventory.slots.push(ItemSlot::Item(item_kind));
+                            }
+                            skills.hunting += skills.growth_rate() * 0.01;
+
+                            log.push(
+                                time.tick,
+                                format!("A cat catches a {species_name}."),
+                                crate::resources::narrative::NarrativeTier::Action,
+                            );
+                            chain.advance();
+                        } else {
+                            // Pounce failed — prey bolts.
+                            if let Ok((_, _, mut prey_animal)) = prey_query.get_mut(target_entity) {
+                                prey_animal.ai_state = PreyAiState::Fleeing {
+                                    from: cat_entity,
+                                    ticks: 0,
+                                };
+                            }
+
+                            log.push(
+                                time.tick,
+                                format!("The prey bolts."),
+                                crate::resources::narrative::NarrativeTier::Micro,
+                            );
+
+                            if personality.boldness > 0.7 {
+                                // Bold cat: brief chase (keep target, fail after 5 more ticks).
+                                if ticks > 5 {
+                                    chain.fail_current("prey escaped after chase".into());
+                                }
+                                // Otherwise keep pursuing — step_toward will run next tick.
+                            } else {
+                                // Cat watches prey escape, then gives up.
+                                chain.fail_current("pounce missed".into());
+                            }
+                        }
+                    } else if dist <= 5 {
+                        // === STALK === (slow, deliberate)
+                        // Move every 2 ticks (half speed).
+                        if ticks % 2 == 0 {
+                            if let Some(next) = step_toward(&pos, &prey_pos, &map) {
+                                *pos = next;
+                            }
+                        }
+                        // Anxiety check: nervous cat spooks prey.
+                        if personality.anxiety > 0.7 && rng.rng.random::<f32>() < 0.15 {
+                            if let Ok((_, _, mut prey_animal)) = prey_query.get_mut(target_entity) {
+                                prey_animal.ai_state = PreyAiState::Fleeing {
+                                    from: cat_entity,
+                                    ticks: 0,
+                                };
+                            }
+                            chain.fail_current("spooked the prey".into());
+                        }
+                    } else {
+                        // === APPROACH === (closing distance at full speed)
+                        if let Some(next) = step_toward(&pos, &prey_pos, &map) {
+                            *pos = next;
+                        }
+                        // If scent lost (prey moved, wind shifted), drop target.
+                        if !can_smell_prey(&pos, &prey_pos, &wind, &map) && dist > 5 {
+                            step.target_entity = None;
+                        }
+                    }
+                } else {
+                    // === SEARCH === (no target yet — move upwind, scan for scent)
+                    let (wx, wy) = wind.direction();
+                    // Move into the wind (opposite of wind direction).
+                    let mut dx = if wx.abs() > 0.3 { -(wx.signum() as i32) } else { patrol_dir.0 };
+                    let mut dy = if wy.abs() > 0.3 { -(wy.signum() as i32) } else { patrol_dir.1 };
+                    // 10% jitter.
+                    if rng.rng.random::<f32>() < 0.10 {
+                        dx = rng.rng.random_range(-1i32..=1);
+                        dy = rng.rng.random_range(-1i32..=1);
+                    }
+                    // Ensure we actually move (avoid 0,0).
+                    if dx == 0 && dy == 0 { dx = 1; }
+                    *pos = patrol_move(&pos, dx, dy, &map);
+
+                    // Scan for prey scent.
+                    let scented_prey = prey_query
+                        .iter()
+                        .filter(|(_, pp, _)| can_smell_prey(&pos, pp, &wind, &map))
+                        .min_by_key(|(_, pp, _)| pos.manhattan_distance(pp));
+
+                    if let Some((prey_entity, _, _)) = scented_prey {
+                        step.target_entity = Some(prey_entity);
+                        log.push(
+                            time.tick,
+                            "A cat catches a scent on the wind.".to_string(),
+                            crate::resources::narrative::NarrativeTier::Micro,
+                        );
+                    }
+
+                    if ticks > 60 {
+                        chain.fail_current("no scent found".into());
                     }
                 }
             }
 
-            StepKind::ForageItem => {
-                if ticks >= 8 {
-                    if map.in_bounds(pos.x, pos.y) {
-                        let tile = map.get(pos.x, pos.y);
-                        let forage_yield = tile.terrain.foraging_yield();
-                        if forage_yield > 0.0 {
-                            food.deposit(forage_yield);
-                            skills.foraging += skills.growth_rate() * 0.008;
+            StepKind::ForageItem { patrol_dir } => {
+                // Active foraging: directional patrol, check each tile.
+                // Use patrol_dir with jitter and reverse-on-blocked (wildlife pattern).
+                let mut dx = patrol_dir.0;
+                let mut dy = patrol_dir.1;
+                if dx == 0 && dy == 0 { dx = 1; } // ensure movement
+                // 10% jitter.
+                if rng.rng.random::<f32>() < 0.10 {
+                    dx = rng.rng.random_range(-1i32..=1);
+                    dy = rng.rng.random_range(-1i32..=1);
+                    if dx == 0 && dy == 0 { dx = 1; }
+                }
+                *pos = patrol_move(&pos, dx, dy, &map);
+
+                // Check current tile for forage yield.
+                if map.in_bounds(pos.x, pos.y) {
+                    let tile = map.get(pos.x, pos.y);
+                    let forage_yield = tile.terrain.foraging_yield();
+                    if forage_yield > 0.0 && rng.rng.random::<f32>() < forage_yield * 0.25 {
+                        use crate::components::items::ItemKind;
+                        use crate::components::magic::ItemSlot;
+                        let item_kind = match tile.terrain {
+                            Terrain::DenseForest => {
+                                if rng.rng.random::<bool>() { ItemKind::Mushroom } else { ItemKind::Nuts }
+                            }
+                            Terrain::LightForest => {
+                                if rng.rng.random::<bool>() { ItemKind::Nuts } else { ItemKind::Berries }
+                            }
+                            _ => {
+                                if rng.rng.random::<bool>() { ItemKind::Berries } else { ItemKind::Roots }
+                            }
+                        };
+                        if !inventory.is_full() {
+                            inventory.slots.push(ItemSlot::Item(item_kind));
                         }
+                        skills.foraging += skills.growth_rate() * 0.008;
+                        chain.advance();
+                    } else if ticks > 40 {
+                        chain.fail_current("nothing found while foraging".into());
                     }
-                    chain.advance();
                 }
             }
 
             StepKind::DepositAtStores => {
-                // Instant on arrival — just advance.
+                // Transfer carried items from inventory into the store.
+                if let Some(store_entity) = step.target_entity {
+                    use crate::components::magic::ItemSlot;
+                    let food_items: Vec<crate::components::items::ItemKind> = inventory.slots
+                        .iter()
+                        .filter_map(|slot| match slot {
+                            ItemSlot::Item(kind) if kind.is_food() => Some(*kind),
+                            _ => None,
+                        })
+                        .collect();
+                    // Remove deposited items from inventory.
+                    inventory.slots.retain(|slot| !matches!(slot, ItemSlot::Item(k) if k.is_food()));
+                    // Spawn real item entities in the store.
+                    if let Ok(mut stored) = stores_query.get_mut(store_entity) {
+                        for kind in food_items {
+                            let item_entity = commands
+                                .spawn(Item::new(kind, 1.0, ItemLocation::StoredIn(store_entity)))
+                                .id();
+                            stored.add(item_entity, StructureType::Stores);
+                        }
+                    }
+                }
                 chain.advance();
             }
 
             StepKind::EatAtStores => {
                 if ticks >= 5 {
-                    if food.current > 0.0 {
-                        let eat_amount = 0.3_f32.min(food.current);
-                        food.withdraw(eat_amount);
-                        needs.hunger = (needs.hunger + eat_amount).min(1.0);
+                    if let Some(store_entity) = step.target_entity {
+                        if let Ok(mut stored) = stores_query.get_mut(store_entity) {
+                            let food_item = stored.items.iter()
+                                .copied()
+                                .find(|&item_e| {
+                                    items_query.get(item_e)
+                                        .is_ok_and(|item| item.kind.is_food())
+                                });
+                            if let Some(item_entity) = food_item {
+                                if let Ok(item) = items_query.get(item_entity) {
+                                    needs.hunger = (needs.hunger + item.kind.food_value()).min(1.0);
+                                }
+                                stored.remove(item_entity);
+                                commands.entity(item_entity).despawn();
+                            }
+                        }
                     }
                     chain.advance();
                 }
@@ -1295,7 +1612,7 @@ pub fn resolve_disposition_chains(
 
             StepKind::Sleep { ticks: duration } => {
                 // Restore energy each tick.
-                needs.energy = (needs.energy + 0.02).min(1.0);
+                needs.energy = (needs.energy + 0.04).min(1.0);
                 if ticks >= *duration {
                     chain.advance();
                 }

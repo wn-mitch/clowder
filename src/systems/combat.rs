@@ -102,11 +102,11 @@ pub fn resolve_combat(
         }
 
         // Get cat data.
-        let (cat_pos, cat_boldness, _cat_loyalty, _cat_health_pct, combat_effective, cat_name) = {
+        let (cat_pos, cat_boldness, cat_temper, _cat_loyalty, _cat_health_pct, combat_effective, cat_name) = {
             if let Ok((_, _, health, _, skills, personality, pos, name, _, _)) = cats.get(fight.cat_entity) {
                 let ce = skills.combat + skills.hunting * 0.3;
                 let hp = health.current / health.max.max(0.01);
-                (pos.manhattan_distance(&wildlife_pos), personality.boldness, personality.loyalty, hp, ce, name.0.clone())
+                (pos.manhattan_distance(&wildlife_pos), personality.boldness, personality.temper, personality.loyalty, hp, ce, name.0.clone())
             } else {
                 continue;
             }
@@ -119,6 +119,7 @@ pub fn resolve_combat(
 
         // --- Cat attacks wildlife ---
         let cat_damage = (combat_effective * cat_boldness * (1.0 + 0.2 * ally_count as f32)
+            * (1.0 + cat_temper * 0.15)
             - animal_defense
             + combat_jitter(&mut rng.rng))
             .max(0.0);
@@ -206,7 +207,8 @@ pub fn resolve_combat(
             // Cat morale check.
             let cat_hp = cat_health.current / cat_health.max.max(0.01);
             let morale = cat_hp * 0.4
-                + personality.boldness * 0.3
+                + personality.boldness * 0.2
+                + personality.temper * 0.1
                 + ally_count as f32 * 0.1
                 + personality.loyalty * 0.2;
             let morale_threshold = 0.4 + combat_jitter(&mut rng.rng);
@@ -226,16 +228,18 @@ pub fn resolve_combat(
 
     // Apply victory rewards.
     for (cat_entity, _defeated) in &victorious_cats {
-        if let Ok((_, mut current, _, mut needs, _, _, _, _, _memory, mut mood)) = cats.get_mut(*cat_entity) {
+        if let Ok((_, mut current, _, mut needs, _, personality, _, _, _memory, mut mood)) = cats.get_mut(*cat_entity) {
             needs.respect = (needs.respect + 0.1).min(1.0);
             needs.safety = (needs.safety + 0.2).min(1.0);
             current.ticks_remaining = 0; // Allow new action selection.
 
-            mood.modifiers.push_back(MoodModifier {
+            let mut victory_mod = MoodModifier {
                 amount: 0.3,
                 ticks_remaining: 50,
                 source: "won a fight".to_string(),
-            });
+            };
+            crate::systems::mood::patience_extend(&mut victory_mod, personality.patience);
+            mood.modifiers.push_back(victory_mod);
         }
     }
 

@@ -8,15 +8,17 @@ use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::components::skills::{Corruption, MagicAffinity, Skills};
 use crate::resources::event_log::{EventKind, EventLog, RelationshipEntry};
 use crate::resources::relationships::Relationships;
+use crate::resources::snapshot_config::SnapshotConfig;
 use crate::resources::time::TimeState;
 
 // ---------------------------------------------------------------------------
 // emit_cat_snapshots system
 // ---------------------------------------------------------------------------
 
-/// Emit a `CatSnapshot` event for every living cat every 100 ticks.
+/// Emit a `CatSnapshot` event for every living cat at the configured interval.
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub fn emit_cat_snapshots(
+    config: Res<SnapshotConfig>,
     time: Res<TimeState>,
     query: Query<
         (
@@ -39,7 +41,8 @@ pub fn emit_cat_snapshots(
     mut event_log: Option<ResMut<EventLog>>,
 ) {
     let Some(ref mut log) = event_log else { return };
-    if !time.tick.is_multiple_of(100) {
+    let interval = config.full_snapshot_interval;
+    if interval == 0 || !time.tick.is_multiple_of(interval) {
         return;
     }
 
@@ -84,6 +87,39 @@ pub fn emit_cat_snapshots(
                 current_action: current.action,
                 relationships: top_rels,
                 last_scores: current.last_scores.clone(),
+            },
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// emit_position_traces system
+// ---------------------------------------------------------------------------
+
+/// Lightweight per-tick position trace. Disabled by default — enable via
+/// `--trace-positions <interval>`.
+pub fn emit_position_traces(
+    config: Res<SnapshotConfig>,
+    time: Res<TimeState>,
+    query: Query<(&Name, &Position, &CurrentAction), Without<Dead>>,
+    mut event_log: Option<ResMut<EventLog>>,
+) {
+    let interval = config.position_trace_interval;
+    if interval == 0 {
+        return;
+    }
+    let Some(ref mut log) = event_log else { return };
+    if !time.tick.is_multiple_of(interval) {
+        return;
+    }
+
+    for (name, pos, current) in &query {
+        log.push(
+            time.tick,
+            EventKind::PositionTrace {
+                cat: name.0.clone(),
+                position: (pos.x, pos.y),
+                action: current.action,
             },
         );
     }

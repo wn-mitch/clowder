@@ -1,8 +1,10 @@
 pub mod terrain_sprites;
 pub mod tilemap_sync;
 pub mod camera;
+pub mod day_night;
 pub mod debug_grid;
 pub mod entity_sprites;
+pub mod sprite_assets;
 pub mod ui;
 
 use bevy::prelude::*;
@@ -16,14 +18,20 @@ impl Plugin for RenderingPlugin {
             .add_systems(
                 Startup,
                 (
+                    // load_sprite_assets must run before create_tilemap (trees, corruption)
                     (
-                        tilemap_sync::create_tilemap,
                         entity_sprites::create_white_pixel,
+                        sprite_assets::load_sprite_assets,
                     ),
+                    tilemap_sync::create_tilemap,
                     debug_grid::setup_grid,
                 )
                     .chain()
                     .after(crate::plugins::setup::setup_world_exclusive),
+            )
+            .add_systems(
+                Startup,
+                day_night::setup_day_night_overlay,
             )
             .add_systems(
                 Update,
@@ -32,6 +40,7 @@ impl Plugin for RenderingPlugin {
                     entity_sprites::sync_entity_positions,
                     debug_grid::toggle_grid,
                     debug_grid::toggle_overlay_layers,
+                    day_night::update_day_night_overlay,
                 )
                     .chain(),
             );

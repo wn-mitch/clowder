@@ -85,7 +85,8 @@ pub fn setup_cat_inspect_panel(
 pub fn update_cat_inspect_panel(
     mut commands: Commands,
     inspection: Res<InspectionState>,
-    mut panel_query: Query<&mut Visibility, With<CatInspectPanel>>,
+    panel_vis: Res<crate::rendering::ui::PanelVisibility>,
+    mut panel_query: Query<(&mut Visibility, &mut Node), With<CatInspectPanel>>,
     content_query: Query<Entity, With<CatInspectContent>>,
     cats: Query<
         (
@@ -116,11 +117,17 @@ pub fn update_cat_inspect_panel(
 ) {
     let should_show = matches!(inspection.mode, InspectionMode::CatInspect(_));
 
-    for mut vis in &mut panel_query {
+    for (mut vis, mut node) in &mut panel_query {
         *vis = if should_show {
             Visibility::Inherited
         } else {
             Visibility::Hidden
+        };
+        // Shift right when roster panel is visible to avoid overlap.
+        node.left = if panel_vis.roster {
+            Val::Px(236.0) // 220px roster + 16px gap
+        } else {
+            Val::Px(8.0)
         };
     }
 

@@ -8,7 +8,9 @@ pub mod narrative;
 pub mod narrative_templates;
 pub mod relationships;
 pub mod rng;
+pub mod snapshot_config;
 pub mod time;
+pub mod wind;
 pub mod weather;
 pub mod zodiac;
 

@@ -1,3 +1,13 @@
+use bevy_ecs::prelude::*;
+
+/// Bundles colony-wide optional resources that many scoring systems need.
+/// Exists to keep systems under Bevy's 16-param limit.
+#[derive(bevy_ecs::system::SystemParam)]
+pub struct ColonyContext<'w> {
+    pub knowledge: Option<Res<'w, crate::resources::colony_knowledge::ColonyKnowledge>>,
+    pub priority: Option<Res<'w, crate::resources::colony_priority::ColonyPriority>>,
+}
+
 pub mod actions;
 pub mod ai;
 pub mod aspirations;
@@ -14,6 +24,8 @@ pub mod memory;
 pub mod mood;
 pub mod narrative;
 pub mod needs;
+pub mod personality_events;
+pub mod personality_friction;
 pub mod prey;
 pub mod snapshot;
 pub mod social;
@@ -21,3 +33,4 @@ pub mod task_chains;
 pub mod time;
 pub mod weather;
 pub mod wildlife;
+pub mod wind;

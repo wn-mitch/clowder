@@ -17,6 +17,9 @@ pub struct SimulationPlugin;
 
 impl Plugin for SimulationPlugin {
     fn build(&self, app: &mut App) {
+        // Register personality event observers (cascade handlers).
+        systems::personality_events::register_observers(app);
+
         app.add_systems(
             FixedUpdate,
             (
@@ -25,6 +28,7 @@ impl Plugin for SimulationPlugin {
                     systems::time::advance_time
                         .run_if(systems::time::not_paused),
                     systems::weather::update_weather,
+                    systems::wind::update_wind,
                     systems::time::emit_weather_transitions,
                     systems::magic::corruption_spread,
                     systems::magic::ward_decay,
@@ -36,6 +40,7 @@ impl Plugin for SimulationPlugin {
                     systems::wildlife::predator_hunt_prey,
                     systems::prey::prey_population,
                     systems::prey::prey_hunger,
+                    systems::prey::prey_ai,
                     systems::wildlife::detect_threats,
                     systems::buildings::apply_building_effects,
                     systems::buildings::decay_building_condition,
@@ -56,6 +61,7 @@ impl Plugin for SimulationPlugin {
                     systems::memory::decay_memories,
                     systems::coordination::evaluate_coordinators,
                     systems::coordination::assess_colony_needs,
+                    systems::coordination::accumulate_build_pressure,
                 )
                     .chain(),
                 // Chain 3: Action resolution
@@ -71,6 +77,7 @@ impl Plugin for SimulationPlugin {
                 // Chain 4: Social, combat, death, cleanup, narrative
                 (
                     systems::social::passive_familiarity,
+                    systems::personality_friction::personality_friction,
                     systems::social::check_bonds,
                     systems::colony_knowledge::update_colony_knowledge,
                     systems::combat::resolve_combat,
@@ -102,10 +109,26 @@ impl Plugin for SimulationPlugin {
             systems::disposition::evaluate_dispositions
                 .after(systems::disposition::check_anxiety_interrupts),
         );
+        // Flush commands so Disposition inserted by evaluate_dispositions is
+        // visible to disposition_to_chain (and evaluate_actions) in the same tick.
+        app.add_systems(
+            FixedUpdate,
+            bevy::ecs::schedule::ApplyDeferred
+                .after(systems::disposition::evaluate_dispositions)
+                .before(systems::disposition::disposition_to_chain),
+        );
         app.add_systems(
             FixedUpdate,
             systems::disposition::disposition_to_chain
                 .after(systems::disposition::evaluate_dispositions),
+        );
+        // Flush commands so TaskChain inserted by disposition_to_chain is
+        // visible to resolve_disposition_chains in the same tick.
+        app.add_systems(
+            FixedUpdate,
+            bevy::ecs::schedule::ApplyDeferred
+                .after(systems::disposition::disposition_to_chain)
+                .before(systems::disposition::resolve_disposition_chains),
         );
         app.add_systems(
             FixedUpdate,
@@ -119,9 +142,14 @@ impl Plugin for SimulationPlugin {
         app.add_systems(
             FixedUpdate,
             (
-                systems::ai::evaluate_actions,
+                systems::ai::evaluate_actions
+                    .after(systems::disposition::disposition_to_chain),
+                systems::personality_events::emit_personality_events,
                 systems::ai::emit_periodic_events,
-                systems::snapshot::emit_cat_snapshots,
+                systems::snapshot::emit_cat_snapshots
+                    .after(systems::actions::resolve_actions),
+                systems::snapshot::emit_position_traces
+                    .after(systems::actions::resolve_actions),
                 systems::fate::assign_fated_connections,
                 systems::fate::awaken_fated_connections,
                 systems::aspirations::select_aspirations,

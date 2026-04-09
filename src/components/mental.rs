@@ -110,6 +110,82 @@ impl Memory {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Location Preferences (tradition system)
+// ---------------------------------------------------------------------------
+
+/// Per-cat record of successful action locations. Used by the tradition
+/// personality modifier to create "favorite spots" — traditional cats prefer
+/// tiles where they've previously succeeded.
+///
+/// Capped at `MAX_ENTRIES`; evicts the least-visited entry on overflow.
+#[derive(Component, Debug, Clone, Default)]
+pub struct LocationPreferences {
+    /// (x, y, action, success_count) tuples.
+    entries: Vec<(i32, i32, crate::ai::Action, u32)>,
+}
+
+impl LocationPreferences {
+    const MAX_ENTRIES: usize = 20;
+
+    /// Record a successful action at a tile. Increments existing count or adds
+    /// a new entry (evicting the least-visited if at capacity).
+    pub fn record_success(&mut self, x: i32, y: i32, action: crate::ai::Action) {
+        if let Some(entry) = self
+            .entries
+            .iter_mut()
+            .find(|e| e.0 == x && e.1 == y && e.2 == action)
+        {
+            entry.3 += 1;
+        } else {
+            if self.entries.len() >= Self::MAX_ENTRIES {
+                if let Some(min_idx) = self
+                    .entries
+                    .iter()
+                    .enumerate()
+                    .min_by_key(|(_, e)| e.3)
+                    .map(|(i, _)| i)
+                {
+                    self.entries.remove(min_idx);
+                }
+            }
+            self.entries.push((x, y, action, 1));
+        }
+    }
+
+    /// How many times this cat succeeded at `action` on tile `(x, y)`.
+    pub fn success_count(&self, x: i32, y: i32, action: crate::ai::Action) -> u32 {
+        self.entries
+            .iter()
+            .find(|e| e.0 == x && e.1 == y && e.2 == action)
+            .map_or(0, |e| e.3)
+    }
+
+    /// The tile position this cat has visited most frequently (across all
+    /// actions), or `None` if no data exists.
+    pub fn most_frequented(&self) -> Option<(i32, i32)> {
+        let mut totals: std::collections::HashMap<(i32, i32), u32> =
+            std::collections::HashMap::new();
+        for &(x, y, _, count) in &self.entries {
+            *totals.entry((x, y)).or_default() += count;
+        }
+        totals
+            .into_iter()
+            .max_by_key(|&(_, count)| count)
+            .map(|(pos, _)| pos)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Pride Cooldown
+// ---------------------------------------------------------------------------
+
+/// Tracks per-cat cooldown for `PrideCrisis` events to prevent spam.
+#[derive(Component, Debug, Clone, Default)]
+pub struct PrideCooldown {
+    pub last_pride_crisis_tick: Option<u64>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -149,5 +225,66 @@ mod tests {
             strengths.contains(&0.9),
             "new memory (0.9) should be present; got {strengths:?}"
         );
+    }
+
+    // --- LocationPreferences tests ---
+
+    #[test]
+    fn location_prefs_records_and_retrieves() {
+        let mut prefs = LocationPreferences::default();
+        prefs.record_success(5, 10, crate::ai::Action::Hunt);
+        prefs.record_success(5, 10, crate::ai::Action::Hunt);
+        assert_eq!(prefs.success_count(5, 10, crate::ai::Action::Hunt), 2);
+        assert_eq!(prefs.success_count(5, 10, crate::ai::Action::Forage), 0);
+    }
+
+    #[test]
+    fn location_prefs_caps_at_20_entries() {
+        let mut prefs = LocationPreferences::default();
+        for i in 0..25 {
+            prefs.record_success(i, 0, crate::ai::Action::Wander);
+        }
+        assert_eq!(prefs.entries.len(), 20);
+    }
+
+    #[test]
+    fn location_prefs_evicts_least_visited() {
+        let mut prefs = LocationPreferences::default();
+        // Fill with 20 entries, each with 1 visit
+        for i in 0..20 {
+            prefs.record_success(i, 0, crate::ai::Action::Wander);
+        }
+        // Give one entry a higher count
+        prefs.record_success(5, 0, crate::ai::Action::Wander);
+        // Add a 21st entry — should evict a 1-count entry, not the 2-count
+        prefs.record_success(99, 0, crate::ai::Action::Wander);
+        assert_eq!(prefs.entries.len(), 20);
+        assert_eq!(
+            prefs.success_count(5, 0, crate::ai::Action::Wander),
+            2,
+            "high-count entry should survive eviction"
+        );
+        assert_eq!(
+            prefs.success_count(99, 0, crate::ai::Action::Wander),
+            1,
+            "new entry should be present"
+        );
+    }
+
+    #[test]
+    fn location_prefs_most_frequented() {
+        let mut prefs = LocationPreferences::default();
+        prefs.record_success(1, 1, crate::ai::Action::Hunt);
+        prefs.record_success(2, 2, crate::ai::Action::Hunt);
+        prefs.record_success(2, 2, crate::ai::Action::Forage);
+        prefs.record_success(2, 2, crate::ai::Action::Forage);
+        // (2,2) has 3 total visits; (1,1) has 1
+        assert_eq!(prefs.most_frequented(), Some((2, 2)));
+    }
+
+    #[test]
+    fn location_prefs_most_frequented_empty() {
+        let prefs = LocationPreferences::default();
+        assert_eq!(prefs.most_frequented(), None);
     }
 }

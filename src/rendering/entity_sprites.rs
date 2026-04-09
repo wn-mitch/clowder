@@ -3,10 +3,11 @@ use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::sprite::Text2d;
 
 use crate::components::identity::{Appearance, Name, Species};
-use crate::components::magic::{Herb, Harvestable, Ward};
+use crate::components::magic::{Herb, HerbKind, Harvestable, Ward};
 use crate::components::physical::{Dead, Position};
 use crate::components::prey::PreyAnimal;
 use crate::components::wildlife::WildAnimal;
+use crate::rendering::sprite_assets::SpriteAssets;
 use crate::rendering::tilemap_sync::{TILE_PX, TILE_SCALE};
 use crate::resources::map::TileMap;
 
@@ -37,6 +38,7 @@ pub fn create_white_pixel(mut commands: Commands, mut images: ResMut<Assets<Imag
 pub fn attach_entity_sprites(
     mut commands: Commands,
     white_pixel: Res<WhitePixel>,
+    sprite_assets: Res<SpriteAssets>,
     map: Res<TileMap>,
     cats: Query<
         (Entity, &Position, &Appearance, &Name),
@@ -55,8 +57,8 @@ pub fn attach_entity_sprites(
         Without<EntitySpriteMarker>,
     >,
     herbs: Query<
-        (Entity, &Position),
-        (With<Herb>, With<Harvestable>, Without<EntitySpriteMarker>),
+        (Entity, &Position, &Herb),
+        (With<Harvestable>, Without<EntitySpriteMarker>),
     >,
     wards: Query<
         (Entity, &Position, &Ward),
@@ -75,7 +77,7 @@ pub fn attach_entity_sprites(
         );
     }
 
-    // Living cats — colored by fur, with name label.
+    // Living cats — character sprite tinted by fur color, with name label.
     for (entity, pos, appearance, name) in &cats {
         let color = fur_color_to_bevy(&appearance.fur_color);
         let (x, y) = grid_to_world(pos, map_h, world_px);
@@ -95,9 +97,13 @@ pub fn attach_entity_sprites(
 
         commands.entity(entity).insert((
             Sprite {
-                image: white_pixel.0.clone(),
+                image: sprite_assets.character_texture.clone(),
                 color,
-                custom_size: Some(Vec2::new(world_px * 0.8, world_px * 0.8)),
+                custom_size: Some(Vec2::splat(world_px)),
+                texture_atlas: Some(TextureAtlas {
+                    layout: sprite_assets.character_layout.clone(),
+                    index: 0, // front-facing idle
+                }),
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 20.0),
@@ -153,14 +159,24 @@ pub fn attach_entity_sprites(
         ));
     }
 
-    // Herbs — small green.
-    for (entity, pos) in &herbs {
+    // Herbs — distinct flower/mushroom sprite per kind.
+    for (entity, pos, herb) in &herbs {
         let (x, y) = grid_to_world(pos, map_h, world_px);
+        let atlas_index = herb_sprite_index(herb.kind);
+        let color = if herb.twisted {
+            Color::srgb(0.6, 0.15, 0.4) // corrupted: dark magenta tint
+        } else {
+            Color::WHITE
+        };
         commands.entity(entity).insert((
             Sprite {
-                image: white_pixel.0.clone(),
-                color: Color::srgb(0.2, 0.8, 0.3),
-                custom_size: Some(Vec2::new(world_px * 0.3, world_px * 0.3)),
+                image: sprite_assets.herbs_texture.clone(),
+                color,
+                custom_size: Some(Vec2::splat(world_px * 0.5)),
+                texture_atlas: Some(TextureAtlas {
+                    layout: sprite_assets.herbs_layout.clone(),
+                    index: atlas_index,
+                }),
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 17.0),
@@ -228,6 +244,20 @@ fn fur_color_to_bevy(fur: &str) -> Color {
         "silver" => Color::srgb(0.75, 0.78, 0.8),
         "russet" => Color::srgb(0.7, 0.3, 0.15),
         _ => Color::srgb(0.7, 0.5, 0.3), // fallback brown
+    }
+}
+
+/// Map each herb kind to a sprite index in the Mushrooms, Flowers, Stones atlas.
+/// The atlas is a 12-col x 5-row grid of 16x16 sprites. Indices are row-major
+/// (0 = top-left, 11 = top-right, 12 = second-row-left, etc.).
+/// These picks are approximate — tune by running `just run` and eyeballing.
+fn herb_sprite_index(kind: HerbKind) -> usize {
+    match kind {
+        HerbKind::HealingMoss => 0,       // mushroom (top-left)
+        HerbKind::Moonpetal => 24,         // flower (row 2, col 0 area)
+        HerbKind::Calmroot => 36,          // small green plant (row 3)
+        HerbKind::Thornbriar => 6,         // darker mushroom/thorny (row 0, col 6)
+        HerbKind::Dreamroot => 27,         // colorful flower (row 2, col 3)
     }
 }
 

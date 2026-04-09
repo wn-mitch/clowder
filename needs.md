@@ -1,5 +1,1 @@
-- resource tracking
-- need tab to cat in inspect view
-- animals don't show in inspect view
-- need a map key
-- the fate story events all trigger as soon as the game loads, making a deluge of messages. these should have a slight cooldown per message so they seem more interesting
+
