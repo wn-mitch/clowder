@@ -1,35 +1,41 @@
 use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::Schedule;
 
-use clowder::ai::{Action, CurrentAction};
+use clowder::ai::CurrentAction;
 use clowder::components::identity::Name;
-use clowder::components::mental::{Memory, Mood};
-use clowder::components::physical::{Needs, Position};
 use clowder::components::magic::Inventory;
+use clowder::components::personality::Personality;
+use clowder::components::physical::{Needs, Position};
 use clowder::components::skills::Skills;
-use clowder::resources::food::FoodStores;
+use clowder::components::task_chain::{FailurePolicy, StepKind, StepStatus, TaskChain, TaskStep};
 use clowder::resources::map::{Terrain, TileMap};
 use clowder::resources::narrative::NarrativeLog;
 use clowder::resources::relationships::Relationships;
 use clowder::resources::rng::SimRng;
 use clowder::resources::time::TimeState;
-use clowder::systems::actions::resolve_actions;
+use clowder::resources::wind::WindState;
+use clowder::systems::disposition::resolve_disposition_chains;
 
 fn setup_world() -> (World, Schedule) {
     let mut world = World::new();
     world.insert_resource(TileMap::new(20, 20, Terrain::Grass));
-    world.insert_resource(FoodStores::default());
     world.insert_resource(SimRng::new(42));
     world.insert_resource(TimeState::default());
-    world.insert_resource(clowder::resources::time::SimConfig::default());
     world.insert_resource(Relationships::default());
     world.insert_resource(NarrativeLog::default());
+    world.insert_resource(WindState::default());
     let mut schedule = Schedule::default();
-    schedule.add_systems(resolve_actions);
+    schedule.add_systems(resolve_disposition_chains);
     (world, schedule)
 }
 
-/// Mentor action restores the mentor's mastery need when adjacent to apprentice.
+fn mentor_chain(target: Entity) -> TaskChain {
+    let mut step = TaskStep::new(StepKind::MentorCat).with_entity(target);
+    step.status = StepStatus::InProgress { ticks_elapsed: 0 };
+    TaskChain::new(vec![step], FailurePolicy::AbortChain)
+}
+
+/// Mentor action restores the mentor's mastery need.
 #[test]
 fn mentoring_restores_mastery() {
     let (mut world, mut schedule) = setup_world();
@@ -38,39 +44,36 @@ fn mentoring_restores_mastery() {
     mentor_needs.mastery = 0.3;
 
     let mut mentor_skills = Skills::default();
-    mentor_skills.hunting = 0.8; // high enough to teach
+    mentor_skills.hunting = 0.8;
 
-    // Spawn apprentice adjacent to mentor.
-    let apprentice = world.spawn((
-        CurrentAction::default(),
-        Needs::default(),
-        Position::new(5, 6),
-        Skills::default(), // hunting defaults to 0.1
-        Memory::default(),
-        Mood::default(),
-        Inventory::default(),
-        Name("Apprentice".to_string()),
-    )).id();
+    let apprentice = world
+        .spawn((
+            CurrentAction::default(),
+            Needs::default(),
+            Position::new(5, 6),
+            Skills::default(),
+            Inventory::default(),
+            Personality::random(&mut rand::rng()),
+            Name("Apprentice".to_string()),
+        ))
+        .id();
 
-    let mentor = world.spawn((
-        CurrentAction {
-            action: Action::Mentor,
-            ticks_remaining: 10,
-            target_position: Some(Position::new(5, 6)),
-            target_entity: Some(apprentice),
-            last_scores: Vec::new(),
-        },
-        mentor_needs,
-        Position::new(5, 5), // adjacent
-        mentor_skills,
-        Memory::default(),
-        Mood::default(),
-        Inventory::default(),
-        Name("Mentor".to_string()),
-    )).id();
+    let mentor = world
+        .spawn((
+            mentor_chain(apprentice),
+            CurrentAction::default(),
+            mentor_needs,
+            Position::new(5, 5),
+            mentor_skills,
+            Inventory::default(),
+            Personality::random(&mut rand::rng()),
+            Name("Mentor".to_string()),
+        ))
+        .id();
 
     let mastery_before = world.get::<Needs>(mentor).unwrap().mastery;
 
+    // Run enough ticks for per-tick mastery gain.
     schedule.run(&mut world);
 
     let mastery_after = world.get::<Needs>(mentor).unwrap().mastery;
@@ -80,7 +83,7 @@ fn mentoring_restores_mastery() {
     );
 }
 
-/// Mentor action grows the apprentice's skill at 2x rate when adjacent.
+/// Mentor action grows the apprentice's skill at 2x rate.
 #[test]
 fn mentoring_grows_apprentice_skill() {
     let (mut world, mut schedule) = setup_world();
@@ -88,33 +91,31 @@ fn mentoring_grows_apprentice_skill() {
     let mut mentor_skills = Skills::default();
     mentor_skills.hunting = 0.8;
 
-    let apprentice_skills = Skills::default(); // hunting = 0.1
+    let apprentice = world
+        .spawn((
+            CurrentAction::default(),
+            Needs::default(),
+            Position::new(5, 6),
+            Skills::default(), // hunting = 0.1
+            Inventory::default(),
+            Personality::random(&mut rand::rng()),
+            Name("Apprentice".to_string()),
+        ))
+        .id();
 
-    let apprentice = world.spawn((
-        CurrentAction::default(),
-        Needs::default(),
-        Position::new(5, 6),
-        apprentice_skills,
-        Memory::default(),
-        Mood::default(),
-        Inventory::default(),
-        Name("Apprentice".to_string()),
-    )).id();
+    // Chain with ticks_elapsed already at 12 so completion fires on next run.
+    let mut step = TaskStep::new(StepKind::MentorCat).with_entity(apprentice);
+    step.status = StepStatus::InProgress { ticks_elapsed: 11 };
+    let chain = TaskChain::new(vec![step], FailurePolicy::AbortChain);
 
     world.spawn((
-        CurrentAction {
-            action: Action::Mentor,
-            ticks_remaining: 10,
-            target_position: Some(Position::new(5, 6)),
-            target_entity: Some(apprentice),
-            last_scores: Vec::new(),
-        },
+        chain,
+        CurrentAction::default(),
         Needs::default(),
         Position::new(5, 5),
         mentor_skills,
-        Memory::default(),
-        Mood::default(),
         Inventory::default(),
+        Personality::random(&mut rand::rng()),
         Name("Mentor".to_string()),
     ));
 
@@ -137,35 +138,31 @@ fn mentoring_builds_fondness() {
     let mut mentor_skills = Skills::default();
     mentor_skills.hunting = 0.8;
 
-    let apprentice = world.spawn((
-        CurrentAction::default(),
-        Needs::default(),
-        Position::new(5, 6),
-        Skills::default(),
-        Memory::default(),
-        Mood::default(),
-        Inventory::default(),
-        Name("Apprentice".to_string()),
-    )).id();
+    let apprentice = world
+        .spawn((
+            CurrentAction::default(),
+            Needs::default(),
+            Position::new(5, 6),
+            Skills::default(),
+            Inventory::default(),
+            Personality::random(&mut rand::rng()),
+            Name("Apprentice".to_string()),
+        ))
+        .id();
 
-    let mentor = world.spawn((
-        CurrentAction {
-            action: Action::Mentor,
-            ticks_remaining: 10,
-            target_position: Some(Position::new(5, 6)),
-            target_entity: Some(apprentice),
-            last_scores: Vec::new(),
-        },
-        Needs::default(),
-        Position::new(5, 5),
-        mentor_skills,
-        Memory::default(),
-        Mood::default(),
-        Inventory::default(),
-        Name("Mentor".to_string()),
-    )).id();
+    let mentor = world
+        .spawn((
+            mentor_chain(apprentice),
+            CurrentAction::default(),
+            Needs::default(),
+            Position::new(5, 5),
+            mentor_skills,
+            Inventory::default(),
+            Personality::random(&mut rand::rng()),
+            Name("Mentor".to_string()),
+        ))
+        .id();
 
-    // Init relationship.
     {
         let mut rels = world.resource_mut::<Relationships>();
         let rel = rels.get_or_insert(mentor, apprentice);

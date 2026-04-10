@@ -38,6 +38,10 @@ template-audit:
 inspect name *ARGS:
     cargo run --example inspect_cat -- {{name}} {{ARGS}}
 
+# Generate balance report from most recent diagnostic run
+balance-report *ARGS:
+    uv run scripts/balance_report.py {{ARGS}}
+
 # Run all checks
 ci: check test
 

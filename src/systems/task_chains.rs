@@ -100,7 +100,11 @@ pub fn resolve_task_chains(
 
         let ticks = match &mut step.status {
             StepStatus::InProgress { ticks_elapsed } => {
-                *ticks_elapsed += 1;
+                // Steps handled by other systems (disposition, magic) manage
+                // their own timers — don't increment here or they tick 2×.
+                if !step.kind.is_externally_timed() {
+                    *ticks_elapsed += 1;
+                }
                 *ticks_elapsed
             }
             _ => continue,

@@ -57,15 +57,16 @@ impl PreySpecies {
 
     /// Maximum number of individuals of this species allowed in the world.
     ///
-    /// Tuned for a 120×90 map with ~8 cats. Enough prey that scent-based
-    /// hunting finds targets within a reasonable search, but scarce enough
-    /// that overhunting depletes an area and cats range further.
+    /// Tuned for a 120×90 map (10,800 tiles) with ~8 cats. Total cap of ~200
+    /// gives density of ~1 prey per 54 tiles — enough that scent-based hunting
+    /// reliably finds targets within a search phase, while overhunting a local
+    /// area still forces cats to range further.
     pub fn population_cap(self) -> usize {
         match self {
-            Self::Mouse => 12,
-            Self::Rat => 18,
-            Self::Fish => 8,
-            Self::Bird => 6,
+            Self::Mouse => 80,
+            Self::Rat => 55,
+            Self::Fish => 35,
+            Self::Bird => 30,
         }
     }
 
@@ -146,8 +147,8 @@ mod tests {
     #[test]
     fn population_caps_are_reasonable() {
         assert!(
-            PreySpecies::Rat.population_cap() > PreySpecies::Mouse.population_cap(),
-            "Rat cap should exceed Mouse cap"
+            PreySpecies::Mouse.population_cap() > PreySpecies::Rat.population_cap(),
+            "Mouse cap should exceed Rat cap (mice are most abundant)"
         );
         assert!(
             PreySpecies::Bird.population_cap() < PreySpecies::Rat.population_cap(),

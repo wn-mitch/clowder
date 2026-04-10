@@ -67,6 +67,13 @@ pub fn check_anxiety_interrupts(
         let interrupt = check_interrupt(needs, personality, pos, disposition, &wildlife);
         let Some(reason) = interrupt else { continue };
 
+        // Don't interrupt cats actively hunting (even if Resting disposition).
+        if matches!(reason, InterruptReason::ThreatDetected { .. })
+            && current.action == Action::Hunt
+        {
+            continue;
+        }
+
         // Record the interruption in action history.
         if let Some(mut hist) = history {
             hist.record(ActionRecord {
@@ -120,8 +127,12 @@ fn check_interrupt(
     disposition: &Disposition,
     wildlife: &Query<&Position, With<WildAnimal>>,
 ) -> Option<InterruptReason> {
-    // Resting is exempt from physiological interrupts (it's handling them).
-    if disposition.kind != DispositionKind::Resting {
+    // Resting, Hunting, and Foraging are exempt from hunger interrupts.
+    // Resting is already handling it; Hunting/Foraging ARE the food solution.
+    if !matches!(
+        disposition.kind,
+        DispositionKind::Resting | DispositionKind::Hunting | DispositionKind::Foraging
+    ) {
         if needs.hunger < 0.15 {
             return Some(InterruptReason::Starvation);
         }
@@ -130,17 +141,21 @@ fn check_interrupt(
         }
     }
 
-    // Guarding is exempt from threat interrupts (it's handling threats).
-    if disposition.kind != DispositionKind::Guarding {
-        // Check for nearby wildlife threats.
+    // Guarding, Hunting, and Foraging are exempt from threat interrupts.
+    // Guards handle threats directly; hunters/foragers are focused on food.
+    if !matches!(
+        disposition.kind,
+        DispositionKind::Guarding | DispositionKind::Hunting | DispositionKind::Foraging
+    ) {
+        // Check for nearby wildlife threats (3-tile awareness range).
         let nearest_threat = wildlife
             .iter()
-            .filter(|wp| pos.manhattan_distance(wp) <= 5)
+            .filter(|wp| pos.manhattan_distance(wp) <= 3)
             .min_by_key(|wp| pos.manhattan_distance(wp));
 
         if let Some(threat_pos) = nearest_threat {
             let dist = pos.manhattan_distance(threat_pos) as f32;
-            let threat_urgency = 1.0 - (dist / 5.0);
+            let threat_urgency = 1.0 - (dist / 3.0);
             // Bold cats resist fleeing: threshold is 0.3 (bold) to 0.7 (timid).
             let flee_threshold = 0.3 + personality.boldness * 0.4;
             if threat_urgency > flee_threshold {
@@ -609,7 +624,7 @@ pub fn disposition_to_chain(
     skills_query: Query<&Skills, Without<Dead>>,
     relationships: Res<Relationships>,
     map: Res<TileMap>,
-    _food: Res<FoodStores>,
+    food: Res<FoodStores>,
     mut rng: ResMut<SimRng>,
     mut commands: Commands,
 ) {
@@ -644,7 +659,7 @@ pub fn disposition_to_chain(
 
         let chain = match disposition.kind {
             DispositionKind::Resting => {
-                build_resting_chain(needs, pos, &building_query, &map)
+                build_resting_chain(needs, pos, &building_query, &map, nearest_store, food.is_empty(), &mut rng.rng)
             }
             DispositionKind::Hunting => {
                 build_hunting_chain(pos, &memory, &map, nearest_store, &mut rng.rng)
@@ -707,7 +722,7 @@ pub fn disposition_to_chain(
 fn should_complete_disposition(disposition: &Disposition, needs: &Needs) -> bool {
     match disposition.kind {
         DispositionKind::Resting => {
-            needs.hunger >= 0.75 && needs.energy >= 0.75 && needs.warmth >= 0.70
+            needs.hunger >= 0.5 && needs.energy >= 0.5 && needs.warmth >= 0.50
         }
         _ => disposition.is_count_complete(),
     }
@@ -728,6 +743,9 @@ fn build_resting_chain(
         Option<&CropState>,
     )>,
     _map: &TileMap,
+    nearest_store: Option<(Entity, Position)>,
+    food_empty: bool,
+    rng: &mut impl Rng,
 ) -> Option<(TaskChain, Action)> {
     // Pick the most urgent physiological need.
     let hunger_deficit = 1.0 - needs.hunger;
@@ -735,6 +753,24 @@ fn build_resting_chain(
     let warmth_deficit = 1.0 - needs.warmth;
 
     if hunger_deficit >= energy_deficit && hunger_deficit >= warmth_deficit {
+        if food_empty {
+            // Stores are empty — hunt for food instead of walking to empty stores.
+            let patrol_dir = (rng.random_range(-1i32..=1), rng.random_range(-1i32..=1));
+            let mut steps = vec![
+                TaskStep::new(StepKind::HuntPrey { patrol_dir }),
+            ];
+            if let Some((store_entity, store_pos)) = nearest_store {
+                steps.push(TaskStep::new(StepKind::MoveTo).with_position(store_pos));
+                steps.push(
+                    TaskStep::new(StepKind::DepositAtStores)
+                        .with_position(store_pos)
+                        .with_entity(store_entity),
+                );
+            }
+            let chain = TaskChain::new(steps, FailurePolicy::AbortChain);
+            return Some((chain, Action::Hunt));
+        }
+
         // Eat: walk to nearest Stores building.
         let nearest_store = building_query
             .iter()
@@ -1308,13 +1344,23 @@ pub fn resolve_disposition_chains(
     mut prey_query: Query<(Entity, &Position, &mut PreyAnimal)>,
     mut stores_query: Query<&mut StoredItems>,
     items_query: Query<&Item>,
+    // Disjoint from `cats` (which requires TaskChain) — reads skills of non-chain
+    // entities like apprentices being mentored.
+    mut unchained_skills: Query<&mut Skills, (Without<TaskChain>, Without<Structure>)>,
     map: Res<TileMap>,
     wind: Res<crate::resources::wind::WindState>,
+    mut relationships: ResMut<Relationships>,
     mut log: ResMut<crate::resources::narrative::NarrativeLog>,
     time: Res<TimeState>,
     mut rng: ResMut<SimRng>,
     mut commands: Commands,
 ) {
+    // Deferred effects applied after the main loop (avoids mutable borrow conflicts).
+    struct MentorEffect {
+        apprentice: Entity,
+        mentor_skills: Skills,
+    }
+    let mut mentor_effects: Vec<MentorEffect> = Vec::new();
     let mut chains_to_remove: Vec<Entity> = Vec::new();
 
     for (cat_entity, mut chain, mut current, mut pos, mut skills, mut needs, mut inventory, personality, disposition, history) in &mut cats {
@@ -1324,6 +1370,19 @@ pub fn resolve_disposition_chains(
             if let Some(mut disp) = disposition {
                 let outcome = if chain.is_succeeded() {
                     disp.completions += 1;
+                    // Successful completions earn respect proportional to contribution.
+                    let respect_gain = match disp.kind {
+                        DispositionKind::Hunting => 0.03,
+                        DispositionKind::Foraging => 0.01,
+                        DispositionKind::Guarding => 0.02,
+                        DispositionKind::Building => 0.04,
+                        DispositionKind::Coordinating => 0.05,
+                        DispositionKind::Socializing => 0.02,
+                        _ => 0.0,
+                    };
+                    if respect_gain > 0.0 {
+                        needs.respect = (needs.respect + respect_gain).min(1.0);
+                    }
                     ActionOutcome::Success
                 } else {
                     ActionOutcome::Failure
@@ -1406,8 +1465,8 @@ pub fn resolve_disposition_chains(
                     if dist <= pounce_range {
                         // === POUNCE ===
                         let distance_mod = if dist <= 1 { 1.0 } else { 0.6 };
-                        let success_chance = 0.5
-                            * (0.5 + skills.hunting * 0.5)
+                        let success_chance = 0.6
+                            * (0.7 + skills.hunting * 0.3)
                             * distance_mod;
 
                         if rng.rng.random::<f32>() < success_chance {
@@ -1477,8 +1536,10 @@ pub fn resolve_disposition_chains(
                         if let Some(next) = step_toward(&pos, &prey_pos, &map) {
                             *pos = next;
                         }
-                        // If scent lost (prey moved, wind shifted), drop target.
-                        if !can_smell_prey(&pos, &prey_pos, &wind, &map) && dist > 5 {
+                        // Give up only if prey has fled far beyond detection range.
+                        // Cats are persistent hunters — they don't lose interest just
+                        // because the wind shifted mid-chase.
+                        if dist > 25 {
                             step.target_entity = None;
                         }
                     }
@@ -1497,22 +1558,32 @@ pub fn resolve_disposition_chains(
                     if dx == 0 && dy == 0 { dx = 1; }
                     *pos = patrol_move(&pos, dx, dy, &map);
 
-                    // Scan for prey scent.
-                    let scented_prey = prey_query
+                    // Visual detection: spot nearby prey within 3 tiles.
+                    let visible_prey = prey_query
                         .iter()
-                        .filter(|(_, pp, _)| can_smell_prey(&pos, pp, &wind, &map))
+                        .filter(|(_, pp, _)| pos.manhattan_distance(pp) <= 3)
                         .min_by_key(|(_, pp, _)| pos.manhattan_distance(pp));
 
-                    if let Some((prey_entity, _, _)) = scented_prey {
+                    if let Some((prey_entity, _prey_pos_ref, _)) = visible_prey {
                         step.target_entity = Some(prey_entity);
-                        log.push(
-                            time.tick,
-                            "A cat catches a scent on the wind.".to_string(),
-                            crate::resources::narrative::NarrativeTier::Micro,
-                        );
+                    } else {
+                        // Scan for prey scent (wind-dependent, longer range).
+                        let scented_prey = prey_query
+                            .iter()
+                            .filter(|(_, pp, _)| can_smell_prey(&pos, pp, &wind, &map))
+                            .min_by_key(|(_, pp, _)| pos.manhattan_distance(pp));
+
+                        if let Some((prey_entity, _prey_pos_ref, _)) = scented_prey {
+                            step.target_entity = Some(prey_entity);
+                            log.push(
+                                time.tick,
+                                "A cat catches a scent on the wind.".to_string(),
+                                crate::resources::narrative::NarrativeTier::Micro,
+                            );
+                        }
                     }
 
-                    if ticks > 60 {
+                    if ticks > 100 {
                         chain.fail_current("no scent found".into());
                     }
                 }
@@ -1576,9 +1647,10 @@ pub fn resolve_disposition_chains(
                     inventory.slots.retain(|slot| !matches!(slot, ItemSlot::Item(k) if k.is_food()));
                     // Spawn real item entities in the store.
                     if let Ok(mut stored) = stores_query.get_mut(store_entity) {
+                        let quality = (0.3 + skills.hunting * 0.4).clamp(0.0, 1.0);
                         for kind in food_items {
                             let item_entity = commands
-                                .spawn(Item::new(kind, 1.0, ItemLocation::StoredIn(store_entity)))
+                                .spawn(Item::new(kind, quality, ItemLocation::StoredIn(store_entity)))
                                 .id();
                             stored.add(item_entity, StructureType::Stores);
                         }
@@ -1611,8 +1683,9 @@ pub fn resolve_disposition_chains(
             }
 
             StepKind::Sleep { ticks: duration } => {
-                // Restore energy each tick.
-                needs.energy = (needs.energy + 0.04).min(1.0);
+                // Restore energy and warmth each tick (matches legacy pacing).
+                needs.energy = (needs.energy + 0.02).min(1.0);
+                needs.warmth = (needs.warmth + 0.01).min(1.0);
                 if ticks >= *duration {
                     chain.advance();
                 }
@@ -1626,23 +1699,50 @@ pub fn resolve_disposition_chains(
             }
 
             StepKind::Socialize => {
+                if let Some(target_entity) = step.target_entity {
+                    // Per-tick social restoration while adjacent.
+                    needs.social = (needs.social + 0.03).min(1.0);
+                    relationships.modify_fondness(cat_entity, target_entity, 0.005);
+                    relationships.modify_familiarity(cat_entity, target_entity, 0.003);
+                    relationships.get_or_insert(cat_entity, target_entity).last_interaction = time.tick;
+                }
                 if ticks >= 10 {
-                    needs.social = (needs.social + 0.1).min(1.0);
                     chain.advance();
                 }
             }
 
             StepKind::GroomOther => {
+                if let Some(target_entity) = step.target_entity {
+                    // Per-tick social + warmth while grooming.
+                    needs.social = (needs.social + 0.02).min(1.0);
+                    relationships.modify_fondness(cat_entity, target_entity, 0.008);
+                    relationships.modify_familiarity(cat_entity, target_entity, 0.003);
+                    relationships.get_or_insert(cat_entity, target_entity).last_interaction = time.tick;
+                }
                 if ticks >= 8 {
-                    needs.social = (needs.social + 0.08).min(1.0);
                     needs.warmth = (needs.warmth + 0.05).min(1.0);
                     chain.advance();
                 }
             }
 
             StepKind::MentorCat => {
+                if let Some(target_entity) = step.target_entity {
+                    // Per-tick teaching effects.
+                    needs.mastery = (needs.mastery + 0.02).min(1.0);
+                    needs.social = (needs.social + 0.01).min(1.0);
+                    needs.respect = (needs.respect + 0.002).min(1.0);
+                    relationships.modify_fondness(cat_entity, target_entity, 0.005);
+                    relationships.modify_familiarity(cat_entity, target_entity, 0.003);
+                    relationships.get_or_insert(cat_entity, target_entity).last_interaction = time.tick;
+                }
                 if ticks >= 12 {
-                    needs.social = (needs.social + 0.05).min(1.0);
+                    // Defer apprentice skill growth (applied after the loop).
+                    if let Some(target_entity) = step.target_entity {
+                        mentor_effects.push(MentorEffect {
+                            apprentice: target_entity,
+                            mentor_skills: skills.clone(),
+                        });
+                    }
                     chain.advance();
                 }
             }
@@ -1683,6 +1783,8 @@ pub fn resolve_disposition_chains(
 
             StepKind::DeliverDirective => {
                 if ticks >= 5 {
+                    needs.respect = (needs.respect + 0.05).min(1.0);
+                    needs.social = (needs.social + 0.05).min(1.0);
                     chain.advance();
                 }
             }
@@ -1694,16 +1796,31 @@ pub fn resolve_disposition_chains(
         if chain.is_complete() {
             chains_to_remove.push(cat_entity);
             if let Some(mut disp) = disposition {
+                let succeeded = !chain.is_failed();
                 disp.completions += 1;
+                if succeeded {
+                    let respect_gain = match disp.kind {
+                        DispositionKind::Hunting => 0.03,
+                        DispositionKind::Foraging => 0.01,
+                        DispositionKind::Guarding => 0.02,
+                        DispositionKind::Building => 0.04,
+                        DispositionKind::Coordinating => 0.05,
+                        DispositionKind::Socializing => 0.02,
+                        _ => 0.0,
+                    };
+                    if respect_gain > 0.0 {
+                        needs.respect = (needs.respect + respect_gain).min(1.0);
+                    }
+                }
                 if let Some(mut hist) = history {
                     hist.record(ActionRecord {
                         action: current.action,
                         disposition: Some(disp.kind),
                         tick: time.tick,
-                        outcome: if chain.is_failed() {
-                            ActionOutcome::Failure
-                        } else {
+                        outcome: if succeeded {
                             ActionOutcome::Success
+                        } else {
+                            ActionOutcome::Failure
                         },
                     });
                 }
@@ -1714,5 +1831,73 @@ pub fn resolve_disposition_chains(
 
     for entity in chains_to_remove {
         commands.entity(entity).remove::<TaskChain>();
+    }
+
+    // Apply deferred mentor effects: grow apprentice's weakest teachable skill.
+    // The apprentice may have a TaskChain (in `cats`) or not (in `unchained_skills`).
+    for effect in &mentor_effects {
+        // Try the unchained query first (more common — apprentice is usually idle).
+        let app_skills_result = if let Ok(s) = unchained_skills.get(effect.apprentice) {
+            Some((s.hunting, s.foraging, s.herbcraft, s.building, s.combat, s.magic, s.growth_rate()))
+        } else if let Ok((_, _, _, _, s, _, _, _, _, _)) = cats.get(effect.apprentice) {
+            Some((s.hunting, s.foraging, s.herbcraft, s.building, s.combat, s.magic, s.growth_rate()))
+        } else {
+            None
+        };
+        if let Some((hunt, forage, herb, build, combat, magic, growth_rate)) = app_skills_result {
+            let pairs: [(f32, f32); 6] = [
+                (effect.mentor_skills.hunting, hunt),
+                (effect.mentor_skills.foraging, forage),
+                (effect.mentor_skills.herbcraft, herb),
+                (effect.mentor_skills.building, build),
+                (effect.mentor_skills.combat, combat),
+                (effect.mentor_skills.magic, magic),
+            ];
+            let pairs: [(f32, f32); 6] = [
+                (effect.mentor_skills.hunting, hunt),
+                (effect.mentor_skills.foraging, forage),
+                (effect.mentor_skills.herbcraft, herb),
+                (effect.mentor_skills.building, build),
+                (effect.mentor_skills.combat, combat),
+                (effect.mentor_skills.magic, magic),
+            ];
+            // Skill with the largest teachable gap (mentor > 0.6, apprentice < 0.3).
+            if let Some((idx, _)) = pairs
+                .iter()
+                .enumerate()
+                .filter(|(_, (m, a))| *m > 0.6 && *a < 0.3)
+                .max_by(|(_, (am, aa)), (_, (bm, ba))| {
+                    (am - aa)
+                        .partial_cmp(&(bm - ba))
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+            {
+                let growth = growth_rate * 0.04; // 2× normal
+                // Write to whichever query holds this entity.
+                if let Ok(mut s) = unchained_skills.get_mut(effect.apprentice) {
+                    match idx {
+                        0 => s.hunting += growth,
+                        1 => s.foraging += growth,
+                        2 => s.herbcraft += growth,
+                        3 => s.building += growth,
+                        4 => s.combat += growth,
+                        5 => s.magic += growth,
+                        _ => {}
+                    }
+                } else if let Ok((_, _, _, _, mut s, _, _, _, _, _)) =
+                    cats.get_mut(effect.apprentice)
+                {
+                    match idx {
+                        0 => s.hunting += growth,
+                        1 => s.foraging += growth,
+                        2 => s.herbcraft += growth,
+                        3 => s.building += growth,
+                        4 => s.combat += growth,
+                        5 => s.magic += growth,
+                        _ => {}
+                    }
+                }
+            }
+        }
     }
 }

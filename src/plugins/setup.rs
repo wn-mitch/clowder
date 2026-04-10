@@ -152,7 +152,8 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     world.insert_resource(sim_rng);
 
     // Spawn cats.
-    let mut entity_ids: Vec<bevy_ecs::entity::Entity> = Vec::with_capacity(8);
+    let cat_count = cat_blueprints.len();
+    let mut entity_ids: Vec<bevy_ecs::entity::Entity> = Vec::with_capacity(cat_count);
     for (i, cat) in cat_blueprints.into_iter().enumerate() {
         let offset_x = (i as i32 % 5) - 2;
         let offset_y = (i as i32 / 5) - 1;
@@ -179,7 +180,7 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
                     cat.appearance,
                     Position::new(spawn_x, spawn_y),
                     Health::default(),
-                    Needs::default(),
+                    Needs::staggered(i, cat_count),
                     Mood::default(),
                     Memory::default(),
                 ),

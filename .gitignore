@@ -25,5 +25,8 @@ Thumbs.db
 .rust-analyzer/
 rust_analyzer/
 
+# Asset packs not licensed for redistribution
+assets/sprites/Sprout Lands - UI Pack - Basic pack/
+
 # Superpowers brainstorm artifacts
 .superpowers/

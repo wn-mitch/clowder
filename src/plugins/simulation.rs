@@ -64,11 +64,10 @@ impl Plugin for SimulationPlugin {
                     systems::coordination::accumulate_build_pressure,
                 )
                     .chain(),
-                // Chain 3: Action resolution
+                // Chain 3: Action resolution (disposition system handles all action selection)
                 (
                     systems::task_chains::resolve_task_chains,
                     systems::magic::resolve_magic_task_chains,
-                    systems::actions::resolve_actions,
                     systems::magic::apply_remedy_effects,
                     systems::buildings::process_gates,
                     systems::buildings::tidy_buildings,
@@ -110,7 +109,7 @@ impl Plugin for SimulationPlugin {
                 .after(systems::disposition::check_anxiety_interrupts),
         );
         // Flush commands so Disposition inserted by evaluate_dispositions is
-        // visible to disposition_to_chain (and evaluate_actions) in the same tick.
+        // visible to disposition_to_chain in the same tick.
         app.add_systems(
             FixedUpdate,
             bevy::ecs::schedule::ApplyDeferred
@@ -142,14 +141,12 @@ impl Plugin for SimulationPlugin {
         app.add_systems(
             FixedUpdate,
             (
-                systems::ai::evaluate_actions
-                    .after(systems::disposition::disposition_to_chain),
                 systems::personality_events::emit_personality_events,
                 systems::ai::emit_periodic_events,
                 systems::snapshot::emit_cat_snapshots
-                    .after(systems::actions::resolve_actions),
+                    .after(systems::disposition::resolve_disposition_chains),
                 systems::snapshot::emit_position_traces
-                    .after(systems::actions::resolve_actions),
+                    .after(systems::disposition::resolve_disposition_chains),
                 systems::fate::assign_fated_connections,
                 systems::fate::awaken_fated_connections,
                 systems::aspirations::select_aspirations,

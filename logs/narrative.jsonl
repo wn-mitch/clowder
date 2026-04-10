@@ -1,132 +1,338 @@
-{"_header":true,"duration_secs":1,"seed":42}
+{"_header":true,"duration_secs":300,"seed":42}
 {"day":1001,"phase":"Dawn","text":"A small group of cats settles in a clearing.","tick":100000,"tier":"Significant"}
 {"day":1001,"phase":"Dawn","text":"Something settles in Mallow's heart -- a quiet certainty. The path of Leadership calls.","tick":100000,"tier":"Action"}
 {"day":1001,"phase":"Dawn","text":"Something settles in Clover's heart -- a quiet certainty. The path of Leadership calls.","tick":100000,"tier":"Action"}
 {"day":1001,"phase":"Dawn","text":"Something settles in Hazel's heart -- a quiet certainty. The path of Leadership calls.","tick":100000,"tier":"Action"}
-{"day":1001,"phase":"Dawn","text":"Something settles in Reed's heart -- a quiet certainty. The path of Herbcraft calls.","tick":100000,"tier":"Action"}
+{"day":1001,"phase":"Dawn","text":"Something settles in Reed's heart -- a quiet certainty. The path of Social calls.","tick":100000,"tier":"Action"}
 {"day":1001,"phase":"Dawn","text":"Something settles in Bramble's heart -- a quiet certainty. The path of Combat calls.","tick":100000,"tier":"Action"}
 {"day":1001,"phase":"Dawn","text":"Something settles in Rowan's heart -- a quiet certainty. The path of Exploration calls.","tick":100000,"tier":"Action"}
 {"day":1001,"phase":"Dawn","text":"Something settles in Flint's heart -- a quiet certainty. The path of Combat calls.","tick":100000,"tier":"Action"}
 {"day":1001,"phase":"Dawn","text":"Something settles in Finch's heart -- a quiet certainty. The path of Building calls.","tick":100000,"tier":"Action"}
 {"day":1001,"phase":"Dawn","text":"The stars mark Mallow and Bramble -- The Storm Fur and The Lone Thorn, drawn together by a thread older than memory.","tick":100000,"tier":"Significant"}
 {"day":1001,"phase":"Dawn","text":"Mallow and Rowan lock eyes across the clearing -- The Storm Fur and The Swift River, bound by a challenge written in the stars.","tick":100000,"tier":"Significant"}
+{"day":1001,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":100001,"tier":"Micro"}
+{"day":1001,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":100001,"tier":"Micro"}
 {"day":1001,"phase":"Dawn","text":"Something stirs between Bramble and Mallow as their paths cross.","tick":100001,"tier":"Significant"}
 {"day":1001,"phase":"Dawn","text":"Rowan and Mallow lock eyes across the clearing. A challenge unspoken.","tick":100001,"tier":"Significant"}
-{"day":1001,"phase":"Dawn","text":"Bramble freezes — a rust-red shape moves between the trees.","tick":100006,"tier":"Action"}
-{"day":1001,"phase":"Dawn","text":"Reed freezes — a rust-red shape moves between the trees.","tick":100006,"tier":"Action"}
-{"day":1001,"phase":"Dawn","text":"Finch freezes — a rust-red shape moves between the trees.","tick":100007,"tier":"Action"}
-{"day":1001,"phase":"Dawn","text":"Clover spots a fox slinking through the undergrowth.","tick":100008,"tier":"Action"}
-{"day":1001,"phase":"Dawn","text":"Rowan spots a fox slinking through the undergrowth.","tick":100009,"tier":"Action"}
-{"day":1001,"phase":"Dawn","text":"Hazel spots a fox slinking through the undergrowth.","tick":100009,"tier":"Action"}
-{"day":1001,"phase":"Dawn","text":"Flint spots a fox slinking through the undergrowth.","tick":100009,"tier":"Action"}
-{"day":1001,"phase":"Dawn","text":"Mallow hears something prowling in the brush.","tick":100009,"tier":"Action"}
-{"day":1001,"phase":"Dawn","text":"Bramble stretches out beside Hazel and purrs.","tick":100009,"tier":"Action"}
-{"day":1001,"phase":"Dawn","text":"Rowan lies in wait beside a game trail.","tick":100009,"tier":"Action"}
-{"day":1001,"phase":"Dawn","text":"Reed chases an unusual scent into the brush.","tick":100009,"tier":"Action"}
-{"day":1001,"phase":"Dawn","text":"Flint pounces without hesitation and comes back proud.","tick":100009,"tier":"Action"}
-{"day":1001,"phase":"Dawn","text":"Reed brings down prey with a quick snap.","tick":100010,"tier":"Action"}
-{"day":1001,"phase":"Dawn","text":"Reed drops mouse at the colony stores without a word.","tick":100014,"tier":"Action"}
-{"day":1001,"phase":"Dawn","text":"Hazel circles back empty-pawed after a long stalk.","tick":100014,"tier":"Action"}
-{"day":1001,"phase":"Dawn","text":"Mallow brings down prey with a quick snap.","tick":100019,"tier":"Action"}
-{"day":1001,"phase":"Dawn","text":"Reed drags back a field mouse.","tick":100023,"tier":"Action"}
-{"day":1001,"phase":"Day","text":"Young Bramble brings back a mouse, beaming with pride.","tick":100039,"tier":"Action"}
-{"day":1001,"phase":"Day","text":"Clover comes back muddy but fed.","tick":100039,"tier":"Action"}
-{"day":1001,"phase":"Day","text":"Flint hunts fat autumn mice.","tick":100049,"tier":"Action"}
-{"day":1001,"phase":"Dusk","text":"Bramble and Reed lock eyes across the clearing -- The Lone Thorn and The Silver Pool, bound by a challenge written in the stars.","tick":100050,"tier":"Significant"}
-{"day":1001,"phase":"Dusk","text":"A downpour drenches the clearing.","tick":100051,"tier":"Action"}
-{"day":1001,"phase":"Dusk","text":"Bramble and Reed lock eyes across the clearing. A challenge unspoken.","tick":100051,"tier":"Significant"}
-{"day":1001,"phase":"Dusk","text":"Rowan stalks through the undergrowth but comes back empty-pawed.","tick":100059,"tier":"Action"}
-{"day":1001,"phase":"Dusk","text":"Finch crouches low, then strikes.","tick":100059,"tier":"Action"}
-{"day":1001,"phase":"Dusk","text":"Hazel hunts fat autumn mice.","tick":100064,"tier":"Action"}
-{"day":1001,"phase":"Dusk","text":"Rowan drags back a field mouse.","tick":100069,"tier":"Action"}
-{"day":1001,"phase":"Dusk","text":"Finch hunts fat autumn mice.","tick":100069,"tier":"Action"}
-{"day":1001,"phase":"Dusk","text":"Flint hunts in the fading dusk light.","tick":100069,"tier":"Action"}
-{"day":1001,"phase":"Dusk","text":"Reed catches a vole in one clean strike.","tick":100073,"tier":"Action"}
-{"day":1001,"phase":"Night","text":"Mallow brings down prey with a quick snap.","tick":100079,"tier":"Action"}
-{"day":1001,"phase":"Night","text":"Young Hazel bounds after a mouse, all enthusiasm and no technique.","tick":100084,"tier":"Action"}
-{"day":1001,"phase":"Night","text":"Mallow hunts fat autumn mice.","tick":100089,"tier":"Action"}
-{"day":1001,"phase":"Night","text":"Bramble hunts by moonlight, pupils wide.","tick":100089,"tier":"Action"}
-{"day":1001,"phase":"Night","text":"The wind rises, carrying the scent of distant places.","tick":100097,"tier":"Action"}
-{"day":1001,"phase":"Night","text":"Finch bats the catch around before bringing it back.","tick":100099,"tier":"Action"}
-{"day":1001,"phase":"Night","text":"Young Mallow bounds after a mouse, all enthusiasm and no technique.","tick":100099,"tier":"Action"}
-{"day":1001,"phase":"Night","text":"Bramble snaps up a moth mid-flight.","tick":100099,"tier":"Action"}
-{"day":1002,"phase":"Dawn","text":"The others look to Hazel and Bramble when decisions need making.","tick":100100,"tier":"Significant"}
-{"day":1002,"phase":"Dawn","text":"A new fire kindles in Rowan. The path of Combat beckons.","tick":100100,"tier":"Action"}
+{"day":1001,"phase":"Dawn","text":"Bramble hears something prowling in the brush.","tick":100006,"tier":"Action"}
+{"day":1001,"phase":"Dawn","text":"A cat catches a mouse.","tick":100007,"tier":"Action"}
+{"day":1001,"phase":"Dawn","text":"The prey bolts.","tick":100007,"tier":"Micro"}
+{"day":1001,"phase":"Dawn","text":"The prey bolts.","tick":100007,"tier":"Micro"}
+{"day":1001,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":100008,"tier":"Micro"}
+{"day":1001,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":100009,"tier":"Micro"}
+{"day":1001,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":100012,"tier":"Micro"}
+{"day":1001,"phase":"Dawn","text":"A cat catches a mouse.","tick":100014,"tier":"Action"}
+{"day":1001,"phase":"Dawn","text":"The prey bolts.","tick":100015,"tier":"Micro"}
+{"day":1001,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":100017,"tier":"Micro"}
+{"day":1001,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":100018,"tier":"Micro"}
+{"day":1001,"phase":"Dawn","text":"A cat catches a rat.","tick":100018,"tier":"Action"}
+{"day":1001,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":100020,"tier":"Micro"}
+{"day":1001,"phase":"Dawn","text":"A cat catches a rat.","tick":100021,"tier":"Action"}
+{"day":1001,"phase":"Dawn","text":"Clover catches the scent of fox on the wind.","tick":100022,"tier":"Action"}
+{"day":1001,"phase":"Dawn","text":"Finch catches the scent of fox on the wind.","tick":100023,"tier":"Action"}
+{"day":1001,"phase":"Dawn","text":"Rowan catches the scent of fox on the wind.","tick":100024,"tier":"Action"}
+{"day":1001,"phase":"Day","text":"A cat catches a scent on the wind.","tick":100025,"tier":"Micro"}
+{"day":1001,"phase":"Day","text":"Hazel catches the scent of fox on the wind.","tick":100025,"tier":"Action"}
+{"day":1001,"phase":"Day","text":"Mallow catches the scent of fox on the wind.","tick":100025,"tier":"Action"}
+{"day":1001,"phase":"Day","text":"Flint freezes — a rust-red shape moves between the trees.","tick":100026,"tier":"Action"}
+{"day":1001,"phase":"Day","text":"A cat catches a scent on the wind.","tick":100027,"tier":"Micro"}
+{"day":1001,"phase":"Day","text":"The prey bolts.","tick":100027,"tier":"Micro"}
+{"day":1001,"phase":"Day","text":"A cat catches a bird.","tick":100029,"tier":"Action"}
+{"day":1001,"phase":"Day","text":"A cat catches a scent on the wind.","tick":100032,"tier":"Micro"}
+{"day":1001,"phase":"Day","text":"The prey bolts.","tick":100032,"tier":"Micro"}
+{"day":1001,"phase":"Day","text":"A cat catches a scent on the wind.","tick":100036,"tier":"Micro"}
+{"day":1001,"phase":"Day","text":"The prey bolts.","tick":100040,"tier":"Micro"}
+{"day":1001,"phase":"Day","text":"The prey bolts.","tick":100041,"tier":"Micro"}
+{"day":1001,"phase":"Day","text":"A cat catches a mouse.","tick":100042,"tier":"Action"}
+{"day":1001,"phase":"Day","text":"A cat catches a rat.","tick":100042,"tier":"Action"}
+{"day":1001,"phase":"Day","text":"A cat catches a scent on the wind.","tick":100043,"tier":"Micro"}
+{"day":1001,"phase":"Day","text":"A cat catches a fish.","tick":100048,"tier":"Action"}
+{"day":1001,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":100050,"tier":"Micro"}
+{"day":1001,"phase":"Dusk","text":"The stars mark Rowan and Reed -- The Swift River and The Silver Pool, drawn together by a thread older than memory.","tick":100050,"tier":"Significant"}
+{"day":1001,"phase":"Dusk","text":"The sun disappears behind thickening clouds.","tick":100051,"tier":"Action"}
+{"day":1001,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":100052,"tier":"Micro"}
+{"day":1001,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":100055,"tier":"Micro"}
+{"day":1001,"phase":"Dusk","text":"A cat catches a mouse.","tick":100055,"tier":"Action"}
+{"day":1001,"phase":"Dusk","text":"The prey bolts.","tick":100059,"tier":"Micro"}
+{"day":1001,"phase":"Dusk","text":"The prey bolts.","tick":100060,"tier":"Micro"}
+{"day":1001,"phase":"Dusk","text":"A cat catches a mouse.","tick":100060,"tier":"Action"}
+{"day":1001,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":100061,"tier":"Micro"}
+{"day":1001,"phase":"Dusk","text":"The prey bolts.","tick":100063,"tier":"Micro"}
+{"day":1001,"phase":"Dusk","text":"The prey bolts.","tick":100064,"tier":"Micro"}
+{"day":1001,"phase":"Dusk","text":"The prey bolts.","tick":100065,"tier":"Micro"}
+{"day":1001,"phase":"Dusk","text":"A cat catches a mouse.","tick":100066,"tier":"Action"}
+{"day":1001,"phase":"Dusk","text":"A cat catches a mouse.","tick":100069,"tier":"Action"}
+{"day":1001,"phase":"Dusk","text":"A cat catches a mouse.","tick":100069,"tier":"Action"}
+{"day":1001,"phase":"Dusk","text":"A hawk circles overhead — Reed freezes.","tick":100072,"tier":"Action"}
+{"day":1001,"phase":"Night","text":"A cat catches a mouse.","tick":100075,"tier":"Action"}
+{"day":1001,"phase":"Night","text":"The prey bolts.","tick":100079,"tier":"Micro"}
+{"day":1001,"phase":"Night","text":"A cat catches a scent on the wind.","tick":100080,"tier":"Micro"}
+{"day":1001,"phase":"Night","text":"A cat catches a mouse.","tick":100092,"tier":"Action"}
+{"day":1001,"phase":"Night","text":"A cat catches a bird.","tick":100098,"tier":"Action"}
+{"day":1002,"phase":"Dawn","text":"The others look to Hazel and Clover when decisions need making.","tick":100100,"tier":"Significant"}
+{"day":1002,"phase":"Dawn","text":"The stars mark Flint and Clover -- The Storm Fur and The Storm Fur, drawn together by a thread older than memory.","tick":100100,"tier":"Significant"}
+{"day":1002,"phase":"Dawn","text":"Flint and Bramble lock eyes across the clearing -- The Storm Fur and The Lone Thorn, bound by a challenge written in the stars.","tick":100100,"tier":"Significant"}
 {"day":1002,"phase":"Dawn","text":"A new fire kindles in Reed. The path of Combat beckons.","tick":100100,"tier":"Action"}
-{"day":1002,"phase":"Dawn","text":"A new fire kindles in Finch. The path of Combat beckons.","tick":100100,"tier":"Action"}
-{"day":1002,"phase":"Dawn","text":"A new fire kindles in Clover. The path of Combat beckons.","tick":100100,"tier":"Action"}
+{"day":1002,"phase":"Dawn","text":"A new fire kindles in Rowan. The path of Hunting beckons.","tick":100100,"tier":"Action"}
 {"day":1002,"phase":"Dawn","text":"A new fire kindles in Flint. The path of Leadership beckons.","tick":100100,"tier":"Action"}
-{"day":1002,"phase":"Dawn","text":"The stars mark Rowan and Clover -- The Swift River and The Storm Fur, drawn together by a thread older than memory.","tick":100100,"tier":"Significant"}
-{"day":1002,"phase":"Dawn","text":"Something stirs between Rowan and Clover as their paths cross.","tick":100101,"tier":"Significant"}
-{"day":1002,"phase":"Dawn","text":"Finch hunts in the early mist.","tick":100109,"tier":"Action"}
-{"day":1002,"phase":"Dawn","text":"Flint pounces without hesitation and comes back proud.","tick":100109,"tier":"Action"}
-{"day":1002,"phase":"Dawn","text":"Rowan returns with a catch between her teeth.","tick":100109,"tier":"Action"}
-{"day":1002,"phase":"Dawn","text":"Clover freezes — a rust-red shape moves between the trees.","tick":100110,"tier":"Action"}
-{"day":1002,"phase":"Dawn","text":"Finch catches the scent of fox on the wind.","tick":100110,"tier":"Action"}
-{"day":1002,"phase":"Dawn","text":"Flint hears something prowling in the brush.","tick":100111,"tier":"Action"}
-{"day":1002,"phase":"Dawn","text":"Mallow catches the scent of fox on the wind.","tick":100111,"tier":"Action"}
-{"day":1002,"phase":"Dawn","text":"Rowan spots a fox slinking through the undergrowth.","tick":100111,"tier":"Action"}
-{"day":1002,"phase":"Dawn","text":"Hazel spots a fox slinking through the undergrowth.","tick":100111,"tier":"Action"}
-{"day":1002,"phase":"Dawn","text":"Reed curls up and sleeps.","tick":100113,"tier":"Action"}
-{"day":1002,"phase":"Dawn","text":"Bramble spots a fox slinking through the undergrowth.","tick":100117,"tier":"Action"}
-{"day":1002,"phase":"Dawn","text":"Flint hunts fat autumn mice.","tick":100119,"tier":"Action"}
-{"day":1002,"phase":"Dawn","text":"Young Mallow bounds after a mouse, all enthusiasm and no technique.","tick":100119,"tier":"Action"}
-{"day":1002,"phase":"Dawn","text":"Hazel circles back empty-pawed after a long stalk.","tick":100124,"tier":"Action"}
-{"day":1002,"phase":"Day","text":"Flint comes back muddy but fed.","tick":100129,"tier":"Action"}
-{"day":1002,"phase":"Day","text":"Hazel crouches low, then strikes.","tick":100134,"tier":"Action"}
-{"day":1002,"phase":"Day","text":"Mist rolls in, swallowing the edges of the camp.","tick":100137,"tier":"Action"}
-{"day":1002,"phase":"Day","text":"Flint drags back a field mouse.","tick":100139,"tier":"Action"}
-{"day":1002,"phase":"Day","text":"Mallow hunts fat autumn mice.","tick":100139,"tier":"Action"}
-{"day":1002,"phase":"Day","text":"Rowan hunts fat autumn mice.","tick":100139,"tier":"Action"}
-{"day":1002,"phase":"Day","text":"Bramble circles back empty-pawed after a long stalk.","tick":100139,"tier":"Action"}
-{"day":1002,"phase":"Day","text":"Mallow stalks through the undergrowth but comes back empty-pawed.","tick":100149,"tier":"Action"}
-{"day":1002,"phase":"Dusk","text":"Clover and Finch lock eyes across the clearing -- The Storm Fur and The Long Shadow, bound by a challenge written in the stars.","tick":100150,"tier":"Significant"}
+{"day":1002,"phase":"Dawn","text":"A new fire kindles in Finch. The path of Social beckons.","tick":100100,"tier":"Action"}
+{"day":1002,"phase":"Dawn","text":"A new fire kindles in Clover. The path of Combat beckons.","tick":100100,"tier":"Action"}
+{"day":1002,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":100103,"tier":"Micro"}
+{"day":1002,"phase":"Dawn","text":"The prey bolts.","tick":100106,"tier":"Micro"}
+{"day":1002,"phase":"Dawn","text":"The prey bolts.","tick":100112,"tier":"Micro"}
+{"day":1002,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":100120,"tier":"Micro"}
+{"day":1002,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":100123,"tier":"Micro"}
+{"day":1002,"phase":"Dawn","text":"The prey bolts.","tick":100124,"tier":"Micro"}
+{"day":1002,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":100124,"tier":"Micro"}
+{"day":1002,"phase":"Day","text":"A cat catches a scent on the wind.","tick":100125,"tier":"Micro"}
+{"day":1002,"phase":"Day","text":"The prey bolts.","tick":100131,"tier":"Micro"}
+{"day":1002,"phase":"Day","text":"The prey bolts.","tick":100133,"tier":"Micro"}
+{"day":1002,"phase":"Day","text":"The prey bolts.","tick":100134,"tier":"Micro"}
+{"day":1002,"phase":"Day","text":"The prey bolts.","tick":100134,"tier":"Micro"}
+{"day":1002,"phase":"Day","text":"A cat catches a scent on the wind.","tick":100134,"tier":"Micro"}
+{"day":1002,"phase":"Day","text":"The prey bolts.","tick":100143,"tier":"Micro"}
+{"day":1002,"phase":"Day","text":"The prey bolts.","tick":100144,"tier":"Micro"}
+{"day":1002,"phase":"Day","text":"A cat catches a rat.","tick":100147,"tier":"Action"}
+{"day":1002,"phase":"Day","text":"The prey bolts.","tick":100147,"tier":"Micro"}
+{"day":1002,"phase":"Day","text":"A cat catches a rat.","tick":100148,"tier":"Action"}
+{"day":1002,"phase":"Dusk","text":"The stars mark Finch and Hazel -- The Long Shadow and The Storm Fur, drawn together by a thread older than memory.","tick":100150,"tier":"Significant"}
+{"day":1002,"phase":"Dusk","text":"Finch and Clover lock eyes across the clearing -- The Long Shadow and The Storm Fur, bound by a challenge written in the stars.","tick":100150,"tier":"Significant"}
 {"day":1002,"phase":"Dusk","text":"The colony has forgotten the danger near the western ridge.","tick":100151,"tier":"Significant"}
-{"day":1002,"phase":"Dusk","text":"Finch and Clover lock eyes across the clearing. A challenge unspoken.","tick":100151,"tier":"Significant"}
-{"day":1002,"phase":"Dusk","text":"Reed hunts fat autumn mice.","tick":100153,"tier":"Action"}
-{"day":1002,"phase":"Dusk","text":"Flint follows a scent trail into the brush.","tick":100159,"tier":"Action"}
-{"day":1002,"phase":"Dusk","text":"Bramble brings down prey with a quick snap.","tick":100159,"tier":"Action"}
-{"day":1002,"phase":"Dusk","text":"Flint follows a scent trail into the brush.","tick":100169,"tier":"Action"}
-{"day":1002,"phase":"Dusk","text":"Rowan drags back a field mouse.","tick":100169,"tier":"Action"}
-{"day":1002,"phase":"Dusk","text":"Clover works the tall grass, ears forward.","tick":100169,"tier":"Action"}
-{"day":1002,"phase":"Dusk","text":"Reed hunts in the fading dusk light.","tick":100173,"tier":"Action"}
-{"day":1002,"phase":"Night","text":"Reed freezes — a rust-red shape moves between the trees.","tick":100175,"tier":"Action"}
-{"day":1002,"phase":"Night","text":"Finch stalks a shape in the fog.","tick":100179,"tier":"Action"}
-{"day":1002,"phase":"Night","text":"Clover stalks through the undergrowth but comes back empty-pawed.","tick":100179,"tier":"Action"}
-{"day":1002,"phase":"Night","text":"Young Hazel bounds after a mouse, all enthusiasm and no technique.","tick":100184,"tier":"Action"}
-{"day":1002,"phase":"Night","text":"Finch hunts fat autumn mice.","tick":100189,"tier":"Action"}
-{"day":1002,"phase":"Night","text":"Flint stalks through the undergrowth but comes back empty-pawed.","tick":100189,"tier":"Action"}
-{"day":1002,"phase":"Night","text":"Rowan brings down prey with a quick snap.","tick":100189,"tier":"Action"}
-{"day":1002,"phase":"Night","text":"Flint crouches low, then strikes.","tick":100199,"tier":"Action"}
-{"day":1002,"phase":"Night","text":"Rowan catches a mouse in the dark.","tick":100199,"tier":"Action"}
-{"day":1002,"phase":"Night","text":"Clover works the tall grass, ears forward.","tick":100199,"tier":"Action"}
-{"day":1002,"phase":"Night","text":"Bramble hunts by moonlight, pupils wide.","tick":100199,"tier":"Action"}
-{"day":1003,"phase":"Dawn","text":"The stars mark Reed and Finch -- The Silver Pool and The Long Shadow, drawn together by a thread older than memory.","tick":100200,"tier":"Significant"}
+{"day":1002,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":100157,"tier":"Micro"}
+{"day":1002,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":100164,"tier":"Micro"}
+{"day":1002,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":100166,"tier":"Micro"}
+{"day":1002,"phase":"Dusk","text":"The prey bolts.","tick":100171,"tier":"Micro"}
+{"day":1002,"phase":"Dusk","text":"A cat catches a mouse.","tick":100173,"tier":"Action"}
+{"day":1002,"phase":"Night","text":"Flint freezes — a rust-red shape moves between the trees.","tick":100177,"tier":"Action"}
+{"day":1002,"phase":"Night","text":"A cat catches a scent on the wind.","tick":100178,"tier":"Micro"}
+{"day":1002,"phase":"Night","text":"A cat catches a bird.","tick":100187,"tier":"Action"}
+{"day":1002,"phase":"Night","text":"The prey bolts.","tick":100188,"tier":"Micro"}
+{"day":1002,"phase":"Night","text":"A cat catches a scent on the wind.","tick":100192,"tier":"Micro"}
+{"day":1002,"phase":"Night","text":"A cat catches a mouse.","tick":100196,"tier":"Action"}
+{"day":1002,"phase":"Night","text":"Mallow catches the scent of fox on the wind.","tick":100196,"tier":"Action"}
+{"day":1003,"phase":"Dawn","text":"Reed and Hazel lock eyes across the clearing -- The Silver Pool and The Storm Fur, bound by a challenge written in the stars.","tick":100200,"tier":"Significant"}
 {"day":1003,"phase":"Dawn","text":"Some rat in the stores has gone off.","tick":100201,"tier":"Micro"}
 {"day":1003,"phase":"Dawn","text":"Some mouse in the stores has gone off.","tick":100201,"tier":"Micro"}
-{"day":1003,"phase":"Dawn","text":"Some roots in the stores has gone off.","tick":100201,"tier":"Micro"}
-{"day":1003,"phase":"Dawn","text":"The colony has forgotten the danger near the western lowlands.","tick":100201,"tier":"Significant"}
-{"day":1003,"phase":"Dawn","text":"Something stirs between Finch and Reed as their paths cross.","tick":100201,"tier":"Significant"}
-{"day":1003,"phase":"Dawn","text":"Bramble circles back empty-pawed after a long stalk.","tick":100209,"tier":"Action"}
-{"day":1003,"phase":"Dawn","text":"Finch hunts fat autumn mice.","tick":100209,"tier":"Action"}
-{"day":1003,"phase":"Dawn","text":"Bramble crouches low, then strikes.","tick":100219,"tier":"Action"}
-{"day":1003,"phase":"Dawn","text":"Finch pounces without hesitation and comes back proud.","tick":100219,"tier":"Action"}
-{"day":1003,"phase":"Day","text":"Flint returns with a catch between her teeth.","tick":100229,"tier":"Action"}
-{"day":1003,"phase":"Day","text":"Rowan stalks through the undergrowth but comes back empty-pawed.","tick":100229,"tier":"Action"}
-{"day":1003,"phase":"Day","text":"Mallow spots a fox slinking through the undergrowth.","tick":100232,"tier":"Action"}
-{"day":1003,"phase":"Day","text":"Rowan hears something prowling in the brush.","tick":100232,"tier":"Action"}
-{"day":1003,"phase":"Day","text":"Hazel hears something prowling in the brush.","tick":100232,"tier":"Action"}
-{"day":1003,"phase":"Day","text":"Clover freezes — a rust-red shape moves between the trees.","tick":100233,"tier":"Action"}
-{"day":1003,"phase":"Day","text":"Reed hunts in the open, bold and quick.","tick":100233,"tier":"Action"}
-{"day":1003,"phase":"Day","text":"Flint hears something prowling in the brush.","tick":100234,"tier":"Action"}
-{"day":1003,"phase":"Day","text":"Finch hears something prowling in the brush.","tick":100234,"tier":"Action"}
-{"day":1003,"phase":"Day","text":"The sky clears. Light dapples through the canopy.","tick":100240,"tier":"Action"}
-{"day":1003,"phase":"Day","text":"Flint hunts in the open, bold and quick.","tick":100249,"tier":"Action"}
-{"day":1003,"phase":"Day","text":"Bramble stalks through the undergrowth but comes back empty-pawed.","tick":100249,"tier":"Action"}
-{"day":1003,"phase":"Day","text":"Finch follows a scent trail into the brush.","tick":100249,"tier":"Action"}
-{"day":1003,"phase":"Dusk","text":"The stars mark Flint and Hazel -- The Storm Fur and The Storm Fur, drawn together by a thread older than memory.","tick":100250,"tier":"Significant"}
-{"day":1003,"phase":"Dusk","text":"Flint and Hazel lock eyes across the clearing -- The Storm Fur and The Storm Fur, bound by a challenge written in the stars.","tick":100250,"tier":"Significant"}
-{"day":1003,"phase":"Dusk","text":"Something stirs between Flint and Hazel as their paths cross.","tick":100251,"tier":"Significant"}
-{"day":1003,"phase":"Dusk","text":"Flint and Hazel lock eyes across the clearing. A challenge unspoken.","tick":100251,"tier":"Significant"}
-{"day":1003,"phase":"Dusk","text":"Reed hunts in the fading dusk light.","tick":100263,"tier":"Action"}
-{"day":1003,"phase":"Dusk","text":"Hazel lies in wait beside a game trail.","tick":100264,"tier":"Action"}
+{"day":1003,"phase":"Dawn","text":"Some nuts in the stores has gone off.","tick":100201,"tier":"Micro"}
+{"day":1003,"phase":"Dawn","text":"A biting wind picks up, tugging at fur.","tick":100202,"tier":"Action"}
+{"day":1003,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":100211,"tier":"Micro"}
+{"day":1003,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":100213,"tier":"Micro"}
+{"day":1003,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":100216,"tier":"Micro"}
+{"day":1003,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":100221,"tier":"Micro"}
+{"day":1003,"phase":"Dawn","text":"The prey bolts.","tick":100222,"tier":"Micro"}
+{"day":1003,"phase":"Dawn","text":"A cat catches a rat.","tick":100222,"tier":"Action"}
+{"day":1003,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":100223,"tier":"Micro"}
+{"day":1003,"phase":"Day","text":"Some nuts in the stores has gone off.","tick":100226,"tier":"Micro"}
+{"day":1003,"phase":"Day","text":"A cat catches a scent on the wind.","tick":100235,"tier":"Micro"}
+{"day":1003,"phase":"Day","text":"The prey bolts.","tick":100241,"tier":"Micro"}
+{"day":1003,"phase":"Day","text":"A cat catches a scent on the wind.","tick":100243,"tier":"Micro"}
+{"day":1003,"phase":"Day","text":"A cat catches a mouse.","tick":100247,"tier":"Action"}
+{"day":1003,"phase":"Dusk","text":"Reed catches the scent of fox on the wind.","tick":100253,"tier":"Action"}
+{"day":1003,"phase":"Dusk","text":"Clouds gather overhead, muting the light.","tick":100257,"tier":"Action"}
+{"day":1003,"phase":"Dusk","text":"The prey bolts.","tick":100263,"tier":"Micro"}
+{"day":1003,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":100264,"tier":"Micro"}
+{"day":1003,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":100268,"tier":"Micro"}
+{"day":1003,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":100272,"tier":"Micro"}
+{"day":1003,"phase":"Night","text":"Some mouse in the stores has gone off.","tick":100275,"tier":"Micro"}
+{"day":1003,"phase":"Night","text":"The prey bolts.","tick":100286,"tier":"Micro"}
+{"day":1003,"phase":"Night","text":"A cat catches a rat.","tick":100296,"tier":"Action"}
+{"day":1004,"phase":"Dawn","text":"Some mouse in the stores has gone off.","tick":100303,"tier":"Micro"}
+{"day":1004,"phase":"Dawn","text":"Something stirs between Flint and Clover as their paths cross.","tick":100305,"tier":"Significant"}
+{"day":1004,"phase":"Dawn","text":"The sky clears. Light dapples through the canopy.","tick":100320,"tier":"Action"}
+{"day":1004,"phase":"Day","text":"The prey bolts.","tick":100326,"tier":"Micro"}
+{"day":1004,"phase":"Day","text":"The prey bolts.","tick":100345,"tier":"Micro"}
+{"day":1004,"phase":"Day","text":"Rowan catches the scent of fox on the wind.","tick":100346,"tier":"Action"}
+{"day":1004,"phase":"Dusk","text":"Clouds gather overhead, muting the light.","tick":100355,"tier":"Action"}
+{"day":1004,"phase":"Dusk","text":"Flint catches the scent of fox on the wind.","tick":100357,"tier":"Action"}
+{"day":1004,"phase":"Dusk","text":"The prey bolts.","tick":100363,"tier":"Micro"}
+{"day":1004,"phase":"Dusk","text":"Mallow catches the scent of fox on the wind.","tick":100363,"tier":"Action"}
+{"day":1004,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":100364,"tier":"Micro"}
+{"day":1004,"phase":"Night","text":"The prey bolts.","tick":100382,"tier":"Micro"}
+{"day":1004,"phase":"Night","text":"The prey bolts.","tick":100382,"tier":"Micro"}
+{"day":1004,"phase":"Night","text":"The prey bolts.","tick":100385,"tier":"Micro"}
+{"day":1004,"phase":"Night","text":"A cat catches a mouse.","tick":100386,"tier":"Action"}
+{"day":1005,"phase":"Dawn","text":"Blue sky breaks through. The air warms.","tick":100419,"tier":"Action"}
+{"day":1005,"phase":"Day","text":"Reed freezes — a rust-red shape moves between the trees.","tick":100434,"tier":"Action"}
+{"day":1005,"phase":"Day","text":"Clover spots a fox slinking through the undergrowth.","tick":100441,"tier":"Action"}
+{"day":1005,"phase":"Dusk","text":"The prey bolts.","tick":100451,"tier":"Micro"}
+{"day":1005,"phase":"Dusk","text":"A downpour drenches the clearing.","tick":100463,"tier":"Action"}
+{"day":1005,"phase":"Night","text":"Rowan spots a fox slinking through the undergrowth.","tick":100482,"tier":"Action"}
+{"day":1006,"phase":"Dawn","text":"Flint spots a fox slinking through the undergrowth.","tick":100522,"tier":"Action"}
+{"day":1006,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":100523,"tier":"Micro"}
+{"day":1006,"phase":"Day","text":"Gusts rattle through the branches.","tick":100527,"tier":"Action"}
+{"day":1006,"phase":"Day","text":"A cat catches a rat.","tick":100529,"tier":"Action"}
+{"day":1006,"phase":"Day","text":"Reed freezes — a rust-red shape moves between the trees.","tick":100539,"tier":"Action"}
+{"day":1006,"phase":"Dusk","text":"Hazel hears something prowling in the brush.","tick":100560,"tier":"Action"}
+{"day":1006,"phase":"Night","text":"Mallow catches the scent of fox on the wind.","tick":100582,"tier":"Action"}
+{"day":1006,"phase":"Night","text":"A cat catches a scent on the wind.","tick":100588,"tier":"Micro"}
+{"day":1006,"phase":"Night","text":"A cat catches a scent on the wind.","tick":100590,"tier":"Micro"}
+{"day":1006,"phase":"Night","text":"The sky clears. Light dapples through the canopy.","tick":100596,"tier":"Action"}
+{"day":1006,"phase":"Night","text":"Bramble freezes — a rust-red shape moves between the trees.","tick":100596,"tier":"Action"}
+{"day":1006,"phase":"Night","text":"A cat catches a rat.","tick":100597,"tier":"Action"}
+{"day":1006,"phase":"Night","text":"Rowan freezes — a rust-red shape moves between the trees.","tick":100598,"tier":"Action"}
+{"day":1007,"phase":"Dawn","text":"Clover freezes — a rust-red shape moves between the trees.","tick":100604,"tier":"Action"}
+{"day":1007,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":100606,"tier":"Micro"}
+{"day":1007,"phase":"Dawn","text":"A cat catches a rat.","tick":100614,"tier":"Action"}
+{"day":1007,"phase":"Day","text":"Flint freezes — a rust-red shape moves between the trees.","tick":100640,"tier":"Action"}
+{"day":1007,"phase":"Day","text":"A cat catches a scent on the wind.","tick":100645,"tier":"Micro"}
+{"day":1007,"phase":"Dusk","text":"Reed freezes — a rust-red shape moves between the trees.","tick":100651,"tier":"Action"}
+{"day":1007,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":100654,"tier":"Micro"}
+{"day":1007,"phase":"Dusk","text":"The prey bolts.","tick":100654,"tier":"Micro"}
+{"day":1007,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":100658,"tier":"Micro"}
+{"day":1007,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":100659,"tier":"Micro"}
+{"day":1007,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":100660,"tier":"Micro"}
+{"day":1007,"phase":"Dusk","text":"The prey bolts.","tick":100660,"tier":"Micro"}
+{"day":1007,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":100662,"tier":"Micro"}
+{"day":1007,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":100669,"tier":"Micro"}
+{"day":1007,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":100670,"tier":"Micro"}
+{"day":1007,"phase":"Night","text":"A light drizzle settles over the camp.","tick":100675,"tier":"Action"}
+{"day":1007,"phase":"Night","text":"The prey bolts.","tick":100675,"tier":"Micro"}
+{"day":1007,"phase":"Night","text":"A cat catches a scent on the wind.","tick":100677,"tier":"Micro"}
+{"day":1007,"phase":"Night","text":"A cat catches a rat.","tick":100681,"tier":"Action"}
+{"day":1007,"phase":"Night","text":"Hazel catches the scent of fox on the wind.","tick":100699,"tier":"Action"}
+{"day":1008,"phase":"Dawn","text":"The colony has forgotten the danger near the western lowlands.","tick":100701,"tier":"Significant"}
+{"day":1008,"phase":"Dawn","text":"Finch has starved.","tick":100701,"tier":"Significant"}
+{"day":1008,"phase":"Dawn","text":"The stars dim where Finch's light once was. Hazel feels the thread go cold.","tick":100701,"tier":"Significant"}
+{"day":1008,"phase":"Dawn","text":"Clover stands still a long time where Finch fell. The challenge will never be answered.","tick":100701,"tier":"Significant"}
+{"day":1008,"phase":"Dawn","text":"Reed and Hazel lock eyes across the clearing. A challenge unspoken.","tick":100701,"tier":"Significant"}
+{"day":1008,"phase":"Dawn","text":"Bramble hears something prowling in the brush.","tick":100710,"tier":"Action"}
+{"day":1008,"phase":"Day","text":"Clouds gather overhead, muting the light.","tick":100741,"tier":"Action"}
+{"day":1008,"phase":"Day","text":"Some rat in the stores has gone off.","tick":100743,"tier":"Micro"}
+{"day":1008,"phase":"Day","text":"Rowan catches the scent of fox on the wind.","tick":100746,"tier":"Action"}
+{"day":1008,"phase":"Dusk","text":"Mallow catches the scent of fox on the wind.","tick":100751,"tier":"Action"}
+{"day":1008,"phase":"Dusk","text":"Flint has starved.","tick":100772,"tier":"Significant"}
+{"day":1008,"phase":"Dusk","text":"The stars dim where Flint's light once was. Clover feels the thread go cold.","tick":100772,"tier":"Significant"}
+{"day":1008,"phase":"Dusk","text":"Bramble stands still a long time where Flint fell. The challenge will never be answered.","tick":100772,"tier":"Significant"}
+{"day":1008,"phase":"Night","text":"Reed hears something prowling in the brush.","tick":100797,"tier":"Action"}
+{"day":1009,"phase":"Dawn","text":"A gentle rain begins to fall.","tick":100813,"tier":"Action"}
+{"day":1009,"phase":"Day","text":"Bramble hears something prowling in the brush.","tick":100833,"tier":"Action"}
+{"day":1009,"phase":"Day","text":"Hazel freezes — a rust-red shape moves between the trees.","tick":100833,"tier":"Action"}
+{"day":1009,"phase":"Day","text":"Something stirs between Rowan and Reed as their paths cross.","tick":100846,"tier":"Significant"}
+{"day":1009,"phase":"Dusk","text":"The sun disappears behind thickening clouds.","tick":100874,"tier":"Action"}
+{"day":1009,"phase":"Dusk","text":"Rowan catches the scent of fox on the wind.","tick":100874,"tier":"Action"}
+{"day":1009,"phase":"Night","text":"Mallow hears something prowling in the brush.","tick":100879,"tier":"Action"}
+{"day":1010,"phase":"Day","text":"A cat catches a scent on the wind.","tick":100930,"tier":"Micro"}
+{"day":1010,"phase":"Day","text":"Mist rolls in, swallowing the edges of the camp.","tick":100937,"tier":"Action"}
+{"day":1010,"phase":"Dusk","text":"Bramble spots a fox slinking through the undergrowth.","tick":100959,"tier":"Action"}
+{"day":1010,"phase":"Dusk","text":"Hazel catches the scent of fox on the wind.","tick":100959,"tier":"Action"}
+{"day":1010,"phase":"Night","text":"Rowan freezes — a rust-red shape moves between the trees.","tick":100978,"tier":"Action"}
+{"day":1010,"phase":"Night","text":"Reed has starved.","tick":100986,"tier":"Significant"}
+{"day":1010,"phase":"Night","text":"The stars dim where Reed's light once was. Rowan feels the thread go cold.","tick":100986,"tier":"Significant"}
+{"day":1010,"phase":"Night","text":"Hazel stands still a long time where Reed fell. The challenge will never be answered.","tick":100986,"tier":"Significant"}
+{"day":1010,"phase":"Night","text":"Mallow freezes — a rust-red shape moves between the trees.","tick":100995,"tier":"Action"}
+{"day":1011,"phase":"Dusk","text":"Bramble freezes — a rust-red shape moves between the trees.","tick":101065,"tier":"Action"}
+{"day":1011,"phase":"Dusk","text":"Hazel catches the scent of fox on the wind.","tick":101065,"tier":"Action"}
+{"day":1011,"phase":"Dusk","text":"A grey blanket spreads across the sky.","tick":101068,"tier":"Action"}
+{"day":1012,"phase":"Day","text":"A hawk circles overhead — Mallow freezes.","tick":101126,"tier":"Action"}
+{"day":1012,"phase":"Day","text":"A fox snatches a rat from the undergrowth.","tick":101129,"tier":"Micro"}
+{"day":1012,"phase":"Day","text":"Rowan catches the scent of fox on the wind.","tick":101134,"tier":"Action"}
+{"day":1012,"phase":"Day","text":"Thunder rumbles. A storm rolls in.","tick":101142,"tier":"Action"}
+{"day":1012,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101151,"tier":"Micro"}
+{"day":1012,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101153,"tier":"Micro"}
+{"day":1012,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101154,"tier":"Micro"}
+{"day":1012,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101155,"tier":"Micro"}
+{"day":1012,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101156,"tier":"Micro"}
+{"day":1012,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101158,"tier":"Micro"}
+{"day":1012,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101162,"tier":"Micro"}
+{"day":1012,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101162,"tier":"Micro"}
+{"day":1012,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101164,"tier":"Micro"}
+{"day":1012,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101166,"tier":"Micro"}
+{"day":1012,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101167,"tier":"Micro"}
+{"day":1012,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101170,"tier":"Micro"}
+{"day":1012,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101172,"tier":"Micro"}
+{"day":1012,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101173,"tier":"Micro"}
+{"day":1012,"phase":"Night","text":"A cat catches a scent on the wind.","tick":101175,"tier":"Micro"}
+{"day":1012,"phase":"Night","text":"A cat catches a mouse.","tick":101179,"tier":"Action"}
+{"day":1012,"phase":"Night","text":"A cat catches a scent on the wind.","tick":101180,"tier":"Micro"}
+{"day":1012,"phase":"Night","text":"A cat catches a scent on the wind.","tick":101183,"tier":"Micro"}
+{"day":1012,"phase":"Night","text":"A cat catches a scent on the wind.","tick":101191,"tier":"Micro"}
+{"day":1012,"phase":"Night","text":"A cat catches a scent on the wind.","tick":101192,"tier":"Micro"}
+{"day":1012,"phase":"Night","text":"A cat catches a scent on the wind.","tick":101193,"tier":"Micro"}
+{"day":1012,"phase":"Night","text":"A cat catches a scent on the wind.","tick":101194,"tier":"Micro"}
+{"day":1012,"phase":"Night","text":"A cat catches a scent on the wind.","tick":101195,"tier":"Micro"}
+{"day":1012,"phase":"Night","text":"A cat catches a scent on the wind.","tick":101196,"tier":"Micro"}
+{"day":1012,"phase":"Night","text":"A cat catches a scent on the wind.","tick":101197,"tier":"Micro"}
+{"day":1012,"phase":"Night","text":"Bramble hears something prowling in the brush.","tick":101197,"tier":"Action"}
+{"day":1012,"phase":"Night","text":"Hazel hears something prowling in the brush.","tick":101197,"tier":"Action"}
+{"day":1013,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":101201,"tier":"Micro"}
+{"day":1013,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":101201,"tier":"Micro"}
+{"day":1013,"phase":"Dawn","text":"The prey bolts.","tick":101201,"tier":"Micro"}
+{"day":1013,"phase":"Dawn","text":"Mallow has starved.","tick":101201,"tier":"Significant"}
+{"day":1013,"phase":"Dawn","text":"The stars dim where Mallow's light once was. Bramble feels the thread go cold.","tick":101201,"tier":"Significant"}
+{"day":1013,"phase":"Dawn","text":"Rowan stands still a long time where Mallow fell. The challenge will never be answered.","tick":101201,"tier":"Significant"}
+{"day":1013,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":101203,"tier":"Micro"}
+{"day":1013,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":101205,"tier":"Micro"}
+{"day":1013,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":101206,"tier":"Micro"}
+{"day":1013,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":101208,"tier":"Micro"}
+{"day":1013,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":101210,"tier":"Micro"}
+{"day":1013,"phase":"Dawn","text":"Clouds gather overhead, muting the light.","tick":101212,"tier":"Action"}
+{"day":1013,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":101214,"tier":"Micro"}
+{"day":1013,"phase":"Dawn","text":"A cat catches a rat.","tick":101217,"tier":"Action"}
+{"day":1013,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":101218,"tier":"Micro"}
+{"day":1013,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":101222,"tier":"Micro"}
+{"day":1013,"phase":"Dawn","text":"A cat catches a scent on the wind.","tick":101224,"tier":"Micro"}
+{"day":1013,"phase":"Day","text":"A cat catches a scent on the wind.","tick":101225,"tier":"Micro"}
+{"day":1013,"phase":"Day","text":"A cat catches a scent on the wind.","tick":101226,"tier":"Micro"}
+{"day":1013,"phase":"Day","text":"A cat catches a scent on the wind.","tick":101227,"tier":"Micro"}
+{"day":1013,"phase":"Day","text":"A cat catches a scent on the wind.","tick":101230,"tier":"Micro"}
+{"day":1013,"phase":"Day","text":"A cat catches a scent on the wind.","tick":101233,"tier":"Micro"}
+{"day":1013,"phase":"Day","text":"A cat catches a scent on the wind.","tick":101236,"tier":"Micro"}
+{"day":1013,"phase":"Day","text":"A cat catches a scent on the wind.","tick":101237,"tier":"Micro"}
+{"day":1013,"phase":"Dusk","text":"The colony has forgotten the danger near the eastern lowlands.","tick":101251,"tier":"Significant"}
+{"day":1013,"phase":"Dusk","text":"Rowan catches the scent of fox on the wind.","tick":101255,"tier":"Action"}
+{"day":1013,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101263,"tier":"Micro"}
+{"day":1013,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101269,"tier":"Micro"}
+{"day":1013,"phase":"Night","text":"A fox snatches a bird from the undergrowth.","tick":101290,"tier":"Micro"}
+{"day":1014,"phase":"Dawn","text":"Bramble has starved.","tick":101315,"tier":"Significant"}
+{"day":1014,"phase":"Day","text":"Hazel freezes — a rust-red shape moves between the trees.","tick":101325,"tier":"Action"}
+{"day":1014,"phase":"Day","text":"A cat catches a scent on the wind.","tick":101327,"tier":"Micro"}
+{"day":1014,"phase":"Day","text":"A cat catches a scent on the wind.","tick":101330,"tier":"Micro"}
+{"day":1014,"phase":"Day","text":"A cat catches a scent on the wind.","tick":101332,"tier":"Micro"}
+{"day":1014,"phase":"Day","text":"A cat catches a scent on the wind.","tick":101333,"tier":"Micro"}
+{"day":1014,"phase":"Day","text":"A cat catches a scent on the wind.","tick":101335,"tier":"Micro"}
+{"day":1014,"phase":"Day","text":"A cat catches a scent on the wind.","tick":101337,"tier":"Micro"}
+{"day":1014,"phase":"Day","text":"Soft droplets patter against the leaves.","tick":101338,"tier":"Action"}
+{"day":1014,"phase":"Day","text":"A cat catches a scent on the wind.","tick":101338,"tier":"Micro"}
+{"day":1014,"phase":"Day","text":"A cat catches a scent on the wind.","tick":101339,"tier":"Micro"}
+{"day":1014,"phase":"Day","text":"A cat catches a scent on the wind.","tick":101342,"tier":"Micro"}
+{"day":1014,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101352,"tier":"Micro"}
+{"day":1014,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101353,"tier":"Micro"}
+{"day":1014,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101354,"tier":"Micro"}
+{"day":1014,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101355,"tier":"Micro"}
+{"day":1014,"phase":"Night","text":"A cat catches a scent on the wind.","tick":101383,"tier":"Micro"}
+{"day":1014,"phase":"Night","text":"A cat catches a scent on the wind.","tick":101385,"tier":"Micro"}
+{"day":1014,"phase":"Night","text":"Rowan spots a shadow sweeping across the ground — a hawk.","tick":101385,"tier":"Action"}
+{"day":1014,"phase":"Night","text":"A cat catches a scent on the wind.","tick":101390,"tier":"Micro"}
+{"day":1014,"phase":"Night","text":"Rowan has starved.","tick":101390,"tier":"Significant"}
+{"day":1015,"phase":"Dawn","text":"A biting wind picks up, tugging at fur.","tick":101400,"tier":"Action"}
+{"day":1015,"phase":"Day","text":"Hazel looks up sharply. A raptor rides the thermals.","tick":101439,"tier":"Action"}
+{"day":1015,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101462,"tier":"Micro"}
+{"day":1015,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101463,"tier":"Micro"}
+{"day":1015,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101464,"tier":"Micro"}
+{"day":1015,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101465,"tier":"Micro"}
+{"day":1015,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101466,"tier":"Micro"}
+{"day":1015,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101467,"tier":"Micro"}
+{"day":1015,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101468,"tier":"Micro"}
+{"day":1015,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101469,"tier":"Micro"}
+{"day":1015,"phase":"Dusk","text":"The sun disappears behind thickening clouds.","tick":101471,"tier":"Action"}
+{"day":1015,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101471,"tier":"Micro"}
+{"day":1015,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101472,"tier":"Micro"}
+{"day":1015,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101473,"tier":"Micro"}
+{"day":1015,"phase":"Dusk","text":"A cat catches a scent on the wind.","tick":101474,"tier":"Micro"}
+{"day":1015,"phase":"Night","text":"A cat catches a scent on the wind.","tick":101475,"tier":"Micro"}
+{"day":1015,"phase":"Night","text":"A cat catches a scent on the wind.","tick":101476,"tier":"Micro"}
+{"day":1015,"phase":"Night","text":"A cat catches a scent on the wind.","tick":101479,"tier":"Micro"}
+{"day":1015,"phase":"Night","text":"A cat catches a scent on the wind.","tick":101481,"tier":"Micro"}
+{"day":1016,"phase":"Dawn","text":"A fox snatches a mouse from the undergrowth.","tick":101519,"tier":"Micro"}
+{"day":1016,"phase":"Day","text":"Blue sky breaks through. The air warms.","tick":101536,"tier":"Action"}
+{"day":1016,"phase":"Dusk","text":"Hazel has starved.","tick":101558,"tier":"Significant"}
+{"day":1016,"phase":"Dusk","text":"The others look to Clover when decisions need making.","tick":101559,"tier":"Significant"}
+{"day":1016,"phase":"Night","text":"Rain hammers down in heavy sheets.","tick":101586,"tier":"Action"}
+{"day":1017,"phase":"Day","text":"The sky clears. Light dapples through the canopy.","tick":101641,"tier":"Action"}
+{"day":1018,"phase":"Dawn","text":"The world shrinks to a grey haze.","tick":101701,"tier":"Action"}
+{"day":1018,"phase":"Day","text":"Blue sky breaks through. The air warms.","tick":101737,"tier":"Action"}
+{"day":1018,"phase":"Dusk","text":"The world shrinks to a grey haze.","tick":101774,"tier":"Action"}
+{"day":1018,"phase":"Night","text":"A hawk dives and plucks a mouse from the ground.","tick":101789,"tier":"Micro"}
+{"day":1019,"phase":"Day","text":"The sun disappears behind thickening clouds.","tick":101838,"tier":"Action"}
+{"day":1019,"phase":"Night","text":"Rain hammers down in heavy sheets.","tick":101887,"tier":"Action"}
+{"day":1020,"phase":"Day","text":"Clover has starved.","tick":101929,"tier":"Significant"}

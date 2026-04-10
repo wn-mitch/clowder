@@ -8,8 +8,8 @@ use clowder::components::physical::{Health, Needs, Position};
 use clowder::components::magic::Inventory;
 use clowder::components::skills::{Corruption, MagicAffinity, Training};
 use clowder::resources::{
-    FoodStores, NarrativeLog, Relationships, SimConfig, SimRng, TemplateRegistry, TimeState,
-    TileMap, WeatherState,
+    ColonyKnowledge, ColonyPriority, FoodStores, NarrativeLog, Relationships, SimConfig,
+    SimRng, TemplateRegistry, TimeState, TileMap, WeatherState,
 };
 use clowder::world_gen::colony::{find_colony_site, generate_starting_cats, spawn_starting_buildings};
 use clowder::world_gen::terrain::generate_terrain;
@@ -48,6 +48,10 @@ fn setup_world(seed: u64) -> World {
     world.insert_resource(WeatherState::default());
     world.insert_resource(NarrativeLog::default());
     world.insert_resource(FoodStores::default());
+    world.insert_resource(ColonyKnowledge::default());
+    world.insert_resource(ColonyPriority::default());
+    world.insert_resource(clowder::resources::wind::WindState::default());
+    world.insert_resource(clowder::resources::time::TransitionTracker::default());
     world.insert_resource(map);
     world.insert_resource(sim_rng);
 
@@ -92,6 +96,7 @@ fn setup_world(seed: u64) -> World {
                 Training::default(),
                 CurrentAction::default(),
                 Inventory::default(),
+                clowder::components::disposition::ActionHistory::default(),
             ),
         )).id();
         entity_ids.push(entity);
@@ -122,13 +127,44 @@ fn build_schedule() -> Schedule {
             clowder::systems::items::prune_stored_items,
             clowder::systems::items::sync_food_stores,
             clowder::systems::needs::decay_needs,
-            clowder::systems::ai::evaluate_actions,
-            clowder::systems::actions::resolve_actions,
+        )
+            .chain(),
+    );
+    // Disposition pipeline (mirrors main schedule ordering).
+    schedule.add_systems(
+        clowder::systems::disposition::check_anxiety_interrupts,
+    );
+    schedule.add_systems(
+        clowder::systems::disposition::evaluate_dispositions
+            .after(clowder::systems::disposition::check_anxiety_interrupts),
+    );
+    schedule.add_systems(
+        bevy_ecs::schedule::ApplyDeferred
+            .after(clowder::systems::disposition::evaluate_dispositions)
+            .before(clowder::systems::disposition::disposition_to_chain),
+    );
+    schedule.add_systems(
+        clowder::systems::disposition::disposition_to_chain
+            .after(clowder::systems::disposition::evaluate_dispositions),
+    );
+    schedule.add_systems(
+        bevy_ecs::schedule::ApplyDeferred
+            .after(clowder::systems::disposition::disposition_to_chain)
+            .before(clowder::systems::disposition::resolve_disposition_chains),
+    );
+    schedule.add_systems(
+        clowder::systems::disposition::resolve_disposition_chains
+            .after(clowder::systems::disposition::disposition_to_chain),
+    );
+    schedule.add_systems(
+        (
+            clowder::systems::task_chains::resolve_task_chains,
             clowder::systems::social::passive_familiarity,
             clowder::systems::social::check_bonds,
             clowder::systems::narrative::generate_narrative,
         )
-            .chain(),
+            .chain()
+            .after(clowder::systems::disposition::resolve_disposition_chains),
     );
     schedule
 }

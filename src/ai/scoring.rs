@@ -136,7 +136,7 @@ pub fn score_actions(
 
     // --- Hunt (boldness-driven; requires reachable forest/grass) ---
     if ctx.can_hunt {
-        let food_scarcity = (1.0 - ctx.food_fraction) * 0.5;
+        let food_scarcity = (1.0 - ctx.food_fraction) * 0.6;
         let prey_bonus = if ctx.prey_nearby { 0.2 } else { 0.0 };
         let urgency = ((1.0 - ctx.needs.hunger) + food_scarcity)
             * ctx.personality.boldness * 2.2

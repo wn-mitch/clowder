@@ -140,14 +140,29 @@ impl Default for Needs {
             safety: 1.0,
             social: 0.6,
             acceptance: 0.5,
-            respect: 0.3,
-            mastery: 0.3,
+            respect: 0.5,
+            mastery: 0.4,
             purpose: 0.2,
         }
     }
 }
 
 impl Needs {
+    /// Create needs with hunger and energy staggered by position within a
+    /// group.  Spreads hunger across `[0.5, 1.0]` and energy across
+    /// `[0.55, 0.8]` so that cats don't all hit eat/sleep thresholds at the
+    /// same tick — preventing synchronised binge-eating that drains stores in
+    /// one wave.
+    pub fn staggered(index: usize, group_size: usize) -> Self {
+        let mut needs = Self::default();
+        if group_size > 1 {
+            let t = index as f32 / (group_size - 1) as f32;
+            needs.hunger = 1.0 - t * 0.5; // [0.5, 1.0]
+            needs.energy = 0.8 - t * 0.25; // [0.55, 0.8]
+        }
+        needs
+    }
+
     // -----------------------------------------------------------------------
     // Internal satisfaction helpers
     // -----------------------------------------------------------------------
@@ -276,8 +291,8 @@ mod tests {
         assert_eq!(n.safety, 1.0);
         assert_eq!(n.social, 0.6);
         assert_eq!(n.acceptance, 0.5);
-        assert_eq!(n.respect, 0.3);
-        assert_eq!(n.mastery, 0.3);
+        assert_eq!(n.respect, 0.5);
+        assert_eq!(n.mastery, 0.4);
         assert_eq!(n.purpose, 0.2);
     }
 

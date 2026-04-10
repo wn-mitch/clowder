@@ -9,7 +9,7 @@ pub struct UiAssets {
 
 pub fn setup_ui_assets(mut commands: Commands, asset_server: Res<AssetServer>) {
     let image = asset_server
-        .load("sprites/Sprout Lands - UI Pack - Basic pack/Sprite sheets/Dialouge UI/dialog box.png");
+        .load("sprites/Sprout Lands - UI Pack - Premium pack/UI Sprites/Dialouge UI/dialog box.png");
 
     let slicer = TextureSlicer {
         border: BorderRect::all(6.0),

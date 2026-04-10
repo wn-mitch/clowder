@@ -3,6 +3,7 @@ pub mod building;
 pub mod coordination;
 pub mod disposition;
 pub mod fate;
+pub mod hunting_priors;
 pub mod identity;
 pub mod items;
 pub mod magic;

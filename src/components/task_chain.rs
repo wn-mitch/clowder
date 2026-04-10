@@ -128,6 +128,38 @@ pub enum StepKind {
     DeliverDirective,
 }
 
+impl StepKind {
+    /// Returns `true` for steps whose timer is managed by a dedicated system
+    /// (disposition or magic), so `resolve_task_chains` must not double-count.
+    pub fn is_externally_timed(&self) -> bool {
+        matches!(
+            self,
+            // Disposition system (resolve_disposition_chains)
+            StepKind::HuntPrey { .. }
+                | StepKind::ForageItem { .. }
+                | StepKind::DepositAtStores
+                | StepKind::EatAtStores
+                | StepKind::Sleep { .. }
+                | StepKind::SelfGroom
+                | StepKind::Socialize
+                | StepKind::GroomOther
+                | StepKind::MentorCat
+                | StepKind::PatrolTo
+                | StepKind::FightThreat
+                | StepKind::Survey
+                | StepKind::DeliverDirective
+                // Magic system (resolve_magic_task_chains)
+                | StepKind::GatherHerb
+                | StepKind::PrepareRemedy { .. }
+                | StepKind::ApplyRemedy { .. }
+                | StepKind::SetWard { .. }
+                | StepKind::Scry
+                | StepKind::CleanseCorruption
+                | StepKind::SpiritCommunion
+        )
+    }
+}
+
 /// Materials used in construction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Material {

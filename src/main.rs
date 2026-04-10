@@ -18,7 +18,7 @@ use bevy_ecs::schedule::Schedule;
 use clowder::ai::CurrentAction;
 use clowder::components::identity::{Age, Name, Species};
 use clowder::components::mental::{Memory, Mood};
-use clowder::components::physical::{Health, Needs, Position};
+use clowder::components::physical::{Dead, Health, Needs, Position};
 use clowder::components::magic::Inventory;
 use clowder::components::skills::{Corruption, MagicAffinity, Training};
 use clowder::persistence;
@@ -276,11 +276,10 @@ fn build_schedule() -> Schedule {
                 clowder::systems::coordination::accumulate_build_pressure,
             )
                 .chain(),
-            // Action resolution (evaluate_actions added separately — exceeds chain param limit)
+            // Action resolution (disposition system handles all action selection/execution)
             (
                 clowder::systems::task_chains::resolve_task_chains,
                 clowder::systems::magic::resolve_magic_task_chains,
-                clowder::systems::actions::resolve_actions,
                 clowder::systems::magic::apply_remedy_effects,
                 clowder::systems::buildings::process_gates,
                 clowder::systems::buildings::tidy_buildings,
@@ -312,7 +311,7 @@ fn build_schedule() -> Schedule {
         clowder::systems::disposition::evaluate_dispositions
             .after(clowder::systems::disposition::check_anxiety_interrupts),
     );
-    // Flush commands so Disposition is visible to disposition_to_chain and evaluate_actions.
+    // Flush commands so Disposition is visible to disposition_to_chain.
     schedule.add_systems(
         bevy_ecs::schedule::ApplyDeferred
             .after(clowder::systems::disposition::evaluate_dispositions)
@@ -334,20 +333,15 @@ fn build_schedule() -> Schedule {
             .before(clowder::systems::task_chains::resolve_task_chains),
     );
 
-    // These systems exceed Bevy's chain param limit — register separately.
-    schedule.add_systems(
-        clowder::systems::ai::evaluate_actions
-            .after(clowder::systems::disposition::disposition_to_chain),
-    );
     schedule.add_systems(clowder::systems::personality_events::emit_personality_events);
     schedule.add_systems(clowder::systems::ai::emit_periodic_events);
     schedule.add_systems(
         clowder::systems::snapshot::emit_cat_snapshots
-            .after(clowder::systems::actions::resolve_actions),
+            .after(clowder::systems::disposition::resolve_disposition_chains),
     );
     schedule.add_systems(
         clowder::systems::snapshot::emit_position_traces
-            .after(clowder::systems::actions::resolve_actions),
+            .after(clowder::systems::disposition::resolve_disposition_chains),
     );
     // Fate and aspiration lifecycle.
     schedule.add_systems(clowder::systems::fate::assign_fated_connections);
@@ -477,6 +471,20 @@ fn run_headless(args: CliArgs) -> io::Result<()> {
                 time.tick,
                 TimeState::day_number(time.tick, config),
             );
+        }
+
+        // Stop early if all cats are dead.
+        let alive = world
+            .query_filtered::<(), (
+                bevy_ecs::prelude::With<Species>,
+                bevy_ecs::prelude::Without<Dead>,
+            )>()
+            .iter(&world)
+            .count();
+        if alive == 0 {
+            let time = world.resource::<TimeState>();
+            eprintln!("\n  All cats dead at tick {}. Ending early.", time.tick);
+            break;
         }
     }
 
@@ -648,7 +656,8 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
     world.insert_resource(sim_rng);
 
     // Spawn cats.
-    let mut entity_ids: Vec<Entity> = Vec::with_capacity(8);
+    let cat_count = cat_blueprints.len();
+    let mut entity_ids: Vec<Entity> = Vec::with_capacity(cat_count);
     for (i, cat) in cat_blueprints.into_iter().enumerate() {
         let offset_x = (i as i32 % 5) - 2;
         let offset_y = (i as i32 / 5) - 1;
@@ -672,7 +681,7 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
                 cat.appearance,
                 Position::new(spawn_x, spawn_y),
                 Health::default(),
-                Needs::default(),
+                Needs::staggered(i, cat_count),
                 Mood::default(),
                 Memory::default(),
             ),
