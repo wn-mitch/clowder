@@ -19,6 +19,7 @@ use crate::components::coordination::{
 use crate::components::disposition::{
     ActionHistory, ActionOutcome, ActionRecord, Disposition, DispositionKind,
 };
+use crate::components::hunting_priors::HuntingPriors;
 use crate::components::identity::Name;
 use crate::components::magic::{Harvestable, Herb, Inventory, Ward};
 use crate::components::mental::{Memory, MemoryType};
@@ -1338,6 +1339,7 @@ pub fn resolve_disposition_chains(
             &Personality,
             Option<&mut Disposition>,
             Option<&mut ActionHistory>,
+            &mut HuntingPriors,
         ),
         (Without<Dead>, Without<Structure>, Without<PreyAnimal>),
     >,
@@ -1363,7 +1365,7 @@ pub fn resolve_disposition_chains(
     let mut mentor_effects: Vec<MentorEffect> = Vec::new();
     let mut chains_to_remove: Vec<Entity> = Vec::new();
 
-    for (cat_entity, mut chain, mut current, mut pos, mut skills, mut needs, mut inventory, personality, disposition, history) in &mut cats {
+    for (cat_entity, mut chain, mut current, mut pos, mut skills, mut needs, mut inventory, personality, disposition, history, mut hunting_priors) in &mut cats {
         let Some(step) = chain.current_mut() else {
             // Chain exhausted — handle completion or failure.
             chains_to_remove.push(cat_entity);
@@ -1487,6 +1489,7 @@ pub fn resolve_disposition_chains(
                                 crate::resources::narrative::NarrativeTier::Action,
                             );
                             chain.advance();
+                            hunting_priors.record_catch(&prey_pos);
                         } else {
                             // Pounce failed — prey bolts.
                             if let Ok((_, _, mut prey_animal)) = prey_query.get_mut(target_entity) {
@@ -1573,8 +1576,9 @@ pub fn resolve_disposition_chains(
                             .filter(|(_, pp, _)| can_smell_prey(&pos, pp, &wind, &map))
                             .min_by_key(|(_, pp, _)| pos.manhattan_distance(pp));
 
-                        if let Some((prey_entity, _prey_pos_ref, _)) = scented_prey {
+                        if let Some((prey_entity, prey_pos_ref, _)) = scented_prey {
                             step.target_entity = Some(prey_entity);
+                            hunting_priors.record_scent(prey_pos_ref);
                             log.push(
                                 time.tick,
                                 "A cat catches a scent on the wind.".to_string(),
@@ -1584,6 +1588,7 @@ pub fn resolve_disposition_chains(
                     }
 
                     if ticks > 100 {
+                        hunting_priors.record_failed_search(&pos, ticks);
                         chain.fail_current("no scent found".into());
                     }
                 }
@@ -1839,7 +1844,7 @@ pub fn resolve_disposition_chains(
         // Try the unchained query first (more common — apprentice is usually idle).
         let app_skills_result = if let Ok(s) = unchained_skills.get(effect.apprentice) {
             Some((s.hunting, s.foraging, s.herbcraft, s.building, s.combat, s.magic, s.growth_rate()))
-        } else if let Ok((_, _, _, _, s, _, _, _, _, _)) = cats.get(effect.apprentice) {
+        } else if let Ok((_, _, _, _, s, _, _, _, _, _, _)) = cats.get(effect.apprentice) {
             Some((s.hunting, s.foraging, s.herbcraft, s.building, s.combat, s.magic, s.growth_rate()))
         } else {
             None
@@ -1884,7 +1889,7 @@ pub fn resolve_disposition_chains(
                         5 => s.magic += growth,
                         _ => {}
                     }
-                } else if let Ok((_, _, _, _, mut s, _, _, _, _, _)) =
+                } else if let Ok((_, _, _, _, mut s, _, _, _, _, _, _)) =
                     cats.get_mut(effect.apprentice)
                 {
                     match idx {

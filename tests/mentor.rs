@@ -2,6 +2,7 @@ use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::Schedule;
 
 use clowder::ai::CurrentAction;
+use clowder::components::hunting_priors::HuntingPriors;
 use clowder::components::identity::Name;
 use clowder::components::magic::Inventory;
 use clowder::components::personality::Personality;
@@ -68,6 +69,7 @@ fn mentoring_restores_mastery() {
             Inventory::default(),
             Personality::random(&mut rand::rng()),
             Name("Mentor".to_string()),
+            HuntingPriors::default(),
         ))
         .id();
 
@@ -117,6 +119,7 @@ fn mentoring_grows_apprentice_skill() {
         Inventory::default(),
         Personality::random(&mut rand::rng()),
         Name("Mentor".to_string()),
+        HuntingPriors::default(),
     ));
 
     let hunting_before = world.get::<Skills>(apprentice).unwrap().hunting;
@@ -160,6 +163,7 @@ fn mentoring_builds_fondness() {
             Inventory::default(),
             Personality::random(&mut rand::rng()),
             Name("Mentor".to_string()),
+            HuntingPriors::default(),
         ))
         .id();
 
