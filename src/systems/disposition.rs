@@ -1549,13 +1549,22 @@ pub fn resolve_disposition_chains(
                         }
                     }
                 } else {
-                    // === SEARCH === (no target yet — move upwind, scan for scent)
+                    // === SEARCH === (no target yet — move toward best-known hunting ground)
+                    // Priority: personal belief > colony belief > wind > patrol_dir.
+                    let belief_dir = hunting_priors.best_direction(&pos, 25);
+                    let colony_dir = colony_map.beliefs.best_direction(&pos, 25);
                     let (wx, wy) = wind.direction();
-                    // Move into the wind (opposite of wind direction).
-                    let mut dx = if wx.abs() > 0.3 { -(wx.signum() as i32) } else { patrol_dir.0 };
-                    let mut dy = if wy.abs() > 0.3 { -(wy.signum() as i32) } else { patrol_dir.1 };
-                    // 10% jitter.
-                    if rng.rng.random::<f32>() < 0.10 {
+                    let (mut dx, mut dy) = if let Some((bx, by)) = belief_dir {
+                        (bx, by)
+                    } else if let Some((cx, cy)) = colony_dir {
+                        (cx, cy)
+                    } else if wx.abs() > 0.3 || wy.abs() > 0.3 {
+                        (-(wx.signum() as i32), -(wy.signum() as i32))
+                    } else {
+                        *patrol_dir
+                    };
+                    // 20% jitter — enough to explore but not lose the gradient.
+                    if rng.rng.random::<f32>() < 0.20 {
                         dx = rng.rng.random_range(-1i32..=1);
                         dy = rng.rng.random_range(-1i32..=1);
                     }
