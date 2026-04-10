@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0]
+## [0.1.0] - 2026-04-10
 
 ### Added
 - Colony simulation with procedurally generated terrain and starting cats
@@ -27,3 +27,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Save/load persistence (autosave)
 - Headless simulation mode with event logging
 - Random seed on boot; use `--seed N` to reproduce a specific world
+
+[unreleased]: https://github.com/wn-mitch/clowder/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/wn-mitch/clowder/releases/tag/v0.1.0
