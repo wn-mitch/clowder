@@ -8,8 +8,8 @@ use clowder::components::physical::{Health, Needs, Position};
 use clowder::components::magic::Inventory;
 use clowder::components::skills::{Corruption, MagicAffinity, Training};
 use clowder::resources::{
-    ColonyKnowledge, ColonyPriority, FoodStores, NarrativeLog, Relationships, SimConfig,
-    SimRng, TemplateRegistry, TimeState, TileMap, WeatherState,
+    ColonyHuntingMap, ColonyKnowledge, ColonyPriority, FoodStores, NarrativeLog, Relationships,
+    SimConfig, SimRng, TemplateRegistry, TimeState, TileMap, WeatherState,
 };
 use clowder::world_gen::colony::{find_colony_site, generate_starting_cats, spawn_starting_buildings};
 use clowder::world_gen::terrain::generate_terrain;
@@ -50,6 +50,7 @@ fn setup_world(seed: u64) -> World {
     world.insert_resource(FoodStores::default());
     world.insert_resource(ColonyKnowledge::default());
     world.insert_resource(ColonyPriority::default());
+    world.insert_resource(ColonyHuntingMap::default());
     world.insert_resource(clowder::resources::wind::WindState::default());
     world.insert_resource(clowder::resources::time::TransitionTracker::default());
     world.insert_resource(map);
@@ -97,6 +98,7 @@ fn setup_world(seed: u64) -> World {
                 CurrentAction::default(),
                 Inventory::default(),
                 clowder::components::disposition::ActionHistory::default(),
+                clowder::components::hunting_priors::HuntingPriors::default(),
             ),
         )).id();
         entity_ids.push(entity);

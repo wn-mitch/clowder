@@ -19,6 +19,7 @@ use clowder::ai::CurrentAction;
 use clowder::components::identity::{Age, Name, Species};
 use clowder::components::mental::{Memory, Mood};
 use clowder::components::physical::{Dead, Health, Needs, Position};
+use clowder::components::hunting_priors::HuntingPriors;
 use clowder::components::magic::Inventory;
 use clowder::components::skills::{Corruption, MagicAffinity, Training};
 use clowder::persistence;
@@ -27,8 +28,8 @@ use clowder::plugins::simulation::SimulationPlugin;
 use clowder::rendering;
 
 use clowder::resources::{
-    EventLog, FoodStores, NarrativeLog, NarrativeTier, Relationships, SimConfig, SimRng,
-    TemplateRegistry, TimeState, TileMap, WeatherState,
+    ColonyHuntingMap, EventLog, FoodStores, NarrativeLog, NarrativeTier, Relationships, SimConfig,
+    SimRng, TemplateRegistry, TimeState, TileMap, WeatherState,
 };
 use clowder::resources::time::DayPhase;
 use clowder::world_gen::colony::{find_colony_site, generate_starting_cats, spawn_starting_buildings};
@@ -403,6 +404,9 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
     if !world.contains_resource::<clowder::resources::ColonyPriority>() {
         world.insert_resource(clowder::resources::ColonyPriority::default());
     }
+    if !world.contains_resource::<ColonyHuntingMap>() {
+        world.insert_resource(ColonyHuntingMap::default());
+    }
     if !world.contains_resource::<clowder::systems::wildlife::DetectionCooldowns>() {
         world.insert_resource(clowder::systems::wildlife::DetectionCooldowns::default());
     }
@@ -650,6 +654,7 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
     world.insert_resource(NarrativeLog::default());
     world.insert_resource(clowder::resources::ColonyKnowledge::default());
     world.insert_resource(clowder::resources::ColonyPriority::default());
+    world.insert_resource(ColonyHuntingMap::default());
     world.insert_resource(FoodStores::default());
     world.insert_resource(clowder::systems::wildlife::DetectionCooldowns::default());
     world.insert_resource(map);
@@ -693,6 +698,7 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
                 Training::default(),
                 CurrentAction::default(),
                 Inventory::default(),
+                HuntingPriors::default(),
             ),
         )).id();
         entity_ids.push(entity);

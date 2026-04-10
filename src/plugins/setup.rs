@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use bevy::prelude::Resource;
 use bevy_ecs::world::World;
 
+use crate::components::hunting_priors::HuntingPriors;
 use crate::components::identity::{Age, Name, Species};
 use crate::components::magic::Inventory;
 use crate::components::mental::{Memory, Mood};
@@ -10,8 +11,8 @@ use crate::components::physical::{Health, Needs, Position};
 use crate::components::skills::{Corruption, MagicAffinity, Training};
 use crate::persistence;
 use crate::resources::{
-    ColonyKnowledge, ColonyPriority, EventLog, FoodStores, NarrativeLog, NarrativeTier,
-    Relationships, SimConfig, SimRng, TemplateRegistry, TimeState, WeatherState,
+    ColonyHuntingMap, ColonyKnowledge, ColonyPriority, EventLog, FoodStores, NarrativeLog,
+    NarrativeTier, Relationships, SimConfig, SimRng, TemplateRegistry, TimeState, WeatherState,
 };
 use crate::world_gen::colony::{find_colony_site, generate_starting_cats, spawn_starting_buildings};
 use crate::world_gen::terrain::generate_terrain;
@@ -96,6 +97,9 @@ pub fn setup_world_exclusive(world: &mut World) {
     if !world.contains_resource::<ColonyPriority>() {
         world.insert_resource(ColonyPriority::default());
     }
+    if !world.contains_resource::<ColonyHuntingMap>() {
+        world.insert_resource(ColonyHuntingMap::default());
+    }
     if !world.contains_resource::<crate::systems::wildlife::DetectionCooldowns>() {
         world.insert_resource(crate::systems::wildlife::DetectionCooldowns::default());
     }
@@ -146,6 +150,7 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     world.insert_resource(NarrativeLog::default());
     world.insert_resource(ColonyKnowledge::default());
     world.insert_resource(ColonyPriority::default());
+    world.insert_resource(ColonyHuntingMap::default());
     world.insert_resource(FoodStores::default());
     world.insert_resource(crate::systems::wildlife::DetectionCooldowns::default());
     world.insert_resource(map);
@@ -193,6 +198,7 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
                     crate::ai::CurrentAction::default(),
                     Inventory::default(),
                     crate::components::disposition::ActionHistory::default(),
+                    HuntingPriors::default(),
                 ),
             ))
             .id();
