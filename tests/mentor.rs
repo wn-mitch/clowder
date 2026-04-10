@@ -9,6 +9,7 @@ use clowder::components::personality::Personality;
 use clowder::components::physical::{Needs, Position};
 use clowder::components::skills::Skills;
 use clowder::components::task_chain::{FailurePolicy, StepKind, StepStatus, TaskChain, TaskStep};
+use clowder::resources::colony_hunting_map::ColonyHuntingMap;
 use clowder::resources::map::{Terrain, TileMap};
 use clowder::resources::narrative::NarrativeLog;
 use clowder::resources::relationships::Relationships;
@@ -25,6 +26,7 @@ fn setup_world() -> (World, Schedule) {
     world.insert_resource(Relationships::default());
     world.insert_resource(NarrativeLog::default());
     world.insert_resource(WindState::default());
+    world.insert_resource(ColonyHuntingMap::new(20, 20));
     let mut schedule = Schedule::default();
     schedule.add_systems(resolve_disposition_chains);
     (world, schedule)

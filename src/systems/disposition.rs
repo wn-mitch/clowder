@@ -29,6 +29,7 @@ use crate::components::prey::PreyAnimal;
 use crate::components::skills::{MagicAffinity, Skills};
 use crate::components::task_chain::{FailurePolicy, StepKind, TaskChain, TaskStep};
 use crate::components::wildlife::WildAnimal;
+use crate::resources::colony_hunting_map::ColonyHuntingMap;
 use crate::resources::food::FoodStores;
 use crate::resources::map::{Terrain, TileMap};
 use crate::resources::relationships::Relationships;
@@ -1355,6 +1356,7 @@ pub fn resolve_disposition_chains(
     mut log: ResMut<crate::resources::narrative::NarrativeLog>,
     time: Res<TimeState>,
     mut rng: ResMut<SimRng>,
+    mut colony_map: ResMut<ColonyHuntingMap>,
     mut commands: Commands,
 ) {
     // Deferred effects applied after the main loop (avoids mutable borrow conflicts).
@@ -1710,6 +1712,9 @@ pub fn resolve_disposition_chains(
                     relationships.modify_fondness(cat_entity, target_entity, 0.005);
                     relationships.modify_familiarity(cat_entity, target_entity, 0.003);
                     relationships.get_or_insert(cat_entity, target_entity).last_interaction = time.tick;
+                    // Share hunting knowledge during social interaction.
+                    colony_map.absorb(&hunting_priors, 0.05);
+                    hunting_priors.learn_from(&colony_map.beliefs, 0.1);
                 }
                 if ticks >= 10 {
                     chain.advance();
@@ -1723,6 +1728,9 @@ pub fn resolve_disposition_chains(
                     relationships.modify_fondness(cat_entity, target_entity, 0.008);
                     relationships.modify_familiarity(cat_entity, target_entity, 0.003);
                     relationships.get_or_insert(cat_entity, target_entity).last_interaction = time.tick;
+                    // Share hunting knowledge during grooming (more intimate interaction).
+                    colony_map.absorb(&hunting_priors, 0.08);
+                    hunting_priors.learn_from(&colony_map.beliefs, 0.12);
                 }
                 if ticks >= 8 {
                     needs.warmth = (needs.warmth + 0.05).min(1.0);
