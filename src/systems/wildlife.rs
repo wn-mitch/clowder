@@ -87,7 +87,7 @@ pub fn wildlife_ai(
         // ShadowFox spreads corruption to tiles it crosses.
         if animal.species == WildSpecies::ShadowFox && map.in_bounds(pos.x, pos.y) {
             let tile = map.get_mut(pos.x, pos.y);
-            tile.corruption = (tile.corruption + 0.01).min(1.0);
+            tile.corruption = (tile.corruption + 0.001).min(1.0);
         }
 
         // Small random direction jitter for patrol creatures to avoid getting stuck.

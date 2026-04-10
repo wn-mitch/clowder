@@ -103,7 +103,7 @@ pub fn mood_contagion(
             let fondness_weight = (fondness + 1.0) / 2.0; // map -1..1 to 0..1
             let weight = (1.0 / dist as f32) * fondness_weight * other_valence.abs();
             // Stubborn cats resist mood contagion.
-            let influence = other_valence * weight * 0.02
+            let influence = other_valence * weight * 0.002
                 * (1.0 - personality.stubbornness * 0.2);
 
             mood.modifiers.push_back(MoodModifier {

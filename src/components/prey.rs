@@ -48,10 +48,10 @@ impl PreySpecies {
     /// Per-tick probability that a new individual is added to the population.
     pub fn breed_rate(self) -> f32 {
         match self {
-            Self::Mouse => 0.003,
-            Self::Rat => 0.005,
-            Self::Fish => 0.002,
-            Self::Bird => 0.001,
+            Self::Mouse => 0.0003,
+            Self::Rat => 0.0005,
+            Self::Fish => 0.0002,
+            Self::Bird => 0.0001,
         }
     }
 

@@ -8,14 +8,14 @@ use crate::components::physical::Dead;
 // ---------------------------------------------------------------------------
 
 /// Each tick, decay the strength of every memory entry. Firsthand memories
-/// fade slowly (0.01/tick), secondhand memories faster (0.02/tick). Entries
+/// fade slowly (0.001/tick), secondhand memories faster (0.002/tick). Entries
 /// whose strength drops to zero are evicted.
 pub fn decay_memories(
     mut query: Query<&mut Memory, Without<Dead>>,
 ) {
     for mut memory in &mut query {
         for entry in memory.events.iter_mut() {
-            let rate = if entry.firsthand { 0.01 } else { 0.02 };
+            let rate = if entry.firsthand { 0.001 } else { 0.002 };
             entry.strength -= rate;
         }
         memory.events.retain(|e| e.strength > 0.0);
@@ -52,7 +52,7 @@ mod tests {
     }
 
     #[test]
-    fn firsthand_memory_decays_at_001_per_tick() {
+    fn firsthand_memory_decays_at_0001_per_tick() {
         let (mut world, mut schedule) = setup_world();
         let mut memory = Memory::default();
         memory.remember(make_entry(true, 1.0));
@@ -63,13 +63,13 @@ mod tests {
         let mem = world.get::<Memory>(entity).unwrap();
         let strength = mem.events[0].strength;
         assert!(
-            (strength - 0.99).abs() < 1e-5,
-            "firsthand memory should decay to ~0.99; got {strength}"
+            (strength - 0.999).abs() < 1e-5,
+            "firsthand memory should decay to ~0.999; got {strength}"
         );
     }
 
     #[test]
-    fn secondhand_memory_decays_at_002_per_tick() {
+    fn secondhand_memory_decays_at_0002_per_tick() {
         let (mut world, mut schedule) = setup_world();
         let mut memory = Memory::default();
         memory.remember(make_entry(false, 1.0));
@@ -80,8 +80,8 @@ mod tests {
         let mem = world.get::<Memory>(entity).unwrap();
         let strength = mem.events[0].strength;
         assert!(
-            (strength - 0.98).abs() < 1e-5,
-            "secondhand memory should decay to ~0.98; got {strength}"
+            (strength - 0.998).abs() < 1e-5,
+            "secondhand memory should decay to ~0.998; got {strength}"
         );
     }
 
@@ -89,7 +89,7 @@ mod tests {
     fn weak_memories_evicted_when_strength_zero() {
         let (mut world, mut schedule) = setup_world();
         let mut memory = Memory::default();
-        memory.remember(make_entry(true, 0.005)); // will drop below 0 after 1 tick
+        memory.remember(make_entry(true, 0.0005)); // will drop below 0 after 1 tick
         memory.remember(make_entry(true, 1.0));    // will survive
         let entity = world.spawn(memory).id();
 

@@ -11,13 +11,13 @@ use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::time::TimeState;
 
 /// Decay rate per tick for colony knowledge entries.
-const DECAY_PER_TICK: f32 = 0.001;
+const DECAY_PER_TICK: f32 = 0.0001;
 
 /// Minimum number of carriers required to promote a memory to colony knowledge.
 const PROMOTION_THRESHOLD: u32 = 3;
 
 /// How often (in ticks) to scan for promotable memories.
-const SCAN_INTERVAL: u64 = 50;
+const SCAN_INTERVAL: u64 = 500;
 
 // ---------------------------------------------------------------------------
 // update_colony_knowledge system
@@ -152,7 +152,7 @@ mod tests {
         world.insert_resource(ColonyKnowledge::default());
         world.insert_resource(NarrativeLog::default());
         let mut time = TimeState::default();
-        time.tick = 50; // divisible by SCAN_INTERVAL
+        time.tick = 500; // divisible by SCAN_INTERVAL
         world.insert_resource(time);
 
         let mut schedule = Schedule::default();

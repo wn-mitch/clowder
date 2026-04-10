@@ -36,37 +36,37 @@ pub fn decay_needs(
 
     // Additional warmth drain from weather.
     let weather_warmth_drain = match weather.current {
-        Weather::Snow => 0.004,
-        Weather::Storm => 0.003,
-        Weather::Wind => 0.002,
-        Weather::HeavyRain => 0.002,
-        Weather::LightRain => 0.001,
+        Weather::Snow => 0.0004,
+        Weather::Storm => 0.0003,
+        Weather::Wind => 0.0002,
+        Weather::HeavyRain => 0.0002,
+        Weather::LightRain => 0.0001,
         _ => 0.0,
     };
 
     // Additional warmth drain from season.
     let season_warmth_drain = match season {
-        Season::Winter => 0.003,
-        Season::Autumn => 0.001,
+        Season::Winter => 0.0003,
+        Season::Autumn => 0.0001,
         _ => 0.0,
     };
 
-    let warmth_drain = 0.001 + weather_warmth_drain + season_warmth_drain;
+    let warmth_drain = 0.0001 + weather_warmth_drain + season_warmth_drain;
 
     for (mut needs, personality, mut health, mut mood, pos, loc_prefs) in &mut query {
         // --- Level 1: Physiological ---
-        needs.hunger = (needs.hunger - 0.001).max(0.0);
-        needs.energy = (needs.energy - 0.001).max(0.0);
+        needs.hunger = (needs.hunger - 0.0001).max(0.0);
+        needs.energy = (needs.energy - 0.0001).max(0.0);
         needs.warmth = (needs.warmth - warmth_drain).max(0.0);
 
         // --- Starvation cascade ---
         let starving = needs.hunger == 0.0;
         if starving {
             // Health drains when starving.
-            health.current = (health.current - 0.005).max(0.0);
+            health.current = (health.current - 0.0005).max(0.0);
 
             // Safety drops from existential anxiety.
-            needs.safety = (needs.safety - 0.005).max(0.0);
+            needs.safety = (needs.safety - 0.0005).max(0.0);
 
             // Persistent mood penalty (refresh each tick while starving).
             if !mood.modifiers.iter().any(|m| m.source == "starvation") {
@@ -87,15 +87,15 @@ pub fn decay_needs(
 
         // --- Level 2: Safety — recovers passively (unless starving) ---
         if !starving {
-            needs.safety = (needs.safety + 0.005).min(1.0);
+            needs.safety = (needs.safety + 0.0005).min(1.0);
         }
 
         // --- Level 3: Belonging ---
         let social_multiplier = if starving { 2.0 } else { 1.0 };
-        let social_drain = 0.001 * (1.0 + personality.sociability * 0.5) * social_multiplier;
+        let social_drain = 0.0001 * (1.0 + personality.sociability * 0.5) * social_multiplier;
         needs.social = (needs.social - social_drain).max(0.0);
 
-        let acceptance_drain = 0.0005 * (1.0 + personality.warmth * 0.5);
+        let acceptance_drain = 0.00005 * (1.0 + personality.warmth * 0.5);
         needs.acceptance = (needs.acceptance - acceptance_drain).max(0.0);
 
         // --- Level 4: Esteem ---
@@ -105,15 +105,15 @@ pub fn decay_needs(
         } else {
             1.0
         };
-        let respect_drain = 0.0003 * (1.0 + personality.ambition * 0.5) * pride_amplifier;
+        let respect_drain = 0.00003 * (1.0 + personality.ambition * 0.5) * pride_amplifier;
         needs.respect = (needs.respect - respect_drain).max(0.0);
 
-        let mastery_drain = 0.0002 * (1.0 + personality.diligence * 0.5);
+        let mastery_drain = 0.00002 * (1.0 + personality.diligence * 0.5);
         needs.mastery = (needs.mastery - mastery_drain).max(0.0);
 
         // --- Level 5: Self-actualisation ---
         // Patience slows purpose drain; independence speeds it up.
-        let purpose_drain = 0.0001
+        let purpose_drain = 0.00001
             * (1.0 + personality.curiosity * 0.5)
             * (1.0 - personality.patience * 0.3)
             * (1.0 + personality.independence * 0.4);
@@ -125,9 +125,9 @@ pub fn decay_needs(
                 let fam_pos = Position::new(fam_x, fam_y);
                 let dist = pos.manhattan_distance(&fam_pos);
                 if dist <= 5 {
-                    needs.safety = (needs.safety + personality.tradition * 0.002).min(1.0);
+                    needs.safety = (needs.safety + personality.tradition * 0.0002).min(1.0);
                 } else {
-                    needs.safety = (needs.safety - personality.tradition * 0.001).max(0.0);
+                    needs.safety = (needs.safety - personality.tradition * 0.0001).max(0.0);
                 }
             }
         }
@@ -192,7 +192,7 @@ mod tests {
         let after = world.get::<Needs>(entity).unwrap().hunger;
 
         assert!(after < before, "hunger should decrease; before={before}, after={after}");
-        assert!((before - after - 0.001).abs() < 1e-6, "expected drain of 0.001");
+        assert!((before - after - 0.0001).abs() < 1e-6, "expected drain of 0.0001");
     }
 
     #[test]
@@ -205,7 +205,7 @@ mod tests {
         let after = world.get::<Needs>(entity).unwrap().energy;
 
         assert!(after < before, "energy should decrease; before={before}, after={after}");
-        assert!((before - after - 0.001).abs() < 1e-6, "expected drain of 0.001");
+        assert!((before - after - 0.0001).abs() < 1e-6, "expected drain of 0.0001");
     }
 
     #[test]
@@ -243,7 +243,7 @@ mod tests {
         let after = world.get::<Needs>(entity).unwrap().safety;
 
         assert!(after > 0.5, "safety should recover toward 1.0; got {after}");
-        assert!((after - 0.505).abs() < 1e-6, "expected recovery of 0.005");
+        assert!((after - 0.5005).abs() < 1e-6, "expected recovery of 0.0005");
     }
 
     #[test]
@@ -323,8 +323,8 @@ mod tests {
             "starvation should drain health; before={health_before}, after={health_after}"
         );
         assert!(
-            (health_before - health_after - 0.005).abs() < 1e-6,
-            "expected 0.005 health drain per tick"
+            (health_before - health_after - 0.0005).abs() < 1e-6,
+            "expected 0.0005 health drain per tick"
         );
     }
 
@@ -499,9 +499,9 @@ mod tests {
         schedule.run(&mut world);
 
         let safety = world.get::<Needs>(entity).unwrap().safety;
-        // Safety normally recovers by 0.005. With tradition bonus: +0.002 extra.
+        // Safety normally recovers by 0.0005. With tradition bonus: +0.0002 extra.
         assert!(
-            safety > 0.806,
+            safety > 0.8006,
             "traditional cat near familiar territory should get safety boost; got {safety}"
         );
     }

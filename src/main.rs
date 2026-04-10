@@ -138,7 +138,7 @@ fn parse_args() -> CliArgs {
     let mut seed: u64 = rand::random();
     let mut load_path = None;
     let mut headless = false;
-    let mut duration_secs = 60u64;
+    let mut duration_secs = 600u64;
     let mut log_path = None;
     let mut load_log_path = None;
     let mut event_log_path = None;
@@ -206,7 +206,7 @@ fn parse_args() -> CliArgs {
         }
     }
 
-    if !headless && duration_secs != 60 {
+    if !headless && duration_secs != 600 {
         eprintln!("Warning: --duration has no effect without --headless");
     }
 

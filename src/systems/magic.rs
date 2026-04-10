@@ -47,7 +47,7 @@ pub fn corruption_spread(
     let mut new_tiles_corrupted = 0u32;
     let deltas: [(i32, i32); 4] = [(0, 1), (0, -1), (1, 0), (-1, 0)];
     for (sx, sy, corruption) in sources {
-        let spread = corruption * 0.001;
+        let spread = corruption * 0.0001;
         for (dx, dy) in &deltas {
             let nx = sx + dx;
             let ny = sy + dy;
@@ -114,17 +114,17 @@ pub fn apply_remedy_effects(
     for (entity, mut remedy, mut health, mut needs, mut mood) in &mut query {
         match remedy.kind {
             RemedyKind::HealingPoultice => {
-                health.current = (health.current + 0.05).min(health.max);
+                health.current = (health.current + 0.005).min(health.max);
             }
             RemedyKind::EnergyTonic => {
-                needs.energy = (needs.energy + 0.03).min(1.0);
+                needs.energy = (needs.energy + 0.003).min(1.0);
             }
             RemedyKind::MoodTonic => {
                 // Only on the first tick of application.
                 if remedy.ticks_remaining == remedy.kind.duration() {
                     mood.modifiers.push_back(MoodModifier {
                         amount: 0.2,
-                        ticks_remaining: 50,
+                        ticks_remaining: 500,
                         source: "herbal remedy".to_string(),
                     });
                 }
@@ -531,10 +531,10 @@ pub fn resolve_magic_task_chains(
                 // Per-tick: reduce tile corruption.
                 if map.in_bounds(pos.x, pos.y) {
                     let tile = map.get_mut(pos.x, pos.y);
-                    tile.corruption = (tile.corruption - skills.magic * 0.01).max(0.0);
+                    tile.corruption = (tile.corruption - skills.magic * 0.001).max(0.0);
                 }
                 // Occupational hazard: personal corruption increases.
-                corruption.0 = (corruption.0 + 0.005).min(1.0);
+                corruption.0 = (corruption.0 + 0.0005).min(1.0);
                 skills.magic += skills.growth_rate() * 0.005;
 
                 // Advance when tile is cleansed or after 100 ticks.
@@ -773,7 +773,7 @@ mod tests {
         schedule.run(&mut world);
 
         let map = world.resource::<TileMap>();
-        let expected_spread = 0.5 * 0.001;
+        let expected_spread = 0.5 * 0.0001;
 
         // 4-adjacent tiles should have gained corruption.
         for (nx, ny) in [(5, 4), (5, 6), (4, 5), (6, 5)] {
@@ -823,8 +823,8 @@ mod tests {
 
         let health = world.get::<Health>(cat).unwrap();
         assert!(
-            (health.current - 0.55).abs() < 1e-6,
-            "health should increase by 0.05 per tick, got {}",
+            (health.current - 0.505).abs() < 1e-6,
+            "health should increase by 0.005 per tick, got {}",
             health.current
         );
     }

@@ -101,10 +101,10 @@ mod tests {
     fn destroyed_items_are_despawned() {
         let (mut world, mut schedule) = setup();
 
-        // RawFish decays at 0.01/tick. Spawn with condition just above 0 so
+        // RawFish decays at 0.0005/tick. Spawn with condition just above 0 so
         // a single tick drives it to <= 0.0.
         let mut item = Item::new(ItemKind::RawFish, 1.0, ItemLocation::OnGround);
-        item.condition = 0.005; // less than one decay step (0.01)
+        item.condition = 0.0004; // less than one decay step (0.0005)
 
         let entity = world.spawn(item).id();
 

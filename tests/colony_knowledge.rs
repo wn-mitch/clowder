@@ -45,7 +45,7 @@ fn spawn_cat_with_memories(world: &mut World, entries: Vec<MemoryEntry>) -> Enti
 /// promotes to colony knowledge.
 #[test]
 fn knowledge_promotes_at_threshold() {
-    let (mut world, mut schedule) = setup_world(50);
+    let (mut world, mut schedule) = setup_world(500);
 
     for _ in 0..3 {
         spawn_cat_with_memories(
@@ -65,7 +65,7 @@ fn knowledge_promotes_at_threshold() {
 /// Colony knowledge is not promoted below the threshold.
 #[test]
 fn knowledge_does_not_promote_below_threshold() {
-    let (mut world, mut schedule) = setup_world(50);
+    let (mut world, mut schedule) = setup_world(500);
 
     for _ in 0..2 {
         spawn_cat_with_memories(
@@ -84,7 +84,7 @@ fn knowledge_does_not_promote_below_threshold() {
 /// and a "forgotten" narrative fires.
 #[test]
 fn knowledge_lost_when_carriers_gone() {
-    let (mut world, mut schedule) = setup_world(50);
+    let (mut world, mut schedule) = setup_world(500);
 
     // Manually insert a colony knowledge entry.
     {
@@ -104,7 +104,7 @@ fn knowledge_lost_when_carriers_gone() {
     // Next tick: entry removed.
     {
         let mut time = world.resource_mut::<TimeState>();
-        time.tick = 51;
+        time.tick = 501;
     }
     schedule.run(&mut world);
 

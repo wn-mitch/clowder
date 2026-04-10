@@ -1288,7 +1288,7 @@ fn can_smell_prey(
     } else {
         1.0
     };
-    let scent_range = 20.0 * wind.strength * terrain_mod;
+    let scent_range = 35.0 * wind.strength * terrain_mod;
     dist <= scent_range
 }
 
@@ -1468,9 +1468,9 @@ pub fn resolve_disposition_chains(
 
                     if dist <= pounce_range {
                         // === POUNCE ===
-                        let distance_mod = if dist <= 1 { 1.0 } else { 0.6 };
-                        let success_chance = 0.6
-                            * (0.7 + skills.hunting * 0.3)
+                        let distance_mod = if dist <= 1 { 1.0 } else { 0.8 };
+                        let success_chance = 0.75
+                            * (0.5 + skills.hunting * 0.5)
                             * distance_mod;
 
                         if rng.rng.random::<f32>() < success_chance {
@@ -1483,7 +1483,7 @@ pub fn resolve_disposition_chains(
                             if !inventory.is_full() {
                                 inventory.slots.push(ItemSlot::Item(item_kind));
                             }
-                            skills.hunting += skills.growth_rate() * 0.01;
+                            skills.hunting += skills.growth_rate() * 0.001;
 
                             log.push(
                                 time.tick,
@@ -1507,15 +1507,10 @@ pub fn resolve_disposition_chains(
                                 crate::resources::narrative::NarrativeTier::Micro,
                             );
 
-                            if personality.boldness > 0.7 {
-                                // Bold cat: brief chase (keep target, fail after 5 more ticks).
-                                if ticks > 5 {
-                                    chain.fail_current("prey escaped after chase".into());
-                                }
-                                // Otherwise keep pursuing — step_toward will run next tick.
-                            } else {
-                                // Cat watches prey escape, then gives up.
-                                chain.fail_current("pounce missed".into());
+                            // All cats give chase briefly; bold cats pursue longer.
+                            let chase_limit = if personality.boldness > 0.7 { 80 } else { 30 };
+                            if ticks > chase_limit {
+                                chain.fail_current("prey escaped after chase".into());
                             }
                         }
                     } else if dist <= 5 {
@@ -1527,7 +1522,7 @@ pub fn resolve_disposition_chains(
                             }
                         }
                         // Anxiety check: nervous cat spooks prey.
-                        if personality.anxiety > 0.7 && rng.rng.random::<f32>() < 0.15 {
+                        if personality.anxiety > 0.7 && rng.rng.random::<f32>() < 0.05 {
                             if let Ok((_, _, mut prey_animal)) = prey_query.get_mut(target_entity) {
                                 prey_animal.ai_state = PreyAiState::Fleeing {
                                     from: cat_entity,
@@ -1572,10 +1567,10 @@ pub fn resolve_disposition_chains(
                     if dx == 0 && dy == 0 { dx = 1; }
                     *pos = patrol_move(&pos, dx, dy, &map);
 
-                    // Visual detection: spot nearby prey within 3 tiles.
+                    // Visual detection: spot nearby prey within 5 tiles.
                     let visible_prey = prey_query
                         .iter()
-                        .filter(|(_, pp, _)| pos.manhattan_distance(pp) <= 3)
+                        .filter(|(_, pp, _)| pos.manhattan_distance(pp) <= 5)
                         .min_by_key(|(_, pp, _)| pos.manhattan_distance(pp));
 
                     if let Some((prey_entity, _prey_pos_ref, _)) = visible_prey {
@@ -1598,7 +1593,7 @@ pub fn resolve_disposition_chains(
                         }
                     }
 
-                    if ticks > 100 {
+                    if ticks > 50 {
                         hunting_priors.record_failed_search(&pos, ticks);
                         chain.fail_current("no scent found".into());
                     }
@@ -1640,7 +1635,7 @@ pub fn resolve_disposition_chains(
                         if !inventory.is_full() {
                             inventory.slots.push(ItemSlot::Item(item_kind));
                         }
-                        skills.foraging += skills.growth_rate() * 0.008;
+                        skills.foraging += skills.growth_rate() * 0.0008;
                         chain.advance();
                     } else if ticks > 40 {
                         chain.fail_current("nothing found while foraging".into());
@@ -1676,7 +1671,7 @@ pub fn resolve_disposition_chains(
             }
 
             StepKind::EatAtStores => {
-                if ticks >= 5 {
+                if ticks >= 50 {
                     if let Some(store_entity) = step.target_entity {
                         if let Ok(mut stored) = stores_query.get_mut(store_entity) {
                             let food_item = stored.items.iter()
@@ -1700,8 +1695,8 @@ pub fn resolve_disposition_chains(
 
             StepKind::Sleep { ticks: duration } => {
                 // Restore energy and warmth each tick (matches legacy pacing).
-                needs.energy = (needs.energy + 0.02).min(1.0);
-                needs.warmth = (needs.warmth + 0.01).min(1.0);
+                needs.energy = (needs.energy + 0.002).min(1.0);
+                needs.warmth = (needs.warmth + 0.001).min(1.0);
                 if ticks >= *duration {
                     chain.advance();
                 }
@@ -1717,15 +1712,15 @@ pub fn resolve_disposition_chains(
             StepKind::Socialize => {
                 if let Some(target_entity) = step.target_entity {
                     // Per-tick social restoration while adjacent.
-                    needs.social = (needs.social + 0.03).min(1.0);
-                    relationships.modify_fondness(cat_entity, target_entity, 0.005);
-                    relationships.modify_familiarity(cat_entity, target_entity, 0.003);
+                    needs.social = (needs.social + 0.003).min(1.0);
+                    relationships.modify_fondness(cat_entity, target_entity, 0.0005);
+                    relationships.modify_familiarity(cat_entity, target_entity, 0.0003);
                     relationships.get_or_insert(cat_entity, target_entity).last_interaction = time.tick;
                     // Share hunting knowledge during social interaction.
-                    colony_map.absorb(&hunting_priors, 0.05);
-                    hunting_priors.learn_from(&colony_map.beliefs, 0.1);
+                    colony_map.absorb(&hunting_priors, 0.005);
+                    hunting_priors.learn_from(&colony_map.beliefs, 0.01);
                 }
-                if ticks >= 10 {
+                if ticks >= 100 {
                     chain.advance();
                 }
             }
@@ -1733,16 +1728,16 @@ pub fn resolve_disposition_chains(
             StepKind::GroomOther => {
                 if let Some(target_entity) = step.target_entity {
                     // Per-tick social + warmth while grooming.
-                    needs.social = (needs.social + 0.02).min(1.0);
-                    relationships.modify_fondness(cat_entity, target_entity, 0.008);
-                    relationships.modify_familiarity(cat_entity, target_entity, 0.003);
+                    needs.social = (needs.social + 0.002).min(1.0);
+                    relationships.modify_fondness(cat_entity, target_entity, 0.0008);
+                    relationships.modify_familiarity(cat_entity, target_entity, 0.0003);
                     relationships.get_or_insert(cat_entity, target_entity).last_interaction = time.tick;
                     // Share hunting knowledge during grooming (more intimate interaction).
-                    colony_map.absorb(&hunting_priors, 0.08);
-                    hunting_priors.learn_from(&colony_map.beliefs, 0.12);
+                    colony_map.absorb(&hunting_priors, 0.008);
+                    hunting_priors.learn_from(&colony_map.beliefs, 0.012);
                 }
-                if ticks >= 8 {
-                    needs.warmth = (needs.warmth + 0.05).min(1.0);
+                if ticks >= 80 {
+                    needs.warmth = (needs.warmth + 0.005).min(1.0);
                     chain.advance();
                 }
             }
@@ -1776,37 +1771,37 @@ pub fn resolve_disposition_chains(
                     continue;
                 };
                 if pos.manhattan_distance(&target) == 0 {
-                    needs.safety = (needs.safety + 0.05).min(1.0);
+                    needs.safety = (needs.safety + 0.005).min(1.0);
                     chain.advance();
                 } else if let Some(next) = step_toward(&pos, &target, &map) {
                     *pos = next;
                     // Small safety boost per tile patrolled.
-                    needs.safety = (needs.safety + 0.005).min(1.0);
-                } else if ticks > 30 {
+                    needs.safety = (needs.safety + 0.0005).min(1.0);
+                } else if ticks > 300 {
                     chain.fail_current("stuck patrolling".into());
                 }
             }
 
             StepKind::FightThreat => {
-                if ticks >= 30 {
-                    skills.combat += skills.growth_rate() * 0.015;
+                if ticks >= 300 {
+                    skills.combat += skills.growth_rate() * 0.0015;
                     needs.safety = (needs.safety + 0.2).min(1.0);
                     chain.advance();
                 }
             }
 
             StepKind::Survey => {
-                if ticks >= 5 {
+                if ticks >= 50 {
                     // Small exploration satisfaction.
-                    needs.purpose = (needs.purpose + 0.03).min(1.0);
+                    needs.purpose = (needs.purpose + 0.003).min(1.0);
                     chain.advance();
                 }
             }
 
             StepKind::DeliverDirective => {
-                if ticks >= 5 {
-                    needs.respect = (needs.respect + 0.05).min(1.0);
-                    needs.social = (needs.social + 0.05).min(1.0);
+                if ticks >= 50 {
+                    needs.respect = (needs.respect + 0.005).min(1.0);
+                    needs.social = (needs.social + 0.005).min(1.0);
                     chain.advance();
                 }
             }

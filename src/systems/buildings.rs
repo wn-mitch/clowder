@@ -46,17 +46,17 @@ pub fn apply_building_effects(
             StructureType::Den => {
                 for (cat_pos, mut needs) in &mut cats {
                     if cat_pos.manhattan_distance(&center) <= 4 {
-                        needs.warmth = (needs.warmth + 0.01 * eff).min(1.0);
-                        needs.safety = (needs.safety + 0.005 * eff).min(1.0);
+                        needs.warmth = (needs.warmth + 0.001 * eff).min(1.0);
+                        needs.safety = (needs.safety + 0.0005 * eff).min(1.0);
                     }
                 }
             }
             StructureType::Hearth => {
                 for (cat_pos, mut needs) in &mut cats {
                     if cat_pos.manhattan_distance(&center) <= 5 {
-                        needs.social = (needs.social + 0.01 * eff).min(1.0);
+                        needs.social = (needs.social + 0.001 * eff).min(1.0);
                         if is_cold {
-                            needs.warmth = (needs.warmth + 0.01 * eff).min(1.0);
+                            needs.warmth = (needs.warmth + 0.001 * eff).min(1.0);
                         }
                     }
                 }
@@ -74,7 +74,7 @@ pub fn apply_building_effects(
             for (cat_pos, mut needs) in &mut cats {
                 if cat_pos.manhattan_distance(&center) <= 3 {
                     needs.warmth = (needs.warmth
-                        - 0.003 * (1.0 - structure.cleanliness))
+                        - 0.0003 * (1.0 - structure.cleanliness))
                         .max(0.0);
                 }
             }
@@ -98,18 +98,18 @@ pub fn decay_building_condition(
 ) {
     // Structural decay: very slow, only from harsh weather.
     let structural_decay = match weather.current {
-        Weather::Storm => 0.0003,
-        Weather::Snow => 0.0002,
-        Weather::HeavyRain => 0.0001,
+        Weather::Storm => 0.00003,
+        Weather::Snow => 0.00002,
+        Weather::HeavyRain => 0.00001,
         _ => 0.0,
     };
 
     // Cleanliness decay: routine, from weather and use.
     let cleanliness_decay = match weather.current {
-        Weather::HeavyRain | Weather::Storm => 0.002,
-        Weather::Snow | Weather::Wind => 0.0015,
-        Weather::LightRain | Weather::Fog => 0.001,
-        _ => 0.0008,
+        Weather::HeavyRain | Weather::Storm => 0.0002,
+        Weather::Snow | Weather::Wind => 0.00015,
+        Weather::LightRain | Weather::Fog => 0.0001,
+        _ => 0.00008,
     };
 
     for mut structure in &mut buildings {
@@ -140,7 +140,7 @@ pub fn tidy_buildings(
         for (building_pos, mut structure) in &mut buildings {
             let center = structure.center(building_pos);
             if cat_pos.manhattan_distance(&center) <= 3 {
-                structure.cleanliness = (structure.cleanliness + 0.005).min(1.0);
+                structure.cleanliness = (structure.cleanliness + 0.0005).min(1.0);
             }
         }
     }
@@ -359,13 +359,13 @@ mod tests {
         schedule.run(&mut world);
 
         let s = world.get::<Structure>(building).unwrap();
-        let expected_condition = 1.0 - 0.0003;
+        let expected_condition = 1.0 - 0.00003;
         assert!(
             (s.condition - expected_condition).abs() < 1e-6,
             "storm should cause structural decay (expected {expected_condition}, got {})",
             s.condition
         );
-        let expected_cleanliness = 1.0 - 0.002;
+        let expected_cleanliness = 1.0 - 0.0002;
         assert!(
             (s.cleanliness - expected_cleanliness).abs() < 1e-6,
             "storm should decay cleanliness faster (expected {expected_cleanliness}, got {})",
@@ -384,8 +384,8 @@ mod tests {
         let building = world
             .spawn(Structure {
                 kind: StructureType::Den,
-                condition: 0.0001,
-                cleanliness: 0.0001,
+                condition: 0.00001, // below storm structural_decay (0.00003)
+                cleanliness: 0.00001, // below storm cleanliness_decay (0.0002)
                 size: StructureType::Den.default_size(),
             })
             .id();

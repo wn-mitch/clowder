@@ -22,10 +22,10 @@ pub struct TransitionTracker {
 #[derive(Resource, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SimConfig {
     /// Number of ticks per day phase (Dawn / Day / Dusk / Night).
-    /// Default 25 → a full day is 100 ticks.
+    /// Default 250 → a full day is 1000 ticks.
     pub ticks_per_day_phase: u64,
     /// Number of ticks per season (Spring / Summer / Autumn / Winter).
-    /// Default 2000 → a full year is 8000 ticks.
+    /// Default 20000 → a full year is 80000 ticks.
     pub ticks_per_season: u64,
     /// RNG seed for reproducible runs.
     pub seed: u64,
@@ -34,8 +34,8 @@ pub struct SimConfig {
 impl Default for SimConfig {
     fn default() -> Self {
         Self {
-            ticks_per_day_phase: 25,
-            ticks_per_season: 2000,
+            ticks_per_day_phase: 250,
+            ticks_per_season: 20000,
             seed: 42,
         }
     }
@@ -225,30 +225,30 @@ mod tests {
     fn day_phase_from_tick() {
         let config = SimConfig::default();
         assert_eq!(DayPhase::from_tick(0, &config), DayPhase::Dawn);
-        assert_eq!(DayPhase::from_tick(24, &config), DayPhase::Dawn);
-        assert_eq!(DayPhase::from_tick(25, &config), DayPhase::Day);
-        assert_eq!(DayPhase::from_tick(50, &config), DayPhase::Dusk);
-        assert_eq!(DayPhase::from_tick(75, &config), DayPhase::Night);
-        assert_eq!(DayPhase::from_tick(100, &config), DayPhase::Dawn); // wraps
+        assert_eq!(DayPhase::from_tick(249, &config), DayPhase::Dawn);
+        assert_eq!(DayPhase::from_tick(250, &config), DayPhase::Day);
+        assert_eq!(DayPhase::from_tick(500, &config), DayPhase::Dusk);
+        assert_eq!(DayPhase::from_tick(750, &config), DayPhase::Night);
+        assert_eq!(DayPhase::from_tick(1000, &config), DayPhase::Dawn); // wraps
     }
 
     #[test]
     fn season_from_tick() {
         let config = SimConfig::default();
         assert_eq!(Season::from_tick(0, &config), Season::Spring);
-        assert_eq!(Season::from_tick(1999, &config), Season::Spring);
-        assert_eq!(Season::from_tick(2000, &config), Season::Summer);
-        assert_eq!(Season::from_tick(4000, &config), Season::Autumn);
-        assert_eq!(Season::from_tick(6000, &config), Season::Winter);
-        assert_eq!(Season::from_tick(8000, &config), Season::Spring); // wraps
+        assert_eq!(Season::from_tick(19999, &config), Season::Spring);
+        assert_eq!(Season::from_tick(20000, &config), Season::Summer);
+        assert_eq!(Season::from_tick(40000, &config), Season::Autumn);
+        assert_eq!(Season::from_tick(60000, &config), Season::Winter);
+        assert_eq!(Season::from_tick(80000, &config), Season::Spring); // wraps
     }
 
     #[test]
     fn day_number_from_tick() {
         let config = SimConfig::default();
         assert_eq!(TimeState::day_number(0, &config), 1);
-        assert_eq!(TimeState::day_number(99, &config), 1);
-        assert_eq!(TimeState::day_number(100, &config), 2);
+        assert_eq!(TimeState::day_number(999, &config), 1);
+        assert_eq!(TimeState::day_number(1000, &config), 2);
     }
 
     #[test]
@@ -269,7 +269,7 @@ mod tests {
     fn time_state_derived_accessors() {
         let config = SimConfig::default();
         let mut ts = TimeState::default();
-        ts.tick = 75;
+        ts.tick = 750;
         assert_eq!(ts.day_phase(&config), DayPhase::Night);
         assert_eq!(ts.season(&config), Season::Spring);
         assert_eq!(TimeState::day_number(ts.tick, &config), 1);
@@ -277,20 +277,20 @@ mod tests {
 
     #[test]
     fn day_progress_within_day() {
-        let config = SimConfig::default(); // 25 ticks/phase, 100 ticks/day
+        let config = SimConfig::default(); // 250 ticks/phase, 1000 ticks/day
         assert!((TimeState::day_progress(0, &config) - 0.0).abs() < 1e-6);
-        assert!((TimeState::day_progress(50, &config) - 0.5).abs() < 1e-6);
-        assert!((TimeState::day_progress(99, &config) - 0.99).abs() < 1e-6);
+        assert!((TimeState::day_progress(500, &config) - 0.5).abs() < 1e-6);
+        assert!((TimeState::day_progress(999, &config) - 0.999).abs() < 1e-6);
         // Wraps at day boundary
-        assert!((TimeState::day_progress(100, &config) - 0.0).abs() < 1e-6);
+        assert!((TimeState::day_progress(1000, &config) - 0.0).abs() < 1e-6);
     }
 
     #[test]
     fn week_number_from_tick() {
-        let config = SimConfig::default(); // 100 ticks/day
-        assert_eq!(TimeState::week_number(0, &config), 1);     // Day 1 → Week 1
-        assert_eq!(TimeState::week_number(699, &config), 1);   // Day 7 → Week 1
-        assert_eq!(TimeState::week_number(700, &config), 2);   // Day 8 → Week 2
-        assert_eq!(TimeState::week_number(1399, &config), 2);  // Day 14 → Week 2
+        let config = SimConfig::default(); // 1000 ticks/day
+        assert_eq!(TimeState::week_number(0, &config), 1);       // Day 1 → Week 1
+        assert_eq!(TimeState::week_number(6999, &config), 1);    // Day 7 → Week 1
+        assert_eq!(TimeState::week_number(7000, &config), 2);    // Day 8 → Week 2
+        assert_eq!(TimeState::week_number(13999, &config), 2);   // Day 14 → Week 2
     }
 }

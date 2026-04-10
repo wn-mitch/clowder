@@ -43,20 +43,20 @@ pub fn personality_friction(
             if (a.tradition > 0.8 && b.independence > 0.8)
                 || (b.tradition > 0.8 && a.independence > 0.8)
             {
-                relationships.modify_fondness(*ea, *eb, -0.002);
+                relationships.modify_fondness(*ea, *eb, -0.0002);
             }
 
             // Diligence vs playfulness (symmetric).
             if (a.diligence > 0.8 && b.playfulness > 0.8)
                 || (b.diligence > 0.8 && a.playfulness > 0.8)
             {
-                relationships.modify_fondness(*ea, *eb, -0.001);
+                relationships.modify_fondness(*ea, *eb, -0.0001);
             }
 
             // Dual ambition (symmetric) — no distance filter, just both present
             // in the snapshot (i.e., both alive).
             if a.ambition > 0.8 && b.ambition > 0.8 {
-                relationships.modify_fondness(*ea, *eb, -0.003);
+                relationships.modify_fondness(*ea, *eb, -0.0003);
             }
 
             // Loyalty vs independence during active directive (one-directional).
@@ -66,11 +66,11 @@ pub fn personality_friction(
             if either_has_directive {
                 // A is loyal, B is independent → A resents B.
                 if a.loyalty > 0.8 && b.independence > 0.8 {
-                    relationships.modify_fondness(*ea, *eb, -0.002);
+                    relationships.modify_fondness(*ea, *eb, -0.0002);
                 }
                 // B is loyal, A is independent → B resents A.
                 if b.loyalty > 0.8 && a.independence > 0.8 {
-                    relationships.modify_fondness(*ea, *eb, -0.002);
+                    relationships.modify_fondness(*ea, *eb, -0.0002);
                 }
             }
         }
@@ -132,8 +132,8 @@ mod tests {
 
         let fondness = world.resource::<Relationships>().get(a, b).unwrap().fondness;
         assert!(
-            (fondness - (-0.002)).abs() < 1e-5,
-            "tradition vs independence should cause -0.002/tick; got {fondness}"
+            (fondness - (-0.0002)).abs() < 1e-5,
+            "tradition vs independence should cause -0.0002/tick; got {fondness}"
         );
     }
 
@@ -170,8 +170,8 @@ mod tests {
 
         let fondness = world.resource::<Relationships>().get(a, b).unwrap().fondness;
         assert!(
-            (fondness - (-0.001)).abs() < 1e-5,
-            "diligence vs playfulness should cause -0.001/tick; got {fondness}"
+            (fondness - (-0.0001)).abs() < 1e-5,
+            "diligence vs playfulness should cause -0.0001/tick; got {fondness}"
         );
     }
 
@@ -189,8 +189,8 @@ mod tests {
 
         let fondness = world.resource::<Relationships>().get(a, b).unwrap().fondness;
         assert!(
-            (fondness - (-0.003)).abs() < 1e-5,
-            "dual ambition should cause -0.003/tick; got {fondness}"
+            (fondness - (-0.0003)).abs() < 1e-5,
+            "dual ambition should cause -0.0003/tick; got {fondness}"
         );
     }
 
@@ -219,9 +219,9 @@ mod tests {
 
         let fondness = world.resource::<Relationships>().get(a, b).unwrap().fondness;
         // tradition/independence check doesn't fire (both below 0.8 threshold)
-        // loyalty/independence fires: -0.002
+        // loyalty/independence fires: -0.0002
         assert!(
-            (fondness - (-0.002)).abs() < 1e-5,
+            (fondness - (-0.0002)).abs() < 1e-5,
             "loyal cat should resent independent cat during directive; got {fondness}"
         );
     }

@@ -22,7 +22,7 @@ pub fn passive_familiarity(
     for i in 0..cats.len() {
         for j in (i + 1)..cats.len() {
             if cats[i].1.manhattan_distance(&cats[j].1) <= 2 {
-                relationships.modify_familiarity(cats[i].0, cats[j].0, 0.001);
+                relationships.modify_familiarity(cats[i].0, cats[j].0, 0.0001);
             }
         }
     }
@@ -119,7 +119,7 @@ pub fn are_orientation_compatible(
 // ---------------------------------------------------------------------------
 
 /// Compute fondness delta from comparing two cats' value axes during interaction.
-/// Same-side values: +0.002 per axis. Divergent values: -0.001 per axis.
+/// Same-side values: +0.0002 per axis. Divergent values: -0.0001 per axis.
 #[allow(clippy::too_many_arguments)]
 pub fn value_compatibility_delta(
     a_loyalty: f32, a_tradition: f32, a_compassion: f32, a_pride: f32, a_independence: f32,
@@ -137,10 +137,10 @@ pub fn value_compatibility_delta(
         let same_side = (va > 0.5 && vb > 0.5) || (va < 0.5 && vb < 0.5);
         let divergent = (va > 0.7 && vb < 0.3) || (va < 0.3 && vb > 0.7);
         if same_side {
-            delta += 0.002;
+            delta += 0.0002;
         }
         if divergent {
-            delta -= 0.001;
+            delta -= 0.0001;
         }
     }
     delta
@@ -184,8 +184,8 @@ mod tests {
 
         let fam = world.resource::<Relationships>().get(a, b).unwrap().familiarity;
         assert!(
-            (fam - 0.001).abs() < 1e-6,
-            "familiarity should be ~0.001; got {fam}"
+            (fam - 0.0001).abs() < 1e-6,
+            "familiarity should be ~0.0001; got {fam}"
         );
     }
 
@@ -213,8 +213,8 @@ mod tests {
         );
         assert!(delta > 0.0, "aligned values should produce positive delta; got {delta}");
         assert!(
-            (delta - 0.01).abs() < 1e-6,
-            "5 same-side axes should give +0.010; got {delta}"
+            (delta - 0.001).abs() < 1e-6,
+            "5 same-side axes should give +0.001; got {delta}"
         );
     }
 
@@ -227,11 +227,11 @@ mod tests {
         );
         // Each axis: same_side is true (both effectively "above or below") — wait, 0.8 > 0.5 and 0.2 < 0.5, so NOT same side.
         // Each axis: divergent is true (0.8 > 0.7, 0.2 < 0.3).
-        // So delta = 5 * (-0.001) = -0.005
+        // So delta = 5 * (-0.0001) = -0.0005
         assert!(delta < 0.0, "divergent values should produce negative delta; got {delta}");
         assert!(
-            (delta - (-0.005)).abs() < 1e-6,
-            "5 divergent axes should give -0.005; got {delta}"
+            (delta - (-0.0005)).abs() < 1e-6,
+            "5 divergent axes should give -0.0005; got {delta}"
         );
     }
 

@@ -70,8 +70,8 @@ pub fn prey_ai(
                     }
                 }
 
-                // Move 1 tile every 3 ticks.
-                if new_ticks % 3 == 0 {
+                // Move 1 tile every 30 ticks.
+                if new_ticks % 30 == 0 {
                     let nx = pos.x + dx;
                     let ny = pos.y + dy;
                     let habitat = animal.species.habitat();
@@ -92,7 +92,7 @@ pub fn prey_ai(
                     }
                 }
 
-                if new_ticks >= 20 {
+                if new_ticks >= 200 {
                     animal.ai_state = PreyAiState::Idle;
                 } else {
                     animal.ai_state = PreyAiState::Grazing { dx, dy, ticks: new_ticks };
@@ -104,7 +104,7 @@ pub fn prey_ai(
 
                 // Check if the threat still exists and is nearby.
                 let threat_pos = positions.get(from).ok();
-                let should_stop = new_ticks >= 15
+                let should_stop = new_ticks >= 150
                     || threat_pos.is_none()
                     || threat_pos
                         .map(|tp| pos.manhattan_distance(tp) > 10)
@@ -248,11 +248,11 @@ pub fn prey_hunger(
         let cap = animal.species.population_cap();
 
         // Base hunger increase.
-        animal.hunger += 0.002;
+        animal.hunger += 0.0002;
 
         // Extra overcrowding hunger when above 80% of cap.
         if pop as f32 > cap as f32 * 0.8 {
-            animal.hunger += 0.001;
+            animal.hunger += 0.0001;
         }
 
         // Mice and rats near stores raid them; all other prey forage in the wild.
@@ -276,8 +276,8 @@ pub fn prey_hunger(
                     if let Some(food_entity) = food_entity {
                         stored.remove(food_entity);
                         commands.entity(food_entity).despawn();
-                        animal.hunger = (animal.hunger - 0.15).max(0.0);
-                        structure.cleanliness = (structure.cleanliness - 0.01).max(0.0);
+                        animal.hunger = (animal.hunger - 0.015).max(0.0);
+                        structure.cleanliness = (structure.cleanliness - 0.001).max(0.0);
                         ate_from_stores = true;
 
                         if rng.rng.random::<f32>() < 0.02 {
@@ -297,13 +297,13 @@ pub fn prey_hunger(
         }
 
         if !ate_from_stores {
-            animal.hunger -= 0.003;
+            animal.hunger -= 0.0003;
         }
         animal.hunger = animal.hunger.clamp(0.0, 1.0);
 
         // Starvation drains health; despawn at zero health.
         if animal.hunger > 0.9 {
-            health.current -= 0.01;
+            health.current -= 0.001;
         }
 
         if health.current <= 0.0 {
@@ -480,14 +480,14 @@ mod tests {
         prey.ai_state = PreyAiState::Grazing { dx: 1, dy: 0, ticks: 0 };
         world.spawn((prey, Health::default(), start));
 
-        for _ in 0..20 {
+        for _ in 0..60 {
             schedule.run(&mut world);
         }
 
         let final_pos = *world.query::<&Position>().single(&world).unwrap();
         assert!(
             final_pos != start,
-            "prey should have moved from {start:?} after 20 ticks of grazing, still at {final_pos:?}"
+            "prey should have moved from {start:?} after 60 ticks of grazing, still at {final_pos:?}"
         );
     }
 

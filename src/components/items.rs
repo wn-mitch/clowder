@@ -39,13 +39,13 @@ pub enum ItemKind {
 impl ItemKind {
     /// Per-tick decay rate applied to `Item::condition`.
     ///
-    /// - Raw prey: 0.005 (spoils in ~200 ticks)
-    /// - Foraged organic: 0.005 (same rate as raw prey)
-    /// - Herbs: 0.003 (preserved longer)
+    /// - Raw prey: 0.0005 (spoils in ~2000 ticks)
+    /// - Foraged organic: 0.0005 (same rate as raw prey)
+    /// - Herbs: 0.0003 (preserved longer)
     /// - Inorganic / curiosities: 0.0 (no decay)
     pub fn decay_rate(self) -> f32 {
         match self {
-            Self::RawMouse | Self::RawRat | Self::RawFish | Self::RawBird => 0.005,
+            Self::RawMouse | Self::RawRat | Self::RawFish | Self::RawBird => 0.0005,
 
             Self::Berries
             | Self::Nuts
@@ -54,13 +54,13 @@ impl ItemKind {
             | Self::Mushroom
             | Self::Moss
             | Self::DriedGrass
-            | Self::Feather => 0.005,
+            | Self::Feather => 0.0005,
 
             Self::HerbHealingMoss
             | Self::HerbMoonpetal
             | Self::HerbCalmroot
             | Self::HerbThornbriar
-            | Self::HerbDreamroot => 0.003,
+            | Self::HerbDreamroot => 0.0003,
 
             Self::ShinyPebble | Self::GlassShard | Self::ColorfulShell => 0.0,
         }
@@ -245,16 +245,16 @@ mod tests {
     #[test]
     fn item_decays_over_time() {
         let mut item = Item::new(ItemKind::RawFish, 1.0, ItemLocation::OnGround);
-        // RawFish decay_rate = 0.005; with f32 rounding the condition clears
-        // slightly above 200 ticks. Allow up to 220 to be float-safe.
+        // RawFish decay_rate = 0.0005; condition starts at 1.0, so ~2000 ticks
+        // to fully decay. Allow up to 2200 to be float-safe.
         let mut destroyed = false;
-        for _ in 0..220 {
+        for _ in 0..2200 {
             if item.tick_decay() {
                 destroyed = true;
                 break;
             }
         }
-        assert!(destroyed, "RawFish should be destroyed within 220 ticks");
+        assert!(destroyed, "RawFish should be destroyed within 2200 ticks");
     }
 
     #[test]

@@ -49,7 +49,7 @@ pub fn check_death(
                 if age_ticks > elder_entry + grace {
                     let excess_seasons = ((age_ticks - elder_entry - grace)
                         / config.ticks_per_season) as f64;
-                    let chance = excess_seasons * 0.002;
+                    let chance = excess_seasons * 0.0002;
                     if rng.rng.random::<f64>() < chance {
                         Some(DeathCause::OldAge)
                     } else {
@@ -157,7 +157,7 @@ pub fn cleanup_dead(
     time: Res<TimeState>,
     query: Query<(Entity, &Dead)>,
 ) {
-    const GRACE_PERIOD: u64 = 50;
+    const GRACE_PERIOD: u64 = 500;
 
     for (entity, dead) in &query {
         if time.tick.saturating_sub(dead.tick) >= GRACE_PERIOD {
@@ -317,7 +317,7 @@ mod tests {
     #[test]
     fn cleanup_despawns_after_grace() {
         let mut world = World::new();
-        world.insert_resource(TimeState { tick: 200, paused: false, speed: crate::resources::time::SimSpeed::Normal });
+        world.insert_resource(TimeState { tick: 700, paused: false, speed: crate::resources::time::SimSpeed::Normal });
         let mut schedule = Schedule::default();
         schedule.add_systems(cleanup_dead);
 
@@ -336,7 +336,7 @@ mod tests {
     #[test]
     fn cleanup_keeps_recent_dead() {
         let mut world = World::new();
-        world.insert_resource(TimeState { tick: 110, paused: false, speed: crate::resources::time::SimSpeed::Normal });
+        world.insert_resource(TimeState { tick: 400, paused: false, speed: crate::resources::time::SimSpeed::Normal });
         let mut schedule = Schedule::default();
         schedule.add_systems(cleanup_dead);
 

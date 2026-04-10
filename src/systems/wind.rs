@@ -23,20 +23,20 @@ pub fn update_wind(
         Weather::Storm => {
             // Storms: big random angle shifts, high strength.
             wind.angle += rng.rng.random_range(-0.3f32..0.3);
-            wind.strength = (wind.strength + 0.05).min(1.0);
+            wind.strength = (wind.strength + 0.005).min(1.0);
         }
         Weather::Wind => {
             // Windy: moderate jitter, boost strength.
             wind.angle += rng.rng.random_range(-0.1f32..0.1);
-            wind.strength = (wind.strength + 0.02).min(0.9);
+            wind.strength = (wind.strength + 0.002).min(0.9);
         }
         Weather::Clear | Weather::Overcast => {
             // Calm: strength decays toward 0.4.
-            wind.strength += (0.4 - wind.strength) * 0.01;
+            wind.strength += (0.4 - wind.strength) * 0.001;
         }
         _ => {
             // Rain/snow/fog: strength decays toward 0.5.
-            wind.strength += (0.5 - wind.strength) * 0.01;
+            wind.strength += (0.5 - wind.strength) * 0.001;
         }
     }
 
