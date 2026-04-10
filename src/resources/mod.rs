@@ -1,4 +1,5 @@
 pub mod aspiration_registry;
+pub mod colony_hunting_map;
 pub mod colony_knowledge;
 pub mod colony_priority;
 pub mod event_log;
@@ -14,6 +15,7 @@ pub mod wind;
 pub mod weather;
 pub mod zodiac;
 
+pub use colony_hunting_map::ColonyHuntingMap;
 pub use colony_knowledge::ColonyKnowledge;
 pub use colony_priority::{ColonyPriority, PriorityKind};
 pub use event_log::{EventEntry, EventKind, EventLog};
