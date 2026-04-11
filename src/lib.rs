@@ -1,6 +1,8 @@
 pub mod components;
 pub mod events;
 pub mod resources;
+pub mod species;
+pub mod steps;
 pub mod world_gen;
 pub mod systems;
 pub mod ai;

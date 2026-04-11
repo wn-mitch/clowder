@@ -7,12 +7,11 @@ use crate::components::identity::Name;
 use crate::components::mental::{Mood, MoodModifier, PrideCooldown};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Needs, Position};
-use crate::events::personality::{
-    DirectiveRefused, PlayInitiated, PrideCrisis, TemperFlared,
-};
+use crate::events::personality::{DirectiveRefused, PlayInitiated, PrideCrisis, TemperFlared};
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::relationships::Relationships;
 use crate::resources::rng::SimRng;
+use crate::resources::sim_constants::SimConstants;
 use crate::resources::time::TimeState;
 use crate::systems::mood::patience_extend;
 
@@ -29,16 +28,19 @@ pub fn emit_personality_events(
     mut commands: Commands,
     time: Res<TimeState>,
     mut rng: ResMut<SimRng>,
-    cats: Query<(
-        Entity,
-        &Personality,
-        &Needs,
-        &Mood,
-        &CurrentAction,
-        &Position,
-        Option<&ActiveDirective>,
-        Option<&PrideCooldown>,
-    ), Without<Dead>>,
+    cats: Query<
+        (
+            Entity,
+            &Personality,
+            &Needs,
+            &Mood,
+            &CurrentAction,
+            &Position,
+            Option<&ActiveDirective>,
+            Option<&PrideCooldown>,
+        ),
+        Without<Dead>,
+    >,
 ) {
     for (entity, personality, needs, mood, current, _pos, directive, pride_cd) in &cats {
         let phys = needs.physiological_satisfaction();
@@ -142,10 +144,7 @@ fn on_temper_flared(
             continue;
         }
         let dist = cat_pos.manhattan_distance(other_pos);
-        if dist > 0
-            && dist <= 3
-            && (nearest.is_none() || dist < nearest.as_ref().unwrap().1)
-        {
+        if dist > 0 && dist <= 3 && (nearest.is_none() || dist < nearest.as_ref().unwrap().1) {
             nearest = Some((other, dist, other_name.0.clone()));
         }
     }
@@ -248,6 +247,7 @@ fn on_play_initiated(
     mut moods: Query<&mut Mood>,
     mut log: ResMut<NarrativeLog>,
     time: Res<TimeState>,
+    constants: Res<SimConstants>,
 ) {
     let event = trigger.event();
     let Ok((_, cat_pos, _, cat_name)) = cats.get(event.cat) else {
@@ -271,7 +271,7 @@ fn on_play_initiated(
                 ticks_remaining: 15,
                 source: "watched play nearby".to_string(),
             };
-            patience_extend(&mut modifier, other_pers.patience);
+            patience_extend(&mut modifier, other_pers.patience, &constants.mood);
             other_mood.modifiers.push_back(modifier);
         }
         if play_partner.is_none() {
@@ -327,35 +327,38 @@ mod tests {
 
     #[test]
     fn patience_extend_positive_modifier() {
+        let mc = &crate::resources::SimConstants::default().mood;
         let mut m = MoodModifier {
             amount: 0.3,
             ticks_remaining: 50,
             source: "test".to_string(),
         };
-        patience_extend(&mut m, 1.0);
+        patience_extend(&mut m, 1.0, mc);
         // 50 + (1.0 * 50 * 0.3).round() = 50 + 15 = 65
         assert_eq!(m.ticks_remaining, 65);
     }
 
     #[test]
     fn patience_extend_does_not_affect_negative() {
+        let mc = &crate::resources::SimConstants::default().mood;
         let mut m = MoodModifier {
             amount: -0.3,
             ticks_remaining: 50,
             source: "test".to_string(),
         };
-        patience_extend(&mut m, 1.0);
+        patience_extend(&mut m, 1.0, mc);
         assert_eq!(m.ticks_remaining, 50);
     }
 
     #[test]
     fn patience_extend_zero_patience() {
+        let mc = &crate::resources::SimConstants::default().mood;
         let mut m = MoodModifier {
             amount: 0.3,
             ticks_remaining: 50,
             source: "test".to_string(),
         };
-        patience_extend(&mut m, 0.0);
+        patience_extend(&mut m, 0.0, mc);
         assert_eq!(m.ticks_remaining, 50);
     }
 }

@@ -5,6 +5,8 @@ use crate::components::identity::{Gender, Name, Orientation};
 use crate::components::physical::{Dead, Position};
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::relationships::{BondType, Relationships};
+use crate::resources::sim_constants::SimConstants;
+use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::resources::time::TimeState;
 
 // ---------------------------------------------------------------------------
@@ -17,12 +19,14 @@ use crate::resources::time::TimeState;
 pub fn passive_familiarity(
     query: Query<(Entity, &Position), (Without<Dead>, Without<Structure>)>,
     mut relationships: ResMut<Relationships>,
+    constants: Res<SimConstants>,
 ) {
+    let c = &constants.social;
     let cats: Vec<(Entity, Position)> = query.iter().map(|(e, p)| (e, *p)).collect();
     for i in 0..cats.len() {
         for j in (i + 1)..cats.len() {
-            if cats[i].1.manhattan_distance(&cats[j].1) <= 2 {
-                relationships.modify_familiarity(cats[i].0, cats[j].0, 0.0001);
+            if cats[i].1.manhattan_distance(&cats[j].1) <= c.passive_familiarity_range {
+                relationships.modify_familiarity(cats[i].0, cats[j].0, c.passive_familiarity_rate);
             }
         }
     }
@@ -39,20 +43,34 @@ pub fn check_bonds(
     mut relationships: ResMut<Relationships>,
     mut log: ResMut<NarrativeLog>,
     names: Query<&Name>,
+    positions: Query<&Position>,
+    mut colony_score: Option<ResMut<crate::resources::colony_score::ColonyScore>>,
+    constants: Res<SimConstants>,
+    mut activation: ResMut<SystemActivation>,
+    mut pushback: MessageWriter<crate::systems::magic::CorruptionPushback>,
 ) {
-    // Only check every 50 ticks.
-    if !time.tick.is_multiple_of(50) {
+    let c = &constants.social;
+    // Only check every bond_check_interval ticks.
+    if !time.tick.is_multiple_of(c.bond_check_interval) {
         return;
     }
 
     for ((a, b), rel) in relationships.pairs_iter_mut() {
         let old_bond = rel.bond;
 
-        let new_bond = if rel.romantic > 0.7 && rel.fondness > 0.7 && rel.familiarity > 0.6 {
+        let new_bond = if rel.romantic > c.mates_romantic_threshold
+            && rel.fondness > c.mates_fondness_threshold
+            && rel.familiarity > c.mates_familiarity_threshold
+        {
             Some(BondType::Mates)
-        } else if rel.romantic > 0.5 && rel.fondness > 0.6 && rel.familiarity > 0.5 {
+        } else if rel.romantic > c.partners_romantic_threshold
+            && rel.fondness > c.partners_fondness_threshold
+            && rel.familiarity > c.partners_familiarity_threshold
+        {
             Some(BondType::Partners)
-        } else if rel.fondness > 0.3 && rel.familiarity > 0.4 {
+        } else if rel.fondness > c.friends_fondness_threshold
+            && rel.familiarity > c.friends_familiarity_threshold
+        {
             Some(BondType::Friends)
         } else {
             None
@@ -61,6 +79,10 @@ pub fn check_bonds(
         // Only upgrade bonds, never downgrade.
         if new_bond > old_bond {
             rel.bond = new_bond;
+            activation.record(Feature::BondFormed);
+            if let Some(ref mut score) = colony_score {
+                score.bonds_formed += 1;
+            }
             if let (Ok(name_a), Ok(name_b)) = (names.get(a), names.get(b)) {
                 let text = match new_bond.unwrap() {
                     BondType::Friends => {
@@ -74,6 +96,14 @@ pub fn check_bonds(
                     }
                 };
                 log.push(time.tick, text, NarrativeTier::Significant);
+            }
+            // Bond warmth pushes back corruption.
+            if let Ok(pos) = positions.get(a) {
+                pushback.write(crate::systems::magic::CorruptionPushback {
+                    position: *pos,
+                    radius: 3,
+                    amount: 0.05,
+                });
             }
         }
     }
@@ -99,14 +129,22 @@ pub fn are_orientation_compatible(
     }
 
     let a_attracted = match a_orient {
-        Orientation::Straight => a_gender != b_gender || b_gender == Gender::Nonbinary || a_gender == Gender::Nonbinary,
-        Orientation::Gay => a_gender == b_gender || b_gender == Gender::Nonbinary || a_gender == Gender::Nonbinary,
+        Orientation::Straight => {
+            a_gender != b_gender || b_gender == Gender::Nonbinary || a_gender == Gender::Nonbinary
+        }
+        Orientation::Gay => {
+            a_gender == b_gender || b_gender == Gender::Nonbinary || a_gender == Gender::Nonbinary
+        }
         Orientation::Bisexual => true,
         Orientation::Asexual => false,
     };
     let b_attracted = match b_orient {
-        Orientation::Straight => b_gender != a_gender || a_gender == Gender::Nonbinary || b_gender == Gender::Nonbinary,
-        Orientation::Gay => b_gender == a_gender || a_gender == Gender::Nonbinary || b_gender == Gender::Nonbinary,
+        Orientation::Straight => {
+            b_gender != a_gender || a_gender == Gender::Nonbinary || b_gender == Gender::Nonbinary
+        }
+        Orientation::Gay => {
+            b_gender == a_gender || a_gender == Gender::Nonbinary || b_gender == Gender::Nonbinary
+        }
         Orientation::Bisexual => true,
         Orientation::Asexual => false,
     };
@@ -119,11 +157,20 @@ pub fn are_orientation_compatible(
 // ---------------------------------------------------------------------------
 
 /// Compute fondness delta from comparing two cats' value axes during interaction.
-/// Same-side values: +0.0002 per axis. Divergent values: -0.0001 per axis.
+/// Same-side values: +same_delta per axis. Divergent values: +divergent_delta per axis.
 #[allow(clippy::too_many_arguments)]
 pub fn value_compatibility_delta(
-    a_loyalty: f32, a_tradition: f32, a_compassion: f32, a_pride: f32, a_independence: f32,
-    b_loyalty: f32, b_tradition: f32, b_compassion: f32, b_pride: f32, b_independence: f32,
+    a_loyalty: f32,
+    a_tradition: f32,
+    a_compassion: f32,
+    a_pride: f32,
+    a_independence: f32,
+    b_loyalty: f32,
+    b_tradition: f32,
+    b_compassion: f32,
+    b_pride: f32,
+    b_independence: f32,
+    constants: &crate::resources::sim_constants::SocialConstants,
 ) -> f32 {
     let axes = [
         (a_loyalty, b_loyalty),
@@ -134,13 +181,19 @@ pub fn value_compatibility_delta(
     ];
     let mut delta = 0.0;
     for (va, vb) in axes {
-        let same_side = (va > 0.5 && vb > 0.5) || (va < 0.5 && vb < 0.5);
-        let divergent = (va > 0.7 && vb < 0.3) || (va < 0.3 && vb > 0.7);
+        let same_side = (va > constants.value_compat_same_threshold
+            && vb > constants.value_compat_same_threshold)
+            || (va < constants.value_compat_same_threshold
+                && vb < constants.value_compat_same_threshold);
+        let divergent = (va > constants.value_compat_divergent_high
+            && vb < constants.value_compat_divergent_low)
+            || (va < constants.value_compat_divergent_low
+                && vb > constants.value_compat_divergent_high);
         if same_side {
-            delta += 0.0002;
+            delta += constants.value_compat_same_delta;
         }
         if divergent {
-            delta -= 0.0001;
+            delta += constants.value_compat_divergent_delta;
         }
     }
     delta
@@ -156,15 +209,17 @@ mod tests {
     use bevy_ecs::schedule::Schedule;
 
     use crate::components::physical::Position;
+    use crate::resources::narrative::NarrativeLog;
     use crate::resources::relationships::Relationships;
     use crate::resources::time::TimeState;
-    use crate::resources::narrative::NarrativeLog;
 
     fn setup_world() -> (World, Schedule) {
         let mut world = World::new();
         world.insert_resource(Relationships::default());
         world.insert_resource(TimeState::default());
         world.insert_resource(NarrativeLog::default());
+        world.insert_resource(crate::resources::SimConstants::default());
+        world.insert_resource(SystemActivation::default());
         let mut schedule = Schedule::default();
         schedule.add_systems(passive_familiarity);
         (world, schedule)
@@ -178,14 +233,21 @@ mod tests {
         let b = world.spawn(Position::new(5, 6)).id();
 
         // Init relationship.
-        world.resource_mut::<Relationships>().get_or_insert(a, b).familiarity = 0.0;
+        world
+            .resource_mut::<Relationships>()
+            .get_or_insert(a, b)
+            .familiarity = 0.0;
 
         schedule.run(&mut world);
 
-        let fam = world.resource::<Relationships>().get(a, b).unwrap().familiarity;
+        let fam = world
+            .resource::<Relationships>()
+            .get(a, b)
+            .unwrap()
+            .familiarity;
         assert!(
-            (fam - 0.0001).abs() < 1e-6,
-            "familiarity should be ~0.0001; got {fam}"
+            (fam - 0.0003).abs() < 1e-6,
+            "familiarity should be ~0.0003; got {fam}"
         );
     }
 
@@ -196,22 +258,30 @@ mod tests {
         let a = world.spawn(Position::new(0, 0)).id();
         let b = world.spawn(Position::new(10, 10)).id();
 
-        world.resource_mut::<Relationships>().get_or_insert(a, b).familiarity = 0.0;
+        world
+            .resource_mut::<Relationships>()
+            .get_or_insert(a, b)
+            .familiarity = 0.0;
 
         schedule.run(&mut world);
 
-        let fam = world.resource::<Relationships>().get(a, b).unwrap().familiarity;
+        let fam = world
+            .resource::<Relationships>()
+            .get(a, b)
+            .unwrap()
+            .familiarity;
         assert_eq!(fam, 0.0, "distant cats should not gain familiarity");
     }
 
     #[test]
     fn value_compatibility_positive_for_aligned_values() {
+        let sc = &crate::resources::SimConstants::default().social;
         // Both cats have all values > 0.5 (same side).
-        let delta = value_compatibility_delta(
-            0.8, 0.7, 0.9, 0.6, 0.8,
-            0.7, 0.8, 0.6, 0.9, 0.7,
+        let delta = value_compatibility_delta(0.8, 0.7, 0.9, 0.6, 0.8, 0.7, 0.8, 0.6, 0.9, 0.7, sc);
+        assert!(
+            delta > 0.0,
+            "aligned values should produce positive delta; got {delta}"
         );
-        assert!(delta > 0.0, "aligned values should produce positive delta; got {delta}");
         assert!(
             (delta - 0.001).abs() < 1e-6,
             "5 same-side axes should give +0.001; got {delta}"
@@ -220,15 +290,16 @@ mod tests {
 
     #[test]
     fn value_compatibility_negative_for_divergent_values() {
+        let sc = &crate::resources::SimConstants::default().social;
         // Cat A has high values, Cat B has low values (all divergent).
-        let delta = value_compatibility_delta(
-            0.8, 0.8, 0.8, 0.8, 0.8,
-            0.2, 0.2, 0.2, 0.2, 0.2,
-        );
+        let delta = value_compatibility_delta(0.8, 0.8, 0.8, 0.8, 0.8, 0.2, 0.2, 0.2, 0.2, 0.2, sc);
         // Each axis: same_side is true (both effectively "above or below") — wait, 0.8 > 0.5 and 0.2 < 0.5, so NOT same side.
         // Each axis: divergent is true (0.8 > 0.7, 0.2 < 0.3).
         // So delta = 5 * (-0.0001) = -0.0005
-        assert!(delta < 0.0, "divergent values should produce negative delta; got {delta}");
+        assert!(
+            delta < 0.0,
+            "divergent values should produce negative delta; got {delta}"
+        );
         assert!(
             (delta - (-0.0005)).abs() < 1e-6,
             "5 divergent axes should give -0.0005; got {delta}"
@@ -238,11 +309,21 @@ mod tests {
     #[test]
     fn romantic_stays_zero_for_asexual_cats() {
         assert!(
-            !are_orientation_compatible(Gender::Queen, Orientation::Asexual, Gender::Tom, Orientation::Straight),
+            !are_orientation_compatible(
+                Gender::Queen,
+                Orientation::Asexual,
+                Gender::Tom,
+                Orientation::Straight
+            ),
             "asexual cat should not be romantically compatible"
         );
         assert!(
-            !are_orientation_compatible(Gender::Tom, Orientation::Straight, Gender::Queen, Orientation::Asexual),
+            !are_orientation_compatible(
+                Gender::Tom,
+                Orientation::Straight,
+                Gender::Queen,
+                Orientation::Asexual
+            ),
             "cat paired with asexual should not be compatible"
         );
     }
@@ -250,20 +331,60 @@ mod tests {
     #[test]
     fn orientation_compatibility_matrix() {
         // Straight Tom + Queen → compatible
-        assert!(are_orientation_compatible(Gender::Tom, Orientation::Straight, Gender::Queen, Orientation::Straight));
+        assert!(are_orientation_compatible(
+            Gender::Tom,
+            Orientation::Straight,
+            Gender::Queen,
+            Orientation::Straight
+        ));
         // Straight Tom + Tom → NOT compatible
-        assert!(!are_orientation_compatible(Gender::Tom, Orientation::Straight, Gender::Tom, Orientation::Straight));
+        assert!(!are_orientation_compatible(
+            Gender::Tom,
+            Orientation::Straight,
+            Gender::Tom,
+            Orientation::Straight
+        ));
         // Gay Tom + Tom → compatible
-        assert!(are_orientation_compatible(Gender::Tom, Orientation::Gay, Gender::Tom, Orientation::Gay));
+        assert!(are_orientation_compatible(
+            Gender::Tom,
+            Orientation::Gay,
+            Gender::Tom,
+            Orientation::Gay
+        ));
         // Gay Tom + Queen → NOT compatible
-        assert!(!are_orientation_compatible(Gender::Tom, Orientation::Gay, Gender::Queen, Orientation::Gay));
+        assert!(!are_orientation_compatible(
+            Gender::Tom,
+            Orientation::Gay,
+            Gender::Queen,
+            Orientation::Gay
+        ));
         // Bisexual + any non-asexual → compatible
-        assert!(are_orientation_compatible(Gender::Tom, Orientation::Bisexual, Gender::Tom, Orientation::Bisexual));
-        assert!(are_orientation_compatible(Gender::Tom, Orientation::Bisexual, Gender::Queen, Orientation::Straight));
+        assert!(are_orientation_compatible(
+            Gender::Tom,
+            Orientation::Bisexual,
+            Gender::Tom,
+            Orientation::Bisexual
+        ));
+        assert!(are_orientation_compatible(
+            Gender::Tom,
+            Orientation::Bisexual,
+            Gender::Queen,
+            Orientation::Straight
+        ));
         // Nonbinary + Straight → compatible
-        assert!(are_orientation_compatible(Gender::Nonbinary, Orientation::Straight, Gender::Tom, Orientation::Straight));
+        assert!(are_orientation_compatible(
+            Gender::Nonbinary,
+            Orientation::Straight,
+            Gender::Tom,
+            Orientation::Straight
+        ));
         // Nonbinary + Gay → compatible
-        assert!(are_orientation_compatible(Gender::Nonbinary, Orientation::Gay, Gender::Tom, Orientation::Gay));
+        assert!(are_orientation_compatible(
+            Gender::Nonbinary,
+            Orientation::Gay,
+            Gender::Tom,
+            Orientation::Gay
+        ));
     }
 
     #[test]
@@ -273,6 +394,9 @@ mod tests {
         time.tick = 50; // divisible by 50
         world.insert_resource(time);
         world.insert_resource(NarrativeLog::default());
+        world.insert_resource(crate::resources::SimConstants::default());
+        world.insert_resource(SystemActivation::default());
+        bevy_ecs::message::MessageRegistry::register_message::<crate::systems::magic::CorruptionPushback>(&mut world);
         let mut rels = Relationships::default();
 
         let a = world.spawn(Name("Fern".to_string())).id();
@@ -285,6 +409,7 @@ mod tests {
         world.insert_resource(rels);
 
         let mut schedule = Schedule::default();
+        schedule.add_systems(bevy_ecs::message::message_update_system);
         schedule.add_systems(check_bonds);
         schedule.run(&mut world);
 

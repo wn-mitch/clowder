@@ -24,6 +24,14 @@ pub struct SpriteAssets {
     /// Row 0-1: saplings/small, Row 2: medium, Row 3: full-grown.
     pub trees_texture: Handle<Image>,
     pub trees_layout: Handle<TextureAtlasLayout>,
+
+    /// Items spritesheet — 128x240, 16x16 frames (8 cols x 15 rows).
+    /// Food, foraged goods, herbs-as-bottles, curiosities.
+    pub items_texture: Handle<Image>,
+    pub items_layout: Handle<TextureAtlasLayout>,
+
+    /// Colony well — 32x32 single image (decorative landmark at colony center).
+    pub well_texture: Handle<Image>,
 }
 
 pub fn load_sprite_assets(
@@ -72,6 +80,21 @@ pub fn load_sprite_assets(
         None,
     ));
 
+    let items_texture = asset_server.load(
+        "sprites/Sprout Lands - Sprites - premium pack/Objects/Items/items-spritesheet.png",
+    );
+    let items_layout = layouts.add(TextureAtlasLayout::from_grid(
+        UVec2::splat(16),
+        8,
+        15,
+        None,
+        None,
+    ));
+
+    let well_texture = asset_server.load(
+        "sprites/Sprout Lands - Sprites - premium pack/Objects/Water well.png",
+    );
+
     commands.insert_resource(SpriteAssets {
         white_pixel,
         character_texture,
@@ -80,5 +103,8 @@ pub fn load_sprite_assets(
         herbs_layout,
         trees_texture,
         trees_layout,
+        items_texture,
+        items_layout,
+        well_texture,
     });
 }

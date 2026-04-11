@@ -37,8 +37,15 @@ impl Terrain {
     /// Movement cost in abstract ticks. `u32::MAX` means impassable.
     pub fn movement_cost(self) -> u32 {
         match self {
-            Self::Grass | Self::Sand | Self::Den | Self::Hearth | Self::Stores | Self::Workshop
-            | Self::Watchtower | Self::WardPost | Self::Gate => 1,
+            Self::Grass
+            | Self::Sand
+            | Self::Den
+            | Self::Hearth
+            | Self::Stores
+            | Self::Workshop
+            | Self::Watchtower
+            | Self::WardPost
+            | Self::Gate => 1,
             Self::LightForest | Self::Mud | Self::Garden => 2,
             Self::Wall => u32::MAX,
             Self::DenseForest => 3,

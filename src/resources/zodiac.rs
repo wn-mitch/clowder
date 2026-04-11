@@ -67,10 +67,7 @@ impl ZodiacData {
 
     /// Lore text for a given sign.
     pub fn lore(&self, sign: ZodiacSign) -> &str {
-        self.signs
-            .get(&sign)
-            .map(|d| d.lore.as_str())
-            .unwrap_or("")
+        self.signs.get(&sign).map(|d| d.lore.as_str()).unwrap_or("")
     }
 }
 
@@ -83,18 +80,14 @@ mod tests {
     use super::*;
 
     fn load_test_data() -> ZodiacData {
-        ZodiacData::load(Path::new("assets/data/zodiac.ron"))
-            .expect("zodiac.ron should parse")
+        ZodiacData::load(Path::new("assets/data/zodiac.ron")).expect("zodiac.ron should parse")
     }
 
     #[test]
     fn ron_loads_all_signs() {
         let data = load_test_data();
         for sign in ZodiacSign::ALL {
-            assert!(
-                data.signs.contains_key(&sign),
-                "missing sign {sign:?}",
-            );
+            assert!(data.signs.contains_key(&sign), "missing sign {sign:?}",);
         }
     }
 
@@ -102,23 +95,38 @@ mod tests {
     fn compatible_signs_return_positive() {
         let data = load_test_data();
         // LeapingFlame is compatible with StormFur and TallPine.
-        assert_eq!(data.compatibility(ZodiacSign::LeapingFlame, ZodiacSign::StormFur), 0.5);
-        assert_eq!(data.compatibility(ZodiacSign::LeapingFlame, ZodiacSign::TallPine), 0.5);
+        assert_eq!(
+            data.compatibility(ZodiacSign::LeapingFlame, ZodiacSign::StormFur),
+            0.5
+        );
+        assert_eq!(
+            data.compatibility(ZodiacSign::LeapingFlame, ZodiacSign::TallPine),
+            0.5
+        );
     }
 
     #[test]
     fn rival_signs_return_negative() {
         let data = load_test_data();
         // LeapingFlame rivals SilverPool and LongShadow.
-        assert_eq!(data.compatibility(ZodiacSign::LeapingFlame, ZodiacSign::SilverPool), -0.5);
-        assert_eq!(data.compatibility(ZodiacSign::LeapingFlame, ZodiacSign::LongShadow), -0.5);
+        assert_eq!(
+            data.compatibility(ZodiacSign::LeapingFlame, ZodiacSign::SilverPool),
+            -0.5
+        );
+        assert_eq!(
+            data.compatibility(ZodiacSign::LeapingFlame, ZodiacSign::LongShadow),
+            -0.5
+        );
     }
 
     #[test]
     fn neutral_signs_return_zero() {
         let data = load_test_data();
         // LeapingFlame and WarmDen are neither compatible nor rival.
-        assert_eq!(data.compatibility(ZodiacSign::LeapingFlame, ZodiacSign::WarmDen), 0.0);
+        assert_eq!(
+            data.compatibility(ZodiacSign::LeapingFlame, ZodiacSign::WarmDen),
+            0.0
+        );
     }
 
     #[test]
@@ -136,10 +144,7 @@ mod tests {
     fn lore_nonempty() {
         let data = load_test_data();
         for sign in ZodiacSign::ALL {
-            assert!(
-                !data.lore(sign).is_empty(),
-                "sign {sign:?} has no lore",
-            );
+            assert!(!data.lore(sign).is_empty(), "sign {sign:?} has no lore",);
         }
     }
 }

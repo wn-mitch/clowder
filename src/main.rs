@@ -5,8 +5,8 @@ use std::time::{Duration, Instant};
 use bevy::app::AppExit;
 use bevy::input::keyboard::KeyCode;
 use bevy::prelude::{
-    App, ButtonInput, ClearColor, Color, DefaultPlugins, ImagePlugin, MessageWriter, PluginGroup,
-    Res, ResMut, Startup, Time, Fixed, Update, Window, WindowPlugin,
+    App, ButtonInput, ClearColor, Color, DefaultPlugins, Fixed, ImagePlugin, MessageWriter,
+    PluginGroup, Res, ResMut, Startup, Time, Update, Window, WindowPlugin,
 };
 use bevy::window::WindowResolution;
 
@@ -16,23 +16,26 @@ use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::Schedule;
 
 use clowder::ai::CurrentAction;
+use clowder::components::hunting_priors::HuntingPriors;
 use clowder::components::identity::{Age, Name, Species};
+use clowder::components::magic::Inventory;
 use clowder::components::mental::{Memory, Mood};
 use clowder::components::physical::{Dead, Health, Needs, Position};
-use clowder::components::hunting_priors::HuntingPriors;
-use clowder::components::magic::Inventory;
 use clowder::components::skills::{Corruption, MagicAffinity, Training};
 use clowder::persistence;
 use clowder::plugins::setup::AppArgs;
 use clowder::plugins::simulation::SimulationPlugin;
 use clowder::rendering;
 
+use clowder::resources::time::DayPhase;
 use clowder::resources::{
     ColonyHuntingMap, EventLog, FoodStores, NarrativeLog, NarrativeTier, Relationships, SimConfig,
-    SimRng, TemplateRegistry, TimeState, TileMap, WeatherState,
+    SimRng, TemplateRegistry, TileMap, TimeState, WeatherState,
 };
-use clowder::resources::time::DayPhase;
-use clowder::world_gen::colony::{find_colony_site, generate_starting_cats, spawn_starting_buildings};
+use clowder::world_gen::colony::{
+    find_colony_site, generate_starting_cats, spawn_starting_buildings,
+};
+use clowder::world_gen::custom_cats::load_custom_cats;
 use clowder::world_gen::terrain::generate_terrain;
 
 /// Parsed CLI arguments.
@@ -61,16 +64,18 @@ fn main() {
     }
 
     App::new()
-        .add_plugins(DefaultPlugins
-            .set(ImagePlugin::default_nearest())
-            .set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "Clowder".into(),
-                resolution: WindowResolution::new(1280, 720),
-                ..Window::default()
-            }),
-            ..WindowPlugin::default()
-        }))
+        .add_plugins(
+            DefaultPlugins
+                .set(ImagePlugin::default_nearest())
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "Clowder".into(),
+                        resolution: WindowResolution::new(1280, 720),
+                        ..Window::default()
+                    }),
+                    ..WindowPlugin::default()
+                }),
+        )
         .insert_resource(ClearColor(Color::srgb(0.15, 0.22, 0.12)))
         .insert_resource(AppArgs {
             seed: args.seed,
@@ -78,10 +83,7 @@ fn main() {
             load_log_path: args.load_log_path,
             test_map: args.test_map,
         })
-        .add_systems(
-            Startup,
-            clowder::plugins::setup::setup_world_exclusive,
-        )
+        .add_systems(Startup, clowder::plugins::setup::setup_world_exclusive)
         .add_plugins(SimulationPlugin)
         .add_plugins(rendering::RenderingPlugin)
         .add_plugins(rendering::CameraPlugin)
@@ -118,10 +120,7 @@ fn handle_input(
 }
 
 /// Keeps Bevy's FixedUpdate timestep in sync with the SimSpeed setting.
-fn sync_sim_speed(
-    time_state: Res<TimeState>,
-    mut fixed_time: ResMut<Time<Fixed>>,
-) {
+fn sync_sim_speed(time_state: Res<TimeState>, mut fixed_time: ResMut<Time<Fixed>>) {
     if !time_state.is_changed() {
         return;
     }
@@ -234,43 +233,71 @@ const SAVE_PATH: &str = "saves/autosave.json";
 
 fn build_schedule() -> Schedule {
     let mut schedule = Schedule::default();
+    // Message buffer flush — must run before systems that read messages.
+    schedule.add_systems(bevy_ecs::message::message_update_system);
     schedule.add_systems(
         (
             // World simulation
             (
-                clowder::systems::time::advance_time
-                    .run_if(clowder::systems::time::not_paused),
+                clowder::systems::time::advance_time.run_if(clowder::systems::time::not_paused),
                 clowder::systems::weather::update_weather,
                 clowder::systems::wind::update_wind,
                 clowder::systems::time::emit_weather_transitions,
                 clowder::systems::magic::corruption_spread,
                 clowder::systems::magic::ward_decay,
-                clowder::systems::magic::herb_seasonal_check,
+                (
+                    clowder::systems::magic::herb_seasonal_check,
+                    clowder::systems::magic::advance_herb_growth,
+                    clowder::systems::magic::advance_flavor_growth,
+                )
+                    .chain(),
                 clowder::systems::magic::corruption_tile_effects,
+                clowder::systems::magic::apply_corruption_pushback,
                 clowder::systems::magic::spawn_shadow_fox_from_corruption,
-                clowder::systems::wildlife::spawn_wildlife,
-                clowder::systems::wildlife::wildlife_ai,
-                clowder::systems::wildlife::predator_hunt_prey,
+                (
+                    clowder::systems::wildlife::spawn_wildlife,
+                    clowder::systems::wildlife::wildlife_ai,
+                    clowder::systems::wildlife::fox_movement,
+                    clowder::systems::wildlife::fox_needs_tick,
+                    clowder::systems::wildlife::fox_ai_decision,
+                    clowder::systems::wildlife::fox_scent_tick,
+                    clowder::systems::wildlife::predator_hunt_prey,
+                    clowder::systems::wildlife::carcass_decay,
+                    clowder::systems::wildlife::predator_stalk_cats,
+                )
+                    .chain(),
                 clowder::systems::prey::prey_population,
                 clowder::systems::prey::prey_hunger,
                 clowder::systems::prey::prey_ai,
+                clowder::systems::prey::prey_den_lifecycle,
                 clowder::systems::wildlife::detect_threats,
                 clowder::systems::buildings::apply_building_effects,
                 clowder::systems::buildings::decay_building_condition,
                 clowder::systems::items::decay_items,
             )
                 .chain(),
-            // Item pruning and food sync — split out to stay under Bevy's chain param limit.
+            // Item pruning, food sync, den pressure — split to stay under chain param limit.
             (
                 clowder::systems::items::prune_stored_items,
                 clowder::systems::items::sync_food_stores,
+                clowder::systems::prey::update_den_pressure,
+                clowder::systems::prey::apply_den_raids,
+                clowder::systems::prey::orphan_prey_adopt_or_found,
             )
                 .chain(),
             // Cat needs, mood, and decision-making
             (
                 clowder::systems::needs::decay_needs,
+                clowder::systems::needs::decay_grooming,
+                clowder::systems::needs::eat_from_inventory,
+                clowder::systems::needs::decay_exploration,
+                clowder::systems::needs::bond_proximity_social,
+                clowder::systems::pregnancy::tick_pregnancy,
+                clowder::systems::growth::tick_kitten_growth,
+                clowder::systems::growth::kitten_mood_aura,
                 clowder::systems::mood::update_mood,
                 clowder::systems::mood::mood_contagion,
+                clowder::systems::mood::bond_proximity_mood,
                 clowder::systems::memory::decay_memories,
                 clowder::systems::coordination::evaluate_coordinators,
                 clowder::systems::coordination::assess_colony_needs,
@@ -294,6 +321,9 @@ fn build_schedule() -> Schedule {
                 clowder::systems::colony_knowledge::update_colony_knowledge,
                 clowder::systems::combat::resolve_combat,
                 clowder::systems::combat::heal_injuries,
+                clowder::systems::wildlife::fox_lifecycle_tick,
+                clowder::systems::wildlife::fox_confrontation_tick,
+                clowder::systems::wildlife::fox_store_raid_tick,
                 clowder::systems::magic::personal_corruption_effects,
                 clowder::systems::death::check_death,
                 clowder::systems::coordination::flag_coordinator_death,
@@ -306,44 +336,45 @@ fn build_schedule() -> Schedule {
         )
             .chain(),
     );
-    // Disposition systems — must mirror SimulationPlugin ordering.
-    schedule.add_systems(clowder::systems::disposition::check_anxiety_interrupts);
+    // GOAP systems — must mirror SimulationPlugin ordering.
+    // check_anxiety_interrupts and evaluate_and_plan run after sync_food_stores
+    // so food_available reflects actual item state this tick, not the default 0.0.
     schedule.add_systems(
-        clowder::systems::disposition::evaluate_dispositions
-            .after(clowder::systems::disposition::check_anxiety_interrupts),
+        clowder::systems::goap::check_anxiety_interrupts
+            .after(clowder::systems::items::sync_food_stores),
     );
-    // Flush commands so Disposition is visible to disposition_to_chain.
+    schedule.add_systems(
+        clowder::systems::goap::evaluate_and_plan
+            .after(clowder::systems::goap::check_anxiety_interrupts)
+            .after(clowder::systems::items::sync_food_stores),
+    );
     schedule.add_systems(
         bevy_ecs::schedule::ApplyDeferred
-            .after(clowder::systems::disposition::evaluate_dispositions)
-            .before(clowder::systems::disposition::disposition_to_chain),
+            .after(clowder::systems::goap::evaluate_and_plan)
+            .before(clowder::systems::goap::resolve_goap_plans),
     );
     schedule.add_systems(
-        clowder::systems::disposition::disposition_to_chain
-            .after(clowder::systems::disposition::evaluate_dispositions),
-    );
-    // Flush commands so TaskChain is visible to resolve_disposition_chains.
-    schedule.add_systems(
-        bevy_ecs::schedule::ApplyDeferred
-            .after(clowder::systems::disposition::disposition_to_chain)
-            .before(clowder::systems::disposition::resolve_disposition_chains),
-    );
-    schedule.add_systems(
-        clowder::systems::disposition::resolve_disposition_chains
-            .after(clowder::systems::disposition::disposition_to_chain)
+        clowder::systems::goap::resolve_goap_plans
+            .after(clowder::systems::goap::evaluate_and_plan)
             .before(clowder::systems::task_chains::resolve_task_chains),
     );
+    schedule.add_systems(
+        clowder::systems::goap::emit_plan_narrative
+            .after(clowder::systems::goap::resolve_goap_plans),
+    );
 
+    schedule.add_systems(clowder::systems::disposition::cat_presence_tick);
     schedule.add_systems(clowder::systems::personality_events::emit_personality_events);
     schedule.add_systems(clowder::systems::ai::emit_periodic_events);
     schedule.add_systems(
         clowder::systems::snapshot::emit_cat_snapshots
-            .after(clowder::systems::disposition::resolve_disposition_chains),
+            .after(clowder::systems::goap::resolve_goap_plans),
     );
     schedule.add_systems(
         clowder::systems::snapshot::emit_position_traces
-            .after(clowder::systems::disposition::resolve_disposition_chains),
+            .after(clowder::systems::goap::resolve_goap_plans),
     );
+    schedule.add_systems(clowder::systems::colony_score::emit_colony_score);
     // Fate and aspiration lifecycle.
     schedule.add_systems(clowder::systems::fate::assign_fated_connections);
     schedule.add_systems(clowder::systems::fate::awaken_fated_connections);
@@ -407,8 +438,38 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
     if !world.contains_resource::<ColonyHuntingMap>() {
         world.insert_resource(ColonyHuntingMap::default());
     }
+    if !world.contains_resource::<clowder::resources::ExplorationMap>() {
+        world.insert_resource(clowder::resources::ExplorationMap::default());
+    }
     if !world.contains_resource::<clowder::systems::wildlife::DetectionCooldowns>() {
         world.insert_resource(clowder::systems::wildlife::DetectionCooldowns::default());
+    }
+    if !world.contains_resource::<clowder::species::SpeciesRegistry>() {
+        world.insert_resource(clowder::species::build_registry());
+    }
+    if !world.contains_resource::<clowder::components::prey::PreyDensity>() {
+        world.insert_resource(clowder::components::prey::PreyDensity::default());
+    }
+    bevy_ecs::message::MessageRegistry::register_message::<clowder::components::prey::PreyKilled>(
+        &mut world,
+    );
+    bevy_ecs::message::MessageRegistry::register_message::<clowder::components::prey::DenRaided>(
+        &mut world,
+    );
+    bevy_ecs::message::MessageRegistry::register_message::<clowder::components::goap_plan::PlanNarrative>(
+        &mut world,
+    );
+    bevy_ecs::message::MessageRegistry::register_message::<clowder::systems::magic::CorruptionPushback>(
+        &mut world,
+    );
+    if !world.contains_resource::<clowder::resources::ColonyScore>() {
+        world.insert_resource(clowder::resources::ColonyScore::default());
+    }
+    if !world.contains_resource::<clowder::resources::SimConstants>() {
+        world.insert_resource(clowder::resources::SimConstants::default());
+    }
+    if !world.contains_resource::<clowder::resources::SystemActivation>() {
+        world.insert_resource(clowder::resources::SystemActivation::default());
     }
 
     Ok(world)
@@ -429,8 +490,12 @@ fn run_headless(args: CliArgs) -> io::Result<()> {
     }
 
     // Resolve log paths.
-    let log_path = args.log_path.unwrap_or_else(|| PathBuf::from("logs/narrative.jsonl"));
-    let event_log_path = args.event_log_path.unwrap_or_else(|| PathBuf::from("logs/events.jsonl"));
+    let log_path = args
+        .log_path
+        .unwrap_or_else(|| PathBuf::from("logs/narrative.jsonl"));
+    let event_log_path = args
+        .event_log_path
+        .unwrap_or_else(|| PathBuf::from("logs/events.jsonl"));
     if let Some(parent) = log_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
@@ -445,10 +510,14 @@ fn run_headless(args: CliArgs) -> io::Result<()> {
         "{}",
         serde_json::json!({"_header": true, "seed": args.seed, "duration_secs": args.duration_secs})
     )?;
+    let constants_json = {
+        let c = world.resource::<clowder::resources::SimConstants>();
+        serde_json::to_value(c.clone()).unwrap_or_default()
+    };
     writeln!(
         event_file,
         "{}",
-        serde_json::json!({"_header": true, "seed": args.seed, "duration_secs": args.duration_secs})
+        serde_json::json!({"_header": true, "seed": args.seed, "duration_secs": args.duration_secs, "constants": constants_json})
     )?;
 
     let duration = Duration::from_secs(args.duration_secs);
@@ -565,11 +634,7 @@ fn flush_event_entries(
     }
     let start = log.entries.len().saturating_sub(new_count as usize);
     for entry in log.entries.range(start..) {
-        writeln!(
-            file,
-            "{}",
-            serde_json::to_string(entry).unwrap_or_default()
-        )?;
+        writeln!(file, "{}", serde_json::to_string(entry).unwrap_or_default())?;
     }
     *last_flushed = log.total_pushed;
     Ok(())
@@ -621,27 +686,44 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
         generate_terrain(120, 90, &mut sim_rng.rng)
     };
 
-    // Set initial corruption and mystery on special tiles.
-    clowder::world_gen::herbs::initialize_tile_magic(&mut map, &mut sim_rng.rng);
-
-    // Find colony site.
+    // Find colony site first (read-only) so special tiles can respect colony distance.
     let colony_site = find_colony_site(&map, &mut sim_rng.rng);
+
+    // Place special terrain tiles (ruins, fairy rings, standing stones, deep pools).
+    let constants = clowder::resources::SimConstants::default();
+    clowder::world_gen::special_tiles::place_special_tiles(
+        &mut map,
+        colony_site,
+        &mut sim_rng.rng,
+        &constants.world_gen,
+    );
+
+    // Set initial corruption and mystery on special tiles (must be after placement).
+    clowder::world_gen::herbs::initialize_tile_magic(&mut map, &mut sim_rng.rng);
 
     // Start the clock high enough that cats can have varied ages.
     let start_tick: u64 = 100_000;
 
-    let cat_blueprints = generate_starting_cats(
-        8,
-        start_tick,
-        config.ticks_per_season,
-        &mut sim_rng.rng,
-    );
+    let mut cat_blueprints =
+        load_custom_cats(start_tick, config.ticks_per_season, &mut sim_rng.rng);
+    let remaining = 8usize.saturating_sub(cat_blueprints.len());
+    if remaining > 0 {
+        cat_blueprints.extend(generate_starting_cats(
+            remaining,
+            start_tick,
+            config.ticks_per_season,
+            &mut sim_rng.rng,
+        ));
+    }
 
     // Build ECS world.
     let mut world = World::new();
 
     // Spawn starting buildings (sets terrain tiles and creates entities).
     spawn_starting_buildings(&mut world, colony_site, &mut map);
+
+    // Persist colony center (no well entity in headless — no rendering).
+    world.insert_resource(clowder::resources::ColonyCenter(colony_site));
 
     world.insert_resource(TimeState {
         tick: start_tick,
@@ -655,8 +737,26 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
     world.insert_resource(clowder::resources::ColonyKnowledge::default());
     world.insert_resource(clowder::resources::ColonyPriority::default());
     world.insert_resource(ColonyHuntingMap::default());
+    world.insert_resource(clowder::resources::ExplorationMap::default());
     world.insert_resource(FoodStores::default());
     world.insert_resource(clowder::systems::wildlife::DetectionCooldowns::default());
+    world.insert_resource(clowder::resources::SimConstants::default());
+    world.insert_resource(clowder::resources::SystemActivation::default());
+    world.insert_resource(clowder::species::build_registry());
+    world.insert_resource(clowder::components::prey::PreyDensity::default());
+    bevy_ecs::message::MessageRegistry::register_message::<clowder::components::prey::PreyKilled>(
+        &mut world,
+    );
+    bevy_ecs::message::MessageRegistry::register_message::<clowder::components::prey::DenRaided>(
+        &mut world,
+    );
+    bevy_ecs::message::MessageRegistry::register_message::<clowder::components::goap_plan::PlanNarrative>(
+        &mut world,
+    );
+    bevy_ecs::message::MessageRegistry::register_message::<clowder::systems::magic::CorruptionPushback>(
+        &mut world,
+    );
+    world.insert_resource(clowder::resources::ColonyScore::default());
     world.insert_resource(map);
     world.insert_resource(sim_rng);
 
@@ -675,32 +775,37 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
             )
         };
 
-        let entity = world.spawn((
-            (
-                Name(cat.name),
-                Species,
-                Age { born_tick: cat.born_tick },
-                cat.gender,
-                cat.orientation,
-                cat.personality,
-                cat.appearance,
-                Position::new(spawn_x, spawn_y),
-                Health::default(),
-                Needs::staggered(i, cat_count),
-                Mood::default(),
-                Memory::default(),
-            ),
-            (
-                cat.zodiac_sign,
-                cat.skills,
-                MagicAffinity(cat.magic_affinity),
-                Corruption(0.0),
-                Training::default(),
-                CurrentAction::default(),
-                Inventory::default(),
-                HuntingPriors::default(),
-            ),
-        )).id();
+        let entity = world
+            .spawn((
+                (
+                    Name(cat.name),
+                    Species,
+                    Age {
+                        born_tick: cat.born_tick,
+                    },
+                    cat.gender,
+                    cat.orientation,
+                    cat.personality,
+                    cat.appearance,
+                    Position::new(spawn_x, spawn_y),
+                    Health::default(),
+                    Needs::staggered(i, cat_count),
+                    Mood::default(),
+                    Memory::default(),
+                ),
+                (
+                    cat.zodiac_sign,
+                    cat.skills,
+                    MagicAffinity(cat.magic_affinity),
+                    Corruption(0.0),
+                    Training::default(),
+                    CurrentAction::default(),
+                    Inventory::default(),
+                    HuntingPriors::default(),
+                    clowder::components::grooming::GroomingCondition::default(),
+                ),
+            ))
+            .id();
         entity_ids.push(entity);
     }
 
@@ -718,9 +823,16 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
 
     // Spawn initial wildlife far from the colony.
     clowder::systems::wildlife::spawn_initial_wildlife(&mut world, colony_site);
+    clowder::systems::wildlife::spawn_initial_fox_dens(&mut world, colony_site);
+
+    // Insert fox scent map resource.
+    world.insert_resource(clowder::resources::FoxScentMap::default());
+
+    // Insert cat presence map resource.
+    world.insert_resource(clowder::resources::CatPresenceMap::default());
 
     // Spawn initial prey animals across their habitats.
-    clowder::systems::prey::spawn_initial_prey(&mut world);
+    clowder::world_gen::prey_ecosystem::seed_prey_ecosystem(&mut world);
 
     // Spawn herbs based on terrain and current season.
     let current_season = {
@@ -729,6 +841,7 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
         time.season(config)
     };
     clowder::world_gen::herbs::spawn_herbs(&mut world, current_season);
+    clowder::world_gen::herbs::spawn_flavor_plants(&mut world, current_season);
 
     Ok(world)
 }

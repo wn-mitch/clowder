@@ -1,9 +1,9 @@
 use bevy_ecs::prelude::*;
 use rand::Rng;
 
+use crate::resources::rng::SimRng;
 use crate::resources::weather::{Weather, WeatherState};
 use crate::resources::wind::WindState;
-use crate::resources::rng::SimRng;
 
 /// Drift wind direction and strength each tick.
 ///

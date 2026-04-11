@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::components::physical::Position;
-use crate::components::prey::PreyAnimal;
+use crate::components::prey::{PreyAnimal, PreyConfig, PreyState};
 use crate::components::wildlife::{BehaviorType, WildAnimal};
 use crate::rendering::ui::{PANEL_BG, PANEL_BORDER, TEXT_COLOR, TEXT_DIM, TEXT_HIGHLIGHT, UiRoot};
 use crate::ui_data::{InspectionMode, InspectionState};
@@ -60,7 +60,7 @@ pub fn update_wildlife_inspect(
     mut popup_query: Query<(&mut Visibility, &mut Node), With<WildlifeInspectPopup>>,
     content_query: Query<Entity, With<WildlifeInspectContent>>,
     wildlife: Query<(&Position, &WildAnimal)>,
-    prey: Query<(&Position, &PreyAnimal)>,
+    prey: Query<(&Position, &PreyConfig, &PreyState), With<PreyAnimal>>,
     windows: Query<&Window>,
     mut last_entity: Local<Option<Entity>>,
 ) {
@@ -132,17 +132,27 @@ pub fn update_wildlife_inspect(
             "Position",
             &format!("({}, {})", pos.x, pos.y),
         ));
-    } else if let Ok((pos, prey_animal)) = prey.get(entity) {
+    } else if let Ok((pos, config, state)) = prey.get(entity) {
         children.push(spawn_text(
             &mut commands,
-            &capitalize(prey_animal.species.name()),
+            &capitalize(config.name),
             HEADER_FONT_SIZE,
             TEXT_HIGHLIGHT,
         ));
         children.push(spawn_prop(
             &mut commands,
             "Hunger",
-            &format!("{:.0}%", prey_animal.hunger * 100.0),
+            &format!("{:.0}%", state.hunger * 100.0),
+        ));
+        children.push(spawn_prop(
+            &mut commands,
+            "Alertness",
+            &format!("{:.0}%", state.alertness * 100.0),
+        ));
+        children.push(spawn_prop(
+            &mut commands,
+            "State",
+            ai_state_label(&state.ai_state),
         ));
         children.push(spawn_prop(
             &mut commands,
@@ -159,6 +169,16 @@ pub fn update_wildlife_inspect(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+fn ai_state_label(state: &crate::components::prey::PreyAiState) -> &'static str {
+    use crate::components::prey::PreyAiState;
+    match state {
+        PreyAiState::Idle => "Idle",
+        PreyAiState::Grazing { .. } => "Grazing",
+        PreyAiState::Alert { .. } => "Alert",
+        PreyAiState::Fleeing { .. } => "Fleeing",
+    }
+}
 
 fn behavior_label(behavior: BehaviorType) -> &'static str {
     match behavior {

@@ -3,7 +3,8 @@ use rand::Rng;
 
 use crate::ai::Action;
 use crate::components::aspirations::{
-    ActiveAspiration, AspirationDomain, Aspirations, AspirationsInitialized, Preference, Preferences,
+    ActiveAspiration, AspirationDomain, Aspirations, AspirationsInitialized, Preference,
+    Preferences,
 };
 use crate::components::identity::{Age, LifeStage, Name};
 use crate::components::mental::{Memory, MemoryType, MoodModifier};
@@ -13,6 +14,8 @@ use crate::components::zodiac::ZodiacSign;
 use crate::resources::aspiration_registry::AspirationRegistry;
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::rng::SimRng;
+use crate::resources::sim_constants::{AspirationConstants, SimConstants};
+use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::resources::time::{SimConfig, TimeState};
 use crate::resources::zodiac::ZodiacData;
 
@@ -35,7 +38,11 @@ fn domain_personality_axis(domain: AspirationDomain, p: &Personality) -> f32 {
 
 /// Count memories of a given type.
 fn memory_count(memory: &Memory, mem_type: MemoryType) -> usize {
-    memory.events.iter().filter(|e| e.event_type == mem_type).count()
+    memory
+        .events
+        .iter()
+        .filter(|e| e.event_type == mem_type)
+        .count()
 }
 
 /// Score a candidate chain for a cat.
@@ -44,33 +51,46 @@ fn score_chain(
     personality: &Personality,
     memory: &Memory,
     zodiac_domains: &[AspirationDomain],
+    c: &AspirationConstants,
     rng: &mut impl Rng,
 ) -> f32 {
     let mut score = 0.0;
 
     // Zodiac affinity.
     if zodiac_domains.contains(&domain) {
-        score += 0.4;
+        score += c.zodiac_affinity_bonus;
     }
 
     // Personality alignment.
-    score += 0.3 * domain_personality_axis(domain, personality);
+    score += c.personality_alignment_weight * domain_personality_axis(domain, personality);
 
     // Experience modifier: relevant memories boost the score.
     let experience = match domain {
-        AspirationDomain::Hunting => memory_count(memory, MemoryType::ResourceFound) as f32 * 0.2,
-        AspirationDomain::Combat => memory_count(memory, MemoryType::ThreatSeen) as f32 * 0.2
-            + memory_count(memory, MemoryType::Injury) as f32 * 0.1,
-        AspirationDomain::Social => memory_count(memory, MemoryType::SocialEvent) as f32 * 0.2,
-        AspirationDomain::Herbcraft => memory_count(memory, MemoryType::MagicEvent) as f32 * 0.2,
-        AspirationDomain::Exploration => memory_count(memory, MemoryType::ResourceFound) as f32 * 0.1,
+        AspirationDomain::Hunting => {
+            memory_count(memory, MemoryType::ResourceFound) as f32 * c.experience_memory_scale
+        }
+        AspirationDomain::Combat => {
+            memory_count(memory, MemoryType::ThreatSeen) as f32 * c.experience_memory_scale
+                + memory_count(memory, MemoryType::Injury) as f32 * c.experience_secondary_scale
+        }
+        AspirationDomain::Social => {
+            memory_count(memory, MemoryType::SocialEvent) as f32 * c.experience_memory_scale
+        }
+        AspirationDomain::Herbcraft => {
+            memory_count(memory, MemoryType::MagicEvent) as f32 * c.experience_memory_scale
+        }
+        AspirationDomain::Exploration => {
+            memory_count(memory, MemoryType::ResourceFound) as f32 * c.experience_secondary_scale
+        }
         AspirationDomain::Building => 0.0, // no specific memory type
-        AspirationDomain::Leadership => memory_count(memory, MemoryType::SocialEvent) as f32 * 0.1,
+        AspirationDomain::Leadership => {
+            memory_count(memory, MemoryType::SocialEvent) as f32 * c.experience_secondary_scale
+        }
     };
-    score += experience.min(0.6); // cap experience contribution
+    score += experience.min(c.experience_cap); // cap experience contribution
 
     // Jitter.
-    score += rng.random_range(-0.05f32..0.05f32);
+    score += rng.random_range(-c.scoring_jitter..c.scoring_jitter);
 
     score
 }
@@ -181,14 +201,19 @@ pub fn select_aspirations(
     >,
     registry: Option<Res<AspirationRegistry>>,
     zodiac_data: Option<Res<ZodiacData>>,
+    constants: Res<SimConstants>,
     time: Res<TimeState>,
     config: Res<SimConfig>,
     mut log: ResMut<NarrativeLog>,
     mut rng: ResMut<SimRng>,
     mut commands: Commands,
+    mut activation: ResMut<SystemActivation>,
 ) {
     let Some(registry) = registry else { return };
-    let Some(zodiac_data) = zodiac_data else { return };
+    let Some(zodiac_data) = zodiac_data else {
+        return;
+    };
+    let c = &constants.aspirations;
 
     for (entity, name, age, personality, memory, &sign) in &query {
         let stage = age.stage(time.tick, config.ticks_per_season);
@@ -201,13 +226,21 @@ pub fn select_aspirations(
         // Score all available chains.
         let mut best: Option<(&str, AspirationDomain, f32)> = None;
         for chain in registry.all_chains() {
-            let s = score_chain(chain.domain, personality, memory, zodiac_domains, &mut rng.rng);
+            let s = score_chain(
+                chain.domain,
+                personality,
+                memory,
+                zodiac_domains,
+                &c,
+                &mut rng.rng,
+            );
             if best.as_ref().is_none_or(|(_, _, bs)| s > *bs) {
                 best = Some((&chain.name, chain.domain, s));
             }
         }
 
         if let Some((chain_name, domain, _)) = best {
+            activation.record(Feature::AspirationSelected);
             let aspirations = Aspirations {
                 active: vec![ActiveAspiration {
                     chain_name: chain_name.to_string(),
@@ -222,18 +255,15 @@ pub fn select_aspirations(
 
             let preferences = generate_preferences(sign, personality, &zodiac_data);
 
-            commands.entity(entity).insert((
-                aspirations,
-                preferences,
-                AspirationsInitialized,
-            ));
+            commands
+                .entity(entity)
+                .insert((aspirations, preferences, AspirationsInitialized));
 
             log.push(
                 time.tick,
                 format!(
                     "Something settles in {}'s heart -- a quiet certainty. The path of {:?} calls.",
-                    name.0,
-                    domain,
+                    name.0, domain,
                 ),
                 NarrativeTier::Action,
             );
@@ -251,8 +281,17 @@ pub fn select_aspirations(
 /// Grants a second aspiration slot to Adult cats.
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub fn check_second_aspiration_slot(
+    constants: Res<SimConstants>,
     mut query: Query<
-        (Entity, &Name, &Age, &Personality, &Memory, &ZodiacSign, &mut Aspirations),
+        (
+            Entity,
+            &Name,
+            &Age,
+            &Personality,
+            &Memory,
+            &ZodiacSign,
+            &mut Aspirations,
+        ),
         Without<Dead>,
     >,
     registry: Option<Res<AspirationRegistry>>,
@@ -263,10 +302,13 @@ pub fn check_second_aspiration_slot(
     mut rng: ResMut<SimRng>,
 ) {
     let Some(registry) = registry else { return };
-    let Some(zodiac_data) = zodiac_data else { return };
+    let Some(zodiac_data) = zodiac_data else {
+        return;
+    };
+    let c = &constants.aspirations;
 
     // Rate-limit: only check every 100 ticks.
-    if !time.tick.is_multiple_of(100) {
+    if !time.tick.is_multiple_of(c.second_slot_check_interval) {
         return;
     }
 
@@ -280,7 +322,8 @@ pub fn check_second_aspiration_slot(
         }
 
         let zodiac_domains = zodiac_data.domain_affinities(sign);
-        let existing_domains: Vec<AspirationDomain> = aspirations.active.iter().map(|a| a.domain).collect();
+        let existing_domains: Vec<AspirationDomain> =
+            aspirations.active.iter().map(|a| a.domain).collect();
 
         // Score chains, excluding active domains and already-completed chains.
         let mut best: Option<(&str, AspirationDomain, f32)> = None;
@@ -291,7 +334,14 @@ pub fn check_second_aspiration_slot(
             if aspirations.completed.contains(&chain.name) {
                 continue;
             }
-            let s = score_chain(chain.domain, personality, memory, zodiac_domains, &mut rng.rng);
+            let s = score_chain(
+                chain.domain,
+                personality,
+                memory,
+                zodiac_domains,
+                &c,
+                &mut rng.rng,
+            );
             if best.as_ref().is_none_or(|(_, _, bs)| s > *bs) {
                 best = Some((&chain.name, chain.domain, s));
             }
@@ -311,8 +361,7 @@ pub fn check_second_aspiration_slot(
                 time.tick,
                 format!(
                     "A new fire kindles in {}. The path of {:?} beckons.",
-                    name.0,
-                    domain,
+                    name.0, domain,
                 ),
                 NarrativeTier::Action,
             );
@@ -330,6 +379,7 @@ pub fn check_aspiration_abandonment(
     mut query: Query<(&Name, &Personality, &mut Aspirations), Without<Dead>>,
     time: Res<TimeState>,
     mut log: ResMut<NarrativeLog>,
+    mut activation: ResMut<SystemActivation>,
 ) {
     const STAGNATION_TICKS: u64 = 2000;
     const MIN_ALIGNMENT: f32 = 0.3;
@@ -341,12 +391,12 @@ pub fn check_aspiration_abandonment(
             let low_alignment = domain_personality_axis(asp.domain, personality) < MIN_ALIGNMENT;
             if stagnant && low_alignment {
                 to_remove.push(i);
+                activation.record(Feature::AspirationAbandoned);
                 log.push(
                     time.tick,
                     format!(
                         "The dream fades. {} no longer sees the path in {:?}.",
-                        name.0,
-                        asp.domain,
+                        name.0, asp.domain,
                     ),
                     NarrativeTier::Action,
                 );
@@ -387,6 +437,8 @@ pub fn track_milestones(
     relationships: Res<crate::resources::relationships::Relationships>,
     time: Res<TimeState>,
     mut log: ResMut<NarrativeLog>,
+    mut colony_score: Option<ResMut<crate::resources::colony_score::ColonyScore>>,
+    mut activation: ResMut<SystemActivation>,
 ) {
     let Some(registry) = registry else { return };
 
@@ -394,7 +446,9 @@ pub fn track_milestones(
         let mut completions: Vec<usize> = Vec::new(); // indices of fully completed chains
 
         for (i, asp) in aspirations.active.iter_mut().enumerate() {
-            let Some(chain) = registry.chain_by_name(&asp.chain_name) else { continue };
+            let Some(chain) = registry.chain_by_name(&asp.chain_name) else {
+                continue;
+            };
             if asp.current_milestone >= chain.milestones.len() {
                 // Already completed all milestones — will be moved to completed.
                 completions.push(i);
@@ -403,7 +457,10 @@ pub fn track_milestones(
             let milestone = &chain.milestones[asp.current_milestone];
 
             let met = match &milestone.condition {
-                crate::components::aspirations::MilestoneCondition::ActionCount { action, count } => {
+                crate::components::aspirations::MilestoneCondition::ActionCount {
+                    action,
+                    count,
+                } => {
                     // Increment progress when the matching action completes.
                     if current.ticks_remaining == 1 {
                         let action_name = format!("{:?}", current.action);
@@ -434,7 +491,10 @@ pub fn track_milestones(
                     // A proper implementation would filter by bond_type string.
                     false // Will be refined when bond checking is available per-entity.
                 }
-                crate::components::aspirations::MilestoneCondition::WitnessEvent { event_type, count } => {
+                crate::components::aspirations::MilestoneCondition::WitnessEvent {
+                    event_type,
+                    count,
+                } => {
                     let mem_type = match event_type.as_str() {
                         "ThreatSeen" => Some(MemoryType::ThreatSeen),
                         "Death" => Some(MemoryType::Death),
@@ -445,7 +505,8 @@ pub fn track_milestones(
                         _ => None,
                     };
                     if let Some(mt) = mem_type {
-                        let witnessed = memory.events
+                        let witnessed = memory
+                            .events
                             .iter()
                             .filter(|e| e.event_type == mt && e.tick >= asp.adopted_tick)
                             .count();
@@ -471,7 +532,8 @@ pub fn track_milestones(
                 // Milestone completed!
                 log.push(
                     time.tick,
-                    milestone.narrative_on_complete
+                    milestone
+                        .narrative_on_complete
                         .replace("{name}", &name.0)
                         .replace("{possessive}", "their") // simplified
                         .replace("{subject}", "they")
@@ -504,13 +566,16 @@ pub fn track_milestones(
         // Handle completed chains (in reverse to preserve indices).
         let mut seen = std::collections::HashSet::new();
         for &i in completions.iter().rev() {
-            if !seen.insert(i) { continue; }
+            if !seen.insert(i) {
+                continue;
+            }
             let asp = aspirations.active.remove(i);
 
             if let Some(chain) = registry.chain_by_name(&asp.chain_name) {
                 log.push(
                     time.tick,
-                    chain.completion_narrative
+                    chain
+                        .completion_narrative
                         .replace("{name}", &name.0)
                         .replace("{possessive}", "their")
                         .replace("{subject}", "they")
@@ -528,6 +593,11 @@ pub fn track_milestones(
             needs.purpose = (needs.purpose + 0.1).min(1.0);
 
             aspirations.completed.push(asp.chain_name);
+            activation.record(Feature::AspirationCompleted);
+
+            if let Some(ref mut score) = colony_score {
+                score.aspirations_completed += 1;
+            }
         }
     }
 
@@ -550,12 +620,14 @@ mod tests {
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
         let personality = Personality::random(&mut rng);
         let memory = Memory::default();
+        let ac = crate::resources::sim_constants::AspirationConstants::default();
 
         let with_affinity = score_chain(
             AspirationDomain::Hunting,
             &personality,
             &memory,
             &[AspirationDomain::Hunting, AspirationDomain::Combat],
+            &ac,
             &mut rng,
         );
 
@@ -566,11 +638,15 @@ mod tests {
             &personality2,
             &memory,
             &[AspirationDomain::Social], // not hunting
+            &ac,
             &mut rng2,
         );
 
         // With zodiac affinity should score ~0.4 higher.
-        assert!(with_affinity > without_affinity, "zodiac affinity should boost score");
+        assert!(
+            with_affinity > without_affinity,
+            "zodiac affinity should boost score"
+        );
     }
 
     #[test]
@@ -582,6 +658,8 @@ mod tests {
         let prefs = generate_preferences(ZodiacSign::LeapingFlame, &personality, &zodiac_data);
 
         // LeapingFlame has Hunting and Combat affinities → should like Hunt and Fight.
-        assert!(prefs.get(Action::Hunt).is_some_and(|p| p == Preference::Like));
+        assert!(prefs
+            .get(Action::Hunt)
+            .is_some_and(|p| p == Preference::Like));
     }
 }

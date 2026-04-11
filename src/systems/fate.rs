@@ -9,6 +9,8 @@ use crate::components::physical::{Dead, Position};
 use crate::components::zodiac::ZodiacSign;
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::rng::SimRng;
+use crate::resources::sim_constants::SimConstants;
+use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::resources::time::{SimConfig, TimeState};
 use crate::resources::zodiac::ZodiacData;
 
@@ -16,38 +18,37 @@ use crate::resources::zodiac::ZodiacData;
 // assign_fated_connections
 // ---------------------------------------------------------------------------
 
-/// Minimum ticks between fate assignments, so narrative messages don't flood.
-const FATE_ASSIGN_COOLDOWN: u64 = 50;
-
 /// Assigns fated love and fated rival connections to cats reaching Young stage.
 ///
 /// Runs every tick but only processes cats that lack the `FateAssigned` marker.
-/// Throttled to assign at most one cat per `FATE_ASSIGN_COOLDOWN` ticks so
-/// narrative messages trickle in rather than arriving in a burst at game start.
+/// Throttled to assign at most one cat per cooldown ticks so narrative messages
+/// trickle in rather than arriving in a burst at game start.
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub fn assign_fated_connections(
     query: Query<
         (Entity, &Name, &Age, &Personality, &Position, &ZodiacSign),
         (Without<FateAssigned>, Without<Dead>),
     >,
-    all_cats: Query<
-        (Entity, &Name, &Personality, &ZodiacSign),
-        (Without<Dead>,),
-    >,
+    all_cats: Query<(Entity, &Name, &Personality, &ZodiacSign), (Without<Dead>,)>,
     existing_loves: Query<Entity, With<FatedLove>>,
     existing_rivals: Query<Entity, With<FatedRival>>,
     time: Res<TimeState>,
     config: Res<SimConfig>,
+    constants: Res<SimConstants>,
     zodiac_data: Option<Res<ZodiacData>>,
     mut log: ResMut<NarrativeLog>,
     mut rng: ResMut<SimRng>,
     mut commands: Commands,
     mut last_assign_tick: Local<u64>,
+    mut activation: ResMut<SystemActivation>,
 ) {
-    let Some(zodiac_data) = zodiac_data else { return };
+    let Some(zodiac_data) = zodiac_data else {
+        return;
+    };
+    let c = &constants.fate;
 
-    // Throttle: wait at least FATE_ASSIGN_COOLDOWN ticks between assignments.
-    if time.tick < *last_assign_tick + FATE_ASSIGN_COOLDOWN {
+    // Throttle: wait at least assign_cooldown ticks between assignments.
+    if time.tick < *last_assign_tick + c.assign_cooldown {
         return;
     }
 
@@ -62,8 +63,10 @@ pub fn assign_fated_connections(
         .collect();
 
     // Track entities assigned in this tick to avoid double-assigning within the batch.
-    let mut love_assigned_this_tick: std::collections::HashSet<Entity> = std::collections::HashSet::new();
-    let mut rival_assigned_this_tick: std::collections::HashSet<Entity> = std::collections::HashSet::new();
+    let mut love_assigned_this_tick: std::collections::HashSet<Entity> =
+        std::collections::HashSet::new();
+    let mut rival_assigned_this_tick: std::collections::HashSet<Entity> =
+        std::collections::HashSet::new();
 
     for (entity, name, age, personality, _pos, &sign) in &query {
         let stage = age.stage(time.tick, config.ticks_per_season);
@@ -80,18 +83,27 @@ pub fn assign_fated_connections(
         if !has_love.contains(&entity) && !love_assigned_this_tick.contains(&entity) {
             let mut best: Option<(Entity, &str, ZodiacSign, f32)> = None;
             for &(cand_e, cand_name, cand_pers, cand_sign) in &candidates {
-                if cand_e == entity { continue; }
-                if has_love.contains(&cand_e) || love_assigned_this_tick.contains(&cand_e) { continue; }
+                if cand_e == entity {
+                    continue;
+                }
+                if has_love.contains(&cand_e) || love_assigned_this_tick.contains(&cand_e) {
+                    continue;
+                }
 
                 let compat = zodiac_data.compatibility(sign, cand_sign);
-                let zodiac_score = if compat > 0.0 { 0.5 } else { 0.0 };
+                let zodiac_score = if compat > 0.0 {
+                    c.love_zodiac_score
+                } else {
+                    0.0
+                };
 
                 // Warmth/sociability alignment: bonus if both high or both low.
                 let warmth_align = 1.0 - (personality.warmth - cand_pers.warmth).abs();
                 let social_align = 1.0 - (personality.sociability - cand_pers.sociability).abs();
-                let personality_score = 0.3 * ((warmth_align + social_align) / 2.0);
+                let personality_score =
+                    c.love_personality_weight * ((warmth_align + social_align) / 2.0);
 
-                let jitter = rng.rng.random_range(-0.05f32..0.05f32);
+                let jitter = rng.rng.random_range(-c.love_jitter..c.love_jitter);
                 let total = zodiac_score + personality_score + jitter;
 
                 if best.as_ref().is_none_or(|(_, _, _, s)| total > *s) {
@@ -100,6 +112,7 @@ pub fn assign_fated_connections(
             }
 
             if let Some((partner_e, partner_name, partner_sign, _score)) = best {
+                activation.record(Feature::FateAssigned);
                 love_assigned_this_tick.insert(entity);
                 love_assigned_this_tick.insert(partner_e);
 
@@ -129,18 +142,27 @@ pub fn assign_fated_connections(
         if !has_rival.contains(&entity) && !rival_assigned_this_tick.contains(&entity) {
             let mut best: Option<(Entity, &str, ZodiacSign, f32)> = None;
             for &(cand_e, cand_name, cand_pers, cand_sign) in &candidates {
-                if cand_e == entity { continue; }
-                if has_rival.contains(&cand_e) || rival_assigned_this_tick.contains(&cand_e) { continue; }
+                if cand_e == entity {
+                    continue;
+                }
+                if has_rival.contains(&cand_e) || rival_assigned_this_tick.contains(&cand_e) {
+                    continue;
+                }
 
                 let compat = zodiac_data.compatibility(sign, cand_sign);
-                let zodiac_score = if compat < 0.0 { 0.5 } else { 0.0 };
+                let zodiac_score = if compat < 0.0 {
+                    c.rival_zodiac_score
+                } else {
+                    0.0
+                };
 
                 // Opposing ambition/pride: bonus if axes differ significantly.
                 let ambition_diff = (personality.ambition - cand_pers.ambition).abs();
                 let pride_diff = (personality.pride - cand_pers.pride).abs();
-                let personality_score = 0.3 * ((ambition_diff + pride_diff) / 2.0);
+                let personality_score =
+                    c.rival_personality_weight * ((ambition_diff + pride_diff) / 2.0);
 
-                let jitter = rng.rng.random_range(-0.05f32..0.05f32);
+                let jitter = rng.rng.random_range(-c.rival_jitter..c.rival_jitter);
                 let total = zodiac_score + personality_score + jitter;
 
                 if best.as_ref().is_none_or(|(_, _, _, s)| total > *s) {
@@ -149,6 +171,7 @@ pub fn assign_fated_connections(
             }
 
             if let Some((rival_e, rival_name, rival_sign, _score)) = best {
+                activation.record(Feature::FateAssigned);
                 rival_assigned_this_tick.insert(entity);
                 rival_assigned_this_tick.insert(rival_e);
 
@@ -185,27 +208,39 @@ pub fn assign_fated_connections(
 
 /// Checks whether dormant fated connections should awaken.
 ///
-/// - Fated love awakens when both cats are within 5 tiles.
-/// - Fated rival awakens when both cats perform the same action type within 10 tiles.
+/// - Fated love awakens when both cats are within `love_awaken_distance` tiles.
+/// - Fated rival awakens when both cats perform the same action type within
+///   `rival_awaken_distance` tiles.
 ///
 /// Pairs are collected and deduplicated so that each awakening produces exactly
 /// one narrative line, not two (one per cat in the pair).
 #[allow(clippy::type_complexity)]
 pub fn awaken_fated_connections(
     mut love_query: Query<(Entity, &Name, &Position, &mut FatedLove), Without<Dead>>,
-    mut rival_query: Query<(Entity, &Name, &Position, &CurrentAction, &mut FatedRival), Without<Dead>>,
+    mut rival_query: Query<
+        (Entity, &Name, &Position, &CurrentAction, &mut FatedRival),
+        Without<Dead>,
+    >,
     positions: Query<&Position, Without<Dead>>,
     actions: Query<&CurrentAction, Without<Dead>>,
     names: Query<&Name>,
+    constants: Res<SimConstants>,
     mut log: ResMut<NarrativeLog>,
     time: Res<TimeState>,
+    mut activation: ResMut<SystemActivation>,
 ) {
+    let c = &constants.fate;
+
     // --- Fated loves: collect pairs, deduplicate, then apply. -----------------
     let mut love_pairs: Vec<(Entity, Entity)> = Vec::new();
     for (entity, _name, pos, love) in &love_query {
-        if love.awakened { continue; }
-        let Ok(partner_pos) = positions.get(love.partner) else { continue };
-        if pos.manhattan_distance(partner_pos) <= 5 {
+        if love.awakened {
+            continue;
+        }
+        let Ok(partner_pos) = positions.get(love.partner) else {
+            continue;
+        };
+        if pos.manhattan_distance(partner_pos) <= c.love_awaken_distance {
             let pair = if entity < love.partner {
                 (entity, love.partner)
             } else {
@@ -219,6 +254,7 @@ pub fn awaken_fated_connections(
     love_pairs.truncate(1); // At most one awakening per tick.
 
     for (a, b) in &love_pairs {
+        activation.record(Feature::FateAwakened);
         if let Ok((_, _, _, mut love_a)) = love_query.get_mut(*a) {
             love_a.awakened = true;
         }
@@ -229,7 +265,10 @@ pub fn awaken_fated_connections(
         let name_b = names.get(*b).map_or("another", |n| n.0.as_str());
         log.push(
             time.tick,
-            format!("Something stirs between {} and {} as their paths cross.", name_a, name_b),
+            format!(
+                "Something stirs between {} and {} as their paths cross.",
+                name_a, name_b
+            ),
             NarrativeTier::Significant,
         );
     }
@@ -237,10 +276,18 @@ pub fn awaken_fated_connections(
     // --- Fated rivals: collect pairs, deduplicate, then apply. ----------------
     let mut rival_pairs: Vec<(Entity, Entity)> = Vec::new();
     for (entity, _name, pos, current, rival) in &rival_query {
-        if rival.awakened { continue; }
-        let Ok(rival_pos) = positions.get(rival.rival) else { continue };
-        if pos.manhattan_distance(rival_pos) > 10 { continue; }
-        let Ok(rival_action) = actions.get(rival.rival) else { continue };
+        if rival.awakened {
+            continue;
+        }
+        let Ok(rival_pos) = positions.get(rival.rival) else {
+            continue;
+        };
+        if pos.manhattan_distance(rival_pos) > c.rival_awaken_distance {
+            continue;
+        }
+        let Ok(rival_action) = actions.get(rival.rival) else {
+            continue;
+        };
         if current.action == rival_action.action && current.ticks_remaining > 0 {
             let pair = if entity < rival.rival {
                 (entity, rival.rival)
@@ -255,6 +302,7 @@ pub fn awaken_fated_connections(
     rival_pairs.truncate(1); // At most one awakening per tick.
 
     for (a, b) in &rival_pairs {
+        activation.record(Feature::FateAwakened);
         if let Ok((_, _, _, _, mut rival_a)) = rival_query.get_mut(*a) {
             rival_a.awakened = true;
         }
@@ -265,7 +313,10 @@ pub fn awaken_fated_connections(
         let name_b = names.get(*b).map_or("another", |n| n.0.as_str());
         log.push(
             time.tick,
-            format!("{} and {} lock eyes across the clearing. A challenge unspoken.", name_a, name_b),
+            format!(
+                "{} and {} lock eyes across the clearing. A challenge unspoken.",
+                name_a, name_b
+            ),
             NarrativeTier::Significant,
         );
     }
@@ -280,12 +331,13 @@ mod tests {
     use super::*;
     use crate::ai::CurrentAction;
     use crate::components::identity::Age;
-    use crate::components::physical::{Health, Needs};
-    use crate::components::mental::{Memory, Mood};
-    use crate::components::skills::{MagicAffinity, Skills, Corruption, Training};
-    use crate::components::magic::Inventory;
     use crate::components::identity::{Gender, Orientation, Species};
+    use crate::components::magic::Inventory;
+    use crate::components::mental::{Memory, Mood};
+    use crate::components::physical::{Health, Needs};
+    use crate::components::skills::{Corruption, MagicAffinity, Skills, Training};
     use crate::resources::relationships::Relationships;
+    use crate::resources::sim_constants::SimConstants;
     use rand::SeedableRng;
     use rand_chacha::ChaCha8Rng;
 
@@ -295,11 +347,20 @@ mod tests {
 
     fn test_world() -> (World, Schedule) {
         let mut world = World::new();
-        world.insert_resource(TimeState { tick: 100_000, paused: false, speed: crate::resources::time::SimSpeed::Normal });
-        world.insert_resource(SimConfig { ticks_per_season: 2000, ..SimConfig::default() });
+        world.insert_resource(TimeState {
+            tick: 100_000,
+            paused: false,
+            speed: crate::resources::time::SimSpeed::Normal,
+        });
+        world.insert_resource(SimConfig {
+            ticks_per_season: 2000,
+            ..SimConfig::default()
+        });
+        world.insert_resource(SimConstants::default());
         world.insert_resource(SimRng::new(42));
         world.insert_resource(NarrativeLog::default());
         world.insert_resource(Relationships::default());
+        world.insert_resource(SystemActivation::default());
         let zodiac_data = ZodiacData::load(std::path::Path::new("assets/data/zodiac.ron")).unwrap();
         world.insert_resource(zodiac_data);
 
@@ -310,36 +371,38 @@ mod tests {
 
     fn spawn_cat(world: &mut World, name: &str, sign: ZodiacSign, born_tick: u64) -> Entity {
         let mut rng = test_rng();
-        world.spawn((
-            (
-                Name(name.to_string()),
-                Species,
-                Age { born_tick },
-                Gender::Tom,
-                Orientation::Straight,
-                Personality::random(&mut rng),
-                crate::components::identity::Appearance {
-                    fur_color: "grey".to_string(),
-                    pattern: "solid".to_string(),
-                    eye_color: "amber".to_string(),
-                    distinguishing_marks: vec![],
-                },
-                Position::new(5, 5),
-                Health::default(),
-                Needs::default(),
-                Mood::default(),
-                Memory::default(),
-            ),
-            (
-                sign,
-                Skills::default(),
-                MagicAffinity(0.1),
-                Corruption(0.0),
-                Training::default(),
-                CurrentAction::default(),
-                Inventory::default(),
-            ),
-        )).id()
+        world
+            .spawn((
+                (
+                    Name(name.to_string()),
+                    Species,
+                    Age { born_tick },
+                    Gender::Tom,
+                    Orientation::Straight,
+                    Personality::random(&mut rng),
+                    crate::components::identity::Appearance {
+                        fur_color: "grey".to_string(),
+                        pattern: "solid".to_string(),
+                        eye_color: "amber".to_string(),
+                        distinguishing_marks: vec![],
+                    },
+                    Position::new(5, 5),
+                    Health::default(),
+                    Needs::default(),
+                    Mood::default(),
+                    Memory::default(),
+                ),
+                (
+                    sign,
+                    Skills::default(),
+                    MagicAffinity(0.1),
+                    Corruption(0.0),
+                    Training::default(),
+                    CurrentAction::default(),
+                    Inventory::default(),
+                ),
+            ))
+            .id()
     }
 
     /// Advance tick by the given amount to surpass the cooldown.
@@ -358,7 +421,7 @@ mod tests {
 
         // First run assigns one cat; second run (after cooldown) assigns the other.
         schedule.run(&mut world);
-        advance_tick(&mut world, FATE_ASSIGN_COOLDOWN);
+        advance_tick(&mut world, SimConstants::default().fate.assign_cooldown);
         schedule.run(&mut world);
 
         let love_count = world.query::<&FatedLove>().iter(&world).count();
@@ -389,7 +452,7 @@ mod tests {
         let b = spawn_cat(&mut world, "Fern", ZodiacSign::StormFur, 90_000);
 
         schedule.run(&mut world);
-        advance_tick(&mut world, FATE_ASSIGN_COOLDOWN);
+        advance_tick(&mut world, SimConstants::default().fate.assign_cooldown);
         schedule.run(&mut world);
 
         let love_a = world.get::<FatedLove>(a).expect("A should have love");
@@ -415,10 +478,13 @@ mod tests {
         // Running again without advancing tick should not assign more.
         schedule.run(&mut world);
         let assigned = world.query::<&FateAssigned>().iter(&world).count();
-        assert_eq!(assigned, 1, "cooldown should prevent immediate re-assignment");
+        assert_eq!(
+            assigned, 1,
+            "cooldown should prevent immediate re-assignment"
+        );
 
         // After cooldown, one more should be assigned.
-        advance_tick(&mut world, FATE_ASSIGN_COOLDOWN);
+        advance_tick(&mut world, SimConstants::default().fate.assign_cooldown);
         schedule.run(&mut world);
         let assigned = world.query::<&FateAssigned>().iter(&world).count();
         assert_eq!(assigned, 2, "second cat should be assigned after cooldown");

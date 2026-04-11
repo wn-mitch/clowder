@@ -12,6 +12,8 @@ fn setup_world(tick: u64) -> (World, Schedule) {
     let mut world = World::new();
     world.insert_resource(ColonyKnowledge::default());
     world.insert_resource(NarrativeLog::default());
+    world.insert_resource(clowder::resources::SimConstants::default());
+    world.insert_resource(clowder::resources::SystemActivation::default());
     world.insert_resource(TimeState {
         tick,
         paused: false,

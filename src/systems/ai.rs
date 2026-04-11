@@ -10,16 +10,14 @@ use crate::ai::scoring::{
     ScoringContext,
 };
 use crate::ai::{Action, CurrentAction};
-use crate::components::coordination::{
-    ActiveDirective, DirectiveQueue, PendingDelivery,
-};
+use crate::components::coordination::{ActiveDirective, DirectiveQueue, PendingDelivery};
+use crate::components::identity::Name;
 use crate::components::magic::{Harvestable, Herb, Inventory, Ward};
 use crate::components::mental::{Memory, MemoryType};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Health, Needs, Position};
-use crate::components::skills::{MagicAffinity, Skills};
-use crate::components::identity::Name;
 use crate::components::prey::PreyAnimal;
+use crate::components::skills::{MagicAffinity, Skills};
 use crate::components::wildlife::WildAnimal;
 use crate::resources::event_log::{EventKind, EventLog};
 use crate::resources::food::FoodStores;
@@ -106,17 +104,17 @@ fn pick_social_target(
 ) -> Option<(Entity, Position)> {
     cat_positions
         .iter()
-        .filter(|(other, other_pos)| {
-            *other != entity && pos.manhattan_distance(other_pos) <= 10
-        })
+        .filter(|(other, other_pos)| *other != entity && pos.manhattan_distance(other_pos) <= 10)
         .max_by(|(e_a, _), (e_b, _)| {
-            let score_a = relationships
-                .get(entity, *e_a)
-                .map_or(0.0, |r| r.fondness * fondness_weight + (1.0 - r.familiarity) * novelty_weight);
-            let score_b = relationships
-                .get(entity, *e_b)
-                .map_or(0.0, |r| r.fondness * fondness_weight + (1.0 - r.familiarity) * novelty_weight);
-            score_a.partial_cmp(&score_b).unwrap_or(std::cmp::Ordering::Equal)
+            let score_a = relationships.get(entity, *e_a).map_or(0.0, |r| {
+                r.fondness * fondness_weight + (1.0 - r.familiarity) * novelty_weight
+            });
+            let score_b = relationships.get(entity, *e_b).map_or(0.0, |r| {
+                r.fondness * fondness_weight + (1.0 - r.familiarity) * novelty_weight
+            });
+            score_a
+                .partial_cmp(&score_b)
+                .unwrap_or(std::cmp::Ordering::Equal)
         })
         .map(|(e, p)| (*e, *p))
 }
@@ -133,8 +131,12 @@ fn has_mentoring_target(
     skills_query: &Query<&Skills, Without<Dead>>,
 ) -> bool {
     let mentor_skills = [
-        skills.hunting, skills.foraging, skills.herbcraft,
-        skills.building, skills.combat, skills.magic,
+        skills.hunting,
+        skills.foraging,
+        skills.herbcraft,
+        skills.building,
+        skills.combat,
+        skills.magic,
     ];
     if !mentor_skills.iter().any(|&s| s > 0.6) {
         return false;
@@ -144,10 +146,17 @@ fn has_mentoring_target(
             && pos.manhattan_distance(other_pos) <= 10
             && skills_query.get(*other).is_ok_and(|other_skills| {
                 let other_arr = [
-                    other_skills.hunting, other_skills.foraging, other_skills.herbcraft,
-                    other_skills.building, other_skills.combat, other_skills.magic,
+                    other_skills.hunting,
+                    other_skills.foraging,
+                    other_skills.herbcraft,
+                    other_skills.building,
+                    other_skills.combat,
+                    other_skills.magic,
                 ];
-                mentor_skills.iter().zip(other_arr.iter()).any(|(&m, &a)| m > 0.6 && a < 0.3)
+                mentor_skills
+                    .iter()
+                    .zip(other_arr.iter())
+                    .any(|(&m, &a)| m > 0.6 && a < 0.3)
             })
     })
 }
@@ -162,23 +171,31 @@ fn pick_mentoring_target(
     skills_query: &Query<&Skills, Without<Dead>>,
 ) -> Option<(Entity, Position)> {
     let mentor_skills = [
-        skills.hunting, skills.foraging, skills.herbcraft,
-        skills.building, skills.combat, skills.magic,
+        skills.hunting,
+        skills.foraging,
+        skills.herbcraft,
+        skills.building,
+        skills.combat,
+        skills.magic,
     ];
 
     cat_positions
         .iter()
-        .filter(|(other, other_pos)| {
-            *other != entity && pos.manhattan_distance(other_pos) <= 10
-        })
+        .filter(|(other, other_pos)| *other != entity && pos.manhattan_distance(other_pos) <= 10)
         .filter_map(|(other, other_pos)| {
             let other_skills = skills_query.get(*other).ok()?;
             let other_arr = [
-                other_skills.hunting, other_skills.foraging, other_skills.herbcraft,
-                other_skills.building, other_skills.combat, other_skills.magic,
+                other_skills.hunting,
+                other_skills.foraging,
+                other_skills.herbcraft,
+                other_skills.building,
+                other_skills.combat,
+                other_skills.magic,
             ];
             // Find the maximum teachable skill gap.
-            let max_gap = mentor_skills.iter().zip(other_arr.iter())
+            let max_gap = mentor_skills
+                .iter()
+                .zip(other_arr.iter())
                 .filter(|(&m, &a)| m > 0.6 && a < 0.3)
                 .map(|(&m, &a)| m - a)
                 .fold(0.0f32, f32::max);
@@ -189,7 +206,9 @@ fn pick_mentoring_target(
             }
         })
         .max_by(|(_, _, gap_a), (_, _, gap_b)| {
-            gap_a.partial_cmp(gap_b).unwrap_or(std::cmp::Ordering::Equal)
+            gap_a
+                .partial_cmp(gap_b)
+                .unwrap_or(std::cmp::Ordering::Equal)
         })
         .map(|(e, p, _)| (e, p))
 }
@@ -216,20 +235,24 @@ fn pick_directive_target(
         .filter(|(e, _)| active_directive_query.get(*e).is_err())
         .filter(|(_, p)| coordinator_pos.manhattan_distance(p) <= 30)
         .max_by(|(e_a, p_a), (e_b, p_b)| {
-            let skill_a = skills_query.get(*e_a).map_or(0.0, |s| match directive.kind {
-                DirectiveKind::Hunt => s.hunting,
-                DirectiveKind::Forage => s.foraging,
-                DirectiveKind::Build => s.building,
-                DirectiveKind::Fight | DirectiveKind::Patrol => s.combat,
-                DirectiveKind::Herbcraft | DirectiveKind::SetWard => s.herbcraft,
-            });
-            let skill_b = skills_query.get(*e_b).map_or(0.0, |s| match directive.kind {
-                DirectiveKind::Hunt => s.hunting,
-                DirectiveKind::Forage => s.foraging,
-                DirectiveKind::Build => s.building,
-                DirectiveKind::Fight | DirectiveKind::Patrol => s.combat,
-                DirectiveKind::Herbcraft | DirectiveKind::SetWard => s.herbcraft,
-            });
+            let skill_a = skills_query
+                .get(*e_a)
+                .map_or(0.0, |s| match directive.kind {
+                    DirectiveKind::Hunt => s.hunting,
+                    DirectiveKind::Forage => s.foraging,
+                    DirectiveKind::Build => s.building,
+                    DirectiveKind::Fight | DirectiveKind::Patrol => s.combat,
+                    DirectiveKind::Herbcraft | DirectiveKind::SetWard => s.herbcraft,
+                });
+            let skill_b = skills_query
+                .get(*e_b)
+                .map_or(0.0, |s| match directive.kind {
+                    DirectiveKind::Hunt => s.hunting,
+                    DirectiveKind::Forage => s.foraging,
+                    DirectiveKind::Build => s.building,
+                    DirectiveKind::Fight | DirectiveKind::Patrol => s.combat,
+                    DirectiveKind::Herbcraft | DirectiveKind::SetWard => s.herbcraft,
+                });
             // Rank by: skill descending, then distance ascending (prefer nearby).
             let is_coord_a = coordinator_entities.contains(e_a);
             let is_coord_b = coordinator_entities.contains(e_b);
@@ -253,31 +276,42 @@ pub fn emit_periodic_events(
     config: Res<crate::resources::snapshot_config::SnapshotConfig>,
     time: Res<crate::resources::time::TimeState>,
     food: Res<FoodStores>,
-    prey: Query<&crate::components::prey::PreyAnimal>,
+    prey: Query<&crate::components::prey::PreyConfig, With<crate::components::prey::PreyAnimal>>,
     mut event_log: Option<ResMut<EventLog>>,
 ) {
     let interval = config.economy_interval;
     if let Some(ref mut log) = event_log {
         if interval > 0 && time.tick.is_multiple_of(interval) {
-            log.push(time.tick, EventKind::FoodLevel {
-                current: food.current,
-                capacity: food.capacity,
-                fraction: food.fraction(),
-            });
+            log.push(
+                time.tick,
+                EventKind::FoodLevel {
+                    current: food.current,
+                    capacity: food.capacity,
+                    fraction: food.fraction(),
+                },
+            );
 
-            use crate::components::prey::PreySpecies;
-            let (mut mice, mut rats, mut fish, mut birds) = (0, 0, 0, 0);
+            use crate::components::prey::PreyKind;
+            let (mut mice, mut rats, mut rabbits, mut fish, mut birds) = (0, 0, 0, 0, 0);
             for p in &prey {
-                match p.species {
-                    PreySpecies::Mouse => mice += 1,
-                    PreySpecies::Rat => rats += 1,
-                    PreySpecies::Fish => fish += 1,
-                    PreySpecies::Bird => birds += 1,
+                match p.kind {
+                    PreyKind::Mouse => mice += 1,
+                    PreyKind::Rat => rats += 1,
+                    PreyKind::Rabbit => rabbits += 1,
+                    PreyKind::Fish => fish += 1,
+                    PreyKind::Bird => birds += 1,
                 }
             }
-            log.push(time.tick, EventKind::PopulationSnapshot {
-                mice, rats, fish, birds,
-            });
+            log.push(
+                time.tick,
+                EventKind::PopulationSnapshot {
+                    mice,
+                    rats,
+                    rabbits,
+                    fish,
+                    birds,
+                },
+            );
         }
     }
 }

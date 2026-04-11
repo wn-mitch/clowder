@@ -10,9 +10,7 @@ use crate::components::physical::Dead;
 /// Each tick, decay the strength of every memory entry. Firsthand memories
 /// fade slowly (0.001/tick), secondhand memories faster (0.002/tick). Entries
 /// whose strength drops to zero are evicted.
-pub fn decay_memories(
-    mut query: Query<&mut Memory, Without<Dead>>,
-) {
+pub fn decay_memories(mut query: Query<&mut Memory, Without<Dead>>) {
     for mut memory in &mut query {
         for entry in memory.events.iter_mut() {
             let rate = if entry.firsthand { 0.001 } else { 0.002 };
@@ -29,9 +27,9 @@ pub fn decay_memories(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bevy_ecs::schedule::Schedule;
     use crate::components::mental::{MemoryEntry, MemoryType};
     use crate::components::physical::Position;
+    use bevy_ecs::schedule::Schedule;
 
     fn setup_world() -> (World, Schedule) {
         let mut world = World::new();
@@ -90,7 +88,7 @@ mod tests {
         let (mut world, mut schedule) = setup_world();
         let mut memory = Memory::default();
         memory.remember(make_entry(true, 0.0005)); // will drop below 0 after 1 tick
-        memory.remember(make_entry(true, 1.0));    // will survive
+        memory.remember(make_entry(true, 1.0)); // will survive
         let entity = world.spawn(memory).id();
 
         schedule.run(&mut world);

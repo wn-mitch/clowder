@@ -40,17 +40,14 @@ pub struct ColonyKnowledge {
 impl ColonyKnowledge {
     /// Bucket a position to a ~5-tile grid for approximate matching.
     pub fn bucket_position(pos: &Position) -> Position {
-        Position::new(
-            (pos.x / 5) * 5 + 2,
-            (pos.y / 5) * 5 + 2,
-        )
+        Position::new((pos.x / 5) * 5 + 2, (pos.y / 5) * 5 + 2)
     }
 
     /// Check whether an entry matching this (event_type, bucketed_location) exists.
     pub fn has_entry(&self, event_type: MemoryType, location: &Option<Position>) -> bool {
-        self.entries.iter().any(|e| {
-            e.event_type == event_type && approx_location_match(&e.location, location)
-        })
+        self.entries
+            .iter()
+            .any(|e| e.event_type == event_type && approx_location_match(&e.location, location))
     }
 
     /// Find the index of an entry matching (event_type, bucketed_location).
@@ -101,10 +98,22 @@ mod tests {
 
     #[test]
     fn bucket_position_rounds_to_grid() {
-        assert_eq!(ColonyKnowledge::bucket_position(&Position::new(0, 0)), Position::new(2, 2));
-        assert_eq!(ColonyKnowledge::bucket_position(&Position::new(3, 7)), Position::new(2, 7));
-        assert_eq!(ColonyKnowledge::bucket_position(&Position::new(5, 10)), Position::new(7, 12));
-        assert_eq!(ColonyKnowledge::bucket_position(&Position::new(12, 23)), Position::new(12, 22));
+        assert_eq!(
+            ColonyKnowledge::bucket_position(&Position::new(0, 0)),
+            Position::new(2, 2)
+        );
+        assert_eq!(
+            ColonyKnowledge::bucket_position(&Position::new(3, 7)),
+            Position::new(2, 7)
+        );
+        assert_eq!(
+            ColonyKnowledge::bucket_position(&Position::new(5, 10)),
+            Position::new(7, 12)
+        );
+        assert_eq!(
+            ColonyKnowledge::bucket_position(&Position::new(12, 23)),
+            Position::new(12, 22)
+        );
     }
 
     #[test]
@@ -156,6 +165,9 @@ mod tests {
         };
         let desc = knowledge_description(&entry);
         assert!(desc.contains("danger"), "expected 'danger', got: {desc}");
-        assert!(desc.contains("eastern"), "expected 'eastern' for x=50, got: {desc}");
+        assert!(
+            desc.contains("eastern"),
+            "expected 'eastern' for x=50, got: {desc}"
+        );
     }
 }

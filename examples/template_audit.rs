@@ -111,6 +111,7 @@ fn main() {
                         life_stage: LifeStage::Adult,
                         has_target: false,
                         terrain: Terrain::Grass,
+                        event: None,
                     };
                     if registry.select(&ctx, &personality, &needs, &mut rng).is_some() {
                         count += 1;
@@ -154,6 +155,7 @@ fn main() {
                 life_stage: LifeStage::Adult,
                 has_target: false,
                 terrain: Terrain::Grass,
+                event: None,
             };
             if registry.select(&ctx, &personality, &needs, &mut rng).is_none() {
                 println!("  {:?} × {}", action, mood.label());

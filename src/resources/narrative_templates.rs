@@ -9,7 +9,7 @@ use crate::components::identity::{Gender, LifeStage};
 use crate::components::personality::Personality;
 use crate::components::physical::Needs;
 use crate::resources::map::Terrain;
-use crate::resources::narrative::NarrativeTier;
+use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::time::{DayPhase, Season};
 use crate::resources::weather::Weather;
 
@@ -325,6 +325,11 @@ pub struct NarrativeTemplate {
     /// Terrain the cat is standing on (e.g. Forest, Grass, Water).
     #[serde(default)]
     pub terrain: Option<Terrain>,
+    /// Sub-event tag for mid-action narrative (e.g. "catch", "miss", "scent", "raid", "find").
+    /// Templates with an event set only match contexts with the same event string.
+    /// Templates without an event match any context (backwards-compatible).
+    #[serde(default)]
+    pub event: Option<String>,
 }
 
 fn default_weight() -> f32 {
@@ -344,6 +349,10 @@ pub struct TemplateContext {
     pub life_stage: LifeStage,
     pub has_target: bool,
     pub terrain: Terrain,
+    /// Sub-event tag for mid-action narrative matching.
+    /// When set, only templates with a matching `event` will be selected.
+    /// When `None`, templates with any or no event can match.
+    pub event: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -352,12 +361,7 @@ pub struct TemplateContext {
 
 impl NarrativeTemplate {
     /// Returns true if all non-None conditions match the current context.
-    pub fn matches(
-        &self,
-        ctx: &TemplateContext,
-        personality: &Personality,
-        needs: &Needs,
-    ) -> bool {
+    pub fn matches(&self, ctx: &TemplateContext, personality: &Personality, needs: &Needs) -> bool {
         if let Some(a) = self.action {
             if a != ctx.action {
                 return false;
@@ -397,6 +401,20 @@ impl NarrativeTemplate {
             if t != ctx.terrain {
                 return false;
             }
+        }
+
+        // Event tag: if the template specifies an event, the context must match.
+        // If the context specifies an event but the template doesn't, skip this
+        // template — event-specific contexts should prefer event-tagged templates.
+        if let Some(ref te) = self.event {
+            match &ctx.event {
+                Some(ce) if ce == te => {}
+                _ => return false,
+            }
+        } else if ctx.event.is_some() {
+            // Context has an event but template doesn't — skip generic templates
+            // when we're looking for event-specific narrative.
+            return false;
         }
 
         for req in &self.personality {
@@ -442,6 +460,9 @@ impl NarrativeTemplate {
             count += 1;
         }
         if self.terrain.is_some() {
+            count += 1;
+        }
+        if self.event.is_some() {
             count += 1;
         }
         count += self.personality.len() as u32;
@@ -511,6 +532,35 @@ fn life_stage_label(ls: LifeStage) -> &'static str {
 }
 
 // ---------------------------------------------------------------------------
+// emit_event_narrative — mid-action template-driven narrative
+// ---------------------------------------------------------------------------
+
+/// Attempt to emit a template-driven narrative for a mid-action event.
+/// Falls back to the provided `fallback` string if no template matches
+/// or no registry is available.
+pub fn emit_event_narrative(
+    registry: Option<&TemplateRegistry>,
+    log: &mut NarrativeLog,
+    tick: u64,
+    fallback: String,
+    fallback_tier: NarrativeTier,
+    ctx: &TemplateContext,
+    var_ctx: &VariableContext<'_>,
+    personality: &Personality,
+    needs: &Needs,
+    rng: &mut impl Rng,
+) {
+    if let Some(reg) = registry {
+        if let Some(template) = reg.select(ctx, personality, needs, rng) {
+            let text = resolve_variables(&template.text, var_ctx);
+            log.push(tick, text, template.tier);
+            return;
+        }
+    }
+    log.push(tick, fallback, fallback_tier);
+}
+
+// ---------------------------------------------------------------------------
 // TemplateRegistry resource
 // ---------------------------------------------------------------------------
 
@@ -525,11 +575,7 @@ impl TemplateRegistry {
         let mut templates = Vec::new();
         let mut entries: Vec<_> = std::fs::read_dir(path)?
             .filter_map(|e| e.ok())
-            .filter(|e| {
-                e.path()
-                    .extension()
-                    .is_some_and(|ext| ext == "ron")
-            })
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "ron"))
             .collect();
         // Sort by filename for deterministic load order.
         entries.sort_by_key(|e| e.file_name());
@@ -691,13 +737,16 @@ mod tests {
 
     #[test]
     fn personality_get_axis_round_trips() {
-        use rand_chacha::ChaCha8Rng;
         use rand_chacha::rand_core::SeedableRng;
+        use rand_chacha::ChaCha8Rng;
 
         let p = Personality::random(&mut ChaCha8Rng::seed_from_u64(42));
         for axis in PersonalityAxis::ALL {
             let value = p.get_axis(axis);
-            assert!((0.0..=1.0).contains(&value), "{axis:?} out of range: {value}");
+            assert!(
+                (0.0..=1.0).contains(&value),
+                "{axis:?} out of range: {value}"
+            );
         }
         // Spot check one axis
         assert_eq!(p.get_axis(PersonalityAxis::Boldness), p.boldness);
@@ -728,6 +777,7 @@ mod tests {
             life_stage: None,
             has_target: None,
             terrain: None,
+            event: None,
         }
     }
 
@@ -752,12 +802,13 @@ mod tests {
             life_stage: None,
             has_target: None,
             terrain: None,
+            event: None,
         }
     }
 
     fn default_personality() -> Personality {
-        use rand_chacha::ChaCha8Rng;
         use rand_chacha::rand_core::SeedableRng;
+        use rand_chacha::ChaCha8Rng;
         Personality::random(&mut ChaCha8Rng::seed_from_u64(0))
     }
 
@@ -771,6 +822,7 @@ mod tests {
             life_stage: LifeStage::Adult,
             has_target: false,
             terrain: Terrain::Grass,
+            event: None,
         }
     }
 
@@ -825,8 +877,8 @@ mod tests {
 
     #[test]
     fn select_from_empty_registry_returns_none() {
-        use rand_chacha::ChaCha8Rng;
         use rand_chacha::rand_core::SeedableRng;
+        use rand_chacha::ChaCha8Rng;
 
         let reg = TemplateRegistry::from_templates(vec![]);
         let ctx = make_context(Action::Eat);
@@ -838,8 +890,8 @@ mod tests {
 
     #[test]
     fn select_prefers_specific_templates() {
-        use rand_chacha::ChaCha8Rng;
         use rand_chacha::rand_core::SeedableRng;
+        use rand_chacha::ChaCha8Rng;
 
         let generic = generic_eat_template();
         let specific = specific_eat_template();

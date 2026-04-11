@@ -1,0 +1,72 @@
+[
+    // --- Generic scent ---
+    (
+        text: "{name} catches a scent on the wind.",
+        tier: Micro,
+        action: Some(Hunt),
+        event: Some("scent"),
+    ),
+    (
+        text: "{name}'s nose twitches — something close.",
+        tier: Micro,
+        action: Some(Hunt),
+        event: Some("scent"),
+    ),
+    (
+        text: "{name} picks up a trail through the undergrowth.",
+        tier: Micro,
+        action: Some(Hunt),
+        event: Some("scent"),
+    ),
+    (
+        text: "{name} pauses, whiskers forward — a fresh scent.",
+        tier: Micro,
+        action: Some(Hunt),
+        event: Some("scent"),
+    ),
+    (
+        text: "{name} lifts {possessive} head, testing the breeze.",
+        tier: Micro,
+        action: Some(Hunt),
+        event: Some("scent"),
+    ),
+
+    // --- Weather ---
+    (
+        text: "{name} tracks a scent through the rain-washed air.",
+        tier: Micro,
+        action: Some(Hunt),
+        event: Some("scent"),
+        weather: Some(LightRain),
+    ),
+    (
+        text: "{name} follows a faint trail through the fog.",
+        tier: Micro,
+        action: Some(Hunt),
+        event: Some("scent"),
+        weather: Some(Fog),
+    ),
+    (
+        text: "{name} noses through the snow — something passed here recently.",
+        tier: Micro,
+        action: Some(Hunt),
+        event: Some("scent"),
+        weather: Some(Snow),
+    ),
+
+    // --- Terrain ---
+    (
+        text: "{name} catches prey-scent among the dense roots.",
+        tier: Micro,
+        action: Some(Hunt),
+        event: Some("scent"),
+        terrain: Some(DenseForest),
+    ),
+    (
+        text: "{name} scents something in the open grass.",
+        tier: Micro,
+        action: Some(Hunt),
+        event: Some("scent"),
+        terrain: Some(Grass),
+    ),
+]

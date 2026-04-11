@@ -20,11 +20,7 @@ impl AspirationRegistry {
         let mut chains = Vec::new();
         let mut entries: Vec<_> = std::fs::read_dir(path)?
             .filter_map(|e| e.ok())
-            .filter(|e| {
-                e.path()
-                    .extension()
-                    .is_some_and(|ext| ext == "ron")
-            })
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "ron"))
             .collect();
         // Sort by filename for deterministic load order.
         entries.sort_by_key(|e| e.file_name());
@@ -39,10 +35,7 @@ impl AspirationRegistry {
 
     /// All chains in a given domain.
     pub fn chains_for_domain(&self, domain: AspirationDomain) -> Vec<&AspirationChain> {
-        self.chains
-            .iter()
-            .filter(|c| c.domain == domain)
-            .collect()
+        self.chains.iter().filter(|c| c.domain == domain).collect()
     }
 
     /// Look up a chain by its unique name.
@@ -72,10 +65,7 @@ mod tests {
     #[test]
     fn all_ron_files_parse() {
         let registry = load_test_registry();
-        assert!(
-            !registry.chains.is_empty(),
-            "no aspiration chains loaded",
-        );
+        assert!(!registry.chains.is_empty(), "no aspiration chains loaded",);
     }
 
     #[test]

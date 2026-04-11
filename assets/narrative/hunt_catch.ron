@@ -1,0 +1,142 @@
+[
+    // --- Generic catch ---
+    (
+        text: "{name} catches a {prey} in one clean strike.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("catch"),
+    ),
+    (
+        text: "{name} drags a {prey} back between {possessive} teeth.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("catch"),
+    ),
+    (
+        text: "{name} snags a {prey} from the brush.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("catch"),
+    ),
+    (
+        text: "{name} brings down a {prey} with a quick snap.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("catch"),
+    ),
+    (
+        text: "{name} pins a {prey} and finishes it swiftly.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("catch"),
+    ),
+    (
+        text: "{name} returns with a {prey}, whiskers twitching.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("catch"),
+    ),
+
+    // --- Personality-conditioned ---
+    (
+        text: "{name} pounces without hesitation — a {prey}, caught clean.",
+        tier: Action,
+        weight: 1.2,
+        action: Some(Hunt),
+        event: Some("catch"),
+        personality: [(axis: Boldness, bucket: High)],
+    ),
+    (
+        text: "{name} waited ages for the perfect moment, then struck. A {prey}.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("catch"),
+        personality: [(axis: Patience, bucket: High)],
+    ),
+    (
+        text: "{name} bats the {prey} around before bringing it back.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("catch"),
+        personality: [(axis: Playfulness, bucket: High)],
+    ),
+    (
+        text: "{name} catches a {prey} and presents it with visible pride.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("catch"),
+        personality: [(axis: Pride, bucket: High)],
+    ),
+
+    // --- Life stage ---
+    (
+        text: "Young {name} catches {possessive} first {prey}, beaming.",
+        tier: Significant,
+        weight: 1.5,
+        action: Some(Hunt),
+        event: Some("catch"),
+        life_stage: Some(Young),
+    ),
+    (
+        text: "Elder {name} brings down a {prey} with practiced ease.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("catch"),
+        life_stage: Some(Elder),
+    ),
+
+    // --- Time/weather ---
+    (
+        text: "{name} catches a {prey} in the early mist.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("catch"),
+        day_phase: Some(Dawn),
+    ),
+    (
+        text: "{name} strikes in the dark — a {prey}.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("catch"),
+        day_phase: Some(Night),
+    ),
+    (
+        text: "{name} catches a {prey} in the rain-slick grass.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("catch"),
+        weather: Some(LightRain),
+    ),
+
+    // --- Season ---
+    (
+        text: "{name} catches a fat autumn {prey}.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("catch"),
+        season: Some(Autumn),
+    ),
+    (
+        text: "{name} digs a {prey} from beneath the frost.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("catch"),
+        season: Some(Winter),
+    ),
+
+    // --- Terrain ---
+    (
+        text: "{name} ambushes a {prey} in the dense undergrowth.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("catch"),
+        terrain: Some(DenseForest),
+    ),
+    (
+        text: "{name} plucks a {prey} from the tall grass.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("catch"),
+        terrain: Some(Grass),
+    ),
+]

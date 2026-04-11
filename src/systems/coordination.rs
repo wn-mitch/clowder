@@ -12,6 +12,8 @@ use crate::components::physical::{Dead, Position};
 use crate::components::skills::Skills;
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::relationships::Relationships;
+use crate::resources::sim_constants::SimConstants;
+use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::resources::time::TimeState;
 
 // ---------------------------------------------------------------------------
@@ -24,7 +26,12 @@ use crate::resources::time::TimeState;
 ///
 /// Social weight is derived, not stored — computed when needed for coordinator
 /// evaluation, directive compliance bonuses, and narrative.
-pub fn social_weight(entity: Entity, relationships: &Relationships, memory: &Memory) -> f32 {
+pub fn social_weight(
+    entity: Entity,
+    relationships: &Relationships,
+    memory: &Memory,
+    constants: &crate::resources::sim_constants::CoordinationConstants,
+) -> f32 {
     let rels = relationships.all_for(entity);
     let positive_fondness_sum: f32 = rels.iter().map(|(_, r)| r.fondness.max(0.0)).sum();
     let avg_familiarity: f32 = if rels.is_empty() {
@@ -37,7 +44,9 @@ pub fn social_weight(entity: Entity, relationships: &Relationships, memory: &Mem
         .iter()
         .filter(|e| matches!(e.event_type, MemoryType::SocialEvent | MemoryType::Death))
         .count();
-    positive_fondness_sum + avg_familiarity * 0.5 + significant_events as f32 * 0.1
+    positive_fondness_sum
+        + avg_familiarity * constants.social_weight_familiarity_scale
+        + significant_events as f32 * constants.social_weight_event_scale
 }
 
 // ---------------------------------------------------------------------------
@@ -56,24 +65,33 @@ pub fn evaluate_coordinators(
     relationships: Res<Relationships>,
     mut log: ResMut<NarrativeLog>,
     event_log: Option<ResMut<crate::resources::event_log::EventLog>>,
+    constants: Res<SimConstants>,
+    mut activation: ResMut<SystemActivation>,
 ) {
+    let c = &constants.coordination;
     let should_run = coordinator_died.is_some()
-        || (time.tick > 0 && time.tick.is_multiple_of(100));
+        || (time.tick > 0 && time.tick.is_multiple_of(c.evaluate_interval));
     if !should_run {
         return;
     }
 
     let living_count = query.iter().count();
-    let max_coordinators: usize = if living_count < 6 { 1 } else { 2 };
-    let threshold = 0.15_f32;
+    let max_coordinators: usize = if living_count < c.small_colony_threshold {
+        1
+    } else {
+        2
+    };
+    let threshold = c.promotion_threshold;
 
     // Score all living cats.
     let mut candidates: Vec<(Entity, f32, String)> = query
         .iter()
         .map(|(entity, personality, memory, name)| {
-            let sw = social_weight(entity, &relationships, memory);
-            let score = sw * personality.diligence * personality.sociability
-                * (1.0 + personality.ambition * 0.3);
+            let sw = social_weight(entity, &relationships, memory, c);
+            let score = sw
+                * personality.diligence
+                * personality.sociability
+                * (1.0 + personality.ambition * c.ambition_bonus);
             (entity, score, name.0.clone())
         })
         .filter(|(_, score, _)| *score >= threshold)
@@ -104,24 +122,33 @@ pub fn evaluate_coordinators(
     let mut new_coordinator_names: Vec<&str> = Vec::new();
     for (entity, score, name) in &candidates {
         if existing_coordinators.get(*entity).is_err() {
-            commands
-                .entity(*entity)
-                .insert((Coordinator, DirectiveQueue::default(), BuildPressure::default()));
+            commands.entity(*entity).insert((
+                Coordinator,
+                DirectiveQueue::default(),
+                BuildPressure::default(),
+            ));
             new_coordinator_names.push(name.as_str());
             if let Some(ref mut elog) = event_log {
-                elog.push(time.tick, crate::resources::event_log::EventKind::CoordinatorElected {
-                    cat: name.clone(),
-                    social_weight: *score,
-                });
+                elog.push(
+                    time.tick,
+                    crate::resources::event_log::EventKind::CoordinatorElected {
+                        cat: name.clone(),
+                        social_weight: *score,
+                    },
+                );
             }
         }
     }
 
     // Emit a single combined narrative line for all new coordinators.
     if !new_coordinator_names.is_empty() {
+        activation.record(Feature::CoordinatorElected);
         let names = match new_coordinator_names.len() {
             1 => new_coordinator_names[0].to_string(),
-            2 => format!("{} and {}", new_coordinator_names[0], new_coordinator_names[1]),
+            2 => format!(
+                "{} and {}",
+                new_coordinator_names[0], new_coordinator_names[1]
+            ),
             _ => {
                 let (last, rest) = new_coordinator_names.split_last().unwrap();
                 format!("{}, and {last}", rest.join(", "))
@@ -151,10 +178,7 @@ pub fn evaluate_coordinators(
 pub fn assess_colony_needs(
     time: Res<TimeState>,
     food: Res<crate::resources::food::FoodStores>,
-    mut coordinators: Query<
-        (Entity, &Name, &Skills, &mut DirectiveQueue),
-        With<Coordinator>,
-    >,
+    mut coordinators: Query<(Entity, &Name, &Skills, &mut DirectiveQueue), With<Coordinator>>,
     injured_cats: Query<(Entity, &crate::components::physical::Health, &Position), Without<Dead>>,
     building_query: Query<(
         Entity,
@@ -165,8 +189,11 @@ pub fn assess_colony_needs(
     ward_query: Query<&crate::components::magic::Ward>,
     wildlife: Query<(Entity, &Position), With<crate::components::wildlife::WildAnimal>>,
     event_log: Option<ResMut<crate::resources::event_log::EventLog>>,
+    constants: Res<SimConstants>,
+    mut activation: ResMut<SystemActivation>,
 ) {
-    if !time.tick.is_multiple_of(20) {
+    let cc = &constants.coordination;
+    if !time.tick.is_multiple_of(cc.assess_interval) {
         return;
     }
 
@@ -176,16 +203,43 @@ pub fn assess_colony_needs(
         .iter()
         .filter(|(_, h, _)| h.injuries.iter().any(|i| !i.healed))
         .count();
-    let active_threat_count = wildlife.iter().count();
+
+    // Collect building positions for proximity checks.
+    let building_positions: Vec<Position> = building_query
+        .iter()
+        .filter(|(_, _, _, site)| site.is_none())
+        .map(|(_, _, bpos, _)| *bpos)
+        .collect();
+
+    // Count threats near colony buildings (not the entire map).
+    let nearby_threats: Vec<(Entity, Position)> = wildlife
+        .iter()
+        .filter(|(_, wp)| {
+            building_positions
+                .iter()
+                .any(|bp| bp.manhattan_distance(wp) <= cc.threat_proximity_range)
+        })
+        .map(|(e, p)| (e, *p))
+        .collect();
+
+    // Breach = wildlife very close to a building.
+    let breach_threats: Vec<(Entity, Position)> = nearby_threats
+        .iter()
+        .filter(|(_, wp)| {
+            building_positions
+                .iter()
+                .any(|bp| bp.manhattan_distance(wp) <= cc.colony_breach_range)
+        })
+        .cloned()
+        .collect();
 
     let ward_strength_low = {
         let ward_count = ward_query.iter().count();
         if ward_count == 0 {
             true
         } else {
-            let avg: f32 =
-                ward_query.iter().map(|w| w.strength).sum::<f32>() / ward_count as f32;
-            avg < 0.3
+            let avg: f32 = ward_query.iter().map(|w| w.strength).sum::<f32>() / ward_count as f32;
+            avg < cc.ward_avg_strength_low_threshold
         }
     };
 
@@ -195,8 +249,11 @@ pub fn assess_colony_needs(
         queue.directives.clear();
 
         // Domain specialization: coordinator's skills shift thresholds.
-        let food_threshold = 0.5 - skills.hunting * 0.1 - skills.foraging * 0.1;
-        let building_threshold = 0.7 - skills.building * 0.1;
+        let food_threshold = cc.food_threshold_base
+            - skills.hunting * cc.food_threshold_hunting_scale
+            - skills.foraging * cc.food_threshold_foraging_scale;
+        let building_threshold =
+            cc.building_threshold_base - skills.building * cc.building_threshold_building_scale;
 
         // Food assessment.
         if food_fraction < food_threshold {
@@ -212,7 +269,7 @@ pub fn assess_colony_needs(
             if food_fraction < food_threshold * 0.5 {
                 queue.directives.push(Directive {
                     kind: DirectiveKind::Forage,
-                    priority: priority * 0.8,
+                    priority: priority * cc.forage_critical_multiplier,
                     target_entity: None,
                     target_position: None,
                     blueprint: None,
@@ -220,20 +277,31 @@ pub fn assess_colony_needs(
             }
         }
 
-        // Threat assessment.
-        if active_threat_count > 0 {
+        // Threat assessment — only react to wildlife near colony.
+        if !breach_threats.is_empty() {
+            // Wildlife has breached colony perimeter — issue Fight.
             queue.directives.push(Directive {
                 kind: DirectiveKind::Fight,
-                priority: 0.8,
-                target_entity: None,
-                target_position: None,
+                priority: cc.threat_fight_priority,
+                target_entity: breach_threats.first().map(|(e, _)| *e),
+                target_position: breach_threats.first().map(|(_, p)| *p),
                 blueprint: None,
+            });
+        }
+        if !nearby_threats.is_empty() {
+            // Wildlife detected near colony — issue targeted Patrol toward it.
+            let closest_threat = nearby_threats.iter().min_by_key(|(_, wp)| {
+                building_positions
+                    .iter()
+                    .map(|bp| bp.manhattan_distance(wp))
+                    .min()
+                    .unwrap_or(i32::MAX)
             });
             queue.directives.push(Directive {
                 kind: DirectiveKind::Patrol,
-                priority: 0.5,
+                priority: cc.threat_patrol_targeted_priority,
                 target_entity: None,
-                target_position: None,
+                target_position: closest_threat.map(|(_, p)| *p),
                 blueprint: None,
             });
         }
@@ -248,7 +316,9 @@ pub fn assess_colony_needs(
                     .unwrap_or(std::cmp::Ordering::Equal)
             });
         if let Some((build_entity, structure, build_pos, _)) = worst_building {
-            let priority = (0.6 + skills.building * 0.1).min(1.0);
+            let priority = (cc.build_repair_priority_base
+                + skills.building * cc.build_repair_priority_building_scale)
+                .min(1.0);
             queue.directives.push(Directive {
                 kind: DirectiveKind::Build,
                 priority,
@@ -261,7 +331,7 @@ pub fn assess_colony_needs(
 
         // Injury assessment.
         if colony_injury_count > 0 {
-            let priority = (colony_injury_count as f32 * 0.3).min(1.0);
+            let priority = (colony_injury_count as f32 * cc.injury_priority_per_cat).min(1.0);
             queue.directives.push(Directive {
                 kind: DirectiveKind::Herbcraft,
                 priority,
@@ -275,7 +345,7 @@ pub fn assess_colony_needs(
         if ward_strength_low {
             queue.directives.push(Directive {
                 kind: DirectiveKind::SetWard,
-                priority: 0.5,
+                priority: cc.ward_set_priority,
                 target_entity: None,
                 target_position: None,
                 blueprint: None,
@@ -283,18 +353,26 @@ pub fn assess_colony_needs(
         }
 
         // Sort by priority descending.
-        queue
-            .directives
-            .sort_by(|a, b| b.priority.partial_cmp(&a.priority).unwrap_or(std::cmp::Ordering::Equal));
+        queue.directives.sort_by(|a, b| {
+            b.priority
+                .partial_cmp(&a.priority)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Emit directive events.
+        if !queue.directives.is_empty() {
+            activation.record(Feature::DirectiveIssued);
+        }
         if let Some(ref mut elog) = event_log {
             for d in &queue.directives {
-                elog.push(time.tick, crate::resources::event_log::EventKind::DirectiveIssued {
-                    coordinator: name.0.clone(),
-                    kind: format!("{:?}", d.kind),
-                    priority: d.priority,
-                });
+                elog.push(
+                    time.tick,
+                    crate::resources::event_log::EventKind::DirectiveIssued {
+                        coordinator: name.0.clone(),
+                        kind: format!("{:?}", d.kind),
+                        priority: d.priority,
+                    },
+                );
             }
         }
     }
@@ -328,10 +406,12 @@ pub fn expire_directives(
     active_query: Query<(Entity, &ActiveDirective)>,
     alive_check: Query<(), Without<Dead>>,
     stale_delivery_query: Query<(Entity, &PendingDelivery, &crate::ai::CurrentAction)>,
+    constants: Res<SimConstants>,
 ) {
+    let expiry_ticks = constants.coordination.directive_expiry_ticks;
     for (entity, directive) in &active_query {
         let coordinator_dead = alive_check.get(directive.coordinator).is_err();
-        let expired = time.tick.saturating_sub(directive.delivered_tick) > 200;
+        let expired = time.tick.saturating_sub(directive.delivered_tick) > expiry_ticks;
         if coordinator_dead || expired {
             commands.entity(entity).remove::<ActiveDirective>();
         }
@@ -359,7 +439,14 @@ pub fn accumulate_build_pressure(
     time: Res<TimeState>,
     food: Res<crate::resources::food::FoodStores>,
     mut coordinators: Query<
-        (Entity, &Name, &Personality, &Skills, &mut BuildPressure, &mut DirectiveQueue),
+        (
+            Entity,
+            &Name,
+            &Personality,
+            &Skills,
+            &mut BuildPressure,
+            &mut DirectiveQueue,
+        ),
         With<Coordinator>,
     >,
     cats: Query<(&Position, &crate::ai::CurrentAction), Without<Dead>>,
@@ -369,30 +456,34 @@ pub fn accumulate_build_pressure(
         &crate::components::building::StoredItems,
     )>,
     wildlife: Query<&Position, With<crate::components::wildlife::WildAnimal>>,
+    items_query: Query<&crate::components::items::Item>,
     mut log: ResMut<NarrativeLog>,
+    constants: Res<SimConstants>,
 ) {
-    if !time.tick.is_multiple_of(20) {
+    let cc = &constants.coordination;
+    if !time.tick.is_multiple_of(cc.assess_interval) {
         return;
     }
 
     // Pre-compute colony state.
-    let has_structure = |kind: StructureType| -> bool {
-        buildings.iter().any(|(s, _)| s.kind == kind)
-    };
+    let has_structure =
+        |kind: StructureType| -> bool { buildings.iter().any(|(s, _)| s.kind == kind) };
 
     let stores_full = stored_items_query.iter().any(|(s, items)| {
         s.kind == StructureType::Stores
-            && items.items.len() >= crate::components::building::StoredItems::capacity(StructureType::Stores)
+            && items.is_effectively_full(StructureType::Stores, &items_query)
     });
 
     // Cats sleeping without a Den nearby.
-    let unsheltered_sleepers = cats.iter().filter(|(cat_pos, action)| {
-        action.action == crate::ai::Action::Sleep
-            && !buildings.iter().any(|(s, bpos)| {
-                s.kind == StructureType::Den
-                    && cat_pos.manhattan_distance(&s.center(bpos)) <= 4
-            })
-    }).count();
+    let unsheltered_sleepers = cats
+        .iter()
+        .filter(|(cat_pos, action)| {
+            action.action == crate::ai::Action::Sleep
+                && !buildings.iter().any(|(s, bpos)| {
+                    s.kind == StructureType::Den && cat_pos.manhattan_distance(&s.center(bpos)) <= 4
+                })
+        })
+        .count();
 
     let food_fraction = food.fraction();
     let has_garden = has_structure(StructureType::Garden);
@@ -400,18 +491,19 @@ pub fn accumulate_build_pressure(
     let has_watchtower = has_structure(StructureType::Watchtower);
 
     let skilled_crafters = cats.iter().count(); // simplified: count living cats as proxy
-    // Wildlife inside colony area (within ~15 tiles of any building).
+                                                // Wildlife inside colony area (within ~wildlife_breach_range tiles of any building).
     let wildlife_breach = wildlife.iter().any(|wpos| {
-        buildings.iter().any(|(s, bpos)| {
-            wpos.manhattan_distance(&s.center(bpos)) <= 10
-        })
+        buildings
+            .iter()
+            .any(|(s, bpos)| wpos.manhattan_distance(&s.center(bpos)) <= cc.wildlife_breach_range)
     });
 
     for (_entity, name, personality, skills, mut pressure, mut queue) in &mut coordinators {
-        let attentiveness =
-            personality.diligence * 0.5 + personality.ambition * 0.3 + (1.0 - personality.patience) * 0.2;
+        let attentiveness = personality.diligence * cc.attentiveness_diligence_weight
+            + personality.ambition * cc.attentiveness_ambition_weight
+            + (1.0 - personality.patience) * cc.attentiveness_impatience_weight;
         let rate = BuildPressure::BASE_RATE * attentiveness;
-        let threshold = 1.0 - attentiveness * 0.3;
+        let threshold = 1.0 - attentiveness * cc.build_pressure_attentiveness_threshold_scale;
 
         // Storage pressure.
         if stores_full {
@@ -433,14 +525,14 @@ pub fn accumulate_build_pressure(
         pressure.gathering *= BuildPressure::DECAY;
 
         // Workshop pressure.
-        if !has_workshop && skilled_crafters >= 4 {
+        if !has_workshop && skilled_crafters >= cc.build_pressure_workshop_min_cats {
             pressure.workshop += rate;
         } else {
             pressure.workshop *= BuildPressure::DECAY;
         }
 
         // Farming pressure.
-        if !has_garden && food_fraction < 0.3 {
+        if !has_garden && food_fraction < cc.build_pressure_farming_food_threshold {
             pressure.farming += rate;
         } else {
             pressure.farming *= BuildPressure::DECAY;
@@ -457,11 +549,14 @@ pub fn accumulate_build_pressure(
         if let Some(blueprint) = pressure.highest_actionable(threshold) {
             // Only issue if there isn't already a Build directive with a blueprint
             // in the queue (avoid spamming).
-            let already_queued = queue.directives.iter().any(|d| {
-                d.kind == DirectiveKind::Build && d.blueprint.is_some()
-            });
+            let already_queued = queue
+                .directives
+                .iter()
+                .any(|d| d.kind == DirectiveKind::Build && d.blueprint.is_some());
             if !already_queued {
-                let priority = (0.5 + skills.building * 0.2).min(1.0);
+                let priority = (cc.build_directive_priority_base
+                    + skills.building * cc.build_directive_priority_building_scale)
+                    .min(1.0);
                 queue.directives.push(Directive {
                     kind: DirectiveKind::Build,
                     priority,
@@ -522,18 +617,20 @@ mod tests {
     /// A cat with no relationships has zero social weight.
     #[test]
     fn social_weight_no_relationships() {
+        let cc = &crate::resources::SimConstants::default().coordination;
         let mut world = World::new();
         let entity = world.spawn_empty().id();
         let relationships = Relationships::default();
         let memory = Memory::default();
 
-        let sw = social_weight(entity, &relationships, &memory);
+        let sw = social_weight(entity, &relationships, &memory, cc);
         assert_eq!(sw, 0.0);
     }
 
     /// Social weight increases with positive fondness.
     #[test]
     fn social_weight_increases_with_fondness() {
+        let cc = &crate::resources::SimConstants::default().coordination;
         let mut world = World::new();
         let a = world.spawn_empty().id();
         let b = world.spawn_empty().id();
@@ -545,7 +642,7 @@ mod tests {
 
         let memory = Memory::default();
 
-        let sw = social_weight(a, &rels, &memory);
+        let sw = social_weight(a, &rels, &memory, cc);
         // positive fondness = 0.5, avg familiarity = 0.4, no events
         // 0.5 + 0.4 * 0.5 + 0 = 0.7
         assert!((sw - 0.7).abs() < 0.001, "expected ~0.7, got {sw}");
@@ -554,6 +651,7 @@ mod tests {
     /// Negative fondness does not contribute to social weight.
     #[test]
     fn social_weight_ignores_negative_fondness() {
+        let cc = &crate::resources::SimConstants::default().coordination;
         let mut world = World::new();
         let a = world.spawn_empty().id();
         let b = world.spawn_empty().id();
@@ -565,7 +663,7 @@ mod tests {
 
         let memory = Memory::default();
 
-        let sw = social_weight(a, &rels, &memory);
+        let sw = social_weight(a, &rels, &memory, cc);
         // positive fondness clamped to 0, avg familiarity = 0.6
         // 0.0 + 0.6 * 0.5 + 0 = 0.3
         assert!((sw - 0.3).abs() < 0.001, "expected ~0.3, got {sw}");
@@ -574,6 +672,7 @@ mod tests {
     /// Significant events contribute to social weight.
     #[test]
     fn social_weight_includes_significant_events() {
+        let cc = &crate::resources::SimConstants::default().coordination;
         let mut world = World::new();
         let entity = world.spawn_empty().id();
         let relationships = Relationships::default();
@@ -596,7 +695,7 @@ mod tests {
             firsthand: true,
         });
 
-        let sw = social_weight(entity, &relationships, &memory);
+        let sw = social_weight(entity, &relationships, &memory, cc);
         // 0 fondness + 0 familiarity + 2 events * 0.1 = 0.2
         assert!((sw - 0.2).abs() < 0.001, "expected ~0.2, got {sw}");
     }
@@ -607,9 +706,14 @@ mod tests {
         use bevy_ecs::schedule::Schedule;
 
         let mut world = World::new();
-        world.insert_resource(TimeState { tick: 100, ..Default::default() });
+        world.insert_resource(TimeState {
+            tick: 100,
+            ..Default::default()
+        });
         world.insert_resource(Relationships::default());
         world.insert_resource(NarrativeLog::default());
+        world.insert_resource(crate::resources::SimConstants::default());
+        world.insert_resource(SystemActivation::default());
 
         let high_diligence = Personality {
             diligence: 0.9,
@@ -631,11 +735,7 @@ mod tests {
             ))
             .id();
         let b = world
-            .spawn((
-                low_diligence,
-                Memory::default(),
-                Name("Reed".to_string()),
-            ))
+            .spawn((low_diligence, Memory::default(), Name("Reed".to_string())))
             .id();
 
         let mut rels = Relationships::default();
@@ -664,8 +764,13 @@ mod tests {
         use bevy_ecs::schedule::Schedule;
 
         let mut world = World::new();
-        world.insert_resource(TimeState { tick: 100, ..Default::default() });
+        world.insert_resource(TimeState {
+            tick: 100,
+            ..Default::default()
+        });
         world.insert_resource(NarrativeLog::default());
+        world.insert_resource(crate::resources::SimConstants::default());
+        world.insert_resource(SystemActivation::default());
 
         let strong = Personality {
             diligence: 0.9,
@@ -677,11 +782,7 @@ mod tests {
         let mut entities = Vec::new();
         for i in 0..4 {
             let e = world
-                .spawn((
-                    strong.clone(),
-                    Memory::default(),
-                    Name(format!("Cat{i}")),
-                ))
+                .spawn((strong.clone(), Memory::default(), Name(format!("Cat{i}"))))
                 .id();
             entities.push(e);
         }
@@ -714,11 +815,16 @@ mod tests {
     /// assess_colony_needs emits Hunt directive when food is low.
     #[test]
     fn assess_emits_hunt_when_food_low() {
-        use bevy_ecs::schedule::Schedule;
         use crate::components::skills::Skills;
+        use bevy_ecs::schedule::Schedule;
 
         let mut world = World::new();
-        world.insert_resource(TimeState { tick: 20, ..Default::default() });
+        world.insert_resource(TimeState {
+            tick: 20,
+            ..Default::default()
+        });
+        world.insert_resource(crate::resources::SimConstants::default());
+        world.insert_resource(SystemActivation::default());
         // Food stores at 10% capacity.
         world.insert_resource(crate::resources::food::FoodStores::new(5.0, 50.0, 0.0));
 
@@ -737,7 +843,10 @@ mod tests {
 
         let queue = world.get::<DirectiveQueue>(entity).unwrap();
         assert!(
-            queue.directives.iter().any(|d| d.kind == DirectiveKind::Hunt),
+            queue
+                .directives
+                .iter()
+                .any(|d| d.kind == DirectiveKind::Hunt),
             "should have Hunt directive when food is low; got: {:?}",
             queue.directives.iter().map(|d| d.kind).collect::<Vec<_>>()
         );
@@ -746,11 +855,16 @@ mod tests {
     /// Domain specialization: a skilled hunter coordinator has a lower food threshold.
     #[test]
     fn domain_specialization_lowers_threshold() {
-        use bevy_ecs::schedule::Schedule;
         use crate::components::skills::Skills;
+        use bevy_ecs::schedule::Schedule;
 
         let mut world = World::new();
-        world.insert_resource(TimeState { tick: 20, ..Default::default() });
+        world.insert_resource(TimeState {
+            tick: 20,
+            ..Default::default()
+        });
+        world.insert_resource(crate::resources::SimConstants::default());
+        world.insert_resource(SystemActivation::default());
         // Food at 45% — above default 0.5 threshold but below shifted threshold
         // for a non-hunter coordinator.
         world.insert_resource(crate::resources::food::FoodStores::new(22.5, 50.0, 0.0));
@@ -759,12 +873,22 @@ mod tests {
         let mut hunter_skills = Skills::default();
         hunter_skills.hunting = 0.9;
         let hunter = world
-            .spawn((Coordinator, DirectiveQueue::default(), hunter_skills, Name("Hunter".to_string())))
+            .spawn((
+                Coordinator,
+                DirectiveQueue::default(),
+                hunter_skills,
+                Name("Hunter".to_string()),
+            ))
             .id();
 
         // Unskilled cat: threshold = 0.5 - 0.0*0.1 = 0.5. 45% < 50%, directive!
         let unskilled = world
-            .spawn((Coordinator, DirectiveQueue::default(), Skills::default(), Name("Unskilled".to_string())))
+            .spawn((
+                Coordinator,
+                DirectiveQueue::default(),
+                Skills::default(),
+                Name("Unskilled".to_string()),
+            ))
             .id();
 
         let mut schedule = Schedule::default();
@@ -775,11 +899,17 @@ mod tests {
         let unskilled_queue = world.get::<DirectiveQueue>(unskilled).unwrap();
 
         assert!(
-            !hunter_queue.directives.iter().any(|d| d.kind == DirectiveKind::Hunt),
+            !hunter_queue
+                .directives
+                .iter()
+                .any(|d| d.kind == DirectiveKind::Hunt),
             "skilled hunter coordinator should NOT emit Hunt at 45% food"
         );
         assert!(
-            unskilled_queue.directives.iter().any(|d| d.kind == DirectiveKind::Hunt),
+            unskilled_queue
+                .directives
+                .iter()
+                .any(|d| d.kind == DirectiveKind::Hunt),
             "unskilled coordinator should emit Hunt at 45% food"
         );
     }
@@ -838,8 +968,9 @@ mod tests {
 
         let attentive_val =
             attentive.diligence * 0.5 + attentive.ambition * 0.3 + (1.0 - attentive.patience) * 0.2;
-        let inattentive_val =
-            inattentive.diligence * 0.5 + inattentive.ambition * 0.3 + (1.0 - inattentive.patience) * 0.2;
+        let inattentive_val = inattentive.diligence * 0.5
+            + inattentive.ambition * 0.3
+            + (1.0 - inattentive.patience) * 0.2;
 
         let attentive_threshold = 1.0 - attentive_val * 0.3;
         let inattentive_threshold = 1.0 - inattentive_val * 0.3;

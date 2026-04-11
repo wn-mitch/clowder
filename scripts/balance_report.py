@@ -29,7 +29,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def parse_events(path: str) -> list[dict]:
+def parse_events(path: str) -> tuple[dict | None, list[dict]]:
+    header = None
     events = []
     with open(path) as f:
         for line in f:
@@ -38,9 +39,10 @@ def parse_events(path: str) -> list[dict]:
                 continue
             obj = json.loads(line)
             if obj.get("_header"):
+                header = obj
                 continue
             events.append(obj)
-    return events
+    return header, events
 
 
 def bucket_events(events: list[dict]) -> dict[str, list[dict]]:
@@ -184,10 +186,10 @@ def plot_food_economy(food_events: list[dict], pop_events: list[dict], out_dir: 
     # Prey populations
     if pop_events:
         ticks = [e["tick"] for e in pop_events]
-        for species in ["mice", "rats", "fish", "birds"]:
-            counts = [e[species] for e in pop_events]
+        for species in ["mice", "rats", "rabbits", "fish", "birds"]:
+            counts = [e.get(species, 0) for e in pop_events]
             ax2.plot(ticks, counts, linewidth=1.5, label=species.capitalize())
-        total = [e["mice"] + e["rats"] + e["fish"] + e["birds"] for e in pop_events]
+        total = [e.get("mice", 0) + e.get("rats", 0) + e.get("rabbits", 0) + e.get("fish", 0) + e.get("birds", 0) for e in pop_events]
         ax2.plot(ticks, total, "k-", linewidth=2, alpha=0.5, label="Total")
         ax2.set_xlabel("Tick")
         ax2.set_ylabel("Count")
@@ -294,7 +296,8 @@ def plot_needs_heatmap(snapshots: list[dict], out_dir: str):
 # ---------------------------------------------------------------------------
 
 def write_summary(snapshots, action_events, food_events, pop_events,
-                  death_events, respect_slopes, mood_slopes, out_dir):
+                  death_events, activation_events, header,
+                  respect_slopes, mood_slopes, out_dir):
     lines = []
     lines.append("=" * 70)
     lines.append("CLOWDER BALANCE REPORT")
@@ -367,9 +370,10 @@ def write_summary(snapshots, action_events, food_events, pop_events,
     # Prey populations
     if pop_events:
         final_pop = pop_events[-1]
-        total = final_pop["mice"] + final_pop["rats"] + final_pop["fish"] + final_pop["birds"]
-        lines.append(f"  Final prey: mice={final_pop['mice']} rats={final_pop['rats']} "
-                     f"fish={final_pop['fish']} birds={final_pop['birds']} total={total}")
+        total = final_pop.get("mice", 0) + final_pop.get("rats", 0) + final_pop.get("rabbits", 0) + final_pop.get("fish", 0) + final_pop.get("birds", 0)
+        lines.append(f"  Final prey: mice={final_pop.get('mice', 0)} rats={final_pop.get('rats', 0)} "
+                     f"rabbits={final_pop.get('rabbits', 0)} fish={final_pop.get('fish', 0)} "
+                     f"birds={final_pop.get('birds', 0)} total={total}")
 
     # Action distribution
     lines.append("\n" + "-" * 50)
@@ -401,6 +405,38 @@ def write_summary(snapshots, action_events, food_events, pop_events,
             bar = "#" * int(avg * 40) + "." * (40 - int(avg * 40))
             lines.append(f"  {need:12s}  [{bar}]  avg={avg:.3f}  min={mn:.3f}  max={mx:.3f}")
 
+    # Constants hash
+    if header and "constants" in header:
+        import hashlib
+        constants_json = json.dumps(header["constants"], sort_keys=True)
+        constants_hash = hashlib.sha256(constants_json.encode()).hexdigest()[:16]
+        lines.append("\n" + "-" * 50)
+        lines.append("CONSTANTS")
+        lines.append("-" * 50)
+        lines.append(f"  Hash: {constants_hash}")
+        lines.append(f"  Seed: {header.get('seed', '?')}")
+
+    # System activation
+    if activation_events:
+        lines.append("\n" + "-" * 50)
+        lines.append("SYSTEM ACTIVATION")
+        lines.append("-" * 50)
+        # Use the last activation snapshot (most complete)
+        last = activation_events[-1]
+        counts = last.get("counts", {})
+        active = sum(1 for v in counts.values() if v > 0)
+        total = len(counts)
+        lines.append(f"  Features active: {active}/{total}")
+        for name, count in sorted(counts.items(), key=lambda x: -x[1]):
+            marker = "" if count > 0 else " ** DEAD **"
+            lines.append(f"  {name:35s}  {count:8d}{marker}")
+
+        dead = [name for name, count in counts.items() if count == 0]
+        if dead:
+            lines.append(f"\n  DEAD FEATURES ({len(dead)}):")
+            for name in sorted(dead):
+                lines.append(f"    - {name}")
+
     lines.append("\n" + "=" * 70)
 
     summary = "\n".join(lines)
@@ -429,7 +465,7 @@ def main():
     os.makedirs(args.out, exist_ok=True)
 
     print(f"Parsing {args.events}...")
-    events = parse_events(args.events)
+    header, events = parse_events(args.events)
     buckets = bucket_events(events)
 
     snapshots = buckets.get("CatSnapshot", [])
@@ -437,9 +473,11 @@ def main():
     pop_events = buckets.get("PopulationSnapshot", [])
     action_events = buckets.get("ActionChosen", [])
     death_events = buckets.get("Death", [])
+    activation_events = buckets.get("SystemActivation", [])
 
     print(f"  {len(snapshots)} snapshots, {len(food_events)} food events, "
-          f"{len(action_events)} action events, {len(death_events)} deaths")
+          f"{len(action_events)} action events, {len(death_events)} deaths, "
+          f"{len(activation_events)} activation snapshots")
 
     print("Generating charts...")
     respect_slopes = plot_respect(snapshots, args.out)
@@ -451,7 +489,8 @@ def main():
     print("Writing summary...")
     summary = write_summary(
         snapshots, action_events, food_events, pop_events,
-        death_events, respect_slopes, mood_slopes, args.out,
+        death_events, activation_events, header,
+        respect_slopes, mood_slopes, args.out,
     )
     print(summary)
     print(f"\nCharts saved to {args.out}/")

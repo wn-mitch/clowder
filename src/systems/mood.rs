@@ -4,6 +4,8 @@ use crate::components::mental::{Mood, MoodModifier};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Needs, Position};
 use crate::resources::relationships::Relationships;
+use crate::resources::sim_constants::SimConstants;
+use crate::resources::system_activation::{Feature, SystemActivation};
 
 // ---------------------------------------------------------------------------
 // update_mood system
@@ -16,7 +18,9 @@ use crate::resources::relationships::Relationships;
 /// anxiety-amplified negative modifiers, clamped to [-1.0, 1.0].
 pub fn update_mood(
     mut query: Query<(&mut Mood, &Personality, &Needs), Without<Dead>>,
+    constants: Res<SimConstants>,
 ) {
+    let c = &constants.mood;
     for (mut mood, personality, needs) in &mut query {
         // Tick down and remove expired modifiers.
         mood.modifiers.retain_mut(|m| {
@@ -25,14 +29,18 @@ pub fn update_mood(
         });
 
         // Personality-driven baseline: optimistic cats lean positive.
-        let baseline = personality.optimism * 0.4 - 0.2;
+        let baseline = personality.optimism * c.baseline_optimism_weight + c.baseline_offset;
 
-        let positive_sum: f32 = mood.modifiers.iter()
+        let positive_sum: f32 = mood
+            .modifiers
+            .iter()
             .filter(|m| m.amount > 0.0)
             .map(|m| m.amount)
             .sum();
 
-        let negative_sum: f32 = mood.modifiers.iter()
+        let negative_sum: f32 = mood
+            .modifiers
+            .iter()
             .filter(|m| m.amount < 0.0)
             .map(|m| m.amount)
             .sum();
@@ -40,18 +48,32 @@ pub fn update_mood(
         // Anxious cats feel negative events more intensely.
         // Temper amplifies negatives when physiological needs are unmet.
         let phys = needs.physiological_satisfaction();
-        let temper_amp = personality.temper * 0.3 * (1.0 - phys);
-        let amplified_negative = negative_sum * (1.0 + personality.anxiety * 0.5 + temper_amp);
+        let temper_amp = personality.temper * c.temper_amplification_scale * (1.0 - phys);
+        let amplified_negative =
+            negative_sum * (1.0 + personality.anxiety * c.anxiety_amplification + temper_amp);
 
         mood.valence = (baseline + positive_sum + amplified_negative).clamp(-1.0, 1.0);
 
         // Pride: wounded pride generates per-tick negative modifier when
         // respect is critically low.
-        if needs.respect < 0.3 && !mood.modifiers.iter().any(|m| m.source == "wounded pride") {
+        if needs.respect < c.wounded_pride_respect_threshold
+            && !mood.modifiers.iter().any(|m| m.source == "wounded pride")
+        {
             mood.modifiers.push_back(MoodModifier {
-                amount: -(personality.pride * 0.15),
+                amount: -(personality.pride * c.wounded_pride_scale),
                 ticks_remaining: 1,
                 source: "wounded pride".to_string(),
+            });
+        }
+
+        // Contentment: well-fed, rested, warm cats feel a small positive glow.
+        if needs.physiological_satisfaction() >= c.contentment_phys_threshold
+            && !mood.modifiers.iter().any(|m| m.source == "contentment")
+        {
+            mood.modifiers.push_back(MoodModifier {
+                amount: c.contentment_mood_bonus,
+                ticks_remaining: c.contentment_mood_ticks,
+                source: "contentment".to_string(),
             });
         }
     }
@@ -61,9 +83,15 @@ pub fn update_mood(
 ///
 /// Called at modifier creation time (not per-tick). At patience=1.0, positive
 /// modifiers last 30% longer. Negative modifiers are unaffected.
-pub fn patience_extend(modifier: &mut MoodModifier, patience: f32) {
+pub fn patience_extend(
+    modifier: &mut MoodModifier,
+    patience: f32,
+    constants: &crate::resources::sim_constants::MoodConstants,
+) {
     if modifier.amount > 0.0 {
-        let extension = (patience * modifier.ticks_remaining as f32 * 0.3).round() as u64;
+        let extension =
+            (patience * modifier.ticks_remaining as f32 * constants.patience_extension_scale)
+                .round() as u64;
         modifier.ticks_remaining += extension;
     }
 }
@@ -80,9 +108,13 @@ pub fn patience_extend(modifier: &mut MoodModifier, patience: f32) {
 pub fn mood_contagion(
     mut query: Query<(Entity, &Position, &mut Mood, &Personality), Without<Dead>>,
     relationships: Res<Relationships>,
+    constants: Res<SimConstants>,
+    mut activation: ResMut<SystemActivation>,
 ) {
+    let c = &constants.mood;
     // Read pass: snapshot all positions and valences.
-    let snapshot: Vec<(Entity, Position, f32)> = query.iter()
+    let snapshot: Vec<(Entity, Position, f32)> = query
+        .iter()
         .map(|(e, p, m, _)| (e, *p, m.valence))
         .collect();
 
@@ -93,7 +125,7 @@ pub fn mood_contagion(
                 continue;
             }
             let dist = pos.manhattan_distance(&other_pos);
-            if dist == 0 || dist > 3 {
+            if dist == 0 || dist > c.contagion_range {
                 continue;
             }
 
@@ -103,13 +135,61 @@ pub fn mood_contagion(
             let fondness_weight = (fondness + 1.0) / 2.0; // map -1..1 to 0..1
             let weight = (1.0 / dist as f32) * fondness_weight * other_valence.abs();
             // Stubborn cats resist mood contagion.
-            let influence = other_valence * weight * 0.002
-                * (1.0 - personality.stubbornness * 0.2);
+            let influence = other_valence
+                * weight
+                * c.contagion_base_influence
+                * (1.0 - personality.stubbornness * c.contagion_stubbornness_resistance);
 
+            activation.record(Feature::MoodContagion);
             mood.modifiers.push_back(MoodModifier {
                 amount: influence,
-                ticks_remaining: 5,
+                ticks_remaining: c.contagion_modifier_ticks,
                 source: "contagion".to_string(),
+            });
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// bond_proximity_mood system
+// ---------------------------------------------------------------------------
+
+/// Cats near a bonded companion (Friend, Partner, or Mate) receive a small
+/// positive mood modifier — "social warmth."
+pub fn bond_proximity_mood(
+    mut query: Query<(Entity, &Position, &mut Mood), Without<Dead>>,
+    relationships: Res<Relationships>,
+    constants: Res<SimConstants>,
+) {
+    let c = &constants.mood;
+    // Read pass: snapshot positions of all living cats.
+    let snapshot: Vec<(Entity, Position)> = query.iter().map(|(e, p, _)| (e, *p)).collect();
+
+    // Write pass: check each cat for nearby bonded companions.
+    for (entity, pos, mut mood) in &mut query {
+        // Skip if already has a social warmth modifier.
+        if mood.modifiers.iter().any(|m| m.source == "social warmth") {
+            continue;
+        }
+
+        let has_nearby_bond = snapshot.iter().any(|&(other, other_pos)| {
+            if other == entity {
+                return false;
+            }
+            let dist = pos.manhattan_distance(&other_pos);
+            if dist == 0 || dist > c.bond_proximity_range {
+                return false;
+            }
+            relationships
+                .get(entity, other)
+                .is_some_and(|r| r.bond.is_some())
+        });
+
+        if has_nearby_bond {
+            mood.modifiers.push_back(MoodModifier {
+                amount: c.bond_proximity_mood,
+                ticks_remaining: c.bond_proximity_mood_ticks,
+                source: "social warmth".to_string(),
             });
         }
     }
@@ -122,9 +202,9 @@ pub fn mood_contagion(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::VecDeque;
-    use bevy_ecs::schedule::Schedule;
     use crate::resources::relationships::Relationships;
+    use bevy_ecs::schedule::Schedule;
+    use std::collections::VecDeque;
 
     fn default_personality() -> Personality {
         Personality {
@@ -151,6 +231,7 @@ mod tests {
 
     fn setup_mood_world() -> (World, Schedule) {
         let mut world = World::new();
+        world.insert_resource(crate::resources::SimConstants::default());
         let mut schedule = Schedule::default();
         schedule.add_systems(update_mood);
         (world, schedule)
@@ -185,6 +266,8 @@ mod tests {
                 source: "test".to_string(),
             }],
         );
+        // Give the cat low hunger so contentment doesn't fire and add extra modifiers.
+        world.get_mut::<Needs>(entity).unwrap().hunger = 0.1;
 
         schedule.run(&mut world);
         assert_eq!(world.get::<Mood>(entity).unwrap().modifiers.len(), 1);
@@ -216,11 +299,13 @@ mod tests {
         schedule.run(&mut world);
         let mood = world.get::<Mood>(entity).unwrap();
 
-        // baseline for optimism=0.5: 0.5*0.4 - 0.2 = 0.0
-        // plus 0.5 modifier = 0.5
+        // baseline for optimism=0.5: 0.5*0.4 - 0.05 = 0.15
+        // plus 0.5 modifier = 0.65
+        // (contentment modifier is added after valence calc, applies next tick)
+        let expected = 0.15 + 0.5;
         assert!(
-            (mood.valence - 0.5).abs() < 1e-5,
-            "valence should be ~0.5; got {}",
+            (mood.valence - expected).abs() < 1e-5,
+            "valence should be ~{expected}; got {}",
             mood.valence
         );
     }
@@ -275,7 +360,7 @@ mod tests {
         schedule.run(&mut world);
         let valence = world.get::<Mood>(entity).unwrap().valence;
 
-        // baseline: 1.0 * 0.4 - 0.2 = 0.2
+        // baseline: 1.0 * 0.4 - 0.05 = 0.35
         assert!(
             valence > 0.0,
             "optimistic cat should have positive baseline; got {valence}"
@@ -292,7 +377,7 @@ mod tests {
         schedule.run(&mut world);
         let valence = world.get::<Mood>(entity).unwrap().valence;
 
-        // baseline: 0.0 * 0.4 - 0.2 = -0.2
+        // baseline: 0.0 * 0.4 - 0.05 = -0.05
         assert!(
             valence < 0.0,
             "pessimistic cat should have negative baseline; got {valence}"
@@ -335,6 +420,8 @@ mod tests {
     fn setup_contagion_world() -> (World, Schedule) {
         let mut world = World::new();
         world.insert_resource(Relationships::default());
+        world.insert_resource(crate::resources::SimConstants::default());
+        world.insert_resource(SystemActivation::default());
         let mut schedule = Schedule::default();
         schedule.add_systems(mood_contagion);
         (world, schedule)
@@ -345,27 +432,27 @@ mod tests {
         let (mut world, mut schedule) = setup_contagion_world();
 
         // Happy cat at (5, 5)
-        let source = world.spawn((
-            Mood {
-                valence: 0.8,
-                modifiers: VecDeque::new(),
-            },
-            Position::new(5, 5),
-            default_personality(),
-        )).id();
-
-        // Neutral cat at (6, 5) — 1 tile away
-        let receiver = world
+        let source = world
             .spawn((
-                Mood::default(),
-                Position::new(6, 5),
+                Mood {
+                    valence: 0.8,
+                    modifiers: VecDeque::new(),
+                },
+                Position::new(5, 5),
                 default_personality(),
             ))
             .id();
 
+        // Neutral cat at (6, 5) — 1 tile away
+        let receiver = world
+            .spawn((Mood::default(), Position::new(6, 5), default_personality()))
+            .id();
+
         // Give them a relationship with positive fondness.
-        world.resource_mut::<Relationships>()
-            .get_or_insert(source, receiver).fondness = 0.5;
+        world
+            .resource_mut::<Relationships>()
+            .get_or_insert(source, receiver)
+            .fondness = 0.5;
 
         schedule.run(&mut world);
 
@@ -396,11 +483,7 @@ mod tests {
 
         // Distant cat at (4, 0) — 4 tiles away
         let receiver = world
-            .spawn((
-                Mood::default(),
-                Position::new(4, 0),
-                default_personality(),
-            ))
+            .spawn((Mood::default(), Position::new(4, 0), default_personality()))
             .id();
 
         schedule.run(&mut world);
@@ -422,41 +505,61 @@ mod tests {
         // Cat pair with high fondness vs low fondness, same distance.
         let (mut world_high, mut schedule_high) = setup_contagion_world();
 
-        let src_h = world_high.spawn((
-            Mood { valence: 0.8, modifiers: VecDeque::new() },
-            Position::new(5, 5),
-            default_personality(),
-        )).id();
-        let rcv_h = world_high.spawn((
-            Mood::default(),
-            Position::new(6, 5),
-            default_personality(),
-        )).id();
-        world_high.resource_mut::<Relationships>()
-            .get_or_insert(src_h, rcv_h).fondness = 0.9;
+        let src_h = world_high
+            .spawn((
+                Mood {
+                    valence: 0.8,
+                    modifiers: VecDeque::new(),
+                },
+                Position::new(5, 5),
+                default_personality(),
+            ))
+            .id();
+        let rcv_h = world_high
+            .spawn((Mood::default(), Position::new(6, 5), default_personality()))
+            .id();
+        world_high
+            .resource_mut::<Relationships>()
+            .get_or_insert(src_h, rcv_h)
+            .fondness = 0.9;
 
         let (mut world_low, mut schedule_low) = setup_contagion_world();
 
-        let src_l = world_low.spawn((
-            Mood { valence: 0.8, modifiers: VecDeque::new() },
-            Position::new(5, 5),
-            default_personality(),
-        )).id();
-        let rcv_l = world_low.spawn((
-            Mood::default(),
-            Position::new(6, 5),
-            default_personality(),
-        )).id();
-        world_low.resource_mut::<Relationships>()
-            .get_or_insert(src_l, rcv_l).fondness = -0.8;
+        let src_l = world_low
+            .spawn((
+                Mood {
+                    valence: 0.8,
+                    modifiers: VecDeque::new(),
+                },
+                Position::new(5, 5),
+                default_personality(),
+            ))
+            .id();
+        let rcv_l = world_low
+            .spawn((Mood::default(), Position::new(6, 5), default_personality()))
+            .id();
+        world_low
+            .resource_mut::<Relationships>()
+            .get_or_insert(src_l, rcv_l)
+            .fondness = -0.8;
 
         schedule_high.run(&mut world_high);
         schedule_low.run(&mut world_low);
 
-        let influence_high: f32 = world_high.get::<Mood>(rcv_h).unwrap()
-            .modifiers.iter().map(|m| m.amount).sum();
-        let influence_low: f32 = world_low.get::<Mood>(rcv_l).unwrap()
-            .modifiers.iter().map(|m| m.amount).sum();
+        let influence_high: f32 = world_high
+            .get::<Mood>(rcv_h)
+            .unwrap()
+            .modifiers
+            .iter()
+            .map(|m| m.amount)
+            .sum();
+        let influence_low: f32 = world_low
+            .get::<Mood>(rcv_l)
+            .unwrap()
+            .modifiers
+            .iter()
+            .map(|m| m.amount)
+            .sum();
 
         assert!(
             influence_high > influence_low,

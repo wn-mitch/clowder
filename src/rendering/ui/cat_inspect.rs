@@ -2,7 +2,8 @@ use bevy::prelude::*;
 
 use crate::ai::CurrentAction;
 use crate::components::aspirations::{Aspirations, MilestoneCondition, Preferences, Preference};
-use crate::components::disposition::{ActionHistory, Disposition};
+use crate::components::disposition::ActionHistory;
+use crate::components::goap_plan::GoapPlan;
 use crate::components::coordination::{ActiveDirective, Coordinator};
 use crate::components::fate::{FatedLove, FatedRival};
 use crate::components::identity::{Age, LifeStage, Species};
@@ -103,7 +104,7 @@ pub fn update_cat_inspect_panel(
             Option<&FatedRival>,
             Option<&Aspirations>,
             Option<&Preferences>,
-            Option<&Disposition>,
+            Option<&GoapPlan>,
             Option<&ActionHistory>,
         ),
         (With<Species>, Without<Dead>),
@@ -202,10 +203,10 @@ pub fn update_cat_inspect_panel(
 
     // Current disposition
     if let Some(disp) = disposition {
-        let disp_label = if disp.target_completions == u32::MAX {
+        let disp_label = if disp.target_trips == u32::MAX {
             disp.kind.label().to_string()
         } else {
-            format!("{} ({}/{})", disp.kind.label(), disp.completions, disp.target_completions)
+            format!("{} ({}/{})", disp.kind.label(), disp.trips_done, disp.target_trips)
         };
         children.push(spawn_text(
             &mut commands,
@@ -415,7 +416,12 @@ pub fn update_cat_inspect_panel(
                 };
                 children.push(spawn_text(
                     &mut commands,
-                    &format!("  t{}: {:?} ({})", entry.tick, entry.action, outcome_str),
+                    &format!("  D{} {}: {:?} ({})",
+                        TimeState::day_number(entry.tick, &config),
+                        crate::resources::time::DayPhase::from_tick(entry.tick, &config).label(),
+                        entry.action,
+                        outcome_str,
+                    ),
                     FONT_SIZE,
                     color,
                 ));

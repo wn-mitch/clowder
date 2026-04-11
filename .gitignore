@@ -28,5 +28,11 @@ rust_analyzer/
 # Asset packs not licensed for redistribution
 assets/sprites/Sprout Lands - UI Pack - Basic pack/
 
+# mdBook build output
+docs/wiki/book/
+
+# Custom cat JSON files (personal, not committed)
+assets/data/cats/*.json
+
 # Superpowers brainstorm artifacts
 .superpowers/

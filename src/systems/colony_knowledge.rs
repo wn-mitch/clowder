@@ -4,20 +4,11 @@ use bevy_ecs::prelude::*;
 
 use crate::components::mental::{Memory, MemoryType};
 use crate::components::physical::{Dead, Position};
-use crate::resources::colony_knowledge::{
-    ColonyKnowledge, KnowledgeEntry, knowledge_description,
-};
+use crate::resources::colony_knowledge::{knowledge_description, ColonyKnowledge, KnowledgeEntry};
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
+use crate::resources::sim_constants::SimConstants;
+use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::resources::time::TimeState;
-
-/// Decay rate per tick for colony knowledge entries.
-const DECAY_PER_TICK: f32 = 0.0001;
-
-/// Minimum number of carriers required to promote a memory to colony knowledge.
-const PROMOTION_THRESHOLD: u32 = 3;
-
-/// How often (in ticks) to scan for promotable memories.
-const SCAN_INTERVAL: u64 = 500;
 
 // ---------------------------------------------------------------------------
 // update_colony_knowledge system
@@ -30,10 +21,14 @@ const SCAN_INTERVAL: u64 = 500;
 /// (event_type, bucketed_location), promote if threshold met.
 pub fn update_colony_knowledge(
     time: Res<TimeState>,
+    constants: Res<SimConstants>,
     cats: Query<&Memory, Without<Dead>>,
     mut knowledge: ResMut<ColonyKnowledge>,
     mut log: ResMut<NarrativeLog>,
+    mut activation: ResMut<SystemActivation>,
 ) {
+    let c = &constants.knowledge;
+
     // --- Decay and cleanup (every tick) ------------------------------------
     let mut removed = Vec::new();
     knowledge.entries.retain(|entry| {
@@ -48,8 +43,7 @@ pub fn update_colony_knowledge(
     // Deduplicate by description before emitting narrative so that multiple
     // entries with the same knowledge_description produce only one line.
     // Also enforce a cooldown: don't re-narrate forgetting the same knowledge
-    // within 1000 ticks to prevent spam from promote/decay cycles.
-    const FORGOTTEN_COOLDOWN: u64 = 1000;
+    // within forgotten_cooldown ticks to prevent spam from promote/decay cycles.
     let mut seen_descriptions = std::collections::HashSet::new();
     for entry in &removed {
         let desc = knowledge_description(entry);
@@ -59,8 +53,9 @@ pub fn update_colony_knowledge(
         let on_cooldown = knowledge
             .recently_forgotten
             .get(&desc)
-            .is_some_and(|&last_tick| time.tick.saturating_sub(last_tick) < FORGOTTEN_COOLDOWN);
+            .is_some_and(|&last_tick| time.tick.saturating_sub(last_tick) < c.forgotten_cooldown);
         if !on_cooldown {
+            activation.record(Feature::KnowledgeForgotten);
             knowledge.recently_forgotten.insert(desc.clone(), time.tick);
             log.push(
                 time.tick,
@@ -73,16 +68,16 @@ pub fn update_colony_knowledge(
     // Prune stale cooldown entries.
     knowledge
         .recently_forgotten
-        .retain(|_, tick| time.tick.saturating_sub(*tick) < FORGOTTEN_COOLDOWN);
+        .retain(|_, tick| time.tick.saturating_sub(*tick) < c.forgotten_cooldown);
 
     // Apply decay after cleanup (so newly-promoted entries don't decay on
     // their first tick).
     for entry in &mut knowledge.entries {
-        entry.strength = (entry.strength - DECAY_PER_TICK).max(0.0);
+        entry.strength = (entry.strength - c.decay_per_tick).max(0.0);
     }
 
-    // --- Promotion scan (every SCAN_INTERVAL ticks) ------------------------
-    if !time.tick.is_multiple_of(SCAN_INTERVAL) {
+    // --- Promotion scan (every scan_interval ticks) ------------------------
+    if !time.tick.is_multiple_of(c.scan_interval) {
         return;
     }
 
@@ -104,7 +99,7 @@ pub fn update_colony_knowledge(
             seen_groups.push(key);
 
             let group = memory_groups.entry(key).or_insert((0, 0.0));
-            group.0 += 1;          // carrier count
+            group.0 += 1; // carrier count
             group.1 += entry.strength; // sum of strengths (for averaging)
         }
     }
@@ -114,8 +109,9 @@ pub fn update_colony_knowledge(
         if let Some(idx) = knowledge.find_entry(*event_type, location) {
             // Update carrier count for existing entry.
             knowledge.entries[idx].carrier_count = *count;
-        } else if *count >= PROMOTION_THRESHOLD {
+        } else if *count >= c.promotion_threshold {
             // New promotion.
+            activation.record(Feature::KnowledgePromoted);
             let avg_strength = strength_sum / *count as f32;
             knowledge.entries.push(KnowledgeEntry {
                 event_type: *event_type,
@@ -142,17 +138,20 @@ pub fn update_colony_knowledge(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bevy_ecs::schedule::Schedule;
     use crate::components::mental::MemoryEntry;
     use crate::resources::narrative::NarrativeLog;
+    use crate::resources::sim_constants::SimConstants;
     use crate::resources::time::TimeState;
+    use bevy_ecs::schedule::Schedule;
 
     fn setup_world() -> (World, Schedule) {
         let mut world = World::new();
         world.insert_resource(ColonyKnowledge::default());
+        world.insert_resource(SimConstants::default());
         world.insert_resource(NarrativeLog::default());
+        world.insert_resource(SystemActivation::default());
         let mut time = TimeState::default();
-        time.tick = 500; // divisible by SCAN_INTERVAL
+        time.tick = SimConstants::default().knowledge.scan_interval; // divisible by scan_interval
         world.insert_resource(time);
 
         let mut schedule = Schedule::default();
@@ -214,7 +213,10 @@ mod tests {
         schedule.run(&mut world);
 
         let knowledge = world.resource::<ColonyKnowledge>();
-        assert!(knowledge.entries.is_empty(), "should not promote with only 2 carriers");
+        assert!(
+            knowledge.entries.is_empty(),
+            "should not promote with only 2 carriers"
+        );
     }
 
     #[test]
@@ -272,10 +274,16 @@ mod tests {
         schedule.run(&mut world);
 
         let knowledge = world.resource::<ColonyKnowledge>();
-        let count = knowledge.entries.iter()
+        let count = knowledge
+            .entries
+            .iter()
             .find(|e| e.event_type == MemoryType::Death)
             .map(|e| e.carrier_count);
-        assert_eq!(count, Some(0), "carrier count should be 0 with no matching memories");
+        assert_eq!(
+            count,
+            Some(0),
+            "carrier count should be 0 with no matching memories"
+        );
 
         // Next tick: entry should be removed (carrier_count == 0 caught by retain).
         {
@@ -320,7 +328,9 @@ mod tests {
         schedule.run(&mut world);
 
         let knowledge = world.resource::<ColonyKnowledge>();
-        let matching: Vec<_> = knowledge.entries.iter()
+        let matching: Vec<_> = knowledge
+            .entries
+            .iter()
             .filter(|e| e.event_type == MemoryType::ThreatSeen)
             .collect();
         assert_eq!(matching.len(), 1, "should not create duplicate entry");

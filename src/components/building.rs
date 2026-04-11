@@ -1,9 +1,14 @@
 use bevy_ecs::prelude::*;
 
+use crate::components::items::Item;
 use crate::components::physical::Position;
 use crate::components::task_chain::{
     FailurePolicy, Material, StepKind, TaskChain, TaskStep,
 };
+
+/// Decorative marker for the colony well entity at the colony center.
+#[derive(Component)]
+pub struct ColonyWell;
 
 // ---------------------------------------------------------------------------
 // StructureType
@@ -281,6 +286,45 @@ impl StoredItems {
     /// Attempt to add an item. Returns `false` if at capacity.
     pub fn add(&mut self, item: Entity, kind: StructureType) -> bool {
         if self.is_full(kind) {
+            return false;
+        }
+        self.items.push(item);
+        true
+    }
+
+    /// Effective capacity accounting for storage-upgrade items in the Vec.
+    /// Requires an `Item` query to inspect stored items for `capacity_bonus()`.
+    pub fn effective_capacity_with_items(
+        kind: StructureType,
+        stored: &[Entity],
+        items_q: &Query<&Item>,
+    ) -> usize {
+        let base = Self::capacity(kind);
+        let bonus: usize = stored
+            .iter()
+            .filter_map(|&e| items_q.get(e).ok())
+            .map(|item| item.kind.capacity_bonus())
+            .sum();
+        base + bonus
+    }
+
+    /// Whether this building is at effective capacity (accounting for storage upgrades).
+    pub fn is_effectively_full(
+        &self,
+        kind: StructureType,
+        items_q: &Query<&Item>,
+    ) -> bool {
+        self.items.len() >= Self::effective_capacity_with_items(kind, &self.items, items_q)
+    }
+
+    /// Attempt to add an item, using effective capacity. Returns `false` if full.
+    pub fn add_effective(
+        &mut self,
+        item: Entity,
+        kind: StructureType,
+        items_q: &Query<&Item>,
+    ) -> bool {
+        if self.is_effectively_full(kind, items_q) {
             return false;
         }
         self.items.push(item);

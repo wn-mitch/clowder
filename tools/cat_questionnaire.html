@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Know Thy Cat - Clowder Questionnaire</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #222244;
+    --surface-alt: #2a2a4a;
+    --text: #e0d8c8;
+    --text-muted: #8a8477;
+    --accent: #d4a574;
+    --accent-hover: #e0b888;
+    --border: #3a3a5a;
+    --bar-bg: #2e2e4e;
+    --positive: #7ec87e;
+    --negative: #c87e7e;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: Georgia, 'Times New Roman', serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  h1 {
+    font-size: 2rem;
+    color: var(--accent);
+    margin-bottom: 0.25rem;
+  }
+
+  .subtitle {
+    color: var(--text-muted);
+    font-style: italic;
+    margin-bottom: 2rem;
+    font-size: 0.95rem;
+  }
+
+  h2 {
+    font-size: 1.3rem;
+    color: var(--accent);
+    margin: 2rem 0 1rem;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  h3 {
+    font-size: 1.05rem;
+    color: var(--text);
+    margin: 1.5rem 0 0.5rem;
+  }
+
+  .question-number {
+    color: var(--accent);
+    font-weight: bold;
+  }
+
+  .question-flavor {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+  }
+
+  /* Identity fields */
+  .field-group {
+    margin-bottom: 1rem;
+  }
+
+  .field-group label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+    color: var(--accent);
+    font-size: 0.9rem;
+  }
+
+  .field-group input[type="text"] {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.95rem;
+    border-radius: 4px;
+  }
+
+  .field-group input[type="text"]:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .field-group input[type="text"]::placeholder {
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  .radio-group {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .radio-group label {
+    font-weight: normal;
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .marks-input {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  /* Questions */
+  .question-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  .question-block.answered {
+    border-color: var(--accent);
+    border-left: 3px solid var(--accent);
+  }
+
+  .option {
+    display: block;
+    padding: 0.5rem 0.75rem;
+    margin: 0.25rem 0;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s;
+    font-size: 0.9rem;
+  }
+
+  .option:hover {
+    background: var(--surface-alt);
+  }
+
+  .option input[type="radio"] {
+    margin-right: 0.5rem;
+    accent-color: var(--accent);
+  }
+
+  .option-letter {
+    font-weight: bold;
+    color: var(--accent);
+    margin-right: 0.25rem;
+  }
+
+  /* Personality panel */
+  .personality-panel {
+    position: sticky;
+    top: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .trait-row {
+    display: flex;
+    align-items: center;
+    margin: 0.2rem 0;
+    font-size: 0.8rem;
+  }
+
+  .trait-name {
+    width: 100px;
+    text-align: right;
+    padding-right: 0.5rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .trait-bar-container {
+    flex: 1;
+    height: 14px;
+    background: var(--bar-bg);
+    border-radius: 3px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .trait-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease, background-color 0.3s ease;
+    min-width: 2px;
+  }
+
+  .trait-value {
+    width: 36px;
+    text-align: right;
+    padding-left: 0.4rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .trait-section-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    margin-top: 0.5rem;
+    margin-bottom: 0.15rem;
+  }
+
+  .center-mark {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--border);
+  }
+
+  /* Layout */
+  .two-col {
+    display: flex;
+    gap: 1.5rem;
+  }
+
+  .col-main { flex: 1; min-width: 0; }
+  .col-side { width: 280px; flex-shrink: 0; }
+
+  @media (max-width: 900px) {
+    .two-col { flex-direction: column; }
+    .col-side { width: 100%; }
+    .personality-panel { position: static; }
+  }
+
+  /* Actions */
+  .actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  button {
+    padding: 0.6rem 1.2rem;
+    font-family: inherit;
+    font-size: 0.9rem;
+    border: 1px solid var(--accent);
+    background: transparent;
+    color: var(--accent);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  button:hover {
+    background: var(--accent);
+    color: var(--bg);
+  }
+
+  button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  button:disabled:hover {
+    background: transparent;
+    color: var(--accent);
+  }
+
+  button.primary {
+    background: var(--accent);
+    color: var(--bg);
+    font-weight: bold;
+  }
+
+  button.primary:hover {
+    background: var(--accent-hover);
+  }
+
+  .progress {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+  }
+
+  /* JSON preview */
+  .json-preview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    margin-top: 1rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 400px;
+    overflow-y: auto;
+    display: none;
+  }
+
+  .json-preview.visible { display: block; }
+
+  .toast {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent);
+    color: var(--bg);
+    padding: 0.5rem 1.25rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Know Thy Cat</h1>
+  <p class="subtitle">A questionnaire for immortalizing your real-life feline as a colonist in Clowder. Answer honestly. Your cat already knows what you're going to pick.</p>
+
+  <h2>Your Cat</h2>
+
+  <div class="field-group">
+    <label for="cat-name">Name</label>
+    <input type="text" id="cat-name" placeholder="e.g. Biscuit, Chairman Meow, Lord Fluffington">
+  </div>
+
+  <div class="field-group">
+    <label>Gender</label>
+    <div class="radio-group">
+      <label><input type="radio" name="gender" value="Tom"> Tom (he/him)</label>
+      <label><input type="radio" name="gender" value="Queen"> Queen (she/her)</label>
+      <label><input type="radio" name="gender" value="Nonbinary"> Nonbinary (they/them)</label>
+    </div>
+  </div>
+
+  <div class="field-group">
+    <label for="fur-color">Fur Color</label>
+    <input type="text" id="fur-color" placeholder='e.g. "orange tabby," "tuxedo black-and-white," "void"'>
+  </div>
+
+  <div class="field-group">
+    <label for="pattern">Pattern</label>
+    <input type="text" id="pattern" placeholder='e.g. "mackerel," "solid," "calico"'>
+  </div>
+
+  <div class="field-group">
+    <label for="eye-color">Eye Color</label>
+    <input type="text" id="eye-color" placeholder='e.g. "green," "amber," "heterochromia blue/gold"'>
+  </div>
+
+  <div class="field-group">
+    <label for="marks">Distinguishing Marks <span class="marks-input">(comma-separated)</span></label>
+    <input type="text" id="marks" placeholder='e.g. "notched left ear, one white toe, perpetual judgment"'>
+  </div>
+
+  <hr style="border-color: var(--border); margin: 2rem 0;">
+
+  <h2>The Questions</h2>
+  <p class="subtitle">Answer each scenario with the option that best describes your cat. If multiple apply, pick the one that happens most often.</p>
+
+  <div class="two-col">
+    <div class="col-main">
+      <p class="progress" id="progress">0 of 15 answered</p>
+      <div id="questions"></div>
+
+      <div class="actions">
+        <button class="primary" id="btn-download" disabled>Download JSON</button>
+        <button id="btn-copy" disabled>Copy to Clipboard</button>
+        <button id="btn-preview" disabled>Preview JSON</button>
+        <button id="btn-reset">Reset All</button>
+      </div>
+
+      <div class="json-preview" id="json-preview"></div>
+
+      <div class="instructions" style="margin-top:1.5rem; padding:1rem; background:var(--surface); border:1px solid var(--border); border-radius:6px; font-size:0.85rem; color:var(--text-muted);">
+        <strong style="color:var(--accent);">What to do with the file</strong>
+        <ol style="margin:0.5rem 0 0 1.25rem; padding:0;">
+          <li>Fill out the identity fields and all 15 questions above.</li>
+          <li>Click <strong>Download JSON</strong> to save your cat's file.</li>
+          <li>Drop the <code>.json</code> file into <code>assets/data/cats/</code> in your Clowder directory.</li>
+          <li>Launch the game. Your cat will join the colony, and any remaining slots (up to 8) will be filled with random cats.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="col-side">
+      <div class="personality-panel">
+        <h3 style="margin-top:0; font-size:0.95rem; color:var(--accent);">Personality</h3>
+        <div id="trait-bars"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Scoring data ──────────────────────────────────────────────────
+// Each question maps answer index (0=a, 1=b, ...) to trait deltas.
+
+const SCORING = [
+  // Q1: The String Hunt
+  [
+    { boldness: -0.10, playfulness: -0.10, patience: 0.10 },
+    { boldness: 0.05, playfulness: 0.05, patience: 0.15 },
+    { boldness: 0.05, playfulness: 0.15, patience: -0.05 },
+    { boldness: 0.10, playfulness: 0.05, patience: -0.10 },
+    { boldness: 0.15, playfulness: 0.10, patience: -0.15 },
+  ],
+  // Q2: A Stranger Arrives
+  [
+    { sociability: -0.15, anxiety: 0.15, boldness: -0.10, warmth: -0.05 },
+    { sociability: -0.05, anxiety: 0.05, boldness: 0.05 },
+    {},
+    { sociability: 0.15, anxiety: -0.10, boldness: 0.10, warmth: 0.10 },
+    { sociability: 0.10, anxiety: -0.05, boldness: 0.15, warmth: 0.15 },
+  ],
+  // Q3: The Closed Door
+  [
+    { curiosity: -0.10, stubbornness: -0.10, diligence: -0.05 },
+    { curiosity: 0.05, stubbornness: 0.05, patience: -0.10, diligence: -0.05 },
+    { curiosity: 0.10, stubbornness: 0.05, patience: 0.05, diligence: 0.05 },
+    { curiosity: 0.15, stubbornness: 0.10, patience: 0.10, diligence: 0.15 },
+    { curiosity: 0.10, stubbornness: 0.15, patience: -0.10, diligence: 0.10 },
+  ],
+  // Q4: The Empty Food Bowl
+  [
+    { temper: -0.10, diligence: -0.05, patience: 0.15, independence: -0.05 },
+    { temper: 0.05, diligence: -0.05, patience: 0.05, independence: -0.05 },
+    { temper: -0.05, diligence: 0.15, patience: 0.05, independence: 0.05 },
+    { temper: 0.10, diligence: 0.05, patience: -0.10, independence: 0.10 },
+    { temper: 0.05, diligence: 0.10, patience: -0.15, independence: 0.15 },
+  ],
+  // Q5: Another Cat's Toy
+  [
+    { compassion: -0.05, pride: 0.15, warmth: -0.05 },
+    { compassion: 0.05, pride: -0.05, warmth: 0.05 },
+    { compassion: 0.15, pride: -0.10, warmth: 0.15 },
+    { compassion: -0.15, pride: 0.10, warmth: -0.10 },
+    { compassion: 0.10, pride: -0.05, warmth: 0.10 },
+  ],
+  // Q6: The Vacuum Cleaner
+  [
+    { anxiety: 0.15, boldness: -0.15, optimism: -0.10 },
+    { anxiety: 0.05, boldness: -0.05 },
+    { anxiety: -0.05, boldness: 0.10, optimism: 0.05 },
+    { anxiety: -0.10, boldness: 0.15, optimism: 0.10 },
+    { anxiety: -0.15, boldness: 0.10, optimism: 0.15 },
+  ],
+  // Q7: Favorite Spot Occupied
+  [
+    { tradition: -0.15, temper: -0.10, stubbornness: -0.10, ambition: -0.05 },
+    { tradition: 0.10, temper: -0.05, stubbornness: 0.10, ambition: -0.05 },
+    { tradition: 0.15, temper: 0.05, stubbornness: 0.10, ambition: 0.05 },
+    { tradition: 0.10, temper: 0.10, stubbornness: 0.15, ambition: 0.15 },
+    { tradition: 0.05, temper: 0.15, stubbornness: 0.10, ambition: 0.10 },
+  ],
+  // Q8: The Bird Outside
+  [
+    { curiosity: -0.10, boldness: -0.05, spirituality: -0.05 },
+    { curiosity: 0.10, patience: -0.05, boldness: 0.05, spirituality: 0.05 },
+    { curiosity: 0.10, patience: 0.15, boldness: 0.05, spirituality: 0.05 },
+    { curiosity: 0.05, patience: -0.15, boldness: 0.15, spirituality: -0.05 },
+    { curiosity: 0.05, patience: 0.05, boldness: 0.10, spirituality: 0.10 },
+  ],
+  // Q9: Your Laptop
+  [
+    { ambition: -0.10, loyalty: -0.10, playfulness: -0.05, warmth: -0.05 },
+    { ambition: -0.05, loyalty: 0.15, playfulness: -0.05, warmth: 0.10 },
+    { ambition: 0.15, loyalty: 0.05, playfulness: 0.05, warmth: 0.05 },
+    { ambition: 0.05, loyalty: 0.05, playfulness: 0.15, warmth: 0.05 },
+    { ambition: 0.10, loyalty: 0.10, playfulness: 0.10, warmth: -0.05 },
+  ],
+  // Q10: The 3 AM Phenomenon
+  [
+    { playfulness: -0.15, independence: -0.05, curiosity: -0.10, optimism: 0.05 },
+    { playfulness: 0.05, independence: 0.05, curiosity: 0.05, optimism: 0.05 },
+    { playfulness: 0.15, independence: 0.10, curiosity: 0.05, optimism: 0.10 },
+    { playfulness: 0.10, independence: -0.05, curiosity: 0.05, optimism: 0.15 },
+    { playfulness: 0.05, independence: 0.15, curiosity: 0.15, optimism: -0.05 },
+  ],
+  // Q11: The Vet
+  [
+    { anxiety: 0.05, pride: -0.15, stubbornness: -0.15 },
+    { anxiety: 0.15, pride: 0.05, stubbornness: 0.05 },
+    { anxiety: 0.10, pride: 0.10, stubbornness: 0.15 },
+    { anxiety: -0.05, pride: 0.15, stubbornness: 0.10 },
+    { anxiety: -0.10, pride: 0.10, stubbornness: 0.10 },
+  ],
+  // Q12: A New Cat Appears
+  [
+    { sociability: -0.15, loyalty: 0.10, compassion: -0.10, independence: -0.05 },
+    { sociability: -0.05, compassion: -0.05, independence: 0.15 },
+    { independence: 0.05 },
+    { sociability: 0.15, loyalty: -0.05, compassion: 0.15, independence: -0.10 },
+    { sociability: 0.10, loyalty: 0.10, compassion: 0.10, independence: -0.05 },
+  ],
+  // Q13: The Sacred Routine
+  [
+    { tradition: -0.15, curiosity: 0.05, independence: 0.05 },
+    { tradition: -0.05 },
+    { tradition: 0.10, patience: 0.05 },
+    { tradition: 0.15, patience: 0.10, stubbornness: 0.05 },
+    { tradition: 0.10, patience: 0.15, diligence: 0.05 },
+  ],
+  // Q14: The Love Language
+  [
+    { warmth: -0.10, loyalty: -0.10, sociability: -0.10, independence: 0.05 },
+    { warmth: 0.05, loyalty: 0.05 },
+    { warmth: 0.15, sociability: 0.10 },
+    { loyalty: 0.15, warmth: 0.05, independence: -0.10 },
+    { warmth: 0.15, loyalty: 0.10, sociability: 0.10 },
+  ],
+  // Q15: Staring at Nothing
+  [
+    { spirituality: -0.15, curiosity: -0.05 },
+    { spirituality: -0.05, curiosity: 0.05, patience: -0.05 },
+    { spirituality: 0.10, curiosity: 0.10, patience: 0.10 },
+    { spirituality: 0.15, curiosity: 0.15, patience: 0.05 },
+    { spirituality: 0.10, curiosity: 0.05, patience: 0.15 },
+  ],
+];
+
+const QUESTIONS = [
+  {
+    title: "The String Hunt",
+    flavor: "When you drag a string across the floor, your cat:",
+    options: [
+      "Watches from across the room, pretending not to care. It's beneath them. (They're tracking it.)",
+      "Sneaks up with military precision and delivers one surgical pounce. Mission complete.",
+      "Wiggles their butt dramatically for 30 seconds, then overshoots by a mile.",
+      "Grabs it immediately and sprints to a hiding spot. Possession is law.",
+      "The string has been shredded. The couch has been shredded. Nothing with fibers is safe in your home.",
+    ]
+  },
+  {
+    title: "A Stranger Arrives",
+    flavor: "A new person enters the house. Your cat:",
+    options: [
+      "Gone. Vanished. Will reappear in 3\u20136 business hours.",
+      "Observes from a high perch, gathering intelligence.",
+      "Cautious approach, one sniff, returns to their spot. You passed muster. For now.",
+      "Already in the visitor's lap, demanding tribute. This is their new person now.",
+      "Brings them a dead thing. (Or a hairband. Or a sock.) You're family now.",
+    ]
+  },
+  {
+    title: "The Closed Door",
+    flavor: "There's a closed door in the house. Your cat:",
+    options: [
+      "Ignores it. If the door is closed, it wasn't meant to be.",
+      "Sits outside and cries. Sits and cries. Sits and cries.",
+      "Reaches a paw under the gap and fishes around like they're checking for survivors.",
+      "Methodically tests the handle. Has learned how handles work.",
+      "This is an open door household. They won't tolerate anything else.",
+    ]
+  },
+  {
+    title: "The Empty Food Bowl",
+    flavor: "The food bowl is empty. Your cat:",
+    options: [
+      "Sits politely next to it. Makes meaningful eye contact. Waits.",
+      "Meows once. If nothing happens, meows at the wall about it.",
+      "Leads you to the bowl. Leads you back. Leads you to the bowl again. You are being project-managed.",
+      "Knocks something off the counter. Maintains eye contact the entire time.",
+      "Has located the food bag. Has opened the food bag. Welcome to the self-service economy.",
+    ]
+  },
+  {
+    title: "Another Cat's Toy",
+    flavor: "There's another cat's toy on the floor. Your cat:",
+    options: [
+      "Wouldn't touch it. Has their own, thank you very much.",
+      "Watches the other cat play, waits for them to leave, then casually inspects it.",
+      "Brings their own toy over and drops it nearby. Playdate initiated.",
+      "Takes it. This is theirs now. All toys have always been theirs.",
+      "Ignores the toy, walks over, and starts grooming the other cat instead.",
+    ]
+  },
+  {
+    title: "The Vacuum Cleaner",
+    flavor: "You turn on the vacuum. Your cat:",
+    options: [
+      "Under the bed before you've even opened the closet.",
+      "Relocates to another room with dignified haste. Not scared. Strategically repositioning.",
+      "Watches from the arm of the couch. Suspicious. Holding ground.",
+      "Has swatted the vacuum. The vacuum started it.",
+      "Rides the Roomba. Has claimed it as a vehicle.",
+    ]
+  },
+  {
+    title: "Favorite Spot Occupied",
+    flavor: "Someone is in your cat's spot. Your cat:",
+    options: [
+      "Finds somewhere else. Spots are temporary. Naps are forever.",
+      "Sits nearby and radiates disappointment until the spot opens up.",
+      "Squeezes in anyway. There is room. There is always room.",
+      "Sits ON the occupant. The spot includes whatever's currently in it.",
+      "Initiates a campaign of total warfare until the occupant relocates.",
+    ]
+  },
+  {
+    title: "The Bird Outside",
+    flavor: "There's a bird outside the window. Your cat:",
+    options: [
+      "Couldn't care less. Birds are a concept that doesn't apply to them.",
+      "Chatters their teeth at it. The ancient, involuntary battle cry.",
+      "Watches in complete stillness for 45 minutes. No blinking. Just bird.",
+      "Full-body slams the window. The bird is unfazed. Your cat is undeterred.",
+      "Has caught one before. Brought it inside. Presented it with ceremony.",
+    ]
+  },
+  {
+    title: "Your Laptop",
+    flavor: "You're trying to work. Your cat:",
+    options: [
+      "You and your glowing rectangle are beneath notice.",
+      "Curls up next to you while you work. Quiet solidarity.",
+      "Sits on the keyboard. Your work is done now. Accept this.",
+      "Bats at the cursor. Every cursor movement is a personal invitation.",
+      "Has closed your laptop lid. Has opened 14 tabs on your phone.",
+    ]
+  },
+  {
+    title: "The 3 AM Phenomenon",
+    flavor: "At 3 AM, your cat:",
+    options: [
+      "Sleeps through the night like a normal, reasonable creature.",
+      "Emits one single loud meow. No context provided. Returns to sleep.",
+      "Parkour. Full-contact parkour off every surface in the house.",
+      "Brings you a toy and drops it on your face. It's play time.",
+      "You hear sounds from rooms that should be empty.",
+    ]
+  },
+  {
+    title: "The Vet",
+    flavor: "It's time for the vet. Your cat:",
+    options: [
+      "Goes limp. Accepts fate. Has transcended this mortal coil.",
+      "Vanishes at the first sight of the carrier. You are now 30 minutes late.",
+      "Requires two people and a towel. There were casualties (your forearms).",
+      "Hisses at the vet. Just the vet. Everyone else gets a pass.",
+      'The vet has a note in the file. The note says "Beware."',
+    ]
+  },
+  {
+    title: "A New Cat Appears",
+    flavor: "You bring a new cat into the household. Your cat:",
+    options: [
+      "Hisses and retreats to a high shelf. This is a betrayal.",
+      "Pretends the new cat doesn't exist. For weeks.",
+      "Cautious parallel existence. Borders have been drawn.",
+      "Grooming the new cat within 48 hours. Best friends acquired.",
+      "Has adopted the new cat as their own kitten, regardless of size or age.",
+    ]
+  },
+  {
+    title: "The Sacred Routine",
+    flavor: "Your cat's daily habits:",
+    options: [
+      "What routine? Every day is improvised. The only constant is chaos.",
+      "Has a loose pattern \u2014 breakfast spot, afternoon sun patch \u2014 but adapts without complaint.",
+      "Same sequence every day. Window. Nap spot. Dinner. Deviation is noted.",
+      "Has a schedule. You have learned the schedule. It does not accommodate yours.",
+      "Patrols the same route at the same time each day. You could set a clock by it.",
+    ]
+  },
+  {
+    title: "The Love Language",
+    flavor: "How does your cat show affection?",
+    options: [
+      "They don't. You are the help. Compensation is room and board.",
+      "The slow blink from across the room. Once a day, if you're lucky.",
+      "Headbutts. Relentless, precision-targeted headbutts.",
+      "Follows you from room to room. Not clingy. Supervisory.",
+      "Falls asleep on you and purrs until your ribs vibrate.",
+    ]
+  },
+  {
+    title: "Staring at Nothing",
+    flavor: "Your cat and empty walls:",
+    options: [
+      "Doesn't do this. A grounded, normal cat who lives in the material world.",
+      "Occasionally stares at a corner. It's probably a bug. (There's never a bug.)",
+      "Regular wall-staring sessions. Ten-minute minimum. No blinking.",
+      "Tracks things you cannot see across the room. Gets up to follow them.",
+      "Has a spot. Sits in the spot and stares. The spot has no distinguishing features.",
+    ]
+  },
+];
+
+const TRAITS = [
+  // Core Drives
+  'boldness', 'sociability', 'curiosity', 'diligence',
+  'warmth', 'spirituality', 'ambition', 'patience',
+  // Temperament
+  'anxiety', 'optimism', 'temper', 'stubbornness', 'playfulness',
+  // Values
+  'loyalty', 'tradition', 'compassion', 'pride', 'independence',
+];
+
+const TRAIT_SECTIONS = [
+  { label: 'Core Drives', start: 0, end: 8 },
+  { label: 'Temperament', start: 8, end: 13 },
+  { label: 'Values', start: 13, end: 18 },
+];
+
+const TRAIT_COLORS = {
+  boldness: '#e07040', sociability: '#e0a040', curiosity: '#d4d040',
+  diligence: '#80c040', warmth: '#e08080', spirituality: '#a080d0',
+  ambition: '#d06060', patience: '#60a0c0',
+  anxiety: '#c06080', optimism: '#e0c060', temper: '#d04040',
+  stubbornness: '#a08060', playfulness: '#60c0a0',
+  loyalty: '#6080c0', tradition: '#a09070', compassion: '#80b080',
+  pride: '#c0a060', independence: '#70a0a0',
+};
+
+// ── State ─────────────────────────────────────────────────────────
+
+const answers = new Array(15).fill(-1);
+
+function computeTraits() {
+  const traits = {};
+  TRAITS.forEach(t => traits[t] = 0.5);
+
+  for (let q = 0; q < 15; q++) {
+    if (answers[q] < 0) continue;
+    const deltas = SCORING[q][answers[q]];
+    for (const [trait, delta] of Object.entries(deltas)) {
+      traits[trait] += delta;
+    }
+  }
+
+  // Clamp
+  TRAITS.forEach(t => {
+    traits[t] = Math.max(0.0, Math.min(1.0, traits[t]));
+    traits[t] = Math.round(traits[t] * 100) / 100;
+  });
+
+  return traits;
+}
+
+function buildJSON() {
+  const traits = computeTraits();
+  const name = document.getElementById('cat-name').value.trim() || 'Unnamed';
+  const gender = document.querySelector('input[name="gender"]:checked')?.value || 'Nonbinary';
+  const marks = document.getElementById('marks').value
+    .split(',')
+    .map(s => s.trim())
+    .filter(s => s.length > 0);
+
+  return {
+    name,
+    gender,
+    appearance: {
+      fur_color: document.getElementById('fur-color').value.trim() || 'tabby brown',
+      pattern: document.getElementById('pattern').value.trim() || 'tabby',
+      eye_color: document.getElementById('eye-color').value.trim() || 'amber',
+      distinguishing_marks: marks,
+    },
+    personality: traits,
+  };
+}
+
+// ── Rendering ─────────────────────────────────────────────────────
+
+function renderQuestions() {
+  const container = document.getElementById('questions');
+  container.innerHTML = '';
+
+  QUESTIONS.forEach((q, qi) => {
+    const block = document.createElement('div');
+    block.className = 'question-block' + (answers[qi] >= 0 ? ' answered' : '');
+    block.id = `q${qi}`;
+
+    const letters = 'abcde';
+    block.innerHTML = `
+      <h3><span class="question-number">${qi + 1}.</span> ${q.title}</h3>
+      <p class="question-flavor">${q.flavor}</p>
+      ${q.options.map((opt, oi) => `
+        <label class="option">
+          <input type="radio" name="q${qi}" value="${oi}"
+            ${answers[qi] === oi ? 'checked' : ''}>
+          <span class="option-letter">${letters[oi]})</span> ${opt}
+        </label>
+      `).join('')}
+    `;
+
+    block.querySelectorAll('input[type="radio"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        answers[qi] = parseInt(radio.value);
+        block.classList.add('answered');
+        updateTraitBars();
+        updateProgress();
+      });
+    });
+
+    container.appendChild(block);
+  });
+}
+
+function renderTraitBars() {
+  const container = document.getElementById('trait-bars');
+  container.innerHTML = '';
+
+  TRAIT_SECTIONS.forEach(section => {
+    const label = document.createElement('div');
+    label.className = 'trait-section-label';
+    label.textContent = section.label;
+    container.appendChild(label);
+
+    for (let i = section.start; i < section.end; i++) {
+      const trait = TRAITS[i];
+      const row = document.createElement('div');
+      row.className = 'trait-row';
+      row.innerHTML = `
+        <span class="trait-name">${trait}</span>
+        <div class="trait-bar-container">
+          <div class="center-mark"></div>
+          <div class="trait-bar" id="bar-${trait}" style="width:50%; background:${TRAIT_COLORS[trait]}"></div>
+        </div>
+        <span class="trait-value" id="val-${trait}">0.50</span>
+      `;
+      container.appendChild(row);
+    }
+  });
+}
+
+function updateTraitBars() {
+  const traits = computeTraits();
+  TRAITS.forEach(t => {
+    const bar = document.getElementById(`bar-${t}`);
+    const val = document.getElementById(`val-${t}`);
+    const v = traits[t];
+    bar.style.width = `${v * 100}%`;
+    val.textContent = v.toFixed(2);
+  });
+
+  const answeredCount = answers.filter(a => a >= 0).length;
+  const allDone = answeredCount === 15;
+  const hasName = document.getElementById('cat-name').value.trim().length > 0;
+  const hasGender = !!document.querySelector('input[name="gender"]:checked');
+  const ready = allDone && hasName && hasGender;
+
+  document.getElementById('btn-download').disabled = !ready;
+  document.getElementById('btn-copy').disabled = !ready;
+  document.getElementById('btn-preview').disabled = !ready;
+}
+
+function updateProgress() {
+  const count = answers.filter(a => a >= 0).length;
+  document.getElementById('progress').textContent = `${count} of 15 answered`;
+}
+
+// ── Actions ───────────────────────────────────────────────────────
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+document.getElementById('btn-download').addEventListener('click', () => {
+  const data = buildJSON();
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${data.name.toLowerCase().replace(/\s+/g, '_')}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`Downloaded ${a.download}`);
+});
+
+document.getElementById('btn-copy').addEventListener('click', () => {
+  const json = JSON.stringify(buildJSON(), null, 2);
+  navigator.clipboard.writeText(json).then(() => {
+    showToast('Copied to clipboard');
+  });
+});
+
+document.getElementById('btn-preview').addEventListener('click', () => {
+  const preview = document.getElementById('json-preview');
+  const json = JSON.stringify(buildJSON(), null, 2);
+  preview.textContent = json;
+  preview.classList.toggle('visible');
+});
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+  answers.fill(-1);
+  document.getElementById('cat-name').value = '';
+  document.getElementById('fur-color').value = '';
+  document.getElementById('pattern').value = '';
+  document.getElementById('eye-color').value = '';
+  document.getElementById('marks').value = '';
+  document.querySelectorAll('input[name="gender"]').forEach(r => r.checked = false);
+  document.getElementById('json-preview').classList.remove('visible');
+  renderQuestions();
+  updateTraitBars();
+  updateProgress();
+});
+
+// Listen for identity field changes to update button state
+['cat-name', 'fur-color', 'pattern', 'eye-color', 'marks'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateTraitBars);
+});
+document.querySelectorAll('input[name="gender"]').forEach(r => {
+  r.addEventListener('change', updateTraitBars);
+});
+
+// ── Init ──────────────────────────────────────────────────────────
+renderQuestions();
+renderTraitBars();
+updateProgress();
+</script>
+</body>
+</html>

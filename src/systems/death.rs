@@ -6,6 +6,8 @@ use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModif
 use crate::components::physical::{Dead, DeathCause, Health, Needs, Position};
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::rng::SimRng;
+use crate::resources::sim_constants::SimConstants;
+use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::resources::time::{SimConfig, TimeState};
 
 // ---------------------------------------------------------------------------
@@ -27,9 +29,13 @@ pub fn check_death(
     event_log: Option<ResMut<crate::resources::event_log::EventLog>>,
     love_query: Query<(Entity, &Name, &crate::components::fate::FatedLove), Without<Dead>>,
     rival_query: Query<(Entity, &Name, &crate::components::fate::FatedRival), Without<Dead>>,
+    mut colony_score: Option<ResMut<crate::resources::colony_score::ColonyScore>>,
+    constants: Res<SimConstants>,
+    mut activation: ResMut<SystemActivation>,
 ) {
+    let c = &constants.death;
     let tick = time.tick;
-    let mut newly_dead: Vec<(Entity, Position, String, DeathCause)> = Vec::new();
+    let mut newly_dead: Vec<(Entity, Position, String, DeathCause, Option<String>)> = Vec::new();
 
     for (entity, name, health, needs, age, pos) in &alive_query {
         let cause = if health.current <= 0.0 {
@@ -43,13 +49,12 @@ pub fn check_death(
             let stage = age.stage(tick, config.ticks_per_season);
             if stage == crate::components::identity::LifeStage::Elder {
                 let age_ticks = tick.saturating_sub(age.born_tick);
-                // Elder stage begins at 48 seasons; grant 7 grace seasons.
-                let elder_entry = 48 * config.ticks_per_season;
-                let grace = 7 * config.ticks_per_season;
+                let elder_entry = c.elder_entry_seasons * config.ticks_per_season;
+                let grace = c.grace_seasons * config.ticks_per_season;
                 if age_ticks > elder_entry + grace {
-                    let excess_seasons = ((age_ticks - elder_entry - grace)
-                        / config.ticks_per_season) as f64;
-                    let chance = excess_seasons * 0.0002;
+                    let excess_seasons =
+                        ((age_ticks - elder_entry - grace) / config.ticks_per_season) as f64;
+                    let chance = excess_seasons * c.chance_per_excess_season;
                     if rng.rng.random::<f64>() < chance {
                         Some(DeathCause::OldAge)
                     } else {
@@ -65,14 +70,37 @@ pub fn check_death(
 
         if let Some(cause) = cause {
             commands.entity(entity).insert(Dead { tick, cause });
-            newly_dead.push((entity, *pos, name.0.clone(), cause));
+            let injury_source = if cause == DeathCause::Injury {
+                health
+                    .injuries
+                    .iter()
+                    .filter(|inj| !inj.healed)
+                    .max_by_key(|inj| inj.tick_received)
+                    .map(|inj| format!("{:?}", inj.source))
+            } else {
+                None
+            };
+            newly_dead.push((entity, *pos, name.0.clone(), cause, injury_source));
+
+            match cause {
+                DeathCause::Starvation => activation.record(Feature::DeathStarvation),
+                DeathCause::OldAge => activation.record(Feature::DeathOldAge),
+                DeathCause::Injury => activation.record(Feature::DeathInjury),
+            }
+            if let Some(ref mut score) = colony_score {
+                match cause {
+                    DeathCause::Starvation => score.deaths_starvation += 1,
+                    DeathCause::OldAge => score.deaths_old_age += 1,
+                    DeathCause::Injury => score.deaths_injury += 1,
+                }
+            }
         }
     }
 
     let mut event_log = event_log;
 
     // Process reactions to each death.
-    for (dead_entity, dead_pos, dead_name, cause) in &newly_dead {
+    for (dead_entity, dead_pos, dead_name, cause, injury_source) in &newly_dead {
         // Tier 3 narrative.
         let text = match cause {
             DeathCause::Starvation => format!("{dead_name} has starved."),
@@ -82,19 +110,23 @@ pub fn check_death(
         log.push(tick, text.clone(), NarrativeTier::Significant);
 
         if let Some(ref mut elog) = event_log {
-            elog.push(tick, crate::resources::event_log::EventKind::Death {
-                cat: dead_name.clone(),
-                cause: format!("{cause:?}"),
-            });
+            elog.push(
+                tick,
+                crate::resources::event_log::EventKind::Death {
+                    cat: dead_name.clone(),
+                    cause: format!("{cause:?}"),
+                    injury_source: injury_source.clone(),
+                },
+            );
         }
 
         // Nearby living cats react.
         for (pos, mut mood, mut memory) in &mut mood_query {
             let dist = pos.manhattan_distance(dead_pos);
-            if dist <= 5 {
+            if dist <= c.grief_detection_range {
                 mood.modifiers.push_back(MoodModifier {
-                    amount: -0.3,
-                    ticks_remaining: 50,
+                    amount: c.grief_mood_penalty,
+                    ticks_remaining: c.grief_mood_ticks,
                     source: format!("{dead_name} died"),
                 });
 
@@ -103,7 +135,7 @@ pub fn check_death(
                     location: Some(*dead_pos),
                     involved: vec![*dead_entity],
                     tick,
-                    strength: 1.0,
+                    strength: c.grief_memory_strength,
                     firsthand: true,
                 });
             }
@@ -121,7 +153,9 @@ pub fn check_death(
                     NarrativeTier::Significant,
                 );
                 // Remove the component — fate doesn't repeat.
-                commands.entity(survivor_e).remove::<crate::components::fate::FatedLove>();
+                commands
+                    .entity(survivor_e)
+                    .remove::<crate::components::fate::FatedLove>();
             }
         }
 
@@ -136,7 +170,9 @@ pub fn check_death(
                     ),
                     NarrativeTier::Significant,
                 );
-                commands.entity(survivor_e).remove::<crate::components::fate::FatedRival>();
+                commands
+                    .entity(survivor_e)
+                    .remove::<crate::components::fate::FatedRival>();
             }
         }
     }
@@ -156,11 +192,12 @@ pub fn cleanup_dead(
     mut commands: Commands,
     time: Res<TimeState>,
     query: Query<(Entity, &Dead)>,
+    constants: Res<SimConstants>,
 ) {
-    const GRACE_PERIOD: u64 = 500;
+    let grace_period = constants.death.cleanup_grace_period;
 
     for (entity, dead) in &query {
-        if time.tick.saturating_sub(dead.tick) >= GRACE_PERIOD {
+        if time.tick.saturating_sub(dead.tick) >= grace_period {
             commands.entity(entity).despawn();
         }
     }
@@ -175,28 +212,34 @@ mod tests {
     use super::*;
     use bevy_ecs::schedule::Schedule;
 
-    use crate::components::identity::{Age, Gender, Name, Orientation, Species, Appearance};
+    use crate::ai::CurrentAction;
+    use crate::components::identity::{Age, Appearance, Gender, Name, Orientation, Species};
     use crate::components::mental::{Memory, Mood};
     use crate::components::personality::Personality;
     use crate::components::physical::{Health, Needs, Position};
     use crate::components::skills::{Corruption, MagicAffinity, Skills, Training};
-    use crate::ai::CurrentAction;
     use crate::resources::time::{SimConfig, TimeState};
 
     fn setup_world() -> (World, Schedule) {
         let mut world = World::new();
-        world.insert_resource(TimeState { tick: 100, paused: false, speed: crate::resources::time::SimSpeed::Normal });
+        world.insert_resource(TimeState {
+            tick: 100,
+            paused: false,
+            speed: crate::resources::time::SimSpeed::Normal,
+        });
         world.insert_resource(SimConfig::default());
         world.insert_resource(NarrativeLog::default());
         world.insert_resource(SimRng::new(42));
+        world.insert_resource(crate::resources::SimConstants::default());
+        world.insert_resource(SystemActivation::default());
         let mut schedule = Schedule::default();
         schedule.add_systems(check_death);
         (world, schedule)
     }
 
     fn test_personality() -> Personality {
-        use rand_chacha::ChaCha8Rng;
         use rand_chacha::rand_core::SeedableRng;
+        use rand_chacha::ChaCha8Rng;
         Personality::random(&mut ChaCha8Rng::seed_from_u64(0))
     }
 
@@ -221,7 +264,11 @@ mod tests {
                 ),
                 (
                     Position::new(5, 5),
-                    Health { current: health, max: 1.0, injuries: vec![] },
+                    Health {
+                        current: health,
+                        max: 1.0,
+                        injuries: vec![],
+                    },
                     needs,
                     Mood::default(),
                     Memory::default(),
@@ -269,10 +316,14 @@ mod tests {
         schedule.run(&mut world);
 
         let log = world.resource::<NarrativeLog>();
-        let has_death_entry = log.entries.iter().any(|e| {
-            e.text.contains("Ash") && e.tier == NarrativeTier::Significant
-        });
-        assert!(has_death_entry, "death should produce a Significant narrative entry");
+        let has_death_entry = log
+            .entries
+            .iter()
+            .any(|e| e.text.contains("Ash") && e.tier == NarrativeTier::Significant);
+        assert!(
+            has_death_entry,
+            "death should produce a Significant narrative entry"
+        );
     }
 
     #[test]
@@ -299,7 +350,10 @@ mod tests {
         schedule.run(&mut world);
 
         let memory = world.get::<Memory>(bystander).unwrap();
-        let has_death_memory = memory.events.iter().any(|e| e.event_type == MemoryType::Death);
+        let has_death_memory = memory
+            .events
+            .iter()
+            .any(|e| e.event_type == MemoryType::Death);
         assert!(has_death_memory, "nearby cat should have a Death memory");
     }
 
@@ -317,12 +371,20 @@ mod tests {
     #[test]
     fn cleanup_despawns_after_grace() {
         let mut world = World::new();
-        world.insert_resource(TimeState { tick: 700, paused: false, speed: crate::resources::time::SimSpeed::Normal });
+        world.insert_resource(TimeState {
+            tick: 700,
+            paused: false,
+            speed: crate::resources::time::SimSpeed::Normal,
+        });
+        world.insert_resource(crate::resources::SimConstants::default());
         let mut schedule = Schedule::default();
         schedule.add_systems(cleanup_dead);
 
         let entity = world
-            .spawn(Dead { tick: 100, cause: DeathCause::Starvation })
+            .spawn(Dead {
+                tick: 100,
+                cause: DeathCause::Starvation,
+            })
             .id();
 
         schedule.run(&mut world);
@@ -336,12 +398,20 @@ mod tests {
     #[test]
     fn cleanup_keeps_recent_dead() {
         let mut world = World::new();
-        world.insert_resource(TimeState { tick: 400, paused: false, speed: crate::resources::time::SimSpeed::Normal });
+        world.insert_resource(TimeState {
+            tick: 400,
+            paused: false,
+            speed: crate::resources::time::SimSpeed::Normal,
+        });
+        world.insert_resource(crate::resources::SimConstants::default());
         let mut schedule = Schedule::default();
         schedule.add_systems(cleanup_dead);
 
         let entity = world
-            .spawn(Dead { tick: 100, cause: DeathCause::OldAge })
+            .spawn(Dead {
+                tick: 100,
+                cause: DeathCause::OldAge,
+            })
             .id();
 
         schedule.run(&mut world);

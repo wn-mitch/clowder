@@ -146,7 +146,7 @@ pub fn generate_starting_cats(
 /// Roll an age in seasons with a bell curve weighted toward younger cats.
 ///
 /// Distribution: ~60% Young (4-11), ~30% Adult (12-30), ~10% Elder (48-55).
-fn roll_age_seasons(rng: &mut impl Rng) -> u64 {
+pub(crate) fn roll_age_seasons(rng: &mut impl Rng) -> u64 {
     let roll: f32 = rng.random();
     if roll < 0.10 {
         // Elder: 48-55 seasons
@@ -195,7 +195,7 @@ fn roll_gender(rng: &mut impl Rng) -> Gender {
 }
 
 /// ~75% Straight, ~10% Gay, ~10% Bisexual, ~5% Asexual.
-fn roll_orientation(rng: &mut impl Rng) -> Orientation {
+pub(crate) fn roll_orientation(rng: &mut impl Rng) -> Orientation {
     match rng.random_range(0..20u32) {
         0..=14 => Orientation::Straight,
         15..=16 => Orientation::Gay,
@@ -205,7 +205,7 @@ fn roll_orientation(rng: &mut impl Rng) -> Orientation {
 }
 
 /// 80% get 0.0–0.2, 15% get 0.3–0.6, 5% get 0.7–1.0.
-fn roll_magic_affinity(rng: &mut impl Rng) -> f32 {
+pub(crate) fn roll_magic_affinity(rng: &mut impl Rng) -> f32 {
     match rng.random_range(0..20u32) {
         0..=15 => rng.random_range(0.0_f32..=0.2),
         16..=18 => rng.random_range(0.3_f32..=0.6),
@@ -214,7 +214,7 @@ fn roll_magic_affinity(rng: &mut impl Rng) -> f32 {
 }
 
 /// Start from default skills and add small personality-based aptitude boosts.
-fn roll_skills(personality: &Personality, magic_affinity: f32, rng: &mut impl Rng) -> Skills {
+pub(crate) fn roll_skills(personality: &Personality, magic_affinity: f32, rng: &mut impl Rng) -> Skills {
     let _ = rng; // reserved for future randomised variance
 
     let mut skills = Skills::default();
@@ -261,7 +261,7 @@ fn roll_appearance(rng: &mut impl Rng) -> Appearance {
 
 /// Shift personality axes based on fur color, adding per-trait jitter so
 /// same-color cats aren't clones.
-fn apply_fur_color_bias(personality: &mut Personality, fur_color: &str, rng: &mut impl Rng) {
+pub(crate) fn apply_fur_color_bias(personality: &mut Personality, fur_color: &str, rng: &mut impl Rng) {
     match fur_color {
         "ginger" => apply_ginger_bias(personality, rng),
         "calico" => apply_calico_bias(personality, rng),

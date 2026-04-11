@@ -1,5 +1,6 @@
 use bevy_ecs::prelude::*;
 
+use crate::ai::CurrentAction;
 use crate::components::magic::{RemedyKind, WardKind};
 use crate::components::physical::Position;
 
@@ -28,6 +29,10 @@ pub struct TaskStep {
     /// Entity target (e.g. the construction site or garden).
     #[serde(skip)]
     pub target_entity: Option<Entity>,
+    /// Pre-computed A* path for fixed-target movement (MoveTo, PatrolTo, etc.).
+    /// Waypoints are consumed front-to-back each tick.
+    #[serde(skip)]
+    pub cached_path: Option<Vec<Position>>,
 }
 
 impl TaskStep {
@@ -37,6 +42,7 @@ impl TaskStep {
             status: StepStatus::Pending,
             target_position: None,
             target_entity: None,
+            cached_path: None,
         }
     }
 
@@ -125,7 +131,18 @@ pub enum StepKind {
     /// Observe surroundings at current position. ~5 ticks.
     Survey,
     /// Deliver a coordinator directive to target cat. ~5 ticks on arrival.
-    DeliverDirective,
+    DeliverDirective {
+        kind: crate::components::coordination::DirectiveKind,
+        priority: f32,
+    },
+    /// Mate with target cat. ~10 ticks. Requires proximity.
+    MateWith,
+    /// Feed a dependent kitten from stores. ~10 ticks.
+    FeedKitten,
+    /// Retrieve an item of the given kind from a Stores building. ~5 ticks.
+    RetrieveFromStores {
+        kind: crate::components::items::ItemKind,
+    },
 }
 
 impl StepKind {
@@ -147,7 +164,10 @@ impl StepKind {
                 | StepKind::PatrolTo
                 | StepKind::FightThreat
                 | StepKind::Survey
-                | StepKind::DeliverDirective
+                | StepKind::DeliverDirective { .. }
+                | StepKind::MateWith
+                | StepKind::FeedKitten
+                | StepKind::RetrieveFromStores { .. }
                 // Magic system (resolve_magic_task_chains)
                 | StepKind::GatherHerb
                 | StepKind::PrepareRemedy { .. }
@@ -223,6 +243,17 @@ impl TaskChain {
     /// Mutable access to the currently active step.
     pub fn current_mut(&mut self) -> Option<&mut TaskStep> {
         self.steps.get_mut(self.current_step)
+    }
+
+    /// Copy `target_position` and `target_entity` from the current step into
+    /// `CurrentAction`.  Call this after `advance()` or `fail_current()` so
+    /// systems that read `CurrentAction` (e.g. `resolve_combat`) see the
+    /// targets that belong to the *now-active* step.
+    pub fn sync_targets(&self, current: &mut CurrentAction) {
+        if let Some(step) = self.current() {
+            current.target_position = step.target_position;
+            current.target_entity = step.target_entity;
+        }
     }
 
     /// Mark the current step as succeeded and advance to the next.
@@ -424,8 +455,7 @@ mod tests {
 
     #[test]
     fn step_builder_sets_fields() {
-        let step = TaskStep::new(StepKind::MoveTo)
-            .with_position(Position::new(10, 20));
+        let step = TaskStep::new(StepKind::MoveTo).with_position(Position::new(10, 20));
         assert_eq!(step.target_position, Some(Position::new(10, 20)));
         assert!(step.target_entity.is_none());
         assert!(matches!(step.status, StepStatus::Pending));

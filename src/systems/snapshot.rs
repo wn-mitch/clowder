@@ -46,12 +46,28 @@ pub fn emit_cat_snapshots(
         return;
     }
 
-    for (entity, name, pos, personality, needs, skills, mood, health, corruption, magic_aff, current) in &query {
+    for (
+        entity,
+        name,
+        pos,
+        personality,
+        needs,
+        skills,
+        mood,
+        health,
+        corruption,
+        magic_aff,
+        current,
+    ) in &query
+    {
         // Build top-3 relationships by |fondness|.
         let mut rels: Vec<(Entity, &crate::resources::relationships::Relationship)> =
             relationships.all_for(entity);
         rels.sort_by(|(_, a), (_, b)| {
-            b.fondness.abs().partial_cmp(&a.fondness.abs()).unwrap_or(std::cmp::Ordering::Equal)
+            b.fondness
+                .abs()
+                .partial_cmp(&a.fondness.abs())
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
         let top_rels: Vec<RelationshipEntry> = rels
             .iter()
@@ -68,8 +84,7 @@ pub fn emit_cat_snapshots(
             })
             .collect();
 
-        let effective_valence = mood.valence
-            + mood.modifiers.iter().map(|m| m.amount).sum::<f32>();
+        let effective_valence = mood.valence + mood.modifiers.iter().map(|m| m.amount).sum::<f32>();
 
         log.push(
             time.tick,

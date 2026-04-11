@@ -14,7 +14,10 @@ use crate::resources::{
     ColonyHuntingMap, ColonyKnowledge, ColonyPriority, EventLog, FoodStores, NarrativeLog,
     NarrativeTier, Relationships, SimConfig, SimRng, TemplateRegistry, TimeState, WeatherState,
 };
-use crate::world_gen::colony::{find_colony_site, generate_starting_cats, spawn_starting_buildings};
+use crate::world_gen::colony::{
+    find_colony_site, generate_starting_cats, spawn_starting_buildings,
+};
+use crate::world_gen::custom_cats::load_custom_cats;
 use crate::world_gen::terrain::generate_terrain;
 
 /// CLI arguments passed as a Bevy resource so the startup system can read them.
@@ -41,6 +44,13 @@ pub fn setup_world_exclusive(world: &mut World) {
         args_load_path = args.load_path.clone();
         args_load_log_path = args.load_log_path.clone();
         args_test_map = args.test_map;
+    }
+
+    // Insert the species registry early — spawn_initial_prey needs it during build_new_world.
+    world.insert_resource(crate::species::build_registry());
+    world.insert_resource(crate::components::prey::PreyDensity::default());
+    if !world.contains_resource::<crate::resources::ColonyScore>() {
+        world.insert_resource(crate::resources::ColonyScore::default());
     }
 
     if let Some(ref load_path) = args_load_path {
@@ -89,7 +99,6 @@ pub fn setup_world_exclusive(world: &mut World) {
         world.insert_resource(crate::resources::wind::WindState::default());
     }
 
-
     // Ensure new resources exist (may be absent from older saves).
     if !world.contains_resource::<ColonyKnowledge>() {
         world.insert_resource(ColonyKnowledge::default());
@@ -100,8 +109,17 @@ pub fn setup_world_exclusive(world: &mut World) {
     if !world.contains_resource::<ColonyHuntingMap>() {
         world.insert_resource(ColonyHuntingMap::default());
     }
+    if !world.contains_resource::<crate::resources::ExplorationMap>() {
+        world.insert_resource(crate::resources::ExplorationMap::default());
+    }
     if !world.contains_resource::<crate::systems::wildlife::DetectionCooldowns>() {
         world.insert_resource(crate::systems::wildlife::DetectionCooldowns::default());
+    }
+    if !world.contains_resource::<crate::resources::SimConstants>() {
+        world.insert_resource(crate::resources::SimConstants::default());
+    }
+    if !world.contains_resource::<crate::resources::SystemActivation>() {
+        world.insert_resource(crate::resources::SystemActivation::default());
     }
 }
 
@@ -120,24 +138,45 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
         generate_terrain(120, 90, &mut sim_rng.rng)
     };
 
-    // Set initial corruption and mystery on special tiles.
-    crate::world_gen::herbs::initialize_tile_magic(&mut map, &mut sim_rng.rng);
-
-    // Find colony site.
+    // Find colony site first (read-only) so special tiles can respect colony distance.
     let colony_site = find_colony_site(&map, &mut sim_rng.rng);
+
+    // Place special terrain tiles (ruins, fairy rings, standing stones, deep pools).
+    let constants = crate::resources::SimConstants::default();
+    crate::world_gen::special_tiles::place_special_tiles(
+        &mut map,
+        colony_site,
+        &mut sim_rng.rng,
+        &constants.world_gen,
+    );
+
+    // Set initial corruption and mystery on special tiles (must be after placement).
+    crate::world_gen::herbs::initialize_tile_magic(&mut map, &mut sim_rng.rng);
 
     // Start the clock high enough that cats can have varied ages.
     let start_tick: u64 = 100_000;
 
-    let cat_blueprints = generate_starting_cats(
-        8,
-        start_tick,
-        config.ticks_per_season,
-        &mut sim_rng.rng,
-    );
+    let mut cat_blueprints =
+        load_custom_cats(start_tick, config.ticks_per_season, &mut sim_rng.rng);
+    let remaining = 8usize.saturating_sub(cat_blueprints.len());
+    if remaining > 0 {
+        cat_blueprints.extend(generate_starting_cats(
+            remaining,
+            start_tick,
+            config.ticks_per_season,
+            &mut sim_rng.rng,
+        ));
+    }
 
     // Spawn starting buildings (sets terrain tiles and creates entities).
     spawn_starting_buildings(world, colony_site, &mut map);
+
+    // Persist colony center and spawn decorative well entity.
+    world.insert_resource(crate::resources::ColonyCenter(colony_site));
+    world.spawn((
+        crate::components::building::ColonyWell,
+        Position::new(colony_site.x, colony_site.y),
+    ));
 
     world.insert_resource(TimeState {
         tick: start_tick,
@@ -151,8 +190,11 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     world.insert_resource(ColonyKnowledge::default());
     world.insert_resource(ColonyPriority::default());
     world.insert_resource(ColonyHuntingMap::default());
+    world.insert_resource(crate::resources::ExplorationMap::default());
     world.insert_resource(FoodStores::default());
     world.insert_resource(crate::systems::wildlife::DetectionCooldowns::default());
+    world.insert_resource(crate::resources::SystemActivation::default());
+    world.insert_resource(constants);
     world.insert_resource(map);
     world.insert_resource(sim_rng);
 
@@ -199,6 +241,7 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
                     Inventory::default(),
                     crate::components::disposition::ActionHistory::default(),
                     HuntingPriors::default(),
+                    crate::components::grooming::GroomingCondition::default(),
                 ),
             ))
             .id();
@@ -219,9 +262,16 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
 
     // Spawn initial wildlife far from the colony.
     crate::systems::wildlife::spawn_initial_wildlife(world, colony_site);
+    crate::systems::wildlife::spawn_initial_fox_dens(world, colony_site);
+
+    // Insert fox scent map resource.
+    world.insert_resource(crate::resources::FoxScentMap::default());
+
+    // Insert cat presence map resource.
+    world.insert_resource(crate::resources::CatPresenceMap::default());
 
     // Spawn initial prey animals across their habitats.
-    crate::systems::prey::spawn_initial_prey(world);
+    crate::world_gen::prey_ecosystem::seed_prey_ecosystem(world);
 
     // Spawn herbs based on terrain and current season.
     let current_season = {
@@ -230,6 +280,7 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
         time.season(config)
     };
     crate::world_gen::herbs::spawn_herbs(world, current_season);
+    crate::world_gen::herbs::spawn_flavor_plants(world, current_season);
 }
 
 fn load_templates(world: &mut World) {
@@ -268,10 +319,7 @@ fn load_aspiration_data(world: &mut World) {
     }
 }
 
-fn load_log_file(
-    world: &mut World,
-    path: &std::path::Path,
-) -> Result<(), std::io::Error> {
+fn load_log_file(world: &mut World, path: &std::path::Path) -> Result<(), std::io::Error> {
     use std::io::BufRead;
 
     let file = std::fs::File::open(path)?;

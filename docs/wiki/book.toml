@@ -1,0 +1,11 @@
+[book]
+title = "Clowder Game Wiki"
+authors = ["Auto-generated from source"]
+src = "."
+
+[build]
+build-dir = "book"
+
+[output.html]
+git-repository-url = "https://github.com/wnmitch/clowder"
+additional-css = []

@@ -1,4 +1,5 @@
 pub mod pathfinding;
+pub mod planner;
 pub mod scoring;
 
 use bevy_ecs::prelude::*;
@@ -30,6 +31,8 @@ pub enum Action {
     PracticeMagic,
     Coordinate,
     Mentor,
+    Mate,
+    Caretake,
 }
 
 // ---------------------------------------------------------------------------

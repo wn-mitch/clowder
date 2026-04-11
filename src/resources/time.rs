@@ -288,9 +288,9 @@ mod tests {
     #[test]
     fn week_number_from_tick() {
         let config = SimConfig::default(); // 1000 ticks/day
-        assert_eq!(TimeState::week_number(0, &config), 1);       // Day 1 → Week 1
-        assert_eq!(TimeState::week_number(6999, &config), 1);    // Day 7 → Week 1
-        assert_eq!(TimeState::week_number(7000, &config), 2);    // Day 8 → Week 2
-        assert_eq!(TimeState::week_number(13999, &config), 2);   // Day 14 → Week 2
+        assert_eq!(TimeState::week_number(0, &config), 1); // Day 1 → Week 1
+        assert_eq!(TimeState::week_number(6999, &config), 1); // Day 7 → Week 1
+        assert_eq!(TimeState::week_number(7000, &config), 2); // Day 8 → Week 2
+        assert_eq!(TimeState::week_number(13999, &config), 2); // Day 14 → Week 2
     }
 }

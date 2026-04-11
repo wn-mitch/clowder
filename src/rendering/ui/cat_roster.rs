@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::components::disposition::Disposition;
+use crate::components::goap_plan::GoapPlan;
 use crate::components::identity::{Appearance, Name, Species};
 use crate::components::mental::Mood;
 use crate::components::physical::{Dead, Needs};
@@ -108,7 +108,7 @@ pub fn update_cat_roster(
     mut header_query: Query<&mut Text, With<RosterHeader>>,
     mut content_query: Query<(Entity, &mut RosterState), With<CatRosterContent>>,
     cats: Query<
-        (Entity, &Name, &Appearance, &Needs, &Mood, Option<&Disposition>),
+        (Entity, &Name, &Appearance, &Needs, &Mood, Option<&GoapPlan>),
         (With<Species>, Without<Dead>),
     >,
 ) {
@@ -169,7 +169,7 @@ fn spawn_roster_row(
     appearance: &Appearance,
     needs: &Needs,
     mood: &Mood,
-    disposition: Option<&Disposition>,
+    disposition: Option<&GoapPlan>,
     selected: bool,
 ) -> Entity {
     let bg = if selected { SELECTED_BG } else { Color::NONE };

@@ -4,6 +4,20 @@ use crate::ai::Action;
 use crate::components::personality::Personality;
 
 // ---------------------------------------------------------------------------
+// CraftingHint — sub-mode selected by the scorer for crafting dispositions
+// ---------------------------------------------------------------------------
+
+/// Indicates which crafting sub-mode won during scoring, so the chain builder
+/// doesn't re-derive the decision and accidentally shadow PrepareRemedy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum CraftingHint {
+    GatherHerbs,
+    PrepareRemedy,
+    SetWard,
+    Magic,
+}
+
+// ---------------------------------------------------------------------------
 // DispositionKind — the sustained behavioral orientations
 // ---------------------------------------------------------------------------
 
@@ -32,6 +46,10 @@ pub enum DispositionKind {
     Coordinating,
     /// Explore distant tiles, survey surroundings.
     Exploring,
+    /// Court and mate with a partner.
+    Mating,
+    /// Feed and groom dependent kittens.
+    Caretaking,
 }
 
 impl DispositionKind {
@@ -43,13 +61,18 @@ impl DispositionKind {
             Self::Foraging => 1 + (personality.diligence * 2.0).round() as u32,
             Self::Exploring => 2 + (personality.curiosity * 3.0).round() as u32,
             Self::Guarding => 1 + (personality.boldness * 2.0).round() as u32,
-            Self::Socializing => 1 + (personality.sociability * 2.0 + personality.playfulness * 1.0).round() as u32,
+            Self::Socializing => {
+                1 + (personality.sociability * 2.0 + personality.playfulness * 1.0).round() as u32
+            }
+            Self::Caretaking => 1 + (personality.compassion * 2.0).round() as u32,
+            // Single-event dispositions.
+            Self::Mating => return 1,
             // Chain-driven dispositions complete when their chain finishes.
             Self::Building | Self::Farming | Self::Crafting | Self::Coordinating => 1,
             // Resting completes on need thresholds, not count.
             Self::Resting => return u32::MAX,
         };
-        // Patience adds to all non-Resting dispositions: patient cats commit longer.
+        // Patience adds to all non-Resting/Mating dispositions: patient cats commit longer.
         base + (personality.patience * 1.0).round() as u32
     }
 
@@ -68,6 +91,8 @@ impl DispositionKind {
             Action::Herbcraft | Action::PracticeMagic => Some(Self::Crafting),
             Action::Coordinate => Some(Self::Coordinating),
             Action::Explore | Action::Wander => Some(Self::Exploring),
+            Action::Mate => Some(Self::Mating),
+            Action::Caretake => Some(Self::Caretaking),
             Action::Idle | Action::Flee => None,
         }
     }
@@ -85,6 +110,8 @@ impl DispositionKind {
             Self::Crafting => &[Action::Herbcraft, Action::PracticeMagic],
             Self::Coordinating => &[Action::Coordinate],
             Self::Exploring => &[Action::Explore, Action::Wander],
+            Self::Mating => &[Action::Mate],
+            Self::Caretaking => &[Action::Caretake],
         }
     }
 
@@ -100,6 +127,8 @@ impl DispositionKind {
         Self::Crafting,
         Self::Coordinating,
         Self::Exploring,
+        Self::Mating,
+        Self::Caretaking,
     ];
 
     /// Human-readable label for the inspect panel.
@@ -115,6 +144,8 @@ impl DispositionKind {
             Self::Crafting => "Crafting",
             Self::Coordinating => "Coordinating",
             Self::Exploring => "Exploring",
+            Self::Mating => "Mating",
+            Self::Caretaking => "Caretaking",
         }
     }
 }
@@ -136,6 +167,9 @@ pub struct Disposition {
     pub completions: u32,
     /// Disposition clears when completions >= target.
     pub target_completions: u32,
+    /// For Crafting dispositions: which sub-mode the scorer selected.
+    /// Threaded from scoring to chain builder so the cascade doesn't re-derive.
+    pub crafting_hint: Option<CraftingHint>,
 }
 
 impl Disposition {
@@ -145,6 +179,7 @@ impl Disposition {
             adopted_tick: tick,
             completions: 0,
             target_completions: kind.target_completions(personality),
+            crafting_hint: None,
         }
     }
 
@@ -231,16 +266,28 @@ mod tests {
     #[test]
     fn target_completions_scales_with_personality() {
         // patience=0.5 adds (0.5*1.0).round()=1 to all non-Resting dispositions.
-        let lazy = Personality { diligence: 0.0, ..test_personality() };
-        let diligent = Personality { diligence: 1.0, ..test_personality() };
-        assert_eq!(DispositionKind::Hunting.target_completions(&lazy), 2);  // 1 + patience(1)
+        let lazy = Personality {
+            diligence: 0.0,
+            ..test_personality()
+        };
+        let diligent = Personality {
+            diligence: 1.0,
+            ..test_personality()
+        };
+        assert_eq!(DispositionKind::Hunting.target_completions(&lazy), 2); // 1 + patience(1)
         assert_eq!(DispositionKind::Hunting.target_completions(&diligent), 4); // 3 + patience(1)
     }
 
     #[test]
     fn patience_increases_target_completions() {
-        let impatient = Personality { patience: 0.0, ..test_personality() };
-        let patient = Personality { patience: 1.0, ..test_personality() };
+        let impatient = Personality {
+            patience: 0.0,
+            ..test_personality()
+        };
+        let patient = Personality {
+            patience: 1.0,
+            ..test_personality()
+        };
         let impatient_target = DispositionKind::Hunting.target_completions(&impatient);
         let patient_target = DispositionKind::Hunting.target_completions(&patient);
         assert!(
@@ -251,8 +298,14 @@ mod tests {
 
     #[test]
     fn playfulness_increases_socializing_target() {
-        let boring = Personality { playfulness: 0.0, ..test_personality() };
-        let playful = Personality { playfulness: 1.0, ..test_personality() };
+        let boring = Personality {
+            playfulness: 0.0,
+            ..test_personality()
+        };
+        let playful = Personality {
+            playfulness: 1.0,
+            ..test_personality()
+        };
         let boring_target = DispositionKind::Socializing.target_completions(&boring);
         let playful_target = DispositionKind::Socializing.target_completions(&playful);
         assert!(
@@ -264,10 +317,7 @@ mod tests {
     #[test]
     fn resting_target_completions_is_max() {
         let p = test_personality();
-        assert_eq!(
-            DispositionKind::Resting.target_completions(&p),
-            u32::MAX,
-        );
+        assert_eq!(DispositionKind::Resting.target_completions(&p), u32::MAX,);
     }
 
     #[test]
@@ -287,15 +337,24 @@ mod tests {
 
     #[test]
     fn from_action_mapping() {
-        assert_eq!(DispositionKind::from_action(Action::Hunt), Some(DispositionKind::Hunting));
+        assert_eq!(
+            DispositionKind::from_action(Action::Hunt),
+            Some(DispositionKind::Hunting)
+        );
         assert_eq!(DispositionKind::from_action(Action::Flee), None);
         assert_eq!(DispositionKind::from_action(Action::Idle), None);
-        assert_eq!(DispositionKind::from_action(Action::Build), Some(DispositionKind::Building));
+        assert_eq!(
+            DispositionKind::from_action(Action::Build),
+            Some(DispositionKind::Building)
+        );
     }
 
     #[test]
     fn disposition_count_completion() {
-        let p = Personality { diligence: 0.5, ..test_personality() };
+        let p = Personality {
+            diligence: 0.5,
+            ..test_personality()
+        };
         let mut d = Disposition::new(DispositionKind::Hunting, 0, &p);
         assert!(!d.is_count_complete());
         d.completions = d.target_completions;

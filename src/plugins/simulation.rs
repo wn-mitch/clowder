@@ -20,44 +20,86 @@ impl Plugin for SimulationPlugin {
         // Register personality event observers (cascade handlers).
         systems::personality_events::register_observers(app);
 
+        // Register messages.
+        app.add_message::<crate::components::prey::PreyKilled>();
+        app.add_message::<crate::components::prey::DenRaided>();
+        app.add_message::<crate::components::goap_plan::PlanNarrative>();
+        app.add_message::<crate::systems::magic::CorruptionPushback>();
+
+        // Snapshot positions before any simulation system moves entities.
+        // The rendering layer interpolates between PreviousPosition and Position.
+        app.add_systems(
+            FixedUpdate,
+            crate::rendering::entity_sprites::snapshot_previous_positions
+                .before(systems::time::advance_time),
+        );
+
         app.add_systems(
             FixedUpdate,
             (
                 // Chain 1: World simulation
                 (
-                    systems::time::advance_time
-                        .run_if(systems::time::not_paused),
+                    systems::time::advance_time.run_if(systems::time::not_paused),
                     systems::weather::update_weather,
                     systems::wind::update_wind,
                     systems::time::emit_weather_transitions,
                     systems::magic::corruption_spread,
                     systems::magic::ward_decay,
-                    systems::magic::herb_seasonal_check,
+                    // Herb/flavor growth sub-chain: seasonal check resets stage,
+                    // then growth advances, then flavors advance.
+                    (
+                        systems::magic::herb_seasonal_check,
+                        systems::magic::advance_herb_growth,
+                        systems::magic::advance_flavor_growth,
+                    )
+                        .chain(),
                     systems::magic::corruption_tile_effects,
+                    systems::magic::apply_corruption_pushback,
                     systems::magic::spawn_shadow_fox_from_corruption,
-                    systems::wildlife::spawn_wildlife,
-                    systems::wildlife::wildlife_ai,
-                    systems::wildlife::predator_hunt_prey,
+                    (
+                        systems::wildlife::spawn_wildlife,
+                        systems::wildlife::wildlife_ai,
+                        systems::wildlife::fox_movement,
+                        systems::wildlife::fox_needs_tick,
+                        systems::wildlife::fox_ai_decision,
+                        systems::wildlife::fox_scent_tick,
+                        systems::wildlife::predator_hunt_prey,
+                        systems::wildlife::carcass_decay,
+                        systems::wildlife::predator_stalk_cats,
+                    )
+                        .chain(),
                     systems::prey::prey_population,
                     systems::prey::prey_hunger,
                     systems::prey::prey_ai,
+                    systems::prey::prey_den_lifecycle,
                     systems::wildlife::detect_threats,
                     systems::buildings::apply_building_effects,
                     systems::buildings::decay_building_condition,
                     systems::items::decay_items,
                 )
                     .chain(),
-                // Item pruning and food sync (split to stay under chain param limit).
+                // Item pruning, food sync, den pressure/raids, orphan prey.
                 (
                     systems::items::prune_stored_items,
                     systems::items::sync_food_stores,
+                    systems::prey::update_den_pressure,
+                    systems::prey::apply_den_raids,
+                    systems::prey::orphan_prey_adopt_or_found,
                 )
                     .chain(),
                 // Chain 2: Cat needs, mood, decision-making
                 (
                     systems::needs::decay_needs,
+                    systems::needs::decay_grooming,
+                    systems::needs::eat_from_inventory,
+                    systems::needs::decay_exploration,
+                    systems::needs::bond_proximity_social,
+                    systems::pregnancy::tick_pregnancy,
+                    systems::growth::tick_kitten_growth,
+                    systems::growth::kitten_mood_aura,
                     systems::mood::update_mood,
                     systems::mood::mood_contagion,
+                    systems::mood::bond_proximity_mood,
                     systems::memory::decay_memories,
                     systems::coordination::evaluate_coordinators,
                     systems::coordination::assess_colony_needs,
@@ -81,6 +123,9 @@ impl Plugin for SimulationPlugin {
                     systems::colony_knowledge::update_colony_knowledge,
                     systems::combat::resolve_combat,
                     systems::combat::heal_injuries,
+                    systems::wildlife::fox_lifecycle_tick,
+                    systems::wildlife::fox_confrontation_tick,
+                    systems::wildlife::fox_store_raid_tick,
                     systems::magic::personal_corruption_effects,
                     systems::death::check_death,
                     systems::coordination::flag_coordinator_death,
@@ -94,46 +139,41 @@ impl Plugin for SimulationPlugin {
                 .chain(),
         );
 
-        // Disposition systems — ordered relative to each other but standalone.
-        // check_anxiety_interrupts → evaluate_dispositions → disposition_to_chain
-        // → resolve_disposition_chains. These query disjoint entity sets by
-        // component filter (With/Without<Disposition>) so they can't be chained
-        // via Bevy's tuple-chain due to static analysis limitations.
+        // GOAP systems — ordered pipeline replacing the old disposition systems.
+        // check_anxiety_interrupts → evaluate_and_plan → resolve_goap_plans → emit_plan_narrative.
+        //
+        // Both check_anxiety_interrupts and evaluate_and_plan must run AFTER
+        // sync_food_stores so that food_available reflects the current tick's
+        // item state, not a stale default of 0.0.
         app.add_systems(
             FixedUpdate,
-            systems::disposition::check_anxiety_interrupts,
+            systems::goap::check_anxiety_interrupts
+                .after(systems::items::sync_food_stores),
         );
         app.add_systems(
             FixedUpdate,
-            systems::disposition::evaluate_dispositions
-                .after(systems::disposition::check_anxiety_interrupts),
+            systems::goap::evaluate_and_plan
+                .after(systems::goap::check_anxiety_interrupts)
+                .after(systems::items::sync_food_stores),
         );
-        // Flush commands so Disposition inserted by evaluate_dispositions is
-        // visible to disposition_to_chain in the same tick.
+        // Flush commands so GoapPlan inserted by evaluate_and_plan is
+        // visible to resolve_goap_plans in the same tick.
         app.add_systems(
             FixedUpdate,
             bevy::ecs::schedule::ApplyDeferred
-                .after(systems::disposition::evaluate_dispositions)
-                .before(systems::disposition::disposition_to_chain),
+                .after(systems::goap::evaluate_and_plan)
+                .before(systems::goap::resolve_goap_plans),
         );
         app.add_systems(
             FixedUpdate,
-            systems::disposition::disposition_to_chain
-                .after(systems::disposition::evaluate_dispositions),
-        );
-        // Flush commands so TaskChain inserted by disposition_to_chain is
-        // visible to resolve_disposition_chains in the same tick.
-        app.add_systems(
-            FixedUpdate,
-            bevy::ecs::schedule::ApplyDeferred
-                .after(systems::disposition::disposition_to_chain)
-                .before(systems::disposition::resolve_disposition_chains),
-        );
-        app.add_systems(
-            FixedUpdate,
-            systems::disposition::resolve_disposition_chains
-                .after(systems::disposition::disposition_to_chain)
+            systems::goap::resolve_goap_plans
+                .after(systems::goap::evaluate_and_plan)
                 .before(systems::task_chains::resolve_task_chains),
+        );
+        app.add_systems(
+            FixedUpdate,
+            systems::goap::emit_plan_narrative
+                .after(systems::goap::resolve_goap_plans),
         );
 
         // Standalone systems — registered after the chains but unordered
@@ -141,12 +181,15 @@ impl Plugin for SimulationPlugin {
         app.add_systems(
             FixedUpdate,
             (
+                systems::disposition::cat_presence_tick
+                    .after(systems::goap::resolve_goap_plans),
                 systems::personality_events::emit_personality_events,
                 systems::ai::emit_periodic_events,
                 systems::snapshot::emit_cat_snapshots
-                    .after(systems::disposition::resolve_disposition_chains),
+                    .after(systems::goap::resolve_goap_plans),
                 systems::snapshot::emit_position_traces
-                    .after(systems::disposition::resolve_disposition_chains),
+                    .after(systems::goap::resolve_goap_plans),
+                systems::colony_score::emit_colony_score,
                 systems::fate::assign_fated_connections,
                 systems::fate::awaken_fated_connections,
                 systems::aspirations::select_aspirations,

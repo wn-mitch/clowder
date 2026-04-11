@@ -1,0 +1,52 @@
+[
+    // --- Generic den raid ---
+    (
+        text: "{name} raids a {prey} den!",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("raid"),
+    ),
+    (
+        text: "{name} finds a {prey} den and cleans it out.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("raid"),
+    ),
+    (
+        text: "{name} discovers a {prey} den among the roots.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("raid"),
+    ),
+    (
+        text: "{name} digs into a {prey} den, scattering the inhabitants.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("raid"),
+    ),
+
+    // --- Personality ---
+    (
+        text: "{name} tears into a {prey} den without a moment's pause.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("raid"),
+        personality: [(axis: Boldness, bucket: High)],
+    ),
+    (
+        text: "{name} carefully stalks around the {prey} den before striking.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("raid"),
+        personality: [(axis: Patience, bucket: High)],
+    ),
+
+    // --- Terrain ---
+    (
+        text: "{name} uncovers a {prey} den beneath the forest floor.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("raid"),
+        terrain: Some(DenseForest),
+    ),
+]

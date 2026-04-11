@@ -1,0 +1,65 @@
+[
+    // --- Generic miss ---
+    (
+        text: "{name}'s quarry bolts.",
+        tier: Micro,
+        action: Some(Hunt),
+        event: Some("miss"),
+    ),
+    (
+        text: "{name}'s pounce goes wide and the {prey} bolts.",
+        tier: Micro,
+        action: Some(Hunt),
+        event: Some("miss"),
+    ),
+    (
+        text: "The {prey} slips from {name}'s grasp.",
+        tier: Micro,
+        action: Some(Hunt),
+        event: Some("miss"),
+    ),
+    (
+        text: "{name} lunges — misses. The {prey} is gone.",
+        tier: Micro,
+        action: Some(Hunt),
+        event: Some("miss"),
+    ),
+    (
+        text: "{name} pounces on empty air.",
+        tier: Micro,
+        action: Some(Hunt),
+        event: Some("miss"),
+    ),
+
+    // --- Personality-conditioned ---
+    (
+        text: "{name} charges recklessly — the {prey} saw {object} coming.",
+        tier: Micro,
+        action: Some(Hunt),
+        event: Some("miss"),
+        personality: [(axis: Patience, bucket: Low)],
+    ),
+    (
+        text: "{name} hesitates a heartbeat too long. The {prey} escapes.",
+        tier: Micro,
+        action: Some(Hunt),
+        event: Some("miss"),
+        personality: [(axis: Boldness, bucket: Low)],
+    ),
+    (
+        text: "{name} overshoots — too eager, too fast.",
+        tier: Micro,
+        action: Some(Hunt),
+        event: Some("miss"),
+        personality: [(axis: Boldness, bucket: High)],
+    ),
+
+    // --- Life stage ---
+    (
+        text: "Young {name} fumbles the pounce. The {prey} escapes easily.",
+        tier: Micro,
+        action: Some(Hunt),
+        event: Some("miss"),
+        life_stage: Some(Young),
+    ),
+]

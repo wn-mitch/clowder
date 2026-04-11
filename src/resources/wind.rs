@@ -35,10 +35,16 @@ mod tests {
 
     #[test]
     fn direction_is_unit_length() {
-        let wind = WindState { angle: 1.2, strength: 0.7 };
+        let wind = WindState {
+            angle: 1.2,
+            strength: 0.7,
+        };
         let (dx, dy) = wind.direction();
         let len = (dx * dx + dy * dy).sqrt();
-        assert!((len - 1.0).abs() < 1e-5, "direction should be unit length, got {len}");
+        assert!(
+            (len - 1.0).abs() < 1e-5,
+            "direction should be unit length, got {len}"
+        );
     }
 
     #[test]

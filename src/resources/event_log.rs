@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::collections::VecDeque;
 
 use bevy_ecs::prelude::Resource;
@@ -62,6 +63,7 @@ pub enum EventKind {
     PopulationSnapshot {
         mice: usize,
         rats: usize,
+        rabbits: usize,
         fish: usize,
         birds: usize,
     },
@@ -82,6 +84,44 @@ pub enum EventKind {
     Death {
         cat: String,
         cause: String,
+        /// For Injury deaths: the source of the most recent unhealed injury.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        injury_source: Option<String>,
+    },
+    ColonyScore {
+        // Welfare snapshot [0.0, 1.0]
+        shelter: f32,
+        nourishment: f32,
+        health: f32,
+        happiness: f32,
+        fulfillment: f32,
+        welfare: f32,
+
+        // Cumulative ledger
+        seasons_survived: u64,
+        bonds_formed: u64,
+        peak_population: u64,
+        deaths_starvation: u64,
+        deaths_old_age: u64,
+        deaths_injury: u64,
+        aspirations_completed: u64,
+        structures_built: u64,
+        kittens_born: u64,
+        prey_dens_discovered: u64,
+
+        // Aggregate
+        aggregate: f64,
+
+        // Activation
+        activation_score: f64,
+        features_active: u32,
+        features_total: u32,
+
+        // Context
+        living_cats: u64,
+    },
+    SystemActivation {
+        counts: HashMap<String, u64>,
     },
 }
 
@@ -139,11 +179,14 @@ mod tests {
     #[test]
     fn push_adds_entry() {
         let mut log = EventLog::default();
-        log.push(1, EventKind::FoodLevel {
-            current: 10.0,
-            capacity: 50.0,
-            fraction: 0.2,
-        });
+        log.push(
+            1,
+            EventKind::FoodLevel {
+                current: 10.0,
+                capacity: 50.0,
+                fraction: 0.2,
+            },
+        );
         assert_eq!(log.entries.len(), 1);
         assert_eq!(log.total_pushed, 1);
     }
@@ -153,11 +196,14 @@ mod tests {
         let mut log = EventLog::default();
         log.capacity = 3;
         for i in 0..5u64 {
-            log.push(i, EventKind::FoodLevel {
-                current: i as f32,
-                capacity: 50.0,
-                fraction: i as f32 / 50.0,
-            });
+            log.push(
+                i,
+                EventKind::FoodLevel {
+                    current: i as f32,
+                    capacity: 50.0,
+                    fraction: i as f32 / 50.0,
+                },
+            );
         }
         assert_eq!(log.entries.len(), 3);
         assert_eq!(log.entries[0].tick, 2);

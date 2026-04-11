@@ -1,14 +1,15 @@
 use bevy_ecs::prelude::*;
 use rand::Rng;
 
-use crate::ai::pathfinding::step_toward;
+use crate::ai::pathfinding::find_path;
 use crate::ai::CurrentAction;
+use crate::components::identity::Name;
 use crate::components::magic::{
-    Harvestable, Herb, Inventory, MisfireEffect, RemedyEffect, RemedyKind, Seasonal, Ward,
-    WardKind,
+    FlavorPlant, GrowthStage, Harvestable, Herb, Inventory, MisfireEffect, RemedyEffect,
+    RemedyKind, Seasonal, Ward, WardKind,
 };
 use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier};
-use crate::components::physical::{Dead, Health, InjuryKind, Injury, Needs, Position};
+use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::components::skills::{Corruption, MagicAffinity, Skills};
 use crate::components::task_chain::{StepKind, StepStatus, TaskChain};
 use crate::components::wildlife::{WildAnimal, WildSpecies, WildlifeAiState};
@@ -16,7 +17,21 @@ use crate::resources::map::{Terrain, TileMap};
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::relationships::Relationships;
 use crate::resources::rng::SimRng;
+use crate::resources::sim_constants::{MagicConstants, SimConstants};
+use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::resources::time::{Season, SimConfig, TimeState};
+
+// ---------------------------------------------------------------------------
+// CorruptionPushback — message emitted by positive colony events
+// ---------------------------------------------------------------------------
+
+/// Emitted by births, bonds, socializing, etc. to reduce local corruption.
+#[derive(Message, Debug, Clone)]
+pub struct CorruptionPushback {
+    pub position: Position,
+    pub radius: i32,
+    pub amount: f32,
+}
 
 // ---------------------------------------------------------------------------
 // corruption_spread
@@ -28,8 +43,11 @@ pub fn corruption_spread(
     mut map: ResMut<TileMap>,
     time: Res<TimeState>,
     mut log: ResMut<NarrativeLog>,
+    constants: Res<SimConstants>,
+    mut activation: ResMut<SystemActivation>,
 ) {
-    if !time.tick.is_multiple_of(10) {
+    let m = &constants.magic;
+    if !time.tick.is_multiple_of(m.corruption_spread_interval) {
         return;
     }
 
@@ -38,7 +56,7 @@ pub fn corruption_spread(
     for y in 0..map.height {
         for x in 0..map.width {
             let c = map.get(x, y).corruption;
-            if c > 0.3 {
+            if c > m.corruption_spread_threshold {
                 sources.push((x, y, c));
             }
         }
@@ -47,15 +65,15 @@ pub fn corruption_spread(
     let mut new_tiles_corrupted = 0u32;
     let deltas: [(i32, i32); 4] = [(0, 1), (0, -1), (1, 0), (-1, 0)];
     for (sx, sy, corruption) in sources {
-        let spread = corruption * 0.0001;
+        let spread = corruption * m.corruption_spread_rate;
         for (dx, dy) in &deltas {
             let nx = sx + dx;
             let ny = sy + dy;
             if map.in_bounds(nx, ny) {
                 let tile = map.get_mut(nx, ny);
-                let was_clean = tile.corruption < 0.05;
+                let was_clean = tile.corruption < m.corruption_new_tile_threshold;
                 tile.corruption = (tile.corruption + spread).min(1.0);
-                if was_clean && tile.corruption >= 0.05 {
+                if was_clean && tile.corruption >= m.corruption_new_tile_threshold {
                     new_tiles_corrupted += 1;
                 }
             }
@@ -64,6 +82,7 @@ pub fn corruption_spread(
 
     // Narrate when corruption reaches new ground.
     if new_tiles_corrupted > 0 {
+        activation.record(Feature::CorruptionSpread);
         log.push(
             time.tick,
             "Dark tendrils creep across the ground. The corruption spreads.".to_string(),
@@ -80,24 +99,41 @@ pub fn corruption_spread(
 /// speed. Wards that hit zero strength are despawned.
 pub fn ward_decay(
     mut wards: Query<(Entity, &mut Ward, &Position)>,
+    shadow_foxes: Query<(&WildlifeAiState, &Position), With<WildAnimal>>,
     map: Res<TileMap>,
     mut commands: Commands,
+    constants: Res<SimConstants>,
+    mut activation: ResMut<SystemActivation>,
 ) {
+    let m = &constants.magic;
+    let c = &constants.wildlife;
+    let mut any_decayed = false;
     for (entity, mut ward, pos) in &mut wards {
-        let on_ward_post = map.in_bounds(pos.x, pos.y)
-            && map.get(pos.x, pos.y).terrain == Terrain::WardPost;
+        let on_ward_post =
+            map.in_bounds(pos.x, pos.y) && map.get(pos.x, pos.y).terrain == Terrain::WardPost;
 
-        let effective_decay = if on_ward_post {
-            ward.decay_rate * 0.5
+        let mut effective_decay = if on_ward_post {
+            ward.decay_rate * m.ward_post_decay_multiplier
         } else {
             ward.decay_rate
         };
 
+        // Shadow foxes encircling this ward increase decay.
+        let siege_count = shadow_foxes.iter().filter(|(ai, _)| {
+            matches!(ai, WildlifeAiState::EncirclingWard { ward_x, ward_y, .. }
+                if *ward_x == pos.x && *ward_y == pos.y)
+        }).count();
+        effective_decay += siege_count as f32 * c.ward_siege_decay_bonus;
+
         ward.strength -= effective_decay;
+        any_decayed = true;
 
         if ward.strength <= 0.0 {
             commands.entity(entity).despawn();
         }
+    }
+    if any_decayed {
+        activation.record(Feature::WardDecay);
     }
 }
 
@@ -108,23 +144,33 @@ pub fn ward_decay(
 /// Tick active remedy buffs. Healing and energy tonics apply each tick; mood
 /// tonic pushes a single modifier on the first tick only.
 pub fn apply_remedy_effects(
-    mut query: Query<(Entity, &mut RemedyEffect, &mut Health, &mut Needs, &mut Mood)>,
+    mut query: Query<(
+        Entity,
+        &mut RemedyEffect,
+        &mut Health,
+        &mut Needs,
+        &mut Mood,
+    )>,
     mut commands: Commands,
+    constants: Res<SimConstants>,
+    mut activation: ResMut<SystemActivation>,
 ) {
+    let m = &constants.magic;
     for (entity, mut remedy, mut health, mut needs, mut mood) in &mut query {
+        activation.record(Feature::RemedyApplied);
         match remedy.kind {
             RemedyKind::HealingPoultice => {
-                health.current = (health.current + 0.005).min(health.max);
+                health.current = (health.current + m.healing_poultice_rate).min(health.max);
             }
             RemedyKind::EnergyTonic => {
-                needs.energy = (needs.energy + 0.003).min(1.0);
+                needs.energy = (needs.energy + m.energy_tonic_rate).min(1.0);
             }
             RemedyKind::MoodTonic => {
                 // Only on the first tick of application.
                 if remedy.ticks_remaining == remedy.kind.duration() {
                     mood.modifiers.push_back(MoodModifier {
-                        amount: 0.2,
-                        ticks_remaining: 500,
+                        amount: m.mood_tonic_bonus,
+                        ticks_remaining: m.mood_tonic_ticks,
                         source: "herbal remedy".to_string(),
                     });
                 }
@@ -147,7 +193,10 @@ pub fn personal_corruption_effects(
     mut cats: Query<(&Corruption, &mut Mood, Option<&mut CurrentAction>)>,
     _relationships: Res<Relationships>,
     mut rng: ResMut<SimRng>,
+    constants: Res<SimConstants>,
+    mut activation: ResMut<SystemActivation>,
 ) {
+    let m = &constants.magic;
     // TODO: corruption > 0.5 should also decay fondness toward all known cats
     // in Relationships. This requires mutable access to Relationships plus
     // multi-entity iteration (needs to know *which* cats this cat knows),
@@ -155,18 +204,19 @@ pub fn personal_corruption_effects(
     // system or event-based approach.
 
     for (corruption, mut mood, current_action) in &mut cats {
-        if corruption.0 > 0.3
-            && rng.rng.random::<f32>() < 0.05
+        if corruption.0 > m.personal_corruption_mood_threshold
+            && rng.rng.random::<f32>() < m.personal_corruption_mood_chance
         {
+            activation.record(Feature::PersonalCorruptionEffect);
             mood.modifiers.push_back(MoodModifier {
-                amount: -0.15,
-                ticks_remaining: 10,
+                amount: m.personal_corruption_mood_penalty,
+                ticks_remaining: m.personal_corruption_mood_ticks,
                 source: "corruption".to_string(),
             });
         }
 
-        if corruption.0 > 0.7
-            && rng.rng.random::<f32>() < 0.02
+        if corruption.0 > m.personal_corruption_erratic_threshold
+            && rng.rng.random::<f32>() < m.personal_corruption_erratic_chance
         {
             if let Some(mut action) = current_action {
                 action.ticks_remaining = 0;
@@ -179,40 +229,55 @@ pub fn personal_corruption_effects(
 // corruption_tile_effects
 // ---------------------------------------------------------------------------
 
-/// Cats standing on corrupted ground receive a mood penalty. Herbs on heavily
-/// corrupted tiles become twisted.
+/// Cats standing on corrupted ground receive a mood penalty and (at high
+/// corruption) health drain. Herbs on heavily corrupted tiles become twisted.
 pub fn corruption_tile_effects(
-    mut cats: Query<(&Position, &mut Mood), Without<Dead>>,
+    mut cats: Query<(&Position, &mut Mood, &mut Health), Without<Dead>>,
     map: Res<TileMap>,
-    mut herbs: Query<(&Position, &mut Herb)>,
+    mut herbs: Query<(Entity, &Position, &mut Herb, Option<&Harvestable>)>,
+    constants: Res<SimConstants>,
+    mut activation: ResMut<SystemActivation>,
+    mut commands: Commands,
 ) {
-    for (pos, mut mood) in &mut cats {
+    let m = &constants.magic;
+    for (pos, mut mood, mut health) in &mut cats {
         if !map.in_bounds(pos.x, pos.y) {
             continue;
         }
         let corruption = map.get(pos.x, pos.y).corruption;
-        if corruption > 0.1 {
+        if corruption > m.corruption_tile_mood_threshold {
             let already_has = mood
                 .modifiers
                 .iter()
-                .any(|m| m.source == "corrupted ground");
+                .any(|md| md.source == "corrupted ground");
             if !already_has {
+                activation.record(Feature::CorruptionTileEffect);
                 mood.modifiers.push_back(MoodModifier {
-                    amount: -0.1 * corruption,
-                    ticks_remaining: 5,
+                    amount: -m.corruption_tile_mood_threshold * corruption,
+                    ticks_remaining: m.corruption_tile_mood_ticks,
                     source: "corrupted ground".to_string(),
                 });
             }
         }
+        // Health drain on heavily corrupted tiles.
+        if corruption > m.corruption_health_drain_threshold {
+            health.current = (health.current - m.corruption_health_drain).max(0.0);
+            activation.record(Feature::CorruptionHealthDrain);
+        }
     }
 
-    for (pos, mut herb) in &mut herbs {
+    for (entity, pos, mut herb, harvestable) in &mut herbs {
         if !map.in_bounds(pos.x, pos.y) {
             continue;
         }
         let corruption = map.get(pos.x, pos.y).corruption;
-        if corruption > 0.3 {
+        if corruption > m.corruption_twisted_herb_threshold {
             herb.twisted = true;
+        }
+        // High corruption suppresses harvestability entirely.
+        if corruption > m.herb_suppression_threshold && harvestable.is_some() {
+            commands.entity(entity).remove::<Harvestable>();
+            activation.record(Feature::HerbSuppressed);
         }
     }
 }
@@ -224,10 +289,11 @@ pub fn corruption_tile_effects(
 /// On season transitions, add or remove the `Harvestable` marker on herbs
 /// depending on whether the current season is in the herb's available list.
 pub fn herb_seasonal_check(
-    query: Query<(Entity, &Herb, &Seasonal, Option<&Harvestable>)>,
+    mut query: Query<(Entity, &mut Herb, &Seasonal, Option<&Harvestable>)>,
     time: Res<TimeState>,
     config: Res<SimConfig>,
     mut commands: Commands,
+    mut activation: ResMut<SystemActivation>,
 ) {
     if !time.tick.is_multiple_of(config.ticks_per_season) {
         return;
@@ -235,13 +301,67 @@ pub fn herb_seasonal_check(
 
     let current_season = Season::from_tick(time.tick, &config);
 
-    for (entity, herb, seasonal, harvestable) in &query {
+    for (entity, mut herb, seasonal, harvestable) in &mut query {
         let in_season = seasonal.available.contains(&current_season);
 
         if in_season && !herb.twisted && harvestable.is_none() {
+            activation.record(Feature::HerbSeasonalCheck);
             commands.entity(entity).insert(Harvestable);
         } else if !in_season && harvestable.is_some() {
+            activation.record(Feature::HerbSeasonalCheck);
             commands.entity(entity).remove::<Harvestable>();
+            // Reset visual growth stage when season ends.
+            herb.growth_stage = GrowthStage::Sprout;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// advance_herb_growth
+// ---------------------------------------------------------------------------
+
+/// Every `herb_growth_interval` ticks, advance the growth stage of in-season herbs.
+/// Plants start as Sprout and grow toward Blossom while their season is active.
+pub fn advance_herb_growth(
+    mut herbs: Query<&mut Herb, With<Harvestable>>,
+    time: Res<TimeState>,
+    constants: Res<SimConstants>,
+    mut activation: ResMut<SystemActivation>,
+) {
+    let interval = constants.magic.herb_growth_interval;
+    if !time.tick.is_multiple_of(interval) {
+        return;
+    }
+
+    for mut herb in &mut herbs {
+        if let Some(next) = herb.growth_stage.next() {
+            herb.growth_stage = next;
+            activation.record(Feature::HerbSeasonalCheck);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// advance_flavor_growth
+// ---------------------------------------------------------------------------
+
+/// Advance growth stage for seasonal flavor plants (Sunflower, Rose).
+/// Rock decorations have no Seasonal component and are skipped automatically.
+pub fn advance_flavor_growth(
+    mut plants: Query<&mut FlavorPlant, With<Seasonal>>,
+    time: Res<TimeState>,
+    constants: Res<SimConstants>,
+) {
+    let interval = constants.magic.herb_growth_interval;
+    if !time.tick.is_multiple_of(interval) {
+        return;
+    }
+
+    for mut plant in &mut plants {
+        if plant.kind.is_seasonal() {
+            if let Some(next) = plant.growth_stage.next() {
+                plant.growth_stage = next;
+            }
         }
     }
 }
@@ -258,8 +378,11 @@ pub fn spawn_shadow_fox_from_corruption(
     wildlife: Query<&WildAnimal>,
     time: Res<TimeState>,
     mut commands: Commands,
+    constants: Res<SimConstants>,
+    mut activation: ResMut<SystemActivation>,
 ) {
-    if !time.tick.is_multiple_of(10) {
+    let m = &constants.magic;
+    if !time.tick.is_multiple_of(m.shadow_fox_spawn_interval) {
         return;
     }
 
@@ -268,13 +391,16 @@ pub fn spawn_shadow_fox_from_corruption(
         .filter(|a| a.species == WildSpecies::ShadowFox)
         .count();
 
-    if shadow_fox_count >= 2 {
+    if shadow_fox_count >= m.shadow_fox_population_cap {
         return;
     }
 
     for y in 0..map.height {
         for x in 0..map.width {
-            if map.get(x, y).corruption > 0.7 && rng.rng.random::<f32>() < 0.001 {
+            if map.get(x, y).corruption > m.shadow_fox_corruption_threshold
+                && rng.rng.random::<f32>() < m.shadow_fox_spawn_chance
+            {
+                activation.record(Feature::ShadowFoxSpawn);
                 commands.spawn((
                     WildAnimal::new(WildSpecies::ShadowFox),
                     Position::new(x, y),
@@ -316,17 +442,22 @@ pub fn resolve_magic_task_chains(
             &MagicAffinity,
             &mut Corruption,
             &mut Health,
+            &Name,
         ),
         (Without<Dead>, Without<Herb>),
     >,
     herb_entities: Query<(Entity, &Herb, &Position), With<Harvestable>>,
+    alive_check: Query<(), Without<Dead>>,
     mut map: ResMut<TileMap>,
     mut rng: ResMut<SimRng>,
     mut log: ResMut<NarrativeLog>,
     mut relationships: ResMut<Relationships>,
     time: Res<TimeState>,
     mut commands: Commands,
+    constants: Res<SimConstants>,
+    mut activation: ResMut<SystemActivation>,
 ) {
+    let m = &constants.magic;
     // Collect workshop positions for speed bonus detection.
     // (We can't query buildings here due to borrow conflicts, so we check terrain.)
     let workshop_tiles_exist = true; // simplified — workshop bonus checked via terrain
@@ -335,7 +466,21 @@ pub fn resolve_magic_task_chains(
     // Deferred fondness changes for gratitude mechanic.
     let mut gratitude: Vec<(Entity, Entity, f32)> = Vec::new();
 
-    for (cat_entity, mut chain, mut current, mut pos, mut skills, mut inventory, mut mood, mut memory, magic_aff, mut corruption, mut health) in &mut cats {
+    for (
+        cat_entity,
+        mut chain,
+        mut current,
+        mut pos,
+        mut skills,
+        mut inventory,
+        mut mood,
+        mut memory,
+        magic_aff,
+        mut corruption,
+        mut health,
+        name,
+    ) in &mut cats
+    {
         let Some(step) = chain.current_mut() else {
             chains_to_remove.push(cat_entity);
             current.ticks_remaining = 0;
@@ -371,207 +516,182 @@ pub fn resolve_magic_task_chains(
         };
 
         // Workshop proximity check via terrain.
-        let at_workshop = map.in_bounds(pos.x, pos.y)
-            && map.get(pos.x, pos.y).terrain == Terrain::Workshop;
+        let at_workshop =
+            map.in_bounds(pos.x, pos.y) && map.get(pos.x, pos.y).terrain == Terrain::Workshop;
         let _ = workshop_tiles_exist;
+
+        // Extract step data before the match to avoid borrow conflicts
+        // between step (borrowed from chain) and chain mutations.
+        let step_target_entity = step.target_entity;
+        let step_target_position = step.target_position;
+
+        use crate::steps::StepResult;
+        let apply = |result: StepResult, chain: &mut TaskChain| match result {
+            StepResult::Continue => {}
+            StepResult::Advance => {
+                chain.advance();
+            }
+            StepResult::Fail(reason) => {
+                chain.fail_current(reason);
+            }
+        };
 
         match step.kind.clone() {
             StepKind::GatherHerb => {
-                if ticks >= 5 {
-                    // Find the herb entity at the target position.
-                    let target_entity = step.target_entity;
-                    if let Some(herb_e) = target_entity {
-                        if let Ok((_, herb, _)) = herb_entities.get(herb_e) {
-                            if inventory.add_herb(herb.kind) {
-                                commands.entity(herb_e).despawn();
-                                skills.herbcraft += skills.growth_rate() * 0.01;
-                                chain.advance();
-                            } else {
-                                chain.fail_current("inventory full".into());
-                            }
-                        } else {
-                            chain.fail_current("herb already taken".into());
-                        }
-                    } else {
-                        chain.fail_current("no herb target".into());
-                    }
-                }
+                apply(
+                    crate::steps::magic::resolve_gather_herb(
+                        ticks,
+                        step_target_entity,
+                        &mut inventory,
+                        &mut skills,
+                        &herb_entities,
+                        &mut commands,
+                        m,
+                    ),
+                    &mut chain,
+                );
             }
 
             StepKind::PrepareRemedy { remedy } => {
-                let required_ticks = if at_workshop { 10 } else { 15 };
-                if ticks >= required_ticks {
-                    let herb_needed = remedy.required_herb();
-                    if inventory.take_herb(herb_needed) {
-                        skills.herbcraft += skills.growth_rate() * 0.01;
-                        chain.advance();
-                    } else {
-                        chain.fail_current("missing herb for remedy".into());
-                    }
-                }
+                apply(
+                    crate::steps::magic::resolve_prepare_remedy(
+                        ticks,
+                        remedy,
+                        at_workshop,
+                        &mut inventory,
+                        &mut skills,
+                        m,
+                    ),
+                    &mut chain,
+                );
             }
 
             StepKind::ApplyRemedy { remedy } => {
-                // Move to patient if not adjacent.
-                if let Some(target_pos) = step.target_position {
-                    if pos.manhattan_distance(&target_pos) > 1 {
-                        if let Some(next) = step_toward(&pos, &target_pos, &map) {
-                            *pos = next;
-                        }
-                        // Don't advance yet — still walking.
-                        continue;
-                    }
+                let patient_alive = step_target_entity
+                    .map(|e| alive_check.get(e).is_ok())
+                    .unwrap_or(false);
+                let cached = &mut step.cached_path;
+                let (result, grat) = crate::steps::magic::resolve_apply_remedy(
+                    remedy,
+                    cat_entity,
+                    step_target_position,
+                    step_target_entity,
+                    patient_alive,
+                    cached,
+                    &mut pos,
+                    &mut skills,
+                    &map,
+                    &mut commands,
+                    &mut log,
+                    time.tick,
+                    m,
+                );
+                if let Some(g) = grat {
+                    gratitude.push(g);
                 }
-
-                // Apply remedy to target.
-                if let Some(patient) = step.target_entity {
-                    commands.entity(patient).insert(RemedyEffect {
-                        kind: remedy,
-                        ticks_remaining: remedy.duration(),
-                        healer: Some(cat_entity),
-                    });
-                    // Gratitude: deferred fondness increase.
-                    gratitude.push((patient, cat_entity, 0.1));
-
-                    let cat_name = "a herbalist"; // simplified
-                    log.push(
-                        time.tick,
-                        format!("{cat_name} applies a remedy with careful paws."),
-                        NarrativeTier::Action,
-                    );
-                }
-                skills.herbcraft += skills.growth_rate() * 0.005;
-                chain.advance();
+                apply(result, &mut chain);
             }
 
             StepKind::SetWard { kind } => {
-                if ticks >= 8 {
-                    // Consume thornbriar if setting a thornward.
-                    if kind == WardKind::Thornward
-                        && !inventory.take_herb(crate::components::magic::HerbKind::Thornbriar)
-                    {
-                        chain.fail_current("no thornbriar for ward".into());
-                        continue;
-                    }
-
-                    // Check for misfire on magical actions.
-                    if kind == WardKind::DurableWard {
-                        if let Some(misfire) = check_misfire(magic_aff.0, skills.magic, &mut rng.rng) {
-                            apply_misfire(misfire, cat_entity, &mut mood, &mut corruption, &mut health, &pos, &mut commands, &mut log, time.tick);
-                            if matches!(misfire, MisfireEffect::Fizzle) {
-                                chain.fail_current("misfire: fizzle".into());
-                                continue;
-                            }
-                            if matches!(misfire, MisfireEffect::InvertedWard) {
-                                // Spawn inverted ward instead.
-                                commands.spawn((
-                                    Ward::inverted_at(kind),
-                                    Position::new(pos.x, pos.y),
-                                ));
-                                chain.advance();
-                                continue;
-                            }
-                        }
-                    }
-
-                    // Spawn the ward entity.
-                    let ward = match kind {
-                        WardKind::Thornward => Ward::thornward(),
-                        WardKind::DurableWard => Ward::durable(),
-                    };
-                    commands.spawn((ward, Position::new(pos.x, pos.y)));
-                    skills.herbcraft += skills.growth_rate() * 0.01;
-                    if kind == WardKind::DurableWard {
-                        skills.magic += skills.growth_rate() * 0.01;
-                    }
-                    chain.advance();
-                }
+                apply(
+                    crate::steps::magic::resolve_set_ward(
+                        ticks,
+                        kind,
+                        &name.0,
+                        &mut inventory,
+                        magic_aff,
+                        &mut skills,
+                        &mut mood,
+                        &mut corruption,
+                        &mut health,
+                        &pos,
+                        &mut rng.rng,
+                        &mut commands,
+                        &mut log,
+                        time.tick,
+                        m,
+                        &constants.combat,
+                    ),
+                    &mut chain,
+                );
             }
 
             StepKind::Scry => {
-                if ticks == 1 {
-                    // Misfire check on first tick.
-                    if let Some(misfire) = check_misfire(magic_aff.0, skills.magic, &mut rng.rng) {
-                        apply_misfire(misfire, cat_entity, &mut mood, &mut corruption, &mut health, &pos, &mut commands, &mut log, time.tick);
-                        if matches!(misfire, MisfireEffect::Fizzle) {
-                            chain.fail_current("misfire: fizzle".into());
-                            continue;
-                        }
-                    }
-                }
-                if ticks >= 10 {
-                    // Create a memory of a random distant tile.
-                    let rx = rng.rng.random_range(0..map.width);
-                    let ry = rng.rng.random_range(0..map.height);
-                    memory.remember(MemoryEntry {
-                        event_type: MemoryType::ResourceFound,
-                        location: Some(Position::new(rx, ry)),
-                        involved: vec![],
-                        tick: time.tick,
-                        strength: 0.6,
-                        firsthand: true,
-                    });
-                    skills.magic += skills.growth_rate() * 0.01;
-                    chain.advance();
-                }
+                apply(
+                    crate::steps::magic::resolve_scry(
+                        ticks,
+                        &name.0,
+                        magic_aff,
+                        &mut skills,
+                        &mut memory,
+                        &mut mood,
+                        &mut corruption,
+                        &mut health,
+                        &pos,
+                        &map,
+                        &mut rng.rng,
+                        &mut commands,
+                        &mut log,
+                        time.tick,
+                        m,
+                        &constants.combat,
+                    ),
+                    &mut chain,
+                );
             }
 
             StepKind::CleanseCorruption => {
-                if ticks == 1 {
-                    // Misfire check on first tick.
-                    if let Some(misfire) = check_misfire(magic_aff.0, skills.magic, &mut rng.rng) {
-                        apply_misfire(misfire, cat_entity, &mut mood, &mut corruption, &mut health, &pos, &mut commands, &mut log, time.tick);
-                        if matches!(misfire, MisfireEffect::Fizzle) {
-                            chain.fail_current("misfire: fizzle".into());
-                            continue;
-                        }
-                    }
-                }
-
-                // Per-tick: reduce tile corruption.
-                if map.in_bounds(pos.x, pos.y) {
-                    let tile = map.get_mut(pos.x, pos.y);
-                    tile.corruption = (tile.corruption - skills.magic * 0.001).max(0.0);
-                }
-                // Occupational hazard: personal corruption increases.
-                corruption.0 = (corruption.0 + 0.0005).min(1.0);
-                skills.magic += skills.growth_rate() * 0.005;
-
-                // Advance when tile is cleansed or after 100 ticks.
-                let done = if map.in_bounds(pos.x, pos.y) {
-                    map.get(pos.x, pos.y).corruption < 0.05
-                } else {
-                    true
-                };
-                if done || ticks >= 100 {
-                    chain.advance();
-                }
+                apply(
+                    crate::steps::magic::resolve_cleanse_corruption(
+                        ticks,
+                        &name.0,
+                        magic_aff,
+                        &mut skills,
+                        &mut corruption,
+                        &mut mood,
+                        &mut health,
+                        &pos,
+                        &mut map,
+                        &mut rng.rng,
+                        &mut commands,
+                        &mut log,
+                        time.tick,
+                        m,
+                        &constants.combat,
+                    ),
+                    &mut chain,
+                );
             }
 
             StepKind::SpiritCommunion => {
-                if ticks == 1 {
-                    if let Some(misfire) = check_misfire(magic_aff.0, skills.magic, &mut rng.rng) {
-                        apply_misfire(misfire, cat_entity, &mut mood, &mut corruption, &mut health, &pos, &mut commands, &mut log, time.tick);
-                        if matches!(misfire, MisfireEffect::Fizzle) {
-                            chain.fail_current("misfire: fizzle".into());
-                            continue;
-                        }
-                    }
-                }
-                if ticks >= 15 {
-                    mood.modifiers.push_back(MoodModifier {
-                        amount: 0.3,
-                        ticks_remaining: 100,
-                        source: "spirit communion".to_string(),
-                    });
-                    skills.magic += skills.growth_rate() * 0.01;
-                    chain.advance();
-                }
+                apply(
+                    crate::steps::magic::resolve_spirit_communion(
+                        ticks,
+                        &name.0,
+                        magic_aff,
+                        &mut skills,
+                        &mut mood,
+                        &mut corruption,
+                        &mut health,
+                        &pos,
+                        &mut rng.rng,
+                        &mut commands,
+                        &mut log,
+                        time.tick,
+                        &mut activation,
+                        m,
+                        &constants.combat,
+                    ),
+                    &mut chain,
+                );
             }
 
             // Non-magic steps handled by resolve_task_chains.
             _ => {}
         }
+
+        // Sync CurrentAction targets from whatever step is now active.
+        chain.sync_targets(&mut current);
 
         if chain.is_complete() {
             chains_to_remove.push(cat_entity);
@@ -591,9 +711,9 @@ pub fn resolve_magic_task_chains(
 
 /// Apply a misfire effect to the caster.
 #[allow(clippy::too_many_arguments)]
-fn apply_misfire(
+pub fn apply_misfire(
     effect: MisfireEffect,
-    _cat_entity: Entity,
+    cat_name: &str,
     mood: &mut Mood,
     corruption: &mut Corruption,
     health: &mut Health,
@@ -601,35 +721,57 @@ fn apply_misfire(
     commands: &mut Commands,
     log: &mut NarrativeLog,
     tick: u64,
+    m: &MagicConstants,
+    combat: &crate::resources::sim_constants::CombatConstants,
 ) {
     match effect {
         MisfireEffect::Fizzle => {
             mood.modifiers.push_back(MoodModifier {
-                amount: -0.1,
-                ticks_remaining: 20,
+                amount: m.misfire_fizzle_mood_penalty,
+                ticks_remaining: m.misfire_fizzle_mood_ticks,
                 source: "embarrassment".to_string(),
             });
-            log.push(tick, "A cat concentrates... and nothing happens.".to_string(), NarrativeTier::Significant);
+            log.push(
+                tick,
+                format!("{cat_name} concentrates... and nothing happens."),
+                NarrativeTier::Significant,
+            );
         }
         MisfireEffect::CorruptionBacksplash => {
-            corruption.0 = (corruption.0 + 0.1).min(1.0);
-            log.push(tick, "Dark energy surges back into a cat!".to_string(), NarrativeTier::Significant);
+            corruption.0 = (corruption.0 + m.misfire_corruption_backsplash_amount).min(1.0);
+            log.push(
+                tick,
+                format!("Dark energy surges back into {cat_name}!"),
+                NarrativeTier::Significant,
+            );
         }
         MisfireEffect::InvertedWard => {
             // Spawned by the caller — just log here.
-            log.push(tick, "The ward twists, its light turning sickly...".to_string(), NarrativeTier::Significant);
+            log.push(
+                tick,
+                "The ward twists, its light turning sickly...".to_string(),
+                NarrativeTier::Significant,
+            );
         }
         MisfireEffect::WoundTransfer => {
-            health.injuries.push(Injury {
-                kind: InjuryKind::Minor,
-                tick_received: tick,
-                healed: false,
-            });
-            log.push(tick, "A cat gasps as a wound appears on their own flank.".to_string(), NarrativeTier::Significant);
+            // Minor wound: apply_injury handles HP penalty + injury record.
+            // Use the negligible threshold + epsilon so a Minor injury is
+            // always created regardless of the combat damage thresholds.
+            let synthetic_damage = combat.injury_negligible_threshold + 0.001;
+            crate::systems::combat::apply_injury(health, synthetic_damage, tick, crate::components::physical::InjurySource::MagicMisfire, combat);
+            log.push(
+                tick,
+                format!("{cat_name} gasps as a wound appears on their own flank."),
+                NarrativeTier::Significant,
+            );
         }
         MisfireEffect::LocationReveal => {
             // Create a MagicEvent memory that wildlife systems can check.
-            log.push(tick, "Something in the darkness turns its head...".to_string(), NarrativeTier::Significant);
+            log.push(
+                tick,
+                "Something in the darkness turns its head...".to_string(),
+                NarrativeTier::Significant,
+            );
             // The inverted ward spawned at the caster's location acts as a beacon.
             commands.spawn((
                 Ward::inverted_at(WardKind::Thornward),
@@ -645,22 +787,54 @@ fn apply_misfire(
 
 /// Determine whether a magic attempt misfires, based on the gap between
 /// affinity and skill. Returns `None` when the attempt succeeds cleanly.
-pub fn check_misfire(affinity: f32, skill: f32, rng: &mut impl Rng) -> Option<MisfireEffect> {
-    if skill >= affinity * 0.8 {
+pub fn check_misfire(
+    affinity: f32,
+    skill: f32,
+    rng: &mut impl Rng,
+    m: &MagicConstants,
+) -> Option<MisfireEffect> {
+    if skill >= affinity * m.misfire_skill_safe_ratio {
         return None;
     }
-    let chance = (affinity - skill) * 0.5;
+    let chance = (affinity - skill) * m.misfire_chance_scale;
     if rng.random::<f32>() >= chance {
         return None;
     }
     let roll: f32 = rng.random();
     Some(match roll {
-        r if r < 0.3 => MisfireEffect::Fizzle,
-        r if r < 0.5 => MisfireEffect::CorruptionBacksplash,
-        r if r < 0.7 => MisfireEffect::InvertedWard,
-        r if r < 0.9 => MisfireEffect::WoundTransfer,
+        r if r < m.misfire_fizzle_threshold => MisfireEffect::Fizzle,
+        r if r < m.misfire_corruption_backsplash_threshold => MisfireEffect::CorruptionBacksplash,
+        r if r < m.misfire_inverted_ward_threshold => MisfireEffect::InvertedWard,
+        r if r < m.misfire_wound_transfer_threshold => MisfireEffect::WoundTransfer,
         _ => MisfireEffect::LocationReveal,
     })
+}
+
+// ---------------------------------------------------------------------------
+// apply_corruption_pushback — positive colony events reduce local corruption
+// ---------------------------------------------------------------------------
+
+pub fn apply_corruption_pushback(
+    mut messages: MessageReader<CorruptionPushback>,
+    mut map: ResMut<TileMap>,
+    mut activation: ResMut<SystemActivation>,
+) {
+    for msg in messages.read() {
+        activation.record(Feature::CorruptionPushback);
+        for dy in -msg.radius..=msg.radius {
+            for dx in -msg.radius..=msg.radius {
+                if dx.abs() + dy.abs() > msg.radius {
+                    continue; // Manhattan distance
+                }
+                let tx = msg.position.x + dx;
+                let ty = msg.position.y + dy;
+                if map.in_bounds(tx, ty) {
+                    let tile = map.get_mut(tx, ty);
+                    tile.corruption = (tile.corruption - msg.amount).max(0.0);
+                }
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -670,8 +844,8 @@ pub fn check_misfire(affinity: f32, skill: f32, rng: &mut impl Rng) -> Option<Mi
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bevy_ecs::schedule::Schedule;
     use crate::resources::time::SimSpeed;
+    use bevy_ecs::schedule::Schedule;
 
     fn test_world() -> World {
         let mut world = World::new();
@@ -685,6 +859,8 @@ mod tests {
         world.insert_resource(SimRng::new(42));
         world.insert_resource(Relationships::default());
         world.insert_resource(NarrativeLog::default());
+        world.insert_resource(SimConstants::default());
+        world.insert_resource(SystemActivation::default());
         world
     }
 
@@ -694,25 +870,27 @@ mod tests {
 
     #[test]
     fn misfire_no_misfire_when_skilled() {
-        use rand_chacha::ChaCha8Rng;
         use rand_chacha::rand_core::SeedableRng;
+        use rand_chacha::ChaCha8Rng;
 
+        let m = &SimConstants::default().magic;
         let mut rng = ChaCha8Rng::seed_from_u64(1);
         // skill (0.5) >= affinity (0.5) * 0.8 = 0.4 → always None
         for _ in 0..100 {
-            assert!(check_misfire(0.5, 0.5, &mut rng).is_none());
+            assert!(check_misfire(0.5, 0.5, &mut rng, m).is_none());
         }
     }
 
     #[test]
     fn misfire_high_chance_when_unskilled() {
-        use rand_chacha::ChaCha8Rng;
         use rand_chacha::rand_core::SeedableRng;
+        use rand_chacha::ChaCha8Rng;
 
+        let m = &SimConstants::default().magic;
         let mut rng = ChaCha8Rng::seed_from_u64(1);
         let mut some_count = 0;
         for _ in 0..200 {
-            if check_misfire(0.9, 0.1, &mut rng).is_some() {
+            if check_misfire(0.9, 0.1, &mut rng, m).is_some() {
                 some_count += 1;
             }
         }
@@ -823,8 +1001,8 @@ mod tests {
 
         let health = world.get::<Health>(cat).unwrap();
         assert!(
-            (health.current - 0.505).abs() < 1e-6,
-            "health should increase by 0.005 per tick, got {}",
+            (health.current - 0.508).abs() < 1e-6,
+            "health should increase by healing_poultice_rate per tick, got {}",
             health.current
         );
     }

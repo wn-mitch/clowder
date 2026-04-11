@@ -1,12 +1,18 @@
+use std::collections::HashMap;
+
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::sprite::Text2d;
 
+use crate::components::building::Structure;
 use crate::components::identity::{Appearance, Name, Species};
-use crate::components::magic::{Herb, HerbKind, Harvestable, Ward};
-use crate::components::physical::{Dead, Position};
-use crate::components::prey::PreyAnimal;
-use crate::components::wildlife::WildAnimal;
+use crate::components::items::{Item, ItemKind, ItemLocation};
+use crate::components::magic::{
+    FlavorKind, FlavorPlant, GrowthStage, Harvestable, Herb, HerbKind, Ward,
+};
+use crate::components::physical::{Dead, Position, PreviousPosition};
+use crate::components::prey::{PreyAnimal, PreyConfig, PreyDen, PreyKind};
+use crate::components::wildlife::{FoxDen, WildAnimal};
 use crate::rendering::sprite_assets::SpriteAssets;
 use crate::rendering::tilemap_sync::{TILE_PX, TILE_SCALE};
 use crate::resources::map::TileMap;
@@ -24,7 +30,11 @@ pub fn create_white_pixel(mut commands: Commands, mut images: ResMut<Assets<Imag
     let format = TextureFormat::Rgba8UnormSrgb;
     let data = vec![255u8, 255, 255, 255]; // RGBA white pixel
     let image = Image::new(
-        Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
+        Extent3d {
+            width: 1,
+            height: 1,
+            depth_or_array_layers: 1,
+        },
         TextureDimension::D2,
         data,
         format,
@@ -32,6 +42,85 @@ pub fn create_white_pixel(mut commands: Commands, mut images: ResMut<Assets<Imag
     );
     let handle = images.add(image);
     commands.insert_resource(WhitePixel(handle));
+}
+
+/// Give stored items a Position matching their container building so the
+/// standard sprite-attach + position-sync pipeline can render them.
+/// OnGround items already have Position from spawn.
+pub fn sync_item_positions(
+    mut commands: Commands,
+    items_without_pos: Query<(Entity, &Item), Without<Position>>,
+    buildings: Query<&Position, With<Structure>>,
+) {
+    for (entity, item) in &items_without_pos {
+        if let ItemLocation::StoredIn(building) = item.location {
+            if let Ok(building_pos) = buildings.get(building) {
+                commands.entity(entity).insert(*building_pos);
+            }
+        }
+    }
+}
+
+/// Visual layout slot for items rendered at a shared grid position.
+/// Same-kind items stack vertically (up to 5); different kinds tile into columns.
+#[derive(Component, Clone, Copy)]
+pub struct ItemDisplaySlot {
+    /// Which kind-group column this item belongs to (0, 1, 2...).
+    pub kind_column: u8,
+    /// Vertical position within the kind-group stack (0 = bottom, max 4).
+    pub stack_row: u8,
+    /// Total distinct kind-columns at this position, for centering.
+    pub total_columns: u8,
+}
+
+/// Compute stacking/tiling layout for items sharing a grid position.
+/// Runs each frame after `sync_item_positions` assigns positions to stored items.
+pub fn compute_item_layout(mut commands: Commands, items: Query<(Entity, &Position, &Item)>) {
+    // Group items by grid position.
+    let mut by_pos: HashMap<(i32, i32), Vec<(Entity, ItemKind)>> = HashMap::new();
+    for (entity, pos, item) in &items {
+        by_pos
+            .entry((pos.x, pos.y))
+            .or_default()
+            .push((entity, item.kind));
+    }
+
+    for (_pos, mut group) in by_pos {
+        // Sort by ItemKind discriminant for stable column ordering, then by entity for
+        // stable stack ordering within a kind group.
+        group.sort_by(|a, b| {
+            (a.1 as usize)
+                .cmp(&(b.1 as usize))
+                .then(a.0.to_bits().cmp(&b.0.to_bits()))
+        });
+
+        // Assign columns per distinct kind.
+        let mut current_kind: Option<ItemKind> = None;
+        let mut kind_column: u8 = 0;
+        let mut stack_row: u8 = 0;
+        let mut slots: Vec<(Entity, u8, u8)> = Vec::with_capacity(group.len());
+
+        for (entity, kind) in &group {
+            if current_kind != Some(*kind) {
+                if current_kind.is_some() {
+                    kind_column += 1;
+                }
+                current_kind = Some(*kind);
+                stack_row = 0;
+            }
+            slots.push((*entity, kind_column, stack_row.min(4)));
+            stack_row += 1;
+        }
+
+        let total_columns = kind_column + 1;
+        for (entity, col, row) in slots {
+            commands.entity(entity).insert(ItemDisplaySlot {
+                kind_column: col,
+                stack_row: row,
+                total_columns,
+            });
+        }
+    }
 }
 
 /// Attach sprites to entities that have Position but no EntitySpriteMarker.
@@ -44,36 +133,31 @@ pub fn attach_entity_sprites(
         (Entity, &Position, &Appearance, &Name),
         (With<Species>, Without<EntitySpriteMarker>, Without<Dead>),
     >,
-    dead_cats: Query<
-        (Entity, &Position),
-        (With<Species>, With<Dead>, Without<EntitySpriteMarker>),
-    >,
-    wildlife: Query<
-        (Entity, &Position, &WildAnimal),
-        Without<EntitySpriteMarker>,
-    >,
-    prey: Query<
-        (Entity, &Position, &PreyAnimal),
-        Without<EntitySpriteMarker>,
-    >,
-    herbs: Query<
-        (Entity, &Position, &Herb),
-        (With<Harvestable>, Without<EntitySpriteMarker>),
-    >,
-    wards: Query<
-        (Entity, &Position, &Ward),
-        Without<EntitySpriteMarker>,
-    >,
+    dead_cats: Query<(Entity, &Position), (With<Species>, With<Dead>, Without<EntitySpriteMarker>)>,
+    wildlife: Query<(Entity, &Position, &WildAnimal), Without<EntitySpriteMarker>>,
+    prey: Query<(Entity, &Position, &PreyConfig), (With<PreyAnimal>, Without<EntitySpriteMarker>)>,
+    dens: Query<(Entity, &Position, &PreyDen), Without<EntitySpriteMarker>>,
+    fox_dens: Query<(Entity, &Position), (With<FoxDen>, Without<EntitySpriteMarker>)>,
+    herbs: Query<(Entity, &Position, &Herb), (With<Harvestable>, Without<EntitySpriteMarker>)>,
+    flavor_plants: Query<(Entity, &Position, &FlavorPlant), Without<EntitySpriteMarker>>,
+    wards: Query<(Entity, &Position, &Ward), Without<EntitySpriteMarker>>,
+    items: Query<(Entity, &Position, &Item), Without<EntitySpriteMarker>>,
+    carcasses: Query<(Entity, &Position, &crate::components::wildlife::Carcass), Without<EntitySpriteMarker>>,
+    wells: Query<(Entity, &Position), (With<crate::components::building::ColonyWell>, Without<EntitySpriteMarker>)>,
 ) {
     let world_px = TILE_PX * TILE_SCALE;
     let map_h = map.height as f32;
 
     if !cats.is_empty() || !wildlife.is_empty() || !prey.is_empty() {
         eprintln!(
-            "Attaching sprites: {} cats, {} dead, {} wildlife, {} prey, {} herbs, {} wards",
-            cats.iter().count(), dead_cats.iter().count(),
-            wildlife.iter().count(), prey.iter().count(),
-            herbs.iter().count(), wards.iter().count(),
+            "Attaching sprites: {} cats, {} dead, {} wildlife, {} prey, {} herbs, {} wards, {} fox dens",
+            cats.iter().count(),
+            dead_cats.iter().count(),
+            wildlife.iter().count(),
+            prey.iter().count(),
+            herbs.iter().count(),
+            wards.iter().count(),
+            fox_dens.iter().count(),
         );
     }
 
@@ -90,7 +174,7 @@ pub fn attach_entity_sprites(
                     font_size: 10.0,
                     ..Default::default()
                 },
-                TextColor(Color::srgb(0.95, 0.92, 0.85)),
+                TextColor(Color::srgb(0.0, 0.0, 0.0)),
                 Transform::from_xyz(0.0, world_px * 0.55, 1.0),
             ))
             .id();
@@ -107,6 +191,7 @@ pub fn attach_entity_sprites(
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 20.0),
+            PreviousPosition { x: pos.x, y: pos.y },
             EntitySpriteMarker,
         ));
         commands.entity(entity).add_children(&[label]);
@@ -123,14 +208,26 @@ pub fn attach_entity_sprites(
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 19.0),
+            PreviousPosition { x: pos.x, y: pos.y },
             EntitySpriteMarker,
         ));
     }
 
-    // Wildlife — colored by species.
+    // Wildlife — colored by species, with label.
     for (entity, pos, animal) in &wildlife {
         let color = wildlife_color(animal);
         let (x, y) = grid_to_world(pos, map_h, world_px);
+        let label = commands
+            .spawn((
+                Text2d::new(animal.species.name()),
+                TextFont {
+                    font_size: 9.0,
+                    ..Default::default()
+                },
+                TextColor(Color::srgb(0.0, 0.0, 0.0)),
+                Transform::from_xyz(0.0, world_px * 0.45, 1.0),
+            ))
+            .id();
         commands.entity(entity).insert((
             Sprite {
                 image: white_pixel.0.clone(),
@@ -139,30 +236,148 @@ pub fn attach_entity_sprites(
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 21.0),
+            PreviousPosition { x: pos.x, y: pos.y },
             EntitySpriteMarker,
         ));
+        commands.entity(entity).add_children(&[label]);
     }
 
-    // Prey — small, colored by species.
-    for (entity, pos, prey_animal) in &prey {
-        let color = prey_color(prey_animal);
+    // Prey — species-specific size and color, with label.
+    for (entity, pos, config) in &prey {
+        let color = prey_color(config.kind);
+        let size = prey_sprite_size(config.kind, world_px);
         let (x, y) = grid_to_world(pos, map_h, world_px);
+        let label = commands
+            .spawn((
+                Text2d::new(config.name),
+                TextFont {
+                    font_size: 8.0,
+                    ..Default::default()
+                },
+                TextColor(Color::srgb(0.0, 0.0, 0.0)),
+                Transform::from_xyz(0.0, size.y * 0.55 + 2.0, 1.0),
+            ))
+            .id();
         commands.entity(entity).insert((
             Sprite {
                 image: white_pixel.0.clone(),
                 color,
-                custom_size: Some(Vec2::new(world_px * 0.4, world_px * 0.4)),
+                custom_size: Some(size),
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 18.0),
+            PreviousPosition { x: pos.x, y: pos.y },
             EntitySpriteMarker,
         ));
+        commands.entity(entity).add_children(&[label]);
     }
 
-    // Herbs — distinct flower/mushroom sprite per kind.
+    // Carcasses — dark desaturated prey colors, fading with age.
+    for (entity, pos, carcass) in &carcasses {
+        use crate::components::prey::PreyKind;
+        let base_color = match carcass.prey_kind {
+            PreyKind::Mouse => Color::srgba(0.3, 0.25, 0.15, 0.7),
+            PreyKind::Rat => Color::srgba(0.25, 0.2, 0.15, 0.7),
+            PreyKind::Rabbit => Color::srgba(0.35, 0.25, 0.12, 0.7),
+            PreyKind::Fish => Color::srgba(0.2, 0.25, 0.3, 0.7),
+            PreyKind::Bird => Color::srgba(0.3, 0.2, 0.25, 0.7),
+        };
+        let size = prey_sprite_size(carcass.prey_kind, world_px);
+        let (x, y) = grid_to_world(pos, map_h, world_px);
+        let species_name = match carcass.prey_kind {
+            PreyKind::Mouse => "mouse remains",
+            PreyKind::Rat => "rat remains",
+            PreyKind::Rabbit => "rabbit remains",
+            PreyKind::Fish => "fish remains",
+            PreyKind::Bird => "bird remains",
+        };
+        let label = commands
+            .spawn((
+                Text2d::new(species_name),
+                TextFont {
+                    font_size: 8.0,
+                    ..Default::default()
+                },
+                TextColor(Color::srgb(0.0, 0.0, 0.0)),
+                Transform::from_xyz(0.0, size.y * 0.55 + 2.0, 1.0),
+            ))
+            .id();
+        commands.entity(entity).insert((
+            Sprite {
+                image: white_pixel.0.clone(),
+                color: base_color,
+                custom_size: Some(size),
+                ..Default::default()
+            },
+            Transform::from_xyz(x, y, 16.0),
+            PreviousPosition { x: pos.x, y: pos.y },
+            EntitySpriteMarker,
+        ));
+        commands.entity(entity).add_children(&[label]);
+    }
+
+    // Prey dens — hot colors, visible.
+    for (entity, pos, den) in &dens {
+        let color = den_color(den.kind);
+        let (x, y) = grid_to_world(pos, map_h, world_px);
+        let label = commands
+            .spawn((
+                Text2d::new(den.den_name),
+                TextFont {
+                    font_size: 8.0,
+                    ..Default::default()
+                },
+                TextColor(Color::srgb(0.0, 0.0, 0.0)),
+                Transform::from_xyz(0.0, world_px * 0.4, 1.0),
+            ))
+            .id();
+        commands.entity(entity).insert((
+            Sprite {
+                image: white_pixel.0.clone(),
+                color,
+                custom_size: Some(Vec2::splat(world_px * 0.6)),
+                ..Default::default()
+            },
+            Transform::from_xyz(x, y, 16.0),
+            PreviousPosition { x: pos.x, y: pos.y },
+            EntitySpriteMarker,
+        ));
+        commands.entity(entity).add_children(&[label]);
+    }
+
+    // Fox dens — earthy brown marker with label.
+    for (entity, pos) in &fox_dens {
+        let color = Color::srgb(0.6, 0.25, 0.1);
+        let (x, y) = grid_to_world(pos, map_h, world_px);
+        let label = commands
+            .spawn((
+                Text2d::new("Fox Den"),
+                TextFont {
+                    font_size: 8.0,
+                    ..Default::default()
+                },
+                TextColor(Color::srgb(0.0, 0.0, 0.0)),
+                Transform::from_xyz(0.0, world_px * 0.4, 1.0),
+            ))
+            .id();
+        commands.entity(entity).insert((
+            Sprite {
+                image: white_pixel.0.clone(),
+                color,
+                custom_size: Some(Vec2::splat(world_px * 0.5)),
+                ..Default::default()
+            },
+            Transform::from_xyz(x, y, 16.0),
+            PreviousPosition { x: pos.x, y: pos.y },
+            EntitySpriteMarker,
+        ));
+        commands.entity(entity).add_children(&[label]);
+    }
+
+    // Herbs — distinct flower/mushroom sprite per kind and growth stage.
     for (entity, pos, herb) in &herbs {
         let (x, y) = grid_to_world(pos, map_h, world_px);
-        let atlas_index = herb_sprite_index(herb.kind);
+        let atlas_index = herb_sprite_index(herb.kind, herb.growth_stage);
         let color = if herb.twisted {
             Color::srgb(0.6, 0.15, 0.4) // corrupted: dark magenta tint
         } else {
@@ -180,6 +395,28 @@ pub fn attach_entity_sprites(
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 17.0),
+            PreviousPosition { x: pos.x, y: pos.y },
+            EntitySpriteMarker,
+        ));
+    }
+
+    // Flavor plants (non-harvestable) — same herbs atlas.
+    for (entity, pos, plant) in &flavor_plants {
+        let (x, y) = grid_to_world(pos, map_h, world_px);
+        let atlas_index = flavor_sprite_index(plant.kind, plant.growth_stage);
+        commands.entity(entity).insert((
+            Sprite {
+                image: sprite_assets.herbs_texture.clone(),
+                color: Color::WHITE,
+                custom_size: Some(Vec2::splat(world_px * 0.5)),
+                texture_atlas: Some(TextureAtlas {
+                    layout: sprite_assets.herbs_layout.clone(),
+                    index: atlas_index,
+                }),
+                ..Default::default()
+            },
+            Transform::from_xyz(x, y, 16.5),
+            PreviousPosition { x: pos.x, y: pos.y },
             EntitySpriteMarker,
         ));
     }
@@ -200,28 +437,114 @@ pub fn attach_entity_sprites(
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 22.0),
+            PreviousPosition { x: pos.x, y: pos.y },
+            EntitySpriteMarker,
+        ));
+    }
+
+    // Items — 16x16 sprites from the items spritesheet.
+    for (entity, pos, item) in &items {
+        let (x, y) = grid_to_world(pos, map_h, world_px);
+        let atlas_index = item_sprite_index(item.kind);
+        commands.entity(entity).insert((
+            Sprite {
+                image: sprite_assets.items_texture.clone(),
+                color: Color::WHITE,
+                custom_size: Some(Vec2::splat(world_px * 0.4)),
+                texture_atlas: Some(TextureAtlas {
+                    layout: sprite_assets.items_layout.clone(),
+                    index: atlas_index,
+                }),
+                ..Default::default()
+            },
+            Transform::from_xyz(x, y, 15.0),
+            PreviousPosition { x: pos.x, y: pos.y },
+            EntitySpriteMarker,
+        ));
+    }
+
+    // Colony well — 32x32 decorative landmark at colony center.
+    for (entity, pos) in &wells {
+        let (x, y) = grid_to_world(pos, map_h, world_px);
+        commands.entity(entity).insert((
+            Sprite {
+                image: sprite_assets.well_texture.clone(),
+                color: Color::WHITE,
+                custom_size: Some(Vec2::splat(world_px * 2.0)),
+                ..Default::default()
+            },
+            Transform::from_xyz(x, y, 14.0),
+            PreviousPosition { x: pos.x, y: pos.y },
             EntitySpriteMarker,
         ));
     }
 }
 
-/// Sync Position → Transform for all entities with both components.
+/// Snapshot current Position into PreviousPosition before the simulation tick
+/// advances positions. Runs in FixedUpdate before all simulation systems.
+pub fn snapshot_previous_positions(mut query: Query<(&Position, &mut PreviousPosition)>) {
+    for (pos, mut prev) in &mut query {
+        prev.x = pos.x;
+        prev.y = pos.y;
+    }
+}
+
+/// Sync Position → Transform for all entities, interpolating smoothly between
+/// the previous tick's position and the current one using the fixed-timestep
+/// overstep fraction.
 pub fn sync_entity_positions(
     map: Res<TileMap>,
-    mut query: Query<(Entity, &Position, &mut Transform), With<EntitySpriteMarker>>,
+    fixed_time: Res<Time<Fixed>>,
+    mut query: Query<
+        (
+            Entity,
+            &Position,
+            &PreviousPosition,
+            &mut Transform,
+            Option<&ItemDisplaySlot>,
+        ),
+        With<EntitySpriteMarker>,
+    >,
 ) {
     let world_px = TILE_PX * TILE_SCALE;
     let map_h = map.height as f32;
+    let t = fixed_time.overstep_fraction();
 
-    for (entity, pos, mut transform) in &mut query {
-        let (x, y) = grid_to_world(pos, map_h, world_px);
-        // Small deterministic sub-tile offset so sprites on the same tile
-        // don't stack exactly and name labels stay readable.
-        let hash = entity.to_bits() as f32;
-        let offset_x = (hash * 7.3).sin() * 0.3 * world_px;
-        let offset_y = (hash * 13.7).sin() * 0.15 * world_px;
-        transform.translation.x = x + offset_x;
-        transform.translation.y = y + offset_y;
+    for (entity, pos, prev, mut transform, display_slot) in &mut query {
+        let (curr_x, curr_y) = grid_to_world(pos, map_h, world_px);
+
+        // Snap directly for large jumps (spawn, teleport) — skip lerp.
+        let dist = (pos.x - prev.x).unsigned_abs() + (pos.y - prev.y).unsigned_abs();
+        let (x, y) = if dist > 5 {
+            (curr_x, curr_y)
+        } else {
+            let prev_x = prev.x as f32 * world_px;
+            let prev_y = (map_h - 1.0 - prev.y as f32) * world_px;
+            (
+                prev_x + (curr_x - prev_x) * t,
+                prev_y + (curr_y - prev_y) * t,
+            )
+        };
+
+        if let Some(slot) = display_slot {
+            // Structured layout for items: columns per kind, stacks per item.
+            let col_spacing = world_px * 0.35;
+            let row_step = world_px * 0.12;
+            let centering = slot.total_columns as f32 * col_spacing * 0.5;
+            transform.translation.x =
+                x - centering + slot.kind_column as f32 * col_spacing + col_spacing * 0.5;
+            transform.translation.y = y + slot.stack_row as f32 * row_step;
+            // Upper items render on top.
+            transform.translation.z = 15.0 + slot.stack_row as f32 * 0.01;
+        } else {
+            // Non-item entities: small deterministic sub-tile offset so sprites
+            // on the same tile don't stack exactly and name labels stay readable.
+            let hash = entity.to_bits() as f32;
+            let offset_x = (hash * 7.3).sin() * 0.3 * world_px;
+            let offset_y = (hash * 13.7).sin() * 0.15 * world_px;
+            transform.translation.x = x + offset_x;
+            transform.translation.y = y + offset_y;
+        }
     }
 }
 
@@ -247,17 +570,126 @@ fn fur_color_to_bevy(fur: &str) -> Color {
     }
 }
 
-/// Map each herb kind to a sprite index in the Mushrooms, Flowers, Stones atlas.
-/// The atlas is a 12-col x 5-row grid of 16x16 sprites. Indices are row-major
-/// (0 = top-left, 11 = top-right, 12 = second-row-left, etc.).
-/// These picks are approximate — tune by running `just run` and eyeballing.
-fn herb_sprite_index(kind: HerbKind) -> usize {
+/// Map each herb kind + growth stage to a sprite index in the Mushrooms, Flowers, Stones atlas.
+/// Atlas: 12 cols × 5 rows, 16×16, row-major (index 0 = top-left).
+fn herb_sprite_index(kind: HerbKind, stage: GrowthStage) -> usize {
+    use GrowthStage::*;
     match kind {
-        HerbKind::HealingMoss => 0,       // mushroom (top-left)
-        HerbKind::Moonpetal => 24,         // flower (row 2, col 0 area)
-        HerbKind::Calmroot => 36,          // small green plant (row 3)
-        HerbKind::Thornbriar => 6,         // darker mushroom/thorny (row 0, col 6)
-        HerbKind::Dreamroot => 27,         // colorful flower (row 2, col 3)
+        // Row 0: mushroom cluster (3 sprites, no Bud distinct from Bloom)
+        HerbKind::HealingMoss => match stage {
+            Sprout => 0,
+            Bud | Bloom => 1,
+            Blossom => 2,
+        },
+        // Row 0, cols 3–6: thornbriar stages
+        HerbKind::Thornbriar => match stage {
+            Sprout => 3,
+            Bud => 4,
+            Bloom => 5,
+            Blossom => 6,
+        },
+        // Row 4: moonpetal bud (58) / bloom (59) — previously wrong at index 24
+        HerbKind::Moonpetal => match stage {
+            Sprout | Bud | Bloom => 58,
+            Blossom => 59,
+        },
+        // Row 4: calmroot bloom (56) / blossom (57) — previously wrong at index 36
+        HerbKind::Calmroot => match stage {
+            Sprout | Bud | Bloom => 56,
+            Blossom => 57,
+        },
+        // Row 4: dreamroot full 4-stage progression — previously wrong at index 27
+        HerbKind::Dreamroot => match stage {
+            Sprout => 52,
+            Bud => 53,
+            Bloom => 54,
+            Blossom => 55,
+        },
+        // Row 2, cols 0–3: catnip sprout → bush
+        HerbKind::Catnip => match stage {
+            Sprout => 24,
+            Bud => 25,
+            Bloom => 26,
+            Blossom => 27,
+        },
+        // Row 3, cols 4–7: slumbershade
+        HerbKind::Slumbershade => match stage {
+            Sprout => 40,
+            Bud => 41,
+            Bloom => 42,
+            Blossom => 43,
+        },
+        // Row 4, cols 0–2: oracle orchid (3 sprites, skip Bud)
+        HerbKind::OracleOrchid => match stage {
+            Sprout | Bud => 48,
+            Bloom => 49,
+            Blossom => 50,
+        },
+    }
+}
+
+/// Map each flavor plant kind + growth stage to a sprite index in the Mushrooms, Flowers, Stones atlas.
+fn flavor_sprite_index(kind: FlavorKind, stage: GrowthStage) -> usize {
+    use GrowthStage::*;
+    match kind {
+        // Row 3, cols 0–3: sunflower shoot → blossom top
+        FlavorKind::Sunflower => match stage {
+            Sprout => 36,
+            Bud => 37,
+            Bloom => 38,
+            Blossom => 39,
+        },
+        // Row 3, col 8: rose (single sprite, all stages same)
+        FlavorKind::Rose => 44,
+        // Rocks — static sprites, stage irrelevant
+        FlavorKind::Pebble => 12,
+        FlavorKind::Rock => 13,
+        FlavorKind::Stone => 14,
+        FlavorKind::StoneChunk => 15,
+        FlavorKind::StoneFlat => 16,
+        FlavorKind::Boulder => 17,
+    }
+}
+
+/// Map each item kind to a sprite index in the items spritesheet atlas.
+/// The atlas is an 8-col x 15-row grid of 16x16 sprites, row-major.
+/// These picks are approximate — tune by running `just run` and eyeballing.
+fn item_sprite_index(kind: ItemKind) -> usize {
+    match kind {
+        // Raw prey — row 0 food sprites
+        ItemKind::RawMouse => 0,  // drumstick
+        ItemKind::RawRat => 1,    // meat cut
+        ItemKind::RawRabbit => 1, // meat cut
+        ItemKind::RawFish => 66,  // PEAR (closest fish shape in this pack)
+        ItemKind::RawBird => 0,   // drumstick (poultry)
+        // Foraged — actual produce sprites from the catalog
+        ItemKind::Berries => 82,    // STRAWBERRY
+        ItemKind::Nuts => 50,       // APPLE (round food, nut stand-in)
+        ItemKind::Roots => 81,      // TURNIP
+        ItemKind::WildOnion => 97,  // RADISH (bulb vegetable)
+        ItemKind::Mushroom => 7,    // mushroom
+        ItemKind::Moss => 5,        // leaf
+        ItemKind::DriedGrass => 11, // GRASS
+        ItemKind::Feather => 5,     // leaf shape
+        // Herbs as bottled items — bottles at cols 4-7: plain, special, large, large-special.
+        ItemKind::HerbHealingMoss => 20, // WHITEBOTTLE  (row 3, col 4)
+        ItemKind::HerbMoonpetal => 68,   // PINKBOTTLE   (row 9, col 4)
+        ItemKind::HerbCalmroot => 84,    // GREENBOTTLE  (row 11, col 4)
+        ItemKind::HerbThornbriar => 36,  // BROWNBOTTLE  (row 5, col 4)
+        ItemKind::HerbDreamroot => 52,   // PURPLEBOTTLE (row 7, col 4)
+        ItemKind::HerbCatnip => 69,      // PINKBOTTLESPECIAL   (row 9, col 5)
+        ItemKind::HerbSlumbershade => 37, // BROWNBOTTLESPECIAL  (row 5, col 5)
+        ItemKind::HerbOracleOrchid => 53, // PURPLEBOTTLESPECIAL (row 7, col 5)
+        // Curiosities
+        ItemKind::ShinyPebble => 42,   // STONE
+        ItemKind::GlassShard => 43,    // ROCK
+        ItemKind::ColorfulShell => 93, // PINKEGG (colorful rounded shape)
+        // Shadow materials
+        ItemKind::ShadowBone => 43, // ROCK (dark bone-like)
+        // Storage upgrades
+        ItemKind::Barrel => 30, // LARGEBROWNJAR
+        ItemKind::Crate => 35,  // STONEBRICK
+        ItemKind::Shelf => 34,  // PLANK
     }
 }
 
@@ -271,12 +703,32 @@ fn wildlife_color(animal: &WildAnimal) -> Color {
     }
 }
 
-fn prey_color(prey: &PreyAnimal) -> Color {
-    use crate::components::prey::PreySpecies;
-    match prey.species {
-        PreySpecies::Mouse => Color::srgb(0.6, 0.5, 0.35),
-        PreySpecies::Rat => Color::srgb(0.45, 0.45, 0.45),
-        PreySpecies::Fish => Color::srgb(0.4, 0.6, 0.85),
-        PreySpecies::Bird => Color::srgb(0.85, 0.85, 0.8),
+fn prey_color(kind: PreyKind) -> Color {
+    match kind {
+        PreyKind::Mouse => Color::srgb(0.6, 0.5, 0.35),
+        PreyKind::Rat => Color::srgb(0.45, 0.45, 0.45),
+        PreyKind::Rabbit => Color::srgb(0.65, 0.45, 0.25),
+        PreyKind::Fish => Color::srgb(0.4, 0.6, 0.85),
+        PreyKind::Bird => Color::srgb(0.85, 0.85, 0.8),
+    }
+}
+
+fn den_color(kind: PreyKind) -> Color {
+    match kind {
+        PreyKind::Mouse => Color::srgb(1.0, 0.3, 0.1), // hot orange
+        PreyKind::Rat => Color::srgb(0.9, 0.1, 0.1),   // red
+        PreyKind::Rabbit => Color::srgb(1.0, 0.5, 0.0), // amber
+        PreyKind::Fish => Color::srgb(0.9, 0.2, 0.6),  // hot pink
+        PreyKind::Bird => Color::srgb(1.0, 0.8, 0.0),  // yellow
+    }
+}
+
+fn prey_sprite_size(kind: PreyKind, world_px: f32) -> Vec2 {
+    match kind {
+        PreyKind::Mouse => Vec2::new(world_px * 0.25, world_px * 0.25),
+        PreyKind::Rat => Vec2::new(world_px * 0.35, world_px * 0.30),
+        PreyKind::Rabbit => Vec2::new(world_px * 0.40, world_px * 0.35),
+        PreyKind::Fish => Vec2::new(world_px * 0.35, world_px * 0.20),
+        PreyKind::Bird => Vec2::new(world_px * 0.25, world_px * 0.30),
     }
 }

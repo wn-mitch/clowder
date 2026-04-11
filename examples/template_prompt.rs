@@ -62,6 +62,8 @@ fn main() {
             Action::PracticeMagic => "magic.ron",
             Action::Coordinate => "coordinate.ron",
             Action::Mentor => "mentor.ron",
+            Action::Mate => "socialize.ron",
+            Action::Caretake => "socialize.ron",
         };
 
         let tier = match action {

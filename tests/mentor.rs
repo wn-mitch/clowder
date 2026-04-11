@@ -3,9 +3,10 @@ use bevy_ecs::schedule::Schedule;
 
 use clowder::ai::CurrentAction;
 use clowder::components::hunting_priors::HuntingPriors;
-use clowder::components::identity::Name;
+use clowder::components::identity::{Gender, Name};
 use clowder::components::magic::Inventory;
 use clowder::components::personality::Personality;
+use clowder::components::mental::Mood;
 use clowder::components::physical::{Needs, Position};
 use clowder::components::skills::Skills;
 use clowder::components::task_chain::{FailurePolicy, StepKind, StepStatus, TaskChain, TaskStep};
@@ -14,7 +15,8 @@ use clowder::resources::map::{Terrain, TileMap};
 use clowder::resources::narrative::NarrativeLog;
 use clowder::resources::relationships::Relationships;
 use clowder::resources::rng::SimRng;
-use clowder::resources::time::TimeState;
+use clowder::resources::time::{SimConfig, TimeState};
+use clowder::resources::weather::WeatherState;
 use clowder::resources::wind::WindState;
 use clowder::systems::disposition::resolve_disposition_chains;
 
@@ -27,6 +29,15 @@ fn setup_world() -> (World, Schedule) {
     world.insert_resource(NarrativeLog::default());
     world.insert_resource(WindState::default());
     world.insert_resource(ColonyHuntingMap::new(20, 20));
+    world.insert_resource(clowder::resources::ExplorationMap::new(20, 20));
+    world.insert_resource(clowder::resources::SimConstants::default());
+    world.insert_resource(SimConfig::default());
+    world.insert_resource(WeatherState::default());
+    world.insert_resource(clowder::species::build_registry());
+    world.insert_resource(clowder::components::prey::PreyDensity::default());
+    bevy_ecs::message::MessageRegistry::register_message::<clowder::components::prey::PreyKilled>(&mut world);
+    bevy_ecs::message::MessageRegistry::register_message::<clowder::components::prey::DenRaided>(&mut world);
+    bevy_ecs::message::MessageRegistry::register_message::<clowder::components::goap_plan::PlanNarrative>(&mut world);
     let mut schedule = Schedule::default();
     schedule.add_systems(resolve_disposition_chains);
     (world, schedule)
@@ -58,6 +69,7 @@ fn mentoring_restores_mastery() {
             Inventory::default(),
             Personality::random(&mut rand::rng()),
             Name("Apprentice".to_string()),
+            Mood::default(),
         ))
         .id();
 
@@ -71,7 +83,9 @@ fn mentoring_restores_mastery() {
             Inventory::default(),
             Personality::random(&mut rand::rng()),
             Name("Mentor".to_string()),
+            Gender::Tom,
             HuntingPriors::default(),
+            Mood::default(),
         ))
         .id();
 
@@ -104,6 +118,7 @@ fn mentoring_grows_apprentice_skill() {
             Inventory::default(),
             Personality::random(&mut rand::rng()),
             Name("Apprentice".to_string()),
+            Mood::default(),
         ))
         .id();
 
@@ -121,7 +136,9 @@ fn mentoring_grows_apprentice_skill() {
         Inventory::default(),
         Personality::random(&mut rand::rng()),
         Name("Mentor".to_string()),
+        Gender::Tom,
         HuntingPriors::default(),
+        Mood::default(),
     ));
 
     let hunting_before = world.get::<Skills>(apprentice).unwrap().hunting;
@@ -152,6 +169,7 @@ fn mentoring_builds_fondness() {
             Inventory::default(),
             Personality::random(&mut rand::rng()),
             Name("Apprentice".to_string()),
+            Mood::default(),
         ))
         .id();
 
@@ -165,7 +183,9 @@ fn mentoring_builds_fondness() {
             Inventory::default(),
             Personality::random(&mut rand::rng()),
             Name("Mentor".to_string()),
+            Gender::Tom,
             HuntingPriors::default(),
+            Mood::default(),
         ))
         .id();
 

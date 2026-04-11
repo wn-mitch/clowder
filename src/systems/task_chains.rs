@@ -1,12 +1,17 @@
+use std::collections::HashMap;
+
 use bevy_ecs::prelude::*;
 
-use crate::ai::pathfinding::step_toward;
+use crate::ai::pathfinding::find_path;
 use crate::ai::CurrentAction;
-use crate::components::building::{ConstructionSite, CropState, StoredItems, Structure, StructureType};
+use crate::components::building::{
+    ConstructionSite, CropState, StoredItems, Structure, StructureType,
+};
 use crate::components::items::{Item, ItemKind, ItemLocation};
 use crate::components::physical::{Dead, Needs, Position};
 use crate::components::skills::Skills;
 use crate::components::task_chain::{StepKind, StepStatus, TaskChain};
+use crate::resources::colony_score::ColonyScore;
 use crate::resources::map::TileMap;
 use crate::resources::time::{Season, SimConfig, TimeState};
 
@@ -46,6 +51,7 @@ pub fn resolve_task_chains(
     time: Res<TimeState>,
     config: Res<SimConfig>,
     mut commands: Commands,
+    mut colony_score: Option<ResMut<ColonyScore>>,
 ) {
     let season = time.season(&config);
     let season_mod = match season {
@@ -84,6 +90,15 @@ pub fn resolve_task_chains(
         .map(|(_, _, _, _, pos)| *pos)
         .collect();
 
+    // Snapshot tile occupancy for anti-stacking jitter on arrival.
+    let cat_tile_counts: HashMap<Position, u32> = {
+        let mut counts = HashMap::new();
+        for (_, _, _, pos, _, _) in &cats {
+            *counts.entry(*pos).or_insert(0) += 1;
+        }
+        counts
+    };
+
     let mut chains_to_remove: Vec<Entity> = Vec::new();
 
     for (cat_entity, mut chain, mut current, mut pos, mut skills, _needs) in &mut cats {
@@ -119,203 +134,128 @@ pub fn resolve_task_chains(
             1.0
         };
 
+        // Extract step data before the match to avoid borrow conflicts.
+        let step_target_entity = step.target_entity;
+        let step_target_position = step.target_position;
+
+        use crate::steps::StepResult;
+        let apply = |result: StepResult, chain: &mut TaskChain| match result {
+            StepResult::Continue => {}
+            StepResult::Advance => {
+                chain.advance();
+            }
+            StepResult::Fail(reason) => {
+                chain.fail_current(reason);
+            }
+        };
+
         match &step.kind {
             StepKind::MoveTo => {
-                let Some(target) = step.target_position else {
-                    chain.fail_current("no target position for MoveTo".into());
-                    continue;
-                };
-                if pos.manhattan_distance(&target) == 0 {
-                    chain.advance();
-                } else if let Some(next) = step_toward(&pos, &target, &map) {
-                    *pos = next;
-                } else if ticks > 20 {
-                    chain.fail_current("stuck for 20 ticks".into());
-                }
+                let cached = &mut step.cached_path;
+                apply(
+                    crate::steps::building::resolve_move_to(
+                        &mut pos,
+                        step_target_position,
+                        cached,
+                        &map,
+                        &cat_tile_counts,
+                    ),
+                    &mut chain,
+                );
             }
 
             StepKind::Gather { .. } => {
-                if ticks >= 5 {
-                    skills.building += skills.growth_rate() * 0.005 * workshop_bonus;
-                    chain.advance();
-                }
+                apply(
+                    crate::steps::building::resolve_gather(ticks, &mut skills, workshop_bonus),
+                    &mut chain,
+                );
             }
 
             StepKind::Deliver { material, amount } => {
-                if let Some(target_entity) = step.target_entity {
-                    if let Ok((_, _, Some(mut site), _, _)) = buildings.get_mut(target_entity) {
-                        site.deliver(*material, *amount);
-                    }
-                }
-                chain.advance();
+                apply(
+                    crate::steps::building::resolve_deliver(
+                        *material,
+                        *amount,
+                        step_target_entity,
+                        &mut buildings,
+                    ),
+                    &mut chain,
+                );
             }
 
             StepKind::Construct => {
-                let Some(target_entity) = step.target_entity else {
-                    chain.fail_current("no target for Construct".into());
-                    continue;
-                };
-
-                let Ok((_, _, maybe_site, _, building_pos)) = buildings.get_mut(target_entity) else {
-                    chain.fail_current("construction site not found".into());
-                    continue;
-                };
-
-                if pos.manhattan_distance(building_pos) > 1 {
-                    if let Some(next) = step_toward(&pos, building_pos, &map) {
-                        *pos = next;
-                    }
-                    continue;
-                }
-
-                if let Some(mut site) = maybe_site {
-                    if !site.materials_complete() {
-                        chain.fail_current("materials not delivered".into());
-                        continue;
-                    }
-
-                    let other_builders = builders_per_site
-                        .get(&target_entity)
-                        .copied()
-                        .unwrap_or(1)
-                        .max(1);
-                    let rate =
-                        skills.building * 0.02 * (1.0 + 0.3 * (other_builders as f32 - 1.0));
-                    site.progress = (site.progress + rate).min(1.0);
-                    skills.building += skills.growth_rate() * 0.01 * workshop_bonus;
-
-                    if site.progress >= 1.0 {
-                        let blueprint = site.blueprint;
-                        commands.entity(target_entity).remove::<ConstructionSite>();
-                        commands.entity(target_entity).insert(Structure::new(blueprint));
-                        chain.advance();
-                    }
-                } else {
-                    // ConstructionSite already removed — building is done.
-                    chain.advance();
-                }
+                let cached = &mut step.cached_path;
+                apply(
+                    crate::steps::building::resolve_construct(
+                        step_target_entity,
+                        &mut pos,
+                        cached,
+                        &mut skills,
+                        workshop_bonus,
+                        &builders_per_site,
+                        &mut buildings,
+                        &map,
+                        &mut commands,
+                        &mut colony_score,
+                    ),
+                    &mut chain,
+                );
             }
 
             StepKind::Repair => {
-                let Some(target_entity) = step.target_entity else {
-                    chain.fail_current("no target for Repair".into());
-                    continue;
-                };
-
-                let Ok((_, mut structure, _, _, building_pos)) = buildings.get_mut(target_entity)
-                else {
-                    chain.fail_current("building not found".into());
-                    continue;
-                };
-
-                if pos.manhattan_distance(building_pos) > 1 {
-                    if let Some(next) = step_toward(&pos, building_pos, &map) {
-                        *pos = next;
-                    }
-                    continue;
-                }
-
-                structure.condition = (structure.condition + skills.building * 0.01).min(1.0);
-                skills.building += skills.growth_rate() * 0.01 * workshop_bonus;
-
-                if structure.condition >= 1.0 {
-                    chain.advance();
-                }
+                let cached = &mut step.cached_path;
+                apply(
+                    crate::steps::building::resolve_repair(
+                        step_target_entity,
+                        &mut pos,
+                        cached,
+                        &mut skills,
+                        workshop_bonus,
+                        &mut buildings,
+                        &map,
+                    ),
+                    &mut chain,
+                );
             }
 
             StepKind::Tend => {
-                let Some(target_entity) = step.target_entity else {
-                    chain.fail_current("no target for Tend".into());
-                    continue;
-                };
-
-                let Ok((_, _, _, maybe_crop, garden_pos)) = buildings.get_mut(target_entity) else {
-                    chain.fail_current("garden not found".into());
-                    continue;
-                };
-
-                if pos.manhattan_distance(garden_pos) > 1 {
-                    if let Some(next) = step_toward(&pos, garden_pos, &map) {
-                        *pos = next;
-                    }
-                    continue;
-                }
-
-                if let Some(mut crop) = maybe_crop {
-                    crop.growth += skills.foraging * season_mod * 0.01;
-                    skills.foraging += skills.growth_rate() * 0.005 * workshop_bonus;
-
-                    if crop.growth >= 1.0 {
-                        chain.advance();
-                    }
-                } else {
-                    chain.fail_current("no CropState on garden".into());
-                }
+                let cached = &mut step.cached_path;
+                apply(
+                    crate::steps::building::resolve_tend(
+                        step_target_entity,
+                        &mut pos,
+                        cached,
+                        &mut skills,
+                        season_mod,
+                        workshop_bonus,
+                        &mut buildings,
+                        &map,
+                    ),
+                    &mut chain,
+                );
             }
 
             StepKind::Harvest => {
-                let Some(target_entity) = step.target_entity else {
-                    chain.fail_current("no target for Harvest".into());
-                    continue;
-                };
-
-                let Ok((_, _, _, maybe_crop, _)) = buildings.get_mut(target_entity) else {
-                    chain.fail_current("garden not found".into());
-                    continue;
-                };
-
-                if let Some(mut crop) = maybe_crop {
-                    // Spawn harvested food as real items in the nearest Stores.
-                    let nearest_store = stores_list
-                        .iter()
-                        .min_by_key(|(_, sp)| pos.manhattan_distance(sp))
-                        .map(|(e, _)| *e);
-                    if let Some(store_entity) = nearest_store {
-                        // Harvest produces 2 food items.
-                        for kind in [ItemKind::Berries, ItemKind::Roots] {
-                            let item_entity = commands
-                                .spawn(Item::new(kind, 0.9, ItemLocation::StoredIn(store_entity)))
-                                .id();
-                            if let Ok(mut stored) = stored_items.get_mut(store_entity) {
-                                stored.add(item_entity, StructureType::Stores);
-                            }
-                        }
-                    }
-                    crop.growth = 0.0;
-                    chain.advance();
-                } else {
-                    chain.fail_current("no CropState on garden".into());
-                }
+                apply(
+                    crate::steps::building::resolve_harvest(
+                        step_target_entity,
+                        &pos,
+                        &stores_list,
+                        &mut buildings,
+                        &mut stored_items,
+                        &mut commands,
+                    ),
+                    &mut chain,
+                );
             }
 
-            // Magic/herbcraft steps are resolved by the magic task chain system.
-            StepKind::GatherHerb
-            | StepKind::PrepareRemedy { .. }
-            | StepKind::ApplyRemedy { .. }
-            | StepKind::SetWard { .. }
-            | StepKind::Scry
-            | StepKind::CleanseCorruption
-            | StepKind::SpiritCommunion => {
-                // Handled by systems::magic::resolve_magic_task_chains
-            }
-
-            // Disposition-driven steps are resolved by the disposition system.
-            StepKind::HuntPrey { .. }
-            | StepKind::ForageItem { .. }
-            | StepKind::DepositAtStores
-            | StepKind::EatAtStores
-            | StepKind::Sleep { .. }
-            | StepKind::SelfGroom
-            | StepKind::Socialize
-            | StepKind::GroomOther
-            | StepKind::MentorCat
-            | StepKind::PatrolTo
-            | StepKind::FightThreat
-            | StepKind::Survey
-            | StepKind::DeliverDirective => {
-                // Handled by systems::disposition::resolve_disposition_chains
-            }
+            // Magic/herbcraft and disposition steps are resolved by their own systems.
+            _ => {}
         }
+
+        // After the step match, sync CurrentAction targets from whatever step
+        // is now active (may have changed via advance/fail inside the match).
+        chain.sync_targets(&mut current);
 
         if chain.is_complete() {
             chains_to_remove.push(cat_entity);
@@ -335,11 +275,11 @@ pub fn resolve_task_chains(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bevy_ecs::schedule::Schedule;
     use crate::ai::Action;
     use crate::components::building::StructureType;
-    use crate::resources::food::FoodStores;
     use crate::components::task_chain::{FailurePolicy, Material, TaskStep};
+    use crate::resources::food::FoodStores;
+    use bevy_ecs::schedule::Schedule;
 
     fn test_world() -> World {
         let mut world = World::new();
@@ -360,7 +300,7 @@ mod tests {
             ticks_remaining: u64::MAX,
             target_position: None,
             target_entity: None,
-                last_scores: Vec::new(),
+            last_scores: Vec::new(),
         }
     }
 

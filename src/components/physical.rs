@@ -11,6 +11,14 @@ pub struct Position {
     pub y: i32,
 }
 
+/// Snapshot of an entity's grid position at the start of the current tick.
+/// Used by the rendering layer to interpolate smooth movement between ticks.
+#[derive(Component, Clone, Copy)]
+pub struct PreviousPosition {
+    pub x: i32,
+    pub y: i32,
+}
+
 impl Position {
     pub fn new(x: i32, y: i32) -> Self {
         Self { x, y }
@@ -41,12 +49,29 @@ pub enum InjuryKind {
     Severe,
 }
 
+/// What inflicted an injury.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum InjurySource {
+    /// Regular wildlife combat (hawk, snake, etc.).
+    WildlifeCombat,
+    /// Shadow fox ambush.
+    ShadowFoxAmbush,
+    /// Fox confrontation/standoff escalation.
+    FoxConfrontation,
+    /// Magic misfire (wound transfer).
+    MagicMisfire,
+    /// Unknown / legacy (pre-tagging injuries).
+    Unknown,
+}
+
 /// A single wound record.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Injury {
     pub kind: InjuryKind,
     pub tick_received: u64,
     pub healed: bool,
+    /// What system inflicted this injury.
+    pub source: InjurySource,
 }
 
 /// Health component. `current` and `max` are normalised to `[0.0, 1.0]`.
@@ -122,6 +147,10 @@ pub struct Needs {
     // Level 3 — Belonging
     pub social: f32,
     pub acceptance: f32,
+    /// Mating drive. L3 but NOT averaged into belonging_satisfaction — only
+    /// used as a scoring input for the Mate action.
+    #[serde(default = "default_mating")]
+    pub mating: f32,
 
     // Level 4 — Esteem
     pub respect: f32,
@@ -129,6 +158,10 @@ pub struct Needs {
 
     // Level 5 — Self-actualisation
     pub purpose: f32,
+}
+
+fn default_mating() -> f32 {
+    1.0
 }
 
 impl Default for Needs {
@@ -140,6 +173,7 @@ impl Default for Needs {
             safety: 1.0,
             social: 0.6,
             acceptance: 0.5,
+            mating: 1.0,
             respect: 0.5,
             mastery: 0.4,
             purpose: 0.2,
@@ -161,6 +195,7 @@ impl Needs {
             needs.hunger = 1.0 - t * 0.2; // [0.8, 1.0]
             needs.energy = 0.8 - t * 0.15; // [0.65, 0.8]
         }
+        needs.mating = 1.0; // Always starts fully satisfied
         needs
     }
 

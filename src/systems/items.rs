@@ -55,23 +55,27 @@ pub fn sync_food_stores(
     stores_query: Query<(&Structure, &StoredItems)>,
     items_query: Query<&Item>,
 ) {
-    let mut total_food_value = 0.0f32;
+    let mut total_food_count = 0u32;
     let mut total_capacity = 0.0f32;
 
     for (structure, stored) in stores_query.iter() {
         if structure.kind == StructureType::Stores {
-            total_capacity += StoredItems::capacity(StructureType::Stores) as f32;
+            total_capacity += StoredItems::effective_capacity_with_items(
+                StructureType::Stores,
+                &stored.items,
+                &items_query,
+            ) as f32;
             for &item_entity in &stored.items {
                 if let Ok(item) = items_query.get(item_entity) {
                     if item.kind.is_food() {
-                        total_food_value += item.kind.food_value();
+                        total_food_count += 1;
                     }
                 }
             }
         }
     }
 
-    food.current = total_food_value;
+    food.current = total_food_count as f32;
     if total_capacity > 0.0 {
         food.capacity = total_capacity;
     }
@@ -101,10 +105,10 @@ mod tests {
     fn destroyed_items_are_despawned() {
         let (mut world, mut schedule) = setup();
 
-        // RawFish decays at 0.0005/tick. Spawn with condition just above 0 so
+        // RawFish decays at 0.0001/tick. Spawn with condition just above 0 so
         // a single tick drives it to <= 0.0.
         let mut item = Item::new(ItemKind::RawFish, 1.0, ItemLocation::OnGround);
-        item.condition = 0.0004; // less than one decay step (0.0005)
+        item.condition = 0.00009; // less than one decay step (0.0001)
 
         let entity = world.spawn(item).id();
 
@@ -154,7 +158,7 @@ mod tests {
     }
 
     #[test]
-    fn sync_food_stores_sums_food_items_in_stores() {
+    fn sync_food_stores_counts_food_items_in_stores() {
         let (mut world, mut schedule) = setup_sync();
 
         // Spawn a Stores building with two food items.
@@ -165,10 +169,18 @@ mod tests {
             ))
             .id();
         let mouse = world
-            .spawn(Item::new(ItemKind::RawMouse, 1.0, ItemLocation::StoredIn(store)))
+            .spawn(Item::new(
+                ItemKind::RawMouse,
+                1.0,
+                ItemLocation::StoredIn(store),
+            ))
             .id();
         let fish = world
-            .spawn(Item::new(ItemKind::RawFish, 1.0, ItemLocation::StoredIn(store)))
+            .spawn(Item::new(
+                ItemKind::RawFish,
+                1.0,
+                ItemLocation::StoredIn(store),
+            ))
             .id();
         world
             .entity_mut(store)
@@ -179,10 +191,10 @@ mod tests {
         schedule.run(&mut world);
 
         let food = world.resource::<FoodStores>();
-        let expected = ItemKind::RawMouse.food_value() + ItemKind::RawFish.food_value();
+        let expected = 2.0f32; // 2 food items (mouse + fish)
         assert!(
             (food.current - expected).abs() < f32::EPSILON,
-            "FoodStores.current should be {expected}; got {}",
+            "FoodStores.current should count {expected} food items; got {}",
             food.current
         );
     }
@@ -198,7 +210,11 @@ mod tests {
             ))
             .id();
         let pebble = world
-            .spawn(Item::new(ItemKind::ShinyPebble, 1.0, ItemLocation::StoredIn(store)))
+            .spawn(Item::new(
+                ItemKind::ShinyPebble,
+                1.0,
+                ItemLocation::StoredIn(store),
+            ))
             .id();
         world
             .entity_mut(store)
@@ -222,13 +238,14 @@ mod tests {
 
         // A Den with a food item should not count.
         let den = world
-            .spawn((
-                Structure::new(StructureType::Den),
-                StoredItems::default(),
-            ))
+            .spawn((Structure::new(StructureType::Den), StoredItems::default()))
             .id();
         let mouse = world
-            .spawn(Item::new(ItemKind::RawMouse, 1.0, ItemLocation::StoredIn(den)))
+            .spawn(Item::new(
+                ItemKind::RawMouse,
+                1.0,
+                ItemLocation::StoredIn(den),
+            ))
             .id();
         world
             .entity_mut(den)

@@ -1,0 +1,82 @@
+[
+    // --- Generic forage find ---
+    (
+        text: "{name} finds {item} growing wild.",
+        tier: Action,
+        action: Some(Forage),
+        event: Some("find"),
+    ),
+    (
+        text: "{name} picks up some {item}.",
+        tier: Action,
+        action: Some(Forage),
+        event: Some("find"),
+    ),
+    (
+        text: "{name} digs up {item} from the forest floor.",
+        tier: Action,
+        action: Some(Forage),
+        event: Some("find"),
+    ),
+    (
+        text: "{name} spots {item} and gathers them carefully.",
+        tier: Action,
+        action: Some(Forage),
+        event: Some("find"),
+    ),
+
+    // --- Personality ---
+    (
+        text: "{name} methodically gathers every last {item} in sight.",
+        tier: Action,
+        action: Some(Forage),
+        event: Some("find"),
+        personality: [(axis: Diligence, bucket: High)],
+    ),
+    (
+        text: "{name} nearly walks past the {item} but catches the scent.",
+        tier: Action,
+        action: Some(Forage),
+        event: Some("find"),
+        personality: [(axis: Curiosity, bucket: High)],
+    ),
+
+    // --- Season ---
+    (
+        text: "{name} finds {item} among the new spring growth.",
+        tier: Action,
+        action: Some(Forage),
+        event: Some("find"),
+        season: Some(Spring),
+    ),
+    (
+        text: "{name} scrounges {item} from the frozen ground.",
+        tier: Action,
+        action: Some(Forage),
+        event: Some("find"),
+        season: Some(Winter),
+    ),
+    (
+        text: "{name} gathers ripe autumn {item}.",
+        tier: Action,
+        action: Some(Forage),
+        event: Some("find"),
+        season: Some(Autumn),
+    ),
+
+    // --- Terrain ---
+    (
+        text: "{name} finds {item} beneath the canopy.",
+        tier: Action,
+        action: Some(Forage),
+        event: Some("find"),
+        terrain: Some(DenseForest),
+    ),
+    (
+        text: "{name} plucks {item} from the meadow.",
+        tier: Action,
+        action: Some(Forage),
+        event: Some("find"),
+        terrain: Some(Grass),
+    ),
+]

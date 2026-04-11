@@ -9,7 +9,7 @@ use crate::components::physical::{Dead, Needs, Position};
 use crate::resources::map::TileMap;
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::narrative_templates::{
-    MoodBucket, TemplateContext, TemplateRegistry, VariableContext, resolve_variables,
+    resolve_variables, MoodBucket, TemplateContext, TemplateRegistry, VariableContext,
 };
 use crate::resources::rng::SimRng;
 use crate::resources::time::{DayPhase, Season, SimConfig, TimeState};
@@ -26,17 +26,20 @@ use crate::resources::weather::WeatherState;
 /// template engine. Otherwise falls back to hardcoded strings.
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn generate_narrative(
-    query: Query<(
-        &Name,
-        &CurrentAction,
-        &Needs,
-        &Personality,
-        &Mood,
-        &Gender,
-        &Age,
-        &Appearance,
-        &Position,
-    ), Without<Dead>>,
+    query: Query<
+        (
+            &Name,
+            &CurrentAction,
+            &Needs,
+            &Personality,
+            &Mood,
+            &Gender,
+            &Age,
+            &Appearance,
+            &Position,
+        ),
+        Without<Dead>,
+    >,
     names: Query<&Name>,
     map: Res<TileMap>,
     time: Res<TimeState>,
@@ -112,6 +115,7 @@ pub fn generate_narrative(
                 life_stage: age.stage(tick, config.ticks_per_season),
                 has_target,
                 terrain,
+                event: None,
             };
 
             if let Some(template) = reg.select(&ctx, personality, needs, &mut rng.rng) {
@@ -247,7 +251,10 @@ pub fn generate_narrative(
             Action::Fight => {
                 // Combat narrative is event-driven from the combat system.
                 // Action-completion narrative is minimal.
-                (format!("{cat} disengages from the fight."), NarrativeTier::Action)
+                (
+                    format!("{cat} disengages from the fight."),
+                    NarrativeTier::Action,
+                )
             }
 
             Action::Patrol => {
@@ -324,6 +331,19 @@ pub fn generate_narrative(
                 let idx = rng.rng.random_range(0..options.len());
                 (options[idx].clone(), NarrativeTier::Action)
             }
+
+            Action::Mate => {
+                let other = other_name.as_deref().unwrap_or("their partner");
+                (
+                    format!("{cat} and {other} share a tender moment."),
+                    NarrativeTier::Significant,
+                )
+            }
+
+            Action::Caretake => (
+                format!("{cat} tends to a hungry kitten."),
+                NarrativeTier::Action,
+            ),
         };
 
         log.push(tick, text, tier);
@@ -364,8 +384,8 @@ mod tests {
     }
 
     fn test_personality() -> Personality {
-        use rand_chacha::ChaCha8Rng;
         use rand_chacha::rand_core::SeedableRng;
+        use rand_chacha::ChaCha8Rng;
         Personality::random(&mut ChaCha8Rng::seed_from_u64(0))
     }
 
@@ -416,7 +436,7 @@ mod tests {
                         ticks_remaining,
                         target_position: None,
                         target_entity: None,
-                last_scores: Vec::new(),
+                        last_scores: Vec::new(),
                     },
                 ),
             ))

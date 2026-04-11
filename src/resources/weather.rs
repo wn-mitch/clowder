@@ -188,7 +188,12 @@ mod tests {
             Weather::Storm,
         ];
 
-        for season in [Season::Spring, Season::Summer, Season::Autumn, Season::Winter] {
+        for season in [
+            Season::Spring,
+            Season::Summer,
+            Season::Autumn,
+            Season::Winter,
+        ] {
             for _ in 0..50 {
                 let w = state.next_weather(season, &mut rng);
                 assert!(
@@ -204,7 +209,8 @@ mod tests {
         let state = WeatherState::default();
         let mut rng = seeded_rng(1);
 
-        let saw_snow = (0..500).any(|_| state.next_weather(Season::Winter, &mut rng) == Weather::Snow);
+        let saw_snow =
+            (0..500).any(|_| state.next_weather(Season::Winter, &mut rng) == Weather::Snow);
         assert!(saw_snow, "snow should appear within 500 winter draws");
     }
 

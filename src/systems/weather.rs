@@ -30,8 +30,8 @@ pub fn update_weather(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::resources::{SimConfig, SimRng, TimeState, WeatherState};
     use crate::resources::weather::Weather;
+    use crate::resources::{SimConfig, SimRng, TimeState, WeatherState};
 
     /// Mirror of the system logic, callable without ECS.
     fn update_weather_direct(

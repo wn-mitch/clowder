@@ -38,9 +38,31 @@ template-audit:
 inspect name *ARGS:
     cargo run --example inspect_cat -- {{name}} {{ARGS}}
 
+# Run multi-seed benchmark and record scores against current changeset
+score-track *ARGS:
+    uv run scripts/score_track.py {{ARGS}}
+
+# Compare scores between recent changesets
+score-diff *ARGS:
+    uv run scripts/score_diff.py {{ARGS}}
+
 # Generate balance report from most recent diagnostic run
 balance-report *ARGS:
     uv run scripts/balance_report.py {{ARGS}}
+
+# Generate game wiki and build mdBook site
+wiki:
+    uv run scripts/generate_wiki.py
+    mdbook build docs/wiki
+
+# Generate wiki and open in browser
+wiki-serve:
+    uv run scripts/generate_wiki.py
+    mdbook serve docs/wiki --open
+
+# Open the cat questionnaire in a browser
+questionnaire:
+    open tools/cat_questionnaire.html
 
 # Run all checks
 ci: check test

@@ -4,6 +4,8 @@ use crate::components::building::{ConstructionSite, GateState, Structure, Struct
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Needs, Position};
 use crate::resources::food::FoodStores;
+use crate::resources::sim_constants::SimConstants;
+use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::resources::time::{Season, SimConfig, TimeState};
 use crate::resources::weather::{Weather, WeatherState};
 
@@ -22,7 +24,9 @@ pub fn apply_building_effects(
     time: Res<TimeState>,
     config: Res<SimConfig>,
     weather: Res<WeatherState>,
+    constants: Res<SimConstants>,
 ) {
+    let b = &constants.buildings;
     let season = time.season(&config);
     let is_winter = season == Season::Winter;
     let is_cold = is_winter
@@ -45,24 +49,25 @@ pub fn apply_building_effects(
         match structure.kind {
             StructureType::Den => {
                 for (cat_pos, mut needs) in &mut cats {
-                    if cat_pos.manhattan_distance(&center) <= 4 {
-                        needs.warmth = (needs.warmth + 0.001 * eff).min(1.0);
-                        needs.safety = (needs.safety + 0.0005 * eff).min(1.0);
+                    if cat_pos.manhattan_distance(&center) <= b.den_effect_radius {
+                        needs.warmth = (needs.warmth + b.den_warmth_bonus * eff).min(1.0);
+                        needs.safety = (needs.safety + b.den_safety_bonus * eff).min(1.0);
                     }
                 }
             }
             StructureType::Hearth => {
                 for (cat_pos, mut needs) in &mut cats {
-                    if cat_pos.manhattan_distance(&center) <= 5 {
-                        needs.social = (needs.social + 0.001 * eff).min(1.0);
+                    if cat_pos.manhattan_distance(&center) <= b.hearth_effect_radius {
+                        needs.social = (needs.social + b.hearth_social_bonus * eff).min(1.0);
                         if is_cold {
-                            needs.warmth = (needs.warmth + 0.001 * eff).min(1.0);
+                            needs.warmth =
+                                (needs.warmth + b.hearth_warmth_bonus_cold * eff).min(1.0);
                         }
                     }
                 }
             }
             StructureType::Stores => {
-                food.spoilage_multiplier = 0.5;
+                food.spoilage_multiplier = b.stores_spoilage_multiplier;
             }
             // Workshop, Watchtower, WardPost, Wall, Gate, Garden:
             // passive effects or handled by other systems.
@@ -70,11 +75,11 @@ pub fn apply_building_effects(
         }
 
         // Dirty building discomfort: mild warmth drain for nearby cats.
-        if structure.cleanliness < 0.3 {
+        if structure.cleanliness < b.dirty_threshold {
             for (cat_pos, mut needs) in &mut cats {
-                if cat_pos.manhattan_distance(&center) <= 3 {
+                if cat_pos.manhattan_distance(&center) <= b.dirty_discomfort_radius {
                     needs.warmth = (needs.warmth
-                        - 0.0003 * (1.0 - structure.cleanliness))
+                        - b.dirty_warmth_drain * (1.0 - structure.cleanliness))
                         .max(0.0);
                 }
             }
@@ -95,21 +100,23 @@ pub fn apply_building_effects(
 pub fn decay_building_condition(
     mut buildings: Query<&mut Structure>,
     weather: Res<WeatherState>,
+    constants: Res<SimConstants>,
 ) {
+    let b = &constants.buildings;
     // Structural decay: very slow, only from harsh weather.
     let structural_decay = match weather.current {
-        Weather::Storm => 0.00003,
-        Weather::Snow => 0.00002,
-        Weather::HeavyRain => 0.00001,
+        Weather::Storm => b.structural_decay_storm,
+        Weather::Snow => b.structural_decay_snow,
+        Weather::HeavyRain => b.structural_decay_heavy_rain,
         _ => 0.0,
     };
 
     // Cleanliness decay: routine, from weather and use.
     let cleanliness_decay = match weather.current {
-        Weather::HeavyRain | Weather::Storm => 0.0002,
-        Weather::Snow | Weather::Wind => 0.00015,
-        Weather::LightRain | Weather::Fog => 0.0001,
-        _ => 0.00008,
+        Weather::HeavyRain | Weather::Storm => b.cleanliness_decay_storm,
+        Weather::Snow | Weather::Wind => b.cleanliness_decay_snow,
+        Weather::LightRain | Weather::Fog => b.cleanliness_decay_fog,
+        _ => b.cleanliness_decay_clear,
     };
 
     for mut structure in &mut buildings {
@@ -124,12 +131,12 @@ pub fn decay_building_condition(
 
 /// Cats that are idle or grooming near buildings passively restore cleanliness.
 pub fn tidy_buildings(
-    cats: Query<
-        (&Position, &crate::ai::CurrentAction),
-        Without<Dead>,
-    >,
+    cats: Query<(&Position, &crate::ai::CurrentAction), Without<Dead>>,
     mut buildings: Query<(&Position, &mut Structure)>,
+    constants: Res<SimConstants>,
+    mut activation: ResMut<SystemActivation>,
 ) {
+    let b = &constants.buildings;
     for (cat_pos, action) in &cats {
         if !matches!(
             action.action,
@@ -139,8 +146,9 @@ pub fn tidy_buildings(
         }
         for (building_pos, mut structure) in &mut buildings {
             let center = structure.center(building_pos);
-            if cat_pos.manhattan_distance(&center) <= 3 {
-                structure.cleanliness = (structure.cleanliness + 0.0005).min(1.0);
+            if cat_pos.manhattan_distance(&center) <= b.tidy_radius {
+                activation.record(Feature::BuildingTidied);
+                structure.cleanliness = (structure.cleanliness + b.tidy_cleanliness_rate).min(1.0);
             }
         }
     }
@@ -160,37 +168,38 @@ pub fn tidy_buildings(
 pub fn process_gates(
     mut gates: Query<(&Position, &mut GateState)>,
     cats: Query<(&Position, &Personality, &Needs), Without<Dead>>,
+    constants: Res<SimConstants>,
+    mut activation: ResMut<SystemActivation>,
 ) {
+    let b = &constants.buildings;
     for (gate_pos, mut gate) in &mut gates {
         let cat_on_gate = cats.iter().any(|(pos, _, _)| pos == gate_pos);
 
         if cat_on_gate {
+            if !gate.open {
+                activation.record(Feature::GateProcessed);
+            }
             gate.open = true;
         } else if gate.open {
-            // No cat on gate — did someone just walk through?
-            // Check adjacent cats (distance 1 = just departed this tick).
             let mut best_diligence: Option<f32> = None;
             for (cat_pos, personality, needs) in &cats {
                 if cat_pos.manhattan_distance(gate_pos) == 1 {
-                    // Tired cats act less diligent.
-                    let effective = if needs.energy < 0.3 {
-                        personality.diligence * 0.6
+                    let effective = if needs.energy < b.gate_tired_energy_threshold {
+                        personality.diligence * b.gate_tired_diligence_scale
                     } else {
                         personality.diligence
                     };
-                    best_diligence = Some(
-                        best_diligence.map_or(effective, |prev: f32| prev.max(effective)),
-                    );
+                    best_diligence =
+                        Some(best_diligence.map_or(effective, |prev: f32| prev.max(effective)));
                 }
             }
 
             if let Some(diligence) = best_diligence {
-                if diligence > 0.5 {
+                if diligence > b.gate_close_diligence_threshold {
+                    activation.record(Feature::GateProcessed);
                     gate.open = false;
                 }
-                // Otherwise: careless cat left it open.
             }
-            // No adjacent cat: gate stays in current state (open).
         }
     }
 }
@@ -202,15 +211,21 @@ pub fn process_gates(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bevy_ecs::schedule::Schedule;
     use crate::components::building::Structure;
+    use bevy_ecs::schedule::Schedule;
 
     fn test_world() -> World {
         let mut world = World::new();
         world.insert_resource(FoodStores::default());
-        world.insert_resource(TimeState { tick: 0, paused: false, speed: crate::resources::SimSpeed::Normal });
+        world.insert_resource(TimeState {
+            tick: 0,
+            paused: false,
+            speed: crate::resources::SimSpeed::Normal,
+        });
         world.insert_resource(SimConfig::default());
         world.insert_resource(WeatherState::default());
+        world.insert_resource(crate::resources::SimConstants::default());
+        world.insert_resource(SystemActivation::default());
         world
     }
 
@@ -219,20 +234,13 @@ mod tests {
         let mut world = test_world();
 
         // Den (3×3) at anchor (5, 5), center = (6, 6). Radius = 4.
-        world.spawn((
-            Structure::new(StructureType::Den),
-            Position::new(5, 5),
-        ));
+        world.spawn((Structure::new(StructureType::Den), Position::new(5, 5)));
 
         // Cat within range: distance 2 from center (6,6)
-        let near_cat = world
-            .spawn((Position::new(7, 7), Needs::default()))
-            .id();
+        let near_cat = world.spawn((Position::new(7, 7), Needs::default())).id();
 
         // Cat outside range: distance 6 from center (6,6) — well beyond radius 4
-        let far_cat = world
-            .spawn((Position::new(12, 6), Needs::default()))
-            .id();
+        let far_cat = world.spawn((Position::new(12, 6), Needs::default())).id();
 
         let mut schedule = Schedule::default();
         schedule.add_systems(apply_building_effects);
@@ -240,7 +248,10 @@ mod tests {
 
         let near_needs = world.get::<Needs>(near_cat).unwrap();
         assert!(near_needs.warmth > 0.9, "near cat should get warmth bonus");
-        assert!(near_needs.safety > 1.0 - f32::EPSILON, "near cat should get safety bonus");
+        assert!(
+            near_needs.safety > 1.0 - f32::EPSILON,
+            "near cat should get safety bonus"
+        );
 
         let far_needs = world.get::<Needs>(far_cat).unwrap();
         assert!(
@@ -253,10 +264,7 @@ mod tests {
     fn hearth_provides_social_bonus() {
         let mut world = test_world();
 
-        world.spawn((
-            Structure::new(StructureType::Hearth),
-            Position::new(5, 5),
-        ));
+        world.spawn((Structure::new(StructureType::Hearth), Position::new(5, 5)));
 
         let cat = world
             .spawn((Position::new(5, 7), Needs::default())) // distance 2
@@ -267,17 +275,18 @@ mod tests {
         schedule.run(&mut world);
 
         let needs = world.get::<Needs>(cat).unwrap();
-        assert!(needs.social > 0.6, "cat near hearth should get social bonus (got {})", needs.social);
+        assert!(
+            needs.social > 0.6,
+            "cat near hearth should get social bonus (got {})",
+            needs.social
+        );
     }
 
     #[test]
     fn stores_halves_spoilage_multiplier() {
         let mut world = test_world();
 
-        world.spawn((
-            Structure::new(StructureType::Stores),
-            Position::new(5, 5),
-        ));
+        world.spawn((Structure::new(StructureType::Stores), Position::new(5, 5)));
 
         let mut schedule = Schedule::default();
         schedule.add_systems(apply_building_effects);
@@ -322,10 +331,9 @@ mod tests {
             current: Weather::Clear,
             ticks_until_change: 50,
         });
+        world.insert_resource(crate::resources::SimConstants::default());
 
-        let building = world
-            .spawn(Structure::new(StructureType::Den))
-            .id();
+        let building = world.spawn(Structure::new(StructureType::Den)).id();
 
         let mut schedule = Schedule::default();
         schedule.add_systems(decay_building_condition);
@@ -349,10 +357,9 @@ mod tests {
             current: Weather::Storm,
             ticks_until_change: 50,
         });
+        world.insert_resource(crate::resources::SimConstants::default());
 
-        let building = world
-            .spawn(Structure::new(StructureType::Den))
-            .id();
+        let building = world.spawn(Structure::new(StructureType::Den)).id();
 
         let mut schedule = Schedule::default();
         schedule.add_systems(decay_building_condition);
@@ -380,11 +387,12 @@ mod tests {
             current: Weather::Storm,
             ticks_until_change: 50,
         });
+        world.insert_resource(crate::resources::SimConstants::default());
 
         let building = world
             .spawn(Structure {
                 kind: StructureType::Den,
-                condition: 0.00001, // below storm structural_decay (0.00003)
+                condition: 0.00001,   // below storm structural_decay (0.00003)
                 cleanliness: 0.00001, // below storm cleanliness_decay (0.0002)
                 size: StructureType::Den.default_size(),
             })

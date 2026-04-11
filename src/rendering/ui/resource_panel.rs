@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::components::items::{Item, ItemKind};
-use crate::components::prey::{PreyAnimal, PreySpecies};
+use crate::components::prey::{PreyAnimal, PreyConfig, PreyKind};
 use crate::rendering::ui::{PANEL_BG, PANEL_BORDER, TEXT_COLOR, TEXT_DIM, TEXT_HIGHLIGHT, UiRoot};
 use crate::resources::food::FoodStores;
 
@@ -67,7 +67,7 @@ pub fn update_resource_panel(
     content_query: Query<Entity, With<ResourcePanelContent>>,
     food: Res<FoodStores>,
     items: Query<&Item>,
-    prey: Query<&PreyAnimal>,
+    prey: Query<&PreyConfig, With<PreyAnimal>>,
 ) {
     for mut vis in &mut panel_query {
         *vis = if panel_vis.resource_panel {
@@ -122,8 +122,9 @@ pub fn update_resource_panel(
     ));
 
     // --- Prey populations ---
-    let (mice, rats, fish, birds) = count_prey(&prey);
-    if mice + rats + fish + birds > 0 {
+    let (mice, rats, rabbits, fish, birds) = count_prey(&prey);
+    let total_prey = mice + rats + rabbits + fish + birds;
+    if total_prey > 0 {
         children.push(spawn_spacer(&mut commands));
         children.push(spawn_text(&mut commands, "Wildlife", FONT_SIZE + 1.0, TEXT_COLOR));
         if mice > 0 {
@@ -131,6 +132,9 @@ pub fn update_resource_panel(
         }
         if rats > 0 {
             children.push(spawn_text(&mut commands, &format!("  Rats: {rats}"), FONT_SIZE, TEXT_DIM));
+        }
+        if rabbits > 0 {
+            children.push(spawn_text(&mut commands, &format!("  Rabbits: {rabbits}"), FONT_SIZE, TEXT_DIM));
         }
         if fish > 0 {
             children.push(spawn_text(&mut commands, &format!("  Fish: {fish}"), FONT_SIZE, TEXT_DIM));
@@ -161,17 +165,18 @@ fn count_items_by_category(items: &Query<&Item>) -> (usize, usize, usize) {
     (food, herbs, materials)
 }
 
-fn count_prey(prey: &Query<&PreyAnimal>) -> (usize, usize, usize, usize) {
-    let (mut mice, mut rats, mut fish, mut birds) = (0, 0, 0, 0);
+fn count_prey(prey: &Query<&PreyConfig, With<PreyAnimal>>) -> (usize, usize, usize, usize, usize) {
+    let (mut mice, mut rats, mut rabbits, mut fish, mut birds) = (0, 0, 0, 0, 0);
     for p in prey.iter() {
-        match p.species {
-            PreySpecies::Mouse => mice += 1,
-            PreySpecies::Rat => rats += 1,
-            PreySpecies::Fish => fish += 1,
-            PreySpecies::Bird => birds += 1,
+        match p.kind {
+            PreyKind::Mouse => mice += 1,
+            PreyKind::Rat => rats += 1,
+            PreyKind::Rabbit => rabbits += 1,
+            PreyKind::Fish => fish += 1,
+            PreyKind::Bird => birds += 1,
         }
     }
-    (mice, rats, fish, birds)
+    (mice, rats, rabbits, fish, birds)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

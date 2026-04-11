@@ -4,6 +4,31 @@ use crate::resources::map::Terrain;
 use crate::resources::time::Season;
 
 // ---------------------------------------------------------------------------
+// Growth stages (shared by Herb and FlavorPlant)
+// ---------------------------------------------------------------------------
+
+/// Visual growth stage of a plant entity. Advances over time while in season.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum GrowthStage {
+    Sprout,
+    Bud,
+    Bloom,
+    Blossom,
+}
+
+impl GrowthStage {
+    /// Advance to the next stage. Returns None if already at Blossom.
+    pub fn next(self) -> Option<Self> {
+        match self {
+            Self::Sprout => Some(Self::Bud),
+            Self::Bud => Some(Self::Bloom),
+            Self::Bloom => Some(Self::Blossom),
+            Self::Blossom => None,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Herb system
 // ---------------------------------------------------------------------------
 
@@ -20,6 +45,12 @@ pub enum HerbKind {
     Thornbriar,
     /// Visions and narrative events. Fairy rings and standing stones only.
     Dreamroot,
+    /// Playful mood herb. Open grass and clearings.
+    Catnip,
+    /// Rest and anxiety-easing herb. Forest shade.
+    Slumbershade,
+    /// Rare visions herb. Near standing stones and fairy rings.
+    OracleOrchid,
 }
 
 impl HerbKind {
@@ -38,6 +69,13 @@ impl HerbKind {
             ],
             Self::Thornbriar => &[Terrain::LightForest, Terrain::DenseForest],
             Self::Dreamroot => &[Terrain::FairyRing, Terrain::StandingStone],
+            Self::Catnip => &[Terrain::Grass, Terrain::Garden, Terrain::LightForest],
+            Self::Slumbershade => &[Terrain::DenseForest, Terrain::LightForest],
+            Self::OracleOrchid => &[
+                Terrain::FairyRing,
+                Terrain::StandingStone,
+                Terrain::AncientRuin,
+            ],
         }
     }
 
@@ -47,8 +85,16 @@ impl HerbKind {
             Self::HealingMoss => &[Season::Spring, Season::Summer, Season::Autumn],
             Self::Moonpetal => &[Season::Summer],
             Self::Calmroot => &[Season::Spring, Season::Summer],
-            Self::Thornbriar => &[Season::Spring, Season::Summer, Season::Autumn, Season::Winter],
+            Self::Thornbriar => &[
+                Season::Spring,
+                Season::Summer,
+                Season::Autumn,
+                Season::Winter,
+            ],
             Self::Dreamroot => &[Season::Autumn, Season::Winter],
+            Self::Catnip => &[Season::Spring, Season::Summer],
+            Self::Slumbershade => &[Season::Autumn, Season::Winter],
+            Self::OracleOrchid => &[Season::Summer, Season::Autumn],
         }
     }
 
@@ -65,6 +111,9 @@ impl HerbKind {
             Self::Calmroot => 0.08,
             Self::Thornbriar => 0.12,
             Self::Dreamroot => 1.0,
+            Self::Catnip => 0.12,
+            Self::Slumbershade => 0.10,
+            Self::OracleOrchid => 0.60,
         }
     }
 }
@@ -73,6 +122,8 @@ impl HerbKind {
 #[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Herb {
     pub kind: HerbKind,
+    /// Visual growth stage. Advances while in season; resets to Sprout at season end.
+    pub growth_stage: GrowthStage,
     /// True if growing on a tile with high mystery.
     pub magical: bool,
     /// True if corrupted — cannot be harvested and may cause negative effects.
@@ -87,6 +138,89 @@ pub struct Harvestable;
 #[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Seasonal {
     pub available: Vec<Season>,
+}
+
+// ---------------------------------------------------------------------------
+// Flavor plants (non-harvestable world decoration)
+// ---------------------------------------------------------------------------
+
+/// Decorative plant species with no harvest use.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum FlavorKind {
+    // Seasonal flowering plants
+    Sunflower,
+    Rose,
+    // Stone decorations (spawned permanently, no seasonal cycle)
+    Pebble,
+    Rock,
+    Stone,
+    StoneChunk,
+    StoneFlat,
+    Boulder,
+}
+
+impl FlavorKind {
+    /// Terrain types where this plant/decoration can spawn.
+    pub fn spawn_terrains(self) -> &'static [Terrain] {
+        match self {
+            Self::Sunflower => &[Terrain::Grass, Terrain::Garden, Terrain::LightForest],
+            Self::Rose => &[Terrain::Grass, Terrain::Garden],
+            Self::Pebble
+            | Self::Rock
+            | Self::Stone
+            | Self::StoneChunk
+            | Self::StoneFlat
+            | Self::Boulder => &[Terrain::Rock, Terrain::Sand],
+        }
+    }
+
+    /// Seasons during which this flavor plant is visible. Rocks return all seasons.
+    pub fn available_seasons(self) -> &'static [Season] {
+        match self {
+            Self::Sunflower => &[Season::Summer],
+            Self::Rose => &[Season::Spring, Season::Summer],
+            // Rocks are permanent — always present.
+            Self::Pebble
+            | Self::Rock
+            | Self::Stone
+            | Self::StoneChunk
+            | Self::StoneFlat
+            | Self::Boulder => &[
+                Season::Spring,
+                Season::Summer,
+                Season::Autumn,
+                Season::Winter,
+            ],
+        }
+    }
+
+    /// Spawn density.
+    pub fn spawn_density(self) -> f32 {
+        match self {
+            Self::Sunflower => 0.06,
+            Self::Rose => 0.05,
+            Self::Pebble => 0.12,
+            Self::Rock => 0.10,
+            Self::Stone => 0.08,
+            Self::StoneChunk => 0.08,
+            Self::StoneFlat => 0.06,
+            Self::Boulder => 0.04,
+        }
+    }
+
+    /// Whether this kind participates in seasonal growth cycling.
+    /// Rocks are permanent and skip the growth system.
+    pub fn is_seasonal(self) -> bool {
+        matches!(self, Self::Sunflower | Self::Rose)
+    }
+}
+
+/// A non-harvestable decorative plant entity.
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FlavorPlant {
+    pub kind: FlavorKind,
+    /// Visual growth stage. Only meaningful for seasonal plants.
+    pub growth_stage: GrowthStage,
 }
 
 // ---------------------------------------------------------------------------
@@ -149,9 +283,7 @@ impl Inventory {
         self.slots.iter().any(|s| {
             matches!(
                 s,
-                ItemSlot::Herb(
-                    HerbKind::HealingMoss | HerbKind::Moonpetal | HerbKind::Calmroot
-                )
+                ItemSlot::Herb(HerbKind::HealingMoss | HerbKind::Moonpetal | HerbKind::Calmroot)
             )
         })
     }
@@ -159,6 +291,19 @@ impl Inventory {
     /// Whether the inventory has thornbriar for ward-setting.
     pub fn has_ward_herb(&self) -> bool {
         self.has_herb(HerbKind::Thornbriar)
+    }
+
+    /// Return the first remedy kind that can be prepared from current herbs.
+    pub fn first_remedy_kind(&self) -> Option<RemedyKind> {
+        for slot in &self.slots {
+            match slot {
+                ItemSlot::Herb(HerbKind::HealingMoss) => return Some(RemedyKind::HealingPoultice),
+                ItemSlot::Herb(HerbKind::Moonpetal) => return Some(RemedyKind::EnergyTonic),
+                ItemSlot::Herb(HerbKind::Calmroot) => return Some(RemedyKind::MoodTonic),
+                _ => {}
+            }
+        }
+        None
     }
 
     // --- Item methods ---
@@ -259,7 +404,7 @@ impl Ward {
 /// The kind of herbal remedy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum RemedyKind {
-    /// HealingMoss → +0.05 health/tick for 20 ticks.
+    /// HealingMoss → +healing_poultice_rate health/tick for 20 ticks.
     HealingPoultice,
     /// Moonpetal → +0.03 energy/tick for 15 ticks.
     EnergyTonic,
@@ -374,10 +519,7 @@ mod tests {
             RemedyKind::HealingPoultice.required_herb(),
             HerbKind::HealingMoss
         );
-        assert_eq!(
-            RemedyKind::EnergyTonic.required_herb(),
-            HerbKind::Moonpetal
-        );
+        assert_eq!(RemedyKind::EnergyTonic.required_herb(), HerbKind::Moonpetal);
         assert_eq!(RemedyKind::MoodTonic.required_herb(), HerbKind::Calmroot);
     }
 
@@ -392,5 +534,31 @@ mod tests {
             HerbKind::Dreamroot.available_seasons(),
             &[Season::Autumn, Season::Winter]
         );
+    }
+
+    #[test]
+    fn new_herbs_have_terrains_and_seasons() {
+        assert!(!HerbKind::Catnip.spawn_terrains().is_empty());
+        assert!(!HerbKind::Slumbershade.spawn_terrains().is_empty());
+        assert!(!HerbKind::OracleOrchid.spawn_terrains().is_empty());
+        assert!(!HerbKind::Catnip.available_seasons().is_empty());
+        assert!(!HerbKind::Slumbershade.available_seasons().is_empty());
+        assert!(!HerbKind::OracleOrchid.available_seasons().is_empty());
+    }
+
+    #[test]
+    fn growth_stage_advances_to_blossom() {
+        assert_eq!(GrowthStage::Sprout.next(), Some(GrowthStage::Bud));
+        assert_eq!(GrowthStage::Bud.next(), Some(GrowthStage::Bloom));
+        assert_eq!(GrowthStage::Bloom.next(), Some(GrowthStage::Blossom));
+        assert_eq!(GrowthStage::Blossom.next(), None);
+    }
+
+    #[test]
+    fn rocks_are_not_seasonal() {
+        assert!(!FlavorKind::Pebble.is_seasonal());
+        assert!(!FlavorKind::Boulder.is_seasonal());
+        assert!(FlavorKind::Sunflower.is_seasonal());
+        assert!(FlavorKind::Rose.is_seasonal());
     }
 }

@@ -142,14 +142,14 @@ pub fn build_inspect_data(
     completed_aspirations: Vec<String>,
     likes: Vec<String>,
     dislikes: Vec<String>,
-    disposition: Option<&crate::components::disposition::Disposition>,
+    disposition: Option<&crate::components::goap_plan::GoapPlan>,
     action_history: Option<&crate::components::disposition::ActionHistory>,
 ) -> CatInspectData {
     let disposition_str = disposition.map(|d| {
-        if d.target_completions == u32::MAX {
+        if d.target_trips == u32::MAX {
             d.kind.label().to_string()
         } else {
-            format!("{} ({}/{})", d.kind.label(), d.completions, d.target_completions)
+            format!("{} ({}/{})", d.kind.label(), d.trips_done, d.target_trips)
         }
     });
 

@@ -36,6 +36,8 @@ impl Plugin for RenderingPlugin {
             .add_systems(
                 Update,
                 (
+                    entity_sprites::sync_item_positions,
+                    entity_sprites::compute_item_layout,
                     entity_sprites::attach_entity_sprites,
                     entity_sprites::sync_entity_positions,
                     debug_grid::toggle_grid,

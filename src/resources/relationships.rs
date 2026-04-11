@@ -8,7 +8,9 @@ use rand::Rng;
 // ---------------------------------------------------------------------------
 
 /// Named bond between two cats. Ordered by intensity for upgrade detection.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum BondType {
     Friends,
     Partners,
@@ -118,7 +120,9 @@ impl Relationships {
     }
 
     /// Iterate over all relationship pairs mutably.
-    pub fn pairs_iter_mut(&mut self) -> impl Iterator<Item = ((Entity, Entity), &mut Relationship)> {
+    pub fn pairs_iter_mut(
+        &mut self,
+    ) -> impl Iterator<Item = ((Entity, Entity), &mut Relationship)> {
         self.data.iter_mut().map(|(&key, rel)| (key, rel))
     }
 
@@ -242,8 +246,8 @@ mod tests {
 
     #[test]
     fn init_pair_values_in_range() {
-        use rand_chacha::ChaCha8Rng;
         use rand_chacha::rand_core::SeedableRng;
+        use rand_chacha::ChaCha8Rng;
 
         let mut world = World::new();
         let mut rng = ChaCha8Rng::seed_from_u64(42);

@@ -3,15 +3,17 @@ use bevy_ecs::schedule::Schedule;
 
 use clowder::ai::CurrentAction;
 use clowder::components::identity::{Age, Name, Species};
+use clowder::components::magic::Inventory;
 use clowder::components::mental::{Memory, Mood};
 use clowder::components::physical::{Health, Needs, Position};
-use clowder::components::magic::Inventory;
 use clowder::components::skills::{Corruption, MagicAffinity, Training};
 use clowder::resources::{
     ColonyHuntingMap, ColonyKnowledge, ColonyPriority, FoodStores, NarrativeLog, Relationships,
-    SimConfig, SimRng, TemplateRegistry, TimeState, TileMap, WeatherState,
+    SimConfig, SimRng, TemplateRegistry, TileMap, TimeState, WeatherState,
 };
-use clowder::world_gen::colony::{find_colony_site, generate_starting_cats, spawn_starting_buildings};
+use clowder::world_gen::colony::{
+    find_colony_site, generate_starting_cats, spawn_starting_buildings,
+};
 use clowder::world_gen::terrain::generate_terrain;
 
 // ---------------------------------------------------------------------------
@@ -29,13 +31,18 @@ fn setup_world(seed: u64) -> World {
 
     let colony_site = find_colony_site(&map, &mut sim_rng.rng);
 
-    let start_tick: u64 = 100_000;
-    let cat_blueprints = generate_starting_cats(
-        8,
-        start_tick,
-        config.ticks_per_season,
+    let constants = clowder::resources::SimConstants::default();
+    clowder::world_gen::special_tiles::place_special_tiles(
+        &mut map,
+        colony_site,
         &mut sim_rng.rng,
+        &constants.world_gen,
     );
+    clowder::world_gen::herbs::initialize_tile_magic(&mut map, &mut sim_rng.rng);
+
+    let start_tick: u64 = 100_000;
+    let cat_blueprints =
+        generate_starting_cats(8, start_tick, config.ticks_per_season, &mut sim_rng.rng);
 
     let mut world = World::new();
     spawn_starting_buildings(&mut world, colony_site, &mut map);
@@ -51,8 +58,28 @@ fn setup_world(seed: u64) -> World {
     world.insert_resource(ColonyKnowledge::default());
     world.insert_resource(ColonyPriority::default());
     world.insert_resource(ColonyHuntingMap::default());
+    world.insert_resource(clowder::resources::ExplorationMap::default());
     world.insert_resource(clowder::resources::wind::WindState::default());
     world.insert_resource(clowder::resources::time::TransitionTracker::default());
+    world.insert_resource(clowder::species::build_registry());
+    world.insert_resource(clowder::components::prey::PreyDensity::default());
+    world.insert_resource(clowder::systems::wildlife::DetectionCooldowns::default());
+    world.insert_resource(clowder::resources::SimConstants::default());
+    world.insert_resource(clowder::resources::SystemActivation::default());
+    world.insert_resource(clowder::resources::FoxScentMap::default());
+    world.insert_resource(clowder::resources::CatPresenceMap::default());
+    bevy_ecs::message::MessageRegistry::register_message::<clowder::components::prey::PreyKilled>(
+        &mut world,
+    );
+    bevy_ecs::message::MessageRegistry::register_message::<clowder::components::prey::DenRaided>(
+        &mut world,
+    );
+    bevy_ecs::message::MessageRegistry::register_message::<clowder::components::goap_plan::PlanNarrative>(
+        &mut world,
+    );
+    bevy_ecs::message::MessageRegistry::register_message::<clowder::systems::magic::CorruptionPushback>(
+        &mut world,
+    );
     world.insert_resource(map);
     world.insert_resource(sim_rng);
 
@@ -74,33 +101,37 @@ fn setup_world(seed: u64) -> World {
             )
         };
 
-        let entity = world.spawn((
-            (
-                Name(cat.name),
-                Species,
-                Age { born_tick: cat.born_tick },
-                cat.gender,
-                cat.orientation,
-                cat.personality,
-                cat.appearance,
-                Position::new(spawn_x, spawn_y),
-                Health::default(),
-                Needs::default(),
-                Mood::default(),
-                Memory::default(),
-            ),
-            (
-                cat.zodiac_sign,
-                cat.skills,
-                MagicAffinity(cat.magic_affinity),
-                Corruption(0.0),
-                Training::default(),
-                CurrentAction::default(),
-                Inventory::default(),
-                clowder::components::disposition::ActionHistory::default(),
-                clowder::components::hunting_priors::HuntingPriors::default(),
-            ),
-        )).id();
+        let entity = world
+            .spawn((
+                (
+                    Name(cat.name),
+                    Species,
+                    Age {
+                        born_tick: cat.born_tick,
+                    },
+                    cat.gender,
+                    cat.orientation,
+                    cat.personality,
+                    cat.appearance,
+                    Position::new(spawn_x, spawn_y),
+                    Health::default(),
+                    Needs::default(),
+                    Mood::default(),
+                    Memory::default(),
+                ),
+                (
+                    cat.zodiac_sign,
+                    cat.skills,
+                    MagicAffinity(cat.magic_affinity),
+                    Corruption(0.0),
+                    Training::default(),
+                    CurrentAction::default(),
+                    Inventory::default(),
+                    clowder::components::disposition::ActionHistory::default(),
+                    clowder::components::hunting_priors::HuntingPriors::default(),
+                ),
+            ))
+            .id();
         entity_ids.push(entity);
     }
 
@@ -133,9 +164,7 @@ fn build_schedule() -> Schedule {
             .chain(),
     );
     // Disposition pipeline (mirrors main schedule ordering).
-    schedule.add_systems(
-        clowder::systems::disposition::check_anxiety_interrupts,
-    );
+    schedule.add_systems(clowder::systems::disposition::check_anxiety_interrupts);
     schedule.add_systems(
         clowder::systems::disposition::evaluate_dispositions
             .after(clowder::systems::disposition::check_anxiety_interrupts),
@@ -220,12 +249,8 @@ fn cats_eat_when_hungry() {
     // Run one tick to let sync_food_stores populate FoodStores from actual items.
     schedule.run(&mut world);
 
-
     // Drive all cats to near-starving hunger.
-    let entity_ids: Vec<Entity> = world
-        .query::<Entity>()
-        .iter(&world)
-        .collect();
+    let entity_ids: Vec<Entity> = world.query::<Entity>().iter(&world).collect();
 
     for entity in entity_ids {
         if let Some(mut needs) = world.get_mut::<Needs>(entity) {

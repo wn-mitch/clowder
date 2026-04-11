@@ -1,0 +1,133 @@
+[
+    // --- Plan adopted ---
+    (
+        text: "{name} heads out to hunt.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("plan_adopted"),
+    ),
+    (
+        text: "{name} sets out to forage.",
+        tier: Action,
+        action: Some(Forage),
+        event: Some("plan_adopted"),
+    ),
+    (
+        text: "{name} settles in to rest.",
+        tier: Micro,
+        action: Some(Eat),
+        event: Some("plan_adopted"),
+    ),
+    (
+        text: "{name} begins a patrol.",
+        tier: Action,
+        action: Some(Patrol),
+        event: Some("plan_adopted"),
+    ),
+    (
+        text: "{name} seeks out company.",
+        tier: Micro,
+        action: Some(Socialize),
+        event: Some("plan_adopted"),
+    ),
+    (
+        text: "{name} picks up tools to build.",
+        tier: Action,
+        action: Some(Build),
+        event: Some("plan_adopted"),
+    ),
+    (
+        text: "{name} heads to the garden.",
+        tier: Action,
+        action: Some(Farm),
+        event: Some("plan_adopted"),
+    ),
+    (
+        text: "{name} gathers herbs with purpose.",
+        tier: Action,
+        action: Some(Herbcraft),
+        event: Some("plan_adopted"),
+    ),
+    (
+        text: "{name} sets out to explore.",
+        tier: Action,
+        action: Some(Explore),
+        event: Some("plan_adopted"),
+    ),
+
+    // --- Plan completed ---
+    (
+        text: "{name} returns from a productive hunt.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("plan_complete"),
+    ),
+    (
+        text: "{name} finishes foraging.",
+        tier: Action,
+        action: Some(Forage),
+        event: Some("plan_complete"),
+    ),
+    (
+        text: "{name} feels rested.",
+        tier: Micro,
+        action: Some(Eat),
+        event: Some("plan_complete"),
+    ),
+    (
+        text: "{name} finishes the patrol.",
+        tier: Action,
+        action: Some(Patrol),
+        event: Some("plan_complete"),
+    ),
+    (
+        text: "{name} wraps up {possessive} social rounds.",
+        tier: Micro,
+        action: Some(Socialize),
+        event: Some("plan_complete"),
+    ),
+    (
+        text: "{name} steps back from a job well done.",
+        tier: Action,
+        action: Some(Build),
+        event: Some("plan_complete"),
+    ),
+
+    // --- Plan replanned ---
+    (
+        text: "{name} adjusts course after losing the scent.",
+        tier: Micro,
+        action: Some(Hunt),
+        event: Some("plan_replanned"),
+    ),
+    (
+        text: "{name} tries a different patch.",
+        tier: Micro,
+        action: Some(Forage),
+        event: Some("plan_replanned"),
+    ),
+    (
+        text: "{name} reconsiders {possessive} approach.",
+        tier: Micro,
+        event: Some("plan_replanned"),
+    ),
+
+    // --- Plan abandoned ---
+    (
+        text: "{name} gives up the hunt.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("plan_abandoned"),
+    ),
+    (
+        text: "{name} abandons the search for food.",
+        tier: Action,
+        action: Some(Forage),
+        event: Some("plan_abandoned"),
+    ),
+    (
+        text: "{name} calls it quits.",
+        tier: Micro,
+        event: Some("plan_abandoned"),
+    ),
+]

@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clowder — Sprite Catalog</title>
+<style>
+:root {
+  --bg-deep: #15120f;
+  --bg: #1c1917;
+  --surface: #262220;
+  --raised: #302b28;
+  --border: #3d3835;
+  --border-light: #504a44;
+  --text: #d4cfc9;
+  --text-dim: #8a8480;
+  --text-bright: #f0ece8;
+  --accent: #d4943a;
+  --accent-hover: #e8a84e;
+  --accent-dim: rgba(212, 148, 58, 0.15);
+  --accent-glow: rgba(212, 148, 58, 0.4);
+  --font-display: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { background: var(--bg-deep); }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  min-height: 100vh;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+img, canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+h1 { font-family: var(--font-display); font-size: 22px; font-weight: 600; color: var(--text-bright); letter-spacing: 0.02em; }
+h2 { font-family: var(--font-display); font-size: 17px; font-weight: 600; color: var(--accent); margin-bottom: 12px; }
+
+header {
+  padding: 16px 24px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: baseline; gap: 16px;
+}
+header .subtitle { color: var(--text-dim); font-size: 11px; }
+
+nav {
+  display: flex; gap: 0; padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.tab-btn {
+  background: none; border: none; color: var(--text-dim); cursor: pointer;
+  padding: 10px 18px; font: inherit; font-size: 12px;
+  border-bottom: 2px solid transparent; transition: all 0.15s;
+  letter-spacing: 0.03em;
+}
+.tab-btn:hover { color: var(--text); background: var(--accent-dim); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+main { padding: 20px 24px; }
+.panel { display: none; }
+.panel.active { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+
+/* Sprite grid */
+.sheet-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px;
+  flex: 1;
+  min-width: 0;
+}
+.sheet-meta {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+  line-height: 1.8;
+}
+.sheet-meta span { color: var(--text); }
+
+.sprite-grid {
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  background: #1a1714;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  width: fit-content;
+}
+.sprite-cell {
+  position: relative;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: outline 0.1s;
+  outline: 1px solid transparent;
+}
+.sprite-cell:hover { outline-color: var(--accent); z-index: 2; }
+.sprite-cell.named { outline: 1px solid rgba(107, 158, 58, 0.5); }
+.sprite-cell.named:hover { outline-color: #6b9e3a; }
+.sprite-cell canvas {
+  display: block;
+  background-image:
+    linear-gradient(45deg, #181512 25%, transparent 25%, transparent 75%, #181512 75%),
+    linear-gradient(45deg, #181512 25%, transparent 25%, transparent 75%, #181512 75%);
+  background-size: 8px 8px;
+  background-position: 0 0, 4px 4px;
+  border-radius: 2px;
+}
+.sprite-index {
+  position: absolute;
+  bottom: 1px; right: 2px;
+  font-size: 8px;
+  color: rgba(140, 130, 120, 0.8);
+  line-height: 1;
+  pointer-events: none;
+  font-family: var(--font-mono);
+}
+
+/* Sidebar info */
+.sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: sticky;
+  top: 20px;
+}
+.info-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+}
+.info-box h3 {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+}
+.preview-canvas {
+  display: block;
+  margin: 0 auto 10px;
+  border-radius: 3px;
+  background-image:
+    linear-gradient(45deg, #181512 25%, transparent 25%, transparent 75%, #181512 75%),
+    linear-gradient(45deg, #181512 25%, transparent 25%, transparent 75%, #181512 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 8px 8px;
+  border: 1px solid var(--border-light);
+}
+.info-row { display: flex; justify-content: space-between; font-size: 11px; padding: 2px 0; }
+.info-row .label { color: var(--text-dim); }
+.info-row .value { color: var(--text-bright); font-weight: 500; }
+
+.name-input-wrap { margin-top: 10px; }
+.name-input-wrap label { display: block; font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
+.name-input {
+  width: 100%;
+  background: var(--raised);
+  border: 1px solid var(--border);
+  color: var(--text-bright);
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12px;
+  border-radius: 4px;
+  outline: none;
+}
+.name-input:focus { border-color: var(--accent); }
+.name-input::placeholder { color: var(--text-dim); }
+
+.save-btn {
+  margin-top: 6px;
+  width: 100%;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  padding: 6px;
+  font: inherit;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.save-btn:hover { background: var(--accent); color: var(--bg); }
+
+/* Named list */
+.named-list {
+  max-height: 300px;
+  overflow-y: auto;
+  font-size: 11px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.named-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.named-entry:last-child { border-bottom: none; }
+.named-entry:hover .entry-name { color: var(--accent); }
+.entry-idx { color: var(--text-dim); min-width: 26px; }
+.entry-name { color: var(--text); flex: 1; }
+.entry-del {
+  color: var(--text-dim);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0 2px;
+  line-height: 1;
+}
+.entry-del:hover { color: #c0504a; }
+
+/* Rust export */
+.export-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+}
+.export-box h3 {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+.export-code {
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px;
+  font-size: 10px;
+  line-height: 1.6;
+  white-space: pre;
+  overflow-x: auto;
+  color: var(--text-dim);
+  max-height: 200px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.copy-btn {
+  margin-top: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 11px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.empty-msg { color: var(--text-dim); font-size: 11px; font-style: italic; }
+
+/* Loading overlay */
+#loading {
+  position: fixed; inset: 0; background: var(--bg); z-index: 999;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+}
+#loading h1 { font-size: 24px; }
+#loading .prog { color: var(--text-dim); font-size: 11px; }
+.hidden { display: none !important; }
+
+/* ── Animation panel ───────────────────────────────────────────────────────── */
+.anim-wrap { flex-direction: column; overflow-x: hidden; }
+.anim-strip-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0;
+}
+.anim-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+}
+.anim-row:hover { background: rgba(255,255,255,0.03); }
+.anim-row.anim-row-labelled { border-color: var(--border); }
+.anim-row-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.anim-row-num {
+  font-size: 10px;
+  color: var(--text-dim);
+  min-width: 18px;
+  text-align: right;
+}
+.anim-label-input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+  padding: 3px 6px;
+  width: 150px;
+}
+.anim-label-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.anim-frames {
+  display: flex;
+  flex-direction: row;
+  gap: 2px;
+  overflow-x: auto;
+}
+.anim-cell {
+  position: relative;
+  flex-shrink: 0;
+}
+.anim-frame-num {
+  position: absolute;
+  bottom: 1px;
+  right: 2px;
+  font-size: 8px;
+  color: rgba(255,255,255,0.5);
+  pointer-events: none;
+  line-height: 1;
+}
+.anim-preview-canvas {
+  image-rendering: pixelated;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: #111;
+}
+.anim-play-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 13px;
+  padding: 3px 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+  transition: background 0.1s;
+}
+.anim-play-btn:hover { background: var(--accent); color: #fff; }
+.anim-play-btn.playing { background: var(--accent); color: #fff; }
+/* Blank frame: dimmed with diagonal cross */
+.anim-cell-blank { opacity: 0.25; }
+.anim-cell-blank::after {
+  content: '∅';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: rgba(255,100,100,0.8);
+  pointer-events: none;
+}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <h1>Clowder</h1>
+  <div class="prog" id="load-msg">Loading sprite sheets…</div>
+</div>
+
+<header>
+  <h1>Sprite Catalog</h1>
+  <span class="subtitle">Click any sprite to name it · Names saved to localStorage</span>
+</header>
+
+<nav id="tab-nav">
+  <button class="tab-btn active" data-sheet="items">Items (8×15)</button>
+  <button class="tab-btn" data-sheet="herbs">Herbs (12×5)</button>
+  <button class="tab-btn" data-sheet="trees">Trees (12×4)</button>
+  <button class="tab-btn" data-sheet="chars">Characters (8×24)</button>
+</nav>
+
+<main>
+  <div id="items-panel" class="panel active"></div>
+  <div id="herbs-panel" class="panel"></div>
+  <div id="trees-panel" class="panel"></div>
+  <div id="chars-panel" class="panel"></div>
+</main>
+
+<script>
+// ── Sheet definitions ──────────────────────────────────────────────────────
+const SHEETS = {
+  items: {
+    path: '../assets/sprites/Sprout Lands - Sprites - premium pack/Objects/Items/items-spritesheet.png',
+    cols: 8, rows: 15, spriteW: 16, spriteH: 16,
+    scale: 4,
+    label: 'Items spritesheet',
+    desc: '128×240 · 16×16 · 8 cols × 15 rows · 120 total sprites',
+  },
+  herbs: {
+    path: '../assets/sprites/Sprout Lands - Sprites - premium pack/Objects/Mushrooms, Flowers, Stones.png',
+    cols: 12, rows: 5, spriteW: 16, spriteH: 16,
+    scale: 4,
+    label: 'Mushrooms, Flowers, Stones',
+    desc: '192×80 · 16×16 · 12 cols × 5 rows · 60 total sprites',
+  },
+  trees: {
+    path: '../assets/sprites/Sprout Lands - Sprites - premium pack/Objects/Tree animations/tree_sprites.png',
+    cols: 12, rows: 4, spriteW: 48, spriteH: 48,
+    scale: 2,
+    label: 'Tree animations',
+    desc: '576×192 · 48×48 · 12 cols × 4 rows · 48 total sprites',
+  },
+  chars: {
+    path: '../assets/sprites/Sprout Lands - Sprites - premium pack/Characters/Premium Charakter Spritesheet.png',
+    cols: 8, rows: 24, spriteW: 48, spriteH: 48,
+    scale: 2,
+    label: 'Premium Character Spritesheet',
+    desc: '384×1152 · 48×48 · 8 cols × 24 rows · 192 total sprites',
+  },
+};
+
+// Pre-existing game mappings (informational — shown as green outlines)
+const EXISTING = {
+  items: {
+    // ── Currently mapped to game items ──
+    0: 'RawMouse / RawBird (drumstick)',
+    1: 'RawRat / RawRabbit (meat cut)',
+    2: 'RawFish (fish)',
+    3: 'Roots (turnip/root)',
+    5: 'Moss / DriedGrass / Feather (leaf)',
+    7: 'Mushroom',
+    9: 'Nuts (round food)',
+    12: 'Berries',
+    15: 'WildOnion (onion)',
+    16: 'HerbHealingMoss (bottle)',
+    17: 'HerbMoonpetal (bottle)',
+    18: 'HerbCalmroot (bottle)',
+    19: 'HerbThornbriar (bottle)',
+    20: 'HerbDreamroot (bottle)',
+    88: 'ShinyPebble',
+    89: 'GlassShard',
+    90: 'ColorfulShell',
+    // ── Tools / materials (cols 0-3) ──
+    2: 'AXE',
+    3: 'HOE',
+    4: 'EMPTYJAR',
+    6: 'LARGEEMPTYJAR',
+    8: 'CORNPACKET',
+    9: 'CORN',
+    10: 'WATERINGCAN',
+    11: 'GRASS',
+    16: 'CARROTPACKET',
+    17: 'CARROT',
+    18: 'STICK',
+    19: 'LOG',
+    24: 'CAULIFLOWERPACKET',
+    25: 'CAULIFLOWER',
+    26: 'STUMP',
+    27: 'STICK_27',
+    32: 'TOMATOPACKET',
+    33: 'TOMATO',
+    34: 'PLANK',
+    35: 'STONEBRICK',
+    40: 'EGGPLANTPACKET',
+    41: 'EGGPLANT',
+    42: 'STONE',
+    43: 'ROCK',
+    48: 'ROSEPACKET',
+    49: 'ROSE',
+    50: 'APPLE',
+    56: 'LETTUCEPACKET',
+    57: 'LETTUCE',
+    58: 'LEMON',
+    64: 'WHEATPACKET',
+    65: 'WHEAT',
+    66: 'PEAR',
+    72: 'PUMPKINPACKET',
+    73: 'PUMPKIN',
+    74: 'PEACH',
+    80: 'TURNIPPACKET',
+    81: 'TURNIP',
+    82: 'STRAWBERRY',
+    88: 'BROCOLIPACKET',
+    89: 'BROCOLI',
+    90: 'GRAPE',
+    91: 'WHITEEGG',
+    92: 'BLACKEGG',
+    93: 'PINKEGG',
+    94: 'GREENEGG',
+    95: 'BLUEEGG',
+    96: 'RADISHPACKET',
+    97: 'RADISH',
+    98: 'PLUM',
+    104: 'STARFRUITPACKET',
+    105: 'STARFRUIT',
+    112: 'PEAPACKET',
+    113: 'PEA',
+    // ── Jars (cols 4-7, rows 2/4/6/8/10/12): SMALL, SMALL_SPECIAL, LARGE, LARGE_SPECIAL ──
+    12: 'WHITEJAR',        13: 'WHITEJARSPECIAL',        14: 'LARGEWHITEJAR',        15: 'LARGEWHITEJARSPECIAL',
+    28: 'BROWNJAR',        29: 'BROWNJARSPECIAL',         30: 'LARGEBROWNJAR',        31: 'LARGEBROWNJARSPECIAL',
+    44: 'PURPLEJAR',       45: 'PURPLEJARSPECIAL',        46: 'LARGEPURPLEJAR',       47: 'LARGEPURPLEJARSPECIAL',
+    60: 'PINKJAR',         61: 'PINKJARSPECIAL',          62: 'LARGEPINKJAR',         63: 'LARGEPINKJARSPECIAL',
+    76: 'GREENJAR',        77: 'GREENJARSPECIAL',         78: 'LARGEGREENJAR',        79: 'LARGEGREENJARSPECIAL',
+    // ── Bottles (cols 4-7, rows 3/5/7/9/11/13): SMALL, SMALL_SPECIAL, LARGE, LARGE_SPECIAL ──
+    20: 'WHITEBOTTLE',     21: 'WHITEBOTTLESPECIAL',      22: 'LARGEWHITEBOTTLE',     23: 'LARGEWHITEBOTTLESPECIAL',
+    36: 'BROWNBOTTLE',     37: 'BROWNBOTTLESPECIAL',      38: 'LARGEBROWNBOTTLE',     39: 'LARGEBROWNBOTTLESPECIAL',
+    52: 'PURPLEBOTTLE',    53: 'PURPLEBOTTLESPECIAL',     54: 'LARGEPURPLEBOTTLE',    55: 'LARGEPURPLEBOTTLESPECIAL',
+    68: 'PINKBOTTLE',      69: 'PINKBOTTLESPECIAL',       70: 'LARGEPINKBOTTLE',      71: 'LARGEPINKBOTTLESPECIAL',
+    84: 'GREENBOTTLE',     85: 'GREENBOTTLESPECIAL',      86: 'LARGEGREENBOTTLE',     87: 'LARGEGREENBOTTLESPECIAL',
+  },
+  herbs: {
+    // ── Mushrooms (row 0) ──
+    0: 'HEALINGMOSSSINGLE',
+    1: 'HEALINGMOSSCAP',
+    2: 'HEALINGMOSSCLUSTER',
+    3: 'THORNBRIARSINGLE',
+    4: 'THORNBRIARCLUSTER',
+    5: 'THORNBRIARCAP',
+    6: 'THORNBRIARANGRYCAP',
+    // 7-9: blank
+    // ── Stones (row 0-1, cols 10+) ──
+    10: 'HUGEBOULDERTOPLEFT',
+    11: 'HUGEBOULDERTOPRIGHT',
+    12: 'PEBBLE',
+    13: 'ROCK',
+    14: 'STONE',
+    15: 'STONECHUNK',
+    16: 'STONEFLAT',
+    17: 'BOULDER',
+    18: 'BIGBOULDERTOPLEFT',
+    19: 'BIGBOULDERTOPRIGHT',
+    20: 'HUGEBOULDERTOPLEFT_20',
+    21: 'HUGEBOULDERTOPRIGHT_21',
+    22: 'MOSSYHUGEBOULDERTOPMIDDLE',
+    23: 'HUGEBOULDERMIDDLERIGHT',
+    // ── Catnip (row 2, cols 0-3) ──
+    24: 'CATNIPSPROUT',
+    25: 'CATNIPSPROUTS',
+    26: 'CATNIPBUNCH',
+    27: 'CATNIPBUSH',
+    // 28-29: unnamed
+    30: 'BIGBOULDERBOTTOMLEFT',
+    31: 'BIGBOULDERBOTTOMRIGHT',
+    32: 'HUGEBOULDERBOTTOMLEFT',
+    33: 'HUGEBOULDERBOTTOMRIGHT',
+    34: 'MOSSYHUGEBOULDERBOTTOMLEFT',
+    35: 'MOSSYHUGEBOULDERBOTTOMRIGHT',
+    // ── Flowers (rows 3-4) ──
+    36: 'SUNFLOWERSHOOT',
+    37: 'SUNFLOWERSPROUT',
+    38: 'SUNFLOWERBLOOM',
+    39: 'SUNFLOWERBLOSSOMTOP',
+    40: 'SLUMBERSHADESPROUT',
+    41: 'SLUMBERSHADEBUD',
+    42: 'SLUMBERSHADEBLOOM',
+    43: 'SLUMBERSHADEBLOSSOM',
+    44: 'ROSE',
+    // 45-47: unnamed
+    48: 'ORACLEORCHIDSPROUT',
+    49: 'ORACLEORCHIDBLOOM',
+    50: 'ORACLEORCHIDBLOSSOM',
+    51: 'SUNFLOWERBLOSSOMBOTTOM',
+    52: 'DREAMROOTSPROUT',
+    53: 'DREAMROOTBUD',
+    54: 'DREAMROOTBLOOM',
+    55: 'DREAMROOTBLOSSOM',
+    56: 'CALMROOTBLOOM',
+    57: 'CALMROOTBLOSSOM',
+    58: 'MOONPETALBUD',
+    59: 'MOONPETALBLOOM',
+  },
+  trees: {
+    24: 'LightForest tree (medium, variant 0)',
+    25: 'LightForest tree (medium, variant 1)',
+    26: 'LightForest tree (medium, variant 2)',
+    36: 'DenseForest tree (full, variant 0)',
+    37: 'DenseForest tree (full, variant 1)',
+    38: 'DenseForest tree (full, variant 2)',
+  },
+  chars: {
+    0: 'Cat — front-facing idle',
+  },
+};
+
+// ── State ──────────────────────────────────────────────────────────────────
+const images = {};
+let activeSheet = 'items';
+let selectedIdx = null;
+
+function storageKey(sheet) { return `clowder_sprites_${sheet}`; }
+function loadNames(sheet) {
+  try { return JSON.parse(localStorage.getItem(storageKey(sheet)) || '{}'); } catch { return {}; }
+}
+function saveNames(sheet, names) {
+  localStorage.setItem(storageKey(sheet), JSON.stringify(names));
+}
+
+// ── Image loading ──────────────────────────────────────────────────────────
+function loadImage(src) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => res(img);
+    img.onerror = () => rej(new Error(`Failed: ${src}`));
+    img.src = src;
+  });
+}
+
+async function loadAll() {
+  const keys = Object.keys(SHEETS);
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    document.getElementById('load-msg').textContent = `Loading ${SHEETS[k].label}…`;
+    images[k] = await loadImage(SHEETS[k].path);
+  }
+  document.getElementById('loading').classList.add('hidden');
+  renderAll();
+}
+
+// ── Rendering ──────────────────────────────────────────────────────────────
+// Keys that are animation strips — label per row, not per sprite.
+const ANIM_SHEETS = new Set(['trees', 'chars']);
+
+function renderAll() {
+  for (const key of Object.keys(SHEETS)) {
+    if (ANIM_SHEETS.has(key)) buildAnimationPanel(key);
+    else buildPanel(key);
+  }
+}
+
+// ── Animation-strip panel (row-labelled) ───────────────────────────────────
+// localStorage key pattern: clowder_sprites_<sheet>_row_<N>
+// blank frames:            clowder_sprites_<sheet>_blanks_<N>  (comma-sep col indices)
+
+function blankStorageKey(sheetKey, rowIdx) {
+  return `clowder_sprites_${sheetKey}_blanks_${rowIdx}`;
+}
+function loadBlankFrames(sheetKey, rowIdx) {
+  const raw = localStorage.getItem(blankStorageKey(sheetKey, rowIdx));
+  if (!raw) return new Set();
+  return new Set(raw.split(',').map(Number));
+}
+function saveBlankFrames(sheetKey, rowIdx, set) {
+  if (set.size === 0) localStorage.removeItem(blankStorageKey(sheetKey, rowIdx));
+  else localStorage.setItem(blankStorageKey(sheetKey, rowIdx), [...set].sort((a,b)=>a-b).join(','));
+}
+function applyBlankStyle(cell, isBlank) {
+  if (isBlank) {
+    cell.classList.add('anim-cell-blank');
+  } else {
+    cell.classList.remove('anim-cell-blank');
+  }
+}
+
+function animRowStorageKey(sheetKey, rowIdx) {
+  return `clowder_sprites_${sheetKey}_row_${rowIdx}`;
+}
+function loadAnimRowLabel(sheetKey, rowIdx) {
+  return localStorage.getItem(animRowStorageKey(sheetKey, rowIdx)) || '';
+}
+function saveAnimRowLabel(sheetKey, rowIdx, label) {
+  if (label) localStorage.setItem(animRowStorageKey(sheetKey, rowIdx), label);
+  else localStorage.removeItem(animRowStorageKey(sheetKey, rowIdx));
+}
+
+// ── Per-row playback state: animPlayState[sheetKey][rowIdx] = { timer, frame }
+const animPlayState = {};
+
+function getAnimFps(sheetKey) {
+  const el = document.getElementById(`${sheetKey}-fps`);
+  return el ? parseInt(el.value, 10) || 8 : 8;
+}
+
+function stopRowAnim(sheetKey, rowIdx) {
+  const s = (animPlayState[sheetKey] || {})[rowIdx];
+  if (s) {
+    clearInterval(s.timer);
+    delete animPlayState[sheetKey][rowIdx];
+  }
+}
+
+function startRowAnim(sheetKey, rowIdx, previewCnv, cells, playBtn) {
+  stopRowAnim(sheetKey, rowIdx);
+  if (!animPlayState[sheetKey]) animPlayState[sheetKey] = {};
+  const sheet = SHEETS[sheetKey];
+  const img = images[sheetKey];
+  const pw = previewCnv.width, ph = previewCnv.height;
+
+  // Build the ordered list of non-blank frame column indices to cycle through
+  const activeFrames = () => {
+    const blanks = loadBlankFrames(sheetKey, rowIdx);
+    const active = [];
+    for (let c = 0; c < sheet.cols; c++) {
+      if (!blanks.has(c)) active.push(c);
+    }
+    return active.length ? active : [...Array(sheet.cols).keys()]; // fallback: all frames
+  };
+
+  let stepIdx = 0; // index into activeFrames()
+
+  const drawFrame = () => {
+    const frames = activeFrames();
+    if (!frames.length) return;
+    stepIdx = stepIdx % frames.length;
+    const col = frames[stepIdx];
+    const pctx = previewCnv.getContext('2d');
+    pctx.imageSmoothingEnabled = false;
+    pctx.clearRect(0, 0, pw, ph);
+    pctx.drawImage(img,
+      col * sheet.spriteW, rowIdx * sheet.spriteH,
+      sheet.spriteW, sheet.spriteH,
+      0, 0, pw, ph
+    );
+    cells.forEach((c, i) => { c.style.outline = i === col ? '2px solid var(--accent)' : ''; });
+    stepIdx = (stepIdx + 1) % frames.length;
+  };
+
+  drawFrame();
+  const fps = getAnimFps(sheetKey);
+  const timer = setInterval(drawFrame, 1000 / fps);
+  animPlayState[sheetKey][rowIdx] = { timer };
+  playBtn.textContent = '⏸';
+  playBtn.classList.add('playing');
+}
+
+function toggleRowPlay(sheetKey, rowIdx, previewCnv, cells, playBtn) {
+  const isPlaying = !!(animPlayState[sheetKey] || {})[rowIdx];
+  if (isPlaying) {
+    stopRowAnim(sheetKey, rowIdx);
+    playBtn.textContent = '▶';
+    playBtn.classList.remove('playing');
+    // Clear cell highlights
+    cells.forEach(c => { c.style.outline = ''; });
+  } else {
+    startRowAnim(sheetKey, rowIdx, previewCnv, cells, playBtn);
+  }
+}
+
+function buildAnimationPanel(sheetKey) {
+  // Stop any running animations for this sheet before rebuild
+  if (animPlayState[sheetKey]) {
+    for (const rowIdx of Object.keys(animPlayState[sheetKey])) {
+      clearInterval(animPlayState[sheetKey][rowIdx].timer);
+    }
+    delete animPlayState[sheetKey];
+  }
+
+  const sheet = SHEETS[sheetKey];
+  const img = images[sheetKey];
+  const panelEl = document.getElementById(`${sheetKey}-panel`);
+  panelEl.innerHTML = '';
+
+  const cellPx  = sheet.spriteW * sheet.scale;
+  const cellPxH = sheet.spriteH * sheet.scale;
+  // Preview canvas: 3× the sprite size for a clear view
+  const prevScale = 3;
+  const prevPx = sheet.spriteW * prevScale;
+  const prevPxH = sheet.spriteH * prevScale;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'sheet-wrap anim-wrap';
+
+  // ── Meta header + FPS control
+  const meta = document.createElement('div');
+  meta.className = 'sheet-meta';
+  meta.innerHTML = `<span>${sheet.label}</span><br>${sheet.desc}<br>` +
+    `<em style="color:var(--text-dim)">Animation sheet — label each row · click ▶ to preview</em>` +
+    `&nbsp;&nbsp;<label style="font-size:11px;color:var(--text-dim)">FPS:&nbsp;` +
+    `<select id="${sheetKey}-fps" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:3px;font-size:11px;padding:1px 3px">` +
+    `<option>4</option><option>6</option><option selected>8</option><option>12</option><option>16</option><option>24</option>` +
+    `</select></label>`;
+  wrap.appendChild(meta);
+
+  // ── One row per animation
+  const stripContainer = document.createElement('div');
+  stripContainer.className = 'anim-strip-container';
+  stripContainer.id = `${sheetKey}-strips`;
+
+  for (let r = 0; r < sheet.rows; r++) {
+    const rowWrap = document.createElement('div');
+    rowWrap.className = 'anim-row';
+    rowWrap.dataset.row = r;
+
+    // ── Label column (row#, preview canvas, play btn, text input)
+    const labelWrap = document.createElement('div');
+    labelWrap.className = 'anim-row-label';
+
+    const rowNumSpan = document.createElement('span');
+    rowNumSpan.className = 'anim-row-num';
+    rowNumSpan.textContent = r;
+    labelWrap.appendChild(rowNumSpan);
+
+    // Preview canvas (shows current frame when playing)
+    const previewCnv = document.createElement('canvas');
+    previewCnv.width = prevPx;
+    previewCnv.height = prevPxH;
+    previewCnv.className = 'anim-preview-canvas';
+    // Draw first frame immediately so it's not blank
+    const pctx = previewCnv.getContext('2d');
+    pctx.imageSmoothingEnabled = false;
+    pctx.drawImage(img, 0, r * sheet.spriteH, sheet.spriteW, sheet.spriteH, 0, 0, prevPx, prevPxH);
+    labelWrap.appendChild(previewCnv);
+
+    // Play/pause button
+    const playBtn = document.createElement('button');
+    playBtn.className = 'anim-play-btn';
+    playBtn.textContent = '▶';
+    playBtn.title = 'Play / pause animation';
+    labelWrap.appendChild(playBtn);
+
+    // Text label input
+    const labelInput = document.createElement('input');
+    labelInput.type = 'text';
+    labelInput.className = 'anim-label-input';
+    labelInput.placeholder = `Row ${r} name…`;
+    labelInput.value = loadAnimRowLabel(sheetKey, r);
+    labelInput.dataset.row = r;
+    labelInput.addEventListener('input', () => {
+      saveAnimRowLabel(sheetKey, r, labelInput.value.trim());
+      rebuildAnimExport(sheetKey, document.getElementById(`${sheetKey}-export`));
+      if (labelInput.value.trim()) rowWrap.classList.add('anim-row-labelled');
+      else rowWrap.classList.remove('anim-row-labelled');
+    });
+    if (labelInput.value.trim()) rowWrap.classList.add('anim-row-labelled');
+
+    labelInput.addEventListener('keydown', e => {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const allInputs = stripContainer.querySelectorAll('.anim-label-input');
+        const arr = Array.from(allInputs);
+        const cur = arr.indexOf(labelInput);
+        const next = e.shiftKey ? (cur - 1 + arr.length) % arr.length : (cur + 1) % arr.length;
+        arr[next].focus();
+        arr[next].scrollIntoView({ block: 'nearest' });
+      }
+    });
+    labelWrap.appendChild(labelInput);
+    rowWrap.appendChild(labelWrap);
+
+    // ── Frame cells
+    const framesWrap = document.createElement('div');
+    framesWrap.className = 'anim-frames';
+    const cellEls = [];
+    const blanks = loadBlankFrames(sheetKey, r);
+
+    for (let c = 0; c < sheet.cols; c++) {
+      const frameIdx = r * sheet.cols + c;
+      const cell = document.createElement('div');
+      cell.className = 'sprite-cell anim-cell';
+      cell.style.width  = `${cellPx}px`;
+      cell.style.height = `${cellPxH}px`;
+      cell.style.cursor = 'pointer';
+      cell.title = 'Left-click: jump to frame · Right-click: toggle blank';
+      applyBlankStyle(cell, blanks.has(c));
+
+      const cnv = document.createElement('canvas');
+      cnv.width  = cellPx;
+      cnv.height = cellPxH;
+      const ctx = cnv.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img,
+        c * sheet.spriteW, r * sheet.spriteH,
+        sheet.spriteW, sheet.spriteH,
+        0, 0, cellPx, cellPxH
+      );
+      cell.appendChild(cnv);
+
+      const idxLabel = document.createElement('span');
+      idxLabel.className = 'sprite-index';
+      idxLabel.textContent = frameIdx;
+      cell.appendChild(idxLabel);
+
+      const frameLabel = document.createElement('span');
+      frameLabel.className = 'anim-frame-num';
+      frameLabel.textContent = `f${c}`;
+      cell.appendChild(frameLabel);
+
+      framesWrap.appendChild(cell);
+      cellEls.push(cell);
+    }
+
+    // Wire up play button and cell interactions now that cellEls is populated
+    playBtn.addEventListener('click', () => {
+      toggleRowPlay(sheetKey, r, previewCnv, cellEls, playBtn);
+    });
+
+    cellEls.forEach((cell, frameCol) => {
+      // Left-click: stop playback, jump preview to this frame
+      cell.addEventListener('click', () => {
+        if ((animPlayState[sheetKey] || {})[r]) {
+          stopRowAnim(sheetKey, r);
+          playBtn.textContent = '▶';
+          playBtn.classList.remove('playing');
+        }
+        const pctx = previewCnv.getContext('2d');
+        pctx.imageSmoothingEnabled = false;
+        pctx.clearRect(0, 0, previewCnv.width, previewCnv.height);
+        pctx.drawImage(img,
+          frameCol * sheet.spriteW, r * sheet.spriteH,
+          sheet.spriteW, sheet.spriteH,
+          0, 0, previewCnv.width, previewCnv.height
+        );
+        cellEls.forEach((c, i) => { c.style.outline = i === frameCol ? '2px solid var(--accent)' : ''; });
+      });
+
+      // Right-click: toggle blank
+      cell.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        const b = loadBlankFrames(sheetKey, r);
+        if (b.has(frameCol)) b.delete(frameCol);
+        else b.add(frameCol);
+        saveBlankFrames(sheetKey, r, b);
+        applyBlankStyle(cell, b.has(frameCol));
+        rebuildAnimExport(sheetKey, document.getElementById(`${sheetKey}-export`));
+      });
+    });
+
+    rowWrap.appendChild(framesWrap);
+    stripContainer.appendChild(rowWrap);
+  }
+
+  wrap.appendChild(stripContainer);
+  panelEl.appendChild(wrap);
+
+  // ── Sidebar
+  const sidebar = document.createElement('div');
+  sidebar.className = 'sidebar';
+  sidebar.id = `${sheetKey}-sidebar`;
+
+  const exportBox = document.createElement('div');
+  exportBox.className = 'export-box';
+  exportBox.innerHTML = '<h3>Export</h3><p class="empty-msg" style="margin-bottom:8px">Row labels export as comments.<br>Unlabelled rows are omitted.</p>';
+
+  const code = document.createElement('pre');
+  code.className = 'export-code';
+  code.id = `${sheetKey}-export`;
+  rebuildAnimExport(sheetKey, code);
+  exportBox.appendChild(code);
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'copy-btn';
+  copyBtn.textContent = 'Copy';
+  copyBtn.onclick = () => {
+    navigator.clipboard.writeText(code.textContent);
+    copyBtn.textContent = 'Copied!';
+    setTimeout(() => copyBtn.textContent = 'Copy', 1500);
+  };
+  exportBox.appendChild(copyBtn);
+  sidebar.appendChild(exportBox);
+  panelEl.appendChild(sidebar);
+}
+
+function rebuildAnimExport(sheetKey, el) {
+  const sheet = SHEETS[sheetKey];
+  const lines = [];
+  lines.push(`// ${sheet.label}`);
+  lines.push(`// Animation rows — first-frame index = row × ${sheet.cols}`);
+  lines.push('');
+  let any = false;
+  for (let r = 0; r < sheet.rows; r++) {
+    const label = loadAnimRowLabel(sheetKey, r);
+    const blanks = loadBlankFrames(sheetKey, r);
+    if (label || blanks.size) {
+      const firstFrame = r * sheet.cols;
+      const lastFrame  = firstFrame + sheet.cols - 1;
+      let line = `// Row ${r}`;
+      if (label) line += `: ${label}`;
+      line += `  (frames ${firstFrame}–${lastFrame})`;
+      if (blanks.size) {
+        const absBlankIds = [...blanks].sort((a,b)=>a-b).map(c => firstFrame + c);
+        line += `  blanks: ${absBlankIds.join(', ')}`;
+      }
+      lines.push(line);
+      any = true;
+    }
+  }
+  if (!any) {
+    el.textContent = '// Label some rows to generate exports.';
+    return;
+  }
+  el.textContent = lines.join('\n');
+}
+
+function buildPanel(sheetKey) {
+  const sheet = SHEETS[sheetKey];
+  const img = images[sheetKey];
+  const names = loadNames(sheetKey);
+  const existing = EXISTING[sheetKey] || {};
+  const panelEl = document.getElementById(`${sheetKey}-panel`);
+  panelEl.innerHTML = '';
+
+  const cellPx = sheet.spriteW * sheet.scale;
+  const cellPxH = sheet.spriteH * sheet.scale;
+  const total = sheet.cols * sheet.rows;
+
+  // — Grid wrap
+  const wrap = document.createElement('div');
+  wrap.className = 'sheet-wrap';
+
+  const meta = document.createElement('div');
+  meta.className = 'sheet-meta';
+  meta.innerHTML = `<span>${sheet.label}</span><br>${sheet.desc}<br>` +
+    `<span>${Object.keys(names).length}</span> named · ` +
+    `<span style="color:#6b9e3a">${Object.keys(existing).length}</span> pre-mapped`;
+  wrap.appendChild(meta);
+
+  const grid = document.createElement('div');
+  grid.className = 'sprite-grid';
+  grid.style.gridTemplateColumns = `repeat(${sheet.cols}, ${cellPx}px)`;
+
+  for (let i = 0; i < total; i++) {
+    const col = i % sheet.cols;
+    const row = Math.floor(i / sheet.cols);
+
+    const cell = document.createElement('div');
+    cell.className = 'sprite-cell';
+    cell.style.width = `${cellPx}px`;
+    cell.style.height = `${cellPxH}px`;
+    cell.dataset.idx = i;
+
+    if (names[i]) cell.classList.add('named');
+    else if (existing[i]) cell.classList.add('named'); // green for pre-existing too
+
+    const cnv = document.createElement('canvas');
+    cnv.width = cellPx;
+    cnv.height = cellPxH;
+    const ctx = cnv.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(img,
+      col * sheet.spriteW, row * sheet.spriteH,
+      sheet.spriteW, sheet.spriteH,
+      0, 0, cellPx, cellPxH
+    );
+    cell.appendChild(cnv);
+
+    const idxLabel = document.createElement('span');
+    idxLabel.className = 'sprite-index';
+    idxLabel.textContent = i;
+    cell.appendChild(idxLabel);
+
+    cell.addEventListener('click', () => selectSprite(sheetKey, i));
+    grid.appendChild(cell);
+  }
+
+  wrap.appendChild(grid);
+  panelEl.appendChild(wrap);
+
+  // — Sidebar
+  const sidebar = buildSidebar(sheetKey);
+  panelEl.appendChild(sidebar);
+}
+
+function buildSidebar(sheetKey) {
+  const sidebar = document.createElement('div');
+  sidebar.className = 'sidebar';
+  sidebar.id = `${sheetKey}-sidebar`;
+
+  // Preview + info
+  const infoBox = document.createElement('div');
+  infoBox.className = 'info-box';
+  infoBox.id = `${sheetKey}-info`;
+  infoBox.innerHTML = `<h3>Selected</h3><p class="empty-msg">Click a sprite to inspect it.</p>`;
+  sidebar.appendChild(infoBox);
+
+  // Named list
+  const listBox = document.createElement('div');
+  listBox.className = 'info-box';
+  listBox.innerHTML = '<h3>Named Sprites</h3>';
+  const list = document.createElement('div');
+  list.className = 'named-list';
+  list.id = `${sheetKey}-list`;
+  rebuildNamedList(sheetKey, list);
+  listBox.appendChild(list);
+  sidebar.appendChild(listBox);
+
+  // Rust export
+  const exportBox = document.createElement('div');
+  exportBox.className = 'export-box';
+  exportBox.innerHTML = '<h3>Rust Export</h3>';
+  const code = document.createElement('pre');
+  code.className = 'export-code';
+  code.id = `${sheetKey}-export`;
+  rebuildExport(sheetKey, code);
+  exportBox.appendChild(code);
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'copy-btn';
+  copyBtn.textContent = 'Copy';
+  copyBtn.onclick = () => {
+    navigator.clipboard.writeText(code.textContent);
+    copyBtn.textContent = 'Copied!';
+    setTimeout(() => copyBtn.textContent = 'Copy', 1500);
+  };
+  exportBox.appendChild(copyBtn);
+  sidebar.appendChild(exportBox);
+
+  return sidebar;
+}
+
+function selectSprite(sheetKey, idx) {
+  selectedIdx = idx;
+  const sheet = SHEETS[sheetKey];
+  const img = images[sheetKey];
+  const names = loadNames(sheetKey);
+  const existing = EXISTING[sheetKey] || {};
+
+  // Highlight cell
+  const panel = document.getElementById(`${sheetKey}-panel`);
+  panel.querySelectorAll('.sprite-cell').forEach(c => c.style.outline = '');
+  const cells = panel.querySelectorAll('.sprite-cell');
+  if (cells[idx]) cells[idx].style.outline = `2px solid var(--accent)`;
+
+  const col = idx % sheet.cols;
+  const row = Math.floor(idx / sheet.cols);
+
+  const infoBox = document.getElementById(`${sheetKey}-info`);
+  const previewScale = sheet.spriteW <= 16 ? 8 : 4;
+  const pw = sheet.spriteW * previewScale;
+  const ph = sheet.spriteH * previewScale;
+
+  const currentName = names[idx] || existing[idx] || '';
+  const isExisting = !!existing[idx] && !names[idx];
+
+  infoBox.innerHTML = `<h3>Selected</h3>`;
+
+  const cnv = document.createElement('canvas');
+  cnv.className = 'preview-canvas';
+  cnv.width = pw; cnv.height = ph;
+  cnv.style.width = `${pw}px`; cnv.style.height = `${ph}px`;
+  const ctx = cnv.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(img,
+    col * sheet.spriteW, row * sheet.spriteH,
+    sheet.spriteW, sheet.spriteH,
+    0, 0, pw, ph
+  );
+  infoBox.appendChild(cnv);
+
+  const rows = [
+    ['Index', idx],
+    ['Row / Col', `${row} / ${col}`],
+    ['Source px', `${col * sheet.spriteW}, ${row * sheet.spriteH}`],
+  ];
+  for (const [label, val] of rows) {
+    const div = document.createElement('div');
+    div.className = 'info-row';
+    div.innerHTML = `<span class="label">${label}</span><span class="value">${val}</span>`;
+    infoBox.appendChild(div);
+  }
+
+  const nameWrap = document.createElement('div');
+  nameWrap.className = 'name-input-wrap';
+  nameWrap.innerHTML = `<label>${isExisting ? 'Pre-mapped name (editable)' : 'Name this sprite'}</label>`;
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'name-input';
+  input.placeholder = isExisting ? existing[idx] : 'e.g. apple, sword, blue_bottle…';
+  input.value = names[idx] || '';
+  nameWrap.appendChild(input);
+
+  const btn = document.createElement('button');
+  btn.className = 'save-btn';
+  btn.textContent = 'Save Name';
+  const doSave = () => {
+    const val = input.value.trim();
+    const n = loadNames(sheetKey);
+    if (val) n[idx] = val;
+    else delete n[idx];
+    saveNames(sheetKey, n);
+    // Update cell outline
+    const cells2 = panel.querySelectorAll('.sprite-cell');
+    if (cells2[idx]) {
+      if (val || existing[idx]) cells2[idx].classList.add('named');
+      else cells2[idx].classList.remove('named');
+    }
+    // Refresh list + export
+    rebuildNamedList(sheetKey, document.getElementById(`${sheetKey}-list`));
+    rebuildExport(sheetKey, document.getElementById(`${sheetKey}-export`));
+    // Update meta count
+    const metaEl = panel.querySelector('.sheet-meta span');
+    if (metaEl) metaEl.textContent = Object.keys(loadNames(sheetKey)).length;
+    btn.textContent = '✓ Saved';
+    setTimeout(() => btn.textContent = 'Save Name', 1200);
+  };
+  btn.onclick = doSave;
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { doSave(); }
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      doSave();
+      const total = sheet.cols * sheet.rows;
+      const next = e.shiftKey ? (idx - 1 + total) % total : (idx + 1) % total;
+      selectSprite(sheetKey, next);
+      // Scroll the newly selected cell into view
+      const cells3 = panel.querySelectorAll('.sprite-cell');
+      if (cells3[next]) cells3[next].scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+  });
+  nameWrap.appendChild(btn);
+  infoBox.appendChild(nameWrap);
+  input.focus();
+}
+
+function rebuildNamedList(sheetKey, el) {
+  const names = loadNames(sheetKey);
+  const existing = EXISTING[sheetKey] || {};
+  const merged = { ...existing, ...names }; // user names override existing
+  const keys = Object.keys(merged).map(Number).sort((a, b) => a - b);
+
+  el.innerHTML = '';
+  if (keys.length === 0) {
+    el.innerHTML = '<span class="empty-msg">No sprites named yet.</span>';
+    return;
+  }
+  for (const idx of keys) {
+    const isUser = !!names[idx];
+    const entry = document.createElement('div');
+    entry.className = 'named-entry';
+    entry.innerHTML = `
+      <span class="entry-idx">${idx}</span>
+      <span class="entry-name" style="${isUser ? '' : 'color: var(--text-dim); font-style: italic;'}">${merged[idx]}</span>
+      ${isUser ? `<button class="entry-del" data-idx="${idx}" title="Remove">×</button>` : ''}
+    `;
+    entry.querySelector('.entry-idx, .entry-name') && entry.addEventListener('click', (e) => {
+      if (!e.target.classList.contains('entry-del')) selectSprite(sheetKey, idx);
+    });
+    const del = entry.querySelector('.entry-del');
+    if (del) del.addEventListener('click', e => {
+      e.stopPropagation();
+      const n = loadNames(sheetKey);
+      delete n[parseInt(del.dataset.idx)];
+      saveNames(sheetKey, n);
+      rebuildNamedList(sheetKey, el);
+      rebuildExport(sheetKey, document.getElementById(`${sheetKey}-export`));
+    });
+    el.appendChild(entry);
+  }
+}
+
+function rebuildExport(sheetKey, el) {
+  const names = loadNames(sheetKey);
+  const existing = EXISTING[sheetKey] || {};
+  const merged = { ...existing, ...names };
+  const keys = Object.keys(merged).map(Number).sort((a, b) => a - b);
+
+  if (keys.length === 0) {
+    el.textContent = '// Name some sprites to generate exports.';
+    return;
+  }
+
+  // Build const names, deduplicating by appending _<idx> on collision
+  const seen = new Map(); // constName -> first idx that used it
+  const lines = keys.map(idx => {
+    const raw = merged[idx];
+    // Full name → SCREAMING_SNAKE: replace any non-alnum run with _
+    let constName = raw
+      .trim()
+      .replace(/[^a-zA-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .toUpperCase();
+    if (!constName) constName = `SPRITE_${idx}`;
+    // Deduplicate
+    if (seen.has(constName)) {
+      constName = `${constName}_${idx}`;
+    }
+    seen.set(constName, idx);
+    return `pub const ${constName.padEnd(28)}: usize = ${idx};`;
+  });
+
+  el.textContent = `// ${SHEETS[sheetKey].label}\n// Auto-exported from sprite_catalog.html\n\n` + lines.join('\n');
+}
+
+// ── Tab switching ──────────────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const key = btn.dataset.sheet;
+    activeSheet = key;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById(`${key}-panel`).classList.add('active');
+    selectedIdx = null;
+  });
+});
+
+// ── Boot ──────────────────────────────────────────────────────────────────
+loadAll().catch(err => {
+  document.getElementById('load-msg').textContent = `Error: ${err.message}`;
+});
+</script>
+</body>
+</html>

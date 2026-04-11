@@ -10,6 +10,7 @@ pub enum ItemKind {
     // --- Raw prey ---
     RawMouse,
     RawRat,
+    RawRabbit,
     RawFish,
     RawBird,
 
@@ -29,11 +30,22 @@ pub enum ItemKind {
     HerbCalmroot,
     HerbThornbriar,
     HerbDreamroot,
+    HerbCatnip,
+    HerbSlumbershade,
+    HerbOracleOrchid,
 
     // --- Curiosities ---
     ShinyPebble,
     GlassShard,
     ColorfulShell,
+
+    // --- Shadow materials ---
+    ShadowBone,
+
+    // --- Storage upgrades ---
+    Barrel,
+    Crate,
+    Shelf,
 }
 
 impl ItemKind {
@@ -45,7 +57,7 @@ impl ItemKind {
     /// - Inorganic / curiosities: 0.0 (no decay)
     pub fn decay_rate(self) -> f32 {
         match self {
-            Self::RawMouse | Self::RawRat | Self::RawFish | Self::RawBird => 0.0005,
+            Self::RawMouse | Self::RawRat | Self::RawRabbit | Self::RawFish | Self::RawBird => 0.0001,
 
             Self::Berries
             | Self::Nuts
@@ -60,26 +72,33 @@ impl ItemKind {
             | Self::HerbMoonpetal
             | Self::HerbCalmroot
             | Self::HerbThornbriar
-            | Self::HerbDreamroot => 0.0003,
+            | Self::HerbDreamroot
+            | Self::HerbCatnip
+            | Self::HerbSlumbershade
+            | Self::HerbOracleOrchid => 0.0003,
 
-            Self::ShinyPebble | Self::GlassShard | Self::ColorfulShell => 0.0,
+            Self::ShinyPebble | Self::GlassShard | Self::ColorfulShell | Self::ShadowBone => 0.0,
+
+            Self::Barrel | Self::Crate | Self::Shelf => 0.0,
+        }
+    }
+
+    /// Extra item capacity granted when this item is stored in a building.
+    /// Most items provide no bonus; storage upgrades add slots.
+    pub fn capacity_bonus(self) -> usize {
+        match self {
+            Self::Barrel => 10,
+            Self::Crate => 8,
+            Self::Shelf => 15,
+            _ => 0,
         }
     }
 
     /// Returns true if this item can be eaten.
     pub fn is_food(self) -> bool {
-        matches!(
-            self,
-            Self::RawMouse
-                | Self::RawRat
-                | Self::RawFish
-                | Self::RawBird
-                | Self::Berries
-                | Self::Nuts
-                | Self::Roots
-                | Self::WildOnion
-                | Self::Mushroom
-        )
+        matches!(self, Self::RawMouse | Self::RawRat | Self::RawRabbit | Self::RawFish
+            | Self::RawBird | Self::Berries | Self::Nuts | Self::Roots | Self::WildOnion
+            | Self::Mushroom)
     }
 
     /// Human-readable name for narrative output.
@@ -87,6 +106,7 @@ impl ItemKind {
         match self {
             Self::RawMouse => "mouse",
             Self::RawRat => "rat",
+            Self::RawRabbit => "rabbit",
             Self::RawFish => "fish",
             Self::RawBird => "bird",
             Self::Berries => "berries",
@@ -102,9 +122,16 @@ impl ItemKind {
             Self::HerbCalmroot => "calmroot",
             Self::HerbThornbriar => "thornbriar",
             Self::HerbDreamroot => "dreamroot",
+            Self::HerbCatnip => "catnip",
+            Self::HerbSlumbershade => "slumbershade",
+            Self::HerbOracleOrchid => "oracle orchid",
             Self::ShinyPebble => "shiny pebble",
             Self::GlassShard => "glass shard",
             Self::ColorfulShell => "colorful shell",
+            Self::ShadowBone => "shadow bone",
+            Self::Barrel => "barrel",
+            Self::Crate => "crate",
+            Self::Shelf => "shelf",
         }
     }
 
@@ -116,13 +143,11 @@ impl ItemKind {
     pub fn food_value(self) -> f32 {
         match self {
             Self::RawRat => 0.8,
+            Self::RawRabbit => 0.65,
             Self::RawMouse => 0.5,
             Self::RawFish => 0.7,
             Self::RawBird => 0.6,
-            Self::Berries => 0.2,
-            Self::Nuts => 0.2,
-            Self::Roots | Self::Mushroom => 0.2,
-            Self::WildOnion => 0.2,
+            Self::Berries | Self::Nuts | Self::Roots | Self::Mushroom | Self::WildOnion => 0.2,
             _ => 0.0,
         }
     }
@@ -231,6 +256,7 @@ mod tests {
     fn raw_prey_is_food() {
         assert!(ItemKind::RawMouse.is_food());
         assert!(ItemKind::RawRat.is_food());
+        assert!(ItemKind::RawRabbit.is_food());
         assert!(ItemKind::RawFish.is_food());
         assert!(ItemKind::RawBird.is_food());
         assert!(ItemKind::Berries.is_food());
@@ -245,16 +271,16 @@ mod tests {
     #[test]
     fn item_decays_over_time() {
         let mut item = Item::new(ItemKind::RawFish, 1.0, ItemLocation::OnGround);
-        // RawFish decay_rate = 0.0005; condition starts at 1.0, so ~2000 ticks
-        // to fully decay. Allow up to 2200 to be float-safe.
+        // RawFish decay_rate = 0.0001; condition starts at 1.0, so ~10000 ticks
+        // to fully decay. Allow up to 11000 to be float-safe.
         let mut destroyed = false;
-        for _ in 0..2200 {
+        for _ in 0..11000 {
             if item.tick_decay() {
                 destroyed = true;
                 break;
             }
         }
-        assert!(destroyed, "RawFish should be destroyed within 2200 ticks");
+        assert!(destroyed, "RawFish should be destroyed within 11000 ticks");
     }
 
     #[test]
@@ -283,6 +309,7 @@ mod tests {
         let food_items = [
             ItemKind::RawMouse,
             ItemKind::RawRat,
+            ItemKind::RawRabbit,
             ItemKind::RawFish,
             ItemKind::RawBird,
             ItemKind::Berries,
