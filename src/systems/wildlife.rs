@@ -306,7 +306,7 @@ pub fn spawn_wildlife(
                     WildSpecies::Snake => "A snake slithers out from the underbrush.",
                     WildSpecies::ShadowFox => "A shadow-fox materializes from the corruption.",
                 };
-                log.push(time.tick, text.to_string(), NarrativeTier::Action);
+                log.push(time.tick, text.to_string(), NarrativeTier::Danger);
                 cooldowns.spawn_cooldowns.insert(species, time.tick);
             }
         }
@@ -638,8 +638,10 @@ pub fn predator_hunt_prey(
                     let kill_kind = prey_cfg.kind;
                     commands.entity(prey_entity).despawn();
 
-                    // Shadow fox kills leave rotting carcasses that emit corruption.
-                    if predator.species == WildSpecies::ShadowFox {
+                    // Shadow fox kills sometimes leave rotting carcasses that emit corruption.
+                    if predator.species == WildSpecies::ShadowFox
+                        && rng.rng.random::<f32>() < c.carcass_drop_chance
+                    {
                         commands.spawn((
                             crate::components::wildlife::Carcass {
                                 prey_kind: kill_kind,
@@ -673,7 +675,7 @@ pub fn predator_hunt_prey(
                                 format!("A snake strikes at a {species_name} in the grass.")
                             }
                         };
-                        log.push(time.tick, text, NarrativeTier::Micro);
+                        log.push(time.tick, text, NarrativeTier::Nature);
                     }
                 }
             }
@@ -708,7 +710,7 @@ pub fn carcass_decay(
             log.push(
                 time.tick,
                 "The remains crumble to dust.".to_string(),
-                NarrativeTier::Micro,
+                NarrativeTier::Nature,
             );
             commands.entity(entity).despawn();
         }
@@ -723,7 +725,7 @@ pub fn carcass_decay(
 /// A stalking fox that reaches an adjacent tile ambushes the nearest cat,
 /// dealing damage and draining safety.
 pub fn predator_stalk_cats(
-    mut wildlife: Query<(&WildAnimal, &Position, &mut WildlifeAiState, &mut Health), (Without<Dead>, Without<crate::components::wildlife::Carcass>)>,
+    mut wildlife: Query<(&mut WildAnimal, &Position, &mut WildlifeAiState, &mut Health), (Without<Dead>, Without<crate::components::wildlife::Carcass>)>,
     mut cats: Query<
         (Entity, &Position, &mut Health, &mut Needs, &mut Mood, &Name),
         (Without<WildAnimal>, Without<Dead>),
@@ -750,10 +752,15 @@ pub fn predator_stalk_cats(
     let cat_positions: Vec<(Entity, Position)> =
         cats.iter().map(|(e, p, _, _, _, _)| (e, *p)).collect();
 
-    for (animal, wl_pos, mut ai_state, _health) in &mut wildlife {
+    for (mut animal, wl_pos, mut ai_state, _health) in &mut wildlife {
         // Only shadow foxes stalk via this system. Regular foxes use fox_ai_decision.
         if animal.species != WildSpecies::ShadowFox {
             continue;
+        }
+
+        // Tick down ambush cooldown.
+        if animal.ambush_cooldown > 0 {
+            animal.ambush_cooldown -= 1;
         }
 
         // --- Ward avoidance: shadow foxes absolutely avoid wards ---
@@ -778,6 +785,11 @@ pub fn predator_stalk_cats(
 
         match *ai_state {
             WildlifeAiState::Patrolling { .. } | WildlifeAiState::Circling { .. } => {
+                // Don't initiate new stalks during post-ambush cooldown.
+                if animal.ambush_cooldown > 0 {
+                    continue;
+                }
+
                 // Find nearest cat within detection range, not inside a ward.
                 let nearest = cat_positions
                     .iter()
@@ -851,7 +863,7 @@ pub fn predator_stalk_cats(
                                     "A {species_name} lunges at {} from the undergrowth!",
                                     name.0
                                 ),
-                                NarrativeTier::Action,
+                                NarrativeTier::Danger,
                             );
 
                             mood.modifiers
@@ -862,7 +874,8 @@ pub fn predator_stalk_cats(
                                 });
                         }
                     }
-                    // After ambush, revert to patrolling (flee after striking).
+                    // After ambush, revert to patrolling with cooldown before next stalk.
+                    animal.ambush_cooldown = c.ambush_cooldown_ticks;
                     *ai_state = WildlifeAiState::Patrolling { dx: 1, dy: 0 };
                 } else if dist > c.base_detection_range * 2 {
                     // Target moved too far, give up.
@@ -904,7 +917,7 @@ pub fn cleanup_wildlife(
                 WildSpecies::Snake => "A snake disappears into the undergrowth.",
                 WildSpecies::ShadowFox => "A shadow-fox dissolves into the dark.",
             };
-            log.push(time.tick, text.to_string(), NarrativeTier::Micro);
+            log.push(time.tick, text.to_string(), NarrativeTier::Nature);
             commands.entity(entity).despawn();
         }
     }
@@ -1263,7 +1276,7 @@ pub fn fox_lifecycle_tick(
                     log.push(
                         time.tick,
                         format!("A fox succumbs to {cause}."),
-                        NarrativeTier::Action,
+                        NarrativeTier::Nature,
                     );
                     activation.record(Feature::FoxDied);
                 }
@@ -1327,7 +1340,7 @@ pub fn fox_lifecycle_tick(
                 "A fox den stirs with new life \u{2014} {} cubs born.",
                 litter_size
             ),
-            NarrativeTier::Action,
+            NarrativeTier::Nature,
         );
     }
 }
@@ -1923,7 +1936,7 @@ pub fn fox_confrontation_tick(
                 log.push(
                     time.tick,
                     "The fox stands its ground, hackles raised.".to_string(),
-                    NarrativeTier::Action,
+                    NarrativeTier::Danger,
                 );
             }
             continue;
@@ -1968,7 +1981,7 @@ pub fn fox_confrontation_tick(
                         "Claws flash between {} and a fox \u{2014} both draw blood!",
                         name.0
                     ),
-                    NarrativeTier::Significant,
+                    NarrativeTier::Danger,
                 );
             }
 
@@ -2057,7 +2070,7 @@ pub fn fox_store_raid_tick(
                 log.push(
                     time.tick,
                     format!("A fox raids the colony stores, making off with {stolen:.1} food!"),
-                    NarrativeTier::Significant,
+                    NarrativeTier::Danger,
                 );
             }
 

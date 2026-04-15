@@ -1,27 +1,40 @@
 use bevy::prelude::*;
 
+use crate::rendering::sprite_assets::SpriteAssets;
+use crate::rendering::tilemap_sync::{TILE_PX, TILE_SCALE};
+use crate::resources::map::TileMap;
 use crate::resources::time::{SimConfig, TimeState};
 
-/// Marker for the fullscreen day/night tint overlay.
+/// Marker for the day/night tint overlay sprite.
 #[derive(Component)]
 pub struct DayNightOverlay;
 
-/// Spawn a fullscreen UI node used as the day/night color tint.
-pub fn setup_day_night_overlay(mut commands: Commands) {
+/// Spawn a world-space sprite covering the map, used as the day/night tint.
+///
+/// A world-space sprite (rather than a UI node) ensures the tint only covers
+/// the map area, leaving UI panels untinted.
+pub fn setup_day_night_overlay(
+    mut commands: Commands,
+    sprite_assets: Res<SpriteAssets>,
+    map: Res<TileMap>,
+) {
+    let world_px = TILE_PX * TILE_SCALE;
+    let center_x = map.width as f32 * world_px / 2.0;
+    let center_y = map.height as f32 * world_px / 2.0;
+    // Half-tile margin on each side prevents sub-pixel gaps at map edges.
+    let size = Vec2::new(
+        (map.width as f32 + 1.0) * world_px,
+        (map.height as f32 + 1.0) * world_px,
+    );
+
     commands.spawn((
-        // Fullscreen transparent node covering the entire viewport.
-        Node {
-            position_type: PositionType::Absolute,
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
+        Sprite {
+            image: sprite_assets.white_pixel.clone(),
+            color: Color::NONE,
+            custom_size: Some(size),
             ..default()
         },
-        // Start fully transparent.
-        BackgroundColor(Color::NONE),
-        // High z-index so it renders above all other UI.
-        ZIndex(100),
-        // Don't capture mouse/touch events.
-        Pickable::IGNORE,
+        Transform::from_xyz(center_x, center_y, 50.0),
         DayNightOverlay,
     ));
 }
@@ -34,9 +47,9 @@ pub fn setup_day_night_overlay(mut commands: Commands) {
 pub fn update_day_night_overlay(
     time_state: Res<TimeState>,
     config: Res<SimConfig>,
-    mut query: Query<&mut BackgroundColor, With<DayNightOverlay>>,
+    mut query: Query<&mut Sprite, With<DayNightOverlay>>,
 ) {
-    let Ok(mut bg) = query.single_mut() else { return };
+    let Ok(mut sprite) = query.single_mut() else { return };
 
     let ticks_per_day = config.ticks_per_day_phase * 4;
     let tick_in_day = (time_state.tick % ticks_per_day) as f32;
@@ -60,7 +73,7 @@ pub fn update_day_night_overlay(
         p => lerp_rgba(night, dawn, p - 3.0),               // Night → Dawn
     };
 
-    bg.0 = Color::LinearRgba(color);
+    sprite.color = Color::LinearRgba(color);
 }
 
 fn lerp_rgba(a: LinearRgba, b: LinearRgba, t: f32) -> LinearRgba {

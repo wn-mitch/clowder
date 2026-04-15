@@ -124,6 +124,8 @@ pub struct StepExecutionState {
     pub phase: StepPhase,
     /// Patrol direction for hunt/forage search patterns.
     pub patrol_dir: (i32, i32),
+    /// Consecutive ticks with zero position change. Reset on any movement.
+    pub no_move_ticks: u64,
 }
 
 /// Internal phase tracking for complex actions.

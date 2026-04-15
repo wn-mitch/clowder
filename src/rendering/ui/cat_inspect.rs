@@ -6,9 +6,9 @@ use crate::components::disposition::ActionHistory;
 use crate::components::goap_plan::GoapPlan;
 use crate::components::coordination::{ActiveDirective, Coordinator};
 use crate::components::fate::{FatedLove, FatedRival};
-use crate::components::identity::{Age, LifeStage, Species};
+use crate::components::identity::{Age, LifeStage, Name, Species};
 use crate::components::mental::Mood;
-use crate::components::physical::{Dead, Needs};
+use crate::components::physical::{Dead, Health, Needs};
 use crate::components::skills::Skills;
 use crate::components::zodiac::ZodiacSign;
 use crate::rendering::ui::{TEXT_COLOR, TEXT_DIM, TEXT_HIGHLIGHT, UiRoot};
@@ -110,6 +110,7 @@ pub fn update_cat_inspect_panel(
         (With<Species>, Without<Dead>),
     >,
     names: Query<&Name>,
+    health_query: Query<&Health>,
     relationships: Res<Relationships>,
     time: Res<TimeState>,
     config: Res<SimConfig>,
@@ -169,7 +170,7 @@ pub fn update_cat_inspect_panel(
     let mut children: Vec<Entity> = Vec::new();
 
     // --- Header: cat name ---
-    children.push(spawn_text(&mut commands, name.as_ref(), HEADER_FONT_SIZE, TEXT_HIGHLIGHT));
+    children.push(spawn_text(&mut commands, &name.0, HEADER_FONT_SIZE, TEXT_HIGHLIGHT));
 
     // --- Life stage + mood ---
     let stage_str = match life_stage {
@@ -238,7 +239,7 @@ pub fn update_cat_inspect_panel(
     if let Some(fl) = fated_love {
         let partner_name = names
             .get(fl.partner)
-            .map(|n| n.to_string())
+            .map(|n| n.0.clone())
             .unwrap_or_else(|_| "???".to_string());
         let status = if fl.awakened { "awakened" } else { "dormant" };
         children.push(spawn_text(
@@ -253,7 +254,7 @@ pub fn update_cat_inspect_panel(
     if let Some(fr) = fated_rival {
         let rival_name = names
             .get(fr.rival)
-            .map(|n| n.to_string())
+            .map(|n| n.0.clone())
             .unwrap_or_else(|_| "???".to_string());
         let status = if fr.awakened { "awakened" } else { "dormant" };
         children.push(spawn_text(
@@ -262,6 +263,23 @@ pub fn update_cat_inspect_panel(
             FONT_SIZE,
             Color::srgb(0.4, 0.5, 0.9),
         ));
+    }
+
+    // --- Health ---
+    if let Ok(health) = health_query.get(entity) {
+        children.push(spawn_spacer(&mut commands));
+        children.push(spawn_bar_row(&mut commands, "Health", health.current / health.max));
+        if !health.injuries.is_empty() {
+            let injury_count = health.injuries.iter().filter(|i| !i.healed).count();
+            if injury_count > 0 {
+                children.push(spawn_text(
+                    &mut commands,
+                    &format!("  {injury_count} active injur{}", if injury_count == 1 { "y" } else { "ies" }),
+                    FONT_SIZE,
+                    BAR_RED,
+                ));
+            }
+        }
     }
 
     // --- Spacer ---
@@ -292,10 +310,10 @@ pub fn update_cat_inspect_panel(
         children.push(spawn_spacer(&mut commands));
         children.push(spawn_text(&mut commands, "Relationships", FONT_SIZE + 1.0, TEXT_COLOR));
         for (other, rel) in &rels {
-            let other_name = names
-                .get(*other)
-                .map(|n| n.to_string())
-                .unwrap_or_else(|_| "???".to_string());
+            let Ok(other_name_comp) = names.get(*other) else {
+                continue; // entity despawned — skip stale relationship
+            };
+            let other_name = other_name_comp.0.clone();
             let bond_str = match rel.bond {
                 Some(crate::resources::relationships::BondType::Friends) => " Friends",
                 Some(crate::resources::relationships::BondType::Partners) => " Partners",

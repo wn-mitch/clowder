@@ -25,13 +25,10 @@ impl Plugin for RenderingPlugin {
                     ),
                     tilemap_sync::create_tilemap,
                     debug_grid::setup_grid,
+                    day_night::setup_day_night_overlay,
                 )
                     .chain()
                     .after(crate::plugins::setup::setup_world_exclusive),
-            )
-            .add_systems(
-                Startup,
-                day_night::setup_day_night_overlay,
             )
             .add_systems(
                 Update,
@@ -59,6 +56,10 @@ impl Plugin for CameraPlugin {
                 camera::setup_camera
                     .after(crate::plugins::setup::setup_world_exclusive),
             )
-            .add_systems(Update, (camera::camera_update, camera::auto_screenshot));
+            .add_systems(
+                Update,
+                (camera::camera_update, camera::auto_screenshot)
+                    .after(entity_sprites::sync_entity_positions),
+            );
     }
 }

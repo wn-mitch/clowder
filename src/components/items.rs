@@ -154,6 +154,46 @@ impl ItemKind {
 }
 
 // ---------------------------------------------------------------------------
+// Item modifiers
+// ---------------------------------------------------------------------------
+
+/// Modifiers stamped onto an item at creation time. Corruption is captured from
+/// the source tile when the item is first produced (hunt catch, forage, den
+/// raid). Future modifiers (blessed, poisoned, shadow-touched) add fields here.
+#[derive(Debug, Clone, Copy, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ItemModifiers {
+    /// Corruption level from the source tile, clamped to `[0.0, 1.0]`.
+    pub corruption: f32,
+}
+
+impl ItemModifiers {
+    pub fn with_corruption(corruption: f32) -> Self {
+        Self {
+            corruption: corruption.clamp(0.0, 1.0),
+        }
+    }
+
+    /// True when no modifiers are active (clean item).
+    pub fn is_clean(&self) -> bool {
+        self.corruption == 0.0
+    }
+}
+
+/// Returns a display name combining quality, modifiers, and kind.
+/// Examples: `"corrupted rat"`, `"exceptional corrupted rat"`, `"fine rabbit"`.
+pub fn item_display_name(kind: ItemKind, quality: f32, modifiers: &ItemModifiers) -> String {
+    let mut parts: Vec<&str> = Vec::new();
+    if let Some(ql) = quality_label(quality) {
+        parts.push(ql);
+    }
+    if modifiers.corruption > 0.3 {
+        parts.push("corrupted");
+    }
+    parts.push(kind.name());
+    parts.join(" ")
+}
+
+// ---------------------------------------------------------------------------
 // Quality tiers for narrative
 // ---------------------------------------------------------------------------
 
@@ -216,16 +256,37 @@ pub struct Item {
     /// `OnGround` on deserialization.
     #[serde(skip, default = "ItemLocation::on_ground")]
     pub location: ItemLocation,
+    /// Modifiers stamped at creation (corruption, etc.). Defaults to clean
+    /// for items created before this field existed.
+    #[serde(default)]
+    pub modifiers: ItemModifiers,
 }
 
 impl Item {
-    /// Create a new item with quality clamped to `[0.0, 1.0]`.
+    /// Create a new item with quality clamped to `[0.0, 1.0]` and clean modifiers.
     pub fn new(kind: ItemKind, quality: f32, location: ItemLocation) -> Self {
         Self {
             kind,
             quality: quality.clamp(0.0, 1.0),
             condition: 1.0,
             location,
+            modifiers: ItemModifiers::default(),
+        }
+    }
+
+    /// Create a new item with explicit modifiers.
+    pub fn with_modifiers(
+        kind: ItemKind,
+        quality: f32,
+        location: ItemLocation,
+        modifiers: ItemModifiers,
+    ) -> Self {
+        Self {
+            kind,
+            quality: quality.clamp(0.0, 1.0),
+            condition: 1.0,
+            location,
+            modifiers,
         }
     }
 
@@ -324,5 +385,75 @@ mod tests {
                 "{kind:?} is food but has food_value == 0.0"
             );
         }
+    }
+
+    #[test]
+    fn item_modifiers_default_is_clean() {
+        let mods = ItemModifiers::default();
+        assert!(mods.is_clean());
+        assert_eq!(mods.corruption, 0.0);
+    }
+
+    #[test]
+    fn with_corruption_clamps_to_unit_range() {
+        let mods = ItemModifiers::with_corruption(2.5);
+        assert_eq!(mods.corruption, 1.0);
+        let mods = ItemModifiers::with_corruption(-0.3);
+        assert_eq!(mods.corruption, 0.0);
+    }
+
+    #[test]
+    fn corrupted_item_reduces_effective_food_value() {
+        let penalty = 0.5;
+        let base = ItemKind::RawRat.food_value(); // 0.8
+        let mods = ItemModifiers::with_corruption(0.6);
+        let freshness = 1.0 - mods.corruption * penalty;
+        let effective = base * freshness;
+        assert!(effective < base, "corrupted food should give less hunger");
+        assert!((effective - 0.56).abs() < 0.01, "0.8 * 0.7 ≈ 0.56");
+    }
+
+    #[test]
+    fn clean_item_gives_full_food_value() {
+        let penalty = 0.5;
+        let base = ItemKind::RawRat.food_value();
+        let mods = ItemModifiers::default();
+        let freshness = 1.0 - mods.corruption * penalty;
+        assert_eq!(freshness, 1.0);
+        assert_eq!(base * freshness, base);
+    }
+
+    #[test]
+    fn item_display_name_reflects_corruption() {
+        let mods = ItemModifiers::with_corruption(0.5);
+        let name = item_display_name(ItemKind::RawRat, 0.4, &mods);
+        assert_eq!(name, "corrupted rat");
+    }
+
+    #[test]
+    fn item_display_name_clean_item() {
+        let mods = ItemModifiers::default();
+        let name = item_display_name(ItemKind::RawRat, 0.4, &mods);
+        assert_eq!(name, "rat");
+    }
+
+    #[test]
+    fn item_display_name_quality_and_corruption() {
+        let mods = ItemModifiers::with_corruption(0.8);
+        let name = item_display_name(ItemKind::RawRabbit, 0.85, &mods);
+        assert_eq!(name, "exceptional corrupted rabbit");
+    }
+
+    #[test]
+    fn item_new_has_clean_modifiers() {
+        let item = Item::new(ItemKind::RawFish, 0.5, ItemLocation::OnGround);
+        assert!(item.modifiers.is_clean());
+    }
+
+    #[test]
+    fn item_with_modifiers_preserves_corruption() {
+        let mods = ItemModifiers::with_corruption(0.7);
+        let item = Item::with_modifiers(ItemKind::Berries, 0.5, ItemLocation::OnGround, mods);
+        assert_eq!(item.modifiers.corruption, 0.7);
     }
 }

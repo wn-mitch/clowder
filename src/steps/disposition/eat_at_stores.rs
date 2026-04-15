@@ -25,7 +25,10 @@ pub fn resolve_eat_at_stores(
                 });
                 if let Some(item_entity) = food_item {
                     if let Ok(item) = items_query.get(item_entity) {
-                        needs.hunger = (needs.hunger + item.kind.food_value()).min(1.0);
+                        let freshness =
+                            1.0 - item.modifiers.corruption * d.corruption_food_penalty;
+                        needs.hunger =
+                            (needs.hunger + item.kind.food_value() * freshness).min(1.0);
                     }
                     stored.remove(item_entity);
                     commands.entity(item_entity).despawn();

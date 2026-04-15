@@ -99,10 +99,10 @@ impl HuntingPriors {
 
     /// A fruitless search decreases belief proportional to effort (tiles covered).
     ///
-    /// The penalty is `tiles_searched / 500.0`, so 500 searched tiles produce
+    /// The penalty is `tiles_searched / 2000.0`, so 2000 searched tiles produce
     /// a full −1.0 delta (clamped at `MIN_BELIEF`).
     pub fn record_failed_search(&mut self, pos: &Position, tiles_searched: u64) {
-        self.update(pos.x, pos.y, -(tiles_searched as f32 / 500.0));
+        self.update(pos.x, pos.y, -(tiles_searched as f32 / 2000.0));
     }
 
     /// Find the highest-belief bucket within `radius` buckets of `pos` that

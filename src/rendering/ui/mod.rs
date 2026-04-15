@@ -85,6 +85,8 @@ pub const PANEL_BORDER: Color = Color::srgba(0.4, 0.35, 0.25, 0.9);
 pub const TEXT_COLOR: Color = Color::srgb(0.9, 0.88, 0.82);
 pub const TEXT_DIM: Color = Color::srgb(0.5, 0.5, 0.48);
 pub const TEXT_HIGHLIGHT: Color = Color::srgb(0.95, 0.85, 0.4);
+pub const TEXT_DANGER: Color = Color::srgb(0.9, 0.25, 0.2);
+pub const TEXT_NATURE: Color = Color::srgb(0.55, 0.78, 0.95);
 
 fn setup_ui_root(mut commands: Commands) {
     commands.spawn((

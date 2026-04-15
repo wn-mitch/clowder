@@ -24,8 +24,12 @@ pub fn resolve_retrieve_from_stores(
                     .copied()
                     .find(|&e| items_query.get(e).is_ok_and(|item| item.kind == kind));
                 if let Some(item_entity) = target_item {
+                    let modifiers = items_query
+                        .get(item_entity)
+                        .map(|item| item.modifiers)
+                        .unwrap_or_default();
                     stored.remove(item_entity);
-                    inventory.add_item(kind);
+                    inventory.add_item_with_modifiers(kind, modifiers);
                     commands.entity(item_entity).despawn();
                     retrieved = true;
                 }

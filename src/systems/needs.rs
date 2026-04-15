@@ -1,11 +1,12 @@
 use bevy_ecs::prelude::*;
 
 use crate::components::identity::{Age, LifeStage, Orientation};
-use crate::components::magic::{Inventory, ItemSlot};
+use crate::components::magic::Inventory;
 use crate::components::mental::{LocationPreferences, Mood, MoodModifier};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::components::pregnancy::Pregnant;
+
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::time::{Season, SimConfig, TimeState};
 use crate::resources::weather::{Weather, WeatherState};
@@ -214,6 +215,8 @@ pub fn decay_grooming(
 
 /// A hungry cat with food in its inventory eats directly rather than
 /// waiting to deposit at stores. Keeps cats alive during long hunts.
+/// Corruption penalty comes from the item's modifiers (stamped at catch
+/// time), not from the cat's current tile.
 pub fn eat_from_inventory(
     constants: Res<SimConstants>,
     mut query: Query<(&mut Needs, &mut Inventory), Without<Dead>>,
@@ -221,14 +224,9 @@ pub fn eat_from_inventory(
     let c = &constants.needs;
     for (mut needs, mut inventory) in &mut query {
         if needs.hunger < c.eat_from_inventory_threshold {
-            if let Some(idx) = inventory
-                .slots
-                .iter()
-                .position(|s| matches!(s, ItemSlot::Item(k) if k.is_food()))
-            {
-                if let ItemSlot::Item(kind) = inventory.slots.remove(idx) {
-                    needs.hunger = (needs.hunger + kind.food_value()).min(1.0);
-                }
+            if let Some((kind, modifiers)) = inventory.take_food() {
+                let freshness = 1.0 - modifiers.corruption * c.corruption_food_penalty;
+                needs.hunger = (needs.hunger + kind.food_value() * freshness).min(1.0);
             }
         }
     }

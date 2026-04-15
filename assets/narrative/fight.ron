@@ -3,42 +3,42 @@
     // These templates fire on action completion (disengage).
     (
         text: "{name} disengages from the fight, panting.",
-        tier: Action,
+        tier: Danger,
         action: Some(Fight),
     ),
     (
         text: "{name} backs away from the scuffle.",
-        tier: Action,
+        tier: Danger,
         action: Some(Fight),
     ),
     (
         text: "{name} shakes off the dust and catches {possessive} breath.",
-        tier: Action,
+        tier: Danger,
         action: Some(Fight),
     ),
 
     // --- Personality-conditioned ---
     (
         text: "{name} stands {possessive} ground, teeth bared, until the threat retreats.",
-        tier: Action,
+        tier: Danger,
         action: Some(Fight),
         personality: [(axis: Boldness, bucket: High)],
     ),
     (
         text: "{name} fights with cold precision, wasting no movement.",
-        tier: Action,
+        tier: Danger,
         action: Some(Fight),
         personality: [(axis: Diligence, bucket: High)],
     ),
     (
         text: "{name} hisses and swipes, more fury than form.",
-        tier: Action,
+        tier: Danger,
         action: Some(Fight),
         personality: [(axis: Temper, bucket: High)],
     ),
     (
         text: "{name} steps back from the fight, fur bristling, eyes wide.",
-        tier: Action,
+        tier: Danger,
         action: Some(Fight),
         personality: [(axis: Anxiety, bucket: High)],
     ),
@@ -46,25 +46,25 @@
     // --- Weather/mood ---
     (
         text: "{name} fights through the downpour, blinking rain from {possessive} eyes.",
-        tier: Action,
+        tier: Danger,
         action: Some(Fight),
         weather: Some(HeavyRain),
     ),
     (
         text: "{name} disengages with a victorious yowl.",
-        tier: Action,
+        tier: Danger,
         action: Some(Fight),
         mood: Some(Happy),
     ),
     (
         text: "{name} limps away from the fray, but alive.",
-        tier: Action,
+        tier: Danger,
         action: Some(Fight),
         mood: Some(Low),
     ),
     (
         text: "{name} throws {object}self into the fight without hesitation.",
-        tier: Action,
+        tier: Danger,
         action: Some(Fight),
         personality: [(axis: Boldness, bucket: High)],
         mood: Some(Neutral),

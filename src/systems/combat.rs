@@ -185,7 +185,7 @@ pub fn resolve_combat(
             // Narrative: cat attacks.
             if rng.rng.random::<f32>() < c.narrative_attack_chance {
                 let text = format!("{cat_name} rakes the {species_name} across the muzzle.");
-                log.push(time.tick, text, NarrativeTier::Action);
+                log.push(time.tick, text, NarrativeTier::Danger);
             }
 
             // Check if wildlife is killed.
@@ -193,7 +193,7 @@ pub fn resolve_combat(
                 let text = format!(
                     "The {species_name} crumples. {cat_name} stands over it, breathing hard."
                 );
-                log.push(time.tick, text, NarrativeTier::Significant);
+                log.push(time.tick, text, NarrativeTier::Danger);
                 wildlife_to_despawn.push(fight.target_entity);
                 victorious_cats.push((fight.cat_entity, fight.target_entity));
                 continue;
@@ -242,7 +242,7 @@ pub fn resolve_combat(
                 // Narrative for injuries.
                 if matches!(kind, InjuryKind::Moderate | InjuryKind::Severe) {
                     let text = format!("{} is knocked aside but scrambles back.", name.0);
-                    log.push(time.tick, text, NarrativeTier::Action);
+                    log.push(time.tick, text, NarrativeTier::Danger);
                 }
 
                 memory.remember(MemoryEntry {

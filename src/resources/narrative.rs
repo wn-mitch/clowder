@@ -16,6 +16,8 @@ pub enum NarrativeTier {
     Micro,
     Action,
     Significant,
+    Danger,
+    Nature,
 }
 
 // ---------------------------------------------------------------------------

@@ -610,7 +610,7 @@ pub fn prey_population(
                 log.push(
                     time.tick,
                     format!("The {} have overrun their territory.", profile.name()),
-                    NarrativeTier::Micro,
+                    NarrativeTier::Nature,
                 );
             }
             continue;
@@ -620,7 +620,7 @@ pub fn prey_population(
             log.push(
                 time.tick,
                 format!("The {} are growing restless.", profile.name()),
-                NarrativeTier::Micro,
+                NarrativeTier::Nature,
             );
         }
 
@@ -691,7 +691,7 @@ pub fn prey_den_lifecycle(
             log.push(
                 time.tick,
                 format!("The {kind_name} have abandoned their {name}."),
-                NarrativeTier::Action,
+                NarrativeTier::Nature,
             );
             commands.entity(entity).despawn();
         }
@@ -840,7 +840,7 @@ pub fn orphan_prey_adopt_or_found(
                 profile.den_name(),
                 dir,
             ),
-            NarrativeTier::Action,
+            NarrativeTier::Nature,
         );
     }
 }
@@ -925,7 +925,7 @@ pub fn prey_hunger(
                             log.push(
                                 time.tick,
                                 format!("A {} has gotten into the stores!", cfg.name),
-                                NarrativeTier::Action,
+                                NarrativeTier::Nature,
                             );
                         }
                         break;
@@ -949,7 +949,7 @@ pub fn prey_hunger(
                 log.push(
                     time.tick,
                     format!("A {} collapses from hunger.", cfg.name),
-                    NarrativeTier::Micro,
+                    NarrativeTier::Nature,
                 );
             }
             commands.entity(entity).despawn();

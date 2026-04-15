@@ -34,7 +34,7 @@ pub fn emit_weather_transitions(
     if let Some(prev) = tracker.last_weather {
         if prev != current {
             let text = weather_narrative(current, &mut rng);
-            log.push(time.tick, text, NarrativeTier::Action);
+            log.push(time.tick, text, NarrativeTier::Nature);
         }
     }
 

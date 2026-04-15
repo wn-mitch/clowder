@@ -2,7 +2,7 @@ use bevy_ecs::prelude::*;
 use rand::Rng;
 
 use crate::components::building::{StoredItems, Structure, StructureType};
-use crate::components::items::Item;
+use crate::components::items::{item_display_name, Item};
 use crate::resources::food::FoodStores;
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::rng::SimRng;
@@ -21,7 +21,7 @@ pub fn decay_items(
         if item.tick_decay() {
             // Narrate food spoilage (~10% of destroyed food items).
             if item.kind.is_food() && rng.rng.random::<f32>() < 0.1 {
-                let name = item.kind.name();
+                let name = item_display_name(item.kind, item.quality, &item.modifiers);
                 log.push(
                     time.tick,
                     format!("Some {name} in the stores has gone off."),

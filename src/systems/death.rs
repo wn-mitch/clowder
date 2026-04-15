@@ -107,7 +107,7 @@ pub fn check_death(
             DeathCause::OldAge => format!("{dead_name} does not wake."),
             DeathCause::Injury => format!("{dead_name} has died from wounds."),
         };
-        log.push(tick, text.clone(), NarrativeTier::Significant);
+        log.push(tick, text.clone(), NarrativeTier::Danger);
 
         if let Some(ref mut elog) = event_log {
             elog.push(
@@ -150,7 +150,7 @@ pub fn check_death(
                         "The stars dim where {}'s light once was. {} feels the thread go cold.",
                         dead_name, survivor_name.0,
                     ),
-                    NarrativeTier::Significant,
+                    NarrativeTier::Danger,
                 );
                 // Remove the component — fate doesn't repeat.
                 commands
@@ -168,7 +168,7 @@ pub fn check_death(
                         "{} stands still a long time where {} fell. The challenge will never be answered.",
                         survivor_name.0, dead_name,
                     ),
-                    NarrativeTier::Significant,
+                    NarrativeTier::Danger,
                 );
                 commands
                     .entity(survivor_e)
@@ -319,10 +319,10 @@ mod tests {
         let has_death_entry = log
             .entries
             .iter()
-            .any(|e| e.text.contains("Ash") && e.tier == NarrativeTier::Significant);
+            .any(|e| e.text.contains("Ash") && e.tier == NarrativeTier::Danger);
         assert!(
             has_death_entry,
-            "death should produce a Significant narrative entry"
+            "death should produce a Danger narrative entry"
         );
     }
 

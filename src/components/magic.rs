@@ -231,7 +231,7 @@ pub struct FlavorPlant {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum ItemSlot {
     Herb(HerbKind),
-    Item(crate::components::items::ItemKind),
+    Item(crate::components::items::ItemKind, crate::components::items::ItemModifiers),
 }
 
 /// A cat's carried inventory. Capacity-limited; holds both herbs and items.
@@ -311,15 +311,24 @@ impl Inventory {
     pub fn has_item(&self, kind: crate::components::items::ItemKind) -> bool {
         self.slots
             .iter()
-            .any(|s| matches!(s, ItemSlot::Item(i) if *i == kind))
+            .any(|s| matches!(s, ItemSlot::Item(i, _) if *i == kind))
     }
 
-    /// Add an item. Returns false if inventory is full.
+    /// Add an item with default (clean) modifiers. Returns false if inventory is full.
     pub fn add_item(&mut self, kind: crate::components::items::ItemKind) -> bool {
+        self.add_item_with_modifiers(kind, crate::components::items::ItemModifiers::default())
+    }
+
+    /// Add an item with explicit modifiers. Returns false if inventory is full.
+    pub fn add_item_with_modifiers(
+        &mut self,
+        kind: crate::components::items::ItemKind,
+        modifiers: crate::components::items::ItemModifiers,
+    ) -> bool {
         if self.is_full() {
             return false;
         }
-        self.slots.push(ItemSlot::Item(kind));
+        self.slots.push(ItemSlot::Item(kind, modifiers));
         true
     }
 
@@ -328,12 +337,24 @@ impl Inventory {
         if let Some(idx) = self
             .slots
             .iter()
-            .position(|s| matches!(s, ItemSlot::Item(i) if *i == kind))
+            .position(|s| matches!(s, ItemSlot::Item(i, _) if *i == kind))
         {
             self.slots.swap_remove(idx);
             true
         } else {
             false
+        }
+    }
+
+    /// Take the first food item, returning its kind and modifiers.
+    pub fn take_food(&mut self) -> Option<(crate::components::items::ItemKind, crate::components::items::ItemModifiers)> {
+        let idx = self
+            .slots
+            .iter()
+            .position(|s| matches!(s, ItemSlot::Item(k, _) if k.is_food()))?;
+        match self.slots.remove(idx) {
+            ItemSlot::Item(kind, mods) => Some((kind, mods)),
+            _ => unreachable!(),
         }
     }
 }
@@ -368,7 +389,7 @@ impl Ward {
         Self {
             kind: WardKind::Thornward,
             strength: 1.0,
-            decay_rate: 0.005,
+            decay_rate: 0.002,
             inverted: false,
         }
     }
@@ -393,7 +414,7 @@ impl Ward {
 
     /// Effective repulsion radius (tiles). Proportional to strength.
     pub fn repel_radius(&self) -> f32 {
-        3.0 * self.strength
+        6.0 * self.strength
     }
 }
 

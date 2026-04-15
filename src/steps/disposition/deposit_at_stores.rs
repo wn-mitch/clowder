@@ -29,28 +29,29 @@ pub fn resolve_deposit_at_stores(
     let mut rejected = false;
 
     if let Some(store_entity) = target_entity {
-        let food_items: Vec<ItemKind> = inventory
+        let food_items: Vec<(ItemKind, crate::components::items::ItemModifiers)> = inventory
             .slots
             .iter()
             .filter_map(|slot| match slot {
-                ItemSlot::Item(kind) if kind.is_food() => Some(*kind),
+                ItemSlot::Item(kind, mods) if kind.is_food() => Some((*kind, *mods)),
                 _ => None,
             })
             .collect();
         // Remove deposited items from inventory up front.
         inventory
             .slots
-            .retain(|slot| !matches!(slot, ItemSlot::Item(k) if k.is_food()));
+            .retain(|slot| !matches!(slot, ItemSlot::Item(k, _) if k.is_food()));
         // Spawn real item entities in the store.
         if let Ok(mut stored) = stores_query.get_mut(store_entity) {
             let quality = (d.deposit_quality_base + skills.hunting * d.deposit_quality_skill_scale)
                 .clamp(0.0, 1.0);
-            for kind in food_items {
+            for (kind, mods) in food_items {
                 let item_entity = commands
-                    .spawn(Item::new(
+                    .spawn(Item::with_modifiers(
                         kind,
                         quality,
                         ItemLocation::StoredIn(store_entity),
+                        mods,
                     ))
                     .id();
                 if !stored.add_effective(item_entity, StructureType::Stores, items_query) {

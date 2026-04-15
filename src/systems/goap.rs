@@ -169,9 +169,9 @@ pub fn check_anxiety_interrupts(
 
         activation.record(Feature::AnxietyInterrupt);
 
-        // Don't interrupt cats actively hunting.
+        // Don't interrupt cats actively hunting or doing herbcraft (defensive work).
         if matches!(reason, InterruptReason::ThreatDetected { .. })
-            && current.action == Action::Hunt
+            && matches!(current.action, Action::Hunt | Action::Herbcraft)
         {
             continue;
         }
@@ -268,7 +268,10 @@ fn check_interrupt(
 
     if !matches!(
         kind,
-        DispositionKind::Guarding | DispositionKind::Hunting | DispositionKind::Foraging
+        DispositionKind::Guarding
+            | DispositionKind::Hunting
+            | DispositionKind::Foraging
+            | DispositionKind::Crafting
     ) {
         let nearest_threat = wildlife
             .iter()
@@ -733,7 +736,10 @@ pub fn evaluate_and_plan(
         let goal = goal_for_disposition(chosen, 0);
 
         if let Some(steps) = make_plan(planner_state, &actions, &goal, 12, 1000) {
-            let plan = GoapPlan::new(chosen, res.time.tick, personality, steps, crafting_hint);
+            let mut plan = GoapPlan::new(chosen, res.time.tick, personality, steps, crafting_hint);
+            if chosen == DispositionKind::Resting {
+                plan.max_replans = d.resting_max_replans;
+            }
 
             plan_writer.write(PlanNarrative {
                 entity,
@@ -1526,7 +1532,15 @@ pub fn resolve_goap_plans(
                     if ticks >= ec.constants.magic.harvest_carcass_ticks {
                         if let Ok((_, mut carcass, _)) = magic_params.carcass_query.get_mut(carcass_entity) {
                             carcass.harvested = true;
-                            inventory.add_item(crate::components::items::ItemKind::ShadowBone);
+                            let harvest_corruption = if ec.map.in_bounds(pos.x, pos.y) {
+                                ec.map.get(pos.x, pos.y).corruption
+                            } else {
+                                0.0
+                            };
+                            inventory.add_item_with_modifiers(
+                                crate::components::items::ItemKind::ShadowBone,
+                                crate::components::items::ItemModifiers::with_corruption(harvest_corruption),
+                            );
                             corruption.0 = (corruption.0 + ec.constants.magic.harvest_corruption_gain).min(1.0);
                             skills.herbcraft += skills.growth_rate() * ec.constants.magic.herbcraft_gather_skill_growth;
                             if let Some(ref mut act) = narr.activation {
@@ -1631,6 +1645,15 @@ pub fn resolve_goap_plans(
                     d,
                 )
             }
+        };
+
+        // Global safety net: no single step should run indefinitely.
+        let step_result = if matches!(step_result, crate::steps::StepResult::Continue)
+            && ticks > d.global_step_timeout_ticks
+        {
+            crate::steps::StepResult::Fail("global step timeout".into())
+        } else {
+            step_result
         };
 
         // Apply step result.
@@ -1918,16 +1941,26 @@ fn resolve_travel_to(
         }
     } else {
         // No path found — step toward target directly.
+        let before = *pos;
         if let Some(next) = step_toward(pos, &target, map) {
             *pos = next;
         }
         if pos.manhattan_distance(&target) <= 1 {
             return crate::steps::StepResult::Advance;
         }
+        // Early exit: A* found no path and greedy movement made no progress.
+        if *pos == before {
+            state.no_move_ticks += 1;
+        } else {
+            state.no_move_ticks = 0;
+        }
+        if state.no_move_ticks > d.travel_no_path_stuck_ticks {
+            return crate::steps::StepResult::Fail("no path and stuck".into());
+        }
     }
 
     // Timeout: if stuck for too long, fail.
-    if state.ticks_elapsed > 200 {
+    if state.ticks_elapsed > d.travel_timeout_ticks {
         return crate::steps::StepResult::Fail("travel timeout".into());
     }
 
@@ -1978,15 +2011,22 @@ fn resolve_search_prey(
                 let den_name = den.den_name;
                 let den_pos_copy = *den_pos;
 
+                let den_corruption = if map.in_bounds(den_pos_copy.x, den_pos_copy.y) {
+                    map.get(den_pos_copy.x, den_pos_copy.y).corruption
+                } else {
+                    0.0
+                };
+                let den_mods = crate::components::items::ItemModifiers::with_corruption(den_corruption);
                 for _ in 0..kills {
                     if !inventory.is_full() {
-                        inventory.slots.push(ItemSlot::Item(drop_item));
+                        inventory.slots.push(ItemSlot::Item(drop_item, den_mods));
                     } else {
                         commands.spawn((
-                            crate::components::items::Item::new(
+                            crate::components::items::Item::with_modifiers(
                                 drop_item,
                                 d.den_dropped_item_quality,
                                 ItemLocation::OnGround,
+                                den_mods,
                             ),
                             Position::new(
                                 den_pos_copy.x + rng.rng.random_range(-1..=1i32),
@@ -2038,8 +2078,18 @@ fn resolve_search_prey(
     if dx == 0 && dy == 0 {
         dx = 1;
     }
+    let before = *pos;
     for _ in 0..d.search_speed {
         *pos = patrol_move(pos, dx, dy, map);
+    }
+    // If stuck at terrain edge, randomize direction to escape.
+    if *pos == before {
+        state.patrol_dir = (
+            rng.rng.random_range(-1i32..=1),
+            rng.rng.random_range(-1i32..=1),
+        );
+        let (ndx, ndy) = state.patrol_dir;
+        *pos = patrol_move(pos, ndx, ndy, map);
     }
 
     // Visual detection.
@@ -2068,7 +2118,7 @@ fn resolve_search_prey(
 
     // Timeout.
     if ticks > d.search_timeout_ticks {
-        if inventory.slots.iter().any(|s| matches!(s, ItemSlot::Item(k) if k.is_food())) {
+        if inventory.slots.iter().any(|s| matches!(s, ItemSlot::Item(k, _) if k.is_food())) {
             // Have food from earlier — advance to deposit.
             return crate::steps::StepResult::Advance;
         }
@@ -2172,8 +2222,13 @@ fn resolve_engage_prey(
         if rng.rng.random::<f32>() < success_chance {
             // Catch!
             commands.entity(target_entity).despawn();
+            let catch_corruption = if map.in_bounds(prey_pos.x, prey_pos.y) {
+                map.get(prey_pos.x, prey_pos.y).corruption
+            } else {
+                0.0
+            };
             if !inventory.is_full() {
-                inventory.slots.push(ItemSlot::Item(item_kind));
+                inventory.slots.push(ItemSlot::Item(item_kind, crate::components::items::ItemModifiers::with_corruption(catch_corruption)));
             }
             skills.hunting += skills.growth_rate() * d.hunt_catch_skill_growth;
 
@@ -2182,7 +2237,12 @@ fn resolve_engage_prey(
                 position: prey_pos,
             });
 
-            emit_hunt_narrative(narr, time, rng, map, pos, name, gender, personality, needs, "catch", &format!("{} catches a {}.", name.0, species_name), Some(species_name), None);
+            let catch_desc = if catch_corruption > 0.3 {
+                format!("{} catches a corrupted {}.", name.0, species_name)
+            } else {
+                format!("{} catches a {}.", name.0, species_name)
+            };
+            emit_hunt_narrative(narr, time, rng, map, pos, name, gender, personality, needs, "catch", &catch_desc, Some(species_name), None);
 
             hunting_priors.record_catch(&prey_pos);
 
@@ -2217,10 +2277,28 @@ fn resolve_engage_prey(
     } else if dist <= stalk_start {
         if prey_is_fleeing {
             // === CHASE ===
+            let mut moved = false;
             for _ in 0..d.chase_speed {
                 if let Some(next) = step_toward(pos, &prey_pos, map) {
                     *pos = next;
+                    moved = true;
                 }
+            }
+            if moved {
+                state.no_move_ticks = 0;
+            } else {
+                state.no_move_ticks += 1;
+            }
+            if state.no_move_ticks > d.chase_stuck_ticks {
+                return crate::steps::StepResult::Fail("stuck while chasing".into());
+            }
+            let chase_limit = if personality.boldness > 0.7 {
+                d.chase_limit_bold
+            } else {
+                d.chase_limit_default
+            };
+            if ticks > chase_limit {
+                return crate::steps::StepResult::Fail("chase timeout".into());
             }
         } else {
             // === STALK ===
@@ -2241,7 +2319,12 @@ fn resolve_engage_prey(
                 }
                 return crate::steps::StepResult::Fail("anxiety spooked prey".into());
             }
-            if !moved && ticks > 10 {
+            if moved {
+                state.no_move_ticks = 0;
+            } else {
+                state.no_move_ticks += 1;
+            }
+            if state.no_move_ticks > d.chase_stuck_ticks {
                 return crate::steps::StepResult::Fail("stuck while stalking".into());
             }
         }
@@ -2254,7 +2337,12 @@ fn resolve_engage_prey(
                 moved = true;
             }
         }
-        if dist > d.approach_give_up_distance || (!moved && ticks > 10) {
+        if moved {
+            state.no_move_ticks = 0;
+        } else {
+            state.no_move_ticks += 1;
+        }
+        if dist > d.approach_give_up_distance || state.no_move_ticks > d.chase_stuck_ticks {
             return crate::steps::StepResult::Fail("lost prey during approach".into());
         }
     }
@@ -2326,12 +2414,21 @@ fn resolve_forage_item(
                     }
                 }
             };
+            let forage_corruption = if map.in_bounds(pos.x, pos.y) {
+                map.get(pos.x, pos.y).corruption
+            } else {
+                0.0
+            };
             if !inventory.is_full() {
-                inventory.slots.push(ItemSlot::Item(item_kind));
+                inventory.slots.push(ItemSlot::Item(item_kind, crate::components::items::ItemModifiers::with_corruption(forage_corruption)));
             }
             skills.foraging += skills.growth_rate() * d.forage_skill_growth;
 
-            let item_name = item_kind.name();
+            let item_name = if forage_corruption > 0.3 {
+                format!("corrupted {}", item_kind.name())
+            } else {
+                item_kind.name().to_string()
+            };
             let terrain = if map.in_bounds(pos.x, pos.y) {
                 map.get(pos.x, pos.y).terrain
             } else {
@@ -2360,7 +2457,7 @@ fn resolve_forage_item(
                 fur_color: "unknown",
                 other: None,
                 prey: None,
-                item: Some(item_name),
+                item: Some(&item_name),
                 quality: None,
             };
             emit_event_narrative(
@@ -2483,12 +2580,17 @@ fn can_smell_prey(
     map: &TileMap,
     d: &DispositionConstants,
 ) -> bool {
-    let dx = (prey_pos.x - cat_pos.x) as f32;
-    let dy = (prey_pos.y - cat_pos.y) as f32;
     let dist = cat_pos.manhattan_distance(prey_pos) as f32;
     if dist == 0.0 {
         return true;
     }
+    // Close-range olfaction: always detectable regardless of wind.
+    if dist <= d.scent_min_range {
+        return true;
+    }
+    // Wind-assisted scent: requires favorable angle and sufficient range.
+    let dx = (prey_pos.x - cat_pos.x) as f32;
+    let dy = (prey_pos.y - cat_pos.y) as f32;
     let (nx, ny) = (dx / dist, dy / dist);
     let (wx, wy) = wind.direction();
     let dot = wx * nx + wy * ny;
@@ -2702,8 +2804,8 @@ fn build_planner_state(
     herb_positions: &[(Entity, Position, HerbKind)],
 ) -> PlannerState {
     let zone = classify_zone(pos, map, stores_positions, construction_positions, farm_positions, herb_positions);
-    let carrying = if inventory.slots.iter().any(|s| matches!(s, crate::components::magic::ItemSlot::Item(k) if k.is_food())) {
-        if inventory.slots.iter().any(|s| matches!(s, crate::components::magic::ItemSlot::Item(crate::components::items::ItemKind::RawMouse | crate::components::items::ItemKind::RawRat | crate::components::items::ItemKind::RawBird | crate::components::items::ItemKind::RawFish | crate::components::items::ItemKind::RawRabbit))) {
+    let carrying = if inventory.slots.iter().any(|s| matches!(s, crate::components::magic::ItemSlot::Item(k, _) if k.is_food())) {
+        if inventory.slots.iter().any(|s| matches!(s, crate::components::magic::ItemSlot::Item(crate::components::items::ItemKind::RawMouse | crate::components::items::ItemKind::RawRat | crate::components::items::ItemKind::RawBird | crate::components::items::ItemKind::RawFish | crate::components::items::ItemKind::RawRabbit, _))) {
             Carrying::Prey
         } else {
             Carrying::ForagedFood

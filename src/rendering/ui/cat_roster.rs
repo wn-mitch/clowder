@@ -249,25 +249,46 @@ fn spawn_roster_row(
     // --- Line 2: mini need bars ---
     let bars_row = commands
         .spawn(Node {
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(4.0),
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(1.0),
             margin: UiRect::top(Val::Px(2.0)),
             ..default()
         })
         .id();
 
-    let hunger_bar = spawn_mini_bar(commands, needs.hunger);
-    let energy_bar = spawn_mini_bar(commands, needs.energy);
-    let safety_bar = spawn_mini_bar(commands, needs.safety);
+    let hunger_bar = spawn_mini_bar(commands, "H", needs.hunger);
+    let energy_bar = spawn_mini_bar(commands, "E", needs.energy);
+    let safety_bar = spawn_mini_bar(commands, "S", needs.safety);
     commands.entity(bars_row).add_children(&[hunger_bar, energy_bar, safety_bar]);
 
     commands.entity(row).add_children(&[header_row, bars_row]);
     row
 }
 
-fn spawn_mini_bar(commands: &mut Commands, value: f32) -> Entity {
-    let container = commands
+fn spawn_mini_bar(commands: &mut Commands, label: &str, value: f32) -> Entity {
+    let pct = (value * 100.0).round() as u32;
+
+    let row = commands
+        .spawn(Node {
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            ..default()
+        })
+        .id();
+
+    let label_node = commands
+        .spawn((
+            Node {
+                width: Val::Px(12.0),
+                ..default()
+            },
+            Text::new(label.to_string()),
+            TextFont { font_size: FONT_SIZE, ..default() },
+            TextColor(TEXT_DIM),
+        ))
+        .id();
+
+    let bar_container = commands
         .spawn(Node {
             width: Val::Px(MINI_BAR_WIDTH),
             height: Val::Px(MINI_BAR_HEIGHT),
@@ -297,8 +318,22 @@ fn spawn_mini_bar(commands: &mut Commands, value: f32) -> Entity {
         ))
         .id();
 
-    commands.entity(container).add_children(&[filled, empty]);
-    container
+    commands.entity(bar_container).add_children(&[filled, empty]);
+
+    let pct_node = commands
+        .spawn((
+            Node {
+                margin: UiRect::left(Val::Px(3.0)),
+                ..default()
+            },
+            Text::new(format!("{pct}%")),
+            TextFont { font_size: FONT_SIZE, ..default() },
+            TextColor(TEXT_DIM),
+        ))
+        .id();
+
+    commands.entity(row).add_children(&[label_node, bar_container, pct_node]);
+    row
 }
 
 fn bar_color(value: f32) -> Color {

@@ -1942,15 +1942,22 @@ pub fn resolve_disposition_chains(
                             let den_pos_copy = *den_pos;
 
                             // Cat picks up what it can carry.
+                            let den_corruption = if map.in_bounds(den_pos_copy.x, den_pos_copy.y) {
+                                map.get(den_pos_copy.x, den_pos_copy.y).corruption
+                            } else {
+                                0.0
+                            };
+                            let den_mods = crate::components::items::ItemModifiers::with_corruption(den_corruption);
                             for _ in 0..kills {
                                 if !inventory.is_full() {
-                                    inventory.slots.push(ItemSlot::Item(drop_item));
+                                    inventory.slots.push(ItemSlot::Item(drop_item, den_mods));
                                 } else {
                                     commands.spawn((
-                                        crate::components::items::Item::new(
+                                        crate::components::items::Item::with_modifiers(
                                             drop_item,
                                             d.den_dropped_item_quality,
                                             crate::components::items::ItemLocation::OnGround,
+                                            den_mods,
                                         ),
                                         Position::new(
                                             den_pos_copy.x + rng.rng.random_range(-1..=1i32),
@@ -2182,9 +2189,14 @@ pub fn resolve_disposition_chains(
                         if rng.rng.random::<f32>() < success_chance {
                             // Catch!
                             commands.entity(target_entity).despawn();
+                            let catch_corruption = if map.in_bounds(prey_pos.x, prey_pos.y) {
+                                map.get(prey_pos.x, prey_pos.y).corruption
+                            } else {
+                                0.0
+                            };
 
                             if !inventory.is_full() {
-                                inventory.slots.push(ItemSlot::Item(item_kind));
+                                inventory.slots.push(ItemSlot::Item(item_kind, crate::components::items::ItemModifiers::with_corruption(catch_corruption)));
                             }
                             skills.hunting += skills.growth_rate() * d.hunt_catch_skill_growth;
 
@@ -2202,6 +2214,11 @@ pub fn resolve_disposition_chains(
                                 };
                                 let day_phase = DayPhase::from_tick(time.tick, &narr.config);
                                 let season = Season::from_tick(time.tick, &narr.config);
+                                let catch_desc = if catch_corruption > 0.3 {
+                                    format!("corrupted {}", species_name)
+                                } else {
+                                    species_name.to_string()
+                                };
                                 let ctx = TemplateContext {
                                     action: crate::ai::Action::Hunt,
                                     day_phase,
@@ -2230,7 +2247,7 @@ pub fn resolve_disposition_chains(
                                     narr.registry.as_deref(),
                                     &mut narr.log,
                                     time.tick,
-                                    format!("{} catches a {}.", name.0, species_name),
+                                    format!("{} catches a {}.", name.0, catch_desc),
                                     crate::resources::narrative::NarrativeTier::Action,
                                     &ctx,
                                     &var_ctx,
@@ -2473,7 +2490,7 @@ pub fn resolve_disposition_chains(
                         if inventory
                             .slots
                             .iter()
-                            .any(|s| matches!(s, ItemSlot::Item(k) if k.is_food()))
+                            .any(|s| matches!(s, ItemSlot::Item(k, _) if k.is_food()))
                         {
                             chain.advance();
                             chain.sync_targets(&mut current);
@@ -2535,12 +2552,21 @@ pub fn resolve_disposition_chains(
                                 }
                             }
                         };
+                        let forage_corruption = if map.in_bounds(pos.x, pos.y) {
+                            map.get(pos.x, pos.y).corruption
+                        } else {
+                            0.0
+                        };
                         if !inventory.is_full() {
-                            inventory.slots.push(ItemSlot::Item(item_kind));
+                            inventory.slots.push(ItemSlot::Item(item_kind, crate::components::items::ItemModifiers::with_corruption(forage_corruption)));
                         }
                         skills.foraging += skills.growth_rate() * d.forage_skill_growth;
                         {
-                            let item_name = item_kind.name();
+                            let item_name = if forage_corruption > 0.3 {
+                                format!("corrupted {}", item_kind.name())
+                            } else {
+                                item_kind.name().to_string()
+                            };
                             let terrain = if map.in_bounds(pos.x, pos.y) {
                                 map.get(pos.x, pos.y).terrain
                             } else {
@@ -2569,7 +2595,7 @@ pub fn resolve_disposition_chains(
                                 fur_color: "unknown",
                                 other: None,
                                 prey: None,
-                                item: Some(item_name),
+                                item: Some(&item_name),
                                 quality: None,
                             };
                             emit_event_narrative(

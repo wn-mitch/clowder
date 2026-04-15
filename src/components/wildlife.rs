@@ -40,7 +40,7 @@ impl WildSpecies {
             Self::Fox => 0.15,
             Self::Hawk => 0.10,
             Self::Snake => 0.08,
-            Self::ShadowFox => 0.25,
+            Self::ShadowFox => 0.18,
         }
     }
 
@@ -107,6 +107,8 @@ pub struct WildAnimal {
     pub behavior: BehaviorType,
     pub threat_power: f32,
     pub defense: f32,
+    /// Ticks remaining before this animal can initiate a new stalk after ambushing.
+    pub ambush_cooldown: u32,
 }
 
 impl WildAnimal {
@@ -117,6 +119,7 @@ impl WildAnimal {
             behavior: species.default_behavior(),
             threat_power: species.default_threat_power(),
             defense: species.default_defense(),
+            ambush_cooldown: 0,
         }
     }
 }

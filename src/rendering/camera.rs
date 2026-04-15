@@ -28,6 +28,8 @@ pub enum CameraMode {
     Follow,
     /// Manual control (WASD/scroll).
     Override,
+    /// Camera tracks a specific entity's visual position (inspector lock).
+    LockedOn(Entity),
 }
 
 /// The camera "brain" — drives all camera movement.
@@ -112,6 +114,7 @@ pub fn camera_update(
     mut query: Query<(&mut Transform, &mut Projection), With<GameCamera>>,
     time: Res<Time>,
     cats: Query<(&Position, &CurrentAction), With<Species>>,
+    cat_transforms: Query<&Transform, (With<Species>, Without<GameCamera>)>,
     narrative: Res<NarrativeLog>,
     map: Res<TileMap>,
     inspection: Res<crate::ui_data::InspectionState>,
@@ -167,6 +170,20 @@ pub fn camera_update(
         && inspection.mode == crate::ui_data::InspectionMode::None
     {
         brain.mode = CameraMode::Drift;
+    }
+
+    // --- Sync camera lock with inspector selection ---
+    match &inspection.mode {
+        crate::ui_data::InspectionMode::CatInspect(entity) => {
+            if brain.mode != CameraMode::Override {
+                brain.mode = CameraMode::LockedOn(*entity);
+            }
+        }
+        _ => {
+            if matches!(brain.mode, CameraMode::LockedOn(_)) {
+                brain.mode = CameraMode::Drift;
+            }
+        }
     }
 
     // --- Run current mode ---
@@ -248,6 +265,16 @@ pub fn camera_update(
             }
         }
 
+        CameraMode::LockedOn(entity) => {
+            if let Ok(cat_tf) = cat_transforms.get(entity) {
+                brain.target = cat_tf.translation.truncate();
+                brain.clamp_target();
+            } else {
+                // Entity despawned — release the lock.
+                brain.mode = CameraMode::Drift;
+            }
+        }
+
         CameraMode::Override => {
             brain.idle_seconds += dt;
             let current_scale = match &*projection {
@@ -292,7 +319,8 @@ pub fn camera_update(
         let lerp_speed = match brain.mode {
             CameraMode::Drift => 0.4,   // Very floaty — cloud on a breeze
             CameraMode::Linger => 0.8,  // Settles gently near activity
-            CameraMode::Follow => 1.8,  // Purposeful but not jarring
+            CameraMode::Follow => 1.8,      // Purposeful but not jarring
+            CameraMode::LockedOn(_) => 1.2,  // Smooth entity tracking
             CameraMode::Override => unreachable!(),
         };
         let current = Vec2::new(transform.translation.x, transform.translation.y);

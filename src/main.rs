@@ -597,7 +597,10 @@ fn flush_new_entries(
     if new_count == 0 {
         return Ok(());
     }
-    let start = log.entries.len().saturating_sub(new_count as usize);
+    // Cap at buffer size — if entries were evicted before this flush,
+    // they're lost rather than replayed from the ring buffer tail.
+    let capped = (new_count as usize).min(log.entries.len());
+    let start = log.entries.len() - capped;
     for entry in log.entries.range(start..) {
         let day = TimeState::day_number(entry.tick, config);
         let phase = DayPhase::from_tick(entry.tick, config);
@@ -605,6 +608,8 @@ fn flush_new_entries(
             NarrativeTier::Micro => "Micro",
             NarrativeTier::Action => "Action",
             NarrativeTier::Significant => "Significant",
+            NarrativeTier::Danger => "Danger",
+            NarrativeTier::Nature => "Nature",
         };
         writeln!(
             file,
@@ -632,7 +637,8 @@ fn flush_event_entries(
     if new_count == 0 {
         return Ok(());
     }
-    let start = log.entries.len().saturating_sub(new_count as usize);
+    let capped = (new_count as usize).min(log.entries.len());
+    let start = log.entries.len() - capped;
     for entry in log.entries.range(start..) {
         writeln!(file, "{}", serde_json::to_string(entry).unwrap_or_default())?;
     }
@@ -658,6 +664,8 @@ fn load_log_file(world: &mut World, path: &std::path::Path) -> io::Result<()> {
         let tier = match v["tier"].as_str().unwrap_or("Action") {
             "Micro" => NarrativeTier::Micro,
             "Significant" => NarrativeTier::Significant,
+            "Danger" => NarrativeTier::Danger,
+            "Nature" => NarrativeTier::Nature,
             _ => NarrativeTier::Action,
         };
         let mut log = world.resource_mut::<NarrativeLog>();

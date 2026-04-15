@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::rendering::ui::{TEXT_COLOR, TEXT_DIM, TEXT_HIGHLIGHT, UiRoot};
+use crate::rendering::ui::{TEXT_COLOR, TEXT_DANGER, TEXT_DIM, TEXT_HIGHLIGHT, TEXT_NATURE, UiRoot};
 use crate::resources::{NarrativeLog, NarrativeTier, SimConfig, TimeState};
 
 /// Marker for the log panel container.
@@ -121,6 +121,8 @@ pub fn update_log_panel(
             NarrativeTier::Micro => TEXT_DIM,
             NarrativeTier::Action => TEXT_COLOR,
             NarrativeTier::Significant => TEXT_HIGHLIGHT,
+            NarrativeTier::Danger => TEXT_DANGER,
+            NarrativeTier::Nature => TEXT_NATURE,
         };
 
         let day = TimeState::day_number(entry.tick, &config);
