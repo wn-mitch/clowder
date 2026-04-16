@@ -117,10 +117,7 @@ fn population_respects_carrying_capacity() {
     }
 
     let count = count_prey(&mut world, PreyKind::Rat);
-    assert!(
-        count <= cap,
-        "rat count {count} exceeded cap of {cap}",
-    );
+    assert!(count <= cap, "rat count {count} exceeded cap of {cap}",);
 }
 
 /// Density pressure near the cap should produce "restless" or "overrun" log messages.
@@ -139,9 +136,10 @@ fn density_pressure_logged_near_cap() {
     }
 
     let log = world.resource::<NarrativeLog>();
-    let has_density_message = log.entries.iter().any(|e| {
-        e.text.contains("restless") || e.text.contains("overrun")
-    });
+    let has_density_message = log
+        .entries
+        .iter()
+        .any(|e| e.text.contains("restless") || e.text.contains("overrun"));
 
     assert!(
         has_density_message,

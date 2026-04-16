@@ -4,7 +4,7 @@ use crate::components::goap_plan::GoapPlan;
 use crate::components::identity::{Appearance, Name, Species};
 use crate::components::mental::Mood;
 use crate::components::physical::{Dead, Needs};
-use crate::rendering::ui::{TEXT_DIM, TEXT_HIGHLIGHT, UiRoot};
+use crate::rendering::ui::{UiRoot, TEXT_DIM, TEXT_HIGHLIGHT};
 use crate::resources::TimeState;
 use crate::ui_data::{InspectionMode, InspectionState};
 
@@ -40,11 +40,10 @@ const BAR_GREEN: Color = Color::srgb(0.3, 0.8, 0.3);
 const BAR_BG: Color = Color::srgba(0.2, 0.2, 0.2, 0.6);
 const SELECTED_BG: Color = Color::srgba(0.15, 0.15, 0.2, 0.95);
 
-pub fn setup_cat_roster(
-    mut commands: Commands,
-    root_query: Query<Entity, With<UiRoot>>,
-) {
-    let Ok(root) = root_query.single() else { return };
+pub fn setup_cat_roster(mut commands: Commands, root_query: Query<Entity, With<UiRoot>>) {
+    let Ok(root) = root_query.single() else {
+        return;
+    };
 
     let panel = commands
         .spawn((
@@ -92,7 +91,10 @@ pub fn setup_cat_roster(
             },
             ScrollPosition::default(),
             CatRosterContent,
-            RosterState { last_tick: u64::MAX, last_cat_count: 0 },
+            RosterState {
+                last_tick: u64::MAX,
+                last_cat_count: 0,
+            },
         ))
         .id();
 
@@ -112,7 +114,9 @@ pub fn update_cat_roster(
         (With<Species>, Without<Dead>),
     >,
 ) {
-    let Ok((content_entity, mut state)) = content_query.single_mut() else { return };
+    let Ok((content_entity, mut state)) = content_query.single_mut() else {
+        return;
+    };
 
     let cat_count = cats.iter().count();
 
@@ -127,7 +131,9 @@ pub fn update_cat_roster(
     state.last_tick = time_state.tick;
     state.last_cat_count = cat_count;
 
-    commands.entity(content_entity).despawn_related::<Children>();
+    commands
+        .entity(content_entity)
+        .despawn_related::<Children>();
 
     let mut cat_list: Vec<_> = cats.iter().collect();
     cat_list.sort_by_key(|(e, ..)| *e);
@@ -139,8 +145,14 @@ pub fn update_cat_roster(
 
     for (entity, name, appearance, needs, mood, disposition) in &cat_list {
         let row = spawn_roster_row(
-            &mut commands, *entity, name, appearance, needs, mood,
-            disposition.as_deref(), selected == Some(*entity),
+            &mut commands,
+            *entity,
+            name,
+            appearance,
+            needs,
+            mood,
+            disposition.as_deref(),
+            selected == Some(*entity),
         );
         commands.entity(content_entity).add_children(&[row]);
     }
@@ -219,7 +231,10 @@ fn spawn_roster_row(
     let name_node = commands
         .spawn((
             Text::new(name.0.clone()),
-            TextFont { font_size: FONT_SIZE, ..default() },
+            TextFont {
+                font_size: FONT_SIZE,
+                ..default()
+            },
             TextColor(fur_color_to_ui(&appearance.fur_color)),
         ))
         .id();
@@ -231,20 +246,25 @@ fn spawn_roster_row(
             ..default()
         })
         .id();
-    commands.entity(left_group).add_children(&[mood_dot, name_node]);
+    commands
+        .entity(left_group)
+        .add_children(&[mood_dot, name_node]);
 
-    let disp_label = disposition
-        .map(|d| d.kind.label())
-        .unwrap_or("Idle");
+    let disp_label = disposition.map(|d| d.kind.label()).unwrap_or("Idle");
     let disp_node = commands
         .spawn((
             Text::new(disp_label.to_string()),
-            TextFont { font_size: FONT_SIZE, ..default() },
+            TextFont {
+                font_size: FONT_SIZE,
+                ..default()
+            },
             TextColor(TEXT_DIM),
         ))
         .id();
 
-    commands.entity(header_row).add_children(&[left_group, disp_node]);
+    commands
+        .entity(header_row)
+        .add_children(&[left_group, disp_node]);
 
     // --- Line 2: mini need bars ---
     let bars_row = commands
@@ -259,7 +279,9 @@ fn spawn_roster_row(
     let hunger_bar = spawn_mini_bar(commands, "H", needs.hunger);
     let energy_bar = spawn_mini_bar(commands, "E", needs.energy);
     let safety_bar = spawn_mini_bar(commands, "S", needs.safety);
-    commands.entity(bars_row).add_children(&[hunger_bar, energy_bar, safety_bar]);
+    commands
+        .entity(bars_row)
+        .add_children(&[hunger_bar, energy_bar, safety_bar]);
 
     commands.entity(row).add_children(&[header_row, bars_row]);
     row
@@ -283,7 +305,10 @@ fn spawn_mini_bar(commands: &mut Commands, label: &str, value: f32) -> Entity {
                 ..default()
             },
             Text::new(label.to_string()),
-            TextFont { font_size: FONT_SIZE, ..default() },
+            TextFont {
+                font_size: FONT_SIZE,
+                ..default()
+            },
             TextColor(TEXT_DIM),
         ))
         .id();
@@ -318,7 +343,9 @@ fn spawn_mini_bar(commands: &mut Commands, label: &str, value: f32) -> Entity {
         ))
         .id();
 
-    commands.entity(bar_container).add_children(&[filled, empty]);
+    commands
+        .entity(bar_container)
+        .add_children(&[filled, empty]);
 
     let pct_node = commands
         .spawn((
@@ -327,12 +354,17 @@ fn spawn_mini_bar(commands: &mut Commands, label: &str, value: f32) -> Entity {
                 ..default()
             },
             Text::new(format!("{pct}%")),
-            TextFont { font_size: FONT_SIZE, ..default() },
+            TextFont {
+                font_size: FONT_SIZE,
+                ..default()
+            },
             TextColor(TEXT_DIM),
         ))
         .id();
 
-    commands.entity(row).add_children(&[label_node, bar_container, pct_node]);
+    commands
+        .entity(row)
+        .add_children(&[label_node, bar_container, pct_node]);
     row
 }
 

@@ -134,7 +134,11 @@ pub enum WildlifeAiState {
     /// Patrol: current direction of travel along terrain edge.
     Patrolling { dx: i32, dy: i32 },
     /// Circle: center point and current angle (radians).
-    Circling { center_x: i32, center_y: i32, angle: f32 },
+    Circling {
+        center_x: i32,
+        center_y: i32,
+        angle: f32,
+    },
     /// Ambush: stationary, waiting.
     Waiting,
     /// Fleeing toward map edge after losing a fight.
@@ -142,7 +146,12 @@ pub enum WildlifeAiState {
     /// Stalking: moving toward a cat to ambush it.
     Stalking { target_x: i32, target_y: i32 },
     /// Encircling a ward — shadow fox deposits corruption to siege it.
-    EncirclingWard { ward_x: i32, ward_y: i32, angle: f32, ticks: u64 },
+    EncirclingWard {
+        ward_x: i32,
+        ward_y: i32,
+        angle: f32,
+        ticks: u64,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -204,7 +213,10 @@ pub enum FoxAiPhase {
     /// Depositing scent marks at territory boundary.
     ScentMarking,
     /// In a standoff with a cat or rival fox.
-    Confronting { target_id: u64, ticks_remaining: u64 },
+    Confronting {
+        target_id: u64,
+        ticks_remaining: u64,
+    },
     /// Retreating from danger toward map edge.
     Fleeing { dx: i32, dy: i32 },
     /// Approaching colony stores to steal food.
@@ -308,7 +320,12 @@ mod tests {
 
     #[test]
     fn species_defaults_are_consistent() {
-        for species in [WildSpecies::Fox, WildSpecies::Hawk, WildSpecies::Snake, WildSpecies::ShadowFox] {
+        for species in [
+            WildSpecies::Fox,
+            WildSpecies::Hawk,
+            WildSpecies::Snake,
+            WildSpecies::ShadowFox,
+        ] {
             let animal = WildAnimal::new(species);
             assert_eq!(animal.species, species);
             assert_eq!(animal.behavior, species.default_behavior());
@@ -319,14 +336,23 @@ mod tests {
 
     #[test]
     fn fox_is_strongest_threat() {
-        assert!(WildSpecies::ShadowFox.default_threat_power() > WildSpecies::Fox.default_threat_power());
+        assert!(
+            WildSpecies::ShadowFox.default_threat_power() > WildSpecies::Fox.default_threat_power()
+        );
         assert!(WildSpecies::Fox.default_threat_power() > WildSpecies::Hawk.default_threat_power());
-        assert!(WildSpecies::Hawk.default_threat_power() > WildSpecies::Snake.default_threat_power());
+        assert!(
+            WildSpecies::Hawk.default_threat_power() > WildSpecies::Snake.default_threat_power()
+        );
     }
 
     #[test]
     fn population_caps_are_positive() {
-        for species in [WildSpecies::Fox, WildSpecies::Hawk, WildSpecies::Snake, WildSpecies::ShadowFox] {
+        for species in [
+            WildSpecies::Fox,
+            WildSpecies::Hawk,
+            WildSpecies::Snake,
+            WildSpecies::ShadowFox,
+        ] {
             assert!(species.population_cap() > 0);
         }
     }

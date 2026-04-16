@@ -57,7 +57,9 @@ impl ItemKind {
     /// - Inorganic / curiosities: 0.0 (no decay)
     pub fn decay_rate(self) -> f32 {
         match self {
-            Self::RawMouse | Self::RawRat | Self::RawRabbit | Self::RawFish | Self::RawBird => 0.0001,
+            Self::RawMouse | Self::RawRat | Self::RawRabbit | Self::RawFish | Self::RawBird => {
+                0.0001
+            }
 
             Self::Berries
             | Self::Nuts
@@ -96,9 +98,19 @@ impl ItemKind {
 
     /// Returns true if this item can be eaten.
     pub fn is_food(self) -> bool {
-        matches!(self, Self::RawMouse | Self::RawRat | Self::RawRabbit | Self::RawFish
-            | Self::RawBird | Self::Berries | Self::Nuts | Self::Roots | Self::WildOnion
-            | Self::Mushroom)
+        matches!(
+            self,
+            Self::RawMouse
+                | Self::RawRat
+                | Self::RawRabbit
+                | Self::RawFish
+                | Self::RawBird
+                | Self::Berries
+                | Self::Nuts
+                | Self::Roots
+                | Self::WildOnion
+                | Self::Mushroom
+        )
     }
 
     /// Human-readable name for narrative output.

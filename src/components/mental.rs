@@ -1,6 +1,6 @@
-use std::collections::VecDeque;
-use bevy_ecs::prelude::*;
 use crate::components::physical::Position;
+use bevy_ecs::prelude::*;
+use std::collections::VecDeque;
 
 // ---------------------------------------------------------------------------
 // Mood

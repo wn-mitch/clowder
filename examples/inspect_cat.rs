@@ -16,7 +16,10 @@ fn main() -> io::Result<()> {
     let (cat_name, events_path) = parse_args();
 
     let file = std::fs::File::open(&events_path).map_err(|e| {
-        io::Error::new(e.kind(), format!("cannot open {}: {e}", events_path.display()))
+        io::Error::new(
+            e.kind(),
+            format!("cannot open {}: {e}", events_path.display()),
+        )
     })?;
     let reader = io::BufReader::new(file);
 
@@ -47,7 +50,10 @@ fn main() -> io::Result<()> {
     }
 
     if snapshots.is_empty() && actions.is_empty() {
-        eprintln!("No events found for cat '{cat_name}' in {}", events_path.display());
+        eprintln!(
+            "No events found for cat '{cat_name}' in {}",
+            events_path.display()
+        );
         eprintln!("Available cats:");
         // Re-scan for unique cat names.
         let file = std::fs::File::open(&events_path)?;
@@ -105,8 +111,12 @@ fn parse_args() -> (String, PathBuf) {
 // ---------------------------------------------------------------------------
 
 fn print_personality(name: &str, snapshots: &[Value]) {
-    let Some(snap) = snapshots.first() else { return };
-    let Some(p) = snap.get("personality") else { return };
+    let Some(snap) = snapshots.first() else {
+        return;
+    };
+    let Some(p) = snap.get("personality") else {
+        return;
+    };
 
     println!("=== {name} — Personality Profile ===");
     println!();
@@ -149,7 +159,10 @@ fn print_personality(name: &str, snapshots: &[Value]) {
 
 fn print_axes(personality: &Value, axes: &[(&str, &str, &str)]) {
     for (key, low_label, high_label) in axes {
-        let val = personality.get(*key).and_then(|v| v.as_f64()).unwrap_or(0.5) as f32;
+        let val = personality
+            .get(*key)
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.5) as f32;
         let bar = make_bar(val, 10);
         let label = if val < 0.3 {
             *low_label
@@ -185,7 +198,10 @@ fn print_action_distribution(name: &str, actions: &[Value], snapshots: &[Value])
     } else if !snapshots.is_empty() {
         source = format!("{} snapshots", snapshots.len());
         for s in snapshots {
-            let action = s.get("current_action").and_then(|v| v.as_str()).unwrap_or("?");
+            let action = s
+                .get("current_action")
+                .and_then(|v| v.as_str())
+                .unwrap_or("?");
             *counts.entry(action.to_string()).or_default() += 1;
         }
     } else {
@@ -223,10 +239,22 @@ fn print_action_distribution(name: &str, actions: &[Value], snapshots: &[Value])
             let explore_pct = action_pct(&sorted, &["Explore", "Wander"], total);
             let social_pct = action_pct(&sorted, &["Socialize", "Groom"], total);
 
-            println!("    boldness={:.2}     -> combat-oriented: {:.1}%", boldness, combat_pct);
-            println!("    diligence={:.2}    -> work-oriented:   {:.1}%", diligence, work_pct);
-            println!("    curiosity={:.2}    -> exploration:     {:.1}%", curiosity, explore_pct);
-            println!("    sociability={:.2}  -> social:          {:.1}%", sociability, social_pct);
+            println!(
+                "    boldness={:.2}     -> combat-oriented: {:.1}%",
+                boldness, combat_pct
+            );
+            println!(
+                "    diligence={:.2}    -> work-oriented:   {:.1}%",
+                diligence, work_pct
+            );
+            println!(
+                "    curiosity={:.2}    -> exploration:     {:.1}%",
+                curiosity, explore_pct
+            );
+            println!(
+                "    sociability={:.2}  -> social:          {:.1}%",
+                sociability, social_pct
+            );
         }
     }
     println!();
@@ -259,7 +287,10 @@ fn print_score_breakdown(snapshots: &[Value]) {
         return;
     }
 
-    println!("=== Score Breakdown ({} snapshots with scores) ===", scored.len());
+    println!(
+        "=== Score Breakdown ({} snapshots with scores) ===",
+        scored.len()
+    );
     println!();
 
     // Flag Maslow violations: non-survival action won while hunger < 0.2.
@@ -275,12 +306,20 @@ fn print_score_breakdown(snapshots: &[Value]) {
         }
         let scores = s.get("last_scores").and_then(|v| v.as_array()).unwrap();
         if let Some(top) = scores.first() {
-            let action = top.as_array().and_then(|a| a.first()).and_then(|v| v.as_str()).unwrap_or("?");
+            let action = top
+                .as_array()
+                .and_then(|a| a.first())
+                .and_then(|v| v.as_str())
+                .unwrap_or("?");
             if action != "Eat" && action != "Sleep" && action != "Flee" {
                 violations += 1;
                 if violations <= 3 {
                     let tick = s.get("tick").and_then(|v| v.as_u64()).unwrap_or(0);
-                    let score = top.as_array().and_then(|a| a.get(1)).and_then(|v| v.as_f64()).unwrap_or(0.0);
+                    let score = top
+                        .as_array()
+                        .and_then(|a| a.get(1))
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.0);
                     println!(
                         "  WARNING tick {tick}: {action} ({score:.2}) won over Eat while hunger={hunger:.2}"
                     );
@@ -331,11 +370,21 @@ fn print_needs_timeline(snapshots: &[Value]) {
     println!();
 
     let need_keys = [
-        "hunger", "energy", "warmth", "safety", "social",
-        "acceptance", "respect", "mastery", "purpose",
+        "hunger",
+        "energy",
+        "warmth",
+        "safety",
+        "social",
+        "acceptance",
+        "respect",
+        "mastery",
+        "purpose",
     ];
 
-    println!("  {:<12} {:>6} {:>6} {:>6}  critical dips", "need", "min", "max", "final");
+    println!(
+        "  {:<12} {:>6} {:>6} {:>6}  critical dips",
+        "need", "min", "max", "final"
+    );
     println!("  {}", "-".repeat(55));
 
     for key in &need_keys {
@@ -374,7 +423,9 @@ fn print_needs_timeline(snapshots: &[Value]) {
 
 fn print_relationships(snapshots: &[Value]) {
     let Some(snap) = snapshots.last() else { return };
-    let Some(rels) = snap.get("relationships").and_then(|r| r.as_array()) else { return };
+    let Some(rels) = snap.get("relationships").and_then(|r| r.as_array()) else {
+        return;
+    };
     if rels.is_empty() {
         return;
     }
@@ -384,11 +435,11 @@ fn print_relationships(snapshots: &[Value]) {
     for rel in rels {
         let name = rel.get("cat").and_then(|c| c.as_str()).unwrap_or("?");
         let fondness = rel.get("fondness").and_then(|v| v.as_f64()).unwrap_or(0.0);
-        let familiarity = rel.get("familiarity").and_then(|v| v.as_f64()).unwrap_or(0.0);
-        let bond = rel
-            .get("bond")
-            .and_then(|b| b.as_str())
-            .unwrap_or("");
+        let familiarity = rel
+            .get("familiarity")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0);
+        let bond = rel.get("bond").and_then(|b| b.as_str()).unwrap_or("");
         let bond_str = if bond.is_empty() {
             String::new()
         } else {
@@ -423,7 +474,10 @@ fn print_key_decisions(actions: &[Value]) {
         let action = a.get("action").and_then(|v| v.as_str()).unwrap_or("?");
         let score = a.get("score").and_then(|v| v.as_f64()).unwrap_or(0.0);
         let runner = a.get("runner_up").and_then(|v| v.as_str()).unwrap_or("?");
-        let runner_score = a.get("runner_up_score").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let runner_score = a
+            .get("runner_up_score")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0);
         let third = a.get("third").and_then(|v| v.as_str()).unwrap_or("?");
         let third_score = a.get("third_score").and_then(|v| v.as_f64()).unwrap_or(0.0);
         println!(
@@ -439,8 +493,14 @@ fn print_key_decisions(actions: &[Value]) {
 // ---------------------------------------------------------------------------
 
 fn print_death(death_event: &Value, snapshots: &[Value]) {
-    let tick = death_event.get("tick").and_then(|v| v.as_u64()).unwrap_or(0);
-    let cause = death_event.get("cause").and_then(|v| v.as_str()).unwrap_or("unknown");
+    let tick = death_event
+        .get("tick")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+    let cause = death_event
+        .get("cause")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
 
     println!("=== Death ===");
     println!();
@@ -453,9 +513,18 @@ fn print_death(death_event: &Value, snapshots: &[Value]) {
         for s in last_snaps.iter().rev() {
             let snap_tick = s.get("tick").and_then(|v| v.as_u64()).unwrap_or(0);
             let needs = s.get("needs");
-            let hunger = needs.and_then(|n| n.get("hunger")).and_then(|v| v.as_f64()).unwrap_or(0.0);
-            let energy = needs.and_then(|n| n.get("energy")).and_then(|v| v.as_f64()).unwrap_or(0.0);
-            let safety = needs.and_then(|n| n.get("safety")).and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let hunger = needs
+                .and_then(|n| n.get("hunger"))
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
+            let energy = needs
+                .and_then(|n| n.get("energy"))
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
+            let safety = needs
+                .and_then(|n| n.get("safety"))
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
             let health = s.get("health").and_then(|v| v.as_f64()).unwrap_or(0.0);
             println!(
                 "    tick {snap_tick}: hunger={hunger:.2} energy={energy:.2} safety={safety:.2} health={health:.2}"

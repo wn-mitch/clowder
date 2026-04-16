@@ -8,9 +8,7 @@ use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
 
 use crate::ai::CurrentAction;
-use crate::components::building::{
-    ConstructionSite, CropState, GateState, Structure,
-};
+use crate::components::building::{ConstructionSite, CropState, GateState, Structure};
 use crate::components::identity::{Age, Appearance, Gender, Name, Orientation, Species};
 use crate::components::magic::{Inventory, ItemSlot};
 use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood};
@@ -19,7 +17,7 @@ use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::components::skills::{Corruption, MagicAffinity, Skills, Training};
 use crate::resources::relationships::{Relationship, Relationships};
 use crate::resources::{
-    FoodStores, NarrativeLog, SimConfig, SimRng, TimeState, TileMap, WeatherState,
+    FoodStores, NarrativeLog, SimConfig, SimRng, TileMap, TimeState, WeatherState,
 };
 
 // ---------------------------------------------------------------------------
@@ -225,11 +223,7 @@ pub fn save_world(world: &mut World) -> SaveFile {
     }
 }
 
-fn snapshot_cat(
-    world: &World,
-    entity: Entity,
-    entity_map: &HashMap<Entity, usize>,
-) -> CatSnapshot {
+fn snapshot_cat(world: &World, entity: Entity, entity_map: &HashMap<Entity, usize>) -> CatSnapshot {
     let name = world.get::<Name>(entity).unwrap();
     let age = world.get::<Age>(entity).unwrap();
     let gender = world.get::<Gender>(entity).unwrap();
@@ -292,10 +286,7 @@ fn save_memory(memory: &Memory, entity_map: &HashMap<Entity, usize>) -> SavedMem
     }
 }
 
-fn save_memory_entry(
-    entry: &MemoryEntry,
-    entity_map: &HashMap<Entity, usize>,
-) -> SavedMemoryEntry {
+fn save_memory_entry(entry: &MemoryEntry, entity_map: &HashMap<Entity, usize>) -> SavedMemoryEntry {
     let involved = entry
         .involved
         .iter()
@@ -368,7 +359,9 @@ pub fn load_world(world: &mut World, save: SaveFile) {
                     Corruption(cat.corruption),
                     Training::default(),
                     cat.current_action.clone(),
-                    Inventory { slots: cat.inventory.clone() },
+                    Inventory {
+                        slots: cat.inventory.clone(),
+                    },
                 ),
             ))
             .id();
@@ -520,8 +513,8 @@ mod tests {
     use crate::components::identity::Orientation;
     use crate::components::mental::{MemoryEntry, MemoryType};
     use crate::resources::map::Terrain;
-    use rand::SeedableRng;
     use crate::resources::SimSpeed;
+    use rand::SeedableRng;
 
     /// Build a minimal world with two cats for testing.
     fn build_test_world() -> World {
@@ -605,14 +598,17 @@ mod tests {
             .id();
 
         // Give cat_a a memory involving cat_b.
-        world.get_mut::<Memory>(cat_a).unwrap().remember(MemoryEntry {
-            event_type: MemoryType::SocialEvent,
-            location: Some(Position::new(5, 5)),
-            involved: vec![cat_b],
-            tick: 4500,
-            strength: 0.8,
-            firsthand: true,
-        });
+        world
+            .get_mut::<Memory>(cat_a)
+            .unwrap()
+            .remember(MemoryEntry {
+                event_type: MemoryType::SocialEvent,
+                location: Some(Position::new(5, 5)),
+                involved: vec![cat_b],
+                tick: 4500,
+                strength: 0.8,
+                firsthand: true,
+            });
 
         // Set up a training relationship: A mentors B.
         *world.get_mut::<Training>(cat_a).unwrap() = Training {

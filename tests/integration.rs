@@ -74,12 +74,12 @@ fn setup_world(seed: u64) -> World {
     bevy_ecs::message::MessageRegistry::register_message::<clowder::components::prey::DenRaided>(
         &mut world,
     );
-    bevy_ecs::message::MessageRegistry::register_message::<clowder::components::goap_plan::PlanNarrative>(
-        &mut world,
-    );
-    bevy_ecs::message::MessageRegistry::register_message::<clowder::systems::magic::CorruptionPushback>(
-        &mut world,
-    );
+    bevy_ecs::message::MessageRegistry::register_message::<
+        clowder::components::goap_plan::PlanNarrative,
+    >(&mut world);
+    bevy_ecs::message::MessageRegistry::register_message::<
+        clowder::systems::magic::CorruptionPushback,
+    >(&mut world);
     world.insert_resource(map);
     world.insert_resource(sim_rng);
 

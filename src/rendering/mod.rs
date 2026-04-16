@@ -1,10 +1,10 @@
-pub mod terrain_sprites;
-pub mod tilemap_sync;
 pub mod camera;
 pub mod day_night;
 pub mod debug_grid;
 pub mod entity_sprites;
 pub mod sprite_assets;
+pub mod terrain_sprites;
+pub mod tilemap_sync;
 pub mod ui;
 
 use bevy::prelude::*;
@@ -53,8 +53,7 @@ impl Plugin for CameraPlugin {
         app.init_resource::<camera::AutoScreenshot>()
             .add_systems(
                 Startup,
-                camera::setup_camera
-                    .after(crate::plugins::setup::setup_world_exclusive),
+                camera::setup_camera.after(crate::plugins::setup::setup_world_exclusive),
             )
             .add_systems(
                 Update,

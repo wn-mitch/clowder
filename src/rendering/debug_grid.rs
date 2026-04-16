@@ -23,11 +23,7 @@ const LINE_COLOR: Color = Color::srgba(1.0, 1.0, 1.0, 0.15);
 const LABEL_COLOR: Color = Color::srgba(1.0, 1.0, 1.0, 0.6);
 
 /// Startup: spawn grid lines and coordinate labels, initially hidden.
-pub fn setup_grid(
-    mut commands: Commands,
-    map: Res<TileMap>,
-    white_pixel: Res<WhitePixel>,
-) {
+pub fn setup_grid(mut commands: Commands, map: Res<TileMap>, white_pixel: Res<WhitePixel>) {
     commands.insert_resource(DebugGrid { visible: false });
 
     let world_px = TILE_PX * TILE_SCALE;

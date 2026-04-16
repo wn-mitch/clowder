@@ -456,12 +456,12 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
     bevy_ecs::message::MessageRegistry::register_message::<clowder::components::prey::DenRaided>(
         &mut world,
     );
-    bevy_ecs::message::MessageRegistry::register_message::<clowder::components::goap_plan::PlanNarrative>(
-        &mut world,
-    );
-    bevy_ecs::message::MessageRegistry::register_message::<clowder::systems::magic::CorruptionPushback>(
-        &mut world,
-    );
+    bevy_ecs::message::MessageRegistry::register_message::<
+        clowder::components::goap_plan::PlanNarrative,
+    >(&mut world);
+    bevy_ecs::message::MessageRegistry::register_message::<
+        clowder::systems::magic::CorruptionPushback,
+    >(&mut world);
     if !world.contains_resource::<clowder::resources::ColonyScore>() {
         world.insert_resource(clowder::resources::ColonyScore::default());
     }
@@ -758,12 +758,12 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
     bevy_ecs::message::MessageRegistry::register_message::<clowder::components::prey::DenRaided>(
         &mut world,
     );
-    bevy_ecs::message::MessageRegistry::register_message::<clowder::components::goap_plan::PlanNarrative>(
-        &mut world,
-    );
-    bevy_ecs::message::MessageRegistry::register_message::<clowder::systems::magic::CorruptionPushback>(
-        &mut world,
-    );
+    bevy_ecs::message::MessageRegistry::register_message::<
+        clowder::components::goap_plan::PlanNarrative,
+    >(&mut world);
+    bevy_ecs::message::MessageRegistry::register_message::<
+        clowder::systems::magic::CorruptionPushback,
+    >(&mut world);
     world.insert_resource(clowder::resources::ColonyScore::default());
     world.insert_resource(map);
     world.insert_resource(sim_rng);

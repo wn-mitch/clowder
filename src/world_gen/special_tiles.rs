@@ -1,5 +1,5 @@
-use rand::Rng;
 use rand::seq::SliceRandom;
+use rand::Rng;
 
 use crate::components::physical::Position;
 use crate::resources::map::{Terrain, TileMap};
@@ -98,13 +98,7 @@ fn has_water_neighbor(map: &TileMap, x: i32, y: i32) -> bool {
 /// Returns true if every tile in the footprint at anchor (ax, ay) is in bounds,
 /// within edge margins, matches the terrain affinity, and isn't already a special
 /// tile.
-fn footprint_valid(
-    map: &TileMap,
-    ax: i32,
-    ay: i32,
-    kind: &SpecialSiteKind,
-    margin: i32,
-) -> bool {
+fn footprint_valid(map: &TileMap, ax: i32, ay: i32, kind: &SpecialSiteKind, margin: i32) -> bool {
     let (bw, bh) = kind.bounds;
     // Entire bounding box must be within edge margin.
     if ax < margin || ay < margin || ax + bw > map.width - margin || ay + bh > map.height - margin {
@@ -187,7 +181,8 @@ pub fn place_special_tiles(
 
             // Colony distance check for corruption sources.
             if kind.requires_colony_distance
-                && anchor.manhattan_distance(&colony_site) < constants.corruption_colony_min_distance
+                && anchor.manhattan_distance(&colony_site)
+                    < constants.corruption_colony_min_distance
             {
                 continue;
             }
@@ -366,7 +361,10 @@ mod tests {
         place_special_tiles(&mut map, colony, &mut rng.rng, &c);
 
         let pools = find_special_positions(&map, Terrain::DeepPool);
-        assert!(!pools.is_empty(), "should place at least one DeepPool near water");
+        assert!(
+            !pools.is_empty(),
+            "should place at least one DeepPool near water"
+        );
         for pos in &pools {
             assert!(
                 has_water_neighbor(&map, pos.x, pos.y),
@@ -407,9 +405,9 @@ mod tests {
                 continue;
             }
             // Check all 8 perimeter tiles.
-            let all_ring = FOOTPRINT_RING_3X3.iter().all(|&(dx, dy)| {
-                map.get(ax + dx, ay + dy).terrain == Terrain::FairyRing
-            });
+            let all_ring = FOOTPRINT_RING_3X3
+                .iter()
+                .all(|&(dx, dy)| map.get(ax + dx, ay + dy).terrain == Terrain::FairyRing);
             if all_ring {
                 found_hollow = true;
                 break;

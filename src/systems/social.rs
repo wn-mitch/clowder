@@ -396,7 +396,9 @@ mod tests {
         world.insert_resource(NarrativeLog::default());
         world.insert_resource(crate::resources::SimConstants::default());
         world.insert_resource(SystemActivation::default());
-        bevy_ecs::message::MessageRegistry::register_message::<crate::systems::magic::CorruptionPushback>(&mut world);
+        bevy_ecs::message::MessageRegistry::register_message::<
+            crate::systems::magic::CorruptionPushback,
+        >(&mut world);
         let mut rels = Relationships::default();
 
         let a = world.spawn(Name("Fern".to_string())).id();

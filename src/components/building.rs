@@ -2,9 +2,7 @@ use bevy_ecs::prelude::*;
 
 use crate::components::items::Item;
 use crate::components::physical::Position;
-use crate::components::task_chain::{
-    FailurePolicy, Material, StepKind, TaskChain, TaskStep,
-};
+use crate::components::task_chain::{FailurePolicy, Material, StepKind, TaskChain, TaskStep};
 
 /// Decorative marker for the colony well entity at the colony center.
 #[derive(Component)]
@@ -35,7 +33,11 @@ impl StructureType {
             Self::Den => vec![(Material::Wood, 10), (Material::Stone, 6)],
             Self::Hearth => vec![(Material::Stone, 12), (Material::Wood, 5)],
             Self::Stores => vec![(Material::Wood, 10), (Material::Stone, 5)],
-            Self::Workshop => vec![(Material::Wood, 7), (Material::Stone, 4), (Material::Herbs, 3)],
+            Self::Workshop => vec![
+                (Material::Wood, 7),
+                (Material::Stone, 4),
+                (Material::Herbs, 3),
+            ],
             Self::Garden => vec![(Material::Wood, 6)],
             Self::Watchtower => vec![(Material::Wood, 8), (Material::Stone, 8)],
             Self::WardPost => vec![(Material::Stone, 2), (Material::Herbs, 3)],
@@ -78,22 +80,15 @@ impl StructureType {
 
             if let Some(rpos) = resource_pos {
                 // Move to resource
-                steps.push(
-                    TaskStep::new(StepKind::MoveTo).with_position(rpos),
-                );
+                steps.push(TaskStep::new(StepKind::MoveTo).with_position(rpos));
                 // Gather
-                steps.push(
-                    TaskStep::new(StepKind::Gather { material, amount })
-                        .with_position(rpos),
-                );
+                steps
+                    .push(TaskStep::new(StepKind::Gather { material, amount }).with_position(rpos));
                 // Move back to construction site
-                steps.push(
-                    TaskStep::new(StepKind::MoveTo).with_position(site_pos),
-                );
+                steps.push(TaskStep::new(StepKind::MoveTo).with_position(site_pos));
                 // Deliver
                 steps.push(
-                    TaskStep::new(StepKind::Deliver { material, amount })
-                        .with_entity(site_entity),
+                    TaskStep::new(StepKind::Deliver { material, amount }).with_entity(site_entity),
                 );
             }
         }
@@ -169,10 +164,7 @@ impl Structure {
 
     /// Center tile position given the building's anchor (top-left) position.
     pub fn center(&self, anchor: &Position) -> Position {
-        Position::new(
-            anchor.x + self.size.0 / 2,
-            anchor.y + self.size.1 / 2,
-        )
+        Position::new(anchor.x + self.size.0 / 2, anchor.y + self.size.1 / 2)
     }
 
     /// Effectiveness multiplier based on condition.
@@ -210,10 +202,7 @@ pub struct ConstructionSite {
 impl ConstructionSite {
     pub fn new(blueprint: StructureType) -> Self {
         let materials_needed = blueprint.material_cost();
-        let materials_delivered = materials_needed
-            .iter()
-            .map(|(m, _)| (*m, 0u32))
-            .collect();
+        let materials_delivered = materials_needed.iter().map(|(m, _)| (*m, 0u32)).collect();
         Self {
             blueprint,
             progress: 0.0,
@@ -309,11 +298,7 @@ impl StoredItems {
     }
 
     /// Whether this building is at effective capacity (accounting for storage upgrades).
-    pub fn is_effectively_full(
-        &self,
-        kind: StructureType,
-        items_q: &Query<&Item>,
-    ) -> bool {
+    pub fn is_effectively_full(&self, kind: StructureType, items_q: &Query<&Item>) -> bool {
         self.items.len() >= Self::effective_capacity_with_items(kind, &self.items, items_q)
     }
 
@@ -350,9 +335,7 @@ impl StoredItems {
 ///
 /// Open gates allow wildlife through. Cats can always pass regardless of state,
 /// but personality (diligence) determines whether they close the gate behind them.
-#[derive(
-    Component, Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize,
-)]
+#[derive(Component, Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct GateState {
     pub open: bool,
 }

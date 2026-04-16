@@ -75,7 +75,12 @@ pub fn load_custom_cats(
         };
 
         eprintln!("Loaded custom cat: {}", custom.name);
-        blueprints.push(custom_to_blueprint(custom, start_tick, ticks_per_season, rng));
+        blueprints.push(custom_to_blueprint(
+            custom,
+            start_tick,
+            ticks_per_season,
+            rng,
+        ));
     }
 
     blueprints
@@ -118,8 +123,8 @@ fn custom_to_blueprint(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand_chacha::ChaCha8Rng;
     use rand_chacha::rand_core::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
 
     fn rng(seed: u64) -> ChaCha8Rng {
         ChaCha8Rng::seed_from_u64(seed)

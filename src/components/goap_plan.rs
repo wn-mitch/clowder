@@ -202,7 +202,9 @@ impl GoapActionKind {
             Self::GatherHerb | Self::PrepareRemedy | Self::ApplyRemedy | Self::SetWard => {
                 Action::Herbcraft
             }
-            Self::Scry | Self::SpiritCommunion | Self::CleanseCorruption | Self::HarvestCarcass => Action::PracticeMagic,
+            Self::Scry | Self::SpiritCommunion | Self::CleanseCorruption | Self::HarvestCarcass => {
+                Action::PracticeMagic
+            }
             Self::MateWith => Action::Mate,
             Self::FeedKitten => Action::Caretake,
             Self::DeliverDirective => Action::Coordinate,
@@ -264,7 +266,10 @@ mod tests {
     fn new_plan_sets_target_trips() {
         let p = test_personality();
         let plan = GoapPlan::new(DispositionKind::Hunting, 100, &p, sample_steps(), None);
-        assert_eq!(plan.target_trips, DispositionKind::Hunting.target_completions(&p));
+        assert_eq!(
+            plan.target_trips,
+            DispositionKind::Hunting.target_completions(&p)
+        );
         assert_eq!(plan.trips_done, 0);
         assert_eq!(plan.adopted_tick, 100);
         assert_eq!(plan.replan_count, 0);

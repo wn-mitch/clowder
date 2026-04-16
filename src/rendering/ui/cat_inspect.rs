@@ -1,17 +1,17 @@
 use bevy::prelude::*;
 
 use crate::ai::CurrentAction;
-use crate::components::aspirations::{Aspirations, MilestoneCondition, Preferences, Preference};
-use crate::components::disposition::ActionHistory;
-use crate::components::goap_plan::GoapPlan;
+use crate::components::aspirations::{Aspirations, MilestoneCondition, Preference, Preferences};
 use crate::components::coordination::{ActiveDirective, Coordinator};
+use crate::components::disposition::ActionHistory;
 use crate::components::fate::{FatedLove, FatedRival};
+use crate::components::goap_plan::GoapPlan;
 use crate::components::identity::{Age, LifeStage, Name, Species};
 use crate::components::mental::Mood;
 use crate::components::physical::{Dead, Health, Needs};
 use crate::components::skills::Skills;
 use crate::components::zodiac::ZodiacSign;
-use crate::rendering::ui::{TEXT_COLOR, TEXT_DIM, TEXT_HIGHLIGHT, UiRoot};
+use crate::rendering::ui::{UiRoot, TEXT_COLOR, TEXT_DIM, TEXT_HIGHLIGHT};
 use crate::resources::aspiration_registry::AspirationRegistry;
 use crate::resources::relationships::Relationships;
 use crate::resources::{SimConfig, TimeState};
@@ -41,11 +41,10 @@ const HEADER_FONT_SIZE: f32 = 15.0;
 const BAR_WIDTH: f32 = 100.0;
 const BAR_HEIGHT: f32 = 10.0;
 
-pub fn setup_cat_inspect_panel(
-    mut commands: Commands,
-    root_query: Query<Entity, With<UiRoot>>,
-) {
-    let Ok(root) = root_query.single() else { return };
+pub fn setup_cat_inspect_panel(mut commands: Commands, root_query: Query<Entity, With<UiRoot>>) {
+    let Ok(root) = root_query.single() else {
+        return;
+    };
 
     let panel = commands
         .spawn((
@@ -148,19 +147,38 @@ pub fn update_cat_inspect_panel(
     }
     *last_entity = Some(entity);
 
-    let Ok(content_entity) = content_query.single() else { return };
+    let Ok(content_entity) = content_query.single() else {
+        return;
+    };
 
     // Clear previous content.
-    commands.entity(content_entity).despawn_related::<Children>();
+    commands
+        .entity(content_entity)
+        .despawn_related::<Children>();
 
     // If the cat is dead or despawned, dismiss.
     let Ok((
-        name, age, needs, mood, action, skills,
-        coordinator, directive, zodiac, fated_love, fated_rival,
-        aspirations, preferences, disposition, action_history,
-    )) = cats.get(entity) else {
+        name,
+        age,
+        needs,
+        mood,
+        action,
+        skills,
+        coordinator,
+        directive,
+        zodiac,
+        fated_love,
+        fated_rival,
+        aspirations,
+        preferences,
+        disposition,
+        action_history,
+    )) = cats.get(entity)
+    else {
         // Entity gone — clear the panel.
-        commands.entity(content_entity).despawn_related::<Children>();
+        commands
+            .entity(content_entity)
+            .despawn_related::<Children>();
         return;
     };
 
@@ -170,7 +188,12 @@ pub fn update_cat_inspect_panel(
     let mut children: Vec<Entity> = Vec::new();
 
     // --- Header: cat name ---
-    children.push(spawn_text(&mut commands, &name.0, HEADER_FONT_SIZE, TEXT_HIGHLIGHT));
+    children.push(spawn_text(
+        &mut commands,
+        &name.0,
+        HEADER_FONT_SIZE,
+        TEXT_HIGHLIGHT,
+    ));
 
     // --- Life stage + mood ---
     let stage_str = match life_stage {
@@ -190,7 +213,12 @@ pub fn update_cat_inspect_panel(
     if coordinator.is_some() {
         stage_line.push_str("  [Coordinator]");
     }
-    children.push(spawn_text(&mut commands, &stage_line, FONT_SIZE, TEXT_COLOR));
+    children.push(spawn_text(
+        &mut commands,
+        &stage_line,
+        FONT_SIZE,
+        TEXT_COLOR,
+    ));
 
     // Zodiac
     if let Some(sign) = zodiac {
@@ -207,7 +235,12 @@ pub fn update_cat_inspect_panel(
         let disp_label = if disp.target_trips == u32::MAX {
             disp.kind.label().to_string()
         } else {
-            format!("{} ({}/{})", disp.kind.label(), disp.trips_done, disp.target_trips)
+            format!(
+                "{} ({}/{})",
+                disp.kind.label(),
+                disp.trips_done,
+                disp.target_trips
+            )
         };
         children.push(spawn_text(
             &mut commands,
@@ -268,13 +301,20 @@ pub fn update_cat_inspect_panel(
     // --- Health ---
     if let Ok(health) = health_query.get(entity) {
         children.push(spawn_spacer(&mut commands));
-        children.push(spawn_bar_row(&mut commands, "Health", health.current / health.max));
+        children.push(spawn_bar_row(
+            &mut commands,
+            "Health",
+            health.current / health.max,
+        ));
         if !health.injuries.is_empty() {
             let injury_count = health.injuries.iter().filter(|i| !i.healed).count();
             if injury_count > 0 {
                 children.push(spawn_text(
                     &mut commands,
-                    &format!("  {injury_count} active injur{}", if injury_count == 1 { "y" } else { "ies" }),
+                    &format!(
+                        "  {injury_count} active injur{}",
+                        if injury_count == 1 { "y" } else { "ies" }
+                    ),
                     FONT_SIZE,
                     BAR_RED,
                 ));
@@ -286,7 +326,12 @@ pub fn update_cat_inspect_panel(
     children.push(spawn_spacer(&mut commands));
 
     // --- Needs section ---
-    children.push(spawn_text(&mut commands, "Needs", FONT_SIZE + 1.0, TEXT_COLOR));
+    children.push(spawn_text(
+        &mut commands,
+        "Needs",
+        FONT_SIZE + 1.0,
+        TEXT_COLOR,
+    ));
     children.push(spawn_bar_row(&mut commands, "Hunger", needs.hunger));
     children.push(spawn_bar_row(&mut commands, "Energy", needs.energy));
     children.push(spawn_bar_row(&mut commands, "Warmth", needs.warmth));
@@ -296,10 +341,19 @@ pub fn update_cat_inspect_panel(
     children.push(spawn_spacer(&mut commands));
 
     // --- Skills section ---
-    children.push(spawn_text(&mut commands, "Skills", FONT_SIZE + 1.0, TEXT_COLOR));
+    children.push(spawn_text(
+        &mut commands,
+        "Skills",
+        FONT_SIZE + 1.0,
+        TEXT_COLOR,
+    ));
     children.push(spawn_skill_line(&mut commands, "Hunting", skills.hunting));
     children.push(spawn_skill_line(&mut commands, "Foraging", skills.foraging));
-    children.push(spawn_skill_line(&mut commands, "Herbcraft", skills.herbcraft));
+    children.push(spawn_skill_line(
+        &mut commands,
+        "Herbcraft",
+        skills.herbcraft,
+    ));
     children.push(spawn_skill_line(&mut commands, "Building", skills.building));
     children.push(spawn_skill_line(&mut commands, "Combat", skills.combat));
     children.push(spawn_skill_line(&mut commands, "Magic", skills.magic));
@@ -308,7 +362,12 @@ pub fn update_cat_inspect_panel(
     let rels = relationships.all_for(entity);
     if !rels.is_empty() {
         children.push(spawn_spacer(&mut commands));
-        children.push(spawn_text(&mut commands, "Relationships", FONT_SIZE + 1.0, TEXT_COLOR));
+        children.push(spawn_text(
+            &mut commands,
+            "Relationships",
+            FONT_SIZE + 1.0,
+            TEXT_COLOR,
+        ));
         for (other, rel) in &rels {
             let Ok(other_name_comp) = names.get(*other) else {
                 continue; // entity despawned — skip stale relationship
@@ -335,7 +394,12 @@ pub fn update_cat_inspect_panel(
     if let Some(asps) = aspirations {
         if !asps.active.is_empty() || !asps.completed.is_empty() {
             children.push(spawn_spacer(&mut commands));
-            children.push(spawn_text(&mut commands, "Aspirations", FONT_SIZE + 1.0, TEXT_COLOR));
+            children.push(spawn_text(
+                &mut commands,
+                "Aspirations",
+                FONT_SIZE + 1.0,
+                TEXT_COLOR,
+            ));
 
             for asp in &asps.active {
                 let (milestone_name, target) = registry
@@ -434,7 +498,8 @@ pub fn update_cat_inspect_panel(
                 };
                 children.push(spawn_text(
                     &mut commands,
-                    &format!("  D{} {}: {:?} ({})",
+                    &format!(
+                        "  D{} {}: {:?} ({})",
                         TimeState::day_number(entry.tick, &config),
                         crate::resources::time::DayPhase::from_tick(entry.tick, &config).label(),
                         entry.action,
@@ -522,7 +587,10 @@ fn spawn_bar_row(commands: &mut Commands, label: &str, value: f32) -> Entity {
                 ..default()
             },
             Text::new(format!("  {label}")),
-            TextFont { font_size: FONT_SIZE, ..default() },
+            TextFont {
+                font_size: FONT_SIZE,
+                ..default()
+            },
             TextColor(TEXT_DIM),
         ))
         .id();
@@ -560,7 +628,9 @@ fn spawn_bar_row(commands: &mut Commands, label: &str, value: f32) -> Entity {
         ))
         .id();
 
-    commands.entity(bar_container).add_children(&[filled, empty]);
+    commands
+        .entity(bar_container)
+        .add_children(&[filled, empty]);
 
     // Percentage text
     let pct_node = commands
@@ -570,12 +640,17 @@ fn spawn_bar_row(commands: &mut Commands, label: &str, value: f32) -> Entity {
                 ..default()
             },
             Text::new(format!("{pct}%")),
-            TextFont { font_size: FONT_SIZE, ..default() },
+            TextFont {
+                font_size: FONT_SIZE,
+                ..default()
+            },
             TextColor(TEXT_DIM),
         ))
         .id();
 
-    commands.entity(row).add_children(&[label_node, bar_container, pct_node]);
+    commands
+        .entity(row)
+        .add_children(&[label_node, bar_container, pct_node]);
     row
 }
 
@@ -587,7 +662,10 @@ fn spawn_skill_line(commands: &mut Commands, label: &str, value: f32) -> Entity 
                 ..default()
             },
             Text::new(format!("  {label:<10} {value:.2}")),
-            TextFont { font_size: FONT_SIZE, ..default() },
+            TextFont {
+                font_size: FONT_SIZE,
+                ..default()
+            },
             TextColor(Color::srgb(0.4, 0.8, 0.9)),
         ))
         .id()
@@ -610,9 +688,15 @@ fn spawn_relationship_row(
 
     let label = commands
         .spawn((
-            Node { width: Val::Px(90.0), ..default() },
+            Node {
+                width: Val::Px(90.0),
+                ..default()
+            },
             Text::new(format!("  {name}")),
-            TextFont { font_size: FONT_SIZE, ..default() },
+            TextFont {
+                font_size: FONT_SIZE,
+                ..default()
+            },
             TextColor(TEXT_COLOR),
         ))
         .id();
@@ -638,23 +722,37 @@ fn spawn_relationship_row(
 
     let empty = commands
         .spawn((
-            Node { flex_grow: 1.0, height: Val::Percent(100.0), ..default() },
+            Node {
+                flex_grow: 1.0,
+                height: Val::Percent(100.0),
+                ..default()
+            },
             BackgroundColor(BAR_BG),
         ))
         .id();
 
-    commands.entity(bar_container).add_children(&[filled, empty]);
+    commands
+        .entity(bar_container)
+        .add_children(&[filled, empty]);
 
     let bond_node = commands
         .spawn((
-            Node { margin: UiRect::left(Val::Px(4.0)), ..default() },
+            Node {
+                margin: UiRect::left(Val::Px(4.0)),
+                ..default()
+            },
             Text::new(bond_str.to_string()),
-            TextFont { font_size: FONT_SIZE, ..default() },
+            TextFont {
+                font_size: FONT_SIZE,
+                ..default()
+            },
             TextColor(TEXT_HIGHLIGHT),
         ))
         .id();
 
-    commands.entity(row).add_children(&[label, bar_container, bond_node]);
+    commands
+        .entity(row)
+        .add_children(&[label, bar_container, bond_node]);
     row
 }
 
@@ -677,7 +775,10 @@ fn spawn_aspiration_row(
     let header = commands
         .spawn((
             Text::new(format!("  {chain_name}: {milestone_name}")),
-            TextFont { font_size: FONT_SIZE, ..default() },
+            TextFont {
+                font_size: FONT_SIZE,
+                ..default()
+            },
             TextColor(Color::srgb(0.4, 0.8, 0.9)),
         ))
         .id();
@@ -712,23 +813,37 @@ fn spawn_aspiration_row(
 
     let empty_part = commands
         .spawn((
-            Node { flex_grow: 1.0, height: Val::Percent(100.0), ..default() },
+            Node {
+                flex_grow: 1.0,
+                height: Val::Percent(100.0),
+                ..default()
+            },
             BackgroundColor(BAR_BG),
         ))
         .id();
 
-    commands.entity(bar_container).add_children(&[filled, empty_part]);
+    commands
+        .entity(bar_container)
+        .add_children(&[filled, empty_part]);
 
     let count = commands
         .spawn((
-            Node { margin: UiRect::left(Val::Px(4.0)), ..default() },
+            Node {
+                margin: UiRect::left(Val::Px(4.0)),
+                ..default()
+            },
             Text::new(format!("{progress}/{target}")),
-            TextFont { font_size: FONT_SIZE, ..default() },
+            TextFont {
+                font_size: FONT_SIZE,
+                ..default()
+            },
             TextColor(TEXT_DIM),
         ))
         .id();
 
-    commands.entity(bar_row).add_children(&[bar_container, count]);
+    commands
+        .entity(bar_row)
+        .add_children(&[bar_container, count]);
     commands.entity(row).add_children(&[header, bar_row]);
     row
 }

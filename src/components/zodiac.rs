@@ -40,10 +40,10 @@ impl ZodiacSign {
     /// chance of an off-season sign drawn uniformly from all eight.
     pub fn from_season(season: u64, rng: &mut impl Rng) -> Self {
         let primary = match season % 4 {
-            0 => [Self::LeapingFlame, Self::StormFur],   // Spring — fire and storms
-            1 => [Self::SwiftRiver, Self::TallPine],     // Summer — rivers and growth
-            2 => [Self::LoneThorn, Self::LongShadow],    // Autumn — solitude and patience
-            3 => [Self::SilverPool, Self::WarmDen],      // Winter — reflection and warmth
+            0 => [Self::LeapingFlame, Self::StormFur], // Spring — fire and storms
+            1 => [Self::SwiftRiver, Self::TallPine],   // Summer — rivers and growth
+            2 => [Self::LoneThorn, Self::LongShadow],  // Autumn — solitude and patience
+            3 => [Self::SilverPool, Self::WarmDen],    // Winter — reflection and warmth
             _ => unreachable!(),
         };
         if rng.random::<f32>() < 0.8 {
@@ -124,7 +124,10 @@ mod tests {
         }
         // ~80% should be primary signs (each ~40%).
         let primary_frac = (flame + storm) as f64 / n as f64;
-        assert!(primary_frac > 0.7, "primary fraction {primary_frac} too low");
+        assert!(
+            primary_frac > 0.7,
+            "primary fraction {primary_frac} too low"
+        );
     }
 
     #[test]

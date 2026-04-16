@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::rendering::ui::{TEXT_COLOR, UiRoot};
+use crate::rendering::ui::{UiRoot, TEXT_COLOR};
 use crate::resources::time::DayPhase;
 use crate::resources::weather::WeatherState;
 use crate::resources::{SimConfig, TimeState};
@@ -13,11 +13,10 @@ pub struct StatusBar;
 #[derive(Component)]
 pub struct StatusText;
 
-pub fn setup_status_bar(
-    mut commands: Commands,
-    root_query: Query<Entity, With<UiRoot>>,
-) {
-    let Ok(root) = root_query.single() else { return };
+pub fn setup_status_bar(mut commands: Commands, root_query: Query<Entity, With<UiRoot>>) {
+    let Ok(root) = root_query.single() else {
+        return;
+    };
 
     let bar = commands
         .spawn((
@@ -61,7 +60,9 @@ pub fn update_status_bar(
     weather: Res<WeatherState>,
     mut text_query: Query<&mut Text, With<StatusText>>,
 ) {
-    let Ok(mut text) = text_query.single_mut() else { return };
+    let Ok(mut text) = text_query.single_mut() else {
+        return;
+    };
 
     let day = TimeState::day_number(time_state.tick, &config);
     let season = time_state.season(&config);

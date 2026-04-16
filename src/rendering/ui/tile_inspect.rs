@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::components::building::{ConstructionSite, CropState, GateState, Structure};
 use crate::components::identity::Species;
 use crate::components::physical::{Dead, Position};
-use crate::rendering::ui::{TEXT_COLOR, TEXT_DIM, TEXT_HIGHLIGHT, UiRoot};
+use crate::rendering::ui::{UiRoot, TEXT_COLOR, TEXT_DIM, TEXT_HIGHLIGHT};
 use crate::resources::map::TileMap;
 use crate::ui_data::{terrain_label, InspectionMode, InspectionState};
 
@@ -16,11 +16,10 @@ pub struct TileInspectPopup;
 #[derive(Component)]
 pub struct TileInspectContent;
 
-pub fn setup_tile_inspect(
-    mut commands: Commands,
-    root_query: Query<Entity, With<UiRoot>>,
-) {
-    let Ok(root) = root_query.single() else { return };
+pub fn setup_tile_inspect(mut commands: Commands, root_query: Query<Entity, With<UiRoot>>) {
+    let Ok(root) = root_query.single() else {
+        return;
+    };
 
     let popup = commands
         .spawn((
@@ -82,20 +81,18 @@ pub fn update_tile_inspect(
 
             // Position near click point, clamped to screen edges.
             if let Some(click_pos) = inspection.click_screen_pos {
-                let window_width = windows
-                    .single()
-                    .map(|w| w.width())
-                    .unwrap_or(1280.0);
-                let window_height = windows
-                    .single()
-                    .map(|w| w.height())
-                    .unwrap_or(720.0);
+                let window_width = windows.single().map(|w| w.width()).unwrap_or(1280.0);
+                let window_height = windows.single().map(|w| w.height()).unwrap_or(720.0);
 
                 let popup_w = 260.0;
                 let popup_h = 300.0; // estimated max height
 
-                let x = (click_pos.x + 20.0).min(window_width - popup_w - 8.0).max(8.0);
-                let y = (click_pos.y + 20.0).min(window_height - popup_h - 8.0).max(8.0);
+                let x = (click_pos.x + 20.0)
+                    .min(window_width - popup_w - 8.0)
+                    .max(8.0);
+                let y = (click_pos.y + 20.0)
+                    .min(window_height - popup_h - 8.0)
+                    .max(8.0);
 
                 node.left = Val::Px(x);
                 node.top = Val::Px(y);
@@ -120,8 +117,12 @@ pub fn update_tile_inspect(
     }
     *last_tile = Some((x, y));
 
-    let Ok(content_entity) = content_query.single() else { return };
-    commands.entity(content_entity).despawn_related::<Children>();
+    let Ok(content_entity) = content_query.single() else {
+        return;
+    };
+    commands
+        .entity(content_entity)
+        .despawn_related::<Children>();
 
     let mut children: Vec<Entity> = Vec::new();
 
@@ -134,7 +135,12 @@ pub fn update_tile_inspect(
     ));
 
     if !map.in_bounds(x, y) {
-        children.push(spawn_text(&mut commands, "Out of bounds", FONT_SIZE, TEXT_DIM));
+        children.push(spawn_text(
+            &mut commands,
+            "Out of bounds",
+            FONT_SIZE,
+            TEXT_DIM,
+        ));
         commands.entity(content_entity).add_children(&children);
         return;
     }
@@ -153,7 +159,12 @@ pub fn update_tile_inspect(
     children.push(spawn_spacer(&mut commands));
 
     // Properties
-    children.push(spawn_text(&mut commands, "Properties", FONT_SIZE + 1.0, TEXT_COLOR));
+    children.push(spawn_text(
+        &mut commands,
+        "Properties",
+        FONT_SIZE + 1.0,
+        TEXT_COLOR,
+    ));
 
     let cost = tile.terrain.movement_cost();
     let cost_str = if cost == u32::MAX {
@@ -175,7 +186,11 @@ pub fn update_tile_inspect(
     children.push(spawn_prop(
         &mut commands,
         "Passable",
-        if tile.terrain.is_passable() { "yes" } else { "no" },
+        if tile.terrain.is_passable() {
+            "yes"
+        } else {
+            "no"
+        },
     ));
 
     // Corruption / mystery
@@ -204,7 +219,12 @@ pub fn update_tile_inspect(
     for (bpos, structure, construction, crop, gate) in &buildings {
         if bpos.x == x && bpos.y == y {
             children.push(spawn_spacer(&mut commands));
-            children.push(spawn_text(&mut commands, "Building", FONT_SIZE + 1.0, TEXT_COLOR));
+            children.push(spawn_text(
+                &mut commands,
+                "Building",
+                FONT_SIZE + 1.0,
+                TEXT_COLOR,
+            ));
             children.push(spawn_prop(
                 &mut commands,
                 "Condition",
@@ -219,7 +239,11 @@ pub fn update_tile_inspect(
                 children.push(spawn_prop(
                     &mut commands,
                     "Materials",
-                    if site.materials_complete() { "complete" } else { "needed" },
+                    if site.materials_complete() {
+                        "complete"
+                    } else {
+                        "needed"
+                    },
                 ));
             }
             if let Some(c) = crop {
@@ -248,7 +272,12 @@ pub fn update_tile_inspect(
         .collect();
     if !occupants.is_empty() {
         children.push(spawn_spacer(&mut commands));
-        children.push(spawn_text(&mut commands, "Occupants", FONT_SIZE + 1.0, TEXT_COLOR));
+        children.push(spawn_text(
+            &mut commands,
+            "Occupants",
+            FONT_SIZE + 1.0,
+            TEXT_COLOR,
+        ));
         for name in &occupants {
             children.push(spawn_text(
                 &mut commands,
@@ -274,7 +303,10 @@ fn spawn_text(commands: &mut Commands, content: &str, size: f32, color: Color) -
                 ..default()
             },
             Text::new(content.to_string()),
-            TextFont { font_size: size, ..default() },
+            TextFont {
+                font_size: size,
+                ..default()
+            },
             TextColor(color),
         ))
         .id()
@@ -300,9 +332,15 @@ fn spawn_prop(commands: &mut Commands, label: &str, value: &str) -> Entity {
 
     let label_node = commands
         .spawn((
-            Node { width: Val::Px(100.0), ..default() },
+            Node {
+                width: Val::Px(100.0),
+                ..default()
+            },
             Text::new(format!("  {label}")),
-            TextFont { font_size: FONT_SIZE, ..default() },
+            TextFont {
+                font_size: FONT_SIZE,
+                ..default()
+            },
             TextColor(TEXT_DIM),
         ))
         .id();
@@ -310,7 +348,10 @@ fn spawn_prop(commands: &mut Commands, label: &str, value: &str) -> Entity {
     let value_node = commands
         .spawn((
             Text::new(value.to_string()),
-            TextFont { font_size: FONT_SIZE, ..default() },
+            TextFont {
+                font_size: FONT_SIZE,
+                ..default()
+            },
             TextColor(TEXT_COLOR),
         ))
         .id();

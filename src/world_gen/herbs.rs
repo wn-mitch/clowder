@@ -133,7 +133,10 @@ pub fn spawn_flavor_plants(world: &mut World, current_season: Season) {
 
     // Phase 3: spawn entities.
     for (kind, x, y) in spawns {
-        let plant = FlavorPlant { kind, growth_stage: GrowthStage::Sprout };
+        let plant = FlavorPlant {
+            kind,
+            growth_stage: GrowthStage::Sprout,
+        };
         let pos = Position::new(x, y);
 
         if kind.is_seasonal() {
@@ -243,7 +246,8 @@ mod tests {
             "FairyRing should have mystery >= 0.7"
         );
         assert_eq!(
-            map.get(0, 0).corruption, 0.0,
+            map.get(0, 0).corruption,
+            0.0,
             "grass tile should have no corruption"
         );
     }

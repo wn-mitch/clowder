@@ -231,7 +231,10 @@ pub struct FlavorPlant {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum ItemSlot {
     Herb(HerbKind),
-    Item(crate::components::items::ItemKind, crate::components::items::ItemModifiers),
+    Item(
+        crate::components::items::ItemKind,
+        crate::components::items::ItemModifiers,
+    ),
 }
 
 /// A cat's carried inventory. Capacity-limited; holds both herbs and items.
@@ -347,7 +350,12 @@ impl Inventory {
     }
 
     /// Take the first food item, returning its kind and modifiers.
-    pub fn take_food(&mut self) -> Option<(crate::components::items::ItemKind, crate::components::items::ItemModifiers)> {
+    pub fn take_food(
+        &mut self,
+    ) -> Option<(
+        crate::components::items::ItemKind,
+        crate::components::items::ItemModifiers,
+    )> {
         let idx = self
             .slots
             .iter()

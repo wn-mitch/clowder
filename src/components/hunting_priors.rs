@@ -153,9 +153,8 @@ impl HuntingPriors {
         for i in 0..len {
             let theirs = other.beliefs[i];
             if (theirs - DEFAULT_PRIOR).abs() > 0.01 {
-                self.beliefs[i] =
-                    (self.beliefs[i] + (theirs - self.beliefs[i]) * weight)
-                        .clamp(MIN_BELIEF, MAX_BELIEF);
+                self.beliefs[i] = (self.beliefs[i] + (theirs - self.beliefs[i]) * weight)
+                    .clamp(MIN_BELIEF, MAX_BELIEF);
             }
         }
     }
@@ -193,20 +192,33 @@ mod tests {
         p.record_catch(&pos(10, 10));
 
         // The catch site is > default.
-        assert!(p.get(10, 10) > DEFAULT_PRIOR, "catch site should increase belief");
+        assert!(
+            p.get(10, 10) > DEFAULT_PRIOR,
+            "catch site should increase belief"
+        );
 
         // A tile in the same 5×5 bucket is also updated.
-        assert!(p.get(12, 12) > DEFAULT_PRIOR, "same-bucket tile should share belief");
+        assert!(
+            p.get(12, 12) > DEFAULT_PRIOR,
+            "same-bucket tile should share belief"
+        );
 
         // A distant tile is unaffected.
-        assert_eq!(p.get(60, 60), DEFAULT_PRIOR, "distant tile should be unchanged");
+        assert_eq!(
+            p.get(60, 60),
+            DEFAULT_PRIOR,
+            "distant tile should be unchanged"
+        );
     }
 
     #[test]
     fn failed_search_decreases_belief() {
         let mut p = HuntingPriors::default_map();
         p.record_failed_search(&pos(20, 20), 100);
-        assert!(p.get(20, 20) < DEFAULT_PRIOR, "failed search should reduce belief");
+        assert!(
+            p.get(20, 20) < DEFAULT_PRIOR,
+            "failed search should reduce belief"
+        );
     }
 
     #[test]
@@ -216,14 +228,20 @@ mod tests {
         for _ in 0..100 {
             p.record_catch(&catch_pos);
         }
-        assert!(p.get(5, 5) <= MAX_BELIEF, "100 catches must not exceed MAX_BELIEF");
+        assert!(
+            p.get(5, 5) <= MAX_BELIEF,
+            "100 catches must not exceed MAX_BELIEF"
+        );
 
         let mut p2 = HuntingPriors::default_map();
         let fail_pos = pos(5, 5);
         for _ in 0..1000 {
             p2.record_failed_search(&fail_pos, 10);
         }
-        assert!(p2.get(5, 5) >= MIN_BELIEF, "1000 failed searches must not go below MIN_BELIEF");
+        assert!(
+            p2.get(5, 5) >= MIN_BELIEF,
+            "1000 failed searches must not go below MIN_BELIEF"
+        );
     }
 
     #[test]
@@ -234,7 +252,10 @@ mod tests {
             p.record_catch(&pos(50, 30));
         }
         let dir = p.best_direction(&pos(30, 30), 10);
-        assert!(dir.is_some(), "should find a direction toward high-belief area");
+        assert!(
+            dir.is_some(),
+            "should find a direction toward high-belief area"
+        );
         let (dx, _dy) = dir.unwrap();
         assert_eq!(dx, 1, "best direction should be east (dx=1), got dx={dx}");
     }
@@ -260,7 +281,10 @@ mod tests {
         learner.learn_from(&teacher, 0.3);
 
         let learned = learner.get(10, 10);
-        assert!(learned > DEFAULT_PRIOR, "learner should increase belief toward teacher's");
+        assert!(
+            learned > DEFAULT_PRIOR,
+            "learner should increase belief toward teacher's"
+        );
         assert!(
             learned < teacher_belief,
             "learner belief ({learned}) should be less than teacher's ({teacher_belief}) after partial blend"

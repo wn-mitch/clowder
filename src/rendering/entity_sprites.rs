@@ -142,8 +142,17 @@ pub fn attach_entity_sprites(
     flavor_plants: Query<(Entity, &Position, &FlavorPlant), Without<EntitySpriteMarker>>,
     wards: Query<(Entity, &Position, &Ward), Without<EntitySpriteMarker>>,
     items: Query<(Entity, &Position, &Item), Without<EntitySpriteMarker>>,
-    carcasses: Query<(Entity, &Position, &crate::components::wildlife::Carcass), Without<EntitySpriteMarker>>,
-    wells: Query<(Entity, &Position), (With<crate::components::building::ColonyWell>, Without<EntitySpriteMarker>)>,
+    carcasses: Query<
+        (Entity, &Position, &crate::components::wildlife::Carcass),
+        Without<EntitySpriteMarker>,
+    >,
+    wells: Query<
+        (Entity, &Position),
+        (
+            With<crate::components::building::ColonyWell>,
+            Without<EntitySpriteMarker>,
+        ),
+    >,
 ) {
     let world_px = TILE_PX * TILE_SCALE;
     let map_h = map.height as f32;

@@ -1947,7 +1947,9 @@ pub fn resolve_disposition_chains(
                             } else {
                                 0.0
                             };
-                            let den_mods = crate::components::items::ItemModifiers::with_corruption(den_corruption);
+                            let den_mods = crate::components::items::ItemModifiers::with_corruption(
+                                den_corruption,
+                            );
                             for _ in 0..kills {
                                 if !inventory.is_full() {
                                     inventory.slots.push(ItemSlot::Item(drop_item, den_mods));
@@ -2196,7 +2198,12 @@ pub fn resolve_disposition_chains(
                             };
 
                             if !inventory.is_full() {
-                                inventory.slots.push(ItemSlot::Item(item_kind, crate::components::items::ItemModifiers::with_corruption(catch_corruption)));
+                                inventory.slots.push(ItemSlot::Item(
+                                    item_kind,
+                                    crate::components::items::ItemModifiers::with_corruption(
+                                        catch_corruption,
+                                    ),
+                                ));
                             }
                             skills.hunting += skills.growth_rate() * d.hunt_catch_skill_growth;
 
@@ -2558,7 +2565,12 @@ pub fn resolve_disposition_chains(
                             0.0
                         };
                         if !inventory.is_full() {
-                            inventory.slots.push(ItemSlot::Item(item_kind, crate::components::items::ItemModifiers::with_corruption(forage_corruption)));
+                            inventory.slots.push(ItemSlot::Item(
+                                item_kind,
+                                crate::components::items::ItemModifiers::with_corruption(
+                                    forage_corruption,
+                                ),
+                            ));
                         }
                         skills.foraging += skills.growth_rate() * d.forage_skill_growth;
                         {

@@ -41,7 +41,11 @@ pub fn load_sprite_assets(
     mut images: ResMut<Assets<Image>>,
 ) {
     let white_pixel = images.add(Image::new(
-        Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
+        Extent3d {
+            width: 1,
+            height: 1,
+            depth_or_array_layers: 1,
+        },
         TextureDimension::D2,
         vec![255u8, 255, 255, 255],
         TextureFormat::Rgba8UnormSrgb,
@@ -80,9 +84,8 @@ pub fn load_sprite_assets(
         None,
     ));
 
-    let items_texture = asset_server.load(
-        "sprites/Sprout Lands - Sprites - premium pack/Objects/Items/items-spritesheet.png",
-    );
+    let items_texture = asset_server
+        .load("sprites/Sprout Lands - Sprites - premium pack/Objects/Items/items-spritesheet.png");
     let items_layout = layouts.add(TextureAtlasLayout::from_grid(
         UVec2::splat(16),
         8,
@@ -91,9 +94,8 @@ pub fn load_sprite_assets(
         None,
     ));
 
-    let well_texture = asset_server.load(
-        "sprites/Sprout Lands - Sprites - premium pack/Objects/Water well.png",
-    );
+    let well_texture =
+        asset_server.load("sprites/Sprout Lands - Sprites - premium pack/Objects/Water well.png");
 
     commands.insert_resource(SpriteAssets {
         white_pixel,

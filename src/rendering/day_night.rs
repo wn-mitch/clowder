@@ -49,7 +49,9 @@ pub fn update_day_night_overlay(
     config: Res<SimConfig>,
     mut query: Query<&mut Sprite, With<DayNightOverlay>>,
 ) {
-    let Ok(mut sprite) = query.single_mut() else { return };
+    let Ok(mut sprite) = query.single_mut() else {
+        return;
+    };
 
     let ticks_per_day = config.ticks_per_day_phase * 4;
     let tick_in_day = (time_state.tick % ticks_per_day) as f32;
@@ -67,10 +69,10 @@ pub fn update_day_night_overlay(
 
     // Lerp between adjacent phases based on fractional progress.
     let color = match progress {
-        p if p < 1.0 => lerp_rgba(dawn, day, p),           // Dawn → Day
-        p if p < 2.0 => lerp_rgba(day, dusk, p - 1.0),     // Day → Dusk
-        p if p < 3.0 => lerp_rgba(dusk, night, p - 2.0),   // Dusk → Night
-        p => lerp_rgba(night, dawn, p - 3.0),               // Night → Dawn
+        p if p < 1.0 => lerp_rgba(dawn, day, p),       // Dawn → Day
+        p if p < 2.0 => lerp_rgba(day, dusk, p - 1.0), // Day → Dusk
+        p if p < 3.0 => lerp_rgba(dusk, night, p - 2.0), // Dusk → Night
+        p => lerp_rgba(night, dawn, p - 3.0),          // Night → Dawn
     };
 
     sprite.color = Color::LinearRgba(color);

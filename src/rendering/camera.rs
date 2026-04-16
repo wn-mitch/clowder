@@ -70,10 +70,7 @@ impl CameraBrain {
             last_checked_narrative: 0,
             idle_seconds: 0.0,
             map_min: Vec2::ZERO,
-            map_max: Vec2::new(
-                map_width as f32 * world_px,
-                map_height as f32 * world_px,
-            ),
+            map_max: Vec2::new(map_width as f32 * world_px, map_height as f32 * world_px),
         }
     }
 
@@ -203,10 +200,14 @@ pub fn camera_update(
             let margin = world_px * 4.0;
             let center = (brain.map_min + brain.map_max) * 0.5;
             let pull_strength = 0.3 * dt;
-            if brain.target.x < brain.map_min.x + margin || brain.target.x > brain.map_max.x - margin {
+            if brain.target.x < brain.map_min.x + margin
+                || brain.target.x > brain.map_max.x - margin
+            {
                 brain.target.x += (center.x - brain.target.x) * pull_strength;
             }
-            if brain.target.y < brain.map_min.y + margin || brain.target.y > brain.map_max.y - margin {
+            if brain.target.y < brain.map_min.y + margin
+                || brain.target.y > brain.map_max.y - margin
+            {
                 brain.target.y += (center.y - brain.target.y) * pull_strength;
             }
             brain.clamp_target();
@@ -302,8 +303,14 @@ pub fn camera_update(
                 transform.translation.y += direction.y * pan_speed;
             }
             // Clamp to map bounds.
-            transform.translation.x = transform.translation.x.clamp(brain.map_min.x, brain.map_max.x);
-            transform.translation.y = transform.translation.y.clamp(brain.map_min.y, brain.map_max.y);
+            transform.translation.x = transform
+                .translation
+                .x
+                .clamp(brain.map_min.x, brain.map_max.x);
+            transform.translation.y = transform
+                .translation
+                .y
+                .clamp(brain.map_min.y, brain.map_max.y);
             // Update target to current position so lerp doesn't fight manual control.
             brain.target = Vec2::new(transform.translation.x, transform.translation.y);
 
@@ -317,10 +324,10 @@ pub fn camera_update(
     // --- Lerp camera toward target (except Override, which moves directly) ---
     if brain.mode != CameraMode::Override {
         let lerp_speed = match brain.mode {
-            CameraMode::Drift => 0.4,   // Very floaty — cloud on a breeze
-            CameraMode::Linger => 0.8,  // Settles gently near activity
+            CameraMode::Drift => 0.4,       // Very floaty — cloud on a breeze
+            CameraMode::Linger => 0.8,      // Settles gently near activity
             CameraMode::Follow => 1.8,      // Purposeful but not jarring
-            CameraMode::LockedOn(_) => 1.2,  // Smooth entity tracking
+            CameraMode::LockedOn(_) => 1.2, // Smooth entity tracking
             CameraMode::Override => unreachable!(),
         };
         let current = Vec2::new(transform.translation.x, transform.translation.y);
@@ -408,11 +415,7 @@ impl Default for AutoScreenshot {
     }
 }
 
-pub fn auto_screenshot(
-    mut commands: Commands,
-    time: Res<Time>,
-    mut state: ResMut<AutoScreenshot>,
-) {
+pub fn auto_screenshot(mut commands: Commands, time: Res<Time>, mut state: ResMut<AutoScreenshot>) {
     if state.taken {
         return;
     }

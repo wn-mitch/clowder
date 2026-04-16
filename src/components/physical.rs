@@ -5,7 +5,9 @@ use bevy_ecs::prelude::*;
 // ---------------------------------------------------------------------------
 
 /// World-space grid position.
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Component, Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub struct Position {
     pub x: i32,
     pub y: i32,

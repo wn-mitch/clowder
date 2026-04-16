@@ -92,12 +92,13 @@ fn knowledge_lost_when_carriers_gone() {
     {
         let bucketed = ColonyKnowledge::bucket_position(&Position::new(10, 10));
         let mut ck = world.resource_mut::<ColonyKnowledge>();
-        ck.entries.push(clowder::resources::colony_knowledge::KnowledgeEntry {
-            event_type: MemoryType::ThreatSeen,
-            location: Some(bucketed),
-            strength: 0.8,
-            carrier_count: 3,
-        });
+        ck.entries
+            .push(clowder::resources::colony_knowledge::KnowledgeEntry {
+                event_type: MemoryType::ThreatSeen,
+                location: Some(bucketed),
+                strength: 0.8,
+                carrier_count: 3,
+            });
     }
 
     // No cats spawned → carrier count drops to 0 on next scan.
@@ -111,7 +112,10 @@ fn knowledge_lost_when_carriers_gone() {
     schedule.run(&mut world);
 
     let knowledge = world.resource::<ColonyKnowledge>();
-    assert!(knowledge.entries.is_empty(), "entry should be removed with 0 carriers");
+    assert!(
+        knowledge.entries.is_empty(),
+        "entry should be removed with 0 carriers"
+    );
 
     let log = world.resource::<NarrativeLog>();
     assert!(
@@ -119,7 +123,9 @@ fn knowledge_lost_when_carriers_gone() {
         "should narrate knowledge loss"
     );
     assert!(
-        log.entries.iter().any(|e| e.tier == NarrativeTier::Significant),
+        log.entries
+            .iter()
+            .any(|e| e.tier == NarrativeTier::Significant),
         "knowledge loss should be tier Significant"
     );
 }

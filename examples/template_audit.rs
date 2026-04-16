@@ -18,8 +18,8 @@ use clowder::resources::narrative_templates::{MoodBucket, TemplateContext, Templ
 use clowder::resources::time::{DayPhase, Season};
 use clowder::resources::weather::Weather;
 
-use rand_chacha::ChaCha8Rng;
 use rand_chacha::rand_core::SeedableRng;
+use rand_chacha::ChaCha8Rng;
 
 const ALL_ACTIONS: [Action; 18] = [
     Action::Eat,
@@ -50,7 +50,12 @@ const ALL_MOODS: [MoodBucket; 5] = [
     MoodBucket::Euphoric,
 ];
 
-const ALL_SEASONS: [Season; 4] = [Season::Spring, Season::Summer, Season::Autumn, Season::Winter];
+const ALL_SEASONS: [Season; 4] = [
+    Season::Spring,
+    Season::Summer,
+    Season::Autumn,
+    Season::Winter,
+];
 
 const ALL_WEATHER: [Weather; 8] = [
     Weather::Clear,
@@ -73,7 +78,11 @@ fn main() {
         }
     };
 
-    println!("Loaded {} templates from {}", registry.len(), template_path.display());
+    println!(
+        "Loaded {} templates from {}",
+        registry.len(),
+        template_path.display()
+    );
     println!();
 
     let mut rng = ChaCha8Rng::seed_from_u64(42);
@@ -113,7 +122,10 @@ fn main() {
                         terrain: Terrain::Grass,
                         event: None,
                     };
-                    if registry.select(&ctx, &personality, &needs, &mut rng).is_some() {
+                    if registry
+                        .select(&ctx, &personality, &needs, &mut rng)
+                        .is_some()
+                    {
                         count += 1;
                     }
                 }
@@ -157,7 +169,10 @@ fn main() {
                 terrain: Terrain::Grass,
                 event: None,
             };
-            if registry.select(&ctx, &personality, &needs, &mut rng).is_none() {
+            if registry
+                .select(&ctx, &personality, &needs, &mut rng)
+                .is_none()
+            {
                 println!("  {:?} × {}", action, mood.label());
                 gaps += 1;
             }

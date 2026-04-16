@@ -16,18 +16,23 @@ pub enum TerrainGroup {
 impl Terrain {
     pub fn group(&self) -> TerrainGroup {
         match self {
-            Terrain::Grass | Terrain::LightForest | Terrain::DenseForest
-            | Terrain::Garden => TerrainGroup::Grass,
+            Terrain::Grass | Terrain::LightForest | Terrain::DenseForest | Terrain::Garden => {
+                TerrainGroup::Grass
+            }
             Terrain::Water => TerrainGroup::Water,
             Terrain::Mud => TerrainGroup::Dirt,
             Terrain::Sand => TerrainGroup::Sand,
             Terrain::Rock => TerrainGroup::Rock,
-            Terrain::Den | Terrain::Hearth | Terrain::Stores
-            | Terrain::Workshop => TerrainGroup::Building,
-            Terrain::Wall | Terrain::Gate | Terrain::Watchtower
-            | Terrain::WardPost => TerrainGroup::Stone,
-            Terrain::FairyRing | Terrain::StandingStone
-            | Terrain::DeepPool | Terrain::AncientRuin => TerrainGroup::Special,
+            Terrain::Den | Terrain::Hearth | Terrain::Stores | Terrain::Workshop => {
+                TerrainGroup::Building
+            }
+            Terrain::Wall | Terrain::Gate | Terrain::Watchtower | Terrain::WardPost => {
+                TerrainGroup::Stone
+            }
+            Terrain::FairyRing
+            | Terrain::StandingStone
+            | Terrain::DeepPool
+            | Terrain::AncientRuin => TerrainGroup::Special,
         }
     }
 }
@@ -50,10 +55,7 @@ fn is_friendly(tile_group: TerrainGroup, neighbor_group: TerrainGroup) -> bool {
         // toward Water and Building (which have no overlay).
         TerrainGroup::Grass => matches!(
             neighbor_group,
-            TerrainGroup::Dirt
-                | TerrainGroup::Sand
-                | TerrainGroup::Rock
-                | TerrainGroup::Stone
+            TerrainGroup::Dirt | TerrainGroup::Sand | TerrainGroup::Rock | TerrainGroup::Stone
         ),
         _ => false,
     }
@@ -82,14 +84,30 @@ pub fn blob_bitmask(map: &TileMap, x: i32, y: i32, group: TerrainGroup) -> u8 {
     let w = same(-1, 0);
 
     let mut mask = 0u8;
-    if n { mask |= 1; }
-    if n && e && same(1, -1) { mask |= 2; }   // NE
-    if e { mask |= 4; }
-    if e && s && same(1, 1) { mask |= 8; }    // SE
-    if s { mask |= 16; }
-    if s && w && same(-1, 1) { mask |= 32; }  // SW
-    if w { mask |= 64; }
-    if w && n && same(-1, -1) { mask |= 128; } // NW
+    if n {
+        mask |= 1;
+    }
+    if n && e && same(1, -1) {
+        mask |= 2;
+    } // NE
+    if e {
+        mask |= 4;
+    }
+    if e && s && same(1, 1) {
+        mask |= 8;
+    } // SE
+    if s {
+        mask |= 16;
+    }
+    if s && w && same(-1, 1) {
+        mask |= 32;
+    } // SW
+    if w {
+        mask |= 64;
+    }
+    if w && n && same(-1, -1) {
+        mask |= 128;
+    } // NW
     mask
 }
 
@@ -105,10 +123,18 @@ pub fn cardinal_bitmask(map: &TileMap, x: i32, y: i32, group: TerrainGroup) -> u
         }
         map.get(nx, ny).terrain.group() == group
     };
-    if same(0, -1) { mask |= 0x1; }
-    if same(1, 0)  { mask |= 0x2; }
-    if same(0, 1)  { mask |= 0x4; }
-    if same(-1, 0) { mask |= 0x8; }
+    if same(0, -1) {
+        mask |= 0x1;
+    }
+    if same(1, 0) {
+        mask |= 0x2;
+    }
+    if same(0, 1) {
+        mask |= 0x4;
+    }
+    if same(-1, 0) {
+        mask |= 0x8;
+    }
     mask
 }
 
@@ -150,7 +176,9 @@ pub fn grass_overlay_atlas_index(bitmask: u8) -> u32 {
 pub fn grass_overlay_atlas_index_with_variant(bitmask: u8, x: i32, y: i32) -> u32 {
     let base = BLOB_TO_ATLAS[bitmask as usize];
     if base == CENTER_FILL_INDEX {
-        let hash = (x as u32).wrapping_mul(7).wrapping_add((y as u32).wrapping_mul(13));
+        let hash = (x as u32)
+            .wrapping_mul(7)
+            .wrapping_add((y as u32).wrapping_mul(13));
         if hash % 10 < 3 {
             DECORATIVE_BASE + (hash / 10) % DECORATIVE_COUNT
         } else {
@@ -189,12 +217,36 @@ pub struct OverlayConfig {
 /// All overlay layers, ordered by z (bottom to top).
 /// Grass is highest so its scalloped edges render on top of other terrain.
 pub const OVERLAY_LAYERS: &[OverlayConfig] = &[
-    OverlayConfig { group: TerrainGroup::Dirt,  atlas_path: "sprites/soil_autotile_atlas.png",  z: 1.0 },
-    OverlayConfig { group: TerrainGroup::Sand,  atlas_path: "sprites/soil_autotile_atlas.png",  z: 1.0 },
-    OverlayConfig { group: TerrainGroup::Rock,  atlas_path: "sprites/stone_autotile_atlas.png", z: 2.0 },
-    OverlayConfig { group: TerrainGroup::Stone, atlas_path: "sprites/stone_autotile_atlas.png", z: 2.0 },
-    OverlayConfig { group: TerrainGroup::Grass,   atlas_path: "sprites/grass_autotile_atlas.png",  z: 3.0 },
-    OverlayConfig { group: TerrainGroup::Special, atlas_path: "sprites/grass_autotile_atlas.png",  z: 3.0 },
+    OverlayConfig {
+        group: TerrainGroup::Dirt,
+        atlas_path: "sprites/soil_autotile_atlas.png",
+        z: 1.0,
+    },
+    OverlayConfig {
+        group: TerrainGroup::Sand,
+        atlas_path: "sprites/soil_autotile_atlas.png",
+        z: 1.0,
+    },
+    OverlayConfig {
+        group: TerrainGroup::Rock,
+        atlas_path: "sprites/stone_autotile_atlas.png",
+        z: 2.0,
+    },
+    OverlayConfig {
+        group: TerrainGroup::Stone,
+        atlas_path: "sprites/stone_autotile_atlas.png",
+        z: 2.0,
+    },
+    OverlayConfig {
+        group: TerrainGroup::Grass,
+        atlas_path: "sprites/grass_autotile_atlas.png",
+        z: 3.0,
+    },
+    OverlayConfig {
+        group: TerrainGroup::Special,
+        atlas_path: "sprites/grass_autotile_atlas.png",
+        z: 3.0,
+    },
 ];
 
 #[cfg(test)]
@@ -295,11 +347,9 @@ mod tests {
     #[test]
     fn atlas_lookup_covers_all_47_values() {
         let valid_bitmasks: Vec<u8> = vec![
-            0, 1, 4, 5, 7, 16, 17, 20, 21, 23, 28, 29, 31,
-            64, 65, 68, 69, 71, 80, 81, 84, 85, 87, 92, 93, 95,
-            112, 113, 116, 117, 119, 124, 125, 127,
-            193, 197, 199, 209, 213, 215, 221, 223,
-            241, 245, 247, 253, 255,
+            0, 1, 4, 5, 7, 16, 17, 20, 21, 23, 28, 29, 31, 64, 65, 68, 69, 71, 80, 81, 84, 85, 87,
+            92, 93, 95, 112, 113, 116, 117, 119, 124, 125, 127, 193, 197, 199, 209, 213, 215, 221,
+            223, 241, 245, 247, 253, 255,
         ];
         assert_eq!(valid_bitmasks.len(), 47);
         let mut atlas_indices: Vec<u32> = valid_bitmasks
@@ -308,7 +358,11 @@ mod tests {
             .collect();
         atlas_indices.sort();
         atlas_indices.dedup();
-        assert_eq!(atlas_indices.len(), 47, "all 47 should map to distinct indices");
+        assert_eq!(
+            atlas_indices.len(),
+            47,
+            "all 47 should map to distinct indices"
+        );
         assert_eq!(*atlas_indices.last().unwrap(), 46);
     }
 
@@ -331,7 +385,7 @@ mod tests {
         // Mud tile surrounded by grass should get full bitmask (not isolated)
         let map = make_map(&[
             &[Terrain::Grass, Terrain::Grass, Terrain::Grass],
-            &[Terrain::Grass, Terrain::Mud,   Terrain::Grass],
+            &[Terrain::Grass, Terrain::Mud, Terrain::Grass],
             &[Terrain::Grass, Terrain::Grass, Terrain::Grass],
         ]);
         assert_eq!(blob_bitmask(&map, 1, 1, TerrainGroup::Dirt), 255);
@@ -342,7 +396,7 @@ mod tests {
         // Mud between water (north) and grass (south) — should show north edge
         let map = make_map(&[
             &[Terrain::Water, Terrain::Water, Terrain::Water],
-            &[Terrain::Grass, Terrain::Mud,   Terrain::Grass],
+            &[Terrain::Grass, Terrain::Mud, Terrain::Grass],
             &[Terrain::Grass, Terrain::Grass, Terrain::Grass],
         ]);
         let mask = blob_bitmask(&map, 1, 1, TerrainGroup::Dirt);
@@ -356,11 +410,15 @@ mod tests {
         // Grass defers to Dirt's own overlay — no grass edge toward mud
         let map = make_map(&[
             &[Terrain::Grass, Terrain::Grass, Terrain::Grass],
-            &[Terrain::Mud,   Terrain::Grass, Terrain::Grass],
+            &[Terrain::Mud, Terrain::Grass, Terrain::Grass],
             &[Terrain::Grass, Terrain::Grass, Terrain::Grass],
         ]);
         let mask = blob_bitmask(&map, 1, 1, TerrainGroup::Grass);
-        assert_eq!(mask & 64, 64, "W should be set (grass defers to dirt's overlay)");
+        assert_eq!(
+            mask & 64,
+            64,
+            "W should be set (grass defers to dirt's overlay)"
+        );
     }
 
     #[test]

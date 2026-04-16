@@ -1,7 +1,7 @@
 //! Shared data types for UI display — used by both the TUI and Bevy UI renderers.
 
-use bevy_ecs::prelude::*;
 use bevy::prelude::Vec2;
+use bevy_ecs::prelude::*;
 
 use crate::ai::CurrentAction;
 use crate::components::building::{ConstructionSite, CropState, GateState, Structure};
@@ -30,7 +30,10 @@ pub enum InspectionMode {
     #[default]
     None,
     CatInspect(Entity),
-    TileInspect { x: i32, y: i32 },
+    TileInspect {
+        x: i32,
+        y: i32,
+    },
     WildlifeInspect(Entity),
 }
 
@@ -165,7 +168,9 @@ pub fn build_inspect_data(
                     outcome: match r.outcome {
                         crate::components::disposition::ActionOutcome::Success => "ok".into(),
                         crate::components::disposition::ActionOutcome::Failure => "fail".into(),
-                        crate::components::disposition::ActionOutcome::Interrupted => "interrupted".into(),
+                        crate::components::disposition::ActionOutcome::Interrupted => {
+                            "interrupted".into()
+                        }
                     },
                 })
                 .collect()

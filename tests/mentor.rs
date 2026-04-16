@@ -5,8 +5,8 @@ use clowder::ai::CurrentAction;
 use clowder::components::hunting_priors::HuntingPriors;
 use clowder::components::identity::{Gender, Name};
 use clowder::components::magic::Inventory;
-use clowder::components::personality::Personality;
 use clowder::components::mental::Mood;
+use clowder::components::personality::Personality;
 use clowder::components::physical::{Needs, Position};
 use clowder::components::skills::Skills;
 use clowder::components::task_chain::{FailurePolicy, StepKind, StepStatus, TaskChain, TaskStep};
@@ -35,9 +35,15 @@ fn setup_world() -> (World, Schedule) {
     world.insert_resource(WeatherState::default());
     world.insert_resource(clowder::species::build_registry());
     world.insert_resource(clowder::components::prey::PreyDensity::default());
-    bevy_ecs::message::MessageRegistry::register_message::<clowder::components::prey::PreyKilled>(&mut world);
-    bevy_ecs::message::MessageRegistry::register_message::<clowder::components::prey::DenRaided>(&mut world);
-    bevy_ecs::message::MessageRegistry::register_message::<clowder::components::goap_plan::PlanNarrative>(&mut world);
+    bevy_ecs::message::MessageRegistry::register_message::<clowder::components::prey::PreyKilled>(
+        &mut world,
+    );
+    bevy_ecs::message::MessageRegistry::register_message::<clowder::components::prey::DenRaided>(
+        &mut world,
+    );
+    bevy_ecs::message::MessageRegistry::register_message::<
+        clowder::components::goap_plan::PlanNarrative,
+    >(&mut world);
     let mut schedule = Schedule::default();
     schedule.add_systems(resolve_disposition_chains);
     (world, schedule)

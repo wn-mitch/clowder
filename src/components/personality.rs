@@ -109,8 +109,8 @@ impl Personality {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand_chacha::ChaCha8Rng;
     use rand_chacha::rand_core::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
 
     fn seeded_rng(seed: u64) -> ChaCha8Rng {
         ChaCha8Rng::seed_from_u64(seed)
@@ -122,10 +122,7 @@ mod tests {
         for _ in 0..100 {
             let p = Personality::random(&mut rng);
             for v in p.all_values() {
-                assert!(
-                    (0.0..=1.0).contains(&v),
-                    "value {v} is out of [0.0, 1.0]"
-                );
+                assert!((0.0..=1.0).contains(&v), "value {v} is out of [0.0, 1.0]");
             }
         }
     }
@@ -150,9 +147,6 @@ mod tests {
         }
         let mean = sum / (n as f64 * 18.0);
         // Triangular distribution centred on 0.5 — mean should be very close
-        assert!(
-            (0.45..=0.55).contains(&mean),
-            "mean {mean} is not near 0.5"
-        );
+        assert!((0.45..=0.55).contains(&mean), "mean {mean} is not near 0.5");
     }
 }

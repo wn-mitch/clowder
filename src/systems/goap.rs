@@ -7,7 +7,7 @@ use crate::ai::pathfinding::{find_free_adjacent, find_path, step_toward};
 use crate::ai::planner::actions::actions_for_disposition;
 use crate::ai::planner::goals::goal_for_disposition;
 use crate::ai::planner::{
-    make_plan, Carrying, GoapActionKind, PlannerState, PlannerZone, PlannedStep, ZoneDistances,
+    make_plan, Carrying, GoapActionKind, PlannedStep, PlannerState, PlannerZone, ZoneDistances,
 };
 use crate::ai::scoring::{
     aggregate_to_dispositions, apply_aspiration_bonuses, apply_cascading_bonuses,
@@ -23,7 +23,9 @@ use crate::components::coordination::{ActiveDirective, Directive, DirectiveKind,
 use crate::components::disposition::{
     ActionHistory, ActionOutcome, ActionRecord, CraftingHint, DispositionKind,
 };
-use crate::components::goap_plan::{GoapPlan, PlanEvent, PlanNarrative, StepExecutionState, StepPhase};
+use crate::components::goap_plan::{
+    GoapPlan, PlanEvent, PlanNarrative, StepExecutionState, StepPhase,
+};
 use crate::components::hunting_priors::HuntingPriors;
 use crate::components::identity::{Gender, LifeStage, Name};
 use crate::components::items::{Item, ItemLocation};
@@ -73,16 +75,35 @@ pub struct NarrativeEmitter<'w> {
 /// Bundles world-state queries for evaluate_and_plan to stay under 16 params.
 #[derive(bevy_ecs::system::SystemParam)]
 pub struct WorldStateQueries<'w, 's> {
-    pub all_positions: Query<'w, 's, (Entity, &'static Position, Option<&'static PreyAnimal>), Without<Dead>>,
+    pub all_positions:
+        Query<'w, 's, (Entity, &'static Position, Option<&'static PreyAnimal>), Without<Dead>>,
     pub wildlife: Query<'w, 's, (Entity, &'static Position), With<WildAnimal>>,
-    pub building_query: Query<'w, 's, (Entity, &'static Structure, &'static Position, Option<&'static ConstructionSite>, Option<&'static CropState>)>,
+    pub building_query: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static Structure,
+            &'static Position,
+            Option<&'static ConstructionSite>,
+            Option<&'static CropState>,
+        ),
+    >,
     pub herb_query: Query<'w, 's, (Entity, &'static Herb, &'static Position), With<Harvestable>>,
     pub ward_query: Query<'w, 's, (&'static Ward, &'static Position)>,
     pub directive_queue_query: Query<'w, 's, (Entity, &'static DirectiveQueue)>,
     pub active_directive_query: Query<'w, 's, &'static ActiveDirective>,
     pub skills_query: Query<'w, 's, &'static Skills, Without<Dead>>,
-    pub carcass_query: Query<'w, 's, (&'static crate::components::wildlife::Carcass, &'static Position)>,
-    pub wildlife_ai_query: Query<'w, 's, &'static crate::components::wildlife::WildlifeAiState, With<WildAnimal>>,
+    pub carcass_query: Query<
+        'w,
+        's,
+        (
+            &'static crate::components::wildlife::Carcass,
+            &'static Position,
+        ),
+    >,
+    pub wildlife_ai_query:
+        Query<'w, 's, &'static crate::components::wildlife::WildlifeAiState, With<WildAnimal>>,
 }
 
 /// Bundles resources for evaluate_and_plan.
@@ -102,9 +123,26 @@ pub struct PlanResources<'w> {
 /// the cats filter (herbs are never cats).
 #[derive(bevy_ecs::system::SystemParam)]
 pub struct MagicResolverParams<'w, 's> {
-    pub herb_query: Query<'w, 's, (Entity, &'static Herb, &'static crate::components::physical::Position), With<Harvestable>>,
+    pub herb_query: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static Herb,
+            &'static crate::components::physical::Position,
+        ),
+        With<Harvestable>,
+    >,
     pub pushback_writer: MessageWriter<'w, crate::systems::magic::CorruptionPushback>,
-    pub carcass_query: Query<'w, 's, (Entity, &'static mut crate::components::wildlife::Carcass, &'static crate::components::physical::Position)>,
+    pub carcass_query: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static mut crate::components::wildlife::Carcass,
+            &'static crate::components::physical::Position,
+        ),
+    >,
 }
 
 /// Bundles building queries for resolve_goap_plans.
@@ -112,10 +150,18 @@ pub struct MagicResolverParams<'w, 's> {
 /// this query accesses `&mut Structure` — Bevy proves disjointness on Structure.
 #[derive(bevy_ecs::system::SystemParam)]
 pub struct BuildingResolverParams<'w, 's> {
-    pub buildings: Query<'w, 's,
-        (Entity, &'static mut Structure, Option<&'static mut ConstructionSite>,
-         Option<&'static mut CropState>, &'static Position),
-        Without<crate::components::task_chain::TaskChain>>,
+    pub buildings: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static mut Structure,
+            Option<&'static mut ConstructionSite>,
+            Option<&'static mut CropState>,
+            &'static Position,
+        ),
+        Without<crate::components::task_chain::TaskChain>,
+    >,
     pub colony_score: Option<ResMut<'w, crate::resources::colony_score::ColonyScore>>,
 }
 
@@ -128,7 +174,12 @@ pub struct ExecutorContext<'w, 's> {
     pub constants: Res<'w, SimConstants>,
     /// Wildlife entities with positions, for `EngageThreat` target resolution.
     /// Excludes prey animals so cats don't try to "fight" rabbits as threats.
-    pub wildlife: bevy_ecs::prelude::Query<'w, 's, (Entity, &'static Position), (With<WildAnimal>, Without<Dead>, Without<PreyAnimal>)>,
+    pub wildlife: bevy_ecs::prelude::Query<
+        'w,
+        's,
+        (Entity, &'static Position),
+        (With<WildAnimal>, Without<Dead>, Without<PreyAnimal>),
+    >,
 }
 
 // ===========================================================================
@@ -239,8 +290,7 @@ fn check_interrupt(
     // A critically injured cat that chooses to rest is already recovering.
     // Interrupting Resting creates a plan/interrupt oscillation that prevents
     // any healing from occurring.
-    if kind != DispositionKind::Resting
-        && health.current / health.max < d.critical_health_threshold
+    if kind != DispositionKind::Resting && health.current / health.max < d.critical_health_threshold
     {
         return Some(InterruptReason::CriticalHealth);
     }
@@ -348,32 +398,43 @@ pub fn evaluate_and_plan(
     let wildlife_positions: Vec<(Entity, Position)> =
         world_state.wildlife.iter().map(|(e, p)| (e, *p)).collect();
 
-    let has_construction_site = world_state.building_query
+    let has_construction_site = world_state
+        .building_query
         .iter()
         .any(|(_, _, _, site, _)| site.is_some());
-    let has_damaged_building = world_state.building_query
+    let has_damaged_building = world_state
+        .building_query
         .iter()
         .any(|(_, s, _, site, _)| site.is_none() && s.condition < d.damaged_building_threshold);
-    let has_garden = world_state.building_query
+    let has_garden = world_state
+        .building_query
         .iter()
         .any(|(_, s, _, site, _)| s.kind == StructureType::Garden && site.is_none());
 
-    let herb_positions: Vec<(Entity, Position, HerbKind)> =
-        world_state.herb_query.iter().map(|(e, herb, p)| (e, *p, herb.kind)).collect();
+    let herb_positions: Vec<(Entity, Position, HerbKind)> = world_state
+        .herb_query
+        .iter()
+        .map(|(e, herb, p)| (e, *p, herb.kind))
+        .collect();
 
     let ward_strength_low = {
         let ward_count = world_state.ward_query.iter().count();
         if ward_count == 0 {
             true
         } else {
-            let avg: f32 =
-                world_state.ward_query.iter().map(|(w, _)| w.strength).sum::<f32>() / ward_count as f32;
+            let avg: f32 = world_state
+                .ward_query
+                .iter()
+                .map(|(w, _)| w.strength)
+                .sum::<f32>()
+                / ward_count as f32;
             avg < d.ward_strength_low_threshold
         }
     };
 
     // Snapshot actionable carcasses for scoring.
-    let carcass_positions: Vec<Position> = world_state.carcass_query
+    let carcass_positions: Vec<Position> = world_state
+        .carcass_query
         .iter()
         .filter(|(c, _)| !c.cleansed || !c.harvested)
         .map(|(_, p)| *p)
@@ -402,16 +463,20 @@ pub fn evaluate_and_plan(
     };
 
     // Detect if any shadow fox is actively sieging a ward.
-    let wards_under_siege = world_state.wildlife_ai_query
-        .iter()
-        .any(|s| matches!(s, crate::components::wildlife::WildlifeAiState::EncirclingWard { .. }));
+    let wards_under_siege = world_state.wildlife_ai_query.iter().any(|s| {
+        matches!(
+            s,
+            crate::components::wildlife::WildlifeAiState::EncirclingWard { .. }
+        )
+    });
 
     let colony_injury_count = query
         .iter()
         .filter(|(_, _, _, _, _, _, _, health, _, _, _, _, _, _, _)| health.current < 1.0)
         .count();
 
-    let directive_snapshot: HashMap<Entity, (usize, Option<Directive>)> = world_state.directive_queue_query
+    let directive_snapshot: HashMap<Entity, (usize, Option<Directive>)> = world_state
+        .directive_queue_query
         .iter()
         .map(|(entity, q)| (entity, (q.directives.len(), q.directives.first().cloned())))
         .collect();
@@ -443,24 +508,28 @@ pub fn evaluate_and_plan(
         cat_positions.iter().any(|(other, other_pos)| {
             *other != entity
                 && pos.manhattan_distance(other_pos) <= d.mentoring_detection_range
-                && world_state.skills_query.get(*other).is_ok_and(|other_skills| {
-                    let other_arr = [
-                        other_skills.hunting,
-                        other_skills.foraging,
-                        other_skills.herbcraft,
-                        other_skills.building,
-                        other_skills.combat,
-                        other_skills.magic,
-                    ];
-                    mentor_skills.iter().zip(other_arr.iter()).any(|(&m, &a)| {
-                        m > d.mentor_skill_threshold_high && a < d.mentor_skill_threshold_low
+                && world_state
+                    .skills_query
+                    .get(*other)
+                    .is_ok_and(|other_skills| {
+                        let other_arr = [
+                            other_skills.hunting,
+                            other_skills.foraging,
+                            other_skills.herbcraft,
+                            other_skills.building,
+                            other_skills.combat,
+                            other_skills.magic,
+                        ];
+                        mentor_skills.iter().zip(other_arr.iter()).any(|(&m, &a)| {
+                            m > d.mentor_skill_threshold_high && a < d.mentor_skill_threshold_low
+                        })
                     })
-                })
         })
     };
 
     // Pre-compute stores positions for zone distance calculations.
-    let stores_positions: Vec<Position> = world_state.building_query
+    let stores_positions: Vec<Position> = world_state
+        .building_query
         .iter()
         .filter(|(_, s, _, _, _)| s.kind == StructureType::Stores)
         .map(|(_, _, p, _, _)| *p)
@@ -660,7 +729,8 @@ pub fn evaluate_and_plan(
             .is_some_and(|(_, rp)| pos.manhattan_distance(rp) <= d.fated_rival_detection_range);
         apply_fated_bonuses(&mut scores, love_visible, rival_nearby, sc);
         if let Ok(directive) = world_state.active_directive_query.get(entity) {
-            let fondness_factor = res.relationships
+            let fondness_factor = res
+                .relationships
                 .get(entity, directive.coordinator)
                 .map_or(d.fondness_default, |r| (r.fondness + 1.0) / 2.0);
             let bonus = directive.priority
@@ -728,10 +798,40 @@ pub fn evaluate_and_plan(
         };
 
         // Build planner state and zone distances.
-        let construction_pos: Vec<(Entity, Position)> = world_state.building_query.iter().filter(|(_, _, _, site, _)| site.is_some()).map(|(e, _, p, _, _)| (e, *p)).collect();
-        let farm_pos: Vec<Position> = world_state.building_query.iter().filter(|(_, s, _, site, _)| s.kind == StructureType::Garden && site.is_none()).map(|(_, _, p, _, _)| *p).collect();
-        let planner_state = build_planner_state(pos, needs, &inventory, 0, &res.map, &stores_positions, &construction_pos, &farm_pos, &herb_positions);
-        let zone_distances = build_zone_distances(pos, &res.map, &stores_positions, &construction_pos, &farm_pos, &herb_positions, &cat_positions, entity, d);
+        let construction_pos: Vec<(Entity, Position)> = world_state
+            .building_query
+            .iter()
+            .filter(|(_, _, _, site, _)| site.is_some())
+            .map(|(e, _, p, _, _)| (e, *p))
+            .collect();
+        let farm_pos: Vec<Position> = world_state
+            .building_query
+            .iter()
+            .filter(|(_, s, _, site, _)| s.kind == StructureType::Garden && site.is_none())
+            .map(|(_, _, p, _, _)| *p)
+            .collect();
+        let planner_state = build_planner_state(
+            pos,
+            needs,
+            &inventory,
+            0,
+            &res.map,
+            &stores_positions,
+            &construction_pos,
+            &farm_pos,
+            &herb_positions,
+        );
+        let zone_distances = build_zone_distances(
+            pos,
+            &res.map,
+            &stores_positions,
+            &construction_pos,
+            &farm_pos,
+            &herb_positions,
+            &cat_positions,
+            entity,
+            d,
+        );
         let actions = actions_for_disposition(chosen, crafting_hint, &zone_distances);
         let goal = goal_for_disposition(chosen, 0);
 
@@ -763,12 +863,28 @@ pub fn evaluate_and_plan(
 pub fn resolve_goap_plans(
     mut cats: Query<
         (
-            (Entity, &mut GoapPlan, &mut CurrentAction, &mut Position,
-             &mut Skills, &mut Needs, &mut Inventory, &Personality, &Name),
-            (&Gender, Option<&mut ActionHistory>, &mut HuntingPriors,
-             Option<&mut crate::components::grooming::GroomingCondition>,
-             &mut crate::components::mental::Mood, &mut Health,
-             &MagicAffinity, &mut Corruption, &mut Memory),
+            (
+                Entity,
+                &mut GoapPlan,
+                &mut CurrentAction,
+                &mut Position,
+                &mut Skills,
+                &mut Needs,
+                &mut Inventory,
+                &Personality,
+                &Name,
+            ),
+            (
+                &Gender,
+                Option<&mut ActionHistory>,
+                &mut HuntingPriors,
+                Option<&mut crate::components::grooming::GroomingCondition>,
+                &mut crate::components::mental::Mood,
+                &mut Health,
+                &MagicAffinity,
+                &mut Corruption,
+                &mut Memory,
+            ),
         ),
         (
             Without<Dead>,
@@ -807,7 +923,11 @@ pub fn resolve_goap_plans(
 
     let grooming_snapshot: HashMap<Entity, f32> = cats
         .iter()
-        .map(|((e, _, _, _, _, _, _, _, _), (_, _, _, g, _, _, _, _, _))| (e, g.as_ref().map_or(0.8, |g| g.0)))
+        .map(
+            |((e, _, _, _, _, _, _, _, _), (_, _, _, g, _, _, _, _, _))| {
+                (e, g.as_ref().map_or(0.8, |g| g.0))
+            },
+        )
         .collect();
     let mut grooming_restorations: Vec<(Entity, f32)> = Vec::new();
 
@@ -850,12 +970,16 @@ pub fn resolve_goap_plans(
         .map(|(_, _, p, _, _)| *p)
         .collect();
 
-    let herb_positions: Vec<(Entity, Position, HerbKind)> = magic_params.herb_query
+    let herb_positions: Vec<(Entity, Position, HerbKind)> = magic_params
+        .herb_query
         .iter()
         .map(|(e, herb, p)| (e, *p, herb.kind))
         .collect();
 
-    let workshop_bonus: f32 = if building_snapshot.iter().any(|(_, kind, _, _, _)| *kind == StructureType::Workshop) {
+    let workshop_bonus: f32 = if building_snapshot
+        .iter()
+        .any(|(_, kind, _, _, _)| *kind == StructureType::Workshop)
+    {
         1.3
     } else {
         1.0
@@ -867,11 +991,17 @@ pub fn resolve_goap_plans(
 
     // Count cats adjacent to each construction site (for multi-builder bonuses).
     let builders_per_site: HashMap<Entity, usize> = {
-        let cat_pos_list: Vec<Position> = cats.iter().map(|((_, _, _, pos, _, _, _, _, _), _)| *pos).collect();
+        let cat_pos_list: Vec<Position> = cats
+            .iter()
+            .map(|((_, _, _, pos, _, _, _, _, _), _)| *pos)
+            .collect();
         let mut counts = HashMap::new();
         for (site_e, _, site_pos, is_site, _) in &building_snapshot {
             if *is_site {
-                let n = cat_pos_list.iter().filter(|cp| cp.manhattan_distance(site_pos) <= 1).count();
+                let n = cat_pos_list
+                    .iter()
+                    .filter(|cp| cp.manhattan_distance(site_pos) <= 1)
+                    .count();
                 if n > 0 {
                     counts.insert(*site_e, n);
                 }
@@ -880,8 +1010,10 @@ pub fn resolve_goap_plans(
         counts
     };
 
-    let cat_positions: Vec<(Entity, Position)> =
-        cats.iter().map(|((e, _, _, pos, _, _, _, _, _), _)| (e, *pos)).collect();
+    let cat_positions: Vec<(Entity, Position)> = cats
+        .iter()
+        .map(|((e, _, _, pos, _, _, _, _, _), _)| (e, *pos))
+        .collect();
 
     let injured_cat_positions: Vec<(Entity, Position)> = cats
         .iter()
@@ -890,10 +1022,28 @@ pub fn resolve_goap_plans(
         .collect();
 
     for (
-        (cat_entity, mut plan, mut current, mut pos, mut skills, mut needs,
-         mut inventory, personality, name),
-        (gender, history, mut hunting_priors, mut grooming, mut mood, mut health,
-         magic_aff, mut corruption, mut memory),
+        (
+            cat_entity,
+            mut plan,
+            mut current,
+            mut pos,
+            mut skills,
+            mut needs,
+            mut inventory,
+            personality,
+            name,
+        ),
+        (
+            gender,
+            history,
+            mut hunting_priors,
+            mut grooming,
+            mut mood,
+            mut health,
+            magic_aff,
+            mut corruption,
+            mut memory,
+        ),
     ) in &mut cats
     {
         // ---- Plan exhausted: handle trip completion / replanning ----
@@ -943,9 +1093,30 @@ pub fn resolve_goap_plans(
                 plans_to_remove.push(cat_entity);
             } else {
                 // Need more trips — replan from current state.
-                let planner_state = build_planner_state(&pos, &needs, &inventory, plan.trips_done, &ec.map, &stores_positions, &construction_positions, &farm_positions, &herb_positions);
-                let zone_distances = build_zone_distances(&pos, &ec.map, &stores_positions, &construction_positions, &farm_positions, &herb_positions, &cat_positions, cat_entity, d);
-                let actions = actions_for_disposition(plan.kind, plan.crafting_hint, &zone_distances);
+                let planner_state = build_planner_state(
+                    &pos,
+                    &needs,
+                    &inventory,
+                    plan.trips_done,
+                    &ec.map,
+                    &stores_positions,
+                    &construction_positions,
+                    &farm_positions,
+                    &herb_positions,
+                );
+                let zone_distances = build_zone_distances(
+                    &pos,
+                    &ec.map,
+                    &stores_positions,
+                    &construction_positions,
+                    &farm_positions,
+                    &herb_positions,
+                    &cat_positions,
+                    cat_entity,
+                    d,
+                );
+                let actions =
+                    actions_for_disposition(plan.kind, plan.crafting_hint, &zone_distances);
                 let goal = goal_for_disposition(plan.kind, plan.trips_done);
 
                 if let Some(new_steps) = make_plan(planner_state, &actions, &goal, 12, 1000) {
@@ -976,48 +1147,45 @@ pub fn resolve_goap_plans(
 
         // ---- Dispatch on action kind ----
         let step_result = match action_kind {
-            GoapActionKind::TravelTo(zone) => {
-                resolve_travel_to(
-                    zone,
-                    &mut plan.step_state[step_idx],
-                    &mut pos,
-                    &ec.map,
-                    &cat_tile_counts,
-                    &stores_positions,
-                    &construction_positions, &farm_positions,
-                    &herb_positions,
-                    &cat_positions,
-                    cat_entity,
-                    d,
-                )
-            }
+            GoapActionKind::TravelTo(zone) => resolve_travel_to(
+                zone,
+                &mut plan.step_state[step_idx],
+                &mut pos,
+                &ec.map,
+                &cat_tile_counts,
+                &stores_positions,
+                &construction_positions,
+                &farm_positions,
+                &herb_positions,
+                &cat_positions,
+                cat_entity,
+                d,
+            ),
 
-            GoapActionKind::SearchPrey => {
-                resolve_search_prey(
-                    &mut plan.step_state[step_idx],
-                    ticks,
-                    &mut pos,
-                    &mut hunting_priors,
-                    &mut colony_map,
-                    &prey_query,
-                    &den_query,
-                    &mut inventory,
-                    &mut skills,
-                    &mut prey_params,
-                    &ec.map,
-                    &ec.wind,
-                    &mut narr,
-                    &ec.time,
-                    &mut rng,
-                    &mut commands,
-                    cat_entity,
-                    personality,
-                    name,
-                    gender,
-                    &needs,
-                    d,
-                )
-            }
+            GoapActionKind::SearchPrey => resolve_search_prey(
+                &mut plan.step_state[step_idx],
+                ticks,
+                &mut pos,
+                &mut hunting_priors,
+                &mut colony_map,
+                &prey_query,
+                &den_query,
+                &mut inventory,
+                &mut skills,
+                &mut prey_params,
+                &ec.map,
+                &ec.wind,
+                &mut narr,
+                &ec.time,
+                &mut rng,
+                &mut commands,
+                cat_entity,
+                personality,
+                name,
+                gender,
+                &needs,
+                d,
+            ),
 
             GoapActionKind::EngagePrey => {
                 // Get prey target from previous SearchPrey step's state, or from
@@ -1052,7 +1220,10 @@ pub fn resolve_goap_plans(
             GoapActionKind::DepositPrey | GoapActionKind::DepositFood => {
                 // Resolve nearest store as target.
                 if plan.step_state[step_idx].target_entity.is_none() {
-                    plan.step_state[step_idx].target_entity = stores_entities.iter().min_by_key(|(_, sp)| pos.manhattan_distance(sp)).map(|(e, _)| *e);
+                    plan.step_state[step_idx].target_entity = stores_entities
+                        .iter()
+                        .min_by_key(|(_, sp)| pos.manhattan_distance(sp))
+                        .map(|(e, _)| *e);
                 }
                 let deposit = crate::steps::disposition::resolve_deposit_at_stores(
                     plan.step_state[step_idx].target_entity,
@@ -1076,28 +1247,29 @@ pub fn resolve_goap_plans(
                 deposit.step
             }
 
-            GoapActionKind::ForageItem => {
-                resolve_forage_item(
-                    &mut plan.step_state[step_idx],
-                    ticks,
-                    &mut pos,
-                    &mut inventory,
-                    &mut skills,
-                    &ec.map,
-                    &mut narr,
-                    &ec.time,
-                    &mut rng,
-                    personality,
-                    name,
-                    gender,
-                    &needs,
-                    d,
-                )
-            }
+            GoapActionKind::ForageItem => resolve_forage_item(
+                &mut plan.step_state[step_idx],
+                ticks,
+                &mut pos,
+                &mut inventory,
+                &mut skills,
+                &ec.map,
+                &mut narr,
+                &ec.time,
+                &mut rng,
+                personality,
+                name,
+                gender,
+                &needs,
+                d,
+            ),
 
             GoapActionKind::EatAtStores => {
                 if plan.step_state[step_idx].target_entity.is_none() {
-                    plan.step_state[step_idx].target_entity = stores_entities.iter().min_by_key(|(_, sp)| pos.manhattan_distance(sp)).map(|(e, _)| *e);
+                    plan.step_state[step_idx].target_entity = stores_entities
+                        .iter()
+                        .min_by_key(|(_, sp)| pos.manhattan_distance(sp))
+                        .map(|(e, _)| *e);
                 }
                 crate::steps::disposition::resolve_eat_at_stores(
                     ticks,
@@ -1111,29 +1283,30 @@ pub fn resolve_goap_plans(
             }
 
             GoapActionKind::Sleep => {
-                let duration = d.sleep_duration_base + ((1.0 - needs.energy) * d.sleep_duration_deficit_multiplier) as u64;
+                let duration = d.sleep_duration_base
+                    + ((1.0 - needs.energy) * d.sleep_duration_deficit_multiplier) as u64;
                 // Corruption degrades rest quality.
                 let tile_corruption = if ec.map.in_bounds(pos.x, pos.y) {
                     ec.map.get(pos.x, pos.y).corruption
                 } else {
                     0.0
                 };
-                let result = crate::steps::disposition::resolve_sleep(ticks, duration, &mut needs, d);
+                let result =
+                    crate::steps::disposition::resolve_sleep(ticks, duration, &mut needs, d);
                 if tile_corruption > 0.0 {
-                    let penalty = tile_corruption * (1.0 - ec.constants.magic.corruption_rest_penalty);
+                    let penalty =
+                        tile_corruption * (1.0 - ec.constants.magic.corruption_rest_penalty);
                     needs.energy = (needs.energy - d.sleep_energy_per_tick * penalty).max(0.0);
                 }
                 result
             }
 
-            GoapActionKind::SelfGroom => {
-                crate::steps::disposition::resolve_self_groom(
-                    ticks,
-                    &mut needs,
-                    grooming.as_deref_mut(),
-                    d,
-                )
-            }
+            GoapActionKind::SelfGroom => crate::steps::disposition::resolve_self_groom(
+                ticks,
+                &mut needs,
+                grooming.as_deref_mut(),
+                d,
+            ),
 
             GoapActionKind::SocializeWith => {
                 // Resolve social target on first tick.
@@ -1155,11 +1328,13 @@ pub fn resolve_goap_plans(
                     d,
                 );
                 if matches!(result, crate::steps::StepResult::Advance) {
-                    magic_params.pushback_writer.write(crate::systems::magic::CorruptionPushback {
-                        position: *pos,
-                        radius: 2,
-                        amount: 0.01,
-                    });
+                    magic_params
+                        .pushback_writer
+                        .write(crate::systems::magic::CorruptionPushback {
+                            position: *pos,
+                            radius: 2,
+                            amount: 0.01,
+                        });
                 }
                 result
             }
@@ -1214,8 +1389,13 @@ pub fn resolve_goap_plans(
 
             GoapActionKind::PatrolArea => {
                 if plan.step_state[step_idx].target_position.is_none() {
-                    plan.step_state[step_idx].target_position =
-                        find_random_nearby_tile(&pos, &ec.map, d.guard_patrol_radius as i32, |t| t.is_passable(), &mut rng.rng);
+                    plan.step_state[step_idx].target_position = find_random_nearby_tile(
+                        &pos,
+                        &ec.map,
+                        d.guard_patrol_radius as i32,
+                        |t| t.is_passable(),
+                        &mut rng.rng,
+                    );
                 }
                 crate::steps::disposition::resolve_patrol_to(
                     &mut pos,
@@ -1234,7 +1414,8 @@ pub fn resolve_goap_plans(
                 // only at ticks_elapsed == 0 (before dispatch), so we must also write
                 // current.target_entity directly here for resolve_combat to pick it up.
                 if plan.step_state[step_idx].target_entity.is_none() {
-                    let nearest = ec.wildlife
+                    let nearest = ec
+                        .wildlife
                         .iter()
                         .min_by_key(|(_, wp)| pos.manhattan_distance(wp))
                         .map(|(e, _)| e);
@@ -1250,15 +1431,13 @@ pub fn resolve_goap_plans(
                 )
             }
 
-            GoapActionKind::Survey => {
-                crate::steps::disposition::resolve_survey(
-                    ticks,
-                    &mut needs,
-                    &pos,
-                    &mut prey_params.exploration_map,
-                    d,
-                )
-            }
+            GoapActionKind::Survey => crate::steps::disposition::resolve_survey(
+                ticks,
+                &mut needs,
+                &pos,
+                &mut prey_params.exploration_map,
+                d,
+            ),
 
             GoapActionKind::DeliverDirective => {
                 let result =
@@ -1295,18 +1474,23 @@ pub fn resolve_goap_plans(
                     if let Some(ref mut act) = narr.activation {
                         act.record(Feature::MatingOccurred);
                     }
-                    magic_params.pushback_writer.write(crate::systems::magic::CorruptionPushback {
-                        position: *pos,
-                        radius: 2,
-                        amount: 0.03,
-                    });
+                    magic_params
+                        .pushback_writer
+                        .write(crate::systems::magic::CorruptionPushback {
+                            position: *pos,
+                            radius: 2,
+                            amount: 0.03,
+                        });
                 }
                 result
             }
 
             GoapActionKind::FeedKitten => {
                 if plan.step_state[step_idx].target_entity.is_none() {
-                    plan.step_state[step_idx].target_entity = stores_entities.iter().min_by_key(|(_, sp)| pos.manhattan_distance(sp)).map(|(e, _)| *e);
+                    plan.step_state[step_idx].target_entity = stores_entities
+                        .iter()
+                        .min_by_key(|(_, sp)| pos.manhattan_distance(sp))
+                        .map(|(e, _)| *e);
                 }
                 crate::steps::disposition::resolve_feed_kitten(
                     ticks,
@@ -1323,7 +1507,9 @@ pub fn resolve_goap_plans(
                     // When the plan includes SetWard, target Thornbriar specifically.
                     // Otherwise SetWard fails at runtime ("no thornbriar for ward")
                     // because the cat gathered the wrong herb type.
-                    let wants_thornbriar = plan.steps.iter()
+                    let wants_thornbriar = plan
+                        .steps
+                        .iter()
                         .any(|s| matches!(s.action, GoapActionKind::SetWard));
                     plan.step_state[step_idx].target_entity = herb_positions
                         .iter()
@@ -1376,7 +1562,8 @@ pub fn resolve_goap_plans(
             }
 
             GoapActionKind::PrepareRemedy => {
-                let remedy = inventory.first_remedy_kind()
+                let remedy = inventory
+                    .first_remedy_kind()
                     .unwrap_or(crate::components::magic::RemedyKind::HealingPoultice);
                 let at_workshop = building_snapshot.iter().any(|(_, kind, p, _, _)| {
                     *kind == StructureType::Stores && pos.manhattan_distance(p) <= 1
@@ -1402,9 +1589,11 @@ pub fn resolve_goap_plans(
                         plan.step_state[step_idx].target_position = Some(*patient_pos);
                     }
                 }
-                let remedy = inventory.first_remedy_kind()
+                let remedy = inventory
+                    .first_remedy_kind()
                     .unwrap_or(crate::components::magic::RemedyKind::HealingPoultice);
-                let patient_alive = plan.step_state[step_idx].target_entity
+                let patient_alive = plan.step_state[step_idx]
+                    .target_entity
                     .map(|e| cat_positions.iter().any(|(ce, _)| *ce == e))
                     .unwrap_or(false);
                 let (result, gratitude) = crate::steps::magic::resolve_apply_remedy(
@@ -1475,11 +1664,13 @@ pub fn resolve_goap_plans(
                     &ec.constants.combat,
                 );
                 if matches!(result, crate::steps::StepResult::Advance) {
-                    magic_params.pushback_writer.write(crate::systems::magic::CorruptionPushback {
-                        position: *pos,
-                        radius: 4,
-                        amount: 0.08,
-                    });
+                    magic_params
+                        .pushback_writer
+                        .write(crate::systems::magic::CorruptionPushback {
+                            position: *pos,
+                            radius: 4,
+                            amount: 0.08,
+                        });
                 }
                 result
             }
@@ -1522,7 +1713,8 @@ pub fn resolve_goap_plans(
             GoapActionKind::HarvestCarcass => {
                 // Find nearest carcass that hasn't been harvested.
                 if plan.step_state[step_idx].target_entity.is_none() {
-                    plan.step_state[step_idx].target_entity = magic_params.carcass_query
+                    plan.step_state[step_idx].target_entity = magic_params
+                        .carcass_query
                         .iter()
                         .filter(|(_, c, _)| !c.harvested)
                         .min_by_key(|(_, _, cp)| pos.manhattan_distance(cp))
@@ -1530,7 +1722,9 @@ pub fn resolve_goap_plans(
                 }
                 if let Some(carcass_entity) = plan.step_state[step_idx].target_entity {
                     if ticks >= ec.constants.magic.harvest_carcass_ticks {
-                        if let Ok((_, mut carcass, _)) = magic_params.carcass_query.get_mut(carcass_entity) {
+                        if let Ok((_, mut carcass, _)) =
+                            magic_params.carcass_query.get_mut(carcass_entity)
+                        {
                             carcass.harvested = true;
                             let harvest_corruption = if ec.map.in_bounds(pos.x, pos.y) {
                                 ec.map.get(pos.x, pos.y).corruption
@@ -1539,10 +1733,15 @@ pub fn resolve_goap_plans(
                             };
                             inventory.add_item_with_modifiers(
                                 crate::components::items::ItemKind::ShadowBone,
-                                crate::components::items::ItemModifiers::with_corruption(harvest_corruption),
+                                crate::components::items::ItemModifiers::with_corruption(
+                                    harvest_corruption,
+                                ),
                             );
-                            corruption.0 = (corruption.0 + ec.constants.magic.harvest_corruption_gain).min(1.0);
-                            skills.herbcraft += skills.growth_rate() * ec.constants.magic.herbcraft_gather_skill_growth;
+                            corruption.0 = (corruption.0
+                                + ec.constants.magic.harvest_corruption_gain)
+                                .min(1.0);
+                            skills.herbcraft += skills.growth_rate()
+                                * ec.constants.magic.herbcraft_gather_skill_growth;
                             if let Some(ref mut act) = narr.activation {
                                 act.record(Feature::CarcassHarvested);
                             }
@@ -1672,9 +1871,30 @@ pub fn resolve_goap_plans(
             }
             crate::steps::StepResult::Fail(reason) => {
                 // Attempt replanning.
-                let planner_state = build_planner_state(&pos, &needs, &inventory, plan.trips_done, &ec.map, &stores_positions, &construction_positions, &farm_positions, &herb_positions);
-                let zone_distances = build_zone_distances(&pos, &ec.map, &stores_positions, &construction_positions, &farm_positions, &herb_positions, &cat_positions, cat_entity, d);
-                let actions = actions_for_disposition(plan.kind, plan.crafting_hint, &zone_distances);
+                let planner_state = build_planner_state(
+                    &pos,
+                    &needs,
+                    &inventory,
+                    plan.trips_done,
+                    &ec.map,
+                    &stores_positions,
+                    &construction_positions,
+                    &farm_positions,
+                    &herb_positions,
+                );
+                let zone_distances = build_zone_distances(
+                    &pos,
+                    &ec.map,
+                    &stores_positions,
+                    &construction_positions,
+                    &farm_positions,
+                    &herb_positions,
+                    &cat_positions,
+                    cat_entity,
+                    d,
+                );
+                let actions =
+                    actions_for_disposition(plan.kind, plan.crafting_hint, &zone_distances);
                 let goal = goal_for_disposition(plan.kind, plan.trips_done);
 
                 if let Some(new_steps) = make_plan(planner_state, &actions, &goal, 12, 1000) {
@@ -1744,9 +1964,25 @@ pub fn resolve_goap_plans(
     // Deferred mentor effects.
     for effect in &mentor_effects {
         let app_skills_result = if let Ok(s) = unchained_skills.get(effect.apprentice) {
-            Some((s.hunting, s.foraging, s.herbcraft, s.building, s.combat, s.magic, s.growth_rate()))
+            Some((
+                s.hunting,
+                s.foraging,
+                s.herbcraft,
+                s.building,
+                s.combat,
+                s.magic,
+                s.growth_rate(),
+            ))
         } else if let Ok(((_, _, _, _, s, _, _, _, _), _)) = cats.get(effect.apprentice) {
-            Some((s.hunting, s.foraging, s.herbcraft, s.building, s.combat, s.magic, s.growth_rate()))
+            Some((
+                s.hunting,
+                s.foraging,
+                s.herbcraft,
+                s.building,
+                s.combat,
+                s.magic,
+                s.growth_rate(),
+            ))
         } else {
             None
         };
@@ -1766,7 +2002,9 @@ pub fn resolve_goap_plans(
                     *m > d.mentor_skill_threshold_high && *a < d.mentor_skill_threshold_low
                 })
                 .max_by(|(_, (am, aa)), (_, (bm, ba))| {
-                    (am - aa).partial_cmp(&(bm - ba)).unwrap_or(std::cmp::Ordering::Equal)
+                    (am - aa)
+                        .partial_cmp(&(bm - ba))
+                        .unwrap_or(std::cmp::Ordering::Equal)
                 })
             {
                 let growth = growth_rate * d.apprentice_skill_growth_multiplier;
@@ -1871,8 +2109,14 @@ pub fn emit_plan_narrative(
         };
 
         let fallback = match msg.event {
-            PlanEvent::Adopted => format!("{} sets out to {}.", name.0, msg.kind.label().to_lowercase()),
-            PlanEvent::Completed => format!("{} finishes {}.", name.0, msg.kind.label().to_lowercase()),
+            PlanEvent::Adopted => format!(
+                "{} sets out to {}.",
+                name.0,
+                msg.kind.label().to_lowercase()
+            ),
+            PlanEvent::Completed => {
+                format!("{} finishes {}.", name.0, msg.kind.label().to_lowercase())
+            }
             PlanEvent::Replanned => format!("{} adjusts course.", name.0),
             PlanEvent::Abandoned => format!("{} gives up.", name.0),
         };
@@ -1911,7 +2155,18 @@ fn resolve_travel_to(
     d: &DispositionConstants,
 ) -> crate::steps::StepResult {
     if state.target_position.is_none() {
-        state.target_position = resolve_zone_position(zone, pos, map, stores_positions, construction_positions, farm_positions, herb_positions, cat_positions, cat_entity, d);
+        state.target_position = resolve_zone_position(
+            zone,
+            pos,
+            map,
+            stores_positions,
+            construction_positions,
+            farm_positions,
+            herb_positions,
+            cat_positions,
+            cat_entity,
+            d,
+        );
     }
     let Some(target) = state.target_position else {
         return crate::steps::StepResult::Fail("no reachable zone target".into());
@@ -1930,7 +2185,11 @@ fn resolve_travel_to(
         if pos.manhattan_distance(&target) <= 1 {
             // Anti-stacking jitter.
             if cat_tile_counts.get(&target).copied().unwrap_or(0) > 1 {
-                let occupied: std::collections::HashSet<Position> = cat_tile_counts.keys().filter(|p| cat_tile_counts[p] > 1).copied().collect();
+                let occupied: std::collections::HashSet<Position> = cat_tile_counts
+                    .keys()
+                    .filter(|p| cat_tile_counts[p] > 1)
+                    .copied()
+                    .collect();
                 if let Some(adj) = find_free_adjacent(target, *pos, map, &occupied) {
                     *pos = adj;
                 }
@@ -2016,7 +2275,8 @@ fn resolve_search_prey(
                 } else {
                     0.0
                 };
-                let den_mods = crate::components::items::ItemModifiers::with_corruption(den_corruption);
+                let den_mods =
+                    crate::components::items::ItemModifiers::with_corruption(den_corruption);
                 for _ in 0..kills {
                     if !inventory.is_full() {
                         inventory.slots.push(ItemSlot::Item(drop_item, den_mods));
@@ -2047,7 +2307,21 @@ fn resolve_search_prey(
                     den_name,
                 });
 
-                emit_hunt_narrative(narr, time, rng, map, pos, name, gender, personality, needs, "raid", &format!("{} raids a {}!", name.0, den_name), Some(den_name), None);
+                emit_hunt_narrative(
+                    narr,
+                    time,
+                    rng,
+                    map,
+                    pos,
+                    name,
+                    gender,
+                    personality,
+                    needs,
+                    "raid",
+                    &format!("{} raids a {}!", name.0, den_name),
+                    Some(den_name),
+                    None,
+                );
 
                 // Den raid counts as finding prey — advance.
                 return crate::steps::StepResult::Advance;
@@ -2057,7 +2331,9 @@ fn resolve_search_prey(
 
     // Search movement: belief > colony belief > wind > patrol_dir.
     let belief_dir = hunting_priors.best_direction(pos, d.search_belief_radius);
-    let colony_dir = colony_map.beliefs.best_direction(pos, d.search_belief_radius);
+    let colony_dir = colony_map
+        .beliefs
+        .best_direction(pos, d.search_belief_radius);
     let (wx, wy) = wind.direction();
     let (mut dx, mut dy) = if let Some((bx, by)) = belief_dir {
         (bx, by)
@@ -2112,13 +2388,31 @@ fn resolve_search_prey(
     if let Some((prey_entity, prey_pos_ref, _, _)) = scented_prey {
         state.target_entity = Some(prey_entity);
         hunting_priors.record_scent(prey_pos_ref);
-        emit_hunt_narrative(narr, time, rng, map, pos, name, gender, personality, needs, "scent", &format!("{} catches a scent on the wind.", name.0), None, None);
+        emit_hunt_narrative(
+            narr,
+            time,
+            rng,
+            map,
+            pos,
+            name,
+            gender,
+            personality,
+            needs,
+            "scent",
+            &format!("{} catches a scent on the wind.", name.0),
+            None,
+            None,
+        );
         return crate::steps::StepResult::Advance;
     }
 
     // Timeout.
     if ticks > d.search_timeout_ticks {
-        if inventory.slots.iter().any(|s| matches!(s, ItemSlot::Item(k, _) if k.is_food())) {
+        if inventory
+            .slots
+            .iter()
+            .any(|s| matches!(s, ItemSlot::Item(k, _) if k.is_food()))
+        {
             // Have food from earlier — advance to deposit.
             return crate::steps::StepResult::Advance;
         }
@@ -2228,7 +2522,10 @@ fn resolve_engage_prey(
                 0.0
             };
             if !inventory.is_full() {
-                inventory.slots.push(ItemSlot::Item(item_kind, crate::components::items::ItemModifiers::with_corruption(catch_corruption)));
+                inventory.slots.push(ItemSlot::Item(
+                    item_kind,
+                    crate::components::items::ItemModifiers::with_corruption(catch_corruption),
+                ));
             }
             skills.hunting += skills.growth_rate() * d.hunt_catch_skill_growth;
 
@@ -2242,7 +2539,21 @@ fn resolve_engage_prey(
             } else {
                 format!("{} catches a {}.", name.0, species_name)
             };
-            emit_hunt_narrative(narr, time, rng, map, pos, name, gender, personality, needs, "catch", &catch_desc, Some(species_name), None);
+            emit_hunt_narrative(
+                narr,
+                time,
+                rng,
+                map,
+                pos,
+                name,
+                gender,
+                personality,
+                needs,
+                "catch",
+                &catch_desc,
+                Some(species_name),
+                None,
+            );
 
             hunting_priors.record_catch(&prey_pos);
 
@@ -2263,7 +2574,21 @@ fn resolve_engage_prey(
                 };
             }
 
-            emit_hunt_narrative(narr, time, rng, map, pos, name, gender, personality, needs, "miss", &format!("{}'s quarry bolts.", name.0), Some(species_name), None);
+            emit_hunt_narrative(
+                narr,
+                time,
+                rng,
+                map,
+                pos,
+                name,
+                gender,
+                personality,
+                needs,
+                "miss",
+                &format!("{}'s quarry bolts.", name.0),
+                Some(species_name),
+                None,
+            );
 
             let chase_limit = if personality.boldness > 0.7 {
                 d.chase_limit_bold
@@ -2420,7 +2745,10 @@ fn resolve_forage_item(
                 0.0
             };
             if !inventory.is_full() {
-                inventory.slots.push(ItemSlot::Item(item_kind, crate::components::items::ItemModifiers::with_corruption(forage_corruption)));
+                inventory.slots.push(ItemSlot::Item(
+                    item_kind,
+                    crate::components::items::ItemModifiers::with_corruption(forage_corruption),
+                ));
             }
             skills.foraging += skills.growth_rate() * d.forage_skill_growth;
 
@@ -2697,7 +3025,13 @@ fn respect_for_disposition(kind: DispositionKind, d: &DispositionConstants) -> f
 
 fn find_nearest_store(
     pos: &Position,
-    building_query: &Query<(Entity, &Structure, &Position, Option<&ConstructionSite>, Option<&CropState>)>,
+    building_query: &Query<(
+        Entity,
+        &Structure,
+        &Position,
+        Option<&ConstructionSite>,
+        Option<&CropState>,
+    )>,
 ) -> Option<Entity> {
     building_query
         .iter()
@@ -2719,8 +3053,12 @@ fn find_social_target(
             *other != cat_entity && pos.manhattan_distance(other_pos) <= d.social_target_range
         })
         .max_by(|(a, _), (b, _)| {
-            let fa = relationships.get(cat_entity, *a).map_or(0.0, |r| r.fondness);
-            let fb = relationships.get(cat_entity, *b).map_or(0.0, |r| r.fondness);
+            let fa = relationships
+                .get(cat_entity, *a)
+                .map_or(0.0, |r| r.fondness);
+            let fb = relationships
+                .get(cat_entity, *b)
+                .map_or(0.0, |r| r.fondness);
             fa.partial_cmp(&fb).unwrap_or(std::cmp::Ordering::Equal)
         })
         .map(|(e, _)| *e)
@@ -2765,29 +3103,22 @@ fn resolve_zone_position(
             .iter()
             .min_by_key(|(_, hp, _)| pos.manhattan_distance(hp))
             .map(|(_, p, _)| *p),
-        PlannerZone::RestingSpot => {
-            stores_positions
-                .iter()
-                .min_by_key(|sp| pos.manhattan_distance(sp))
-                .map(|sp| Position::new(sp.x + 1, sp.y))
-                .or(Some(*pos))
-        }
+        PlannerZone::RestingSpot => stores_positions
+            .iter()
+            .min_by_key(|sp| pos.manhattan_distance(sp))
+            .map(|sp| Position::new(sp.x + 1, sp.y))
+            .or(Some(*pos)),
         PlannerZone::SocialTarget => cat_positions
             .iter()
             .filter(|(other, _)| *other != cat_entity)
             .min_by_key(|(_, op)| pos.manhattan_distance(op))
             .map(|(_, p)| *p),
-        PlannerZone::Wilds => {
-            find_nearest_tile(pos, map, 20, |t| t.is_passable())
-                .or(Some(*pos))
-        }
-        PlannerZone::PatrolZone => {
-            stores_positions
-                .iter()
-                .min_by_key(|sp| pos.manhattan_distance(sp))
-                .map(|sp| Position::new(sp.x + d.guard_patrol_radius as i32, sp.y))
-                .or(Some(*pos))
-        }
+        PlannerZone::Wilds => find_nearest_tile(pos, map, 20, |t| t.is_passable()).or(Some(*pos)),
+        PlannerZone::PatrolZone => stores_positions
+            .iter()
+            .min_by_key(|sp| pos.manhattan_distance(sp))
+            .map(|sp| Position::new(sp.x + d.guard_patrol_radius as i32, sp.y))
+            .or(Some(*pos)),
     }
 }
 
@@ -2803,14 +3134,41 @@ fn build_planner_state(
     farm_positions: &[Position],
     herb_positions: &[(Entity, Position, HerbKind)],
 ) -> PlannerState {
-    let zone = classify_zone(pos, map, stores_positions, construction_positions, farm_positions, herb_positions);
-    let carrying = if inventory.slots.iter().any(|s| matches!(s, crate::components::magic::ItemSlot::Item(k, _) if k.is_food())) {
-        if inventory.slots.iter().any(|s| matches!(s, crate::components::magic::ItemSlot::Item(crate::components::items::ItemKind::RawMouse | crate::components::items::ItemKind::RawRat | crate::components::items::ItemKind::RawBird | crate::components::items::ItemKind::RawFish | crate::components::items::ItemKind::RawRabbit, _))) {
+    let zone = classify_zone(
+        pos,
+        map,
+        stores_positions,
+        construction_positions,
+        farm_positions,
+        herb_positions,
+    );
+    let carrying = if inventory
+        .slots
+        .iter()
+        .any(|s| matches!(s, crate::components::magic::ItemSlot::Item(k, _) if k.is_food()))
+    {
+        if inventory.slots.iter().any(|s| {
+            matches!(
+                s,
+                crate::components::magic::ItemSlot::Item(
+                    crate::components::items::ItemKind::RawMouse
+                        | crate::components::items::ItemKind::RawRat
+                        | crate::components::items::ItemKind::RawBird
+                        | crate::components::items::ItemKind::RawFish
+                        | crate::components::items::ItemKind::RawRabbit,
+                    _
+                )
+            )
+        }) {
             Carrying::Prey
         } else {
             Carrying::ForagedFood
         }
-    } else if inventory.slots.iter().any(|s| matches!(s, crate::components::magic::ItemSlot::Herb(_))) {
+    } else if inventory
+        .slots
+        .iter()
+        .any(|s| matches!(s, crate::components::magic::ItemSlot::Herb(_)))
+    {
         Carrying::Herbs
     } else {
         Carrying::Nothing
@@ -2838,16 +3196,28 @@ fn classify_zone(
     farm_positions: &[Position],
     herb_positions: &[(Entity, Position, HerbKind)],
 ) -> PlannerZone {
-    if stores_positions.iter().any(|sp| pos.manhattan_distance(sp) <= 2) {
+    if stores_positions
+        .iter()
+        .any(|sp| pos.manhattan_distance(sp) <= 2)
+    {
         return PlannerZone::Stores;
     }
-    if construction_positions.iter().any(|(_, cp)| pos.manhattan_distance(cp) <= 2) {
+    if construction_positions
+        .iter()
+        .any(|(_, cp)| pos.manhattan_distance(cp) <= 2)
+    {
         return PlannerZone::ConstructionSite;
     }
-    if farm_positions.iter().any(|fp| pos.manhattan_distance(fp) <= 2) {
+    if farm_positions
+        .iter()
+        .any(|fp| pos.manhattan_distance(fp) <= 2)
+    {
         return PlannerZone::Farm;
     }
-    if herb_positions.iter().any(|(_, hp, _)| pos.manhattan_distance(hp) <= 3) {
+    if herb_positions
+        .iter()
+        .any(|(_, hp, _)| pos.manhattan_distance(hp) <= 3)
+    {
         return PlannerZone::HerbPatch;
     }
     if map.in_bounds(pos.x, pos.y) {
@@ -2877,16 +3247,69 @@ fn build_zone_distances(
     let mut distances = ZoneDistances::default();
 
     let zone_positions: Vec<(PlannerZone, Option<Position>)> = vec![
-        (PlannerZone::Stores, stores_positions.iter().min_by_key(|sp| pos.manhattan_distance(sp)).copied()),
-        (PlannerZone::HuntingGround, find_nearest_tile(pos, map, d.hunt_terrain_search_radius, |t| matches!(t, Terrain::DenseForest | Terrain::LightForest))),
-        (PlannerZone::ForagingGround, find_nearest_tile(pos, map, d.forage_terrain_search_radius, |t| t.foraging_yield() > 0.0)),
-        (PlannerZone::Farm, farm_positions.iter().min_by_key(|fp| pos.manhattan_distance(fp)).copied()),
-        (PlannerZone::ConstructionSite, construction_positions.iter().min_by_key(|(_, cp)| pos.manhattan_distance(cp)).map(|(_, p)| *p)),
-        (PlannerZone::HerbPatch, herb_positions.iter().min_by_key(|(_, hp, _)| pos.manhattan_distance(hp)).map(|(_, p, _)| *p)),
-        (PlannerZone::RestingSpot, stores_positions.iter().min_by_key(|sp| pos.manhattan_distance(sp)).map(|sp| Position::new(sp.x + 1, sp.y))),
-        (PlannerZone::SocialTarget, cat_positions.iter().filter(|(other, _)| *other != cat_entity).min_by_key(|(_, op)| pos.manhattan_distance(op)).map(|(_, p)| *p)),
+        (
+            PlannerZone::Stores,
+            stores_positions
+                .iter()
+                .min_by_key(|sp| pos.manhattan_distance(sp))
+                .copied(),
+        ),
+        (
+            PlannerZone::HuntingGround,
+            find_nearest_tile(pos, map, d.hunt_terrain_search_radius, |t| {
+                matches!(t, Terrain::DenseForest | Terrain::LightForest)
+            }),
+        ),
+        (
+            PlannerZone::ForagingGround,
+            find_nearest_tile(pos, map, d.forage_terrain_search_radius, |t| {
+                t.foraging_yield() > 0.0
+            }),
+        ),
+        (
+            PlannerZone::Farm,
+            farm_positions
+                .iter()
+                .min_by_key(|fp| pos.manhattan_distance(fp))
+                .copied(),
+        ),
+        (
+            PlannerZone::ConstructionSite,
+            construction_positions
+                .iter()
+                .min_by_key(|(_, cp)| pos.manhattan_distance(cp))
+                .map(|(_, p)| *p),
+        ),
+        (
+            PlannerZone::HerbPatch,
+            herb_positions
+                .iter()
+                .min_by_key(|(_, hp, _)| pos.manhattan_distance(hp))
+                .map(|(_, p, _)| *p),
+        ),
+        (
+            PlannerZone::RestingSpot,
+            stores_positions
+                .iter()
+                .min_by_key(|sp| pos.manhattan_distance(sp))
+                .map(|sp| Position::new(sp.x + 1, sp.y)),
+        ),
+        (
+            PlannerZone::SocialTarget,
+            cat_positions
+                .iter()
+                .filter(|(other, _)| *other != cat_entity)
+                .min_by_key(|(_, op)| pos.manhattan_distance(op))
+                .map(|(_, p)| *p),
+        ),
         (PlannerZone::Wilds, Some(*pos)),
-        (PlannerZone::PatrolZone, stores_positions.iter().min_by_key(|sp| pos.manhattan_distance(sp)).map(|sp| Position::new(sp.x + d.guard_patrol_radius as i32, sp.y))),
+        (
+            PlannerZone::PatrolZone,
+            stores_positions
+                .iter()
+                .min_by_key(|sp| pos.manhattan_distance(sp))
+                .map(|sp| Position::new(sp.x + d.guard_patrol_radius as i32, sp.y)),
+        ),
     ];
 
     // Build pairwise distances between reachable zones.

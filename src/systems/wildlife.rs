@@ -44,7 +44,15 @@ pub struct DetectionCooldowns {
 pub fn wildlife_ai(
     mut query: Query<(&WildAnimal, &mut Position, &mut WildlifeAiState), Without<FoxState>>,
     wards: Query<(&Ward, &Position), Without<WildAnimal>>,
-    cat_positions: Query<&Position, (With<Needs>, Without<Dead>, Without<PreyAnimal>, Without<WildAnimal>)>,
+    cat_positions: Query<
+        &Position,
+        (
+            With<Needs>,
+            Without<Dead>,
+            Without<PreyAnimal>,
+            Without<WildAnimal>,
+        ),
+    >,
     mut map: ResMut<TileMap>,
     mut rng: ResMut<SimRng>,
     constants: Res<SimConstants>,
@@ -135,11 +143,18 @@ pub fn wildlife_ai(
                 }
                 // If we'd go off-map, despawn is handled by cleanup_wildlife.
             }
-            WildlifeAiState::EncirclingWard { ward_x, ward_y, ref mut angle, ref mut ticks } => {
+            WildlifeAiState::EncirclingWard {
+                ward_x,
+                ward_y,
+                ref mut angle,
+                ref mut ticks,
+            } => {
                 *ticks += 1;
 
                 // Check if ward still exists (not destroyed).
-                let ward_alive = ward_positions.iter().any(|(wp, _)| wp.x == ward_x && wp.y == ward_y);
+                let ward_alive = ward_positions
+                    .iter()
+                    .any(|(wp, _)| wp.x == ward_x && wp.y == ward_y);
 
                 // Break siege if cat approaches or ward destroyed or timed out.
                 let cat_nearby = cat_positions.iter().any(|cp| {
@@ -150,10 +165,14 @@ pub fn wildlife_ai(
                     *ai_state = WildlifeAiState::Patrolling { dx: 1, dy: 0 };
                 } else if cat_nearby {
                     // Aggression: siege provokes confrontation.
-                    if let Some(cat_pos) = cat_positions.iter().min_by_key(|cp| {
-                        (cp.x - pos.x).abs() + (cp.y - pos.y).abs()
-                    }) {
-                        *ai_state = WildlifeAiState::Stalking { target_x: cat_pos.x, target_y: cat_pos.y };
+                    if let Some(cat_pos) = cat_positions
+                        .iter()
+                        .min_by_key(|cp| (cp.x - pos.x).abs() + (cp.y - pos.y).abs())
+                    {
+                        *ai_state = WildlifeAiState::Stalking {
+                            target_x: cat_pos.x,
+                            target_y: cat_pos.y,
+                        };
                     }
                 } else {
                     // Orbit at ward edge + 1 tile.
@@ -161,7 +180,8 @@ pub fn wildlife_ai(
                     if *angle > std::f32::consts::TAU {
                         *angle -= std::f32::consts::TAU;
                     }
-                    let orbit_radius = ward_positions.iter()
+                    let orbit_radius = ward_positions
+                        .iter()
                         .find(|(wp, _)| wp.x == ward_x && wp.y == ward_y)
                         .map(|(_, r)| *r + 1.0)
                         .unwrap_or(4.0);
@@ -725,7 +745,15 @@ pub fn carcass_decay(
 /// A stalking fox that reaches an adjacent tile ambushes the nearest cat,
 /// dealing damage and draining safety.
 pub fn predator_stalk_cats(
-    mut wildlife: Query<(&mut WildAnimal, &Position, &mut WildlifeAiState, &mut Health), (Without<Dead>, Without<crate::components::wildlife::Carcass>)>,
+    mut wildlife: Query<
+        (
+            &mut WildAnimal,
+            &Position,
+            &mut WildlifeAiState,
+            &mut Health,
+        ),
+        (Without<Dead>, Without<crate::components::wildlife::Carcass>),
+    >,
     mut cats: Query<
         (Entity, &Position, &mut Health, &mut Needs, &mut Mood, &Name),
         (Without<WildAnimal>, Without<Dead>),
@@ -841,7 +869,8 @@ pub fn predator_stalk_cats(
                             } else {
                                 0.0
                             };
-                            let damage = animal.threat_power * (1.0 + tile_corruption * c.corruption_threat_multiplier);
+                            let damage = animal.threat_power
+                                * (1.0 + tile_corruption * c.corruption_threat_multiplier);
                             cat_health.current = (cat_health.current - damage).max(0.0);
                             crate::systems::combat::apply_injury(
                                 &mut cat_health,

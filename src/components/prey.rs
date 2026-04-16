@@ -47,11 +47,22 @@ pub enum FleeStrategy {
 #[derive(Debug, Clone, Copy)]
 pub enum PreyAiState {
     Idle,
-    Grazing { dx: i32, dy: i32, ticks: u64 },
+    Grazing {
+        dx: i32,
+        dy: i32,
+        ticks: u64,
+    },
     /// Prey has detected a threat and freezes, watching. Transitions to
     /// Fleeing after the species-specific freeze duration.
-    Alert { threat: Entity, ticks: u64 },
-    Fleeing { from: Entity, toward: Option<(i32, i32)>, ticks: u64 },
+    Alert {
+        threat: Entity,
+        ticks: u64,
+    },
+    Fleeing {
+        from: Entity,
+        toward: Option<(i32, i32)>,
+        ticks: u64,
+    },
 }
 
 impl Default for PreyAiState {

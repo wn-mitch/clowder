@@ -147,8 +147,7 @@ impl Plugin for SimulationPlugin {
         // item state, not a stale default of 0.0.
         app.add_systems(
             FixedUpdate,
-            systems::goap::check_anxiety_interrupts
-                .after(systems::items::sync_food_stores),
+            systems::goap::check_anxiety_interrupts.after(systems::items::sync_food_stores),
         );
         app.add_systems(
             FixedUpdate,
@@ -172,8 +171,7 @@ impl Plugin for SimulationPlugin {
         );
         app.add_systems(
             FixedUpdate,
-            systems::goap::emit_plan_narrative
-                .after(systems::goap::resolve_goap_plans),
+            systems::goap::emit_plan_narrative.after(systems::goap::resolve_goap_plans),
         );
 
         // Standalone systems — registered after the chains but unordered
@@ -181,14 +179,11 @@ impl Plugin for SimulationPlugin {
         app.add_systems(
             FixedUpdate,
             (
-                systems::disposition::cat_presence_tick
-                    .after(systems::goap::resolve_goap_plans),
+                systems::disposition::cat_presence_tick.after(systems::goap::resolve_goap_plans),
                 systems::personality_events::emit_personality_events,
                 systems::ai::emit_periodic_events,
-                systems::snapshot::emit_cat_snapshots
-                    .after(systems::goap::resolve_goap_plans),
-                systems::snapshot::emit_position_traces
-                    .after(systems::goap::resolve_goap_plans),
+                systems::snapshot::emit_cat_snapshots.after(systems::goap::resolve_goap_plans),
+                systems::snapshot::emit_position_traces.after(systems::goap::resolve_goap_plans),
                 systems::colony_score::emit_colony_score,
                 systems::fate::assign_fated_connections,
                 systems::fate::awaken_fated_connections,

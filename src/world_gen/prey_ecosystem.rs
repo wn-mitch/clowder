@@ -29,7 +29,9 @@ fn seed_dens(
             break;
         }
         let pos = Position::new(x, y);
-        let far_enough = dens.iter().all(|d| pos.manhattan_distance(d) >= min_spacing);
+        let far_enough = dens
+            .iter()
+            .all(|d| pos.manhattan_distance(d) >= min_spacing);
         if far_enough {
             dens.push(pos);
         }
@@ -57,9 +59,7 @@ pub fn seed_prey_ecosystem(world: &mut World) {
         (map.width, map.height, snapshot)
     };
 
-    let terrain_at = |x: i32, y: i32| -> Terrain {
-        terrain_snapshot[(y * map_width + x) as usize]
-    };
+    let terrain_at = |x: i32, y: i32| -> Terrain { terrain_snapshot[(y * map_width + x) as usize] };
 
     // We'll collect habitat tiles per species below (terrain isn't Hash).
 
@@ -198,12 +198,15 @@ fn presimulate_prey(world: &mut World) {
     use bevy_ecs::schedule::Schedule;
 
     let mut schedule = Schedule::default();
-    schedule.add_systems((
-        crate::systems::prey::prey_population,
-        crate::systems::prey::prey_ai,
-        crate::systems::prey::prey_den_lifecycle,
-        crate::systems::prey::orphan_prey_adopt_or_found,
-    ).chain());
+    schedule.add_systems(
+        (
+            crate::systems::prey::prey_population,
+            crate::systems::prey::prey_ai,
+            crate::systems::prey::prey_den_lifecycle,
+            crate::systems::prey::orphan_prey_adopt_or_found,
+        )
+            .chain(),
+    );
 
     let presim_ticks = 5000; // ~5 sim days of prey-only ecology
     for _ in 0..presim_ticks {
@@ -216,7 +219,10 @@ fn presimulate_prey(world: &mut World) {
     for _ in world.query::<&PreyDen>().iter(world) {
         den_count += 1;
     }
-    for _ in world.query::<&crate::components::prey::PreyConfig>().iter(world) {
+    for _ in world
+        .query::<&crate::components::prey::PreyConfig>()
+        .iter(world)
+    {
         prey_count += 1;
     }
     eprintln!("  Prey presim: {presim_ticks} ticks → {den_count} dens, {prey_count} prey");

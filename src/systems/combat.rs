@@ -5,7 +5,9 @@ use crate::ai::{Action, CurrentAction};
 use crate::components::identity::Name;
 use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier};
 use crate::components::personality::Personality;
-use crate::components::physical::{Dead, Health, Injury, InjuryKind, InjurySource, Needs, Position};
+use crate::components::physical::{
+    Dead, Health, Injury, InjuryKind, InjurySource, Needs, Position,
+};
 use crate::components::skills::Skills;
 use crate::components::wildlife::{WildAnimal, WildlifeAiState};
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
@@ -238,7 +240,13 @@ pub fn resolve_combat(
             cat_health.current = (cat_health.current - wildlife_damage).max(0.0);
 
             // Apply injury based on damage.
-            if let Some(kind) = apply_injury(&mut cat_health, wildlife_damage, time.tick, InjurySource::WildlifeCombat, c) {
+            if let Some(kind) = apply_injury(
+                &mut cat_health,
+                wildlife_damage,
+                time.tick,
+                InjurySource::WildlifeCombat,
+                c,
+            ) {
                 // Narrative for injuries.
                 if matches!(kind, InjuryKind::Moderate | InjuryKind::Severe) {
                     let text = format!("{} is knocked aside but scrambles back.", name.0);
@@ -616,7 +624,13 @@ mod tests {
 
         // Apply raw damage (same as predator_stalk_cats).
         health.current = (health.current - raw_damage).max(0.0);
-        let kind = apply_injury(&mut health, raw_damage, tick_of_injury, InjurySource::Unknown, &c.combat);
+        let kind = apply_injury(
+            &mut health,
+            raw_damage,
+            tick_of_injury,
+            InjurySource::Unknown,
+            &c.combat,
+        );
         assert_eq!(kind, Some(InjuryKind::Moderate));
 
         let hp_after_hit = health.current;

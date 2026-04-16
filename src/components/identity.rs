@@ -157,7 +157,10 @@ mod tests {
         let born = 500;
         let age = Age::new(born);
         assert_eq!(age.stage(born, TICKS_PER_SEASON), LifeStage::Kitten);
-        assert_eq!(age.stage(born + 4 * TICKS_PER_SEASON, TICKS_PER_SEASON), LifeStage::Young);
+        assert_eq!(
+            age.stage(born + 4 * TICKS_PER_SEASON, TICKS_PER_SEASON),
+            LifeStage::Young
+        );
     }
 
     #[test]

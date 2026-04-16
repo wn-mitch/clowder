@@ -11,14 +11,14 @@
 use std::io::{self, BufRead, Write};
 
 use rand::Rng;
-use rand_chacha::ChaCha8Rng;
 use rand_chacha::rand_core::SeedableRng;
+use rand_chacha::ChaCha8Rng;
 
 use clowder::ai::Action;
 use clowder::components::identity::{Gender, LifeStage};
 use clowder::resources::narrative_templates::{
-    MoodBucket, NeedAxis, NeedLevel, PersonalityAxis, PersonalityBucket, VariableContext,
-    resolve_variables,
+    resolve_variables, MoodBucket, NeedAxis, NeedLevel, PersonalityAxis, PersonalityBucket,
+    VariableContext,
 };
 use clowder::resources::time::{DayPhase, Season};
 use clowder::resources::weather::Weather;
@@ -76,25 +76,37 @@ fn main() {
         let preview_gender = PREVIEW_GENDERS[rng.random_range(0..PREVIEW_GENDERS.len())];
         let preview_fur = PREVIEW_FUR[rng.random_range(0..PREVIEW_FUR.len())];
 
-        let preview_weather = conditions.iter().find_map(|c| match c {
-            Condition::Weather(w) => Some(*w),
-            _ => None,
-        }).unwrap_or(Weather::Clear);
+        let preview_weather = conditions
+            .iter()
+            .find_map(|c| match c {
+                Condition::Weather(w) => Some(*w),
+                _ => None,
+            })
+            .unwrap_or(Weather::Clear);
 
-        let preview_day_phase = conditions.iter().find_map(|c| match c {
-            Condition::DayPhase(dp) => Some(*dp),
-            _ => None,
-        }).unwrap_or(DayPhase::Day);
+        let preview_day_phase = conditions
+            .iter()
+            .find_map(|c| match c {
+                Condition::DayPhase(dp) => Some(*dp),
+                _ => None,
+            })
+            .unwrap_or(DayPhase::Day);
 
-        let preview_season = conditions.iter().find_map(|c| match c {
-            Condition::Season(s) => Some(*s),
-            _ => None,
-        }).unwrap_or(Season::Summer);
+        let preview_season = conditions
+            .iter()
+            .find_map(|c| match c {
+                Condition::Season(s) => Some(*s),
+                _ => None,
+            })
+            .unwrap_or(Season::Summer);
 
-        let preview_life_stage = conditions.iter().find_map(|c| match c {
-            Condition::LifeStage(ls) => Some(*ls),
-            _ => None,
-        }).unwrap_or(LifeStage::Adult);
+        let preview_life_stage = conditions
+            .iter()
+            .find_map(|c| match c {
+                Condition::LifeStage(ls) => Some(*ls),
+                _ => None,
+            })
+            .unwrap_or(LifeStage::Adult);
 
         let var_ctx = VariableContext {
             name: preview_name,
@@ -307,10 +319,7 @@ impl Condition {
                 )
             }
             Condition::Need(axis, level) => {
-                format!(
-                    "        needs: [(axis: {:?}, level: {:?})],",
-                    axis, level
-                )
+                format!("        needs: [(axis: {:?}, level: {:?})],", axis, level)
             }
             Condition::LifeStage(ls) => format!("        life_stage: Some({:?}),", ls),
         }
@@ -376,12 +385,21 @@ fn pick_conditions(rng: &mut impl Rng) -> Vec<Condition> {
                 Condition::Weather(weathers[rng.random_range(0..weathers.len())])
             }
             1 => {
-                let phases = [DayPhase::Dawn, DayPhase::Day, DayPhase::Dusk, DayPhase::Night];
+                let phases = [
+                    DayPhase::Dawn,
+                    DayPhase::Day,
+                    DayPhase::Dusk,
+                    DayPhase::Night,
+                ];
                 Condition::DayPhase(phases[rng.random_range(0..phases.len())])
             }
             2 => {
-                let seasons =
-                    [Season::Spring, Season::Summer, Season::Autumn, Season::Winter];
+                let seasons = [
+                    Season::Spring,
+                    Season::Summer,
+                    Season::Autumn,
+                    Season::Winter,
+                ];
                 Condition::Season(seasons[rng.random_range(0..seasons.len())])
             }
             3 => {

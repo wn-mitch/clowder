@@ -1,11 +1,13 @@
 use bevy_ecs::prelude::World;
-use rand::Rng;
 use rand::seq::SliceRandom;
+use rand::Rng;
 
 use crate::components::building::{StoredItems, Structure, StructureType};
 use crate::components::identity::Name;
 use crate::components::items::{Item, ItemKind, ItemLocation};
-use crate::components::{Appearance, Gender, Orientation, Personality, Position, Skills, ZodiacSign};
+use crate::components::{
+    Appearance, Gender, Orientation, Personality, Position, Skills, ZodiacSign,
+};
 use crate::resources::map::{Terrain, TileMap};
 
 /// A description of a cat to be spawned at game start.
@@ -160,7 +162,12 @@ pub(crate) fn roll_age_seasons(rng: &mut impl Rng) -> u64 {
     }
 }
 
-fn generate_cat(name: String, born_tick: u64, ticks_per_season: u64, rng: &mut impl Rng) -> CatBlueprint {
+fn generate_cat(
+    name: String,
+    born_tick: u64,
+    ticks_per_season: u64,
+    rng: &mut impl Rng,
+) -> CatBlueprint {
     let gender = roll_gender(rng);
     let orientation = roll_orientation(rng);
     let mut personality = Personality::random(rng);
@@ -214,7 +221,11 @@ pub(crate) fn roll_magic_affinity(rng: &mut impl Rng) -> f32 {
 }
 
 /// Start from default skills and add small personality-based aptitude boosts.
-pub(crate) fn roll_skills(personality: &Personality, magic_affinity: f32, rng: &mut impl Rng) -> Skills {
+pub(crate) fn roll_skills(
+    personality: &Personality,
+    magic_affinity: f32,
+    rng: &mut impl Rng,
+) -> Skills {
     let _ = rng; // reserved for future randomised variance
 
     let mut skills = Skills::default();
@@ -261,7 +272,11 @@ fn roll_appearance(rng: &mut impl Rng) -> Appearance {
 
 /// Shift personality axes based on fur color, adding per-trait jitter so
 /// same-color cats aren't clones.
-pub(crate) fn apply_fur_color_bias(personality: &mut Personality, fur_color: &str, rng: &mut impl Rng) {
+pub(crate) fn apply_fur_color_bias(
+    personality: &mut Personality,
+    fur_color: &str,
+    rng: &mut impl Rng,
+) {
     match fur_color {
         "ginger" => apply_ginger_bias(personality, rng),
         "calico" => apply_calico_bias(personality, rng),
@@ -357,27 +372,48 @@ pub fn spawn_starting_buildings(world: &mut World, colony_site: Position, map: &
         den_pos,
         Structure::new(StructureType::Den),
     ));
-    let stores_entity = world.spawn((
-        Name("The Stores".to_string()),
-        stores_pos,
-        Structure::new(StructureType::Stores),
-        StoredItems::default(),
-    )).id();
+    let stores_entity = world
+        .spawn((
+            Name("The Stores".to_string()),
+            stores_pos,
+            Structure::new(StructureType::Stores),
+            StoredItems::default(),
+        ))
+        .id();
 
     // Seed starting food supply. A mix of foraged and hunted items to give
     // the colony a buffer while cats establish hunting/foraging routines.
     // 30 items (~60% of Stores capacity). Prioritize high-value items.
     let starting_food: &[ItemKind] = &[
-        ItemKind::RawRat, ItemKind::RawRat, ItemKind::RawRat,
-        ItemKind::RawRat, ItemKind::RawRat, ItemKind::RawRat,
-        ItemKind::RawFish, ItemKind::RawFish, ItemKind::RawFish,
-        ItemKind::RawFish, ItemKind::RawFish,
-        ItemKind::RawBird, ItemKind::RawBird, ItemKind::RawBird,
-        ItemKind::RawMouse, ItemKind::RawMouse, ItemKind::RawMouse,
-        ItemKind::RawMouse, ItemKind::RawMouse,
-        ItemKind::Berries, ItemKind::Berries, ItemKind::Berries, ItemKind::Berries,
-        ItemKind::Nuts, ItemKind::Nuts, ItemKind::Nuts, ItemKind::Nuts,
-        ItemKind::Roots, ItemKind::Roots,
+        ItemKind::RawRat,
+        ItemKind::RawRat,
+        ItemKind::RawRat,
+        ItemKind::RawRat,
+        ItemKind::RawRat,
+        ItemKind::RawRat,
+        ItemKind::RawFish,
+        ItemKind::RawFish,
+        ItemKind::RawFish,
+        ItemKind::RawFish,
+        ItemKind::RawFish,
+        ItemKind::RawBird,
+        ItemKind::RawBird,
+        ItemKind::RawBird,
+        ItemKind::RawMouse,
+        ItemKind::RawMouse,
+        ItemKind::RawMouse,
+        ItemKind::RawMouse,
+        ItemKind::RawMouse,
+        ItemKind::Berries,
+        ItemKind::Berries,
+        ItemKind::Berries,
+        ItemKind::Berries,
+        ItemKind::Nuts,
+        ItemKind::Nuts,
+        ItemKind::Nuts,
+        ItemKind::Nuts,
+        ItemKind::Roots,
+        ItemKind::Roots,
         ItemKind::WildOnion,
     ];
     for &kind in starting_food {
@@ -399,8 +435,8 @@ pub fn spawn_starting_buildings(world: &mut World, colony_site: Position, map: &
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand_chacha::ChaCha8Rng;
     use rand_chacha::rand_core::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
 
     fn rng(seed: u64) -> ChaCha8Rng {
         ChaCha8Rng::seed_from_u64(seed)
@@ -498,8 +534,14 @@ mod tests {
         }
         let bold_mean = bold_sum / n as f64;
         let patience_mean = patience_sum / n as f64;
-        assert!(bold_mean > 0.55, "ginger boldness mean {bold_mean} should be above 0.55");
-        assert!(patience_mean < 0.45, "ginger patience mean {patience_mean} should be below 0.45");
+        assert!(
+            bold_mean > 0.55,
+            "ginger boldness mean {bold_mean} should be above 0.55"
+        );
+        assert!(
+            patience_mean < 0.45,
+            "ginger patience mean {patience_mean} should be below 0.45"
+        );
     }
 
     #[test]
@@ -516,8 +558,14 @@ mod tests {
         }
         let warmth_mean = warmth_sum / n as f64;
         let boldness_mean = boldness_sum / n as f64;
-        assert!(warmth_mean > 0.55, "calico warmth mean {warmth_mean} should be above 0.55");
-        assert!(boldness_mean < 0.45, "calico boldness mean {boldness_mean} should be below 0.45");
+        assert!(
+            warmth_mean > 0.55,
+            "calico warmth mean {warmth_mean} should be above 0.55"
+        );
+        assert!(
+            boldness_mean < 0.45,
+            "calico boldness mean {boldness_mean} should be below 0.45"
+        );
     }
 
     #[test]
@@ -534,8 +582,14 @@ mod tests {
         }
         let anxiety_mean = anxiety_sum / n as f64;
         let sociability_mean = sociability_sum / n as f64;
-        assert!(anxiety_mean > 0.55, "black anxiety mean {anxiety_mean} should be above 0.55");
-        assert!(sociability_mean < 0.45, "black sociability mean {sociability_mean} should be below 0.45");
+        assert!(
+            anxiety_mean > 0.55,
+            "black anxiety mean {anxiety_mean} should be above 0.55"
+        );
+        assert!(
+            sociability_mean < 0.45,
+            "black sociability mean {sociability_mean} should be below 0.45"
+        );
     }
 
     #[test]
@@ -544,7 +598,10 @@ mod tests {
         let p_before = Personality::random(&mut r);
         let mut p_after = p_before.clone();
         apply_fur_color_bias(&mut p_after, "gray", &mut r);
-        assert_eq!(p_before, p_after, "gray cats should not have personality bias");
+        assert_eq!(
+            p_before, p_after,
+            "gray cats should not have personality bias"
+        );
     }
 
     #[test]

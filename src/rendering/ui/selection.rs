@@ -32,7 +32,9 @@ pub fn track_cursor_position(
     mut inspection: ResMut<InspectionState>,
 ) {
     let Ok(window) = windows.single() else { return };
-    let Ok((camera, global_transform)) = camera_q.single() else { return };
+    let Ok((camera, global_transform)) = camera_q.single() else {
+        return;
+    };
 
     let Some(cursor_pos) = window.cursor_position() else {
         inspection.cursor_world_pos = None;
@@ -68,7 +70,9 @@ pub fn handle_world_click(
         return;
     }
 
-    let Some((gx, gy)) = inspection.cursor_grid_pos else { return };
+    let Some((gx, gy)) = inspection.cursor_grid_pos else {
+        return;
+    };
 
     // Ignore clicks outside the map entirely.
     if !map.in_bounds(gx, gy) {

@@ -233,9 +233,8 @@ pub fn score_actions(ctx: &ScoringContext, rng: &mut impl Rng) -> ScoringResult 
             + ctx.personality.playfulness * s.socialize_playfulness_bonus;
         // Socializing on corrupted ground pushes back corruption.
         if ctx.tile_corruption > 0.1 {
-            score += s.corruption_social_bonus
-                * ctx.tile_corruption
-                * ctx.needs.level_suppression(3);
+            score +=
+                s.corruption_social_bonus * ctx.tile_corruption * ctx.needs.level_suppression(3);
         }
         scores.push((
             Action::Socialize,
@@ -402,8 +401,8 @@ pub fn score_actions(ctx: &ScoringContext, rng: &mut impl Rng) -> ScoringResult 
         // in inventory. The GOAP plan for SetWard includes a GatherHerb step that
         // will acquire Thornbriar. This ensures CraftingHint::SetWard wins over
         // GatherHerbs, producing a plan that filters for the right herb type.
-        let ward_eligible = ctx.ward_strength_low
-            && (ctx.has_ward_herbs || corruption_emergency > 0.0);
+        let ward_eligible =
+            ctx.ward_strength_low && (ctx.has_ward_herbs || corruption_emergency > 0.0);
         let mut ward = if ward_eligible {
             ctx.personality.spirituality
                 * (s.herbcraft_ward_skill_offset + ctx.herbcraft_skill)

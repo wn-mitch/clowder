@@ -37,9 +37,14 @@ impl PartialOrd for Node {
 
 /// 8-directional neighbor offsets.
 const NEIGHBORS: [(i32, i32); 8] = [
-    (-1, -1), (0, -1), (1, -1),
-    (-1,  0),          (1,  0),
-    (-1,  1), (0,  1), (1,  1),
+    (-1, -1),
+    (0, -1),
+    (1, -1),
+    (-1, 0),
+    (1, 0),
+    (-1, 1),
+    (0, 1),
+    (1, 1),
 ];
 
 /// Chebyshev distance — admissible heuristic for 8-directional movement
@@ -79,7 +84,10 @@ pub fn find_path(from: Position, to: Position, map: &TileMap) -> Option<Vec<Posi
     g_score[start_idx] = 0;
 
     let mut open = BinaryHeap::new();
-    open.push(Node { pos: from, f_score: heuristic(&from, &to) });
+    open.push(Node {
+        pos: from,
+        f_score: heuristic(&from, &to),
+    });
 
     while let Some(current) = open.pop() {
         if current.pos == to {
@@ -345,7 +353,8 @@ mod tests {
                 map.get(p.x, p.y).terrain,
                 Terrain::Water,
                 "path crossed water at ({}, {})",
-                p.x, p.y
+                p.x,
+                p.y
             );
         }
     }
@@ -356,7 +365,9 @@ mod tests {
         // Surround target (10,10) with water on all 8 sides.
         for dy in -1..=1 {
             for dx in -1..=1 {
-                if dx == 0 && dy == 0 { continue; }
+                if dx == 0 && dy == 0 {
+                    continue;
+                }
                 map.set(10 + dx, 10 + dy, Terrain::Water);
             }
         }
@@ -377,7 +388,8 @@ mod tests {
 
         let path = find_path(from, to, &map).expect("path should exist");
         // Count how many DenseForest tiles the path crosses.
-        let forest_tiles = path.iter()
+        let forest_tiles = path
+            .iter()
             .filter(|p| map.get(p.x, p.y).terrain == Terrain::DenseForest)
             .count();
         // The optimal path should mostly avoid the forest corridor.
@@ -411,14 +423,13 @@ mod tests {
     fn free_adjacent_jitters_when_target_occupied() {
         let map = open_map();
         let occupied: HashSet<Position> = [Position::new(5, 5)].into();
-        let result = find_free_adjacent(
-            Position::new(5, 5),
-            Position::new(4, 5),
-            &map,
-            &occupied,
-        );
+        let result = find_free_adjacent(Position::new(5, 5), Position::new(4, 5), &map, &occupied);
         let p = result.expect("should find a free neighbor");
-        assert_ne!(p, Position::new(5, 5), "should not return the occupied tile");
+        assert_ne!(
+            p,
+            Position::new(5, 5),
+            "should not return the occupied tile"
+        );
         // Must be adjacent to target.
         assert!(
             (p.x - 5).abs() <= 1 && (p.y - 5).abs() <= 1,
@@ -431,12 +442,7 @@ mod tests {
         let map = open_map();
         let occupied: HashSet<Position> = [Position::new(5, 5)].into();
         // Hint at (4, 5) — neighbor (4, 5) should be preferred (it's closest).
-        let result = find_free_adjacent(
-            Position::new(5, 5),
-            Position::new(4, 5),
-            &map,
-            &occupied,
-        );
+        let result = find_free_adjacent(Position::new(5, 5), Position::new(4, 5), &map, &occupied);
         assert_eq!(
             result,
             Some(Position::new(4, 5)),

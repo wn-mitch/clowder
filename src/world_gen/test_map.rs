@@ -93,7 +93,11 @@ pub fn generate_test_map() -> TileMap {
     // C5: Checkerboard Dirt/Sand — same overlay layer (z=1), different groups
     for y in 45..53 {
         for x in 48..56 {
-            let terrain = if (x + y) % 2 == 0 { Terrain::Mud } else { Terrain::Sand };
+            let terrain = if (x + y) % 2 == 0 {
+                Terrain::Mud
+            } else {
+                Terrain::Sand
+            };
             map.set(x, y, terrain);
         }
     }
@@ -187,10 +191,7 @@ fn fill_rect(map: &mut TileMap, x: i32, y: i32, w: i32, h: i32, terrain: Terrain
     }
 }
 
-fn dump_legend(
-    patches: &[(Terrain, &str)],
-    pairs: &[(Terrain, Terrain, &str)],
-) {
+fn dump_legend(patches: &[(Terrain, &str)], pairs: &[(Terrain, Terrain, &str)]) {
     use std::io::Write;
     let Ok(mut f) = std::fs::File::create("/tmp/clowder_test_map_legend.txt") else {
         return;
@@ -202,13 +203,19 @@ fn dump_legend(
     let _ = writeln!(f, "Colony spawns in rows 15-44 (open grass).");
     let _ = writeln!(f, "Column grid: x=2,12,22,32,42,52,62 (8 wide, 2 gap)\n");
 
-    let _ = writeln!(f, "Section A — Isolated patches (rows 1–5, 8×5 each on grass):");
+    let _ = writeln!(
+        f,
+        "Section A — Isolated patches (rows 1–5, 8×5 each on grass):"
+    );
     for (i, &(_, label)) in patches.iter().enumerate() {
         let x = COLS[i];
         let _ = writeln!(f, "  col {i} x={x:>2}..{end}: {label}", end = x + 7);
     }
 
-    let _ = writeln!(f, "\nSection B — Boundary pairs (rows 7–14, top=A / bottom=B):");
+    let _ = writeln!(
+        f,
+        "\nSection B — Boundary pairs (rows 7–14, top=A / bottom=B):"
+    );
     for (i, &(_, _, label)) in pairs.iter().enumerate() {
         let x = COLS[i];
         let _ = writeln!(f, "  col {i} x={x:>2}..{end}: {label}", end = x + 7);

@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::components::items::{Item, ItemKind};
 use crate::components::prey::{PreyAnimal, PreyConfig, PreyKind};
-use crate::rendering::ui::{PANEL_BG, PANEL_BORDER, TEXT_COLOR, TEXT_DIM, TEXT_HIGHLIGHT, UiRoot};
+use crate::rendering::ui::{UiRoot, PANEL_BG, PANEL_BORDER, TEXT_COLOR, TEXT_DIM, TEXT_HIGHLIGHT};
 use crate::resources::food::FoodStores;
 
 #[derive(Component)]
@@ -20,11 +20,10 @@ const BAR_YELLOW: Color = Color::srgb(0.9, 0.75, 0.2);
 const BAR_RED: Color = Color::srgb(0.9, 0.25, 0.2);
 const BAR_BG: Color = Color::srgba(0.2, 0.2, 0.2, 0.6);
 
-pub fn setup_resource_panel(
-    mut commands: Commands,
-    root_query: Query<Entity, With<UiRoot>>,
-) {
-    let Ok(root) = root_query.single() else { return };
+pub fn setup_resource_panel(mut commands: Commands, root_query: Query<Entity, With<UiRoot>>) {
+    let Ok(root) = root_query.single() else {
+        return;
+    };
 
     let panel = commands
         .spawn((
@@ -81,27 +80,37 @@ pub fn update_resource_panel(
         return;
     }
 
-    let Ok(content_entity) = content_query.single() else { return };
+    let Ok(content_entity) = content_query.single() else {
+        return;
+    };
 
     // Rebuild every frame (cheap — just counting).
-    commands.entity(content_entity).despawn_related::<Children>();
+    commands
+        .entity(content_entity)
+        .despawn_related::<Children>();
 
     let mut children: Vec<Entity> = Vec::new();
 
     // --- Header ---
-    children.push(spawn_text(&mut commands, "Resources", HEADER_FONT_SIZE, TEXT_HIGHLIGHT));
+    children.push(spawn_text(
+        &mut commands,
+        "Resources",
+        HEADER_FONT_SIZE,
+        TEXT_HIGHLIGHT,
+    ));
 
     // --- Food stores bar ---
-    children.push(spawn_food_bar(
-        &mut commands,
-        food.current,
-        food.capacity,
-    ));
+    children.push(spawn_food_bar(&mut commands, food.current, food.capacity));
 
     // --- Item counts by category ---
     let (food_count, herb_count, material_count) = count_items_by_category(&items);
     children.push(spawn_spacer(&mut commands));
-    children.push(spawn_text(&mut commands, "Stockpile", FONT_SIZE + 1.0, TEXT_COLOR));
+    children.push(spawn_text(
+        &mut commands,
+        "Stockpile",
+        FONT_SIZE + 1.0,
+        TEXT_COLOR,
+    ));
     children.push(spawn_text(
         &mut commands,
         &format!("  Food items: {food_count}"),
@@ -126,21 +135,51 @@ pub fn update_resource_panel(
     let total_prey = mice + rats + rabbits + fish + birds;
     if total_prey > 0 {
         children.push(spawn_spacer(&mut commands));
-        children.push(spawn_text(&mut commands, "Wildlife", FONT_SIZE + 1.0, TEXT_COLOR));
+        children.push(spawn_text(
+            &mut commands,
+            "Wildlife",
+            FONT_SIZE + 1.0,
+            TEXT_COLOR,
+        ));
         if mice > 0 {
-            children.push(spawn_text(&mut commands, &format!("  Mice: {mice}"), FONT_SIZE, TEXT_DIM));
+            children.push(spawn_text(
+                &mut commands,
+                &format!("  Mice: {mice}"),
+                FONT_SIZE,
+                TEXT_DIM,
+            ));
         }
         if rats > 0 {
-            children.push(spawn_text(&mut commands, &format!("  Rats: {rats}"), FONT_SIZE, TEXT_DIM));
+            children.push(spawn_text(
+                &mut commands,
+                &format!("  Rats: {rats}"),
+                FONT_SIZE,
+                TEXT_DIM,
+            ));
         }
         if rabbits > 0 {
-            children.push(spawn_text(&mut commands, &format!("  Rabbits: {rabbits}"), FONT_SIZE, TEXT_DIM));
+            children.push(spawn_text(
+                &mut commands,
+                &format!("  Rabbits: {rabbits}"),
+                FONT_SIZE,
+                TEXT_DIM,
+            ));
         }
         if fish > 0 {
-            children.push(spawn_text(&mut commands, &format!("  Fish: {fish}"), FONT_SIZE, TEXT_DIM));
+            children.push(spawn_text(
+                &mut commands,
+                &format!("  Fish: {fish}"),
+                FONT_SIZE,
+                TEXT_DIM,
+            ));
         }
         if birds > 0 {
-            children.push(spawn_text(&mut commands, &format!("  Birds: {birds}"), FONT_SIZE, TEXT_DIM));
+            children.push(spawn_text(
+                &mut commands,
+                &format!("  Birds: {birds}"),
+                FONT_SIZE,
+                TEXT_DIM,
+            ));
         }
     }
 
@@ -208,7 +247,10 @@ fn spawn_text(commands: &mut Commands, content: &str, size: f32, color: Color) -
                 ..default()
             },
             Text::new(content.to_string()),
-            TextFont { font_size: size, ..default() },
+            TextFont {
+                font_size: size,
+                ..default()
+            },
             TextColor(color),
         ))
         .id()
@@ -252,9 +294,15 @@ fn spawn_food_bar(commands: &mut Commands, current: f32, capacity: f32) -> Entit
 
     let label = commands
         .spawn((
-            Node { width: Val::Px(50.0), ..default() },
+            Node {
+                width: Val::Px(50.0),
+                ..default()
+            },
             Text::new("  Food"),
-            TextFont { font_size: FONT_SIZE, ..default() },
+            TextFont {
+                font_size: FONT_SIZE,
+                ..default()
+            },
             TextColor(TEXT_DIM),
         ))
         .id();
@@ -280,23 +328,37 @@ fn spawn_food_bar(commands: &mut Commands, current: f32, capacity: f32) -> Entit
 
     let empty = commands
         .spawn((
-            Node { flex_grow: 1.0, height: Val::Percent(100.0), ..default() },
+            Node {
+                flex_grow: 1.0,
+                height: Val::Percent(100.0),
+                ..default()
+            },
             BackgroundColor(BAR_BG),
         ))
         .id();
 
-    commands.entity(bar_container).add_children(&[filled, empty]);
+    commands
+        .entity(bar_container)
+        .add_children(&[filled, empty]);
 
     let value_text = commands
         .spawn((
-            Node { margin: UiRect::left(Val::Px(4.0)), ..default() },
+            Node {
+                margin: UiRect::left(Val::Px(4.0)),
+                ..default()
+            },
             Text::new(format!("{:.0}/{:.0}", current, capacity)),
-            TextFont { font_size: FONT_SIZE, ..default() },
+            TextFont {
+                font_size: FONT_SIZE,
+                ..default()
+            },
             TextColor(TEXT_DIM),
         ))
         .id();
 
-    commands.entity(row).add_children(&[label, bar_container, value_text]);
+    commands
+        .entity(row)
+        .add_children(&[label, bar_container, value_text]);
     row
 }
 
@@ -311,12 +373,26 @@ mod tests {
     #[test]
     fn all_item_kinds_have_category() {
         let all_kinds = [
-            ItemKind::RawMouse, ItemKind::RawRat, ItemKind::RawFish, ItemKind::RawBird,
-            ItemKind::Berries, ItemKind::Nuts, ItemKind::Roots, ItemKind::WildOnion,
-            ItemKind::Mushroom, ItemKind::Moss, ItemKind::DriedGrass, ItemKind::Feather,
-            ItemKind::HerbHealingMoss, ItemKind::HerbMoonpetal, ItemKind::HerbCalmroot,
-            ItemKind::HerbThornbriar, ItemKind::HerbDreamroot,
-            ItemKind::ShinyPebble, ItemKind::GlassShard, ItemKind::ColorfulShell,
+            ItemKind::RawMouse,
+            ItemKind::RawRat,
+            ItemKind::RawFish,
+            ItemKind::RawBird,
+            ItemKind::Berries,
+            ItemKind::Nuts,
+            ItemKind::Roots,
+            ItemKind::WildOnion,
+            ItemKind::Mushroom,
+            ItemKind::Moss,
+            ItemKind::DriedGrass,
+            ItemKind::Feather,
+            ItemKind::HerbHealingMoss,
+            ItemKind::HerbMoonpetal,
+            ItemKind::HerbCalmroot,
+            ItemKind::HerbThornbriar,
+            ItemKind::HerbDreamroot,
+            ItemKind::ShinyPebble,
+            ItemKind::GlassShard,
+            ItemKind::ColorfulShell,
         ];
 
         let mut food = 0;
@@ -330,7 +406,11 @@ mod tests {
             }
         }
 
-        assert_eq!(food + herbs + materials, 20, "all 20 item kinds should be classified");
+        assert_eq!(
+            food + herbs + materials,
+            20,
+            "all 20 item kinds should be classified"
+        );
         assert_eq!(food, 9, "9 food items");
         assert_eq!(herbs, 5, "5 herb items");
         assert_eq!(materials, 6, "6 material items");

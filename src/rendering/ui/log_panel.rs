@@ -1,6 +1,8 @@
 use bevy::prelude::*;
 
-use crate::rendering::ui::{TEXT_COLOR, TEXT_DANGER, TEXT_DIM, TEXT_HIGHLIGHT, TEXT_NATURE, UiRoot};
+use crate::rendering::ui::{
+    UiRoot, TEXT_COLOR, TEXT_DANGER, TEXT_DIM, TEXT_HIGHLIGHT, TEXT_NATURE,
+};
 use crate::resources::{NarrativeLog, NarrativeTier, SimConfig, TimeState};
 
 /// Marker for the log panel container.
@@ -21,11 +23,10 @@ pub struct LogState {
     pub rendered_count: u64,
 }
 
-pub fn setup_log_panel(
-    mut commands: Commands,
-    root_query: Query<Entity, With<UiRoot>>,
-) {
-    let Ok(root) = root_query.single() else { return };
+pub fn setup_log_panel(mut commands: Commands, root_query: Query<Entity, With<UiRoot>>) {
+    let Ok(root) = root_query.single() else {
+        return;
+    };
 
     // Log panel: right side, top area
     let panel = commands
@@ -97,12 +98,7 @@ pub fn update_log_panel(
         let day = TimeState::day_number(time_state.tick, &config);
         let season = time_state.season(&config);
         let phase = crate::resources::time::DayPhase::from_tick(time_state.tick, &config);
-        **header_text = format!(
-            "Day {} — {} — {}",
-            day,
-            season.label(),
-            phase.label(),
-        );
+        **header_text = format!("Day {} — {} — {}", day, season.label(), phase.label(),);
     }
 
     // Add new log entries.
@@ -110,7 +106,9 @@ pub fn update_log_panel(
         return;
     };
 
-    let new_count = narrative.total_pushed.saturating_sub(log_state.rendered_count);
+    let new_count = narrative
+        .total_pushed
+        .saturating_sub(log_state.rendered_count);
     if new_count == 0 {
         return;
     }

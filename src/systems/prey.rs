@@ -28,9 +28,14 @@ fn can_move_to(x: i32, y: i32, habitat: &[Terrain], map: &TileMap) -> bool {
 }
 
 /// Prey avoid moving onto heavily corrupted tiles.
-fn can_move_to_prey(x: i32, y: i32, habitat: &[Terrain], map: &TileMap, corruption_threshold: f32) -> bool {
-    can_move_to(x, y, habitat, map)
-        && map.get(x, y).corruption < corruption_threshold
+fn can_move_to_prey(
+    x: i32,
+    y: i32,
+    habitat: &[Terrain],
+    map: &TileMap,
+    corruption_threshold: f32,
+) -> bool {
+    can_move_to(x, y, habitat, map) && map.get(x, y).corruption < corruption_threshold
 }
 
 /// Try up to 50 random tiles to find one whose terrain is in `habitat`.
@@ -582,7 +587,9 @@ pub fn prey_population(
             1.0
         };
 
-        if rng.rng.random::<f32>() < profile.den_spawn_rate() * fear_breeding_mod * corruption_breeding_mod {
+        if rng.rng.random::<f32>()
+            < profile.den_spawn_rate() * fear_breeding_mod * corruption_breeding_mod
+        {
             if let Some(spawn_pos) =
                 find_nearby_habitat_tile(den_pos, 8, profile.habitat(), &map, &mut rng)
             {

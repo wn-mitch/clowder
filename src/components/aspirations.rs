@@ -7,9 +7,7 @@ use crate::ai::Action;
 // ---------------------------------------------------------------------------
 
 /// The broad domains that aspirations can belong to.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum AspirationDomain {
     Hunting,
     Combat,

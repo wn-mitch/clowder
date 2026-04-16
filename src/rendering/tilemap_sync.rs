@@ -100,9 +100,10 @@ pub fn create_tilemap(
 
     let mut pending: Vec<PendingLayer> = Vec::new();
     for overlay in OVERLAY_LAYERS {
-        if let Some(layer) = pending.iter_mut().find(|l| {
-            l.atlas_path == overlay.atlas_path && (l.z - overlay.z).abs() < f32::EPSILON
-        }) {
+        if let Some(layer) = pending
+            .iter_mut()
+            .find(|l| l.atlas_path == overlay.atlas_path && (l.z - overlay.z).abs() < f32::EPSILON)
+        {
             layer.groups.push(overlay.group);
         } else {
             pending.push(PendingLayer {
@@ -124,9 +125,7 @@ pub fn create_tilemap(
                 }
 
                 let bitmask = blob_bitmask(&map, x, y, terrain.group());
-                let atlas_index = grass_overlay_atlas_index_with_variant(
-                    bitmask, x, y,
-                );
+                let atlas_index = grass_overlay_atlas_index_with_variant(bitmask, x, y);
 
                 let world_x = x as f32 * world_px;
                 let world_y = (map.height as f32 - 1.0 - y as f32) * world_px;
@@ -211,7 +210,9 @@ pub fn create_tilemap(
 
 fn dump_terrain_debug(map: &TileMap) {
     use std::io::Write;
-    let Ok(mut f) = std::fs::File::create("/tmp/clowder_terrain.txt") else { return };
+    let Ok(mut f) = std::fs::File::create("/tmp/clowder_terrain.txt") else {
+        return;
+    };
     for y in 0..map.height {
         for x in 0..map.width {
             let t = &map.get(x, y).terrain;

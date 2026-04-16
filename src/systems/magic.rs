@@ -119,10 +119,13 @@ pub fn ward_decay(
         };
 
         // Shadow foxes encircling this ward increase decay.
-        let siege_count = shadow_foxes.iter().filter(|(ai, _)| {
-            matches!(ai, WildlifeAiState::EncirclingWard { ward_x, ward_y, .. }
+        let siege_count = shadow_foxes
+            .iter()
+            .filter(|(ai, _)| {
+                matches!(ai, WildlifeAiState::EncirclingWard { ward_x, ward_y, .. }
                 if *ward_x == pos.x && *ward_y == pos.y)
-        }).count();
+            })
+            .count();
         effective_decay += siege_count as f32 * c.ward_siege_decay_bonus;
 
         ward.strength -= effective_decay;
@@ -758,7 +761,13 @@ pub fn apply_misfire(
             // Use the negligible threshold + epsilon so a Minor injury is
             // always created regardless of the combat damage thresholds.
             let synthetic_damage = combat.injury_negligible_threshold + 0.001;
-            crate::systems::combat::apply_injury(health, synthetic_damage, tick, crate::components::physical::InjurySource::MagicMisfire, combat);
+            crate::systems::combat::apply_injury(
+                health,
+                synthetic_damage,
+                tick,
+                crate::components::physical::InjurySource::MagicMisfire,
+                combat,
+            );
             log.push(
                 tick,
                 format!("{cat_name} gasps as a wound appears on their own flank."),

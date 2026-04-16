@@ -108,11 +108,19 @@ fn toggle_panel_visibility(
     mut panel_vis: ResMut<PanelVisibility>,
     mut log_query: Query<
         &mut Visibility,
-        (With<log_panel::LogPanel>, Without<cat_roster::CatRoster>, Without<resource_panel::ResourcePanel>),
+        (
+            With<log_panel::LogPanel>,
+            Without<cat_roster::CatRoster>,
+            Without<resource_panel::ResourcePanel>,
+        ),
     >,
     mut roster_query: Query<
         &mut Visibility,
-        (With<cat_roster::CatRoster>, Without<log_panel::LogPanel>, Without<resource_panel::ResourcePanel>),
+        (
+            With<cat_roster::CatRoster>,
+            Without<log_panel::LogPanel>,
+            Without<resource_panel::ResourcePanel>,
+        ),
     >,
 ) {
     if keyboard.just_pressed(KeyCode::KeyL) {

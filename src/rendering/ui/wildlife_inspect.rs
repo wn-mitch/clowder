@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::components::physical::Position;
 use crate::components::prey::{PreyAnimal, PreyConfig, PreyState};
 use crate::components::wildlife::{BehaviorType, WildAnimal};
-use crate::rendering::ui::{PANEL_BG, PANEL_BORDER, TEXT_COLOR, TEXT_DIM, TEXT_HIGHLIGHT, UiRoot};
+use crate::rendering::ui::{UiRoot, PANEL_BG, PANEL_BORDER, TEXT_COLOR, TEXT_DIM, TEXT_HIGHLIGHT};
 use crate::ui_data::{InspectionMode, InspectionState};
 
 const FONT_SIZE: f32 = 11.0;
@@ -15,11 +15,10 @@ pub struct WildlifeInspectPopup;
 #[derive(Component)]
 pub struct WildlifeInspectContent;
 
-pub fn setup_wildlife_inspect(
-    mut commands: Commands,
-    root_query: Query<Entity, With<UiRoot>>,
-) {
-    let Ok(root) = root_query.single() else { return };
+pub fn setup_wildlife_inspect(mut commands: Commands, root_query: Query<Entity, With<UiRoot>>) {
+    let Ok(root) = root_query.single() else {
+        return;
+    };
 
     let popup = commands
         .spawn((
@@ -75,8 +74,12 @@ pub fn update_wildlife_inspect(
                 let window_height = windows.single().map(|w| w.height()).unwrap_or(720.0);
                 let popup_w = 220.0;
                 let popup_h = 200.0;
-                let x = (click_pos.x + 20.0).min(window_width - popup_w - 8.0).max(8.0);
-                let y = (click_pos.y + 20.0).min(window_height - popup_h - 8.0).max(8.0);
+                let x = (click_pos.x + 20.0)
+                    .min(window_width - popup_w - 8.0)
+                    .max(8.0);
+                let y = (click_pos.y + 20.0)
+                    .min(window_height - popup_h - 8.0)
+                    .max(8.0);
                 node.left = Val::Px(x);
                 node.top = Val::Px(y);
             }
@@ -99,8 +102,12 @@ pub fn update_wildlife_inspect(
     }
     *last_entity = Some(entity);
 
-    let Ok(content_entity) = content_query.single() else { return };
-    commands.entity(content_entity).despawn_related::<Children>();
+    let Ok(content_entity) = content_query.single() else {
+        return;
+    };
+    commands
+        .entity(content_entity)
+        .despawn_related::<Children>();
 
     let mut children: Vec<Entity> = Vec::new();
 
@@ -160,7 +167,12 @@ pub fn update_wildlife_inspect(
             &format!("({}, {})", pos.x, pos.y),
         ));
     } else {
-        children.push(spawn_text(&mut commands, "Entity gone", FONT_SIZE, TEXT_DIM));
+        children.push(spawn_text(
+            &mut commands,
+            "Entity gone",
+            FONT_SIZE,
+            TEXT_DIM,
+        ));
     }
 
     commands.entity(content_entity).add_children(&children);
@@ -204,7 +216,10 @@ fn spawn_text(commands: &mut Commands, content: &str, size: f32, color: Color) -
                 ..default()
             },
             Text::new(content.to_string()),
-            TextFont { font_size: size, ..default() },
+            TextFont {
+                font_size: size,
+                ..default()
+            },
             TextColor(color),
         ))
         .id()
@@ -221,9 +236,15 @@ fn spawn_prop(commands: &mut Commands, label: &str, value: &str) -> Entity {
 
     let label_node = commands
         .spawn((
-            Node { width: Val::Px(80.0), ..default() },
+            Node {
+                width: Val::Px(80.0),
+                ..default()
+            },
             Text::new(format!("  {label}")),
-            TextFont { font_size: FONT_SIZE, ..default() },
+            TextFont {
+                font_size: FONT_SIZE,
+                ..default()
+            },
             TextColor(TEXT_DIM),
         ))
         .id();
@@ -231,7 +252,10 @@ fn spawn_prop(commands: &mut Commands, label: &str, value: &str) -> Entity {
     let value_node = commands
         .spawn((
             Text::new(value.to_string()),
-            TextFont { font_size: FONT_SIZE, ..default() },
+            TextFont {
+                font_size: FONT_SIZE,
+                ..default()
+            },
             TextColor(TEXT_COLOR),
         ))
         .id();
