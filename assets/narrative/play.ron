@@ -1,0 +1,203 @@
+[
+    // =====================================================================
+    // play_social — PlayInitiated with a nearby partner
+    // =====================================================================
+
+    // --- Generic ---
+    (
+        text: "A game breaks out. {name} bats a pinecone toward {other}.",
+        tier: Action,
+        action: Some(Socialize),
+        event: Some("play_social"),
+    ),
+    (
+        text: "{name} flicks an acorn at {other} and darts behind a tree.",
+        tier: Action,
+        action: Some(Socialize),
+        event: Some("play_social"),
+    ),
+    (
+        text: "{name} and {other} chase each other in wide circles until they're both panting.",
+        tier: Action,
+        action: Some(Socialize),
+        event: Some("play_social"),
+    ),
+    (
+        text: "{name} crouches low, wiggles, and pounces on {other}'s tail.",
+        tier: Action,
+        action: Some(Socialize),
+        event: Some("play_social"),
+    ),
+    (
+        text: "{name} tosses a bit of bark into the air. {other} leaps to catch it.",
+        tier: Action,
+        action: Some(Socialize),
+        event: Some("play_social"),
+    ),
+    (
+        text: "{name} ambushes {other} from behind a fern. {other} pretends to be outraged.",
+        tier: Action,
+        action: Some(Socialize),
+        event: Some("play_social"),
+    ),
+    (
+        text: "{name} and {other} wrestle in the grass, tumbling over each other.",
+        tier: Action,
+        action: Some(Socialize),
+        event: Some("play_social"),
+    ),
+    (
+        text: "A pinecone rolls between {name} and {other}. The game is on.",
+        tier: Action,
+        action: Some(Socialize),
+        event: Some("play_social"),
+    ),
+    (
+        text: "{name} bats a thistlehead toward {other}, who swats it right back.",
+        tier: Action,
+        action: Some(Socialize),
+        event: Some("play_social"),
+    ),
+    (
+        text: "{name} springs from hiding and bowls {other} over. Both come up purring.",
+        tier: Action,
+        action: Some(Socialize),
+        event: Some("play_social"),
+    ),
+
+    // --- Conditioned social play ---
+    (
+        text: "{name} scoops up a pawful of snow and flings it at {other}.",
+        tier: Action,
+        action: Some(Socialize),
+        event: Some("play_social"),
+        weather: Some(Snow),
+    ),
+    (
+        text: "{name} and {other} slide across a frozen puddle, scrambling for balance.",
+        tier: Action,
+        action: Some(Socialize),
+        event: Some("play_social"),
+        season: Some(Winter),
+    ),
+    (
+        text: "{name} and {other} splash through a puddle, soaking each other.",
+        tier: Action,
+        action: Some(Socialize),
+        event: Some("play_social"),
+        weather: Some(LightRain),
+    ),
+    (
+        text: "Little {name} tackles {other}'s hind legs and hangs on.",
+        tier: Action,
+        action: Some(Socialize),
+        event: Some("play_social"),
+        life_stage: Some(Kitten),
+    ),
+    (
+        text: "Young {name} challenges {other} to a race across the clearing.",
+        tier: Action,
+        action: Some(Socialize),
+        event: Some("play_social"),
+        life_stage: Some(Young),
+    ),
+    (
+        text: "{name} and {other} play-fight under the stars, shadows tangling.",
+        tier: Action,
+        action: Some(Socialize),
+        event: Some("play_social"),
+        day_phase: Some(Night),
+    ),
+
+    // =====================================================================
+    // play_solo — PlayInitiated with no partner nearby
+    // =====================================================================
+
+    // --- Generic ---
+    (
+        text: "{name} chases {possessive} own tail, briefly entertained.",
+        tier: Micro,
+        action: Some(Socialize),
+        event: Some("play_solo"),
+    ),
+    (
+        text: "{name} pounces on {possessive} own shadow.",
+        tier: Micro,
+        action: Some(Socialize),
+        event: Some("play_solo"),
+    ),
+    (
+        text: "{name} bats a pebble across the clearing, chasing it down.",
+        tier: Micro,
+        action: Some(Socialize),
+        event: Some("play_solo"),
+    ),
+    (
+        text: "{name} stalks a leaf with exaggerated stealth, then strikes.",
+        tier: Micro,
+        action: Some(Socialize),
+        event: Some("play_solo"),
+    ),
+    (
+        text: "{name} finds a twig and tosses it in the air, catching it.",
+        tier: Micro,
+        action: Some(Socialize),
+        event: Some("play_solo"),
+    ),
+    (
+        text: "{name} rolls in the grass, swatting at nothing in particular.",
+        tier: Micro,
+        action: Some(Socialize),
+        event: Some("play_solo"),
+    ),
+    (
+        text: "{name} bats a dandelion puff and watches it drift away.",
+        tier: Micro,
+        action: Some(Socialize),
+        event: Some("play_solo"),
+    ),
+    (
+        text: "{name} discovers a feather and carries it around like a trophy.",
+        tier: Micro,
+        action: Some(Socialize),
+        event: Some("play_solo"),
+    ),
+
+    // --- Conditioned solo play ---
+    (
+        text: "{name} catches snowflakes on {possessive} tongue, eyes crossed.",
+        tier: Micro,
+        action: Some(Socialize),
+        event: Some("play_solo"),
+        weather: Some(Snow),
+    ),
+    (
+        text: "{name} pounces at raindrops splashing in a puddle.",
+        tier: Micro,
+        action: Some(Socialize),
+        event: Some("play_solo"),
+        weather: Some(LightRain),
+    ),
+    (
+        text: "{name} stalks a long shadow in the fading light.",
+        tier: Micro,
+        action: Some(Socialize),
+        event: Some("play_solo"),
+        day_phase: Some(Dusk),
+    ),
+    (
+        text: "{name} chases fireflies through the dark, leaping and twisting.",
+        tier: Micro,
+        action: Some(Socialize),
+        event: Some("play_solo"),
+        day_phase: Some(Night),
+        season: Some(Summer),
+    ),
+    (
+        text: "Little {name} tumbles over {possessive} own paws chasing a beetle.",
+        tier: Micro,
+        action: Some(Socialize),
+        event: Some("play_solo"),
+        life_stage: Some(Kitten),
+    ),
+]

@@ -76,9 +76,7 @@ pub fn sync_food_stores(
     }
 
     food.current = total_food_count as f32;
-    if total_capacity > 0.0 {
-        food.capacity = total_capacity;
-    }
+    food.capacity = total_capacity;
 }
 
 // ---------------------------------------------------------------------------

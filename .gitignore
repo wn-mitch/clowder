@@ -27,6 +27,8 @@ rust_analyzer/
 
 # Asset packs not licensed for redistribution
 assets/sprites/Sprout Lands - UI Pack - Basic pack/
+# Large PDF docs from tileset packs
+assets/new_sprites/**/*.pdf
 
 # mdBook build output
 docs/wiki/book/
@@ -36,3 +38,7 @@ assets/data/cats/*.json
 
 # Superpowers brainstorm artifacts
 .superpowers/
+
+# Narrative editor
+tools/narrative-editor/node_modules/
+tools/narrative-editor/dist/

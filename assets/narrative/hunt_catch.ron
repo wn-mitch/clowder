@@ -61,6 +61,28 @@
         personality: [(axis: Playfulness, bucket: High)],
     ),
     (
+        text: "{name} tosses the {prey} in the air, catches it, and looks enormously pleased.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("catch"),
+        personality: [(axis: Playfulness, bucket: High)],
+        mood: Some(Happy),
+    ),
+    (
+        text: "{name} carries the {prey} back with a swagger, tail held high.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("catch"),
+        personality: [(axis: Playfulness, bucket: High), (axis: Pride, bucket: High)],
+    ),
+    (
+        text: "{name} kills the {prey} cleanly and wastes no time bringing it back.",
+        tier: Action,
+        action: Some(Hunt),
+        event: Some("catch"),
+        personality: [(axis: Playfulness, bucket: Low)],
+    ),
+    (
         text: "{name} catches a {prey} and presents it with visible pride.",
         tier: Action,
         action: Some(Hunt),

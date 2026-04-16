@@ -1729,6 +1729,13 @@ pub struct CoordinationConstants {
     pub threat_patrol_targeted_priority: f32,
     /// Range from a building at which wildlife triggers a Fight directive (breach).
     pub colony_breach_range: i32,
+    /// Multiplier on build pressure accumulation rate when no Stores building exists.
+    #[serde(default = "default_no_store_pressure_multiplier")]
+    pub no_store_pressure_multiplier: f32,
+}
+
+fn default_no_store_pressure_multiplier() -> f32 {
+    5.0
 }
 
 impl Default for CoordinationConstants {
@@ -1767,6 +1774,7 @@ impl Default for CoordinationConstants {
             threat_proximity_range: 20,
             threat_patrol_targeted_priority: 0.6,
             colony_breach_range: 8,
+            no_store_pressure_multiplier: 5.0,
         }
     }
 }

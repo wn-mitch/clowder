@@ -3,16 +3,21 @@ use rand::Rng;
 
 use crate::ai::{Action, CurrentAction};
 use crate::components::coordination::ActiveDirective;
-use crate::components::identity::Name;
+use crate::components::identity::{Age, Gender, Name};
 use crate::components::mental::{Mood, MoodModifier, PrideCooldown};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Needs, Position};
 use crate::events::personality::{DirectiveRefused, PlayInitiated, PrideCrisis, TemperFlared};
+use crate::resources::map::TileMap;
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
+use crate::resources::narrative_templates::{
+    emit_event_narrative, MoodBucket, TemplateContext, TemplateRegistry, VariableContext,
+};
 use crate::resources::relationships::Relationships;
 use crate::resources::rng::SimRng;
 use crate::resources::sim_constants::SimConstants;
-use crate::resources::time::TimeState;
+use crate::resources::time::{DayPhase, Season, SimConfig, TimeState};
+use crate::resources::weather::WeatherState;
 use crate::systems::mood::patience_extend;
 
 // ---------------------------------------------------------------------------
@@ -240,24 +245,33 @@ fn on_directive_refused(
     );
 }
 
-/// PlayInitiated cascade: mood boost to nearby cats, narrative.
+/// PlayInitiated cascade: mood boost to nearby cats, template-driven narrative.
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn on_play_initiated(
     trigger: On<PlayInitiated>,
-    cats: Query<(Entity, &Position, &Personality, &Name), Without<Dead>>,
+    cats: Query<(Entity, &Position, &Personality, &Name, &Gender, &Age), Without<Dead>>,
+    needs_q: Query<&Needs, Without<Dead>>,
     mut moods: Query<&mut Mood>,
     mut log: ResMut<NarrativeLog>,
     time: Res<TimeState>,
     constants: Res<SimConstants>,
+    config: Res<SimConfig>,
+    weather: Res<WeatherState>,
+    map: Res<TileMap>,
+    registry: Option<Res<TemplateRegistry>>,
+    mut rng: ResMut<SimRng>,
 ) {
     let event = trigger.event();
-    let Ok((_, cat_pos, _, cat_name)) = cats.get(event.cat) else {
+    let Ok((_, cat_pos, personality, cat_name, gender, age)) = cats.get(event.cat) else {
         return;
     };
     let cat_pos = *cat_pos;
     let cat_name = cat_name.0.clone();
+    let gender = *gender;
+    let life_stage = age.stage(time.tick, config.ticks_per_season);
 
     let mut play_partner: Option<String> = None;
-    for (other, other_pos, other_pers, other_name) in &cats {
+    for (other, other_pos, other_pers, other_name, _, _) in &cats {
         if other == event.cat {
             continue;
         }
@@ -279,20 +293,79 @@ fn on_play_initiated(
         }
     }
 
-    // Narrative.
-    if let Some(partner) = play_partner {
-        log.push(
-            time.tick,
+    // Build template context from available state.
+    let day_phase = DayPhase::from_tick(time.tick, &config);
+    let season = Season::from_tick(time.tick, &config);
+    let terrain = if map.in_bounds(cat_pos.x, cat_pos.y) {
+        map.get(cat_pos.x, cat_pos.y).terrain
+    } else {
+        crate::resources::map::Terrain::Grass
+    };
+    let mood_bucket = moods
+        .get(event.cat)
+        .map(|m| MoodBucket::from_valence(m.valence))
+        .unwrap_or(MoodBucket::Neutral);
+    let needs = needs_q
+        .get(event.cat)
+        .cloned()
+        .unwrap_or_else(|_| Needs::default());
+
+    let has_partner = play_partner.is_some();
+    let event_tag = if has_partner {
+        "play_social"
+    } else {
+        "play_solo"
+    };
+
+    let ctx = TemplateContext {
+        action: Action::Socialize,
+        day_phase,
+        season,
+        weather: weather.current,
+        mood_bucket,
+        life_stage,
+        has_target: has_partner,
+        terrain,
+        event: Some(event_tag.into()),
+    };
+    let var_ctx = VariableContext {
+        name: &cat_name,
+        gender,
+        weather: weather.current,
+        day_phase,
+        season,
+        life_stage,
+        fur_color: "unknown",
+        other: play_partner.as_deref(),
+        prey: None,
+        item: None,
+        quality: None,
+    };
+
+    let (fallback, fallback_tier) = if let Some(ref partner) = play_partner {
+        (
             format!("A game breaks out. {cat_name} bats a pinecone toward {partner}."),
             NarrativeTier::Action,
-        );
+        )
     } else {
-        log.push(
-            time.tick,
+        (
             format!("{cat_name} chases their own tail, briefly entertained."),
             NarrativeTier::Micro,
-        );
-    }
+        )
+    };
+
+    emit_event_narrative(
+        registry.as_deref(),
+        &mut log,
+        time.tick,
+        fallback,
+        fallback_tier,
+        &ctx,
+        &var_ctx,
+        personality,
+        &needs,
+        &mut rng.rng,
+    );
 }
 
 /// PrideCrisis cascade: narrative entry. Status-seeking boost is handled via

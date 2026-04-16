@@ -110,6 +110,9 @@ pub struct CoordinatorDied;
 /// personality) determines accumulation rate and action threshold.
 #[derive(Component, Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct BuildPressure {
+    /// No Stores building exists at all.
+    #[serde(default)]
+    pub no_store: f32,
     /// Stores at capacity for extended period.
     pub storage: f32,
     /// Cats sleeping outdoors (no Den in range).
@@ -133,6 +136,7 @@ impl BuildPressure {
     /// The structure type each pressure channel corresponds to.
     pub fn highest_actionable(&self, threshold: f32) -> Option<StructureType> {
         let channels = [
+            (self.no_store, StructureType::Stores),
             (self.shelter, StructureType::Den),
             (self.storage, StructureType::Stores),
             (self.gathering, StructureType::Hearth),

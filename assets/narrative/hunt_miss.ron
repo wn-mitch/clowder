@@ -54,6 +54,22 @@
         personality: [(axis: Boldness, bucket: High)],
     ),
 
+    // --- Playfulness ---
+    (
+        text: "{name} got distracted mid-pounce. The {prey} is long gone.",
+        tier: Micro,
+        action: Some(Hunt),
+        event: Some("miss"),
+        personality: [(axis: Playfulness, bucket: High)],
+    ),
+    (
+        text: "{name} misses, and the frustration shows.",
+        tier: Micro,
+        action: Some(Hunt),
+        event: Some("miss"),
+        personality: [(axis: Playfulness, bucket: Low)],
+    ),
+
     // --- Life stage ---
     (
         text: "Young {name} fumbles the pounce. The {prey} escapes easily.",

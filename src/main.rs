@@ -302,6 +302,7 @@ fn build_schedule() -> Schedule {
                 clowder::systems::coordination::evaluate_coordinators,
                 clowder::systems::coordination::assess_colony_needs,
                 clowder::systems::coordination::accumulate_build_pressure,
+                clowder::systems::coordination::spawn_construction_sites,
             )
                 .chain(),
             // Action resolution (disposition system handles all action selection/execution)

@@ -223,9 +223,8 @@ pub fn attach_entity_sprites(
         ));
     }
 
-    // Wildlife — colored by species, with label.
+    // Wildlife — species-specific sprite from loaded spritesheets.
     for (entity, pos, animal) in &wildlife {
-        let color = wildlife_color(animal);
         let (x, y) = grid_to_world(pos, map_h, world_px);
         let label = commands
             .spawn((
@@ -238,11 +237,14 @@ pub fn attach_entity_sprites(
                 Transform::from_xyz(0.0, world_px * 0.45, 1.0),
             ))
             .id();
+
+        let (image, layout, size) = wildlife_sprite(&sprite_assets, animal);
         commands.entity(entity).insert((
             Sprite {
-                image: white_pixel.0.clone(),
-                color,
-                custom_size: Some(Vec2::new(world_px * 0.7, world_px * 0.7)),
+                image,
+                color: Color::WHITE,
+                custom_size: Some(Vec2::splat(size)),
+                texture_atlas: Some(layout),
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 21.0),
@@ -252,11 +254,10 @@ pub fn attach_entity_sprites(
         commands.entity(entity).add_children(&[label]);
     }
 
-    // Prey — species-specific size and color, with label.
+    // Prey — species-specific sprite from loaded spritesheets.
     for (entity, pos, config) in &prey {
-        let color = prey_color(config.kind);
-        let size = prey_sprite_size(config.kind, world_px);
         let (x, y) = grid_to_world(pos, map_h, world_px);
+        let (image, atlas, color, sprite_size) = prey_sprite(&sprite_assets, config.kind, world_px);
         let label = commands
             .spawn((
                 Text2d::new(config.name),
@@ -265,14 +266,15 @@ pub fn attach_entity_sprites(
                     ..Default::default()
                 },
                 TextColor(Color::srgb(0.0, 0.0, 0.0)),
-                Transform::from_xyz(0.0, size.y * 0.55 + 2.0, 1.0),
+                Transform::from_xyz(0.0, sprite_size * 0.55 + 2.0, 1.0),
             ))
             .id();
         commands.entity(entity).insert((
             Sprite {
-                image: white_pixel.0.clone(),
+                image,
                 color,
-                custom_size: Some(size),
+                custom_size: Some(Vec2::splat(sprite_size)),
+                texture_atlas: atlas,
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 18.0),
@@ -704,23 +706,75 @@ fn item_sprite_index(kind: ItemKind) -> usize {
     }
 }
 
-fn wildlife_color(animal: &WildAnimal) -> Color {
+/// Select the sprite texture, atlas, and render size for a wildlife species.
+fn wildlife_sprite(
+    assets: &SpriteAssets,
+    animal: &WildAnimal,
+) -> (Handle<Image>, TextureAtlas, f32) {
     use crate::components::wildlife::WildSpecies;
+    let world_px = TILE_PX * TILE_SCALE;
     match animal.species {
-        WildSpecies::Fox => Color::srgb(0.85, 0.35, 0.1),
-        WildSpecies::Hawk => Color::srgb(0.8, 0.75, 0.3),
-        WildSpecies::Snake => Color::srgb(0.3, 0.7, 0.2),
-        WildSpecies::ShadowFox => Color::srgb(0.6, 0.15, 0.7),
+        WildSpecies::Fox => (
+            assets.fox_texture.clone(),
+            TextureAtlas { layout: assets.fox_layout.clone(), index: 0 },
+            world_px * 0.7,
+        ),
+        WildSpecies::Hawk => (
+            assets.hawk_texture.clone(),
+            TextureAtlas { layout: assets.hawk_layout.clone(), index: 0 },
+            world_px * 0.5,
+        ),
+        WildSpecies::Snake => (
+            assets.snake_texture.clone(),
+            TextureAtlas { layout: assets.snake_layout.clone(), index: 0 },
+            world_px * 0.5,
+        ),
+        WildSpecies::ShadowFox => (
+            assets.shadow_fox_texture.clone(),
+            TextureAtlas { layout: assets.shadow_fox_layout.clone(), index: 0 },
+            world_px * 0.7,
+        ),
     }
 }
 
-fn prey_color(kind: PreyKind) -> Color {
+/// Select the sprite texture, optional atlas, tint color, and render size for a prey kind.
+/// Mouse reuses the rat sprite with a lighter tint.
+fn prey_sprite(
+    assets: &SpriteAssets,
+    kind: PreyKind,
+    world_px: f32,
+) -> (Handle<Image>, Option<TextureAtlas>, Color, f32) {
     match kind {
-        PreyKind::Mouse => Color::srgb(0.6, 0.5, 0.35),
-        PreyKind::Rat => Color::srgb(0.45, 0.45, 0.45),
-        PreyKind::Rabbit => Color::srgb(0.65, 0.45, 0.25),
-        PreyKind::Fish => Color::srgb(0.4, 0.6, 0.85),
-        PreyKind::Bird => Color::srgb(0.85, 0.85, 0.8),
+        PreyKind::Mouse => (
+            assets.rat_texture.clone(),
+            Some(TextureAtlas { layout: assets.rat_layout.clone(), index: 0 }),
+            Color::srgb(0.85, 0.75, 0.6), // lighter brown tint
+            world_px * 0.3,
+        ),
+        PreyKind::Rat => (
+            assets.rat_texture.clone(),
+            Some(TextureAtlas { layout: assets.rat_layout.clone(), index: 0 }),
+            Color::WHITE,
+            world_px * 0.35,
+        ),
+        PreyKind::Rabbit => (
+            assets.rabbit_texture.clone(),
+            Some(TextureAtlas { layout: assets.rabbit_layout.clone(), index: 0 }),
+            Color::WHITE,
+            world_px * 0.4,
+        ),
+        PreyKind::Fish => (
+            assets.fish_texture.clone(),
+            None,
+            Color::WHITE,
+            world_px * 0.35,
+        ),
+        PreyKind::Bird => (
+            assets.bird_texture.clone(),
+            Some(TextureAtlas { layout: assets.bird_layout.clone(), index: 0 }),
+            Color::WHITE,
+            world_px * 0.3,
+        ),
     }
 }
 

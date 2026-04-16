@@ -468,6 +468,7 @@ pub fn accumulate_build_pressure(
     // Pre-compute colony state.
     let has_structure =
         |kind: StructureType| -> bool { buildings.iter().any(|(s, _)| s.kind == kind) };
+    let has_stores = has_structure(StructureType::Stores);
 
     let stores_full = stored_items_query.iter().any(|(s, items)| {
         s.kind == StructureType::Stores
@@ -505,7 +506,14 @@ pub fn accumulate_build_pressure(
         let rate = BuildPressure::BASE_RATE * attentiveness;
         let threshold = 1.0 - attentiveness * cc.build_pressure_attentiveness_threshold_scale;
 
-        // Storage pressure.
+        // No-store pressure — colony has no Stores building at all.
+        if !has_stores {
+            pressure.no_store += rate * cc.no_store_pressure_multiplier;
+        } else {
+            pressure.no_store *= BuildPressure::DECAY;
+        }
+
+        // Storage pressure — existing stores are full.
         if stores_full {
             pressure.storage += rate;
         } else {
@@ -577,7 +585,10 @@ pub fn accumulate_build_pressure(
 
                 // Reset the channel that fired so it doesn't re-trigger next eval.
                 match blueprint {
-                    StructureType::Stores => pressure.storage = 0.0,
+                    StructureType::Stores => {
+                        pressure.storage = 0.0;
+                        pressure.no_store = 0.0;
+                    }
                     StructureType::Den => pressure.shelter = 0.0,
                     StructureType::Hearth => pressure.gathering = 0.0,
                     StructureType::Workshop => pressure.workshop = 0.0,
@@ -602,6 +613,203 @@ fn structure_display_name(kind: StructureType) -> &'static str {
         StructureType::Wall => "wall",
         StructureType::Gate => "gate",
     }
+}
+
+// ---------------------------------------------------------------------------
+// Construction site spawning
+// ---------------------------------------------------------------------------
+
+/// Convert Build directives into physical ConstructionSite entities on the map.
+///
+/// When a coordinator issues a Build directive with a blueprint, this system
+/// finds a valid placement near the colony center and spawns the site. For the
+/// founding store, materials are pre-delivered (the colony pooled resources they
+/// arrived with).
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
+pub fn spawn_construction_sites(
+    mut commands: Commands,
+    mut coordinators: Query<(&mut DirectiveQueue, &Name), With<Coordinator>>,
+    buildings: Query<(
+        &crate::components::building::Structure,
+        &Position,
+    )>,
+    construction_sites: Query<&crate::components::building::ConstructionSite>,
+    colony_center: Res<crate::resources::ColonyCenter>,
+    mut map: ResMut<crate::resources::map::TileMap>,
+    mut log: ResMut<NarrativeLog>,
+    time: Res<TimeState>,
+) {
+    // Track blueprints spawned this tick to prevent duplicates from multiple
+    // coordinators issuing the same directive (commands are deferred, so
+    // construction_sites won't see entities spawned earlier in this loop).
+    let mut spawned_this_tick = std::collections::HashSet::new();
+
+    for (mut queue, coordinator_name) in &mut coordinators {
+        // Find the first Build directive with a blueprint.
+        let directive_idx = queue
+            .directives
+            .iter()
+            .position(|d| d.kind == DirectiveKind::Build && d.blueprint.is_some());
+        let Some(idx) = directive_idx else {
+            continue;
+        };
+
+        let blueprint = queue.directives[idx].blueprint.unwrap();
+
+        // Don't spawn a duplicate if a site for this blueprint already exists.
+        let already_exists = construction_sites
+            .iter()
+            .any(|site| site.blueprint == blueprint)
+            || spawned_this_tick.contains(&blueprint);
+        // Also skip if the building type already exists as a completed structure.
+        let already_built = buildings
+            .iter()
+            .any(|(s, _)| s.kind == blueprint);
+        if already_exists || already_built {
+            queue.directives.remove(idx);
+            continue;
+        }
+
+        let size = blueprint.default_size();
+        let center = colony_center.0;
+
+        // Find a valid placement position via spiral search from colony center.
+        let placement = find_building_placement(&map, center, size, &buildings);
+        let Some(anchor) = placement else {
+            // No valid placement found — leave the directive for next tick.
+            continue;
+        };
+
+        // Stamp terrain footprint.
+        let terrain = blueprint.terrain();
+        for dy in 0..size.1 {
+            for dx in 0..size.0 {
+                let x = anchor.x + dx;
+                let y = anchor.y + dy;
+                if map.in_bounds(x, y) {
+                    map.set(x, y, terrain);
+                }
+            }
+        }
+
+        // Spawn the construction site entity. Founding buildings get pre-funded
+        // materials (the colony pools what they brought with them).
+        let site = crate::components::building::ConstructionSite::new_prefunded(blueprint);
+        commands.spawn((
+            Name(format!("Construction: {}", structure_display_name(blueprint))),
+            anchor,
+            crate::components::building::Structure {
+                kind: blueprint,
+                condition: 0.0,
+                cleanliness: 0.0,
+                size,
+            },
+            site,
+        ));
+
+        spawned_this_tick.insert(blueprint);
+
+        log.push(
+            time.tick,
+            format!(
+                "{} marks out the site for a new {}.",
+                coordinator_name.0,
+                structure_display_name(blueprint),
+            ),
+            NarrativeTier::Significant,
+        );
+
+        queue.directives.remove(idx);
+    }
+}
+
+/// Spiral search outward from `center` to find a position where a building of
+/// `size` fits with all tiles passable and at least 1 tile gap from existing
+/// buildings.
+fn find_building_placement(
+    map: &crate::resources::map::TileMap,
+    center: Position,
+    size: (i32, i32),
+    buildings: &Query<(
+        &crate::components::building::Structure,
+        &Position,
+    )>,
+) -> Option<Position> {
+    // Collect existing building footprints for gap checking.
+    let occupied: Vec<(Position, (i32, i32))> = buildings
+        .iter()
+        .map(|(s, p)| (*p, s.size))
+        .collect();
+
+    // Spiral search: try positions at increasing Manhattan distance.
+    for radius in 1..=16_i32 {
+        for dy in -radius..=radius {
+            for dx in -radius..=radius {
+                if dx.abs() + dy.abs() != radius {
+                    continue; // Only check the ring at this radius.
+                }
+                let anchor = Position::new(center.x + dx, center.y + dy);
+                if footprint_valid(map, anchor, size, &occupied) {
+                    return Some(anchor);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Check that every tile in the footprint is passable, in-bounds, and has at
+/// least a 1-tile gap from any existing building footprint.
+fn footprint_valid(
+    map: &crate::resources::map::TileMap,
+    anchor: Position,
+    size: (i32, i32),
+    occupied: &[(Position, (i32, i32))],
+) -> bool {
+    // All tiles in footprint must be passable natural terrain.
+    for dy in 0..size.1 {
+        for dx in 0..size.0 {
+            let x = anchor.x + dx;
+            let y = anchor.y + dy;
+            if !map.in_bounds(x, y) {
+                return false;
+            }
+            let terrain = map.get(x, y).terrain;
+            if !terrain.is_passable() || terrain.is_building() {
+                return false;
+            }
+        }
+    }
+
+    // 1-tile gap from existing building footprints.
+    for &(bpos, bsize) in occupied {
+        if footprints_overlap_with_gap(anchor, size, bpos, bsize, 1) {
+            return false;
+        }
+    }
+
+    true
+}
+
+/// Check if two footprints (expanded by `gap` tiles) overlap.
+fn footprints_overlap_with_gap(
+    a_pos: Position,
+    a_size: (i32, i32),
+    b_pos: Position,
+    b_size: (i32, i32),
+    gap: i32,
+) -> bool {
+    let a_left = a_pos.x - gap;
+    let a_right = a_pos.x + a_size.0 + gap;
+    let a_top = a_pos.y - gap;
+    let a_bottom = a_pos.y + a_size.1 + gap;
+
+    let b_left = b_pos.x;
+    let b_right = b_pos.x + b_size.0;
+    let b_top = b_pos.y;
+    let b_bottom = b_pos.y + b_size.1;
+
+    a_left < b_right && a_right > b_left && a_top < b_bottom && a_bottom > b_top
 }
 
 // ---------------------------------------------------------------------------

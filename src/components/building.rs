@@ -58,6 +58,22 @@ impl StructureType {
         }
     }
 
+    /// The `Terrain` tile type used to render this building's footprint.
+    pub fn terrain(self) -> crate::resources::map::Terrain {
+        use crate::resources::map::Terrain;
+        match self {
+            Self::Den => Terrain::Den,
+            Self::Hearth => Terrain::Hearth,
+            Self::Stores => Terrain::Stores,
+            Self::Workshop => Terrain::Workshop,
+            Self::Garden => Terrain::Garden,
+            Self::Watchtower => Terrain::Watchtower,
+            Self::WardPost => Terrain::WardPost,
+            Self::Wall => Terrain::Wall,
+            Self::Gate => Terrain::Gate,
+        }
+    }
+
     /// Generate a `TaskChain` for constructing this structure at the given position.
     ///
     /// The chain gathers each required material (move to resource, gather, move
@@ -203,6 +219,21 @@ impl ConstructionSite {
     pub fn new(blueprint: StructureType) -> Self {
         let materials_needed = blueprint.material_cost();
         let materials_delivered = materials_needed.iter().map(|(m, _)| (*m, 0u32)).collect();
+        Self {
+            blueprint,
+            progress: 0.0,
+            materials_needed,
+            materials_delivered,
+        }
+    }
+
+    /// Create a construction site with all materials already delivered.
+    ///
+    /// Used for founding buildings where the colony pools resources they
+    /// brought with them (analogous to Dwarf Fortress wagon disassembly).
+    pub fn new_prefunded(blueprint: StructureType) -> Self {
+        let materials_needed = blueprint.material_cost();
+        let materials_delivered = materials_needed.clone();
         Self {
             blueprint,
             progress: 0.0,

@@ -117,6 +117,25 @@
         action: Some(Hunt),
         personality: [(axis: Playfulness, bucket: High)],
     ),
+    (
+        text: "{name} stalks a mouse with exaggerated stealth, belly low, tail twitching.",
+        tier: Action,
+        action: Some(Hunt),
+        personality: [(axis: Playfulness, bucket: High)],
+    ),
+    (
+        text: "{name} lets the prey run, catches it, lets it run again.",
+        tier: Action,
+        action: Some(Hunt),
+        personality: [(axis: Playfulness, bucket: High)],
+        mood: Some(Happy),
+    ),
+    (
+        text: "{name} hunts with grim efficiency, no wasted motion.",
+        tier: Action,
+        action: Some(Hunt),
+        personality: [(axis: Playfulness, bucket: Low)],
+    ),
 
     // --- Life stage ---
     (

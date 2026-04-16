@@ -60,6 +60,35 @@
         weather: Some(Fog),
     ),
 
+    // --- Playfulness ---
+    (
+        text: "{name} splashes through a stream crossing, scattering minnows.",
+        tier: Action,
+        action: Some(Explore),
+        personality: [(axis: Playfulness, bucket: High)],
+        terrain: Some(Water),
+    ),
+    (
+        text: "{name} discovers a hollow log and immediately crawls inside.",
+        tier: Action,
+        action: Some(Explore),
+        personality: [(axis: Playfulness, bucket: High)],
+        terrain: Some(LightForest),
+    ),
+    (
+        text: "{name} surveys the new ground methodically, nose to the earth.",
+        tier: Action,
+        action: Some(Explore),
+        personality: [(axis: Playfulness, bucket: Low)],
+    ),
+    (
+        text: "Young {name} treats every new discovery as an excuse to pounce.",
+        tier: Action,
+        action: Some(Explore),
+        life_stage: Some(Young),
+        personality: [(axis: Playfulness, bucket: High)],
+    ),
+
     // --- Solitude ---
     (
         text: "{name} wanders far, with no one to return to.",

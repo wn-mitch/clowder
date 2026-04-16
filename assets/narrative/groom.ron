@@ -36,6 +36,21 @@
         action: Some(Groom),
         has_target: Some(false),
     ),
+    // --- Playfulness (self-groom) ---
+    (
+        text: "{name} grooms {possessive} tail, gets distracted, and chases it instead.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        personality: [(axis: Playfulness, bucket: High)],
+    ),
+    (
+        text: "{name} grooms with brisk, no-nonsense strokes.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        personality: [(axis: Playfulness, bucket: Low)],
+    ),
     // Groom-other templates (has_target: true)
     (
         text: "{name} grooms behind {other}'s ears.",
@@ -61,5 +76,12 @@
         action: Some(Groom),
         has_target: Some(true),
         personality: [(axis: Warmth, bucket: High)],
+    ),
+    (
+        text: "{name} grooms behind {other}'s ears, then nips one playfully.",
+        tier: Action,
+        action: Some(Groom),
+        has_target: Some(true),
+        personality: [(axis: Playfulness, bucket: High)],
     ),
 ]

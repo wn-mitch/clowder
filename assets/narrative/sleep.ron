@@ -84,6 +84,20 @@
         season: Some(Summer),
     ),
 
+    // --- Playfulness ---
+    (
+        text: "{name} twitches and kicks in {possessive} sleep, chasing dream-prey.",
+        tier: Action,
+        action: Some(Sleep),
+        personality: [(axis: Playfulness, bucket: High)],
+    ),
+    (
+        text: "Little {name} falls asleep mid-play, a twig still between {possessive} paws.",
+        tier: Action,
+        action: Some(Sleep),
+        life_stage: Some(Kitten),
+    ),
+
     // --- Solitude ---
     (
         text: "{name} curls up tight, tail over nose, alone.",

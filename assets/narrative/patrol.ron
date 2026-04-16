@@ -54,6 +54,20 @@
         day_phase: Some(Night),
     ),
 
+    // --- Playfulness ---
+    (
+        text: "{name} turns the patrol into a game, stalking imaginary intruders.",
+        tier: Action,
+        action: Some(Patrol),
+        personality: [(axis: Playfulness, bucket: High)],
+    ),
+    (
+        text: "{name} patrols the perimeter with grave focus, ignoring all distractions.",
+        tier: Action,
+        action: Some(Patrol),
+        personality: [(axis: Playfulness, bucket: Low)],
+    ),
+
     // --- Solitude ---
     (
         text: "{name} walks the perimeter, though there is no one left to guard.",

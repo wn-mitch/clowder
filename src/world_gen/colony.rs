@@ -2,7 +2,7 @@ use bevy_ecs::prelude::World;
 use rand::seq::SliceRandom;
 use rand::Rng;
 
-use crate::components::building::{StoredItems, Structure, StructureType};
+use crate::components::building::{Structure, StructureType};
 use crate::components::identity::Name;
 use crate::components::items::{Item, ItemKind, ItemLocation};
 use crate::components::{
@@ -339,27 +339,23 @@ fn stamp_footprint(map: &mut TileMap, anchor: Position, terrain: Terrain, size: 
 
 /// Place starting building terrain tiles and spawn corresponding entities.
 ///
-/// Creates a Hearth at the colony center, a Den to its west, and Stores to
-/// its east, each separated by a 1-tile walkable gap. Each gets both a terrain
-/// footprint (for rendering) and an ECS entity with `Structure` + `Position` +
-/// `Name` (for mechanical effects). The anchor position is the top-left corner
-/// of the footprint.
+/// Creates a Hearth at the colony center and a Den to its west, each separated
+/// by a 1-tile walkable gap. The Stores building is NOT auto-spawned — it is
+/// the colony's first real construction project, built organically when the
+/// coordinator recognizes the need for food storage.
+///
+/// Starting food is scattered on the ground between the den and hearth,
+/// representing supplies the cats brought with them (half lost in transit).
 pub fn spawn_starting_buildings(world: &mut World, colony_site: Position, map: &mut TileMap) {
     let hearth_pos = colony_site;
     let den_size = StructureType::Den.default_size();
     let hearth_size = StructureType::Hearth.default_size();
-    let stores_size = StructureType::Stores.default_size();
     // Space buildings so there's a 1-tile walkable gap between footprints.
     let den_pos = Position::new((colony_site.x - den_size.0 - 1).max(0), colony_site.y);
-    let stores_pos = Position::new(
-        (colony_site.x + hearth_size.0 + 1).min(map.width - stores_size.0),
-        colony_site.y,
-    );
 
     // Stamp full footprints for rendering.
     stamp_footprint(map, hearth_pos, Terrain::Hearth, hearth_size);
     stamp_footprint(map, den_pos, Terrain::Den, den_size);
-    stamp_footprint(map, stores_pos, Terrain::Stores, stores_size);
 
     // Spawn building entities for mechanical effects.
     world.spawn((
@@ -372,59 +368,44 @@ pub fn spawn_starting_buildings(world: &mut World, colony_site: Position, map: &
         den_pos,
         Structure::new(StructureType::Den),
     ));
-    let stores_entity = world
-        .spawn((
-            Name("The Stores".to_string()),
-            stores_pos,
-            Structure::new(StructureType::Stores),
-            StoredItems::default(),
-        ))
-        .id();
 
-    // Seed starting food supply. A mix of foraged and hunted items to give
-    // the colony a buffer while cats establish hunting/foraging routines.
-    // 30 items (~60% of Stores capacity). Prioritize high-value items.
+    // Scatter starting food on the ground between den and hearth — the
+    // supplies the colony carried with them. Reduced from the old 30 to 15;
+    // the rest was lost in transit. Food on the ground spoils and attracts
+    // wildlife, creating pressure to build a store.
     let starting_food: &[ItemKind] = &[
         ItemKind::RawRat,
         ItemKind::RawRat,
         ItemKind::RawRat,
-        ItemKind::RawRat,
-        ItemKind::RawRat,
-        ItemKind::RawRat,
-        ItemKind::RawFish,
-        ItemKind::RawFish,
         ItemKind::RawFish,
         ItemKind::RawFish,
         ItemKind::RawFish,
         ItemKind::RawBird,
         ItemKind::RawBird,
-        ItemKind::RawBird,
-        ItemKind::RawMouse,
-        ItemKind::RawMouse,
         ItemKind::RawMouse,
         ItemKind::RawMouse,
         ItemKind::RawMouse,
         ItemKind::Berries,
         ItemKind::Berries,
-        ItemKind::Berries,
-        ItemKind::Berries,
-        ItemKind::Nuts,
-        ItemKind::Nuts,
-        ItemKind::Nuts,
         ItemKind::Nuts,
         ItemKind::Roots,
-        ItemKind::Roots,
-        ItemKind::WildOnion,
     ];
-    for &kind in starting_food {
-        let item_entity = world
-            .spawn(Item::new(kind, 0.8, ItemLocation::StoredIn(stores_entity)))
-            .id();
-        world
-            .entity_mut(stores_entity)
-            .get_mut::<StoredItems>()
-            .unwrap()
-            .add(item_entity, StructureType::Stores);
+
+    // Scatter items in the walkable gap between den and hearth.
+    let gap_x = den_pos.x + den_size.0; // The 1-tile gap column.
+    let scatter_y_base = colony_site.y;
+    for (i, &kind) in starting_food.iter().enumerate() {
+        // Distribute items across a small area near the colony center.
+        let dx = (i as i32) % 3;
+        let dy = (i as i32) / 3;
+        let food_pos = Position::new(
+            (gap_x + dx).min(map.width - 1),
+            (scatter_y_base + dy).min(map.height - 1),
+        );
+        world.spawn((
+            Item::new(kind, 0.8, ItemLocation::OnGround),
+            food_pos,
+        ));
     }
 }
 
@@ -614,15 +595,10 @@ mod tests {
 
         let den_size = StructureType::Den.default_size();
         let hearth_size = StructureType::Hearth.default_size();
-        let stores_size = StructureType::Stores.default_size();
 
         // Derive positions the same way spawn_starting_buildings does.
         let hearth_pos = center;
         let den_pos = Position::new(center.x - den_size.0 - 1, center.y);
-        let stores_pos = Position::new(
-            (center.x + hearth_size.0 + 1).min(map.width - stores_size.0),
-            center.y,
-        );
 
         // Hearth at center.
         for dy in 0..hearth_size.1 {
@@ -650,17 +626,42 @@ mod tests {
             }
         }
 
-        // Stores east of hearth.
-        for dy in 0..stores_size.1 {
-            for dx in 0..stores_size.0 {
-                assert_eq!(
-                    map.get(stores_pos.x + dx, stores_pos.y + dy).terrain,
-                    Terrain::Stores,
-                    "Stores tile at ({}, {}) not set",
-                    stores_pos.x + dx,
-                    stores_pos.y + dy,
-                );
+        // Stores is no longer auto-spawned — it's the colony's first
+        // construction project. Verify its footprint is NOT stamped.
+        let stores_size = StructureType::Stores.default_size();
+        let stores_pos = Position::new(
+            (center.x + hearth_size.0 + 1).min(map.width - stores_size.0),
+            center.y,
+        );
+        assert_eq!(
+            map.get(stores_pos.x, stores_pos.y).terrain,
+            Terrain::Grass,
+            "Stores should not be auto-spawned",
+        );
+    }
+
+    #[test]
+    fn starting_food_scattered_on_ground() {
+        use crate::components::items::{Item, ItemLocation};
+
+        let mut map = grass_map(120, 90);
+        let mut world = bevy_ecs::world::World::new();
+        let center = Position::new(60, 45);
+        spawn_starting_buildings(&mut world, center, &mut map);
+
+        // Count ground food items.
+        let mut food_count = 0u32;
+        let mut all_on_ground = true;
+        for item in world.query::<&Item>().iter(&world) {
+            if item.kind.is_food() {
+                food_count += 1;
+                if item.location != ItemLocation::OnGround {
+                    all_on_ground = false;
+                }
             }
         }
+
+        assert_eq!(food_count, 15, "should scatter 15 starting food items");
+        assert!(all_on_ground, "all starting food should be on the ground");
     }
 }

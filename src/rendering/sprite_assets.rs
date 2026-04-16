@@ -32,6 +32,41 @@ pub struct SpriteAssets {
 
     /// Colony well — 32x32 single image (decorative landmark at colony center).
     pub well_texture: Handle<Image>,
+
+    // -- Wildlife sprites --
+
+    /// Minifolks fox — 192x192, 32x32 frames (6 cols x 6 rows).
+    pub fox_texture: Handle<Image>,
+    pub fox_layout: Handle<TextureAtlasLayout>,
+
+    /// Bald eagle / hawk — 64x16, 16x16 frames (4 cols x 1 row). Idle animation.
+    pub hawk_texture: Handle<Image>,
+    pub hawk_layout: Handle<TextureAtlasLayout>,
+
+    /// Snake — 160x320, 16x16 frames (10 cols x 20 rows). Directional animations.
+    pub snake_texture: Handle<Image>,
+    pub snake_layout: Handle<TextureAtlasLayout>,
+
+    /// Recolored MiniWolf (purple/pink) — 224x256, 32x32 frames (7 cols x 8 rows).
+    pub shadow_fox_texture: Handle<Image>,
+    pub shadow_fox_layout: Handle<TextureAtlasLayout>,
+
+    // -- Prey sprites --
+
+    /// Rat — 160x256, 16x16 frames (10 cols x 16 rows). Also reused for mouse with tint.
+    pub rat_texture: Handle<Image>,
+    pub rat_layout: Handle<TextureAtlasLayout>,
+
+    /// Minifolks rabbit — 128x128, 32x32 frames (4 cols x 4 rows).
+    pub rabbit_texture: Handle<Image>,
+    pub rabbit_layout: Handle<TextureAtlasLayout>,
+
+    /// Minifolks bird — 64x48, 16x16 frames (4 cols x 3 rows).
+    pub bird_texture: Handle<Image>,
+    pub bird_layout: Handle<TextureAtlasLayout>,
+
+    /// Fish — 16x16 single static frame.
+    pub fish_texture: Handle<Image>,
 }
 
 pub fn load_sprite_assets(
@@ -97,6 +132,73 @@ pub fn load_sprite_assets(
     let well_texture =
         asset_server.load("sprites/Sprout Lands - Sprites - premium pack/Objects/Water well.png");
 
+    // Wildlife sprites
+    let fox_texture = asset_server.load("sprites/wildlife/fox.png");
+    let fox_layout = layouts.add(TextureAtlasLayout::from_grid(
+        UVec2::splat(32),
+        6,
+        6,
+        None,
+        None,
+    ));
+
+    let hawk_texture = asset_server.load("sprites/wildlife/hawk.png");
+    let hawk_layout = layouts.add(TextureAtlasLayout::from_grid(
+        UVec2::new(16, 16),
+        4,
+        1,
+        None,
+        None,
+    ));
+
+    let snake_texture = asset_server.load("sprites/wildlife/snake.png");
+    let snake_layout = layouts.add(TextureAtlasLayout::from_grid(
+        UVec2::splat(16),
+        10,
+        20,
+        None,
+        None,
+    ));
+
+    let shadow_fox_texture = asset_server.load("sprites/wildlife/shadow_fox.png");
+    let shadow_fox_layout = layouts.add(TextureAtlasLayout::from_grid(
+        UVec2::splat(32),
+        7,
+        8,
+        None,
+        None,
+    ));
+
+    // Prey sprites
+    let rat_texture = asset_server.load("sprites/prey/rat.png");
+    let rat_layout = layouts.add(TextureAtlasLayout::from_grid(
+        UVec2::splat(16),
+        10,
+        16,
+        None,
+        None,
+    ));
+
+    let rabbit_texture = asset_server.load("sprites/prey/rabbit.png");
+    let rabbit_layout = layouts.add(TextureAtlasLayout::from_grid(
+        UVec2::splat(32),
+        4,
+        4,
+        None,
+        None,
+    ));
+
+    let bird_texture = asset_server.load("sprites/prey/bird.png");
+    let bird_layout = layouts.add(TextureAtlasLayout::from_grid(
+        UVec2::splat(16),
+        4,
+        3,
+        None,
+        None,
+    ));
+
+    let fish_texture = asset_server.load("sprites/prey/fish.png");
+
     commands.insert_resource(SpriteAssets {
         white_pixel,
         character_texture,
@@ -108,5 +210,20 @@ pub fn load_sprite_assets(
         items_texture,
         items_layout,
         well_texture,
+        fox_texture,
+        fox_layout,
+        hawk_texture,
+        hawk_layout,
+        snake_texture,
+        snake_layout,
+        shadow_fox_texture,
+        shadow_fox_layout,
+        rat_texture,
+        rat_layout,
+        rabbit_texture,
+        rabbit_layout,
+        bird_texture,
+        bird_layout,
+        fish_texture,
     });
 }

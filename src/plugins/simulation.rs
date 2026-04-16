@@ -104,6 +104,7 @@ impl Plugin for SimulationPlugin {
                     systems::coordination::evaluate_coordinators,
                     systems::coordination::assess_colony_needs,
                     systems::coordination::accumulate_build_pressure,
+                    systems::coordination::spawn_construction_sites,
                 )
                     .chain(),
                 // Chain 3: Action resolution (disposition system handles all action selection)

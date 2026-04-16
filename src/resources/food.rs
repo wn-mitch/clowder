@@ -67,7 +67,7 @@ impl Default for FoodStores {
     fn default() -> Self {
         Self {
             current: 0.0, // Recalculated by sync_food_stores from actual items.
-            capacity: 30.0,
+            capacity: 0.0, // Recalculated by sync_food_stores from actual Stores buildings.
             spoilage_rate: 0.002,
             spoilage_multiplier: 1.0,
         }

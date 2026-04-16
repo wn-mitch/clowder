@@ -111,6 +111,22 @@ impl Terrain {
         self.movement_cost() != u32::MAX
     }
 
+    /// Whether this terrain tile is part of a building footprint.
+    pub fn is_building(self) -> bool {
+        matches!(
+            self,
+            Self::Den
+                | Self::Hearth
+                | Self::Stores
+                | Self::Workshop
+                | Self::Garden
+                | Self::Watchtower
+                | Self::WardPost
+                | Self::Wall
+                | Self::Gate
+        )
+    }
+
     /// Whether wildlife can move onto this terrain.
     ///
     /// Walls and gates block wildlife (gate entity state is checked separately

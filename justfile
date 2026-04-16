@@ -64,6 +64,10 @@ wiki-serve:
 questionnaire:
     open tools/cat_questionnaire.html
 
+# Start the narrative editor dev server
+narrative-editor:
+    cd tools/narrative-editor && npm install --silent && npm run dev
+
 # Run all checks
 ci: check test
 

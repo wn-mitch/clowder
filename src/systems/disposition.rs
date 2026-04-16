@@ -2638,6 +2638,7 @@ pub fn resolve_disposition_chains(
                     target,
                     &mut inventory,
                     &skills,
+                    &pos,
                     &mut stores_query,
                     &items_query,
                     &mut commands,

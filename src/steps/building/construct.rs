@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use bevy_ecs::prelude::*;
 
 use crate::ai::pathfinding::find_path;
-use crate::components::building::{ConstructionSite, CropState, Structure};
+use crate::components::building::{ConstructionSite, CropState, StoredItems, Structure, StructureType};
 use crate::components::physical::Position;
 use crate::components::skills::Skills;
 use crate::resources::colony_score::ColonyScore;
@@ -68,6 +68,9 @@ pub fn resolve_construct(
             let blueprint = site.blueprint;
             commands.entity(target).remove::<ConstructionSite>();
             commands.entity(target).insert(Structure::new(blueprint));
+            if blueprint == StructureType::Stores {
+                commands.entity(target).insert(StoredItems::default());
+            }
             if let Some(ref mut score) = colony_score {
                 score.structures_built += 1;
             }

@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: Georgia, 'Times New Roman', serif;
+  --font-mono: 'Courier New', monospace;
+
+  --color-bg: #1a1a2e;
+  --color-surface: #222244;
+  --color-surface-alt: #2a2a4a;
+  --color-txt: #e0d8c8;
+  --color-muted: #8a8477;
+  --color-accent: #d4a574;
+  --color-accent-hover: #e0b888;
+  --color-border: #3a3a5a;
+  --color-bar-bg: #2e2e4e;
+  --color-positive: #7ec87e;
+  --color-negative: #c87e7e;
+  --color-warning: #d4c474;
+
+  --radius-sm: 3px;
+  --radius-md: 6px;
+}
+
+/* Base element styles — things Tailwind preflight doesn't cover for this theme */
+body {
+  @apply bg-bg text-txt font-serif leading-relaxed min-h-screen;
+}
+
+h1, h2, h3 {
+  @apply text-accent;
+}
+
+a {
+  @apply text-accent no-underline hover:text-accent-hover;
+}
+
+/* Form element base styles */
+input[type="text"],
+input[type="number"],
+textarea,
+select {
+  @apply px-3 py-2 bg-surface border border-border text-txt font-serif text-sm rounded-md;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  @apply outline-none border-accent;
+}
+
+input::placeholder,
+textarea::placeholder {
+  @apply text-muted italic;
+}
+
+select {
+  @apply cursor-pointer;
+}
+
+/* Reusable button base — override Tailwind's preflight reset */
+button {
+  @apply px-4 py-2 font-serif text-sm border border-accent bg-transparent text-accent rounded-md cursor-pointer transition-all duration-150;
+}
+
+button:hover {
+  @apply bg-accent text-bg;
+}
+
+button:disabled {
+  @apply opacity-40 cursor-not-allowed;
+}
+
+button:disabled:hover {
+  @apply bg-transparent text-accent;
+}

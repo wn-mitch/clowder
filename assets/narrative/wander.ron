@@ -57,6 +57,55 @@
         needs: [(axis: Social, level: Satisfied)],
     ),
 
+    // --- Playfulness ---
+    (
+        text: "{name} bounds along, leaping over every root and stone for the fun of it.",
+        tier: Action,
+        action: Some(Wander),
+        personality: [(axis: Playfulness, bucket: High)],
+    ),
+    (
+        text: "{name} chases a leaf tumbling in the wind.",
+        tier: Action,
+        action: Some(Wander),
+        personality: [(axis: Playfulness, bucket: High)],
+        season: Some(Autumn),
+    ),
+    (
+        text: "{name} skids through a puddle, spraying muck, and looks delighted.",
+        tier: Action,
+        action: Some(Wander),
+        personality: [(axis: Playfulness, bucket: High)],
+        weather: Some(LightRain),
+    ),
+    (
+        text: "{name} trots along, tail high, ambushing every bush {subject} passes.",
+        tier: Action,
+        action: Some(Wander),
+        personality: [(axis: Playfulness, bucket: High)],
+        terrain: Some(LightForest),
+    ),
+    (
+        text: "{name} pauses to bat at a dangling vine, then moves on.",
+        tier: Action,
+        action: Some(Wander),
+        personality: [(axis: Playfulness, bucket: Mid)],
+        terrain: Some(DenseForest),
+    ),
+    (
+        text: "{name} walks with purpose, wasting no time on distractions.",
+        tier: Action,
+        action: Some(Wander),
+        personality: [(axis: Playfulness, bucket: Low)],
+    ),
+    (
+        text: "Young {name} races ahead, doubles back, then races ahead again.",
+        tier: Action,
+        action: Some(Wander),
+        life_stage: Some(Young),
+        personality: [(axis: Playfulness, bucket: High)],
+    ),
+
     // --- Solitude ---
     (
         text: "{name} drifts through the camp like a ghost.",

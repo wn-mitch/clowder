@@ -1230,6 +1230,7 @@ pub fn resolve_goap_plans(
                     plan.step_state[step_idx].target_entity,
                     &mut inventory,
                     &skills,
+                    &pos,
                     &mut stores_query,
                     &items_query,
                     &mut commands,
@@ -1243,6 +1244,11 @@ pub fn resolve_goap_plans(
                 if deposit.rejected {
                     if let Some(ref mut act) = narr.activation {
                         act.record(Feature::DepositRejected);
+                    }
+                }
+                if deposit.no_store {
+                    if let Some(ref mut act) = narr.activation {
+                        act.record(Feature::DepositFailedNoStore);
                     }
                 }
                 deposit.step
