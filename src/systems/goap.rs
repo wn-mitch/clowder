@@ -7,7 +7,7 @@ use crate::ai::pathfinding::{find_free_adjacent, find_path, step_toward};
 use crate::ai::planner::actions::actions_for_disposition;
 use crate::ai::planner::goals::goal_for_disposition;
 use crate::ai::planner::{
-    make_plan, Carrying, GoapActionKind, PlannedStep, PlannerState, PlannerZone, ZoneDistances,
+    make_plan, Carrying, GoapActionKind, PlannerState, PlannerZone, ZoneDistances,
 };
 use crate::ai::scoring::{
     aggregate_to_dispositions, apply_aspiration_bonuses, apply_cascading_bonuses,
@@ -19,18 +19,16 @@ use crate::ai::{Action, CurrentAction};
 use crate::components::building::{
     ConstructionSite, CropState, StoredItems, Structure, StructureType,
 };
-use crate::components::coordination::{ActiveDirective, Directive, DirectiveKind, DirectiveQueue};
+use crate::components::coordination::{ActiveDirective, Directive, DirectiveQueue};
 use crate::components::disposition::{
     ActionHistory, ActionOutcome, ActionRecord, CraftingHint, DispositionKind,
 };
-use crate::components::goap_plan::{
-    GoapPlan, PlanEvent, PlanNarrative, StepExecutionState, StepPhase,
-};
+use crate::components::goap_plan::{GoapPlan, PlanEvent, PlanNarrative, StepExecutionState};
 use crate::components::hunting_priors::HuntingPriors;
 use crate::components::identity::{Gender, LifeStage, Name};
 use crate::components::items::{Item, ItemLocation};
 use crate::components::magic::{Harvestable, Herb, HerbKind, Inventory, Ward};
-use crate::components::mental::{Memory, MemoryType};
+use crate::components::mental::Memory;
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Health, InjuryKind, Needs, Position};
 use crate::components::prey::{
@@ -73,6 +71,7 @@ pub struct NarrativeEmitter<'w> {
 }
 
 /// Bundles world-state queries for evaluate_and_plan to stay under 16 params.
+#[allow(clippy::type_complexity)]
 #[derive(bevy_ecs::system::SystemParam)]
 pub struct WorldStateQueries<'w, 's> {
     pub all_positions:
@@ -148,6 +147,7 @@ pub struct MagicResolverParams<'w, 's> {
 /// Bundles building queries for resolve_goap_plans.
 /// Disjoint with the cats query because cats have `Without<Structure>` and
 /// this query accesses `&mut Structure` — Bevy proves disjointness on Structure.
+#[allow(clippy::type_complexity)]
 #[derive(bevy_ecs::system::SystemParam)]
 pub struct BuildingResolverParams<'w, 's> {
     pub buildings: Query<
@@ -166,6 +166,7 @@ pub struct BuildingResolverParams<'w, 's> {
 }
 
 /// Bundles resources for resolve_goap_plans.
+#[allow(clippy::type_complexity)]
 #[derive(bevy_ecs::system::SystemParam)]
 pub struct ExecutorContext<'w, 's> {
     pub map: ResMut<'w, TileMap>,
@@ -813,7 +814,7 @@ pub fn evaluate_and_plan(
         let planner_state = build_planner_state(
             pos,
             needs,
-            &inventory,
+            inventory,
             0,
             &res.map,
             &stores_positions,
@@ -1544,7 +1545,7 @@ pub fn resolve_goap_plans(
                     &mut skills,
                     &mut mood,
                     &mut corruption,
-                    &mut *health,
+                    &mut health,
                     &pos,
                     &mut rng.rng,
                     &mut commands,
@@ -1626,7 +1627,7 @@ pub fn resolve_goap_plans(
                     &mut memory,
                     &mut mood,
                     &mut corruption,
-                    &mut *health,
+                    &mut health,
                     &pos,
                     &ec.map,
                     &mut rng.rng,
@@ -1653,7 +1654,7 @@ pub fn resolve_goap_plans(
                     &mut skills,
                     &mut mood,
                     &mut corruption,
-                    &mut *health,
+                    &mut health,
                     &pos,
                     &mut rng.rng,
                     &mut commands,
@@ -1683,7 +1684,7 @@ pub fn resolve_goap_plans(
                     &mut skills,
                     &mut corruption,
                     &mut mood,
-                    &mut *health,
+                    &mut health,
                     &pos,
                     &mut ec.map,
                     &mut rng.rng,
@@ -1869,7 +1870,7 @@ pub fn resolve_goap_plans(
                     current.action = step.action.to_action(plan.kind);
                 }
             }
-            crate::steps::StepResult::Fail(reason) => {
+            crate::steps::StepResult::Fail(_reason) => {
                 // Attempt replanning.
                 let planner_state = build_planner_state(
                     &pos,
@@ -1954,10 +1955,8 @@ pub fn resolve_goap_plans(
 
     // Deferred grooming restorations.
     for (target, delta) in grooming_restorations {
-        if let Ok((_, (_, _, _, grooming_opt, _, _, _, _, _))) = cats.get_mut(target) {
-            if let Some(mut g) = grooming_opt {
-                g.0 = (g.0 + delta).min(1.0);
-            }
+        if let Ok((_, (_, _, _, Some(mut g), _, _, _, _, _))) = cats.get_mut(target) {
+            g.0 = (g.0 + delta).min(1.0);
         }
     }
 
@@ -2040,6 +2039,7 @@ pub fn resolve_goap_plans(
 // emit_plan_narrative
 // ===========================================================================
 
+#[allow(clippy::too_many_arguments)]
 pub fn emit_plan_narrative(
     mut messages: MessageReader<PlanNarrative>,
     names: Query<(&Name, &Gender, &Personality, &Needs, &Position)>,
@@ -2140,6 +2140,7 @@ pub fn emit_plan_narrative(
 // Helper: resolve TravelTo
 // ===========================================================================
 
+#[allow(clippy::too_many_arguments)]
 fn resolve_travel_to(
     zone: PlannerZone,
     state: &mut StepExecutionState,
@@ -2248,7 +2249,7 @@ fn resolve_search_prey(
     time: &TimeState,
     rng: &mut SimRng,
     commands: &mut Commands,
-    cat_entity: Entity,
+    _cat_entity: Entity,
     personality: &Personality,
     name: &Name,
     gender: &Gender,
@@ -3023,6 +3024,7 @@ fn respect_for_disposition(kind: DispositionKind, d: &DispositionConstants) -> f
 // Zone resolution and planner state construction
 // ===========================================================================
 
+#[allow(dead_code, clippy::type_complexity)]
 fn find_nearest_store(
     pos: &Position,
     building_query: &Query<(
@@ -3064,6 +3066,7 @@ fn find_social_target(
         .map(|(e, _)| *e)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn resolve_zone_position(
     zone: PlannerZone,
     pos: &Position,

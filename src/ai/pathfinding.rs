@@ -224,7 +224,7 @@ pub fn find_free_adjacent(
             continue;
         }
         let dist = heuristic(&candidate, &hint); // Chebyshev
-        if best.as_ref().map_or(true, |&(_, d)| dist < d) {
+        if best.as_ref().is_none_or(|&(_, d)| dist < d) {
             best = Some((candidate, dist));
         }
     }

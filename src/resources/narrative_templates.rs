@@ -538,6 +538,7 @@ fn life_stage_label(ls: LifeStage) -> &'static str {
 /// Attempt to emit a template-driven narrative for a mid-action event.
 /// Falls back to the provided `fallback` string if no template matches
 /// or no registry is available.
+#[allow(clippy::too_many_arguments)]
 pub fn emit_event_narrative(
     registry: Option<&TemplateRegistry>,
     log: &mut NarrativeLog,

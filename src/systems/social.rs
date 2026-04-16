@@ -38,6 +38,7 @@ pub fn passive_familiarity(
 
 /// Periodically check all relationships and upgrade bonds when thresholds are
 /// met. Emits Tier::Significant narrative on bond formation.
+#[allow(clippy::too_many_arguments)]
 pub fn check_bonds(
     time: Res<TimeState>,
     mut relationships: ResMut<Relationships>,

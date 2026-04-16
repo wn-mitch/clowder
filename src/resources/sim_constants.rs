@@ -2,7 +2,7 @@ use bevy_ecs::prelude::*;
 
 // ---------- SimConstants (top-level resource) ----------
 
-#[derive(Resource, Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Resource, Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub struct SimConstants {
     pub needs: NeedsConstants,
     pub buildings: BuildingConstants,
@@ -26,33 +26,6 @@ pub struct SimConstants {
     pub personality_friction: PersonalityFrictionConstants,
     #[serde(default)]
     pub world_gen: WorldGenConstants,
-}
-
-impl Default for SimConstants {
-    fn default() -> Self {
-        Self {
-            needs: NeedsConstants::default(),
-            buildings: BuildingConstants::default(),
-            combat: CombatConstants::default(),
-            magic: MagicConstants::default(),
-            social: SocialConstants::default(),
-            mood: MoodConstants::default(),
-            death: DeathConstants::default(),
-            prey: PreyConstants::default(),
-            species: SpeciesConstants::default(),
-            scoring: ScoringConstants::default(),
-            disposition: DispositionConstants::default(),
-            colony_score: ColonyScoreConstants::default(),
-            wildlife: WildlifeConstants::default(),
-            fox_ecology: FoxEcologyConstants::default(),
-            fate: FateConstants::default(),
-            coordination: CoordinationConstants::default(),
-            aspirations: AspirationConstants::default(),
-            knowledge: KnowledgeConstants::default(),
-            personality_friction: PersonalityFrictionConstants::default(),
-            world_gen: WorldGenConstants::default(),
-        }
-    }
 }
 
 // ---------- NeedsConstants ----------

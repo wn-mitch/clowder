@@ -7,6 +7,7 @@ use crate::components::items::{Item, ItemKind, ItemLocation};
 use crate::components::physical::Position;
 use crate::steps::StepResult;
 
+#[allow(clippy::type_complexity)]
 pub fn resolve_harvest(
     target_entity: Option<Entity>,
     pos: &Position,

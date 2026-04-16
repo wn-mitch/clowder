@@ -214,7 +214,7 @@ pub fn assign_fated_connections(
 ///
 /// Pairs are collected and deduplicated so that each awakening produces exactly
 /// one narrative line, not two (one per cat in the pair).
-#[allow(clippy::type_complexity)]
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn awaken_fated_connections(
     mut love_query: Query<(Entity, &Name, &Position, &mut FatedLove), Without<Dead>>,
     mut rival_query: Query<

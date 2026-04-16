@@ -81,7 +81,7 @@ pub fn setup_cat_inspect_panel(mut commands: Commands, root_query: Query<Entity,
     commands.entity(root).add_children(&[panel]);
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub fn update_cat_inspect_panel(
     mut commands: Commands,
     inspection: Res<InspectionState>,

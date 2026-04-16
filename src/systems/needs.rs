@@ -24,6 +24,7 @@ use crate::resources::weather::{Weather, WeatherState};
 /// - Warmth takes additional drain from cold weather and winter seasons.
 /// - **Starvation** (hunger == 0): drains health, drops safety, doubles
 ///   social decay, and applies a persistent mood penalty.
+#[allow(clippy::type_complexity)]
 pub fn decay_needs(
     time: Res<TimeState>,
     config: Res<SimConfig>,

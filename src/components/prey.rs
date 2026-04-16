@@ -44,8 +44,9 @@ pub enum FleeStrategy {
 // ---------------------------------------------------------------------------
 
 /// AI state machine for prey animals.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub enum PreyAiState {
+    #[default]
     Idle,
     Grazing {
         dx: i32,
@@ -63,12 +64,6 @@ pub enum PreyAiState {
         toward: Option<(i32, i32)>,
         ticks: u64,
     },
-}
-
-impl Default for PreyAiState {
-    fn default() -> Self {
-        Self::Idle
-    }
 }
 
 // ---------------------------------------------------------------------------

@@ -231,7 +231,7 @@ pub fn select_aspirations(
                 personality,
                 memory,
                 zodiac_domains,
-                &c,
+                c,
                 &mut rng.rng,
             );
             if best.as_ref().is_none_or(|(_, _, bs)| s > *bs) {
@@ -339,7 +339,7 @@ pub fn check_second_aspiration_slot(
                 personality,
                 memory,
                 zodiac_domains,
-                &c,
+                c,
                 &mut rng.rng,
             );
             if best.as_ref().is_none_or(|(_, _, bs)| s > *bs) {

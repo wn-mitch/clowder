@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use bevy_ecs::prelude::*;
 use rand::Rng;
 
-use crate::ai::pathfinding::{find_free_adjacent, find_path, step_toward};
+use crate::ai::pathfinding::{find_free_adjacent, step_toward};
 use crate::ai::scoring::{
     aggregate_to_dispositions, apply_aspiration_bonuses, apply_cascading_bonuses,
     apply_colony_knowledge_bonuses, apply_directive_bonus, apply_fated_bonuses,
@@ -14,17 +14,15 @@ use crate::ai::{Action, CurrentAction};
 use crate::components::building::{
     ConstructionSite, CropState, StoredItems, Structure, StructureType,
 };
-use crate::components::coordination::{
-    ActiveDirective, Directive, DirectiveKind, DirectiveQueue, PendingDelivery,
-};
+use crate::components::coordination::{ActiveDirective, Directive, DirectiveKind, DirectiveQueue};
 use crate::components::disposition::{
     ActionHistory, ActionOutcome, ActionRecord, CraftingHint, Disposition, DispositionKind,
 };
 use crate::components::hunting_priors::HuntingPriors;
 use crate::components::identity::{Gender, LifeStage, Name};
-use crate::components::items::{Item, ItemLocation};
+use crate::components::items::Item;
 use crate::components::magic::{Harvestable, Herb, Inventory, Ward};
-use crate::components::mental::{Memory, MemoryType};
+use crate::components::mental::Memory;
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Health, InjuryKind, Needs, Position};
 use crate::components::prey::{
@@ -694,6 +692,7 @@ fn has_nearby_tile(
 /// Find a random tile matching `predicate` within `radius`, weighted by inverse
 /// distance so closer tiles are more likely but cats don't all converge on the
 /// same nearest tile.
+#[allow(dead_code)]
 fn find_random_nearby_tile(
     from: &Position,
     map: &TileMap,
@@ -843,7 +842,7 @@ pub fn disposition_to_chain(
                 &mut rng.rng,
             ),
             DispositionKind::Hunting => {
-                build_hunting_chain(pos, &memory, &res.map, nearest_store, &mut rng.rng)
+                build_hunting_chain(pos, memory, &res.map, nearest_store, &mut rng.rng)
             }
             DispositionKind::Foraging => {
                 build_foraging_chain(pos, &res.map, nearest_store, &mut rng.rng)
@@ -980,7 +979,7 @@ fn respect_for_disposition(kind: DispositionKind, d: &DispositionConstants) -> f
 // Chain builders — one per disposition
 // ---------------------------------------------------------------------------
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn build_resting_chain(
     needs: &Needs,
     pos: &Position,
@@ -1061,9 +1060,9 @@ fn build_resting_chain(
 }
 
 fn build_hunting_chain(
-    pos: &Position,
-    memory: &Memory,
-    map: &TileMap,
+    _pos: &Position,
+    _memory: &Memory,
+    _map: &TileMap,
     nearest_store: Option<(Entity, Position)>,
     rng: &mut impl Rng,
 ) -> Option<(TaskChain, Action)> {
@@ -1275,6 +1274,7 @@ fn build_socializing_chain(
     Some((chain, action))
 }
 
+#[allow(clippy::type_complexity)]
 fn build_building_chain(
     _entity: Entity,
     pos: &Position,
@@ -1318,6 +1318,7 @@ fn build_building_chain(
     Some((chain, Action::Build))
 }
 
+#[allow(clippy::type_complexity)]
 fn build_farming_chain(
     pos: &Position,
     building_query: &Query<(
@@ -1338,7 +1339,7 @@ fn build_farming_chain(
     Some((chain, Action::Farm))
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn build_crafting_chain(
     pos: &Position,
     _personality: &Personality,
@@ -1416,7 +1417,7 @@ fn build_crafting_chain(
 
 /// Try to build a crafting chain for a specific sub-mode.
 /// Returns `None` if the preconditions for that mode aren't met.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn try_crafting_sub_mode(
     mode: CraftingHint,
     pos: &Position,
@@ -1583,7 +1584,7 @@ fn build_coordinating_chain(
     cat_positions: &[(Entity, Position)],
     skills_query: &Query<&Skills, Without<Dead>>,
     d: &DispositionConstants,
-    commands: &mut Commands,
+    _commands: &mut Commands,
 ) -> Option<(TaskChain, Action)> {
     let (_, queue) = directive_queue_query.get(entity).ok()?;
     let directive = queue.directives.first()?.clone();
@@ -1696,7 +1697,7 @@ fn build_mating_chain(
         }
         let dist = pos.manhattan_distance(&other_pos) as f32;
         let score = rel.romantic + rel.fondness - dist * 0.05;
-        if best.as_ref().map_or(true, |(_, _, s)| score > *s) {
+        if best.as_ref().is_none_or(|(_, _, s)| score > *s) {
             best = Some((other, other_pos, score));
         }
     }
@@ -2009,7 +2010,7 @@ pub fn resolve_disposition_chains(
                                     life_stage: LifeStage::Adult,
                                     fur_color: "unknown",
                                     other: None,
-                                    prey: Some(&den_name),
+                                    prey: Some(den_name),
                                     item: None,
                                     quality: None,
                                 };
@@ -2935,10 +2936,8 @@ pub fn resolve_disposition_chains(
 
     // Apply deferred grooming restorations from GroomOther steps.
     for (target, delta) in grooming_restorations {
-        if let Ok((_, _, _, _, _, _, _, _, _, _, _, _, _, grooming_opt, _)) = cats.get_mut(target) {
-            if let Some(mut g) = grooming_opt {
-                g.0 = (g.0 + delta).min(1.0);
-            }
+        if let Ok((_, _, _, _, _, _, _, _, _, _, _, _, _, Some(mut g), _)) = cats.get_mut(target) {
+            g.0 = (g.0 + delta).min(1.0);
         }
     }
 
@@ -2972,7 +2971,7 @@ pub fn resolve_disposition_chains(
             None
         };
         if let Some((hunt, forage, herb, build, combat, magic, growth_rate)) = app_skills_result {
-            let pairs: [(f32, f32); 6] = [
+            let _pairs: [(f32, f32); 6] = [
                 (effect.mentor_skills.hunting, hunt),
                 (effect.mentor_skills.foraging, forage),
                 (effect.mentor_skills.herbcraft, herb),

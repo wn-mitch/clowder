@@ -103,6 +103,7 @@ fn setup_ui_root(mut commands: Commands) {
     ));
 }
 
+#[allow(clippy::type_complexity)]
 fn toggle_panel_visibility(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut panel_vis: ResMut<PanelVisibility>,

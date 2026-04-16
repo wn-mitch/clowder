@@ -16,7 +16,7 @@ use crate::resources::rng::SimRng;
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::resources::time::{SimConfig, TimeState};
-use crate::species::{PreyProfile, SpeciesRegistry};
+use crate::species::SpeciesRegistry;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -73,6 +73,7 @@ fn find_nearby_habitat_tile(
 /// Probabilistic detection: each tick, prey rolls to notice nearby cats.
 /// Closer cats are more likely to be detected. `vigilance_mod` comes from
 /// the Risk Allocation Hypothesis (U-shaped curve on predation pressure).
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn try_detect_cat(
     pos: &Position,
     alert_radius: i32,
@@ -182,6 +183,7 @@ fn find_cover_direction(
 /// Species-differentiated: movement speed, alertness, flee strategy (Standard,
 /// SeekCover, Teleport, Stationary), and freeze/alert durations all come from
 /// the `PreyConfig` component.
+#[allow(clippy::type_complexity)]
 pub fn prey_ai(
     mut query: Query<
         (&PreyConfig, &mut PreyState, &mut Position),
@@ -355,9 +357,8 @@ pub fn prey_ai(
                     .or_else(|_| positions.get(threat))
                     .ok();
 
-                let still_near = threat_pos.map_or(false, |tp| {
-                    pos.manhattan_distance(tp) <= config.alert_radius + 2
-                });
+                let still_near = threat_pos
+                    .is_some_and(|tp| pos.manhattan_distance(tp) <= config.alert_radius + 2);
 
                 if !still_near {
                     state.ai_state = PreyAiState::Idle;
@@ -519,6 +520,7 @@ fn flee_step(pos: &mut Mut<Position>, threat: &Position, habitat: &[Terrain], ma
 
 /// Breed prey via dens (primary) and background breeding (secondary).
 /// Applies seasonal modifiers from the species registry.
+#[allow(clippy::too_many_arguments)]
 pub fn prey_population(
     mut commands: Commands,
     configs: Query<&PreyConfig, With<PreyAnimal>>,
@@ -757,6 +759,7 @@ pub fn apply_den_raids(
 
 /// Orphaned prey (home_den is None or stale) try to adopt a nearby den.
 /// If no den within 25 tiles, tiny chance to found a new one.
+#[allow(clippy::too_many_arguments)]
 pub fn orphan_prey_adopt_or_found(
     mut commands: Commands,
     mut prey: Query<(&PreyConfig, &mut PreyState, &Position), With<PreyAnimal>>,
@@ -772,7 +775,7 @@ pub fn orphan_prey_adopt_or_found(
     let p = &constants.prey;
     for (config, mut state, pos) in &mut prey {
         // Only process orphans.
-        let is_orphan = state.home_den.map_or(true, |e| dens.get(e).is_err());
+        let is_orphan = state.home_den.is_none_or(|e| dens.get(e).is_err());
         if !is_orphan {
             continue;
         }
@@ -832,12 +835,10 @@ pub fn orphan_prey_adopt_or_found(
             } else {
                 "western"
             }
+        } else if pos.y > cy {
+            "southern"
         } else {
-            if pos.y > cy {
-                "southern"
-            } else {
-                "northern"
-            }
+            "northern"
         };
         log.push(
             time.tick,
@@ -857,6 +858,7 @@ pub fn orphan_prey_adopt_or_found(
 // ---------------------------------------------------------------------------
 
 /// Advance hunger for all prey; despawn any that starve.
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn prey_hunger(
     mut commands: Commands,
     mut query: Query<

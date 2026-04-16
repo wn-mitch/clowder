@@ -12,7 +12,7 @@ use crate::steps::StepResult;
 
 /// Returns `(StepResult, should_continue)`. The `should_continue` flag indicates
 /// the dispatcher should `continue` to the next entity (used when walking to site).
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub fn resolve_construct(
     target_entity: Option<Entity>,
     pos: &mut Position,

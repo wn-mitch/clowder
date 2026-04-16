@@ -56,6 +56,7 @@ pub fn setup_tile_inspect(mut commands: Commands, root_query: Query<Entity, With
     commands.entity(root).add_children(&[popup]);
 }
 
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn update_tile_inspect(
     mut commands: Commands,
     inspection: Res<InspectionState>,

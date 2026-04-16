@@ -102,7 +102,7 @@ pub fn setup_cat_roster(mut commands: Commands, root_query: Query<Entity, With<U
     commands.entity(root).add_children(&[panel]);
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub fn update_cat_roster(
     mut commands: Commands,
     time_state: Res<TimeState>,
@@ -174,6 +174,7 @@ pub fn handle_roster_clicks(
 // Row building
 // ---------------------------------------------------------------------------
 
+#[allow(clippy::too_many_arguments)]
 fn spawn_roster_row(
     commands: &mut Commands,
     entity: Entity,

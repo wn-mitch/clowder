@@ -45,6 +45,7 @@ pub fn tick_kitten_growth(
 
 /// Kittens provide a persistent mood bonus to nearby adults that scales
 /// inversely with maturity. Multiple kittens stack diminishingly.
+#[allow(clippy::type_complexity)]
 pub fn kitten_mood_aura(
     kittens: Query<(&KittenDependency, &Position), Without<Dead>>,
     mut adults: Query<

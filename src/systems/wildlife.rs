@@ -41,6 +41,7 @@ pub struct DetectionCooldowns {
 // ---------------------------------------------------------------------------
 
 /// Move each wild animal according to its behavior pattern.
+#[allow(clippy::type_complexity)]
 pub fn wildlife_ai(
     mut query: Query<(&WildAnimal, &mut Position, &mut WildlifeAiState), Without<FoxState>>,
     wards: Query<(&Ward, &Position), Without<WildAnimal>>,
@@ -158,7 +159,7 @@ pub fn wildlife_ai(
 
                 // Break siege if cat approaches or ward destroyed or timed out.
                 let cat_nearby = cat_positions.iter().any(|cp| {
-                    let dist = ((cp.x - pos.x).abs() + (cp.y - pos.y).abs()) as i32;
+                    let dist = (cp.x - pos.x).abs() + (cp.y - pos.y).abs();
                     dist <= c.siege_break_range
                 });
                 if !ward_alive || *ticks >= c.ward_siege_max_ticks {
@@ -281,7 +282,7 @@ fn is_patrol_terrain(terrain: Terrain, species: WildSpecies) -> bool {
 // ---------------------------------------------------------------------------
 
 /// Attempt to spawn new wildlife at map edges, respecting population caps.
-
+#[allow(clippy::too_many_arguments)]
 pub fn spawn_wildlife(
     query: Query<&WildAnimal>,
     mut commands: Commands,
@@ -607,6 +608,7 @@ pub fn detect_threats(
 /// Predators (fox, hawk, snake) hunt nearby prey entities.
 /// When a predator kills prey, the prey entity is despawned immediately.
 /// Foxes with `FoxState` only hunt when in `HuntingPrey` phase and gain satiation.
+#[allow(clippy::too_many_arguments)]
 pub fn predator_hunt_prey(
     mut commands: Commands,
     predators: Query<(Entity, &WildAnimal, &Position, Option<&FoxAiPhase>), Without<PreyAnimal>>,
@@ -744,6 +746,7 @@ pub fn carcass_decay(
 /// Foxes within detection range of cats may switch to Stalking behavior.
 /// A stalking fox that reaches an adjacent tile ambushes the nearest cat,
 /// dealing damage and draining safety.
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn predator_stalk_cats(
     mut wildlife: Query<
         (
@@ -1262,18 +1265,15 @@ pub fn fox_lifecycle_tick(
                 let old_stage = fs.life_stage;
                 fs.life_stage = stage;
 
-                match (old_stage, stage) {
-                    (FoxLifeStage::Cub, FoxLifeStage::Juvenile) => {
-                        // Detach from den, begin dispersing.
-                        if let Some(den_e) = fs.home_den {
-                            if let Ok((_, mut den, _)) = dens.get_mut(den_e) {
-                                den.cubs_present = den.cubs_present.saturating_sub(1);
-                            }
+                if let (FoxLifeStage::Cub, FoxLifeStage::Juvenile) = (old_stage, stage) {
+                    // Detach from den, begin dispersing.
+                    if let Some(den_e) = fs.home_den {
+                        if let Ok((_, mut den, _)) = dens.get_mut(den_e) {
+                            den.cubs_present = den.cubs_present.saturating_sub(1);
                         }
-                        fs.home_den = None;
-                        activation.record(Feature::FoxCubMatured);
                     }
-                    _ => {}
+                    fs.home_den = None;
+                    activation.record(Feature::FoxCubMatured);
                 }
             }
         }
@@ -1320,7 +1320,7 @@ pub fn fox_lifecycle_tick(
 
     // Check once per day (tick divisible by ticks_per_day_phase * 4).
     let ticks_per_day = sim_config.ticks_per_day_phase * 4;
-    if ticks_per_day == 0 || time.tick % ticks_per_day != 0 {
+    if ticks_per_day == 0 || !time.tick.is_multiple_of(ticks_per_day) {
         return;
     }
 
@@ -1748,12 +1748,10 @@ pub fn fox_ai_decision(
             let away_dy = (pos.y - cat_pos.y).signum();
             let dx = if away_dx != 0 {
                 away_dx
+            } else if rng.rng.random() {
+                1
             } else {
-                if rng.rng.random() {
-                    1
-                } else {
-                    -1
-                }
+                -1
             };
             let dy = if away_dy != 0 { away_dy } else { 0 };
             *phase = FoxAiPhase::PatrolTerritory { dx, dy };
@@ -1901,7 +1899,7 @@ pub fn fox_movement(
 
 /// Tick down active fox confrontations. May escalate to minor damage or end
 /// with one party retreating.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn fox_confrontation_tick(
     mut foxes: Query<
         (
@@ -2037,7 +2035,7 @@ pub fn fox_confrontation_tick(
 // ---------------------------------------------------------------------------
 
 /// Foxes in the Raiding phase approach stores and steal food if unguarded.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn fox_store_raid_tick(
     mut foxes: Query<(
         &mut FoxState,
@@ -2055,7 +2053,7 @@ pub fn fox_store_raid_tick(
 ) {
     let fc = &constants.fox_ecology;
 
-    let cat_positions: Vec<Position> = cats.iter().map(|p| *p).collect();
+    let cat_positions: Vec<Position> = cats.iter().copied().collect();
 
     for (mut fox, mut phase, mut ai_state, pos) in &mut foxes {
         let (target_x, target_y) = match *phase {

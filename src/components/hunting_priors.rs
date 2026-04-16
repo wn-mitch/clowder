@@ -111,8 +111,8 @@ impl HuntingPriors {
     /// Returns a unit step `(dx.signum(), dy.signum())` toward the centre of
     /// that bucket, or `None` if no bucket beats the default prior.
     pub fn best_direction(&self, pos: &Position, radius: i32) -> Option<(i32, i32)> {
-        let origin_bx = (pos.x / self.bucket_size) as i32;
-        let origin_by = (pos.y / self.bucket_size) as i32;
+        let origin_bx = pos.x / self.bucket_size;
+        let origin_by = pos.y / self.bucket_size;
 
         let mut best_belief = DEFAULT_PRIOR;
         let mut best_bucket: Option<(i32, i32)> = None;

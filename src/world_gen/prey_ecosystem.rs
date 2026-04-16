@@ -6,7 +6,7 @@ use crate::components::physical::{Health, Position};
 use crate::components::prey::{PreyDen, PreyKind};
 use crate::resources::map::{Terrain, TileMap};
 use crate::resources::rng::SimRng;
-use crate::species::{PreyProfile, SpeciesRegistry};
+use crate::species::SpeciesRegistry;
 
 // ---------------------------------------------------------------------------
 // Poisson disk den placement

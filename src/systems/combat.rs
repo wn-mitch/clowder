@@ -35,7 +35,7 @@ fn combat_jitter(rng: &mut impl Rng, jitter_range: f32) -> f32 {
 /// 2. Wildlife attacks cat (damage based on threat_power)
 /// 3. Morale checks determine if either side flees
 /// 4. Resolution: wildlife dies, cat dies (handled by death system), or disengage
-#[allow(clippy::type_complexity)]
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn resolve_combat(
     mut cats: Query<
         (
@@ -323,7 +323,7 @@ pub fn resolve_combat(
     for (cat, defeated) in &victorious_cats {
         by_target.entry(*defeated).or_default().push(*cat);
     }
-    for (_target, allies) in &by_target {
+    for allies in by_target.values() {
         if allies.len() < 2 {
             continue;
         }

@@ -2,12 +2,10 @@ use std::collections::HashMap;
 
 use bevy_ecs::prelude::*;
 
-use crate::ai::pathfinding::find_path;
 use crate::ai::CurrentAction;
 use crate::components::building::{
     ConstructionSite, CropState, StoredItems, Structure, StructureType,
 };
-use crate::components::items::{Item, ItemKind, ItemLocation};
 use crate::components::physical::{Dead, Needs, Position};
 use crate::components::skills::Skills;
 use crate::components::task_chain::{StepKind, StepStatus, TaskChain};
@@ -23,7 +21,7 @@ use crate::resources::time::{Season, SimConfig, TimeState};
 ///
 /// Runs after `evaluate_actions` (which creates chains) and before
 /// `resolve_actions` (which should skip cats that have a chain).
-#[allow(clippy::type_complexity)]
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn resolve_task_chains(
     mut cats: Query<
         (

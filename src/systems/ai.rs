@@ -1,36 +1,21 @@
-use std::collections::HashMap;
-
 use bevy_ecs::prelude::*;
 use rand::Rng;
 
-use crate::ai::scoring::{
-    apply_aspiration_bonuses, apply_cascading_bonuses, apply_colony_knowledge_bonuses,
-    apply_directive_bonus, apply_fated_bonuses, apply_memory_bonuses, apply_preference_bonuses,
-    apply_priority_bonus, enforce_survival_floor, score_actions, select_action_softmax,
-    ScoringContext,
-};
-use crate::ai::{Action, CurrentAction};
-use crate::components::coordination::{ActiveDirective, DirectiveQueue, PendingDelivery};
-use crate::components::identity::Name;
-use crate::components::magic::{Harvestable, Herb, Inventory, Ward};
+use crate::components::coordination::ActiveDirective;
 use crate::components::mental::{Memory, MemoryType};
-use crate::components::personality::Personality;
-use crate::components::physical::{Dead, Health, Needs, Position};
-use crate::components::prey::PreyAnimal;
-use crate::components::skills::{MagicAffinity, Skills};
-use crate::components::wildlife::WildAnimal;
+use crate::components::physical::{Dead, Position};
+use crate::components::skills::Skills;
 use crate::resources::event_log::{EventKind, EventLog};
 use crate::resources::food::FoodStores;
 use crate::resources::map::{Terrain, TileMap};
 use crate::resources::relationships::Relationships;
-use crate::resources::rng::SimRng;
-use crate::resources::time::TimeState;
 
 // ---------------------------------------------------------------------------
 // Terrain helpers
 // ---------------------------------------------------------------------------
 
 /// Find the nearest tile matching a predicate within a search radius.
+#[allow(dead_code)]
 fn find_nearest_tile(
     from: &Position,
     map: &TileMap,
@@ -56,6 +41,7 @@ fn find_nearest_tile(
 }
 
 /// Check whether any tile matching a predicate exists within radius.
+#[allow(dead_code)]
 fn has_nearby_tile(
     from: &Position,
     map: &TileMap,
@@ -67,6 +53,7 @@ fn has_nearby_tile(
 
 /// Pick a hunt target: prefer a remembered successful hunt location, fall back
 /// to the nearest forest tile.
+#[allow(dead_code)]
 fn pick_hunt_target(
     pos: &Position,
     map: &TileMap,
@@ -94,6 +81,7 @@ fn pick_hunt_target(
 
 /// Pick the best social target: among visible cats within range, prefer high
 /// fondness with a novelty bonus for low familiarity.
+#[allow(dead_code)]
 fn pick_social_target(
     entity: Entity,
     pos: &Position,
@@ -123,6 +111,7 @@ fn pick_social_target(
 ///
 /// A target is valid when the mentor has any skill > 0.6 and the candidate has
 /// the same skill < 0.3, within 10 tiles.
+#[allow(dead_code)]
 fn has_mentoring_target(
     entity: Entity,
     pos: &Position,
@@ -163,6 +152,7 @@ fn has_mentoring_target(
 
 /// Pick the best mentoring target: nearby cat with the largest skill gap
 /// where the mentor has skill > 0.6 and the apprentice has skill < 0.3.
+#[allow(dead_code)]
 fn pick_mentoring_target(
     entity: Entity,
     pos: &Position,
@@ -216,6 +206,7 @@ fn pick_mentoring_target(
 /// Pick the best target cat for a coordination directive.
 ///
 /// Prefers: non-coordinator, not already directed, nearby, high relevant skill.
+#[allow(dead_code)]
 fn pick_directive_target(
     coordinator: Entity,
     coordinator_pos: &Position,

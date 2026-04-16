@@ -124,6 +124,7 @@ pub fn compute_item_layout(mut commands: Commands, items: Query<(Entity, &Positi
 }
 
 /// Attach sprites to entities that have Position but no EntitySpriteMarker.
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn attach_entity_sprites(
     mut commands: Commands,
     white_pixel: Res<WhitePixel>,
@@ -501,6 +502,7 @@ pub fn snapshot_previous_positions(mut query: Query<(&Position, &mut PreviousPos
 /// Sync Position → Transform for all entities, interpolating smoothly between
 /// the previous tick's position and the current one using the fixed-timestep
 /// overstep fraction.
+#[allow(clippy::type_complexity)]
 pub fn sync_entity_positions(
     map: Res<TileMap>,
     fixed_time: Res<Time<Fixed>>,

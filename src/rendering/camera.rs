@@ -103,6 +103,7 @@ pub fn setup_camera(mut commands: Commands, map: Res<TileMap>) {
 }
 
 /// Main camera update: runs the state machine, then lerps the camera.
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn camera_update(
     mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,

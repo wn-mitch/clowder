@@ -2,10 +2,10 @@ use bevy_ecs::prelude::*;
 
 use crate::components::grooming::GroomingCondition;
 use crate::components::hunting_priors::HuntingPriors;
-use crate::components::identity::{Age, Appearance, Gender, Name, Orientation, Species};
+use crate::components::identity::{Age, Appearance, Gender, Name, Species};
 use crate::components::kitten::KittenDependency;
 use crate::components::magic::Inventory;
-use crate::components::mental::{Memory, Mood, MoodModifier};
+use crate::components::mental::{Memory, Mood};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::components::pregnancy::{GestationStage, Pregnant};
@@ -26,10 +26,11 @@ use crate::resources::time::{SimConfig, TimeState};
 /// - Advances gestation stage at 33%/66% of ticks_per_season
 /// - Applies physical effects (hunger/energy drain multipliers) — done in needs system
 /// - Triggers birth when gestation is complete
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn tick_pregnancy(
     time: Res<TimeState>,
     config: Res<SimConfig>,
-    constants: Res<SimConstants>,
+    _constants: Res<SimConstants>,
     mut rng: ResMut<SimRng>,
     mut relationships: ResMut<Relationships>,
     mut query: Query<
@@ -83,7 +84,7 @@ pub fn tick_pregnancy(
                 avg_nutrition: preg.avg_nutrition(),
                 pos: *pos,
                 mother_personality: personality.clone(),
-                mother_gender: *gender,
+                _mother_gender: *gender,
             });
         }
     }
@@ -186,12 +187,11 @@ struct BirthEvent {
     avg_nutrition: f32,
     pos: Position,
     mother_personality: Personality,
-    mother_gender: Gender,
+    _mother_gender: Gender,
 }
 
 /// Mutate a personality by averaging with random variation.
 fn mutate_personality(parent: &Personality, rng: &mut impl rand::Rng) -> Personality {
-    use rand::Rng;
     let mut mutate = |v: f32| -> f32 { (v + rng.random_range(-0.1_f32..=0.1)).clamp(0.0, 1.0) };
     Personality {
         boldness: mutate(parent.boldness),
@@ -216,7 +216,6 @@ fn mutate_personality(parent: &Personality, rng: &mut impl rand::Rng) -> Persona
 }
 
 fn roll_gender(rng: &mut impl rand::Rng) -> Gender {
-    use rand::Rng;
     match rng.random_range(0..20u32) {
         0..=9 => Gender::Tom,
         10..=18 => Gender::Queen,
@@ -232,7 +231,6 @@ const KITTEN_NAMES: &[&str] = &[
 ];
 
 fn generate_kitten_name(rng: &mut impl rand::Rng) -> String {
-    use rand::Rng;
     let base = KITTEN_NAMES[rng.random_range(0..KITTEN_NAMES.len())];
     let suffix = rng.random_range(1..100u32);
     format!("{base}kit-{suffix}")

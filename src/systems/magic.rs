@@ -1,14 +1,13 @@
 use bevy_ecs::prelude::*;
 use rand::Rng;
 
-use crate::ai::pathfinding::find_path;
 use crate::ai::CurrentAction;
 use crate::components::identity::Name;
 use crate::components::magic::{
     FlavorPlant, GrowthStage, Harvestable, Herb, Inventory, MisfireEffect, RemedyEffect,
     RemedyKind, Seasonal, Ward, WardKind,
 };
-use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier};
+use crate::components::mental::{Memory, Mood, MoodModifier};
 use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::components::skills::{Corruption, MagicAffinity, Skills};
 use crate::components::task_chain::{StepKind, StepStatus, TaskChain};

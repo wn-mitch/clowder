@@ -53,6 +53,7 @@ pub fn setup_wildlife_inspect(mut commands: Commands, root_query: Query<Entity, 
     commands.entity(root).add_children(&[popup]);
 }
 
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn update_wildlife_inspect(
     mut commands: Commands,
     inspection: Res<InspectionState>,

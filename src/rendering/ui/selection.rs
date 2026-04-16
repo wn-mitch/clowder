@@ -52,6 +52,7 @@ pub fn track_cursor_position(
 }
 
 /// Handle mouse clicks: left-click selects cat or tile, right-click dismisses.
+#[allow(clippy::type_complexity)]
 pub fn handle_world_click(
     mouse: Res<ButtonInput<MouseButton>>,
     mut inspection: ResMut<InspectionState>,
@@ -120,6 +121,7 @@ pub fn handle_world_click(
 }
 
 /// Handle keyboard selection: Tab cycles cats, T inspects tile under cursor.
+#[allow(clippy::type_complexity)]
 pub fn handle_keyboard_selection(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut inspection: ResMut<InspectionState>,

@@ -7,6 +7,7 @@ use crate::components::skills::Skills;
 use crate::resources::map::TileMap;
 use crate::steps::StepResult;
 
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub fn resolve_tend(
     target_entity: Option<Entity>,
     pos: &mut Position,

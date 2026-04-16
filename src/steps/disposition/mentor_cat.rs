@@ -8,6 +8,7 @@ use crate::steps::StepResult;
 
 /// Returns the step result and an optional deferred mentor effect
 /// `(apprentice_entity, mentor_skills_snapshot)` to apply after the main loop.
+#[allow(clippy::too_many_arguments)]
 pub fn resolve_mentor_cat(
     ticks: u64,
     cat_entity: Entity,

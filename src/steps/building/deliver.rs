@@ -7,6 +7,7 @@ use crate::components::physical::Position;
 use crate::components::task_chain::Material;
 use crate::steps::StepResult;
 
+#[allow(clippy::type_complexity)]
 pub fn resolve_deliver(
     material: Material,
     amount: u32,
