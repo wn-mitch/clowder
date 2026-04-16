@@ -33,7 +33,7 @@ jobs:
           cache: npm
           cache-dependency-path: tools/narrative-editor/package-lock.json
 
-      - run: npm ci
+      - run: npm install
       - run: npm run build
         env:
           BASE_PATH: /clowder/
