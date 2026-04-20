@@ -10,47 +10,6 @@ plan — the plan is written when the work is picked up.
 
 ---
 
-## Uncommitted from the 2026-04-19 session
-
-### Balance change: `eat_from_inventory_threshold: 0.05 → 0.4`
-
-**Status:** validated, uncommitted. Commit strategy not chosen.
-
-**Files:**
-- `src/resources/sim_constants.rs:128` (one-line change)
-- `docs/balance/eat-inventory-threshold.predictions.json` (new)
-- `docs/balance/eat-inventory-threshold.report.md` (new)
-- `scripts/analyze_eat_threshold.py` (new)
-
-**Seed-42 15-min soak result:** starvation 2 → 1, below-0.3 hunger 1.06% →
-0.50%, stores mean 85% → 92%, leisure action-time +18%, colony survives +2
-sim-weeks. Canaries pass under the plan's "≤ baseline" criterion (the
-absolute `check_canaries.sh` bar of `Starvation == 0` still fails at 1, but
-the baseline already failed it at 2 — pre-existing).
-
-**Archived baselines:**
-- `logs/tuned-42-archive-apr17/` — pre-session snapshot
-- `logs/tuned-42-baseline-eat-threshold/` — this session's baseline
-- `logs/tuned-42/` — this session's treatment
-
-**Commit options left on the table:** (A) `jj split` to isolate just these
-files into their own commit, (B) bundle with the prior plan's docs reframe
-(CLAUDE.md + `docs/systems/project-vision.md`) as two commits, (C) hand it
-off, (D) bulk wip. No decision made.
-
-### Docs reframe from the prior plan
-
-Also uncommitted:
-- `CLAUDE.md` — opening replaced with "A clowder of cats, living in a world
-  with its own weight"; adds Systems inventory section; fixes
-  `src/main.rs:346` line reference; adds continuity canaries.
-- `docs/systems/project-vision.md` — new; full thesis + influences +
-  design corollaries.
-
-Plan-approved and edited to disk. Same commit-strategy question as above.
-
----
-
 ## Pre-existing issues (not from this session)
 
 ### Test harness drift
@@ -140,18 +99,7 @@ weeks 1–3 settle (22/9/18), weeks 4+ oscillate 3–15. Not a flatline — the
 local depletion → recovery cycle works. The issue is conversion: 1,981
 Hunt plans created, ~11% convert to kills.
 
-### 3. Mentor snapshot is never applied
-
-**`src/steps/disposition/mentor_cat.rs:23–25`** — `resolve_mentor_cat`
-clones the mentor's `Skills` into a snapshot for the apprentice; the
-snapshot is never consumed. Mentoring fires (when a target exists) and
-the mentor gains mastery/respect, but the apprentice learns nothing.
-
-Orthogonal to everything else. Small fix. Primes follow-on #1 to actually
-have an effect — if we lift Mentor's scoring but the action teaches
-nothing, generational knowledge transfer stays cosmetic.
-
-### 4. Magic hard-gated at scoring
+### 3. Magic hard-gated at scoring
 
 **`src/ai/scoring.rs:483`** — `PracticeMagic` only scored if
 `ctx.magic_affinity > 0.3 && ctx.magic_skill > 0.2`. ~60% of cats fall
@@ -168,11 +116,47 @@ Also touches `src/systems/disposition.rs:1675–1676, 1717–1718, 1748`
 
 ---
 
+## Landed
+
+### v0.2.0 release — `aca13acf` (2026-04-19)
+
+The `chore: release v0.2.0` commit bundled in-flight threads that had been
+staged as "uncommitted" in earlier revisions of this document. Kept here
+rather than deleted because the archived baselines and report pointers
+remain useful for retros.
+
+- **Balance: `eat_from_inventory_threshold: 0.05 → 0.4`** — seed-42 15-min
+  soak: starvation 2→1, below-0.3 hunger 1.06%→0.50%, stores mean 85%→92%,
+  leisure action-time +18%, colony survives +2 sim-weeks. Report at
+  `docs/balance/eat-inventory-threshold.report.md`. Baselines:
+  `logs/tuned-42-archive-apr17/`, `logs/tuned-42-baseline-eat-threshold/`,
+  `logs/tuned-42/`. Pre-existing: `check_canaries.sh` still fails on
+  `Starvation == 0` (now 1, was 2).
+- **Docs reframe** — CLAUDE.md opening rewrite + Systems inventory +
+  continuity canaries + `src/main.rs:346` line reference correction;
+  `docs/systems/project-vision.md` new (thesis, influences, design
+  corollaries); this file introduced.
+
+### Mentor snapshot "never applied" — obsolete (no commit, 2026-04-19)
+
+Prior follow-on item claimed `resolve_mentor_cat` produces a snapshot that
+is never consumed. Verified false: the snapshot IS drained in the live
+GOAP path at `src/systems/goap.rs:2672–2743` (biggest teachable skill gap
+gets `growth_rate * apprentice_skill_growth_multiplier` added to the
+apprentice's `Skills`). The `disposition.rs:3157` consumer is in
+`resolve_disposition_chains`, which is not registered in either
+`SimulationPlugin::build()` or `build_schedule()` — dead code.
+
+Mentor *does* teach when it fires. Mentor firing 0× in the seed-42 soak
+is a target-availability problem, already covered by follow-on #1.
+
+---
+
 ## Conventions
 
 - When an item here becomes a plan, write the plan and leave a pointer in
   the entry (don't delete it until the plan lands).
-- When an item lands, move the entry to a "Landed" section at the bottom
-  with the commit hash, or just delete it if trivial.
+- When an item lands, move the entry to the "Landed" section above with
+  the commit hash, or just delete it if trivial.
 - New entries go at the end of the relevant section, dated inline if the
   context is time-sensitive.
