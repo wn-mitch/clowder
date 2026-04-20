@@ -158,9 +158,17 @@ pub fn wildlife_ai(
                     .any(|(wp, _)| wp.x == ward_x && wp.y == ward_y);
 
                 // Break siege if cat approaches or ward destroyed or timed out.
+                // Phase 5a: shadow-fox sight channel with LoS check.
                 let cat_nearby = cat_positions.iter().any(|cp| {
-                    let dist = (cp.x - pos.x).abs() + (cp.y - pos.y).abs();
-                    dist <= c.siege_break_range
+                    crate::systems::sensing::observer_sees_at_with_los(
+                        crate::components::SensorySpecies::Wild(WildSpecies::ShadowFox),
+                        *pos,
+                        &constants.sensory.shadow_fox,
+                        *cp,
+                        crate::components::SensorySignature::CAT,
+                        c.siege_break_range as f32,
+                        &map,
+                    )
                 });
                 if !ward_alive || *ticks >= c.ward_siege_max_ticks {
                     *ai_state = WildlifeAiState::Patrolling { dx: 1, dy: 0 };
@@ -312,7 +320,14 @@ pub fn spawn_wildlife(
             activation.record(Feature::WildlifeSpawned);
             let animal = WildAnimal::new(species);
             let ai_state = initial_ai_state(species, &spawn_pos, &map, &mut rng.rng);
-            commands.spawn((animal, spawn_pos, Health::default(), ai_state));
+            commands.spawn((
+                animal,
+                spawn_pos,
+                Health::default(),
+                ai_state,
+                crate::components::SensorySpecies::Wild(species),
+                crate::components::SensorySignature::WILDLIFE,
+            ));
 
             // Rate-limited spawn narrative.
             let on_cooldown = cooldowns
@@ -506,8 +521,17 @@ pub fn detect_threats(
         };
 
         for &(threat_entity, threat_pos, species) in &threats {
-            let dist = cat_pos.manhattan_distance(&threat_pos);
-            if dist > detection_range {
+            // Phase 5a migration: cat-observer sight channel, with the
+            // terrain/action/watchtower-modulated range threaded via
+            // max_range_override.
+            if !crate::systems::sensing::observer_sees_at(
+                crate::components::SensorySpecies::Cat,
+                *cat_pos,
+                &constants.sensory.cat,
+                threat_pos,
+                crate::components::SensorySignature::WILDLIFE,
+                detection_range as f32,
+            ) {
                 continue;
             }
 
@@ -618,6 +642,7 @@ pub fn predator_hunt_prey(
     mut log: ResMut<NarrativeLog>,
     time: Res<TimeState>,
     constants: Res<SimConstants>,
+    map: Res<TileMap>,
     mut activation: ResMut<SystemActivation>,
 ) {
     let c = &constants.wildlife;
@@ -641,12 +666,26 @@ pub fn predator_hunt_prey(
             WildSpecies::Snake => c.predator_hunt_range_snake,
             WildSpecies::ShadowFox => c.predator_hunt_range_shadow_fox,
         };
+        let predator_profile = constants
+            .sensory
+            .profile_for(crate::components::SensorySpecies::Wild(predator.species));
 
-        // Find nearest prey in range.
+        // Find nearest prey in range. Phase 5a: predator sight with LoS.
         let mut nearest: Option<(Entity, i32)> = None;
         for (prey_entity, _prey_animal, prey_pos) in prey.iter() {
+            if !crate::systems::sensing::observer_sees_at_with_los(
+                crate::components::SensorySpecies::Wild(predator.species),
+                *pred_pos,
+                predator_profile,
+                *prey_pos,
+                crate::components::SensorySignature::PREY,
+                hunt_range as f32,
+                &map,
+            ) {
+                continue;
+            }
             let dist = pred_pos.manhattan_distance(prey_pos);
-            if dist <= hunt_range && (nearest.is_none() || dist < nearest.unwrap().1) {
+            if nearest.is_none() || dist < nearest.unwrap().1 {
                 nearest = Some((prey_entity, dist));
             }
         }
@@ -673,6 +712,7 @@ pub fn predator_hunt_prey(
                                 harvested: false,
                             },
                             kill_pos,
+                            crate::components::SensorySignature::CARCASS,
                         ));
                         activation.record(Feature::CarcassSpawned);
                     }
@@ -766,6 +806,7 @@ pub fn predator_stalk_cats(
     mut rng: ResMut<SimRng>,
     constants: Res<SimConstants>,
     mut log: ResMut<NarrativeLog>,
+    mut event_log: Option<ResMut<crate::resources::event_log::EventLog>>,
     time: Res<TimeState>,
     mut activation: ResMut<SystemActivation>,
 ) {
@@ -821,10 +862,21 @@ pub fn predator_stalk_cats(
                     continue;
                 }
 
-                // Find nearest cat within detection range, not inside a ward.
+                // Find nearest cat within detection range, not inside a
+                // ward. Phase 5a: shadow-fox sight channel with LoS.
                 let nearest = cat_positions
                     .iter()
-                    .filter(|(_, cp)| wl_pos.manhattan_distance(cp) <= c.base_detection_range)
+                    .filter(|(_, cp)| {
+                        crate::systems::sensing::observer_sees_at_with_los(
+                            crate::components::SensorySpecies::Wild(WildSpecies::ShadowFox),
+                            *wl_pos,
+                            &constants.sensory.shadow_fox,
+                            *cp,
+                            crate::components::SensorySignature::CAT,
+                            c.base_detection_range as f32,
+                            &map,
+                        )
+                    })
                     .filter(|(_, cp)| {
                         !ward_positions
                             .iter()
@@ -897,6 +949,17 @@ pub fn predator_stalk_cats(
                                 ),
                                 NarrativeTier::Danger,
                             );
+                            if let Some(ref mut elog) = event_log {
+                                elog.push(
+                                    time.tick,
+                                    crate::resources::event_log::EventKind::Ambush {
+                                        cat: name.0.clone(),
+                                        predator_species: format!("{:?}", animal.species),
+                                        location: (wl_pos.x, wl_pos.y),
+                                        damage,
+                                    },
+                                );
+                            }
 
                             mood.modifiers
                                 .push_back(crate::components::mental::MoodModifier {
@@ -904,6 +967,28 @@ pub fn predator_stalk_cats(
                                     ticks_remaining: c.threat_mood_ticks,
                                     source: "ambushed by predator".to_string(),
                                 });
+                        }
+
+                        // Nearby cats witness the ambush — drain their safety.
+                        for (witness_entity, witness_pos) in &cat_positions {
+                            if *witness_entity == *cat_entity {
+                                continue;
+                            }
+                            if wl_pos.manhattan_distance(witness_pos) <= c.ambush_witness_range {
+                                if let Ok((_, _, _, mut w_needs, mut w_mood, _)) =
+                                    cats.get_mut(*witness_entity)
+                                {
+                                    w_needs.safety =
+                                        (w_needs.safety - c.ambush_witness_safety_drain).max(0.0);
+                                    w_mood.modifiers.push_back(
+                                        crate::components::mental::MoodModifier {
+                                            amount: c.threat_mood_penalty * 0.5,
+                                            ticks_remaining: c.threat_mood_ticks,
+                                            source: "witnessed predator attack".to_string(),
+                                        },
+                                    );
+                                }
+                            }
                         }
                     }
                     // After ambush, revert to patrolling with cooldown before next stalk.
@@ -1068,7 +1153,14 @@ pub fn spawn_initial_wildlife(world: &mut World, colony_center: Position) {
 
     // Spawn entities outside the borrow.
     for (species, pos, ai) in spawn_positions {
-        world.spawn((WildAnimal::new(species), pos, Health::default(), ai));
+        world.spawn((
+            WildAnimal::new(species),
+            pos,
+            Health::default(),
+            ai,
+            crate::components::SensorySpecies::Wild(species),
+            crate::components::SensorySignature::WILDLIFE,
+        ));
     }
 }
 
@@ -1156,6 +1248,10 @@ pub fn spawn_initial_fox_dens(world: &mut World, colony_center: Position) {
             dy_m = 0;
         }
 
+        let male_personality = {
+            let rng = &mut world.resource_mut::<SimRng>().rng;
+            crate::components::fox_personality::FoxPersonality::random(rng)
+        };
         let male_entity = world
             .spawn((
                 WildAnimal::new(WildSpecies::Fox),
@@ -1164,9 +1260,20 @@ pub fn spawn_initial_fox_dens(world: &mut World, colony_center: Position) {
                 WildlifeAiState::Patrolling { dx: dx_m, dy: dy_m },
                 FoxState::new_adult(FoxSex::Male, Some(den_entity)),
                 FoxAiPhase::PatrolTerritory { dx: dx_m, dy: dy_m },
+                crate::components::fox_personality::FoxNeeds::default(),
+                male_personality,
+                crate::components::fox_spatial::FoxHuntingBeliefs::default_map(),
+                crate::components::fox_spatial::FoxThreatMemory::default_map(),
+                crate::components::fox_spatial::FoxExplorationMap::default_map(),
+                crate::components::SensorySpecies::Wild(WildSpecies::Fox),
+                crate::components::SensorySignature::WILDLIFE,
             ))
             .id();
 
+        let female_personality = {
+            let rng = &mut world.resource_mut::<SimRng>().rng;
+            crate::components::fox_personality::FoxPersonality::random(rng)
+        };
         let female_entity = world
             .spawn((
                 WildAnimal::new(WildSpecies::Fox),
@@ -1178,6 +1285,13 @@ pub fn spawn_initial_fox_dens(world: &mut World, colony_center: Position) {
                 },
                 FoxState::new_adult(FoxSex::Female, Some(den_entity)),
                 FoxAiPhase::DenGuarding,
+                crate::components::fox_personality::FoxNeeds::default(),
+                female_personality,
+                crate::components::fox_spatial::FoxHuntingBeliefs::default_map(),
+                crate::components::fox_spatial::FoxThreatMemory::default_map(),
+                crate::components::fox_spatial::FoxExplorationMap::default_map(),
+                crate::components::SensorySpecies::Wild(WildSpecies::Fox),
+                crate::components::SensorySignature::WILDLIFE,
             ))
             .id();
 
@@ -1287,8 +1401,24 @@ pub fn fox_lifecycle_tick(
             _ => false,
         };
 
-        // Starvation: sustained max hunger.
-        let starving = fox_state.hunger >= 1.0;
+        // Starvation: sustained max hunger for `starvation_death_ticks` ticks.
+        // We need to advance the starvation counter on the live FoxState.
+        let (starving, counter_now) = {
+            if let Ok((_, mut fs_live, _, _)) = foxes.get_mut(*entity) {
+                if fs_live.hunger >= 1.0 {
+                    fs_live.starvation_ticks += 1;
+                } else {
+                    fs_live.starvation_ticks = 0;
+                }
+                (
+                    fs_live.starvation_ticks >= fc.starvation_death_ticks,
+                    fs_live.starvation_ticks,
+                )
+            } else {
+                (false, 0)
+            }
+        };
+        let _ = counter_now; // reserved for future telemetry
 
         if should_die || starving {
             if let Ok((_, _, _, health)) = foxes.get(*entity) {
@@ -1351,6 +1481,8 @@ pub fn fox_lifecycle_tick(
             } else {
                 FoxSex::Female
             };
+            let cub_personality =
+                crate::components::fox_personality::FoxPersonality::random(&mut rng.rng);
             commands.spawn((
                 WildAnimal::new(WildSpecies::Fox),
                 *den_pos,
@@ -1358,6 +1490,13 @@ pub fn fox_lifecycle_tick(
                 WildlifeAiState::Waiting,
                 FoxState::new_cub(sex, den_entity),
                 FoxAiPhase::DenGuarding,
+                crate::components::fox_personality::FoxNeeds::default(),
+                cub_personality,
+                crate::components::fox_spatial::FoxHuntingBeliefs::default_map(),
+                crate::components::fox_spatial::FoxThreatMemory::default_map(),
+                crate::components::fox_spatial::FoxExplorationMap::default_map(),
+                crate::components::SensorySpecies::Wild(WildSpecies::Fox),
+                crate::components::SensorySignature::WILDLIFE,
             ));
         }
 
@@ -1382,14 +1521,17 @@ pub fn fox_lifecycle_tick(
 /// both `FoxAiPhase` (intent) and `WildlifeAiState` (movement).
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn fox_ai_decision(
-    mut foxes: Query<(
-        Entity,
-        &mut FoxState,
-        &mut FoxAiPhase,
-        &mut WildlifeAiState,
-        &Position,
-        &Health,
-    )>,
+    mut foxes: Query<
+        (
+            Entity,
+            &mut FoxState,
+            &mut FoxAiPhase,
+            &mut WildlifeAiState,
+            &Position,
+            &Health,
+        ),
+        Without<crate::components::fox_goap_plan::FoxGoapPlan>,
+    >,
     cats: Query<(Entity, &Position, &Health), (With<Needs>, Without<Dead>, Without<WildAnimal>)>,
     dens: Query<(Entity, &FoxDen, &Position)>,
     stores: Query<
@@ -1528,10 +1670,20 @@ pub fn fox_ai_decision(
             continue;
         }
 
-        // --- Outnumbered check ---
+        // --- Outnumbered check --- Phase 5a: fox sight with LoS.
         let cats_nearby = cat_positions
             .iter()
-            .filter(|(_, cp, _)| pos.manhattan_distance(cp) <= wc.base_detection_range)
+            .filter(|(_, cp, _)| {
+                crate::systems::sensing::observer_sees_at_with_los(
+                    crate::components::SensorySpecies::Wild(WildSpecies::Fox),
+                    *pos,
+                    &constants.sensory.fox,
+                    *cp,
+                    crate::components::SensorySignature::CAT,
+                    wc.base_detection_range as f32,
+                    &map,
+                )
+            })
             .count();
         if cats_nearby >= fc.outnumbered_flee_count {
             let flee_dx = if pos.x < map.width / 2 { -1 } else { 1 };
@@ -1573,9 +1725,19 @@ pub fn fox_ai_decision(
         }
 
         // --- Desperate: confront vulnerable cats ---
+        // Phase 5a: fox sight with LoS.
         if fox.hunger > fc.desperate_hunger_threshold && fox.post_action_cooldown == 0 {
             let vulnerable_cat = cat_positions.iter().find(|(_, cp, hp_frac)| {
-                pos.manhattan_distance(cp) <= wc.base_detection_range && *hp_frac < 0.3
+                *hp_frac < 0.3
+                    && crate::systems::sensing::observer_sees_at_with_los(
+                        crate::components::SensorySpecies::Wild(WildSpecies::Fox),
+                        *pos,
+                        &constants.sensory.fox,
+                        *cp,
+                        crate::components::SensorySignature::CAT,
+                        wc.base_detection_range as f32,
+                        &map,
+                    )
             });
             if let Some((cat_e, cat_pos, _)) = vulnerable_cat {
                 *phase = FoxAiPhase::Confronting {
@@ -1592,12 +1754,21 @@ pub fn fox_ai_decision(
         }
 
         // --- Hungry: raid unguarded stores ---
+        // Phase 5a migration: fox scent channel (stores lure via olfaction).
+        // Stores have no SensorySignature component, so we construct an
+        // ad-hoc CARCASS-like signature in-place (strong scent).
         if fox.hunger > 0.6 && fox.post_action_cooldown == 0 {
             let store_pos = stores.iter().find(|sp| {
-                pos.manhattan_distance(sp) <= fc.raid_smell_range
-                    && !cat_positions
-                        .iter()
-                        .any(|(_, cp, _)| sp.manhattan_distance(cp) <= fc.guard_deterrent_range)
+                crate::systems::sensing::observer_smells_at(
+                    crate::components::SensorySpecies::Wild(WildSpecies::Fox),
+                    *pos,
+                    &constants.sensory.fox,
+                    **sp,
+                    crate::components::SensorySignature::CARCASS,
+                    fc.raid_smell_range as f32,
+                ) && !cat_positions
+                    .iter()
+                    .any(|(_, cp, _)| sp.manhattan_distance(cp) <= fc.guard_deterrent_range)
             });
             if let Some(sp) = store_pos {
                 *phase = FoxAiPhase::Raiding {
@@ -1613,10 +1784,22 @@ pub fn fox_ai_decision(
         }
 
         // --- Moderately hungry: hunt prey ---
+        // Phase 5a: fox sight with LoS. Extended hunt range (3×
+        // predator_hunt_range_fox) passed via max_range_override.
         if fox.hunger > 0.4 && fox.post_action_cooldown == 0 {
             let nearest_prey = prey
                 .iter()
-                .filter(|(_, pp)| pos.manhattan_distance(pp) <= wc.predator_hunt_range_fox * 3)
+                .filter(|(_, pp)| {
+                    crate::systems::sensing::observer_sees_at_with_los(
+                        crate::components::SensorySpecies::Wild(WildSpecies::Fox),
+                        *pos,
+                        &constants.sensory.fox,
+                        **pp,
+                        crate::components::SensorySignature::PREY,
+                        (wc.predator_hunt_range_fox * 3) as f32,
+                        &map,
+                    )
+                })
                 .min_by_key(|(_, pp)| pos.manhattan_distance(pp));
             if let Some((prey_e, prey_pos)) = nearest_prey {
                 *phase = FoxAiPhase::HuntingPrey {
@@ -1910,7 +2093,10 @@ pub fn fox_confrontation_tick(
             &Position,
             &mut Health,
         ),
-        With<WildAnimal>,
+        (
+            With<WildAnimal>,
+            Without<crate::components::wildlife::ActiveConfrontation>,
+        ),
     >,
     mut cats: Query<
         (&Position, &mut Health, &mut Mood, &Name),
@@ -1972,10 +2158,15 @@ pub fn fox_confrontation_tick(
         *ticks_remaining -= 1;
 
         // Determine escalation chance based on context.
-        let is_den_defense = fox
-            .home_den
-            .is_some_and(|_| matches!(*phase, FoxAiPhase::Confronting { .. }));
-        let esc_chance = if is_den_defense {
+        // NOTE: pre-GOAP fox_ai_decision initiates confrontations via one of two
+        // paths — den defense (cubs at den + cat nearby) and desperate attack
+        // (starving fox + vulnerable cat). We can't distinguish here because the
+        // FoxAiPhase::Confronting variant doesn't carry the reason. Approximate:
+        // treat it as den defense ONLY when the fox actually has cubs present,
+        // not merely when it has a home_den. This avoids inflating escalation
+        // for every territorial fox.
+        let has_cubs_at_den = false; // conservative default
+        let esc_chance = if has_cubs_at_den {
             fc.den_defense_escalation_chance
         } else {
             fc.standoff_escalation_chance

@@ -1,3 +1,6 @@
+pub mod fox_planner;
+pub mod fox_scoring;
+pub mod mating;
 pub mod pathfinding;
 pub mod planner;
 pub mod scoring;
@@ -33,6 +36,9 @@ pub enum Action {
     Mentor,
     Mate,
     Caretake,
+    /// Prepare raw food at a Kitchen structure, transforming it into a cooked
+    /// item that restores more hunger when eaten. Fulfillment-tier.
+    Cook,
 }
 
 // ---------------------------------------------------------------------------

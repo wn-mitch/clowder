@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::rendering::sprite_assets::SpriteAssets;
+use crate::rendering::sprite_assets::{SpriteAssets, TreeSpritePool};
 use crate::rendering::terrain_sprites::{
     base_tile_index, blob_bitmask, grass_overlay_atlas_index_with_variant, OVERLAY_LAYERS,
 };
@@ -14,9 +14,31 @@ pub struct BaseTerrainLayer;
 #[derive(Component)]
 pub struct BlobOverlayLayer;
 
+/// Marker for the animated rune sprite rendered on AncientRuin footprints.
+#[derive(Component)]
+pub struct RuinRune;
+
+/// 18-step glow-pulse sequence authored in Animation_Rock_Brown_EmeraldGrass.tsx
+/// for tile ID 41 (left half). Entries are column indices 0..9 into
+/// `ruin_rune_layout` row 0. The right half uses the same sequence against
+/// row 1 of the atlas.
+const RUNE_ANIMATION_STEPS: [u8; 18] = [0, 1, 2, 3, 4, 5, 0, 6, 0, 7, 8, 7, 0, 6, 0, 7, 8, 7];
+const RUNE_FRAME_DURATION_MS: u64 = 250;
+/// Row 1 of the 9x2 atlas holds the right-half frames; its base atlas index
+/// is one row-width away from row 0.
+const RUNE_RIGHT_ROW_BASE: u16 = 9;
+
 /// Marker for decorative tree sprites placed on forest terrain.
 #[derive(Component)]
 pub struct TreeDecoration;
+
+/// Marker for shadow sprites cast by trees.
+#[derive(Component)]
+pub struct TreeShadow;
+
+/// Marker for small decorative ground scatter props.
+#[derive(Component)]
+pub struct GroundScatter;
 
 /// Marker for corruption haze overlay sprites.
 #[derive(Component)]
@@ -26,6 +48,22 @@ pub struct CorruptionOverlay;
 pub const TILE_SCALE: f32 = 3.0;
 /// Pixel size of each tile in the sprite sheet.
 pub const TILE_PX: f32 = 16.0;
+/// Coarse region size (in tiles) for tree color palette coherence.
+/// Each region of this size picks a single color palette (Dark/Emerald/Light),
+/// while tree shape varies per-tile within that palette.
+const TREE_COLOR_REGION: i32 = 8;
+
+/// Deterministic hash for stable per-tile variation. Different `salt` values
+/// produce independent sequences so tree selection, scatter placement, and
+/// position jitter don't correlate.
+fn tile_hash(x: i32, y: i32, salt: u32) -> u32 {
+    let mut h = (x as u32)
+        .wrapping_mul(374761393)
+        .wrapping_add((y as u32).wrapping_mul(668265263))
+        .wrapping_add(salt.wrapping_mul(2654435761));
+    h = (h ^ (h >> 13)).wrapping_mul(1274126177);
+    h ^ (h >> 16)
+}
 
 /// Startup system: creates the multi-layer tilemap from the TileMap resource.
 ///
@@ -39,6 +77,7 @@ pub fn create_tilemap(
     asset_server: Res<AssetServer>,
     map: Res<TileMap>,
     sprite_assets: Res<SpriteAssets>,
+    tree_pool: Res<TreeSpritePool>,
     mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
 ) {
     let world_px = TILE_PX * TILE_SCALE;
@@ -147,37 +186,151 @@ pub fn create_tilemap(
         }
     }
 
-    // --- Tree decorations on forest terrain (z=5.0) ---
-    // tree_sprites.png is 12 cols x 4 rows of 48x48 frames.
-    // Row 2 (indices 24-35): medium trees for LightForest.
-    // Row 3 (indices 36-47): full-grown trees for DenseForest.
+    // --- Ancient-ruin rune pair (z=0.5) ---
+    // For each AncientRuin footprint (2x2), detect the top-left anchor and
+    // spawn two animated sprites on the bottom row: tile 41 (left half) and
+    // tile 42 (right half). Both cycle through the same 18-step pulse at
+    // 250ms/frame using the authored TSX sequence. Z sits above the base
+    // terrain but below all blob overlays so grass scalloping renders over
+    // the rune's edges.
+    let is_ruin = |x: i32, y: i32| -> bool {
+        map.in_bounds(x, y) && map.get(x, y).terrain == Terrain::AncientRuin
+    };
+    for y in 0..map.height {
+        for x in 0..map.width {
+            if !is_ruin(x, y) {
+                continue;
+            }
+            // Anchor = top-left tile of a 2x2 cluster.
+            if is_ruin(x - 1, y) || is_ruin(x, y - 1) {
+                continue;
+            }
+            // Bottom row world coordinates. TileMap is Y-down; visual south is y+1.
+            let by = y + 1;
+            for (half_idx, base_atlas_index) in [(0i32, 0u16), (1i32, RUNE_RIGHT_ROW_BASE)] {
+                let tile_x = x + half_idx;
+                let world_x = tile_x as f32 * world_px;
+                let world_y = (map.height as f32 - 1.0 - by as f32) * world_px;
+                commands.spawn((
+                    Sprite {
+                        image: sprite_assets.ruin_rune_texture.clone(),
+                        custom_size: Some(Vec2::splat(world_px)),
+                        texture_atlas: Some(TextureAtlas {
+                            layout: sprite_assets.ruin_rune_layout.clone(),
+                            index: base_atlas_index as usize,
+                        }),
+                        ..default()
+                    },
+                    Transform::from_xyz(world_x, world_y, 0.5),
+                    crate::rendering::sprite_animation::AnimationTimer::new(
+                        RUNE_ANIMATION_STEPS.len() as u8,
+                        std::time::Duration::from_millis(RUNE_FRAME_DURATION_MS),
+                    ),
+                    crate::rendering::sprite_animation::AnimationSequence {
+                        base: base_atlas_index,
+                        steps: &RUNE_ANIMATION_STEPS,
+                        cursor: 0,
+                    },
+                    RuinRune,
+                ));
+            }
+        }
+    }
+
+    // --- Ground scatter layer (z=4.5) ---
+    // Small decorative props (mushrooms, grass tufts) on grass/forest tiles.
+    // Density varies by terrain: dense forest > light forest > open grass.
+    if !tree_pool.scatter.is_empty() {
+        for y in 0..map.height {
+            for x in 0..map.width {
+                let tile = map.get(x, y);
+                let threshold = match tile.terrain {
+                    Terrain::DenseForest => 25,
+                    Terrain::LightForest => 15,
+                    Terrain::Grass => 10,
+                    _ => continue,
+                };
+                if tile_hash(x, y, 1) % 100 >= threshold {
+                    continue;
+                }
+                let idx = tile_hash(x, y, 2) as usize % tree_pool.scatter.len();
+                let scatter = &tree_pool.scatter[idx];
+                let size = scatter.render_size(world_px);
+
+                // Jitter position within the tile so scatter doesn't look grid-aligned.
+                let jx = ((tile_hash(x, y, 3) % 20) as f32 - 10.0) / 10.0 * world_px * 0.3;
+                let jy = ((tile_hash(x, y, 4) % 20) as f32 - 10.0) / 10.0 * world_px * 0.3;
+                let world_x = x as f32 * world_px + jx;
+                let world_y = (map.height as f32 - 1.0 - y as f32) * world_px + jy;
+
+                commands.spawn((
+                    Sprite {
+                        image: scatter.image.clone(),
+                        custom_size: Some(size),
+                        ..default()
+                    },
+                    Transform::from_xyz(world_x, world_y, 4.5),
+                    GroundScatter,
+                ));
+            }
+        }
+    }
+
+    // --- Tree decorations with variety (z=5.0) + shadow companions (z=4.8) ---
+    // Each forest tile gets a deterministically-selected tree sprite. A coarse
+    // spatial hash picks a color palette per region so nearby tiles share the
+    // same color family; a fine per-tile hash picks the shape variant within
+    // that palette.
     for y in 0..map.height {
         for x in 0..map.width {
             let tile = map.get(x, y);
-            let base_index = match tile.terrain {
-                Terrain::LightForest => 24, // medium trees (row 2)
-                Terrain::DenseForest => 36, // full trees (row 3)
+            let palettes = match tile.terrain {
+                Terrain::LightForest => &tree_pool.light_forest,
+                Terrain::DenseForest => &tree_pool.dense_forest,
                 _ => continue,
             };
-            // Deterministic per-tile variation: pick from 3 frames.
-            let variant = ((x.wrapping_mul(7) ^ y.wrapping_mul(13)) % 3) as usize;
-            let atlas_index = base_index + variant;
+            if palettes.is_empty() {
+                continue;
+            }
 
-            let world_x = x as f32 * world_px;
-            let world_y = (map.height as f32 - 1.0 - y as f32) * world_px;
+            let color_idx = tile_hash(x / TREE_COLOR_REGION, y / TREE_COLOR_REGION, 7) as usize
+                % palettes.len();
+            let palette = &palettes[color_idx];
+            if palette.entries.is_empty() {
+                continue;
+            }
+            let idx = tile_hash(x, y, 0) as usize % palette.entries.len();
+            let entry = &palette.entries[idx];
+            let size = entry.render_size(world_px);
+
+            // Small jitter so trees don't sit on a perfect grid.
+            let jx = ((tile_hash(x, y, 5) % 10) as f32 - 5.0) / 5.0 * world_px * 0.15;
+            let jy = ((tile_hash(x, y, 6) % 10) as f32 - 5.0) / 5.0 * world_px * 0.15;
+            let world_x = x as f32 * world_px + jx;
+            let world_y = (map.height as f32 - 1.0 - y as f32) * world_px + jy;
 
             commands.spawn((
                 Sprite {
-                    image: sprite_assets.trees_texture.clone(),
-                    custom_size: Some(Vec2::splat(world_px)),
-                    texture_atlas: Some(TextureAtlas {
-                        layout: sprite_assets.trees_layout.clone(),
-                        index: atlas_index,
-                    }),
+                    image: entry.image.clone(),
+                    custom_size: Some(size),
                     ..default()
                 },
                 Transform::from_xyz(world_x, world_y, 5.0),
                 TreeDecoration,
+            ));
+
+            // Shadow companion — offset south-east, sized relative to tree width.
+            let shadow_w = size.x * 0.7;
+            let shadow_h = shadow_w * 0.6;
+            commands.spawn((
+                Sprite {
+                    image: tree_pool.shadow.clone(),
+                    custom_size: Some(Vec2::new(shadow_w, shadow_h)),
+                    color: Color::srgba(0.0, 0.0, 0.0, 0.25),
+                    ..default()
+                },
+                Transform::from_xyz(world_x + 0.3 * world_px, world_y - 0.2 * world_px, 4.8),
+                TreeShadow,
             ));
         }
     }
@@ -226,6 +379,7 @@ fn dump_terrain_debug(map: &TileMap) {
                 Terrain::Sand => ':',
                 Terrain::Den => 'D',
                 Terrain::Hearth => 'H',
+                Terrain::Kitchen => 'K',
                 Terrain::Stores => 'S',
                 Terrain::Workshop => 'W',
                 Terrain::Garden => 'G',

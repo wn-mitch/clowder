@@ -131,6 +131,7 @@ pub fn generate_narrative(
                     other: other_name.as_deref(),
                     prey: None,
                     item: None,
+                    item_singular: None,
                     quality: None,
                 };
                 let text = resolve_variables(&template.text, &var_ctx);
@@ -344,6 +345,16 @@ pub fn generate_narrative(
                 format!("{cat} tends to a hungry kitten."),
                 NarrativeTier::Action,
             ),
+
+            Action::Cook => {
+                let options = [
+                    format!("{cat} tends a pot of something savoury at the hearth."),
+                    format!("{cat} turns food over hot coals."),
+                    format!("{cat} coaxes flavour out of a simple meal."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
         };
 
         log.push(tick, text, tier);

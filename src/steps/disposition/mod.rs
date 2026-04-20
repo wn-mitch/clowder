@@ -1,3 +1,4 @@
+mod cook;
 mod deliver_directive;
 mod deposit_at_stores;
 mod eat_at_stores;
@@ -8,11 +9,13 @@ mod mate_with;
 mod mentor_cat;
 mod patrol_to;
 mod retrieve_from_stores;
+mod retrieve_raw_food_from_stores;
 mod self_groom;
 mod sleep;
 mod socialize;
 mod survey;
 
+pub use cook::resolve_cook;
 pub use deliver_directive::resolve_deliver_directive;
 pub use deposit_at_stores::resolve_deposit_at_stores;
 pub use eat_at_stores::resolve_eat_at_stores;
@@ -23,6 +26,7 @@ pub use mate_with::resolve_mate_with;
 pub use mentor_cat::resolve_mentor_cat;
 pub use patrol_to::resolve_patrol_to;
 pub use retrieve_from_stores::resolve_retrieve_from_stores;
+pub use retrieve_raw_food_from_stores::resolve_retrieve_raw_food_from_stores;
 pub use self_groom::resolve_self_groom;
 pub use sleep::resolve_sleep;
 pub use socialize::resolve_socialize;

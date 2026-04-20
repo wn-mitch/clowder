@@ -8,20 +8,9 @@ Status of each design document cross-referenced against `SimulationPlugin::build
 
 | System | Status | Registered Functions | Design Doc |
 |--------|--------|---------------------|------------|
-| Activity Cascading | **[Built]** | `personality_events::emit_personality_events` | [doc](../systems/activity-cascading.md) |
-| Buildings | **[Built]** | `buildings::apply_building_effects`, `buildings::decay_building_condition`, `buildings::process_gates`, `buildings::tidy_buildings` | [doc](../systems/buildings.md) |
 | Collective Memory | **[Built]** | `memory::decay_memories`, `colony_knowledge::update_colony_knowledge` | [doc](../systems/collective-memory.md) |
-| Combat | **[Built]** | `combat::resolve_combat`, `combat::heal_injuries` | [doc](../systems/combat.md) |
-| Coordination | **[Built]** | `coordination::evaluate_coordinators`, `coordination::assess_colony_needs`, `coordination::accumulate_build_pressure`, `coordination::flag_coordinator_death`, `coordination::expire_directives` | [doc](../systems/coordination.md) |
 | Corpse Handling | **[Built]** | `death::check_death`, `death::cleanup_dead` | [doc](../systems/corpse-handling.md) |
-| Items | **[Built]** | `items::decay_items`, `items::prune_stored_items`, `items::sync_food_stores` | [doc](../systems/items.md) |
-| Magic | **[Built]** | `magic::corruption_spread`, `magic::ward_decay`, `magic::herb_seasonal_check`, `magic::corruption_tile_effects`, `magic::spawn_shadow_fox_from_corruption` (+3 more) | [doc](../systems/magic.md) |
-| Mood | **[Built]** | `mood::update_mood`, `mood::mood_contagion` | [doc](../systems/mood.md) |
-| Narrative | **[Built]** | `narrative::generate_narrative` | [doc](../systems/narrative.md) |
-| Needs | **[Built]** | `needs::decay_needs`, `needs::eat_from_inventory` | [doc](../systems/needs.md) |
-| Relationships | **[Built]** | `social::passive_familiarity`, `personality_friction::personality_friction`, `social::check_bonds` | [doc](../systems/relationships.md) |
-| Time | **[Built]** | `time::advance_time`, `time::emit_weather_transitions` | [doc](../systems/time.md) |
-| Utility AI | **[Built]** | `disposition::check_anxiety_interrupts`, `disposition::evaluate_dispositions`, `disposition::disposition_to_chain`, `disposition::resolve_disposition_chains`, `ai::emit_periodic_events` | [doc](../systems/utility-ai.md) |
+| Magic | **[Built]** | `magic::CorruptionPushback`, `magic::corruption_spread`, `magic::ward_decay`, `magic::herb_seasonal_check`, `magic::advance_herb_growth` (+8 more) | [doc](../systems/magic.md) |
 | Weather — Living Climate System | **[Built]** | `weather::update_weather`, `wind::update_wind` | [doc](../systems/weather.md) |
 
 ## Partial
@@ -29,8 +18,6 @@ Status of each design document cross-referenced against `SimulationPlugin::build
 | System | Status | Registered Functions | Design Doc |
 |--------|--------|---------------------|------------|
 | Body Zones | **[Partial]** | — | [doc](../systems/body-zones.md) |
-| Identity | **[Partial]** | — | [doc](../systems/identity.md) |
-| Skills | **[Partial]** | — | [doc](../systems/skills.md) |
 | World Generation | **[Partial]** | — | [doc](../systems/world-gen.md) |
 
 ## Aspirational
@@ -39,10 +26,14 @@ Status of each design document cross-referenced against `SimulationPlugin::build
 |--------|--------|---------------------|------------|
 | Disease | *[Aspirational]* | — | [doc](../systems/disease.md) |
 | Environmental Quality | *[Aspirational]* | — | [doc](../systems/environmental-quality.md) |
+| Log Analytics Dashboard | *[Aspirational]* | — | [doc](../systems/log-analytics-dashboard.md) |
 | Mental Breaks | *[Aspirational]* | — | [doc](../systems/mental-breaks.md) |
+| Project vision | *[Aspirational]* | — | [doc](../systems/project-vision.md) |
 | Organized Raids | *[Aspirational]* | — | [doc](../systems/raids.md) |
 | Recreation & Grooming | *[Aspirational]* | — | [doc](../systems/recreation.md) |
-| Reproduction | *[Aspirational]* | — | [doc](../systems/reproduction.md) |
+| Sensory System — Detection, Channels, and Profiles | *[Aspirational]* | — | [doc](../systems/sensory.md) |
+| Sleep That Makes Sense — GOAP for Every Species | *[Aspirational]* | — | [doc](../systems/sleep-that-makes-sense.md) |
+| Strategist coordinator (stub) | *[Aspirational]* | — | [doc](../systems/strategist-coordinator.md) |
 | Substances | *[Aspirational]* | — | [doc](../systems/substances.md) |
 | The Calling | *[Aspirational]* | — | [doc](../systems/the-calling.md) |
 | Trade & Visitors | *[Aspirational]* | — | [doc](../systems/trade.md) |
@@ -54,8 +45,12 @@ System modules with registered functions but no design doc:
 - **aspirations**: select_aspirations, check_second_aspiration_slot, check_aspiration_abandonment, track_milestones
 - **colony_score**: emit_colony_score
 - **fate**: assign_fated_connections, awaken_fated_connections
+- **fox_goap**: sync_fox_needs, fox_evaluate_and_plan, fox_resolve_goap_plans, feed_cubs_at_dens, resolve_paired_confrontations
+- **goap**: check_anxiety_interrupts, evaluate_and_plan, resolve_goap_plans, emit_plan_narrative
+- **growth**: tick_kitten_growth, kitten_mood_aura
+- **pregnancy**: tick_pregnancy
 - **prey**: prey_population, prey_hunger, prey_ai, prey_den_lifecycle, update_den_pressure, apply_den_raids, orphan_prey_adopt_or_found
-- **snapshot**: emit_cat_snapshots, emit_position_traces
+- **snapshot**: emit_cat_snapshots, emit_position_traces, emit_spatial_snapshots
 - **task_chains**: resolve_task_chains
-- **wildlife**: spawn_wildlife, wildlife_ai, predator_hunt_prey, detect_threats, cleanup_wildlife
+- **wildlife**: spawn_wildlife, wildlife_ai, fox_movement, fox_needs_tick, fox_ai_decision, fox_scent_tick, predator_hunt_prey, carcass_decay, predator_stalk_cats, detect_threats, fox_lifecycle_tick, fox_confrontation_tick, fox_store_raid_tick, cleanup_wildlife
 

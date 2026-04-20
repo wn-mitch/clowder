@@ -1,0 +1,26 @@
+[
+    // --- Generic banishment triumph (Legend tier) ---
+    // Tagged with `event: "banishment"` so resolve_combat's targeted
+    // TemplateContext picks these up. Variables: {name} resolves to the
+    // posse leader's name.
+    (
+        text: "{name} drives the shadow-fox to its knees. It shrieks, dissolves into mist — gone.",
+        tier: Legend,
+        event: Some("banishment"),
+    ),
+    (
+        text: "The shadow-fox's form frays at the edges, unravelling into mist. A chorus of breath rises from the colony.",
+        tier: Legend,
+        event: Some("banishment"),
+    ),
+    (
+        text: "A shriek, a burst of cold wind, and the shadow-fox is gone. {name} stands its ground as the colony breathes.",
+        tier: Legend,
+        event: Some("banishment"),
+    ),
+    (
+        text: "The shadow-fox's body dissolves mid-lunge, scattered like smoke on a lifting fog. {name} holds the line.",
+        tier: Legend,
+        event: Some("banishment"),
+    ),
+]

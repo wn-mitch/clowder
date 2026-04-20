@@ -4,7 +4,9 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::sprite::Text2d;
 
-use crate::components::building::Structure;
+use crate::components::building::{
+    ConstructionSite, CropState, GateState, Structure, StructureType,
+};
 use crate::components::identity::{Appearance, Name, Species};
 use crate::components::items::{Item, ItemKind, ItemLocation};
 use crate::components::magic::{
@@ -16,6 +18,7 @@ use crate::components::wildlife::{FoxDen, WildAnimal};
 use crate::rendering::sprite_assets::SpriteAssets;
 use crate::rendering::tilemap_sync::{TILE_PX, TILE_SCALE};
 use crate::resources::map::TileMap;
+use crate::resources::time::{Season, SimConfig, TimeState};
 
 /// Marker: this entity has had rendering components attached.
 #[derive(Component)]
@@ -238,8 +241,9 @@ pub fn attach_entity_sprites(
             ))
             .id();
 
-        let (image, layout, size) = wildlife_sprite(&sprite_assets, animal);
-        commands.entity(entity).insert((
+        let (image, layout, size, frame_count) = wildlife_sprite(&sprite_assets, animal);
+        let mut ecmds = commands.entity(entity);
+        ecmds.insert((
             Sprite {
                 image,
                 color: Color::WHITE,
@@ -251,13 +255,21 @@ pub fn attach_entity_sprites(
             PreviousPosition { x: pos.x, y: pos.y },
             EntitySpriteMarker,
         ));
-        commands.entity(entity).add_children(&[label]);
+        if frame_count > 1 {
+            ecmds.insert(crate::rendering::sprite_animation::AnimationTimer::new(
+                frame_count,
+                std::time::Duration::from_millis(300),
+            ));
+        }
+        ecmds.add_children(&[label]);
     }
 
     // Prey — species-specific sprite from loaded spritesheets.
     for (entity, pos, config) in &prey {
         let (x, y) = grid_to_world(pos, map_h, world_px);
-        let (image, atlas, color, sprite_size) = prey_sprite(&sprite_assets, config.kind, world_px);
+        let entity_hash = entity.to_bits();
+        let (image, atlas, color, sprite_size, frame_count) =
+            prey_sprite(&sprite_assets, config.kind, world_px, entity_hash);
         let label = commands
             .spawn((
                 Text2d::new(config.name),
@@ -269,7 +281,8 @@ pub fn attach_entity_sprites(
                 Transform::from_xyz(0.0, sprite_size * 0.55 + 2.0, 1.0),
             ))
             .id();
-        commands.entity(entity).insert((
+        let mut ecmds = commands.entity(entity);
+        ecmds.insert((
             Sprite {
                 image,
                 color,
@@ -281,7 +294,13 @@ pub fn attach_entity_sprites(
             PreviousPosition { x: pos.x, y: pos.y },
             EntitySpriteMarker,
         ));
-        commands.entity(entity).add_children(&[label]);
+        if frame_count > 1 {
+            ecmds.insert(crate::rendering::sprite_animation::AnimationTimer::new(
+                frame_count,
+                std::time::Duration::from_millis(300),
+            ));
+        }
+        ecmds.add_children(&[label]);
     }
 
     // Carcasses — dark desaturated prey colors, fading with age.
@@ -433,25 +452,56 @@ pub fn attach_entity_sprites(
         ));
     }
 
-    // Wards — cyan or red marker.
+    // Wards — lantern sprite (Lantern_2.png, 16x32) + translucent AOE aura
+    // showing the effective repulsion zone. Aura color encodes ward kind,
+    // alpha scales with strength so fading wards visibly dim before despawn.
     for (entity, pos, ward) in &wards {
-        let color = if ward.inverted {
-            Color::srgb(0.9, 0.2, 0.2)
+        let sprite_color = if ward.inverted {
+            Color::srgb(1.0, 0.3, 0.3)
         } else {
-            Color::srgb(0.2, 0.9, 0.9)
+            Color::WHITE
         };
+        let w = world_px * 0.5;
+        let h = w / 16.0 * 32.0; // preserve 16:32 aspect ratio
         let (x, y) = grid_to_world(pos, map_h, world_px);
         commands.entity(entity).insert((
             Sprite {
-                image: white_pixel.0.clone(),
-                color,
-                custom_size: Some(Vec2::new(world_px * 0.3, world_px * 0.3)),
+                image: sprite_assets.ward_texture.clone(),
+                color: sprite_color,
+                custom_size: Some(Vec2::new(w, h)),
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 22.0),
             PreviousPosition { x: pos.x, y: pos.y },
             EntitySpriteMarker,
         ));
+
+        let aura_rgb = if ward.inverted {
+            (0.9, 0.2, 0.2)
+        } else {
+            match ward.kind {
+                crate::components::magic::WardKind::Thornward => (0.4, 0.9, 0.5),
+                crate::components::magic::WardKind::DurableWard => (0.4, 0.6, 1.0),
+            }
+        };
+        let aura_alpha = 0.18 * ward.strength.clamp(0.0, 1.0);
+        // Aura diameter = 2 * repel_radius tiles (Manhattan-scaled); render as a
+        // square because the repel logic uses manhattan distance, so the tinted
+        // square truthfully represents the actual coverage footprint.
+        let diameter = 2.0 * ward.repel_radius() * world_px;
+        let aura = commands
+            .spawn((
+                Sprite {
+                    image: sprite_assets.white_pixel.clone(),
+                    color: Color::srgba(aura_rgb.0, aura_rgb.1, aura_rgb.2, aura_alpha),
+                    custom_size: Some(Vec2::new(diameter, diameter)),
+                    ..Default::default()
+                },
+                // Child transform is relative to parent ward.
+                Transform::from_xyz(0.0, 0.0, -20.5),
+            ))
+            .id();
+        commands.entity(entity).add_children(&[aura]);
     }
 
     // Items — 16x16 sprites from the items spritesheet.
@@ -475,20 +525,236 @@ pub fn attach_entity_sprites(
         ));
     }
 
-    // Colony well — 32x32 decorative landmark at colony center.
+    // Colony well — Fan-tasy Tileset hay well (56x74 source, ~1.2 tiles wide).
     for (entity, pos) in &wells {
         let (x, y) = grid_to_world(pos, map_h, world_px);
+        let w = 1.2 * world_px;
+        let h = w / 56.0 * 74.0;
         commands.entity(entity).insert((
             Sprite {
                 image: sprite_assets.well_texture.clone(),
                 color: Color::WHITE,
-                custom_size: Some(Vec2::splat(world_px * 2.0)),
+                custom_size: Some(Vec2::new(w, h)),
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 14.0),
             PreviousPosition { x: pos.x, y: pos.y },
             EntitySpriteMarker,
         ));
+    }
+}
+
+/// Attach sprites to building entities (Structure) that lack EntitySpriteMarker.
+///
+/// Separated from `attach_entity_sprites` to stay under Bevy's 16-param limit.
+/// ConstructionSite buildings render semi-transparent; completed buildings are
+/// full opacity.
+#[allow(clippy::type_complexity)]
+pub fn attach_building_sprites(
+    mut commands: Commands,
+    sprite_assets: Res<SpriteAssets>,
+    map: Res<TileMap>,
+    structures: Query<
+        (Entity, &Position, &Structure, Option<&ConstructionSite>),
+        (
+            Without<EntitySpriteMarker>,
+            Without<crate::components::building::ColonyWell>,
+        ),
+    >,
+) {
+    let world_px = TILE_PX * TILE_SCALE;
+    let map_h = map.height as f32;
+
+    for (entity, pos, structure, construction) in &structures {
+        let (image, size) = building_sprite(&sprite_assets, structure.kind, entity.to_bits());
+        let alpha = if construction.is_some() { 0.4 } else { 1.0 };
+        let (x, y) = grid_to_world(pos, map_h, world_px);
+
+        commands.entity(entity).insert((
+            Sprite {
+                image,
+                color: Color::srgba(1.0, 1.0, 1.0, alpha),
+                custom_size: Some(size),
+                ..Default::default()
+            },
+            Transform::from_xyz(x, y, 13.0),
+            PreviousPosition { x: pos.x, y: pos.y },
+            EntitySpriteMarker,
+        ));
+    }
+}
+
+/// Select the texture handle and render size for a building type.
+fn building_sprite(
+    assets: &SpriteAssets,
+    kind: StructureType,
+    entity_hash: u64,
+) -> (Handle<Image>, Vec2) {
+    let world_px = TILE_PX * TILE_SCALE;
+    match kind {
+        // Den: 3 variants, 89x91 source, 2 tiles wide
+        StructureType::Den => {
+            let variant = (entity_hash as usize) % assets.den_textures.len();
+            let w = 2.0 * world_px;
+            let h = w / 89.0 * 91.0;
+            (assets.den_textures[variant].clone(), Vec2::new(w, h))
+        }
+        // Hearth: 128x128 source, 2 tiles wide
+        StructureType::Hearth => {
+            let w = 2.0 * world_px;
+            (assets.hearth_texture.clone(), Vec2::splat(w))
+        }
+        // Kitchen: reuses the workshop sprite until a dedicated asset exists.
+        StructureType::Kitchen => {
+            let w = world_px;
+            let h = w / 35.0 * 44.0;
+            (assets.workshop_texture.clone(), Vec2::new(w, h))
+        }
+        // Stores: 62x57 source, 2 tiles wide
+        StructureType::Stores => {
+            let w = 2.0 * world_px;
+            let h = w / 62.0 * 57.0;
+            (assets.stores_texture.clone(), Vec2::new(w, h))
+        }
+        // Workshop: 35x44 source, 1 tile wide
+        StructureType::Workshop => {
+            let w = world_px;
+            let h = w / 35.0 * 44.0;
+            (assets.workshop_texture.clone(), Vec2::new(w, h))
+        }
+        // Garden: 32x32 source, 0.7 tiles wide (basket prop)
+        StructureType::Garden => {
+            let w = 0.7 * world_px;
+            (assets.garden_textures[0].clone(), Vec2::splat(w))
+        }
+        // Watchtower: 68x149 source, 1.5 tiles wide
+        StructureType::Watchtower => {
+            let w = 1.5 * world_px;
+            let h = w / 68.0 * 149.0;
+            (assets.watchtower_texture.clone(), Vec2::new(w, h))
+        }
+        // WardPost: 24x59 source, 0.5 tiles wide
+        StructureType::WardPost => {
+            let w = 0.5 * world_px;
+            let h = w / 24.0 * 59.0;
+            (assets.wardpost_texture.clone(), Vec2::new(w, h))
+        }
+        // Wall: 16x48 source, 1 tile wide
+        StructureType::Wall => {
+            let w = world_px;
+            let h = w / 16.0 * 48.0;
+            (assets.wall_texture.clone(), Vec2::new(w, h))
+        }
+        // Gate: 80x96 source, 2 tiles wide
+        StructureType::Gate => {
+            let w = 2.0 * world_px;
+            let h = w / 80.0 * 96.0;
+            (assets.gate_texture.clone(), Vec2::new(w, h))
+        }
+    }
+}
+
+/// Update gate sprites when GateState changes: open gates fade to low alpha.
+#[allow(clippy::type_complexity)]
+pub fn update_gate_sprites(
+    mut gates: Query<(&GateState, &mut Sprite), (With<Structure>, Changed<GateState>)>,
+) {
+    for (gate, mut sprite) in &mut gates {
+        sprite.color = if gate.open {
+            Color::srgba(1.0, 1.0, 1.0, 0.3)
+        } else {
+            Color::WHITE
+        };
+    }
+}
+
+/// Update garden sprites when CropState changes: swap basket texture by growth stage.
+#[allow(clippy::type_complexity)]
+pub fn update_crop_sprites(
+    sprite_assets: Res<SpriteAssets>,
+    mut gardens: Query<(&CropState, &mut Sprite), (With<Structure>, Changed<CropState>)>,
+) {
+    for (crop, mut sprite) in &mut gardens {
+        let idx = if crop.growth < 0.3 {
+            0 // Basket_Empty — bare soil
+        } else if crop.growth < 0.7 {
+            1 // Basket_Cotton — growing
+        } else {
+            2 // Basket_Vegetables — harvestable
+        };
+        sprite.image = sprite_assets.garden_textures[idx].clone();
+    }
+}
+
+/// Swap building sprites between Seasons and Snow variants when winter starts/ends.
+pub fn swap_seasonal_building_sprites(
+    sprite_assets: Res<SpriteAssets>,
+    time: Res<TimeState>,
+    config: Res<SimConfig>,
+    mut last_season: Local<Option<Season>>,
+    mut buildings: Query<(Entity, &Structure, &mut Sprite), With<EntitySpriteMarker>>,
+) {
+    let current = time.season(&config);
+    let prev = *last_season;
+    *last_season = Some(current);
+
+    let Some(prev) = prev else { return };
+    if prev == current {
+        return;
+    }
+
+    let entering_winter = current == Season::Winter && prev != Season::Winter;
+    let leaving_winter = current != Season::Winter && prev == Season::Winter;
+    if !entering_winter && !leaving_winter {
+        return;
+    }
+
+    for (entity, structure, mut sprite) in &mut buildings {
+        let hash = entity.to_bits();
+        let (image, _) = if entering_winter {
+            building_sprite_snow(&sprite_assets, structure.kind, hash)
+        } else {
+            building_sprite(&sprite_assets, structure.kind, hash)
+        };
+        sprite.image = image;
+    }
+}
+
+/// Select the snow variant texture for a building type (winter).
+fn building_sprite_snow(
+    assets: &SpriteAssets,
+    kind: StructureType,
+    entity_hash: u64,
+) -> (Handle<Image>, Vec2) {
+    let world_px = TILE_PX * TILE_SCALE;
+    match kind {
+        StructureType::Den => {
+            let variant = (entity_hash as usize) % assets.den_snow_textures.len();
+            let w = 2.0 * world_px;
+            let h = w / 89.0 * 91.0;
+            (assets.den_snow_textures[variant].clone(), Vec2::new(w, h))
+        }
+        StructureType::Hearth => {
+            let w = 2.0 * world_px;
+            (assets.hearth_snow_texture.clone(), Vec2::splat(w))
+        }
+        StructureType::Stores => {
+            let w = 2.0 * world_px;
+            let h = w / 62.0 * 57.0;
+            (assets.stores_snow_texture.clone(), Vec2::new(w, h))
+        }
+        StructureType::Watchtower => {
+            let w = 1.5 * world_px;
+            let h = w / 68.0 * 149.0;
+            (assets.watchtower_snow_texture.clone(), Vec2::new(w, h))
+        }
+        StructureType::WardPost => {
+            let w = 0.5 * world_px;
+            let h = w / 24.0 * 59.0;
+            (assets.wardpost_snow_texture.clone(), Vec2::new(w, h))
+        }
+        // Workshop, Garden, Wall, Gate have no snow variants — keep as-is.
+        _ => building_sprite(assets, kind, entity_hash),
     }
 }
 
@@ -706,75 +972,116 @@ fn item_sprite_index(kind: ItemKind) -> usize {
     }
 }
 
-/// Select the sprite texture, atlas, and render size for a wildlife species.
+/// Select the sprite texture, atlas, render size, and animation frame count for a wildlife species.
 fn wildlife_sprite(
     assets: &SpriteAssets,
     animal: &WildAnimal,
-) -> (Handle<Image>, TextureAtlas, f32) {
+) -> (Handle<Image>, TextureAtlas, f32, u8) {
     use crate::components::wildlife::WildSpecies;
     let world_px = TILE_PX * TILE_SCALE;
     match animal.species {
         WildSpecies::Fox => (
             assets.fox_texture.clone(),
-            TextureAtlas { layout: assets.fox_layout.clone(), index: 0 },
-            world_px * 0.7,
+            TextureAtlas {
+                layout: assets.fox_layout.clone(),
+                index: 0,
+            },
+            world_px * 0.8,
+            1, // Minifolks directional, not a simple animation strip
         ),
         WildSpecies::Hawk => (
             assets.hawk_texture.clone(),
-            TextureAtlas { layout: assets.hawk_layout.clone(), index: 0 },
-            world_px * 0.5,
+            TextureAtlas {
+                layout: assets.hawk_layout.clone(),
+                index: 0,
+            },
+            world_px * 0.65,
+            4,
         ),
         WildSpecies::Snake => (
             assets.snake_texture.clone(),
-            TextureAtlas { layout: assets.snake_layout.clone(), index: 0 },
-            world_px * 0.5,
+            TextureAtlas {
+                layout: assets.snake_layout.clone(),
+                index: 0,
+            },
+            world_px * 0.6,
+            1, // Directional spritesheet, not a simple strip
         ),
         WildSpecies::ShadowFox => (
             assets.shadow_fox_texture.clone(),
-            TextureAtlas { layout: assets.shadow_fox_layout.clone(), index: 0 },
-            world_px * 0.7,
+            TextureAtlas {
+                layout: assets.shadow_fox_layout.clone(),
+                index: 0,
+            },
+            world_px * 0.85,
+            4,
         ),
     }
 }
 
-/// Select the sprite texture, optional atlas, tint color, and render size for a prey kind.
-/// Mouse reuses the rat sprite with a lighter tint.
+/// Select the sprite texture, optional atlas, tint color, render size, and animation
+/// frame count for a prey kind. `entity_hash` provides deterministic per-entity
+/// variant selection for species with multiple sprite options.
 fn prey_sprite(
     assets: &SpriteAssets,
     kind: PreyKind,
     world_px: f32,
-) -> (Handle<Image>, Option<TextureAtlas>, Color, f32) {
+    entity_hash: u64,
+) -> (Handle<Image>, Option<TextureAtlas>, Color, f32, u8) {
     match kind {
         PreyKind::Mouse => (
             assets.rat_texture.clone(),
-            Some(TextureAtlas { layout: assets.rat_layout.clone(), index: 0 }),
+            Some(TextureAtlas {
+                layout: assets.rat_layout.clone(),
+                index: 0,
+            }),
             Color::srgb(0.85, 0.75, 0.6), // lighter brown tint
-            world_px * 0.3,
+            world_px * 0.5,
+            1, // directional spritesheet, not simple strip
         ),
         PreyKind::Rat => (
             assets.rat_texture.clone(),
-            Some(TextureAtlas { layout: assets.rat_layout.clone(), index: 0 }),
+            Some(TextureAtlas {
+                layout: assets.rat_layout.clone(),
+                index: 0,
+            }),
             Color::WHITE,
-            world_px * 0.35,
+            world_px * 0.55,
+            1,
         ),
         PreyKind::Rabbit => (
             assets.rabbit_texture.clone(),
-            Some(TextureAtlas { layout: assets.rabbit_layout.clone(), index: 0 }),
+            Some(TextureAtlas {
+                layout: assets.rabbit_layout.clone(),
+                index: 0,
+            }),
             Color::WHITE,
-            world_px * 0.4,
+            world_px * 0.6,
+            1,
         ),
-        PreyKind::Fish => (
-            assets.fish_texture.clone(),
-            None,
-            Color::WHITE,
-            world_px * 0.35,
-        ),
-        PreyKind::Bird => (
-            assets.bird_texture.clone(),
-            Some(TextureAtlas { layout: assets.bird_layout.clone(), index: 0 }),
-            Color::WHITE,
-            world_px * 0.3,
-        ),
+        PreyKind::Fish => {
+            let variant = (entity_hash as usize) % assets.fish_textures.len();
+            (
+                assets.fish_textures[variant].clone(),
+                None,
+                Color::WHITE,
+                world_px * 0.5,
+                1,
+            )
+        }
+        PreyKind::Bird => {
+            let variant = (entity_hash as usize) % assets.bird_textures.len();
+            (
+                assets.bird_textures[variant].clone(),
+                Some(TextureAtlas {
+                    layout: assets.bird_anim_layout.clone(),
+                    index: 0,
+                }),
+                Color::WHITE,
+                world_px * 0.5,
+                4,
+            )
+        }
     }
 }
 
@@ -790,10 +1097,10 @@ fn den_color(kind: PreyKind) -> Color {
 
 fn prey_sprite_size(kind: PreyKind, world_px: f32) -> Vec2 {
     match kind {
-        PreyKind::Mouse => Vec2::new(world_px * 0.25, world_px * 0.25),
-        PreyKind::Rat => Vec2::new(world_px * 0.35, world_px * 0.30),
-        PreyKind::Rabbit => Vec2::new(world_px * 0.40, world_px * 0.35),
-        PreyKind::Fish => Vec2::new(world_px * 0.35, world_px * 0.20),
-        PreyKind::Bird => Vec2::new(world_px * 0.25, world_px * 0.30),
+        PreyKind::Mouse => Vec2::splat(world_px * 0.4),
+        PreyKind::Rat => Vec2::splat(world_px * 0.45),
+        PreyKind::Rabbit => Vec2::splat(world_px * 0.5),
+        PreyKind::Fish => Vec2::splat(world_px * 0.4),
+        PreyKind::Bird => Vec2::splat(world_px * 0.4),
     }
 }

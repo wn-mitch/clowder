@@ -40,9 +40,14 @@ fn setup_world(seed: u64) -> World {
     );
     clowder::world_gen::herbs::initialize_tile_magic(&mut map, &mut sim_rng.rng);
 
-    let start_tick: u64 = 100_000;
-    let cat_blueprints =
-        generate_starting_cats(8, start_tick, config.ticks_per_season, &mut sim_rng.rng);
+    let start_tick: u64 = 200_000;
+    let cat_blueprints = generate_starting_cats(
+        8,
+        start_tick,
+        config.ticks_per_season,
+        &constants.founder_age,
+        &mut sim_rng.rng,
+    );
 
     let mut world = World::new();
     spawn_starting_buildings(&mut world, colony_site, &mut map);

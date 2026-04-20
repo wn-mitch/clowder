@@ -119,4 +119,140 @@
         action: Some(Wander),
         needs: [(axis: Social, level: Critical)],
     ),
+
+    // =====================================================================
+    // Personality singles
+    // =====================================================================
+    (
+        text: "{name} walks alone and likes it that way.",
+        tier: Action,
+        action: Some(Wander),
+        personality: [(axis: Independence, bucket: High)],
+    ),
+    (
+        text: "{name} slinks along the edges, staying in the shadows.",
+        tier: Action,
+        action: Some(Wander),
+        personality: [(axis: Anxiety, bucket: High)],
+    ),
+    (
+        text: "{name} presses paws to the earth, feeling the land breathe.",
+        tier: Action,
+        action: Some(Wander),
+        personality: [(axis: Spirituality, bucket: High)],
+    ),
+    (
+        text: "{name} follows an old path, tracing the route from memory.",
+        tier: Action,
+        action: Some(Wander),
+        personality: [(axis: Tradition, bucket: High)],
+    ),
+    (
+        text: "{name} surveys the territory with a purposeful eye.",
+        tier: Action,
+        action: Some(Wander),
+        personality: [(axis: Ambition, bucket: High)],
+    ),
+    (
+        text: "{name} paces in tight circles, restless, looking for something to be angry at.",
+        tier: Action,
+        action: Some(Wander),
+        personality: [(axis: Temper, bucket: High)],
+    ),
+    (
+        text: "{name} takes the long way around and refuses to explain why.",
+        tier: Action,
+        action: Some(Wander),
+        personality: [(axis: Stubbornness, bucket: High)],
+    ),
+    (
+        text: "{name} rounds the next bend expecting something wonderful.",
+        tier: Action,
+        action: Some(Wander),
+        personality: [(axis: Optimism, bucket: High)],
+    ),
+    (
+        text: "{name} drags {possessive} paws. Nowhere in particular, nothing in mind.",
+        tier: Action,
+        action: Some(Wander),
+        personality: [(axis: Optimism, bucket: Low)],
+    ),
+    (
+        text: "{name} pauses to check on a passing companion before wandering on.",
+        tier: Action,
+        action: Some(Wander),
+        personality: [(axis: Compassion, bucket: High)],
+    ),
+
+    // =====================================================================
+    // Mood conditions
+    // =====================================================================
+    (
+        text: "{name} wanders without direction, lost in {possessive} own head.",
+        tier: Action,
+        action: Some(Wander),
+        mood: Some(Miserable),
+    ),
+    (
+        text: "{name} strolls along, practically dancing, tail swishing.",
+        tier: Action,
+        action: Some(Wander),
+        mood: Some(Euphoric),
+    ),
+    (
+        text: "{name} trudges along, head low.",
+        tier: Action,
+        action: Some(Wander),
+        mood: Some(Low),
+    ),
+
+    // =====================================================================
+    // Personality + Mood combos
+    // =====================================================================
+    (
+        text: "{name} investigates every leaf, every stone, every bug. Everything is fascinating.",
+        tier: Action,
+        action: Some(Wander),
+        personality: [(axis: Curiosity, bucket: High)],
+        mood: Some(Euphoric),
+    ),
+    (
+        text: "{name} flinches at every shadow, pacing without settling.",
+        tier: Action,
+        action: Some(Wander),
+        personality: [(axis: Anxiety, bucket: High)],
+        mood: Some(Miserable),
+    ),
+
+    // =====================================================================
+    // Needs
+    // =====================================================================
+    (
+        text: "{name} wanders, searching for something {subject} can't name.",
+        tier: Action,
+        action: Some(Wander),
+        needs: [(axis: Purpose, level: Critical)],
+    ),
+
+    // =====================================================================
+    // Environmental seasoning
+    // =====================================================================
+    (
+        text: "Old {name} takes a slow, contemplative walk through the camp.",
+        tier: Action,
+        action: Some(Wander),
+        life_stage: Some(Elder),
+    ),
+    (
+        text: "Little {name} toddles after a butterfly, eyes saucer-wide.",
+        tier: Action,
+        action: Some(Wander),
+        life_stage: Some(Kitten),
+    ),
+    (
+        text: "{name} climbs the rocks and surveys the land below.",
+        tier: Action,
+        action: Some(Wander),
+        terrain: Some(Rock),
+    ),
 ]

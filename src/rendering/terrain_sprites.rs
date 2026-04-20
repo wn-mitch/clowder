@@ -23,9 +23,11 @@ impl Terrain {
             Terrain::Mud => TerrainGroup::Dirt,
             Terrain::Sand => TerrainGroup::Sand,
             Terrain::Rock => TerrainGroup::Rock,
-            Terrain::Den | Terrain::Hearth | Terrain::Stores | Terrain::Workshop => {
-                TerrainGroup::Building
-            }
+            Terrain::Den
+            | Terrain::Hearth
+            | Terrain::Kitchen
+            | Terrain::Stores
+            | Terrain::Workshop => TerrainGroup::Building,
             Terrain::Wall | Terrain::Gate | Terrain::Watchtower | Terrain::WardPost => {
                 TerrainGroup::Stone
             }
@@ -50,13 +52,11 @@ fn is_friendly(tile_group: TerrainGroup, neighbor_group: TerrainGroup) -> bool {
         // Rock and Stone blend into each other
         TerrainGroup::Rock => neighbor_group == TerrainGroup::Stone,
         TerrainGroup::Stone => neighbor_group == TerrainGroup::Rock,
-        // Grass defers to terrain that has its own overlay — no grass edge
-        // rendered toward Dirt/Sand/Rock/Stone. Grass edges still render
-        // toward Water and Building (which have no overlay).
-        TerrainGroup::Grass => matches!(
-            neighbor_group,
-            TerrainGroup::Dirt | TerrainGroup::Sand | TerrainGroup::Rock | TerrainGroup::Stone
-        ),
+        // Grass defers to Dirt/Sand (symmetric full-fill, clean transition)
+        // but renders scalloped edges toward Rock/Stone/Water/Building.
+        // The grass overlay at z=3 sits above stone (z=2), so the grass
+        // edges naturally layer over the stone edges.
+        TerrainGroup::Grass => matches!(neighbor_group, TerrainGroup::Dirt | TerrainGroup::Sand),
         _ => false,
     }
 }
@@ -431,6 +431,38 @@ mod tests {
         ]);
         let mask = blob_bitmask(&map, 1, 1, TerrainGroup::Grass);
         assert_eq!(mask & 64, 0, "W should NOT be set (water has no overlay)");
+    }
+
+    #[test]
+    fn grass_renders_edge_toward_stone() {
+        // Stone has its own overlay at z=2, but grass (z=3) should render
+        // its scalloped edge on top — not defer with a flat full-fill.
+        let map = make_map(&[
+            &[Terrain::Grass, Terrain::Grass, Terrain::Grass],
+            &[Terrain::Wall, Terrain::Grass, Terrain::Grass],
+            &[Terrain::Grass, Terrain::Grass, Terrain::Grass],
+        ]);
+        let mask = blob_bitmask(&map, 1, 1, TerrainGroup::Grass);
+        assert_eq!(
+            mask & 64,
+            0,
+            "W should NOT be set (grass renders edge toward stone)"
+        );
+    }
+
+    #[test]
+    fn grass_renders_edge_toward_rock() {
+        let map = make_map(&[
+            &[Terrain::Grass, Terrain::Grass, Terrain::Grass],
+            &[Terrain::Rock, Terrain::Grass, Terrain::Grass],
+            &[Terrain::Grass, Terrain::Grass, Terrain::Grass],
+        ]);
+        let mask = blob_bitmask(&map, 1, 1, TerrainGroup::Grass);
+        assert_eq!(
+            mask & 64,
+            0,
+            "W should NOT be set (grass renders edge toward rock)"
+        );
     }
 
     #[test]

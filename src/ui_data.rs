@@ -221,6 +221,7 @@ pub fn terrain_label(terrain: Terrain) -> &'static str {
         Terrain::Sand => "Sand",
         Terrain::Den => "Den",
         Terrain::Hearth => "Hearth",
+        Terrain::Kitchen => "Kitchen",
         Terrain::Stores => "Stores",
         Terrain::Workshop => "Workshop",
         Terrain::Garden => "Garden",

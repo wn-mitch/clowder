@@ -121,6 +121,9 @@ pub fn setup_world_exclusive(world: &mut World) {
     if !world.contains_resource::<crate::resources::SystemActivation>() {
         world.insert_resource(crate::resources::SystemActivation::default());
     }
+    if !world.contains_resource::<crate::resources::ForcedConditions>() {
+        world.insert_resource(crate::resources::ForcedConditions::default());
+    }
 }
 
 fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
@@ -154,16 +157,26 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     crate::world_gen::herbs::initialize_tile_magic(&mut map, &mut sim_rng.rng);
 
     // Start the clock high enough that cats can have varied ages.
-    let start_tick: u64 = 100_000;
+    // Must exceed the maximum rolled age in ticks (see
+    // `FounderAgeConstants::elder_max_seasons`) — see main.rs for the detailed
+    // rationale. Short version: saturating_sub silently clamps ages below
+    // start_tick, so too small a value means every founder reads back as Young.
+    let start_tick: u64 = 60 * config.ticks_per_season;
 
-    let mut cat_blueprints =
-        load_custom_cats(start_tick, config.ticks_per_season, &mut sim_rng.rng);
+    let age_consts = &constants.founder_age;
+    let mut cat_blueprints = load_custom_cats(
+        start_tick,
+        config.ticks_per_season,
+        age_consts,
+        &mut sim_rng.rng,
+    );
     let remaining = 8usize.saturating_sub(cat_blueprints.len());
     if remaining > 0 {
         cat_blueprints.extend(generate_starting_cats(
             remaining,
             start_tick,
             config.ticks_per_season,
+            age_consts,
             &mut sim_rng.rng,
         ));
     }
@@ -183,8 +196,14 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
         paused: false,
         speed: crate::resources::SimSpeed::Normal,
     });
+    // Seed `last_recorded_season` so `seasons_survived` counts from 0 despite
+    // the non-zero start_tick. ColonyScore was inserted earlier with defaults.
+    if let Some(mut score) = world.get_resource_mut::<crate::resources::ColonyScore>() {
+        score.last_recorded_season = start_tick / config.ticks_per_season;
+    }
     world.insert_resource(config);
     world.insert_resource(WeatherState::default());
+    world.insert_resource(crate::resources::ForcedConditions::default());
     world.insert_resource(crate::resources::time::TransitionTracker::default());
     world.insert_resource(NarrativeLog::default());
     world.insert_resource(ColonyKnowledge::default());
@@ -242,6 +261,9 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
                     crate::components::disposition::ActionHistory::default(),
                     HuntingPriors::default(),
                     crate::components::grooming::GroomingCondition::default(),
+                    crate::components::goap_plan::PendingUrgencies::default(),
+                    crate::components::SensorySpecies::Cat,
+                    crate::components::SensorySignature::CAT,
                 ),
             ))
             .id();
@@ -269,6 +291,11 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
 
     // Insert cat presence map resource.
     world.insert_resource(crate::resources::CatPresenceMap::default());
+
+    // Insert unmet-demand ledger — tracks frustrated wants (e.g. cats
+    // scoring Cook but with no Kitchen) so the coordinator can prioritize
+    // the missing infrastructure.
+    world.insert_resource(crate::resources::UnmetDemand::default());
 
     // Spawn initial prey animals across their habitats.
     crate::world_gen::prey_ecosystem::seed_prey_ecosystem(world);

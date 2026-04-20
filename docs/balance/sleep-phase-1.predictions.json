@@ -1,0 +1,37 @@
+{
+  "energy_p50": {
+    "direction": "up",
+    "magnitude_pct": 25,
+    "rationale": "Night-heavy Sleep bonus (+1.2) lets cats consolidate rest in a single phase rather than napping erratically. Baseline seed-42 soak: 0.44; target ~0.55. Softer than a phase-agnostic +1.2 would produce because Day naps are suppressed (bonus 0.1)."
+  },
+  "mood_valence_p50": {
+    "direction": "up",
+    "magnitude_pct": 10,
+    "rationale": "Contentment modifier in src/systems/mood.rs fires when physiological_satisfaction >= contentment_phys_threshold. Consolidated Night sleep raises energy high enough for phys_satisfaction to cross the threshold and hold. Baseline 0.19; target ~0.21 — crossing the mating mood_floor (0.2)."
+  },
+  "kittens_born": {
+    "direction": "up",
+    "magnitude_pct": 200,
+    "rationale": "Breeding gate requires mood_valence > 0.2 (breeding_mood_floor). Baseline seed-42 soak: 0 kittens born in 15 min. Once mood crosses 0.2 during Night sleep windows, mating becomes eligible. Expect 1–3 kittens."
+  },
+  "sleep_share_night": {
+    "direction": "up",
+    "magnitude_pct": 80,
+    "rationale": "At Night the Sleep bonus (+1.2) dominates fulfillment-tier action scores (typically 1.4–2.0). Conditional share: of snapshots taken at Night, the fraction with current_action==Sleep should rise substantially over the phase-agnostic baseline."
+  },
+  "sleep_share_day": {
+    "direction": "down",
+    "magnitude_pct": 40,
+    "rationale": "Day bonus (+0.1) is a tie-break, not a pull. At energy >= 0.5, fulfillment activities (PracticeMagic, Explore, Socialize) win. Exhausted cats may still nap, which is the intended pressure-release valve."
+  },
+  "deaths_by_cause.Starvation": {
+    "direction": "flat",
+    "magnitude_pct": 0,
+    "rationale": "Canary gate — must remain 0 on seed 42. The phase-bias change redistributes rest across the day; it doesn't affect hunger/foraging dynamics. Flagged as a prediction so the verification pass checks it explicitly."
+  },
+  "deaths_by_cause.ShadowFoxAmbush": {
+    "direction": "flat",
+    "magnitude_pct": 10,
+    "rationale": "Canary gate — must remain <= 5 on seed 42. Small drift acceptable in either direction. Phase 2 (not this PR) will redistribute ambushes by phase; Phase 1 should not materially move this number."
+  }
+}

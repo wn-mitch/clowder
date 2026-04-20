@@ -10,6 +10,7 @@
 |------|------|------|------|------|------|
 | `kind` | PreyKind::Bird | PreyKind::Fish | PreyKind::Mouse | PreyKind::Rabbit | PreyKind::Rat |
 | `name` | "bird" | "fish" | "mouse" | "rabbit" | "rat" |
+| `plural_name` | "birds" | "fish" | "mice" | "rabbits" | "rats" |
 | `symbol` | 'b' | '~' | 'm' | 'R' | 'r' |
 | `breed_rate` | 0.0001 | 0.0002 | 0.0003 | 0.0004 | 0.0005 |
 | `population_cap` | 30 | 35 | 80 | 45 | 55 |
@@ -37,6 +38,7 @@
 |------|-------|
 | `kind` | PreyKind::Bird |
 | `name` | "bird" |
+| `plural_name` | "birds" |
 | `symbol` | 'b' |
 | `breed_rate` | 0.0001 |
 | `population_cap` | 30 |
@@ -64,6 +66,7 @@
 |------|-------|
 | `kind` | PreyKind::Fish |
 | `name` | "fish" |
+| `plural_name` | "fish" |
 | `symbol` | '~' |
 | `breed_rate` | 0.0002 |
 | `population_cap` | 35 |
@@ -91,6 +94,7 @@
 |------|-------|
 | `kind` | PreyKind::Mouse |
 | `name` | "mouse" |
+| `plural_name` | "mice" |
 | `symbol` | 'm' |
 | `breed_rate` | 0.0003 |
 | `population_cap` | 80 |
@@ -118,6 +122,7 @@
 |------|-------|
 | `kind` | PreyKind::Rabbit |
 | `name` | "rabbit" |
+| `plural_name` | "rabbits" |
 | `symbol` | 'R' |
 | `breed_rate` | 0.0004 |
 | `population_cap` | 45 |
@@ -145,6 +150,7 @@
 |------|-------|
 | `kind` | PreyKind::Rat |
 | `name` | "rat" |
+| `plural_name` | "rats" |
 | `symbol` | 'r' |
 | `breed_rate` | 0.0005 |
 | `population_cap` | 55 |

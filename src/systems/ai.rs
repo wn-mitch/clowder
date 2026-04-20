@@ -234,6 +234,12 @@ fn pick_directive_target(
                     DirectiveKind::Build => s.building,
                     DirectiveKind::Fight | DirectiveKind::Patrol => s.combat,
                     DirectiveKind::Herbcraft | DirectiveKind::SetWard => s.herbcraft,
+                    // Cleansing leans on magic; carcass handling leans on herbcraft.
+                    DirectiveKind::Cleanse => s.magic,
+                    DirectiveKind::HarvestCarcass => s.herbcraft,
+                    // Cooking has no dedicated skill — treat it as neutral so
+                    // ranking falls back to distance + availability.
+                    DirectiveKind::Cook => 0.0,
                 });
             let skill_b = skills_query
                 .get(*e_b)
@@ -243,6 +249,12 @@ fn pick_directive_target(
                     DirectiveKind::Build => s.building,
                     DirectiveKind::Fight | DirectiveKind::Patrol => s.combat,
                     DirectiveKind::Herbcraft | DirectiveKind::SetWard => s.herbcraft,
+                    // Cleansing leans on magic; carcass handling leans on herbcraft.
+                    DirectiveKind::Cleanse => s.magic,
+                    DirectiveKind::HarvestCarcass => s.herbcraft,
+                    // Cooking has no dedicated skill — treat it as neutral so
+                    // ranking falls back to distance + availability.
+                    DirectiveKind::Cook => 0.0,
                 });
             // Rank by: skill descending, then distance ascending (prefer nearby).
             let is_coord_a = coordinator_entities.contains(e_a);
@@ -262,12 +274,14 @@ fn pick_directive_target(
 // emit_periodic_events system
 // ---------------------------------------------------------------------------
 
-/// Emit periodic food-level and population snapshots to the event log.
+/// Emit periodic food-level, prey population, and wildlife population
+/// snapshots to the event log. All three share the `economy_interval`.
 pub fn emit_periodic_events(
     config: Res<crate::resources::snapshot_config::SnapshotConfig>,
     time: Res<crate::resources::time::TimeState>,
     food: Res<FoodStores>,
     prey: Query<&crate::components::prey::PreyConfig, With<crate::components::prey::PreyAnimal>>,
+    wildlife: Query<&crate::components::wildlife::WildAnimal>,
     mut event_log: Option<ResMut<EventLog>>,
 ) {
     let interval = config.economy_interval;
@@ -301,6 +315,26 @@ pub fn emit_periodic_events(
                     rabbits,
                     fish,
                     birds,
+                },
+            );
+
+            use crate::components::wildlife::WildSpecies;
+            let (mut foxes, mut hawks, mut snakes, mut shadow_foxes) = (0u32, 0u32, 0u32, 0u32);
+            for w in &wildlife {
+                match w.species {
+                    WildSpecies::Fox => foxes += 1,
+                    WildSpecies::Hawk => hawks += 1,
+                    WildSpecies::Snake => snakes += 1,
+                    WildSpecies::ShadowFox => shadow_foxes += 1,
+                }
+            }
+            log.push(
+                time.tick,
+                EventKind::WildlifePopulation {
+                    foxes,
+                    hawks,
+                    snakes,
+                    shadow_foxes,
                 },
             );
         }

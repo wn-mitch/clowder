@@ -1,0 +1,12 @@
+{
+  "deaths_by_cause.ShadowFoxAmbush": {
+    "direction": "up",
+    "magnitude_pct": 20,
+    "rationale": "Cats threat-detect shadow-foxes via sight; fog sight 0.6x reduces effective threat-awareness radius. Attempt 1 at 0.4x produced +40% on seed 42; scaled linearly to 0.6x predicts ~+20%."
+  },
+  "deaths_by_cause.Starvation": {
+    "direction": "up",
+    "magnitude_pct": 50,
+    "rationale": "At 0.4x starvation rose 2x (cats can't hunt effectively in fog and the cascade wipes colonies). Expect a softer rise at 0.6x — direction up but well under a doubling. Canary requires = 0 on seed 42, so this is also a diagnostic on whether we cross the survival threshold."
+  }
+}

@@ -489,6 +489,8 @@ pub struct VariableContext<'a> {
     pub prey: Option<&'a str>,
     /// Item name (e.g. "berries", "mushrooms") — set by action outcomes.
     pub item: Option<&'a str>,
+    /// Singular form of item name (e.g. "berry" vs "berries") — for "every last {item_singular}".
+    pub item_singular: Option<&'a str>,
     /// Quality tier label (e.g. "fine", "exceptional") — only set for notable quality.
     pub quality: Option<&'a str>,
 }
@@ -510,6 +512,10 @@ pub fn resolve_variables(template_text: &str, ctx: &VariableContext<'_>) -> Stri
         .replace("{fur_color}", ctx.fur_color)
         .replace("{other}", ctx.other.unwrap_or("a companion"))
         .replace("{prey}", ctx.prey.unwrap_or("prey"))
+        .replace(
+            "{item_singular}",
+            ctx.item_singular.unwrap_or(ctx.item.unwrap_or("something")),
+        )
         .replace("{item}", ctx.item.unwrap_or("something"))
         .replace("{quality}", ctx.quality.unwrap_or(""))
 }
@@ -939,6 +945,7 @@ mod tests {
             other: None,
             prey: None,
             item: None,
+            item_singular: None,
             quality: None,
         };
         let result = resolve_variables(text, &ctx);
@@ -962,6 +969,7 @@ mod tests {
             other: None,
             prey: None,
             item: None,
+            item_singular: None,
             quality: None,
         };
         let result = resolve_variables(text, &ctx);
@@ -985,6 +993,7 @@ mod tests {
             other: None,
             prey: None,
             item: None,
+            item_singular: None,
             quality: None,
         };
         let result = resolve_variables(text, &ctx);
@@ -1005,6 +1014,7 @@ mod tests {
             other: Some("Reed"),
             prey: None,
             item: None,
+            item_singular: None,
             quality: None,
         };
         let result = resolve_variables(text, &ctx);
@@ -1025,6 +1035,7 @@ mod tests {
             other: None,
             prey: None,
             item: None,
+            item_singular: None,
             quality: None,
         };
         let result = resolve_variables(text, &ctx);

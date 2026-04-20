@@ -64,6 +64,7 @@ fn main() {
             Action::Mentor => "mentor.ron",
             Action::Mate => "socialize.ron",
             Action::Caretake => "socialize.ron",
+            Action::Cook => "cook.ron",
         };
 
         let tier = match action {
@@ -119,6 +120,7 @@ fn main() {
             other: None,
             prey: None,
             item: None,
+            item_singular: None,
             quality: None,
         };
 

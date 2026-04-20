@@ -63,6 +63,7 @@ mod tests {
             construction_done: false,
             prey_found: false,
             farm_tended: false,
+            thornbriar_available: false,
         }
     }
 

@@ -1,5 +1,6 @@
 pub mod building;
 pub mod disposition;
+pub mod fox;
 pub mod magic;
 
 /// Outcome of a step handler. The dispatcher applies the result to the chain.

@@ -30,6 +30,7 @@ pub trait PreyProfile: Send + Sync + 'static {
     // --- Identity ---
     fn kind(&self) -> PreyKind;
     fn name(&self) -> &'static str;
+    fn plural_name(&self) -> &'static str;
     fn symbol(&self) -> char;
 
     // --- Population ---

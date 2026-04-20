@@ -421,8 +421,14 @@ impl Ward {
     }
 
     /// Effective repulsion radius (tiles). Proportional to strength.
+    /// Durable wards project a wider aura than thornwards, reflecting the
+    /// deeper magical anchor of the spell.
     pub fn repel_radius(&self) -> f32 {
-        6.0 * self.strength
+        let base = match self.kind {
+            WardKind::Thornward => 6.0,
+            WardKind::DurableWard => 9.0,
+        };
+        base * self.strength
     }
 }
 

@@ -5,7 +5,8 @@ use crate::components::magic::{Inventory, MisfireEffect, Ward, WardKind};
 use crate::components::mental::Mood;
 use crate::components::physical::{Health, Position};
 use crate::components::skills::{Corruption, MagicAffinity, Skills};
-use crate::resources::narrative::NarrativeLog;
+use crate::resources::event_log::{EventKind, EventLog};
+use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::sim_constants::{CombatConstants, MagicConstants};
 use crate::steps::StepResult;
 
@@ -24,6 +25,7 @@ pub fn resolve_set_ward(
     rng: &mut impl Rng,
     commands: &mut Commands,
     log: &mut NarrativeLog,
+    event_log: Option<&mut EventLog>,
     tick: u64,
     m: &MagicConstants,
     combat: &CombatConstants,
@@ -56,16 +58,54 @@ pub fn resolve_set_ward(
             }
         }
 
-        // Spawn the ward entity.
-        let ward = match kind {
+        // Spawn the ward entity. Thornward decay rate is configurable.
+        let mut ward = match kind {
             WardKind::Thornward => Ward::thornward(),
             WardKind::DurableWard => Ward::durable(),
         };
+        if kind == WardKind::Thornward {
+            ward.decay_rate = m.thornward_decay_rate;
+        }
+        let spawn_strength = ward.strength;
         commands.spawn((ward, Position::new(pos.x, pos.y)));
+        if let Some(elog) = event_log {
+            elog.push(
+                tick,
+                EventKind::WardPlaced {
+                    cat: cat_name.to_string(),
+                    ward_kind: format!("{kind:?}"),
+                    location: (pos.x, pos.y),
+                    strength: spawn_strength,
+                },
+            );
+        }
         skills.herbcraft += skills.growth_rate() * m.herbcraft_ward_skill_growth;
-        if kind == WardKind::DurableWard {
+        // Magic-affinity cats absorb magic practice from any ward work.
+        // This gives gifted-but-untrained cats a natural progression path:
+        // they work herbcraft wards alongside the rest of the colony, and
+        // their magic skill climbs until durable wards become viable. Cats
+        // without affinity gain herbcraft only, as intended.
+        if magic_aff.0 > 0.2 || kind == WardKind::DurableWard {
             skills.magic += skills.growth_rate() * m.magic_ward_skill_growth;
         }
+        let text = match kind {
+            WardKind::Thornward => {
+                let variants = [
+                    format!("{cat_name} traces thornbriar sigils into the earth. A ward stands."),
+                    format!("{cat_name} weaves thornbriar into a warding sigil."),
+                    format!("{cat_name} presses thornbriar into the soil — the air tightens."),
+                ];
+                variants[rng.random_range(0..variants.len())].clone()
+            }
+            WardKind::DurableWard => {
+                let variants = [
+                    format!("{cat_name} chants the old words. A durable ward takes root."),
+                    format!("{cat_name} sets a deep ward, felt more than seen."),
+                ];
+                variants[rng.random_range(0..variants.len())].clone()
+            }
+        };
+        log.push(tick, text, NarrativeTier::Significant);
         StepResult::Advance
     } else {
         StepResult::Continue

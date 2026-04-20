@@ -369,28 +369,46 @@ def analyze_system_activation(data: dict):
         print("  No system activation data.")
         return
 
-    # Merge all activation counts
-    merged = defaultdict(int)
+    # Schema v2: activations are split into positive/negative/neutral groups.
+    # Merge each bucket across the run so we see lifetime totals per feature.
+    merged = {"positive": defaultdict(int), "negative": defaultdict(int), "neutral": defaultdict(int)}
     for a in activations:
-        for system, count in a.get("counts", {}).items():
-            merged[system] += count
+        for bucket in ("positive", "negative", "neutral"):
+            for system, count in a.get(bucket, {}).items():
+                merged[bucket][system] += count
 
-    print(f"  Systems that fired ({len(merged)}):")
-    for system, count in sorted(merged.items(), key=lambda x: -x[1]):
-        print(f"    {system:>30}: {count:>6}")
+    def print_group(title: str, counts: dict):
+        if not counts:
+            return
+        total_firings = sum(counts.values())
+        print(f"\n  {title} ({len(counts)} features, {total_firings} total firings):")
+        for system, count in sorted(counts.items(), key=lambda x: -x[1]):
+            marker = "" if count > 0 else "  ** DEAD **"
+            print(f"    {system:>30}: {count:>6}{marker}")
 
-    # Check what's missing
+    print_group("Positive (healthy signals)", merged["positive"])
+    print_group("Negative (adverse events)", merged["negative"])
+    print_group("Neutral (system activity)", merged["neutral"])
+
+    # The "did a system go dead?" canary — positive dormancy is the real concern.
     scores = data["colony_scores"]
     if scores:
         last = scores[-1]
-        active = last.get("features_active", 0)
-        total = last.get("features_total", 0)
-        dormant = total - active
-        print(f"\n  Feature activation: {active}/{total} ({100 * active / total:.0f}%)")
-        if dormant > 0:
-            print(
-                f"  {dormant} features never fired — potential dead systems or unreachable conditions"
-            )
+        pos_active = last.get("positive_features_active", 0)
+        pos_total = last.get("positive_features_total", 0)
+        neg_events = last.get("negative_events_total", 0)
+        neu_active = last.get("neutral_features_active", 0)
+        neu_total = last.get("neutral_features_total", 0)
+        if pos_total > 0:
+            print(f"\n  Positive activation: {pos_active}/{pos_total} ({100 * pos_active / pos_total:.0f}%)")
+            dormant = pos_total - pos_active
+            if dormant > 0:
+                print(
+                    f"  {dormant} positive features never fired — potential dead systems"
+                )
+        print(f"  Negative events: {neg_events} total")
+        if neu_total > 0:
+            print(f"  Neutral activity: {neu_active}/{neu_total} features firing")
 
 
 def analyze_narrative(narratives: list[dict]):

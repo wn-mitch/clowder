@@ -22,5 +22,11 @@
     >
       Know Thy Cat
     </button>
+    <button
+      class="px-4 py-1.5 border-none bg-transparent text-muted text-sm rounded-md cursor-pointer transition-all duration-150 hover:text-txt hover:bg-surface-alt {currentPage === 'logs' ? 'text-accent bg-bg' : ''}"
+      onclick={() => onNavigate('logs')}
+    >
+      Logs
+    </button>
   </div>
 </nav>

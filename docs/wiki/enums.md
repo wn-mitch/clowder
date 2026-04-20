@@ -8,12 +8,12 @@
 
 | Enum | Variants | Source |
 |------|----------|--------|
-| [ItemKind](#itemkind) | 21 | `src/components/items.rs` |
-| [DispositionKind](#dispositionkind) | 10 | `src/components/disposition.rs` |
+| [ItemKind](#itemkind) | 28 | `src/components/items.rs` |
+| [DispositionKind](#dispositionkind) | 12 | `src/components/disposition.rs` |
 | [Weather](#weather) | 8 | `src/resources/weather.rs` |
-| [Terrain](#terrain) | 20 | `src/resources/map.rs` |
-| [StructureType](#structuretype) | 9 | `src/components/building.rs` |
-| [HerbKind](#herbkind) | 5 | `src/components/magic.rs` |
+| [Terrain](#terrain) | 21 | `src/resources/map.rs` |
+| [StructureType](#structuretype) | 10 | `src/components/building.rs` |
+| [HerbKind](#herbkind) | 8 | `src/components/magic.rs` |
 | [WardKind](#wardkind) | 2 | `src/components/magic.rs` |
 | [ZodiacSign](#zodiacsign) | 8 | `src/components/zodiac.rs` |
 | [BondType](#bondtype) | 3 | `src/resources/relationships.rs` |
@@ -25,11 +25,11 @@
 | [PreyKind](#preykind) | 5 | `src/components/prey.rs` |
 | [FleeStrategy](#fleestrategy) | 4 | `src/components/prey.rs` |
 | [WildSpecies](#wildspecies) | 4 | `src/components/wildlife.rs` |
-| [EventKind](#eventkind) | 70 | `src/resources/event_log.rs` |
-| [NarrativeTier](#narrativetier) | 3 | `src/resources/narrative.rs` |
+| [EventKind](#eventkind) | 179 | `src/resources/event_log.rs` |
+| [NarrativeTier](#narrativetier) | 6 | `src/resources/narrative.rs` |
 | [PriorityKind](#prioritykind) | 4 | `src/resources/colony_priority.rs` |
-| [DirectiveKind](#directivekind) | 7 | `src/components/coordination.rs` |
-| [StepKind](#stepkind) | 27 | `src/components/task_chain.rs` |
+| [DirectiveKind](#directivekind) | 10 | `src/components/coordination.rs` |
+| [StepKind](#stepkind) | 34 | `src/components/task_chain.rs` |
 | [ZoneKind](#zonekind) | 3 | `src/components/zone.rs` |
 | [AspirationDomain](#aspirationdomain) | 7 | `src/components/aspirations.rs` |
 
@@ -41,27 +41,39 @@
 
 | Variant | decay_rate | food_value |
 |---------|------------|------------|
-| `RawMouse` | 0.0001 | 0.5 |
-| `RawRat` | 0.0001 | 0.8 |
-| `RawRabbit` | 0.0001 | 0.65 |
-| `RawFish` | 0.0001 | 0.7 |
-| `RawBird` | 0.0001 | 0.6 |
-| `Berries` | 0.0005 | 0.2 |
-| `Nuts` | 0.0005 | 0.2 |
-| `Roots` | 0.0005 | 0.2 |
-| `WildOnion` | 0.0005 | 0.2 |
-| `Mushroom` | 0.0005 | 0.2 |
-| `Moss` | 0.0005 | — |
-| `DriedGrass` | 0.0005 | — |
-| `Feather` | 0.0005 | — |
-| `HerbHealingMoss` | 0.0003 | — |
-| `HerbMoonpetal` | 0.0003 | — |
-| `HerbCalmroot` | 0.0003 | — |
-| `HerbThornbriar` | 0.0003 | — |
-| `HerbDreamroot` | 0.0003 | — |
-| `ShinyPebble` | 0.0 | — |
-| `GlassShard` | 0.0 | — |
-| `ColorfulShell` | 0.0 | — |
+| `RawMouse` | {
+                0.0001 | 0.5 |
+| `RawRat` | {
+                0.0001 | 0.8 |
+| `RawRabbit` | {
+                0.0001 | 0.65 |
+| `RawFish` | {
+                0.0001 | 0.7 |
+| `RawBird` | {
+                0.0001 | 0.6 |
+| `Berries` | — | 0.2 |
+| `Nuts` | — | 0.2 |
+| `Roots` | — | 0.2 |
+| `WildOnion` | — | 0.2 |
+| `Mushroom` | — | 0.2 |
+| `Moss` | — | — |
+| `DriedGrass` | — | — |
+| `Feather` | — | — |
+| `HerbHealingMoss` | — | — |
+| `HerbMoonpetal` | — | — |
+| `HerbCalmroot` | — | — |
+| `HerbThornbriar` | — | — |
+| `HerbDreamroot` | — | — |
+| `HerbCatnip` | — | — |
+| `HerbSlumbershade` | — | — |
+| `HerbOracleOrchid` | — | — |
+| `ShinyPebble` | — | — |
+| `GlassShard` | — | — |
+| `ColorfulShell` | — | — |
+| `ShadowBone` | — | — |
+| `Barrel` | — | — |
+| `Crate` | — | — |
+| `Shelf` | — | — |
 
 ## DispositionKind
 
@@ -79,6 +91,8 @@
 | `Crafting` |
 | `Coordinating` |
 | `Exploring` |
+| `Mating` |
+| `Caretaking` |
 
 ## Weather
 
@@ -110,6 +124,7 @@
 | `Sand` |
 | `Den` |
 | `Hearth` |
+| `Kitchen` |
 | `Stores` |
 | `Workshop` |
 | `Garden` |
@@ -130,6 +145,7 @@
 |---------|
 | `Den` |
 | `Hearth` |
+| `Kitchen` |
 | `Stores` |
 | `Workshop` |
 | `Garden` |
@@ -149,6 +165,9 @@
 | `Calmroot` |
 | `Thornbriar` |
 | `Dreamroot` |
+| `Catnip` |
+| `Slumbershade` |
+| `OracleOrchid` |
 
 ## WardKind
 
@@ -299,6 +318,11 @@
 | `current_action` |
 | `relationships` |
 | `last_scores` |
+| `life_stage` |
+| `sex` |
+| `orientation` |
+| `is_pregnant` |
+| `season` |
 | `FoodLevel` |
 | `current` |
 | `capacity` |
@@ -309,6 +333,23 @@
 | `rabbits` |
 | `fish` |
 | `birds` |
+| `WildlifePopulation` |
+| `foxes` |
+| `hawks` |
+| `snakes` |
+| `shadow_foxes` |
+| `WildlifePositions` |
+| `positions` |
+| `PreyPositions` |
+| `positions` |
+| `DenSnapshot` |
+| `prey_dens` |
+| `fox_dens` |
+| `HuntingBeliefSnapshot` |
+| `cat` |
+| `width` |
+| `height` |
+| `values` |
 | `PositionTrace` |
 | `cat` |
 | `position` |
@@ -323,6 +364,43 @@
 | `Death` |
 | `cat` |
 | `cause` |
+| `injury_source` |
+| `location` |
+| `Ambush` |
+| `cat` |
+| `predator_species` |
+| `location` |
+| `damage` |
+| `WardPlaced` |
+| `cat` |
+| `ward_kind` |
+| `location` |
+| `strength` |
+| `WardDespawned` |
+| `ward_kind` |
+| `location` |
+| `sieged` |
+| `PreyKilled` |
+| `cat` |
+| `species` |
+| `location` |
+| `KittenBorn` |
+| `mother` |
+| `kitten` |
+| `location` |
+| `MatingOccurred` |
+| `partner_a` |
+| `partner_b` |
+| `location` |
+| `BuildingConstructed` |
+| `kind` |
+| `location` |
+| `ShadowFoxSpawn` |
+| `location` |
+| `corruption` |
+| `ShadowFoxBanished` |
+| `posse` |
+| `location` |
 | `ColonyScore` |
 | `shelter` |
 | `nourishment` |
@@ -340,13 +418,63 @@
 | `structures_built` |
 | `kittens_born` |
 | `prey_dens_discovered` |
+| `friends_count` |
+| `partners_count` |
+| `mates_count` |
 | `aggregate` |
-| `activation_score` |
-| `features_active` |
-| `features_total` |
+| `positive_activation_score` |
+| `positive_features_active` |
+| `positive_features_total` |
+| `negative_events_total` |
+| `neutral_features_active` |
+| `neutral_features_total` |
 | `living_cats` |
 | `SystemActivation` |
-| `counts` |
+| `positive` |
+| `negative` |
+| `neutral` |
+| `PlanCreated` |
+| `cat` |
+| `disposition` |
+| `steps` |
+| `hunger` |
+| `energy` |
+| `warmth` |
+| `food_available` |
+| `FoxPlanCreated` |
+| `fox_id` |
+| `disposition` |
+| `steps` |
+| `hunger` |
+| `territory_scent` |
+| `cub_satiation` |
+| `position` |
+| `day_phase` |
+| `PlanInterrupted` |
+| `cat` |
+| `disposition` |
+| `reason` |
+| `current_step` |
+| `hunger` |
+| `energy` |
+| `warmth` |
+| `PlanStepFailed` |
+| `cat` |
+| `disposition` |
+| `step` |
+| `step_index` |
+| `reason` |
+| `hunger` |
+| `energy` |
+| `warmth` |
+| `PlanReplanned` |
+| `cat` |
+| `disposition` |
+| `replan_count` |
+| `new_steps` |
+| `hunger` |
+| `energy` |
+| `warmth` |
 
 ## NarrativeTier
 
@@ -357,6 +485,9 @@
 | `Micro` |
 | `Action` |
 | `Significant` |
+| `Danger` |
+| `Nature` |
+| `Legend` |
 
 ## PriorityKind
 
@@ -381,7 +512,10 @@
 | `Fight` |
 | `Patrol` |
 | `Herbcraft` |
+| `Cook` |
 | `SetWard` |
+| `Cleanse` |
+| `HarvestCarcass` |
 
 ## StepKind
 
@@ -416,6 +550,13 @@
 | `FightThreat` |
 | `Survey` |
 | `DeliverDirective` |
+| `kind` |
+| `priority` |
+| `directive_target` |
+| `MateWith` |
+| `FeedKitten` |
+| `RetrieveFromStores` |
+| `kind` |
 
 ## ZoneKind
 

@@ -1,0 +1,90 @@
+[
+    // --- Generic cooking ---
+    (
+        text: "{name} tends a pot of something savoury over the fire.",
+        tier: Action,
+        action: Some(Cook),
+    ),
+    (
+        text: "{name} turns food over hot coals until it smells right.",
+        tier: Action,
+        action: Some(Cook),
+    ),
+    (
+        text: "{name} coaxes flavour out of a simple meal at the kitchen.",
+        tier: Action,
+        action: Some(Cook),
+    ),
+    (
+        text: "{name} ladles broth into a clay bowl, steam curling up.",
+        tier: Action,
+        action: Some(Cook),
+    ),
+
+    // --- Personality-conditioned ---
+    (
+        text: "{name} measures herbs and timing with quiet care.",
+        tier: Action,
+        weight: 1.2,
+        action: Some(Cook),
+        personality: [(axis: Diligence, bucket: High)],
+    ),
+    (
+        text: "{name} experiments — a pinch of this, a handful of that.",
+        tier: Action,
+        weight: 1.1,
+        action: Some(Cook),
+        personality: [(axis: Curiosity, bucket: High)],
+    ),
+    (
+        text: "{name} hums while stirring, the kitchen filling with warmth.",
+        tier: Action,
+        weight: 1.1,
+        action: Some(Cook),
+        personality: [(axis: Optimism, bucket: High)],
+    ),
+    (
+        text: "{name} tastes the pot and nods, satisfied with the result.",
+        tier: Action,
+        action: Some(Cook),
+        personality: [(axis: Pride, bucket: High)],
+    ),
+
+    // =====================================================================
+    // Mood conditions
+    // =====================================================================
+    (
+        text: "{name} cooks with an easy rhythm, paws sure at the pot.",
+        tier: Action,
+        action: Some(Cook),
+        mood: Some(Happy),
+    ),
+    (
+        text: "{name} stirs the pot without looking up, mind elsewhere.",
+        tier: Action,
+        action: Some(Cook),
+        mood: Some(Miserable),
+    ),
+
+    // =====================================================================
+    // Environmental seasoning
+    // =====================================================================
+    (
+        text: "{name} leans close to the fire for warmth while the food cooks.",
+        tier: Action,
+        action: Some(Cook),
+        season: Some(Winter),
+    ),
+    (
+        text: "Old {name} cooks with a practiced hand, flavours layered just so.",
+        tier: Action,
+        action: Some(Cook),
+        life_stage: Some(Elder),
+    ),
+    (
+        text: "Young {name} watches the elder cook work, learning by eye.",
+        tier: Action,
+        action: Some(Cook),
+        life_stage: Some(Young),
+    ),
+]

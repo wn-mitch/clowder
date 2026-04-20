@@ -1,0 +1,206 @@
+[
+    // --- Generic ---
+    (
+        text: "{name} and {other} share a tender moment.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+    ),
+    (
+        text: "{name} and {other} press close, noses touching.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+    ),
+    (
+        text: "{name} twines {possessive} tail with {other}'s.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+    ),
+
+    // --- Personality: Warmth ---
+    (
+        text: "{name} nuzzles against {other}, purring low and steady.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+        personality: [(axis: Warmth, bucket: High)],
+    ),
+    (
+        text: "{name} leans into {other}, lingering longer than usual.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+        personality: [(axis: Warmth, bucket: High)],
+    ),
+    (
+        text: "{name} sits beside {other} — close, but not quite touching.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+        personality: [(axis: Warmth, bucket: Low)],
+    ),
+
+    // --- Personality: Playfulness ---
+    (
+        text: "{name} bats at {other}'s ear and darts away, daring a chase.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+        personality: [(axis: Playfulness, bucket: High)],
+    ),
+    (
+        text: "{name} and {other} sit together in solemn stillness.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+        personality: [(axis: Playfulness, bucket: Low)],
+    ),
+
+    // --- Personality: Anxiety ---
+    (
+        text: "{name} edges closer to {other}, then freezes, unsure.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+        personality: [(axis: Anxiety, bucket: High)],
+    ),
+
+    // --- Personality: Boldness ---
+    (
+        text: "{name} approaches {other} without hesitation, head high.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+        personality: [(axis: Boldness, bucket: High)],
+    ),
+    (
+        text: "{name} circles {other} at a distance before finally settling close.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+        personality: [(axis: Boldness, bucket: Low)],
+    ),
+
+    // --- Personality: Loyalty ---
+    (
+        text: "{name} presses {possessive} forehead to {other}'s, unmoving, like a promise.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+        personality: [(axis: Loyalty, bucket: High)],
+    ),
+
+    // --- Personality: Pride ---
+    (
+        text: "{name} struts past {other}, tail high, then glances back to make sure they're watching.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+        personality: [(axis: Pride, bucket: High)],
+    ),
+
+    // --- Personality: Sociability ---
+    (
+        text: "{name} purrs so loud the whole camp can hear.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+        personality: [(axis: Sociability, bucket: High)],
+    ),
+    (
+        text: "{name} and {other} slip away from camp without a word.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+        personality: [(axis: Sociability, bucket: Low)],
+    ),
+
+    // --- Personality: Independence ---
+    (
+        text: "{name} looks startled by {possessive} own tenderness toward {other}.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+        personality: [(axis: Independence, bucket: High)],
+    ),
+
+    // --- Mood ---
+    (
+        text: "{name} and {other} curl together, radiating warmth. The world is far away.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+        mood: Some(Euphoric),
+    ),
+    (
+        text: "{name} rests {possessive} chin on {other}'s back, content.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+        mood: Some(Happy),
+    ),
+    (
+        text: "{name} presses close to {other}, seeking comfort in the warmth.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+        mood: Some(Low),
+    ),
+    (
+        text: "{name} clings to {other} like the one still point in a tilting world.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+        mood: Some(Miserable),
+    ),
+
+    // --- Personality + Mood combos ---
+    (
+        text: "{name} chases {other} in dizzy circles, both of them breathless and bright-eyed.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+        personality: [(axis: Playfulness, bucket: High)],
+        mood: Some(Euphoric),
+    ),
+    (
+        text: "{name} finally lets {possessive} guard down beside {other}, tension draining away.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+        personality: [(axis: Anxiety, bucket: High)],
+        mood: Some(Happy),
+    ),
+
+    // --- Environmental seasoning ---
+    (
+        text: "{name} and {other} sit close under the moonlight, breathing in unison.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+        day_phase: Some(Night),
+    ),
+    (
+        text: "{name} and {other} watch the last light fade together.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+        day_phase: Some(Dusk),
+    ),
+    (
+        text: "{name} and {other} huddle together against the cold, sharing warmth.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+        season: Some(Winter),
+    ),
+    (
+        text: "{name} and {other} find each other among the new blossoms.",
+        tier: Significant,
+        action: Some(Mate),
+        has_target: Some(true),
+        season: Some(Spring),
+    ),
+]

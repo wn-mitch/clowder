@@ -41,6 +41,7 @@ pub fn tick_pregnancy(
             &Position,
             &Personality,
             &Gender,
+            &Name,
         ),
         Without<Dead>,
     >,
@@ -48,11 +49,12 @@ pub fn tick_pregnancy(
     mut colony_score: Option<ResMut<crate::resources::colony_score::ColonyScore>>,
     mut activation: Option<ResMut<SystemActivation>>,
     mut pushback: MessageWriter<crate::systems::magic::CorruptionPushback>,
+    mut event_log: Option<ResMut<crate::resources::event_log::EventLog>>,
 ) {
     let tps = config.ticks_per_season;
     let mut births: Vec<BirthEvent> = Vec::new();
 
-    for (entity, mut preg, needs, pos, personality, gender) in &mut query {
+    for (entity, mut preg, needs, pos, personality, gender, name) in &mut query {
         let elapsed = time.tick.saturating_sub(preg.conceived_tick);
 
         // Track nutrition.
@@ -79,6 +81,7 @@ pub fn tick_pregnancy(
         if elapsed >= tps {
             births.push(BirthEvent {
                 mother: entity,
+                mother_name: name.0.clone(),
                 partner: preg.partner,
                 litter_size: preg.litter_size,
                 avg_nutrition: preg.avg_nutrition(),
@@ -145,6 +148,8 @@ pub fn tick_pregnancy(
                         HuntingPriors::default(),
                         GroomingCondition(1.0),
                         KittenDependency::new(birth.mother, birth.partner.unwrap_or(birth.mother)),
+                        crate::components::SensorySpecies::Cat,
+                        crate::components::SensorySignature::CAT,
                     ),
                 ))
                 .id();
@@ -169,6 +174,16 @@ pub fn tick_pregnancy(
             if let Some(ref mut act) = activation {
                 act.record(Feature::KittenBorn);
             }
+            if let Some(ref mut elog) = event_log {
+                elog.push(
+                    time.tick,
+                    crate::resources::event_log::EventKind::KittenBorn {
+                        mother: birth.mother_name.clone(),
+                        kitten: format!("{kitten_entity:?}"),
+                        location: (birth.pos.x, birth.pos.y),
+                    },
+                );
+            }
         }
 
         // New life pushes back darkness.
@@ -182,6 +197,7 @@ pub fn tick_pregnancy(
 
 struct BirthEvent {
     mother: Entity,
+    mother_name: String,
     partner: Option<Entity>,
     litter_size: u8,
     avg_nutrition: f32,

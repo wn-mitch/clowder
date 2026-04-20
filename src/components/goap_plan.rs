@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use bevy_ecs::prelude::*;
 
 use crate::ai::planner::{GoapActionKind, PlannedStep};
@@ -34,6 +36,13 @@ pub struct GoapPlan {
     /// step begins executing.
     #[serde(skip)]
     pub step_state: Vec<StepExecutionState>,
+    /// Target position for ward placement (from coordinator directive).
+    #[serde(skip)]
+    pub ward_placement_pos: Option<Position>,
+    /// Action kinds that failed during this plan's lifetime. Filtered out
+    /// during replanning to avoid regenerating identical impossible plans.
+    #[serde(skip, default)]
+    pub failed_actions: HashSet<GoapActionKind>,
 }
 
 impl GoapPlan {
@@ -59,6 +68,8 @@ impl GoapPlan {
             max_replans: Self::DEFAULT_MAX_REPLANS,
             crafting_hint,
             step_state: vec![StepExecutionState::default(); step_count],
+            ward_placement_pos: None,
+            failed_actions: HashSet::new(),
         }
     }
 
@@ -143,6 +154,56 @@ pub enum StepPhase {
 }
 
 // ---------------------------------------------------------------------------
+// PendingUrgencies — step-boundary need evaluation (replaces per-tick interrupts)
+// ---------------------------------------------------------------------------
+
+/// Categories of urgency that accumulate between step boundaries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UrgencyKind {
+    /// Hunger below critical threshold.
+    Starvation,
+    /// Energy below critical threshold.
+    Exhaustion,
+    /// Safety below critical threshold.
+    CriticalSafety,
+    /// Predator detected nearby (contextual intensity).
+    ThreatNearby,
+}
+
+/// A single pending urgency with Maslow priority and intensity.
+#[derive(Debug, Clone)]
+pub struct UrgentNeed {
+    pub kind: UrgencyKind,
+    /// Maslow level: 1 = physiological, 2 = safety.
+    pub maslow_level: u8,
+    /// How severe this urgency is (0.0–1.0).
+    pub intensity: f32,
+    /// For ThreatNearby: position to flee away from.
+    pub threat_pos: Option<Position>,
+}
+
+/// Urgencies accumulated each tick and evaluated at step boundaries.
+/// Replaces per-tick interrupts for all non-damage conditions.
+#[derive(Component, Debug, Clone, Default)]
+pub struct PendingUrgencies {
+    pub needs: Vec<UrgentNeed>,
+}
+
+impl PendingUrgencies {
+    /// Returns the highest-priority urgency (lowest maslow_level, then highest
+    /// intensity). Returns None if empty.
+    pub fn highest(&self) -> Option<&UrgentNeed> {
+        self.needs.iter().min_by(|a, b| {
+            a.maslow_level.cmp(&b.maslow_level).then_with(|| {
+                b.intensity
+                    .partial_cmp(&a.intensity)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
 // PlanNarrative — message emitted at plan lifecycle transitions
 // ---------------------------------------------------------------------------
 
@@ -209,6 +270,7 @@ impl GoapActionKind {
             Self::FeedKitten => Action::Caretake,
             Self::DeliverDirective => Action::Coordinate,
             Self::ExploreSurvey => Action::Explore,
+            Self::RetrieveRawFood | Self::Cook | Self::DepositCookedFood => Action::Cook,
         }
     }
 }
@@ -324,6 +386,23 @@ mod tests {
         let p = test_personality();
         let plan = GoapPlan::new(DispositionKind::Hunting, 0, &p, sample_steps(), None);
         assert_eq!(plan.steps.len(), plan.step_state.len());
+    }
+
+    #[test]
+    fn failed_actions_persist_across_replans() {
+        let p = test_personality();
+        let mut plan = GoapPlan::new(DispositionKind::Hunting, 0, &p, sample_steps(), None);
+        assert!(plan.failed_actions.is_empty());
+
+        plan.failed_actions.insert(GoapActionKind::SearchPrey);
+        assert!(plan.replan(sample_steps()));
+        // failed_actions should persist after replan.
+        assert!(plan.failed_actions.contains(&GoapActionKind::SearchPrey));
+        assert_eq!(plan.replan_count, 1);
+
+        // A fresh plan starts with empty failed_actions.
+        let fresh = GoapPlan::new(DispositionKind::Hunting, 100, &p, sample_steps(), None);
+        assert!(fresh.failed_actions.is_empty());
     }
 
     #[test]

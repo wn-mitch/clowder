@@ -9,6 +9,7 @@ use crate::components::{
     Appearance, Gender, Orientation, Personality, Position, Skills, ZodiacSign,
 };
 use crate::resources::map::{Terrain, TileMap};
+use crate::resources::sim_constants::FounderAgeConstants;
 
 /// A description of a cat to be spawned at game start.
 ///
@@ -118,7 +119,7 @@ const PATTERNS: [&str; 9] = [
 /// Generate `count` starting cats with randomised attributes and varied ages.
 ///
 /// `start_tick` is the simulation tick at which these cats are spawned.
-/// Ages are distributed so that most cats are Young/Adult with ~1 Elder.
+/// Age distribution is controlled by `age_consts`.
 ///
 /// Names are unique (drawn without replacement from the pool).
 /// `count` must not exceed 30.
@@ -126,6 +127,7 @@ pub fn generate_starting_cats(
     count: usize,
     start_tick: u64,
     ticks_per_season: u64,
+    age_consts: &FounderAgeConstants,
     rng: &mut impl Rng,
 ) -> Vec<CatBlueprint> {
     assert!(count <= NAME_POOL.len(), "count exceeds name pool size");
@@ -137,7 +139,7 @@ pub fn generate_starting_cats(
         .into_iter()
         .take(count)
         .map(|name| {
-            let age_seasons = roll_age_seasons(rng);
+            let age_seasons = roll_age_seasons(rng, age_consts);
             let age_ticks = age_seasons * ticks_per_season;
             let born_tick = start_tick.saturating_sub(age_ticks);
             generate_cat(name.to_string(), born_tick, ticks_per_season, rng)
@@ -145,20 +147,19 @@ pub fn generate_starting_cats(
         .collect()
 }
 
-/// Roll an age in seasons with a bell curve weighted toward younger cats.
+/// Roll an age in seasons from the configured founder-age distribution.
 ///
-/// Distribution: ~60% Young (4-11), ~30% Adult (12-30), ~10% Elder (48-55).
-pub(crate) fn roll_age_seasons(rng: &mut impl Rng) -> u64 {
+/// The default distribution is ~60% Young, ~30% Adult, ~10% senior-Adult —
+/// the senior band stays below the Elder mortality ramp (see
+/// `FounderAgeConstants`).
+pub(crate) fn roll_age_seasons(rng: &mut impl Rng, consts: &FounderAgeConstants) -> u64 {
     let roll: f32 = rng.random();
-    if roll < 0.10 {
-        // Elder: 48-55 seasons
-        rng.random_range(48..=55)
-    } else if roll < 0.40 {
-        // Adult: 12-30 seasons
-        rng.random_range(12..=30)
+    if roll < consts.young_probability {
+        rng.random_range(consts.young_min_seasons..=consts.young_max_seasons)
+    } else if roll < consts.young_probability + consts.adult_probability {
+        rng.random_range(consts.adult_min_seasons..=consts.adult_max_seasons)
     } else {
-        // Young: 4-11 seasons
-        rng.random_range(4..=11)
+        rng.random_range(consts.elder_min_seasons..=consts.elder_max_seasons)
     }
 }
 
@@ -211,11 +212,17 @@ pub(crate) fn roll_orientation(rng: &mut impl Rng) -> Orientation {
     }
 }
 
-/// 80% get 0.0–0.2, 15% get 0.3–0.6, 5% get 0.7–1.0.
+/// 60% get 0.0–0.2, 30% get 0.3–0.6, 10% get 0.7–1.0.
+///
+/// Rebalanced to raise the fraction of cats capable of crossing the
+/// `magic_affinity_threshold` (0.3) for PracticeMagic — the prior 80/15/5
+/// distribution produced ~1 magic-capable cat per 8-cat colony, which killed
+/// the durable-ward path entirely (0/85 DurableWards placed in the baseline
+/// 15-minute deep-soak).
 pub(crate) fn roll_magic_affinity(rng: &mut impl Rng) -> f32 {
     match rng.random_range(0..20u32) {
-        0..=15 => rng.random_range(0.0_f32..=0.2),
-        16..=18 => rng.random_range(0.3_f32..=0.6),
+        0..=11 => rng.random_range(0.0_f32..=0.2),
+        12..=17 => rng.random_range(0.3_f32..=0.6),
         _ => rng.random_range(0.7_f32..=1.0),
     }
 }
@@ -226,8 +233,6 @@ pub(crate) fn roll_skills(
     magic_affinity: f32,
     rng: &mut impl Rng,
 ) -> Skills {
-    let _ = rng; // reserved for future randomised variance
-
     let mut skills = Skills::default();
 
     // Bold → better at hunting and combat.
@@ -244,11 +249,24 @@ pub(crate) fn roll_skills(
         skills.foraging += boost;
     }
 
-    // Spiritual + high magic affinity → magic aptitude.
+    // Every cat is a latent magic user — a small random skill floor so
+    // even low-affinity cats aren't mechanically zero.
+    skills.magic = rng.random_range(0.0_f32..=0.1);
+
+    // Cats with meaningful affinity roll an excellence multiplier. This is
+    // the "some excel" knob: a per-cat random draw means two cats with the
+    // same affinity will have different starting skill levels.
+    if magic_affinity > 0.2 {
+        skills.magic += magic_affinity * rng.random_range(0.3_f32..=1.0);
+    }
+
+    // Spiritual + high magic affinity adds an aptitude boost on top.
     if personality.spirituality > 0.5 && magic_affinity > 0.2 {
         let boost = personality.spirituality * magic_affinity * 0.3;
         skills.magic += boost;
     }
+
+    skills.magic = skills.magic.clamp(0.0, 1.0);
 
     skills
 }
@@ -402,10 +420,7 @@ pub fn spawn_starting_buildings(world: &mut World, colony_site: Position, map: &
             (gap_x + dx).min(map.width - 1),
             (scatter_y_base + dy).min(map.height - 1),
         );
-        world.spawn((
-            Item::new(kind, 0.8, ItemLocation::OnGround),
-            food_pos,
-        ));
+        world.spawn((Item::new(kind, 0.8, ItemLocation::OnGround), food_pos));
     }
 }
 
@@ -447,18 +462,24 @@ mod tests {
         assert_eq!(pos, Position::new(5, 5));
     }
 
-    const START_TICK: u64 = 100_000;
+    const START_TICK: u64 = 200_000;
     const TICKS_PER_SEASON: u64 = 2000;
+
+    fn age_consts() -> FounderAgeConstants {
+        FounderAgeConstants::default()
+    }
 
     #[test]
     fn generate_starting_cats_correct_count() {
-        let cats = generate_starting_cats(8, START_TICK, TICKS_PER_SEASON, &mut rng(42));
+        let cats =
+            generate_starting_cats(8, START_TICK, TICKS_PER_SEASON, &age_consts(), &mut rng(42));
         assert_eq!(cats.len(), 8);
     }
 
     #[test]
     fn generated_cats_have_unique_names() {
-        let cats = generate_starting_cats(10, START_TICK, TICKS_PER_SEASON, &mut rng(7));
+        let cats =
+            generate_starting_cats(10, START_TICK, TICKS_PER_SEASON, &age_consts(), &mut rng(7));
         let mut names: Vec<&str> = cats.iter().map(|c| c.name.as_str()).collect();
         names.sort_unstable();
         names.dedup();
@@ -468,8 +489,9 @@ mod tests {
     #[test]
     fn magic_affinity_in_range() {
         let mut r = rng(99);
+        let consts = age_consts();
         for _ in 0..50 {
-            let cats = generate_starting_cats(5, START_TICK, TICKS_PER_SEASON, &mut r);
+            let cats = generate_starting_cats(5, START_TICK, TICKS_PER_SEASON, &consts, &mut r);
             for cat in &cats {
                 assert!(
                     (0.0..=1.0).contains(&cat.magic_affinity),
@@ -482,7 +504,8 @@ mod tests {
 
     #[test]
     fn varied_starting_ages() {
-        let cats = generate_starting_cats(8, START_TICK, TICKS_PER_SEASON, &mut rng(42));
+        let cats =
+            generate_starting_cats(8, START_TICK, TICKS_PER_SEASON, &age_consts(), &mut rng(42));
         // All born_ticks should be <= start_tick (born in the past).
         for cat in &cats {
             assert!(
@@ -499,6 +522,28 @@ mod tests {
             unique_ticks.len() > 1,
             "expected varied ages but all cats have the same born_tick"
         );
+    }
+
+    /// Invariant: founder ages must stay below the Elder mortality ramp.
+    ///
+    /// `elder_max_seasons` must be less than `DeathConstants::elder_entry_seasons +
+    /// grace_seasons`. Breaking this reintroduces the pre-Activation-1 baseline
+    /// wipe regression — see docs/balance/activation-1-status.md.
+    #[test]
+    fn founder_ages_leave_elder_grace() {
+        use crate::resources::sim_constants::DeathConstants;
+        let age_consts = FounderAgeConstants::default();
+        let death = DeathConstants::default();
+        let mortality_age = death.elder_entry_seasons + death.grace_seasons;
+        let mut r = rng(42);
+        for _ in 0..10_000 {
+            let age = roll_age_seasons(&mut r, &age_consts);
+            assert!(
+                age < mortality_age,
+                "founder rolled age {age} ≥ mortality age {mortality_age}; \
+                 colonies will wipe before first breeding cycle",
+            );
+        }
     }
 
     #[test]

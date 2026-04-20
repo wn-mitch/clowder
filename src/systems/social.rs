@@ -1,13 +1,15 @@
+use std::collections::HashMap;
+
 use bevy_ecs::prelude::*;
 
 use crate::components::building::Structure;
-use crate::components::identity::{Gender, Name, Orientation};
+use crate::components::identity::{Age, Gender, LifeStage, Name, Orientation};
 use crate::components::physical::{Dead, Position};
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::relationships::{BondType, Relationships};
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::system_activation::{Feature, SystemActivation};
-use crate::resources::time::TimeState;
+use crate::resources::time::{SimConfig, TimeState};
 
 // ---------------------------------------------------------------------------
 // passive_familiarity system
@@ -36,15 +38,36 @@ pub fn passive_familiarity(
 // check_bonds system
 // ---------------------------------------------------------------------------
 
+/// Per-cat fields relevant to courtship drift and bond-upgrade gating.
+///
+/// Snapshotted before the main loop so we can look up both sides of each
+/// relationship pair without re-querying components per iteration.
+#[derive(Clone, Copy)]
+struct CourtshipFitness {
+    stage: LifeStage,
+    gender: Gender,
+    orientation: Orientation,
+}
+
 /// Periodically check all relationships and upgrade bonds when thresholds are
 /// met. Emits Tier::Significant narrative on bond formation.
-#[allow(clippy::too_many_arguments)]
+///
+/// Also accumulates romantic attachment for orientation-compatible pairs of
+/// adult cats whose fondness and familiarity have crossed the courtship
+/// gates. Without this, romantic stays at 0.0 forever — the MateWith step is
+/// the only other writer, and it requires a Partners bond to reach.
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub fn check_bonds(
     time: Res<TimeState>,
+    config: Res<SimConfig>,
     mut relationships: ResMut<Relationships>,
     mut log: ResMut<NarrativeLog>,
     names: Query<&Name>,
     positions: Query<&Position>,
+    fitness_query: Query<
+        (Entity, &Age, &Gender, &Orientation),
+        (Without<Dead>, Without<Structure>),
+    >,
     mut colony_score: Option<ResMut<crate::resources::colony_score::ColonyScore>>,
     constants: Res<SimConstants>,
     mut activation: ResMut<SystemActivation>,
@@ -56,15 +79,57 @@ pub fn check_bonds(
         return;
     }
 
+    let fitness: HashMap<Entity, CourtshipFitness> = fitness_query
+        .iter()
+        .map(|(e, age, gender, orient)| {
+            (
+                e,
+                CourtshipFitness {
+                    stage: age.stage(time.tick, config.ticks_per_season),
+                    gender: *gender,
+                    orientation: *orient,
+                },
+            )
+        })
+        .collect();
+
     for ((a, b), rel) in relationships.pairs_iter_mut() {
         let old_bond = rel.bond;
 
-        let new_bond = if rel.romantic > c.mates_romantic_threshold
+        // Orientation + life-stage gate for romantic involvement. Friends bonds
+        // remain open to anyone, including kittens and asexual cats; only
+        // romantic outcomes require compatibility.
+        let romantic_eligible = match (fitness.get(&a), fitness.get(&b)) {
+            (Some(fa), Some(fb)) => {
+                matches!(fa.stage, LifeStage::Adult | LifeStage::Elder)
+                    && matches!(fb.stage, LifeStage::Adult | LifeStage::Elder)
+                    && are_orientation_compatible(
+                        fa.gender,
+                        fa.orientation,
+                        fb.gender,
+                        fb.orientation,
+                    )
+            }
+            _ => false,
+        };
+
+        // Courtship drift: compatible close-friend pairs develop romantic
+        // attraction over time, breaking the Partners/Mate chicken-and-egg.
+        if romantic_eligible
+            && rel.fondness > c.courtship_fondness_gate
+            && rel.familiarity > c.courtship_familiarity_gate
+        {
+            rel.romantic = (rel.romantic + c.courtship_romantic_rate).min(1.0);
+        }
+
+        let new_bond = if romantic_eligible
+            && rel.romantic > c.mates_romantic_threshold
             && rel.fondness > c.mates_fondness_threshold
             && rel.familiarity > c.mates_familiarity_threshold
         {
             Some(BondType::Mates)
-        } else if rel.romantic > c.partners_romantic_threshold
+        } else if romantic_eligible
+            && rel.romantic > c.partners_romantic_threshold
             && rel.fondness > c.partners_fondness_threshold
             && rel.familiarity > c.partners_familiarity_threshold
         {
@@ -388,32 +453,58 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn bond_forms_at_threshold() {
+    /// Helper: build a test world with `check_bonds` ready to run.
+    /// Pre-registers every resource and the single message type the system writes.
+    fn bond_test_world(tick: u64) -> (World, Schedule) {
         let mut world = World::new();
         let mut time = TimeState::default();
-        time.tick = 50; // divisible by 50
+        time.tick = tick;
         world.insert_resource(time);
+        world.insert_resource(crate::resources::time::SimConfig::default());
         world.insert_resource(NarrativeLog::default());
         world.insert_resource(crate::resources::SimConstants::default());
         world.insert_resource(SystemActivation::default());
         bevy_ecs::message::MessageRegistry::register_message::<
             crate::systems::magic::CorruptionPushback,
         >(&mut world);
+        let mut schedule = Schedule::default();
+        schedule.add_systems(bevy_ecs::message::message_update_system);
+        schedule.add_systems(check_bonds);
+        (world, schedule)
+    }
+
+    /// Helper: spawn a cat at life stage Adult by using a born_tick old enough
+    /// for a 12+ season age under the default ticks_per_season (20_000).
+    fn spawn_adult(
+        world: &mut World,
+        name: &str,
+        gender: Gender,
+        orientation: Orientation,
+    ) -> Entity {
+        world
+            .spawn((
+                Name(name.to_string()),
+                Age { born_tick: 0 },
+                gender,
+                orientation,
+            ))
+            .id()
+    }
+
+    #[test]
+    fn bond_forms_at_threshold() {
+        // Age cats to Adult: tick 50 + ticks_per_season * 12 is enough.
+        let adult_tick = 50 + 20_000 * 12;
+        let (mut world, mut schedule) = bond_test_world(adult_tick);
+        let a = spawn_adult(&mut world, "Fern", Gender::Queen, Orientation::Straight);
+        let b = spawn_adult(&mut world, "Reed", Gender::Tom, Orientation::Straight);
+
         let mut rels = Relationships::default();
-
-        let a = world.spawn(Name("Fern".to_string())).id();
-        let b = world.spawn(Name("Reed".to_string())).id();
-
-        // Set fondness and familiarity above Friends threshold.
         let rel = rels.get_or_insert(a, b);
         rel.fondness = 0.4;
         rel.familiarity = 0.5;
         world.insert_resource(rels);
 
-        let mut schedule = Schedule::default();
-        schedule.add_systems(bevy_ecs::message::message_update_system);
-        schedule.add_systems(check_bonds);
         schedule.run(&mut world);
 
         let rels = world.resource::<Relationships>();
@@ -427,6 +518,152 @@ mod tests {
         assert!(
             log.entries.iter().any(|e| e.text.contains("close friends")),
             "should narrate bond formation"
+        );
+    }
+
+    #[test]
+    fn courtship_drift_grows_romantic_for_compatible_pair() {
+        let adult_tick = 50 + 20_000 * 12;
+        let (mut world, mut schedule) = bond_test_world(adult_tick);
+        let a = spawn_adult(&mut world, "Fern", Gender::Queen, Orientation::Straight);
+        let b = spawn_adult(&mut world, "Reed", Gender::Tom, Orientation::Straight);
+
+        let mut rels = Relationships::default();
+        let rel = rels.get_or_insert(a, b);
+        rel.fondness = 0.5;
+        rel.familiarity = 0.5;
+        rel.romantic = 0.0;
+        world.insert_resource(rels);
+
+        schedule.run(&mut world);
+
+        let rels = world.resource::<Relationships>();
+        let rate = crate::resources::SimConstants::default()
+            .social
+            .courtship_romantic_rate;
+        assert!(
+            (rels.get(a, b).unwrap().romantic - rate).abs() < 1e-6,
+            "one tick of courtship should add exactly courtship_romantic_rate to romantic"
+        );
+    }
+
+    #[test]
+    fn courtship_drift_skips_incompatible_orientation() {
+        let adult_tick = 50 + 20_000 * 12;
+        let (mut world, mut schedule) = bond_test_world(adult_tick);
+        // Two straight Toms — not orientation-compatible.
+        let a = spawn_adult(&mut world, "Flint", Gender::Tom, Orientation::Straight);
+        let b = spawn_adult(&mut world, "Reed", Gender::Tom, Orientation::Straight);
+
+        let mut rels = Relationships::default();
+        let rel = rels.get_or_insert(a, b);
+        rel.fondness = 0.5;
+        rel.familiarity = 0.5;
+        rel.romantic = 0.0;
+        world.insert_resource(rels);
+
+        schedule.run(&mut world);
+
+        let rels = world.resource::<Relationships>();
+        assert_eq!(
+            rels.get(a, b).unwrap().romantic,
+            0.0,
+            "incompatible orientations should not accumulate romantic"
+        );
+    }
+
+    #[test]
+    fn courtship_drift_skips_kittens() {
+        // Cats born at tick 0, checked at tick 50 → Kitten stage.
+        let (mut world, mut schedule) = bond_test_world(50);
+        let a = spawn_adult(&mut world, "Sprout", Gender::Queen, Orientation::Straight);
+        let b = spawn_adult(&mut world, "Brook", Gender::Tom, Orientation::Straight);
+
+        let mut rels = Relationships::default();
+        let rel = rels.get_or_insert(a, b);
+        rel.fondness = 0.5;
+        rel.familiarity = 0.5;
+        rel.romantic = 0.0;
+        world.insert_resource(rels);
+
+        schedule.run(&mut world);
+
+        let rels = world.resource::<Relationships>();
+        assert_eq!(
+            rels.get(a, b).unwrap().romantic,
+            0.0,
+            "kittens cannot accumulate romantic"
+        );
+    }
+
+    #[test]
+    fn courtship_drift_engages_at_friends_tier_fondness() {
+        // The courtship_fondness_gate is aligned with friends_fondness_threshold
+        // (0.3) so that drift engages the moment a Friends bond can form.
+        // Previously this was 0.4, leaving a dead zone where Friends-tier pairs
+        // never developed romantic attraction.
+        let adult_tick = 50 + 20_000 * 12;
+        let (mut world, mut schedule) = bond_test_world(adult_tick);
+        let a = spawn_adult(&mut world, "Fern", Gender::Queen, Orientation::Straight);
+        let b = spawn_adult(&mut world, "Reed", Gender::Tom, Orientation::Straight);
+
+        let mut rels = Relationships::default();
+        let rel = rels.get_or_insert(a, b);
+        rel.fondness = 0.35; // above Friends (0.3) and the new gate (0.3)
+        rel.familiarity = 0.45; // above Friends (0.4) and the gate (0.4)
+        rel.romantic = 0.0;
+        world.insert_resource(rels);
+
+        schedule.run(&mut world);
+
+        let rels = world.resource::<Relationships>();
+        let rate = crate::resources::SimConstants::default()
+            .social
+            .courtship_romantic_rate;
+        assert!(
+            rels.get(a, b).unwrap().romantic > 0.0,
+            "drift should engage for Friends-tier pair under new fondness gate"
+        );
+        assert!(
+            (rels.get(a, b).unwrap().romantic - rate).abs() < 1e-6,
+            "one tick of drift should add exactly courtship_romantic_rate"
+        );
+    }
+
+    #[test]
+    fn compatible_adults_reach_partners_bond_in_expected_time() {
+        // Confirms the math: courtship_romantic_rate = 0.0015 per check means
+        // partners_romantic_threshold (0.5) is reached in ~334 checks. We
+        // simulate the needed number of checks directly rather than advancing
+        // time ticks through a full schedule.
+        let c = crate::resources::SimConstants::default().social;
+        let checks_needed =
+            (c.partners_romantic_threshold / c.courtship_romantic_rate).ceil() as u64;
+
+        let adult_tick = 50 + 20_000 * 12;
+        let (mut world, mut schedule) = bond_test_world(adult_tick);
+        let a = spawn_adult(&mut world, "Fern", Gender::Queen, Orientation::Straight);
+        let b = spawn_adult(&mut world, "Reed", Gender::Tom, Orientation::Straight);
+
+        let mut rels = Relationships::default();
+        let rel = rels.get_or_insert(a, b);
+        rel.fondness = 0.7;
+        rel.familiarity = 0.6;
+        rel.romantic = 0.0;
+        world.insert_resource(rels);
+
+        for i in 0..checks_needed + 1 {
+            // Advance tick by bond_check_interval each iteration so check_bonds fires.
+            world.resource_mut::<TimeState>().tick = adult_tick + (i + 1) * c.bond_check_interval;
+            schedule.run(&mut world);
+        }
+
+        let rels = world.resource::<Relationships>();
+        let bond = rels.get(a, b).unwrap().bond;
+        assert_eq!(
+            bond,
+            Some(BondType::Partners),
+            "compatible adults with strong fondness/familiarity should reach Partners in ~{checks_needed} checks; got bond {bond:?}"
         );
     }
 }

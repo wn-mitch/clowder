@@ -11,6 +11,7 @@ use crate::components::skills::Skills;
 use crate::components::task_chain::{StepKind, StepStatus, TaskChain};
 use crate::resources::colony_score::ColonyScore;
 use crate::resources::map::TileMap;
+use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::resources::time::{Season, SimConfig, TimeState};
 
 // ---------------------------------------------------------------------------
@@ -50,6 +51,7 @@ pub fn resolve_task_chains(
     config: Res<SimConfig>,
     mut commands: Commands,
     mut colony_score: Option<ResMut<ColonyScore>>,
+    mut activation: Option<ResMut<SystemActivation>>,
 ) {
     let season = time.season(&config);
     let season_mod = match season {
@@ -183,21 +185,24 @@ pub fn resolve_task_chains(
 
             StepKind::Construct => {
                 let cached = &mut step.cached_path;
-                apply(
-                    crate::steps::building::resolve_construct(
-                        step_target_entity,
-                        &mut pos,
-                        cached,
-                        &mut skills,
-                        workshop_bonus,
-                        &builders_per_site,
-                        &mut buildings,
-                        &map,
-                        &mut commands,
-                        &mut colony_score,
-                    ),
-                    &mut chain,
+                let result = crate::steps::building::resolve_construct(
+                    step_target_entity,
+                    &mut pos,
+                    cached,
+                    &mut skills,
+                    workshop_bonus,
+                    &builders_per_site,
+                    &mut buildings,
+                    &map,
+                    &mut commands,
+                    &mut colony_score,
                 );
+                if matches!(result, crate::steps::StepResult::Advance) {
+                    if let Some(ref mut act) = activation {
+                        act.record(Feature::BuildingConstructed);
+                    }
+                }
+                apply(result, &mut chain);
             }
 
             StepKind::Repair => {
@@ -437,7 +442,10 @@ mod tests {
         let garden = world
             .spawn((
                 Structure::new(StructureType::Garden),
-                CropState { growth: 1.0 },
+                CropState {
+                    growth: 1.0,
+                    ..Default::default()
+                },
                 Position::new(5, 5),
             ))
             .id();

@@ -1,5 +1,11 @@
 use bevy_ecs::prelude::*;
 
+use crate::components::prey::PreyKind;
+use crate::components::sensing::SensorySpecies;
+use crate::components::wildlife::WildSpecies;
+use crate::resources::time::Season;
+use crate::systems::sensing::{Channel, Falloff, SensoryProfile};
+
 // ---------- SimConstants (top-level resource) ----------
 
 #[derive(Resource, Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
@@ -11,6 +17,8 @@ pub struct SimConstants {
     pub social: SocialConstants,
     pub mood: MoodConstants,
     pub death: DeathConstants,
+    #[serde(default)]
+    pub founder_age: FounderAgeConstants,
     pub prey: PreyConstants,
     pub species: SpeciesConstants,
     pub scoring: ScoringConstants,
@@ -26,6 +34,8 @@ pub struct SimConstants {
     pub personality_friction: PersonalityFrictionConstants,
     #[serde(default)]
     pub world_gen: WorldGenConstants,
+    #[serde(default)]
+    pub sensory: SensoryConstants,
 }
 
 // ---------- NeedsConstants ----------
@@ -115,7 +125,7 @@ impl Default for NeedsConstants {
             tradition_familiar_distance: 5,
             tradition_safety_boost: 0.0002,
             tradition_safety_drain: 0.0001,
-            eat_from_inventory_threshold: 0.05,
+            eat_from_inventory_threshold: 0.4,
             corruption_food_penalty: 0.5,
             grooming_decay: 0.00003,
             grooming_pride_penalty_scale: 0.00005,
@@ -158,12 +168,12 @@ pub struct BuildingConstants {
 impl Default for BuildingConstants {
     fn default() -> Self {
         Self {
-            den_effect_radius: 4,
-            den_warmth_bonus: 0.001,
+            den_effect_radius: 5,
+            den_warmth_bonus: 0.003,
             den_safety_bonus: 0.0005,
-            hearth_effect_radius: 5,
+            hearth_effect_radius: 6,
             hearth_social_bonus: 0.001,
-            hearth_warmth_bonus_cold: 0.001,
+            hearth_warmth_bonus_cold: 0.003,
             stores_spoilage_multiplier: 0.5,
             dirty_threshold: 0.3,
             dirty_discomfort_radius: 3,
@@ -191,6 +201,39 @@ pub struct CombatConstants {
     pub jitter_range: f32,
     pub combat_effective_hunting_weight: f32,
     pub ally_damage_bonus_per_ally: f32,
+    /// Extra damage bonus per ally stacked on top of `ally_damage_bonus_per_ally`
+    /// when 2+ cats coordinate an attack on the same target (a "posse").
+    /// Rewards the colony for collective offense, not just individual ganking.
+    pub combat_posse_bonus_per_ally: f32,
+    /// Minimum ally count (including the attacking cat) for the posse bonus
+    /// to activate. A lone ganker doesn't get the posse multiplier.
+    pub combat_posse_min_allies: usize,
+    /// Posse attacks at or below this HP fraction trigger banishment instead
+    /// of a normal kill: shadow-fox dissolves into mist, posse earns a
+    /// Legend-tier event and stat boons. See src/steps/combat/banishment.rs.
+    pub shadow_fox_banish_threshold: f32,
+    /// Tiles within which cats can "witness" a banishment and receive the
+    /// secondhand memory + mood boost.
+    pub legend_witness_range: i32,
+    /// Combat skill delta applied to each posse participant at banishment.
+    pub banishment_combat_skill_grow: f32,
+    /// Diminishing-returns factor on repeat banishments. Effective gain is
+    /// `banishment_combat_skill_grow / (1 + prior_triumphs * factor)`, so a
+    /// cat with N prior banishments earns progressively less from each
+    /// subsequent one. Prevents one cat (see: Mocha) from accumulating
+    /// runaway combat skill across a long game while keeping the first
+    /// banishment meaningful. Set to 0.0 to restore linear gain.
+    pub banishment_skill_gain_diminish_factor: f32,
+    /// Valor mood modifier amount for posse participants (duration = seasons × 2).
+    pub banishment_valor_mood: f32,
+    /// Mood modifier amount for witnesses of a banishment.
+    pub banishment_witness_mood: f32,
+    /// Safety floor for witnesses — they saw the darkness defeated.
+    pub banishment_witness_safety_floor: f32,
+    /// Corruption pushback radius from banishment site.
+    pub banishment_pushback_radius: i32,
+    /// Corruption pushback amount.
+    pub banishment_pushback_amount: f32,
     pub temper_damage_bonus: f32,
     pub narrative_attack_chance: f32,
     pub wildlife_flee_health_threshold: f32,
@@ -229,10 +272,28 @@ impl Default for CombatConstants {
             jitter_range: 0.02,
             combat_effective_hunting_weight: 0.3,
             ally_damage_bonus_per_ally: 0.2,
+            combat_posse_bonus_per_ally: 0.4,
+            combat_posse_min_allies: 2,
+            // Banish at 80% HP: shadow-foxes are spectral, not bodies — the
+            // first real blow from a cat breaks the ambush aura and begins
+            // the dissolution. Keeps above `wildlife_flee_health_threshold`
+            // (0.3) so the fox doesn't run before the cat can finish it.
+            shadow_fox_banish_threshold: 0.8,
+            legend_witness_range: 12,
+            banishment_combat_skill_grow: 0.25,
+            banishment_skill_gain_diminish_factor: 0.25,
+            banishment_valor_mood: 0.35,
+            banishment_witness_mood: 0.20,
+            banishment_witness_safety_floor: 0.8,
+            banishment_pushback_radius: 20,
+            banishment_pushback_amount: 0.5,
             temper_damage_bonus: 0.15,
             narrative_attack_chance: 0.15,
             wildlife_flee_health_threshold: 0.3,
-            wildlife_flee_outnumbered_count: 3,
+            // A 2-cat posse already qualifies as "outnumbered" for a shadow-fox.
+            // Combined with the posse pressure banishment trigger, this means
+            // a duo is usually enough to force the fox into dissolution.
+            wildlife_flee_outnumbered_count: 2,
             injury_negligible_threshold: 0.03,
             injury_moderate_threshold: 0.1,
             injury_severe_threshold: 0.25,
@@ -297,6 +358,7 @@ pub struct MagicConstants {
     pub gratitude_fondness_gain: f32,
     pub herbcraft_apply_skill_growth: f32,
     pub set_ward_ticks: u64,
+    pub thornward_decay_rate: f32,
     pub herbcraft_ward_skill_growth: f32,
     pub magic_ward_skill_growth: f32,
     pub scry_ticks: u64,
@@ -324,6 +386,14 @@ pub struct MagicConstants {
     pub shadow_fox_ward_repel_multiplier: f32,
     /// Ticks between each growth stage advance for herbs and flavor plants.
     pub herb_growth_interval: u64,
+    /// Ticks between herb regrowth attempts.
+    pub herb_regrowth_interval: u64,
+    /// Chance per attempt that a regrowth herb actually spawns.
+    pub herb_regrowth_chance: f32,
+    /// Max concurrent Thornbriar herbs allowed (prevents unbounded growth).
+    pub thornbriar_regrowth_cap: u32,
+    /// Growth rate multiplier for thornbriar in gardens (slower than food crops).
+    pub thornbriar_farm_growth_modifier: f32,
     /// Ticks to harvest a carcass for shadow bone.
     pub harvest_carcass_ticks: u64,
     /// Personal corruption gained when harvesting a carcass.
@@ -365,9 +435,13 @@ impl Default for MagicConstants {
             corruption_tile_mood_threshold: 0.1,
             corruption_tile_mood_ticks: 5,
             corruption_twisted_herb_threshold: 0.3,
-            shadow_fox_corruption_threshold: 0.7,
+            shadow_fox_corruption_threshold: 0.85,
             shadow_fox_spawn_chance: 0.001,
-            shadow_fox_population_cap: 2,
+            // Temporarily disabled (cap = 0) while stabilising the cat
+            // population during balance tuning. Restore to 2 once the
+            // food/building/survival loops hold on seed 42 without
+            // predator churn obscuring the data.
+            shadow_fox_population_cap: 0,
             shadow_fox_spawn_interval: 10,
             gather_herb_ticks: 5,
             herbcraft_gather_skill_growth: 0.01,
@@ -377,6 +451,7 @@ impl Default for MagicConstants {
             gratitude_fondness_gain: 0.1,
             herbcraft_apply_skill_growth: 0.005,
             set_ward_ticks: 8,
+            thornward_decay_rate: 0.001,
             herbcraft_ward_skill_growth: 0.01,
             magic_ward_skill_growth: 0.01,
             scry_ticks: 10,
@@ -400,8 +475,16 @@ impl Default for MagicConstants {
             misfire_fizzle_mood_penalty: -0.1,
             misfire_fizzle_mood_ticks: 20,
             misfire_corruption_backsplash_amount: 0.1,
-            shadow_fox_ward_repel_multiplier: 2.0,
+            // Bumped from 2.0 to 3.0: the 15-min sim showed wards deflecting
+            // shadow foxes but still allowing kills because cat activity zones
+            // were outside the effective radius. 3.0 makes a ward cover a cat
+            // cluster rather than just the ward itself.
+            shadow_fox_ward_repel_multiplier: 3.0,
             herb_growth_interval: 200,
+            herb_regrowth_interval: 500,
+            herb_regrowth_chance: 0.3,
+            thornbriar_regrowth_cap: 30,
+            thornbriar_farm_growth_modifier: 0.5,
             harvest_carcass_ticks: 15,
             harvest_corruption_gain: 0.05,
             herb_suppression_threshold: 0.5,
@@ -439,6 +522,14 @@ pub struct SocialConstants {
     pub fondness_grooming_scale: f32,
     pub romantic_grooming_floor: f32,
     pub romantic_grooming_scale: f32,
+    // --- Courtship: gated romantic drift for orientation-compatible pairs ---
+    // Romantic only accumulates via the MateWith step otherwise, which creates
+    // a chicken-and-egg: Partners bond requires romantic>0.5, but mating
+    // requires Partners bond. Courtship drift breaks the cycle: compatible
+    // close-friend pairs develop romantic attraction passively over time.
+    pub courtship_romantic_rate: f32,
+    pub courtship_fondness_gate: f32,
+    pub courtship_familiarity_gate: f32,
 }
 
 impl Default for SocialConstants {
@@ -464,6 +555,15 @@ impl Default for SocialConstants {
             fondness_grooming_scale: 0.3,
             romantic_grooming_floor: 0.5,
             romantic_grooming_scale: 0.5,
+            // Per bond_check_interval=50: 0.0025 × 20 checks/day = 0.05/day.
+            // Reaches Partners threshold (0.5) in ~10 in-game days; Mates (0.7)
+            // in ~14 days. Compatible close-friend pairs become Partners within
+            // their first fertile Spring, Mates by their second. The fondness
+            // gate sits at the Friends threshold (0.3) so drift engages the
+            // moment a Friends bond forms — no dead zone between tiers.
+            courtship_romantic_rate: 0.0025,
+            courtship_fondness_gate: 0.3,
+            courtship_familiarity_gate: 0.4,
         }
     }
 }
@@ -540,6 +640,46 @@ impl Default for DeathConstants {
             grief_detection_range: 5,
             grief_memory_strength: 1.0,
             cleanup_grace_period: 500,
+        }
+    }
+}
+
+// ---------- FounderAgeConstants ----------
+
+/// Distribution used when rolling ages for starting cats.
+///
+/// Paired invariant with `DeathConstants`: `elder_max_seasons` must stay
+/// below `elder_entry_seasons + grace_seasons` so founders always have
+/// runway before the old-age mortality ramp activates. The
+/// `founder_ages_leave_elder_grace` test enforces this.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FounderAgeConstants {
+    pub young_min_seasons: u64,
+    pub young_max_seasons: u64,
+    pub young_probability: f32,
+    pub adult_min_seasons: u64,
+    pub adult_max_seasons: u64,
+    pub adult_probability: f32,
+    pub elder_min_seasons: u64,
+    pub elder_max_seasons: u64,
+}
+
+impl Default for FounderAgeConstants {
+    fn default() -> Self {
+        Self {
+            young_min_seasons: 4,
+            young_max_seasons: 11,
+            young_probability: 0.60,
+            adult_min_seasons: 12,
+            adult_max_seasons: 30,
+            adult_probability: 0.30,
+            elder_min_seasons: 48,
+            // Capped below `DeathConstants::elder_entry_seasons +
+            // grace_seasons = 55` so founders have runway before the
+            // mortality ramp activates. Widening this into [55, ∞) will
+            // reintroduce the pre-Activation-1 baseline wipe regression
+            // (see docs/balance/activation-1-status.md).
+            elder_max_seasons: 50,
         }
     }
 }
@@ -805,8 +945,65 @@ pub struct ScoringConstants {
     pub incapacitated_idle_score: f32,
     pub eat_urgency_scale: f32,
     pub sleep_urgency_scale: f32,
+    /// Day-phase additive offsets to Sleep urgency. Encodes the cat's
+    /// crepuscular-with-night-heavy-rest design (see
+    /// `docs/systems/sleep-that-makes-sense.md`). Dawn/Dusk are feeding peaks
+    /// (0.0), Day is a tie-break so exhausted cats can still nap (0.1), Night
+    /// dominates fulfillment-tier scores so Sleep wins by default (1.2).
+    #[serde(default = "default_sleep_dawn_bonus")]
+    pub sleep_dawn_bonus: f32,
+    #[serde(default = "default_sleep_day_bonus")]
+    pub sleep_day_bonus: f32,
+    #[serde(default = "default_sleep_dusk_bonus")]
+    pub sleep_dusk_bonus: f32,
+    #[serde(default = "default_sleep_night_bonus")]
+    pub sleep_night_bonus: f32,
     /// Bonus to Sleep score when injured (scaled by injury severity).
     pub injury_rest_bonus: f32,
+    // Fox disposition day-phase bonuses (crepuscular/nocturnal vulpine rhythm).
+    // Applied in src/ai/fox_scoring.rs::score_fox_dispositions. Hunting peaks
+    // Dusk→Night, Resting peaks Day, Patrolling mild-positive Dusk→Dawn.
+    #[serde(default = "default_fox_hunt_dawn_bonus")]
+    pub fox_hunt_dawn_bonus: f32,
+    #[serde(default = "default_fox_hunt_day_bonus")]
+    pub fox_hunt_day_bonus: f32,
+    #[serde(default = "default_fox_hunt_dusk_bonus")]
+    pub fox_hunt_dusk_bonus: f32,
+    #[serde(default = "default_fox_hunt_night_bonus")]
+    pub fox_hunt_night_bonus: f32,
+    #[serde(default = "default_fox_patrol_dawn_bonus")]
+    pub fox_patrol_dawn_bonus: f32,
+    #[serde(default = "default_fox_patrol_day_bonus")]
+    pub fox_patrol_day_bonus: f32,
+    #[serde(default = "default_fox_patrol_dusk_bonus")]
+    pub fox_patrol_dusk_bonus: f32,
+    #[serde(default = "default_fox_patrol_night_bonus")]
+    pub fox_patrol_night_bonus: f32,
+    #[serde(default = "default_fox_rest_dawn_bonus")]
+    pub fox_rest_dawn_bonus: f32,
+    #[serde(default = "default_fox_rest_day_bonus")]
+    pub fox_rest_day_bonus: f32,
+    #[serde(default = "default_fox_rest_dusk_bonus")]
+    pub fox_rest_dusk_bonus: f32,
+    #[serde(default = "default_fox_rest_night_bonus")]
+    pub fox_rest_night_bonus: f32,
+    /// Base score for the Cook action when a Kitchen and raw food are both
+    /// available. Fulfillment-tier action — fires when physiological needs
+    /// are mostly met.
+    #[serde(default = "default_cook_base_score")]
+    pub cook_base_score: f32,
+    /// Diligence-trait scalar added to Cook score.
+    #[serde(default = "default_cook_diligence_scale")]
+    pub cook_diligence_scale: f32,
+    /// Minimum hunger (0.0=starving, 1.0=full) above which a cat is willing
+    /// to cook. Prevents starving cats from wandering off to the Kitchen.
+    #[serde(default = "default_cook_hunger_gate")]
+    pub cook_hunger_gate: f32,
+    /// Cook urgency scales with food-store scarcity — matches Hunt/Forage.
+    /// Low `food_fraction` raises Cook score so the buffer is restocked
+    /// before the stores empty.
+    #[serde(default = "default_cook_food_scarcity_scale")]
+    pub cook_food_scarcity_scale: f32,
     pub hunt_food_scarcity_scale: f32,
     pub hunt_prey_bonus: f32,
     pub hunt_boldness_scale: f32,
@@ -896,6 +1093,31 @@ pub struct ScoringConstants {
     pub mate_warmth_scale: f32,
     pub caretake_compassion_scale: f32,
     pub caretake_parent_bonus: f32,
+    /// Minimum hunger a cat (and its prospective partner) must have to be
+    /// eligible to mate. Hungry cats breed hungry kittens.
+    pub breeding_hunger_floor: f32,
+    /// Minimum energy a cat (and its prospective partner) must have to be
+    /// eligible to mate. Exhausted cats don't court.
+    pub breeding_energy_floor: f32,
+    /// Minimum mood valence required to be eligible to mate. Miserable cats
+    /// don't feel romantic.
+    pub breeding_mood_floor: f32,
+    /// Mating need must drop below this before a cat is interested enough to
+    /// score the Mate action. Creates a seasonal ramp-up window.
+    pub mating_interest_threshold: f32,
+    /// Per-season fertility multiplier on mating-need decay and the
+    /// has_eligible_mate gate. Models the photoperiodic breeding cycle of
+    /// domestic cats — seasonally polyestrous with a Spring peak and Winter
+    /// anestrous window. A value of 0 fully suppresses breeding in that
+    /// season.
+    #[serde(default = "default_mating_fertility_spring")]
+    pub mating_fertility_spring: f32,
+    #[serde(default = "default_mating_fertility_summer")]
+    pub mating_fertility_summer: f32,
+    #[serde(default = "default_mating_fertility_autumn")]
+    pub mating_fertility_autumn: f32,
+    #[serde(default = "default_mating_fertility_winter")]
+    pub mating_fertility_winter: f32,
     // --- Corruption/carcass/siege scoring ---
     pub magic_harvest_carcass_scale: f32,
     pub magic_cleanse_colony_scale: f32,
@@ -909,6 +1131,12 @@ pub struct ScoringConstants {
     pub corruption_suppression_threshold: f32,
     pub corruption_suppression_scale: f32,
     pub carcass_detection_range: i32,
+    /// Tile radius within which a cat "smells" corruption on nearby tiles.
+    /// Corruption beyond this range is out of sensing reach.
+    pub corruption_smell_range: i32,
+    /// Flat score bonus added to Cleanse/SetWard when a cat smells rot nearby
+    /// (nearby_corruption_level above the corruption_tile_mood_threshold).
+    pub corruption_sensed_response_bonus: f32,
 }
 
 impl Default for ScoringConstants {
@@ -922,7 +1150,27 @@ impl Default for ScoringConstants {
             incapacitated_idle_score: 0.2,
             eat_urgency_scale: 2.0,
             sleep_urgency_scale: 1.2,
+            sleep_dawn_bonus: default_sleep_dawn_bonus(),
+            sleep_day_bonus: default_sleep_day_bonus(),
+            sleep_dusk_bonus: default_sleep_dusk_bonus(),
+            sleep_night_bonus: default_sleep_night_bonus(),
             injury_rest_bonus: 0.4,
+            fox_hunt_dawn_bonus: default_fox_hunt_dawn_bonus(),
+            fox_hunt_day_bonus: default_fox_hunt_day_bonus(),
+            fox_hunt_dusk_bonus: default_fox_hunt_dusk_bonus(),
+            fox_hunt_night_bonus: default_fox_hunt_night_bonus(),
+            fox_patrol_dawn_bonus: default_fox_patrol_dawn_bonus(),
+            fox_patrol_day_bonus: default_fox_patrol_day_bonus(),
+            fox_patrol_dusk_bonus: default_fox_patrol_dusk_bonus(),
+            fox_patrol_night_bonus: default_fox_patrol_night_bonus(),
+            fox_rest_dawn_bonus: default_fox_rest_dawn_bonus(),
+            fox_rest_day_bonus: default_fox_rest_day_bonus(),
+            fox_rest_dusk_bonus: default_fox_rest_dusk_bonus(),
+            fox_rest_night_bonus: default_fox_rest_night_bonus(),
+            cook_base_score: default_cook_base_score(),
+            cook_diligence_scale: default_cook_diligence_scale(),
+            cook_hunger_gate: default_cook_hunger_gate(),
+            cook_food_scarcity_scale: default_cook_food_scarcity_scale(),
             hunt_food_scarcity_scale: 0.6,
             hunt_prey_bonus: 0.2,
             hunt_boldness_scale: 2.2,
@@ -931,7 +1179,7 @@ impl Default for ScoringConstants {
             socialize_sociability_scale: 2.0,
             socialize_temper_penalty_scale: 0.3,
             socialize_playfulness_bonus: 0.3,
-            self_groom_warmth_scale: 0.8,
+            self_groom_warmth_scale: 0.6,
             groom_temper_penalty_scale: 0.3,
             explore_curiosity_scale: 0.7,
             fox_scent_suppression_threshold: 0.3,
@@ -941,17 +1189,17 @@ impl Default for ScoringConstants {
             wander_playfulness_bonus: 0.2,
             flee_safety_threshold: 0.5,
             flee_safety_scale: 3.0,
-            fight_min_allies: 1,
+            fight_min_allies: 0,
             fight_ally_bonus_per_cat: 0.15,
             fight_boldness_scale: 1.5,
             fight_health_suppression_threshold: 0.5,
             fight_safety_suppression_threshold: 0.3,
             patrol_safety_threshold: 0.8,
             patrol_boldness_scale: 1.5,
-            build_diligence_scale: 0.8,
-            build_site_bonus: 0.2,
-            build_repair_bonus: 0.15,
-            farm_diligence_scale: 0.6,
+            build_diligence_scale: 1.5,
+            build_site_bonus: 2.0,
+            build_repair_bonus: 0.35,
+            farm_diligence_scale: 1.2,
             herbcraft_gather_spirituality_scale: 0.5,
             herbcraft_gather_skill_offset: 0.1,
             herbcraft_prepare_skill_offset: 0.1,
@@ -961,7 +1209,7 @@ impl Default for ScoringConstants {
             herbcraft_ward_scale: 0.6,
             magic_affinity_threshold: 0.3,
             magic_skill_threshold: 0.2,
-            magic_durable_ward_skill_threshold: 0.5,
+            magic_durable_ward_skill_threshold: 0.25,
             magic_durable_ward_scale: 0.8,
             magic_cleanse_corruption_threshold: 0.1,
             magic_commune_scale: 0.7,
@@ -1002,9 +1250,17 @@ impl Default for ScoringConstants {
             gate_compulsive_explorer_threshold: 0.9,
             gate_compulsive_explorer_chance: 0.20,
             gate_reckless_health_threshold: 0.5,
-            mate_warmth_scale: 1.5,
+            mate_warmth_scale: 5.0,
             caretake_compassion_scale: 1.8,
             caretake_parent_bonus: 0.5,
+            breeding_hunger_floor: 0.6,
+            breeding_energy_floor: 0.5,
+            breeding_mood_floor: 0.2,
+            mating_interest_threshold: 0.6,
+            mating_fertility_spring: default_mating_fertility_spring(),
+            mating_fertility_summer: default_mating_fertility_summer(),
+            mating_fertility_autumn: default_mating_fertility_autumn(),
+            mating_fertility_winter: default_mating_fertility_winter(),
             magic_harvest_carcass_scale: 0.6,
             magic_cleanse_colony_scale: 0.4,
             herbcraft_ward_siege_bonus: 0.4,
@@ -1014,6 +1270,8 @@ impl Default for ScoringConstants {
             corruption_suppression_threshold: 0.3,
             corruption_suppression_scale: 0.6,
             carcass_detection_range: 15,
+            corruption_smell_range: 5,
+            corruption_sensed_response_bonus: 0.6,
         }
     }
 }
@@ -1066,6 +1324,12 @@ pub struct DispositionConstants {
     pub resting_complete_hunger: f32,
     pub resting_complete_energy: f32,
     pub resting_complete_warmth: f32,
+    /// Planner gate thresholds — needs below these are considered unsatisfied
+    /// and trigger the corresponding recovery action (EatAtStores, Sleep,
+    /// SelfGroom) in the Resting plan.
+    pub planner_hunger_ok_threshold: f32,
+    pub planner_energy_ok_threshold: f32,
+    pub planner_warmth_ok_threshold: f32,
     pub resting_max_replans: u32,
     pub sleep_duration_deficit_multiplier: f32,
     pub sleep_duration_base: u64,
@@ -1188,10 +1452,105 @@ pub struct DispositionConstants {
     /// Below this HP ratio, FightThreat step fails the chain (morale break).
     #[serde(default = "default_fight_bail_health_threshold")]
     pub fight_bail_health_threshold: f32,
+    // --- Contextual threat evaluation (zoo vs bush) ---
+    /// Threat intensity multiplier when the cat is inside a ward's repel radius.
+    #[serde(default = "default_threat_ward_dampening")]
+    pub threat_ward_dampening: f32,
+    /// Threat intensity multiplier when the cat is near a colony building.
+    #[serde(default = "default_threat_colony_building_dampening")]
+    pub threat_colony_building_dampening: f32,
+    /// Manhattan range within which a building counts as "nearby" for threat dampening.
+    #[serde(default = "default_threat_building_safety_range")]
+    pub threat_building_safety_range: i32,
+    /// Radius from colony center used to normalize colony proximity factor.
+    #[serde(default = "default_threat_colony_radius")]
+    pub threat_colony_radius: f32,
+    /// Minimum threat intensity multiplier when at colony center (lerps to 1.0 at radius edge).
+    #[serde(default = "default_threat_colony_center_dampening")]
+    pub threat_colony_center_dampening: f32,
+    /// Range within which other cats count as allies for threat dampening.
+    #[serde(default = "default_threat_ally_range")]
+    pub threat_ally_range: i32,
+    /// Per-ally dampening factor: effective urgency = 1 / (1 + n * this).
+    #[serde(default = "default_threat_ally_dampening_per_cat")]
+    pub threat_ally_dampening_per_cat: f32,
+    // --- Cooking (Kitchen) ---
+    /// Hunger-restoration multiplier applied when eating a cooked item.
+    /// Applied in `resolve_eat_at_stores` after corruption freshness.
+    #[serde(default = "default_cooked_food_multiplier")]
+    pub cooked_food_multiplier: f32,
+    /// Ticks a cat spends at a Kitchen to transform a raw food item into cooked.
+    #[serde(default = "default_cook_ticks")]
+    pub cook_ticks: u64,
+    /// Manhattan range within which a cat counts as "at" the Kitchen to cook.
+    #[serde(default = "default_kitchen_cook_radius")]
+    pub kitchen_cook_radius: i32,
 }
 
 fn default_true() -> bool {
     true
+}
+
+fn default_threat_ward_dampening() -> f32 {
+    0.3
+}
+fn default_threat_colony_building_dampening() -> f32 {
+    0.5
+}
+fn default_threat_building_safety_range() -> i32 {
+    5
+}
+fn default_threat_colony_radius() -> f32 {
+    30.0
+}
+fn default_threat_colony_center_dampening() -> f32 {
+    0.4
+}
+fn default_threat_ally_range() -> i32 {
+    8
+}
+fn default_threat_ally_dampening_per_cat() -> f32 {
+    0.4
+}
+
+fn default_cooked_food_multiplier() -> f32 {
+    1.3
+}
+
+fn default_cook_ticks() -> u64 {
+    40
+}
+
+fn default_kitchen_cook_radius() -> i32 {
+    1
+}
+
+fn default_cook_base_score() -> f32 {
+    0.6
+}
+
+fn default_cook_diligence_scale() -> f32 {
+    0.5
+}
+
+fn default_cook_hunger_gate() -> f32 {
+    0.5
+}
+
+fn default_cook_food_scarcity_scale() -> f32 {
+    0.6
+}
+
+fn default_build_pressure_cooking_min_raw_food() -> usize {
+    3
+}
+
+fn default_cook_directive_priority() -> f32 {
+    0.4
+}
+
+fn default_unmet_demand_amplifier() -> f32 {
+    4.0
 }
 
 fn default_critical_health_threshold() -> f32 {
@@ -1206,15 +1565,102 @@ fn default_gate_reckless_health_threshold() -> f32 {
     0.5
 }
 
+fn default_sleep_dawn_bonus() -> f32 {
+    0.0
+}
+
+fn default_sleep_day_bonus() -> f32 {
+    0.1
+}
+
+fn default_sleep_dusk_bonus() -> f32 {
+    0.0
+}
+
+fn default_sleep_night_bonus() -> f32 {
+    1.2
+}
+
+// Fox disposition phase bonuses. Values from
+// docs/systems/sleep-that-makes-sense.md Phase 2 table, mapped Hunt→Hunting,
+// Den→Resting; Patrolling values chosen modest-positive Dusk→Dawn to match
+// crepuscular territorial rounds.
+fn default_fox_hunt_dawn_bonus() -> f32 {
+    0.3
+}
+fn default_fox_hunt_day_bonus() -> f32 {
+    -0.2
+}
+fn default_fox_hunt_dusk_bonus() -> f32 {
+    0.5
+}
+fn default_fox_hunt_night_bonus() -> f32 {
+    0.7
+}
+fn default_fox_patrol_dawn_bonus() -> f32 {
+    0.2
+}
+fn default_fox_patrol_day_bonus() -> f32 {
+    -0.1
+}
+fn default_fox_patrol_dusk_bonus() -> f32 {
+    0.3
+}
+fn default_fox_patrol_night_bonus() -> f32 {
+    0.2
+}
+fn default_fox_rest_dawn_bonus() -> f32 {
+    0.0
+}
+fn default_fox_rest_day_bonus() -> f32 {
+    0.5
+}
+fn default_fox_rest_dusk_bonus() -> f32 {
+    0.0
+}
+fn default_fox_rest_night_bonus() -> f32 {
+    0.0
+}
+
+fn default_mating_fertility_spring() -> f32 {
+    1.0
+}
+
+fn default_mating_fertility_summer() -> f32 {
+    0.55
+}
+
+fn default_mating_fertility_autumn() -> f32 {
+    0.2
+}
+
+fn default_mating_fertility_winter() -> f32 {
+    0.0
+}
+
+impl ScoringConstants {
+    /// Fertility multiplier for a given season. Scales mating-need decay and
+    /// gates the has_eligible_mate check. Returns 0 means "no breeding this
+    /// season" (Winter anestrous by default).
+    pub fn season_fertility(&self, season: Season) -> f32 {
+        match season {
+            Season::Spring => self.mating_fertility_spring,
+            Season::Summer => self.mating_fertility_summer,
+            Season::Autumn => self.mating_fertility_autumn,
+            Season::Winter => self.mating_fertility_winter,
+        }
+    }
+}
+
 impl Default for DispositionConstants {
     fn default() -> Self {
         Self {
             starvation_interrupt_threshold: 0.15,
             exhaustion_interrupt_threshold: 0.10,
-            critical_hunger_interrupt_threshold: 0.05,
-            threat_awareness_range: 2,
-            threat_urgency_divisor: 3.0,
-            flee_threshold_base: 0.4,
+            critical_hunger_interrupt_threshold: 0.15,
+            threat_awareness_range: 10,
+            threat_urgency_divisor: 10.0,
+            flee_threshold_base: 0.15,
             flee_threshold_boldness_scale: 0.4,
             critical_safety_threshold: 0.2,
             flee_distance: 8.0,
@@ -1224,7 +1670,7 @@ impl Default for DispositionConstants {
             hunt_terrain_search_radius: 15,
             forage_terrain_search_radius: 10,
             social_target_range: 10,
-            wildlife_threat_range: 5,
+            wildlife_threat_range: 10,
             allies_fighting_range: 8,
             allies_fighting_cap: 5,
             guard_fight_health_min: 0.5,
@@ -1245,9 +1691,12 @@ impl Default for DispositionConstants {
             fated_love_detection_range: 15,
             fated_rival_detection_range: 15,
             cascading_bonus_range: 5,
-            resting_complete_hunger: 0.3,
+            resting_complete_hunger: 0.5,
             resting_complete_energy: 0.3,
             resting_complete_warmth: 0.3,
+            planner_hunger_ok_threshold: 0.5,
+            planner_energy_ok_threshold: 0.3,
+            planner_warmth_ok_threshold: 0.3,
             resting_max_replans: 12,
             sleep_duration_deficit_multiplier: 175.0,
             sleep_duration_base: 75,
@@ -1314,15 +1763,15 @@ impl Default for DispositionConstants {
             travel_no_path_stuck_ticks: 10,
             global_step_timeout_ticks: 500,
             forage_jitter_chance: 0.10,
-            forage_yield_scale: 0.25,
+            forage_yield_scale: 0.35,
             forage_skill_growth: 0.0008,
             forage_timeout_ticks: 40,
             deposit_quality_base: 0.3,
             deposit_quality_skill_scale: 0.4,
             eat_at_stores_duration: 50,
             corruption_food_penalty: 0.5,
-            sleep_energy_per_tick: 0.002,
-            sleep_warmth_per_tick: 0.001,
+            sleep_energy_per_tick: 0.0035,
+            sleep_warmth_per_tick: 0.002,
             self_groom_duration: 8,
             self_groom_warmth_gain: 0.15,
             socialize_social_per_tick: 0.005,
@@ -1364,6 +1813,16 @@ impl Default for DispositionConstants {
             anti_stack_jitter: true,
             critical_health_threshold: 0.4,
             fight_bail_health_threshold: 0.35,
+            threat_ward_dampening: 0.3,
+            threat_colony_building_dampening: 0.5,
+            threat_building_safety_range: 5,
+            threat_colony_radius: 30.0,
+            threat_colony_center_dampening: 0.4,
+            threat_ally_range: 8,
+            threat_ally_dampening_per_cat: 0.4,
+            cooked_food_multiplier: default_cooked_food_multiplier(),
+            cook_ticks: default_cook_ticks(),
+            kitchen_cook_radius: default_kitchen_cook_radius(),
         }
     }
 }
@@ -1456,6 +1915,10 @@ pub struct WildlifeConstants {
     pub corruption_threat_multiplier: f32,
     /// Ticks a shadow fox must wait after an ambush before it can stalk again.
     pub ambush_cooldown_ticks: u32,
+    /// Range (manhattan) within which cats witness an ambush and have safety drained.
+    pub ambush_witness_range: i32,
+    /// Safety drain applied to cats who witness a nearby ambush.
+    pub ambush_witness_safety_drain: f32,
 }
 
 impl Default for WildlifeConstants {
@@ -1492,13 +1955,15 @@ impl Default for WildlifeConstants {
             carcass_drop_chance: 0.25,
             carcass_max_age: 500,
             ward_siege_chance: 0.3,
-            ward_siege_decay_bonus: 0.003,
+            ward_siege_decay_bonus: 0.0005,
             ward_siege_corruption_rate: 0.005,
             ward_siege_corruption_radius: 3,
             ward_siege_max_ticks: 200,
             siege_break_range: 3,
             corruption_threat_multiplier: 0.5,
             ambush_cooldown_ticks: 100,
+            ambush_witness_range: 12,
+            ambush_witness_safety_drain: 0.08,
         }
     }
 }
@@ -1648,7 +2113,11 @@ impl Default for FoxEcologyConstants {
             cat_presence_avoidance_threshold: 0.3,
 
             // Cooldowns
-            post_action_cooldown: 2000,
+            // Reduced from 2000 to 800 (~0.8 sim days) — 2000 was suppressing
+            // most fox activity; foxes spent the bulk of each day frozen in
+            // Resting. Shorter cooldown keeps downstream features (FoxStandoff,
+            // FoxAvoidedCat, etc.) firing regularly.
+            post_action_cooldown: 800,
 
             // Initial spawn
             initial_den_count_min: 1,
@@ -1710,6 +2179,7 @@ pub struct CoordinationConstants {
     pub injury_priority_per_cat: f32,
     pub ward_set_priority: f32,
     pub ward_avg_strength_low_threshold: f32,
+    pub ward_placement_radius: f32,
     pub directive_expiry_ticks: u64,
     pub attentiveness_diligence_weight: f32,
     pub attentiveness_ambition_weight: f32,
@@ -1717,6 +2187,24 @@ pub struct CoordinationConstants {
     pub build_pressure_attentiveness_threshold_scale: f32,
     pub build_pressure_farming_food_threshold: f32,
     pub build_pressure_workshop_min_cats: usize,
+    /// Minimum raw food items in Stores before cooking-pressure starts
+    /// accumulating. Below this the colony hasn't built enough surplus to
+    /// justify a Kitchen.
+    #[serde(default = "default_build_pressure_cooking_min_raw_food")]
+    pub build_pressure_cooking_min_raw_food: usize,
+    /// Priority of a Cook directive when a Kitchen is functional and raw food
+    /// is available. Kept below Hunt/Fight (~0.7+) so cooking doesn't crowd
+    /// out survival directives.
+    #[serde(default = "default_cook_directive_priority")]
+    pub cook_directive_priority: f32,
+    /// Scales the effect of unmet-demand ledger entries on BuildPressure
+    /// accumulation. `pressure += rate * (1 + unmet * amplifier)` — 2.0
+    /// means a single frustrated-cat increment doubles the pressure rise
+    /// on that cycle. Kept moderate so a few attempts escalate, but the
+    /// coordinator still requires the underlying conditions (Hearth,
+    /// raw food) to issue a build.
+    #[serde(default = "default_unmet_demand_amplifier")]
+    pub unmet_demand_amplifier: f32,
     pub wildlife_breach_range: i32,
     pub build_directive_priority_base: f32,
     pub build_directive_priority_building_scale: f32,
@@ -1729,13 +2217,144 @@ pub struct CoordinationConstants {
     pub threat_patrol_targeted_priority: f32,
     /// Range from a building at which wildlife triggers a Fight directive (breach).
     pub colony_breach_range: i32,
+    /// Radius (manhattan) to check fox scent near colony center for preemptive patrol.
+    pub preemptive_patrol_scent_radius: i32,
+    /// Scent level threshold above which a preemptive patrol is issued.
+    pub preemptive_patrol_scent_threshold: f32,
+    /// Priority for preemptive patrol issued from fox scent detection.
+    pub preemptive_patrol_priority: f32,
     /// Multiplier on build pressure accumulation rate when no Stores building exists.
     #[serde(default = "default_no_store_pressure_multiplier")]
     pub no_store_pressure_multiplier: f32,
+    /// Multiplier on Kitchen build-pressure accumulation rate. Raised above
+    /// 1.0 to push Kitchen up the BuildPressure priority queue so the
+    /// cooking buffer activates before food supply collapses.
+    #[serde(default = "default_cooking_pressure_multiplier")]
+    pub cooking_pressure_multiplier: f32,
+    /// Foundational "phase unlock" multiplier for Kitchen pressure when
+    /// no Kitchen exists yet. Mirrors `no_store_pressure_multiplier` — a
+    /// colony without a Kitchen can't enter the Cook loop at all, so the
+    /// first Kitchen deserves a disproportionate push. Once one exists,
+    /// the `cooking_pressure_multiplier` path takes over for incremental
+    /// expansion.
+    #[serde(default = "default_no_kitchen_pressure_multiplier")]
+    pub no_kitchen_pressure_multiplier: f32,
+    /// Priority of the "work on the existing construction site" directive
+    /// the coordinator pushes whenever an unfinished site exists. Above
+    /// `urgent_directive_priority_threshold` so `dispatch_urgent_directives`
+    /// assigns it to cats directly, boosting their Build scoring via
+    /// the standard ActiveDirective bonus. Without this, blueprint-carrying
+    /// Build directives get consumed by site-spawn and never propagate
+    /// to cats — sites languish unbuilt.
+    #[serde(default = "default_construct_site_directive_priority")]
+    pub construct_site_directive_priority: f32,
+    /// Radius (tiles) around colony center that coordinators sweep for
+    /// corruption hotspots.
+    #[serde(default = "default_corruption_search_radius")]
+    pub corruption_search_radius: i32,
+    /// Sample-step size for the corruption sweep (every Nth tile).
+    #[serde(default = "default_corruption_search_step")]
+    pub corruption_search_step: i32,
+    /// Tile corruption level above which a Cleanse directive is issued.
+    #[serde(default = "default_corruption_alarm_threshold")]
+    pub corruption_alarm_threshold: f32,
+    /// Cleanse directive priority = corruption * this + magic_skill * magic_scale.
+    #[serde(default = "default_corruption_directive_priority_scale")]
+    pub corruption_directive_priority_scale: f32,
+    /// Magic-skill contribution to cleanse directive priority.
+    #[serde(default = "default_corruption_directive_magic_scale")]
+    pub corruption_directive_magic_scale: f32,
+    /// Base priority for HarvestCarcass directives.
+    #[serde(default = "default_carcass_directive_priority_base")]
+    pub carcass_directive_priority_base: f32,
+    /// Herbcraft-skill contribution to carcass directive priority.
+    #[serde(default = "default_carcass_directive_herbcraft_scale")]
+    pub carcass_directive_herbcraft_scale: f32,
+    /// Priority threshold above which a directive is dispatched directly
+    /// to the best-skilled cat (skipping the physical walk-to-cat delivery).
+    #[serde(default = "default_urgent_directive_priority_threshold")]
+    pub urgent_directive_priority_threshold: f32,
+    /// Maximum range in tiles for urgent directive auto-dispatch.
+    #[serde(default = "default_urgent_dispatch_range")]
+    pub urgent_dispatch_range: i32,
+    /// Tiles around colony center within which a shadow-fox triggers posse
+    /// assembly. Large enough to catch foxes before they ambush.
+    #[serde(default = "default_posse_alarm_range")]
+    pub posse_alarm_range: i32,
+    /// How many cats the coordinator summons for a posse. 3-4 is the sweet
+    /// spot: enough for ally damage bonuses, not so many the colony is
+    /// disarmed defensively.
+    #[serde(default = "default_posse_size")]
+    pub posse_size: usize,
+    /// Priority of posse Fight directives. Higher than ward-set so bold
+    /// cats drop ward duty to engage the threat.
+    #[serde(default = "default_posse_priority")]
+    pub posse_priority: f32,
+}
+
+fn default_corruption_search_radius() -> i32 {
+    20
+}
+fn default_corruption_search_step() -> i32 {
+    3
+}
+fn default_corruption_alarm_threshold() -> f32 {
+    0.15
+}
+fn default_corruption_directive_priority_scale() -> f32 {
+    1.0
+}
+fn default_corruption_directive_magic_scale() -> f32 {
+    0.3
+}
+fn default_carcass_directive_priority_base() -> f32 {
+    // Raised from 0.55 → 0.80: carcasses emit corruption to their tile every
+    // tick (~0.002) and are the primary source of colony-threatening decay.
+    // At 0.55 base + 0.2*herbcraft, no realistic skill level reached the 0.75
+    // auto-dispatch threshold, so CarcassHarvested stayed at 0. Emergency
+    // removal of corruption sources warrants immediate dispatch.
+    0.80
+}
+fn default_carcass_directive_herbcraft_scale() -> f32 {
+    0.2
+}
+fn default_urgent_directive_priority_threshold() -> f32 {
+    // Threshold tuning: 0.5 caused corruption response to dominate everything;
+    // cats abandoned hunting/foraging/ward-setting to cleanse. 0.75 reserves
+    // auto-dispatch for genuine emergencies (severe corruption, siege) while
+    // letting normal directives flow through physical coordinator delivery.
+    0.75
+}
+fn default_urgent_dispatch_range() -> i32 {
+    50
+}
+
+fn default_posse_alarm_range() -> i32 {
+    20
+}
+
+fn default_posse_size() -> usize {
+    3
+}
+
+fn default_posse_priority() -> f32 {
+    0.9
+}
+
+fn default_cooking_pressure_multiplier() -> f32 {
+    1.5
 }
 
 fn default_no_store_pressure_multiplier() -> f32 {
     5.0
+}
+
+fn default_no_kitchen_pressure_multiplier() -> f32 {
+    5.0
+}
+
+fn default_construct_site_directive_priority() -> f32 {
+    0.85
 }
 
 impl Default for CoordinationConstants {
@@ -1758,6 +2377,7 @@ impl Default for CoordinationConstants {
             injury_priority_per_cat: 0.3,
             ward_set_priority: 0.5,
             ward_avg_strength_low_threshold: 0.3,
+            ward_placement_radius: 10.0,
             directive_expiry_ticks: 200,
             attentiveness_diligence_weight: 0.5,
             attentiveness_ambition_weight: 0.3,
@@ -1765,6 +2385,9 @@ impl Default for CoordinationConstants {
             build_pressure_attentiveness_threshold_scale: 0.3,
             build_pressure_farming_food_threshold: 0.3,
             build_pressure_workshop_min_cats: 4,
+            build_pressure_cooking_min_raw_food: default_build_pressure_cooking_min_raw_food(),
+            cook_directive_priority: default_cook_directive_priority(),
+            unmet_demand_amplifier: default_unmet_demand_amplifier(),
             wildlife_breach_range: 10,
             build_directive_priority_base: 0.5,
             build_directive_priority_building_scale: 0.2,
@@ -1774,7 +2397,25 @@ impl Default for CoordinationConstants {
             threat_proximity_range: 20,
             threat_patrol_targeted_priority: 0.6,
             colony_breach_range: 8,
+            preemptive_patrol_scent_radius: 25,
+            preemptive_patrol_scent_threshold: 0.3,
+            preemptive_patrol_priority: 0.4,
             no_store_pressure_multiplier: 5.0,
+            cooking_pressure_multiplier: default_cooking_pressure_multiplier(),
+            no_kitchen_pressure_multiplier: default_no_kitchen_pressure_multiplier(),
+            construct_site_directive_priority: default_construct_site_directive_priority(),
+            corruption_search_radius: default_corruption_search_radius(),
+            corruption_search_step: default_corruption_search_step(),
+            corruption_alarm_threshold: default_corruption_alarm_threshold(),
+            corruption_directive_priority_scale: default_corruption_directive_priority_scale(),
+            corruption_directive_magic_scale: default_corruption_directive_magic_scale(),
+            carcass_directive_priority_base: default_carcass_directive_priority_base(),
+            carcass_directive_herbcraft_scale: default_carcass_directive_herbcraft_scale(),
+            urgent_directive_priority_threshold: default_urgent_directive_priority_threshold(),
+            urgent_dispatch_range: default_urgent_dispatch_range(),
+            posse_alarm_range: default_posse_alarm_range(),
+            posse_size: default_posse_size(),
+            posse_priority: default_posse_priority(),
         }
     }
 }
@@ -1913,6 +2554,143 @@ impl Default for WorldGenConstants {
             corruption_colony_min_distance: 30,
             edge_margin: 10,
             max_placement_attempts: 500,
+        }
+    }
+}
+
+// ---------- SensoryConstants ----------
+
+/// Per-species sensory profiles.
+///
+/// Keyed by `SensorySpecies`. Phase 1 defaults are calibrated so that
+/// migrating call sites can preserve existing behavior under identity
+/// environmental multipliers (see `src/systems/sensing.rs`). Specific
+/// ranges like `threat_awareness_range: 10` match the cat sight profile;
+/// broader call sites (herb / search / fated-love detection at 15) pass
+/// a per-site `max_range_override` during migration rather than bloating
+/// the profile table with task-specific fields.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SensoryConstants {
+    pub cat: SensoryProfile,
+    pub fox: SensoryProfile,
+    pub hawk: SensoryProfile,
+    pub snake: SensoryProfile,
+    pub shadow_fox: SensoryProfile,
+    pub mouse: SensoryProfile,
+    pub rat: SensoryProfile,
+    pub rabbit: SensoryProfile,
+    pub fish: SensoryProfile,
+    pub bird: SensoryProfile,
+}
+
+impl SensoryConstants {
+    /// Look up the profile for a species. Panics on no match — the
+    /// enum is exhaustive and every variant has a field.
+    pub fn profile_for(&self, species: SensorySpecies) -> &SensoryProfile {
+        match species {
+            SensorySpecies::Cat => &self.cat,
+            SensorySpecies::Wild(WildSpecies::Fox) => &self.fox,
+            SensorySpecies::Wild(WildSpecies::Hawk) => &self.hawk,
+            SensorySpecies::Wild(WildSpecies::Snake) => &self.snake,
+            SensorySpecies::Wild(WildSpecies::ShadowFox) => &self.shadow_fox,
+            SensorySpecies::Prey(PreyKind::Mouse) => &self.mouse,
+            SensorySpecies::Prey(PreyKind::Rat) => &self.rat,
+            SensorySpecies::Prey(PreyKind::Rabbit) => &self.rabbit,
+            SensorySpecies::Prey(PreyKind::Fish) => &self.fish,
+            SensorySpecies::Prey(PreyKind::Bird) => &self.bird,
+        }
+    }
+}
+
+impl Default for SensoryConstants {
+    fn default() -> Self {
+        // Phase 1 defaults: chosen to match or bracket existing detection
+        // ranges. Scent ranges are the *common-case* baseline — migrating
+        // call sites with longer task-specific ranges (search, forage,
+        // fated-love at 15) pass `max_range_override`. Post-refactor a
+        // task-multiplier system can absorb those; for now keep the
+        // profile table compact.
+        Self {
+            // Cats: sight/hearing hunters, no substrate sense.
+            cat: SensoryProfile {
+                sight: Channel::new(10.0, 0.5, Falloff::Cliff),
+                hearing: Channel::new(8.0, 0.5, Falloff::Cliff),
+                scent: Channel::new(15.0, 0.5, Falloff::Cliff),
+                tremor: Channel::DISABLED,
+                scent_directional: true,
+            },
+            // Fox: ears and nose dominant, modest tremor.
+            fox: SensoryProfile {
+                sight: Channel::new(8.0, 0.5, Falloff::Cliff),
+                hearing: Channel::new(10.0, 0.5, Falloff::Cliff),
+                scent: Channel::new(12.0, 0.5, Falloff::Cliff),
+                tremor: Channel::new(3.0, 0.5, Falloff::Cliff),
+                scent_directional: true,
+            },
+            // Hawk: raptor vision, essentially pure sight.
+            hawk: SensoryProfile {
+                sight: Channel::new(15.0, 0.5, Falloff::Cliff),
+                hearing: Channel::new(5.0, 0.5, Falloff::Cliff),
+                scent: Channel::DISABLED,
+                tremor: Channel::DISABLED,
+                scent_directional: false,
+            },
+            // Snake: scent + vibration hunter, barely sees.
+            snake: SensoryProfile {
+                sight: Channel::new(1.0, 0.5, Falloff::Cliff),
+                hearing: Channel::new(3.0, 0.5, Falloff::Cliff),
+                scent: Channel::new(8.0, 0.5, Falloff::Cliff),
+                tremor: Channel::new(6.0, 0.5, Falloff::Cliff),
+                scent_directional: true,
+            },
+            // Shadow-fox: corrupted; elevated non-visual senses.
+            shadow_fox: SensoryProfile {
+                sight: Channel::new(8.0, 0.5, Falloff::Cliff),
+                hearing: Channel::new(7.0, 0.5, Falloff::Cliff),
+                scent: Channel::new(10.0, 0.5, Falloff::Cliff),
+                tremor: Channel::new(5.0, 0.5, Falloff::Cliff),
+                scent_directional: false, // supernatural — ignores wind
+            },
+            // Prey: substrate-sensitive by design.
+            // `sight` uses Linear falloff so the prey-detects-cat path
+            // can produce a probabilistic proximity gradient matching
+            // the legacy `1 - dist/(alert_radius+1)` formula. Other
+            // channels stay Cliff for Phase 1-4 structural discipline.
+            mouse: SensoryProfile {
+                sight: Channel::new(3.0, 0.5, Falloff::Linear),
+                hearing: Channel::new(6.0, 0.5, Falloff::Cliff),
+                scent: Channel::new(5.0, 0.5, Falloff::Cliff),
+                tremor: Channel::new(6.0, 0.5, Falloff::Cliff),
+                scent_directional: true,
+            },
+            rat: SensoryProfile {
+                sight: Channel::new(5.0, 0.5, Falloff::Linear),
+                hearing: Channel::new(7.0, 0.5, Falloff::Cliff),
+                scent: Channel::new(6.0, 0.5, Falloff::Cliff),
+                tremor: Channel::new(7.0, 0.5, Falloff::Cliff),
+                scent_directional: true,
+            },
+            rabbit: SensoryProfile {
+                sight: Channel::new(6.0, 0.5, Falloff::Linear),
+                hearing: Channel::new(10.0, 0.5, Falloff::Cliff),
+                scent: Channel::new(4.0, 0.5, Falloff::Cliff),
+                tremor: Channel::new(12.0, 0.5, Falloff::Cliff),
+                scent_directional: true,
+            },
+            fish: SensoryProfile {
+                sight: Channel::new(3.0, 0.5, Falloff::Linear),
+                hearing: Channel::new(5.0, 0.5, Falloff::Cliff),
+                scent: Channel::new(5.0, 0.5, Falloff::Cliff),
+                tremor: Channel::new(6.0, 0.5, Falloff::Cliff), // lateral line
+                scent_directional: false,                       // water currents handled separately
+            },
+            bird: SensoryProfile {
+                sight: Channel::new(10.0, 0.5, Falloff::Linear),
+                hearing: Channel::new(5.0, 0.5, Falloff::Cliff),
+                scent: Channel::new(2.0, 0.5, Falloff::Cliff),
+                tremor: Channel::new(2.0, 0.5, Falloff::Cliff),
+                scent_directional: true,
+            },
         }
     }
 }

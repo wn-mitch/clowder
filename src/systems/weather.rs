@@ -1,19 +1,28 @@
 use bevy_ecs::prelude::{Res, ResMut};
 use rand::Rng;
 
-use crate::resources::{SimConfig, SimRng, TimeState, WeatherState};
+use crate::resources::{ForcedConditions, SimConfig, SimRng, TimeState, WeatherState};
 
 /// Update weather state each tick.
 ///
 /// Counts down `ticks_until_change`. When it reaches zero, a new weather
 /// variant is drawn from the season-weighted table and a new countdown is
 /// set. This produces weather that holds for 30–79 ticks before shifting.
+///
+/// If [`ForcedConditions::weather`] is set (headless diagnostic override),
+/// the current weather is pinned to that variant every tick and the natural
+/// transition roll is suppressed.
 pub fn update_weather(
     time: Res<TimeState>,
     config: Res<SimConfig>,
     mut weather: ResMut<WeatherState>,
     mut rng: ResMut<SimRng>,
+    forced: Res<ForcedConditions>,
 ) {
+    if let Some(pinned) = forced.weather {
+        weather.current = pinned;
+        return;
+    }
     if weather.ticks_until_change == 0 {
         let season = time.season(&config);
         weather.current = weather.next_weather(season, &mut rng.rng);
@@ -111,5 +120,50 @@ mod tests {
                 weather.current
             );
         }
+    }
+
+    #[test]
+    fn forced_weather_pins_and_suppresses_transitions() {
+        use crate::resources::ForcedConditions;
+        use bevy_ecs::prelude::*;
+
+        let mut world = World::new();
+        world.insert_resource(TimeState::default());
+        world.insert_resource(SimConfig::default());
+        world.insert_resource(WeatherState {
+            current: Weather::Clear,
+            ticks_until_change: 0, // would normally roll a new variant
+        });
+        world.insert_resource(SimRng::new(42));
+        world.insert_resource(ForcedConditions {
+            weather: Some(Weather::Fog),
+        });
+
+        let mut schedule = Schedule::default();
+        schedule.add_systems(update_weather);
+        // Many ticks; natural rolls would redraw repeatedly.
+        for _ in 0..300 {
+            schedule.run(&mut world);
+            assert_eq!(world.resource::<WeatherState>().current, Weather::Fog);
+        }
+    }
+
+    #[test]
+    fn no_forced_weather_preserves_natural_transitions() {
+        use crate::resources::ForcedConditions;
+        use bevy_ecs::prelude::*;
+
+        let mut world = World::new();
+        world.insert_resource(TimeState::default());
+        world.insert_resource(SimConfig::default());
+        world.insert_resource(WeatherState::default());
+        world.insert_resource(SimRng::new(42));
+        world.insert_resource(ForcedConditions::default()); // weather = None
+
+        let mut schedule = Schedule::default();
+        schedule.add_systems(update_weather);
+        schedule.run(&mut world);
+        // Countdown decremented naturally.
+        assert_eq!(world.resource::<WeatherState>().ticks_until_change, 49);
     }
 }

@@ -6,9 +6,10 @@ use crate::components::mental::Mood;
 use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::resources::colony_score::ColonyScore;
 use crate::resources::event_log::{EventKind, EventLog};
+use crate::resources::relationships::{BondType, Relationships};
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::snapshot_config::SnapshotConfig;
-use crate::resources::system_activation::{Feature, SystemActivation};
+use crate::resources::system_activation::{FeatureCategory, SystemActivation};
 use crate::resources::time::{SimConfig, TimeState};
 
 // ---------------------------------------------------------------------------
@@ -97,6 +98,7 @@ pub fn emit_colony_score(
     sim_config: Res<SimConfig>,
     constants: Res<SimConstants>,
     activation: Res<SystemActivation>,
+    relationships: Res<Relationships>,
     cat_query: Query<(&Position, &Needs, &Health, &Mood), (With<Species>, Without<Dead>)>,
     den_query: Query<(&Position, &Structure), Without<Species>>,
     mut score: ResMut<ColonyScore>,
@@ -153,13 +155,33 @@ pub fn emit_colony_score(
 
     let welfare = (shelter + nourishment + health + happiness + fulfillment) / 5.0;
 
-    // --- Compute activation score ---
-    let activation_score =
-        activation.activation_score(cs.activation_breadth_bonus, cs.activation_depth_bonus);
-    let features_active = activation.features_active();
-    let features_total = Feature::ALL.len() as u32;
+    // --- Compute activation score (positive features only) ---
+    //
+    // Negative features (deaths, corruption, etc.) and neutral features
+    // (ecology churn) are tracked separately so the aggregate doesn't reward
+    // colony distress.
+    let positive_activation_score = activation
+        .positive_activation_score(cs.activation_breadth_bonus, cs.activation_depth_bonus);
+    let positive_features_active = activation.features_active_in(FeatureCategory::Positive);
+    let positive_features_total = SystemActivation::features_total_in(FeatureCategory::Positive);
+    let negative_events_total = activation.negative_event_count();
+    let neutral_features_active = activation.features_active_in(FeatureCategory::Neutral);
+    let neutral_features_total = SystemActivation::features_total_in(FeatureCategory::Neutral);
 
-    let aggregate = score.aggregate(welfare, activation_score, cs);
+    let aggregate = score.aggregate(welfare, positive_activation_score, cs);
+
+    // --- Bond tier snapshot ---
+    let mut friends_count = 0u64;
+    let mut partners_count = 0u64;
+    let mut mates_count = 0u64;
+    for (_, rel) in relationships.iter() {
+        match rel.bond {
+            Some(BondType::Friends) => friends_count += 1,
+            Some(BondType::Partners) => partners_count += 1,
+            Some(BondType::Mates) => mates_count += 1,
+            _ => {}
+        }
+    }
 
     // --- Emit events ---
     let Some(ref mut log) = event_log else { return };
@@ -186,21 +208,46 @@ pub fn emit_colony_score(
             kittens_born: score.kittens_born,
             prey_dens_discovered: score.prey_dens_discovered,
 
+            friends_count,
+            partners_count,
+            mates_count,
+
             aggregate,
-            activation_score,
-            features_active,
-            features_total,
+            positive_activation_score,
+            positive_features_active,
+            positive_features_total,
+            negative_events_total,
+            neutral_features_active,
+            neutral_features_total,
             living_cats,
         },
     );
 
-    // System activation snapshot.
-    let counts = activation
-        .counts
-        .iter()
-        .map(|(k, v)| (format!("{k:?}"), *v))
-        .collect();
-    log.push(time.tick, EventKind::SystemActivation { counts });
+    // System activation snapshot, grouped by feature valence. Every feature
+    // in `Feature::ALL` is emitted — including ones that have never fired —
+    // so analysis tooling can distinguish "no event yet" from "dead system"
+    // without consulting a parallel classification table.
+    use crate::resources::system_activation::Feature;
+    let mut positive = std::collections::HashMap::new();
+    let mut negative = std::collections::HashMap::new();
+    let mut neutral = std::collections::HashMap::new();
+    for feature in Feature::ALL {
+        let count = activation.counts.get(feature).copied().unwrap_or(0);
+        let bucket = match feature.category() {
+            FeatureCategory::Positive => &mut positive,
+            FeatureCategory::Negative => &mut negative,
+            FeatureCategory::Neutral => &mut neutral,
+        };
+        bucket.insert(format!("{feature:?}"), count);
+    }
+    log.push(
+        time.tick,
+        EventKind::SystemActivation {
+            positive,
+            negative,
+            neutral,
+        },
+    );
 }
 
 // ---------------------------------------------------------------------------

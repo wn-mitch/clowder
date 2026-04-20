@@ -339,6 +339,7 @@ fn on_play_initiated(
         other: play_partner.as_deref(),
         prey: None,
         item: None,
+        item_singular: None,
         quality: None,
     };
 

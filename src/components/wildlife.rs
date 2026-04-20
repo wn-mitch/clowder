@@ -50,7 +50,11 @@ impl WildSpecies {
             Self::Fox => 0.15,
             Self::Hawk => 0.05,
             Self::Snake => 0.10,
-            Self::ShadowFox => 0.20,
+            // Shadow-foxes are spectral and fragile — they rely on
+            // ambush-terror for their damage, not armor. A posse of cats
+            // can meaningfully harm one without needing elite combat
+            // training. See assets/narrative/banishment.ron.
+            Self::ShadowFox => 0.08,
         }
     }
 
@@ -249,6 +253,12 @@ pub struct FoxState {
     pub post_action_cooldown: u64,
     /// 0.0–1.0. Derived from hunger — starving foxes are bold.
     pub boldness: f32,
+    /// Consecutive ticks with `hunger >= 1.0`. Resets to 0 when satiated.
+    /// Foxes die when this exceeds `fc.starvation_death_ticks`.
+    pub starvation_ticks: u64,
+    /// Tick when this fox last completed a patrol (DepositScent). Used by
+    /// scoring to build pressure for periodic patrolling even when hunger wins.
+    pub last_patrol_tick: u64,
 }
 
 impl FoxState {
@@ -264,6 +274,8 @@ impl FoxState {
             mate: None,
             post_action_cooldown: 0,
             boldness: 0.25,
+            starvation_ticks: 0,
+            last_patrol_tick: 0,
         }
     }
 
@@ -271,7 +283,7 @@ impl FoxState {
     pub fn new_cub(sex: FoxSex, den: Entity) -> Self {
         Self {
             hunger: 0.0,
-            satiation_ticks: 2000, // cubs are nursed initially
+            satiation_ticks: 8000, // cubs are nursed initially; safety buffer
             life_stage: FoxLifeStage::Cub,
             age_ticks: 0,
             sex,
@@ -279,6 +291,8 @@ impl FoxState {
             mate: None,
             post_action_cooldown: 0,
             boldness: 0.0,
+            starvation_ticks: 0,
+            last_patrol_tick: 0,
         }
     }
 }
@@ -297,6 +311,9 @@ pub struct FoxDen {
     pub scent_strength: f32,
     /// Tick when this den was established.
     pub established_tick: u64,
+    /// Tick of the last successful `FeedCubs` resolution. Defaults to 0
+    /// (never fed). Used by `feed_cubs_at_dens` to refresh cub satiation.
+    pub last_fed_tick: u64,
 }
 
 impl FoxDen {
@@ -306,8 +323,50 @@ impl FoxDen {
             cubs_present: 0,
             scent_strength: 0.5,
             established_tick: tick,
+            last_fed_tick: tick, // treat spawn as freshly fed
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// ActiveConfrontation — shared state for paired standoffs
+// ---------------------------------------------------------------------------
+
+/// Role in an active confrontation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfrontationRole {
+    /// Initiated the confrontation (e.g., fox defending den).
+    Attacker,
+    /// Was confronted (e.g., cat that strayed too close).
+    Defender,
+}
+
+/// Why the confrontation started. Drives escalation chance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfrontationReason {
+    /// Fox is defending cubs at its den — high stakes, high escalation.
+    DenDefense,
+    /// Fox is starving and attacked a vulnerable cat.
+    DesperateAttack,
+    /// Territory dispute (future: two foxes).
+    TerritoryDispute,
+}
+
+/// Shared state for a paired confrontation between two entities (fox vs cat
+/// or fox vs fox). Inserted on BOTH participants so each side's AI sees the
+/// encounter and can decide fight-or-flight independently.
+///
+/// The `min_commitment` field prevents oscillation: once locked in, neither
+/// side can disengage for at least this many ticks.
+#[derive(Component, Debug, Clone)]
+pub struct ActiveConfrontation {
+    pub partner: Entity,
+    pub role: ConfrontationRole,
+    pub reason: ConfrontationReason,
+    pub ticks_remaining: u64,
+    pub min_commitment: u64,
+    /// Tick when the confrontation started — used to enforce min_commitment.
+    pub started_tick: u64,
 }
 
 // ---------------------------------------------------------------------------

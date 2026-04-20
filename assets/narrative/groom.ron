@@ -84,4 +84,262 @@
         has_target: Some(true),
         personality: [(axis: Playfulness, bucket: High)],
     ),
+
+    // =====================================================================
+    // Self-groom: personality singles
+    // =====================================================================
+    (
+        text: "{name} licks the same patch of fur over and over, unable to stop.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        personality: [(axis: Anxiety, bucket: High)],
+    ),
+    (
+        text: "{name} grooms in slow, unhurried strokes, practically meditating.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        personality: [(axis: Anxiety, bucket: Low)],
+    ),
+    (
+        text: "{name} admires the sheen of {possessive} coat between strokes.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        personality: [(axis: Pride, bucket: High)],
+    ),
+    (
+        text: "{name} gives {possessive} fur a cursory lick. Good enough.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        personality: [(axis: Pride, bucket: Low)],
+    ),
+    (
+        text: "{name} works from ears to tail in careful sequence, missing nothing.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        personality: [(axis: Patience, bucket: High)],
+    ),
+    (
+        text: "{name} licks a paw twice and calls it done.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        personality: [(axis: Patience, bucket: Low)],
+    ),
+    (
+        text: "{name} grooms every tuft into place with methodical precision.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        personality: [(axis: Diligence, bucket: High)],
+    ),
+    (
+        text: "{name} starts grooming a tangle, then gives up and leaves it.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        personality: [(axis: Diligence, bucket: Low)],
+    ),
+    (
+        text: "{name} pauses mid-groom, examining something caught in {possessive} fur.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        personality: [(axis: Curiosity, bucket: High)],
+    ),
+    (
+        text: "{name} gnaws at the same knot of fur, refusing to let it win.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        personality: [(axis: Stubbornness, bucket: High)],
+    ),
+    (
+        text: "{name} yanks at a burr and hisses when it pulls.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        personality: [(axis: Temper, bucket: High)],
+    ),
+    (
+        text: "{name} slips off to a quiet spot to groom in private.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        personality: [(axis: Independence, bucket: High)],
+    ),
+    (
+        text: "{name} grooms with a contented expression, tail curled around {possessive} paws.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        personality: [(axis: Optimism, bucket: High)],
+    ),
+    (
+        text: "{name} goes through the motions of grooming, eyes distant.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        personality: [(axis: Optimism, bucket: Low)],
+    ),
+
+    // =====================================================================
+    // Self-groom: mood conditions
+    // =====================================================================
+    (
+        text: "{name} grooms mechanically, paw over paw, trying to feel normal.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        mood: Some(Miserable),
+    ),
+    (
+        text: "{name} starts grooming, stops, stares at nothing, then starts again.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        mood: Some(Low),
+    ),
+    (
+        text: "{name} grooms luxuriously, savoring each long stroke.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        mood: Some(Happy),
+    ),
+    (
+        text: "{name} practically glows as {subject} grooms, purring deep in {possessive} chest.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        mood: Some(Euphoric),
+    ),
+
+    // =====================================================================
+    // Self-groom: personality + mood combos
+    // =====================================================================
+    (
+        text: "{name} grooms the same spot raw, unable to sit still with {possessive} thoughts.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        personality: [(axis: Anxiety, bucket: High)],
+        mood: Some(Miserable),
+    ),
+    (
+        text: "{name} preens with shameless self-satisfaction, every hair in place.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        personality: [(axis: Pride, bucket: High)],
+        mood: Some(Happy),
+    ),
+    (
+        text: "{name} starts grooming {possessive} tail, pounces on it, and gives up all pretense.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        personality: [(axis: Playfulness, bucket: High)],
+        mood: Some(Euphoric),
+    ),
+
+    // =====================================================================
+    // Groom-other: personality singles
+    // =====================================================================
+    (
+        text: "{name} grooms {other} with slow, lingering tenderness.",
+        tier: Action,
+        action: Some(Groom),
+        has_target: Some(true),
+        personality: [(axis: Warmth, bucket: High)],
+    ),
+    (
+        text: "{name} gives {other}'s ear a perfunctory lick. Obligation met.",
+        tier: Action,
+        action: Some(Groom),
+        has_target: Some(true),
+        personality: [(axis: Warmth, bucket: Low)],
+    ),
+    (
+        text: "{name} spots a tangle {other} can't reach and works it loose.",
+        tier: Action,
+        action: Some(Groom),
+        has_target: Some(true),
+        personality: [(axis: Compassion, bucket: High)],
+    ),
+    (
+        text: "{name} hesitates before grooming {other}, not quite sure of the welcome.",
+        tier: Action,
+        action: Some(Groom),
+        has_target: Some(true),
+        personality: [(axis: Boldness, bucket: Low)],
+    ),
+    (
+        text: "{name} grooms {other} with quiet devotion, like a daily sacrament.",
+        tier: Action,
+        action: Some(Groom),
+        has_target: Some(true),
+        personality: [(axis: Loyalty, bucket: High)],
+    ),
+    (
+        text: "{name} purrs loudly while grooming {other}, leaning into the closeness.",
+        tier: Action,
+        action: Some(Groom),
+        has_target: Some(true),
+        personality: [(axis: Sociability, bucket: High)],
+    ),
+    (
+        text: "{name} grooms {other} without a word, comfortable in the silence.",
+        tier: Action,
+        action: Some(Groom),
+        has_target: Some(true),
+        personality: [(axis: Sociability, bucket: Low)],
+    ),
+
+    // =====================================================================
+    // Groom-other: mood conditions
+    // =====================================================================
+    (
+        text: "{name} and {other} groom each other in easy, warm contentment.",
+        tier: Action,
+        action: Some(Groom),
+        has_target: Some(true),
+        mood: Some(Happy),
+    ),
+    (
+        text: "{name} grooms {other} as if trying to borrow some steadiness.",
+        tier: Action,
+        action: Some(Groom),
+        has_target: Some(true),
+        mood: Some(Miserable),
+    ),
+
+    // =====================================================================
+    // Life stage
+    // =====================================================================
+    (
+        text: "Old {name} grooms carefully, stretching stiff joints to reach.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        life_stage: Some(Elder),
+    ),
+    (
+        text: "Little {name} licks {possessive} paw in the wrong direction, then tries again.",
+        tier: Micro,
+        action: Some(Groom),
+        has_target: Some(false),
+        life_stage: Some(Kitten),
+    ),
+    (
+        text: "Young {name} earnestly grooms {other}, tongue working overtime.",
+        tier: Action,
+        action: Some(Groom),
+        has_target: Some(true),
+        life_stage: Some(Young),
+    ),
 ]

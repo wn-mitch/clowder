@@ -65,13 +65,27 @@ def print_comparison(old: dict, new: dict):
     print(f"  duration:   {old.get('duration_secs', '?')}s -> {new.get('duration_secs', '?')}s")
     print()
 
+    # Schema v2 renamed mean_features_active → mean_positive_features_active
+    # and added mean_negative_events. Old entries fall back gracefully.
+    old_pos = os.get("mean_positive_features_active", os.get("mean_features_active", 0))
+    new_pos = ns.get("mean_positive_features_active", ns.get("mean_features_active", 0))
+    old_neg = os.get("mean_negative_events", 0)
+    new_neg = ns.get("mean_negative_events", 0)
+
     rows = [
         ("welfare", os["mean_welfare"], ns["mean_welfare"], False),
         ("aggregate", os["mean_aggregate"], ns["mean_aggregate"], False),
-        ("features", os["mean_features_active"], ns["mean_features_active"], True),
+        ("feat+", old_pos, new_pos, True),
+        ("neg events", old_neg, new_neg, True),
         ("starvation", os["total_deaths_starvation"], ns["total_deaths_starvation"], True),
         ("all dead", os["seeds_with_all_dead"], ns["seeds_with_all_dead"], True),
     ]
+
+    old_schema = os.get("score_schema_version", 1)
+    new_schema = ns.get("score_schema_version", 1)
+    if old_schema != new_schema:
+        print(f"  ⚠ schema change: v{old_schema} -> v{new_schema} — aggregate shift may be definitional, not behavioral")
+        print()
 
     for label, o, n, is_int in rows:
         if is_int:
@@ -93,7 +107,7 @@ def print_comparison(old: dict, new: dict):
 
     if all_seed_keys:
         print()
-        print(f"  {'seed':>6s}  {'welfare':>8s}  {'agg':>7s}  {'feat':>5s}  {'starv':>5s}  {'cats':>4s}")
+        print(f"  {'seed':>6s}  {'welfare':>8s}  {'agg':>7s}  {'feat+':>5s}  {'starv':>5s}  {'cats':>4s}")
         print(f"  {'-'*6}  {'-'*8}  {'-'*7}  {'-'*5}  {'-'*5}  {'-'*4}")
         for sk in all_seed_keys:
             ns_seed = new_seeds.get(sk, {})
@@ -101,7 +115,7 @@ def print_comparison(old: dict, new: dict):
             w_new = ns_seed.get("welfare", 0)
             w_old = os_seed.get("welfare", 0)
             a_new = ns_seed.get("aggregate", 0)
-            f_new = ns_seed.get("features_active", 0)
+            f_new = ns_seed.get("positive_features_active", ns_seed.get("features_active", 0))
             s_new = ns_seed.get("deaths_starvation", 0)
             c_new = ns_seed.get("living_cats", 0)
             delta_w = fmt_delta(w_old, w_new)
@@ -113,7 +127,7 @@ def print_table(entries: list[dict]):
         print("No entries in history.")
         return
 
-    print(f"{'#':>3s}  {'change':>12s}  {'timestamp':>19s}  {'welfare':>8s}  {'agg':>7s}  {'feat':>5s}  {'starv':>5s}  {'dead':>4s}  {'hash':>16s}  description")
+    print(f"{'#':>3s}  {'change':>12s}  {'timestamp':>19s}  {'welfare':>8s}  {'agg':>7s}  {'feat+':>5s}  {'starv':>5s}  {'dead':>4s}  {'hash':>16s}  description")
     print(f"{'─'*3}  {'─'*12}  {'─'*19}  {'─'*8}  {'─'*7}  {'─'*5}  {'─'*5}  {'─'*4}  {'─'*16}  {'─'*30}")
 
     for i, entry in enumerate(entries):
@@ -121,10 +135,12 @@ def print_table(entries: list[dict]):
         ts = entry.get("timestamp", "?")[:19]
         desc = entry.get("description", "")[:30]
         ch = entry.get("constants_hash", "?") or "?"
+        # Schema v2: mean_positive_features_active; v1: mean_features_active
+        feats = s.get("mean_positive_features_active", s.get("mean_features_active", 0))
         print(
             f"{i+1:>3d}  {entry.get('change_id', '?'):>12s}  {ts:>19s}  "
             f"{s.get('mean_welfare', 0):>8.4f}  {s.get('mean_aggregate', 0):>7.0f}  "
-            f"{s.get('mean_features_active', 0):>5.0f}  {s.get('total_deaths_starvation', 0):>5d}  "
+            f"{feats:>5.0f}  {s.get('total_deaths_starvation', 0):>5d}  "
             f"{s.get('seeds_with_all_dead', 0):>4d}  {ch:>16s}  {desc}"
         )
 

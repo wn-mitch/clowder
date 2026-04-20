@@ -1,0 +1,47 @@
+{
+  "fox_hunting_share_dusk_night": {
+    "direction": "up",
+    "magnitude_pct": 200,
+    "rationale": "Phase 2a applies additive bonuses to fox Hunting disposition scoring: Dawn +0.3, Day -0.2, Dusk +0.5, Night +0.7. Bonus ratio across phases is ~(Dusk+Night):(Dawn+Day) = 1.2:0.1 before other terms. Baseline: no FoxPlanCreated events exist pre-change (wiring gap). Predict post-change Hunting plans concentrated >=60% in Dusk+Night phases. Measured as: count(FoxPlanCreated where disposition=='Hunting' and day_phase in {Dusk,Night}) / count(FoxPlanCreated where disposition=='Hunting')."
+  },
+  "fox_resting_share_day": {
+    "direction": "up",
+    "magnitude_pct": 100,
+    "rationale": "Resting bonus table is 0.0/+0.5/0.0/0.0 — Day gets the sole positive offset. Predict the Day share of Resting plans exceeds 40% (uniform baseline would be 25%). Measured as: count(FoxPlanCreated where disposition=='Resting' and day_phase=='Day') / count(FoxPlanCreated where disposition=='Resting')."
+  },
+  "fox_patrol_share_crepuscular": {
+    "direction": "up",
+    "magnitude_pct": 50,
+    "rationale": "Patrol bonus table is +0.2/-0.1/+0.3/+0.2 — mild Dusk-favored. Predict Patrolling plans shifted toward crepuscular phases. Share in {Dawn,Dusk,Night} should exceed 80% (uniform baseline 75%). Milder than Hunting — Patrolling also carries ticks_since_patrol pressure independent of phase."
+  },
+  "fox_plan_created_total": {
+    "direction": "flat",
+    "magnitude_pct": 20,
+    "rationale": "Plan creation frequency is driven by fox count, plan completion rate, and replan triggers — none of which Phase 2a changes. Moderate drift (±20%) acceptable; anything beyond suggests the phase bonuses are causing repeated replanning. Measured as total FoxPlanCreated count across the 15-min soak."
+  },
+  "deaths_by_cause.Starvation": {
+    "direction": "flat",
+    "magnitude_pct": 0,
+    "rationale": "Canary gate — must remain 0 on seed 42. Fox disposition redistribution does not affect cat foraging dynamics or food supply."
+  },
+  "deaths_by_cause.ShadowFoxAmbush": {
+    "direction": "flat",
+    "magnitude_pct": 10,
+    "rationale": "Canary gate — must remain <= 5. Phase 2a biases fox (vulpine) dispositions, not shadow-fox behavior. Shadow-foxes run a separate state machine in wildlife.rs and are untouched by this PR. Phase 2b will bias their spawn by phase; expect this number to remain essentially unchanged in Phase 2a."
+  },
+  "ambush_count_total": {
+    "direction": "flat",
+    "magnitude_pct": 20,
+    "rationale": "Baseline 25 Ambush events; Phase 2a doesn't change shadow-fox spawn rate or aggression. Small drift (±20%) is measurement noise from RNG. > 30% drift would mean fox disposition bias is indirectly affecting cat positions/vulnerability — investigate."
+  },
+  "cat_energy_p50": {
+    "direction": "flat",
+    "magnitude_pct": 5,
+    "rationale": "Phase 1 (cat Sleep phase-bias) and cooked-food already stabilized this metric. Phase 2a is downstream of cat mechanics; no direct channel of influence. Drift beyond 5% would suggest an indirect coupling we didn't anticipate."
+  },
+  "cat_mood_valence_p50": {
+    "direction": "flat",
+    "magnitude_pct": 5,
+    "rationale": "Same reasoning as cat_energy_p50. If fox Hunting shifts to Dusk+Night when cats are also active-feeding, there could be a tiny uptick in standoff/fear events affecting mood. Keep within 5% band."
+  }
+}

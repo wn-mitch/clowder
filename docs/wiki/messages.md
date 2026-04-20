@@ -6,10 +6,22 @@ Inter-system messages (Bevy 0.18 `#[derive(Message)]`).
 
 | Message | Fields | Source File |
 |---------|--------|------------|
+| **PlanNarrative** | `entity: Entity`, `kind: DispositionKind`, `event: PlanEvent`, `completions: u32` | `src/components/goap_plan.rs` |
 | **PreyKilled** | `kind: PreyKind`, `position: Position` | `src/components/prey.rs` |
 | **DenRaided** | `den_entity: Entity`, `kills: u32`, `item_kind: ItemKind`, `position: Position`, `den_name: &'static str` | `src/components/prey.rs` |
 
 ### Details
+
+#### PlanNarrative
+
+> Emitted by the executor on plan lifecycle events. Consumed by `emit_plan_narrative` to generate narrative log entries.
+
+| Field | Type |
+|-------|------|
+| `entity` | `Entity` |
+| `kind` | `DispositionKind` |
+| `event` | `PlanEvent` |
+| `completions` | `u32` |
 
 #### PreyKilled
 

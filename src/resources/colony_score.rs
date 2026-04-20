@@ -36,6 +36,9 @@ pub struct ColonyScore {
     pub kittens_surviving: u64,
     /// Placeholder — incremented when prey den discovery ships.
     pub prey_dens_discovered: u64,
+    /// Shadow-foxes banished by the colony. Each one is a Legend-tier event.
+    #[serde(default)]
+    pub banishments: u64,
     /// Season number at last season-tick update, to detect transitions.
     pub last_recorded_season: u64,
 }
@@ -55,9 +58,18 @@ impl ColonyScore {
     }
 
     /// Compute the full aggregate score given a welfare snapshot and activation score.
-    pub fn aggregate(&self, welfare: f32, activation_score: f64, cs: &ColonyScoreConstants) -> f64 {
+    ///
+    /// Callers should pass the **positive-only** activation score — mixing in
+    /// negative features (deaths, corruption) would cause the aggregate to
+    /// reward colony distress. See `SystemActivation::positive_activation_score`.
+    pub fn aggregate(
+        &self,
+        welfare: f32,
+        positive_activation_score: f64,
+        cs: &ColonyScoreConstants,
+    ) -> f64 {
         let time_multiplier = self.seasons_survived.max(1) as f64;
-        welfare as f64 * time_multiplier + self.achievement_points(cs) + activation_score
+        welfare as f64 * time_multiplier + self.achievement_points(cs) + positive_activation_score
     }
 }
 

@@ -423,6 +423,7 @@ pub fn check_aspiration_abandonment(
 pub fn track_milestones(
     mut query: Query<
         (
+            Entity,
             &Name,
             &crate::ai::CurrentAction,
             &crate::components::skills::Skills,
@@ -442,7 +443,9 @@ pub fn track_milestones(
 ) {
     let Some(registry) = registry else { return };
 
-    for (name, current, skills, memory, mut aspirations, mut mood, mut needs) in &mut query {
+    for (cat_entity, name, current, skills, memory, mut aspirations, mut mood, mut needs) in
+        &mut query
+    {
         let mut completions: Vec<usize> = Vec::new(); // indices of fully completed chains
 
         for (i, asp) in aspirations.active.iter_mut().enumerate() {
@@ -486,10 +489,24 @@ pub fn track_milestones(
                     }
                     current_level >= *level
                 }
-                crate::components::aspirations::MilestoneCondition::FormBond { bond_type: _ } => {
-                    // Check if the cat has any bond (simplified — just check relationships resource).
-                    // A proper implementation would filter by bond_type string.
-                    false // Will be refined when bond checking is available per-entity.
+                crate::components::aspirations::MilestoneCondition::FormBond { bond_type } => {
+                    use crate::resources::relationships::BondType;
+                    let target_bond = match bond_type.as_str() {
+                        "Friends" => Some(BondType::Friends),
+                        "Partners" => Some(BondType::Partners),
+                        "Mates" => Some(BondType::Mates),
+                        _ => None,
+                    };
+                    let has_bond = target_bond.is_some_and(|target| {
+                        relationships
+                            .all_for(cat_entity)
+                            .iter()
+                            .any(|(_, rel)| rel.bond.is_some_and(|b| b >= target))
+                    });
+                    if has_bond {
+                        asp.last_progress_tick = time.tick;
+                    }
+                    has_bond
                 }
                 crate::components::aspirations::MilestoneCondition::WitnessEvent {
                     event_type,

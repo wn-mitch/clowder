@@ -26,7 +26,15 @@ pub enum DirectiveKind {
     Fight,
     Patrol,
     Herbcraft,
+    /// Prepare raw food at a Kitchen — issued when a functional Kitchen exists
+    /// and there are raw food items in Stores.
+    Cook,
     SetWard,
+    /// Cleanse a specific corrupted tile — dispatched when corruption breaches
+    /// a threshold within sensing range of the colony.
+    Cleanse,
+    /// Harvest or cleanse a spawned carcass before it corrupts surrounding tiles.
+    HarvestCarcass,
 }
 
 impl DirectiveKind {
@@ -39,7 +47,10 @@ impl DirectiveKind {
             DirectiveKind::Fight => Action::Fight,
             DirectiveKind::Patrol => Action::Patrol,
             DirectiveKind::Herbcraft => Action::Herbcraft,
+            DirectiveKind::Cook => Action::Cook,
             DirectiveKind::SetWard => Action::Herbcraft, // ward-setting is a herbcraft sub-mode
+            DirectiveKind::Cleanse => Action::PracticeMagic, // cleanse is a magic action
+            DirectiveKind::HarvestCarcass => Action::PracticeMagic,
         }
     }
 }
@@ -85,6 +96,10 @@ pub struct ActiveDirective {
     pub coordinator_social_weight: f32,
     /// Tick when this directive was delivered. Expires after ~200 ticks.
     pub delivered_tick: u64,
+    /// Target position for spatial directives (e.g. ward placement).
+    pub target_position: Option<crate::components::physical::Position>,
+    /// Target entity (e.g. a shadow-fox for a posse Fight directive).
+    pub target_entity: Option<Entity>,
 }
 
 /// Directive-in-transit on a coordinator walking to deliver it.
@@ -121,6 +136,9 @@ pub struct BuildPressure {
     pub gathering: f32,
     /// Skilled crafters with no Workshop available.
     pub workshop: f32,
+    /// Raw food stored with no Kitchen to prepare it.
+    #[serde(default)]
+    pub cooking: f32,
     /// Food scarcity with no Garden.
     pub farming: f32,
     /// Wildlife breaching colony perimeter.
@@ -141,6 +159,7 @@ impl BuildPressure {
             (self.storage, StructureType::Stores),
             (self.gathering, StructureType::Hearth),
             (self.workshop, StructureType::Workshop),
+            (self.cooking, StructureType::Kitchen),
             (self.farming, StructureType::Garden),
             (self.defense, StructureType::Watchtower),
         ];

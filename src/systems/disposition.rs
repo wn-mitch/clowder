@@ -69,6 +69,9 @@ pub struct ChainResources<'w> {
     pub food: Res<'w, FoodStores>,
     pub relationships: Res<'w, Relationships>,
     pub fox_scent_map: Res<'w, FoxScentMap>,
+    /// Mutable ledger of frustrated action desires — chain builders record
+    /// misses here so the coordinator's BuildPressure can respond.
+    pub unmet_demand: ResMut<'w, crate::resources::UnmetDemand>,
 }
 
 use crate::resources::narrative_templates::{
@@ -114,7 +117,16 @@ pub fn check_anxiety_interrupts(
             continue;
         };
 
-        let interrupt = check_interrupt(needs, personality, pos, health, disposition, &wildlife, d);
+        let interrupt = check_interrupt(
+            needs,
+            personality,
+            pos,
+            health,
+            disposition,
+            &wildlife,
+            d,
+            &constants.sensory.cat,
+        );
         let Some(reason) = interrupt else { continue };
 
         activation.record(Feature::AnxietyInterrupt);
@@ -174,6 +186,7 @@ enum InterruptReason {
     CriticalHealth,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn check_interrupt(
     needs: &Needs,
     personality: &Personality,
@@ -182,6 +195,7 @@ fn check_interrupt(
     disposition: &Disposition,
     wildlife: &Query<&Position, With<WildAnimal>>,
     d: &DispositionConstants,
+    cat_profile: &crate::systems::sensing::SensoryProfile,
 ) -> Option<InterruptReason> {
     // Critical health check — fires for ALL dispositions, including Guarding.
     // A cat below the health threshold must re-evaluate immediately.
@@ -203,16 +217,15 @@ fn check_interrupt(
         }
     }
 
-    // Guarding, Hunting, and Foraging are exempt from threat interrupts.
-    // Guards handle threats directly; hunters/foragers are focused on food.
-    if !matches!(
-        disposition.kind,
-        DispositionKind::Guarding | DispositionKind::Hunting | DispositionKind::Foraging
-    ) {
-        // Check for nearby wildlife threats.
+    // Guards are exempt from threat interrupts — they handle threats directly
+    // via guard_threat_detection_range.
+    if !matches!(disposition.kind, DispositionKind::Guarding) {
+        // Check for nearby wildlife threats. Phase 2 migration: the
+        // visual-only detection path now flows through the sensory
+        // model's sight channel. See `cat_sees_threat_at`.
         let nearest_threat = wildlife
             .iter()
-            .filter(|wp| pos.manhattan_distance(wp) <= d.threat_awareness_range)
+            .filter(|wp| crate::systems::sensing::cat_sees_threat_at(*pos, cat_profile, **wp))
             .min_by_key(|wp| pos.manhattan_distance(wp));
 
         if let Some(threat_pos) = nearest_threat {
@@ -242,6 +255,39 @@ fn check_interrupt(
 // ===========================================================================
 // evaluate_dispositions
 // ===========================================================================
+
+/// Bundle of side-effect params for evaluate_dispositions. Collapses commands,
+/// rng, and the mating-eligibility snapshot into one SystemParam slot so the
+/// outer function stays under Bevy's 16-param limit.
+#[derive(bevy_ecs::system::SystemParam)]
+pub struct EvalDispositionSideEffects<'w, 's> {
+    pub rng: ResMut<'w, SimRng>,
+    pub commands: Commands<'w, 's>,
+    pub mating: crate::ai::mating::MatingFitnessParams<'w, 's>,
+}
+
+/// Read-only queries over stored-item state. Bundled into a SystemParam so
+/// the cat scoring systems (evaluate_dispositions, evaluate_and_plan) can
+/// derive cooking eligibility without blowing Bevy's 16-param limit.
+#[derive(bevy_ecs::system::SystemParam)]
+pub struct CookingQueries<'w, 's> {
+    pub stored_items: Query<'w, 's, &'static StoredItems>,
+    pub items: Query<'w, 's, &'static Item>,
+}
+
+impl CookingQueries<'_, '_> {
+    /// True if any Stores building currently holds at least one uncooked
+    /// food item.
+    pub fn has_raw_food_in_stores(&self) -> bool {
+        self.stored_items.iter().any(|stored| {
+            stored.items.iter().copied().any(|e| {
+                self.items
+                    .get(e)
+                    .is_ok_and(|it| it.kind.is_food() && !it.modifiers.cooked)
+            })
+        })
+    }
+}
 
 /// For cats without a Disposition whose action has finished: score all actions,
 /// aggregate to dispositions, select via softmax, insert Disposition component.
@@ -288,9 +334,12 @@ pub fn evaluate_dispositions(
     relationships: Res<Relationships>,
     colony: super::ColonyContext,
     constants: Res<SimConstants>,
-    mut rng: ResMut<SimRng>,
-    mut commands: Commands,
+    cooking: CookingQueries,
+    mut side_effects: EvalDispositionSideEffects,
 ) {
+    let rng = &mut *side_effects.rng;
+    let commands = &mut side_effects.commands;
+    let mating_fitness_params = &side_effects.mating;
     let sc = &constants.scoring;
     let d = &constants.disposition;
     let food_available = !food.is_empty();
@@ -318,9 +367,16 @@ pub fn evaluate_dispositions(
     let has_garden = building_query
         .iter()
         .any(|(_, s, _, site, _)| s.kind == StructureType::Garden && site.is_none());
+    let has_functional_kitchen = building_query.iter().any(|(_, s, _, site, _)| {
+        s.kind == StructureType::Kitchen && site.is_none() && s.effectiveness() > 0.0
+    });
+    let has_raw_food_in_stores = cooking.has_raw_food_in_stores();
 
     let herb_positions: Vec<(Entity, Position)> =
         herb_query.iter().map(|(e, _, p)| (e, *p)).collect();
+    let thornbriar_available = herb_query
+        .iter()
+        .any(|(_, h, _)| h.kind == crate::components::magic::HerbKind::Thornbriar);
 
     let ward_strength_low = {
         let ward_count = ward_query.iter().count();
@@ -342,6 +398,11 @@ pub fn evaluate_dispositions(
         .iter()
         .map(|(entity, q)| (entity, (q.directives.len(), q.directives.first().cloned())))
         .collect();
+
+    // Snapshot per-cat fields needed by the mating eligibility gate.
+    let mating_fitness = mating_fitness_params.snapshot();
+    let current_season = mating_fitness_params.current_season();
+    let current_day_phase = mating_fitness_params.current_day_phase();
 
     // Snapshot current actions for activity cascading.
     let action_snapshot: Vec<(Entity, Position, Action)> = query
@@ -370,7 +431,14 @@ pub fn evaluate_dispositions(
         }
         cat_positions.iter().any(|(other, other_pos)| {
             *other != entity
-                && pos.manhattan_distance(other_pos) <= d.mentoring_detection_range
+                && crate::systems::sensing::observer_sees_at(
+                    crate::components::SensorySpecies::Cat,
+                    *pos,
+                    &constants.sensory.cat,
+                    *other_pos,
+                    crate::components::SensorySignature::CAT,
+                    d.mentoring_detection_range as f32,
+                )
                 && skills_query.get(*other).is_ok_and(|other_skills| {
                     let other_arr = [
                         other_skills.hunting,
@@ -447,13 +515,27 @@ pub fn evaluate_dispositions(
             .iter()
             .any(|inj| inj.kind == InjuryKind::Severe && !inj.healed);
 
-        let has_herbs_nearby = herb_positions
-            .iter()
-            .any(|(_, hp)| pos.manhattan_distance(hp) <= d.herb_detection_range);
+        let has_herbs_nearby = herb_positions.iter().any(|(_, hp)| {
+            crate::systems::sensing::observer_sees_at(
+                crate::components::SensorySpecies::Cat,
+                *pos,
+                &constants.sensory.cat,
+                *hp,
+                crate::components::SensorySignature::PREY,
+                d.herb_detection_range as f32,
+            )
+        });
 
-        let prey_nearby = prey_positions
-            .iter()
-            .any(|pp| pos.manhattan_distance(pp) <= d.prey_detection_range);
+        let prey_nearby = prey_positions.iter().any(|pp| {
+            crate::systems::sensing::observer_sees_at(
+                crate::components::SensorySpecies::Cat,
+                *pos,
+                &constants.sensory.cat,
+                *pp,
+                crate::components::SensorySignature::PREY,
+                d.prey_detection_range as f32,
+            )
+        });
 
         let (on_corrupted_tile, tile_corruption, on_special_terrain) =
             if map.in_bounds(pos.x, pos.y) {
@@ -467,20 +549,17 @@ pub fn evaluate_dispositions(
                 (false, 0.0, false)
             };
 
-        // Check if an eligible mating partner exists (Partners+ bond, alive, nearby).
-        let has_eligible_mate = needs.mating < 1.0
-            && cat_positions.iter().any(|(other, _)| {
-                if *other == entity {
-                    return false;
-                }
-                relationships.get(entity, *other).is_some_and(|r| {
-                    matches!(
-                        r.bond,
-                        Some(crate::resources::relationships::BondType::Partners)
-                            | Some(crate::resources::relationships::BondType::Mates)
-                    )
-                })
-            });
+        // Check if an eligible mating partner exists. Uses the Spring-only,
+        // sated-and-happy gate from `crate::ai::mating`.
+        let has_eligible_mate = crate::ai::mating::has_eligible_mate(
+            entity,
+            needs.mating,
+            current_season,
+            sc,
+            &mating_fitness,
+            &cat_positions,
+            &relationships,
+        );
 
         let ctx = ScoringContext {
             scoring: sc,
@@ -509,10 +588,12 @@ pub fn evaluate_dispositions(
                 .any(|s| matches!(s, crate::components::ItemSlot::Herb(_))),
             has_remedy_herbs: inventory.has_remedy_herb(),
             has_ward_herbs: inventory.has_ward_herb(),
+            thornbriar_available,
             colony_injury_count,
             ward_strength_low,
             on_corrupted_tile,
             tile_corruption,
+            nearby_corruption_level: 0.0, // legacy disposition path — not wired yet
             on_special_terrain,
             is_coordinator_with_directives: directive_snapshot
                 .get(&entity)
@@ -539,6 +620,9 @@ pub fn evaluate_dispositions(
             nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
             wards_under_siege: false,
+            day_phase: current_day_phase,
+            has_functional_kitchen,
+            has_raw_food_in_stores,
         };
 
         let result = score_actions(&ctx, &mut rng.rng);
@@ -570,11 +654,29 @@ pub fn evaluate_dispositions(
         let love_visible = fated_love
             .filter(|l| l.awakened)
             .and_then(|l| cat_positions.iter().find(|(e, _)| *e == l.partner))
-            .is_some_and(|(_, pp)| pos.manhattan_distance(pp) <= d.fated_love_detection_range);
+            .is_some_and(|(_, pp)| {
+                crate::systems::sensing::observer_sees_at(
+                    crate::components::SensorySpecies::Cat,
+                    *pos,
+                    &constants.sensory.cat,
+                    *pp,
+                    crate::components::SensorySignature::CAT,
+                    d.fated_love_detection_range as f32,
+                )
+            });
         let rival_nearby = fated_rival
             .filter(|r| r.awakened)
             .and_then(|r| cat_positions.iter().find(|(e, _)| *e == r.rival))
-            .is_some_and(|(_, rp)| pos.manhattan_distance(rp) <= d.fated_rival_detection_range);
+            .is_some_and(|(_, rp)| {
+                crate::systems::sensing::observer_sees_at(
+                    crate::components::SensorySpecies::Cat,
+                    *pos,
+                    &constants.sensory.cat,
+                    *rp,
+                    crate::components::SensorySignature::CAT,
+                    d.fated_rival_detection_range as f32,
+                )
+            });
         apply_fated_bonuses(&mut scores, love_visible, rival_nearby, sc);
         if let Ok(directive) = active_directive_query.get(entity) {
             let fondness_factor = relationships
@@ -639,8 +741,15 @@ pub fn evaluate_dispositions(
                 .find(|(a, _)| *a == Action::PracticeMagic)
                 .map(|(_, s)| *s)
                 .unwrap_or(0.0);
-            if magic_score > herbcraft_score {
-                Some(CraftingHint::Magic)
+            let cook_score = scores
+                .iter()
+                .find(|(a, _)| *a == Action::Cook)
+                .map(|(_, s)| *s)
+                .unwrap_or(0.0);
+            if cook_score > herbcraft_score && cook_score > magic_score {
+                Some(CraftingHint::Cook)
+            } else if magic_score > herbcraft_score {
+                result.magic_hint.or(Some(CraftingHint::Magic))
             } else {
                 result.herbcraft_hint
             }
@@ -854,6 +963,7 @@ pub fn disposition_to_chain(
                 &res.map,
                 Some(&res.fox_scent_map),
                 d,
+                &constants.sensory.cat,
                 &mut rng.rng,
             ),
             DispositionKind::Socializing => build_socializing_chain(
@@ -1103,6 +1213,7 @@ fn build_foraging_chain(
     Some((chain, Action::Forage))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_guarding_chain(
     pos: &Position,
     health: &Health,
@@ -1110,12 +1221,23 @@ fn build_guarding_chain(
     map: &TileMap,
     fox_scent: Option<&FoxScentMap>,
     d: &DispositionConstants,
+    cat_profile: &crate::systems::sensing::SensoryProfile,
     rng: &mut impl Rng,
 ) -> Option<(TaskChain, Action)> {
-    // If threat nearby, fight it.
+    // If threat nearby, fight it. Phase 4 migration: visual channel
+    // via the unified sensory model.
     let nearest_threat = wildlife
         .iter()
-        .filter(|(_, wp)| pos.manhattan_distance(wp) <= d.guard_threat_detection_range)
+        .filter(|(_, wp)| {
+            crate::systems::sensing::observer_sees_at(
+                crate::components::SensorySpecies::Cat,
+                *pos,
+                cat_profile,
+                **wp,
+                crate::components::SensorySignature::WILDLIFE,
+                d.guard_threat_detection_range as f32,
+            )
+        })
         .min_by_key(|(_, wp)| pos.manhattan_distance(wp));
 
     if let Some((threat_entity, threat_pos)) = nearest_threat {
@@ -1355,7 +1477,7 @@ fn build_crafting_chain(
         Option<&ConstructionSite>,
         Option<&CropState>,
     )>,
-    _ward_query: &Query<(&Ward, &Position)>,
+    ward_query: &Query<(&Ward, &Position)>,
     _cat_positions: &[(Entity, Position)],
     injured_cats: &[(Entity, Position)],
     map: &TileMap,
@@ -1364,6 +1486,30 @@ fn build_crafting_chain(
     rng: &mut impl Rng,
     hint: Option<CraftingHint>,
 ) -> Option<(TaskChain, Action)> {
+    // Pre-compute ward placement position for SetWard chains.
+    let ward_placement_pos = if ward_strength_low {
+        let building_positions: Vec<Position> = building_query
+            .iter()
+            .filter(|(_, _, _, site, _)| site.is_none())
+            .map(|(_, _, bpos, _, _)| *bpos)
+            .collect();
+        let ward_data: Vec<(Position, f32)> = ward_query
+            .iter()
+            .filter(|(w, _)| !w.inverted && w.strength > 0.01)
+            .map(|(w, p)| (*p, w.repel_radius()))
+            .collect();
+        let center = Position::new(map.width / 2, map.height / 2);
+        Some(crate::systems::coordination::compute_ward_placement(
+            &building_positions,
+            &ward_data,
+            center,
+            d.crafting_ward_placement_radius,
+            rng,
+        ))
+    } else {
+        None
+    };
+
     // Try hinted mode first.
     if let Some(h) = hint {
         if let Some(chain) = try_crafting_sub_mode(
@@ -1377,6 +1523,7 @@ fn build_crafting_chain(
             injured_cats,
             map,
             ward_strength_low,
+            ward_placement_pos,
             d,
             rng,
         ) {
@@ -1385,10 +1532,13 @@ fn build_crafting_chain(
     }
 
     // Fallback: cascade through remaining modes, skipping the hint.
+    // (Cook intentionally absent — it's resolved by the GOAP planner, not
+    // this task-chain path.)
     for mode in [
         CraftingHint::GatherHerbs,
         CraftingHint::PrepareRemedy,
         CraftingHint::SetWard,
+        CraftingHint::DurableWard,
         CraftingHint::Magic,
     ] {
         if Some(mode) == hint {
@@ -1405,6 +1555,7 @@ fn build_crafting_chain(
             injured_cats,
             map,
             ward_strength_low,
+            ward_placement_pos,
             d,
             rng,
         ) {
@@ -1435,6 +1586,7 @@ fn try_crafting_sub_mode(
     injured_cats: &[(Entity, Position)],
     map: &TileMap,
     ward_strength_low: bool,
+    ward_placement_pos: Option<Position>,
     d: &DispositionConstants,
     rng: &mut impl Rng,
 ) -> Option<(TaskChain, Action)> {
@@ -1513,33 +1665,52 @@ fn try_crafting_sub_mode(
             Some((chain, Action::Herbcraft))
         }
 
-        CraftingHint::SetWard => {
-            if !inventory.has_ward_herb() || !ward_strength_low {
+        CraftingHint::SetWard | CraftingHint::DurableWard => {
+            let is_durable = matches!(mode, CraftingHint::DurableWard);
+            // Thornwards need herbs; durable wards skip the herb check.
+            if (!is_durable && !inventory.has_ward_herb()) || !ward_strength_low {
+                return None;
+            }
+            if is_durable
+                && (magic_aff.0 <= d.crafting_magic_affinity_threshold
+                    || skills.magic <= d.crafting_magic_skill_threshold)
+            {
                 return None;
             }
 
-            let center_x = map.width / 2;
-            let center_y = map.height / 2;
-            let angle: f32 = rng.random_range(0.0..std::f32::consts::TAU);
-            let radius = d.crafting_ward_placement_radius;
-            let mut ward_pos = Position::new(
-                center_x + (angle.cos() * radius) as i32,
-                center_y + (angle.sin() * radius) as i32,
-            );
-            ward_pos.x = ward_pos.x.clamp(0, map.width - 1);
-            ward_pos.y = ward_pos.y.clamp(0, map.height - 1);
+            let ward_pos = ward_placement_pos.unwrap_or_else(|| {
+                // Fallback: random angle if no computed position.
+                let center_x = map.width / 2;
+                let center_y = map.height / 2;
+                let angle: f32 = rng.random_range(0.0..std::f32::consts::TAU);
+                let radius = d.crafting_ward_placement_radius;
+                let mut p = Position::new(
+                    center_x + (angle.cos() * radius) as i32,
+                    center_y + (angle.sin() * radius) as i32,
+                );
+                p.x = p.x.clamp(0, map.width - 1);
+                p.y = p.y.clamp(0, map.height - 1);
+                p
+            });
 
+            let kind = if is_durable {
+                WardKind::DurableWard
+            } else {
+                WardKind::Thornward
+            };
             let chain = TaskChain::new(
                 vec![
                     TaskStep::new(StepKind::MoveTo).with_position(ward_pos),
-                    TaskStep::new(StepKind::SetWard {
-                        kind: WardKind::Thornward,
-                    })
-                    .with_position(ward_pos),
+                    TaskStep::new(StepKind::SetWard { kind }).with_position(ward_pos),
                 ],
                 FailurePolicy::AbortChain,
             );
-            Some((chain, Action::Herbcraft))
+            let action = if is_durable {
+                Action::PracticeMagic
+            } else {
+                Action::Herbcraft
+            };
+            Some((chain, action))
         }
 
         CraftingHint::Magic => {
@@ -1572,6 +1743,30 @@ fn try_crafting_sub_mode(
             );
             Some((chain, Action::PracticeMagic))
         }
+
+        CraftingHint::Cleanse => {
+            if magic_aff.0 <= d.crafting_magic_affinity_threshold {
+                return None;
+            }
+            let chain = TaskChain::new(
+                vec![TaskStep::new(StepKind::CleanseCorruption).with_position(*pos)],
+                FailurePolicy::AbortChain,
+            );
+            Some((chain, Action::PracticeMagic))
+        }
+
+        CraftingHint::HarvestCarcass => {
+            // Legacy TaskChain path can't express HarvestCarcass cleanly;
+            // the GOAP executor handles it.
+            None
+        }
+
+        // Cook is executed entirely through the GOAP planner
+        // (`GoapActionKind::RetrieveRawFood` / `Cook` / `DepositCookedFood`
+        // in `src/systems/goap.rs`). The unmet-demand signal is emitted
+        // from `score_cook` via `ScoringResult::wants_cook_but_no_kitchen`,
+        // not from here.
+        CraftingHint::Cook => None,
     }
 }
 
@@ -1604,6 +1799,9 @@ fn build_coordinating_chain(
                     DirectiveKind::Build => s.building,
                     DirectiveKind::Fight | DirectiveKind::Patrol => s.combat,
                     DirectiveKind::Herbcraft | DirectiveKind::SetWard => s.herbcraft,
+                    DirectiveKind::Cleanse => s.magic,
+                    DirectiveKind::HarvestCarcass => s.herbcraft,
+                    DirectiveKind::Cook => 0.0,
                 });
             let skill_b = skills_query
                 .get(*e_b)
@@ -1613,6 +1811,9 @@ fn build_coordinating_chain(
                     DirectiveKind::Build => s.building,
                     DirectiveKind::Fight | DirectiveKind::Patrol => s.combat,
                     DirectiveKind::Herbcraft | DirectiveKind::SetWard => s.herbcraft,
+                    DirectiveKind::Cleanse => s.magic,
+                    DirectiveKind::HarvestCarcass => s.herbcraft,
+                    DirectiveKind::Cook => 0.0,
                 });
             let rank_a =
                 skill_a - pos.manhattan_distance(p_a) as f32 * d.coordinating_distance_penalty;
@@ -1632,6 +1833,7 @@ fn build_coordinating_chain(
             TaskStep::new(StepKind::DeliverDirective {
                 kind: directive.kind,
                 priority: directive.priority,
+                directive_target: directive.target_position,
             })
             .with_position(target_pos)
             .with_entity(target_entity),
@@ -1746,8 +1948,11 @@ fn build_caretaking_chain(
 
 /// Check if a cat can smell prey based on wind direction and terrain.
 ///
-/// The cat must be roughly downwind of the prey (scent blows from prey toward
-/// cat). Forest terrain reduces scent carry. Calm wind reduces range.
+/// Phase 3 migration: delegates to
+/// `crate::systems::sensing::cat_smells_prey_windaware` — the unified
+/// scent-channel implementation. The previous local body of this
+/// function and the byte-identical copy in `goap.rs` both now route
+/// through the same helper.
 fn can_smell_prey(
     cat_pos: &Position,
     prey_pos: &Position,
@@ -1755,32 +1960,19 @@ fn can_smell_prey(
     map: &TileMap,
     d: &DispositionConstants,
 ) -> bool {
-    let dx = (prey_pos.x - cat_pos.x) as f32;
-    let dy = (prey_pos.y - cat_pos.y) as f32;
-    let dist = cat_pos.manhattan_distance(prey_pos) as f32;
-    if dist == 0.0 {
-        return true;
-    }
-    // Normalize prey→cat vector (direction scent travels).
-    let (nx, ny) = (dx / dist, dy / dist);
-    let (wx, wy) = wind.direction();
-    // Positive dot = cat is downwind of prey.
-    let dot = wx * nx + wy * ny;
-    if dot < d.scent_downwind_dot_threshold {
-        return false;
-    }
-    // Terrain at prey position affects scent dispersal.
-    let terrain_mod = if map.in_bounds(prey_pos.x, prey_pos.y) {
-        match map.get(prey_pos.x, prey_pos.y).terrain {
-            Terrain::DenseForest => d.scent_dense_forest_modifier,
-            Terrain::LightForest => d.scent_light_forest_modifier,
-            _ => 1.0,
-        }
-    } else {
-        1.0
-    };
-    let scent_range = d.scent_base_range * wind.strength * terrain_mod;
-    dist <= scent_range
+    crate::systems::sensing::cat_smells_prey_windaware(
+        *cat_pos,
+        *prey_pos,
+        wind,
+        map,
+        // `disposition.rs` used only the wind-aware path (no scent_min_range
+        // close-range bypass). Passing 0.0 preserves that exactly.
+        0.0,
+        d.scent_base_range,
+        d.scent_downwind_dot_threshold,
+        d.scent_dense_forest_modifier,
+        d.scent_light_forest_modifier,
+    )
 }
 
 /// Move one tile in direction (dx, dy). If blocked, try perpendicular or
@@ -2012,6 +2204,7 @@ pub fn resolve_disposition_chains(
                                     other: None,
                                     prey: Some(den_name),
                                     item: None,
+                                    item_singular: None,
                                     quality: None,
                                 };
                                 emit_event_narrative(
@@ -2249,6 +2442,7 @@ pub fn resolve_disposition_chains(
                                     other: None,
                                     prey: Some(species_name),
                                     item: None,
+                                    item_singular: None,
                                     quality: None,
                                 };
                                 emit_event_narrative(
@@ -2314,6 +2508,7 @@ pub fn resolve_disposition_chains(
                                     other: None,
                                     prey: Some(species_name),
                                     item: None,
+                                    item_singular: None,
                                     quality: None,
                                 };
                                 emit_event_narrative(
@@ -2429,7 +2624,14 @@ pub fn resolve_disposition_chains(
                     let visible_prey = prey_query
                         .iter()
                         .filter(|(_, pp, _, _)| {
-                            pos.manhattan_distance(pp) <= d.search_visual_detection_range
+                            crate::systems::sensing::observer_sees_at(
+                                crate::components::SensorySpecies::Cat,
+                                *pos,
+                                &constants.sensory.cat,
+                                **pp,
+                                crate::components::SensorySignature::PREY,
+                                d.search_visual_detection_range as f32,
+                            )
                         })
                         .min_by_key(|(_, pp, _, _)| pos.manhattan_distance(pp));
 
@@ -2475,6 +2677,7 @@ pub fn resolve_disposition_chains(
                                     other: None,
                                     prey: None,
                                     item: None,
+                                    item_singular: None,
                                     quality: None,
                                 };
                                 emit_event_narrative(
@@ -2609,6 +2812,7 @@ pub fn resolve_disposition_chains(
                                 other: None,
                                 prey: None,
                                 item: Some(&item_name),
+                                item_singular: Some(item_kind.singular_name()),
                                 quality: None,
                             };
                             emit_event_narrative(
@@ -2809,7 +3013,11 @@ pub fn resolve_disposition_chains(
                 );
             }
 
-            StepKind::DeliverDirective { kind, priority } => {
+            StepKind::DeliverDirective {
+                kind,
+                priority,
+                directive_target,
+            } => {
                 let result =
                     crate::steps::disposition::resolve_deliver_directive(ticks, &mut needs, d);
                 if matches!(result, crate::steps::StepResult::Advance) {
@@ -2821,6 +3029,8 @@ pub fn resolve_disposition_chains(
                             coordinator: cat_entity,
                             coordinator_social_weight: needs.respect,
                             delivered_tick: time.tick,
+                            target_position: *directive_target,
+                            target_entity: None,
                         });
                         if let Some(ref mut act) = narr.activation {
                             act.record(Feature::DirectiveDelivered);
@@ -3112,6 +3322,7 @@ mod tests {
             &disposition,
             &wildlife,
             &d,
+            &SimConstants::default().sensory.cat,
         );
         assert!(
             matches!(result, Some(InterruptReason::CriticalHealth)),
@@ -3141,6 +3352,7 @@ mod tests {
             &disposition,
             &wildlife,
             &d,
+            &SimConstants::default().sensory.cat,
         );
         assert!(
             result.is_none(),
@@ -3174,6 +3386,7 @@ mod tests {
             &disposition,
             &wildlife,
             &d,
+            &SimConstants::default().sensory.cat,
         );
         assert!(
             matches!(result, Some(InterruptReason::CriticalHealth)),
@@ -3207,6 +3420,7 @@ mod tests {
             &disposition,
             &wildlife,
             &d,
+            &SimConstants::default().sensory.cat,
         );
         assert!(
             result.is_none(),
@@ -3257,9 +3471,12 @@ mod tests {
                 ),
             >,
             Query<'w, 's, (&'static Ward, &'static Position)>,
+            Query<'w, 's, (Entity, &'static StoredItems)>,
+            Query<'w, 's, &'static Item>,
         );
         let mut state: SystemState<CraftingQueries> = SystemState::new(&mut world);
-        let (herb_query, building_query, ward_query) = state.get(&world);
+        let (herb_query, building_query, ward_query, stored_items_query, items_query) =
+            state.get(&world);
 
         let pos = Position { x: 2, y: 2 }; // close to the herb
         let personality = mid_personality();
@@ -3276,6 +3493,7 @@ mod tests {
         let map = TileMap::new(10, 10, Terrain::Grass);
         let d = SimConstants::default().disposition;
         let mut rng = ChaCha8Rng::seed_from_u64(99);
+        let mut unmet_demand = crate::resources::UnmetDemand::default();
 
         let result = build_crafting_chain(
             &pos,

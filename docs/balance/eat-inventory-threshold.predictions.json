@@ -1,0 +1,52 @@
+{
+  "cat_hunger_mean": {
+    "direction": "up",
+    "magnitude_pct": 20,
+    "rationale": "Raising eat_from_inventory_threshold from 0.05 to 0.4 lets cats consume carried food at ordinary hunger levels (~0.4) rather than near-death (~0.05). Auditor-observed baseline mean hunger across 8 cats over the 15-min soak is ~0.632; predicted post-change mean rises to ~0.75–0.85. Measured as: mean of CatSnapshot.needs.hunger across all cat-snapshot records in the soak."
+  },
+  "cat_hunger_below_05_fraction": {
+    "direction": "down",
+    "magnitude_pct": 50,
+    "rationale": "With mean hunger lifting into the 0.75+ band, far fewer per-cat snapshot-ticks fall below the 0.5 survival-floor threshold that suppresses leisure scoring. Baseline estimated ~40–50% of snapshots below 0.5; predict ~15–25% post-change. Measured as: fraction of CatSnapshot records with needs.hunger < 0.5."
+  },
+  "leisure_event_count_total": {
+    "direction": "up",
+    "magnitude_pct": 200,
+    "rationale": "The survival-floor + Maslow level_suppression stack currently crushes leisure scoring (Socialize, Groom-other, Mentor, Play, Wander) to near-zero when phys satisfaction < 0.5. With more cat-ticks above 0.5 post-change, leisure scores compete and win more often. Baseline is near-zero fire counts; predict ≥3× across the leisure categories combined. Measured as: sum of Socialize + Groom-other + Mentor + Play + Wander event counts in narrative.jsonl (exact EventKind/narrative-tier names confirmed via src/resources/event_log.rs before report)."
+  },
+  "store_food_level_mean": {
+    "direction": "down",
+    "magnitude_pct": 30,
+    "rationale": "Cats now consume ~30% of catches in-transit when hungry rather than depositing 100% at stores. Stores should remain positive throughout the soak (no catastrophic empty) but time-averaged food level drops ~20–40%. Measured as: mean of FoodLevel.fraction over the soak. Bound: if mean drops >70% or hits zero for >2 consecutive snapshots, reject as magnitude out-of-range."
+  },
+  "deaths_by_cause.Starvation": {
+    "direction": "flat",
+    "magnitude_pct": 0,
+    "rationale": "Canary gate — must remain at baseline value on seed 42. Predicted direction is actually *down* (more eating = fewer starvations), but the canary bar is 'no worse than baseline.' Hard reject if starvation deaths increase."
+  },
+  "deaths_by_cause.ShadowFoxAmbush": {
+    "direction": "flat",
+    "magnitude_pct": 20,
+    "rationale": "Canary gate — must remain ≤ 5. This change doesn't affect shadowfox spawning or cat combat posture. Small RNG drift (±20%) acceptable. Anything beyond suggests an indirect coupling we didn't anticipate (e.g., cats hunting farther from colony to offset in-transit consumption)."
+  },
+  "catches_per_cat_per_day": {
+    "direction": "down",
+    "magnitude_pct": 15,
+    "rationale": "Cats reaching satiation sooner (mid-hunt consumption) may abort hunt cycles earlier. Baseline auditor-observed 3 catches/cat/sim-day aggregate. Predict modest reduction to ~2.4–2.7. If drop exceeds 30%, the in-transit eating is aborting too many hunt trips — worth investigating stalling in the hunt pipeline."
+  },
+  "wipeout_canary": {
+    "direction": "flat",
+    "magnitude_pct": 0,
+    "rationale": "Canary gate — colony must not wipe within --duration 900. The change makes eating easier, not harder; wipeout risk should decrease or remain identical."
+  },
+  "findability_diagnostic_catches_trajectory": {
+    "direction": "diagnostic",
+    "magnitude_pct": null,
+    "rationale": "NOT a prediction of this plan — a diagnostic measurement that either clears or implicates a separate findability hypothesis (cats can't locate dispersed prey after local depletion). Measured as: catches per cat per sim-day, binned by week. If week-1 vs. week-2+ shows >2× drop, the findability hypothesis is implicated and a follow-on plan is queued. This metric is measured in both baseline and treatment runs; the value in the treatment run is the observation of record."
+  },
+  "findability_diagnostic_search_timeout_fraction": {
+    "direction": "diagnostic",
+    "magnitude_pct": null,
+    "rationale": "NOT a prediction of this plan — a diagnostic measurement. Fraction of Hunt actions that exit via search_timeout rather than a successful kill. Rising timeout fraction over sim-days indicates cats repeatedly wandering out of prey contact. Feeds follow-on findability plan scoping."
+  }
+}

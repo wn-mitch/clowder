@@ -204,7 +204,7 @@ const ALL_FLAVOR_KINDS: [FlavorKind; 8] = [
 ];
 
 /// Check if (x, y) is a forest tile adjacent to a non-forest tile.
-fn is_forest_edge(x: i32, y: i32, map: &TileMap) -> bool {
+pub(crate) fn is_forest_edge(x: i32, y: i32, map: &TileMap) -> bool {
     let deltas = [(0, -1), (0, 1), (-1, 0), (1, 0)];
     for (dx, dy) in deltas {
         let nx = x + dx;

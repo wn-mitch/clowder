@@ -22,6 +22,43 @@ pub struct RelationshipEntry {
     pub bond: Option<String>,
 }
 
+/// One wild-predator position in a spatial snapshot.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct WildlifePosRow {
+    pub species: String,
+    pub x: i32,
+    pub y: i32,
+}
+
+/// One prey position in a spatial snapshot.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PreyPosRow {
+    pub species: String,
+    pub x: i32,
+    pub y: i32,
+}
+
+/// One prey den entry in a den snapshot.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PreyDenRow {
+    pub species: String,
+    pub x: i32,
+    pub y: i32,
+    pub spawns_remaining: u32,
+    pub capacity: u32,
+    pub predation_pressure: f32,
+}
+
+/// One fox den entry in a den snapshot.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FoxDenRow {
+    pub x: i32,
+    pub y: i32,
+    pub cubs_present: u32,
+    pub territory_radius: i32,
+    pub scent_strength: f32,
+}
+
 // ---------------------------------------------------------------------------
 // EventKind
 // ---------------------------------------------------------------------------
@@ -54,6 +91,15 @@ pub enum EventKind {
         relationships: Vec<RelationshipEntry>,
         /// Top-3 scored actions from the last decision (post-bonus, post-suppression).
         last_scores: Vec<(Action, f32)>,
+        /// LifeStage at snapshot time ("Kitten", "Adolescent", "Adult", "Elder").
+        life_stage: String,
+        /// Gender at snapshot time ("Tom", "Queen", "Nonbinary").
+        sex: String,
+        /// Orientation at snapshot time.
+        orientation: String,
+        is_pregnant: bool,
+        /// Season at snapshot time — lets `jq` slice mating-need trajectories.
+        season: String,
     },
     FoodLevel {
         current: f32,
@@ -66,6 +112,40 @@ pub enum EventKind {
         rabbits: usize,
         fish: usize,
         birds: usize,
+    },
+    /// Wild predator census, emitted on the same cadence as FoodLevel /
+    /// PopulationSnapshot. Counts live WildAnimal entities grouped by species.
+    WildlifePopulation {
+        foxes: u32,
+        hawks: u32,
+        snakes: u32,
+        shadow_foxes: u32,
+    },
+    /// Sampled wild predator positions for the dashboard map overlay. One
+    /// row per live WildAnimal entity.
+    WildlifePositions {
+        positions: Vec<WildlifePosRow>,
+    },
+    /// Sampled prey positions for the dashboard map overlay. Emitted at a
+    /// coarser cadence than wildlife because there are many more prey.
+    PreyPositions {
+        positions: Vec<PreyPosRow>,
+    },
+    /// Prey dens and fox dens — near-static, emitted infrequently so the
+    /// dashboard can draw them without re-querying the whole log.
+    DenSnapshot {
+        prey_dens: Vec<PreyDenRow>,
+        fox_dens: Vec<FoxDenRow>,
+    },
+    /// Downsampled colony hunting belief grid (aggregate over all cats).
+    /// Values are row-major with length = width * height. The `cat` field
+    /// is reserved for per-cat snapshots in a future extension — colony
+    /// aggregate emits `None`.
+    HuntingBeliefSnapshot {
+        cat: Option<String>,
+        width: u32,
+        height: u32,
+        values: Vec<f32>,
     },
     PositionTrace {
         cat: String,
@@ -87,6 +167,64 @@ pub enum EventKind {
         /// For Injury deaths: the source of the most recent unhealed injury.
         #[serde(skip_serializing_if = "Option::is_none")]
         injury_source: Option<String>,
+        /// Tile where the cat died.
+        location: (i32, i32),
+    },
+    /// A predator struck a cat. Emitted per successful ambush hit.
+    Ambush {
+        cat: String,
+        predator_species: String,
+        location: (i32, i32),
+        damage: f32,
+    },
+    /// A cat successfully placed a ward.
+    WardPlaced {
+        cat: String,
+        ward_kind: String,
+        location: (i32, i32),
+        strength: f32,
+    },
+    /// A ward expired (decayed to zero). Separate from WardPlaced so you can
+    /// answer "is siege-heavy decay concentrated near the colony edge?"
+    WardDespawned {
+        ward_kind: String,
+        location: (i32, i32),
+        sieged: bool,
+    },
+    /// A cat killed a prey animal.
+    PreyKilled {
+        cat: String,
+        species: String,
+        location: (i32, i32),
+    },
+    /// A kitten was born.
+    KittenBorn {
+        mother: String,
+        kitten: String,
+        location: (i32, i32),
+    },
+    /// Two cats mated.
+    MatingOccurred {
+        partner_a: String,
+        partner_b: String,
+        location: (i32, i32),
+    },
+    /// A building reached completion.
+    BuildingConstructed {
+        kind: String,
+        location: (i32, i32),
+    },
+    /// A shadow-fox materialized from corrupted ground.
+    ShadowFoxSpawn {
+        location: (i32, i32),
+        corruption: f32,
+    },
+    /// A posse of cats banished a shadow-fox — a colony-defining moment.
+    /// The `posse` field captures every cat who contributed to the kill,
+    /// so downstream tooling can reconstruct the heroes of the story.
+    ShadowFoxBanished {
+        posse: Vec<String>,
+        location: (i32, i32),
     },
     ColonyScore {
         // Welfare snapshot [0.0, 1.0]
@@ -109,19 +247,98 @@ pub enum EventKind {
         kittens_born: u64,
         prey_dens_discovered: u64,
 
+        // Point-in-time bond tier snapshot. Each unordered pair (A, B) appears
+        // once since `Relationships` canonicalizes keys. Diagnoses whether
+        // courtship drift ever reaches Partners/Mates.
+        friends_count: u64,
+        partners_count: u64,
+        mates_count: u64,
+
         // Aggregate
         aggregate: f64,
 
-        // Activation
-        activation_score: f64,
-        features_active: u32,
-        features_total: u32,
+        // Activation — split by feature valence so the "is the colony thriving?"
+        // signal (positive_activation_score) is not polluted by deaths and other
+        // adverse events. See src/resources/system_activation.rs FeatureCategory.
+        positive_activation_score: f64,
+        positive_features_active: u32,
+        positive_features_total: u32,
+        negative_events_total: u64,
+        neutral_features_active: u32,
+        neutral_features_total: u32,
 
         // Context
         living_cats: u64,
     },
     SystemActivation {
-        counts: HashMap<String, u64>,
+        positive: HashMap<String, u64>,
+        negative: HashMap<String, u64>,
+        neutral: HashMap<String, u64>,
+    },
+
+    // ----- Plan lifecycle events -----
+    /// A new GOAP plan was created for a cat.
+    PlanCreated {
+        cat: String,
+        disposition: String,
+        steps: Vec<String>,
+        hunger: f32,
+        energy: f32,
+        warmth: f32,
+        food_available: bool,
+    },
+
+    /// A new GOAP plan was created for a fox. Fox-specific because FoxNeeds
+    /// uses a 3-level Maslow hierarchy (not the cat 7-level), and because fox
+    /// dispositions (Hunting / Patrolling / Raiding / Resting / ...) are
+    /// disjoint from cat dispositions. See src/ai/fox_scoring.rs.
+    ///
+    /// `fox_id` is the ECS entity id bits — stable within a run, not across runs.
+    FoxPlanCreated {
+        fox_id: u64,
+        disposition: String,
+        steps: Vec<String>,
+        hunger: f32,
+        territory_scent: f32,
+        cub_satiation: f32,
+        position: (i32, i32),
+        day_phase: String,
+    },
+
+    /// An interrupt forced a plan to be abandoned.
+    PlanInterrupted {
+        cat: String,
+        disposition: String,
+        reason: String,
+        current_step: String,
+        hunger: f32,
+        energy: f32,
+        warmth: f32,
+    },
+
+    /// A plan step could not execute — this is a bug canary, not normal
+    /// gameplay. If a planned step fails, the planner made a promise the
+    /// executor can't keep.
+    PlanStepFailed {
+        cat: String,
+        disposition: String,
+        step: String,
+        step_index: usize,
+        reason: String,
+        hunger: f32,
+        energy: f32,
+        warmth: f32,
+    },
+
+    /// A plan was regenerated after step failure (replan attempt).
+    PlanReplanned {
+        cat: String,
+        disposition: String,
+        replan_count: u32,
+        new_steps: Vec<String>,
+        hunger: f32,
+        energy: f32,
+        warmth: f32,
     },
 }
 
@@ -141,11 +358,19 @@ pub struct EventEntry {
 // ---------------------------------------------------------------------------
 
 /// Ring-buffer of structured simulation events for debugging.
+///
+/// Also carries cumulative diagnostic tallies (deaths by cause, plan failures
+/// by reason, interrupts by reason) used by the headless runner's end-of-sim
+/// footer. Tallies are cumulative across the whole run — they don't decay
+/// when ring-buffer entries are evicted.
 #[derive(Resource, Debug)]
 pub struct EventLog {
     pub entries: VecDeque<EventEntry>,
     pub capacity: usize,
     pub total_pushed: u64,
+    pub deaths_by_cause: HashMap<String, u64>,
+    pub plan_failures_by_reason: HashMap<String, u64>,
+    pub interrupts_by_reason: HashMap<String, u64>,
 }
 
 impl Default for EventLog {
@@ -154,12 +379,51 @@ impl Default for EventLog {
             entries: VecDeque::new(),
             capacity: 500,
             total_pushed: 0,
+            deaths_by_cause: HashMap::new(),
+            plan_failures_by_reason: HashMap::new(),
+            interrupts_by_reason: HashMap::new(),
         }
     }
 }
 
 impl EventLog {
     pub fn push(&mut self, tick: u64, kind: EventKind) {
+        match &kind {
+            EventKind::Death {
+                cause,
+                injury_source,
+                ..
+            } => {
+                // For injury deaths, key by injury_source (ShadowFoxAmbush, Fox, ...)
+                // so the dominant killer surfaces immediately. Fall back to
+                // the cause enum name for non-injury deaths (Starvation, OldAge).
+                let key = if cause == "Injury" {
+                    injury_source.clone().unwrap_or_else(|| "Injury".into())
+                } else {
+                    cause.clone()
+                };
+                *self.deaths_by_cause.entry(key).or_insert(0) += 1;
+            }
+            EventKind::Ambush { .. }
+            | EventKind::WardPlaced { .. }
+            | EventKind::WardDespawned { .. }
+            | EventKind::PreyKilled { .. }
+            | EventKind::KittenBorn { .. }
+            | EventKind::MatingOccurred { .. }
+            | EventKind::BuildingConstructed { .. }
+            | EventKind::ShadowFoxSpawn { .. }
+            | EventKind::ShadowFoxBanished { .. } => {
+                // Tallied only as raw events; no aggregate HashMap needed.
+            }
+            EventKind::PlanStepFailed { step, reason, .. } => {
+                let key = format!("{step}: {reason}");
+                *self.plan_failures_by_reason.entry(key).or_insert(0) += 1;
+            }
+            EventKind::PlanInterrupted { reason, .. } => {
+                *self.interrupts_by_reason.entry(reason.clone()).or_insert(0) += 1;
+            }
+            _ => {}
+        }
         self.entries.push_back(EventEntry { tick, kind });
         self.total_pushed += 1;
         while self.entries.len() > self.capacity {

@@ -416,26 +416,42 @@ def write_summary(snapshots, action_events, food_events, pop_events,
         lines.append(f"  Hash: {constants_hash}")
         lines.append(f"  Seed: {header.get('seed', '?')}")
 
-    # System activation
+    # System activation — split by feature valence.
+    #
+    # The old "features active: 29/72" ratio was misleading because deaths
+    # and corruption counted toward it. Since schema v2 we emit three groups:
+    # positive (colony-thriving wins), negative (adverse events), neutral
+    # (ecology churn). Render each separately so readers see what's healthy
+    # vs what's going wrong at a glance.
     if activation_events:
         lines.append("\n" + "-" * 50)
         lines.append("SYSTEM ACTIVATION")
         lines.append("-" * 50)
-        # Use the last activation snapshot (most complete)
         last = activation_events[-1]
-        counts = last.get("counts", {})
-        active = sum(1 for v in counts.values() if v > 0)
-        total = len(counts)
-        lines.append(f"  Features active: {active}/{total}")
-        for name, count in sorted(counts.items(), key=lambda x: -x[1]):
-            marker = "" if count > 0 else " ** DEAD **"
-            lines.append(f"  {name:35s}  {count:8d}{marker}")
 
-        dead = [name for name, count in counts.items() if count == 0]
-        if dead:
-            lines.append(f"\n  DEAD FEATURES ({len(dead)}):")
-            for name in sorted(dead):
-                lines.append(f"    - {name}")
+        positive = last.get("positive", {})
+        negative = last.get("negative", {})
+        neutral = last.get("neutral", {})
+
+        def render_section(title: str, counts: dict, show_dead: bool):
+            if not counts:
+                return
+            active = sum(1 for v in counts.values() if v > 0)
+            total = len(counts)
+            lines.append(f"\n  {title} ({active}/{total} firing)")
+            for name, count in sorted(counts.items(), key=lambda x: -x[1]):
+                marker = "" if count > 0 else " ** DEAD **"
+                lines.append(f"    {name:35s}  {count:8d}{marker}")
+            if show_dead:
+                dead = [name for name, count in counts.items() if count == 0]
+                if dead:
+                    lines.append(f"    DEAD IN {title.upper()} ({len(dead)}):")
+                    for name in sorted(dead):
+                        lines.append(f"      - {name}")
+
+        render_section("Positive (healthy signals)", positive, show_dead=True)
+        render_section("Negative (adverse events)", negative, show_dead=False)
+        render_section("Neutral (system activity)", neutral, show_dead=True)
 
     lines.append("\n" + "=" * 70)
 

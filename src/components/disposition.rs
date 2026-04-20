@@ -15,6 +15,17 @@ pub enum CraftingHint {
     PrepareRemedy,
     SetWard,
     Magic,
+    /// Directed cleanse — planner should only pick CleanseCorruption.
+    Cleanse,
+    /// Directed carcass harvest — planner should only pick HarvestCarcass.
+    HarvestCarcass,
+    /// Magic-specialist ward — planner uses SetWard, resolver picks
+    /// WardKind::DurableWard. Selected when a cat's durable_ward sub-score
+    /// wins the PracticeMagic contest.
+    DurableWard,
+    /// Cook a raw food item at a Kitchen — emits a Stores → Kitchen → Stores
+    /// round-trip chain.
+    Cook,
 }
 
 // ---------------------------------------------------------------------------
@@ -88,7 +99,7 @@ impl DispositionKind {
             Action::Groom => None, // Depends on self vs other — caller decides
             Action::Build => Some(Self::Building),
             Action::Farm => Some(Self::Farming),
-            Action::Herbcraft | Action::PracticeMagic => Some(Self::Crafting),
+            Action::Herbcraft | Action::PracticeMagic | Action::Cook => Some(Self::Crafting),
             Action::Coordinate => Some(Self::Coordinating),
             Action::Explore | Action::Wander => Some(Self::Exploring),
             Action::Mate => Some(Self::Mating),
@@ -107,7 +118,7 @@ impl DispositionKind {
             Self::Socializing => &[Action::Socialize, Action::Groom, Action::Mentor],
             Self::Building => &[Action::Build],
             Self::Farming => &[Action::Farm],
-            Self::Crafting => &[Action::Herbcraft, Action::PracticeMagic],
+            Self::Crafting => &[Action::Herbcraft, Action::PracticeMagic, Action::Cook],
             Self::Coordinating => &[Action::Coordinate],
             Self::Exploring => &[Action::Explore, Action::Wander],
             Self::Mating => &[Action::Mate],
@@ -146,6 +157,37 @@ impl DispositionKind {
             Self::Exploring => "Exploring",
             Self::Mating => "Mating",
             Self::Caretaking => "Caretaking",
+        }
+    }
+
+    /// Maslow hierarchy level. Lower = more fundamental = higher priority.
+    /// An urgency can only preempt a plan whose maslow_level is numerically
+    /// higher (less fundamental).
+    pub fn maslow_level(&self) -> u8 {
+        match self {
+            Self::Resting | Self::Hunting | Self::Foraging => 1,
+            Self::Guarding => 2,
+            Self::Socializing | Self::Caretaking | Self::Mating => 3,
+            Self::Crafting | Self::Coordinating | Self::Building | Self::Farming => 4,
+            Self::Exploring => 5,
+        }
+    }
+
+    /// Infinitive verb form for use after "sets out to".
+    pub fn verb_infinitive(&self) -> &'static str {
+        match self {
+            Self::Resting => "rest",
+            Self::Hunting => "hunt",
+            Self::Foraging => "forage",
+            Self::Guarding => "guard",
+            Self::Socializing => "socialize",
+            Self::Building => "build",
+            Self::Farming => "farm",
+            Self::Crafting => "craft",
+            Self::Coordinating => "coordinate",
+            Self::Exploring => "explore",
+            Self::Mating => "find a mate",
+            Self::Caretaking => "tend the young",
         }
     }
 }
@@ -219,6 +261,14 @@ pub struct ActionHistory {
     /// "heads out to hunt" messages when the same disposition is chosen again.
     #[serde(skip, default)]
     pub last_narrated_disposition: Option<DispositionKind>,
+    /// Tick of the last narrated Completed event per disposition. Used to
+    /// throttle "feels rested" and similar repeated completion messages.
+    #[serde(skip, default)]
+    pub last_completed_tick: Option<(DispositionKind, u64)>,
+    /// Number of Replanned events narrated for the current plan lifecycle.
+    /// Reset when a new plan is Adopted.
+    #[serde(skip, default)]
+    pub replans_narrated: u32,
 }
 
 impl ActionHistory {

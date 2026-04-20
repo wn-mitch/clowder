@@ -280,6 +280,8 @@ mod tests {
                     priority: 0.5,
                     coordinator_social_weight: 0.5,
                     delivered_tick: 0,
+                    target_position: None,
+                    target_entity: None,
                 },
             ))
             .id();

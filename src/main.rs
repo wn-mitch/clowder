@@ -18,7 +18,7 @@ use bevy_ecs::schedule::Schedule;
 use clowder::ai::CurrentAction;
 use clowder::components::hunting_priors::HuntingPriors;
 use clowder::components::identity::{Age, Name, Species};
-use clowder::components::magic::Inventory;
+use clowder::components::magic::{Inventory, Ward};
 use clowder::components::mental::{Memory, Mood};
 use clowder::components::physical::{Dead, Health, Needs, Position};
 use clowder::components::skills::{Corruption, MagicAffinity, Training};
@@ -27,10 +27,12 @@ use clowder::plugins::setup::AppArgs;
 use clowder::plugins::simulation::SimulationPlugin;
 use clowder::rendering;
 
+use clowder::resources::system_activation::{Feature, FeatureCategory, SystemActivation};
 use clowder::resources::time::DayPhase;
+use clowder::resources::weather::Weather;
 use clowder::resources::{
-    ColonyHuntingMap, EventLog, FoodStores, NarrativeLog, NarrativeTier, Relationships, SimConfig,
-    SimRng, TemplateRegistry, TileMap, TimeState, WeatherState,
+    ColonyHuntingMap, EventLog, FoodStores, ForcedConditions, NarrativeLog, NarrativeTier,
+    Relationships, SimConfig, SimRng, TemplateRegistry, TileMap, TimeState, WeatherState,
 };
 use clowder::world_gen::colony::{
     find_colony_site, generate_starting_cats, spawn_starting_buildings,
@@ -50,6 +52,7 @@ struct CliArgs {
     test_map: bool,
     trace_positions: u64,
     snapshot_interval: u64,
+    force_weather: Option<Weather>,
 }
 
 fn main() {
@@ -144,6 +147,7 @@ fn parse_args() -> CliArgs {
     let mut test_map = false;
     let mut trace_positions = 0u64;
     let mut snapshot_interval = 100u64;
+    let mut force_weather: Option<Weather> = None;
     let mut iter = args.iter().skip(1);
     while let Some(arg) = iter.next() {
         match arg.as_str() {
@@ -201,6 +205,20 @@ fn parse_args() -> CliArgs {
                     }
                 }
             }
+            "--force-weather" => {
+                let Some(val) = iter.next() else {
+                    eprintln!("Error: --force-weather requires a value");
+                    std::process::exit(2);
+                };
+                force_weather = Some(parse_weather(val).unwrap_or_else(|| {
+                    eprintln!(
+                        "Error: --force-weather: unknown variant {val:?}. \
+                         Expected one of: clear, overcast, light-rain, heavy-rain, \
+                         snow, fog, wind, storm"
+                    );
+                    std::process::exit(2);
+                }));
+            }
             _ => {}
         }
     }
@@ -208,8 +226,14 @@ fn parse_args() -> CliArgs {
     if !headless && duration_secs != 600 {
         eprintln!("Warning: --duration has no effect without --headless");
     }
+    if !headless && force_weather.is_some() {
+        eprintln!("Warning: --force-weather has no effect without --headless");
+    }
 
     eprintln!("seed: {seed}");
+    if let Some(w) = force_weather {
+        eprintln!("forced weather: {}", w.label());
+    }
 
     CliArgs {
         seed,
@@ -222,6 +246,94 @@ fn parse_args() -> CliArgs {
         test_map,
         trace_positions,
         snapshot_interval,
+        force_weather,
+    }
+}
+
+/// Serialize every (weather × phase × terrain) × channel multiplier into a
+/// structured header block. Two sweeps are semantically comparable iff their
+/// diff against this block is understood. Without this snapshot a Phase 5b
+/// activation (which only edits inline `1.0` returns) would be invisible in
+/// the event-log header — the constants-hash rule wouldn't flag it because
+/// the values live in enum methods, not `SimConstants`.
+fn sensory_env_multipliers_snapshot() -> serde_json::Value {
+    use clowder::resources::map::Terrain;
+
+    let weather_variants = [
+        Weather::Clear,
+        Weather::Overcast,
+        Weather::LightRain,
+        Weather::HeavyRain,
+        Weather::Snow,
+        Weather::Fog,
+        Weather::Wind,
+        Weather::Storm,
+    ];
+    let phase_variants = [DayPhase::Dawn, DayPhase::Day, DayPhase::Dusk, DayPhase::Night];
+
+    let weather_block: serde_json::Map<String, serde_json::Value> = weather_variants
+        .iter()
+        .map(|w| {
+            (
+                w.label().to_string(),
+                serde_json::json!({
+                    "sight": w.sight_multiplier(),
+                    "hearing": w.hearing_multiplier(),
+                    "scent": w.scent_multiplier(),
+                    "tremor": w.tremor_multiplier(),
+                }),
+            )
+        })
+        .collect();
+
+    let phase_block: serde_json::Map<String, serde_json::Value> = phase_variants
+        .iter()
+        .map(|p| {
+            (
+                p.label().to_string(),
+                serde_json::json!({
+                    "sight": p.sight_multiplier(),
+                    "hearing": p.hearing_multiplier(),
+                    "scent": p.scent_multiplier(),
+                    "tremor": p.tremor_multiplier(),
+                }),
+            )
+        })
+        .collect();
+
+    let terrain_block: serde_json::Map<String, serde_json::Value> = Terrain::ALL
+        .iter()
+        .map(|t| {
+            (
+                format!("{t:?}"),
+                serde_json::json!({
+                    "occludes_sight": t.occludes_sight(),
+                    "tremor_transmission": t.tremor_transmission(),
+                }),
+            )
+        })
+        .collect();
+
+    serde_json::json!({
+        "weather": weather_block,
+        "day_phase": phase_block,
+        "terrain": terrain_block,
+    })
+}
+
+/// Accept kebab-case or space-case weather names.
+fn parse_weather(s: &str) -> Option<Weather> {
+    let key = s.to_ascii_lowercase().replace('_', "-");
+    match key.as_str() {
+        "clear" => Some(Weather::Clear),
+        "overcast" => Some(Weather::Overcast),
+        "light-rain" | "lightrain" => Some(Weather::LightRain),
+        "heavy-rain" | "heavyrain" => Some(Weather::HeavyRain),
+        "snow" => Some(Weather::Snow),
+        "fog" => Some(Weather::Fog),
+        "wind" => Some(Weather::Wind),
+        "storm" => Some(Weather::Storm),
+        _ => None,
     }
 }
 
@@ -249,6 +361,7 @@ fn build_schedule() -> Schedule {
                     clowder::systems::magic::herb_seasonal_check,
                     clowder::systems::magic::advance_herb_growth,
                     clowder::systems::magic::advance_flavor_growth,
+                    clowder::systems::magic::herb_regrowth,
                 )
                     .chain(),
                 clowder::systems::magic::corruption_tile_effects,
@@ -259,6 +372,11 @@ fn build_schedule() -> Schedule {
                     clowder::systems::wildlife::wildlife_ai,
                     clowder::systems::wildlife::fox_movement,
                     clowder::systems::wildlife::fox_needs_tick,
+                    clowder::systems::fox_goap::sync_fox_needs,
+                    clowder::systems::fox_goap::fox_evaluate_and_plan,
+                    clowder::systems::fox_goap::fox_resolve_goap_plans,
+                    clowder::systems::fox_goap::feed_cubs_at_dens,
+                    clowder::systems::fox_goap::resolve_paired_confrontations,
                     clowder::systems::wildlife::fox_ai_decision,
                     clowder::systems::wildlife::fox_scent_tick,
                     clowder::systems::wildlife::predator_hunt_prey,
@@ -301,6 +419,7 @@ fn build_schedule() -> Schedule {
                 clowder::systems::memory::decay_memories,
                 clowder::systems::coordination::evaluate_coordinators,
                 clowder::systems::coordination::assess_colony_needs,
+                clowder::systems::coordination::dispatch_urgent_directives,
                 clowder::systems::coordination::accumulate_build_pressure,
                 clowder::systems::coordination::spawn_construction_sites,
             )
@@ -375,6 +494,7 @@ fn build_schedule() -> Schedule {
         clowder::systems::snapshot::emit_position_traces
             .after(clowder::systems::goap::resolve_goap_plans),
     );
+    schedule.add_systems(clowder::systems::snapshot::emit_spatial_snapshots);
     schedule.add_systems(clowder::systems::colony_score::emit_colony_score);
     // Fate and aspiration lifecycle.
     schedule.add_systems(clowder::systems::fate::assign_fated_connections);
@@ -427,6 +547,7 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
         full_snapshot_interval: args.snapshot_interval,
         position_trace_interval: args.trace_positions,
         economy_interval: args.snapshot_interval,
+        ..Default::default()
     });
 
     // Ensure new resources exist (may be absent from older saves).
@@ -472,6 +593,9 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
     if !world.contains_resource::<clowder::resources::SystemActivation>() {
         world.insert_resource(clowder::resources::SystemActivation::default());
     }
+    if !world.contains_resource::<clowder::resources::ForcedConditions>() {
+        world.insert_resource(clowder::resources::ForcedConditions::default());
+    }
 
     Ok(world)
 }
@@ -490,6 +614,15 @@ fn run_headless(args: CliArgs) -> io::Result<()> {
         time.paused = false;
     }
 
+    // Apply diagnostic overrides before the first schedule tick runs.
+    if let Some(w) = args.force_weather {
+        let mut forced = world.resource_mut::<ForcedConditions>();
+        forced.weather = Some(w);
+        // Pin the current weather immediately so tick-0 readers don't see the default.
+        let mut weather = world.resource_mut::<WeatherState>();
+        weather.current = w;
+    }
+
     // Resolve log paths.
     let log_path = args
         .log_path
@@ -506,19 +639,53 @@ fn run_headless(args: CliArgs) -> io::Result<()> {
 
     let mut file = std::fs::File::create(&log_path)?;
     let mut event_file = std::fs::File::create(&event_log_path)?;
+    let commit_hash = env!("GIT_HASH");
+    let commit_hash_short = env!("GIT_HASH_SHORT");
+    let commit_time = env!("GIT_COMMIT_TIME");
+    let commit_dirty = env!("GIT_DIRTY") == "true";
     writeln!(
         file,
         "{}",
-        serde_json::json!({"_header": true, "seed": args.seed, "duration_secs": args.duration_secs})
+        serde_json::json!({
+            "_header": true,
+            "seed": args.seed,
+            "duration_secs": args.duration_secs,
+            "commit_hash": commit_hash,
+            "commit_hash_short": commit_hash_short,
+            "commit_dirty": commit_dirty,
+            "commit_time": commit_time,
+        })
     )?;
     let constants_json = {
         let c = world.resource::<clowder::resources::SimConstants>();
         serde_json::to_value(c.clone()).unwrap_or_default()
     };
+    let sim_config_json = serde_json::to_value(world.resource::<SimConfig>().clone())
+        .unwrap_or_default();
+    let forced_weather_json = args.force_weather.map(|w| w.label());
+    let sensory_env_multipliers_json = sensory_env_multipliers_snapshot();
+    let (map_width, map_height) = {
+        let tm = world.resource::<clowder::resources::map::TileMap>();
+        (tm.width, tm.height)
+    };
     writeln!(
         event_file,
         "{}",
-        serde_json::json!({"_header": true, "seed": args.seed, "duration_secs": args.duration_secs, "constants": constants_json})
+        serde_json::json!({
+            "_header": true,
+            "seed": args.seed,
+            "duration_secs": args.duration_secs,
+            "commit_hash": commit_hash,
+            "commit_hash_short": commit_hash_short,
+            "commit_dirty": commit_dirty,
+            "commit_time": commit_time,
+            "sim_config": sim_config_json,
+            "map_width": map_width,
+            "map_height": map_height,
+            "constants": constants_json,
+            "forced_weather": forced_weather_json,
+            "sensory_env_multipliers": sensory_env_multipliers_json,
+        })
     )?;
 
     let duration = Duration::from_secs(args.duration_secs);
@@ -566,6 +733,12 @@ fn run_headless(args: CliArgs) -> io::Result<()> {
     flush_new_entries(&world, &mut file, &mut last_flushed)?;
     flush_event_entries(&world, &mut event_file, &mut last_events_flushed)?;
 
+    // Emit end-of-sim diagnostic footer to the event log. This is the
+    // machine-readable summary that downstream tooling (baseline diffs,
+    // tuning reports) reads to compare runs. Keep the schema stable.
+    let footer = build_headless_footer(&mut world);
+    writeln!(event_file, "{footer}")?;
+
     let time = world.resource::<TimeState>();
     let config = world.resource::<SimConfig>();
     eprintln!(
@@ -577,6 +750,7 @@ fn run_headless(args: CliArgs) -> io::Result<()> {
     );
     eprintln!("  narrative → {}", log_path.display());
     eprintln!("  events    → {}", event_log_path.display());
+    print_headless_summary(&footer);
 
     // Autosave.
     let save_path = std::path::Path::new(SAVE_PATH);
@@ -585,6 +759,119 @@ fn run_headless(args: CliArgs) -> io::Result<()> {
     }
 
     Ok(())
+}
+
+/// Build the end-of-sim diagnostic footer as a JSON string.
+///
+/// Pulls cumulative tallies from [`EventLog`] and [`SystemActivation`], plus a
+/// live query of surviving [`Ward`] entities for count and average strength.
+/// This is the structured summary that gets appended to `events.jsonl` and
+/// is the source of truth for cross-run comparisons.
+fn build_headless_footer(world: &mut World) -> String {
+    let (ward_count_final, ward_avg_strength_final) = {
+        let mut q = world.query::<&Ward>();
+        let (count, sum) = q
+            .iter(world)
+            .fold((0u64, 0.0f32), |(c, s), w| (c + 1, s + w.strength));
+        let avg = if count == 0 { 0.0 } else { sum / count as f32 };
+        (count, avg)
+    };
+
+    let activation = world.resource::<SystemActivation>();
+    let feature_count = |f: Feature| activation.counts.get(&f).copied().unwrap_or(0);
+    let wards_placed_total = feature_count(Feature::WardPlaced);
+    let wards_despawned_total = feature_count(Feature::WardDespawned);
+    let shadow_foxes_avoided_ward_total = feature_count(Feature::ShadowFoxAvoidedWard);
+    let ward_siege_started_total = feature_count(Feature::WardSiegeStarted);
+    let shadow_fox_spawn_total = feature_count(Feature::ShadowFoxSpawn);
+    let anxiety_interrupt_total = feature_count(Feature::AnxietyInterrupt);
+
+    let positive_features_active = activation.features_active_in(FeatureCategory::Positive);
+    let positive_features_total = SystemActivation::features_total_in(FeatureCategory::Positive);
+    let negative_events_total = activation.negative_event_count();
+    let neutral_features_active = activation.features_active_in(FeatureCategory::Neutral);
+    let neutral_features_total = SystemActivation::features_total_in(FeatureCategory::Neutral);
+
+    let event_log = world.resource::<EventLog>();
+    let footer = serde_json::json!({
+        "_footer": true,
+        "wards_placed_total": wards_placed_total,
+        "wards_despawned_total": wards_despawned_total,
+        "ward_count_final": ward_count_final,
+        "ward_avg_strength_final": ward_avg_strength_final,
+        "shadow_foxes_avoided_ward_total": shadow_foxes_avoided_ward_total,
+        "ward_siege_started_total": ward_siege_started_total,
+        "shadow_fox_spawn_total": shadow_fox_spawn_total,
+        "anxiety_interrupt_total": anxiety_interrupt_total,
+        "positive_features_active": positive_features_active,
+        "positive_features_total": positive_features_total,
+        "negative_events_total": negative_events_total,
+        "neutral_features_active": neutral_features_active,
+        "neutral_features_total": neutral_features_total,
+        "deaths_by_cause": event_log.deaths_by_cause,
+        "plan_failures_by_reason": event_log.plan_failures_by_reason,
+        "interrupts_by_reason": event_log.interrupts_by_reason,
+    });
+    footer.to_string()
+}
+
+/// Pretty-print the footer summary to stderr for the operator running the sim.
+///
+/// Reads the JSON footer back out as a Value so the set of printed fields
+/// stays aligned with the file schema — if a new field is added to
+/// [`build_headless_footer`], it shows up here automatically (for maps) or
+/// gets a one-liner (for scalars).
+fn print_headless_summary(footer: &str) {
+    let v: serde_json::Value = match serde_json::from_str(footer) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("  (footer parse failed: {e})");
+            return;
+        }
+    };
+    eprintln!("\n== Diagnostic footer ==");
+    let scalar_fields = [
+        "wards_placed_total",
+        "wards_despawned_total",
+        "ward_count_final",
+        "ward_avg_strength_final",
+        "shadow_foxes_avoided_ward_total",
+        "ward_siege_started_total",
+        "shadow_fox_spawn_total",
+        "anxiety_interrupt_total",
+        "positive_features_active",
+        "positive_features_total",
+        "negative_events_total",
+        "neutral_features_active",
+        "neutral_features_total",
+    ];
+    for key in scalar_fields {
+        if let Some(val) = v.get(key) {
+            eprintln!("  {key}: {val}");
+        }
+    }
+    for key in [
+        "deaths_by_cause",
+        "plan_failures_by_reason",
+        "interrupts_by_reason",
+    ] {
+        let Some(map) = v.get(key).and_then(|x| x.as_object()) else {
+            continue;
+        };
+        if map.is_empty() {
+            eprintln!("  {key}: (none)");
+            continue;
+        }
+        eprintln!("  {key}:");
+        let mut entries: Vec<_> = map.iter().collect();
+        entries.sort_by(|a, b| b.1.as_u64().unwrap_or(0).cmp(&a.1.as_u64().unwrap_or(0)));
+        for (k, count) in entries.iter().take(10) {
+            eprintln!("    {count}× {k}");
+        }
+        if entries.len() > 10 {
+            eprintln!("    … ({} more)", entries.len() - 10);
+        }
+    }
 }
 
 fn flush_new_entries(
@@ -611,6 +898,7 @@ fn flush_new_entries(
             NarrativeTier::Significant => "Significant",
             NarrativeTier::Danger => "Danger",
             NarrativeTier::Nature => "Nature",
+            NarrativeTier::Legend => "Legend",
         };
         writeln!(
             file,
@@ -710,17 +998,28 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
     // Set initial corruption and mystery on special tiles (must be after placement).
     clowder::world_gen::herbs::initialize_tile_magic(&mut map, &mut sim_rng.rng);
 
-    // Start the clock high enough that cats can have varied ages.
-    let start_tick: u64 = 100_000;
+    // Start the clock high enough that cats can have varied ages. Must exceed
+    // the maximum rolled age in ticks (see `FounderAgeConstants::elder_max_seasons`)
+    // — otherwise `born_tick = start_tick.saturating_sub(age_ticks)` clamps to 0
+    // and every cat reads back as the age of start_tick itself (Young by
+    // default), which silently blocks mating eligibility.
+    let ticks_per_season = config.ticks_per_season;
+    let start_tick: u64 = 60 * ticks_per_season;
 
-    let mut cat_blueprints =
-        load_custom_cats(start_tick, config.ticks_per_season, &mut sim_rng.rng);
+    let age_consts = &constants.founder_age;
+    let mut cat_blueprints = load_custom_cats(
+        start_tick,
+        config.ticks_per_season,
+        age_consts,
+        &mut sim_rng.rng,
+    );
     let remaining = 8usize.saturating_sub(cat_blueprints.len());
     if remaining > 0 {
         cat_blueprints.extend(generate_starting_cats(
             remaining,
             start_tick,
             config.ticks_per_season,
+            age_consts,
             &mut sim_rng.rng,
         ));
     }
@@ -741,6 +1040,7 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
     });
     world.insert_resource(config);
     world.insert_resource(WeatherState::default());
+    world.insert_resource(clowder::resources::ForcedConditions::default());
     world.insert_resource(clowder::resources::time::TransitionTracker::default());
     world.insert_resource(NarrativeLog::default());
     world.insert_resource(clowder::resources::ColonyKnowledge::default());
@@ -765,7 +1065,14 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
     bevy_ecs::message::MessageRegistry::register_message::<
         clowder::systems::magic::CorruptionPushback,
     >(&mut world);
-    world.insert_resource(clowder::resources::ColonyScore::default());
+    // Seed `last_recorded_season` to the current season so `seasons_survived`
+    // starts at 0 and counts real elapsed seasons, not the start_tick offset.
+    let initial_season = start_tick / ticks_per_season;
+    let initial_score = clowder::resources::ColonyScore {
+        last_recorded_season: initial_season,
+        ..Default::default()
+    };
+    world.insert_resource(initial_score);
     world.insert_resource(map);
     world.insert_resource(sim_rng);
 
@@ -812,6 +1119,7 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
                     Inventory::default(),
                     HuntingPriors::default(),
                     clowder::components::grooming::GroomingCondition::default(),
+                    clowder::components::goap_plan::PendingUrgencies::default(),
                 ),
             ))
             .id();
@@ -839,6 +1147,9 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
 
     // Insert cat presence map resource.
     world.insert_resource(clowder::resources::CatPresenceMap::default());
+
+    // Insert unmet-demand ledger (mirrors SimulationPlugin).
+    world.insert_resource(clowder::resources::UnmetDemand::default());
 
     // Spawn initial prey animals across their habitats.
     clowder::world_gen::prey_ecosystem::seed_prey_ecosystem(&mut world);

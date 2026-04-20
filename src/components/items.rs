@@ -147,6 +147,26 @@ impl ItemKind {
         }
     }
 
+    /// Whether `name()` returns a grammatically plural form.
+    pub fn is_plural_name(self) -> bool {
+        matches!(
+            self,
+            Self::Berries | Self::Nuts | Self::Roots | Self::Mushroom | Self::Feather
+        )
+    }
+
+    /// Singular form of the item name for grammatical contexts like "every last X".
+    pub fn singular_name(self) -> &'static str {
+        match self {
+            Self::Berries => "berry",
+            Self::Nuts => "nut",
+            Self::Roots => "root",
+            Self::Mushroom => "mushroom",
+            Self::Feather => "feather",
+            _ => self.name(),
+        }
+    }
+
     /// Hunger satisfaction provided when consumed (0.0–1.0 scale).
     /// Non-food items return 0.0.
     ///
@@ -176,16 +196,22 @@ impl ItemKind {
 pub struct ItemModifiers {
     /// Corruption level from the source tile, clamped to `[0.0, 1.0]`.
     pub corruption: f32,
+    /// True if the item has been cooked at a Kitchen. Cooked food yields a
+    /// hunger-restoration multiplier in `resolve_eat_at_stores`.
+    #[serde(default)]
+    pub cooked: bool,
 }
 
 impl ItemModifiers {
     pub fn with_corruption(corruption: f32) -> Self {
         Self {
             corruption: corruption.clamp(0.0, 1.0),
+            ..Self::default()
         }
     }
 
-    /// True when no modifiers are active (clean item).
+    /// True when the item has no negative modifiers (i.e. is not corrupted).
+    /// Cooked items are still "clean" — cooking is a positive modifier.
     pub fn is_clean(&self) -> bool {
         self.corruption == 0.0
     }
@@ -467,5 +493,38 @@ mod tests {
         let mods = ItemModifiers::with_corruption(0.7);
         let item = Item::with_modifiers(ItemKind::Berries, 0.5, ItemLocation::OnGround, mods);
         assert_eq!(item.modifiers.corruption, 0.7);
+    }
+
+    #[test]
+    fn cooked_defaults_false_and_preserves_through_with_modifiers() {
+        let default = ItemModifiers::default();
+        assert!(!default.cooked);
+        let with_corr = ItemModifiers::with_corruption(0.4);
+        assert!(!with_corr.cooked);
+    }
+
+    #[test]
+    fn cooked_item_yields_multiplier_on_hunger_math() {
+        // Mirrors the formula in `resolve_eat_at_stores`.
+        let cooked_food_multiplier = 1.3_f32;
+        let penalty = 0.5_f32;
+        let base = ItemKind::RawRat.food_value(); // 0.8
+        let raw_mods = ItemModifiers::default();
+        let cooked_mods = ItemModifiers {
+            corruption: 0.0,
+            cooked: true,
+        };
+        let freshness = 1.0 - raw_mods.corruption * penalty;
+        let raw_value = base * freshness;
+        let cooked_value = base * freshness
+            * if cooked_mods.cooked {
+                cooked_food_multiplier
+            } else {
+                1.0
+            };
+        assert!(
+            (cooked_value - raw_value * 1.3).abs() < 1e-4,
+            "cooked item should yield 1.3× the raw food value"
+        );
     }
 }

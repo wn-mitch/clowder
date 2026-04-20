@@ -134,6 +134,8 @@ pub enum StepKind {
     DeliverDirective {
         kind: crate::components::coordination::DirectiveKind,
         priority: f32,
+        /// Spatial target from the directive (e.g. ward placement position).
+        directive_target: Option<crate::components::physical::Position>,
     },
     /// Mate with target cat. ~10 ticks. Requires proximity.
     MateWith,

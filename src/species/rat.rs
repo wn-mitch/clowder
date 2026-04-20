@@ -13,6 +13,9 @@ impl PreyProfile for Rat {
     fn name(&self) -> &'static str {
         "rat"
     }
+    fn plural_name(&self) -> &'static str {
+        "rats"
+    }
     fn symbol(&self) -> char {
         'r'
     }

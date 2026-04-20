@@ -48,7 +48,11 @@ pub fn resolve_tend(
     }
 
     if let Some(mut crop) = maybe_crop {
-        crop.growth += skills.foraging * season_mod * 0.01;
+        let crop_modifier = match crop.crop_kind {
+            crate::components::building::CropKind::Thornbriar => 0.5,
+            _ => 1.0,
+        };
+        crop.growth += skills.foraging * season_mod * 0.01 * crop_modifier;
         skills.foraging += skills.growth_rate() * 0.005 * workshop_bonus;
 
         if crop.growth >= 1.0 {

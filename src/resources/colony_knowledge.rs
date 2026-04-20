@@ -85,6 +85,7 @@ pub fn knowledge_description(entry: &KnowledgeEntry) -> String {
         MemoryType::MagicEvent => format!("the strange happenings near {location_desc}"),
         MemoryType::Injury => format!("the peril near {location_desc}"),
         MemoryType::SocialEvent => format!("the gathering near {location_desc}"),
+        MemoryType::Triumph => format!("the banishment near {location_desc}"),
     }
 }
 

@@ -1,4 +1,5 @@
 pub mod actions;
+pub mod core;
 pub mod goals;
 
 use std::cmp::Reverse;
@@ -17,6 +18,7 @@ pub enum PlannerZone {
     Farm,
     ConstructionSite,
     HerbPatch,
+    Kitchen,
     RestingSpot,
     SocialTarget,
     Wilds,
@@ -29,6 +31,8 @@ pub enum Carrying {
     Nothing,
     Prey,
     ForagedFood,
+    RawFood,
+    CookedFood,
     BuildMaterials,
     Herbs,
     Remedy,
@@ -48,6 +52,7 @@ pub struct PlannerState {
     pub construction_done: bool,
     pub prey_found: bool,
     pub farm_tended: bool,
+    pub thornbriar_available: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -90,6 +95,10 @@ pub enum GoapActionKind {
     SetWard,
     Scry,
     SpiritCommunion,
+    // Cooking
+    RetrieveRawFood,
+    Cook,
+    DepositCookedFood,
     // Cleansing
     CleanseCorruption,
     HarvestCarcass,
@@ -119,6 +128,7 @@ pub enum StatePredicate {
     InteractionDone(bool),
     ConstructionDone(bool),
     FarmTended(bool),
+    ThornbriarAvailable(bool),
     TripsAtLeast(u32),
 }
 
@@ -136,6 +146,7 @@ impl StatePredicate {
             Self::InteractionDone(v) => state.interaction_done == *v,
             Self::ConstructionDone(v) => state.construction_done == *v,
             Self::FarmTended(v) => state.farm_tended == *v,
+            Self::ThornbriarAvailable(v) => state.thornbriar_available == *v,
             Self::TripsAtLeast(n) => state.trips_done >= *n,
         }
     }
@@ -383,6 +394,28 @@ fn reconstruct_path(arena: &[SearchNode], goal_idx: usize) -> Vec<PlannedStep> {
 }
 
 // ---------------------------------------------------------------------------
+// CatDomain — implements GoapDomain for the cat planner
+// ---------------------------------------------------------------------------
+
+/// Marker type binding the cat-specific planner types to the generic core.
+pub struct CatDomain;
+
+impl core::GoapDomain for CatDomain {
+    type State = PlannerState;
+    type ActionKind = GoapActionKind;
+    type Predicate = StatePredicate;
+    type Effect = StateEffect;
+
+    fn evaluate(pred: &StatePredicate, state: &PlannerState) -> bool {
+        pred.evaluate(state)
+    }
+
+    fn apply(effect: &StateEffect, state: &mut PlannerState) {
+        effect.apply(state);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -402,6 +435,7 @@ mod tests {
             construction_done: false,
             prey_found: false,
             farm_tended: false,
+            thornbriar_available: false,
         }
     }
 
@@ -661,6 +695,7 @@ mod tests {
             construction_done: false,
             prey_found: false,
             farm_tended: false,
+            thornbriar_available: false,
         };
         let goal = GoalState {
             predicates: vec![StatePredicate::TripsAtLeast(3)],

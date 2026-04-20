@@ -17,6 +17,10 @@ pub struct ColonyWell;
 pub enum StructureType {
     Den,
     Hearth,
+    /// Cooking workstation — cats bring raw food here, transform it into
+    /// cooked items, and return it to Stores. Cooked items grant a
+    /// hunger-restoration multiplier when eaten (`cooked_food_multiplier`).
+    Kitchen,
     Stores,
     Workshop,
     Garden,
@@ -32,6 +36,7 @@ impl StructureType {
         match self {
             Self::Den => vec![(Material::Wood, 10), (Material::Stone, 6)],
             Self::Hearth => vec![(Material::Stone, 12), (Material::Wood, 5)],
+            Self::Kitchen => vec![(Material::Stone, 6), (Material::Wood, 6)],
             Self::Stores => vec![(Material::Wood, 10), (Material::Stone, 5)],
             Self::Workshop => vec![
                 (Material::Wood, 7),
@@ -49,7 +54,7 @@ impl StructureType {
     /// Default size in tiles (width, height).
     pub fn default_size(self) -> (i32, i32) {
         match self {
-            Self::Den | Self::Workshop => (3, 3),
+            Self::Den | Self::Workshop | Self::Kitchen => (3, 3),
             Self::Hearth | Self::Stores => (4, 3),
             Self::Garden => (6, 5),
             Self::Watchtower => (2, 3),
@@ -64,6 +69,7 @@ impl StructureType {
         match self {
             Self::Den => Terrain::Den,
             Self::Hearth => Terrain::Hearth,
+            Self::Kitchen => Terrain::Kitchen,
             Self::Stores => Terrain::Stores,
             Self::Workshop => Terrain::Workshop,
             Self::Garden => Terrain::Garden,
@@ -269,11 +275,23 @@ impl ConstructionSite {
 // CropState component
 // ---------------------------------------------------------------------------
 
+/// What kind of crop a garden is growing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub enum CropKind {
+    /// Standard food crops: produces Berries + Roots.
+    #[default]
+    FoodCrops,
+    /// Thornbriar herb: produces a harvestable Thornbriar entity.
+    Thornbriar,
+}
+
 /// Tracks crop growth on a `Garden` building entity.
 #[derive(Component, Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
 pub struct CropState {
     /// Growth progress: 0.0 (just planted) → 1.0 (ready to harvest).
     pub growth: f32,
+    /// What kind of crop is being grown.
+    pub crop_kind: CropKind,
 }
 
 // ---------------------------------------------------------------------------
@@ -462,6 +480,7 @@ mod tests {
         let types = [
             StructureType::Den,
             StructureType::Hearth,
+            StructureType::Kitchen,
             StructureType::Stores,
             StructureType::Workshop,
             StructureType::Garden,

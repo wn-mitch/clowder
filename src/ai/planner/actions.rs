@@ -108,7 +108,7 @@ pub fn resting_actions() -> Vec<GoapActionDef> {
         },
         GoapActionDef {
             kind: GoapActionKind::SelfGroom,
-            cost: 1,
+            cost: 2,
             // No zone precondition — cats can groom anywhere.
             preconditions: vec![],
             effects: vec![StateEffect::SetWarmthOk(true)],
@@ -274,6 +274,7 @@ pub fn crafting_actions(hint: CraftingHint) -> Vec<GoapActionDef> {
                 preconditions: vec![
                     StatePredicate::ZoneIs(PlannerZone::HerbPatch),
                     StatePredicate::CarryingIs(Carrying::Nothing),
+                    StatePredicate::ThornbriarAvailable(true),
                 ],
                 effects: vec![StateEffect::SetCarrying(Carrying::Herbs)],
             },
@@ -317,6 +318,66 @@ pub fn crafting_actions(hint: CraftingHint) -> Vec<GoapActionDef> {
                 cost: 3,
                 preconditions: vec![],
                 effects: vec![StateEffect::IncrementTrips],
+            },
+        ],
+        // Directed cleanse — only one action available so the planner must use it.
+        CraftingHint::Cleanse => vec![GoapActionDef {
+            kind: GoapActionKind::CleanseCorruption,
+            cost: 1,
+            preconditions: vec![],
+            effects: vec![StateEffect::IncrementTrips],
+        }],
+        // Directed carcass harvest — only HarvestCarcass available.
+        CraftingHint::HarvestCarcass => vec![GoapActionDef {
+            kind: GoapActionKind::HarvestCarcass,
+            cost: 1,
+            preconditions: vec![],
+            effects: vec![StateEffect::IncrementTrips],
+        }],
+        // Directed durable-ward — magic-specialist cats whose durable_ward
+        // sub-score won the PracticeMagic contest. Single action so A* can't
+        // fall back to cheaper alternatives like Scry.
+        CraftingHint::DurableWard => vec![GoapActionDef {
+            kind: GoapActionKind::SetWard,
+            cost: 1,
+            preconditions: vec![],
+            effects: vec![StateEffect::IncrementTrips],
+        }],
+        // Cook: fetch a raw food from Stores, take it to a Kitchen, cook it,
+        // and return it to Stores. Travel legs come from `travel_actions`
+        // (the zone distance matrix); these three actions are the cook-only
+        // steps that transition Carrying between Nothing → RawFood → CookedFood
+        // → Nothing.
+        CraftingHint::Cook => vec![
+            GoapActionDef {
+                kind: GoapActionKind::RetrieveRawFood,
+                cost: 2,
+                preconditions: vec![
+                    StatePredicate::ZoneIs(PlannerZone::Stores),
+                    StatePredicate::CarryingIs(Carrying::Nothing),
+                ],
+                effects: vec![StateEffect::SetCarrying(Carrying::RawFood)],
+            },
+            GoapActionDef {
+                kind: GoapActionKind::Cook,
+                cost: 3,
+                preconditions: vec![
+                    StatePredicate::ZoneIs(PlannerZone::Kitchen),
+                    StatePredicate::CarryingIs(Carrying::RawFood),
+                ],
+                effects: vec![StateEffect::SetCarrying(Carrying::CookedFood)],
+            },
+            GoapActionDef {
+                kind: GoapActionKind::DepositCookedFood,
+                cost: 1,
+                preconditions: vec![
+                    StatePredicate::ZoneIs(PlannerZone::Stores),
+                    StatePredicate::CarryingIs(Carrying::CookedFood),
+                ],
+                effects: vec![
+                    StateEffect::SetCarrying(Carrying::Nothing),
+                    StateEffect::IncrementTrips,
+                ],
             },
         ],
     }
@@ -413,6 +474,7 @@ mod tests {
             construction_done: false,
             prey_found: false,
             farm_tended: false,
+            thornbriar_available: false,
         }
     }
 
@@ -425,6 +487,7 @@ mod tests {
             PlannerZone::Farm,
             PlannerZone::ConstructionSite,
             PlannerZone::HerbPatch,
+            PlannerZone::Kitchen,
             PlannerZone::RestingSpot,
             PlannerZone::SocialTarget,
             PlannerZone::Wilds,
@@ -585,6 +648,76 @@ mod tests {
             vec![
                 GoapActionKind::TravelTo(PlannerZone::SocialTarget),
                 GoapActionKind::MateWith,
+            ]
+        );
+    }
+
+    #[test]
+    fn set_ward_plan_requires_thornbriar_available() {
+        let start = default_state(); // thornbriar_available: false
+        let goal = GoalState {
+            predicates: vec![StatePredicate::TripsAtLeast(1)],
+        };
+        let distances = basic_distances();
+        let actions = actions_for_disposition(
+            DispositionKind::Crafting,
+            Some(CraftingHint::SetWard),
+            &distances,
+        );
+
+        let plan = make_plan(start, &actions, &goal, 12, 1000);
+        assert!(
+            plan.is_none(),
+            "SetWard plan should be impossible without thornbriar"
+        );
+    }
+
+    #[test]
+    fn set_ward_plan_succeeds_with_thornbriar() {
+        let start = PlannerState {
+            thornbriar_available: true,
+            ..default_state()
+        };
+        let goal = GoalState {
+            predicates: vec![StatePredicate::TripsAtLeast(1)],
+        };
+        let distances = basic_distances();
+        let actions = actions_for_disposition(
+            DispositionKind::Crafting,
+            Some(CraftingHint::SetWard),
+            &distances,
+        );
+
+        let plan = make_plan(start, &actions, &goal, 12, 1000).expect("plan should succeed");
+        let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
+        assert!(kinds.contains(&GoapActionKind::GatherHerb));
+        assert!(kinds.contains(&GoapActionKind::SetWard));
+    }
+
+    #[test]
+    fn cook_plan_travels_through_stores_kitchen_stores() {
+        let start = default_state();
+        let goal = GoalState {
+            predicates: vec![StatePredicate::TripsAtLeast(1)],
+        };
+        let distances = basic_distances();
+        let actions = actions_for_disposition(
+            DispositionKind::Crafting,
+            Some(CraftingHint::Cook),
+            &distances,
+        );
+
+        let plan = make_plan(start, &actions, &goal, 16, 5000).expect("cook plan should succeed");
+        let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                GoapActionKind::TravelTo(PlannerZone::Stores),
+                GoapActionKind::RetrieveRawFood,
+                GoapActionKind::TravelTo(PlannerZone::Kitchen),
+                GoapActionKind::Cook,
+                GoapActionKind::TravelTo(PlannerZone::Stores),
+                GoapActionKind::DepositCookedFood,
             ]
         );
     }

@@ -2,7 +2,7 @@
 
 # Resources
 
-24 resource types derived from `#[derive(Resource)]`.
+30 resource types derived from `#[derive(Resource)]`.
 
 ## `src/components/coordination.rs`
 
@@ -21,6 +21,25 @@
 ### AspirationRegistry (struct)
 
 > All aspiration chains available in the simulation, loaded from RON files.
+
+## `src/resources/cat_presence_map.rs`
+
+### CatPresenceMap (struct)
+
+> Spatial grid tracking cat territorial presence via patrol activity.  Mirrors `FoxScentMap` — same bucketed overlay pattern. Cats deposit presence during patrol actions; all buckets decay globally each tick. Foxes read high-presence areas to avoid cat territory, creating the push-pull territorial boundary dynamic.
+
+| Field | Type |
+|-------|------|
+| `marks` | `Vec<f32>` |
+| `grid_w` | `usize` |
+| `grid_h` | `usize` |
+| `bucket_size` | `i32` |
+
+## `src/resources/colony_center.rs`
+
+### ColonyCenter (struct)
+
+> The colony's founding position, persisted at world generation.  Used as the origin for territory-based queries (corruption ring, threat proximity) and anchors the decorative colony well sprite.
 
 ## `src/resources/colony_hunting_map.rs`
 
@@ -70,20 +89,36 @@
 | `aspirations_completed` | `u64` |
 | `structures_built` | `u64` |
 | `kittens_born` | `u64` |
+| `kittens_surviving` | `u64` |
 | `prey_dens_discovered` | `u64` |
+| `banishments` | `u64` |
 | `last_recorded_season` | `u64` |
 
 ## `src/resources/event_log.rs`
 
 ### EventLog (struct)
 
-> Ring-buffer of structured simulation events for debugging.
+> Ring-buffer of structured simulation events for debugging.  Also carries cumulative diagnostic tallies (deaths by cause, plan failures by reason, interrupts by reason) used by the headless runner's end-of-sim footer. Tallies are cumulative across the whole run — they don't decay when ring-buffer entries are evicted.
 
 | Field | Type |
 |-------|------|
 | `entries` | `VecDeque<EventEntry>` |
 | `capacity` | `usize` |
 | `total_pushed` | `u64` |
+| `deaths_by_cause` | `HashMap<String, u64>` |
+| `plan_failures_by_reason` | `HashMap<String, u64>` |
+| `interrupts_by_reason` | `HashMap<String, u64>` |
+
+## `src/resources/exploration_map.rs`
+
+### ExplorationMap (struct)
+
+> Colony-wide fog-of-war exploration map. Tracks which tiles have been discovered by any cat. Tiles start at 0.0 (unknown) and are set to 1.0 when explored. They decay slowly over time so distant/old discoveries become worth re-visiting.
+
+| Field | Type |
+|-------|------|
+| `width` | `usize` |
+| `height` | `usize` |
 
 ## `src/resources/food.rs`
 
@@ -97,6 +132,29 @@
 | `capacity` | `f32` |
 | `spoilage_rate` | `f32` |
 | `spoilage_multiplier` | `f32` |
+
+## `src/resources/forced_conditions.rs`
+
+### ForcedConditions (struct)
+
+> Diagnostic override that pins simulation conditions to fixed values for controlled-sweep verification runs. Headless-only (the interactive build never sets this).  When `weather` is `Some`, `update_weather` replaces `WeatherState::current` with the pinned variant every tick and suppresses the natural transition roll. The sweep-comparison pipeline uses this to isolate Phase 5b activation effects on a single weather condition without waiting for the condition to arise naturally in a 15-minute run.  Serialized into the event-log header so two run directories can't be accidentally compared when their forced conditions differ.
+
+| Field | Type |
+|-------|------|
+| `weather` | `Option<Weather>` |
+
+## `src/resources/fox_scent_map.rs`
+
+### FoxScentMap (struct)
+
+> Spatial grid tracking fox territorial scent marks.  Follows the same bucketed overlay pattern as `HuntingPriors` and `ColonyHuntingMap`. Foxes deposit scent during patrol and marking phases; all buckets decay globally each tick. Cats can detect high-scent areas to increase vigilance, and rival foxes use scent to recognise claimed territory.
+
+| Field | Type |
+|-------|------|
+| `marks` | `Vec<f32>` |
+| `grid_w` | `usize` |
+| `grid_h` | `usize` |
+| `bucket_size` | `i32` |
 
 ## `src/resources/map.rs`
 
@@ -154,17 +212,21 @@
 | `social` | `SocialConstants` |
 | `mood` | `MoodConstants` |
 | `death` | `DeathConstants` |
+| `founder_age` | `FounderAgeConstants` |
 | `prey` | `PreyConstants` |
 | `species` | `SpeciesConstants` |
 | `scoring` | `ScoringConstants` |
 | `disposition` | `DispositionConstants` |
 | `colony_score` | `ColonyScoreConstants` |
 | `wildlife` | `WildlifeConstants` |
+| `fox_ecology` | `FoxEcologyConstants` |
 | `fate` | `FateConstants` |
 | `coordination` | `CoordinationConstants` |
 | `aspirations` | `AspirationConstants` |
 | `knowledge` | `KnowledgeConstants` |
 | `personality_friction` | `PersonalityFrictionConstants` |
+| `world_gen` | `WorldGenConstants` |
+| `sensory` | `SensoryConstants` |
 
 ## `src/resources/snapshot_config.rs`
 
@@ -177,6 +239,9 @@
 | `full_snapshot_interval` | `u64` |
 | `position_trace_interval` | `u64` |
 | `economy_interval` | `u64` |
+| `spatial_interval` | `u64` |
+| `den_snapshot_interval` | `u64` |
+| `hunting_belief_interval` | `u64` |
 
 ## `src/resources/system_activation.rs`
 
@@ -217,6 +282,18 @@
 | `tick` | `u64` |
 | `paused` | `bool` |
 | `speed` | `SimSpeed` |
+
+## `src/resources/unmet_demand.rs`
+
+### UnmetDemand (struct)
+
+> Colony-wide ledger of "frustrated wants": a cat wanted to perform an action that depends on a specific structure, but no such structure exists (or isn't functional). The coordinator uses this signal to prioritize the missing infrastructure in BuildPressure.  This models the real-world feedback loop where repeated unmet demand drives organizations to invest in the tool/building that would resolve it. Each frustrated attempt adds a small amount; accumulated demand translates to faster BuildPressure accumulation on the matching channel. The ledger decays slowly so that stale frustration fades once the infrastructure is in place.
+
+| Field | Type |
+|-------|------|
+| `kitchen` | `f32` |
+| `workshop` | `f32` |
+| `garden` | `f32` |
 
 ## `src/resources/weather.rs`
 

@@ -218,7 +218,14 @@ pub struct PreyDensity(pub HashMap<PreyKind, f32>);
 // ---------------------------------------------------------------------------
 
 /// Bundle of components for spawning a prey entity.
-pub type PreyBundle = (PreyAnimal, PreyConfig, PreyState, Health);
+pub type PreyBundle = (
+    PreyAnimal,
+    PreyConfig,
+    PreyState,
+    Health,
+    crate::components::sensing::SensorySpecies,
+    crate::components::sensing::SensorySignature,
+);
 
 /// Create a prey entity bundle from a species profile.
 pub fn prey_bundle(profile: &dyn crate::species::PreyProfile) -> PreyBundle {
@@ -227,6 +234,8 @@ pub fn prey_bundle(profile: &dyn crate::species::PreyProfile) -> PreyBundle {
         profile.to_config(),
         profile.to_state(),
         Health::default(),
+        crate::components::sensing::SensorySpecies::Prey(profile.kind()),
+        crate::components::sensing::SensorySignature::PREY,
     )
 }
 

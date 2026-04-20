@@ -11,8 +11,15 @@ pub struct SnapshotConfig {
     pub full_snapshot_interval: u64,
     /// Lightweight position+action trace per cat. Cheap — safe at interval=1.
     pub position_trace_interval: u64,
-    /// FoodLevel + PopulationSnapshot.
+    /// FoodLevel + PopulationSnapshot + WildlifePopulation.
     pub economy_interval: u64,
+    /// WildlifePositions + PreyPositions for the map overlay. 0 = off.
+    pub spatial_interval: u64,
+    /// DenSnapshot cadence (prey dens + fox dens). 0 = off. Dens move rarely,
+    /// so a long interval (default 1000) is sufficient.
+    pub den_snapshot_interval: u64,
+    /// HuntingBeliefSnapshot cadence (downsampled colony belief grid). 0 = off.
+    pub hunting_belief_interval: u64,
 }
 
 impl Default for SnapshotConfig {
@@ -21,6 +28,9 @@ impl Default for SnapshotConfig {
             full_snapshot_interval: 100,
             position_trace_interval: 0, // off by default
             economy_interval: 100,
+            spatial_interval: 500,
+            den_snapshot_interval: 1000,
+            hunting_belief_interval: 1000,
         }
     }
 }

@@ -77,6 +77,38 @@ impl Weather {
             Self::Storm => -0.3,
         }
     }
+
+    // ---- Sensory multipliers (sensing.rs) ----
+    //
+    // Values ship one at a time, each bundled with a verisimilitude
+    // hypothesis + concordance sweep per the Balance Methodology rule in
+    // CLAUDE.md. The activation log lives inline in the per-field docstrings
+    // below.
+
+    /// Multiplier applied to an observer's effective sight range.
+    ///
+    /// Temporarily reverted to 1.0 to re-capture a baseline under the
+    /// updated `start_tick = 60 * ticks_per_season` regime; the prior
+    /// baseline was captured at the legacy `start_tick = 100_000` and
+    /// cross-sweep comparison is unsound across that boundary.
+    pub fn sight_multiplier(self) -> f32 {
+        1.0
+    }
+
+    /// Multiplier applied to an observer's effective hearing range.
+    pub fn hearing_multiplier(self) -> f32 {
+        1.0
+    }
+
+    /// Multiplier applied to an observer's effective scent range.
+    pub fn scent_multiplier(self) -> f32 {
+        1.0
+    }
+
+    /// Multiplier applied to an observer's effective tremor range.
+    pub fn tremor_multiplier(self) -> f32 {
+        1.0
+    }
 }
 
 // ---------------------------------------------------------------------------

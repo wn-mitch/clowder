@@ -43,4 +43,148 @@
         action: Some(Build),
         personality: [(axis: Patience, bucket: High)],
     ),
+
+    // =====================================================================
+    // Personality singles
+    // =====================================================================
+    (
+        text: "{name} steps back to envision the finished structure, then nods and gets back to work.",
+        tier: Action,
+        action: Some(Build),
+        personality: [(axis: Ambition, bucket: High)],
+    ),
+    (
+        text: "{name} lays another stone. One more closer to done.",
+        tier: Action,
+        action: Some(Build),
+        personality: [(axis: Ambition, bucket: Low)],
+    ),
+    (
+        text: "{name} tilts {possessive} head, admiring the wall. Not bad at all.",
+        tier: Action,
+        action: Some(Build),
+        personality: [(axis: Pride, bucket: High)],
+    ),
+    (
+        text: "{name} tries setting the beam at a different angle. Interesting.",
+        tier: Action,
+        action: Some(Build),
+        personality: [(axis: Curiosity, bucket: High)],
+    ),
+    (
+        text: "{name} tears down a section and rebuilds it. Still not right.",
+        tier: Action,
+        action: Some(Build),
+        personality: [(axis: Stubbornness, bucket: High)],
+    ),
+    (
+        text: "{name} chats with a passerby between hammer strikes.",
+        tier: Action,
+        action: Some(Build),
+        personality: [(axis: Sociability, bucket: High)],
+    ),
+    (
+        text: "{name} works in focused silence, not looking up.",
+        tier: Action,
+        action: Some(Build),
+        personality: [(axis: Sociability, bucket: Low)],
+    ),
+    (
+        text: "{name} growls when a joint refuses to seat properly.",
+        tier: Action,
+        action: Some(Build),
+        personality: [(axis: Temper, bucket: High)],
+    ),
+    (
+        text: "{name} whistles tunelessly while fitting stones together.",
+        tier: Action,
+        action: Some(Build),
+        personality: [(axis: Optimism, bucket: High)],
+    ),
+    (
+        text: "{name} stacks stones like none of it will last anyway.",
+        tier: Action,
+        action: Some(Build),
+        personality: [(axis: Optimism, bucket: Low)],
+    ),
+    (
+        text: "{name} measures the same gap three times before cutting the beam.",
+        tier: Action,
+        action: Some(Build),
+        personality: [(axis: Anxiety, bucket: High)],
+    ),
+    (
+        text: "{name} works {possessive} own section, {possessive} own way.",
+        tier: Action,
+        action: Some(Build),
+        personality: [(axis: Independence, bucket: High)],
+    ),
+
+    // =====================================================================
+    // Mood conditions
+    // =====================================================================
+    (
+        text: "{name} works with a satisfied rhythm, paws sure and steady.",
+        tier: Action,
+        action: Some(Build),
+        mood: Some(Happy),
+    ),
+    (
+        text: "{name} lays stones like penance, one after another.",
+        tier: Action,
+        action: Some(Build),
+        mood: Some(Miserable),
+    ),
+    (
+        text: "{name} builds like every beam is a gift to the colony.",
+        tier: Action,
+        action: Some(Build),
+        mood: Some(Euphoric),
+    ),
+
+    // =====================================================================
+    // Personality + Mood combos
+    // =====================================================================
+    (
+        text: "{name} loses {object}self in the craft — paws moving, mind quiet, content.",
+        tier: Action,
+        action: Some(Build),
+        personality: [(axis: Diligence, bucket: High)],
+        mood: Some(Happy),
+    ),
+    (
+        text: "{name} slams a stone into place and wishes it were something else.",
+        tier: Action,
+        action: Some(Build),
+        personality: [(axis: Patience, bucket: Low)],
+        mood: Some(Miserable),
+    ),
+
+    // =====================================================================
+    // Environmental seasoning
+    // =====================================================================
+    (
+        text: "{name} chips at frozen ground, trying to set a foundation.",
+        tier: Action,
+        action: Some(Build),
+        season: Some(Winter),
+    ),
+    (
+        text: "{name} works through the rain, fur plastered flat.",
+        tier: Action,
+        action: Some(Build),
+        weather: Some(LightRain),
+    ),
+    (
+        text: "Young {name} watches the elder builders and copies their technique.",
+        tier: Action,
+        action: Some(Build),
+        life_stage: Some(Young),
+    ),
+    (
+        text: "Old {name} guides the work with a practiced eye, paws steady from years of building.",
+        tier: Action,
+        action: Some(Build),
+        life_stage: Some(Elder),
+    ),
 ]

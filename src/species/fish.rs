@@ -13,6 +13,9 @@ impl PreyProfile for Fish {
     fn name(&self) -> &'static str {
         "fish"
     }
+    fn plural_name(&self) -> &'static str {
+        "fish"
+    }
     fn symbol(&self) -> char {
         '~'
     }

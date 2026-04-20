@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use bevy_ecs::prelude::*;
 
 use crate::ai::pathfinding::find_path;
-use crate::components::building::{ConstructionSite, CropState, StoredItems, Structure, StructureType};
+use crate::components::building::{
+    ConstructionSite, CropState, StoredItems, Structure, StructureType,
+};
 use crate::components::physical::Position;
 use crate::components::skills::Skills;
 use crate::resources::colony_score::ColonyScore;
@@ -67,6 +69,11 @@ pub fn resolve_construct(
         if site.progress >= 1.0 {
             let blueprint = site.blueprint;
             commands.entity(target).remove::<ConstructionSite>();
+            // Remove sprite marker so the rendering system re-attaches at
+            // full opacity now that construction is complete.
+            commands
+                .entity(target)
+                .remove::<crate::rendering::entity_sprites::EntitySpriteMarker>();
             commands.entity(target).insert(Structure::new(blueprint));
             if blueprint == StructureType::Stores {
                 commands.entity(target).insert(StoredItems::default());

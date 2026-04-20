@@ -1,18 +1,29 @@
 #!/usr/bin/env python3
 """
-Build blob autotile atlases from Sprout Lands tilesets.
+Build blob autotile atlases from Fan-tasy Tileset ground sheets.
 
-All terrain tilesets (Grass, Soil, Stone) share the same 11x7 tile layout.
-This script extracts the 47 blob tiles + decorative variants into 8x8 atlases.
+The Fan-tasy Tileset (Premium) uses a single mega-sheet (Tileset_Ground.png,
+768x1520px = 48 cols x 95 rows of 16x16 tiles) with multiple terrain types
+stacked vertically. Each terrain occupies a 10-row band (8 blob rows + 2
+decorative rows) separated by 4-row transition gaps (14 rows per band total).
 
-Each tile is extruded by 1px (edge pixels duplicated outward) to prevent
-texture atlas bleeding at tile boundaries during GPU rendering.
+Within each band, the 47 blob tiles + 1 isolated tile occupy a 6-column x 8-row
+block at (cols 0-5, rows 0-7 relative to band start). The 12 decorative center
+variants occupy (cols 0-5, rows 8-9).
+
+The blob tile coordinates were derived from the TSX Wang Set definitions in:
+  Tiled/Tilesets/Tileset_Ground.tsx
 
 Bitmask bits (clockwise): N=1, NE=2, E=4, SE=8, S=16, SW=32, W=64, NW=128
 Diagonal bits only set when both adjacent cardinals are present.
+
+Transition tiles (terrain A blending into terrain B) live at cols 6+ in each
+band but are NOT extracted here — those are handled separately by the overlay
+layer system.
 """
-from PIL import Image
 from pathlib import Path
+
+from PIL import Image
 
 TILE = 16
 ATLAS_COLS = 8
@@ -20,72 +31,103 @@ PADDING = 0
 STRIDE = TILE + 2 * PADDING  # 16 (no extrusion)
 
 REPO = Path(__file__).resolve().parent.parent
-SPROUT = REPO / "assets/sprites/Sprout Lands - Sprites - premium pack/Tilesets/ground tiles/New tiles"
+FANTASY = REPO / "assets/new_sprites/The Fan-tasy Tileset (Premium)/Art/Ground Tilesets"
+SEASONS = REPO / "assets/new_sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Ground Tilesets"
+SNOW = REPO / "assets/new_sprites/The Fan-tasy Tileset - Snow Adventures/Art/Ground Tilesets"
 OUTPUT_DIR = REPO / "assets/sprites"
 
-# All 47 blob bitmask values → (tileset_col, tileset_row)
-# Layout is identical across Grass, Soil, and Stone tilesets.
+# ---------------------------------------------------------------------------
+# Blob tile coordinates within each 6x8 band.
+# (bitmask, (col_in_band, row_in_band), description)
+# Derived from Tileset_Ground.tsx Wang Set, color=1 (Grass).
+# Coordinates are identical for every terrain band in the mega-sheet.
+# ---------------------------------------------------------------------------
 BLOB_TILES = [
-    (  0, (3, 3), "Isolated"),
-    (  1, (3, 2), "S endcap"),
-    (  4, (0, 3), "W endcap"),
-    (  5, (4, 3), "SW corner+NE inner"),
-    (  7, (0, 2), "SW corner"),
-    ( 16, (3, 0), "N endcap"),
-    ( 17, (3, 1), "N+S strip"),
-    ( 20, (4, 0), "NW corner+SE inner"),
-    ( 21, (4, 4), "W edge+both inners"),
-    ( 23, (4, 1), "W edge+SE inner"),
-    ( 28, (0, 0), "NW corner"),
-    ( 29, (4, 2), "W edge+NE inner"),
-    ( 31, (0, 1), "W edge"),
-    ( 64, (2, 3), "E endcap"),
-    ( 65, (7, 3), "SE corner+NW inner"),
-    ( 68, (1, 3), "E+W strip"),
-    ( 69, (8, 3), "S edge+both inners"),
-    ( 71, (6, 3), "S edge+NW inner"),
-    ( 80, (7, 0), "NE corner+SW inner"),
-    ( 81, (7, 4), "E edge+both inners"),
-    ( 84, (8, 0), "N edge+both inners"),
-    ( 85, (8, 4), "Cross"),
-    ( 87, (9, 3), "3 inner (only NE)"),
-    ( 92, (6, 0), "N edge+SW inner"),
-    ( 93, (9, 2), "3 inner (only SE)"),
-    ( 95, (6, 4), "SW+NW dbl inner"),
-    (112, (2, 0), "NE corner"),
-    (113, (7, 2), "E edge+NW inner"),
-    (116, (5, 0), "N edge+SE inner"),
-    (117, (10, 2), "3 inner (only SW)"),
-    (119, (9, 1), "SE+NW opp inner"),
-    (124, (1, 0), "N edge"),
-    (125, (8, 2), "NE+NW dbl inner"),
-    (127, (6, 2), "NW inner"),
-    (193, (2, 2), "SE corner"),
-    (197, (5, 3), "S edge+NE inner"),
-    (199, (1, 2), "S edge"),
-    (209, (7, 1), "E edge+SW inner"),
-    (213, (10, 3), "3 inner (only NW)"),
-    (215, (8, 1), "SE+SW dbl inner"),
-    (221, (9, 0), "NE+SW opp inner"),
-    (223, (6, 1), "SW inner"),
-    (241, (2, 1), "E edge"),
+    (  0, (0, 3), "Isolated"),
+    (  1, (0, 2), "N endcap"),
+    (  4, (1, 3), "E endcap"),
+    (  5, (2, 5), "NE corner+SW inner"),
+    (  7, (1, 2), "NE corner"),
+    ( 16, (0, 0), "S endcap"),
+    ( 17, (0, 1), "N+S strip"),
+    ( 20, (2, 4), "SE corner+NW inner"),
+    ( 21, (3, 6), "W edge+both inners"),
+    ( 23, (4, 1), "W edge+NW inner"),
+    ( 28, (1, 0), "SE corner"),
+    ( 29, (4, 2), "W edge+SE inner"),
+    ( 31, (1, 1), "W edge"),
+    ( 64, (3, 3), "W endcap"),
+    ( 65, (3, 5), "SW corner+NE inner"),
+    ( 68, (2, 3), "E+W strip"),
+    ( 69, (2, 6), "S edge+both inners"),
+    ( 71, (4, 3), "S edge+NE inner"),
+    ( 80, (3, 4), "NW corner+SE inner"),
+    ( 81, (2, 7), "E edge+both inners"),
+    ( 84, (3, 7), "N edge+both inners"),
+    ( 85, (4, 7), "Cross"),
+    ( 87, (0, 7), "3 inner (only NE)"),
+    ( 92, (4, 0), "N edge+SW inner"),
+    ( 93, (0, 6), "3 inner (only SE)"),
+    ( 95, (4, 5), "SE+NE dbl inner"),
+    (112, (3, 0), "NW corner"),
+    (113, (5, 0), "NW corner alt"),
+    (116, (5, 2), "N edge+SE inner"),
+    (117, (1, 6), "3 inner (only SW)"),
+    (119, (4, 6), "NE+SW opp inner"),
+    (124, (2, 0), "N edge"),
+    (125, (4, 4), "NE+NW dbl inner"),
+    (127, (1, 5), "NW inner"),
+    (193, (3, 2), "SE corner"),
+    (197, (5, 1), "S edge+NE inner"),
+    (199, (2, 2), "S edge"),
+    (209, (5, 3), "E edge+SW inner"),
+    (213, (1, 7), "3 inner (only NW)"),
+    (215, (5, 5), "SE+SW dbl inner"),
+    (221, (5, 6), "NE+SW opp inner alt"),
+    (223, (1, 4), "SW inner"),
+    (241, (3, 1), "E edge"),
     (245, (5, 4), "NE+SE dbl inner"),
-    (247, (5, 1), "SE inner"),
-    (253, (5, 2), "NE inner"),
-    (255, (1, 1), "Center fill"),
+    (247, (0, 4), "SE inner"),
+    (253, (0, 5), "NE inner"),
+    (255, (2, 1), "Center fill"),
 ]
 
-# Decorative center variants (rows 5-6 of tileset)
+# Decorative center variants: rows 8-9 of each band, cols 0-5.
 DECORATIVE = [
-    (0, 5), (1, 5), (2, 5), (3, 5), (4, 5), (5, 5),
-    (0, 6), (1, 6), (2, 6), (3, 6), (4, 6), (5, 6),
+    (0, 8), (1, 8), (2, 8), (3, 8), (4, 8), (5, 8),
+    (0, 9), (1, 9), (2, 9), (3, 9), (4, 9), (5, 9),
 ]
 
-# Tilesets to build atlases for
+# ---------------------------------------------------------------------------
+# Terrain band offsets (row in mega-sheet where each band starts).
+# Band structure: rows 0-7 = blob tiles, rows 8-9 = decorative, rows 10-13 = gap/transitions.
+# Total: 14 rows per band.
+# ---------------------------------------------------------------------------
+BANDS = {
+    "grass":             0,
+    "light_grass":      14,
+    "dark_grass":       28,
+    "winter_grass":     42,
+    "autumn_grass":     56,
+    "dark_autumn_grass":70,
+    "cherry_grass":     84,
+}
+
+# ---------------------------------------------------------------------------
+# Tileset configurations: (name, source_image, band_name, include_decorative)
+# Multiple bands can be extracted from the same source image.
+# ---------------------------------------------------------------------------
+ROAD_BANDS = {
+    "road":           0,
+    "brick_road":    14,
+    "dark_brick":    28,
+}
+
 TILESETS = [
-    ("grass", SPROUT / "Grass_tiles_v2.png", True),     # include decorative variants
-    ("soil",  SPROUT / "Soil_Ground_Tiles.png", True),
-    ("stone", SPROUT / "Stone_Ground_Tiles.png", True),
+    # PR 1: Core ground overlays
+    ("grass",  FANTASY / "Tileset_Ground.png", BANDS, "grass", True),
+    ("soil",   FANTASY / "Tileset_Road.png",   ROAD_BANDS, "road", True),
+    ("stone",  FANTASY / "Tileset_Road.png",   ROAD_BANDS, "brick_road", True),
 ]
 
 assert len(BLOB_TILES) == 47
@@ -148,13 +190,22 @@ def extrude_tile(atlas, tile, ox, oy):
                 atlas.putpixel((cx, cy), tl)
 
 
-def build_atlas(name, tileset_path, include_decorative):
+def build_atlas(name, tileset_path, bands_dict, band_name, include_decorative):
     src = Image.open(tileset_path).convert("RGBA")
     atlas_px = ATLAS_COLS * STRIDE
     atlas = Image.new("RGBA", (atlas_px, atlas_px), (0, 0, 0, 0))
 
+    row_offset = bands_dict[band_name]
+
     for atlas_idx, (bitmask, (sx, sy), desc) in enumerate(BLOB_TILES):
-        tile = src.crop((sx * TILE, sy * TILE, (sx + 1) * TILE, (sy + 1) * TILE))
+        src_col = sx
+        src_row = row_offset + sy
+        tile = src.crop((
+            src_col * TILE,
+            src_row * TILE,
+            (src_col + 1) * TILE,
+            (src_row + 1) * TILE,
+        ))
         col = atlas_idx % ATLAS_COLS
         row = atlas_idx // ATLAS_COLS
         ox = col * STRIDE
@@ -164,7 +215,14 @@ def build_atlas(name, tileset_path, include_decorative):
     if include_decorative:
         for i, (sx, sy) in enumerate(DECORATIVE):
             atlas_idx = 47 + i
-            tile = src.crop((sx * TILE, sy * TILE, (sx + 1) * TILE, (sy + 1) * TILE))
+            src_col = sx
+            src_row = row_offset + sy
+            tile = src.crop((
+                src_col * TILE,
+                src_row * TILE,
+                (src_col + 1) * TILE,
+                (src_row + 1) * TILE,
+            ))
             col = atlas_idx % ATLAS_COLS
             row = atlas_idx // ATLAS_COLS
             ox = col * STRIDE + PADDING
@@ -174,24 +232,60 @@ def build_atlas(name, tileset_path, include_decorative):
     output = OUTPUT_DIR / f"{name}_autotile_atlas.png"
     atlas.save(output)
     n_tiles = 47 + (12 if include_decorative else 0)
-    print(f"  {name}: {output.name} ({atlas.size[0]}x{atlas.size[1]}, {n_tiles} tiles, {PADDING}px extrusion)")
+    print(f"  {name}: {output.name} ({atlas.size[0]}x{atlas.size[1]}, {n_tiles} tiles, band '{band_name}' row {row_offset})")
     return output
 
 
+def build_base_terrain_tiles():
+    """Extract base terrain fill tiles from the Fan-tasy mega-sheet.
+
+    Each terrain band has a center-fill tile at (2, 1) — the bitmask 255 tile.
+    We extract these as individual PNGs for the base terrain layer.
+    """
+    src = Image.open(FANTASY / "Tileset_Ground.png").convert("RGBA")
+
+    base_tiles = {
+        "grass":   ("grass",  0),
+        "dirt":    None,  # Dirt uses the Road tileset, handled separately
+        "rock":    None,  # Rock uses stone_autotile, handled separately
+    }
+
+    # Extract the center-fill tile (col=2, row=1 within each band) as the base tile
+    for name, (band_name, row_offset) in [(k, (k, v)) for k, v in BANDS.items() if k == "grass"]:
+        cx, cy = 2, 1  # center fill position
+        tile = src.crop((
+            cx * TILE,
+            (row_offset + cy) * TILE,
+            (cx + 1) * TILE,
+            (row_offset + cy + 1) * TILE,
+        ))
+        out_path = OUTPUT_DIR / "tiles" / f"{name}.png"
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        tile.save(out_path)
+        print(f"  base tile: {out_path.relative_to(REPO)}")
+
+
 def build_base_terrain_atlas():
-    """Extrude the base terrain atlas (7 tiles in a single row).
-    Reads from the original (tightly packed) source and writes to a
-    separate extruded output so repeated runs don't corrupt the source."""
-    src_path = OUTPUT_DIR / "base_terrain_atlas.png"
-    out_path = OUTPUT_DIR / "base_terrain_atlas_extruded.png"
-    src = Image.open(src_path).convert("RGBA")
-    n_tiles = src.size[0] // TILE
-    atlas = Image.new("RGBA", (n_tiles * STRIDE, STRIDE), (0, 0, 0, 0))
-    for i in range(n_tiles):
-        tile = src.crop((i * TILE, 0, (i + 1) * TILE, TILE))
+    """Build a base terrain atlas from the extracted tiles."""
+    tiles_dir = OUTPUT_DIR / "tiles"
+    tile_names = ["grass", "water", "dirt", "sand", "rock", "stone", "building"]
+    tiles = []
+    for name in tile_names:
+        path = tiles_dir / f"{name}.png"
+        if path.exists():
+            tiles.append(Image.open(path).convert("RGBA"))
+        else:
+            # Placeholder: transparent tile
+            tiles.append(Image.new("RGBA", (TILE, TILE), (0, 0, 0, 0)))
+
+    n = len(tiles)
+    atlas = Image.new("RGBA", (n * STRIDE, STRIDE), (0, 0, 0, 0))
+    for i, tile in enumerate(tiles):
         extrude_tile(atlas, tile, i * STRIDE, 0)
+
+    out_path = OUTPUT_DIR / "base_terrain_atlas.png"
     atlas.save(out_path)
-    print(f"  base: {out_path.name} ({atlas.size[0]}x{atlas.size[1]}, {n_tiles} tiles, {PADDING}px extrusion)")
+    print(f"  base atlas: {out_path.name} ({atlas.size[0]}x{atlas.size[1]}, {n} tiles)")
 
 
 def build_lookup_table():
@@ -202,11 +296,12 @@ def build_lookup_table():
 
 
 def main():
-    print("Building blob autotile atlases...")
-    for name, path, decorative in TILESETS:
-        build_atlas(name, path, decorative)
+    print("Building blob autotile atlases (Fan-tasy Tileset)...")
+    for name, path, bands_dict, band, decorative in TILESETS:
+        build_atlas(name, path, bands_dict, band, decorative)
 
-    print("Extruding base terrain atlas...")
+    print("\nExtracting base terrain tiles...")
+    build_base_terrain_tiles()
     build_base_terrain_atlas()
 
     # Print Rust lookup table (same for all terrain types — same atlas layout)
@@ -220,7 +315,6 @@ def main():
 
     print(f"\nAll atlases use same layout: 47 blob + 12 decorative = 59 tiles in 8x8 grid")
     print(f"Tile size: {TILE}x{TILE}, stride: {STRIDE}x{STRIDE} ({PADDING}px extrusion)")
-    print(f"Set TilemapSpacing {{ x: {PADDING * 2}.0, y: {PADDING * 2}.0 }} in tilemap_sync.rs")
 
 
 if __name__ == "__main__":

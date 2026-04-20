@@ -1,0 +1,27 @@
+{
+  "deaths_by_cause.Starvation": {
+    "direction": "down",
+    "magnitude_pct": 100,
+    "rationale": "Forage yield +20% (0.25 → 0.30) lifts food throughput by roughly the same margin the iteration-1 colony outpaced the stores. Starvation should return to 0 on seed 42."
+  },
+  "deaths_by_cause.ShadowFoxAmbush": {
+    "direction": "flat",
+    "magnitude_pct": 50,
+    "rationale": "Canary — iteration-1 Tier 2C (shadow_fox_corruption_threshold 0.7 → 0.85) stays in place. Expected ≤ 2."
+  },
+  "food_cooked_total": {
+    "direction": "up",
+    "magnitude_pct": 0,
+    "rationale": "New cooking_pressure_multiplier = 1.5× raises Kitchen BuildPressure accumulation so Kitchen completes before food crisis. Expect ≥ 3 cook events once the Kitchen is functional mid-run."
+  },
+  "kittens_born": {
+    "direction": "up",
+    "magnitude_pct": 0,
+    "rationale": "mood_valence_p50 was already 0.22 (above 0.20 breeding gate). Stable food + active Kitchen should finally materialize mating. Expect ≥ 1."
+  },
+  "energy_p50": {
+    "direction": "flat",
+    "magnitude_pct": 10,
+    "rationale": "Already lifted by Tier 1A (sleep_energy_per_tick 0.0035) to 0.493. Should hold, may nudge up slightly from improved food baseline."
+  }
+}

@@ -38,4 +38,128 @@
         action: Some(Flee),
         day_phase: Some(Night),
     ),
+
+    // =====================================================================
+    // Personality singles
+    // =====================================================================
+    (
+        text: "{name} runs blind, crashing through everything in {possessive} path.",
+        tier: Action,
+        action: Some(Flee),
+        personality: [(axis: Anxiety, bucket: High)],
+    ),
+    (
+        text: "{name} backs away snarling, refusing to turn {possessive} back on the threat.",
+        tier: Action,
+        action: Some(Flee),
+        personality: [(axis: Boldness, bucket: High)],
+    ),
+    (
+        text: "{name} flattens and sprints without looking back.",
+        tier: Action,
+        action: Some(Flee),
+        personality: [(axis: Boldness, bucket: Low)],
+    ),
+    (
+        text: "{name} retreats with ears burning. The indignity.",
+        tier: Action,
+        action: Some(Flee),
+        personality: [(axis: Pride, bucket: High)],
+    ),
+    (
+        text: "{name} plants {possessive} paws, refuses to move — then finally breaks and runs.",
+        tier: Action,
+        action: Some(Flee),
+        personality: [(axis: Stubbornness, bucket: High)],
+    ),
+    (
+        text: "{name} glances back to make sure the others got away first.",
+        tier: Action,
+        action: Some(Flee),
+        personality: [(axis: Loyalty, bucket: High)],
+    ),
+    (
+        text: "{name} bolts alone into the undergrowth, trusting no one to cover {object}.",
+        tier: Action,
+        action: Some(Flee),
+        personality: [(axis: Independence, bucket: High)],
+    ),
+    (
+        text: "{name} flees in a fury, tail lashing, hissing at the air behind {object}.",
+        tier: Action,
+        action: Some(Flee),
+        personality: [(axis: Temper, bucket: High)],
+    ),
+    (
+        text: "{name} steals one last look at whatever's chasing {object}.",
+        tier: Action,
+        action: Some(Flee),
+        personality: [(axis: Curiosity, bucket: High)],
+    ),
+    (
+        text: "{name} sprints with reckless confidence — {subject}'ll outrun it.",
+        tier: Action,
+        action: Some(Flee),
+        personality: [(axis: Optimism, bucket: High)],
+    ),
+    (
+        text: "{name} runs with the desperate certainty of a cat who won't make it.",
+        tier: Action,
+        action: Some(Flee),
+        personality: [(axis: Optimism, bucket: Low)],
+    ),
+    (
+        text: "{name} bolts before fully processing what the threat even was.",
+        tier: Action,
+        action: Some(Flee),
+        personality: [(axis: Patience, bucket: Low)],
+    ),
+
+    // =====================================================================
+    // Mood conditions
+    // =====================================================================
+    (
+        text: "{name} runs, and keeps running. {Subject} was already on the edge.",
+        tier: Action,
+        action: Some(Flee),
+        mood: Some(Miserable),
+    ),
+    (
+        text: "One moment {name} was fine. The next, {subject}'s running for {possessive} life.",
+        tier: Action,
+        action: Some(Flee),
+        mood: Some(Happy),
+    ),
+
+    // =====================================================================
+    // Needs
+    // =====================================================================
+    (
+        text: "{name} runs on pure instinct, every hair standing on end.",
+        tier: Action,
+        action: Some(Flee),
+        needs: [(axis: Safety, level: Critical)],
+    ),
+    (
+        text: "{name} stumbles mid-flight, legs heavy with exhaustion.",
+        tier: Action,
+        action: Some(Flee),
+        needs: [(axis: Energy, level: Critical)],
+    ),
+
+    // =====================================================================
+    // Environmental seasoning
+    // =====================================================================
+    (
+        text: "{name} crashes through dense brush, leaving a trail of broken branches.",
+        tier: Action,
+        action: Some(Flee),
+        terrain: Some(DenseForest),
+    ),
+    (
+        text: "{name} flounders through the snow, each bound slower than the last.",
+        tier: Action,
+        action: Some(Flee),
+        weather: Some(Snow),
+    ),
 ]

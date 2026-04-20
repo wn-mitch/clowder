@@ -1,0 +1,182 @@
+[
+    // --- Generic ---
+    (
+        text: "{name} tends to a hungry kitten.",
+        tier: Action,
+        action: Some(Caretake),
+    ),
+    (
+        text: "{name} nudges a morsel toward a waiting kitten.",
+        tier: Action,
+        action: Some(Caretake),
+    ),
+    (
+        text: "{name} settles beside a kitten and licks its ears clean.",
+        tier: Action,
+        action: Some(Caretake),
+    ),
+
+    // --- Personality: Compassion ---
+    (
+        text: "{name} fusses over the kitten, rearranging bedding around it.",
+        tier: Action,
+        action: Some(Caretake),
+        personality: [(axis: Compassion, bucket: High)],
+    ),
+    (
+        text: "{name} can't help checking on the kitten one more time.",
+        tier: Action,
+        action: Some(Caretake),
+        personality: [(axis: Compassion, bucket: High)],
+    ),
+    (
+        text: "{name} drops food beside the kitten and moves on to other duties.",
+        tier: Action,
+        action: Some(Caretake),
+        personality: [(axis: Compassion, bucket: Low)],
+    ),
+
+    // --- Personality: Warmth ---
+    (
+        text: "{name} curls around the kitten, sheltering it from the world.",
+        tier: Action,
+        action: Some(Caretake),
+        personality: [(axis: Warmth, bucket: High)],
+    ),
+    (
+        text: "{name} feeds the kitten with brisk efficiency.",
+        tier: Action,
+        action: Some(Caretake),
+        personality: [(axis: Warmth, bucket: Low)],
+    ),
+
+    // --- Personality: Patience ---
+    (
+        text: "{name} waits calmly while the kitten squirms and fusses over its meal.",
+        tier: Action,
+        action: Some(Caretake),
+        personality: [(axis: Patience, bucket: High)],
+    ),
+    (
+        text: "{name} flicks its tail from side to side as the kitten knocks food everywhere. Again.",
+        tier: Action,
+        action: Some(Caretake),
+        personality: [(axis: Patience, bucket: Low)],
+    ),
+
+    // --- Personality: Diligence ---
+    (
+        text: "{name} feeds the kitten, cleans its face, checks its paws, and tucks it in.",
+        tier: Action,
+        action: Some(Caretake),
+        personality: [(axis: Diligence, bucket: High)],
+    ),
+    (
+        text: "{name} shoves food in the kitten's direction and wanders off.",
+        tier: Action,
+        action: Some(Caretake),
+        personality: [(axis: Diligence, bucket: Low)],
+    ),
+
+    // --- Personality: Anxiety ---
+    (
+        text: "{name} hovers over the kitten, ears swiveling at every sound.",
+        tier: Action,
+        action: Some(Caretake),
+        personality: [(axis: Anxiety, bucket: High)],
+    ),
+    (
+        text: "Did {name} hear their kitten wail? Meh, must have been the wind.",
+        tier: Action,
+        action: Some(Caretake),
+        personality: [(axis: Anxiety, bucket: Low)],
+    ),
+
+    // --- Personality: Playfulness ---
+    (
+        text: "{name} rolls a berry toward the kitten, turning mealtime into a game.",
+        tier: Action,
+        action: Some(Caretake),
+        personality: [(axis: Playfulness, bucket: High)],
+    ),
+
+    // --- Personality: Pride ---
+    (
+        text: "{name} watches the kitten eat and puffs up. Takes after {object}, clearly.",
+        tier: Action,
+        action: Some(Caretake),
+        personality: [(axis: Pride, bucket: High)],
+    ),
+
+    // --- Personality: Stubbornness ---
+    (
+        text: "The kitten won't eat. {name} pushes the food closer. And closer. And closer.",
+        tier: Action,
+        action: Some(Caretake),
+        personality: [(axis: Stubbornness, bucket: High)],
+    ),
+
+    // --- Mood ---
+    (
+        text: "{name} hums tunelessly while feeding the kitten, clearly content.",
+        tier: Action,
+        action: Some(Caretake),
+        mood: Some(Happy),
+    ),
+    (
+        text: "{name} feeds the kitten with grim determination, jaw set.",
+        tier: Action,
+        action: Some(Caretake),
+        mood: Some(Miserable),
+    ),
+    (
+        text: "{name} beams down at the kitten. This is what matters.",
+        tier: Action,
+        action: Some(Caretake),
+        mood: Some(Euphoric),
+    ),
+
+    // --- Personality + Mood combos ---
+    (
+        text: "{name} gives the kitten the last scrap, then licks {possessive} own empty paws.",
+        tier: Action,
+        action: Some(Caretake),
+        personality: [(axis: Compassion, bucket: High)],
+        mood: Some(Miserable),
+    ),
+    (
+        text: "{name} snaps at the kitten — then freezes, ears back, ashamed.",
+        tier: Action,
+        action: Some(Caretake),
+        personality: [(axis: Patience, bucket: Low)],
+        mood: Some(Miserable),
+    ),
+
+    // --- Needs ---
+    (
+        text: "{name}'s stomach growls as {subject} pushes food toward the kitten instead.",
+        tier: Action,
+        action: Some(Caretake),
+        needs: [(axis: Hunger, level: Critical)],
+    ),
+    (
+        text: "{name} fights to keep {possessive} eyes open while the kitten feeds.",
+        tier: Action,
+        action: Some(Caretake),
+        needs: [(axis: Energy, level: Critical)],
+    ),
+
+    // --- Environmental seasoning ---
+    (
+        text: "{name} tucks the kitten close against the winter chill.",
+        tier: Action,
+        action: Some(Caretake),
+        season: Some(Winter),
+    ),
+    (
+        text: "{name} keeps watch over the kitten through the quiet hours.",
+        tier: Action,
+        action: Some(Caretake),
+        day_phase: Some(Night),
+    ),
+]

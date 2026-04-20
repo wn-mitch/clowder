@@ -13,6 +13,9 @@ impl PreyProfile for Bird {
     fn name(&self) -> &'static str {
         "bird"
     }
+    fn plural_name(&self) -> &'static str {
+        "birds"
+    }
     fn symbol(&self) -> char {
         'b'
     }

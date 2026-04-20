@@ -27,7 +27,7 @@
 
     // --- Personality ---
     (
-        text: "{name} methodically gathers every last {item} in sight.",
+        text: "{name} methodically gathers every last {item_singular} in sight.",
         tier: Action,
         action: Some(Forage),
         event: Some("find"),

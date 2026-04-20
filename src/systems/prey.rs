@@ -73,9 +73,17 @@ fn find_nearby_habitat_tile(
 /// Probabilistic detection: each tick, prey rolls to notice nearby cats.
 /// Closer cats are more likely to be detected. `vigilance_mod` comes from
 /// the Risk Allocation Hypothesis (U-shaped curve on predation pressure).
+///
+/// Phase 4 migration: the proximity gradient is computed via
+/// `sensing::prey_cat_proximity`, routed through the unified `detect()`
+/// on the prey's sight channel (Linear falloff). The Bernoulli gate
+/// stays here; alertness and vigilance remain prey-state-dependent
+/// factors outside the sensory model.
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn try_detect_cat(
     pos: &Position,
+    prey_kind: PreyKind,
+    prey_profile: &crate::systems::sensing::SensoryProfile,
     alert_radius: i32,
     alertness: f32,
     vigilance_mod: f32,
@@ -86,11 +94,16 @@ fn try_detect_cat(
     rng: &mut SimRng,
 ) -> Option<Entity> {
     for (entity, cat_pos) in cat_positions.iter() {
-        let dist = pos.manhattan_distance(cat_pos);
-        if dist > alert_radius || dist == 0 {
+        let proximity = crate::systems::sensing::prey_cat_proximity(
+            *pos,
+            prey_kind,
+            prey_profile,
+            *cat_pos,
+            alert_radius,
+        );
+        if proximity <= 0.0 {
             continue;
         }
-        let proximity = 1.0 - (dist as f32 / (alert_radius as f32 + 1.0));
         let alertness_mod = alertness_base + alertness * alertness_range;
         let detection_chance = detection_base_chance * proximity * alertness_mod * vigilance_mod;
         if rng.rng.random::<f32>() < detection_chance {
@@ -216,6 +229,10 @@ pub fn prey_ai(
             PreyAiState::Idle => {
                 if let Some(threat) = try_detect_cat(
                     &pos,
+                    config.kind,
+                    constants
+                        .sensory
+                        .profile_for(crate::components::SensorySpecies::Prey(config.kind)),
                     config.alert_radius,
                     state.alertness,
                     vigilance_mod,
@@ -265,6 +282,10 @@ pub fn prey_ai(
 
                 if let Some(threat) = try_detect_cat(
                     &pos,
+                    config.kind,
+                    constants
+                        .sensory
+                        .profile_for(crate::components::SensorySpecies::Prey(config.kind)),
                     config.alert_radius,
                     state.alertness,
                     vigilance_mod,
@@ -618,7 +639,10 @@ pub fn prey_population(
             if rng.rng.random::<f32>() < 0.001 {
                 log.push(
                     time.tick,
-                    format!("The {} have overrun their territory.", profile.name()),
+                    format!(
+                        "The {} have overrun their territory.",
+                        profile.plural_name()
+                    ),
                     NarrativeTier::Nature,
                 );
             }
@@ -628,7 +652,7 @@ pub fn prey_population(
         if density_pressure < 0.2 && rng.rng.random::<f32>() < 0.002 {
             log.push(
                 time.tick,
-                format!("The {} are growing restless.", profile.name()),
+                format!("The {} are growing restless.", profile.plural_name()),
                 NarrativeTier::Nature,
             );
         }

@@ -96,13 +96,17 @@ pub fn corruption_spread(
 
 /// Each tick, every ward loses strength. Wards on WardPost tiles decay at half
 /// speed. Wards that hit zero strength are despawned.
+#[allow(clippy::too_many_arguments)]
 pub fn ward_decay(
     mut wards: Query<(Entity, &mut Ward, &Position)>,
     shadow_foxes: Query<(&WildlifeAiState, &Position), With<WildAnimal>>,
     map: Res<TileMap>,
+    time: Res<TimeState>,
+    mut log: ResMut<NarrativeLog>,
     mut commands: Commands,
     constants: Res<SimConstants>,
     mut activation: ResMut<SystemActivation>,
+    mut event_log: Option<ResMut<crate::resources::event_log::EventLog>>,
 ) {
     let m = &constants.magic;
     let c = &constants.wildlife;
@@ -117,7 +121,13 @@ pub fn ward_decay(
             ward.decay_rate
         };
 
-        // Shadow foxes encircling this ward increase decay.
+        // Shadow foxes encircling this ward erode it in waves, not in a
+        // countdown. A single fox carries most of the pressure; each extra
+        // fox contributes sub-linearly (sqrt scaling) so compound siege is
+        // sustained, not doubled. The colony's correct response stays the
+        // same either way — drive the foxes off — instead of depending on
+        // how many are present. Under the 2-fox population cap this is the
+        // whole curve; the shape still generalizes if the cap lifts.
         let siege_count = shadow_foxes
             .iter()
             .filter(|(ai, _)| {
@@ -125,13 +135,31 @@ pub fn ward_decay(
                 if *ward_x == pos.x && *ward_y == pos.y)
             })
             .count();
-        effective_decay += siege_count as f32 * c.ward_siege_decay_bonus;
+        let siege_pressure = (siege_count as f32).sqrt();
+        effective_decay += siege_pressure * c.ward_siege_decay_bonus;
 
         ward.strength -= effective_decay;
         any_decayed = true;
 
         if ward.strength <= 0.0 {
             commands.entity(entity).despawn();
+            activation.record(Feature::WardDespawned);
+            let text = if siege_count > 0 {
+                "A ward's thornbriar tangle crumbles — shadow-foxes pressed it too hard."
+            } else {
+                "A ward's thornbriar tangle crumbles back to dust."
+            };
+            log.push(time.tick, text.to_string(), NarrativeTier::Nature);
+            if let Some(ref mut elog) = event_log {
+                elog.push(
+                    time.tick,
+                    crate::resources::event_log::EventKind::WardDespawned {
+                        ward_kind: format!("{:?}", ward.kind),
+                        location: (pos.x, pos.y),
+                        sieged: siege_count > 0,
+                    },
+                );
+            }
         }
     }
     if any_decayed {
@@ -369,11 +397,90 @@ pub fn advance_flavor_growth(
 }
 
 // ---------------------------------------------------------------------------
+// herb_regrowth — periodically respawn depleted herbs
+// ---------------------------------------------------------------------------
+
+/// Every `herb_regrowth_interval` ticks, check Thornbriar population and
+/// attempt to spawn a replacement on a random eligible tile if below cap.
+/// Prevents permanent thornbriar depletion from making wards impossible.
+#[allow(clippy::too_many_arguments)]
+pub fn herb_regrowth(
+    herbs: Query<&Herb>,
+    map: Res<TileMap>,
+    time: Res<TimeState>,
+    config: Res<SimConfig>,
+    constants: Res<SimConstants>,
+    mut rng: ResMut<SimRng>,
+    mut commands: Commands,
+    mut activation: ResMut<SystemActivation>,
+) {
+    use crate::components::magic::HerbKind;
+
+    let m = &constants.magic;
+    if !time.tick.is_multiple_of(m.herb_regrowth_interval) {
+        return;
+    }
+
+    let current_season = time.season(&config);
+    let thornbriar_count = herbs
+        .iter()
+        .filter(|h| h.kind == HerbKind::Thornbriar)
+        .count() as u32;
+    if thornbriar_count >= m.thornbriar_regrowth_cap {
+        return;
+    }
+
+    if rng.rng.random::<f32>() >= m.herb_regrowth_chance {
+        return;
+    }
+
+    // Collect eligible tiles: forest terrain, forest-edge for thornbriar.
+    let mut candidates: Vec<(i32, i32)> = Vec::new();
+    for y in 0..map.height {
+        for x in 0..map.width {
+            let terrain = map.get(x, y).terrain;
+            if !HerbKind::Thornbriar.spawn_terrains().contains(&terrain) {
+                continue;
+            }
+            if !crate::world_gen::herbs::is_forest_edge(x, y, &map) {
+                continue;
+            }
+            candidates.push((x, y));
+        }
+    }
+
+    if candidates.is_empty() {
+        return;
+    }
+
+    let idx = rng.rng.random_range(0..candidates.len());
+    let (x, y) = candidates[idx];
+    let available = HerbKind::Thornbriar.available_seasons().to_vec();
+    let in_season = available.contains(&current_season);
+
+    let mut ec = commands.spawn((
+        Herb {
+            kind: HerbKind::Thornbriar,
+            growth_stage: GrowthStage::Sprout,
+            magical: map.get(x, y).mystery > 0.5,
+            twisted: false,
+        },
+        Position::new(x, y),
+        Seasonal { available },
+    ));
+    if in_season {
+        ec.insert(Harvestable);
+    }
+    activation.record(Feature::HerbSeasonalCheck);
+}
+
+// ---------------------------------------------------------------------------
 // spawn_shadow_fox_from_corruption
 // ---------------------------------------------------------------------------
 
 /// Heavily corrupted tiles (> 0.7) may spontaneously spawn shadow-foxes, up to
 /// a population cap of 2.
+#[allow(clippy::too_many_arguments)]
 pub fn spawn_shadow_fox_from_corruption(
     map: ResMut<TileMap>,
     mut rng: ResMut<SimRng>,
@@ -382,6 +489,7 @@ pub fn spawn_shadow_fox_from_corruption(
     mut commands: Commands,
     constants: Res<SimConstants>,
     mut activation: ResMut<SystemActivation>,
+    mut event_log: Option<ResMut<crate::resources::event_log::EventLog>>,
 ) {
     let m = &constants.magic;
     if !time.tick.is_multiple_of(m.shadow_fox_spawn_interval) {
@@ -403,6 +511,7 @@ pub fn spawn_shadow_fox_from_corruption(
                 && rng.rng.random::<f32>() < m.shadow_fox_spawn_chance
             {
                 activation.record(Feature::ShadowFoxSpawn);
+                let corruption_at_spawn = map.get(x, y).corruption;
                 commands.spawn((
                     WildAnimal::new(WildSpecies::ShadowFox),
                     Position::new(x, y),
@@ -412,7 +521,18 @@ pub fn spawn_shadow_fox_from_corruption(
                         max: 1.0,
                         injuries: Vec::new(),
                     },
+                    crate::components::SensorySpecies::Wild(WildSpecies::ShadowFox),
+                    crate::components::SensorySignature::WILDLIFE,
                 ));
+                if let Some(ref mut elog) = event_log {
+                    elog.push(
+                        time.tick,
+                        crate::resources::event_log::EventKind::ShadowFoxSpawn {
+                            location: (x, y),
+                            corruption: corruption_at_spawn,
+                        },
+                    );
+                }
                 // Cap at 1 spawn per check.
                 return;
             }
@@ -610,6 +730,7 @@ pub fn resolve_magic_task_chains(
                         &mut rng.rng,
                         &mut commands,
                         &mut log,
+                        None,
                         time.tick,
                         m,
                         &constants.combat,

@@ -2,7 +2,7 @@
 
 # Maslow Hierarchy of Needs
 
-9 needs across 5 Maslow levels. All values `f32` in `[0.0, 1.0]`.
+10 needs across 5 Maslow levels. All values `f32` in `[0.0, 1.0]`.
 
 Higher levels are multiplicatively suppressed when lower levels are unmet.
 
@@ -38,6 +38,7 @@ Each satisfaction uses `smoothstep` (Hermite curve) for gradual transitions.
 |------|---------|
 | `social` | 0.6 |
 | `acceptance` | 0.5 |
+| `mating` | 1.0 |
 
 ## Level 4: Esteem
 

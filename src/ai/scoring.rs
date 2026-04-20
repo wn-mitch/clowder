@@ -8,6 +8,7 @@ use crate::components::mental::{Memory, MemoryType};
 use crate::components::personality::Personality;
 use crate::components::physical::{Needs, Position};
 use crate::resources::sim_constants::ScoringConstants;
+use crate::resources::time::DayPhase;
 
 // ---------------------------------------------------------------------------
 // Jitter
@@ -65,6 +66,8 @@ pub struct ScoringContext<'a> {
     pub has_remedy_herbs: bool,
     /// Whether the cat has Thornbriar for ward-setting.
     pub has_ward_herbs: bool,
+    /// Whether harvestable Thornbriar exists anywhere in the world.
+    pub thornbriar_available: bool,
     /// Number of injured cats in the colony.
     pub colony_injury_count: usize,
     /// Whether colony ward coverage is low (no wards or average strength < 0.3).
@@ -73,6 +76,10 @@ pub struct ScoringContext<'a> {
     pub on_corrupted_tile: bool,
     /// Corruption level of the cat's current tile.
     pub tile_corruption: f32,
+    /// Max corruption level on any tile within `corruption_smell_range` of the
+    /// cat's current position. Represents the cat "smelling" rot nearby — drives
+    /// proactive Cleanse/SetWard response even when not standing on corruption.
+    pub nearby_corruption_level: f32,
     /// Whether the cat is on a fairy ring or standing stone.
     pub on_special_terrain: bool,
     // --- Coordination context ---
@@ -124,6 +131,16 @@ pub struct ScoringContext<'a> {
     pub territory_max_corruption: f32,
     /// Whether any ward is currently being encircled by a shadow fox.
     pub wards_under_siege: bool,
+    // --- Temporal context ---
+    /// Current phase of the day. Drives species-specific activity bias —
+    /// Sleep scoring alone in Phase 1, extends to hunting/foraging/denning as
+    /// the initiative progresses. See `docs/systems/sleep-that-makes-sense.md`.
+    pub day_phase: DayPhase,
+    // --- Cooking context ---
+    /// Whether at least one functional Kitchen exists in the colony.
+    pub has_functional_kitchen: bool,
+    /// Whether Stores currently holds at least one raw (uncooked) food item.
+    pub has_raw_food_in_stores: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -133,9 +150,19 @@ pub struct ScoringContext<'a> {
 /// Bundles action scores with metadata the chain builder needs.
 /// `herbcraft_hint` carries which sub-mode won during herbcraft scoring,
 /// so the chain builder doesn't re-derive it via its own priority cascade.
+/// `magic_hint` is the equivalent for PracticeMagic — without it, the GOAP
+/// planner falls back to A*'s cheapest action (Scry) and never picks
+/// DurableWard even when its sub-score is highest.
 pub struct ScoringResult {
     pub scores: Vec<(Action, f32)>,
     pub herbcraft_hint: Option<CraftingHint>,
+    pub magic_hint: Option<CraftingHint>,
+    /// True when the cat would have scored Cook competitively (had raw
+    /// food, non-critical hunger, diligent personality) but no functional
+    /// Kitchen exists. The caller turns this into a colony-wide
+    /// `UnmetDemand::kitchen` tick so the coordinator's BuildPressure can
+    /// respond to the latent desire.
+    pub wants_cook_but_no_kitchen: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -168,6 +195,8 @@ pub fn score_actions(ctx: &ScoringContext, rng: &mut impl Rng) -> ScoringResult 
         return ScoringResult {
             scores,
             herbcraft_hint: None,
+            magic_hint: None,
+            wants_cook_but_no_kitchen: false,
         };
     }
 
@@ -180,8 +209,17 @@ pub fn score_actions(ctx: &ScoringContext, rng: &mut impl Rng) -> ScoringResult 
 
     // --- Sleep ---
     {
-        let urgency =
-            (1.0 - ctx.needs.energy) * s.sleep_urgency_scale * ctx.needs.level_suppression(1);
+        // Day-phase offset encodes the cat's Night-heavy, Dawn/Dusk-feeding
+        // rhythm. Additive (not multiplicative) so Sleep remains available as
+        // a pressure-release valve at low energy even during feeding peaks.
+        let day_phase_offset = match ctx.day_phase {
+            DayPhase::Dawn => s.sleep_dawn_bonus,
+            DayPhase::Day => s.sleep_day_bonus,
+            DayPhase::Dusk => s.sleep_dusk_bonus,
+            DayPhase::Night => s.sleep_night_bonus,
+        };
+        let urgency = ((1.0 - ctx.needs.energy) * s.sleep_urgency_scale + day_phase_offset)
+            * ctx.needs.level_suppression(1);
         // Injured cats are more inclined to rest — recovery requires downtime.
         let injury_bonus = if ctx.health < 1.0 {
             (1.0 - ctx.health) * s.injury_rest_bonus
@@ -324,11 +362,15 @@ pub fn score_actions(ctx: &ScoringContext, rng: &mut impl Rng) -> ScoringResult 
     }
 
     // --- Build (diligence-driven; scored when construction/repair is needed) ---
-    // Gated at level 3 (belonging) so cats build once socially connected,
-    // without requiring full esteem satisfaction.
+    // Level 2 suppression (phys only) — Build erects safety/defense
+    // infrastructure (walls, wards, Hearth, Kitchen), so gating it on
+    // pre-existing safety satisfaction creates a chicken-and-egg: the cats
+    // who most need a wall never build one because they never feel safe.
+    // A hungry/exhausted cat still shouldn't build (level 2), but a fed cat
+    // under predator pressure should be able to.
     if ctx.has_construction_site || ctx.has_damaged_building {
         let base =
-            ctx.personality.diligence * s.build_diligence_scale * ctx.needs.level_suppression(3);
+            ctx.personality.diligence * s.build_diligence_scale * ctx.needs.level_suppression(2);
         let site_bonus = if ctx.has_construction_site {
             s.build_site_bonus
         } else {
@@ -346,11 +388,15 @@ pub fn score_actions(ctx: &ScoringContext, rng: &mut impl Rng) -> ScoringResult 
     }
 
     // --- Farm (diligence-driven; scored when garden exists and food is low) ---
+    // Level 2 suppression (phys only) — Farm is the colony's response to food
+    // scarcity, same class as Hunt/Forage. Gating on safety would leave the
+    // garden unattended when the colony most needs it (predator pressure +
+    // empty stores is exactly when farming matters).
     if ctx.has_garden {
         let urgency = (1.0 - ctx.food_fraction)
             * ctx.personality.diligence
             * s.farm_diligence_scale
-            * ctx.needs.level_suppression(3);
+            * ctx.needs.level_suppression(2);
         scores.push((Action::Farm, urgency + jitter(rng, s.jitter_range)));
     }
 
@@ -364,6 +410,7 @@ pub fn score_actions(ctx: &ScoringContext, rng: &mut impl Rng) -> ScoringResult 
         let gather_emergency = if ctx.has_herbs_nearby
             && ctx.ward_strength_low
             && !ctx.has_ward_herbs
+            && ctx.thornbriar_available
             && ctx.territory_max_corruption > 0.0
         {
             s.ward_corruption_emergency_bonus * ctx.needs.level_suppression(2)
@@ -401,8 +448,8 @@ pub fn score_actions(ctx: &ScoringContext, rng: &mut impl Rng) -> ScoringResult 
         // in inventory. The GOAP plan for SetWard includes a GatherHerb step that
         // will acquire Thornbriar. This ensures CraftingHint::SetWard wins over
         // GatherHerbs, producing a plan that filters for the right herb type.
-        let ward_eligible =
-            ctx.ward_strength_low && (ctx.has_ward_herbs || corruption_emergency > 0.0);
+        let ward_eligible = ctx.ward_strength_low
+            && (ctx.has_ward_herbs || (corruption_emergency > 0.0 && ctx.thornbriar_available));
         let mut ward = if ward_eligible {
             ctx.personality.spirituality
                 * (s.herbcraft_ward_skill_offset + ctx.herbcraft_skill)
@@ -432,6 +479,7 @@ pub fn score_actions(ctx: &ScoringContext, rng: &mut impl Rng) -> ScoringResult 
     }
 
     // --- PracticeMagic (requires affinity > threshold AND magic skill > threshold) ---
+    let mut magic_hint: Option<CraftingHint> = None;
     if ctx.magic_affinity > s.magic_affinity_threshold && ctx.magic_skill > s.magic_skill_threshold
     {
         let scry = ctx.personality.curiosity
@@ -451,6 +499,16 @@ pub fn score_actions(ctx: &ScoringContext, rng: &mut impl Rng) -> ScoringResult 
         } else {
             0.0
         };
+        // "Smells like rot" — proactive response when corruption is sensed nearby.
+        // Boosts both Cleanse and SetWard scoring even if the cat isn't
+        // personally standing on a corrupted tile.
+        let sensed_rot_bonus = if ctx.nearby_corruption_level > 0.1 {
+            s.corruption_sensed_response_bonus
+                * ctx.nearby_corruption_level
+                * ctx.needs.level_suppression(2)
+        } else {
+            0.0
+        };
         let durable_ward =
             if ctx.ward_strength_low && ctx.magic_skill > s.magic_durable_ward_skill_threshold {
                 ctx.personality.spirituality
@@ -458,6 +516,7 @@ pub fn score_actions(ctx: &ScoringContext, rng: &mut impl Rng) -> ScoringResult 
                     * s.magic_durable_ward_scale
                     * ctx.needs.level_suppression(2)
                     + ward_emergency
+                    + sensed_rot_bonus
             } else {
                 0.0
             };
@@ -478,7 +537,8 @@ pub fn score_actions(ctx: &ScoringContext, rng: &mut impl Rng) -> ScoringResult 
             * ctx.territory_max_corruption
             * s.magic_cleanse_colony_scale
             * ctx.needs.level_suppression(2)
-            + cleanse_emergency;
+            + cleanse_emergency
+            + sensed_rot_bonus;
         // Carcass harvesting — curiosity-driven, risk/reward.
         let harvest = if ctx.carcass_nearby {
             ctx.personality.curiosity
@@ -503,6 +563,20 @@ pub fn score_actions(ctx: &ScoringContext, rng: &mut impl Rng) -> ScoringResult 
             .max(colony_cleanse)
             .max(harvest)
             .max(commune);
+        // Pick the winning sub-action as a hint so the GOAP planner uses a
+        // directed action list instead of cost-picking the cheapest option.
+        magic_hint = if best <= 0.0 {
+            None
+        } else if durable_ward >= best {
+            Some(CraftingHint::DurableWard)
+        } else if colony_cleanse >= best || cleanse >= best {
+            Some(CraftingHint::Cleanse)
+        } else if harvest >= best {
+            Some(CraftingHint::HarvestCarcass)
+        } else {
+            // Scry and Commune fall through to the generic Magic action list.
+            Some(CraftingHint::Magic)
+        };
         if best > 0.0 {
             scores.push((Action::PracticeMagic, best + jitter(rng, s.jitter_range)));
         }
@@ -539,6 +613,29 @@ pub fn score_actions(ctx: &ScoringContext, rng: &mut impl Rng) -> ScoringResult 
         if urgency > 0.0 {
             scores.push((Action::Mate, urgency + jitter(rng, s.jitter_range)));
         }
+    }
+
+    // --- Cook (food-production tier; requires a Kitchen, raw food, and the
+    //     cat not to be on the verge of starvation). Diligent cats cook more,
+    //     and urgency scales with food scarcity — cooking is the colony's
+    //     food-buffer multiplier, analogous to Farm. Level 2 suppression
+    //     (phys only) matches Hunt/Forage: a fed cat will cook; an exhausted
+    //     cat will still sleep first, but safety doesn't gate the action.
+    //     Receives a directive bonus if a `DirectiveKind::Cook` is active.
+    let cook_base_conditions =
+        ctx.has_raw_food_in_stores && ctx.needs.hunger > s.cook_hunger_gate;
+    let mut wants_cook_but_no_kitchen = false;
+    if cook_base_conditions && ctx.has_functional_kitchen {
+        let food_scarcity = (1.0 - ctx.food_fraction) * s.cook_food_scarcity_scale;
+        let base = s.cook_base_score + ctx.personality.diligence * s.cook_diligence_scale;
+        let score =
+            (base + food_scarcity) * ctx.needs.level_suppression(2) + jitter(rng, s.jitter_range);
+        scores.push((Action::Cook, score));
+    } else if cook_base_conditions && !ctx.has_functional_kitchen {
+        // Latent desire — the cat would cook if a Kitchen existed. Signal
+        // this up to the caller so colony-wide BuildPressure on Kitchen
+        // reflects the demand.
+        wants_cook_but_no_kitchen = true;
     }
 
     // --- Caretake (compassion-driven; requires nearby hungry kitten) ---
@@ -655,6 +752,8 @@ pub fn score_actions(ctx: &ScoringContext, rng: &mut impl Rng) -> ScoringResult 
     ScoringResult {
         scores,
         herbcraft_hint,
+        magic_hint,
+        wants_cook_but_no_kitchen,
     }
 }
 
@@ -1200,10 +1299,12 @@ mod tests {
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
             has_ward_herbs: false,
+            thornbriar_available: false,
             colony_injury_count: 0,
             ward_strength_low: false,
             on_corrupted_tile: false,
             tile_corruption: 0.0,
+            nearby_corruption_level: 0.0,
             on_special_terrain: false,
             is_coordinator_with_directives: false,
             pending_directive_count: 0,
@@ -1224,6 +1325,9 @@ mod tests {
             nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
             wards_under_siege: false,
+            day_phase: DayPhase::Dawn,
+            has_functional_kitchen: false,
+            has_raw_food_in_stores: false,
         }
     }
 
@@ -1330,10 +1434,12 @@ mod tests {
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
             has_ward_herbs: false,
+            thornbriar_available: false,
             colony_injury_count: 0,
             ward_strength_low: false,
             on_corrupted_tile: false,
             tile_corruption: 0.0,
+            nearby_corruption_level: 0.0,
             on_special_terrain: false,
             is_coordinator_with_directives: false,
             pending_directive_count: 0,
@@ -1354,6 +1460,9 @@ mod tests {
             nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
             wards_under_siege: false,
+            day_phase: DayPhase::Dawn,
+            has_functional_kitchen: false,
+            has_raw_food_in_stores: false,
         };
         let scores = score_actions(&c, &mut rng).scores;
         let best = select_best_action(&scores);
@@ -1454,10 +1563,12 @@ mod tests {
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
             has_ward_herbs: false,
+            thornbriar_available: false,
             colony_injury_count: 0,
             ward_strength_low: false,
             on_corrupted_tile: false,
             tile_corruption: 0.0,
+            nearby_corruption_level: 0.0,
             on_special_terrain: false,
             is_coordinator_with_directives: false,
             pending_directive_count: 0,
@@ -1478,6 +1589,9 @@ mod tests {
             nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
             wards_under_siege: false,
+            day_phase: DayPhase::Dawn,
+            has_functional_kitchen: false,
+            has_raw_food_in_stores: false,
         };
         let scores = score_actions(&c, &mut rng).scores;
         let socialize_score = scores
@@ -1702,10 +1816,12 @@ mod tests {
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
             has_ward_herbs: false,
+            thornbriar_available: false,
             colony_injury_count: 0,
             ward_strength_low: false,
             on_corrupted_tile: false,
             tile_corruption: 0.0,
+            nearby_corruption_level: 0.0,
             on_special_terrain: false,
             is_coordinator_with_directives: false,
             pending_directive_count: 0,
@@ -1726,6 +1842,9 @@ mod tests {
             nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
             wards_under_siege: false,
+            day_phase: DayPhase::Dawn,
+            has_functional_kitchen: false,
+            has_raw_food_in_stores: false,
         };
         let scores = score_actions(&c, &mut rng).scores;
         let best = select_best_action(&scores);
@@ -1771,10 +1890,12 @@ mod tests {
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
             has_ward_herbs: false,
+            thornbriar_available: false,
             colony_injury_count: 0,
             ward_strength_low: false,
             on_corrupted_tile: false,
             tile_corruption: 0.0,
+            nearby_corruption_level: 0.0,
             on_special_terrain: false,
             is_coordinator_with_directives: false,
             pending_directive_count: 0,
@@ -1795,6 +1916,9 @@ mod tests {
             nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
             wards_under_siege: false,
+            day_phase: DayPhase::Dawn,
+            has_functional_kitchen: false,
+            has_raw_food_in_stores: false,
         };
         let scores = score_actions(&c, &mut rng).scores;
         let fight_score = scores.iter().find(|(a, _)| *a == Action::Fight).unwrap().1;
@@ -1843,10 +1967,12 @@ mod tests {
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
             has_ward_herbs: false,
+            thornbriar_available: false,
             colony_injury_count: 0,
             ward_strength_low: false,
             on_corrupted_tile: false,
             tile_corruption: 0.0,
+            nearby_corruption_level: 0.0,
             on_special_terrain: false,
             is_coordinator_with_directives: false,
             pending_directive_count: 0,
@@ -1867,6 +1993,9 @@ mod tests {
             nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
             wards_under_siege: false,
+            day_phase: DayPhase::Dawn,
+            has_functional_kitchen: false,
+            has_raw_food_in_stores: false,
         };
         let scores = score_actions(&c, &mut rng).scores;
         let actions: Vec<Action> = scores
@@ -2110,10 +2239,12 @@ mod tests {
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
             has_ward_herbs: false,
+            thornbriar_available: false,
             colony_injury_count: 0,
             ward_strength_low: false,
             on_corrupted_tile: false,
             tile_corruption: 0.0,
+            nearby_corruption_level: 0.0,
             on_special_terrain: false,
             is_coordinator_with_directives: false,
             pending_directive_count: 0,
@@ -2134,6 +2265,9 @@ mod tests {
             nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
             wards_under_siege: false,
+            day_phase: DayPhase::Dawn,
+            has_functional_kitchen: false,
+            has_raw_food_in_stores: false,
         };
         let scores = score_actions(&c, &mut rng).scores;
         let wander = scores.iter().find(|(a, _)| *a == Action::Wander).unwrap().1;
@@ -2181,10 +2315,12 @@ mod tests {
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
             has_ward_herbs: false,
+            thornbriar_available: false,
             colony_injury_count: 0,
             ward_strength_low: false,
             on_corrupted_tile: false,
             tile_corruption: 0.0,
+            nearby_corruption_level: 0.0,
             on_special_terrain: false,
             is_coordinator_with_directives: false,
             pending_directive_count: 0,
@@ -2205,6 +2341,9 @@ mod tests {
             nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
             wards_under_siege: false,
+            day_phase: DayPhase::Dawn,
+            has_functional_kitchen: false,
+            has_raw_food_in_stores: false,
         };
 
         let scores_full = score_actions(&base, &mut rng_full).scores;

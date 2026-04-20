@@ -13,6 +13,9 @@ impl PreyProfile for Mouse {
     fn name(&self) -> &'static str {
         "mouse"
     }
+    fn plural_name(&self) -> &'static str {
+        "mice"
+    }
     fn symbol(&self) -> char {
         'm'
     }

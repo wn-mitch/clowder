@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.2",
-    "tailwindcss": "^4.2.2"
+    "tailwindcss": "^4.2.2",
+    "uplot": "^1.6.32"
   }
 }

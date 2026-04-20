@@ -51,6 +51,10 @@ pub enum MemoryType {
     MagicEvent,
     Injury,
     SocialEvent,
+    /// A moment of colony triumph — e.g. a banished shadow-fox. Carries
+    /// very long-lasting emotional weight; defines the cat's sense of
+    /// identity and courage for the rest of its life.
+    Triumph,
 }
 
 /// A single memory entry.

@@ -77,6 +77,29 @@ impl DayPhase {
             Self::Night => "Night",
         }
     }
+
+    // ---- Sensory multipliers (see sensing.rs) ----
+    //
+    // Phase 1 stubs returning 1.0 (identity). Activation is a Phase 5b
+    // semantic change requiring a verisimilitude hypothesis — planned
+    // values have Night dim sight (~0.5), Dusk/Dawn mild sight dim
+    // (~0.8), and tremor/hearing/scent phase-independent. See plan file.
+
+    pub fn sight_multiplier(self) -> f32 {
+        1.0
+    }
+
+    pub fn hearing_multiplier(self) -> f32 {
+        1.0
+    }
+
+    pub fn scent_multiplier(self) -> f32 {
+        1.0
+    }
+
+    pub fn tremor_multiplier(self) -> f32 {
+        1.0
+    }
 }
 
 // ---------------------------------------------------------------------------

@@ -2,7 +2,7 @@ use bevy_ecs::prelude::*;
 use rand::Rng;
 
 use crate::ai::{Action, CurrentAction};
-use crate::components::identity::Name;
+use crate::components::identity::{Gender, LifeStage, Name};
 use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier};
 use crate::components::personality::Personality;
 use crate::components::physical::{
@@ -10,11 +10,16 @@ use crate::components::physical::{
 };
 use crate::components::skills::Skills;
 use crate::components::wildlife::{WildAnimal, WildlifeAiState};
+use crate::resources::map::Terrain;
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
+use crate::resources::narrative_templates::{
+    emit_event_narrative, MoodBucket, TemplateContext, TemplateRegistry, VariableContext,
+};
 use crate::resources::rng::SimRng;
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::system_activation::{Feature, SystemActivation};
-use crate::resources::time::TimeState;
+use crate::resources::time::{DayPhase, Season, TimeState};
+use crate::resources::weather::Weather;
 
 // ---------------------------------------------------------------------------
 // Combat jitter
@@ -63,11 +68,16 @@ pub fn resolve_combat(
         Without<CurrentAction>,
     >,
     time: Res<TimeState>,
+    config: Res<crate::resources::time::SimConfig>,
     mut log: ResMut<NarrativeLog>,
     mut rng: ResMut<SimRng>,
     constants: Res<SimConstants>,
     mut activation: ResMut<SystemActivation>,
     mut relationships: ResMut<crate::resources::relationships::Relationships>,
+    mut pushback_writer: MessageWriter<crate::systems::magic::CorruptionPushback>,
+    mut colony_score: Option<ResMut<crate::resources::colony_score::ColonyScore>>,
+    mut event_log: Option<ResMut<crate::resources::event_log::EventLog>>,
+    registry: Option<Res<TemplateRegistry>>,
 ) {
     let c = &constants.combat;
     // Collect fighting cats and their targets.
@@ -104,6 +114,10 @@ pub fn resolve_combat(
     let mut wildlife_to_despawn: Vec<Entity> = Vec::new();
     let mut cats_to_flee: Vec<Entity> = Vec::new();
     let mut victorious_cats: Vec<(Entity, Entity)> = Vec::new(); // (cat, defeated wildlife)
+                                                                 // Pending banishments: (target, location, posse_cats). Resolved in a
+                                                                 // second pass after the main loop so boon application has clean access
+                                                                 // to participant/witness data.
+    let mut pending_banishments: Vec<(Entity, Position, Vec<Entity>)> = Vec::new();
 
     for fight in &fights {
         let ally_count = ally_counts
@@ -168,10 +182,25 @@ pub fn resolve_combat(
             continue;
         }
 
+        // Skip damage if target already banished this tick.
+        if wildlife_to_despawn.contains(&fight.target_entity) {
+            continue;
+        }
+
         // --- Cat attacks wildlife ---
+        // Posse bonus stacks on top of base ally bonus when ≥ min-allies are
+        // coordinating. A lone attacker gets standard ally bonus scaling;
+        // a 3-cat gank gets the extra multiplier that makes banishing a
+        // shadow-fox actually feasible.
+        let posse_allies = if ally_count + 1 >= c.combat_posse_min_allies {
+            ally_count
+        } else {
+            0
+        };
         let cat_damage = (combat_effective
             * cat_boldness
             * (1.0 + c.ally_damage_bonus_per_ally * ally_count as f32)
+            * (1.0 + c.combat_posse_bonus_per_ally * posse_allies as f32)
             * (1.0 + cat_temper * c.temper_damage_bonus)
             - animal_defense
             + combat_jitter(&mut rng.rng, c.jitter_range))
@@ -183,11 +212,36 @@ pub fn resolve_combat(
             wl_health.current = (wl_health.current - cat_damage).max(0.0);
 
             let species_name = animal.species.name();
+            let animal_species = animal.species;
+            let hp_frac = wl_health.current / wl_health.max.max(0.01);
 
             // Narrative: cat attacks.
             if rng.rng.random::<f32>() < c.narrative_attack_chance {
                 let text = format!("{cat_name} rakes the {species_name} across the muzzle.");
                 log.push(time.tick, text, NarrativeTier::Danger);
+            }
+
+            // Shadow-fox banishment — two triggers:
+            //   (a) the fox is driven below the banish-threshold HP (solo or
+            //       posse — rewards any cat brave enough to wear one down), or
+            //   (b) a posse has it outnumbered, in which case the fox is
+            //       dissolving under spiritual pressure rather than fleeing.
+            // The outnumbered branch intercepts the default wildlife morale
+            // logic that would otherwise send the fox running to the map edge.
+            let is_shadow_fox =
+                animal_species == crate::components::wildlife::WildSpecies::ShadowFox;
+            let banish_by_hp = hp_frac <= c.shadow_fox_banish_threshold;
+            let banish_by_posse =
+                posse_allies > 0 && (ally_count + 1) >= c.wildlife_flee_outnumbered_count;
+            if is_shadow_fox && (banish_by_hp || banish_by_posse) {
+                let posse: Vec<Entity> = fights
+                    .iter()
+                    .filter(|f| f.target_entity == fight.target_entity)
+                    .map(|f| f.cat_entity)
+                    .collect();
+                pending_banishments.push((fight.target_entity, wildlife_pos, posse));
+                wildlife_to_despawn.push(fight.target_entity);
+                continue;
             }
 
             // Check if wildlife is killed.
@@ -291,6 +345,182 @@ pub fn resolve_combat(
                 });
             }
         }
+    }
+
+    // --- Banishment resolution -------------------------------------------
+    // Shadow-foxes driven below banish_threshold under posse damage dissolve
+    // into mist instead of dying normally. The posse earns a Legend-tier
+    // event, permanent combat training, and a half-year of Valor. Witnesses
+    // inside legend_witness_range receive a secondhand mood + safety boost
+    // and a lasting Triumph memory.
+    for (target_entity, target_pos, posse) in &pending_banishments {
+        activation.record(Feature::ShadowFoxBanished);
+        if let Some(ref mut score) = colony_score {
+            score.banishments += 1;
+        }
+        // Pushback corruption from the banishment site.
+        pushback_writer.write(crate::systems::magic::CorruptionPushback {
+            position: *target_pos,
+            radius: c.banishment_pushback_radius,
+            amount: c.banishment_pushback_amount,
+        });
+
+        // Identify posse leader (first cat) for narrative. Capture name,
+        // personality, and needs now — the `cats` query is iterated mutably
+        // below for boon application, so read-only access has to happen
+        // before the mutable loops start. If the leader lookup fails (e.g.
+        // the cat was despawned between collection and resolution) we fall
+        // back to a plain log.push at the end, skipping template selection.
+        let leader_read: Option<(String, Personality, Needs)> = posse
+            .first()
+            .and_then(|e| cats.get(*e).ok())
+            .map(|(_, _, _, needs, _, personality, _, name, _, _)| {
+                (name.0.clone(), personality.clone(), needs.clone())
+            });
+        let leader_name = leader_read
+            .as_ref()
+            .map(|(n, _, _)| n.clone())
+            .unwrap_or_else(|| "A cat".to_string());
+
+        // Collect witnesses first (entities within legend_witness_range and
+        // not in the posse) so we can iter_mut without aliasing.
+        let witnesses: Vec<Entity> = cats
+            .iter()
+            .filter(|(e, _, _, _, _, _, pos, _, _, _)| {
+                !posse.contains(e) && pos.manhattan_distance(target_pos) <= c.legend_witness_range
+            })
+            .map(|(e, _, _, _, _, _, _, _, _, _)| e)
+            .collect();
+
+        // Apply posse boons. Skill gain diminishes per prior banishment a
+        // cat has participated in — a cat's first banishment is still a
+        // legend-forging event, but the 5th nets half the skill. Prevents
+        // a single cat from running away with the combat pool across a
+        // long game.
+        let valor_ticks = config.ticks_per_season * 2;
+        let seasonal_ticks = config.ticks_per_season;
+        for cat_entity in posse {
+            if let Ok((_, _, _, _, mut skills, _, _, _, mut memory, mut mood)) =
+                cats.get_mut(*cat_entity)
+            {
+                let prior_triumphs = memory
+                    .events
+                    .iter()
+                    .filter(|m| m.event_type == MemoryType::Triumph && m.firsthand)
+                    .count() as f32;
+                let gain = c.banishment_combat_skill_grow
+                    / (1.0 + prior_triumphs * c.banishment_skill_gain_diminish_factor);
+                skills.combat = (skills.combat + gain).min(5.0);
+                mood.modifiers.push_back(MoodModifier {
+                    amount: c.banishment_valor_mood,
+                    ticks_remaining: valor_ticks,
+                    source: "valor from banishment".to_string(),
+                });
+                memory.remember(MemoryEntry {
+                    event_type: MemoryType::Triumph,
+                    location: Some(*target_pos),
+                    involved: posse.clone(),
+                    tick: time.tick,
+                    strength: 1.0,
+                    firsthand: true,
+                });
+            }
+        }
+
+        // Apply witness boons.
+        for witness in &witnesses {
+            if let Ok((_, _, _, mut w_needs, _, _, _, _, mut w_memory, mut w_mood)) =
+                cats.get_mut(*witness)
+            {
+                w_needs.safety = w_needs.safety.max(c.banishment_witness_safety_floor);
+                w_mood.modifiers.push_back(MoodModifier {
+                    amount: c.banishment_witness_mood,
+                    ticks_remaining: seasonal_ticks,
+                    source: "witnessed a banishment".to_string(),
+                });
+                w_memory.remember(MemoryEntry {
+                    event_type: MemoryType::Triumph,
+                    location: Some(*target_pos),
+                    involved: posse.clone(),
+                    tick: time.tick,
+                    strength: 0.7,
+                    firsthand: false,
+                });
+            }
+        }
+
+        // Legend-tier narrative — route through the template registry so
+        // banishment.ron's variants rotate across runs. Fallback preserves
+        // the hardcoded line for runs without a registry (tests, degraded
+        // boot) or when the leader read failed above.
+        let fallback = format!(
+            "{leader_name} drives the shadow-fox to its knees. It shrieks, dissolves into mist — gone."
+        );
+        if let Some((_, ref personality, ref needs)) = leader_read {
+            let ctx = TemplateContext {
+                action: Action::Fight,
+                day_phase: DayPhase::from_tick(time.tick, &config),
+                season: Season::from_tick(time.tick, &config),
+                weather: Weather::Clear,
+                mood_bucket: MoodBucket::Neutral,
+                life_stage: LifeStage::Adult,
+                has_target: true,
+                terrain: Terrain::Grass,
+                event: Some("banishment".into()),
+            };
+            let var_ctx = VariableContext {
+                name: &leader_name,
+                gender: Gender::Nonbinary,
+                weather: Weather::Clear,
+                day_phase: ctx.day_phase,
+                season: ctx.season,
+                life_stage: LifeStage::Adult,
+                fur_color: "unknown",
+                other: None,
+                prey: None,
+                item: None,
+                item_singular: None,
+                quality: None,
+            };
+            emit_event_narrative(
+                registry.as_deref(),
+                &mut log,
+                time.tick,
+                fallback,
+                NarrativeTier::Legend,
+                &ctx,
+                &var_ctx,
+                personality,
+                needs,
+                &mut rng.rng,
+            );
+        } else {
+            log.push(time.tick, fallback, NarrativeTier::Legend);
+        }
+
+        // Event log entry with full posse roster.
+        if let Some(ref mut elog) = event_log {
+            let posse_names: Vec<String> = posse
+                .iter()
+                .filter_map(|e| cats.get(*e).ok())
+                .map(|(_, _, _, _, _, _, _, name, _, _)| name.0.clone())
+                .collect();
+            elog.push(
+                time.tick,
+                crate::resources::event_log::EventKind::ShadowFoxBanished {
+                    posse: posse_names,
+                    location: (target_pos.x, target_pos.y),
+                },
+            );
+        }
+
+        // Release posse cats from Fight action so they can re-evaluate.
+        for cat_entity in posse {
+            if let Ok((_, mut current, _, _, _, _, _, _, _, _)) = cats.get_mut(*cat_entity) {
+                current.ticks_remaining = 0;
+            }
+        }
+        let _ = target_entity; // despawn handled by wildlife_to_despawn loop.
     }
 
     // Apply victory rewards.
@@ -691,6 +921,33 @@ mod tests {
         assert!(
             (effective - 0.2).abs() < 1e-5,
             "combat_effective should be 0.2; got {effective}"
+        );
+    }
+
+    /// First banishment grants the base boon; subsequent banishments
+    /// grant diminishing returns so no single cat runs away with combat
+    /// skill across a long game.
+    #[test]
+    fn banishment_skill_gain_diminishes_per_prior_triumph() {
+        let c = &SimConstants::default().combat;
+        let gain = |prior: f32| -> f32 {
+            c.banishment_combat_skill_grow / (1.0 + prior * c.banishment_skill_gain_diminish_factor)
+        };
+        // Base = 0.25, factor = 0.25 → progression 0.25, 0.20, 0.167, 0.143, 0.125.
+        let expected = [0.25_f32, 0.20, 0.1667, 0.1429, 0.125];
+        for (i, want) in expected.iter().enumerate() {
+            let got = gain(i as f32);
+            assert!(
+                (got - want).abs() < 1e-3,
+                "prior_triumphs={i}: expected {want}, got {got}"
+            );
+        }
+        // Cumulative total across 7 banishments should stay under 1.1
+        // (vs. 1.75 under the old linear formula).
+        let total: f32 = (0..7).map(|i| gain(i as f32)).sum();
+        assert!(
+            total < 1.1,
+            "7-banishment total should be under 1.1, got {total}"
         );
     }
 }

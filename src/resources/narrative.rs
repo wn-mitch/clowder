@@ -11,6 +11,11 @@ use bevy_ecs::prelude::Resource;
 /// - `Micro`       — low-salience events (idle observations, ambient colour)
 /// - `Action`      — routine actions a cat completes (eating, sleeping, wandering)
 /// - `Significant` — story-worthy moments (first fight, death, major discovery)
+/// - `Danger`      — active threats (ambushes, fights in progress)
+/// - `Nature`      — environmental / ambient world events (seasons, decay)
+/// - `Legend`      — colony-defining triumphs (shadowfox banishment) that
+///   generations of cats remember. Sits at the top — these
+///   are the stories that matter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum NarrativeTier {
     Micro,
@@ -18,6 +23,7 @@ pub enum NarrativeTier {
     Significant,
     Danger,
     Nature,
+    Legend,
 }
 
 // ---------------------------------------------------------------------------

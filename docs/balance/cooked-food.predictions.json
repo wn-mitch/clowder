@@ -1,0 +1,32 @@
+{
+  "energy_p50": {
+    "direction": "up",
+    "magnitude_pct": 20,
+    "rationale": "Cooked-food 1.3× multiplier closes the food-supply gap Phase 1 exposed. Better-fed cats hold higher baseline energy and rest more successfully; baseline seed-42 soak: 0.44."
+  },
+  "mood_valence_p50": {
+    "direction": "up",
+    "magnitude_pct": 10,
+    "rationale": "Higher hunger satiation lifts `physiological_satisfaction` over the contentment modifier threshold in src/systems/mood.rs. Baseline 0.19; target crosses the breeding gate floor (0.2)."
+  },
+  "kittens_born": {
+    "direction": "up",
+    "magnitude_pct": 200,
+    "rationale": "Breeding gate requires mood > 0.2 (breeding_mood_floor). Baseline seed-42 soak: 0 kittens in 15 min. Cooking lifts sustained mood high enough that at least 1–3 kittens are born."
+  },
+  "food_cooked_total": {
+    "direction": "up",
+    "magnitude_pct": 0,
+    "rationale": "New event type (Feature::FoodCooked). Expect non-zero once a Kitchen gets built (~5–10 min into soak) and diligent cats pick up the Cook directive. A zero value here is a signal that the pipeline never fired — investigate before drawing welfare conclusions."
+  },
+  "deaths_by_cause.Starvation": {
+    "direction": "down",
+    "magnitude_pct": 100,
+    "rationale": "Canary — must be 0 on seed 42. The 1.3× multiplier raises effective supply without changing forage/hunt yields, so starvation should drop from the Phase-1 baseline of 1."
+  },
+  "deaths_by_cause.ShadowFoxAmbush": {
+    "direction": "flat",
+    "magnitude_pct": 10,
+    "rationale": "Canary — cooking does not interact with ambush dynamics. Small drift in either direction acceptable."
+  }
+}

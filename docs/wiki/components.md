@@ -2,7 +2,7 @@
 
 # Components
 
-55 component types derived from `#[derive(Component)]`.
+76 component types derived from `#[derive(Component)]`.
 
 ## `src/components/aspirations.rs`
 
@@ -28,6 +28,10 @@
 > Inserted after a cat's aspirations and preferences have been initialised. Systems use `Without<AspirationsInitialized>` to detect cats needing setup.
 
 ## `src/components/building.rs`
+
+### ColonyWell (struct)
+
+> Decorative marker for the colony well entity at the colony center.
 
 ### Structure (struct)
 
@@ -58,6 +62,7 @@
 | Field | Type |
 |-------|------|
 | `growth` | `f32` |
+| `crop_kind` | `CropKind` |
 
 ### StoredItems (struct)
 
@@ -68,6 +73,8 @@
 | `items` | `Vec<Entity>` |
 
 ### GateState (struct)
+
+> Tracks whether a gate is open or closed.  Open gates allow wildlife through. Cats can always pass regardless of state, but personality (diligence) determines whether they close the gate behind them.
 
 | Field | Type |
 |-------|------|
@@ -98,6 +105,8 @@
 | `coordinator` | `Entity` |
 | `coordinator_social_weight` | `f32` |
 | `delivered_tick` | `u64` |
+| `target_position` | `Option<crate::components::physical::Position>` |
+| `target_entity` | `Option<Entity>` |
 
 ### PendingDelivery (struct)
 
@@ -109,10 +118,12 @@
 
 | Field | Type |
 |-------|------|
+| `no_store` | `f32` |
 | `storage` | `f32` |
 | `shelter` | `f32` |
 | `gathering` | `f32` |
 | `workshop` | `f32` |
+| `cooking` | `f32` |
 | `farming` | `f32` |
 | `defense` | `f32` |
 
@@ -128,6 +139,7 @@
 | `adopted_tick` | `u64` |
 | `completions` | `u32` |
 | `target_completions` | `u32` |
+| `crafting_hint` | `Option<CraftingHint>` |
 
 ### ActionHistory (struct)
 
@@ -137,6 +149,8 @@
 |-------|------|
 | `entries` | `Vec<ActionRecord>` |
 | `last_narrated_disposition` | `Option<DispositionKind>` |
+| `last_completed_tick` | `Option<(DispositionKind, u64)>` |
+| `replans_narrated` | `u32` |
 
 ## `src/components/fate.rs`
 
@@ -163,6 +177,119 @@
 ### FateAssigned (struct)
 
 > Inserted after a cat's fated connections have been evaluated. Systems use `Without<FateAssigned>` to detect cats needing assignment.
+
+## `src/components/fox_goap_plan.rs`
+
+### FoxGoapPlan (struct)
+
+> Active GOAP plan for a fox. Inserted by `fox_evaluate_and_plan` and ticked by `fox_resolve_goap_plans` until exhausted or interrupted.
+
+| Field | Type |
+|-------|------|
+| `steps` | `Vec<PlannedStep<FoxDomain>>` |
+| `current_step` | `usize` |
+| `kind` | `FoxDispositionKind` |
+| `adopted_tick` | `u64` |
+| `trips_done` | `u32` |
+| `target_trips` | `u32` |
+| `step_state` | `Vec<FoxStepState>` |
+| `replan_count` | `u32` |
+| `max_replans` | `u32` |
+| `failed_actions` | `HashSet<FoxGoapActionKind>` |
+
+## `src/components/fox_personality.rs`
+
+### FoxPersonality (struct)
+
+> Individual personality for a fox. Influences GOAP scoring weights.  Values are in `[0.0, 1.0]`. Generated at spawn with controlled variance so each fox develops distinct behavioral patterns.
+
+| Field | Type |
+|-------|------|
+| `boldness` | `f32` |
+| `cunning` | `f32` |
+| `protectiveness` | `f32` |
+| `territoriality` | `f32` |
+
+### FoxNeeds (struct)
+
+> Truncated Maslow hierarchy for foxes.  | Level | Name       | Fields                        | |-------|------------|-------------------------------| | 1     | Survival   | hunger, health_fraction        | | 2     | Territory  | territory_scent, den_security  | | 3     | Offspring  | cub_satiation, cub_safety      |  Lower levels suppress higher levels when critical, just like cat needs. All values in `[0.0, 1.0]` where 1.0 = fully satisfied.
+
+| Field | Type |
+|-------|------|
+| `hunger` | `f32` |
+| `health_fraction` | `f32` |
+| `territory_scent` | `f32` |
+| `den_security` | `f32` |
+| `cub_satiation` | `f32` |
+| `cub_safety` | `f32` |
+
+## `src/components/fox_spatial.rs`
+
+### FoxHuntingBeliefs (struct)
+
+> Per-fox spatial belief grid over prey abundance.  Updated on successful kills (positive evidence) and fruitless searches (negative evidence). Foxes that hunt different areas develop different beliefs, producing emergent specialization.
+
+| Field | Type |
+|-------|------|
+| `beliefs` | `Vec<f32>` |
+| `grid_w` | `usize` |
+| `grid_h` | `usize` |
+| `bucket_size` | `i32` |
+
+### FoxThreatMemory (struct)
+
+> Per-fox spatial memory of dangerous locations.  Updated when the fox takes damage, encounters cats, or triggers a ward. Decays slowly over time — foxes eventually retry dangerous areas. Bold foxes discount threat memory; cautious foxes weight it heavily.
+
+| Field | Type |
+|-------|------|
+| `threats` | `Vec<f32>` |
+| `grid_w` | `usize` |
+| `grid_h` | `usize` |
+| `bucket_size` | `i32` |
+
+### FoxExplorationMap (struct)
+
+> Per-fox tile visitation grid.  Tracks which areas the fox has explored. Juvenile dispersers prefer unexplored areas; resident foxes patrol under-visited parts of territory.
+
+| Field | Type |
+|-------|------|
+| `coverage` | `Vec<f32>` |
+| `grid_w` | `usize` |
+| `grid_h` | `usize` |
+| `bucket_size` | `i32` |
+
+## `src/components/goap_plan.rs`
+
+### GoapPlan (struct)
+
+| Field | Type |
+|-------|------|
+| `steps` | `Vec<PlannedStep>` |
+| `current_step` | `usize` |
+| `kind` | `DispositionKind` |
+| `adopted_tick` | `u64` |
+| `trips_done` | `u32` |
+| `target_trips` | `u32` |
+| `replan_count` | `u32` |
+| `max_replans` | `u32` |
+| `crafting_hint` | `Option<CraftingHint>` |
+| `step_state` | `Vec<StepExecutionState>` |
+| `ward_placement_pos` | `Option<Position>` |
+| `failed_actions` | `HashSet<GoapActionKind>` |
+
+### PendingUrgencies (struct)
+
+> Urgencies accumulated each tick and evaluated at step boundaries. Replaces per-tick interrupts for all non-damage conditions.
+
+| Field | Type |
+|-------|------|
+| `needs` | `Vec<UrgentNeed>` |
+
+## `src/components/grooming.rs`
+
+### GroomingCondition (struct)
+
+> Physical grooming condition. 0.0 = matted/filthy, 1.0 = pristine.  A physical property — not a Maslow need. Decays passively and is restored by grooming actions. Other systems read it to modulate social and esteem outcomes.
 
 ## `src/components/hunting_priors.rs`
 
@@ -224,6 +351,19 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 | `quality` | `f32` |
 | `condition` | `f32` |
 | `location` | `ItemLocation` |
+| `modifiers` | `ItemModifiers` |
+
+## `src/components/kitten.rs`
+
+### KittenDependency (struct)
+
+> Marks an entity as a dependent kitten that hasn't reached independence.  Maturity advances linearly from 0.0 to 1.0 over 4 seasons. At 1.0 this component is removed and the cat gains full capabilities.  Parent entity references may become stale if a parent dies and is despawned — the growth system handles this gracefully.
+
+| Field | Type |
+|-------|------|
+| `mother` | `Option<Entity>` |
+| `father` | `Option<Entity>` |
+| `maturity` | `f32` |
 
 ## `src/components/magic.rs`
 
@@ -234,6 +374,7 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 | Field | Type |
 |-------|------|
 | `kind` | `HerbKind` |
+| `growth_stage` | `GrowthStage` |
 | `magical` | `bool` |
 | `twisted` | `bool` |
 
@@ -248,6 +389,15 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 | Field | Type |
 |-------|------|
 | `available` | `Vec<Season>` |
+
+### FlavorPlant (struct)
+
+> A non-harvestable decorative plant entity.
+
+| Field | Type |
+|-------|------|
+| `kind` | `FlavorKind` |
+| `growth_stage` | `GrowthStage` |
 
 ### Inventory (struct)
 
@@ -341,8 +491,6 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 ### Position (struct)
 
-> World-space grid position.
-
 | Field | Type |
 |-------|------|
 | `x` | `i32` |
@@ -388,9 +536,25 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 | `safety` | `f32` |
 | `social` | `f32` |
 | `acceptance` | `f32` |
+| `mating` | `f32` |
 | `respect` | `f32` |
 | `mastery` | `f32` |
 | `purpose` | `f32` |
+
+## `src/components/pregnancy.rs`
+
+### Pregnant (struct)
+
+> Marks a cat as pregnant and tracks gestation state.  Inserted when a mating chain completes. Removed at birth (after `ticks_per_season` ticks of gestation), at which point kitten entities are spawned.
+
+| Field | Type |
+|-------|------|
+| `conceived_tick` | `u64` |
+| `partner` | `Option<Entity>` |
+| `litter_size` | `u8` |
+| `stage` | `GestationStage` |
+| `nutrition_sum` | `f32` |
+| `nutrition_samples` | `u32` |
 
 ## `src/components/prey.rs`
 
@@ -410,6 +574,7 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 | `catch_difficulty` | `f32` |
 | `flee_strategy` | `FleeStrategy` |
 | `flee_duration` | `u64` |
+| `habitat` | `&'static [Terrain]` |
 
 ### PreyState (struct)
 
@@ -440,6 +605,36 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 | `item_kind` | `ItemKind` |
 | `den_name` | `&'static str` |
 | `raid_drop` | `u32` |
+
+## `src/components/sensing.rs`
+
+### SensorySpecies (enum)
+
+Variants: `Cat`, `Wild`, `Prey`
+
+### SensorySignature (struct)
+
+> Static detectability profile of an entity across sensory channels.  Each field is a baseline emission on [0.0, 1.0]. A cat has high visual and moderate auditory/olfactory; prey emit more scent than visual; a carcass emits strong scent but no sound.  `tremor_baseline` is the static substrate-vibration emission from body mass. The effective tremor signature at detection time is `tremor_baseline * action_multiplier(current_action)`, so stalking emits far less than sprinting.
+
+| Field | Type |
+|-------|------|
+| `visual` | `f32` |
+| `auditory` | `f32` |
+| `olfactory` | `f32` |
+| `tremor_baseline` | `f32` |
+
+### SensoryModifier (struct)
+
+| Field | Type |
+|-------|------|
+| `sight_range_bonus` | `f32` |
+| `hearing_range_bonus` | `f32` |
+| `scent_range_bonus` | `f32` |
+| `tremor_range_bonus` | `f32` |
+| `sight_acuity_bonus` | `f32` |
+| `hearing_acuity_bonus` | `f32` |
+| `scent_acuity_bonus` | `f32` |
+| `tremor_acuity_bonus` | `f32` |
 
 ## `src/components/skills.rs`
 
@@ -497,12 +692,74 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 | `behavior` | `BehaviorType` |
 | `threat_power` | `f32` |
 | `defense` | `f32` |
+| `ambush_cooldown` | `u32` |
 
 ### WildlifeAiState (enum)
 
 > Mutable AI state for wildlife movement decisions.
 
-Variants: `Patrolling`, `Circling`, `Waiting`, `Fleeing`
+Variants: `Patrolling`, `Circling`, `center_x`, `center_y`, `angle`, `Waiting`, `Fleeing`, `Stalking`, `EncirclingWard`, `ward_x`, `ward_y`, `angle`, `ticks`
+
+### Carcass (struct)
+
+> A rotting carcass left by a shadow fox kill. Emits corruption unless cleansed.
+
+| Field | Type |
+|-------|------|
+| `prey_kind` | `PreyKind` |
+| `age_ticks` | `u64` |
+| `corruption_rate` | `f32` |
+| `cleansed` | `bool` |
+| `harvested` | `bool` |
+
+### FoxAiPhase (enum)
+
+> High-level behavioral phase for fox AI decision-making.  This sits above `WildlifeAiState` (which handles physical movement). `fox_ai_decision` sets both the phase and the corresponding movement state.
+
+Variants: `PatrolTerritory`, `HuntingPrey`, `Returning`, `Resting`, `Dispersing`, `ScentMarking`, `Confronting`, `target_id`, `ticks_remaining`, `Fleeing`, `Raiding`, `DenGuarding`
+
+### FoxState (struct)
+
+> Per-fox mutable state: needs, lifecycle, and territory association.  Attached alongside `WildAnimal` to distinguish foxes from other wildlife. Systems query `With<FoxState>` for fox-specific behavior.
+
+| Field | Type |
+|-------|------|
+| `hunger` | `f32` |
+| `satiation_ticks` | `u64` |
+| `life_stage` | `FoxLifeStage` |
+| `age_ticks` | `u64` |
+| `sex` | `FoxSex` |
+| `home_den` | `Option<Entity>` |
+| `mate` | `Option<Entity>` |
+| `post_action_cooldown` | `u64` |
+| `boldness` | `f32` |
+| `starvation_ticks` | `u64` |
+| `last_patrol_tick` | `u64` |
+
+### FoxDen (struct)
+
+> A fox den — territory anchor and breeding site.  Follows `PreyDen` pattern. Each den represents a mated pair's home base. Territory extends `territory_radius` tiles from the den position.
+
+| Field | Type |
+|-------|------|
+| `territory_radius` | `i32` |
+| `cubs_present` | `u32` |
+| `scent_strength` | `f32` |
+| `established_tick` | `u64` |
+| `last_fed_tick` | `u64` |
+
+### ActiveConfrontation (struct)
+
+> Shared state for a paired confrontation between two entities (fox vs cat or fox vs fox). Inserted on BOTH participants so each side's AI sees the encounter and can decide fight-or-flight independently.  The `min_commitment` field prevents oscillation: once locked in, neither side can disengage for at least this many ticks.
+
+| Field | Type |
+|-------|------|
+| `partner` | `Entity` |
+| `role` | `ConfrontationRole` |
+| `reason` | `ConfrontationReason` |
+| `ticks_remaining` | `u64` |
+| `min_commitment` | `u64` |
+| `started_tick` | `u64` |
 
 ## `src/components/zodiac.rs`
 

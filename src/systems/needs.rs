@@ -132,15 +132,22 @@ pub fn decay_needs(
             c.acceptance_base_drain * (1.0 + personality.warmth * c.acceptance_warmth_scale);
         needs.acceptance = (needs.acceptance - acceptance_drain).max(0.0);
 
-        // Mating need: decays only for Adult/Elder, Spring/Summer, non-Asexual, not pregnant.
+        // Mating need: decays across the photoperiodic breeding window for
+        // Adult/Elder, non-Asexual, not-pregnant cats. Per-season fertility
+        // multipliers (Spring=1.0, Summer=0.55, Autumn=0.2, Winter=0.0 by
+        // default) scale the decay rate. Winter's 0 multiplier pauses decay
+        // without reversing progress, so need carries across season boundaries.
+        // Non-fertile cats (juvenile, asexual, pregnant) never decay, so
+        // mating stays at its initial 1.0 naturally.
         let life_stage = age.stage(time.tick, config.ticks_per_season);
         let is_fertile = matches!(life_stage, LifeStage::Adult | LifeStage::Elder)
-            && matches!(season, Season::Spring | Season::Summer)
             && *orientation != Orientation::Asexual
             && pregnant.is_none();
-        if is_fertile {
-            let mating_drain =
-                c.mating_base_decay * (1.0 + personality.warmth * c.mating_warmth_scale);
+        let fertility = constants.scoring.season_fertility(season);
+        if is_fertile && fertility > 0.0 {
+            let mating_drain = c.mating_base_decay
+                * (1.0 + personality.warmth * c.mating_warmth_scale)
+                * fertility;
             needs.mating = (needs.mating - mating_drain).max(0.0);
         }
 
@@ -718,6 +725,116 @@ mod tests {
         assert!(
             safety > expected_min,
             "traditional cat near familiar territory should get safety boost; got {safety}"
+        );
+    }
+
+    // --- Mating need: bell-curve fertility window ---
+
+    /// Spawn an adult cat — the default `spawn_cat` creates a Kitten because
+    /// Age::new(0) sits at tick 0. We set born_tick well in the past so the
+    /// `Age::stage` computation returns Adult.
+    fn spawn_adult_cat(world: &mut World, needs: Needs, personality: Personality) -> Entity {
+        world
+            .spawn((
+                needs,
+                personality,
+                Health::default(),
+                Mood::default(),
+                Position::new(5, 5),
+                Age { born_tick: 0 },
+                Orientation::Straight,
+            ))
+            .id()
+    }
+
+    fn world_at_season(season: Season) -> (World, Schedule) {
+        let (mut world, schedule) = setup_world();
+        let config = SimConfig::default();
+        // Put the tick in the middle of the chosen season so age remains stable
+        // and the sub-second week phase doesn't matter.
+        let base = match season {
+            Season::Spring => 0,
+            Season::Summer => config.ticks_per_season,
+            Season::Autumn => config.ticks_per_season * 2,
+            Season::Winter => config.ticks_per_season * 3,
+        };
+        let mid = base + config.ticks_per_season / 2;
+        // Add 12 full years so the cat has time to age into Adult regardless of
+        // which season we chose. `Age::stage` floors on seasons-lived.
+        let tick = mid + config.ticks_per_season * 12 * 4;
+        world.resource_mut::<TimeState>().tick = tick;
+        (world, schedule)
+    }
+
+    #[test]
+    fn mating_need_decays_in_spring_for_adult() {
+        let (mut world, mut schedule) = world_at_season(Season::Spring);
+        let mut needs = Needs::default();
+        needs.mating = 1.0;
+        let entity = spawn_adult_cat(&mut world, needs, default_personality());
+
+        schedule.run(&mut world);
+
+        let after = world.get::<Needs>(entity).unwrap().mating;
+        assert!(
+            after < 1.0,
+            "mating need should decay in Spring for adults; got {after}"
+        );
+    }
+
+    #[test]
+    fn mating_need_decays_in_summer_at_reduced_rate() {
+        let (mut world, mut schedule) = world_at_season(Season::Summer);
+        let mut needs = Needs::default();
+        needs.mating = 1.0;
+        let entity = spawn_adult_cat(&mut world, needs, default_personality());
+
+        schedule.run(&mut world);
+
+        let after = world.get::<Needs>(entity).unwrap().mating;
+        let sc = SimConstants::default();
+        let expected_drain = sc.needs.mating_base_decay
+            * (1.0 + default_personality().warmth * sc.needs.mating_warmth_scale)
+            * sc.scoring.mating_fertility_summer;
+        let expected = 1.0 - expected_drain;
+        assert!(
+            (after - expected).abs() < 1e-6,
+            "Summer mating decay should scale by fertility multiplier: after={after}, expected={expected}"
+        );
+    }
+
+    #[test]
+    fn mating_need_carries_across_season_boundary_into_winter() {
+        // Residual interest from a late-Autumn tick should NOT reset when
+        // Winter arrives — it should pause, not reverse.
+        let (mut world, mut schedule) = world_at_season(Season::Winter);
+        let mut needs = Needs::default();
+        needs.mating = 0.4; // partially-decayed residual
+        let entity = spawn_adult_cat(&mut world, needs, default_personality());
+
+        schedule.run(&mut world);
+
+        let after = world.get::<Needs>(entity).unwrap().mating;
+        assert_eq!(
+            after, 0.4,
+            "Winter fertility=0 pauses decay without resetting; got {after}"
+        );
+    }
+
+    #[test]
+    fn mating_need_does_not_decay_for_kittens_in_spring() {
+        let (mut world, mut schedule) = setup_world();
+        // Default TimeState.tick = 0 puts us in Spring, cat Age(0) is a Kitten.
+        let mut needs = Needs::default();
+        needs.mating = 1.0;
+        let entity = spawn_cat(&mut world, needs, default_personality());
+
+        schedule.run(&mut world);
+
+        let after = world.get::<Needs>(entity).unwrap().mating;
+        assert_eq!(
+            after, 1.0,
+            "kittens should not decay mating; got {after}"
         );
     }
 }

@@ -1,4 +1,5 @@
 use bevy_ecs::prelude::*;
+use rand::SeedableRng;
 
 use crate::components::building::StructureType;
 use crate::components::coordination::{
@@ -186,10 +187,19 @@ pub fn assess_colony_needs(
         &Position,
         Option<&crate::components::building::ConstructionSite>,
     )>,
-    ward_query: Query<&crate::components::magic::Ward>,
-    wildlife: Query<(Entity, &Position), With<crate::components::wildlife::WildAnimal>>,
+    mut garden_query: Query<
+        &mut crate::components::building::CropState,
+        With<crate::components::building::Structure>,
+    >,
+    ward_query: Query<(&crate::components::magic::Ward, &Position)>,
+    herb_query: Query<&crate::components::magic::Herb, With<crate::components::magic::Harvestable>>,
+    wildlife: Query<(Entity, &Position, &crate::components::wildlife::WildAnimal)>,
+    carcass_query: Query<(Entity, &Position, &crate::components::wildlife::Carcass)>,
+    map: Res<crate::resources::map::TileMap>,
+    fox_scent: Res<crate::resources::FoxScentMap>,
     event_log: Option<ResMut<crate::resources::event_log::EventLog>>,
     constants: Res<SimConstants>,
+    colony_center: Res<crate::resources::ColonyCenter>,
     mut activation: ResMut<SystemActivation>,
 ) {
     let cc = &constants.coordination;
@@ -214,12 +224,12 @@ pub fn assess_colony_needs(
     // Count threats near colony buildings (not the entire map).
     let nearby_threats: Vec<(Entity, Position)> = wildlife
         .iter()
-        .filter(|(_, wp)| {
+        .filter(|(_, wp, _)| {
             building_positions
                 .iter()
                 .any(|bp| bp.manhattan_distance(wp) <= cc.threat_proximity_range)
         })
-        .map(|(e, p)| (e, *p))
+        .map(|(e, p, _)| (e, *p))
         .collect();
 
     // Breach = wildlife very close to a building.
@@ -233,19 +243,70 @@ pub fn assess_colony_needs(
         .cloned()
         .collect();
 
+    // Snapshot ward positions and radii for strength check + placement.
+    let ward_data: Vec<(Position, f32)> = ward_query
+        .iter()
+        .filter(|(w, _)| !w.inverted && w.strength > 0.01)
+        .map(|(w, p)| (*p, w.repel_radius()))
+        .collect();
+
     let ward_strength_low = {
         let ward_count = ward_query.iter().count();
         if ward_count == 0 {
             true
         } else {
-            let avg: f32 = ward_query.iter().map(|w| w.strength).sum::<f32>() / ward_count as f32;
+            let avg: f32 =
+                ward_query.iter().map(|(w, _)| w.strength).sum::<f32>() / ward_count as f32;
             avg < cc.ward_avg_strength_low_threshold
         }
     };
 
+    let thornbriar_available = herb_query
+        .iter()
+        .any(|h| h.kind == crate::components::magic::HerbKind::Thornbriar);
+
+    // Corruption sweep: find the hottest corrupted tile in the territory ring
+    // and any actionable carcass within colony reach.
+    // Cheap scan — sample every few tiles, not every pixel.
+    let corruption_hotspot: Option<(Position, f32)> = {
+        let cx = colony_center.0.x;
+        let cy = colony_center.0.y;
+        let search_r: i32 = cc.corruption_search_radius;
+        let step: i32 = cc.corruption_search_step.max(1);
+        let mut best: Option<(Position, f32)> = None;
+        let mut y = -search_r;
+        while y <= search_r {
+            let mut x = -search_r;
+            while x <= search_r {
+                let (nx, ny) = (cx + x, cy + y);
+                if map.in_bounds(nx, ny) {
+                    let c = map.get(nx, ny).corruption;
+                    if c > cc.corruption_alarm_threshold
+                        && best.as_ref().is_none_or(|(_, bc)| c > *bc)
+                    {
+                        best = Some((Position::new(nx, ny), c));
+                    }
+                }
+                x += step;
+            }
+            y += step;
+        }
+        best
+    };
+
+    let uncleansed_carcasses: Vec<(Entity, Position)> = carcass_query
+        .iter()
+        .filter(|(_, p, c)| {
+            !c.cleansed
+                && !c.harvested
+                && p.manhattan_distance(&colony_center.0) <= cc.corruption_search_radius
+        })
+        .map(|(e, p, _)| (e, *p))
+        .collect();
+
     let mut event_log = event_log;
 
-    for (_entity, name, skills, mut queue) in &mut coordinators {
+    for (coord_entity, name, skills, mut queue) in &mut coordinators {
         queue.directives.clear();
 
         // Domain specialization: coordinator's skills shift thresholds.
@@ -306,6 +367,26 @@ pub fn assess_colony_needs(
             });
         }
 
+        // Preemptive patrol: fox scent detected near colony without active sightings.
+        if nearby_threats.is_empty() {
+            if let Some((sx, sy)) = fox_scent.highest_nearby(
+                colony_center.0.x,
+                colony_center.0.y,
+                cc.preemptive_patrol_scent_radius,
+            ) {
+                let scent_level = fox_scent.get(sx, sy);
+                if scent_level > cc.preemptive_patrol_scent_threshold {
+                    queue.directives.push(Directive {
+                        kind: DirectiveKind::Patrol,
+                        priority: cc.preemptive_patrol_priority,
+                        target_entity: None,
+                        target_position: Some(Position::new(sx, sy)),
+                        blueprint: None,
+                    });
+                }
+            }
+        }
+
         // Building assessment.
         let worst_building = building_query
             .iter()
@@ -341,15 +422,98 @@ pub fn assess_colony_needs(
             });
         }
 
-        // Ward assessment.
-        if ward_strength_low {
+        // Shadow-fox posse formation — when a shadow-fox is detected inside
+        // colony territory, queue `posse_size` Fight directives targeting it
+        // so the colony musters a counter-offensive instead of only warding.
+        // Each directive gets dispatched to a different combat-capable cat
+        // by the urgent-dispatch pipeline (which already picks the best
+        // uncommitted cat per directive). The high priority keeps these
+        // above ward/herbcraft work.
+        for (wildlife_entity, wpos, animal) in wildlife.iter() {
+            // Only shadow-foxes trigger posse response; regular foxes are
+            // handled by ambient Patrol / threat-interrupt logic.
+            if animal.species != crate::components::wildlife::WildSpecies::ShadowFox {
+                continue;
+            }
+            if colony_center.0.manhattan_distance(wpos) > cc.posse_alarm_range {
+                continue;
+            }
+            for _ in 0..cc.posse_size {
+                queue.directives.push(Directive {
+                    kind: DirectiveKind::Fight,
+                    priority: cc.posse_priority,
+                    target_entity: Some(wildlife_entity),
+                    target_position: Some(*wpos),
+                    blueprint: None,
+                });
+            }
+        }
+
+        // Ward assessment — only issue if thornbriar exists for cats to gather.
+        if ward_strength_low && thornbriar_available {
+            // Deterministic per-call jitter seeded by tick + coordinator entity.
+            // Coordinator directives run at 20-tick intervals so same-call
+            // stacking is rare; the seed varies each call, avoiding the need
+            // to thread a shared SimRng (which would push the system past
+            // Bevy's 16-param tuple limit).
+            let seed =
+                time.tick.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ coord_entity.to_bits();
+            let mut local_rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+            let ward_pos = compute_ward_placement(
+                &building_positions,
+                &ward_data,
+                colony_center.0,
+                cc.ward_placement_radius,
+                &mut local_rng,
+            );
             queue.directives.push(Directive {
                 kind: DirectiveKind::SetWard,
                 priority: cc.ward_set_priority,
                 target_entity: None,
-                target_position: None,
+                target_position: Some(ward_pos),
                 blueprint: None,
             });
+        }
+
+        // Corruption response — issue a Cleanse directive on the hottest
+        // corrupted tile, and/or a HarvestCarcass directive on nearby carcasses.
+        // Priority scales with corruption severity so a breached ward gets
+        // immediate attention.
+        if let Some((hotspot_pos, hotspot_c)) = corruption_hotspot {
+            let priority = (hotspot_c * cc.corruption_directive_priority_scale
+                + skills.magic * cc.corruption_directive_magic_scale)
+                .min(1.0);
+            queue.directives.push(Directive {
+                kind: DirectiveKind::Cleanse,
+                priority,
+                target_entity: None,
+                target_position: Some(hotspot_pos),
+                blueprint: None,
+            });
+        }
+        if let Some((carcass_entity, carcass_pos)) = uncleansed_carcasses.first() {
+            let priority = (cc.carcass_directive_priority_base
+                + skills.herbcraft * cc.carcass_directive_herbcraft_scale)
+                .min(1.0);
+            queue.directives.push(Directive {
+                kind: DirectiveKind::HarvestCarcass,
+                priority,
+                target_entity: Some(*carcass_entity),
+                target_position: Some(*carcass_pos),
+                blueprint: None,
+            });
+        }
+
+        // Garden repurposing: if wards are needed but no thornbriar exists,
+        // convert one food-crop garden to thornbriar production.
+        if ward_strength_low && !thornbriar_available {
+            for mut crop in &mut garden_query {
+                if crop.crop_kind == crate::components::building::CropKind::FoodCrops {
+                    crop.crop_kind = crate::components::building::CropKind::Thornbriar;
+                    crop.growth = 0.0;
+                    break; // Only convert one garden at a time.
+                }
+            }
         }
 
         // Sort by priority descending.
@@ -374,6 +538,169 @@ pub fn assess_colony_needs(
                     },
                 );
             }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// dispatch_urgent_directives — auto-assign high-priority directives
+// ---------------------------------------------------------------------------
+
+/// For each coordinator's queued directives above the emergency threshold,
+/// skip the physical walk-to-cat delivery and directly insert [`ActiveDirective`]
+/// on the best-skilled uncommitted cat within reach.
+///
+/// This is the "radio" for emergencies: when corruption breaches the colony
+/// or predators siege wards, the coordinator can't afford to wander around
+/// handing out orders. Lower-priority directives still route through the
+/// normal Coordinating disposition so cats learn of them through social
+/// contact (narrative texture preserved for the non-urgent flow).
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
+pub fn dispatch_urgent_directives(
+    mut commands: Commands,
+    time: Res<TimeState>,
+    constants: Res<SimConstants>,
+    mut coordinators: Query<
+        (
+            Entity,
+            &Position,
+            &crate::components::physical::Needs,
+            &mut DirectiveQueue,
+        ),
+        With<Coordinator>,
+    >,
+    candidates: Query<
+        (
+            Entity,
+            &Position,
+            &Skills,
+            &crate::components::physical::Needs,
+        ),
+        (
+            Without<ActiveDirective>,
+            Without<Dead>,
+            Without<Coordinator>,
+        ),
+    >,
+    mut activation: ResMut<SystemActivation>,
+) {
+    let cc = &constants.coordination;
+    let critical_hunger = constants.disposition.critical_hunger_interrupt_threshold;
+    if !time.tick.is_multiple_of(cc.assess_interval) {
+        return;
+    }
+
+    for (coord_entity, coord_pos, coord_needs, mut queue) in &mut coordinators {
+        // Collect uncommitted candidates once per coordinator. Hunger is
+        // captured so Fight directives can skip cats below the critical
+        // starvation floor — pulling a starving cat into a posse loses us
+        // the cat either to death mid-combat or to a desertion interrupt.
+        let cands: Vec<(Entity, Position, Skills, f32)> = candidates
+            .iter()
+            .map(|(e, p, s, n)| (e, *p, s.clone(), n.hunger))
+            .collect();
+
+        let mut dispatched_indices: Vec<usize> = Vec::new();
+        // Track cats already receiving a directive this cycle so a posse
+        // doesn't dispatch the same "best combat cat" for every Fight
+        // directive in the queue.
+        let mut already_dispatched: Vec<Entity> = Vec::new();
+        // One urgent directive per coordinator per cycle in the general
+        // case. Anything more and the colony drops everything chasing
+        // corruption — ward renewal and hunting collapse. Exception: Fight
+        // directives dispatch without this cap so a coordinator can
+        // assemble a full posse (typically 3 cats) in a single cycle.
+        // Also tracks per-target Fight dispatches so the posse doesn't
+        // drag in more cats than posse_size.
+        let mut urgent_slots_remaining: u32 = 1;
+        let mut fight_dispatches_per_target: std::collections::HashMap<Entity, u32> =
+            std::collections::HashMap::new();
+
+        for (idx, directive) in queue.directives.iter().enumerate() {
+            let is_fight = matches!(directive.kind, DirectiveKind::Fight);
+            if !is_fight && urgent_slots_remaining == 0 {
+                break;
+            }
+            if directive.priority < cc.urgent_directive_priority_threshold {
+                continue;
+            }
+            if is_fight {
+                if let Some(target) = directive.target_entity {
+                    let count = fight_dispatches_per_target.entry(target).or_insert(0);
+                    if *count >= cc.posse_size as u32 {
+                        continue;
+                    }
+                }
+            }
+            // Pick the best-skilled cat for the directive within range.
+            let skill_of = |s: &Skills| -> f32 {
+                match directive.kind {
+                    DirectiveKind::Hunt => s.hunting,
+                    DirectiveKind::Forage => s.foraging,
+                    DirectiveKind::Build => s.building,
+                    DirectiveKind::Fight | DirectiveKind::Patrol => s.combat,
+                    DirectiveKind::Herbcraft | DirectiveKind::SetWard => s.herbcraft,
+                    DirectiveKind::Cleanse => s.magic,
+                    DirectiveKind::HarvestCarcass => s.herbcraft,
+                    // Cooking has no dedicated skill — treat as neutral.
+                    DirectiveKind::Cook => 0.0,
+                }
+            };
+            // Fight directives respect the critical-hunger floor: a starving
+            // cat sent to fight will either starve mid-combat or interrupt
+            // to eat, leaving the posse short. Other directive kinds still
+            // accept hungry cats because they don't carry immediate mortal
+            // risk (and hunting/foraging directives actively help the cat).
+            if is_fight {
+                for (e, p, _, hunger) in &cands {
+                    if coord_pos.manhattan_distance(p) <= cc.urgent_dispatch_range
+                        && !already_dispatched.contains(e)
+                        && *hunger < critical_hunger
+                    {
+                        activation.record(Feature::PosseCandidateExcludedStarving);
+                    }
+                }
+            }
+            let best = cands
+                .iter()
+                .filter(|(e, p, _, hunger)| {
+                    coord_pos.manhattan_distance(p) <= cc.urgent_dispatch_range
+                        && !already_dispatched.contains(e)
+                        && !(is_fight && *hunger < critical_hunger)
+                })
+                .max_by(|(_, pa, sa, _), (_, pb, sb, _)| {
+                    let va = skill_of(sa) - coord_pos.manhattan_distance(pa) as f32 * 0.01;
+                    let vb = skill_of(sb) - coord_pos.manhattan_distance(pb) as f32 * 0.01;
+                    va.partial_cmp(&vb).unwrap_or(std::cmp::Ordering::Equal)
+                });
+
+            if let Some((target_entity, _, _, _)) = best {
+                commands.entity(*target_entity).insert(ActiveDirective {
+                    kind: directive.kind,
+                    priority: directive.priority,
+                    coordinator: coord_entity,
+                    coordinator_social_weight: coord_needs.respect,
+                    delivered_tick: time.tick,
+                    target_position: directive.target_position,
+                    target_entity: directive.target_entity,
+                });
+                activation.record(Feature::DirectiveDelivered);
+                dispatched_indices.push(idx);
+                already_dispatched.push(*target_entity);
+                if is_fight {
+                    if let Some(tgt) = directive.target_entity {
+                        *fight_dispatches_per_target.entry(tgt).or_insert(0) += 1;
+                    }
+                } else {
+                    urgent_slots_remaining -= 1;
+                }
+            }
+        }
+
+        // Remove dispatched directives from the queue so the physical
+        // coordinator isn't also trying to deliver them.
+        for idx in dispatched_indices.into_iter().rev() {
+            queue.directives.remove(idx);
         }
     }
 }
@@ -451,12 +778,14 @@ pub fn accumulate_build_pressure(
     >,
     cats: Query<(&Position, &crate::ai::CurrentAction), Without<Dead>>,
     buildings: Query<(&crate::components::building::Structure, &Position)>,
+    construction_sites: Query<&crate::components::building::ConstructionSite>,
     stored_items_query: Query<(
         &crate::components::building::Structure,
         &crate::components::building::StoredItems,
     )>,
     wildlife: Query<&Position, With<crate::components::wildlife::WildAnimal>>,
     items_query: Query<&crate::components::items::Item>,
+    mut unmet_demand: ResMut<crate::resources::UnmetDemand>,
     mut log: ResMut<NarrativeLog>,
     constants: Res<SimConstants>,
 ) {
@@ -490,6 +819,27 @@ pub fn accumulate_build_pressure(
     let has_garden = has_structure(StructureType::Garden);
     let has_workshop = has_structure(StructureType::Workshop);
     let has_watchtower = has_structure(StructureType::Watchtower);
+    let has_kitchen = has_structure(StructureType::Kitchen);
+    let has_hearth = has_structure(StructureType::Hearth);
+    // ConstructionSite entities only exist while the build is incomplete —
+    // they're despawned on completion. So any non-empty iter means there's
+    // work to do somewhere.
+    let has_unfinished_site = construction_sites.iter().next().is_some();
+    let raw_food_items = stored_items_query
+        .iter()
+        .filter(|(s, _)| s.kind == StructureType::Stores)
+        .map(|(_, si)| {
+            si.items
+                .iter()
+                .copied()
+                .filter(|&e| {
+                    items_query
+                        .get(e)
+                        .is_ok_and(|it| it.kind.is_food() && !it.modifiers.cooked)
+                })
+                .count()
+        })
+        .sum::<usize>();
 
     let skilled_crafters = cats.iter().count(); // simplified: count living cats as proxy
                                                 // Wildlife inside colony area (within ~wildlife_breach_range tiles of any building).
@@ -539,6 +889,70 @@ pub fn accumulate_build_pressure(
             pressure.workshop *= BuildPressure::DECAY;
         }
 
+        // Cooking pressure. Two regimes, both additive:
+        //   1. Foundational: no Kitchen exists at all → push hard
+        //      regardless of raw-food or hearth state. The colony can't
+        //      enter the Cook loop without one, so it's a phase unlock
+        //      (mirrors `no_store_pressure_multiplier` for Stores).
+        //   2. Incremental: a Hearth exists and raw food is piling up
+        //      → the existing `cooking_pressure_multiplier` path compounds.
+        // The unmet-demand ledger amplifies both — frustrated Cook desires
+        // from scoring feed directly into the push.
+        //
+        // TODO(strategist-coordinator): hard-coded "Kitchen is foundational"
+        // is a stopgap. A future coordinator should reason over a building
+        // tech-tree (Hearth → Kitchen → Workshop → …) and beeline toward
+        // phase-unlock structures the way Civilization AI does. See
+        // `docs/systems/strategist-coordinator.md`.
+        if !has_kitchen {
+            let demand_boost = 1.0 + unmet_demand.kitchen * cc.unmet_demand_amplifier;
+            pressure.cooking += rate * cc.no_kitchen_pressure_multiplier * demand_boost;
+            if has_hearth && raw_food_items >= cc.build_pressure_cooking_min_raw_food {
+                pressure.cooking += rate * cc.cooking_pressure_multiplier * demand_boost;
+            }
+        } else {
+            pressure.cooking *= BuildPressure::DECAY;
+        }
+
+        // Cook directive — once a Kitchen exists and raw food is available,
+        // keep a low-priority Cook directive live on the queue so diligent
+        // cats get nudged to prep meals. Lower priority than Hunt/Fight, so
+        // survival directives still win when they matter.
+        if has_kitchen && raw_food_items > 0 {
+            queue.directives.push(Directive {
+                kind: DirectiveKind::Cook,
+                priority: cc.cook_directive_priority,
+                target_entity: None,
+                target_position: None,
+                blueprint: None,
+            });
+        }
+
+        // Site-directed Build urgency. The blueprint-carrying Build
+        // directive is consumed by `spawn_construction_sites` as soon as
+        // a site entity exists — it doesn't propagate to cats. Without
+        // a follow-up directive, cats never get an ActiveDirective{Build}
+        // and their Build scoring stays at baseline, so sites linger.
+        //
+        // Push a blueprint-less Build directive above the urgent
+        // threshold so `dispatch_urgent_directives` routes it to cats
+        // directly. Dedup on `kind == Build && blueprint.is_none()` so
+        // the queue doesn't bloat across assess cycles.
+        if has_unfinished_site {
+            let already_queued = queue.directives.iter().any(|d| {
+                d.kind == DirectiveKind::Build && d.blueprint.is_none()
+            });
+            if !already_queued {
+                queue.directives.push(Directive {
+                    kind: DirectiveKind::Build,
+                    priority: cc.construct_site_directive_priority,
+                    target_entity: None,
+                    target_position: None,
+                    blueprint: None,
+                });
+            }
+        }
+
         // Farming pressure.
         if !has_garden && food_fraction < cc.build_pressure_farming_food_threshold {
             pressure.farming += rate;
@@ -561,7 +975,14 @@ pub fn accumulate_build_pressure(
                 .directives
                 .iter()
                 .any(|d| d.kind == DirectiveKind::Build && d.blueprint.is_some());
-            if !already_queued {
+            // One build at a time. Starting a second site while the first
+            // is unfinished just scatters the colony's labor across
+            // competing projects — a Kitchen + Storehouse + Workshop all
+            // started in consecutive cycles means none of them finish.
+            // Surplus-labor-aware parallelism (allow N sites when idle
+            // cats > some threshold) is a future refinement — see
+            // docs/systems/strategist-coordinator.md.
+            if !already_queued && !has_unfinished_site {
                 let priority = (cc.build_directive_priority_base
                     + skills.building * cc.build_directive_priority_building_scale)
                     .min(1.0);
@@ -592,6 +1013,14 @@ pub fn accumulate_build_pressure(
                     StructureType::Den => pressure.shelter = 0.0,
                     StructureType::Hearth => pressure.gathering = 0.0,
                     StructureType::Workshop => pressure.workshop = 0.0,
+                    StructureType::Kitchen => {
+                        pressure.cooking = 0.0;
+                        // Clearing the demand once the build is scheduled
+                        // prevents stale frustration from re-priming the
+                        // pressure after Kitchen is marked for
+                        // construction.
+                        unmet_demand.kitchen = 0.0;
+                    }
                     StructureType::Garden => pressure.farming = 0.0,
                     StructureType::Watchtower => pressure.defense = 0.0,
                     _ => {}
@@ -599,12 +1028,16 @@ pub fn accumulate_build_pressure(
             }
         }
     }
+    // Decay unmet-demand once per assessment cycle, regardless of whether
+    // any pressure fired. Frustration fades over time when no cat tries.
+    unmet_demand.decay();
 }
 
 fn structure_display_name(kind: StructureType) -> &'static str {
     match kind {
         StructureType::Den => "den",
         StructureType::Hearth => "hearth",
+        StructureType::Kitchen => "kitchen",
         StructureType::Stores => "storehouse",
         StructureType::Workshop => "workshop",
         StructureType::Garden => "garden",
@@ -629,10 +1062,7 @@ fn structure_display_name(kind: StructureType) -> &'static str {
 pub fn spawn_construction_sites(
     mut commands: Commands,
     mut coordinators: Query<(&mut DirectiveQueue, &Name), With<Coordinator>>,
-    buildings: Query<(
-        &crate::components::building::Structure,
-        &Position,
-    )>,
+    buildings: Query<(&crate::components::building::Structure, &Position)>,
     construction_sites: Query<&crate::components::building::ConstructionSite>,
     colony_center: Res<crate::resources::ColonyCenter>,
     mut map: ResMut<crate::resources::map::TileMap>,
@@ -662,9 +1092,7 @@ pub fn spawn_construction_sites(
             .any(|site| site.blueprint == blueprint)
             || spawned_this_tick.contains(&blueprint);
         // Also skip if the building type already exists as a completed structure.
-        let already_built = buildings
-            .iter()
-            .any(|(s, _)| s.kind == blueprint);
+        let already_built = buildings.iter().any(|(s, _)| s.kind == blueprint);
         if already_exists || already_built {
             queue.directives.remove(idx);
             continue;
@@ -696,7 +1124,10 @@ pub fn spawn_construction_sites(
         // materials (the colony pools what they brought with them).
         let site = crate::components::building::ConstructionSite::new_prefunded(blueprint);
         commands.spawn((
-            Name(format!("Construction: {}", structure_display_name(blueprint))),
+            Name(format!(
+                "Construction: {}",
+                structure_display_name(blueprint)
+            )),
             anchor,
             crate::components::building::Structure {
                 kind: blueprint,
@@ -730,16 +1161,11 @@ fn find_building_placement(
     map: &crate::resources::map::TileMap,
     center: Position,
     size: (i32, i32),
-    buildings: &Query<(
-        &crate::components::building::Structure,
-        &Position,
-    )>,
+    buildings: &Query<(&crate::components::building::Structure, &Position)>,
 ) -> Option<Position> {
     // Collect existing building footprints for gap checking.
-    let occupied: Vec<(Position, (i32, i32))> = buildings
-        .iter()
-        .map(|(s, p)| (*p, s.size))
-        .collect();
+    let occupied: Vec<(Position, (i32, i32))> =
+        buildings.iter().map(|(s, p)| (*p, s.size)).collect();
 
     // Spiral search: try positions at increasing Manhattan distance.
     for radius in 1..=16_i32 {
@@ -813,6 +1239,110 @@ fn footprints_overlap_with_gap(
 }
 
 // ---------------------------------------------------------------------------
+// Ward placement — find the coverage gap farthest from existing wards
+// ---------------------------------------------------------------------------
+
+/// Pick a position for a new ward.
+///
+/// Prefers positions that cover colony structures (Den/Hearth/Stores/Workshop)
+/// not already protected by existing wards. Falls back to gap-filling around
+/// the colony center when all structures are covered (or none exist).
+///
+/// Scoring (per candidate):
+/// - `uncovered_structures`: count of structure positions within `expected_repel_radius`
+///   of the candidate that are NOT already inside an existing ward.
+/// - `min_gap`: distance from nearest existing ward (higher = less redundant).
+/// - Final score = `uncovered_structures * 100.0 + min_gap`
+///   (the big weight ensures uncovered structures always win over pure gap-filling).
+///
+/// The first ward in an empty colony goes directly onto the structure cluster
+/// centroid so it immediately covers the most valuable cats.
+pub(crate) fn compute_ward_placement(
+    building_positions: &[Position],
+    ward_positions: &[(Position, f32)],
+    colony_center: Position,
+    placement_radius: f32,
+    rng: &mut impl rand::Rng,
+) -> Position {
+    let anchor = if building_positions.is_empty() {
+        colony_center
+    } else {
+        let (sx, sy) = building_positions.iter().fold((0i64, 0i64), |(ax, ay), p| {
+            (ax + p.x as i64, ay + p.y as i64)
+        });
+        let n = building_positions.len() as i64;
+        Position::new((sx / n) as i32, (sy / n) as i32)
+    };
+
+    // First ward with structures: place directly on the structure cluster
+    // so it blankets the colony core.
+    if ward_positions.is_empty() && !building_positions.is_empty() {
+        return anchor;
+    }
+
+    // Fallback default for empty colonies.
+    if ward_positions.is_empty() {
+        return Position::new(anchor.x, anchor.y - placement_radius as i32);
+    }
+
+    // Approximate the radius a new ward will project (conservative estimate
+    // using half of placement_radius — actual repel_radius is data-driven).
+    let expected_repel_radius = placement_radius * 0.5;
+
+    // Build the set of structures that are still uncovered.
+    let uncovered: Vec<Position> = building_positions
+        .iter()
+        .filter(|bp| {
+            !ward_positions
+                .iter()
+                .any(|(wp, r)| (bp.manhattan_distance(wp) as f32) <= *r)
+        })
+        .copied()
+        .collect();
+
+    // Per-call angle offset jitters candidate positions so cats planning
+    // on the same tick don't all land on the same "best" spot. Without this
+    // jitter, simultaneous placement decisions converge to identical
+    // positions and wards visibly stack.
+    let base_angle_offset: f32 = rng.random_range(0.0..std::f32::consts::TAU / 12.0);
+    let mut candidates: Vec<Position> = (0..12)
+        .map(|i| {
+            let angle = base_angle_offset + (i as f32 / 12.0) * std::f32::consts::TAU;
+            let cx = anchor.x + (angle.cos() * placement_radius) as i32;
+            let cy = anchor.y + (angle.sin() * placement_radius) as i32;
+            Position::new(cx, cy)
+        })
+        .collect();
+
+    // Also consider each uncovered structure position directly as a candidate —
+    // placing a ward on top of a cat-activity zone is usually optimal.
+    candidates.extend(uncovered.iter().copied());
+
+    let mut best_pos = candidates[0];
+    let mut best_score = f32::NEG_INFINITY;
+
+    for candidate in candidates {
+        let covered_count = uncovered
+            .iter()
+            .filter(|bp| (candidate.manhattan_distance(bp) as f32) <= expected_repel_radius)
+            .count() as f32;
+
+        let min_gap = ward_positions
+            .iter()
+            .map(|(wp, radius)| candidate.manhattan_distance(wp) as f32 - radius)
+            .fold(f32::MAX, f32::min);
+
+        let score = covered_count * 100.0 + min_gap;
+
+        if score > best_score {
+            best_score = score;
+            best_pos = candidate;
+        }
+    }
+    best_pos
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -821,6 +1351,38 @@ mod tests {
     use super::*;
 
     use crate::components::mental::{Memory, MemoryEntry};
+
+    #[test]
+    fn ward_placement_prefers_uncovered_structure() {
+        // Two structures far apart; no existing wards; placement should land
+        // on the cluster centroid.
+        let structures = vec![Position::new(10, 10), Position::new(14, 10)];
+        let wards: Vec<(Position, f32)> = vec![];
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
+        let pos = compute_ward_placement(&structures, &wards, Position::new(0, 0), 10.0, &mut rng);
+        // Centroid is (12, 10).
+        assert_eq!(pos, Position::new(12, 10));
+    }
+
+    #[test]
+    fn ward_placement_covers_uncovered_structure_when_one_exists() {
+        // One structure already covered by a ward, another 30 tiles away with
+        // no coverage — placement should prefer covering the uncovered one.
+        let covered = Position::new(10, 10);
+        let uncovered = Position::new(40, 10);
+        let structures = vec![covered, uncovered];
+        let wards = vec![(covered, 5.0)];
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
+        let pos =
+            compute_ward_placement(&structures, &wards, Position::new(20, 10), 10.0, &mut rng);
+        // The uncovered structure should be within the chosen ward's coverage.
+        let covered_by_new = uncovered.manhattan_distance(&pos) as f32 <= 5.0;
+        assert!(
+            covered_by_new,
+            "new ward at {:?} does not cover uncovered structure at {:?}",
+            pos, uncovered
+        );
+    }
 
     /// A cat with no relationships has zero social weight.
     #[test]
@@ -1033,6 +1595,13 @@ mod tests {
         });
         world.insert_resource(crate::resources::SimConstants::default());
         world.insert_resource(SystemActivation::default());
+        world.insert_resource(crate::resources::ColonyCenter(Position::new(20, 20)));
+        world.insert_resource(crate::resources::FoxScentMap::default());
+        world.insert_resource(crate::resources::map::TileMap::new(
+            50,
+            50,
+            crate::resources::map::Terrain::Grass,
+        ));
         // Food stores at 10% capacity.
         world.insert_resource(crate::resources::food::FoodStores::new(5.0, 50.0, 0.0));
 
@@ -1073,6 +1642,13 @@ mod tests {
         });
         world.insert_resource(crate::resources::SimConstants::default());
         world.insert_resource(SystemActivation::default());
+        world.insert_resource(crate::resources::ColonyCenter(Position::new(20, 20)));
+        world.insert_resource(crate::resources::FoxScentMap::default());
+        world.insert_resource(crate::resources::map::TileMap::new(
+            50,
+            50,
+            crate::resources::map::Terrain::Grass,
+        ));
         // Food at 45% — above default 0.5 threshold but below shifted threshold
         // for a non-hunter coordinator.
         world.insert_resource(crate::resources::food::FoodStores::new(22.5, 50.0, 0.0));

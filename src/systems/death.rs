@@ -116,14 +116,22 @@ pub fn check_death(
                     cat: dead_name.clone(),
                     cause: format!("{cause:?}"),
                     injury_source: injury_source.clone(),
+                    location: (dead_pos.x, dead_pos.y),
                 },
             );
         }
 
-        // Nearby living cats react.
+        // Nearby living cats react. Phase 4 migration: visual-channel
+        // check via the unified sensory model.
         for (pos, mut mood, mut memory) in &mut mood_query {
-            let dist = pos.manhattan_distance(dead_pos);
-            if dist <= c.grief_detection_range {
+            if crate::systems::sensing::observer_sees_at(
+                crate::components::SensorySpecies::Cat,
+                *pos,
+                &constants.sensory.cat,
+                *dead_pos,
+                crate::components::SensorySignature::CAT,
+                c.grief_detection_range as f32,
+            ) {
                 mood.modifiers.push_back(MoodModifier {
                     amount: c.grief_mood_penalty,
                     ticks_remaining: c.grief_mood_ticks,

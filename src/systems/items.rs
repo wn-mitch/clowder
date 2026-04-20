@@ -22,9 +22,14 @@ pub fn decay_items(
             // Narrate food spoilage (~10% of destroyed food items).
             if item.kind.is_food() && rng.rng.random::<f32>() < 0.1 {
                 let name = item_display_name(item.kind, item.quality, &item.modifiers);
+                let verb = if item.kind.is_plural_name() {
+                    "have"
+                } else {
+                    "has"
+                };
                 log.push(
                     time.tick,
-                    format!("Some {name} in the stores has gone off."),
+                    format!("Some {name} in the stores {verb} gone off."),
                     NarrativeTier::Micro,
                 );
             }

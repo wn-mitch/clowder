@@ -110,4 +110,140 @@
         action: Some(Forage),
         terrain: Some(LightForest),
     ),
+
+    // =====================================================================
+    // Personality singles
+    // =====================================================================
+    (
+        text: "{name} tastes an unfamiliar leaf, then spits it out. Notes taken.",
+        tier: Action,
+        action: Some(Forage),
+        personality: [(axis: Curiosity, bucket: High)],
+    ),
+    (
+        text: "{name} sticks to the same patch that worked last time.",
+        tier: Action,
+        action: Some(Forage),
+        personality: [(axis: Curiosity, bucket: Low)],
+    ),
+    (
+        text: "{name} glances over {possessive} shoulder between every pick.",
+        tier: Action,
+        action: Some(Forage),
+        personality: [(axis: Anxiety, bucket: High)],
+    ),
+    (
+        text: "{name} combs through the underbrush paw by paw, missing nothing.",
+        tier: Action,
+        action: Some(Forage),
+        personality: [(axis: Patience, bucket: High)],
+    ),
+    (
+        text: "{name} stops to investigate an interesting mushroom and forgets what {subject} came for.",
+        tier: Action,
+        action: Some(Forage),
+        personality: [(axis: Playfulness, bucket: High)],
+    ),
+    (
+        text: "{name} peers at the next bush with certain optimism.",
+        tier: Action,
+        action: Some(Forage),
+        personality: [(axis: Optimism, bucket: High)],
+    ),
+    (
+        text: "{name} scrounges without hope. Slim pickings, as expected.",
+        tier: Action,
+        action: Some(Forage),
+        personality: [(axis: Optimism, bucket: Low)],
+    ),
+    (
+        text: "{name} surveys {possessive} haul with visible satisfaction.",
+        tier: Action,
+        action: Some(Forage),
+        personality: [(axis: Pride, bucket: High)],
+    ),
+    (
+        text: "{name} forages far from camp, preferring to work alone.",
+        tier: Action,
+        action: Some(Forage),
+        personality: [(axis: Independence, bucket: High)],
+    ),
+    (
+        text: "{name} refuses to leave a bare patch. There must be something here.",
+        tier: Action,
+        action: Some(Forage),
+        personality: [(axis: Stubbornness, bucket: High)],
+    ),
+
+    // =====================================================================
+    // Mood conditions
+    // =====================================================================
+    (
+        text: "{name} gathers food with a light step, humming between bushes.",
+        tier: Action,
+        action: Some(Forage),
+        mood: Some(Happy),
+    ),
+    (
+        text: "{name} claws through the dirt. Something. Anything.",
+        tier: Action,
+        action: Some(Forage),
+        mood: Some(Miserable),
+    ),
+    (
+        text: "{name} fills {possessive} paws with a grin. Today the land provides.",
+        tier: Action,
+        action: Some(Forage),
+        mood: Some(Euphoric),
+    ),
+
+    // =====================================================================
+    // Personality + Mood combos
+    // =====================================================================
+    (
+        text: "{name} moves through the foraging grounds with quiet efficiency, arms full, content.",
+        tier: Action,
+        action: Some(Forage),
+        personality: [(axis: Diligence, bucket: High)],
+        mood: Some(Happy),
+    ),
+    (
+        text: "{name}'s eyes go wide — a new plant, never seen before. The day is made.",
+        tier: Action,
+        action: Some(Forage),
+        personality: [(axis: Curiosity, bucket: High)],
+        mood: Some(Euphoric),
+    ),
+
+    // =====================================================================
+    // Needs
+    // =====================================================================
+    (
+        text: "{name} eats something raw before {subject} can stop {object}self. The rest goes back.",
+        tier: Action,
+        action: Some(Forage),
+        needs: [(axis: Hunger, level: Critical)],
+    ),
+
+    // =====================================================================
+    // Environmental seasoning
+    // =====================================================================
+    (
+        text: "{name} finds mushrooms pushing up through the damp ground after the rain.",
+        tier: Action,
+        action: Some(Forage),
+        weather: Some(LightRain),
+    ),
+    (
+        text: "Old {name} walks straight to a hidden patch. {Subject} always knew where to look.",
+        tier: Action,
+        action: Some(Forage),
+        life_stage: Some(Elder),
+    ),
+    (
+        text: "Young {name} sniffs at a plant, wrinkles {possessive} nose, and puts it back.",
+        tier: Action,
+        action: Some(Forage),
+        life_stage: Some(Young),
+    ),
 ]

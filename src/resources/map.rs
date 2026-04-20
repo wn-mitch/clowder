@@ -18,6 +18,7 @@ pub enum Terrain {
     // Settlement
     Den,
     Hearth,
+    Kitchen,
     Stores,
     Workshop,
     Garden,
@@ -34,6 +35,32 @@ pub enum Terrain {
 }
 
 impl Terrain {
+    /// Every variant, in declaration order. Used for exhaustive header
+    /// snapshots (event-log `sensory_env_multipliers` block) and tests.
+    pub const ALL: &'static [Terrain] = &[
+        Self::Grass,
+        Self::LightForest,
+        Self::DenseForest,
+        Self::Water,
+        Self::Rock,
+        Self::Mud,
+        Self::Sand,
+        Self::Den,
+        Self::Hearth,
+        Self::Kitchen,
+        Self::Stores,
+        Self::Workshop,
+        Self::Garden,
+        Self::Watchtower,
+        Self::WardPost,
+        Self::Wall,
+        Self::Gate,
+        Self::FairyRing,
+        Self::StandingStone,
+        Self::DeepPool,
+        Self::AncientRuin,
+    ];
+
     /// Movement cost in abstract ticks. `u32::MAX` means impassable.
     pub fn movement_cost(self) -> u32 {
         match self {
@@ -41,6 +68,7 @@ impl Terrain {
             | Self::Sand
             | Self::Den
             | Self::Hearth
+            | Self::Kitchen
             | Self::Stores
             | Self::Workshop
             | Self::Watchtower
@@ -68,6 +96,7 @@ impl Terrain {
             Self::Sand => ':',
             Self::Den => 'D',
             Self::Hearth => 'H',
+            Self::Kitchen => 'K',
             Self::Stores => 'S',
             Self::Workshop => 'W',
             Self::Garden => 'G',
@@ -133,6 +162,41 @@ impl Terrain {
     /// for open gates, but the terrain-level check blocks by default).
     pub fn is_wildlife_passable(self) -> bool {
         !matches!(self, Self::Wall | Self::Gate) && self.is_passable()
+    }
+
+    // ---- Sensory predicates (see systems/sensing.rs) ----
+    //
+    // Phase 1 stubs. In Phase 5a `occludes_sight` will return true for
+    // DenseForest and buildings (Wall, Watchtower, Hearth, Stores,
+    // Workshop) so a Bresenham LoS check can terminate on occluder
+    // tiles. In Phase 5b `tremor_transmission` returns terrain-specific
+    // multipliers (stone ~1.2, grass ~0.5, water 0.0, etc.). Returning
+    // neutral values here keeps Phase 1 purely structural per the
+    // Balance Methodology axiom in CLAUDE.md.
+
+    /// Whether this terrain blocks line-of-sight.
+    ///
+    /// Phase 5a activation: DenseForest (canopy+undergrowth) and Wall
+    /// block sight. Everything else remains clear. Buildings with open
+    /// entrances (Den, Hearth, Stores, Workshop, Gate) are *not*
+    /// occluders — they're represented as tiles with visual access; a
+    /// future pass can distinguish doorway-facing vs wall-facing if
+    /// needed. Watchtower is explicitly not an occluder (it's a raised
+    /// platform that extends sight, not blocks it).
+    ///
+    /// Verisimilitude claim: *real predators lose line-of-sight targets
+    /// behind dense vegetation and walls.* Predicted effect — cat
+    /// ambush rate drops near DenseForest; colony interior (walled
+    /// sections) gains defensive value.
+    pub fn occludes_sight(self) -> bool {
+        matches!(self, Self::DenseForest | Self::Wall)
+    }
+
+    /// Multiplier on substrate-vibration transmission through this
+    /// terrain. Phase 1: 1.0 (neutral) for all; real physics values
+    /// land with Phase 5b tremor activation.
+    pub fn tremor_transmission(self) -> f32 {
+        1.0
     }
 }
 
