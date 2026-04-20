@@ -1018,11 +1018,13 @@ pub fn evaluate_and_plan(
 
         let chosen = select_disposition_softmax(&disposition_scores, &mut rng.rng, sc);
 
-        // Store top-3 scores for diagnostics.
+        // Store all gate-open action scores, sorted descending, for
+        // diagnostics. Truncation removed 2026-04-20 so scoring-competition
+        // analysis can see ranks beyond the top few (e.g., Mate vs Socialize
+        // on shared ticks).
         {
             let mut sorted = scores.clone();
             sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-            sorted.truncate(3);
             current.last_scores = sorted;
         }
 

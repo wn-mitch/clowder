@@ -89,7 +89,9 @@ pub enum EventKind {
         magic_affinity: f32,
         current_action: Action,
         relationships: Vec<RelationshipEntry>,
-        /// Top-3 scored actions from the last decision (post-bonus, post-suppression).
+        /// All gate-open scored actions from the last decision, sorted
+        /// descending (post-bonus, post-suppression). Cap is the size of the
+        /// Action enum.
         last_scores: Vec<(Action, f32)>,
         /// LifeStage at snapshot time ("Kitten", "Adolescent", "Adult", "Elder").
         life_stage: String,

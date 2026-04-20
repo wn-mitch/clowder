@@ -56,7 +56,9 @@ pub struct CurrentAction {
     /// Optional entity target (e.g. cat to socialize/groom with).
     #[serde(skip)]
     pub target_entity: Option<Entity>,
-    /// Top-3 action scores from the last decision (post-bonus, post-suppression).
+    /// All gate-open action scores from the last decision, sorted descending
+    /// (post-bonus, post-suppression). Used by the log_panel UI and by
+    /// offline scoring-competition analysis.
     #[serde(skip)]
     pub last_scores: Vec<(Action, f32)>,
 }

@@ -720,11 +720,11 @@ pub fn evaluate_dispositions(
         // Select disposition via softmax.
         let chosen = select_disposition_softmax(&disposition_scores, &mut rng.rng, sc);
 
-        // Store top-3 action scores for diagnostics (unchanged from evaluate_actions).
+        // Store all gate-open action scores for diagnostics (unchanged from
+        // evaluate_actions). Truncation removed 2026-04-20 to match goap.rs.
         {
             let mut sorted = scores.clone();
             sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-            sorted.truncate(3);
             current.last_scores = sorted;
         }
 
