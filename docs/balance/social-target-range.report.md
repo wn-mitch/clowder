@@ -1,202 +1,217 @@
-# social_target_range 10 → 25 — rejected at range=25
+# social_target_range — iteration 1 rejected, iteration 2 diagnostic
 
-**Status:** iteration 1 rejected on unpredicted reproductive regression.
-Sub-task remains open in `docs/open-work.md` follow-on #1.
+**Status:** sub-task 1 of follow-on #1 in `docs/open-work.md`. Range=25
+rejected (iter 1). Instrumentation added (iter 2) reframes the regression
+mechanism — not scoring competition, but **bond attenuation**.
 
-## Context
+## Iteration 1 — range=25 rejected (2026-04-19)
+
+### Context
 
 From follow-on #1 in `docs/open-work.md`: Explore dominates action-time at
-44–47% on seed-42 soaks, while several leisure actions (Mentor, Caretake,
-Cook) never fire. The proposed root cause for the Explore dominance was a
-"dispersion feedback loop" — Explore wins → cat walks to periphery →
-`has_social_target` turns false → Explore wins again. Sub-task 1 of that
-entry: broaden `social_target_range` from 10 (combat-adjacency sized) to
-~20–30 (cat-perceptual sized).
+44–47% on seed-42 soaks, while Mentor/Caretake/Cook never fire. The
+proposed root cause: "dispersion feedback loop" — Explore wins → cat walks
+to periphery → `has_social_target` turns false → Explore wins again.
+Sub-task 1: broaden `social_target_range` 10 → 20–30.
 
-## Hypothesis
+### Hypothesis and change
 
-> Cats perceive each other at sight + scent range well beyond 10 tiles. The
-> current gate is sized for combat adjacency, not social awareness. A
-> 25-tile gate better reflects perceptual biology, so `has_social_target`
-> becomes true more often, enabling Socialize and Groom-other to compete
-> against Explore more frequently.
+`has_social_target` gates Socialize and Groom-other. Cat perceptual range
+(sight + scent) exceeds 10 tiles; 25 better reflects biology. One-line
+change: `src/resources/sim_constants.rs:1672`, 10 → 25.
 
-`has_social_target` gates Socialize (`src/ai/scoring.rs:262`) and the
-Groom-other branch (`src/ai/scoring.rs:289`). Mentor uses a separate
-`mentoring_detection_range` and additional skill-gap gates, so Mentor was
-explicitly flagged as a diagnostic (not a prediction).
+### Observation (uninstrumented A/B at commit `0ba77d3`)
 
-## Implementation
+| Metric | Baseline | Treatment | Δ |
+|---|---:|---:|---:|
+| Socialize action-time | 17.7% | 19.3% | +9% |
+| Groom action-time | 0.63% | 0.34% | −46% |
+| Explore action-time | 44.2% | 44.4% | +0% |
+| Starvation deaths | 4 | 1 | −75% |
+| **MatingOccurred** | **6** | **2** | **−67%** |
+| **KittenBorn** | **4** | **1** | **−75%** |
+| **bonds_formed** | **34** | **19** | **−44%** |
 
-One line. `src/resources/sim_constants.rs:1672`:
+Full table: `logs/tuned-42-baseline-social-target-range/` vs
+`logs/tuned-42-treatment-social-target-range-25/`. Canary gates passed,
+but unpredicted reproductive regressions >30% rejected the change per
+CLAUDE.md §Balance Methodology.
 
-```diff
-- social_target_range: 10,
-+ social_target_range: 25,
-```
+### Initial hypothesis for the regression (rejected on iter 2 data)
 
-Constants-hash diff between the two runs confirms exactly this one field
-changed. Commit context: `0ba77d3` (post-v0.2.0 bookkeeping), clean working
-copy for the baseline, dirty (one-line edit) for the treatment.
+First pass: Socialize and Mate compete for top score; with
+`has_social_target` more often true, Socialize crowds Mate in the scoring
+layer.
 
-## Prediction
+This turned out to be wrong — see iteration 2 below.
 
-Per `docs/balance/social-target-range.predictions.json`. Summary:
+---
 
-| Metric | Direction | Magnitude |
-| --- | --- | --- |
-| Socialize action-time fraction | up | +30% |
-| Groom action-time fraction | up | +30% |
-| Explore action-time fraction | down | −10% |
-| Mentor action-time fraction | flat (diagnostic) | n/a |
-| Starvation deaths | flat (bar: ≤ baseline) | 0 |
-| ShadowFoxAmbush deaths | flat | ±20% |
-| Catches per cat per day | flat | ±10% |
+## Iteration 2 — full score-distribution instrumentation (2026-04-20)
 
-## Observation
+### What changed
 
-Both runs: seed 42, `--duration 900`, release build, commit `0ba77d3`.
-Headers differ only on `disposition.social_target_range` (10 vs 25).
-Baseline: `logs/tuned-42-baseline-social-target-range/`.
-Treatment: `logs/tuned-42-treatment-social-target-range-25/`.
+Commit `290a5d9`: `src/systems/goap.rs` and `src/systems/disposition.rs`
+now log **every gate-open action score** (not just top 3) in
+`CurrentAction.last_scores`, serialized into each `CatSnapshot` event. No
+behavior change. Cap is the size of the Action enum (22). Analysis
+script: `scripts/analyze_score_competition.py`.
 
-### Action-time fractions (via `CatSnapshot.current_action`)
+### Instrumented A/B (seed 42, commit `290a5d9` with range override)
 
-| Action | Baseline | Treatment | Δ (pp) | Δ (%) |
-| --- | ---: | ---: | ---: | ---: |
-| Explore | 44.2% | 44.4% | +0.2 | +0% |
-| Socialize | 17.7% | 19.3% | +1.6 | +9% |
-| Forage | 13.3% | 14.2% | +0.9 | +7% |
-| Hunt | 8.3% | 6.8% | −1.5 | −18% |
-| PracticeMagic | 4.6% | 5.0% | +0.4 | +9% |
-| Eat | 3.6% | 3.8% | +0.2 | +6% |
-| Sleep | 3.4% | 3.5% | +0.1 | +3% |
-| Groom | 0.63% | 0.34% | −0.3 | −46% |
-| Herbcraft | 0.75% | 0.88% | +0.1 | +17% |
-| Coordinate | 0.22% | 0.27% | 0 | +23% |
-| Patrol | 0.47% | 0.27% | −0.2 | −42% |
-| Idle | 2.0% | 0.48% | −1.5 | −76% |
-| Mentor | 0 | 0 | 0 | — |
-| Mate | 0.01% | 0 | 0 | — |
+Clean constants-hash diff: only `disposition.social_target_range`
+(10 vs 25).
 
-Totals: baseline 13,695 cat-snapshots (13,695 × 100 ticks = 1.37M cat-ticks);
-treatment 15,740 cat-snapshots (1.57M cat-ticks, i.e. +15% more colony-tick
-budget because fewer cats starved).
+#### Finding 1: Mate is gate-starved, not score-competed
 
-### Discrete event counts
+| | Baseline | Treatment |
+|---|---:|---:|
+| Mate snapshots with gate open | 0 / 13,148 | 0 / 14,000-ish |
+| Mate co-occurring with Socialize | 0 | 0 |
 
-| Event | Baseline | Treatment | Δ |
-| --- | ---: | ---: | ---: |
-| BuildingConstructed | 10 | 10 | 0 |
-| CoordinatorElected | 8 | 4 | −50% |
-| Death | 4 | 1 | −75% |
-| KittenBorn | 4 | 1 | −75% |
-| MatingOccurred | 6 | 2 | −67% |
-| PreyKilled | 355 | 329 | −7% |
-| WardPlaced | 421 | 482 | +14% |
-| bonds_formed (final) | 34 | 19 | −44% |
-| friends_count (final) | 16 | 10 | −37% |
+`has_eligible_mate` returns true on **zero** CatSnapshots in either run.
+The gate opens only in brief windows between 100-tick samples. Baseline
+had 4 MatingOccurred events; treatment had 0 — but neither case shows
+Mate in `last_scores`, so the iter-1 "Socialize crowds Mate" hypothesis
+is falsified at the scoring layer.
 
-### Final ColonyScore
+The gate requires, simultaneously, on both partners:
+- Life stage Adult/Elder, non-Asexual, not pregnant
+- Hunger > `breeding_hunger_floor` (0.6)
+- Energy > `breeding_energy_floor` (0.5)
+- Mood valence > `breeding_mood_floor` (0.2)
+- Orientation-compatible
+- Bond ∈ {Partners, Mates}
 
-| Field | Baseline | Treatment |
-| --- | ---: | ---: |
-| welfare | 0.546 | 0.503 |
-| nourishment | 0.662 | 0.720 |
-| happiness | 0.623 | 0.582 |
-| living_cats | 8 | 8 |
-| deaths_starvation | 4 | 1 |
+With 5 starvation deaths in the baseline, many cats dip below the hunger
+floor regularly; co-occurring high-hunger-mood-energy windows are narrow.
 
-## Concordance
+#### Finding 2: Treatment regresses BOND PROGRESSION, not Mate scoring
+
+| Final ColonyScore field | Baseline | Treatment | Δ |
+|---|---:|---:|---:|
+| bonds_formed (cumulative upgrades) | 35 | 17 | −51% |
+| friends_count | 17 | 11 | −35% |
+| partners_count | 0 | 0 | 0 |
+| mates_count | 6 | 2 | −67% |
+| MatingOccurred | 4 | 0 | −100% |
+| KittenBorn | 5 | 0 | −100% |
+| deaths_starvation | 5 | 0 | −100% |
+| welfare | 0.530 | 0.525 | −1% |
+
+Both runs start at mates_count=0; bonds progress during the soak. In
+baseline, 3 pairs reach Mates (mates_count=6, 4 matings). In treatment, 1
+pair reaches Mates (mates_count=2, 0 matings).
+
+**Mechanism:** bond progression (Friends → Partners → Mates) requires
+`fondness` and `familiarity` to build on a pair through repeated
+interactions. Wider `social_target_range` means a cat's Socialize
+interactions are spread across more candidate partners; each pair
+accumulates fondness/familiarity more slowly; fewer pairs cross the
+Partners and Mates thresholds. Reproduction collapses because the
+`has_eligible_mate` requires a Partners/Mates bond and those bonds never
+form.
+
+#### Finding 3: Mentor gate-open dropped −17.8 pp
+
+| | Baseline | Treatment | Δ |
+|---|---:|---:|---:|
+| Mentor gate-open | 43.7% | 25.8% | −17.8 pp |
+| Mentor top-1 | 0.0% | 0.0% | 0 |
+| Mentor mean score | 0.126 | 0.125 | ≈0 |
+
+Unexpected: `has_mentoring_target` uses a separate constant
+(`mentoring_detection_range`, also 10), not `social_target_range`. Yet
+the gate dropped from 44% to 26% open. Likely mechanism: fewer skill-gap
+pairs meet the threshold (mentor skill >0.6 ∧ apprentice skill <0.3)
+because cats' skill-growth trajectories differed in the treatment's
+different clustering pattern. Or: `observer_sees_at` vision interaction
+with cat positioning. Worth further instrumentation before acting.
+
+#### Finding 4: Mentor is score-starved, separately from its gate
+
+Even in baseline where Mentor gate opens 43.7% of the time, Mentor wins
+top-1 zero times. Mean score 0.126 vs Sleep 0.802, Eat 0.725, Hunt 0.669.
+
+`mentor_warmth_diligence_scale = 0.5, mentor_ambition_bonus = 0.1`.
+Compare to `socialize_sociability_scale = 2.0`: Mentor is 4× smaller in
+magnitude and has stricter gating. Without a scale increase, Mentor
+cannot win the scoring layer regardless of target availability.
+
+#### Finding 5: Socialize wins via disposition rollup, not raw action
+
+Socialize has 100% gate-open, 0.0% top-1, yet 17.7% action-time. The
+disposition softmax rolls Socialize/Groom-other under Socializing
+disposition; cats commit to the disposition for multiple ticks. Raw
+action top-1 does not predict action-time for actions that live under
+aggregating dispositions — useful context for future score analysis.
+
+### Concordance — revised
 
 | Claim | Direction | Magnitude | Verdict |
-| --- | --- | --- | --- |
-| Socialize up | ✓ | short (+9% vs +30% predicted) | direction correct, magnitude under |
-| Groom up | ✗ | reversed (−46%) | **direction wrong** |
-| Explore down | ambiguous | within noise | inconclusive |
-| Mentor flat (diagnostic) | ✓ | 0 → 0 | consistent |
-| Starvation ≤ baseline | ✓ | improved (4 → 1) | canary passes |
-| ShadowFoxAmbush ≤ 5 | ✓ | 0 → 0 | canary passes |
-| Wipeout | ✓ | 8 alive both | canary passes |
+|---|---|---|---|
+| Socialize gate-open up | flat | 100% → 100% | wasn't the lever |
+| Socialize action-time up | ✓ | +9% (predicted +30%) | direction correct, magnitude under |
+| Mate lost to Socialize in scoring | ✗ | Mate never scored at all | **original hypothesis wrong** |
+| Starvation ≤ baseline | ✓ | 5 → 0 (canary improved) | |
+| Wipeout | ✓ | both 8 alive | |
+| MatingOccurred / KittenBorn | unpredicted regressions to 0 | | **bond-attenuation mechanism** |
 
-### Unpredicted regressions (>30%)
+### Revised conclusion
 
-Per CLAUDE.md §Balance Methodology, drift > ±30% without a predicting
-hypothesis is a bug, not a feature.
+Sub-task 1 as written ("broaden `social_target_range` 10 → 20–30") is
+**fundamentally compromised** by the bond-attenuation effect. A wider
+range produces the intended Socialize lift but strips reproduction and
+bond progression because fondness/familiarity builds on fewer pairs.
 
-- **MatingOccurred: 6 → 2 (−67%)** — no hypothesis predicted this
-- **KittenBorn: 4 → 1 (−75%)** — no hypothesis predicted this
-- **bonds_formed: 34 → 19 (−44%)** — no hypothesis predicted this
-- **friends_count (final): 16 → 10 (−37%)** — no hypothesis predicted this
-- **Groom: −46%** — hypothesis predicted +30% (direction wrong)
+The real "dispersion feedback loop" described in follow-on #1 exists, but
+the proposed lever (widening the social gate) is the wrong mechanism to
+close it. The gate is already 100% open; the problem was never "cats can't
+see social targets."
 
-## Proposed mechanism for the regression
+## Proposed iteration 3
 
-Socialize and Mate compete in the same scoring layer; both use warmth and
-(for Mate) partial sociability inputs. With `has_social_target` true on
-more ticks, Socialize consistently out-scores Mate at the margin because:
+Three directions, in order of how confident I am:
 
-- Mate requires `has_eligible_mate` (season + partner availability), a
-  narrower gate than Socialize's `has_social_target`.
-- Socialize has lower urgency thresholds; once it wins repeatedly, social
-  need saturates and further Socialize scores drop — but by then the mating
-  urgency window may have closed (seasonal, or partner moved away).
+1. **Pair stickiness in social target selection.** When multiple cats are
+   in `has_social_target` range, prefer the one with highest existing
+   `fondness + familiarity`. This preserves bond-progression dynamics
+   (pairs keep strengthening) while still allowing new introductions
+   through long-fondness or random jitter. Touch points:
+   `find_social_target` in `src/systems/disposition.rs:488` and
+   `src/systems/goap.rs:742, 3796`. Small scoring-layer change with
+   well-bounded blast radius.
 
-Groom-other being crowded out is consistent with the same mechanism:
-Socialize and Groom-other share the `has_social_target` gate; Socialize
-dominates when it wins. Self-Groom is down too, possibly because
-self-grooming's level_suppression(1) gate interacts with the shifted
-need-satisfaction landscape (warmth satisfied via Socialize → less urge to
-self-groom).
+2. **Investigate Mentor score magnitude** (separate from this sub-task).
+   `mentor_warmth_diligence_scale = 0.5` is 4× below
+   `socialize_sociability_scale = 2.0`, and Mentor has stricter gating.
+   Raising the scale to ~1.5–2.0 should lift Mentor from 0% top-1 to
+   non-zero. Predict 1–3 Mentor firings per seed-42 soak. Diagnostic
+   canary: continuity-canary "mentoring fires ≥1× per soak" currently
+   fails.
 
-The starvation improvement (4 → 1) is real but orthogonal to the stated
-hypothesis. Candidate mechanism: clustered cats are closer to stores on
-average (less time walking back from periphery after Explore), so eating
-happens faster once triggered.
+3. **Skip social-target range entirely; pursue sub-task 2** (Explore
+   saturation curve from `docs/open-work.md` follow-on #1). That targets
+   Explore's scoring formula rather than the social gate, so it doesn't
+   risk bond attenuation. A saturation curve on
+   `unexplored_nearby` past a local-familiarity threshold sharply drops
+   Explore's weight without touching social dynamics.
 
-## Verdict: reject iteration 1 (range=25)
+Direction 1 is the cleanest continuation of this sub-task. Direction 2
+is orthogonal and probably warrants its own thread. Direction 3 was
+always next up in the open-work.md ordering.
 
-Canaries pass, but the reproductive-continuity regression (−67% mating,
-−75% kittens) is exactly the kind of drift the methodology flags as
-rejection territory. The hypothesis did not predict this, and the
-verisimilitude story (wider perceptual range) does not argue for
-suppressing mating.
+## Artifacts (archived)
 
-## Proposed iteration 2
-
-Two directions, not yet explored in this session:
-
-1. **Smaller bump (range 15).** The Manhattan-area delta 10→15 is 221→481
-   tiles (~2.2× vs 6× for 10→25). This may lift Socialize modestly without
-   the mating-crowd-out. Predict Socialize +5-10%, Mate within ±20%.
-
-2. **Instrument and diagnose the Mate regression.** Before further tuning,
-   add telemetry for per-tick score distributions across Actions, so we can
-   see *directly* whether Mate is losing to Socialize at the top-score
-   margin, or losing to something else (e.g., Mate's own gates rejecting
-   more often because cats are clustered in non-mating configurations).
-
-Direction 2 is the more rigorous next step but requires code changes
-beyond the scoring constant. Direction 1 is cheap to try but may produce
-another "smaller version of the same regression."
-
-## Follow-on threads
-
-- `docs/open-work.md` follow-on #1 remains open. This iteration's findings
-  are recorded here; sub-task 1 (broaden `social_target_range`) is not yet
-  resolved, pending iteration 2.
-- Sub-task 2 (Explore saturation curve) and sub-task 3 (strategist
-  coordinator) of the same follow-on are independent of this finding.
-- The Mate regression raises a new question: do other leisure actions
-  (Groom-other, Mentor, Caretake) also compete in a shared score budget
-  with reproductive actions? If so, any lift to leisure scoring risks the
-  same regression. Instrumentation (direction 2) would answer this.
-
-## Archived data
-
-- `logs/tuned-42-baseline-social-target-range/` — seed 42, range=10, commit
-  `0ba77d3`, 15-min soak. Restored as `logs/tuned-42/` (canonical).
-- `logs/tuned-42-treatment-social-target-range-25/` — seed 42, range=25,
-  commit `0ba77d3` with one-line edit. Not restored; kept for forensics.
-- `docs/balance/social-target-range.predictions.json` — four-artifact
-  predictions written before treatment.
+- `logs/tuned-42-baseline-social-target-range/` — pre-instrumentation
+  baseline (top-3 scores only). Commit `0ba77d3`.
+- `logs/tuned-42-treatment-social-target-range-25/` — pre-instrumentation
+  treatment (top-3 scores only). Commit `0ba77d3`.
+- `logs/tuned-42-baseline-instrumented/` — instrumented baseline. Commit
+  `290a5d9`, clean. **Canonical baseline as of 2026-04-20.**
+- `logs/tuned-42-treatment-instrumented/` — instrumented treatment
+  (range=25). Commit `290a5d9` + one-line dirty edit.
+- `docs/balance/social-target-range.predictions.json` — iter-1
+  predictions, superseded but kept for provenance.
+- `scripts/analyze_score_competition.py` — per-action score analysis.
+  Usage: `scripts/analyze_score_competition.py --compare <base> <treat>`.

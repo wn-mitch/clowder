@@ -58,12 +58,22 @@ radius):
    from 10 → ~20–30 Manhattan tiles. Current 10 is combat-adjacent range,
    not cat-socializing range. In a 120×90 map with 8 cats, 10 is too
    tight for clustered-at-infrastructure moments to register.
-   - **Iteration 1 (range=25) REJECTED** — 2026-04-19, see
-     `docs/balance/social-target-range.report.md`. Socialize direction
-     correct (+9%) but Mating (−67%), Kittens (−75%), bonds (−44%)
-     regressed unpredicted >30%. Likely mechanism: Socialize crowds Mate in
-     shared-score competition. Iteration 2 options: smaller bump (range
-     15), or instrument per-tick score distributions before tuning further.
+   - **Iter 1 (range=25) REJECTED** — 2026-04-19. Mating (−67%), Kittens
+     (−75%), bonds (−44%) regressed.
+   - **Iter 2 DIAGNOSTIC (instrumented)** — 2026-04-20. Full score
+     distributions (commit `290a5d9`) reframe the mechanism: Mate is
+     gate-starved (0% of snapshots), never competed with Socialize in the
+     scoring layer. The true regression is **bond attenuation** — wider
+     range spreads Socialize interactions across more partners; each pair
+     builds fondness/familiarity slower; Partners/Mates bond progression
+     stalls; `has_eligible_mate` never opens. Treatment had 0 matings and
+     0 kittens vs baseline 4/5.
+   - **Sub-task 1 fundamentally compromised** — lowering/raising
+     `social_target_range` can't fix the dispersion loop without bond
+     attenuation. See `docs/balance/social-target-range.report.md` §
+     Proposed iteration 3 for alternatives: (a) pair-stickiness in
+     social-target selection, (b) pursue sub-task 2 (Explore saturation)
+     which doesn't touch social dynamics.
 2. **Saturation curve on Explore's weight.** Real cats don't explore
    indefinitely — past a local familiarity threshold it becomes
    indistinguishable from Wander. Current formula multiplies by
@@ -105,7 +115,34 @@ weeks 1–3 settle (22/9/18), weeks 4+ oscillate 3–15. Not a flatline — the
 local depletion → recovery cycle works. The issue is conversion: 1,981
 Hunt plans created, ~11% convert to kills.
 
-### 3. Magic hard-gated at scoring
+### 3. Mentor score magnitude (from iter-2 diagnostic, 2026-04-20)
+
+**Why it matters:** "Mentoring fires ≥1× per soak" is a continuity
+canary currently failing. The iter-2 diagnostic for social_target_range
+(commit `290a5d9`) showed Mentor's gate opens 43.7% of baseline
+snapshots — gate availability is **not** the blocker. The blocker is
+raw score magnitude: Mentor mean score 0.126 vs Sleep 0.802, Eat 0.725,
+Hunt 0.669. Mentor cannot win scoring even when its gate is open.
+
+**Touch point:** `src/ai/scoring.rs:597–605` + constants
+`mentor_warmth_diligence_scale: 0.5` and `mentor_ambition_bonus: 0.1` in
+`src/resources/sim_constants.rs`. For comparison
+`socialize_sociability_scale = 2.0` — Mentor is 4× smaller in scale
+despite stricter gates.
+
+**Hypothesis:** Raising `mentor_warmth_diligence_scale` to ~1.5–2.0 lifts
+Mentor score into competitive range, producing ≥1 Mentor firing per
+seed-42 soak (continuity canary). Secondary effect: the already-consumed
+apprentice-skill-growth path at `src/systems/goap.rs:2672–2743` becomes
+load-bearing for the first time, so skill progression for low-skill cats
+accelerates. Orthogonal to social_target_range work.
+
+**Bounds/risks:** Mentor competes in the utility layer with Socialize;
+over-tuning could re-trigger the iter-1 mating regression via a
+different pathway. Measure MatingOccurred / KittenBorn as mandatory
+canaries on any Mentor tuning.
+
+### 4. Magic hard-gated at scoring
 
 **`src/ai/scoring.rs:483`** — `PracticeMagic` only scored if
 `ctx.magic_affinity > 0.3 && ctx.magic_skill > 0.2`. ~60% of cats fall
