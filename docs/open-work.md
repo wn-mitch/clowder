@@ -37,6 +37,14 @@ insertion to `setup_world`.
 
 ## Follow-on plans surfaced but not scoped
 
+> **Cross-reference:** [`docs/systems-backlog-ranking.md`](systems-backlog-ranking.md)
+> prices every unimplemented-system stub on the V×F×R×C×H rubric (see
+> `.claude/skills/rank-sim-idea/SKILL.md`). The top of the standalone
+> backlog is now Recreation & Grooming (900) and The Calling (675);
+> Sleep Phase 1 and Environmental Quality were folded into the
+> A-cluster refactor (see `docs/systems/ai-substrate-refactor.md` §10),
+> which is where the former cheap wins actually get built.
+
 ### 1. Explore dominance over targeted leisure
 
 **Why it matters:** Explore claims 44–47% of all action-time in a seed-42
@@ -397,6 +405,55 @@ without the bond-attenuation regression.
 **Dependency:** natural companion to A1 (new "target quality" axis
 reads best-target score); bundle with A1 to avoid churning Socialize
 twice.
+
+#### A5. Substrate instrumentation — Curvature-at-every-layer traces
+
+**Why it matters:** After A1–A4 land, the substrate is a 3-layer
+Forrester stock-and-flow system (L1 influence maps → L2 DSEs → L3
+selection). Today's `CatSnapshot.last_scores` captures only L2's
+*output*; L1 samples, per-consideration contributions, post-modifier
+deltas, and L3 softmax probabilities are all invisible. `CLAUDE.md`'s
+Balance Methodology (hypothesis → prediction → observation →
+concordance) collapses to "change it and see what happens" without
+instrumentation that exposes input distributions and per-layer
+transforms. A1–A4 ship much harder to verify without A5.
+
+**Design:** focal-cat replay — one designated cat emits full
+layer-by-layer records every tick to a sidecar
+`logs/trace-<focal>.jsonl`; all other cats retain today's snapshot
+cadence. Records are joinable on `(tick, cat)` so
+`scripts/replay_frame.py --tick N --cat NAME` can reconstruct a full
+decision frame top-to-bottom. Default focal cat is user preference
+(Simba on seed 42); `--focal-cat NAME` overrides. Headless-only
+emission via a `FocalTraceTarget` resource that the interactive build
+doesn't insert.
+
+**Touch points:**
+- `src/resources/event_log.rs` — sidecar emitter or new EventKind
+  variants
+- `src/ai/scoring.rs` (and A1's L2 replacement) — per-consideration
+  + per-modifier emission hook behind `FocalTraceTarget`
+- `src/systems/sensing.rs` + B1's influence-map module — lazy L1
+  sample emission (only when an L2 consideration reads the map)
+- `src/systems/goap.rs` + selection sites — L3 selection emission
+- `src/main.rs` — `--focal-cat` flag plumbing, `FocalTraceTarget`
+  resource insertion in the headless runner only
+- `scripts/replay_frame.py` — new Python tool for frame decomposition
+
+**Specification:** `docs/systems/ai-substrate-refactor.md` §11.
+
+**Exit criterion:** `just soak 42 --focal-cat Simba` produces
+`logs/trace-Simba.jsonl` whose line-1 header matches `events.jsonl`'s
+`commit_hash`; `scripts/replay_frame.py --tick N --cat Simba`
+reconstructs L1+L2+L3 for one tick; before/after a known-good curve
+change (e.g. `Eat.hunger` Logistic midpoint 0.75 → 0.65) the replay
+shows matching `consideration.input` distributions, diverging
+`consideration.score` distributions, and a concordant `final_score`
+shift.
+
+**Dependency:** lands *with* A1–A4, not after. Delaying makes the
+refactor harder to verify under `CLAUDE.md`'s balance rule. Bundled
+into cluster A as A5.
 
 ---
 

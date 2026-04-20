@@ -18,12 +18,12 @@ Status of each design document cross-referenced against `SimulationPlugin::build
 | System | Status | Registered Functions | Design Doc |
 |--------|--------|---------------------|------------|
 | Body Zones | **[Partial]** | — | [doc](../systems/body-zones.md) |
-| World Generation | **[Partial]** | — | [doc](../systems/world-gen.md) |
 
 ## Aspirational
 
 | System | Status | Registered Functions | Design Doc |
 |--------|--------|---------------------|------------|
+| AI Substrate Refactor — Design Specification | *[Aspirational]* | — | [doc](../systems/ai-substrate-refactor.md) |
 | Disease | *[Aspirational]* | — | [doc](../systems/disease.md) |
 | Environmental Quality | *[Aspirational]* | — | [doc](../systems/environmental-quality.md) |
 | Log Analytics Dashboard | *[Aspirational]* | — | [doc](../systems/log-analytics-dashboard.md) |

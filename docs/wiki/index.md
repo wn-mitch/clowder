@@ -21,8 +21,8 @@ Auto-generated reference for the Clowder cat colony simulation.
 | Status | Count |
 |--------|-------|
 | Built | 4 |
-| Partial | 2 |
-| Aspirational | 13 |
+| Partial | 1 |
+| Aspirational | 14 |
 
 ## Pages
 

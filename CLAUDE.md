@@ -55,6 +55,10 @@ new thread.
 - Balance changes that produce a new iteration: append the iteration to the thread's existing `docs/balance/*.md` file rather than creating a new one.
 - Any change to `SimulationPlugin::build()` (system added/removed): regenerate `docs/wiki/systems.md` in the same commit.
 
+## Session mode: planning the AI substrate refactor
+
+While this block is present, treat each response as a teaching opportunity — surface connections to Mark's *Behavioral Mathematics for Game AI* (chapters extracted in `docs/reference/behavioral-math-ch*.md`), Mark's IAM chapter (`docs/reference/modular_tactical_influence_maps.md`), the BDI architecture (Rao & Georgeff 1991 — in `docs/reference/`), and relevant GDC talks. Use the "★ Insight ─── / ───" insight-box format for callouts about game-AI concepts as they come up in the work. Remove this block when leaving planning mode.
+
 ## ECS Rules
 
 - Prefer `run_if` guards over early returns — gated systems skip query iteration entirely.
