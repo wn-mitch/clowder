@@ -17,7 +17,7 @@ See [`docs/systems/project-vision.md`](docs/systems/project-vision.md) for the f
 ## Conventions
 
 - Conventional commits (`feat:`, `fix:`, `chore:`, `refactor:`, `test:`, `docs:`) — no scopes
-- Branch naming: `wnmitch/<feature-name>`
+- **Solo-to-main workflow:** this is a personal project; commits push directly to `main` without PR review. Feature branches (`wnmitch/<name>`) are optional and used only when a change is large/experimental enough that the author wants a staging area. The global-CLAUDE feature-branch convention does **not** apply here.
 - VCS: `jj` (not raw git)
 - Design docs: `docs/systems/` — one stub per tunable system
 
