@@ -58,6 +58,12 @@ radius):
    from 10 → ~20–30 Manhattan tiles. Current 10 is combat-adjacent range,
    not cat-socializing range. In a 120×90 map with 8 cats, 10 is too
    tight for clustered-at-infrastructure moments to register.
+   - **Iteration 1 (range=25) REJECTED** — 2026-04-19, see
+     `docs/balance/social-target-range.report.md`. Socialize direction
+     correct (+9%) but Mating (−67%), Kittens (−75%), bonds (−44%)
+     regressed unpredicted >30%. Likely mechanism: Socialize crowds Mate in
+     shared-score competition. Iteration 2 options: smaller bump (range
+     15), or instrument per-tick score distributions before tuning further.
 2. **Saturation curve on Explore's weight.** Real cats don't explore
    indefinitely — past a local familiarity threshold it becomes
    indistinguishable from Wander. Current formula multiplies by

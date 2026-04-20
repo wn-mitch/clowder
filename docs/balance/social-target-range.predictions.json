@@ -1,0 +1,48 @@
+{
+  "hypothesis": "social_target_range governs the Manhattan-distance gate for has_social_target, the context flag that enables Socialize and Groom-other scoring (src/ai/scoring.rs:262, 289). The current value (10) is sized for combat adjacency, not cat-to-cat social awareness. Cats perceive each other at sight + scent range well beyond 10 tiles; a 25-tile gate better reflects perceptual biology. Manhattan area scales as 2r^2+2r+1, so 10 -> 25 grows the area 221 -> 1301 tiles (~6x). On an 8-cat 120x90 map, expected nearby-other-cat count per tile rises from ~0.2 to ~1.2, flipping has_social_target from 'sometimes true' to 'usually true' across the soak. NOTE: Mentor uses a separate constant (mentoring_detection_range) plus skill-gap gates, so this change is NOT expected to lift Mentor firings. Caretake similarly uses its own targeting.",
+  "socialize_action_time_fraction": {
+    "direction": "up",
+    "magnitude_pct": 30,
+    "rationale": "Baseline Socialize action-time is 17.7% of cat-ticks (Explore 44.2%, measured in logs/tuned-42-baseline-social-target-range). With has_social_target true on more ticks, Socialize competes and wins on more of them. Predict rise to ~23%. Drop would be surprising and inconsistent with the gate's only role."
+  },
+  "groom_action_time_fraction": {
+    "direction": "up",
+    "magnitude_pct": 30,
+    "rationale": "Baseline Groom action-time is 0.63%. Groom-other branch is gated by has_social_target; self-groom is always available. The small baseline share suggests most Groom action-time is self-grooming; broadening the gate lets Groom-other occasionally win. Predict ~0.8-0.9%."
+  },
+  "explore_action_time_fraction": {
+    "direction": "down",
+    "magnitude_pct": 10,
+    "rationale": "Explore wins by default when no nearby-cat competes for attention. Baseline 44.2%. Predict 38-42% post-change. Drop >20% would be surprising."
+  },
+  "mentor_action_time_fraction": {
+    "direction": "flat",
+    "magnitude_pct": null,
+    "rationale": "Diagnostic, not a prediction. Mentor uses mentoring_detection_range (separate constant) plus skill-threshold gates (mentor skill >0.6, apprentice skill <0.3). social_target_range has no direct effect on Mentor scoring. If Mentor firings rise materially (>0), there is an indirect coupling we should understand (maybe proximity clustering from Socialize brings mentor+apprentice into mentoring range more often). If Mentor stays 0 -> hypothesis is intact; a separate plan is needed to address the skill-threshold chicken-and-egg."
+  },
+  "caretake_action_time_fraction": {
+    "direction": "flat",
+    "magnitude_pct": null,
+    "rationale": "Diagnostic. Caretake targets kittens/injured, not general social cats. Expect no change."
+  },
+  "deaths_by_cause.Starvation": {
+    "direction": "flat",
+    "magnitude_pct": 0,
+    "rationale": "Canary gate. Baseline is 4 starvation deaths (noise-level jitter vs v0.2.0 report's 1 at a slightly different commit). Hard reject if starvations rise by >1. Indirect coupling would be cats socializing more -> hunting less -> food crisis."
+  },
+  "deaths_by_cause.ShadowFoxAmbush": {
+    "direction": "flat",
+    "magnitude_pct": 20,
+    "rationale": "Canary, must remain <=5. Baseline has 0 ShadowFoxAmbush deaths. No plausible pathway for this change to affect ward defense."
+  },
+  "wipeout_canary": {
+    "direction": "flat",
+    "magnitude_pct": 0,
+    "rationale": "Canary, colony must survive --duration 900. Pure scoring-gate change has no wipeout pathway."
+  },
+  "catches_per_cat_per_day": {
+    "direction": "flat",
+    "magnitude_pct": 10,
+    "rationale": "Hunt logic untouched. Small displacement risk if Socialize competes with Hunt at the margin. Drift <=10% is noise. Drop >20% implicates Socialize over-winning."
+  }
+}
