@@ -1,5 +1,23 @@
 # Activation 1 — Fog sight — status (2026-04-18)
 
+> **Parked 2026-04-21** for AI substrate refactor (see
+> `docs/systems/refactor-plan.md` pre-flight gate 2).
+>
+> - **Blocked by:** pre-existing colony-survival regression (founder-age,
+>   `start_tick = 60 × ticks_per_season` → 15/15 colonies wipe before day
+>   180). Root-cause summary below unchanged.
+> - **Resolution:** standalone balance iteration **post-Phase-7**, not
+>   pre-flight. Fixing it now would move the baseline-pre-substrate-
+>   refactor soak away from current-tip behavior and defeat its purpose
+>   as the frame-diff reference for every phase.
+> - **Baseline soak inheritance:** the refactor's reference soak (gate
+>   6) inherits the founder-age wipeout tendency; this is flagged
+>   explicitly in `docs/balance/substrate-refactor-baseline.md`. Every
+>   frame-diff run against that baseline must account for that noise
+>   until a re-baseline lands post-refactor.
+> - **Resume when:** Phase 7 exits and the founder-age regression is
+>   opened as its own balance thread.
+
 ## Outcome: **deferred, blocked by pre-existing colony-survival regression**
 
 Three rounds of 15-run sweeps were captured. Activation was **not

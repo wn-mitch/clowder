@@ -39,13 +39,33 @@ insertion to `setup_world`.
 
 > **Cross-reference:** [`docs/systems-backlog-ranking.md`](systems-backlog-ranking.md)
 > prices every unimplemented-system stub on the V×F×R×C×H rubric (see
-> `.claude/skills/rank-sim-idea/SKILL.md`). The top of the standalone
-> backlog is now Recreation & Grooming (900) and The Calling (675);
-> Sleep Phase 1 and Environmental Quality were folded into the
-> A-cluster refactor (see `docs/systems/ai-substrate-refactor.md` §10),
-> which is where the former cheap wins actually get built.
+> `.claude/skills/rank-sim-idea/SKILL.md`). The top of the backlog is
+> now **Post-death biographies (1024)** — a presenter-layer entry
+> added 2026-04-21, see #10 below — followed by Recreation & Grooming
+> (900) and The Calling (675). Sleep Phase 1 and Environmental Quality
+> were folded into the A-cluster refactor (see
+> `docs/systems/ai-substrate-refactor.md` §10), which is where the
+> former cheap wins actually get built.
 
 ### 1. Explore dominance over targeted leisure
+
+> **Parked 2026-04-21** for AI substrate refactor (see
+> `docs/systems/refactor-plan.md` pre-flight gate 1). Both sub-tasks
+> verified unresolved but outside the refactor's blast radius.
+> - **Sub-1 (social-target-range iter 3)** — superseded by refactor
+>   Phase 4 target-selection (§6 `TargetTakingDse` replaces
+>   `has_social_target` existence gate with target-quality scoring);
+>   the pair-stickiness alternative named in iter-2's report becomes
+>   a natural per-target consideration there.
+> - **Sub-2 (Explore saturation curve)** — re-evaluated post-Phase-3c
+>   once Explore runs through the unified evaluator with a proper §2.1
+>   response curve. The sharp-decay-past-0.7 shape becomes a Logistic
+>   consideration on `unexplored_fraction_nearby` rather than a bespoke
+>   patch to today's linear multiplier.
+> - **Sub-3 (strategist-coordinator)** — unchanged; still C4 in the
+>   deliberation cluster, gated on cluster A.
+> - **Resume when:** refactor reaches Phase 4 entry (sub-1) / Phase 3c
+>   exit (sub-2).
 
 **Why it matters:** Explore claims 44–47% of all action-time in a seed-42
 soak. Groom sits at 0.4–0.5%, Mentor / Caretake / Cook at exactly 0. The
@@ -984,6 +1004,227 @@ canary passes from t=0 forward without relying on live-sim events.
 - Pairs with **C4 (strategist-coordinator)** — leadership patterns
   during fast-forward produce the current coordinator *and* the
   dynastic backstory explaining why they lead.
+
+---
+
+### 10. Post-death biographies via Claude API (presenter) [2026-04-21]
+
+**Why it matters:** Lights the **mythic-texture** continuity canary
+(≥1 named event per sim year, currently zero from live-sim sources)
+plus §5 **preservation** and **generational knowledge**. On `CatDied`
+(or post-hoc over `logs/events.jsonl`), extract the cat's lifelog,
+feed it to a prebuilt Claude API skill, emit prose into
+`logs/biographies/<cat>.md`. The closest Clowder gets to DF's legend
+mode.
+
+**Architectural contract (load-bearing for the score):** LLM runs as
+a **strict presenter** — reads finalized sim artifacts only, writes
+sidecar files the sim never reads back. The `CLAUDE.md` "No LLMs"
+rule defends authorial intent (sim behavior auditable back to math
+the user wrote); presenter-only discipline is compatible with that
+rule because the presenter contributes nothing to the `ground-truth →
+math → outcome` chain. Audit test for the contract: `rm -rf
+logs/biographies && just soak 42` produces byte-identical
+`events.jsonl` + verification-tier `narrative.jsonl`. Assert this in
+CI.
+
+**Cross-reference:** `docs/systems-backlog-ranking.md` rank 1 —
+V=4/F=4/R=4/C=4/H=4 → **1024** (cheap win; do first). Lands the
+presenter-layer infrastructure (per-cat event indexing, Claude API
+client, sidecar routing, CI audit test) that #11 below reuses.
+
+**Open design choices:**
+- Live-on-death vs. post-hoc log-processing tool. Post-hoc is
+  strictly easier; live-on-death couples the sim binary to an
+  external service.
+- Sidecar directory vs. `narrative.jsonl` tier. **Strongly prefer
+  sidecar** — keeping biographies out of verification-tier files
+  preserves the byte-identical-across-matching-headers property that
+  balance soaks rely on.
+- Which lifelog events feed the prompt (cost and prose quality are
+  both sensitive — more isn't better).
+
+**Soft prerequisites:** audit whether every lifecycle-relevant event
+in `logs/events.jsonl` carries a `cat_id` (spawns, significant
+interactions, deaths); denormalize where missing.
+
+**Memory write-back on landing:** commit an
+`ongoing-tax-biographies` pattern memory per the skill's schema so
+the next external-service triage has a prior to query.
+
+---
+
+### 11. Cat-conversation rendering via Haiku (presenter over C3) [2026-04-21]
+
+**Why it matters:** Once C3 (§7 above) ships deterministic
+facet-exchange records per Ryan, Mateas, Wardrip-Fruin 2016
+*"Characters who speak their minds"* (AIIDE), Haiku renders the
+prose of those exchanges into `logs/conversations/<tick>.md`. Belief
+math stays in C3; LLM output never feeds back into sim state.
+
+**Architectural contract:** same strict-presenter contract as #10.
+C3 decides *what* beliefs got exchanged; the LLM only renders the
+dialogue those exchanges would have produced.
+
+**Cross-reference:** `docs/systems-backlog-ranking.md` rank 7 —
+V=4/F=3/R=3/C=2/H=3 → **216** (earn the slot, after C3). Under the
+**original in-loop framing** (LLM drives conversation → conversation
+drives belief → belief drives scoring) the score is **4** —
+shadowfox-worse, defer. The 216 only holds under strict presenter
+discipline.
+
+**Required hypothesis + prediction** (80–300 bucket per `CLAUDE.md`
+Balance Methodology): *Adding presenter-rendered conversation prose
+over C3's deterministic facet exchanges will not measurably alter
+any canary (sim behavior is unchanged) but will measurably increase
+time-to-comprehension when reading a seed-42 soak's social events.*
+Null-direction sim prediction is unusual but correct here — this is
+a rendering change, not a balance change.
+
+**Dependencies:** gated on **A1** + **A3** + **C3** (above §§5 and
+§7) and on **#10** landing first (reuses presenter-layer
+infrastructure). Three-deep dependency chain; no rush.
+
+**Risk surface to watch:** the soft aesthetic tax that LLM prose and
+sim math can diverge — narratively-satisfying LLM prose subtly
+drowning out the math's quieter truths. H=3 priced this in; vigilance
+is the mitigation.
+
+### 12. Warmth split — temperature need vs social-warmth fulfillment axis [2026-04-21]
+
+**Status:** phase 1 (design) committed; phases 2–4 pending.
+
+**Why it matters:** `needs.warmth` currently conflates physiological
+body-heat (hearth/den/sleep/self-groom) with affective closeness
+(grooming another cat,
+`src/steps/disposition/groom_other.rs:47`). A cat near a hearth is
+immune to loneliness at the needs level. The warring-self dynamic
+of `docs/systems/ai-substrate-refactor.md` §7.W.2 requires a cat to
+be able to be physically warm and socially starving at the same
+time — otherwise the losing-axis narrative signal is drowned out by
+shelter.
+
+**Design captured at:** `docs/systems/warmth-split.md` (phase 1).
+Cross-linked from `ai-substrate-refactor.md` §7.W.4(b).
+
+**Phase 2 — mechanical rename.** Rename `needs.warmth` →
+`needs.temperature` and all `*_warmth_*` constants across ~30 call
+sites enumerated in the design doc. No behavior change. Verify
+with `just check`, `just test`, and byte-identical
+`sim_config`/`constants` header on seed 42 vs pre-rename baseline.
+Safe; a single commit.
+
+**Phase 3 — `social_warmth` implementation.** Gated on §7.W
+Fulfillment component/resource landing. Adds `social_warmth` as a
+fulfillment axis; modifies `groom_other.rs:47` to feed both parties'
+`social_warmth` instead of the groomer's temperature; adds
+isolation-driven decay; adds UI inspect second bar. Small expected
+balance impact.
+
+**Phase 4 — balance-thread retune.** New
+`docs/balance/warmth-split.md` iteration log. Hypothesis: removing
+social-grooming from temperature-inflow reduces well-bonded cats'
+temperature refill by ~10–20%; without compensating drain-rate
+reduction, cold-stress rises 1.5–3× on seed 42. Full four-artifact
+acceptance per CLAUDE.md balance methodology. Starvation and
+cold-death canaries must remain 0.
+
+**Dependencies:** phase 2 is independent and can land any time.
+Phase 3 is gated on §7.W (Fulfillment component) landing. Phase 4
+is gated on phase 3.
+
+### 13. Spec-follow-on debts from AI substrate refactor [2026-04-21]
+
+**Why it matters:** The `docs/systems/ai-substrate-refactor.md`
+spec committed its architectural decisions but carries six
+spec-follow-on hooks whose resolution lives in *other* systems
+(`src/systems/death.rs`, `fate.rs`, `mood.rs`, `coordination.rs`,
+`aspirations.rs`) or in code (retired-constants cleanup under
+§2.3). On 2026-04-21 the refactor's Enumeration Debt ledger was
+pruned to spec-scope only; these six items moved here so (a) they
+don't get lost from the refactor ledger as that doc narrows to
+its own scope, and (b) their respective system owners can pick
+them up in the PRs that touch each system.
+
+Each item's substrate-side contract is *already committed* in
+`ai-substrate-refactor.md`; what remains is target-system
+implementation or enumeration work.
+
+- **13.1 Retired scoring constants + incapacitated branch cleanup.**
+  Spec: §2.3 "Retired constants" subsection. Delete the five
+  `incapacitated_*` fields + the `if ctx.is_incapacitated`
+  early-return block at `src/ai/scoring.rs:181–201`, plus
+  `ward_corruption_emergency_bonus`,
+  `cleanse_corruption_emergency_bonus`, and
+  `corruption_sensed_response_bonus` from `SimConstants`.
+  **Gated:** lands in the same PR that introduces the Logistic
+  curves that replace them — cluster A entry #5 (A1 IAUS
+  refactor). Not before. Behavior-preserving once the curves are
+  in; dangerous before.
+
+- **13.2 Death-event relationship-classified grief emission
+  (§7.7.b).** `src/systems/death.rs` today emits only
+  generic-proximity grief + FatedLove/Rival removal. §7.7
+  aspirations need a richer event — candidate shape is
+  `CatDied { cause, deceased, survivors_by_relationship }` (or
+  equivalent) — so §7.7.b reconsideration events can filter
+  per-relationship (grief-for-mate vs. grief-for-mentor vs.
+  grief-for-kin). **Gated:** requires formal relationship
+  modeling beyond the current three-tier `BondType`, which is
+  Talk-of-the-Town-adjacent work (see cluster C #7, sub-task C3
+  — Subjective knowledge / belief distortion).
+
+- **13.3 Fate event-vocabulary expansion (§7.7.c).**
+  `src/systems/fate.rs` today emits only `FatedLove` / `FatedRival`.
+  Aspirations that should respond to the Calling, destiny
+  modifiers, or fated-pair convergence need those events to
+  exist. **Gated:** on the Calling subsystem design per
+  `docs/systems/the-calling.md` — itself rank 3 in
+  `docs/systems-backlog-ranking.md`. Cross-cutting debt; lands
+  alongside the Calling implementation, not standalone.
+
+- **13.4 Mood drift-threshold detection layer (§7.7.d).**
+  `src/systems/mood.rs` valence today has no hysteresis or
+  sustain-duration detection. §7.7.d aspirations need "valence
+  below X for N seasons AND misalignment with active-arc
+  expected-mood" to fire mood-driven aspiration reconsideration.
+  Design-heavy — its own small balance thread. **Gated:** on
+  per-arc expected-valence targets, which land with the
+  aspiration-catalog work in 13.5 below.
+
+- **13.5 Aspiration compatibility matrix (§7.7.1).** The four
+  conflict classes (hard-logical / hard-identity / soft-resource
+  / soft-emotional) are committed in the spec; the specific
+  hard-logical + hard-identity pair list is enumeration work
+  against the stabilized aspiration catalog. **Gated:** lands in
+  the PR that enumerates aspirations themselves (aspirations
+  catalog isn't currently a tracked entry in this file — add
+  one if prioritized). Also unblocks 13.4.
+
+- **13.6 Coordinator-directive Intention strategy row (§7.3).**
+  The §7.3 footer note commits `SingleMinded` with a
+  coordinator-cancel override; the full row contents land with
+  the coordinator DSE. **Cross-ref:** #1 sub-3 above — the C4
+  strategist-coordinator task board. When C4 is picked up, this
+  row gets its final commit and the ledger-level pointer in
+  `ai-substrate-refactor.md` resolves.
+
+**Dependency graph:**
+
+- 13.1 gated on cluster A (#5 — A1 IAUS refactor).
+- 13.2 gated on C3 (#7 — belief modeling).
+- 13.3 gated on the Calling subsystem
+  (`docs/systems/the-calling.md`; no current open-work entry —
+  add one if prioritized ahead of 13.3).
+- 13.4 gated on 13.5 (needs per-arc valence targets).
+- 13.5 gates 13.4; stands on its own given the aspiration catalog.
+- 13.6 gated on C4 (#1 sub-3).
+
+**Memory write-back on landing:** commit per-subtask memories as
+each lands so the next cross-thread session has a local record
+of what the substrate's follow-on contract was and how the
+system owner satisfied it. Tag pattern: `substrate-follow-on`,
+`{subsystem-name}`, `ai-substrate-refactor`.
 
 ---
 
