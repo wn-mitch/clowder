@@ -73,6 +73,10 @@ fn setup_world(seed: u64) -> World {
     world.insert_resource(clowder::resources::SystemActivation::default());
     world.insert_resource(clowder::resources::FoxScentMap::default());
     world.insert_resource(clowder::resources::CatPresenceMap::default());
+    world.insert_resource(clowder::resources::ForcedConditions::default());
+    world.insert_resource(clowder::resources::ColonyCenter(colony_site));
+    world.insert_resource(clowder::resources::ColonyScore::default());
+    world.insert_resource(clowder::resources::UnmetDemand::default());
     bevy_ecs::message::MessageRegistry::register_message::<clowder::components::prey::PreyKilled>(
         &mut world,
     );
@@ -134,6 +138,10 @@ fn setup_world(seed: u64) -> World {
                     Inventory::default(),
                     clowder::components::disposition::ActionHistory::default(),
                     clowder::components::hunting_priors::HuntingPriors::default(),
+                    clowder::components::grooming::GroomingCondition::default(),
+                    clowder::components::goap_plan::PendingUrgencies::default(),
+                    clowder::components::SensorySpecies::Cat,
+                    clowder::components::SensorySignature::CAT,
                 ),
             ))
             .id();
