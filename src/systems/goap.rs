@@ -1655,12 +1655,26 @@ pub fn resolve_goap_plans(
                 result
             }
 
-            GoapActionKind::SelfGroom => crate::steps::disposition::resolve_self_groom(
-                ticks,
-                &mut needs,
-                grooming.as_deref_mut(),
-                d,
-            ),
+            GoapActionKind::SelfGroom => {
+                let result = crate::steps::disposition::resolve_self_groom(
+                    ticks,
+                    &mut needs,
+                    grooming.as_deref_mut(),
+                    d,
+                );
+                if matches!(result, crate::steps::StepResult::Advance) {
+                    if let Some(ref mut log) = ec.event_log {
+                        log.push(
+                            ec.time.tick,
+                            EventKind::GroomingFired {
+                                cat: name.0.clone(),
+                                target: None,
+                            },
+                        );
+                    }
+                }
+                result
+            }
 
             GoapActionKind::SocializeWith => {
                 // Resolve social target on first tick.
@@ -1714,6 +1728,19 @@ pub fn resolve_goap_plans(
                 if let Some(r) = restoration {
                     grooming_restorations.push(r);
                 }
+                if matches!(result, crate::steps::StepResult::Advance) {
+                    if let Some(ref mut log) = ec.event_log {
+                        log.push(
+                            ec.time.tick,
+                            EventKind::GroomingFired {
+                                cat: name.0.clone(),
+                                target: plan.step_state[step_idx]
+                                    .target_entity
+                                    .map(|e| format!("entity:{}", e.index())),
+                            },
+                        );
+                    }
+                }
                 result
             }
 
@@ -1737,6 +1764,20 @@ pub fn resolve_goap_plans(
                         apprentice,
                         mentor_skills,
                     });
+                }
+                if matches!(result, crate::steps::StepResult::Advance) {
+                    if let Some(ref mut log) = ec.event_log {
+                        log.push(
+                            ec.time.tick,
+                            EventKind::MentoringFired {
+                                mentor: name.0.clone(),
+                                apprentice: plan.step_state[step_idx]
+                                    .target_entity
+                                    .map(|e| format!("entity:{}", e.index()))
+                                    .unwrap_or_else(|| "unknown".into()),
+                            },
+                        );
+                    }
                 }
                 result
             }

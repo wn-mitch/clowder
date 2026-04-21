@@ -202,5 +202,23 @@ impl Plugin for SimulationPlugin {
                 systems::aspirations::track_milestones,
             ),
         );
+
+        // §11 trace emitter — headless-only in practice. Gated on
+        // FocalTraceTarget + TraceLog resources; neither is inserted by
+        // the interactive setup path, so this system never fires outside
+        // headless runs that pass --focal-cat. Registered here (not just
+        // in build_schedule) to satisfy the manual-mirror invariant in
+        // CLAUDE.md's Headless Mode section.
+        app.add_systems(
+            FixedUpdate,
+            systems::trace_emit::emit_focal_trace
+                .after(systems::goap::resolve_goap_plans)
+                .run_if(bevy_ecs::prelude::resource_exists::<
+                    crate::resources::FocalTraceTarget,
+                >)
+                .run_if(bevy_ecs::prelude::resource_exists::<
+                    crate::resources::TraceLog,
+                >),
+        );
     }
 }

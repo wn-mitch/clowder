@@ -53,6 +53,13 @@ struct CliArgs {
     trace_positions: u64,
     snapshot_interval: u64,
     force_weather: Option<Weather>,
+    /// Per §11.5 — name of the focal cat for trace-record emission.
+    /// When `Some`, a `FocalTraceTarget` resource is inserted and
+    /// `logs/trace-<focal>.jsonl` receives layer-by-layer records.
+    /// Default focal cat is resolved deterministically from seed on
+    /// the first tick if the flag is omitted.
+    focal_cat: Option<String>,
+    trace_log_path: Option<PathBuf>,
 }
 
 fn main() {
@@ -148,6 +155,8 @@ fn parse_args() -> CliArgs {
     let mut trace_positions = 0u64;
     let mut snapshot_interval = 100u64;
     let mut force_weather: Option<Weather> = None;
+    let mut focal_cat: Option<String> = None;
+    let mut trace_log_path: Option<PathBuf> = None;
     let mut iter = args.iter().skip(1);
     while let Some(arg) = iter.next() {
         match arg.as_str() {
@@ -219,6 +228,16 @@ fn parse_args() -> CliArgs {
                     std::process::exit(2);
                 }));
             }
+            "--focal-cat" => {
+                if let Some(name) = iter.next() {
+                    focal_cat = Some(name.clone());
+                }
+            }
+            "--trace-log" => {
+                if let Some(path) = iter.next() {
+                    trace_log_path = Some(PathBuf::from(path));
+                }
+            }
             _ => {}
         }
     }
@@ -228,6 +247,9 @@ fn parse_args() -> CliArgs {
     }
     if !headless && force_weather.is_some() {
         eprintln!("Warning: --force-weather has no effect without --headless");
+    }
+    if !headless && (focal_cat.is_some() || trace_log_path.is_some()) {
+        eprintln!("Warning: --focal-cat / --trace-log have no effect without --headless");
     }
 
     eprintln!("seed: {seed}");
@@ -247,6 +269,8 @@ fn parse_args() -> CliArgs {
         trace_positions,
         snapshot_interval,
         force_weather,
+        focal_cat,
+        trace_log_path,
     }
 }
 
@@ -490,6 +514,20 @@ fn build_schedule() -> Schedule {
         clowder::systems::snapshot::emit_cat_snapshots
             .after(clowder::systems::goap::resolve_goap_plans),
     );
+    // §11 trace emitter — headless-only. Run_if gate keeps the system
+    // dormant unless FocalTraceTarget is inserted (interactive builds
+    // never insert it). Runs after resolve_goap_plans so last_scores
+    // reflects the current tick's evaluation.
+    schedule.add_systems(
+        clowder::systems::trace_emit::emit_focal_trace
+            .after(clowder::systems::goap::resolve_goap_plans)
+            .run_if(bevy_ecs::prelude::resource_exists::<
+                clowder::resources::FocalTraceTarget,
+            >)
+            .run_if(bevy_ecs::prelude::resource_exists::<
+                clowder::resources::TraceLog,
+            >),
+    );
     schedule.add_systems(
         clowder::systems::snapshot::emit_position_traces
             .after(clowder::systems::goap::resolve_goap_plans),
@@ -637,8 +675,28 @@ fn run_headless(args: CliArgs) -> io::Result<()> {
         std::fs::create_dir_all(parent)?;
     }
 
+    // Trace sidecar is gated on --focal-cat per §11.5 — headless-only,
+    // opt-in. Path defaults to logs/trace-<focal>.jsonl; --trace-log
+    // overrides. When --focal-cat is absent, no file is opened and no
+    // FocalTraceTarget resource is inserted, so trace systems remain
+    // dormant.
+    let trace_log_path = args.focal_cat.as_ref().map(|name| {
+        args.trace_log_path
+            .clone()
+            .unwrap_or_else(|| PathBuf::from(format!("logs/trace-{name}.jsonl")))
+    });
+    if let Some(ref tp) = trace_log_path {
+        if let Some(parent) = tp.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+    }
+
     let mut file = std::fs::File::create(&log_path)?;
     let mut event_file = std::fs::File::create(&event_log_path)?;
+    let mut trace_file = trace_log_path
+        .as_ref()
+        .map(std::fs::File::create)
+        .transpose()?;
     let commit_hash = env!("GIT_HASH");
     let commit_hash_short = env!("GIT_HASH_SHORT");
     let commit_time = env!("GIT_COMMIT_TIME");
@@ -688,11 +746,51 @@ fn run_headless(args: CliArgs) -> io::Result<()> {
         })
     )?;
 
+    // Trace sidecar header — §11.4 joinability invariant: shares
+    // commit_hash + sim_config + constants fields with events.jsonl so
+    // the two files diff-lock as a pair. A trace from one run is
+    // comparable to another only when both sidecar and events headers
+    // agree.
+    if let (Some(ref mut trace_file), Some(ref focal_name)) =
+        (trace_file.as_mut(), args.focal_cat.as_ref())
+    {
+        writeln!(
+            trace_file,
+            "{}",
+            serde_json::json!({
+                "_header": true,
+                "focal_cat": focal_name,
+                "seed": args.seed,
+                "duration_secs": args.duration_secs,
+                "commit_hash": commit_hash,
+                "commit_hash_short": commit_hash_short,
+                "commit_dirty": commit_dirty,
+                "commit_time": commit_time,
+                "sim_config": sim_config_json,
+                "map_width": map_width,
+                "map_height": map_height,
+                "constants": constants_json,
+                "forced_weather": forced_weather_json,
+                "sensory_env_multipliers": sensory_env_multipliers_json,
+            })
+        )?;
+
+        // Insert the FocalTraceTarget resource. Entity resolution is
+        // lazy — the trace emitters look up the cat by name on each
+        // tick until they find it (or the cat dies / never existed).
+        world.insert_resource(clowder::resources::FocalTraceTarget {
+            name: focal_name.to_string(),
+            entity: None,
+        });
+        world.insert_resource(clowder::resources::TraceLog::default());
+    }
+
     let duration = Duration::from_secs(args.duration_secs);
     let start = Instant::now();
     let mut ticks: u64 = 0;
     let mut last_flushed: u64 = 0;
     let mut last_events_flushed: u64 = 0;
+    let mut last_trace_flushed: u64 = 0;
 
     // Flush any entries already present (e.g. the initial narrative entry).
     flush_new_entries(&world, &mut file, &mut last_flushed)?;
@@ -702,6 +800,9 @@ fn run_headless(args: CliArgs) -> io::Result<()> {
         ticks += 1;
         flush_new_entries(&world, &mut file, &mut last_flushed)?;
         flush_event_entries(&world, &mut event_file, &mut last_events_flushed)?;
+        if let Some(ref mut tf) = trace_file {
+            flush_trace_entries(&world, tf, &mut last_trace_flushed)?;
+        }
 
         if ticks.is_multiple_of(1000) {
             let elapsed = start.elapsed().as_secs();
@@ -732,6 +833,9 @@ fn run_headless(args: CliArgs) -> io::Result<()> {
     // Final flush.
     flush_new_entries(&world, &mut file, &mut last_flushed)?;
     flush_event_entries(&world, &mut event_file, &mut last_events_flushed)?;
+    if let Some(ref mut tf) = trace_file {
+        flush_trace_entries(&world, tf, &mut last_trace_flushed)?;
+    }
 
     // Emit end-of-sim diagnostic footer to the event log. This is the
     // machine-readable summary that downstream tooling (baseline diffs,
@@ -750,6 +854,13 @@ fn run_headless(args: CliArgs) -> io::Result<()> {
     );
     eprintln!("  narrative → {}", log_path.display());
     eprintln!("  events    → {}", event_log_path.display());
+    if let Some(ref tp) = trace_log_path {
+        eprintln!(
+            "  trace     → {}  ({} records)",
+            tp.display(),
+            last_trace_flushed
+        );
+    }
     print_headless_summary(&footer);
 
     // Autosave.
@@ -811,6 +922,7 @@ fn build_headless_footer(world: &mut World) -> String {
         "deaths_by_cause": event_log.deaths_by_cause,
         "plan_failures_by_reason": event_log.plan_failures_by_reason,
         "interrupts_by_reason": event_log.interrupts_by_reason,
+        "continuity_tallies": event_log.continuity_tallies,
     });
     footer.to_string()
 }
@@ -854,6 +966,7 @@ fn print_headless_summary(footer: &str) {
         "deaths_by_cause",
         "plan_failures_by_reason",
         "interrupts_by_reason",
+        "continuity_tallies",
     ] {
         let Some(map) = v.get(key).and_then(|x| x.as_object()) else {
             continue;
@@ -864,7 +977,25 @@ fn print_headless_summary(footer: &str) {
         }
         eprintln!("  {key}:");
         let mut entries: Vec<_> = map.iter().collect();
-        entries.sort_by(|a, b| b.1.as_u64().unwrap_or(0).cmp(&a.1.as_u64().unwrap_or(0)));
+        // continuity_tallies prints by fixed key order so readers can
+        // eyeball the canary set at a glance; others sort by descending count.
+        if key == "continuity_tallies" {
+            let order = [
+                "grooming",
+                "play",
+                "mentoring",
+                "burial",
+                "courtship",
+                "mythic-texture",
+            ];
+            let mut idx: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+            for (i, k) in order.iter().enumerate() {
+                idx.insert(k, i);
+            }
+            entries.sort_by_key(|(k, _)| idx.get(k.as_str()).copied().unwrap_or(usize::MAX));
+        } else {
+            entries.sort_by(|a, b| b.1.as_u64().unwrap_or(0).cmp(&a.1.as_u64().unwrap_or(0)));
+        }
         for (k, count) in entries.iter().take(10) {
             eprintln!("    {count}× {k}");
         }
@@ -922,6 +1053,32 @@ fn flush_event_entries(
     last_flushed: &mut u64,
 ) -> io::Result<()> {
     let log = world.resource::<EventLog>();
+    let new_count = log.total_pushed.saturating_sub(*last_flushed);
+    if new_count == 0 {
+        return Ok(());
+    }
+    let capped = (new_count as usize).min(log.entries.len());
+    let start = log.entries.len() - capped;
+    for entry in log.entries.range(start..) {
+        writeln!(file, "{}", serde_json::to_string(entry).unwrap_or_default())?;
+    }
+    *last_flushed = log.total_pushed;
+    Ok(())
+}
+
+/// Flushes new `TraceLog` entries to `logs/trace-<focal>.jsonl`. Called
+/// every tick when a `FocalTraceTarget` is active. Ring-buffer + forward-
+/// walk semantics match [`flush_event_entries`] — if emission ever
+/// outpaces the flush cadence the ring evicts oldest entries rather
+/// than growing unbounded.
+fn flush_trace_entries(
+    world: &World,
+    file: &mut std::fs::File,
+    last_flushed: &mut u64,
+) -> io::Result<()> {
+    let Some(log) = world.get_resource::<clowder::resources::TraceLog>() else {
+        return Ok(());
+    };
     let new_count = log.total_pushed.saturating_sub(*last_flushed);
     if new_count == 0 {
         return Ok(());

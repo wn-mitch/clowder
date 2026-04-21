@@ -228,6 +228,53 @@ pub enum EventKind {
         posse: Vec<String>,
         location: (i32, i32),
     },
+
+    // -------------------------------------------------------------------
+    // Continuity-canary events (§11.3 — "Emit events for: grooming fires,
+    // play fires, mentoring fires, burial fires, courtship fires,
+    // mythic-texture events"). Canary-class tallies live in
+    // `EventLog::continuity_tallies` and surface in the headless footer;
+    // `just check-continuity` fails when any canary is at zero.
+    //
+    // Some classes piggyback on existing events rather than needing a
+    // new variant — MatingOccurred tallies as `courtship`,
+    // ShadowFoxBanished tallies as `mythic-texture`. Play and Burial
+    // have no emitting system today and stay at zero until the
+    // corresponding features land.
+    // -------------------------------------------------------------------
+    /// A cat completed a grooming action. `target` is `None` for self-
+    /// groom, `Some(name)` for grooming another cat.
+    GroomingFired {
+        cat: String,
+        target: Option<String>,
+    },
+    /// A cat completed a mentoring action with a specific apprentice.
+    MentoringFired {
+        mentor: String,
+        apprentice: String,
+    },
+    /// A cat buried a deceased companion. Reserved; no emitting system
+    /// exists today — a burial action lands with the "broaden sideways"
+    /// epic (`docs/systems/project-vision.md` §5).
+    BurialFired {
+        cat: String,
+        deceased: String,
+    },
+    /// A cat engaged in play. Reserved; no emitting system today.
+    PlayFired {
+        cat: String,
+        partner: Option<String>,
+    },
+    /// A mythic-texture event — Calling fired, named-object crafted,
+    /// cat-on-cat banishment, or visitor arrival. ShadowFoxBanished
+    /// tallies as mythic-texture too, without a separate variant.
+    MythicTexture {
+        /// `"calling"` | `"named-object"` | `"banishment"` | `"visitor-arrival"`.
+        subclass: String,
+        subject: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        detail: Option<String>,
+    },
     ColonyScore {
         // Welfare snapshot [0.0, 1.0]
         shelter: f32,
@@ -373,10 +420,31 @@ pub struct EventLog {
     pub deaths_by_cause: HashMap<String, u64>,
     pub plan_failures_by_reason: HashMap<String, u64>,
     pub interrupts_by_reason: HashMap<String, u64>,
+    /// Continuity-canary class counters. Six fixed keys: `grooming`,
+    /// `play`, `mentoring`, `burial`, `courtship`, `mythic-texture`.
+    /// Populated by `push()` from the corresponding canary event
+    /// variants and from existing events that map to a canary class
+    /// (MatingOccurred → courtship, ShadowFoxBanished → mythic-texture).
+    /// Serialized into the headless footer for `just check-continuity`.
+    pub continuity_tallies: HashMap<String, u64>,
 }
 
 impl Default for EventLog {
     fn default() -> Self {
+        let mut continuity_tallies = HashMap::new();
+        // Initialize all six keys to zero so the footer always reports
+        // the canary set; a missing key is indistinguishable from zero
+        // in JSON but the explicit zero is clearer to readers.
+        for key in [
+            "grooming",
+            "play",
+            "mentoring",
+            "burial",
+            "courtship",
+            "mythic-texture",
+        ] {
+            continuity_tallies.insert(key.to_string(), 0);
+        }
         Self {
             entries: VecDeque::new(),
             capacity: 500,
@@ -384,6 +452,7 @@ impl Default for EventLog {
             deaths_by_cause: HashMap::new(),
             plan_failures_by_reason: HashMap::new(),
             interrupts_by_reason: HashMap::new(),
+            continuity_tallies,
         }
     }
 }
@@ -411,11 +480,48 @@ impl EventLog {
             | EventKind::WardDespawned { .. }
             | EventKind::PreyKilled { .. }
             | EventKind::KittenBorn { .. }
-            | EventKind::MatingOccurred { .. }
             | EventKind::BuildingConstructed { .. }
-            | EventKind::ShadowFoxSpawn { .. }
-            | EventKind::ShadowFoxBanished { .. } => {
+            | EventKind::ShadowFoxSpawn { .. } => {
                 // Tallied only as raw events; no aggregate HashMap needed.
+            }
+            EventKind::MatingOccurred { .. } => {
+                *self
+                    .continuity_tallies
+                    .entry("courtship".into())
+                    .or_insert(0) += 1;
+            }
+            EventKind::ShadowFoxBanished { .. } => {
+                *self
+                    .continuity_tallies
+                    .entry("mythic-texture".into())
+                    .or_insert(0) += 1;
+            }
+            EventKind::GroomingFired { .. } => {
+                *self
+                    .continuity_tallies
+                    .entry("grooming".into())
+                    .or_insert(0) += 1;
+            }
+            EventKind::MentoringFired { .. } => {
+                *self
+                    .continuity_tallies
+                    .entry("mentoring".into())
+                    .or_insert(0) += 1;
+            }
+            EventKind::BurialFired { .. } => {
+                *self
+                    .continuity_tallies
+                    .entry("burial".into())
+                    .or_insert(0) += 1;
+            }
+            EventKind::PlayFired { .. } => {
+                *self.continuity_tallies.entry("play".into()).or_insert(0) += 1;
+            }
+            EventKind::MythicTexture { .. } => {
+                *self
+                    .continuity_tallies
+                    .entry("mythic-texture".into())
+                    .or_insert(0) += 1;
             }
             EventKind::PlanStepFailed { step, reason, .. } => {
                 let key = format!("{step}: {reason}");
