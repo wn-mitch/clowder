@@ -47,7 +47,7 @@ pub struct PlannerState {
     pub trips_done: u32,
     pub hunger_ok: bool,
     pub energy_ok: bool,
-    pub warmth_ok: bool,
+    pub temperature_ok: bool,
     pub interaction_done: bool,
     pub construction_done: bool,
     pub prey_found: bool,
@@ -124,7 +124,7 @@ pub enum StatePredicate {
     PreyFound(bool),
     HungerOk(bool),
     EnergyOk(bool),
-    WarmthOk(bool),
+    TemperatureOk(bool),
     InteractionDone(bool),
     ConstructionDone(bool),
     FarmTended(bool),
@@ -142,7 +142,7 @@ impl StatePredicate {
             Self::PreyFound(v) => state.prey_found == *v,
             Self::HungerOk(v) => state.hunger_ok == *v,
             Self::EnergyOk(v) => state.energy_ok == *v,
-            Self::WarmthOk(v) => state.warmth_ok == *v,
+            Self::TemperatureOk(v) => state.temperature_ok == *v,
             Self::InteractionDone(v) => state.interaction_done == *v,
             Self::ConstructionDone(v) => state.construction_done == *v,
             Self::FarmTended(v) => state.farm_tended == *v,
@@ -160,7 +160,7 @@ pub enum StateEffect {
     SetPreyFound(bool),
     SetHungerOk(bool),
     SetEnergyOk(bool),
-    SetWarmthOk(bool),
+    SetTemperatureOk(bool),
     SetInteractionDone(bool),
     SetConstructionDone(bool),
     SetFarmTended(bool),
@@ -175,7 +175,7 @@ impl StateEffect {
             Self::SetPreyFound(v) => state.prey_found = *v,
             Self::SetHungerOk(v) => state.hunger_ok = *v,
             Self::SetEnergyOk(v) => state.energy_ok = *v,
-            Self::SetWarmthOk(v) => state.warmth_ok = *v,
+            Self::SetTemperatureOk(v) => state.temperature_ok = *v,
             Self::SetInteractionDone(v) => state.interaction_done = *v,
             Self::SetConstructionDone(v) => state.construction_done = *v,
             Self::SetFarmTended(v) => state.farm_tended = *v,
@@ -430,7 +430,7 @@ mod tests {
             trips_done: 0,
             hunger_ok: true,
             energy_ok: true,
-            warmth_ok: true,
+            temperature_ok: true,
             interaction_done: false,
             construction_done: false,
             prey_found: false,
@@ -545,14 +545,14 @@ mod tests {
             zone: PlannerZone::Wilds,
             hunger_ok: false,
             energy_ok: true,
-            warmth_ok: true,
+            temperature_ok: true,
             ..default_state()
         };
         let goal = GoalState {
             predicates: vec![
                 StatePredicate::HungerOk(true),
                 StatePredicate::EnergyOk(true),
-                StatePredicate::WarmthOk(true),
+                StatePredicate::TemperatureOk(true),
             ],
         };
         let actions = vec![
@@ -584,7 +584,7 @@ mod tests {
                 kind: GoapActionKind::SelfGroom,
                 cost: 1,
                 preconditions: vec![],
-                effects: vec![StateEffect::SetWarmthOk(true)],
+                effects: vec![StateEffect::SetTemperatureOk(true)],
             },
         ];
 
@@ -607,14 +607,14 @@ mod tests {
             zone: PlannerZone::Wilds,
             hunger_ok: false,
             energy_ok: false,
-            warmth_ok: false,
+            temperature_ok: false,
             ..default_state()
         };
         let goal = GoalState {
             predicates: vec![
                 StatePredicate::HungerOk(true),
                 StatePredicate::EnergyOk(true),
-                StatePredicate::WarmthOk(true),
+                StatePredicate::TemperatureOk(true),
             ],
         };
         let actions = vec![
@@ -646,7 +646,7 @@ mod tests {
                 kind: GoapActionKind::SelfGroom,
                 cost: 1,
                 preconditions: vec![],
-                effects: vec![StateEffect::SetWarmthOk(true)],
+                effects: vec![StateEffect::SetTemperatureOk(true)],
             },
         ];
 
@@ -675,7 +675,7 @@ mod tests {
             kind: GoapActionKind::SelfGroom,
             cost: 1,
             preconditions: vec![],
-            effects: vec![StateEffect::SetWarmthOk(true)],
+            effects: vec![StateEffect::SetTemperatureOk(true)],
         }];
 
         let plan = make_plan(start, &actions, &goal, 12, 1000);
@@ -690,7 +690,7 @@ mod tests {
             trips_done: 3,
             hunger_ok: true,
             energy_ok: true,
-            warmth_ok: true,
+            temperature_ok: true,
             interaction_done: false,
             construction_done: false,
             prey_found: false,

@@ -50,7 +50,7 @@ pub fn apply_building_effects(
             StructureType::Den => {
                 for (cat_pos, mut needs) in &mut cats {
                     if cat_pos.manhattan_distance(&center) <= b.den_effect_radius {
-                        needs.warmth = (needs.warmth + b.den_warmth_bonus * eff).min(1.0);
+                        needs.temperature = (needs.temperature + b.den_temperature_bonus * eff).min(1.0);
                         needs.safety = (needs.safety + b.den_safety_bonus * eff).min(1.0);
                     }
                 }
@@ -60,8 +60,8 @@ pub fn apply_building_effects(
                     if cat_pos.manhattan_distance(&center) <= b.hearth_effect_radius {
                         needs.social = (needs.social + b.hearth_social_bonus * eff).min(1.0);
                         if is_cold {
-                            needs.warmth =
-                                (needs.warmth + b.hearth_warmth_bonus_cold * eff).min(1.0);
+                            needs.temperature =
+                                (needs.temperature + b.hearth_temperature_bonus_cold * eff).min(1.0);
                         }
                     }
                 }
@@ -74,12 +74,12 @@ pub fn apply_building_effects(
             _ => {}
         }
 
-        // Dirty building discomfort: mild warmth drain for nearby cats.
+        // Dirty building discomfort: mild temperature drain for nearby cats.
         if structure.cleanliness < b.dirty_threshold {
             for (cat_pos, mut needs) in &mut cats {
                 if cat_pos.manhattan_distance(&center) <= b.dirty_discomfort_radius {
-                    needs.warmth = (needs.warmth
-                        - b.dirty_warmth_drain * (1.0 - structure.cleanliness))
+                    needs.temperature = (needs.temperature
+                        - b.dirty_temperature_drain * (1.0 - structure.cleanliness))
                         .max(0.0);
                 }
             }
@@ -230,7 +230,7 @@ mod tests {
     }
 
     #[test]
-    fn den_provides_warmth_and_safety_within_range() {
+    fn den_provides_temperature_and_safety_within_range() {
         let mut world = test_world();
 
         // Den (3×3) at anchor (5, 5), center = (6, 6). Radius = 4.
@@ -247,7 +247,7 @@ mod tests {
         schedule.run(&mut world);
 
         let near_needs = world.get::<Needs>(near_cat).unwrap();
-        assert!(near_needs.warmth > 0.9, "near cat should get warmth bonus");
+        assert!(near_needs.temperature > 0.9, "near cat should get warmth bonus");
         assert!(
             near_needs.safety > 1.0 - f32::EPSILON,
             "near cat should get safety bonus"
@@ -255,7 +255,7 @@ mod tests {
 
         let far_needs = world.get::<Needs>(far_cat).unwrap();
         assert!(
-            (far_needs.warmth - 0.9).abs() < 1e-6,
+            (far_needs.temperature - 0.9).abs() < 1e-6,
             "far cat should not get warmth bonus"
         );
     }

@@ -178,7 +178,7 @@ pub struct PersonalityReq {
 pub enum NeedAxis {
     Hunger,
     Energy,
-    Warmth,
+    Temperature,
     Safety,
     Social,
     Acceptance,
@@ -191,7 +191,7 @@ impl NeedAxis {
     pub const ALL: [NeedAxis; 9] = [
         Self::Hunger,
         Self::Energy,
-        Self::Warmth,
+        Self::Temperature,
         Self::Safety,
         Self::Social,
         Self::Acceptance,
@@ -204,7 +204,7 @@ impl NeedAxis {
         match self {
             Self::Hunger => "Hunger",
             Self::Energy => "Energy",
-            Self::Warmth => "Warmth",
+            Self::Temperature => "Temperature",
             Self::Safety => "Safety",
             Self::Social => "Social",
             Self::Acceptance => "Acceptance",
@@ -682,7 +682,7 @@ impl Needs {
         match axis {
             NeedAxis::Hunger => self.hunger,
             NeedAxis::Energy => self.energy,
-            NeedAxis::Warmth => self.warmth,
+            NeedAxis::Temperature => self.temperature,
             NeedAxis::Safety => self.safety,
             NeedAxis::Social => self.social,
             NeedAxis::Acceptance => self.acceptance,

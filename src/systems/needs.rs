@@ -17,7 +17,7 @@ use crate::resources::weather::{Weather, WeatherState};
 
 /// Advance need decay for every cat entity each tick.
 ///
-/// - Physiological needs (hunger, energy, warmth) drain continuously.
+/// - Physiological needs (hunger, energy, temperature) drain continuously.
 /// - Safety *recovers* passively toward 1.0; it drops only from events.
 /// - Social/acceptance/respect/mastery/purpose decay faster for cats whose
 ///   personality traits make them more invested in those needs.
@@ -49,24 +49,24 @@ pub fn decay_needs(
     let c = &constants.needs;
     let season = time.season(&config);
 
-    // Additional warmth drain from weather.
-    let weather_warmth_drain = match weather.current {
-        Weather::Snow => c.weather_warmth_snow,
-        Weather::Storm => c.weather_warmth_storm,
-        Weather::Wind => c.weather_warmth_wind,
-        Weather::HeavyRain => c.weather_warmth_heavy_rain,
-        Weather::LightRain => c.weather_warmth_light_rain,
+    // Additional temperature drain from weather.
+    let weather_temperature_drain = match weather.current {
+        Weather::Snow => c.weather_temperature_snow,
+        Weather::Storm => c.weather_temperature_storm,
+        Weather::Wind => c.weather_temperature_wind,
+        Weather::HeavyRain => c.weather_temperature_heavy_rain,
+        Weather::LightRain => c.weather_temperature_light_rain,
         _ => 0.0,
     };
 
-    // Additional warmth drain from season.
-    let season_warmth_drain = match season {
-        Season::Winter => c.season_warmth_winter,
-        Season::Autumn => c.season_warmth_autumn,
+    // Additional temperature drain from season.
+    let season_temperature_drain = match season {
+        Season::Winter => c.season_temperature_winter,
+        Season::Autumn => c.season_temperature_autumn,
         _ => 0.0,
     };
 
-    let warmth_drain = c.base_warmth_drain + weather_warmth_drain + season_warmth_drain;
+    let temperature_drain = c.base_temperature_drain + weather_temperature_drain + season_temperature_drain;
 
     for (
         mut needs,
@@ -84,7 +84,7 @@ pub fn decay_needs(
         // --- Level 1: Physiological ---
         needs.hunger = (needs.hunger - c.hunger_decay).max(0.0);
         needs.energy = (needs.energy - c.energy_decay).max(0.0);
-        needs.warmth = (needs.warmth - warmth_drain).max(0.0);
+        needs.temperature = (needs.temperature - temperature_drain).max(0.0);
 
         // --- Starvation cascade ---
         let starving = needs.hunger == 0.0;
@@ -129,7 +129,7 @@ pub fn decay_needs(
         needs.social = (needs.social - social_drain).max(0.0);
 
         let acceptance_drain =
-            c.acceptance_base_drain * (1.0 + personality.warmth * c.acceptance_warmth_scale);
+            c.acceptance_base_drain * (1.0 + personality.warmth * c.acceptance_temperature_scale);
         needs.acceptance = (needs.acceptance - acceptance_drain).max(0.0);
 
         // Mating need: decays across the photoperiodic breeding window for
@@ -146,7 +146,7 @@ pub fn decay_needs(
         let fertility = constants.scoring.season_fertility(season);
         if is_fertile && fertility > 0.0 {
             let mating_drain = c.mating_base_decay
-                * (1.0 + personality.warmth * c.mating_warmth_scale)
+                * (1.0 + personality.warmth * c.mating_temperature_scale)
                 * fertility;
             needs.mating = (needs.mating - mating_drain).max(0.0);
         }
@@ -446,7 +446,7 @@ mod tests {
         let mut needs = Needs::default();
         needs.hunger = 0.0;
         needs.energy = 0.0;
-        needs.warmth = 0.0;
+        needs.temperature = 0.0;
         needs.social = 0.0;
         needs.acceptance = 0.0;
         needs.respect = 0.0;
@@ -459,7 +459,7 @@ mod tests {
         let n = world.get::<Needs>(entity).unwrap();
         assert_eq!(n.hunger, 0.0);
         assert_eq!(n.energy, 0.0);
-        assert_eq!(n.warmth, 0.0);
+        assert_eq!(n.temperature, 0.0);
         assert_eq!(n.social, 0.0);
         assert_eq!(n.acceptance, 0.0);
         assert_eq!(n.respect, 0.0);
@@ -468,11 +468,11 @@ mod tests {
     }
 
     #[test]
-    fn warmth_drains_extra_in_snow() {
+    fn temperature_drains_extra_in_snow() {
         let (mut world_clear, mut schedule_clear) = setup_world();
         let cat_clear = spawn_cat(&mut world_clear, Needs::default(), default_personality());
         schedule_clear.run(&mut world_clear);
-        let warmth_clear = world_clear.get::<Needs>(cat_clear).unwrap().warmth;
+        let temperature_clear = world_clear.get::<Needs>(cat_clear).unwrap().temperature;
 
         let (mut world_snow, mut schedule_snow) = setup_world();
         world_snow.insert_resource(WeatherState {
@@ -481,11 +481,11 @@ mod tests {
         });
         let cat_snow = spawn_cat(&mut world_snow, Needs::default(), default_personality());
         schedule_snow.run(&mut world_snow);
-        let warmth_snow = world_snow.get::<Needs>(cat_snow).unwrap().warmth;
+        let temperature_snow = world_snow.get::<Needs>(cat_snow).unwrap().temperature;
 
         assert!(
-            warmth_snow < warmth_clear,
-            "snow should drain warmth faster; snow={warmth_snow}, clear={warmth_clear}"
+            temperature_snow < temperature_clear,
+            "snow should drain temperature faster; snow={temperature_snow}, clear={temperature_clear}"
         );
     }
 
@@ -794,7 +794,7 @@ mod tests {
         let after = world.get::<Needs>(entity).unwrap().mating;
         let sc = SimConstants::default();
         let expected_drain = sc.needs.mating_base_decay
-            * (1.0 + default_personality().warmth * sc.needs.mating_warmth_scale)
+            * (1.0 + default_personality().warmth * sc.needs.mating_temperature_scale)
             * sc.scoring.mating_fertility_summer;
         let expected = 1.0 - expected_drain;
         assert!(

@@ -334,7 +334,7 @@ pub fn update_cat_inspect_panel(
     ));
     children.push(spawn_bar_row(&mut commands, "Hunger", needs.hunger));
     children.push(spawn_bar_row(&mut commands, "Energy", needs.energy));
-    children.push(spawn_bar_row(&mut commands, "Warmth", needs.warmth));
+    children.push(spawn_bar_row(&mut commands, "Temperature", needs.temperature));
     children.push(spawn_bar_row(&mut commands, "Safety", needs.safety));
     children.push(spawn_bar_row(&mut commands, "Social", needs.social));
 

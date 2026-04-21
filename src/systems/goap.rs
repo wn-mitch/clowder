@@ -270,7 +270,7 @@ pub fn check_anxiety_interrupts(
                         current_step,
                         hunger: needs.hunger,
                         energy: needs.energy,
-                        warmth: needs.warmth,
+                        temperature: needs.temperature,
                     },
                 );
             }
@@ -995,7 +995,7 @@ pub fn evaluate_and_plan(
 
         // Groom routing.
         let self_groom_score =
-            (1.0 - needs.warmth) * sc.self_groom_warmth_scale * needs.level_suppression(1);
+            (1.0 - needs.temperature) * sc.self_groom_temperature_scale * needs.level_suppression(1);
         let other_groom_score = if has_social_target {
             personality.warmth * (1.0 - needs.social) * needs.level_suppression(2)
         } else {
@@ -1165,7 +1165,7 @@ pub fn evaluate_and_plan(
                             .collect(),
                         hunger: needs.hunger,
                         energy: needs.energy,
-                        warmth: needs.warmth,
+                        temperature: needs.temperature,
                         food_available,
                     },
                 );
@@ -1410,7 +1410,7 @@ pub fn resolve_goap_plans(
                 DispositionKind::Resting => {
                     needs.hunger >= d.resting_complete_hunger
                         && needs.energy >= d.resting_complete_energy
-                        && needs.warmth >= d.resting_complete_warmth
+                        && needs.temperature >= d.resting_complete_temperature
                 }
                 _ => plan.trips_done >= plan.target_trips,
             };
@@ -2477,7 +2477,7 @@ pub fn resolve_goap_plans(
                                         current_step,
                                         hunger: needs.hunger,
                                         energy: needs.energy,
-                                        warmth: needs.warmth,
+                                        temperature: needs.temperature,
                                     },
                                 );
                             }
@@ -2549,7 +2549,7 @@ pub fn resolve_goap_plans(
                             reason: fail_reason.clone(),
                             hunger: needs.hunger,
                             energy: needs.energy,
-                            warmth: needs.warmth,
+                            temperature: needs.temperature,
                         },
                     );
                 }
@@ -2606,7 +2606,7 @@ pub fn resolve_goap_plans(
                                         .collect(),
                                     hunger: needs.hunger,
                                     energy: needs.energy,
-                                    warmth: needs.warmth,
+                                    temperature: needs.temperature,
                                 },
                             );
                         }
@@ -3954,7 +3954,7 @@ fn build_planner_state(
         trips_done,
         hunger_ok: needs.hunger >= d.planner_hunger_ok_threshold,
         energy_ok: needs.energy >= d.planner_energy_ok_threshold,
-        warmth_ok: needs.warmth >= d.planner_warmth_ok_threshold,
+        temperature_ok: needs.temperature >= d.planner_temperature_ok_threshold,
         interaction_done: false,
         construction_done: false,
         prey_found: false,

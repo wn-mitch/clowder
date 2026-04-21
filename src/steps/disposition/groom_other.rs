@@ -44,7 +44,7 @@ pub fn resolve_groom_other(
         hunting_priors.learn_from(&colony_map.beliefs, d.groom_other_personal_learn_rate);
     }
     if ticks >= d.groom_other_duration {
-        needs.warmth = (needs.warmth + d.groom_other_warmth_gain).min(1.0);
+        needs.temperature = (needs.temperature + d.groom_other_temperature_gain).min(1.0);
         let restoration = target_entity.map(|t| (t, 0.12));
         (StepResult::Advance, restoration)
     } else {

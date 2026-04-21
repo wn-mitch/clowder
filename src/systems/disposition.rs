@@ -695,7 +695,7 @@ pub fn evaluate_dispositions(
 
         // Determine Groom routing.
         let self_groom_score =
-            (1.0 - needs.warmth) * sc.self_groom_warmth_scale * needs.level_suppression(1);
+            (1.0 - needs.temperature) * sc.self_groom_temperature_scale * needs.level_suppression(1);
         let other_groom_score = if has_social_target {
             personality.warmth * (1.0 - needs.social) * needs.level_suppression(2)
         } else {
@@ -1066,7 +1066,7 @@ fn should_complete_disposition(
         DispositionKind::Resting => {
             needs.hunger >= d.resting_complete_hunger
                 && needs.energy >= d.resting_complete_energy
-                && needs.warmth >= d.resting_complete_warmth
+                && needs.temperature >= d.resting_complete_temperature
         }
         _ => disposition.is_count_complete(),
     }
@@ -1109,9 +1109,9 @@ fn build_resting_chain(
     // Pick the most urgent physiological need.
     let hunger_deficit = 1.0 - needs.hunger;
     let energy_deficit = 1.0 - needs.energy;
-    let warmth_deficit = 1.0 - needs.warmth;
+    let temperature_deficit = 1.0 - needs.temperature;
 
-    if hunger_deficit >= energy_deficit && hunger_deficit >= warmth_deficit {
+    if hunger_deficit >= energy_deficit && hunger_deficit >= temperature_deficit {
         if food_empty {
             // Stores are empty — hunt for food instead of walking to empty stores.
             let patrol_dir = (rng.random_range(-1i32..=1), rng.random_range(-1i32..=1));
@@ -1150,7 +1150,7 @@ fn build_resting_chain(
             // No stores — just idle.
             None
         }
-    } else if energy_deficit >= warmth_deficit {
+    } else if energy_deficit >= temperature_deficit {
         // Sleep in place.
         let sleep_ticks = ((1.0 - needs.energy) * d.sleep_duration_deficit_multiplier) as u64
             + d.sleep_duration_base;
@@ -1376,9 +1376,9 @@ fn build_socializing_chain(
             })
     };
 
-    let (step_kind, action) = if can_mentor && personality.warmth > d.mentor_warmth_threshold {
+    let (step_kind, action) = if can_mentor && personality.warmth > d.mentor_temperature_threshold {
         (StepKind::MentorCat, Action::Mentor)
-    } else if personality.warmth > d.groom_warmth_threshold {
+    } else if personality.warmth > d.groom_temperature_threshold {
         (StepKind::GroomOther, Action::Groom)
     } else {
         (StepKind::Socialize, Action::Socialize)

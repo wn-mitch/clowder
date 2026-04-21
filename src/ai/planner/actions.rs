@@ -111,7 +111,7 @@ pub fn resting_actions() -> Vec<GoapActionDef> {
             cost: 2,
             // No zone precondition — cats can groom anywhere.
             preconditions: vec![],
-            effects: vec![StateEffect::SetWarmthOk(true)],
+            effects: vec![StateEffect::SetTemperatureOk(true)],
         },
     ]
 }
@@ -469,7 +469,7 @@ mod tests {
             trips_done: 0,
             hunger_ok: true,
             energy_ok: true,
-            warmth_ok: true,
+            temperature_ok: true,
             interaction_done: false,
             construction_done: false,
             prey_found: false,
@@ -554,14 +554,14 @@ mod tests {
         let start = PlannerState {
             hunger_ok: false,
             energy_ok: false,
-            warmth_ok: false,
+            temperature_ok: false,
             ..default_state()
         };
         let goal = GoalState {
             predicates: vec![
                 StatePredicate::HungerOk(true),
                 StatePredicate::EnergyOk(true),
-                StatePredicate::WarmthOk(true),
+                StatePredicate::TemperatureOk(true),
             ],
         };
         let distances = basic_distances();

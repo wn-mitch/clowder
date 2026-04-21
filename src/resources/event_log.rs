@@ -286,7 +286,7 @@ pub enum EventKind {
         steps: Vec<String>,
         hunger: f32,
         energy: f32,
-        warmth: f32,
+        temperature: f32,
         food_available: bool,
     },
 
@@ -315,7 +315,7 @@ pub enum EventKind {
         current_step: String,
         hunger: f32,
         energy: f32,
-        warmth: f32,
+        temperature: f32,
     },
 
     /// A plan step could not execute — this is a bug canary, not normal
@@ -329,7 +329,7 @@ pub enum EventKind {
         reason: String,
         hunger: f32,
         energy: f32,
-        warmth: f32,
+        temperature: f32,
     },
 
     /// A plan was regenerated after step failure (replan attempt).
@@ -340,7 +340,7 @@ pub enum EventKind {
         new_steps: Vec<String>,
         hunger: f32,
         energy: f32,
-        warmth: f32,
+        temperature: f32,
     },
 }
 

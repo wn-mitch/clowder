@@ -9,7 +9,7 @@ pub fn resolve_sleep(
     d: &DispositionConstants,
 ) -> StepResult {
     needs.energy = (needs.energy + d.sleep_energy_per_tick).min(1.0);
-    needs.warmth = (needs.warmth + d.sleep_warmth_per_tick).min(1.0);
+    needs.temperature = (needs.temperature + d.sleep_temperature_per_tick).min(1.0);
     if ticks >= duration {
         StepResult::Advance
     } else {

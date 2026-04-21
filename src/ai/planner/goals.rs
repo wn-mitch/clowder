@@ -14,7 +14,7 @@ pub fn goal_for_disposition(kind: DispositionKind, current_trips: u32) -> GoalSt
             predicates: vec![
                 StatePredicate::HungerOk(true),
                 StatePredicate::EnergyOk(true),
-                StatePredicate::WarmthOk(true),
+                StatePredicate::TemperatureOk(true),
             ],
         },
 
@@ -58,7 +58,7 @@ mod tests {
             trips_done: 0,
             hunger_ok: true,
             energy_ok: true,
-            warmth_ok: true,
+            temperature_ok: true,
             interaction_done: false,
             construction_done: false,
             prey_found: false,
@@ -73,7 +73,7 @@ mod tests {
         let satisfied = PlannerState {
             hunger_ok: true,
             energy_ok: true,
-            warmth_ok: true,
+            temperature_ok: true,
             ..default_state()
         };
         assert!(goal.is_satisfied(&satisfied));
@@ -145,7 +145,7 @@ mod tests {
         let all_bad = PlannerState {
             hunger_ok: false,
             energy_ok: false,
-            warmth_ok: false,
+            temperature_ok: false,
             ..default_state()
         };
         assert_eq!(goal.heuristic(&all_bad), 3);
@@ -153,7 +153,7 @@ mod tests {
         let one_bad = PlannerState {
             hunger_ok: false,
             energy_ok: true,
-            warmth_ok: true,
+            temperature_ok: true,
             ..default_state()
         };
         assert_eq!(goal.heuristic(&one_bad), 1);

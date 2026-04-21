@@ -283,7 +283,7 @@ pub fn score_actions(ctx: &ScoringContext, rng: &mut impl Rng) -> ScoringResult 
     // --- Groom (self or other; always available for self) ---
     {
         let self_groom =
-            (1.0 - ctx.needs.warmth) * s.self_groom_warmth_scale * ctx.needs.level_suppression(1);
+            (1.0 - ctx.needs.temperature) * s.self_groom_temperature_scale * ctx.needs.level_suppression(1);
         let temper_penalty =
             ctx.personality.temper * s.groom_temper_penalty_scale * (1.0 - ctx.phys_satisfaction);
         let other_groom = if ctx.has_social_target {
@@ -598,7 +598,7 @@ pub fn score_actions(ctx: &ScoringContext, rng: &mut impl Rng) -> ScoringResult 
     if ctx.has_mentoring_target {
         let score = ctx.personality.warmth
             * ctx.personality.diligence
-            * s.mentor_warmth_diligence_scale
+            * s.mentor_temperature_diligence_scale
             * ctx.needs.level_suppression(4)
             + ctx.personality.ambition * s.mentor_ambition_bonus;
         scores.push((Action::Mentor, score + jitter(rng, s.jitter_range)));
@@ -608,7 +608,7 @@ pub fn score_actions(ctx: &ScoringContext, rng: &mut impl Rng) -> ScoringResult 
     if ctx.has_eligible_mate {
         let urgency = (1.0 - ctx.needs.mating)
             * ctx.personality.warmth
-            * s.mate_warmth_scale
+            * s.mate_temperature_scale
             * ctx.needs.level_suppression(3);
         if urgency > 0.0 {
             scores.push((Action::Mate, urgency + jitter(rng, s.jitter_range)));
@@ -1397,7 +1397,7 @@ mod tests {
         // All needs well-met
         needs.hunger = 0.95;
         needs.energy = 0.95;
-        needs.warmth = 0.95;
+        needs.temperature = 0.95;
         needs.safety = 0.95;
         needs.social = 0.95;
         needs.acceptance = 0.95;
@@ -1533,7 +1533,7 @@ mod tests {
         needs.social = 0.1; // very lonely
         needs.hunger = 0.9;
         needs.energy = 0.9;
-        needs.warmth = 0.9;
+        needs.temperature = 0.9;
 
         let mut personality = default_personality();
         personality.sociability = 0.9;
@@ -1612,7 +1612,7 @@ mod tests {
     fn cold_cat_scores_groom_high() {
         let sc = default_scoring();
         let mut needs = Needs::default();
-        needs.warmth = 0.1;
+        needs.temperature = 0.1;
         needs.hunger = 0.9;
         needs.energy = 0.9;
 
@@ -2378,7 +2378,7 @@ mod tests {
         let mut needs = Needs::default();
         needs.hunger = 0.1; // critically hungry
         needs.energy = 0.9;
-        needs.warmth = 0.9;
+        needs.temperature = 0.9;
 
         // Simulate a bonus-inflated Build score beating Eat.
         let mut scores = vec![
@@ -2403,7 +2403,7 @@ mod tests {
         let mut needs = Needs::default();
         needs.hunger = 0.8;
         needs.energy = 0.8;
-        needs.warmth = 0.8;
+        needs.temperature = 0.8;
 
         let mut scores = vec![
             (Action::Eat, 0.5),
@@ -2427,7 +2427,7 @@ mod tests {
         let mut needs = Needs::default();
         needs.hunger = 0.3; // moderately hungry
         needs.energy = 0.9;
-        needs.warmth = 0.9;
+        needs.temperature = 0.9;
 
         let mut scores = vec![
             (Action::Eat, 1.2),
@@ -2456,7 +2456,7 @@ mod tests {
         let mut needs = Needs::default();
         needs.hunger = 0.05; // nearly starving
         needs.energy = 0.9;
-        needs.warmth = 0.9;
+        needs.temperature = 0.9;
 
         let mut scores = vec![
             (Action::Eat, 1.8),

@@ -10,7 +10,7 @@ pub fn resolve_self_groom(
     d: &DispositionConstants,
 ) -> StepResult {
     if ticks >= d.self_groom_duration {
-        needs.warmth = (needs.warmth + d.self_groom_warmth_gain).min(1.0);
+        needs.temperature = (needs.temperature + d.self_groom_temperature_gain).min(1.0);
         if let Some(g) = grooming {
             g.0 = (g.0 + 0.15).min(1.0);
         }

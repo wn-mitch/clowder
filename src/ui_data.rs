@@ -78,7 +78,7 @@ pub struct AspirationDisplay {
 pub struct NeedsSnapshot {
     pub hunger: f32,
     pub energy: f32,
-    pub warmth: f32,
+    pub temperature: f32,
     pub safety: f32,
     pub social: f32,
 }
@@ -103,7 +103,7 @@ impl NeedsSnapshot {
         Self {
             hunger: needs.hunger,
             energy: needs.energy,
-            warmth: needs.warmth,
+            temperature: needs.temperature,
             safety: needs.safety,
             social: needs.social,
         }

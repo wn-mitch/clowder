@@ -141,7 +141,7 @@ pub struct Needs {
     // Level 1 — Physiological
     pub hunger: f32,
     pub energy: f32,
-    pub warmth: f32,
+    pub temperature: f32,
 
     // Level 2 — Safety
     pub safety: f32,
@@ -171,7 +171,7 @@ impl Default for Needs {
         Self {
             hunger: 1.0,
             energy: 0.8,
-            warmth: 0.9,
+            temperature: 0.9,
             safety: 1.0,
             social: 0.6,
             acceptance: 0.5,
@@ -210,7 +210,7 @@ impl Needs {
     /// Uses the *minimum* of the three needs so that one critical deficiency
     /// suppresses the whole level.
     pub fn physiological_satisfaction(&self) -> f32 {
-        let min = self.hunger.min(self.energy).min(self.warmth);
+        let min = self.hunger.min(self.energy).min(self.temperature);
         smoothstep(0.15, 0.65, min)
     }
 
@@ -325,7 +325,7 @@ mod tests {
         let n = Needs::default();
         assert_eq!(n.hunger, 1.0);
         assert_eq!(n.energy, 0.8);
-        assert_eq!(n.warmth, 0.9);
+        assert_eq!(n.temperature, 0.9);
         assert_eq!(n.safety, 1.0);
         assert_eq!(n.social, 0.6);
         assert_eq!(n.acceptance, 0.5);
@@ -370,7 +370,7 @@ mod tests {
         // All needs comfortably met
         n.hunger = 0.9;
         n.energy = 0.9;
-        n.warmth = 0.9;
+        n.temperature = 0.9;
         n.safety = 0.9;
         n.social = 0.9;
         n.acceptance = 0.9;
