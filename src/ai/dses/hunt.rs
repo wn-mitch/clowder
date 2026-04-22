@@ -25,6 +25,7 @@ use crate::ai::curves::{hangry, scarcity, Curve};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
+use crate::ai::faction::StanceRequirement;
 
 pub struct HuntDse {
     id: DseId,
@@ -63,7 +64,8 @@ impl HuntDse {
             // out-score `Eat`'s direct path. The binary 0/1 prey_nearby
             // value otherwise dominates the sum disproportionately.
             composition: Composition::weighted_sum(vec![0.5, 0.25, 0.15, 0.10]),
-            eligibility: EligibilityFilter::new(),
+            // §9.3 DSE filter binding — Hunt targets `Prey` only.
+            eligibility: EligibilityFilter::new().with_stance(StanceRequirement::hunt()),
         }
     }
 }
@@ -127,5 +129,19 @@ mod tests {
         let dse = HuntDse::new();
         let sum: f32 = dse.composition().weights.iter().sum();
         assert!((sum - 1.0).abs() < 1e-4, "sum was {sum}");
+    }
+
+    #[test]
+    fn hunt_stance_requirement_is_prey_only() {
+        use crate::ai::faction::FactionStance;
+        let req = HuntDse::new()
+            .eligibility()
+            .required_stance
+            .clone()
+            .expect("§9.3 binding must populate required_stance");
+        assert!(req.accepts(FactionStance::Prey));
+        assert!(!req.accepts(FactionStance::Enemy));
+        assert!(!req.accepts(FactionStance::Predator));
+        assert!(!req.accepts(FactionStance::Same));
     }
 }

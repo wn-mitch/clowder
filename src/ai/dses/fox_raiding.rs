@@ -34,6 +34,7 @@ use crate::ai::curves::{hangry, Curve};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
+use crate::ai::faction::StanceRequirement;
 
 pub const HUNGER_INPUT: &str = "hunger_urgency";
 pub const CUNNING_INPUT: &str = "cunning";
@@ -64,7 +65,10 @@ impl FoxRaidingDse {
             // `[0, 1]` personality coefficient. Both=1.0 means CP's
             // per-axis ceilings apply unscaled.
             composition: Composition::compensated_product(vec![1.0, 1.0]),
-            eligibility: EligibilityFilter::new(),
+            // §9.3 DSE filter binding — FoxRaid treats colony stores /
+            // cats as `Prey` per the fox→cat row (`StoreVisible` marker
+            // refinement remains an outer gate — §4 port is Phase 3d).
+            eligibility: EligibilityFilter::new().with_stance(StanceRequirement::hunt()),
         }
     }
 }
@@ -141,5 +145,20 @@ mod tests {
     fn fox_raiding_cp_weights_in_unit_interval() {
         let dse = FoxRaidingDse::new();
         assert!(dse.composition().weights.iter().all(|w| (0.0..=1.0).contains(w)));
+    }
+
+    #[test]
+    fn fox_raiding_stance_requirement_is_prey() {
+        use crate::ai::faction::FactionStance;
+        let req = FoxRaidingDse::new()
+            .eligibility()
+            .required_stance
+            .clone()
+            .expect("§9.3 binding must populate required_stance");
+        // `StanceRequirement::hunt()` (Prey) — §9.3's FoxRaidDse row.
+        // The `StoreVisible` marker refinement lands with §4 in Phase 3d.
+        assert!(req.accepts(FactionStance::Prey));
+        assert!(!req.accepts(FactionStance::Enemy));
+        assert!(!req.accepts(FactionStance::Same));
     }
 }

@@ -29,6 +29,7 @@ use crate::ai::curves::{flee_or_fight, Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
+use crate::ai::faction::StanceRequirement;
 use crate::resources::sim_constants::ScoringConstants;
 
 pub const SAFETY_DEFICIT_INPUT: &str = "safety_deficit";
@@ -65,7 +66,8 @@ impl FleeDse {
                 Consideration::Scalar(ScalarConsideration::new(BOLDNESS_INPUT, boldness_invert)),
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0]),
-            eligibility: EligibilityFilter::new(),
+            // §9.3 DSE filter binding — Flee triggers on `Predator` stance.
+            eligibility: EligibilityFilter::new().with_stance(StanceRequirement::flee()),
         }
     }
 }
@@ -128,6 +130,21 @@ mod tests {
     fn flee_maslow_tier_is_two() {
         let s = ScoringConstants::default();
         assert_eq!(FleeDse::new(&s).maslow_tier(), 2);
+    }
+
+    #[test]
+    fn flee_stance_requirement_is_predator_only() {
+        use crate::ai::faction::FactionStance;
+        let s = ScoringConstants::default();
+        let req = FleeDse::new(&s)
+            .eligibility()
+            .required_stance
+            .clone()
+            .expect("§9.3 binding must populate required_stance");
+        assert!(req.accepts(FactionStance::Predator));
+        assert!(!req.accepts(FactionStance::Enemy));
+        assert!(!req.accepts(FactionStance::Prey));
+        assert!(!req.accepts(FactionStance::Same));
     }
 
     #[test]

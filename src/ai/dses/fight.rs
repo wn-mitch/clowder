@@ -27,6 +27,7 @@ use crate::ai::curves::{fight_gating, Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
+use crate::ai::faction::StanceRequirement;
 use crate::resources::sim_constants::ScoringConstants;
 
 pub const BOLDNESS_INPUT: &str = "boldness";
@@ -85,7 +86,8 @@ impl FightDse {
             //     cornered.
             //   - ally_count 0.25: group-courage signal per §3.1.1.
             composition: Composition::weighted_sum(vec![0.25, 0.20, 0.15, 0.15, 0.25]),
-            eligibility: EligibilityFilter::new(),
+            // §9.3 DSE filter binding — Fight (Attack) accepts `Enemy | Prey`.
+            eligibility: EligibilityFilter::new().with_stance(StanceRequirement::attack()),
         }
     }
 }
@@ -176,6 +178,21 @@ mod tests {
         let bonus = s.fight_ally_bonus_per_cat;
         assert!((c.evaluate(1.0) - bonus).abs() < 1e-4);
         assert!((c.evaluate(10.0) - 1.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn fight_stance_requirement_is_enemy_or_prey() {
+        use crate::ai::faction::FactionStance;
+        let s = ScoringConstants::default();
+        let req = FightDse::new(&s)
+            .eligibility()
+            .required_stance
+            .clone()
+            .expect("§9.3 binding must populate required_stance");
+        assert!(req.accepts(FactionStance::Enemy));
+        assert!(req.accepts(FactionStance::Prey));
+        assert!(!req.accepts(FactionStance::Same));
+        assert!(!req.accepts(FactionStance::Ally));
     }
 
     #[test]

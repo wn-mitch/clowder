@@ -17,6 +17,7 @@ use crate::ai::curves::{inverted_need_penalty, loneliness, Curve};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
+use crate::ai::faction::StanceRequirement;
 
 pub const SOCIAL_DEFICIT_INPUT: &str = "social_deficit";
 pub const SOCIABILITY_INPUT: &str = "sociability";
@@ -70,7 +71,8 @@ impl SocializeDse {
             // score downward via the non-social axes dominating).
             // Corruption bonus is a small-weight additive rider.
             composition: Composition::weighted_sum(vec![0.35, 0.20, 0.05, 0.10, 0.20, 0.10]),
-            eligibility: EligibilityFilter::new(),
+            // §9.3 DSE filter binding — Socialize accepts `Same | Ally`.
+            eligibility: EligibilityFilter::new().with_stance(StanceRequirement::socialize()),
         }
     }
 }
@@ -147,5 +149,19 @@ mod tests {
     #[test]
     fn socialize_maslow_tier_is_two() {
         assert_eq!(SocializeDse::new().maslow_tier(), 2);
+    }
+
+    #[test]
+    fn socialize_stance_requirement_is_same_or_ally() {
+        use crate::ai::faction::FactionStance;
+        let req = SocializeDse::new()
+            .eligibility()
+            .required_stance
+            .clone()
+            .expect("§9.3 binding must populate required_stance");
+        assert!(req.accepts(FactionStance::Same));
+        assert!(req.accepts(FactionStance::Ally));
+        assert!(!req.accepts(FactionStance::Enemy));
+        assert!(!req.accepts(FactionStance::Predator));
     }
 }
