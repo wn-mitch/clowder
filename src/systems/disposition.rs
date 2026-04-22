@@ -2062,6 +2062,13 @@ pub fn resolve_disposition_chains(
         .iter()
         .map(|(e, _, _, _, _, _, _, _, _, _, _, _, _, g, _)| (e, g.map_or(0.8, |g| g.0)))
         .collect();
+    // Snapshot of each cat's gender — used by `MateWith` to look up the
+    // partner's gender for §7.M.7.4's gestator-selection fix without
+    // double-borrowing the mutable `cats` query.
+    let gender_snapshot: std::collections::HashMap<Entity, Gender> = cats
+        .iter()
+        .map(|(e, _, _, _, _, _, _, _, _, g, _, _, _, _, _)| (e, *g))
+        .collect();
     // Deferred grooming restoration for targets of GroomOther steps.
     let mut grooming_restorations: Vec<(Entity, f32)> = Vec::new();
 
@@ -3040,15 +3047,28 @@ pub fn resolve_disposition_chains(
 
             StepKind::MateWith => {
                 let target = step.target_entity;
+                let target_gender = target.and_then(|t| gender_snapshot.get(&t).copied());
                 let (result, pregnancy) = crate::steps::disposition::resolve_mate_with(
                     ticks,
                     cat_entity,
+                    *gender,
                     target,
+                    target_gender,
                     &mut needs,
                     &mut relationships,
                 );
-                if let Some((partner, litter_size)) = pregnancy {
-                    commands.entity(cat_entity).insert(
+                if let Some((gestator, litter_size)) = pregnancy {
+                    // §7.M.7.4: Pregnant lands on the gestation-capable
+                    // partner, not the initiator. `partner` on the
+                    // `Pregnant` struct is the other mate — so if the
+                    // initiator is the gestator, partner = target; if
+                    // the target is the gestator, partner = initiator.
+                    let partner = if gestator == cat_entity {
+                        target.unwrap_or(cat_entity)
+                    } else {
+                        cat_entity
+                    };
+                    commands.entity(gestator).insert(
                         crate::components::pregnancy::Pregnant::new(
                             time.tick,
                             partner,

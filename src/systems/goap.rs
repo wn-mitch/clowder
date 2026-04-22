@@ -1273,6 +1273,13 @@ pub fn resolve_goap_plans(
             },
         )
         .collect();
+    // Gender snapshot for §7.M.7.4's `resolve_mate_with` partner lookup —
+    // lets the MateWith step pick the gestation-capable partner without
+    // double-borrowing the mutable `cats` query.
+    let gender_snapshot: HashMap<Entity, Gender> = cats
+        .iter()
+        .map(|((e, _, _, _, _, _, _, _, _), (g, _, _, _, _, _, _, _, _, _))| (e, *g))
+        .collect();
     let mut grooming_restorations: Vec<(Entity, f32)> = Vec::new();
 
     let cat_tile_counts: HashMap<Position, u32> = {
@@ -1903,15 +1910,28 @@ pub fn resolve_goap_plans(
                     plan.step_state[step_idx].target_entity =
                         find_social_target(cat_entity, &pos, &cat_positions, &relationships, d);
                 }
+                let target = plan.step_state[step_idx].target_entity;
+                let target_gender = target.and_then(|t| gender_snapshot.get(&t).copied());
                 let (result, pregnancy) = crate::steps::disposition::resolve_mate_with(
                     ticks,
                     cat_entity,
-                    plan.step_state[step_idx].target_entity,
+                    *gender,
+                    target,
+                    target_gender,
                     &mut needs,
                     &mut relationships,
                 );
-                if let Some((partner, litter_size)) = pregnancy {
-                    commands.entity(cat_entity).insert(
+                if let Some((gestator, litter_size)) = pregnancy {
+                    // §7.M.7.4: Pregnant lands on the gestation-capable
+                    // partner. `partner` on the Pregnant struct is the
+                    // other mate — so if the initiator is the gestator,
+                    // partner = target; otherwise partner = initiator.
+                    let partner = if gestator == cat_entity {
+                        target.unwrap_or(cat_entity)
+                    } else {
+                        cat_entity
+                    };
+                    commands.entity(gestator).insert(
                         crate::components::pregnancy::Pregnant::new(
                             ec.time.tick,
                             partner,
@@ -1921,10 +1941,6 @@ pub fn resolve_goap_plans(
                     if let Some(ref mut act) = narr.activation {
                         act.record(Feature::MatingOccurred);
                     }
-                    // Partner name lookup from the entity → Name is in
-                    // building_snapshot-adjacent queries; for now record
-                    // the pregnant cat's name and the partner entity is
-                    // encoded as the initiator via cat/partner location pair.
                     if let Some(ref mut elog) = ec.event_log {
                         elog.push(
                             ec.time.tick,

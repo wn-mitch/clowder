@@ -1163,11 +1163,8 @@ remaining work is itemised here.
   Cleanse / Harvest / Commune dormancy (0 fires on re-soak —
   outer-gate eligibility is still the limiting factor, not the
   modifier pipeline).
-- **§7.M.7.4 `resolve_mate_with` gender fix.** Today's pattern marks
-  the initiator `Pregnant`; spec fix is to pick the
-  gestation-capable partner. Independent of the three Phase 4a
-  deliverables; blocking nothing but touches
-  `src/steps/disposition/mate_with.rs`.
+- ~~**§7.M.7.4 `resolve_mate_with` gender fix.**~~ Landed as Phase
+  4b.1 — see Landed section below.
 
 **Balance gaps on the Phase 4a re-soak** (seed 42, `--duration 900`,
 commit TBD on landing):
@@ -1300,6 +1297,27 @@ system owner satisfied it. Tag pattern: `substrate-follow-on`,
 ---
 
 ## Landed
+
+### Phase 4b.1 — §7.M.7.4 `resolve_mate_with` gender fix (2026-04-22)
+
+Spec §7.M.7.4 committed that `Pregnant` must land on the
+gestation-capable partner, not the initiator. Today's code did the
+opposite — a Tom initiator paired with a Queen produced a pregnant
+Tom. Shipped:
+
+- `Gender::can_gestate` — Queens and Nonbinaries gestate; Toms
+  don't.
+- `resolve_mate_with` now takes both genders, returns
+  `Some((gestator, litter_size))`. Tom×Tom returns `None` (mating
+  need clears so the step advances; no `Pregnant` insert, no
+  `MatingOccurred` event). Ties resolve to the initiator per spec.
+- Both callers (`systems/disposition.rs`, `systems/goap.rs`)
+  snapshot gender alongside the existing grooming snapshot and
+  insert `Pregnant` on the returned gestator. `Pregnant::partner`
+  carries the other mate.
+
+Six new unit tests cover the four gender permutations, pre-
+threshold continuation, and hunger-driven litter-size bump.
 
 ### Phase 4a — softmax-over-Intentions + §3.5 modifier port + Adult-window retune (2026-04-22)
 

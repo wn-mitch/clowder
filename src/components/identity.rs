@@ -79,6 +79,15 @@ pub enum Gender {
 }
 
 impl Gender {
+    /// Whether this gender can carry a pregnancy. Queens and
+    /// Nonbinaries gestate; Toms don't. Used by §7.M.7.4's
+    /// `resolve_mate_with` partner-selection fix — the mating act
+    /// now inserts `Pregnant` on the gestation-capable partner rather
+    /// than the initiator, matching feline reproductive anatomy.
+    pub fn can_gestate(self) -> bool {
+        matches!(self, Self::Queen | Self::Nonbinary)
+    }
+
     pub fn subject_pronoun(self) -> &'static str {
         match self {
             Self::Tom => "he",
