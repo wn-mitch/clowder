@@ -289,6 +289,9 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     // Insert fox scent map resource.
     world.insert_resource(crate::resources::FoxScentMap::default());
 
+    // Insert prey scent map resource (Phase 2B).
+    world.insert_resource(crate::resources::PreyScentMap::default());
+
     // Insert cat presence map resource.
     world.insert_resource(crate::resources::CatPresenceMap::default());
 

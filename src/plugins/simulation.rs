@@ -77,6 +77,7 @@ impl Plugin for SimulationPlugin {
                     systems::prey::prey_population,
                     systems::prey::prey_hunger,
                     systems::prey::prey_ai,
+                    systems::prey::prey_scent_tick,
                     systems::prey::prey_den_lifecycle,
                     systems::wildlife::detect_threats,
                     systems::buildings::apply_building_effects,

@@ -157,6 +157,25 @@ impl InfluenceMap for crate::resources::FoxScentMap {
     }
 }
 
+impl InfluenceMap for crate::resources::PreyScentMap {
+    fn metadata(&self) -> MapMetadata {
+        MapMetadata {
+            // Single aggregate map across all prey species today
+            // (§5.6.3 row #1 lists per-species as the end-state —
+            // that's a follow-on once target-selection wants to
+            // discriminate). Faction::Neutral since the map covers
+            // multiple species.
+            name: "prey_scent",
+            channel: ChannelKind::Scent,
+            faction: Faction::Neutral,
+        }
+    }
+
+    fn base_sample(&self, pos: Position) -> f32 {
+        self.get(pos.x, pos.y)
+    }
+}
+
 impl InfluenceMap for crate::resources::CatPresenceMap {
     fn metadata(&self) -> MapMetadata {
         MapMetadata {

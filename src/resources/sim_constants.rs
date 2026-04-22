@@ -740,6 +740,30 @@ pub struct PreyConstants {
     pub initial_den_count_rabbit: usize,
     pub initial_den_count_fish: usize,
     pub initial_den_count_bird: usize,
+
+    // --- Scent (Phase 2B) ---
+    /// Per-tick scent magnitude each live prey deposits at its tile.
+    /// Mirrors `FoxEcologyConstants::scent_deposit` for symmetry
+    /// between predator- and prey-scent grids. Phase 2B baseline;
+    /// tune per §5.6.5 decay-rationale.
+    #[serde(default = "default_prey_scent_deposit_per_tick")]
+    pub scent_deposit_per_tick: f32,
+    /// Per-tick global decay on `PreyScentMap`. §5.6.5 row for
+    /// scent-proximity calls for `0.0` (full re-stamp), but the
+    /// symmetry with FoxScentMap's 0.90 fast-fade is a more
+    /// defensible baseline until per-tile directional plume
+    /// stamping lands. Baseline is deliberately close to fox so the
+    /// two scent grids behave comparably.
+    #[serde(default = "default_prey_scent_decay_per_tick")]
+    pub scent_decay_per_tick: f32,
+}
+
+fn default_prey_scent_deposit_per_tick() -> f32 {
+    0.1
+}
+
+fn default_prey_scent_decay_per_tick() -> f32 {
+    0.02
 }
 
 impl Default for PreyConstants {
@@ -795,6 +819,8 @@ impl Default for PreyConstants {
             initial_den_count_rabbit: 3,
             initial_den_count_fish: 2,
             initial_den_count_bird: 2,
+            scent_deposit_per_tick: default_prey_scent_deposit_per_tick(),
+            scent_decay_per_tick: default_prey_scent_decay_per_tick(),
         }
     }
 }
@@ -1361,6 +1387,20 @@ pub struct DispositionConstants {
     pub scent_light_forest_modifier: f32,
     pub scent_base_range: f32,
     pub scent_min_range: f32,
+    /// Phase 2B — manhattan radius around a cat's position that the
+    /// `PreyScentMap.highest_nearby` search covers when detecting
+    /// prey scent. Replaces the point-to-point `scent_base_range` /
+    /// downwind-dot / forest-modifier formula; those constants stay
+    /// for any residual reader but are not consulted by the new
+    /// grid-sampled detection path.
+    #[serde(default = "default_scent_search_radius")]
+    pub scent_search_radius: i32,
+    /// Phase 2B — minimum `PreyScentMap` value at the strongest
+    /// nearby bucket for a cat to register "prey is scent-detectable
+    /// here." Below this, the hunt-search step returns without
+    /// committing to a prey target.
+    #[serde(default = "default_scent_detect_threshold")]
+    pub scent_detect_threshold: f32,
     pub den_discovery_range: i32,
     pub den_discovery_base_chance: f32,
     pub den_discovery_skill_scale: f32,
@@ -1578,6 +1618,14 @@ fn default_fox_softmax_temperature() -> f32 {
     0.15
 }
 
+fn default_scent_search_radius() -> i32 {
+    20
+}
+
+fn default_scent_detect_threshold() -> f32 {
+    0.05
+}
+
 fn default_sleep_dawn_bonus() -> f32 {
     0.0
 }
@@ -1732,6 +1780,8 @@ impl Default for DispositionConstants {
             scent_light_forest_modifier: 0.75,
             scent_base_range: 80.0,
             scent_min_range: 20.0,
+            scent_search_radius: default_scent_search_radius(),
+            scent_detect_threshold: default_scent_detect_threshold(),
             den_discovery_range: 3,
             den_discovery_base_chance: 0.02,
             den_discovery_skill_scale: 0.01,

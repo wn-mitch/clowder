@@ -63,6 +63,11 @@ pub struct PreyHuntParams<'w, 's> {
     pub raid_writer: MessageWriter<'w, DenRaided>,
     pub exploration_map: ResMut<'w, crate::resources::ExplorationMap>,
     pub health_query: Query<'w, 's, &'static Health, With<PreyAnimal>>,
+    /// Phase 2B — scent-detection grid. Cats sample
+    /// `highest_nearby(pos, scent_search_radius)` to find prey-scent
+    /// source tiles rather than running point-to-point
+    /// `cat_smells_prey_windaware` against each prey entity.
+    pub prey_scent_map: Res<'w, crate::resources::PreyScentMap>,
 }
 
 #[derive(bevy_ecs::system::SystemParam)]
@@ -3164,11 +3169,25 @@ fn resolve_search_prey(
         return crate::steps::StepResult::Advance;
     }
 
-    // Scent detection.
-    let scented_prey = prey_query
-        .iter()
-        .filter(|(_, pp, _, _)| can_smell_prey(pos, pp, wind, map, d))
-        .min_by_key(|(_, pp, _, _)| pos.manhattan_distance(pp));
+    // Scent detection via PreyScentMap (Phase 2B — grid-sampled
+    // influence map). Finds the strongest-scent bucket within
+    // `scent_search_radius`; `min_by_key` resolves to the prey
+    // entity closest to that source tile.
+    let scent_source = prey_params
+        .prey_scent_map
+        .highest_nearby(pos.x, pos.y, d.scent_search_radius);
+    let scent_above_threshold = scent_source
+        .map(|(sx, sy)| prey_params.prey_scent_map.get(sx, sy) >= d.scent_detect_threshold)
+        .unwrap_or(false);
+    let scented_prey = if scent_above_threshold {
+        let (sx, sy) = scent_source.unwrap();
+        let source = Position::new(sx, sy);
+        prey_query
+            .iter()
+            .min_by_key(|(_, pp, _, _)| source.manhattan_distance(pp))
+    } else {
+        None
+    };
 
     if let Some((prey_entity, prey_pos_ref, _, _)) = scented_prey {
         state.target_entity = Some(prey_entity);
@@ -3697,30 +3716,6 @@ fn patrol_move(pos: &Position, dx: i32, dy: i32, map: &TileMap) -> Position {
         return rev;
     }
     *pos
-}
-
-fn can_smell_prey(
-    cat_pos: &Position,
-    prey_pos: &Position,
-    wind: &crate::resources::wind::WindState,
-    map: &TileMap,
-    d: &DispositionConstants,
-) -> bool {
-    // Phase 3 migration: scent detection consolidated into
-    // `crate::systems::sensing::cat_smells_prey_windaware`. The goap.rs
-    // variant had a `scent_min_range` close-range bypass in addition to
-    // the wind-aware path; the helper reproduces both in one formula.
-    crate::systems::sensing::cat_smells_prey_windaware(
-        *cat_pos,
-        *prey_pos,
-        wind,
-        map,
-        d.scent_min_range,
-        d.scent_base_range,
-        d.scent_downwind_dot_threshold,
-        d.scent_dense_forest_modifier,
-        d.scent_light_forest_modifier,
-    )
 }
 
 fn has_nearby_tile(

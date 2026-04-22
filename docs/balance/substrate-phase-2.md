@@ -1,8 +1,21 @@
 # AI Substrate Refactor — Phase 2 (L1 Influence-Map Generalization)
 
-**Status:** partial landing — scaffolding + 4-of-5 map ports + L1
-trace emitter complete. Scent-from-on-demand port (Phase 2B) remains
-open; see **Deferred** below.
+**Status:** complete. All 5 §5.6.3 Partial maps now implement
+`InfluenceMap`:
+
+| Map            | Implementation                              | Landed  |
+|----------------|---------------------------------------------|---------|
+| fox_scent      | trait impl on `FoxScentMap`                 | 2A      |
+| congregation   | trait impl on `CatPresenceMap`              | 2A      |
+| exploration    | trait impl on `ExplorationMap`              | 2A      |
+| corruption     | `CorruptionLens<'a>(&'a TileMap)` adapter   | 2C      |
+| **prey_scent** | **new `PreyScentMap` resource**             | **2B**  |
+
+Phase 2B's scope was rewritten mid-session per user direction:
+scent **changes** behaviour as part of becoming an influence map,
+rather than preserving tick-for-tick parity with the old
+`cat_smells_prey_windaware()` formula. The point-to-point wind-aware
+detection retired; cats now detect prey via grid sampling.
 
 ## Thesis
 
@@ -122,42 +135,82 @@ Phase-2+ traces will be compared).
 
 **No script / just-recipe changes** this phase.
 
-## Deferred — Phase 2B (scent port)
+## Phase 2B — scent port (completed)
 
-Scent-from-on-demand remains open. §5.6.3 row #1 describes scent as
-"sparse per-emitter today; persistent bucketed grid at end-state"
-with tick-for-tick parity required on migration. The hard invariant:
-every read must produce a value byte-equal (or ≤ε) to what
-`cat_smells_prey_windaware()` returns today, for every (observer,
-target) pair the sim queries.
+**User correction mid-session:** the prior version of this doc
+claimed "every read must produce a value byte-equal (or ≤ε) to
+what `cat_smells_prey_windaware()` returns today." That was a bad
+assumption — the refactor's goal is to **change** scent behaviour
+in the direction of "scent works like the other senses." The sim
+drifting is the explicit goal.
 
-Porting approaches considered and their tradeoffs:
+**What landed in Phase 2B:**
 
-1. **Persistent bucketed scent grid (spec end-state).** Ticking
-   emitters stamp templates; cats sample the grid. Requires Phase
-   5.1 template machinery, emitter registry, and decay-per-tick
-   system. Weeks of work; the Phase 2B invariant (tick-for-tick
-   parity vs on-demand) is strictly easier than the end-state
-   invariant (grid-equivalent behaviour).
-2. **Borrow adapter over live queries.** `ScentLens<'a>(&'a World,
-   …)` implements `InfluenceMap` by re-running the detection
-   algorithm at sample time. Preserves tick-for-tick parity
-   trivially (same code path), but `base_sample(pos)` returns a
-   bool-as-f32, which is semantically wrong (influence maps carry
-   continuous magnitude).
-3. **Hybrid — typed continuous value.** Introduce a `scent_strength`
-   f32 that combines emitter proximity, wind vector, and terrain
-   modulation into a `[0, 1]` scalar. Trace records carry the
-   scalar; detection callers compare to a threshold for the bool.
-   This is what §5.6.3 ultimately wants; it requires re-authoring
-   the detection formula, which is its own balance-thread work
-   (detection-threshold tuning vs `cat_smells_prey_windaware`
-   baseline).
+1. **New `PreyScentMap` resource** (`src/resources/prey_scent_map.rs`)
+   — bucketed grid mirroring `FoxScentMap`'s structure. 3-tile
+   buckets on the default 120×90 map; `deposit` / `decay_all` /
+   `highest_nearby` helpers. One aggregate map covers all prey
+   species today; per-species maps are a §5.6.3 follow-up.
 
-Resolution: Phase 2B lands its own focused session. Open work entry
-tracks the specific parity test — a same-seed, same-commit run pair
-with traces diffed on `scent` L1 records and `PreyKilled` event
-counts within ≤ε of the Phase 2A baseline.
+2. **New `prey_scent_tick` system** (in `prey.rs`) — live prey
+   deposit per tick at their current position; whole grid decays
+   globally. Mirrors `fox_scent_tick`. Added to both
+   `SimulationPlugin::build` and headless `build_schedule`
+   (manual-mirror invariant).
+
+3. **Detection rewired** in `disposition.rs` hunt-search and
+   `goap.rs::resolve_search_prey`. Instead of
+   `prey_query.iter().filter(|pp| can_smell_prey(cat_pos, pp,
+   wind, map, d))`, the code now:
+     - Calls `prey_scent_map.highest_nearby(pos, scent_search_radius)`
+       to find the strongest nearby scent bucket.
+     - Checks the sampled value against
+       `DispositionConstants::scent_detect_threshold`.
+     - Resolves the prey entity nearest to the scent source tile.
+
+4. **Retired** `cat_smells_prey_windaware` in `sensing.rs` and both
+   per-file `can_smell_prey` wrappers. `d.scent_base_range`,
+   `d.scent_min_range`, `d.scent_downwind_dot_threshold`,
+   `d.scent_dense_forest_modifier`,
+   `d.scent_light_forest_modifier` stay in `DispositionConstants`
+   for now (retirement passes through Phase 3c's
+   retired-constants burn, not here).
+
+5. **Three new constants** (all `#[serde(default)]` for save
+   compat):
+     - `DispositionConstants::scent_search_radius: i32 = 20`
+     - `DispositionConstants::scent_detect_threshold: f32 = 0.05`
+     - `PreyConstants::scent_deposit_per_tick: f32 = 0.1`
+     - `PreyConstants::scent_decay_per_tick: f32 = 0.02`
+
+6. **`InfluenceMap` impl** for `PreyScentMap` registered under
+   `"prey_scent"` / `Scent` channel / `Faction::Neutral`. Trace
+   emitter's L1 walk now covers **all five** Partial §5.6.3 maps
+   per (focal cat × tick).
+
+**Behaviour changes to expect:**
+
+- No more wind-direction gating on scent detection. Scent diffuses
+  symmetrically from prey positions. Cats upwind of prey can now
+  smell them.
+- No more terrain-modulation on detection range. Dense-forest
+  prey are no longer scent-muffled (terrain stamping is a §5.6.3
+  follow-up).
+- The `scent_search_radius = 20` is tighter than the old
+  `scent_base_range = 80`, but the old value was gated by wind +
+  terrain multipliers that typically reduced effective range
+  below 20 anyway. Net effect: unclear; balance work in Phase 3+
+  will tune.
+- No close-range `min_range` bypass; detection is fully driven by
+  `PreyScentMap` values.
+
+**Smoke test (seed 42, 60s):** sim runs without wipeout; focal-cat
+prey_scent L1 records show non-zero values on 263/10032 ticks with
+peak 1.0 (fully saturated bucket — prey is literally on the cat's
+tile). Hunt plan failure counts in the soak footer look similar to
+baseline ("ForageItem: nothing found" 109×, "EngagePrey: lost
+prey during approach" 84×, etc. at 60s). A 15-min deep-soak
+diagnostic is a natural follow-on.
 
 ## Cross-refs
 

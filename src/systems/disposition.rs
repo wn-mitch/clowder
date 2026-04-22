@@ -44,6 +44,11 @@ pub struct PreyHuntParams<'w, 's> {
     /// Health lookup for FightThreat bail-out. Lives here to stay under the
     /// 16-system-param limit — conceptually unrelated to prey hunting.
     pub health_query: Query<'w, 's, &'static Health>,
+    /// Phase 2B — scent-detection grid. Cats sample
+    /// `highest_nearby(pos, scent_search_radius)` to find prey-scent
+    /// source tiles rather than running point-to-point
+    /// `cat_smells_prey_windaware` against each prey entity.
+    pub prey_scent_map: Res<'w, crate::resources::PreyScentMap>,
 }
 /// Bundled system params for narrative emission in `resolve_disposition_chains`.
 /// Groups NarrativeLog + optional TemplateRegistry + context resources to stay
@@ -1942,39 +1947,6 @@ fn build_caretaking_chain(
     Some((chain, Action::Caretake))
 }
 
-// ===========================================================================
-// Scent detection helper
-// ===========================================================================
-
-/// Check if a cat can smell prey based on wind direction and terrain.
-///
-/// Phase 3 migration: delegates to
-/// `crate::systems::sensing::cat_smells_prey_windaware` — the unified
-/// scent-channel implementation. The previous local body of this
-/// function and the byte-identical copy in `goap.rs` both now route
-/// through the same helper.
-fn can_smell_prey(
-    cat_pos: &Position,
-    prey_pos: &Position,
-    wind: &crate::resources::wind::WindState,
-    map: &TileMap,
-    d: &DispositionConstants,
-) -> bool {
-    crate::systems::sensing::cat_smells_prey_windaware(
-        *cat_pos,
-        *prey_pos,
-        wind,
-        map,
-        // `disposition.rs` used only the wind-aware path (no scent_min_range
-        // close-range bypass). Passing 0.0 preserves that exactly.
-        0.0,
-        d.scent_base_range,
-        d.scent_downwind_dot_threshold,
-        d.scent_dense_forest_modifier,
-        d.scent_light_forest_modifier,
-    )
-}
-
 /// Move one tile in direction (dx, dy). If blocked, try perpendicular or
 /// reverse. Returns the new position. Guaranteed to attempt movement — never
 /// returns the original position without trying alternatives.
@@ -2638,11 +2610,31 @@ pub fn resolve_disposition_chains(
                     if let Some((prey_entity, _prey_pos_ref, _, _)) = visible_prey {
                         step.target_entity = Some(prey_entity);
                     } else {
-                        // Scan for prey scent (wind-dependent, longer range).
-                        let scented_prey = prey_query
-                            .iter()
-                            .filter(|(_, pp, _, _)| can_smell_prey(&pos, pp, &wind, &map, d))
-                            .min_by_key(|(_, pp, _, _)| pos.manhattan_distance(pp));
+                        // Scan for prey scent via PreyScentMap (Phase 2B —
+                        // grid-sampled influence map). Finds the strongest-
+                        // scent bucket within `scent_search_radius`; the
+                        // `min_by_key` below resolves to the prey entity
+                        // closest to that source tile.
+                        let scent_source = prey_params.prey_scent_map.highest_nearby(
+                            pos.x,
+                            pos.y,
+                            d.scent_search_radius,
+                        );
+                        let scent_above_threshold = scent_source
+                            .map(|(sx, sy)| {
+                                prey_params.prey_scent_map.get(sx, sy)
+                                    >= d.scent_detect_threshold
+                            })
+                            .unwrap_or(false);
+                        let scented_prey = if scent_above_threshold {
+                            let (sx, sy) = scent_source.unwrap();
+                            let source = Position::new(sx, sy);
+                            prey_query
+                                .iter()
+                                .min_by_key(|(_, pp, _, _)| source.manhattan_distance(pp))
+                        } else {
+                            None
+                        };
 
                         if let Some((prey_entity, prey_pos_ref, _, _)) = scented_prey {
                             step.target_entity = Some(prey_entity);

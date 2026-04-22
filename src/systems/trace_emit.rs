@@ -47,6 +47,7 @@ use crate::resources::cat_presence_map::CatPresenceMap;
 use crate::resources::exploration_map::ExplorationMap;
 use crate::resources::fox_scent_map::FoxScentMap;
 use crate::resources::map::TileMap;
+use crate::resources::prey_scent_map::PreyScentMap;
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::time::TimeState;
 use crate::resources::trace_log::{
@@ -72,6 +73,7 @@ pub fn emit_focal_trace(
     time: Res<TimeState>,
     constants: Res<SimConstants>,
     fox_scent_map: Option<Res<FoxScentMap>>,
+    prey_scent_map: Option<Res<PreyScentMap>>,
     cat_presence_map: Option<Res<CatPresenceMap>>,
     exploration_map: Option<Res<ExplorationMap>>,
     tile_map: Option<Res<TileMap>>,
@@ -119,6 +121,9 @@ pub fn emit_focal_trace(
     // is looked up against `SensorySpecies::Cat` on each channel.
     // -----------------------------------------------------------------
     if let Some(ref m) = fox_scent_map {
+        emit_l1_for_map(&mut trace_log, tick, &cat_name, *pos, &**m, &constants);
+    }
+    if let Some(ref m) = prey_scent_map {
         emit_l1_for_map(&mut trace_log, tick, &cat_name, *pos, &**m, &constants);
     }
     if let Some(ref m) = cat_presence_map {

@@ -72,6 +72,7 @@ fn setup_world(seed: u64) -> World {
     world.insert_resource(clowder::resources::SimConstants::default());
     world.insert_resource(clowder::resources::SystemActivation::default());
     world.insert_resource(clowder::resources::FoxScentMap::default());
+    world.insert_resource(clowder::resources::PreyScentMap::default());
     world.insert_resource(clowder::resources::CatPresenceMap::default());
     world.insert_resource(clowder::resources::ForcedConditions::default());
     world.insert_resource(clowder::resources::ColonyCenter(colony_site));

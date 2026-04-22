@@ -411,6 +411,7 @@ fn build_schedule() -> Schedule {
                 clowder::systems::prey::prey_population,
                 clowder::systems::prey::prey_hunger,
                 clowder::systems::prey::prey_ai,
+                clowder::systems::prey::prey_scent_tick,
                 clowder::systems::prey::prey_den_lifecycle,
                 clowder::systems::wildlife::detect_threats,
                 clowder::systems::buildings::apply_building_effects,
@@ -1301,6 +1302,9 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
 
     // Insert fox scent map resource.
     world.insert_resource(clowder::resources::FoxScentMap::default());
+
+    // Insert prey scent map resource (Phase 2B).
+    world.insert_resource(clowder::resources::PreyScentMap::default());
 
     // Insert cat presence map resource.
     world.insert_resource(clowder::resources::CatPresenceMap::default());

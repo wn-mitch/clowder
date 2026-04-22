@@ -37,48 +37,6 @@ insertion to `setup_world`.
 
 ## Follow-on plans surfaced but not scoped
 
-### 0. Scent port — Phase 2B of AI substrate refactor [2026-04-21]
-
-**Status:** in-flight; `docs/systems/refactor-plan.md` Phase 2 is
-partially landed (2A scaffolding + 2C corruption lens + 2D L1 trace
-emitter registry walk, 3 commits). Phase 2B (scent-from-on-demand
-port with tick-for-tick parity) intentionally deferred to its own
-session.
-
-**Why it matters:** Scent is the invariant-preservation reference
-port per `refactor-plan.md`. Tick-for-tick parity against
-`cat_smells_prey_windaware()` (`src/systems/sensing.rs:525–563`) is
-the hardest invariant in the substrate refactor — a botched port
-silently changes sim behavior.
-
-**Three porting approaches** (§5.6.3 row #1), each discussed in
-`docs/balance/substrate-phase-2.md` §Deferred:
-
-1. Persistent bucketed scent grid — spec end-state; requires §5.1
-   template machinery; weeks of work.
-2. Borrow adapter over live queries — `ScentLens<'a>(&'a World)`
-   re-runs the detection algorithm; preserves parity but returns
-   bool-as-f32 (semantically wrong for influence-map magnitude).
-3. Hybrid — introduce `scent_strength: f32` continuous scalar;
-   trace records carry the scalar; detection callers threshold.
-   This is what §5.6.3 ultimately wants; requires re-authoring the
-   detection formula (its own balance thread).
-
-**Acceptance gate (hard):** a same-seed, same-commit pair —
-baseline Phase 2A + treatment Phase 2B — diffed on `scent` L1
-records and `PreyKilled` event counts, both within ≤ε of baseline.
-
-**Touch points:**
-- `src/systems/sensing.rs:525–563` — `cat_smells_prey_windaware`
-- `src/resources/wind.rs` — `WindState`
-- `src/systems/influence_map.rs` — trait + attenuation pipeline
-- `src/systems/trace_emit.rs::emit_focal_trace` — add scent L1
-  emission via the new adapter/grid
-
-**Before picking up:** read
-`docs/balance/substrate-phase-2.md` §Deferred to decide approach
-(1/2/3) and land Phase 2E's updated observation table once the
-parity test runs clean.
 
 
 > **Cross-reference:** [`docs/systems-backlog-ranking.md`](systems-backlog-ranking.md)

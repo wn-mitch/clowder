@@ -536,6 +536,34 @@ fn flee_step(pos: &mut Mut<Position>, threat: &Position, habitat: &[Terrain], ma
 }
 
 // ---------------------------------------------------------------------------
+// prey_scent_tick system (Phase 2B)
+// ---------------------------------------------------------------------------
+
+/// Live prey deposit scent onto `PreyScentMap` each tick; the whole
+/// grid decays globally. Mirrors `fox_scent_tick` — scent becomes a
+/// grid-addressable influence-map read rather than a point-to-point
+/// wind-aware formula per (cat, prey) pair.
+///
+/// Per §5.6.3 row #1, scent propagation is eventually `wind+terrain`.
+/// Phase 2B ships the simplest viable version (uniform deposit; no
+/// directional plume, no terrain modulation on stamp) so cats get a
+/// usable scent read this phase; directional stamping is a
+/// follow-on balance pass.
+pub fn prey_scent_tick(
+    prey: Query<&Position, (With<PreyAnimal>, Without<Dead>)>,
+    mut scent_map: ResMut<crate::resources::PreyScentMap>,
+    constants: Res<SimConstants>,
+) {
+    let p = &constants.prey;
+    // Global decay first — prior-tick deposits fade before this tick's
+    // stamps land, matching FoxScentMap's ordering.
+    scent_map.decay_all(p.scent_decay_per_tick);
+    for pos in &prey {
+        scent_map.deposit(pos.x, pos.y, p.scent_deposit_per_tick);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // prey_population system
 // ---------------------------------------------------------------------------
 

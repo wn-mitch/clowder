@@ -35,6 +35,7 @@ fn setup_world() -> (World, Schedule) {
     world.insert_resource(WeatherState::default());
     world.insert_resource(clowder::species::build_registry());
     world.insert_resource(clowder::components::prey::PreyDensity::default());
+    world.insert_resource(clowder::resources::PreyScentMap::default());
     bevy_ecs::message::MessageRegistry::register_message::<clowder::components::prey::PreyKilled>(
         &mut world,
     );

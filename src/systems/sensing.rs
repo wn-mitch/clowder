@@ -512,56 +512,6 @@ pub fn observer_smells_at(
         > 0.0
 }
 
-/// Wind-modulated prey-scent detection. Consolidates the two
-/// byte-identical copies of `can_smell_prey` that used to live in
-/// `disposition.rs` and `goap.rs`. Close-range (dist ≤ `min_range`)
-/// bypasses wind entirely; beyond that, the cat must be downwind and
-/// terrain at the prey's tile modulates effective range.
-///
-/// The formula matches the legacy code exactly so Phase 3 preserves
-/// behavior. Phase 5b activation of weather multipliers will compose
-/// on top of this (via `env.scent_mul`).
-#[allow(clippy::too_many_arguments)]
-pub fn cat_smells_prey_windaware(
-    cat_pos: Position,
-    prey_pos: Position,
-    wind: &crate::resources::wind::WindState,
-    map: &crate::resources::map::TileMap,
-    min_range: f32,
-    base_range: f32,
-    downwind_dot_threshold: f32,
-    dense_forest_modifier: f32,
-    light_forest_modifier: f32,
-) -> bool {
-    let dist = cat_pos.manhattan_distance(&prey_pos) as f32;
-    if dist == 0.0 {
-        return true;
-    }
-    // Close-range olfaction: always detectable.
-    if dist <= min_range {
-        return true;
-    }
-    let dx = (prey_pos.x - cat_pos.x) as f32;
-    let dy = (prey_pos.y - cat_pos.y) as f32;
-    let (nx, ny) = (dx / dist, dy / dist);
-    let (wx, wy) = wind.direction();
-    let dot = wx * nx + wy * ny;
-    if dot < downwind_dot_threshold {
-        return false;
-    }
-    let terrain_mod = if map.in_bounds(prey_pos.x, prey_pos.y) {
-        match map.get(prey_pos.x, prey_pos.y).terrain {
-            crate::resources::map::Terrain::DenseForest => dense_forest_modifier,
-            crate::resources::map::Terrain::LightForest => light_forest_modifier,
-            _ => 1.0,
-        }
-    } else {
-        1.0
-    };
-    let scent_range = base_range * wind.strength * terrain_mod;
-    dist <= scent_range
-}
-
 /// Probabilistic prey-cat detection proximity factor.
 ///
 /// Phase 4 migration helper for `src/systems/prey.rs::try_detect_cat`.
