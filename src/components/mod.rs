@@ -13,6 +13,7 @@ pub mod identity;
 pub mod items;
 pub mod kitten;
 pub mod magic;
+pub mod markers;
 pub mod mental;
 pub mod personality;
 pub mod physical;
