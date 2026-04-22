@@ -1156,13 +1156,39 @@ remaining work is itemised here.
   trait; `eval.rs` gets a `add_target_taking_dse` method on
   `DseRegistryAppExt`.
 - **§4 marker-eligibility authoring systems for roster gap-fill.**
-  New `src/systems/markers_authoring.rs` with per-tick systems that
-  insert/remove `CanHunt`, `CanFight`, `HasSocialTarget`,
-  `HasStoredFood`, `StoreVisible`, `ThreatNearby`, etc. Retires the
-  outer eligibility gates still live in `score_actions`. Unblocks
-  Cleanse / Harvest / Commune dormancy (0 fires on re-soak —
-  outer-gate eligibility is still the limiting factor, not the
-  modifier pipeline).
+  Per spec §4.6, this is a ~50-marker catalog across 13 author
+  files plus the `src/ai/capabilities.rs` new-file. Scope for the
+  landing PR:
+    1. Wire `has_marker` from its current `|_, _| false` stub
+       (`scoring.rs:435`, `score_dse_by_id`) to a real ECS-query
+       backed closure. Canonical pattern: a `#[derive(SystemParam)]`
+       bundle carrying per-marker `Query<With<MarkerN>>` rows, with
+       a `fn has(&self, key: &str, entity: Entity) -> bool` that
+       dispatches on the key. Every new marker in the catalog
+       requires a query row here; the dispatch grows by one arm.
+    2. Introduce a `ColonyState` singleton entity for colony-scoped
+       markers (`HasStoredFood`, `HasFunctionalKitchen`,
+       `WardStrengthLow`, `ThornbriarAvailable`, …).
+    3. Author per-tick systems for each marker per §4.6 author-file
+       assignments. `Changed<T>` filters where predicates read
+       changing parent components; full-scan where predicates read
+       position-adjacent state.
+    4. Cut over each DSE's outer eligibility gate in `score_actions`
+       to an `EligibilityFilter::require(marker)` row. Retire the
+       inline `if ctx.flag { … }` block as its marker lands.
+  **Nuance uncovered during Phase 4b investigation:** marker
+  authoring alone does **not** unblock the Cleanse / Harvest /
+  Commune dormancies. `magic_cleanse` requires the cat to be
+  standing on a corrupted tile; `magic_harvest` requires a carcass
+  within range; `magic_commune` requires fairy-ring / standing-stone
+  adjacency. These gates reflect physical colocation, not authoring
+  absence — porting them to markers cleans up the evaluator's hot
+  path but doesn't change the underlying navigate-to-tile problem.
+  Real unblock needs either (a) GOAP plan-shape changes that route
+  cats TO corrupted tiles when they carry intent to cleanse, or
+  (b) the §6.3 `TargetTakingDse` path where "target = corrupted
+  tile" is a first-class candidate the evaluator scores distance
+  to. Track as its own follow-on once §4 markers land.
 - ~~**§7.M.7.4 `resolve_mate_with` gender fix.**~~ Landed as Phase
   4b.1 — see Landed section below.
 
@@ -1177,20 +1203,35 @@ commit TBD on landing):
   Generational-continuity canary), reduce cycle period, or tune
   `mating_interest_threshold`. Needs a separate balance iteration.
 - **PracticeMagic sub-mode count 2 / 5** (Scry + DurableWard fire;
-  Cleanse, ColonyCleanse, Harvest, Commune dormant). The three
-  still-dormant sub-modes are gated on outer eligibility (corrupted
-  tile, carcass nearby, special terrain) — unblocked by §4 marker
-  authoring, not by the modifier port that Phase 4a shipped.
-- **Farming = 0** (stayed dormant). Likely same outer-eligibility
-  symptom; resolution tracks with §4 marker authoring above.
+  Cleanse, ColonyCleanse, Harvest, Commune dormant). These gates
+  reflect *physical colocation* (corrupted tile under the cat,
+  carcass in sensor range, fairy ring under the cat), not modifier
+  shape or marker authoring. Real unblock is plan-shape work — a
+  cat with intent to cleanse must navigate to known corruption
+  first. Routes through either §4 + GOAP-prep-step work, or §6.3
+  `TargetTakingDse` where the target-candidate set includes
+  corrupted tiles as spatial candidates.
+- **Farming = 0** (stayed dormant). Baseline log shows
+  `TendCrops: no target` plan-failures = 83 — crop entities exist
+  but the resolver isn't matching them to the chain. Same target-
+  availability shape as the cleanse/harvest dormancies. Tracks
+  with whichever of §4 markers or target-taking DSE lands the
+  target-resolver plumbing.
+- **Dependency graph (balance gaps):** `markers_authoring` +
+  `target-taking DSE` land in either order but together are the
+  prerequisite for the dormancy unblock. The
+  `mating_density` lever (Fertility-cycle pacing) is independent
+  and tunable without either.
 
-**Dependency graph:**
-- `add_target_taking_dse` and `markers_authoring` can land in any
-  order — orthogonal but both unblock the Cleanse/Harvest/Commune
-  and Farming dormancies.
-- `resolve_mate_with` gender fix is independent and blocking nothing
-  (can land any time; contributes to MatingOccurred density via
-  correct gestation side but not the primary lever).
+**Dependency graph (spec-scope work):**
+- `add_target_taking_dse` and `markers_authoring` are orthogonal
+  refactors — either can land first. Both are session-scale
+  multi-hour pieces on their own. Shipping either partially is
+  high-risk because `has_marker` wiring and `EligibilityFilter`
+  consumption both need to land in lockstep.
+- Neither directly unblocks the balance gaps — those route through
+  downstream GOAP / target-resolver work once the foundations
+  land.
 
 **Re-open condition for Phase 3 hypothesis:** Phase 4a cleared the
 survival canaries (Starvation 8 → 0, ShadowFoxAmbush 0) and moved
