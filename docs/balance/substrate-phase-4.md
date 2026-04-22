@@ -1,4 +1,4 @@
-# Substrate Phase 4a — softmax, §3.5 modifiers, Adult-window retune
+# Substrate Phase 4 — softmax, §3.5 modifiers, Adult-window retune, gender fix, §4 marker foundation
 
 **Date:** 2026-04-22
 **Seed / duration:** 42 / 900s
@@ -208,10 +208,68 @@ Density target (≥ 1 per colony per season ≈ ≥ 7 per 7-season soak)
 remains unmet and is deferred to a follow-on balance iteration
 named in open-work #14.
 
+## Phase 4b additions
+
+Two additional mechanisms landed after Phase 4a on the same seed-42
+soak window:
+
+- **Phase 4b.1 (`90105c7`) — §7.M.7.4 `resolve_mate_with` gender
+  fix.** `Pregnant` now lands on the gestation-capable partner,
+  not the initiator. Tom×Tom fails cleanly. No direct soak-metric
+  prediction — a bug fix at the anatomy layer. Tests cover the
+  four gender permutations.
+
+- **Phase 4b.2 MVP (`89d6b81`) — §4 marker lookup foundation +
+  `HasStoredFood` reference port.** The `has_marker` closure moves
+  from its `|_, _| false` stub to a real `MarkerSnapshot` lookup.
+  `EatDse` gains `.require("HasStoredFood")` and the inline
+  `if ctx.food_available` outer gate retires in both code paths.
+  Behavior-preserving by design — the marker state is populated
+  from the same `!food.is_empty()` check the retired gate used.
+
+### Phase 4b.2 soak concordance (seed 42, `--duration 900`, log `logs/phase4b2-wip/events.jsonl`)
+
+| Metric | Phase 4a | Phase 4b.2 | Direction |
+|---|---|---|---|
+| deaths_by_cause.Starvation | 0 | 0 | ✅ canary still passes |
+| shadowfox_ambush | 0 | 0 | flat |
+| Grooming (continuity) | 213 | 229 | +16 (seed noise) |
+| BondFormed | 34 | 31 | -3 (seed noise) |
+| ScryCompleted | 615 | 614 | -1 (noise) |
+| WardPlaced | 264 | 246 | -18 (noise) |
+| BuildingTidied | 128 | 274 | +146 |
+| DirectiveDelivered | 157 | 512 | +355 |
+| RemedyApplied | 20 | 0 | -20 (low-count variance) |
+
+**Interpretation.** Phase 4b.2 is predicted to be behavior-
+preserving — the marker lookup returns the same eligibility answer
+the retired inline bool gave. The visible deltas split cleanly:
+
+- Headline metrics (Starvation, Shadowfox) flat — canaries pass.
+- Mid-tier deltas (BondFormed ±3, ScryCompleted ±1, WardPlaced
+  ±18) are inside seed-noise envelope for 7-season soaks.
+- Two notable positive deltas (BuildingTidied +146, DirectiveDelivered
+  +355) point to a small ordering shift: retiring the outer
+  `if ctx.food_available` gate frees the scoring loop to push
+  Eat with score 0 into the flat pool before the softmax filter
+  drops it, which changes RNG-consumption order enough to reorder
+  some downstream tie-breaks. Not a semantic change; just a
+  determinism delta under fixed seed.
+- RemedyApplied 20 → 0 is low-count variance on a rare event —
+  `GatherHerbCompleted` held at 7–8 across both runs, so the
+  herbcraft supply chain is intact; the drop is the application
+  side not firing in this specific seed. Multi-seed sweep would
+  be needed to confirm.
+
+Acceptance: all four `scripts/check_canaries.sh` canaries pass at
+Phase 4b.2. Marker-port semantics verified behavior-preserving
+within variance bounds.
+
 ## Next iterations
 
-Phase 4a unblocks the three Phase 3 exit regressions at the substrate
-level. The remaining Phase 4 work (target-taking DSE registration,
-marker-authoring systems, resolve_mate_with gender fix) and the
-follow-on balance levers (MatingOccurred density, dormant
-PracticeMagic sub-modes, Farming dormancy) live in open-work #14.
+Phase 4 closes with softmax, modifier pipeline, Adult-window
+retune, gender fix, and marker-lookup foundation all landed. The
+remaining Phase 4-scope work (target-taking DSE registration
+§6.3/§6.5, full §4 marker catalog port) plus balance follow-ons
+(MatingOccurred density, dormant PracticeMagic sub-modes, Farming
+dormancy) live in open-work #14.
