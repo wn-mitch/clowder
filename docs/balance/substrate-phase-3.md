@@ -1,8 +1,12 @@
 # AI Substrate Refactor — Phase 3 (L2 core: curves + composition + markers + faction)
 
-**Status:** Phases 3a + 3b + 3c.0 landed — reference DSE live,
-evaluator resource live, plumbing threaded through `score_actions`.
-Phase 3c.1 (first peer-group port) is the next wave.
+**Status:** Phases 3a + 3b + 3c landed end-to-end. All 21 cat
+DSEs + 9 fox DSEs + 9 Herbcraft/PracticeMagic sibling DSEs
+registered through the unified evaluator. `scoring.rs` action
+blocks retired (Herbcraft + PracticeMagic outer selectors retain
+hint-picking + emergency-bonus logic pending §3.5 modifier
+pipeline work in Phase 3d); `fox_scoring.rs` action blocks fully
+retired. 852 lib tests pass.
 
 | Sub-phase | Scope | Status |
 |---|---|---|
@@ -14,7 +18,10 @@ Phase 3c.1 (first peer-group port) is the next wave.
 | 3c.1b — Fox Starvation-urgency port | fox Hunting + Raiding through `fox_scoring.rs` | **landed** |
 | 3c.2 — Fatal-threat peer group | Flee + Fight + fox Fleeing + Avoiding + DenDefense | **landed** |
 | 3c.3 — Rest-urgency peer group | Sleep + Idle + fox Resting | **landed** |
-| 3c.4+ — remaining peer groups | Social, Territory, Work, Exploration, Lifecycle | pending |
+| 3c.4 — Social-urgency peer group | Socialize + Groom(self) + Groom(other) + Mentor + Caretake + Mate | **landed** |
+| 3c.5+6+7 — Territory + Work + Exploration | Patrol + fox Patrolling + Build + Farm + Coordinate + Explore + Wander | **landed** |
+| 3c.8 — Lifecycle + Offspring | fox Dispersing + fox Feeding | **landed** |
+| 3c.last — Herbcraft + PracticeMagic sibling splits | 9 sibling DSEs (gather, prepare, ward, scry, durable_ward, cleanse, colony_cleanse, harvest, commune) | **landed** |
 | 3c.last — sibling splits | Herbcraft × 3, PracticeMagic × 6 per §L2.10.10 | pending |
 | 3d — faction matrix + roster gap-fill | Authoring systems for §4.6 markers | pending |
 

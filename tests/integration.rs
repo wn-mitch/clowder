@@ -124,6 +124,25 @@ fn setup_world(seed: u64) -> World {
             .cat_dses
             .push(clowder::ai::dses::wander_dse(&scoring));
         registry
+            .cat_dses
+            .push(clowder::ai::dses::herbcraft_gather_dse());
+        registry
+            .cat_dses
+            .push(clowder::ai::dses::herbcraft_prepare_dse());
+        registry
+            .cat_dses
+            .push(clowder::ai::dses::herbcraft_ward_dse());
+        registry.cat_dses.push(clowder::ai::dses::scry_dse());
+        registry
+            .cat_dses
+            .push(clowder::ai::dses::durable_ward_dse());
+        registry.cat_dses.push(clowder::ai::dses::cleanse_dse());
+        registry
+            .cat_dses
+            .push(clowder::ai::dses::colony_cleanse_dse());
+        registry.cat_dses.push(clowder::ai::dses::harvest_dse());
+        registry.cat_dses.push(clowder::ai::dses::commune_dse());
+        registry
             .fox_dses
             .push(clowder::ai::dses::fox_patrolling_dse(&scoring));
         registry

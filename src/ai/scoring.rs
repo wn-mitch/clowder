@@ -317,6 +317,37 @@ fn ctx_scalars(ctx: &ScoringContext) -> HashMap<&'static str, f32> {
         "pending_directive_count",
         ctx.pending_directive_count as f32,
     );
+    // Herbcraft + PracticeMagic sibling-DSE axes.
+    m.insert(
+        "spirituality",
+        ctx.personality.spirituality.clamp(0.0, 1.0),
+    );
+    m.insert(
+        "herbcraft_skill",
+        ctx.herbcraft_skill.clamp(0.0, 1.0),
+    );
+    m.insert("magic_skill", ctx.magic_skill.clamp(0.0, 1.0));
+    // Ward deficit: 1.0 when wards are low, 0 when fully warded.
+    // `ward_strength_low` is the inline gate today; port as a 0/1
+    // scalar so the sibling DSE sees it through Linear identity.
+    m.insert(
+        "ward_deficit",
+        if ctx.ward_strength_low { 1.0 } else { 0.0 },
+    );
+    m.insert(
+        "territory_max_corruption",
+        ctx.territory_max_corruption.clamp(0.0, 1.0),
+    );
+    // Saturating-count for Harvest carcass axis — cap at 3 per the
+    // old inline `min(3)`.
+    m.insert(
+        "carcass_count_saturated",
+        (ctx.nearby_carcass_count.min(3) as f32) / 3.0,
+    );
+    m.insert(
+        "on_special_terrain",
+        if ctx.on_special_terrain { 1.0 } else { 0.0 },
+    );
     // Pre-inverted personality scalars for Idle. `incuriosity` =
     // `1 − curiosity`; `playfulness_invert` = `1 − playfulness`. The
     // pre-inversion keeps the consuming curve as a plain Linear
@@ -542,13 +573,13 @@ pub fn score_actions(
         scores.push((Action::Farm, urgency + jitter(rng, s.jitter_range)));
     }
 
-    // --- Herbcraft (spirituality + herbcraft skill; three sub-modes) ---
+    // --- Herbcraft (§L2.10.10 sibling split: gather + prepare + ward) ---
+    // Each sub-mode's base score comes from its sibling DSE; the
+    // corruption/ward emergency bonuses stay inline until the §3.5
+    // modifier pipeline lands in Phase 3d. The outer Max + hint
+    // selection is a selection-layer concern that stays here.
     let herbcraft_hint;
     {
-        // Gathering herbs for warding is the first step in the defense pipeline.
-        // When corruption is detected and wards are low, the gather step also
-        // gets the emergency bonus — otherwise cats never acquire the Thornbriar
-        // they need to place wards (base gather score ~0.05 can't beat Hunt ~1.5).
         let gather_emergency = if ctx.has_herbs_nearby
             && ctx.ward_strength_low
             && !ctx.has_ward_herbs
@@ -560,44 +591,24 @@ pub fn score_actions(
             0.0
         };
         let gather = if ctx.has_herbs_nearby {
-            ctx.personality.spirituality
-                * s.herbcraft_gather_spirituality_scale
-                * (s.herbcraft_gather_skill_offset + ctx.herbcraft_skill)
-                * ctx.needs.level_suppression(2)
-                + gather_emergency
+            score_dse_by_id("herbcraft_gather", ctx, inputs) + gather_emergency
         } else {
             0.0
         };
         let prepare = if ctx.has_remedy_herbs && ctx.colony_injury_count > 0 {
-            ctx.personality.compassion
-                * (s.herbcraft_prepare_skill_offset + ctx.herbcraft_skill)
-                * (ctx.colony_injury_count as f32 * s.herbcraft_prepare_injury_scale)
-                    .min(s.herbcraft_prepare_injury_cap)
-                * ctx.needs.level_suppression(2)
+            score_dse_by_id("herbcraft_prepare", ctx, inputs)
         } else {
             0.0
         };
-        // Ward-setting is a Safety (Level 2) action — it builds defenses against
-        // shadow foxes. When corruption is detected in colony territory and ward
-        // coverage is low, an emergency bonus makes warding competitive with
-        // Hunt/Eat so cats actually place wards before the colony is overrun.
         let corruption_emergency = if ctx.ward_strength_low && ctx.territory_max_corruption > 0.0 {
             s.ward_corruption_emergency_bonus * ctx.needs.level_suppression(2)
         } else {
             0.0
         };
-        // When corruption is present, allow ward to score even without ward herbs
-        // in inventory. The GOAP plan for SetWard includes a GatherHerb step that
-        // will acquire Thornbriar. This ensures CraftingHint::SetWard wins over
-        // GatherHerbs, producing a plan that filters for the right herb type.
         let ward_eligible = ctx.ward_strength_low
             && (ctx.has_ward_herbs || (corruption_emergency > 0.0 && ctx.thornbriar_available));
         let mut ward = if ward_eligible {
-            ctx.personality.spirituality
-                * (s.herbcraft_ward_skill_offset + ctx.herbcraft_skill)
-                * s.herbcraft_ward_scale
-                * ctx.needs.level_suppression(2)
-                + corruption_emergency
+            score_dse_by_id("herbcraft_ward", ctx, inputs) + corruption_emergency
         } else {
             0.0
         };
@@ -605,7 +616,6 @@ pub fn score_actions(
             ward += s.herbcraft_ward_siege_bonus * ctx.needs.level_suppression(2);
         }
         let best = gather.max(prepare).max(ward);
-        // Determine winning sub-mode deterministically (no jitter).
         herbcraft_hint = if best <= 0.0 {
             None
         } else if prepare >= gather && prepare >= ward {
@@ -620,17 +630,16 @@ pub fn score_actions(
         }
     }
 
-    // --- PracticeMagic (requires affinity > threshold AND magic skill > threshold) ---
+    // --- PracticeMagic (§L2.10.10 sibling split — 6 sub-modes) ---
+    // Outer gate: `magic_affinity + magic_skill > thresholds`.
+    // Sub-mode base scores come from their sibling DSEs; emergency
+    // bonuses for ward/cleanse corruption response and "smells like
+    // rot" proactive sensing stay inline until the §3.5 modifier
+    // pipeline lands in Phase 3d. The outer Max + hint selection
+    // stays here.
     let mut magic_hint: Option<CraftingHint> = None;
     if ctx.magic_affinity > s.magic_affinity_threshold && ctx.magic_skill > s.magic_skill_threshold
     {
-        let scry = ctx.personality.curiosity
-            * ctx.personality.spirituality
-            * ctx.magic_skill
-            * ctx.needs.level_suppression(5);
-        // Durable wards and cleansing are Safety actions — they defend against
-        // corruption, an existential threat. Same emergency bonus pattern as
-        // herbcraft wards.
         let ward_emergency = if ctx.ward_strength_low && ctx.territory_max_corruption > 0.0 {
             s.ward_corruption_emergency_bonus * ctx.needs.level_suppression(2)
         } else {
@@ -641,9 +650,6 @@ pub fn score_actions(
         } else {
             0.0
         };
-        // "Smells like rot" — proactive response when corruption is sensed nearby.
-        // Boosts both Cleanse and SetWard scoring even if the cat isn't
-        // personally standing on a corrupted tile.
         let sensed_rot_bonus = if ctx.nearby_corruption_level > 0.1 {
             s.corruption_sensed_response_bonus
                 * ctx.nearby_corruption_level
@@ -651,12 +657,11 @@ pub fn score_actions(
         } else {
             0.0
         };
+
+        let scry = score_dse_by_id("magic_scry", ctx, inputs);
         let durable_ward =
             if ctx.ward_strength_low && ctx.magic_skill > s.magic_durable_ward_skill_threshold {
-                ctx.personality.spirituality
-                    * ctx.magic_skill
-                    * s.magic_durable_ward_scale
-                    * ctx.needs.level_suppression(2)
+                score_dse_by_id("magic_durable_ward", ctx, inputs)
                     + ward_emergency
                     + sensed_rot_bonus
             } else {
@@ -665,37 +670,20 @@ pub fn score_actions(
         let cleanse = if ctx.on_corrupted_tile
             && ctx.tile_corruption > s.magic_cleanse_corruption_threshold
         {
-            ctx.personality.spirituality
-                * ctx.magic_skill
-                * ctx.tile_corruption
-                * ctx.needs.level_suppression(2)
-                + cleanse_emergency
+            score_dse_by_id("magic_cleanse", ctx, inputs) + cleanse_emergency
         } else {
             0.0
         };
-        // Territory corruption motivates proactive cleansing even off corrupted tiles.
-        let colony_cleanse = ctx.personality.spirituality
-            * ctx.magic_skill
-            * ctx.territory_max_corruption
-            * s.magic_cleanse_colony_scale
-            * ctx.needs.level_suppression(2)
+        let colony_cleanse = score_dse_by_id("magic_colony_cleanse", ctx, inputs)
             + cleanse_emergency
             + sensed_rot_bonus;
-        // Carcass harvesting — curiosity-driven, risk/reward.
         let harvest = if ctx.carcass_nearby {
-            ctx.personality.curiosity
-                * (ctx.herbcraft_skill + 0.1)
-                * (ctx.nearby_carcass_count.min(3) as f32)
-                * s.magic_harvest_carcass_scale
-                * ctx.needs.level_suppression(3)
+            score_dse_by_id("magic_harvest", ctx, inputs)
         } else {
             0.0
         };
         let commune = if ctx.on_special_terrain {
-            ctx.personality.spirituality
-                * ctx.magic_skill
-                * s.magic_commune_scale
-                * ctx.needs.level_suppression(5)
+            score_dse_by_id("magic_commune", ctx, inputs)
         } else {
             0.0
         };
@@ -1404,6 +1392,15 @@ mod tests {
             r.cat_dses.push(crate::ai::dses::coordinate_dse(&scoring));
             r.cat_dses.push(crate::ai::dses::explore_dse());
             r.cat_dses.push(crate::ai::dses::wander_dse(&scoring));
+            r.cat_dses.push(crate::ai::dses::herbcraft_gather_dse());
+            r.cat_dses.push(crate::ai::dses::herbcraft_prepare_dse());
+            r.cat_dses.push(crate::ai::dses::herbcraft_ward_dse());
+            r.cat_dses.push(crate::ai::dses::scry_dse());
+            r.cat_dses.push(crate::ai::dses::durable_ward_dse());
+            r.cat_dses.push(crate::ai::dses::cleanse_dse());
+            r.cat_dses.push(crate::ai::dses::colony_cleanse_dse());
+            r.cat_dses.push(crate::ai::dses::harvest_dse());
+            r.cat_dses.push(crate::ai::dses::commune_dse());
             r
         })
     }
