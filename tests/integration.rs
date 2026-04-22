@@ -78,6 +78,15 @@ fn setup_world(seed: u64) -> World {
     world.insert_resource(clowder::resources::ColonyCenter(colony_site));
     world.insert_resource(clowder::resources::ColonyScore::default());
     world.insert_resource(clowder::resources::UnmetDemand::default());
+    // L2 substrate resources + Eat DSE registration (mirrors the
+    // plugin/headless insertion pattern).
+    world.insert_resource(clowder::ai::faction::FactionRelations::canonical());
+    {
+        let mut registry = clowder::ai::eval::DseRegistry::new();
+        registry.cat_dses.push(clowder::ai::dses::eat_dse());
+        world.insert_resource(registry);
+    }
+    world.insert_resource(clowder::ai::eval::ModifierPipeline::new());
     bevy_ecs::message::MessageRegistry::register_message::<clowder::components::prey::PreyKilled>(
         &mut world,
     );

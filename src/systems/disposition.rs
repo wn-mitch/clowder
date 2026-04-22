@@ -269,6 +269,9 @@ pub struct EvalDispositionSideEffects<'w, 's> {
     pub rng: ResMut<'w, SimRng>,
     pub commands: Commands<'w, 's>,
     pub mating: crate::ai::mating::MatingFitnessParams<'w, 's>,
+    pub dse_registry: Res<'w, crate::ai::eval::DseRegistry>,
+    pub modifier_pipeline: Res<'w, crate::ai::eval::ModifierPipeline>,
+    pub time: Res<'w, crate::resources::time::TimeState>,
 }
 
 /// Read-only queries over stored-item state. Bundled into a SystemParam so
@@ -630,7 +633,14 @@ pub fn evaluate_dispositions(
             has_raw_food_in_stores,
         };
 
-        let result = score_actions(&ctx, &mut rng.rng);
+        let eval_inputs = crate::ai::scoring::EvalInputs {
+            cat: entity,
+            position: *pos,
+            tick: side_effects.time.tick,
+            dse_registry: &side_effects.dse_registry,
+            modifier_pipeline: &side_effects.modifier_pipeline,
+        };
+        let result = score_actions(&ctx, &eval_inputs, &mut rng.rng);
         let mut scores = result.scores;
 
         // Apply all bonus layers (identical to evaluate_actions).

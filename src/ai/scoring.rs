@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
+use bevy::prelude::Entity;
 use rand::Rng;
 
+use crate::ai::dse::EvalCtx;
+use crate::ai::eval::{evaluate_single, DseRegistry, ModifierPipeline};
 use crate::ai::Action;
 use crate::components::disposition::CraftingHint;
 use crate::components::mental::{Memory, MemoryType};
@@ -9,6 +12,27 @@ use crate::components::personality::Personality;
 use crate::components::physical::{Needs, Position};
 use crate::resources::sim_constants::ScoringConstants;
 use crate::resources::time::DayPhase;
+
+// ---------------------------------------------------------------------------
+// EvalInputs — evaluator identity / registry bundle
+// ---------------------------------------------------------------------------
+
+/// Per-cat evaluator identity and registry refs. Passed alongside
+/// `ScoringContext` so `score_actions` can dispatch ported DSEs
+/// through the L2 evaluator per §L2.10.2.
+///
+/// Phase 3c.0 lands this bundle; Phase 3c.N ports each remaining DSE
+/// into the registry and deletes its inline block in `score_actions`.
+/// The consideration scalar inputs are pulled via [`ctx_scalars`] —
+/// centralizing the semantic inversion (spec's "hunger" = urgency =
+/// `1 - needs.hunger`).
+pub struct EvalInputs<'a> {
+    pub cat: Entity,
+    pub position: Position,
+    pub tick: u64,
+    pub dse_registry: &'a DseRegistry,
+    pub modifier_pipeline: &'a ModifierPipeline,
+}
 
 // ---------------------------------------------------------------------------
 // Jitter
@@ -169,12 +193,95 @@ pub struct ScoringResult {
 // Scoring
 // ---------------------------------------------------------------------------
 
+/// Build the scalar-input map for L2 consideration dispatch. Each
+/// entry maps a consideration's scalar name to the value the curve
+/// should see. Critically, **needs are inverted** — the spec's §2.3
+/// "hunger" axis is a deficit, so `needs.hunger = 0.1` (stomach 10%
+/// full) maps to `"hunger" = 0.9` (urgency 90%). The inversion lives
+/// here rather than in each DSE's fetch_scalar so future ports
+/// (Sleep's "energy", Hunt's "hunger" and "food_scarcity", …) share
+/// one source of truth.
+fn ctx_scalars(ctx: &ScoringContext) -> HashMap<&'static str, f32> {
+    let mut m = HashMap::new();
+    // Needs-as-urgency (deficit form, spec §2.3 column names).
+    m.insert("hunger", (1.0 - ctx.needs.hunger).clamp(0.0, 1.0));
+    // Future ports append here: energy_deficit, safety_deficit,
+    // social_deficit, thermal_deficit, etc.
+    m
+}
+
+/// Score the `Eat` DSE through the L2 evaluator. Replaces the inline
+/// `(1 - needs.hunger) * eat_urgency_scale * level_suppression(1)`
+/// formula with §2.3's hangry anchor: `Logistic(steepness=8,
+/// midpoint=0.75)` applied to hunger-as-urgency.
+///
+/// The `level_suppression(1)` multiplier is preserved via the
+/// evaluator's Maslow pre-gate (§3.4); at tier 1 the gate returns
+/// 1.0 unconditionally, so behavior is numerically identical to the
+/// old path minus the curve-shape change.
+///
+/// **Phase 3c.0: dead code.** The caller (`score_actions`) does not
+/// yet invoke this helper. `score_actions` keeps the old linear Eat
+/// formula until Phase 3c.1 ports the full Starvation-urgency peer
+/// group (Eat + Hunt + Forage + Cook + fox Hunting + Raiding) per
+/// §3.3.2 and flips all six branches together. Landing this dead
+/// helper now establishes the evaluator call shape that the
+/// peer-group port follows.
+#[allow(dead_code)]
+fn score_eat(ctx: &ScoringContext, inputs: &EvalInputs) -> f32 {
+    let Some(dse) = inputs.dse_registry.cat_dse("eat") else {
+        // Defensive: if the registry is empty (e.g., a test
+        // accidentally constructs a bare registry), return 0. The
+        // plugin registration path guarantees this is never hit in
+        // production.
+        return 0.0;
+    };
+    let scalars = ctx_scalars(ctx);
+    let fetch_scalar = |name: &str, _entity: Entity| -> f32 {
+        scalars.get(name).copied().unwrap_or(0.0)
+    };
+    let has_marker = |_name: &str, _entity: Entity| false;
+    let sample_map = |_name: &str, _pos: Position| 0.0_f32;
+    let needs_ref = ctx.needs;
+    let maslow = |tier: u8| needs_ref.level_suppression(tier);
+
+    let eval_ctx = EvalCtx {
+        cat: inputs.cat,
+        tick: inputs.tick,
+        sample_map: &sample_map,
+        has_marker: &has_marker,
+        self_position: inputs.position,
+        target: None,
+        target_position: None,
+    };
+
+    evaluate_single(
+        dse,
+        inputs.cat,
+        &eval_ctx,
+        &maslow,
+        inputs.modifier_pipeline,
+        &fetch_scalar,
+    )
+    .map(|s| s.final_score)
+    .unwrap_or(0.0)
+}
+
 /// Score all available actions for a cat given its current state.
 ///
 /// Returns a [`ScoringResult`] containing `(Action, score)` pairs and an
 /// optional herbcraft sub-mode hint. Higher score = more preferred.
 /// The caller should pass the scores to [`select_best_action`].
-pub fn score_actions(ctx: &ScoringContext, rng: &mut impl Rng) -> ScoringResult {
+pub fn score_actions(
+    ctx: &ScoringContext,
+    inputs: &EvalInputs,
+    rng: &mut impl Rng,
+) -> ScoringResult {
+    // `inputs` is threaded through for Phase 3c.1+ DSE ports but
+    // unused by the current inline formulas. Silence the warning —
+    // the param is part of the public surface so callers migrate
+    // once and stay migrated.
+    let _ = inputs;
     let s = ctx.scoring;
     let mut scores = Vec::with_capacity(12);
 
@@ -201,6 +308,14 @@ pub fn score_actions(ctx: &ScoringContext, rng: &mut impl Rng) -> ScoringResult 
     }
 
     // --- Eat (only when food stores are available) ---
+    //
+    // **Phase 3c.0 plumbing, not consumed yet.** The `score_eat`
+    // helper below dispatches to the L2 evaluator via `inputs`, but
+    // using it here in isolation breaks §3.3.2's Starvation-urgency
+    // peer-group anchor (Hunt/Forage/Cook still produce linear
+    // scores outside `[0, 1]`, so the [0, 1]-capped Logistic Eat
+    // gets out-scored). Phase 3c.1 ports the full hangry peer group
+    // together and flips this branch over in the same commit.
     if ctx.food_available {
         let urgency =
             (1.0 - ctx.needs.hunger) * s.eat_urgency_scale * ctx.needs.level_suppression(1);
@@ -1239,9 +1354,46 @@ mod tests {
     use super::*;
     use rand_chacha::rand_core::SeedableRng;
     use rand_chacha::ChaCha8Rng;
+    use std::sync::OnceLock;
 
     fn seeded_rng(seed: u64) -> ChaCha8Rng {
         ChaCha8Rng::seed_from_u64(seed)
+    }
+
+    // --- Shared DseRegistry + ModifierPipeline for tests ---
+    //
+    // Each score_actions call needs an EvalInputs bundle with refs to
+    // a live DseRegistry (carrying the ported DSEs — currently EatDse
+    // only) and a ModifierPipeline (empty until Phase 3c ports the
+    // §3.5.1 modifier catalog). Building these per-test is verbose;
+    // we cache them via `OnceLock` and return fresh `EvalInputs`
+    // pointing at the cached instances. Each test gets a clean
+    // identity (cat=dummy entity, position=origin, tick=0) — tests
+    // that need a specific entity/position override the relevant
+    // field before calling `score_actions`.
+
+    fn cached_registry() -> &'static DseRegistry {
+        static REG: OnceLock<DseRegistry> = OnceLock::new();
+        REG.get_or_init(|| {
+            let mut r = DseRegistry::new();
+            r.cat_dses.push(crate::ai::dses::eat_dse());
+            r
+        })
+    }
+
+    fn cached_modifier_pipeline() -> &'static ModifierPipeline {
+        static PIPELINE: OnceLock<ModifierPipeline> = OnceLock::new();
+        PIPELINE.get_or_init(ModifierPipeline::new)
+    }
+
+    fn test_eval_inputs() -> EvalInputs<'static> {
+        EvalInputs {
+            cat: Entity::from_raw_u32(1).unwrap(),
+            position: Position::new(0, 0),
+            tick: 0,
+            dse_registry: cached_registry(),
+            modifier_pipeline: cached_modifier_pipeline(),
+        }
     }
 
     fn default_personality() -> Personality {
@@ -1342,7 +1494,7 @@ mod tests {
         let personality = default_personality();
         let mut rng = seeded_rng(1);
 
-        let scores = score_actions(&ctx(&needs, &personality, &sc), &mut rng).scores;
+        let scores = score_actions(&ctx(&needs, &personality, &sc), &test_eval_inputs(), &mut rng).scores;
         let best = select_best_action(&scores);
 
         assert_eq!(
@@ -1371,7 +1523,7 @@ mod tests {
         let personality = default_personality();
         let mut rng = seeded_rng(2);
 
-        let scores = score_actions(&ctx(&needs, &personality, &sc), &mut rng).scores;
+        let scores = score_actions(&ctx(&needs, &personality, &sc), &test_eval_inputs(), &mut rng).scores;
         let best = select_best_action(&scores);
 
         assert_eq!(
@@ -1464,7 +1616,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
         };
-        let scores = score_actions(&c, &mut rng).scores;
+        let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let best = select_best_action(&scores);
 
         assert!(
@@ -1492,7 +1644,7 @@ mod tests {
 
         let mut rng = seeded_rng(10);
 
-        let scores = score_actions(&ctx(&needs, &personality, &sc), &mut rng).scores;
+        let scores = score_actions(&ctx(&needs, &personality, &sc), &test_eval_inputs(), &mut rng).scores;
         let hunt_score = scores.iter().find(|(a, _)| *a == Action::Hunt).unwrap().1;
         let forage_score = scores.iter().find(|(a, _)| *a == Action::Forage).unwrap().1;
 
@@ -1515,7 +1667,7 @@ mod tests {
 
         let mut rng = seeded_rng(11);
 
-        let scores = score_actions(&ctx(&needs, &personality, &sc), &mut rng).scores;
+        let scores = score_actions(&ctx(&needs, &personality, &sc), &test_eval_inputs(), &mut rng).scores;
         let hunt_score = scores.iter().find(|(a, _)| *a == Action::Hunt).unwrap().1;
         let forage_score = scores.iter().find(|(a, _)| *a == Action::Forage).unwrap().1;
 
@@ -1593,7 +1745,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
         };
-        let scores = score_actions(&c, &mut rng).scores;
+        let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let socialize_score = scores
             .iter()
             .find(|(a, _)| *a == Action::Socialize)
@@ -1619,7 +1771,7 @@ mod tests {
         let personality = default_personality();
         let mut rng = seeded_rng(21);
 
-        let scores = score_actions(&ctx(&needs, &personality, &sc), &mut rng).scores;
+        let scores = score_actions(&ctx(&needs, &personality, &sc), &test_eval_inputs(), &mut rng).scores;
         let groom_score = scores.iter().find(|(a, _)| *a == Action::Groom).unwrap().1;
         let idle_score = scores.iter().find(|(a, _)| *a == Action::Idle).unwrap().1;
 
@@ -1846,7 +1998,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
         };
-        let scores = score_actions(&c, &mut rng).scores;
+        let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let best = select_best_action(&scores);
 
         assert_eq!(
@@ -1920,7 +2072,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
         };
-        let scores = score_actions(&c, &mut rng).scores;
+        let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let fight_score = scores.iter().find(|(a, _)| *a == Action::Fight).unwrap().1;
         let flee_score = scores.iter().find(|(a, _)| *a == Action::Flee);
 
@@ -1997,7 +2149,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
         };
-        let scores = score_actions(&c, &mut rng).scores;
+        let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let actions: Vec<Action> = scores
             .iter()
             .filter(|(_, s)| *s > 0.0)
@@ -2090,7 +2242,7 @@ mod tests {
         c.has_herbs_nearby = true;
         c.herbcraft_skill = 0.3;
 
-        let scores = score_actions(&c, &mut rng).scores;
+        let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let herbcraft = scores.iter().find(|(a, _)| *a == Action::Herbcraft);
 
         assert!(
@@ -2113,7 +2265,7 @@ mod tests {
         let c = ctx(&needs, &personality, &sc);
         // no herbs nearby, no inventory herbs
 
-        let scores = score_actions(&c, &mut rng).scores;
+        let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let herbcraft = scores.iter().find(|(a, _)| *a == Action::Herbcraft);
         assert!(
             herbcraft.is_none(),
@@ -2133,7 +2285,7 @@ mod tests {
         c.magic_affinity = 0.2;
         c.magic_skill = 0.3;
 
-        let scores = score_actions(&c, &mut rng).scores;
+        let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let magic = scores.iter().find(|(a, _)| *a == Action::PracticeMagic);
         assert!(
             magic.is_none(),
@@ -2145,7 +2297,7 @@ mod tests {
         c2.magic_affinity = 0.5;
         c2.magic_skill = 0.1;
 
-        let scores2 = score_actions(&c2, &mut rng).scores;
+        let scores2 = score_actions(&c2, &test_eval_inputs(), &mut rng).scores;
         let magic2 = scores2.iter().find(|(a, _)| *a == Action::PracticeMagic);
         assert!(magic2.is_none(), "below skill threshold → no PracticeMagic");
     }
@@ -2168,7 +2320,7 @@ mod tests {
         c.on_corrupted_tile = true;
         c.tile_corruption = 0.5;
 
-        let scores = score_actions(&c, &mut rng).scores;
+        let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let magic = scores.iter().find(|(a, _)| *a == Action::PracticeMagic);
 
         assert!(
@@ -2199,7 +2351,7 @@ mod tests {
         c.herbcraft_skill = 0.4;
         c.colony_injury_count = 2;
 
-        let scores = score_actions(&c, &mut rng).scores;
+        let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let herbcraft = scores.iter().find(|(a, _)| *a == Action::Herbcraft);
 
         assert!(
@@ -2269,7 +2421,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
         };
-        let scores = score_actions(&c, &mut rng).scores;
+        let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let wander = scores.iter().find(|(a, _)| *a == Action::Wander).unwrap().1;
         let idle = scores.iter().find(|(a, _)| *a == Action::Idle).unwrap().1;
         assert!(
@@ -2346,7 +2498,7 @@ mod tests {
             has_raw_food_in_stores: false,
         };
 
-        let scores_full = score_actions(&base, &mut rng_full).scores;
+        let scores_full = score_actions(&base, &test_eval_inputs(), &mut rng_full).scores;
         let hunt_full = scores_full
             .iter()
             .find(|(a, _)| *a == Action::Hunt)
@@ -2357,7 +2509,7 @@ mod tests {
             food_fraction: 0.2,
             ..base
         };
-        let scores_low = score_actions(&low, &mut rng_low).scores;
+        let scores_low = score_actions(&low, &test_eval_inputs(), &mut rng_low).scores;
         let hunt_low = scores_low
             .iter()
             .find(|(a, _)| *a == Action::Hunt)
@@ -2691,7 +2843,7 @@ mod tests {
         // Also set herbs nearby so gather *could* fire — hint should still be PrepareRemedy.
         c.has_herbs_nearby = true;
 
-        let result = score_actions(&c, &mut rng);
+        let result = score_actions(&c, &test_eval_inputs(), &mut rng);
         assert_eq!(
             result.herbcraft_hint,
             Some(CraftingHint::PrepareRemedy),
@@ -2717,7 +2869,7 @@ mod tests {
         c.herbcraft_skill = 0.3;
         // No remedy herbs, no ward herbs — only gather is viable.
 
-        let result = score_actions(&c, &mut rng);
+        let result = score_actions(&c, &test_eval_inputs(), &mut rng);
         assert_eq!(
             result.herbcraft_hint,
             Some(CraftingHint::GatherHerbs),
@@ -2746,7 +2898,7 @@ mod tests {
         c.herbcraft_skill = 0.3;
         // No herbs nearby, no remedy herbs — only ward is viable.
 
-        let result = score_actions(&c, &mut rng);
+        let result = score_actions(&c, &test_eval_inputs(), &mut rng);
         assert_eq!(
             result.herbcraft_hint,
             Some(CraftingHint::SetWard),
@@ -2770,7 +2922,7 @@ mod tests {
         c.herbcraft_skill = 0.1;
         c.territory_max_corruption = 0.5; // corruption detected in territory ring
 
-        let result = score_actions(&c, &mut rng);
+        let result = score_actions(&c, &test_eval_inputs(), &mut rng);
         let ward_score = result
             .scores
             .iter()
@@ -2800,7 +2952,7 @@ mod tests {
         c.herbcraft_skill = 0.1;
         c.territory_max_corruption = 0.0; // no corruption
 
-        let result = score_actions(&c, &mut rng);
+        let result = score_actions(&c, &test_eval_inputs(), &mut rng);
         let ward_score = result
             .scores
             .iter()

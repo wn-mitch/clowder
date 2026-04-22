@@ -125,6 +125,8 @@ pub struct PlanResources<'w> {
     pub constants: Res<'w, SimConstants>,
     pub time: Res<'w, TimeState>,
     pub colony_center: Res<'w, crate::resources::ColonyCenter>,
+    pub dse_registry: Res<'w, crate::ai::eval::DseRegistry>,
+    pub modifier_pipeline: Res<'w, crate::ai::eval::ModifierPipeline>,
 }
 
 /// Bundles magic resolver dependencies to keep resolve_goap_plans under 16 params.
@@ -922,7 +924,14 @@ pub fn evaluate_and_plan(
             has_raw_food_in_stores,
         };
 
-        let result = score_actions(&ctx, &mut rng.rng);
+        let eval_inputs = crate::ai::scoring::EvalInputs {
+            cat: entity,
+            position: *pos,
+            tick: res.time.tick,
+            dse_registry: &res.dse_registry,
+            modifier_pipeline: &res.modifier_pipeline,
+        };
+        let result = score_actions(&ctx, &eval_inputs, &mut rng.rng);
         // Record latent Cook desire so the coordinator's BuildPressure
         // channel for Kitchen rises when enough cats want to cook but
         // no Kitchen exists.
