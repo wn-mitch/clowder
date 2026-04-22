@@ -1150,15 +1150,34 @@ remaining work is itemised here.
 **Still outstanding (spec-committed, Phase 4 scope):**
 
 - **`add_target_taking_dse` + per-target considerations (§6.3,
-  §6.5).** The §9.3 stance bindings shipped in `c8bb1c6` are
-  declarative — their runtime-filtering consumption waits on this
-  registration method. `src/ai/dse.rs` needs a `TargetTakingDse`
-  trait; `eval.rs` gets a `add_target_taking_dse` method on
-  `DseRegistryAppExt`.
+  §6.5).** **Phase 4b.3 foundation landed** — `TargetTakingDse`
+  struct, `TargetAggregation` enum, `evaluate_target_taking`
+  evaluator, retyped `DseRegistry.target_taking_dses`, and
+  `add_target_taking_dse` registration method. 6 unit tests
+  cover the three aggregation modes, per-candidate spatial
+  sampling, and the empty-candidate short-circuit. **Remaining:**
+  nine per-DSE ports (Socialize, Mate, Mentor, Groom-other, Hunt,
+  Fight, ApplyRemedy, Build, Caretake) following §6.5 per-target
+  consideration bundles. Each port needs:
+    1. `TargetTakingDse` factory function (consideration bundle
+       from §6.5.N, composition, aggregation).
+    2. Caller-side `SystemParam` bundle that produces the candidate
+       `Vec<Entity>` + parallel position slice each tick.
+    3. Wiring into goap.rs / disposition.rs scoring loop —
+       invoke `evaluate_target_taking`, merge result into the
+       flat action-score pool.
+    4. Retire the legacy resolver (e.g. `find_social_target`,
+       `nearest_threat`) — silent-divergence fix per §6.2.
+    5. Thread winning target through the downstream step's
+       `target_entity` field so GOAP plans against it.
+  Socialize is the simplest reference port and has a clean
+  existing resolver (`disposition.rs:1329–1347` +
+  `goap.rs:3788–3810`) to cut over; best candidate for the
+  first per-DSE port.
 - **§4 marker-eligibility authoring systems for roster gap-fill.**
-  **Phase 4b.2 MVP landed** (lookup foundation + `HasStoredFood`
-  reference port — see Landed section below). The remaining ~49
-  §4.3 markers each need:
+  **Phase 4b.2 MVP + 4b.4 landed** (lookup foundation +
+  `HasStoredFood` + `HasGarden` reference ports — see Landed
+  section below). The remaining ~48 §4.3 markers each need:
     1. Author system per §4.6 author-file assignment (`Changed<T>`
        filter where the predicate reads changing parent components;
        full-scan where it reads position-adjacent state).
@@ -1334,6 +1353,52 @@ system owner satisfied it. Tag pattern: `substrate-follow-on`,
 ---
 
 ## Landed
+
+### Phase 4b.4 — §4 `HasGarden` marker port (2026-04-22)
+
+Second reference port of the Phase 4b.2 MVP pattern. Farm's outer
+`if ctx.has_garden` gate retired; `FarmDse::new()` gains
+`.require("HasGarden")`. Caller-side population in goap.rs /
+disposition.rs reuses the existing `has_garden` computation with a
+single appended `markers.set_colony("HasGarden", has_garden)` line.
+Reinforces that per-marker porting is mechanical: three line
+changes (population + `.require` + outer-gate retirement) +
+optional test-fixture update.
+
+Does not unblock Farming dormancy — the baseline's Farming = 0
+traces to `TendCrops: no target` plan-failures (target-resolver
+issue in GOAP), not an outer-eligibility issue.
+
+### Phase 4b.3 — §6.3 `TargetTakingDse` type + evaluator (2026-04-22)
+
+Foundation for §6 target-taking scoring. No DSE ports yet — the
+scope is the type, the evaluator, and the registration surface.
+
+- New `src/ai/target_dse.rs` with:
+    - `TargetTakingDse` struct per §6.3 — id, candidate_query,
+      per-target considerations, composition, aggregation,
+      intention factory.
+    - `TargetAggregation` enum — `Best` (default), `SumTopN(n)`
+      for threat aggregation, `WeightedAverage` for rank-decayed
+      sums.
+    - `ScoredTargetTakingDse` output — per-candidate scores
+      (unsorted), winning target, aggregated score, emitted
+      intention; `ranked_candidates()` sorts descending for trace
+      emission.
+    - `evaluate_target_taking` evaluator — per-candidate score via
+      per-target considerations, compose, aggregate. Scalar names
+      prefixed `target_` dispatch through a target-scoped fetcher;
+      everything else reads the scoring cat.
+- `DseRegistry.target_taking_dses` retyped from
+  `Vec<Box<dyn Dse>>` to `Vec<TargetTakingDse>`.
+  `add_target_taking_dse` registration method on
+  `DseRegistryAppExt` takes `TargetTakingDse` by value.
+- 6 unit tests: empty-candidate short-circuit,
+  `Best`/`SumTopN`/`WeightedAverage` aggregation semantics,
+  per-candidate spatial sampling, ranked-candidates helper.
+
+No live-sim behavior change — nothing registers a target-taking
+DSE yet. Pure foundation; per-DSE ports follow.
 
 ### Phase 4b.2 MVP — §4 marker lookup foundation + `HasStoredFood` reference port (2026-04-22)
 
