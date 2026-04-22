@@ -19,8 +19,10 @@ use crate::ai::fox_planner::goals::goal_for_disposition;
 use crate::ai::fox_planner::{
     FoxDispositionKind, FoxDomain, FoxGoapActionKind, FoxPlannerState, FoxZone,
 };
+use crate::ai::eval::{DseRegistry, ModifierPipeline};
 use crate::ai::fox_scoring::{score_fox_dispositions, select_best_disposition, FoxScoringContext};
 use crate::ai::planner::core::make_plan;
+use crate::ai::scoring::EvalInputs;
 use crate::components::fox_goap_plan::FoxGoapPlan;
 use crate::components::fox_personality::{FoxNeeds, FoxPersonality};
 use crate::components::fox_spatial::FoxHuntingBeliefs;
@@ -169,6 +171,7 @@ fn build_scoring_context<'a>(
         has_den: fox_state.home_den.is_some(),
         ticks_since_patrol,
         day_phase,
+        self_position: fox_pos,
         scoring,
         jitter_range: 0.05,
     }
@@ -284,6 +287,8 @@ pub fn fox_evaluate_and_plan(
     time: Res<TimeState>,
     constants: Res<SimConstants>,
     config: Res<SimConfig>,
+    dse_registry: Res<DseRegistry>,
+    modifier_pipeline: Res<ModifierPipeline>,
     mut event_log: Option<ResMut<EventLog>>,
 ) {
     let cat_positions: Vec<Position> = cats.iter().copied().collect();
@@ -316,7 +321,15 @@ pub fn fox_evaluate_and_plan(
             day_phase,
         );
 
-        let scoring_result = score_fox_dispositions(&ctx, &mut rng.rng);
+        let inputs = EvalInputs {
+            cat: fox_entity,
+            position: *fox_pos,
+            tick: time.tick,
+            dse_registry: &dse_registry,
+            modifier_pipeline: &modifier_pipeline,
+        };
+
+        let scoring_result = score_fox_dispositions(&ctx, &inputs, &mut rng.rng);
         let Some(chosen) = select_best_disposition(&scoring_result) else {
             continue;
         };

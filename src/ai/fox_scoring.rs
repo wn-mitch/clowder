@@ -2,11 +2,25 @@
 //!
 //! Parallel to `crate::ai::scoring` for cats, but using the fox's truncated
 //! 3-level Maslow hierarchy and 4-axis personality.
+//!
+//! Phase 3c.1b ports `Hunting` and `Raiding` through the L2 evaluator.
+//! The inline scoring blocks for those two dispositions are retired in
+//! favor of `score_fox_dse_by_id`, which dispatches to
+//! `FoxHuntingDse`/`FoxRaidingDse` in `src/ai/dses/`. The remaining
+//! dispositions still use their hand-authored formulas; they port in
+//! Phase 3c.2+.
 
+use std::collections::HashMap;
+
+use bevy_ecs::prelude::Entity;
 use rand::Rng;
 
+use crate::ai::dse::EvalCtx;
+use crate::ai::eval::evaluate_single;
 use crate::ai::fox_planner::FoxDispositionKind;
+use crate::ai::scoring::EvalInputs;
 use crate::components::fox_personality::{FoxNeeds, FoxPersonality};
+use crate::components::physical::Position;
 use crate::resources::sim_constants::ScoringConstants;
 use crate::resources::time::DayPhase;
 
@@ -74,6 +88,12 @@ pub struct FoxScoringContext<'a> {
     /// rest at den during Day.
     pub day_phase: DayPhase,
 
+    // --- Self position ---
+    /// Fox's current tile. Plumbs through to `EvalCtx.self_position` for
+    /// any future spatial consideration; today the ported fox DSEs are
+    /// scalar-only.
+    pub self_position: Position,
+
     // --- Tuning ---
     pub scoring: &'a ScoringConstants,
     pub jitter_range: f32,
@@ -88,6 +108,88 @@ pub struct FoxScoringResult {
 }
 
 // ---------------------------------------------------------------------------
+// L2 evaluator plumbing (Phase 3c.1b)
+// ---------------------------------------------------------------------------
+
+/// Day-phase scalar knots, keyed to the Piecewise curve in
+/// `FoxHuntingDse`. Keep in sync with `dses::fox_hunting::{DAWN_KNOT,
+/// DAY_KNOT, DUSK_KNOT, NIGHT_KNOT}`.
+fn day_phase_scalar(phase: DayPhase) -> f32 {
+    use crate::ai::dses::fox_hunting;
+    match phase {
+        DayPhase::Dawn => fox_hunting::DAWN_KNOT,
+        DayPhase::Day => fox_hunting::DAY_KNOT,
+        DayPhase::Dusk => fox_hunting::DUSK_KNOT,
+        DayPhase::Night => fox_hunting::NIGHT_KNOT,
+    }
+}
+
+/// Build the scalar-input map for fox DSE consideration dispatch.
+///
+/// Parallels `scoring::ctx_scalars`. Needs are inverted to urgency form
+/// (§2.3: "hunger" = deficit), personality coefficients flow through as
+/// `[0, 1]` inputs, `prey_nearby` is a binary 0/1, `day_phase` is the
+/// Piecewise knot encoding.
+fn fox_ctx_scalars(ctx: &FoxScoringContext) -> HashMap<&'static str, f32> {
+    let mut m = HashMap::new();
+    m.insert(
+        "hunger_urgency",
+        (1.0 - ctx.needs.hunger).clamp(0.0, 1.0),
+    );
+    m.insert("boldness", ctx.personality.boldness.clamp(0.0, 1.0));
+    m.insert("cunning", ctx.personality.cunning.clamp(0.0, 1.0));
+    m.insert("prey_nearby", if ctx.prey_nearby { 1.0 } else { 0.0 });
+    m.insert(
+        "prey_belief",
+        ctx.local_prey_belief.clamp(0.0, 1.0),
+    );
+    m.insert("day_phase", day_phase_scalar(ctx.day_phase));
+    m
+}
+
+/// Score a registered fox DSE through the L2 evaluator. Returns 0.0 if
+/// the DSE is missing or ineligible — same contract as the cat-side
+/// `score_dse_by_id`.
+pub fn score_fox_dse_by_id(
+    dse_id: &str,
+    ctx: &FoxScoringContext,
+    inputs: &EvalInputs,
+) -> f32 {
+    let Some(dse) = inputs.dse_registry.fox_dse(dse_id) else {
+        return 0.0;
+    };
+    let scalars = fox_ctx_scalars(ctx);
+    let fetch_scalar = |name: &str, _: Entity| -> f32 {
+        scalars.get(name).copied().unwrap_or(0.0)
+    };
+    let has_marker = |_: &str, _: Entity| false;
+    let sample_map = |_: &str, _: Position| 0.0_f32;
+    let needs_ref = ctx.needs;
+    let maslow = |tier: u8| needs_ref.level_suppression(tier);
+
+    let eval_ctx = EvalCtx {
+        cat: inputs.cat,
+        tick: inputs.tick,
+        sample_map: &sample_map,
+        has_marker: &has_marker,
+        self_position: inputs.position,
+        target: None,
+        target_position: None,
+    };
+
+    evaluate_single(
+        dse,
+        inputs.cat,
+        &eval_ctx,
+        &maslow,
+        inputs.modifier_pipeline,
+        &fetch_scalar,
+    )
+    .map(|s| s.final_score)
+    .unwrap_or(0.0)
+}
+
+// ---------------------------------------------------------------------------
 // Scoring
 // ---------------------------------------------------------------------------
 
@@ -97,7 +199,11 @@ pub struct FoxScoringResult {
 /// - Level 1 (Survival): Hunting, Raiding, Resting, Fleeing
 /// - Level 2 (Territory): Patrolling, Dispersing
 /// - Level 3 (Offspring): Feeding, DenDefense
-pub fn score_fox_dispositions(ctx: &FoxScoringContext, rng: &mut impl Rng) -> FoxScoringResult {
+pub fn score_fox_dispositions(
+    ctx: &FoxScoringContext,
+    inputs: &EvalInputs,
+    rng: &mut impl Rng,
+) -> FoxScoringResult {
     let needs = ctx.needs;
     let p = ctx.personality;
     let j = ctx.jitter_range;
@@ -108,10 +214,14 @@ pub fn score_fox_dispositions(ctx: &FoxScoringContext, rng: &mut impl Rng) -> Fo
         // Dispersal bypasses Maslow — it's a survival-level instinct for juveniles.
         scores.push((FoxDispositionKind::Dispersing, 2.0 + jitter(rng, j)));
 
-        // Still allow hunting if starving.
+        // Still allow hunting if starving. Uses the ported `FoxHuntingDse`
+        // so the juvenile path stays consistent with adult Hunting scoring
+        // under the L2 evaluator.
         if needs.hunger < 0.3 {
-            let urgency = (1.0 - needs.hunger) * p.boldness * 1.5;
-            scores.push((FoxDispositionKind::Hunting, urgency + jitter(rng, j)));
+            let urgency = score_fox_dse_by_id("fox_hunting", ctx, inputs);
+            if urgency > 0.0 {
+                scores.push((FoxDispositionKind::Hunting, urgency + jitter(rng, j)));
+            }
         }
 
         // Allow fleeing if badly hurt.
@@ -128,31 +238,23 @@ pub fn score_fox_dispositions(ctx: &FoxScoringContext, rng: &mut impl Rng) -> Fo
     // -----------------------------------------------------------------------
     let l1 = needs.level_suppression(1); // always 1.0
 
-    // Hunting: driven by hunger, modified by boldness and prey awareness.
-    // Day-phase offset is additive so foxes still hunt when starving mid-Day,
-    // but the default active window shifts toward Dusk/Night.
+    // Hunting: §2.3 fox row — WS of 5 axes (hunger_urgency, prey_nearby,
+    // prey_belief, day_phase, boldness) via `FoxHuntingDse`. Maslow
+    // pre-gate applied inside `evaluate_single` through `l1 = 1.0`.
     {
-        let hunger_urgency = 1.0 - needs.hunger; // higher when hungrier
-        let prey_bonus = if ctx.prey_nearby { 0.3 } else { 0.0 };
-        let belief_bonus = ctx.local_prey_belief * 0.2;
-        let phase_bonus = match ctx.day_phase {
-            DayPhase::Dawn => ctx.scoring.fox_hunt_dawn_bonus,
-            DayPhase::Day => ctx.scoring.fox_hunt_day_bonus,
-            DayPhase::Dusk => ctx.scoring.fox_hunt_dusk_bonus,
-            DayPhase::Night => ctx.scoring.fox_hunt_night_bonus,
-        };
-        let score = (hunger_urgency + prey_bonus + belief_bonus + phase_bonus)
-            * p.boldness.max(0.3) // even timid foxes hunt when hungry
-            * l1;
+        let score = score_fox_dse_by_id("fox_hunting", ctx, inputs);
         if score > 0.0 {
             scores.push((FoxDispositionKind::Hunting, score + jitter(rng, j)));
         }
     }
 
-    // Raiding: hunger-driven but gated by cunning and store availability.
+    // Raiding: §2.3 fox row — CP of (hunger_urgency, cunning) via
+    // `FoxRaidingDse`. The `store_visible && !store_guarded` gate stays
+    // outer (same pattern as cat `Eat`'s `food_available` outer gate
+    // through Phase 3c.1a); Phase 3d flips it to marker-driven
+    // eligibility inside `EligibilityFilter`.
     if ctx.store_visible && !ctx.store_guarded {
-        let hunger_urgency = 1.0 - needs.hunger;
-        let score = hunger_urgency * p.cunning * 1.2 * l1;
+        let score = score_fox_dse_by_id("fox_raiding", ctx, inputs);
         if score > 0.0 {
             scores.push((FoxDispositionKind::Raiding, score + jitter(rng, j)));
         }
@@ -266,6 +368,9 @@ mod tests {
     use super::*;
     use std::sync::LazyLock;
 
+    use crate::ai::dses::{fox_hunting_dse, fox_raiding_dse};
+    use crate::ai::eval::{DseRegistry, ModifierPipeline};
+
     /// Shared default ScoringConstants for tests — avoids threading a local
     /// `scoring` binding through every test body. Static lifetime satisfies
     /// the `&'a ScoringConstants` field on FoxScoringContext.
@@ -294,8 +399,36 @@ mod tests {
             has_den: true,
             ticks_since_patrol: 0,
             day_phase: DayPhase::Night, // hunt-favorable default; tests override
+            self_position: Position::new(0, 0),
             scoring,
             jitter_range: 0.0, // no jitter in tests
+        }
+    }
+
+    /// Build a fox-only DSE registry with `fox_hunting` + `fox_raiding`
+    /// registered. Parallels the 4 mirror sites but self-contained for
+    /// tests.
+    fn test_fox_registry(scoring: &ScoringConstants) -> DseRegistry {
+        let mut r = DseRegistry::new();
+        r.fox_dses.push(fox_hunting_dse(scoring));
+        r.fox_dses.push(fox_raiding_dse());
+        r
+    }
+
+    /// Build a throwaway `EvalInputs` bundle for fox tests — tests don't
+    /// need a real entity, they just need the registry + modifier
+    /// pipeline plumbed through. Entity::from_raw_u32(1) is a stable
+    /// placeholder.
+    fn test_eval_inputs<'a>(
+        registry: &'a DseRegistry,
+        modifiers: &'a ModifierPipeline,
+    ) -> EvalInputs<'a> {
+        EvalInputs {
+            cat: Entity::from_raw_u32(1).unwrap(),
+            position: Position::new(0, 0),
+            tick: 0,
+            dse_registry: registry,
+            modifier_pipeline: modifiers,
         }
     }
 
@@ -311,8 +444,11 @@ mod tests {
         };
         let personality = FoxPersonality::balanced();
         let ctx = default_context(&needs, &personality, &SCORING);
+        let registry = test_fox_registry(&SCORING);
+        let modifiers = ModifierPipeline::new();
+        let inputs = test_eval_inputs(&registry, &modifiers);
 
-        let result = score_fox_dispositions(&ctx, &mut rand::rng());
+        let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
         let best = select_best_disposition(&result).unwrap();
         assert_eq!(best, FoxDispositionKind::Hunting);
     }
@@ -335,8 +471,11 @@ mod tests {
             prey_nearby: false,
             ..default_context(&needs, &personality, &SCORING)
         };
+        let registry = test_fox_registry(&SCORING);
+        let modifiers = ModifierPipeline::new();
+        let inputs = test_eval_inputs(&registry, &modifiers);
 
-        let result = score_fox_dispositions(&ctx, &mut rand::rng());
+        let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
         let best = select_best_disposition(&result).unwrap();
         assert_eq!(best, FoxDispositionKind::Patrolling);
     }
@@ -358,8 +497,11 @@ mod tests {
         let mut ctx = default_context(&needs, &personality, &SCORING);
         ctx.has_cubs = true;
         ctx.cubs_hungry = true;
+        let registry = test_fox_registry(&SCORING);
+        let modifiers = ModifierPipeline::new();
+        let inputs = test_eval_inputs(&registry, &modifiers);
 
-        let result = score_fox_dispositions(&ctx, &mut rand::rng());
+        let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
         let best = select_best_disposition(&result).unwrap();
         assert_eq!(best, FoxDispositionKind::Feeding);
     }
@@ -381,8 +523,11 @@ mod tests {
         let mut ctx = default_context(&needs, &personality, &SCORING);
         ctx.has_cubs = true;
         ctx.cubs_hungry = true;
+        let registry = test_fox_registry(&SCORING);
+        let modifiers = ModifierPipeline::new();
+        let inputs = test_eval_inputs(&registry, &modifiers);
 
-        let result = score_fox_dispositions(&ctx, &mut rand::rng());
+        let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
         let best = select_best_disposition(&result).unwrap();
         // Survival suppresses offspring — fox hunts for itself first.
         assert_eq!(best, FoxDispositionKind::Hunting);
@@ -407,8 +552,11 @@ mod tests {
         ctx.has_cubs = true;
         ctx.cubs_hungry = false;
         ctx.cat_threatening_den = true;
+        let registry = test_fox_registry(&SCORING);
+        let modifiers = ModifierPipeline::new();
+        let inputs = test_eval_inputs(&registry, &modifiers);
 
-        let result = score_fox_dispositions(&ctx, &mut rand::rng());
+        let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
         let best = select_best_disposition(&result).unwrap();
         assert_eq!(best, FoxDispositionKind::DenDefense);
     }
@@ -420,8 +568,11 @@ mod tests {
         let mut ctx = default_context(&needs, &personality, &SCORING);
         ctx.is_dispersing_juvenile = true;
         ctx.has_den = false;
+        let registry = test_fox_registry(&SCORING);
+        let modifiers = ModifierPipeline::new();
+        let inputs = test_eval_inputs(&registry, &modifiers);
 
-        let result = score_fox_dispositions(&ctx, &mut rand::rng());
+        let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
         let best = select_best_disposition(&result).unwrap();
         assert_eq!(best, FoxDispositionKind::Dispersing);
     }
@@ -445,8 +596,11 @@ mod tests {
         ctx.store_visible = true;
         ctx.store_guarded = false;
         ctx.prey_nearby = false;
+        let registry = test_fox_registry(&SCORING);
+        let modifiers = ModifierPipeline::new();
+        let inputs = test_eval_inputs(&registry, &modifiers);
 
-        let result = score_fox_dispositions(&ctx, &mut rand::rng());
+        let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
         // Should pick raiding over hunting (cunning + unguarded store).
         let has_raiding = result
             .scores
@@ -471,8 +625,11 @@ mod tests {
         };
         let mut ctx = default_context(&needs, &personality, &SCORING);
         ctx.cats_nearby = 3;
+        let registry = test_fox_registry(&SCORING);
+        let modifiers = ModifierPipeline::new();
+        let inputs = test_eval_inputs(&registry, &modifiers);
 
-        let result = score_fox_dispositions(&ctx, &mut rand::rng());
+        let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
         let best = select_best_disposition(&result).unwrap();
         assert_eq!(best, FoxDispositionKind::Fleeing);
     }

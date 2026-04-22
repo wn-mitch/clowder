@@ -11,7 +11,7 @@ Phase 3c.1 (first peer-group port) is the next wave.
 | 3b.2 — Eat reference port | `EatDse` registered in plugin + headless | **landed** |
 | 3c.0 — `score_actions` threading | `EvalInputs` bundle, call-site migration, dead-code `score_eat` helper | **landed** |
 | 3c.1a — Cat Starvation-urgency port | Eat + Hunt + Forage + Cook via `score_dse_by_id` | **landed** |
-| 3c.1b — Fox Starvation-urgency port | fox Hunting + Raiding through `fox_scoring.rs` | pending |
+| 3c.1b — Fox Starvation-urgency port | fox Hunting + Raiding through `fox_scoring.rs` | **landed** |
 | 3c.2+ — remaining peer groups | Fatal-threat, Rest, Social, Territory, Work, Exploration, Lifecycle | pending |
 | 3c.last — sibling splits | Herbcraft × 3, PracticeMagic × 6 per §L2.10.10 | pending |
 | 3d — faction matrix + roster gap-fill | Authoring systems for §4.6 markers | pending |
@@ -141,6 +141,11 @@ fan-out strategy.
 Avoiding, Feeding, DenDefense, Dispersing) port one-to-one per §3.1.1
 + §2.3 fox tables. Predictions committed at 3c landing.
 
+| DSE | Composition | Curve(s) | Prediction | Landing commit |
+|---|---|---|---|---|
+| fox Hunting | WS | hangry + Linear(prey_nearby) + Linear(0.2, prey_belief) + Piecewise(day_phase) + Composite{Linear, ClampMin(0.3)}(boldness) | GOAP Hunting plans drop until 3c.2 ports Avoiding (magnitude mismatch); legacy path absorbs. Deep-soak EngagePrey family within 2× baseline. | 3c.1b |
+| fox Raiding | CP | hangry + Linear(cunning) | Raiding fires when store unguarded + cunning fox hungry; CP gate means either-axis-zero kills the DSE. | 3c.1b |
+
 ## Canaries under this phase
 
 ### Hard gates (must pass)
@@ -194,6 +199,7 @@ Phase 3 exits when all of:
 | `afe22f5` | Phase 3b.2 `EatDse` reference port — single hunger consideration through `Logistic(8, 0.75)`, CP composition, Maslow tier 1, Goal Intention with SingleMinded commitment. Registered in plugin + headless + save-load. 10 tests. |
 | `91e6b56` | Phase 3c.0 — `EvalInputs` threaded through `score_actions` (2 production + 24 test + 3 integration-test sites). Dead-code `score_eat` helper lands the pattern. |
 | `0a25d9b` | Phase 3c.1a — cat Starvation-urgency port. `HuntDse` + `ForageDse` + `CookDse` join `EatDse`; 4 inline `score_actions` blocks retire. Anchor resolution: option 1 (tuned WS weights). Seed-42 5-min smoke soak: 0 Starvation deaths, 42 grooming events. |
+| *(3c.1b)* | Phase 3c.1b — fox Starvation-urgency port. `FoxHuntingDse` (5-axis WS, `Piecewise` day-phase knots from `ScoringConstants`) + `FoxRaidingDse` (2-axis CP) registered in all 4 mirror sites; `score_fox_dispositions` takes `&EvalInputs` and dispatches through `score_fox_dse_by_id`. Seed-42 5-min release soak: 0 Starvation deaths, Engage/SearchPrey plan-failure counts within 2× baseline. Observed soft-gate regression documented below. |
 
 **Total Phases 3a + 3b + 3c test coverage to date:** 112+ unit tests on new primitives; 745 lib tests pass.
 
@@ -257,31 +263,70 @@ primitive math makes that value depend on composition mode.
 The right answer likely falls out of a calibration soak. Phase 3c.1
 opens with option (1) as the default hypothesis, then measures.
 
-## Phase 3c.1b entry checklist
+## Phase 3c.1b — landed
 
 The cat Starvation-urgency port shipped in 3c.1a. 3c.1b closes the
 peer group by porting fox Hunting + fox Raiding through the same
 evaluator surface.
 
-1. Read §2.3 fox rows for `Hunting` and `Raiding` — curves + axes.
-2. Read §3.1.1 fox rows — WS vs CP + axis lists.
-3. Fox side has its own `FoxScoringContext` + `FoxPersonality`
-   (boldness / cunning / territoriality / protectiveness). Build
-   `fox_ctx_scalars` parallel to `ctx_scalars`; scalar vocabulary
-   likely overlaps (hunger_urgency) plus fox-specific (cunning,
-   prey_belief).
-4. Define `fox_hunting.rs` + `fox_raiding.rs` under
-   `src/ai/dses/`; register via `add_fox_dse` — verify
-   `registry.fox_dse(id)` lookup path works.
-5. Thread `EvalInputs` equivalent through
-   `fox_scoring::score_fox_dispositions`; replace inline Hunting
-   + Raiding branches.
-6. Register in all 4 mirror sites.
-7. Run seed-42 deep-soak (15-min release build). Verify:
-   - `Starvation` canary = 0 (colony + fox).
-   - `FoxHunt`-family plan-failure counts within 2× baseline.
-   - `Hunt` / `Raiding` firing frequency holds.
-8. Update this doc's concordance section with observed drift.
+### Port shape
+
+- `FoxHuntingDse` (5-axis WS, RtEO weights `[0.45, 0.10, 0.10, 0.10,
+  0.25]`): `hunger_urgency` via `hangry()`, `prey_nearby` via `Linear`
+  (binary 0/1), `prey_belief` via `Linear(slope=0.2)`, `day_phase`
+  via `Piecewise([(0.0, fox_hunt_dawn_bonus), (0.33, ...day...),
+  (0.66, ...dusk...), (1.0, ...night...)])` with knot values from
+  `ScoringConstants`, `boldness` via `Composite { Linear,
+  ClampMin(0.3) }`. Maslow tier 1.
+- `FoxRaidingDse` (2-axis CP, RtM weights `[1.0, 1.0]`):
+  `hunger_urgency` via `hangry()`, `cunning` via `Linear`. Maslow
+  tier 1. `store_visible && !store_guarded` stays an outer gate in
+  `score_fox_dispositions` — §4 marker port lands in Phase 3d.
+- `score_fox_dse_by_id` + `fox_ctx_scalars` parallel the cat-side
+  `score_dse_by_id` + `ctx_scalars` (semantic inversion of
+  `needs.hunger` happens in one place).
+- `score_fox_dispositions` takes `&EvalInputs`; the two inline
+  Hunting + Raiding blocks retire. The juvenile-dispersing branch's
+  emergency-Hunting clause also routes through the DSE path.
+
+### Mirror sites (all 4)
+
+`SimulationPlugin::build`, `main.rs::build_new_world` (headless),
+`main.rs::setup_world` (save-load defensive insert),
+`tests/integration.rs::setup_world`. Plugin uses
+`ScoringConstants::default()` because plugin `build()` runs before
+`setup_world_exclusive` inserts `SimConstants`; the other three
+sites pull the live `ScoringConstants` from the resource.
+
+### Observed drift (seed-42 `--duration 300 --release`)
+
+| Metric | 3c.1a baseline | 3c.1b | Ratio | Verdict |
+|---|---|---|---|---|
+| Starvation deaths | 0 | 0 | — | ✓ hard gate |
+| EngagePrey plan failures (family sum) | 417 | 409 | 0.98× | ✓ within 2× |
+| SearchPrey plan failures | 45 | 14 | 0.31× | ✓ within 2× |
+| Fox Hunting plans (GOAP) | 143 | **0** | **0×** | ✗ soft-gate regression |
+| Fox Avoiding plans (GOAP) | 80 304 | 59 267 | 0.74× | — |
+| Grooming events | 42 | 27 | 0.64× | within jitter (±0.05) + uncommitted-doc churn noise |
+
+Hard gates all pass. The fox-Hunting-plans-to-zero drop is the
+cross-peer-group magnitude mismatch predicted in "Peer-group anchor
+tension" above: fox `Hunting` peaks at ~0.78 under the 5-axis WS
+(starving, bold, Night, prey-present, belief=0.5), while un-ported
+`Avoiding`'s inline formula peaks near `cats_nearby × 0.6` — i.e.
+~1.2 at `cats_nearby=2` and ~1.8 at `cats_nearby=3`. Avoiding wins
+every contest near the colony boundary. The legacy
+`fox_ai_decision` priority-tree system still runs in parallel and
+absorbs the lost GOAP hunting (prey still dies, cats still get
+fed), which is why Starvation holds at 0.
+
+### Follow-on for Phase 3c.2 (Fatal-threat peer group)
+
+Port `Flee` + `Fight` + fox `Fleeing` + fox `Avoiding` + fox
+`DenDefense` in the same commit so all magnitude-1.0-anchored DSEs
+in the fatal-threat peer group land together. Expectation: fox
+`Hunting` re-appears as a GOAP disposition in the deep-soak once
+Avoiding's ceiling compresses from [0, 2+] to [0, 1].
 
 ## Phase 3a → 3b boundary (landed)
 

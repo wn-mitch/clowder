@@ -35,10 +35,20 @@ impl Plugin for SimulationPlugin {
         app.init_resource::<crate::ai::eval::ModifierPipeline>();
         {
             use crate::ai::eval::DseRegistryAppExt;
+            // Plugin build runs before `setup_world_exclusive` (which
+            // inserts SimConstants at the Startup schedule), so fox
+            // DSEs that depend on tunable knot values read from a
+            // default ScoringConstants here. The other three mirror
+            // sites (headless, save-load, integration tests) register
+            // after SimConstants is inserted and pass the live values.
+            let default_scoring =
+                crate::resources::sim_constants::ScoringConstants::default();
             app.add_dse(crate::ai::dses::eat_dse())
                 .add_dse(crate::ai::dses::hunt_dse())
                 .add_dse(crate::ai::dses::forage_dse())
-                .add_dse(crate::ai::dses::cook_dse());
+                .add_dse(crate::ai::dses::cook_dse())
+                .add_fox_dse(crate::ai::dses::fox_hunting_dse(&default_scoring))
+                .add_fox_dse(crate::ai::dses::fox_raiding_dse());
         }
 
         // Snapshot positions before any simulation system moves entities.

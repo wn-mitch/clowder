@@ -82,11 +82,19 @@ fn setup_world(seed: u64) -> World {
     // plugin/headless insertion pattern).
     world.insert_resource(clowder::ai::faction::FactionRelations::canonical());
     {
+        let scoring = world
+            .resource::<clowder::resources::SimConstants>()
+            .scoring
+            .clone();
         let mut registry = clowder::ai::eval::DseRegistry::new();
         registry.cat_dses.push(clowder::ai::dses::eat_dse());
         registry.cat_dses.push(clowder::ai::dses::hunt_dse());
         registry.cat_dses.push(clowder::ai::dses::forage_dse());
         registry.cat_dses.push(clowder::ai::dses::cook_dse());
+        registry
+            .fox_dses
+            .push(clowder::ai::dses::fox_hunting_dse(&scoring));
+        registry.fox_dses.push(clowder::ai::dses::fox_raiding_dse());
         world.insert_resource(registry);
     }
     world.insert_resource(clowder::ai::eval::ModifierPipeline::new());

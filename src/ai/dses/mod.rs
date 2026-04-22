@@ -9,9 +9,13 @@
 pub mod cook;
 pub mod eat;
 pub mod forage;
+pub mod fox_hunting;
+pub mod fox_raiding;
 pub mod hunt;
 
 pub use cook::cook_dse;
 pub use eat::eat_dse;
 pub use forage::forage_dse;
+pub use fox_hunting::fox_hunting_dse;
+pub use fox_raiding::fox_raiding_dse;
 pub use hunt::hunt_dse;
