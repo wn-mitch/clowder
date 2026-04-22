@@ -55,7 +55,11 @@ use super::dse::{CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, Int
 #[derive(Resource, Default)]
 pub struct DseRegistry {
     pub cat_dses: Vec<Box<dyn Dse>>,
-    pub target_taking_dses: Vec<Box<dyn Dse>>,
+    /// §6.3 target-taking DSEs. Distinct slot and type from `cat_dses`
+    /// because the evaluator dispatches differently: regular Dses score
+    /// once per cat-tick; target-taking DSEs iterate candidates and
+    /// aggregate per-candidate scores into (action_score, winning_target).
+    pub target_taking_dses: Vec<super::target_dse::TargetTakingDse>,
     pub fox_dses: Vec<Box<dyn Dse>>,
     pub aspiration_dses: Vec<Box<dyn Dse>>,
     pub coordinator_dses: Vec<Box<dyn Dse>>,
@@ -114,7 +118,13 @@ impl DseRegistry {
 /// Six methods cover the 45-row §L2.10.3 catalog.
 pub trait DseRegistryAppExt {
     fn add_dse(&mut self, dse: Box<dyn Dse>) -> &mut Self;
-    fn add_target_taking_dse(&mut self, dse: Box<dyn Dse>) -> &mut Self;
+    /// Register a §6.3 target-taking DSE. Distinct from `add_dse`
+    /// because target-taking uses a struct-shape type (see
+    /// [`crate::ai::target_dse::TargetTakingDse`]), not `Box<dyn Dse>`.
+    fn add_target_taking_dse(
+        &mut self,
+        dse: super::target_dse::TargetTakingDse,
+    ) -> &mut Self;
     fn add_fox_dse(&mut self, dse: Box<dyn Dse>) -> &mut Self;
     fn add_aspiration_dse(&mut self, dse: Box<dyn Dse>) -> &mut Self;
     fn add_coordinator_dse(&mut self, dse: Box<dyn Dse>) -> &mut Self;
@@ -130,7 +140,10 @@ impl DseRegistryAppExt for App {
         self
     }
 
-    fn add_target_taking_dse(&mut self, dse: Box<dyn Dse>) -> &mut Self {
+    fn add_target_taking_dse(
+        &mut self,
+        dse: super::target_dse::TargetTakingDse,
+    ) -> &mut Self {
         self.world_mut()
             .get_resource_or_insert_with(DseRegistry::new)
             .target_taking_dses
