@@ -35,7 +35,10 @@ impl Plugin for SimulationPlugin {
         app.init_resource::<crate::ai::eval::ModifierPipeline>();
         {
             use crate::ai::eval::DseRegistryAppExt;
-            app.add_dse(crate::ai::dses::eat_dse());
+            app.add_dse(crate::ai::dses::eat_dse())
+                .add_dse(crate::ai::dses::hunt_dse())
+                .add_dse(crate::ai::dses::forage_dse())
+                .add_dse(crate::ai::dses::cook_dse());
         }
 
         // Snapshot positions before any simulation system moves entities.

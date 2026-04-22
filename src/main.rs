@@ -644,6 +644,9 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
     if !world.contains_resource::<clowder::ai::eval::DseRegistry>() {
         let mut registry = clowder::ai::eval::DseRegistry::new();
         registry.cat_dses.push(clowder::ai::dses::eat_dse());
+        registry.cat_dses.push(clowder::ai::dses::hunt_dse());
+        registry.cat_dses.push(clowder::ai::dses::forage_dse());
+        registry.cat_dses.push(clowder::ai::dses::cook_dse());
         world.insert_resource(registry);
     }
     if !world.contains_resource::<clowder::ai::eval::ModifierPipeline>() {
@@ -1245,6 +1248,9 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
     {
         let mut registry = clowder::ai::eval::DseRegistry::new();
         registry.cat_dses.push(clowder::ai::dses::eat_dse());
+        registry.cat_dses.push(clowder::ai::dses::hunt_dse());
+        registry.cat_dses.push(clowder::ai::dses::forage_dse());
+        registry.cat_dses.push(clowder::ai::dses::cook_dse());
         world.insert_resource(registry);
     }
     world.insert_resource(clowder::ai::eval::ModifierPipeline::new());

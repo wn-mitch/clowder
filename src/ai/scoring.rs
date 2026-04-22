@@ -197,43 +197,43 @@ pub struct ScoringResult {
 /// entry maps a consideration's scalar name to the value the curve
 /// should see. Critically, **needs are inverted** — the spec's §2.3
 /// "hunger" axis is a deficit, so `needs.hunger = 0.1` (stomach 10%
-/// full) maps to `"hunger" = 0.9` (urgency 90%). The inversion lives
-/// here rather than in each DSE's fetch_scalar so future ports
-/// (Sleep's "energy", Hunt's "hunger" and "food_scarcity", …) share
-/// one source of truth.
+/// full) maps to `"hunger_urgency" = 0.9`. The inversion lives here
+/// rather than in each DSE's fetch_scalar so future ports share one
+/// source of truth.
 fn ctx_scalars(ctx: &ScoringContext) -> HashMap<&'static str, f32> {
     let mut m = HashMap::new();
-    // Needs-as-urgency (deficit form, spec §2.3 column names).
-    m.insert("hunger", (1.0 - ctx.needs.hunger).clamp(0.0, 1.0));
-    // Future ports append here: energy_deficit, safety_deficit,
-    // social_deficit, thermal_deficit, etc.
+    // Needs-as-urgency (deficit form).
+    m.insert(
+        "hunger_urgency",
+        (1.0 - ctx.needs.hunger).clamp(0.0, 1.0),
+    );
+    // Food-stores scarcity (deficit fraction in `[0, 1]`).
+    m.insert(
+        "food_scarcity",
+        (1.0 - ctx.food_fraction).clamp(0.0, 1.0),
+    );
+    // Personality coefficients flow through directly as `[0, 1]`
+    // inputs to each DSE's Linear identity curve.
+    m.insert("boldness", ctx.personality.boldness.clamp(0.0, 1.0));
+    m.insert("diligence", ctx.personality.diligence.clamp(0.0, 1.0));
+    // Binary presence signals as 0/1 scalars.
+    m.insert("prey_nearby", if ctx.prey_nearby { 1.0 } else { 0.0 });
+    // Dummy "one" input for DSEs with base-rate axes (Cook, Idle,
+    // Wander). Carried as a scalar so the curve's weight slot is
+    // uniform with the other axes.
+    m.insert("one", 1.0);
     m
 }
 
-/// Score the `Eat` DSE through the L2 evaluator. Replaces the inline
-/// `(1 - needs.hunger) * eat_urgency_scale * level_suppression(1)`
-/// formula with §2.3's hangry anchor: `Logistic(steepness=8,
-/// midpoint=0.75)` applied to hunger-as-urgency.
-///
-/// The `level_suppression(1)` multiplier is preserved via the
-/// evaluator's Maslow pre-gate (§3.4); at tier 1 the gate returns
-/// 1.0 unconditionally, so behavior is numerically identical to the
-/// old path minus the curve-shape change.
-///
-/// **Phase 3c.0: dead code.** The caller (`score_actions`) does not
-/// yet invoke this helper. `score_actions` keeps the old linear Eat
-/// formula until Phase 3c.1 ports the full Starvation-urgency peer
-/// group (Eat + Hunt + Forage + Cook + fox Hunting + Raiding) per
-/// §3.3.2 and flips all six branches together. Landing this dead
-/// helper now establishes the evaluator call shape that the
-/// peer-group port follows.
-#[allow(dead_code)]
-fn score_eat(ctx: &ScoringContext, inputs: &EvalInputs) -> f32 {
-    let Some(dse) = inputs.dse_registry.cat_dse("eat") else {
-        // Defensive: if the registry is empty (e.g., a test
-        // accidentally constructs a bare registry), return 0. The
-        // plugin registration path guarantees this is never hit in
-        // production.
+/// Score a registered cat DSE through the L2 evaluator. Returns the
+/// DSE's final score (post-Maslow, post-modifier-pipeline) or 0.0 if
+/// the DSE is missing or ineligible.
+fn score_dse_by_id(
+    dse_id: &str,
+    ctx: &ScoringContext,
+    inputs: &EvalInputs,
+) -> f32 {
+    let Some(dse) = inputs.dse_registry.cat_dse(dse_id) else {
         return 0.0;
     };
     let scalars = ctx_scalars(ctx);
@@ -277,19 +277,16 @@ pub fn score_actions(
     inputs: &EvalInputs,
     rng: &mut impl Rng,
 ) -> ScoringResult {
-    // `inputs` is threaded through for Phase 3c.1+ DSE ports but
-    // unused by the current inline formulas. Silence the warning —
-    // the param is part of the public surface so callers migrate
-    // once and stay migrated.
-    let _ = inputs;
     let s = ctx.scoring;
     let mut scores = Vec::with_capacity(12);
 
     // Incapacitated cats can only Eat, Sleep, or Idle.
     if ctx.is_incapacitated {
         if ctx.food_available {
-            let urgency = (1.0 - ctx.needs.hunger) * s.incapacitated_eat_urgency_scale
-                + s.incapacitated_eat_urgency_offset;
+            // §2.3 retires the incapacitated-Eat scale/offset constants:
+            // the Logistic hangry anchor alone spikes hard enough on
+            // low hunger to dominate without the bespoke multiplier.
+            let urgency = score_dse_by_id("eat", ctx, inputs);
             scores.push((Action::Eat, urgency + jitter(rng, s.jitter_range)));
         }
         let urgency = (1.0 - ctx.needs.energy) * s.incapacitated_sleep_urgency_scale
@@ -307,18 +304,9 @@ pub fn score_actions(
         };
     }
 
-    // --- Eat (only when food stores are available) ---
-    //
-    // **Phase 3c.0 plumbing, not consumed yet.** The `score_eat`
-    // helper below dispatches to the L2 evaluator via `inputs`, but
-    // using it here in isolation breaks §3.3.2's Starvation-urgency
-    // peer-group anchor (Hunt/Forage/Cook still produce linear
-    // scores outside `[0, 1]`, so the [0, 1]-capped Logistic Eat
-    // gets out-scored). Phase 3c.1 ports the full hangry peer group
-    // together and flips this branch over in the same commit.
+    // --- Eat (§2.3 hangry anchor: Logistic(8, 0.75)) ---
     if ctx.food_available {
-        let urgency =
-            (1.0 - ctx.needs.hunger) * s.eat_urgency_scale * ctx.needs.level_suppression(1);
+        let urgency = score_dse_by_id("eat", ctx, inputs);
         scores.push((Action::Eat, urgency + jitter(rng, s.jitter_range)));
     }
 
@@ -347,29 +335,15 @@ pub fn score_actions(
         ));
     }
 
-    // --- Hunt (boldness-driven; requires reachable forest/grass) ---
+    // --- Hunt (§2.3: WS of hunger + scarcity + boldness + prey_nearby) ---
     if ctx.can_hunt {
-        let food_scarcity = (1.0 - ctx.food_fraction) * s.hunt_food_scarcity_scale;
-        let prey_bonus = if ctx.prey_nearby {
-            s.hunt_prey_bonus
-        } else {
-            0.0
-        };
-        let urgency = ((1.0 - ctx.needs.hunger) + food_scarcity)
-            * ctx.personality.boldness
-            * s.hunt_boldness_scale
-            * ctx.needs.level_suppression(1)
-            + prey_bonus;
+        let urgency = score_dse_by_id("hunt", ctx, inputs);
         scores.push((Action::Hunt, urgency + jitter(rng, s.jitter_range)));
     }
 
-    // --- Forage (diligence-driven; requires terrain with yield) ---
+    // --- Forage (§2.3: WS of hunger + scarcity + diligence) ---
     if ctx.can_forage {
-        let food_scarcity = (1.0 - ctx.food_fraction) * s.forage_food_scarcity_scale;
-        let urgency = ((1.0 - ctx.needs.hunger) + food_scarcity)
-            * ctx.personality.diligence
-            * s.forage_diligence_scale
-            * ctx.needs.level_suppression(1);
+        let urgency = score_dse_by_id("forage", ctx, inputs);
         scores.push((Action::Forage, urgency + jitter(rng, s.jitter_range)));
     }
 
@@ -741,10 +715,9 @@ pub fn score_actions(
         ctx.has_raw_food_in_stores && ctx.needs.hunger > s.cook_hunger_gate;
     let mut wants_cook_but_no_kitchen = false;
     if cook_base_conditions && ctx.has_functional_kitchen {
-        let food_scarcity = (1.0 - ctx.food_fraction) * s.cook_food_scarcity_scale;
-        let base = s.cook_base_score + ctx.personality.diligence * s.cook_diligence_scale;
-        let score =
-            (base + food_scarcity) * ctx.needs.level_suppression(2) + jitter(rng, s.jitter_range);
+        // §3.1.1 Cook: WS of base_rate + scarcity + diligence. Maslow
+        // tier 2 (phys-only pre-gate) applied inside the evaluator.
+        let score = score_dse_by_id("cook", ctx, inputs) + jitter(rng, s.jitter_range);
         scores.push((Action::Cook, score));
     } else if cook_base_conditions && !ctx.has_functional_kitchen {
         // Latent desire — the cat would cook if a Kitchen existed. Signal
@@ -1377,6 +1350,9 @@ mod tests {
         REG.get_or_init(|| {
             let mut r = DseRegistry::new();
             r.cat_dses.push(crate::ai::dses::eat_dse());
+            r.cat_dses.push(crate::ai::dses::hunt_dse());
+            r.cat_dses.push(crate::ai::dses::forage_dse());
+            r.cat_dses.push(crate::ai::dses::cook_dse());
             r
         })
     }
@@ -2092,7 +2068,20 @@ mod tests {
     #[test]
     fn incapacitated_cat_only_scores_basic_actions() {
         let sc = default_scoring();
-        let needs = Needs::default();
+        // Use a hungry / tired cat so Eat and Sleep have
+        // above-jitter scores under the new `Logistic` curves. Under
+        // the retired scale+offset formulas, a sated cat still got
+        // a `0.3` Eat offset and would register above the filter; the
+        // §2.3 anchor Logistic(8, 0.75) returns ~0 at `hunger=1.0`,
+        // which is the correct behavior (sated cat has no urge to
+        // eat) but breaks the branch-coverage assertion this test
+        // makes. The scenario adjustment below preserves the test's
+        // intent (verify the incapacitated branch restricts the
+        // action set to Eat/Sleep/Idle) while accommodating the new
+        // curve shape.
+        let mut needs = Needs::default();
+        needs.hunger = 0.4;
+        needs.energy = 0.3;
         let personality = default_personality();
         let mut rng = seeded_rng(40);
 

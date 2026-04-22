@@ -41,10 +41,11 @@ use crate::ai::dse::{
 // Eat DSE
 // ---------------------------------------------------------------------------
 
-/// Scalar input name for the hunger consideration. Matches the key
-/// the evaluator's `fetch_scalar` closure resolves against the cat's
-/// `Needs.hunger` field.
-pub const HUNGER_INPUT: &str = "hunger";
+/// Scalar input name for the hunger consideration. The evaluator's
+/// `fetch_scalar` closure resolves this against the cat's hunger
+/// **urgency** (`1 - Needs.hunger` — spec §2.3 semantics), not the
+/// raw `Needs.hunger` satiation scalar. See `scoring.rs::ctx_scalars`.
+pub const HUNGER_INPUT: &str = "hunger_urgency";
 
 /// Hunger threshold that satisfies the Eat goal. Below this, the cat
 /// is sated; above, the goal state is unreached. 0.3 matches today's

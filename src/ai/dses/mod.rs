@@ -6,6 +6,12 @@
 //! remaining 20 cat DSEs, 9 fox DSEs, and 9 Herbcraft/PracticeMagic
 //! siblings through the same template.
 
+pub mod cook;
 pub mod eat;
+pub mod forage;
+pub mod hunt;
 
+pub use cook::cook_dse;
 pub use eat::eat_dse;
+pub use forage::forage_dse;
+pub use hunt::hunt_dse;
