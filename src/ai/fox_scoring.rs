@@ -516,6 +516,7 @@ mod tests {
     fn test_eval_inputs<'a>(
         registry: &'a DseRegistry,
         modifiers: &'a ModifierPipeline,
+        markers: &'a crate::ai::scoring::MarkerSnapshot,
     ) -> EvalInputs<'a> {
         EvalInputs {
             cat: Entity::from_raw_u32(1).unwrap(),
@@ -523,6 +524,7 @@ mod tests {
             tick: 0,
             dse_registry: registry,
             modifier_pipeline: modifiers,
+            markers,
         }
     }
 
@@ -540,7 +542,8 @@ mod tests {
         let ctx = default_context(&needs, &personality, &SCORING);
         let registry = test_fox_registry(&SCORING);
         let modifiers = ModifierPipeline::new();
-        let inputs = test_eval_inputs(&registry, &modifiers);
+        let markers = crate::ai::scoring::MarkerSnapshot::new();
+        let inputs = test_eval_inputs(&registry, &modifiers, &markers);
 
         let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
         let best = select_best_disposition(&result).unwrap();
@@ -567,7 +570,8 @@ mod tests {
         };
         let registry = test_fox_registry(&SCORING);
         let modifiers = ModifierPipeline::new();
-        let inputs = test_eval_inputs(&registry, &modifiers);
+        let markers = crate::ai::scoring::MarkerSnapshot::new();
+        let inputs = test_eval_inputs(&registry, &modifiers, &markers);
 
         let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
         let best = select_best_disposition(&result).unwrap();
@@ -593,7 +597,8 @@ mod tests {
         ctx.cubs_hungry = true;
         let registry = test_fox_registry(&SCORING);
         let modifiers = ModifierPipeline::new();
-        let inputs = test_eval_inputs(&registry, &modifiers);
+        let markers = crate::ai::scoring::MarkerSnapshot::new();
+        let inputs = test_eval_inputs(&registry, &modifiers, &markers);
 
         let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
         let best = select_best_disposition(&result).unwrap();
@@ -619,7 +624,8 @@ mod tests {
         ctx.cubs_hungry = true;
         let registry = test_fox_registry(&SCORING);
         let modifiers = ModifierPipeline::new();
-        let inputs = test_eval_inputs(&registry, &modifiers);
+        let markers = crate::ai::scoring::MarkerSnapshot::new();
+        let inputs = test_eval_inputs(&registry, &modifiers, &markers);
 
         let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
         let best = select_best_disposition(&result).unwrap();
@@ -648,7 +654,8 @@ mod tests {
         ctx.cat_threatening_den = true;
         let registry = test_fox_registry(&SCORING);
         let modifiers = ModifierPipeline::new();
-        let inputs = test_eval_inputs(&registry, &modifiers);
+        let markers = crate::ai::scoring::MarkerSnapshot::new();
+        let inputs = test_eval_inputs(&registry, &modifiers, &markers);
 
         let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
         let best = select_best_disposition(&result).unwrap();
@@ -664,7 +671,8 @@ mod tests {
         ctx.has_den = false;
         let registry = test_fox_registry(&SCORING);
         let modifiers = ModifierPipeline::new();
-        let inputs = test_eval_inputs(&registry, &modifiers);
+        let markers = crate::ai::scoring::MarkerSnapshot::new();
+        let inputs = test_eval_inputs(&registry, &modifiers, &markers);
 
         let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
         let best = select_best_disposition(&result).unwrap();
@@ -692,7 +700,8 @@ mod tests {
         ctx.prey_nearby = false;
         let registry = test_fox_registry(&SCORING);
         let modifiers = ModifierPipeline::new();
-        let inputs = test_eval_inputs(&registry, &modifiers);
+        let markers = crate::ai::scoring::MarkerSnapshot::new();
+        let inputs = test_eval_inputs(&registry, &modifiers, &markers);
 
         let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
         // Should pick raiding over hunting (cunning + unguarded store).
@@ -721,7 +730,8 @@ mod tests {
         ctx.cats_nearby = 3;
         let registry = test_fox_registry(&SCORING);
         let modifiers = ModifierPipeline::new();
-        let inputs = test_eval_inputs(&registry, &modifiers);
+        let markers = crate::ai::scoring::MarkerSnapshot::new();
+        let inputs = test_eval_inputs(&registry, &modifiers, &markers);
 
         let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
         let best = select_best_disposition(&result).unwrap();

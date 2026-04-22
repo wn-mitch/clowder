@@ -1156,26 +1156,22 @@ remaining work is itemised here.
   trait; `eval.rs` gets a `add_target_taking_dse` method on
   `DseRegistryAppExt`.
 - **§4 marker-eligibility authoring systems for roster gap-fill.**
-  Per spec §4.6, this is a ~50-marker catalog across 13 author
-  files plus the `src/ai/capabilities.rs` new-file. Scope for the
-  landing PR:
-    1. Wire `has_marker` from its current `|_, _| false` stub
-       (`scoring.rs:435`, `score_dse_by_id`) to a real ECS-query
-       backed closure. Canonical pattern: a `#[derive(SystemParam)]`
-       bundle carrying per-marker `Query<With<MarkerN>>` rows, with
-       a `fn has(&self, key: &str, entity: Entity) -> bool` that
-       dispatches on the key. Every new marker in the catalog
-       requires a query row here; the dispatch grows by one arm.
-    2. Introduce a `ColonyState` singleton entity for colony-scoped
-       markers (`HasStoredFood`, `HasFunctionalKitchen`,
-       `WardStrengthLow`, `ThornbriarAvailable`, …).
-    3. Author per-tick systems for each marker per §4.6 author-file
-       assignments. `Changed<T>` filters where predicates read
-       changing parent components; full-scan where predicates read
-       position-adjacent state.
-    4. Cut over each DSE's outer eligibility gate in `score_actions`
-       to an `EligibilityFilter::require(marker)` row. Retire the
-       inline `if ctx.flag { … }` block as its marker lands.
+  **Phase 4b.2 MVP landed** (lookup foundation + `HasStoredFood`
+  reference port — see Landed section below). The remaining ~49
+  §4.3 markers each need:
+    1. Author system per §4.6 author-file assignment (`Changed<T>`
+       filter where the predicate reads changing parent components;
+       full-scan where it reads position-adjacent state).
+    2. Population line in goap.rs / disposition.rs: either
+       `markers.set_colony(name, bool)` or per-cat
+       `markers.set_entity(name, entity, bool)`.
+    3. Target DSE's `.require(name)` cutover — retire the inline
+       `if ctx.flag { … }` block as its marker lands.
+    4. Optional: promote colony-scoped markers off the snapshot
+       shim onto a dedicated `ColonyState` singleton entity with
+       real ZST components and `Q<With<ColonyState>, With<Marker>>`
+       queries. Snapshot is the interim; singleton is the spec
+       canonical (§4.3 Colony).
   **Nuance uncovered during Phase 4b investigation:** marker
   authoring alone does **not** unblock the Cleanse / Harvest /
   Commune dormancies. `magic_cleanse` requires the cat to be
@@ -1338,6 +1334,31 @@ system owner satisfied it. Tag pattern: `substrate-follow-on`,
 ---
 
 ## Landed
+
+### Phase 4b.2 MVP — §4 marker lookup foundation + `HasStoredFood` reference port (2026-04-22)
+
+First end-to-end §4 marker port. `has_marker` moves from its
+`|_, _| false` stub at `scoring.rs:435` to a real lookup against
+a new `MarkerSnapshot` type threaded through `EvalInputs`.
+`EatDse` gains `.require("HasStoredFood")`; the inline outer
+`if ctx.food_available` gate at `score_actions` retires (both
+the non-incapacitated and incapacitated code paths). The caller
+populates `markers.set_colony("HasStoredFood", !food.is_empty())`
+at the top of each scoring tick.
+
+Pattern is now set for the remaining ~49 §4.3 markers: one
+authoring-site line per marker in the caller, one `.require(...)`
+row on the target DSE, optionally a per-tick system if the
+predicate is expensive enough to cache. The canonical spec shape
+(markers as ZST components on a `ColonyState` singleton) is a
+drop-in refactor later — only the caller-side population logic
+shifts; the evaluator-side surface stays identical.
+
+Tests: 5 new `marker_snapshot_*` unit tests (empty pool, colony
+scoping, entity scoping, clear semantics, clear-doesn't-nuke-peers).
+`eat_dse_requires_has_stored_food` + `eat_dse_rejected_without_has_stored_food_marker`
+replace the placeholder `eat_dse_has_no_eligibility_filter_today`
+test (which named itself as a Phase 3d-to-flip placeholder).
 
 ### Phase 4b.1 — §7.M.7.4 `resolve_mate_with` gender fix (2026-04-22)
 

@@ -536,6 +536,15 @@ pub fn evaluate_and_plan(
     let food_available = !res.food.is_empty();
     let food_fraction = res.food.fraction();
 
+    // §4 marker snapshot (Phase 4b.2). Populated once at system start
+    // from Resources and Queries, then passed by reference through
+    // `EvalInputs` so `EligibilityFilter::require(marker)` rows resolve
+    // without each DSE carrying its own query bundle. Phase 4b.2 MVP
+    // ships the colony-scoped `HasStoredFood` reference row; per-cat
+    // markers extend this as authoring systems land per §4.6.
+    let mut markers = crate::ai::scoring::MarkerSnapshot::new();
+    markers.set_colony("HasStoredFood", food_available);
+
     let mut cat_positions: Vec<(Entity, Position)> = Vec::new();
     let mut prey_positions: Vec<Position> = Vec::new();
     for (e, p, prey) in world_state.all_positions.iter() {
@@ -930,6 +939,7 @@ pub fn evaluate_and_plan(
             tick: res.time.tick,
             dse_registry: &res.dse_registry,
             modifier_pipeline: &res.modifier_pipeline,
+            markers: &markers,
         };
         let result = score_actions(&ctx, &eval_inputs, &mut rng.rng);
         // Record latent Cook desire so the coordinator's BuildPressure

@@ -298,6 +298,12 @@ pub fn fox_evaluate_and_plan(
     let prey_positions: Vec<Position> = prey.iter().copied().collect();
     let day_phase = DayPhase::from_tick(time.tick, &config);
     let sc = &constants.scoring;
+    // §4 marker snapshot — foxes don't consume the HasStoredFood
+    // colony marker, but the `EvalInputs` surface is shared across
+    // species. Empty snapshot is correct for the fox-scoring path
+    // until fox-side markers (`CubsHungry`, `StoreVisible`, etc.)
+    // get authoring systems.
+    let fox_markers = crate::ai::scoring::MarkerSnapshot::new();
 
     for (fox_entity, fox_state, fox_pos, needs, personality, hunting_beliefs) in &foxes {
         let den_info = fox_state
@@ -329,6 +335,7 @@ pub fn fox_evaluate_and_plan(
             tick: time.tick,
             dse_registry: &dse_registry,
             modifier_pipeline: &modifier_pipeline,
+            markers: &fox_markers,
         };
 
         let scoring_result = score_fox_dispositions(&ctx, &inputs, &mut rng.rng);

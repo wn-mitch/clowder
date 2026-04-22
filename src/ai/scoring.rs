@@ -32,6 +32,80 @@ pub struct EvalInputs<'a> {
     pub tick: u64,
     pub dse_registry: &'a DseRegistry,
     pub modifier_pipeline: &'a ModifierPipeline,
+    /// §4 marker lookup. Replaces the stub `|_, _| false` closure
+    /// in `score_dse_by_id` so `EligibilityFilter::require(marker)`
+    /// rows start resolving. Phase 4b.2 MVP: populated with the
+    /// colony-scoped subset at system start (caller iterates
+    /// resources/queries, dumps flags into the snapshot). Per-cat
+    /// marker support extends the snapshot when per-cat authoring
+    /// systems land.
+    pub markers: &'a MarkerSnapshot,
+}
+
+// ---------------------------------------------------------------------------
+// MarkerSnapshot — §4 marker lookup surface
+// ---------------------------------------------------------------------------
+
+/// Per-tick snapshot of §4 marker presence. Built by the caller
+/// (`goap.rs`, `disposition.rs`) at system start from live ECS queries
+/// and/or resources, then passed by reference into the evaluator so
+/// `EligibilityFilter::require(name)` rows resolve without each DSE
+/// carrying its own query bundle.
+///
+/// Colony-scoped markers are stored by name alone — the snapshot's
+/// `has(name, _)` lookup ignores the entity parameter for keys in
+/// `colony_markers`, so any cat passes the eligibility check when
+/// the colony-scoped flag is set. Per-cat markers (when added) live
+/// in a separate `entity_markers: HashSet<(&'static str, Entity)>`.
+///
+/// MVP note — the canonical spec shape (§4.3) attaches colony-scoped
+/// markers as ZST components on a dedicated `ColonyState` singleton
+/// entity, queried via `Q<With<ColonyState>, With<MarkerN>>`. This
+/// snapshot is a lookup-shim that produces the same answer without
+/// requiring the singleton to land first. When the singleton arrives,
+/// the population logic in each caller shifts from "read Resource"
+/// to "read ColonyState components" — the evaluator-side surface
+/// stays identical.
+#[derive(Default, Debug)]
+pub struct MarkerSnapshot {
+    colony_markers: std::collections::HashSet<&'static str>,
+    entity_markers: std::collections::HashMap<&'static str, std::collections::HashSet<Entity>>,
+}
+
+impl MarkerSnapshot {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set a colony-scoped marker. Any cat passes `has(name, _)` when
+    /// this is set.
+    pub fn set_colony(&mut self, name: &'static str, present: bool) {
+        if present {
+            self.colony_markers.insert(name);
+        } else {
+            self.colony_markers.remove(name);
+        }
+    }
+
+    /// Set a per-cat marker.
+    pub fn set_entity(&mut self, name: &'static str, entity: Entity, present: bool) {
+        let set = self.entity_markers.entry(name).or_default();
+        if present {
+            set.insert(entity);
+        } else {
+            set.remove(&entity);
+        }
+    }
+
+    /// Eligibility check. True iff the name is in the colony set OR
+    /// the (name, entity) pair is in the per-cat set.
+    pub fn has(&self, name: &str, entity: Entity) -> bool {
+        self.colony_markers.contains(name)
+            || self
+                .entity_markers
+                .get(name)
+                .is_some_and(|set| set.contains(&entity))
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -432,7 +506,13 @@ fn score_dse_by_id(
     let fetch_scalar = |name: &str, _entity: Entity| -> f32 {
         scalars.get(name).copied().unwrap_or(0.0)
     };
-    let has_marker = |_name: &str, _entity: Entity| false;
+    // §4 marker lookup — consumes `EvalInputs::markers` populated by
+    // the caller. `entity` is the evaluating cat when eligibility runs
+    // against a per-cat marker; colony-scoped markers ignore it.
+    let markers = inputs.markers;
+    let has_marker = |name: &str, entity: Entity| -> bool {
+        markers.has(name, entity)
+    };
     let sample_map = |_name: &str, _pos: Position| 0.0_f32;
     let needs_ref = ctx.needs;
     let maslow = |tier: u8| needs_ref.level_suppression(tier);
@@ -474,11 +554,15 @@ pub fn score_actions(
 
     // Incapacitated cats can only Eat, Sleep, or Idle.
     if ctx.is_incapacitated {
-        if ctx.food_available {
-            // §2.3 retires the incapacitated-Eat scale/offset constants:
-            // the Logistic hangry anchor alone spikes hard enough on
-            // low hunger to dominate without the bespoke multiplier.
-            let urgency = score_dse_by_id("eat", ctx, inputs);
+        // §2.3 retires the incapacitated-Eat scale/offset constants:
+        // the Logistic hangry anchor alone spikes hard enough on
+        // low hunger to dominate without the bespoke multiplier. §4
+        // (Phase 4b.2) retires the outer `ctx.food_available` gate —
+        // the Eat DSE's `.require("HasStoredFood")` eligibility filter
+        // returns 0 when the colony has no food, matching the prior
+        // gated-off behavior.
+        let urgency = score_dse_by_id("eat", ctx, inputs);
+        if urgency > 0.0 {
             scores.push((Action::Eat, urgency + jitter(rng, s.jitter_range)));
         }
         let urgency = (1.0 - ctx.needs.energy) * s.incapacitated_sleep_urgency_scale
@@ -497,9 +581,15 @@ pub fn score_actions(
     }
 
     // --- Eat (§2.3 hangry anchor: Logistic(8, 0.75)) ---
-    if ctx.food_available {
+    // §4 (Phase 4b.2) retired the outer `ctx.food_available` gate. The
+    // Eat DSE's `.require("HasStoredFood")` eligibility filter resolves
+    // against `EvalInputs::markers` (populated by the caller from
+    // `FoodStores`), returning 0 when the colony has no food.
+    {
         let urgency = score_dse_by_id("eat", ctx, inputs);
-        scores.push((Action::Eat, urgency + jitter(rng, s.jitter_range)));
+        if urgency > 0.0 {
+            scores.push((Action::Eat, urgency + jitter(rng, s.jitter_range)));
+        }
     }
 
     // --- Sleep (§2.3: WS of energy_deficit + day_phase + injury_rest) ---
@@ -1515,6 +1605,19 @@ mod tests {
         })
     }
 
+    fn cached_test_markers() -> &'static MarkerSnapshot {
+        static M: OnceLock<MarkerSnapshot> = OnceLock::new();
+        M.get_or_init(|| {
+            // Default snapshot for scoring tests: HasStoredFood set so
+            // the Eat DSE's `.require("HasStoredFood")` eligibility gate
+            // opens. Tests that explicitly check the empty-stores path
+            // override `markers` on the returned `EvalInputs`.
+            let mut s = MarkerSnapshot::new();
+            s.set_colony("HasStoredFood", true);
+            s
+        })
+    }
+
     fn test_eval_inputs() -> EvalInputs<'static> {
         EvalInputs {
             cat: Entity::from_raw_u32(1).unwrap(),
@@ -1522,6 +1625,7 @@ mod tests {
             tick: 0,
             dse_registry: cached_registry(),
             modifier_pipeline: cached_modifier_pipeline(),
+            markers: cached_test_markers(),
         }
     }
 
@@ -2843,6 +2947,58 @@ mod tests {
             select_disposition_softmax(&[], &mut rng, &sc),
             DispositionKind::Resting,
         );
+    }
+
+    // --- MarkerSnapshot tests (§4 marker lookup surface) ---
+
+    #[test]
+    fn marker_snapshot_empty_returns_false() {
+        let snap = MarkerSnapshot::new();
+        let e = Entity::from_raw_u32(1).unwrap();
+        assert!(!snap.has("HasStoredFood", e));
+    }
+
+    #[test]
+    fn marker_snapshot_colony_marker_true_for_any_entity() {
+        let mut snap = MarkerSnapshot::new();
+        snap.set_colony("HasStoredFood", true);
+        let a = Entity::from_raw_u32(1).unwrap();
+        let b = Entity::from_raw_u32(99).unwrap();
+        assert!(snap.has("HasStoredFood", a));
+        assert!(snap.has("HasStoredFood", b));
+        assert!(!snap.has("Incapacitated", a));
+    }
+
+    #[test]
+    fn marker_snapshot_colony_marker_clears_cleanly() {
+        let mut snap = MarkerSnapshot::new();
+        let e = Entity::from_raw_u32(1).unwrap();
+        snap.set_colony("HasStoredFood", true);
+        assert!(snap.has("HasStoredFood", e));
+        snap.set_colony("HasStoredFood", false);
+        assert!(!snap.has("HasStoredFood", e));
+    }
+
+    #[test]
+    fn marker_snapshot_entity_marker_discriminates_on_entity() {
+        let mut snap = MarkerSnapshot::new();
+        let a = Entity::from_raw_u32(1).unwrap();
+        let b = Entity::from_raw_u32(2).unwrap();
+        snap.set_entity("Incapacitated", a, true);
+        assert!(snap.has("Incapacitated", a));
+        assert!(!snap.has("Incapacitated", b));
+    }
+
+    #[test]
+    fn marker_snapshot_entity_marker_clear_removes_only_named_cat() {
+        let mut snap = MarkerSnapshot::new();
+        let a = Entity::from_raw_u32(1).unwrap();
+        let b = Entity::from_raw_u32(2).unwrap();
+        snap.set_entity("Incapacitated", a, true);
+        snap.set_entity("Incapacitated", b, true);
+        snap.set_entity("Incapacitated", a, false);
+        assert!(!snap.has("Incapacitated", a));
+        assert!(snap.has("Incapacitated", b));
     }
 
     // --- Behavior gate tests ---

@@ -68,7 +68,12 @@ impl EatDse {
                 hangry(),
             ))],
             composition: Composition::compensated_product(vec![1.0]),
-            eligibility: EligibilityFilter::new(),
+            // §4 marker eligibility (Phase 4b.2): the cat can only
+            // score Eat if the colony has food in stores. Retires the
+            // inline `if ctx.food_available` gate at
+            // `scoring.rs::score_actions`. Populated by the caller-side
+            // `MarkerSnapshot::set_colony("HasStoredFood", ...)`.
+            eligibility: EligibilityFilter::new().require("HasStoredFood"),
         }
     }
 }
@@ -175,7 +180,10 @@ mod tests {
         let dse = EatDse::new();
         let entity = Entity::from_raw_u32(1).unwrap();
 
-        let has_marker = |_: &str, _: Entity| false;
+        // §4 (Phase 4b.2): Eat requires `HasStoredFood` — the test
+        // closure stands in for the `MarkerSnapshot.has()` lookup
+        // by returning true for that key.
+        let has_marker = |name: &str, _: Entity| name == "HasStoredFood";
         let sample = |_: &str, _: Position| 0.0;
         let ctx = EvalCtx {
             cat: entity,
@@ -198,7 +206,7 @@ mod tests {
                 }
             };
             evaluate_single(&dse, entity, &ctx, &maslow, &modifiers, &fetch)
-                .expect("always eligible")
+                .expect("eligible with HasStoredFood")
                 .final_score
         };
 
@@ -267,14 +275,39 @@ mod tests {
     }
 
     #[test]
-    fn eat_dse_has_no_eligibility_filter_today() {
-        // Phase 3b.2 documentation: Eat is outer-gated on
-        // ctx.food_available in score_actions. When Phase 3d lands
-        // HasStoredFood's authoring system, this test should flip
-        // to asserting `require("HasStoredFood")`.
+    fn eat_dse_requires_has_stored_food() {
+        // Phase 4b.2: Eat's outer `ctx.food_available` gate in
+        // `score_actions` retired; the DSE now consumes the
+        // `HasStoredFood` colony marker via its eligibility filter.
         let dse = EatDse::new();
-        assert!(dse.eligibility().required.is_empty());
+        assert_eq!(dse.eligibility().required, vec!["HasStoredFood"]);
         assert!(dse.eligibility().forbidden.is_empty());
+    }
+
+    #[test]
+    fn eat_dse_rejected_without_has_stored_food_marker() {
+        // Inverse of the `uses_hangry_anchor` test: with the marker
+        // absent, the evaluator must skip Eat entirely per §4's
+        // "avoid computing a score that can't win" principle.
+        let dse = EatDse::new();
+        let entity = Entity::from_raw_u32(1).unwrap();
+        let has_marker = |_: &str, _: Entity| false;
+        let sample = |_: &str, _: Position| 0.0;
+        let ctx = EvalCtx {
+            cat: entity,
+            tick: 0,
+            sample_map: &sample,
+            has_marker: &has_marker,
+            self_position: Position::new(0, 0),
+            target: None,
+            target_position: None,
+        };
+        let maslow = |_: u8| 1.0;
+        let modifiers = ModifierPipeline::new();
+        let fetch = |_: &str, _: Entity| 0.8_f32;
+
+        let out = evaluate_single(&dse, entity, &ctx, &maslow, &modifiers, &fetch);
+        assert!(out.is_none(), "Eat must be ineligible without HasStoredFood");
     }
 
     #[test]

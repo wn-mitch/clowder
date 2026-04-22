@@ -353,6 +353,12 @@ pub fn evaluate_dispositions(
     let food_available = !food.is_empty();
     let food_fraction = food.fraction();
 
+    // §4 marker snapshot (Phase 4b.2). Mirror of goap.rs — both scoring
+    // paths must populate the same keys so the evaluator resolves
+    // `EligibilityFilter::require` consistently across the two systems.
+    let mut markers = crate::ai::scoring::MarkerSnapshot::new();
+    markers.set_colony("HasStoredFood", food_available);
+
     // Collect positions once.
     let mut cat_positions: Vec<(Entity, Position)> = Vec::new();
     let mut prey_positions: Vec<Position> = Vec::new();
@@ -639,6 +645,7 @@ pub fn evaluate_dispositions(
             tick: side_effects.time.tick,
             dse_registry: &side_effects.dse_registry,
             modifier_pipeline: &side_effects.modifier_pipeline,
+            markers: &markers,
         };
         let result = score_actions(&ctx, &eval_inputs, &mut rng.rng);
         let mut scores = result.scores;
