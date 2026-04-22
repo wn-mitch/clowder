@@ -91,7 +91,7 @@ pub fn update_fertility_phase(
     time: Res<TimeState>,
     config: Res<SimConfig>,
     constants: Res<SimConstants>,
-    query: Query<
+    mut query: Query<
         (
             Entity,
             &Age,
@@ -111,7 +111,7 @@ pub fn update_fertility_phase(
     let season = time.season(&config);
     let tps = config.ticks_per_season;
 
-    for (entity, age, gender, maybe_fert, maybe_preg) in query {
+    for (entity, age, gender, maybe_fert, maybe_preg) in &mut query {
         let stage = age.stage(time.tick, tps);
         let gestation_capable = !matches!(*gender, Gender::Tom);
 
@@ -237,9 +237,107 @@ pub fn handle_post_partum_reinsert(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::resources::time::{SimConfig, TimeState};
 
     fn test_constants() -> FertilityConstants {
         FertilityConstants::default()
+    }
+
+    /// Drive `update_fertility_phase` once against a freshly-built
+    /// World containing a single Adult Queen. Verifies that the system
+    /// inserts `Fertility` as designed.
+    #[test]
+    fn update_fertility_phase_inserts_on_adult_queen() {
+        let mut world = World::new();
+        world.insert_resource(SimConstants::default());
+        world.insert_resource(TimeState::default());
+        world.insert_resource(SimConfig::default());
+
+        // Spawn an Adult Queen — born far enough back that Age::stage
+        // resolves to Adult (12+ seasons at ticks_per_season=20000).
+        let born_tick = 0u64;
+        let current_tick = 12 * 20_000u64;
+        let mut time = world.resource_mut::<TimeState>();
+        time.tick = current_tick;
+        let queen = world
+            .spawn((
+                Age::new(born_tick),
+                Gender::Queen,
+            ))
+            .id();
+
+        // Run the system.
+        let mut schedule = bevy_ecs::schedule::Schedule::default();
+        schedule.add_systems(update_fertility_phase);
+        schedule.run(&mut world);
+
+        // After one frame + command flush, the Queen must carry Fertility.
+        assert!(
+            world.get::<Fertility>(queen).is_some(),
+            "Adult Queen should have Fertility inserted after update_fertility_phase"
+        );
+    }
+
+    #[test]
+    fn update_fertility_phase_mutates_existing_phase_to_anestrus_in_winter() {
+        let mut world = World::new();
+        world.insert_resource(SimConstants::default());
+        world.insert_resource(SimConfig::default());
+        world.insert_resource(TimeState::default());
+        // Tick 300 000 = 15 seasons in → cat born at tick 0 is Adult
+        // (LifeStage::Adult spans seasons 12–47). Modulo 80 000-tick
+        // year puts us 60 000 ticks into the year = Winter onset.
+        world.resource_mut::<TimeState>().tick = 300_000;
+
+        let queen = world
+            .spawn((
+                Age::new(0),
+                Gender::Queen,
+                Fertility {
+                    phase: FertilityPhase::Estrus,
+                    cycle_offset: 12345,
+                    post_partum_remaining_ticks: 0,
+                },
+            ))
+            .id();
+
+        let mut schedule = bevy_ecs::schedule::Schedule::default();
+        schedule.add_systems(update_fertility_phase);
+        schedule.run(&mut world);
+
+        // Mutation sanity: if the query iterator doesn't actually
+        // mutate through `Option<&mut Fertility>`, the Queen stays in
+        // Estrus and this test fails — guarding the subtle
+        // `for x in query` vs `for x in &mut query` distinction.
+        let phase = world
+            .get::<Fertility>(queen)
+            .expect("Queen must retain Fertility in winter (removed only at Elder)")
+            .phase;
+        assert_eq!(
+            phase,
+            FertilityPhase::Anestrus,
+            "update_fertility_phase must mutate Estrus → Anestrus at Winter onset"
+        );
+    }
+
+    #[test]
+    fn update_fertility_phase_does_not_insert_on_tom() {
+        let mut world = World::new();
+        world.insert_resource(SimConstants::default());
+        world.insert_resource(SimConfig::default());
+        world.insert_resource(TimeState::default());
+        world.resource_mut::<TimeState>().tick = 12 * 20_000;
+
+        let tom = world.spawn((Age::new(0), Gender::Tom)).id();
+
+        let mut schedule = bevy_ecs::schedule::Schedule::default();
+        schedule.add_systems(update_fertility_phase);
+        schedule.run(&mut world);
+
+        assert!(
+            world.get::<Fertility>(tom).is_none(),
+            "Tom should never carry Fertility (§7.M.7.4)"
+        );
     }
 
     #[test]

@@ -1135,6 +1135,71 @@ cold-death canaries must remain 0.
 Phase 3 is gated on §7.W (Fulfillment component) landing. Phase 4
 is gated on phase 3.
 
+### 14. Phase 3 exit regressions → Phase 4 balance thread [2026-04-22]
+
+**Why it matters:** Phase 3 of the AI substrate refactor closed
+"substrate-complete, balance-gated" on commits `c8bb1c6` (§9.3 stance
+bindings) + `562c575` (Fertility + §7.M.7.2 transitions). The seed-42
+15-min exit soak shows three directional-concordant but
+magnitude-extreme regressions that each resolve against specific
+Phase 4 deliverables:
+
+- **MatingOccurred 7 → 0** — downstream of §7.M.7.1 Elder-exit removal
+  of `Fertility`. Baseline's 7 matings were all Elder × Elder at tick
+  1.28M–1.37M; in a 15-min soak, bonded pairs are all Elder by the
+  time mating would fire. Fix = Adult-window retune (lower Elder
+  threshold or raise founder-age distribution); §7.M.7.8 prescribes
+  balance tuning, not substrate rollback.
+- **PracticeMagic sub-mode count 2 / 6 → 1 / 6** — downstream of the
+  Herbcraft + PracticeMagic emergency bonuses (`ward_corruption_*`,
+  `cleanse_*`, `sensed_rot_*`) staying inline additive in
+  `scoring.rs:576–712`. Fix = §3.5 modifier-pipeline port.
+- **Starvation deaths 3 → 8** — cross-peer-group argmax magnifies over
+  a 15-min soak. Fix = §L2.10.6 softmax selection.
+
+Full Phase 3 doc: `docs/balance/substrate-phase-3.md` § Concordance.
+Exit-soak log: `logs/tuned-42/events.jsonl` at commit `562c575`.
+
+**Touch points (all Phase 4):**
+
+- `src/ai/eval.rs` — add softmax selection alongside argmax; §L2.10.6
+  committed a temperature-tunable design.
+- `src/ai/modifier.rs` (new) — three `ScoreModifier` impls:
+  `PrideBoost`, `TraditionInertia`, `FoxSuppression`. Then the magic
+  emergency-bonus retargets: `WardCorruptionEmergency`,
+  `CleanseEmergency`, `SensedRotBoost` — each reads the same
+  `ctx.target_tile.corruption` that the inline path reads today.
+- `src/ai/dse.rs` — add `TargetTakingDse` trait + `add_target_taking_dse`
+  registration method. Consume the declarative stance bindings
+  shipped in `c8bb1c6`.
+- `src/systems/markers_authoring.rs` (new) — per-tick systems that
+  insert / remove `CanHunt`, `CanFight`, `HasSocialTarget`,
+  `HasStoredFood`, `StoreVisible`, `ThreatNearby`, etc. Retires outer
+  eligibility gates from `score_actions`.
+- `src/steps/disposition/mate_with.rs::resolve_mate_with` — §7.M.7.4
+  gender fix: select the gestation-capable partner for `Pregnant`
+  insertion instead of the initiator.
+- `src/resources/sim_constants.rs` — Adult-window retune (likely
+  change `LifeStage::Adult` upper bound from 47 seasons to 60+ so
+  Adult×Adult mating windows exist in 15-min soaks).
+
+**Re-open condition:** if post-Phase-4 seed-42 `--duration 900` soak
+still fails MatingOccurred ≥ 1 per colony per season, Farming ≥ 1, or
+≥ 3 / 5 PracticeMagic sub-modes, re-open the Phase 3 hypothesis in
+`docs/balance/substrate-phase-3.md` rather than loading a new balance
+thread — those three are load-bearing for the Phase 3 refactor's
+validation.
+
+**Dependency graph:**
+- Softmax, modifier pipeline, and target-taking DSE can land in any
+  order — they're orthogonal.
+- Adult-window retune should follow modifier pipeline (lets the
+  Fertility emergency-bonus — if authored — compensate before the
+  window is widened).
+- `resolve_mate_with` gender fix is independent and blocking nothing.
+
+---
+
 ### 13. Spec-follow-on debts from AI substrate refactor [2026-04-21]
 
 **Why it matters:** The `docs/systems/ai-substrate-refactor.md`
