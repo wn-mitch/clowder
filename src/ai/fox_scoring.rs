@@ -138,12 +138,30 @@ fn fox_ctx_scalars(ctx: &FoxScoringContext) -> HashMap<&'static str, f32> {
     );
     m.insert("boldness", ctx.personality.boldness.clamp(0.0, 1.0));
     m.insert("cunning", ctx.personality.cunning.clamp(0.0, 1.0));
+    m.insert(
+        "protectiveness",
+        ctx.personality.protectiveness.clamp(0.0, 1.0),
+    );
     m.insert("prey_nearby", if ctx.prey_nearby { 1.0 } else { 0.0 });
     m.insert(
         "prey_belief",
         ctx.local_prey_belief.clamp(0.0, 1.0),
     );
     m.insert("day_phase", day_phase_scalar(ctx.day_phase));
+    // Fatal-threat peer (3c.2): health deficit and raw cats_nearby
+    // count. cats_nearby flows as raw f32 because the consuming DSEs
+    // (FoxFleeing Piecewise step, FoxAvoiding saturating Linear)
+    // encode their own normalization through their curves.
+    m.insert(
+        "health_deficit",
+        (1.0 - ctx.needs.health_fraction).clamp(0.0, 1.0),
+    );
+    m.insert("cats_nearby", ctx.cats_nearby as f32);
+    // DenDefense axis — cub safety deficit.
+    m.insert(
+        "cub_safety_deficit",
+        (1.0 - ctx.needs.cub_safety).clamp(0.0, 1.0),
+    );
     m
 }
 
@@ -278,10 +296,11 @@ pub fn score_fox_dispositions(
         }
     }
 
-    // Fleeing: when health is critical. Inversely weighted by boldness.
+    // Fleeing: §2.3 WS of health_deficit + cats_nearby (Piecewise
+    // step at 2+) + boldness (damped invert). Outer gate preserves
+    // the original `health < 0.5 || cats_nearby >= 2` precondition.
     if needs.health_fraction < 0.5 || ctx.cats_nearby >= 2 {
-        let danger = (1.0 - needs.health_fraction) + if ctx.cats_nearby >= 2 { 0.5 } else { 0.0 };
-        let score = danger * (1.0 - p.boldness * 0.5) * l1;
+        let score = score_fox_dse_by_id("fox_fleeing", ctx, inputs);
         if score > 0.0 {
             scores.push((FoxDispositionKind::Fleeing, score + jitter(rng, j)));
         }
@@ -311,13 +330,13 @@ pub fn score_fox_dispositions(
         }
     }
 
-    // Avoiding: cats nearby and fox is at least partially fed — withdraw
-    // rather than risk a skirmish. Empirically the 0.3 threshold produces the
-    // best cat survival outcomes; tighter than that and foxes stay in fight
-    // zones; looser and foxes spin in avoid loops and starve.
+    // Avoiding: §2.3 CP of cats_nearby (saturating) + boldness
+    // damped-invert. Outer gate preserves the original `cats_nearby
+    // >= 1 && hunger > 0.3 && health > 0.5` empirical precondition —
+    // tighter than that and foxes stay in fight zones; looser and
+    // foxes spin in avoid loops and starve.
     if ctx.cats_nearby >= 1 && needs.hunger > 0.3 && needs.health_fraction > 0.5 {
-        let urgency = (ctx.cats_nearby as f32) * (1.0 - p.boldness * 0.8);
-        let score = urgency * l1;
+        let score = score_fox_dse_by_id("fox_avoiding", ctx, inputs);
         if score > 0.0 {
             scores.push((FoxDispositionKind::Avoiding, score + jitter(rng, j)));
         }
@@ -337,10 +356,11 @@ pub fn score_fox_dispositions(
         }
     }
 
-    // Den defense: confront intruders near den with cubs.
+    // Den defense: §2.3 CP of cub_safety_deficit (flee_or_fight
+    // Logistic) + protectiveness Linear. Outer gate preserves
+    // `cat_threatening_den && has_cubs`.
     if ctx.cat_threatening_den && ctx.has_cubs {
-        let urgency = (1.0 - needs.cub_safety) * p.protectiveness * 2.0;
-        let score = urgency * l3;
+        let score = score_fox_dse_by_id("fox_den_defense", ctx, inputs);
         if score > 0.0 {
             scores.push((FoxDispositionKind::DenDefense, score + jitter(rng, j)));
         }
@@ -368,7 +388,9 @@ mod tests {
     use super::*;
     use std::sync::LazyLock;
 
-    use crate::ai::dses::{fox_hunting_dse, fox_raiding_dse};
+    use crate::ai::dses::{
+        fox_avoiding_dse, fox_den_defense_dse, fox_fleeing_dse, fox_hunting_dse, fox_raiding_dse,
+    };
     use crate::ai::eval::{DseRegistry, ModifierPipeline};
 
     /// Shared default ScoringConstants for tests — avoids threading a local
@@ -412,6 +434,9 @@ mod tests {
         let mut r = DseRegistry::new();
         r.fox_dses.push(fox_hunting_dse(scoring));
         r.fox_dses.push(fox_raiding_dse());
+        r.fox_dses.push(fox_fleeing_dse());
+        r.fox_dses.push(fox_avoiding_dse());
+        r.fox_dses.push(fox_den_defense_dse());
         r
     }
 

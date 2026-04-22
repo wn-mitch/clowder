@@ -92,9 +92,20 @@ fn setup_world(seed: u64) -> World {
         registry.cat_dses.push(clowder::ai::dses::forage_dse());
         registry.cat_dses.push(clowder::ai::dses::cook_dse());
         registry
+            .cat_dses
+            .push(clowder::ai::dses::flee_dse(&scoring));
+        registry
+            .cat_dses
+            .push(clowder::ai::dses::fight_dse(&scoring));
+        registry
             .fox_dses
             .push(clowder::ai::dses::fox_hunting_dse(&scoring));
         registry.fox_dses.push(clowder::ai::dses::fox_raiding_dse());
+        registry.fox_dses.push(clowder::ai::dses::fox_fleeing_dse());
+        registry.fox_dses.push(clowder::ai::dses::fox_avoiding_dse());
+        registry
+            .fox_dses
+            .push(clowder::ai::dses::fox_den_defense_dse());
         world.insert_resource(registry);
     }
     world.insert_resource(clowder::ai::eval::ModifierPipeline::new());

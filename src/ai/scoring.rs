@@ -212,6 +212,24 @@ fn ctx_scalars(ctx: &ScoringContext) -> HashMap<&'static str, f32> {
         "food_scarcity",
         (1.0 - ctx.food_fraction).clamp(0.0, 1.0),
     );
+    // Safety deficit — Flee axis. Safety is a satisfaction scalar; the
+    // DSE wants urgency form so the Logistic midpoint semantics line
+    // up with `flee_safety_threshold`.
+    m.insert("safety_deficit", (1.0 - ctx.needs.safety).clamp(0.0, 1.0));
+    // Raw safety + health for Fight's piecewise-gated axes (shape
+    // `fight_gating` already encodes the deficit semantics through
+    // its knots).
+    m.insert("safety", ctx.needs.safety.clamp(0.0, 1.0));
+    m.insert("health", ctx.health.clamp(0.0, 1.0));
+    // Fight: combat_effective is already a `[0, 1]` composite index
+    // upstream; flow through directly.
+    m.insert(
+        "combat_effective",
+        ctx.combat_effective.clamp(0.0, 1.0),
+    );
+    // Fight: ally_count is raw count — the DSE's saturating-count
+    // Composite handles normalization.
+    m.insert("ally_count", ctx.allies_fighting_threat as f32);
     // Personality coefficients flow through directly as `[0, 1]`
     // inputs to each DSE's Linear identity curve.
     m.insert("boldness", ctx.personality.boldness.clamp(0.0, 1.0));
@@ -406,38 +424,21 @@ pub fn score_actions(
         scores.push((Action::Wander, score + jitter(rng, s.jitter_range)));
     }
 
-    // --- Flee (fear-driven; scored when threat detected or safety is low) ---
+    // --- Flee (§2.3: CP of safety_deficit + boldness_inverse) ---
     if ctx.has_threat_nearby || ctx.needs.safety < s.flee_safety_threshold {
-        let score = (1.0 - ctx.needs.safety)
-            * s.flee_safety_scale
-            * (1.0 - ctx.personality.boldness)
-            * ctx.needs.level_suppression(2);
+        let score = score_dse_by_id("flee", ctx, inputs);
         scores.push((Action::Flee, score + jitter(rng, s.jitter_range)));
     }
 
-    // --- Fight (boldness + combat; only with allies engaging the same threat) ---
-    // Suppressed when health is low — injured cats should avoid combat.
-    // Also suppressed when safety is critically low — a cat already in danger
-    // shouldn't double down by charging a threat.
+    // --- Fight (§2.3: WS of boldness + combat + health + safety + ally_count) ---
+    // Outer gate retains the original `has_threat_nearby && allies ≥
+    // min` precondition. Inside the DSE: the `fight_gating` Piecewise
+    // curve on the health + safety axes encodes the old suppression
+    // thresholds (drops to ~0.2 at health < 0.3, saturates at
+    // health ≥ 0.5) — no external `health_factor` / `safety_factor`
+    // multipliers needed.
     if ctx.has_threat_nearby && ctx.allies_fighting_threat >= s.fight_min_allies {
-        let health_factor = if ctx.health < s.fight_health_suppression_threshold {
-            ctx.health / s.fight_health_suppression_threshold
-        } else {
-            1.0
-        };
-        let safety_factor = if ctx.needs.safety < s.fight_safety_suppression_threshold {
-            ctx.needs.safety / s.fight_safety_suppression_threshold
-        } else {
-            1.0
-        };
-        let group_bonus = ctx.allies_fighting_threat as f32 * s.fight_ally_bonus_per_cat;
-        let score = ctx.personality.boldness
-            * s.fight_boldness_scale
-            * ctx.combat_effective
-            * ctx.needs.level_suppression(2)
-            * health_factor
-            * safety_factor
-            + group_bonus;
+        let score = score_dse_by_id("fight", ctx, inputs);
         scores.push((Action::Fight, score + jitter(rng, s.jitter_range)));
     }
 
@@ -1348,11 +1349,15 @@ mod tests {
     fn cached_registry() -> &'static DseRegistry {
         static REG: OnceLock<DseRegistry> = OnceLock::new();
         REG.get_or_init(|| {
+            let scoring =
+                crate::resources::sim_constants::ScoringConstants::default();
             let mut r = DseRegistry::new();
             r.cat_dses.push(crate::ai::dses::eat_dse());
             r.cat_dses.push(crate::ai::dses::hunt_dse());
             r.cat_dses.push(crate::ai::dses::forage_dse());
             r.cat_dses.push(crate::ai::dses::cook_dse());
+            r.cat_dses.push(crate::ai::dses::flee_dse(&scoring));
+            r.cat_dses.push(crate::ai::dses::fight_dse(&scoring));
             r
         })
     }

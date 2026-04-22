@@ -12,7 +12,8 @@ Phase 3c.1 (first peer-group port) is the next wave.
 | 3c.0 — `score_actions` threading | `EvalInputs` bundle, call-site migration, dead-code `score_eat` helper | **landed** |
 | 3c.1a — Cat Starvation-urgency port | Eat + Hunt + Forage + Cook via `score_dse_by_id` | **landed** |
 | 3c.1b — Fox Starvation-urgency port | fox Hunting + Raiding through `fox_scoring.rs` | **landed** |
-| 3c.2+ — remaining peer groups | Fatal-threat, Rest, Social, Territory, Work, Exploration, Lifecycle | pending |
+| 3c.2 — Fatal-threat peer group | Flee + Fight + fox Fleeing + Avoiding + DenDefense | **landed** |
+| 3c.3+ — remaining peer groups | Rest, Social, Territory, Work, Exploration, Lifecycle | pending |
 | 3c.last — sibling splits | Herbcraft × 3, PracticeMagic × 6 per §L2.10.10 | pending |
 | 3d — faction matrix + roster gap-fill | Authoring systems for §4.6 markers | pending |
 
@@ -89,13 +90,13 @@ fan-out strategy.
 | Hunt | WS | Logistic(8, 0.75) hunger + Quadratic(2) scarcity + Linear boldness + Spatial prey | Hunt responsiveness to prey-proximity rises; bold-cat-on-full-stomach path opens | 3c |
 | Forage | WS | Hunger + scarcity + Linear diligence | — | 3c |
 | Groom (self) | CP (sibling) | Logistic(7, 0.6) thermal + Logistic(5, 0.6) affection | Retires Max-composed parent | 3c |
-| Flee | CP | Logistic(10, threshold) safety + inverted Linear boldness | Fewer spurious flees in marginal-threat scenarios; sharper response near threshold | 3c |
+| Flee | CP | Logistic(10, threshold) safety + inverted Linear boldness | Fewer spurious flees in marginal-threat scenarios; sharper response near threshold | 3c.2 |
 
 ### Cat DSEs — Tier 2
 
 | DSE | Composition | Curve(s) | Prediction | Landing commit |
 |---|---|---|---|---|
-| Fight | WS | Linear boldness + combat + Piecewise health + Piecewise safety + saturating ally_count | Group-courage signal stronger; low-boldness cat with allies fights instead of fleeing | 3c |
+| Fight | WS | Linear boldness + combat + Piecewise health + Piecewise safety + saturating ally_count | Group-courage signal stronger; low-boldness cat with allies fights instead of fleeing | 3c.2 |
 | Patrol | CP | Linear boldness + Logistic(6, threshold) safety-deficit | — | 3c |
 | Build | WS | Linear diligence + Piecewise site + Piecewise repair | Build frequency rises on respect-low cats via Pride modifier | 3c |
 | Farm | CP | Quadratic(2) scarcity + Linear diligence | **First-ever fire** on seed 42 | 3c |
@@ -145,6 +146,9 @@ Avoiding, Feeding, DenDefense, Dispersing) port one-to-one per §3.1.1
 |---|---|---|---|---|
 | fox Hunting | WS | hangry + Linear(prey_nearby) + Linear(0.2, prey_belief) + Piecewise(day_phase) + Composite{Linear, ClampMin(0.3)}(boldness) | GOAP Hunting plans drop until 3c.2 ports Avoiding (magnitude mismatch); legacy path absorbs. Deep-soak EngagePrey family within 2× baseline. | 3c.1b |
 | fox Raiding | CP | hangry + Linear(cunning) | Raiding fires when store unguarded + cunning fox hungry; CP gate means either-axis-zero kills the DSE. | 3c.1b |
+| fox Fleeing | WS | Logistic(8, 0.5)(health_deficit) + Piecewise(cats_nearby step) + Composite{Linear(0.5), Invert}(boldness) | Peer of cat Flee + Fight; fires on injury panic or cat-outnumber. | 3c.2 |
+| fox Avoiding | CP | Composite{Linear(0.5), Clamp[0,1]}(cats_nearby) + Composite{Linear(0.8), Invert}(boldness) | Dominant under old magnitude; ported to cap at ~0.88. Predicted 0.58× compression landed. | 3c.2 |
+| fox DenDefense | CP | flee_or_fight(0.5)(cub_safety_deficit) + Linear(protectiveness) | Peer of cat Flee through shared steepness=10 Logistic. Fires when cat threatens den + has cubs. | 3c.2 |
 
 ## Canaries under this phase
 
@@ -200,6 +204,7 @@ Phase 3 exits when all of:
 | `91e6b56` | Phase 3c.0 — `EvalInputs` threaded through `score_actions` (2 production + 24 test + 3 integration-test sites). Dead-code `score_eat` helper lands the pattern. |
 | `0a25d9b` | Phase 3c.1a — cat Starvation-urgency port. `HuntDse` + `ForageDse` + `CookDse` join `EatDse`; 4 inline `score_actions` blocks retire. Anchor resolution: option 1 (tuned WS weights). Seed-42 5-min smoke soak: 0 Starvation deaths, 42 grooming events. |
 | *(3c.1b)* | Phase 3c.1b — fox Starvation-urgency port. `FoxHuntingDse` (5-axis WS, `Piecewise` day-phase knots from `ScoringConstants`) + `FoxRaidingDse` (2-axis CP) registered in all 4 mirror sites; `score_fox_dispositions` takes `&EvalInputs` and dispatches through `score_fox_dse_by_id`. Seed-42 5-min release soak: 0 Starvation deaths, Engage/SearchPrey plan-failure counts within 2× baseline. Observed soft-gate regression documented below. |
+| *(3c.2)* | Phase 3c.2 — Fatal-threat peer group port. `FleeDse` + `FightDse` (parameterized by `&ScoringConstants`) + `FoxFleeingDse` + `FoxAvoidingDse` + `FoxDenDefenseDse`. `ctx_scalars` + `fox_ctx_scalars` extended with `safety_deficit`, `health`, `safety`, `ally_count`, `combat_effective`, `health_deficit`, `cats_nearby`, `protectiveness`, `cub_safety_deficit`. Seed-42 5-min release soak: 0 Starvation deaths; Avoiding plans 0.58× (compressed as predicted); fox Hunting plans remain 0 pending Rest peer-group port in 3c.3. |
 
 **Total Phases 3a + 3b + 3c test coverage to date:** 112+ unit tests on new primitives; 745 lib tests pass.
 
@@ -327,6 +332,82 @@ Port `Flee` + `Fight` + fox `Fleeing` + fox `Avoiding` + fox
 in the fatal-threat peer group land together. Expectation: fox
 `Hunting` re-appears as a GOAP disposition in the deep-soak once
 Avoiding's ceiling compresses from [0, 2+] to [0, 1].
+
+## Phase 3c.2 — landed
+
+Ports the Fatal-threat peer group (§3.3.2 anchor 1.0) for both
+species. `Patrol` is dual-listed in §3.3.2 (also Territory urgency)
+and defers to Phase 3c.3 where the Territory cross-species pair
+lands.
+
+### Port shape
+
+- `FleeDse` (CP, 2 axes, `&ScoringConstants`): `safety_deficit`
+  via `flee_or_fight(flee_safety_threshold)` (Logistic steepness=10,
+  midpoint from tunable), `boldness` via `Composite { Linear,
+  Invert }`. Maslow tier 2.
+- `FightDse` (WS, 5 axes, `&ScoringConstants`): `boldness`,
+  `combat_effective`, `health` via `fight_gating` Piecewise,
+  `safety` via `fight_gating` Piecewise, `ally_count` via
+  `Composite { Linear(slope=fight_ally_bonus_per_cat),
+  ClampMax(1.0) }` (saturating-count anchor). RtEO weights `[0.25,
+  0.20, 0.15, 0.15, 0.25]`. Maslow tier 2.
+- `FoxFleeingDse` (WS, 3 axes): `health_deficit` via `Logistic(8,
+  0.5)` (injury-panic threshold), `cats_nearby` via `Piecewise`
+  step at 2+, `boldness` via `Composite { Linear(0.5), Invert }`
+  (damped invert). RtEO weights `[0.45, 0.25, 0.30]`. Maslow tier 1.
+- `FoxAvoidingDse` (CP, 2 axes): `cats_nearby` via `Composite {
+  Linear(0.5), Clamp[0, 1] }` (saturates at 2 cats), `boldness` via
+  `Composite { Linear(0.8), Invert }` (damped more heavily than
+  Fleeing). Maslow tier 1.
+- `FoxDenDefenseDse` (CP, 2 axes): `cub_safety_deficit` via
+  `flee_or_fight(0.5)`, `protectiveness` via `Linear`. Maslow tier 3.
+
+Scalar vocabulary additions:
+
+- **Cat:** `safety_deficit`, `safety`, `health`, `combat_effective`,
+  `ally_count`.
+- **Fox:** `health_deficit`, `cats_nearby`, `protectiveness`,
+  `cub_safety_deficit`.
+
+Registered in all 4 mirror sites (plugin/headless/save-load/tests).
+`FleeDse` + `FightDse` take `&ScoringConstants` because their curve
+parameters (`flee_safety_threshold`, `fight_ally_bonus_per_cat`)
+are tunables — same pattern as `FoxHuntingDse`'s day-phase knots.
+
+### Observed drift (seed-42 `--duration 300 --release`)
+
+| Metric | 3c.1b | 3c.2 | Ratio | Verdict |
+|---|---|---|---|---|
+| Starvation deaths | 0 | 0 | — | ✓ hard gate |
+| EngagePrey plan failures | 409 | 321 | 0.78× | ✓ within 2× |
+| SearchPrey plan failures | 14 | 8 | 0.57× | ✓ within 2× |
+| Fox Avoiding plans (GOAP) | 59 267 | 34 437 | 0.58× | **predicted compression landed** |
+| Fox Resting plans (GOAP) | 277 | 35 306 | 127× | Rest peer group now dominant (3c.3 target) |
+| Fox Hunting plans (GOAP) | 0 | 0 | — | pending Rest peer port |
+
+Avoiding compressed from a 59k-plan dominance to 34k — the 0.58×
+ratio confirms the peer-group-anchor hypothesis: once Avoiding's
+ceiling drops from `cats_nearby × damp ≈ [0, 1.8+]` to the CP
+asymptote near 0.88, Avoiding stops winning every contest near
+the colony boundary.
+
+**Fox Hunting remains at 0.** The lift in Resting (277 → 35 306 =
+127×) is the new bottleneck: un-ported fox `Resting` peaks at
+`comfort × 0.6 + phase_bonus ≈ 1.18` at Night, which exceeds the
+[0, 1] peer-group ceiling every ported DSE now respects. Sated
+foxes (hunger > 0.5) pick Resting because its magnitude
+outcompetes Hunting (peak ~0.78) / Avoiding (peak ~0.88).
+Full Hunting restoration waits on Phase 3c.3 porting `Sleep`,
+`Idle`, and fox `Resting` through the Rest urgency peer group
+(anchor = 1.0).
+
+### Follow-on for Phase 3c.3 (Rest urgency peer group)
+
+§3.3.2 row: `{Sleep, Idle, (fox) Resting}`. After this port, fox
+Resting's magnitude will cap at 1.0 and no longer starve out fox
+Hunting in the sated-fox decision space. Expected: fox Hunting
+plans re-appear at ≥ 3c.1a baseline (143 per 5-min soak).
 
 ## Phase 3a → 3b boundary (landed)
 
