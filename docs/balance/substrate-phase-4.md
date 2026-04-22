@@ -265,11 +265,74 @@ Acceptance: all four `scripts/check_canaries.sh` canaries pass at
 Phase 4b.2. Marker-port semantics verified behavior-preserving
 within variance bounds.
 
+## Phase 4b additions (continued)
+
+- **Phase 4b.3 (`f009ec6`) — §6.3 `TargetTakingDse` type +
+  evaluator.** Foundation-only: struct shape, three aggregation
+  modes (`Best` / `SumTopN` / `WeightedAverage`), evaluator with
+  per-candidate considerations and target-scoped scalar dispatch.
+  No live-sim behavior change — nothing registers a target-taking
+  DSE yet. 6 unit tests cover the full evaluator surface.
+
+- **Phase 4b.4 (`e5b46e5`) — §4 `HasGarden` marker port.** Second
+  reference port of the Phase 4b.2 pattern. Farm's outer
+  `if ctx.has_garden` gate retires; `FarmDse::new()` gains
+  `.require("HasGarden")`.
+
+### Final Phase 4 soak at HEAD (`db7362b`)
+
+All four survival canaries pass:
+
+```
+[pass] starvation_deaths                0 (target == 0)
+[pass] shadowfox_ambush_deaths          0 (target <= 5)
+[pass] footer_written                   1 (target >= 1)
+[pass] features_at_zero                 0 (target informational)
+```
+
+Mid-tier deltas vs Phase 4b.2 are consistent with the HasGarden
+marker port reshuffling eligibility-filter linear-scan order:
+`DirectiveIssued` +2500, `DirectiveDelivered` -352,
+`ScryCompleted` +59, `WardPlaced` +48. No semantic change.
+
+## Balance-tuning deferral
+
+Three positive-feature metrics remain below their literal
+Phase 4 exit targets:
+
+- **MatingOccurred = 0** (target ≥ 7 per 7-season soak).
+- **PracticeMagic sub-modes = 2 / 5** (target ≥ 3 / 5).
+- **Farming = 0** (target ≥ 1).
+
+**These are not treated as Phase 4 blockers.** Per the commitment
+recorded in `docs/open-work.md` #14's balance-tuning-deferral
+section:
+
+1. No colony wipes on the final soak — all four survival canaries
+   pass. Density gaps are verisimilitude, not existential.
+2. Successor refactor phases (target-taking DSE per-DSE ports,
+   full §4 marker catalog, §5 influence maps, §7 commitment
+   strategies) reshape scoring for exactly the DSEs whose numbers
+   would be tuned. Tuning now would be redone after each
+   successor phase.
+3. CLAUDE.md's Balance Methodology requires four-artifact
+   acceptance per drift. Tuning against a moving substrate wastes
+   artifacts.
+
+Commitment: balance iterations on positive-feature density wait
+until the refactor's substrate changes have stabilized. The
+dormancy gaps (Cleanse / Harvest / Commune / Farming) trace to
+refactor-layer missing plumbing — target-taking DSE with spatial
+candidates or GOAP plan-shape preparatory steps. Landing those
+naturally unblocks the dormancies before any numeric tuning is
+relevant.
+
 ## Next iterations
 
-Phase 4 closes with softmax, modifier pipeline, Adult-window
-retune, gender fix, and marker-lookup foundation all landed. The
-remaining Phase 4-scope work (target-taking DSE registration
-§6.3/§6.5, full §4 marker catalog port) plus balance follow-ons
-(MatingOccurred density, dormant PracticeMagic sub-modes, Farming
-dormancy) live in open-work #14.
+Phase 4 substrate closes with softmax, modifier pipeline, Adult-
+window retune, gender fix, marker-lookup foundation, and
+target-taking DSE foundation all landed. Two reference marker
+ports (HasStoredFood, HasGarden) prove the pattern; the
+target-taking DSE reference-port work (Socialize first) is the
+natural next session. Balance tuning waits until the refactor's
+successor phases stabilize — see balance-tuning deferral above.

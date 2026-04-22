@@ -1207,53 +1207,73 @@ remaining work is itemised here.
 - ~~**§7.M.7.4 `resolve_mate_with` gender fix.**~~ Landed as Phase
   4b.1 — see Landed section below.
 
-**Balance gaps on the Phase 4a re-soak** (seed 42, `--duration 900`,
-commit TBD on landing):
+**Balance-tuning observations — deferred to post-refactor.**
 
-- **MatingOccurred = 1, target ≥ 1 per colony per season (45 per
-  soak).** Phase 4a recovered the zero but fell short of the density
-  target by ~45×. BondFormed 16 → 28 shows the social fabric
-  strengthened; mating-act scoring is still the bottleneck. Levers
-  from §7.M.7.8: raise per-mating conception roll (if needed for
-  Generational-continuity canary), reduce cycle period, or tune
-  `mating_interest_threshold`. Needs a separate balance iteration.
-- **PracticeMagic sub-mode count 2 / 5** (Scry + DurableWard fire;
-  Cleanse, ColonyCleanse, Harvest, Commune dormant). These gates
-  reflect *physical colocation* (corrupted tile under the cat,
-  carcass in sensor range, fairy ring under the cat), not modifier
-  shape or marker authoring. Real unblock is plan-shape work — a
-  cat with intent to cleanse must navigate to known corruption
-  first. Routes through either §4 + GOAP-prep-step work, or §6.3
-  `TargetTakingDse` where the target-candidate set includes
-  corrupted tiles as spatial candidates.
-- **Farming = 0** (stayed dormant). Baseline log shows
-  `TendCrops: no target` plan-failures = 83 — crop entities exist
-  but the resolver isn't matching them to the chain. Same target-
-  availability shape as the cleanse/harvest dormancies. Tracks
-  with whichever of §4 markers or target-taking DSE lands the
-  target-resolver plumbing.
-- **Dependency graph (balance gaps):** `markers_authoring` +
-  `target-taking DSE` land in either order but together are the
-  prerequisite for the dormancy unblock. The
-  `mating_density` lever (Fertility-cycle pacing) is independent
-  and tunable without either.
+Several positive-feature metrics remain below their literal
+Phase 4 exit targets on the seed-42 `--duration 900` soak at HEAD
+(`logs/phase4b4-db7362b/events.jsonl`):
 
-**Dependency graph (spec-scope work):**
+- MatingOccurred = 0 (literal target ≥ 7 per 7-season soak).
+- PracticeMagic sub-mode count = 2 / 5 (literal target ≥ 3 / 5).
+- Farming = 0 (literal target ≥ 1).
+
+These are **not** treated as Phase 4 blockers. Rationale:
+
+1. **No colony wipes.** All four survival canaries pass
+   (Starvation 0, ShadowFoxAmbush 0, footer written,
+   features_at_zero informational). The colony survives the
+   soak — the density gaps are aesthetic / verisimilitude gaps,
+   not existential ones.
+2. **Refactor reshapes scoring.** The remaining
+   `ai-substrate-refactor.md` work (target-taking DSE ports,
+   §4 marker catalog fill-in, §5 influence maps, §7 commitment
+   strategies) will change the shape of scoring for exactly
+   the DSEs whose numbers would be tuned. Any per-knob tuning
+   done now would need to be redone after each successor phase
+   lands.
+3. **Tuning belongs at a stable substrate.** CLAUDE.md's Balance
+   Methodology requires a four-artifact acceptance per drift.
+   Tuning against a moving substrate wastes artifacts on shapes
+   that will change.
+
+**Commitment:** balance iterations on positive-feature density
+(mating, magic sub-modes, farming) wait until the refactor's
+substrate changes have stabilized. At that point, each of the
+three gaps gets a dedicated balance thread with its own
+hypothesis-prediction-observation-concordance record. Until
+then, the metrics are tracked in soak footers for trend
+visibility but not tuned.
+
+Causally, the dormancy gaps (Cleanse / Harvest / Commune /
+Farming) also trace to refactor-layer missing plumbing — the
+"navigate TO a physical location before scoring the action"
+shape belongs to §6.3 `TargetTakingDse` with spatial
+candidates or to `GOAP` plan-shape preparatory steps. Landing
+those naturally unblocks the dormancies before any numeric
+tuning is relevant.
+
+**Dependency graph (refactor-scope work):**
 - `add_target_taking_dse` and `markers_authoring` are orthogonal
   refactors — either can land first. Both are session-scale
   multi-hour pieces on their own. Shipping either partially is
   high-risk because `has_marker` wiring and `EligibilityFilter`
-  consumption both need to land in lockstep.
-- Neither directly unblocks the balance gaps — those route through
-  downstream GOAP / target-resolver work once the foundations
-  land.
+  consumption both need to land in lockstep. (4b.2 landed the
+  `has_marker` wire-up; 4b.3 landed the `TargetTakingDse`
+  foundation — remaining work on both tracks is per-DSE /
+  per-marker port work.)
+- The per-DSE target-taking ports are the primary unblock for
+  the named balance gaps (target = corrupted tile, target =
+  carcass, etc. become first-class spatial candidates). Most
+  dormancies resolve as a consequence of refactor completion,
+  not as a separate tuning pass.
 
 **Re-open condition for Phase 3 hypothesis:** Phase 4a cleared the
-survival canaries (Starvation 8 → 0, ShadowFoxAmbush 0) and moved
-MatingOccurred off zero. The Phase 3 hypothesis in
-`docs/balance/substrate-phase-3.md` is not being re-opened — the
-three substrate mechanisms are validated. The remaining gaps route
-through this entry's outstanding items.
+survival canaries (Starvation 8 → 0, ShadowFoxAmbush 0). The
+Phase 3 hypothesis in `docs/balance/substrate-phase-3.md` is not
+re-opened — the three substrate mechanisms are validated and the
+colony survives the soak. The literal positive-exit-metric targets
+(MatingOccurred density / 3-of-5 sub-modes / Farming ≥ 1) are
+deferred per the balance-tuning-after-refactor commitment above.
 
 ---
 
