@@ -6,6 +6,7 @@
 //! remaining 20 cat DSEs, 9 fox DSEs, and 9 Herbcraft/PracticeMagic
 //! siblings through the same template.
 
+pub mod caretake;
 pub mod cook;
 pub mod eat;
 pub mod fight;
@@ -17,10 +18,16 @@ pub mod fox_fleeing;
 pub mod fox_hunting;
 pub mod fox_raiding;
 pub mod fox_resting;
+pub mod groom_other;
+pub mod groom_self;
 pub mod hunt;
 pub mod idle;
+pub mod mate;
+pub mod mentor;
 pub mod sleep;
+pub mod socialize;
 
+pub use caretake::caretake_dse;
 pub use cook::cook_dse;
 pub use eat::eat_dse;
 pub use fight::fight_dse;
@@ -32,6 +39,11 @@ pub use fox_fleeing::fox_fleeing_dse;
 pub use fox_hunting::fox_hunting_dse;
 pub use fox_raiding::fox_raiding_dse;
 pub use fox_resting::fox_resting_dse;
+pub use groom_other::groom_other_dse;
+pub use groom_self::groom_self_dse;
 pub use hunt::hunt_dse;
 pub use idle::idle_dse;
+pub use mate::mate_dse;
+pub use mentor::mentor_dse;
 pub use sleep::sleep_dse;
+pub use socialize::socialize_dse;

@@ -242,6 +242,59 @@ fn ctx_scalars(ctx: &ScoringContext) -> HashMap<&'static str, f32> {
     // inputs to each DSE's Linear identity curve.
     m.insert("boldness", ctx.personality.boldness.clamp(0.0, 1.0));
     m.insert("diligence", ctx.personality.diligence.clamp(0.0, 1.0));
+    m.insert(
+        "sociability",
+        ctx.personality.sociability.clamp(0.0, 1.0),
+    );
+    m.insert("temper", ctx.personality.temper.clamp(0.0, 1.0));
+    m.insert(
+        "playfulness",
+        ctx.personality.playfulness.clamp(0.0, 1.0),
+    );
+    m.insert("warmth", ctx.personality.warmth.clamp(0.0, 1.0));
+    m.insert("ambition", ctx.personality.ambition.clamp(0.0, 1.0));
+    m.insert(
+        "compassion",
+        ctx.personality.compassion.clamp(0.0, 1.0),
+    );
+    // Social-urgency axis inputs. Social deficit = `1 - social`;
+    // mating deficit = `1 - mating`; thermal deficit = `1 -
+    // temperature`. Phys-satisfaction flows through as raw so the
+    // inverted-need-penalty Logistic sees the satisfaction scalar
+    // directly (per §2.3 row 1021).
+    m.insert(
+        "social_deficit",
+        (1.0 - ctx.needs.social).clamp(0.0, 1.0),
+    );
+    m.insert(
+        "mating_deficit",
+        (1.0 - ctx.needs.mating).clamp(0.0, 1.0),
+    );
+    m.insert(
+        "thermal_deficit",
+        (1.0 - ctx.needs.temperature).clamp(0.0, 1.0),
+    );
+    m.insert(
+        "phys_satisfaction",
+        ctx.phys_satisfaction.clamp(0.0, 1.0),
+    );
+    m.insert(
+        "tile_corruption",
+        ctx.tile_corruption.clamp(0.0, 1.0),
+    );
+    // Caretake axes.
+    m.insert(
+        "kitten_urgency",
+        ctx.hungry_kitten_urgency.clamp(0.0, 1.0),
+    );
+    m.insert(
+        "is_parent_of_hungry_kitten",
+        if ctx.is_parent_of_hungry_kitten {
+            1.0
+        } else {
+            0.0
+        },
+    );
     // Pre-inverted personality scalars for Idle. `incuriosity` =
     // `1 − curiosity`; `playfulness_invert` = `1 − playfulness`. The
     // pre-inversion keeps the consuming curve as a plain Linear
@@ -393,44 +446,29 @@ pub fn score_actions(
         scores.push((Action::Forage, urgency + jitter(rng, s.jitter_range)));
     }
 
-    // --- Socialize (sociability-driven; requires a visible cat) ---
+    // --- Socialize (§2.3: WS of 6 axes through loneliness + inverted_need_penalty) ---
     if ctx.has_social_target {
-        let temper_penalty = ctx.personality.temper
-            * s.socialize_temper_penalty_scale
-            * (1.0 - ctx.phys_satisfaction);
-        let mut score = (1.0 - ctx.needs.social)
-            * ctx.personality.sociability
-            * s.socialize_sociability_scale
-            * ctx.needs.level_suppression(2)
-            - temper_penalty
-            + ctx.personality.playfulness * s.socialize_playfulness_bonus;
-        // Socializing on corrupted ground pushes back corruption.
-        if ctx.tile_corruption > 0.1 {
-            score +=
-                s.corruption_social_bonus * ctx.tile_corruption * ctx.needs.level_suppression(3);
-        }
-        scores.push((
-            Action::Socialize,
-            score.max(0.0) + jitter(rng, s.jitter_range),
-        ));
+        let score = score_dse_by_id("socialize", ctx, inputs);
+        scores.push((Action::Socialize, score + jitter(rng, s.jitter_range)));
     }
 
-    // --- Groom (self or other; always available for self) ---
+    // --- Groom (§L2.10.10 sibling split: Groom_self + Groom_other;
+    // Max composition retires, the planner reads whichever sibling
+    // scores higher through the DSE registry). For backward
+    // compatibility with the existing `Action::Groom` enum, this
+    // emits a single score that's the max of the two siblings. Phase
+    // 3d will teach selection about the sibling-id mapping so the
+    // Action variant carries which sibling won.
     {
-        let self_groom =
-            (1.0 - ctx.needs.temperature) * s.self_groom_temperature_scale * ctx.needs.level_suppression(1);
-        let temper_penalty =
-            ctx.personality.temper * s.groom_temper_penalty_scale * (1.0 - ctx.phys_satisfaction);
-        let other_groom = if ctx.has_social_target {
-            (ctx.personality.warmth * (1.0 - ctx.needs.social) * ctx.needs.level_suppression(2)
-                - temper_penalty)
-                .max(0.0)
+        let self_score = score_dse_by_id("groom_self", ctx, inputs);
+        let other_score = if ctx.has_social_target {
+            score_dse_by_id("groom_other", ctx, inputs)
         } else {
             0.0
         };
         scores.push((
             Action::Groom,
-            self_groom.max(other_groom) + jitter(rng, s.jitter_range),
+            self_score.max(other_score) + jitter(rng, s.jitter_range),
         ));
     }
 
@@ -712,22 +750,15 @@ pub fn score_actions(
         scores.push((Action::Coordinate, score + jitter(rng, s.jitter_range)));
     }
 
-    // --- Mentor (warmth + diligence; requires valid mentoring target) ---
+    // --- Mentor (§2.3: WS of warmth + diligence + ambition) ---
     if ctx.has_mentoring_target {
-        let score = ctx.personality.warmth
-            * ctx.personality.diligence
-            * s.mentor_temperature_diligence_scale
-            * ctx.needs.level_suppression(4)
-            + ctx.personality.ambition * s.mentor_ambition_bonus;
+        let score = score_dse_by_id("mentor", ctx, inputs);
         scores.push((Action::Mentor, score + jitter(rng, s.jitter_range)));
     }
 
-    // --- Mate (warmth-driven; gated by mating need, partners, season) ---
+    // --- Mate (§2.3: CP of mating_deficit + warmth — Logistic(6, 0.6)) ---
     if ctx.has_eligible_mate {
-        let urgency = (1.0 - ctx.needs.mating)
-            * ctx.personality.warmth
-            * s.mate_temperature_scale
-            * ctx.needs.level_suppression(3);
+        let urgency = score_dse_by_id("mate", ctx, inputs);
         if urgency > 0.0 {
             scores.push((Action::Mate, urgency + jitter(rng, s.jitter_range)));
         }
@@ -755,18 +786,9 @@ pub fn score_actions(
         wants_cook_but_no_kitchen = true;
     }
 
-    // --- Caretake (compassion-driven; requires nearby hungry kitten) ---
+    // --- Caretake (§2.3: WS of kitten_urgency + compassion + is_parent) ---
     if ctx.hungry_kitten_urgency > 0.0 {
-        let parent_bonus = if ctx.is_parent_of_hungry_kitten {
-            s.caretake_parent_bonus
-        } else {
-            0.0
-        };
-        let score = ctx.hungry_kitten_urgency
-            * ctx.personality.compassion
-            * s.caretake_compassion_scale
-            * ctx.needs.level_suppression(3)
-            + parent_bonus;
+        let score = score_dse_by_id("caretake", ctx, inputs);
         scores.push((Action::Caretake, score + jitter(rng, s.jitter_range)));
     }
 
@@ -1390,6 +1412,12 @@ mod tests {
             r.cat_dses.push(crate::ai::dses::fight_dse(&scoring));
             r.cat_dses.push(crate::ai::dses::sleep_dse(&scoring));
             r.cat_dses.push(crate::ai::dses::idle_dse(&scoring));
+            r.cat_dses.push(crate::ai::dses::socialize_dse());
+            r.cat_dses.push(crate::ai::dses::groom_self_dse());
+            r.cat_dses.push(crate::ai::dses::groom_other_dse());
+            r.cat_dses.push(crate::ai::dses::mentor_dse());
+            r.cat_dses.push(crate::ai::dses::caretake_dse());
+            r.cat_dses.push(crate::ai::dses::mate_dse());
             r
         })
     }
