@@ -46,6 +46,7 @@ use crate::components::sensing::SensorySpecies;
 use crate::resources::cat_presence_map::CatPresenceMap;
 use crate::resources::exploration_map::ExplorationMap;
 use crate::resources::fox_scent_map::FoxScentMap;
+use crate::resources::map::TileMap;
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::time::TimeState;
 use crate::resources::trace_log::{
@@ -53,7 +54,9 @@ use crate::resources::trace_log::{
     FocalTraceTarget, IntentionSummary, ModifierApplication, MomentumSummary, SoftmaxSummary,
     TraceEntry, TraceLog, TraceRecord,
 };
-use crate::systems::influence_map::{channel_label, Attenuation, Faction, InfluenceMap, MapMetadata};
+use crate::systems::influence_map::{
+    channel_label, Attenuation, CorruptionLens, Faction, InfluenceMap, MapMetadata,
+};
 
 /// Resolves the focal cat's entity and emits L1/L2/L3 records for the
 /// current tick. Gated on `FocalTraceTarget`; a no-op in every build
@@ -71,6 +74,7 @@ pub fn emit_focal_trace(
     fox_scent_map: Option<Res<FoxScentMap>>,
     cat_presence_map: Option<Res<CatPresenceMap>>,
     exploration_map: Option<Res<ExplorationMap>>,
+    tile_map: Option<Res<TileMap>>,
     mut trace_log: ResMut<TraceLog>,
     cats: Query<
         (
@@ -122,6 +126,10 @@ pub fn emit_focal_trace(
     }
     if let Some(ref m) = exploration_map {
         emit_l1_for_map(&mut trace_log, tick, &cat_name, *pos, &**m, &constants);
+    }
+    if let Some(ref m) = tile_map {
+        let lens = CorruptionLens(m);
+        emit_l1_for_map(&mut trace_log, tick, &cat_name, *pos, &lens, &constants);
     }
 
     // -----------------------------------------------------------------

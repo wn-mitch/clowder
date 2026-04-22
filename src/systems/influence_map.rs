@@ -190,6 +190,38 @@ impl InfluenceMap for crate::resources::ExplorationMap {
     }
 }
 
+/// Borrow-based adapter that exposes `TileMap`'s per-tile corruption
+/// field as an `InfluenceMap`. Corruption lives alongside terrain on
+/// `Tile` rather than in a dedicated resource; the lens avoids
+/// changing that storage layout while letting the map participate in
+/// the uniform substrate API per §5.6.3 row #2.
+///
+/// The lens is constructed inline at read time (e.g. in the trace
+/// emitter's L1 walk) — `InfluenceMap` is not used as a trait object
+/// in Phase 2A, so a short-lived borrow adapter is sufficient.
+pub struct CorruptionLens<'a>(pub &'a crate::resources::TileMap);
+
+impl InfluenceMap for CorruptionLens<'_> {
+    fn metadata(&self) -> MapMetadata {
+        MapMetadata {
+            name: "corruption",
+            // §5.6.3 row #2: "sight-independent spatial × neutral".
+            // Tagged as Sight here for lack of a "spatial-independent"
+            // channel variant; Phase 3+ may introduce a dedicated
+            // variant when the distinction matters for scoring.
+            channel: ChannelKind::Sight,
+            faction: Faction::Neutral,
+        }
+    }
+
+    fn base_sample(&self, pos: Position) -> f32 {
+        if !self.0.in_bounds(pos.x, pos.y) {
+            return 0.0;
+        }
+        self.0.get(pos.x, pos.y).corruption
+    }
+}
+
 // ---------------------------------------------------------------------------
 // §5.6.6 attenuation pipeline
 // ---------------------------------------------------------------------------
@@ -440,5 +472,25 @@ mod tests {
         assert_eq!(md.name, "exploration");
         assert_eq!(md.channel, ChannelKind::Sight);
         assert!(matches!(md.faction, Faction::Observer));
+    }
+
+    #[test]
+    fn corruption_lens_implements_influence_map() {
+        use crate::resources::map::{Terrain, TileMap};
+        let mut tiles = TileMap::new(10, 10, Terrain::Grass);
+        // Inject a corrupted tile at (3, 4).
+        tiles.get_mut(3, 4).corruption = 0.7;
+
+        let lens = CorruptionLens(&tiles);
+        let md = lens.metadata();
+        assert_eq!(md.name, "corruption");
+        assert_eq!(md.channel, ChannelKind::Sight);
+        assert!(matches!(md.faction, Faction::Neutral));
+
+        assert!((lens.base_sample(Position::new(3, 4)) - 0.7).abs() < 1e-6);
+        assert_eq!(lens.base_sample(Position::new(0, 0)), 0.0);
+        // Out-of-bounds returns 0.0.
+        assert_eq!(lens.base_sample(Position::new(-1, 0)), 0.0);
+        assert_eq!(lens.base_sample(Position::new(100, 100)), 0.0);
     }
 }
