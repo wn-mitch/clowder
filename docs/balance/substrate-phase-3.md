@@ -1,13 +1,15 @@
 # AI Substrate Refactor — Phase 3 (L2 core: curves + composition + markers + faction)
 
-**Status:** Phase 3a partial — scaffolding committed, evaluator wiring
-deferred to Phase 3b.
+**Status:** Phases 3a + 3b landed — reference DSE live, evaluator
+registered as a Bevy Resource. Phase 3c (wholesale fan-out of the
+remaining 29 DSEs + sibling splits) is the next wave.
 
 | Sub-phase | Scope | Status |
 |---|---|---|
-| 3a — scaffolding | Types, curves, composition, markers, faction | in progress |
-| 3b — Eat reference port | First DSE through the evaluator | pending |
-| 3c — fan-out port | 29 remaining DSEs + sibling splits + Mate L3 | pending |
+| 3a — scaffolding | Types, curves, composition, markers, faction | **landed** |
+| 3b.1 — evaluator plumbing | `DseRegistry` resource + `evaluate_single` + modifier pipeline + `DseRegistryAppExt` | **landed** |
+| 3b.2 — Eat reference port | `EatDse` registered in plugin + headless | **landed** |
+| 3c — fan-out port | 29 remaining DSEs + sibling splits + Mate L3; deletes `score_actions` inline blocks | pending |
 | 3d — faction matrix + roster gap-fill | Authoring systems for §4.6 markers | pending |
 
 ## Thesis
@@ -176,7 +178,7 @@ Phase 3 exits when all of:
 6. §9 faction matrix loaded; 5 DSE-filter bindings resolved correctly.
 7. `Fertility` component emits phase transitions consistent with §7.M.7.2.
 
-## Phase 3a deliverables landed
+## Phases 3a + 3b deliverables landed
 
 | Commit | Scope |
 |---|---|
@@ -184,10 +186,25 @@ Phase 3 exits when all of:
 | `01cb6e7` | `Dse` trait + `Intention` enum (Goal / Activity + CommitmentStrategy tag) + `Termination` + `EvalCtx` skeleton + `EligibilityFilter`; `FactionStance` stub + `StanceRequirement`. 7 tests. |
 | `e02121f` | §4 marker catalog — 49 new ZST components across 11 categories (LifeStage, State, Capability, Inventory, TargetExistence, Colony, Reproduction, Fox-specific, §9.2 faction overlays). 10 queryability tests. |
 | `1a50d30` | §9 faction model — flattened `FactionSpecies`, `FactionRelations` resource with 100-cell §9.1 matrix, `StanceOverlays` + `resolve_stance` most-negative-wins resolver, 4 `StanceRequirement` factory helpers. 26 tests. |
+| `d9cf47e` | Phase 3b.1 evaluator — `DseRegistry` + `ModifierPipeline` + `ScoreModifier` trait + 6-method `DseRegistryAppExt`. `evaluate_single` runs eligibility → consideration scoring → composition → Maslow pre-gate → modifier pipeline → Intention emit. 9 tests. |
+| `afe22f5` | Phase 3b.2 `EatDse` reference port — single hunger consideration through `Logistic(8, 0.75)`, CP composition, Maslow tier 1, Goal Intention with SingleMinded commitment. Registered in both `SimulationPlugin::build` and headless `build_new_world` + `setup_world` save-load path. 10 tests. |
 
-**Total Phase 3a test coverage:** 83 unit tests on new primitives.
+**Total Phases 3a + 3b test coverage:** 102 unit tests on new primitives.
 
-## Phase 3a → 3b boundary
+## Phase 3b ↔ 3c boundary
+
+Phase 3b.2 registers `EatDse` but does **not** yet replace
+`score_actions`'s inline Eat arithmetic. The refactor plan's "action
+blocks delete as each new DSE lands" wave is Phase 3c — 3b.2
+establishes the pattern; 3c's fan-out port replaces all formulas
+together so `ScoringContext`'s 9 test-site constructors update once
+rather than incrementally.
+
+No behavior drift lands in production yet — `EatDse`'s score is
+computed on demand but not consumed. Drift lands with Phase 3c's
+wholesale port when the inline blocks delete.
+
+## Phase 3a → 3b boundary (landed)
 
 The refactor plan originally scoped the registration builder + unified
 `evaluate()` + post-scoring modifier pipeline as Phase 3a deliverables.
@@ -196,14 +213,11 @@ speculative design decisions about `EvalCtx` shape, marker-query
 dispatch, and modifier pass ordering that can only be validated against
 a concrete port.
 
-**Decision:** the evaluator, registration builder (`app.add_dse` et al.),
-and modifier pipeline move into Phase 3b alongside the Eat reference
-port, so the shapes are driven by use instead of authored in a vacuum.
-Phase 3a closes with the types + curves + composition + markers +
-faction substrate — enough scaffolding that Phase 3b is "wire the
-evaluator + port Eat" rather than "design from scratch." This
-boundary respects the refactor plan's discipline while adjusting the
-sub-commit decomposition to what the design calls for.
+**Decision (landed):** the evaluator + registration builder (commit
+`d9cf47e`) and the Eat reference port (commit `afe22f5`) ship as
+Phase 3b, immediately after Phase 3a's type foundation. This
+respected the refactor plan's discipline while adjusting the sub-
+commit decomposition so each commit has a clean test boundary.
 
 ## Observation
 
