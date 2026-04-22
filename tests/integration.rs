@@ -138,6 +138,10 @@ fn setup_world(seed: u64) -> World {
         registry
             .fox_dses
             .push(clowder::ai::dses::fox_resting_dse(&scoring));
+        registry.fox_dses.push(clowder::ai::dses::fox_feeding_dse());
+        registry
+            .fox_dses
+            .push(clowder::ai::dses::fox_dispersing_dse());
         world.insert_resource(registry);
     }
     world.insert_resource(clowder::ai::eval::ModifierPipeline::new());

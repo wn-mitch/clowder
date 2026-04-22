@@ -69,7 +69,9 @@ impl Plugin for SimulationPlugin {
                 .add_fox_dse(crate::ai::dses::fox_fleeing_dse())
                 .add_fox_dse(crate::ai::dses::fox_avoiding_dse())
                 .add_fox_dse(crate::ai::dses::fox_den_defense_dse())
-                .add_fox_dse(crate::ai::dses::fox_resting_dse(&default_scoring));
+                .add_fox_dse(crate::ai::dses::fox_resting_dse(&default_scoring))
+                .add_fox_dse(crate::ai::dses::fox_feeding_dse())
+                .add_fox_dse(crate::ai::dses::fox_dispersing_dse());
         }
 
         // Snapshot positions before any simulation system moves entities.

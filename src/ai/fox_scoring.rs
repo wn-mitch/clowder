@@ -178,6 +178,14 @@ fn fox_ctx_scalars(ctx: &FoxScoringContext) -> HashMap<&'static str, f32> {
         "territoriality",
         ctx.personality.territoriality.clamp(0.0, 1.0),
     );
+    // Offspring axis for fox Feeding.
+    m.insert(
+        "cub_satiation_deficit",
+        (1.0 - ctx.needs.cub_satiation).clamp(0.0, 1.0),
+    );
+    // Dummy "one" scalar for the fox Dispersing lifecycle-intercept
+    // axis. Matches the cat-side convention.
+    m.insert("one", 1.0);
     m
 }
 
@@ -239,18 +247,21 @@ pub fn score_fox_dispositions(
     rng: &mut impl Rng,
 ) -> FoxScoringResult {
     let needs = ctx.needs;
-    let p = ctx.personality;
     let j = ctx.jitter_range;
     let mut scores = Vec::with_capacity(8);
 
     // --- Lifecycle override: dispersing juveniles ---
+    // §2.3 row 1140: Dispersing is a Linear(intercept=2.0) lifecycle
+    // override — intentionally above every other disposition's 1.0
+    // peer-group ceiling so it cannot be outvoted.
     if ctx.is_dispersing_juvenile {
-        // Dispersal bypasses Maslow — it's a survival-level instinct for juveniles.
-        scores.push((FoxDispositionKind::Dispersing, 2.0 + jitter(rng, j)));
+        let score = score_fox_dse_by_id("fox_dispersing", ctx, inputs);
+        scores.push((
+            FoxDispositionKind::Dispersing,
+            score + jitter(rng, j),
+        ));
 
-        // Still allow hunting if starving. Uses the ported `FoxHuntingDse`
-        // so the juvenile path stays consistent with adult Hunting scoring
-        // under the L2 evaluator.
+        // Still allow hunting if starving.
         if needs.hunger < 0.3 {
             let urgency = score_fox_dse_by_id("fox_hunting", ctx, inputs);
             if urgency > 0.0 {
@@ -258,10 +269,13 @@ pub fn score_fox_dispositions(
             }
         }
 
-        // Allow fleeing if badly hurt.
+        // Allow fleeing if badly hurt — uses the ported FoxFleeingDse
+        // so the juvenile branch stays consistent with adult Fleeing.
         if needs.health_fraction < 0.4 {
-            let urgency = (1.0 - needs.health_fraction) * (1.0 - p.boldness) * 2.0;
-            scores.push((FoxDispositionKind::Fleeing, urgency + jitter(rng, j)));
+            let urgency = score_fox_dse_by_id("fox_fleeing", ctx, inputs);
+            if urgency > 0.0 {
+                scores.push((FoxDispositionKind::Fleeing, urgency + jitter(rng, j)));
+            }
         }
 
         return FoxScoringResult { scores };
@@ -348,12 +362,16 @@ pub fn score_fox_dispositions(
     // -----------------------------------------------------------------------
     // Level 3: Offspring (suppressed by survival × territory)
     // -----------------------------------------------------------------------
-    let l3 = needs.level_suppression(3);
+    // Maslow tier 3 pre-gate applied inside `evaluate_single` for
+    // Feeding + DenDefense — the explicit `let l3 =
+    // needs.level_suppression(3)` binding retires with the last
+    // inline L3 branch in Phase 3c.8.
 
-    // Feeding: hunt prey and bring it back to cubs.
+    // Feeding: §2.3 CP of cub_satiation_deficit (Logistic(7, 0.6))
+    // + protectiveness (Linear). Maslow tier 3 pre-gate applied
+    // inside evaluate_single.
     if ctx.has_cubs && ctx.cubs_hungry {
-        let urgency = (1.0 - needs.cub_satiation) * p.protectiveness * 1.5;
-        let score = urgency * l3;
+        let score = score_fox_dse_by_id("fox_feeding", ctx, inputs);
         if score > 0.0 {
             scores.push((FoxDispositionKind::Feeding, score + jitter(rng, j)));
         }
@@ -392,8 +410,8 @@ mod tests {
     use std::sync::LazyLock;
 
     use crate::ai::dses::{
-        fox_avoiding_dse, fox_den_defense_dse, fox_fleeing_dse, fox_hunting_dse, fox_patrolling_dse,
-        fox_raiding_dse, fox_resting_dse,
+        fox_avoiding_dse, fox_den_defense_dse, fox_dispersing_dse, fox_feeding_dse, fox_fleeing_dse,
+        fox_hunting_dse, fox_patrolling_dse, fox_raiding_dse, fox_resting_dse,
     };
     use crate::ai::eval::{DseRegistry, ModifierPipeline};
 
@@ -443,6 +461,8 @@ mod tests {
         r.fox_dses.push(fox_den_defense_dse());
         r.fox_dses.push(fox_resting_dse(scoring));
         r.fox_dses.push(fox_patrolling_dse(scoring));
+        r.fox_dses.push(fox_feeding_dse());
+        r.fox_dses.push(fox_dispersing_dse());
         r
     }
 
