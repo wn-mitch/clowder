@@ -658,6 +658,12 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
             .cat_dses
             .push(clowder::ai::dses::fight_dse(&scoring));
         registry
+            .cat_dses
+            .push(clowder::ai::dses::sleep_dse(&scoring));
+        registry
+            .cat_dses
+            .push(clowder::ai::dses::idle_dse(&scoring));
+        registry
             .fox_dses
             .push(clowder::ai::dses::fox_hunting_dse(&scoring));
         registry.fox_dses.push(clowder::ai::dses::fox_raiding_dse());
@@ -666,6 +672,9 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
         registry
             .fox_dses
             .push(clowder::ai::dses::fox_den_defense_dse());
+        registry
+            .fox_dses
+            .push(clowder::ai::dses::fox_resting_dse(&scoring));
         world.insert_resource(registry);
     }
     if !world.contains_resource::<clowder::ai::eval::ModifierPipeline>() {
@@ -1281,6 +1290,12 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
             .cat_dses
             .push(clowder::ai::dses::fight_dse(&scoring));
         registry
+            .cat_dses
+            .push(clowder::ai::dses::sleep_dse(&scoring));
+        registry
+            .cat_dses
+            .push(clowder::ai::dses::idle_dse(&scoring));
+        registry
             .fox_dses
             .push(clowder::ai::dses::fox_hunting_dse(&scoring));
         registry.fox_dses.push(clowder::ai::dses::fox_raiding_dse());
@@ -1289,6 +1304,9 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
         registry
             .fox_dses
             .push(clowder::ai::dses::fox_den_defense_dse());
+        registry
+            .fox_dses
+            .push(clowder::ai::dses::fox_resting_dse(&scoring));
         world.insert_resource(registry);
     }
     world.insert_resource(clowder::ai::eval::ModifierPipeline::new());

@@ -221,6 +221,14 @@ fn ctx_scalars(ctx: &ScoringContext) -> HashMap<&'static str, f32> {
     // its knots).
     m.insert("safety", ctx.needs.safety.clamp(0.0, 1.0));
     m.insert("health", ctx.health.clamp(0.0, 1.0));
+    // Energy/health deficits for Rest peer group. Sleep uses
+    // `energy_deficit` through `sleep_dep()` Logistic and
+    // `health_deficit` through injury-bonus Linear.
+    m.insert(
+        "energy_deficit",
+        (1.0 - ctx.needs.energy).clamp(0.0, 1.0),
+    );
+    m.insert("health_deficit", (1.0 - ctx.health).clamp(0.0, 1.0));
     // Fight: combat_effective is already a `[0, 1]` composite index
     // upstream; flow through directly.
     m.insert(
@@ -234,13 +242,48 @@ fn ctx_scalars(ctx: &ScoringContext) -> HashMap<&'static str, f32> {
     // inputs to each DSE's Linear identity curve.
     m.insert("boldness", ctx.personality.boldness.clamp(0.0, 1.0));
     m.insert("diligence", ctx.personality.diligence.clamp(0.0, 1.0));
+    // Pre-inverted personality scalars for Idle. `incuriosity` =
+    // `1 − curiosity`; `playfulness_invert` = `1 − playfulness`. The
+    // pre-inversion keeps the consuming curve as a plain Linear
+    // rather than requiring `Composite { Linear, Invert }` — cheaper
+    // and matches the old additive formula's reading.
+    m.insert(
+        "incuriosity",
+        (1.0 - ctx.personality.curiosity).clamp(0.0, 1.0),
+    );
+    m.insert(
+        "playfulness_invert",
+        (1.0 - ctx.personality.playfulness).clamp(0.0, 1.0),
+    );
     // Binary presence signals as 0/1 scalars.
     m.insert("prey_nearby", if ctx.prey_nearby { 1.0 } else { 0.0 });
+    // Day-phase knot encoding shared with fox_ctx_scalars. Sleep's
+    // Piecewise resolves these knot-xs to its cat-specific bonus
+    // values; cross-species DSEs (Sleep, fox Hunting, fox Resting)
+    // all consume the same encoding.
+    m.insert(
+        "day_phase",
+        day_phase_scalar(ctx.day_phase),
+    );
     // Dummy "one" input for DSEs with base-rate axes (Cook, Idle,
     // Wander). Carried as a scalar so the curve's weight slot is
     // uniform with the other axes.
     m.insert("one", 1.0);
     m
+}
+
+/// Day-phase scalar knots, keyed to the Piecewise curve in Sleep /
+/// fox_hunting / fox_resting. Must match
+/// `dses::sleep::{DAWN_KNOT, …}` and
+/// `dses::fox_hunting::{DAWN_KNOT, …}`.
+fn day_phase_scalar(phase: DayPhase) -> f32 {
+    use crate::ai::dses::sleep;
+    match phase {
+        DayPhase::Dawn => sleep::DAWN_KNOT,
+        DayPhase::Day => sleep::DAY_KNOT,
+        DayPhase::Dusk => sleep::DUSK_KNOT,
+        DayPhase::Night => sleep::NIGHT_KNOT,
+    }
 }
 
 /// Score a registered cat DSE through the L2 evaluator. Returns the
@@ -328,29 +371,14 @@ pub fn score_actions(
         scores.push((Action::Eat, urgency + jitter(rng, s.jitter_range)));
     }
 
-    // --- Sleep ---
+    // --- Sleep (§2.3: WS of energy_deficit + day_phase + injury_rest) ---
+    // The additive-not-multiplicative semantic noted in the old
+    // inline comment is preserved by WS composition — Sleep remains
+    // available as a pressure-release valve at low energy even
+    // during feeding peaks.
     {
-        // Day-phase offset encodes the cat's Night-heavy, Dawn/Dusk-feeding
-        // rhythm. Additive (not multiplicative) so Sleep remains available as
-        // a pressure-release valve at low energy even during feeding peaks.
-        let day_phase_offset = match ctx.day_phase {
-            DayPhase::Dawn => s.sleep_dawn_bonus,
-            DayPhase::Day => s.sleep_day_bonus,
-            DayPhase::Dusk => s.sleep_dusk_bonus,
-            DayPhase::Night => s.sleep_night_bonus,
-        };
-        let urgency = ((1.0 - ctx.needs.energy) * s.sleep_urgency_scale + day_phase_offset)
-            * ctx.needs.level_suppression(1);
-        // Injured cats are more inclined to rest — recovery requires downtime.
-        let injury_bonus = if ctx.health < 1.0 {
-            (1.0 - ctx.health) * s.injury_rest_bonus
-        } else {
-            0.0
-        };
-        scores.push((
-            Action::Sleep,
-            urgency + injury_bonus + jitter(rng, s.jitter_range),
-        ));
+        let score = score_dse_by_id("sleep", ctx, inputs);
+        scores.push((Action::Sleep, score + jitter(rng, s.jitter_range)));
     }
 
     // --- Hunt (§2.3: WS of hunger + scarcity + boldness + prey_nearby) ---
@@ -742,13 +770,15 @@ pub fn score_actions(
         scores.push((Action::Caretake, score + jitter(rng, s.jitter_range)));
     }
 
-    // --- Idle (always-available fallback; incurious cats idle more) ---
-    let idle_score = s.idle_base + (1.0 - ctx.personality.curiosity) * s.idle_incuriosity_scale
-        - ctx.personality.playfulness * s.idle_playfulness_penalty;
-    scores.push((
-        Action::Idle,
-        idle_score.max(s.idle_minimum_floor) + jitter(rng, s.jitter_range),
-    ));
+    // --- Idle (§2.3: WS of base_rate + incuriosity + playfulness_invert) ---
+    // The always-available fallback. The base_rate axis's Linear
+    // intercept carries `idle_base` and ClampMin floors at
+    // `idle_minimum_floor` — post-composition floor per §2.3 baked
+    // into the base axis rather than a §3.5 modifier.
+    {
+        let score = score_dse_by_id("idle", ctx, inputs);
+        scores.push((Action::Idle, score + jitter(rng, s.jitter_range)));
+    }
 
     // --- Post-scoring personality modifiers ---
 
@@ -1358,6 +1388,8 @@ mod tests {
             r.cat_dses.push(crate::ai::dses::cook_dse());
             r.cat_dses.push(crate::ai::dses::flee_dse(&scoring));
             r.cat_dses.push(crate::ai::dses::fight_dse(&scoring));
+            r.cat_dses.push(crate::ai::dses::sleep_dse(&scoring));
+            r.cat_dses.push(crate::ai::dses::idle_dse(&scoring));
             r
         })
     }

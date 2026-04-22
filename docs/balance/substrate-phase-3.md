@@ -13,7 +13,8 @@ Phase 3c.1 (first peer-group port) is the next wave.
 | 3c.1a — Cat Starvation-urgency port | Eat + Hunt + Forage + Cook via `score_dse_by_id` | **landed** |
 | 3c.1b — Fox Starvation-urgency port | fox Hunting + Raiding through `fox_scoring.rs` | **landed** |
 | 3c.2 — Fatal-threat peer group | Flee + Fight + fox Fleeing + Avoiding + DenDefense | **landed** |
-| 3c.3+ — remaining peer groups | Rest, Social, Territory, Work, Exploration, Lifecycle | pending |
+| 3c.3 — Rest-urgency peer group | Sleep + Idle + fox Resting | **landed** |
+| 3c.4+ — remaining peer groups | Social, Territory, Work, Exploration, Lifecycle | pending |
 | 3c.last — sibling splits | Herbcraft × 3, PracticeMagic × 6 per §L2.10.10 | pending |
 | 3d — faction matrix + roster gap-fill | Authoring systems for §4.6 markers | pending |
 
@@ -86,7 +87,7 @@ fan-out strategy.
 | DSE | Composition | Curve(s) | Prediction | Landing commit |
 |---|---|---|---|---|
 | Eat | CP | Logistic(8, 0.75) hunger | Starvation unchanged; firing threshold sharper at 0.75 midpoint | 3b |
-| Sleep | WS | Logistic(10, 0.7) energy + Piecewise day-phase + Linear injury | Sleep firing rises in the 0.3–0.5 band; falls in the 0.6–0.9 band | 3c |
+| Sleep | WS | Logistic(10, 0.7) energy + Piecewise day-phase + Linear injury | Sleep firing rises in the 0.3–0.5 band; falls in the 0.6–0.9 band | 3c.3 |
 | Hunt | WS | Logistic(8, 0.75) hunger + Quadratic(2) scarcity + Linear boldness + Spatial prey | Hunt responsiveness to prey-proximity rises; bold-cat-on-full-stomach path opens | 3c |
 | Forage | WS | Hunger + scarcity + Linear diligence | — | 3c |
 | Groom (self) | CP (sibling) | Logistic(7, 0.6) thermal + Logistic(5, 0.6) affection | Retires Max-composed parent | 3c |
@@ -112,7 +113,7 @@ fan-out strategy.
 | Coordinate | WS | Linear diligence + saturating directive_count + Linear ambition | — | 3c |
 | Mentor | WS | Linear warmth + Linear diligence + Linear ambition | Frequency rises per open-work #3 hypothesis | 3c |
 | Caretake | WS | Linear urgency + Linear compassion + Piecewise parent | — | 3c |
-| Idle | WS | Linear base + Linear incuriosity + Linear playfulness, floor-clamp | — | 3c |
+| Idle | WS | Composite{Linear, ClampMin(floor)} base + Linear incuriosity + Linear playfulness_invert | Magnitude preserved via small Linear slopes/intercepts (base 0.05, incur 0.08, play 0.05) — Idle stays below other DSEs' peaks as §3.3.2 requires | 3c.3 |
 
 ### Herbcraft / PracticeMagic sibling DSEs (§L2.10.10)
 
@@ -149,6 +150,7 @@ Avoiding, Feeding, DenDefense, Dispersing) port one-to-one per §3.1.1
 | fox Fleeing | WS | Logistic(8, 0.5)(health_deficit) + Piecewise(cats_nearby step) + Composite{Linear(0.5), Invert}(boldness) | Peer of cat Flee + Fight; fires on injury panic or cat-outnumber. | 3c.2 |
 | fox Avoiding | CP | Composite{Linear(0.5), Clamp[0,1]}(cats_nearby) + Composite{Linear(0.8), Invert}(boldness) | Dominant under old magnitude; ported to cap at ~0.88. Predicted 0.58× compression landed. | 3c.2 |
 | fox DenDefense | CP | flee_or_fight(0.5)(cub_safety_deficit) + Linear(protectiveness) | Peer of cat Flee through shared steepness=10 Logistic. Fires when cat threatens den + has cubs. | 3c.2 |
+| fox Resting | WS | Linear(hunger) + Linear(health_fraction) + Piecewise(day_phase, fox_rest_*_bonus knots) | Additive-not-bilinear port (§3.1.1 row 1518 note: diurnal rest even when comfort is low). Peak compresses from ~1.5 to 1.0 — predicted 7× reduction in Resting plan share landed. | 3c.3 |
 
 ## Canaries under this phase
 
@@ -205,6 +207,7 @@ Phase 3 exits when all of:
 | `0a25d9b` | Phase 3c.1a — cat Starvation-urgency port. `HuntDse` + `ForageDse` + `CookDse` join `EatDse`; 4 inline `score_actions` blocks retire. Anchor resolution: option 1 (tuned WS weights). Seed-42 5-min smoke soak: 0 Starvation deaths, 42 grooming events. |
 | *(3c.1b)* | Phase 3c.1b — fox Starvation-urgency port. `FoxHuntingDse` (5-axis WS, `Piecewise` day-phase knots from `ScoringConstants`) + `FoxRaidingDse` (2-axis CP) registered in all 4 mirror sites; `score_fox_dispositions` takes `&EvalInputs` and dispatches through `score_fox_dse_by_id`. Seed-42 5-min release soak: 0 Starvation deaths, Engage/SearchPrey plan-failure counts within 2× baseline. Observed soft-gate regression documented below. |
 | *(3c.2)* | Phase 3c.2 — Fatal-threat peer group port. `FleeDse` + `FightDse` (parameterized by `&ScoringConstants`) + `FoxFleeingDse` + `FoxAvoidingDse` + `FoxDenDefenseDse`. `ctx_scalars` + `fox_ctx_scalars` extended with `safety_deficit`, `health`, `safety`, `ally_count`, `combat_effective`, `health_deficit`, `cats_nearby`, `protectiveness`, `cub_safety_deficit`. Seed-42 5-min release soak: 0 Starvation deaths; Avoiding plans 0.58× (compressed as predicted); fox Hunting plans remain 0 pending Rest peer-group port in 3c.3. |
+| *(3c.3)* | Phase 3c.3 — Rest-urgency peer group port. `SleepDse` + `IdleDse` + `FoxRestingDse` (all parameterized by `&ScoringConstants` for Piecewise day-phase knots / Idle base+floor constants). `ctx_scalars` extended with `energy_deficit`, `health_deficit`, `incuriosity`, `playfulness_invert`, `day_phase`; `fox_ctx_scalars` with raw `hunger`, `health_fraction`. Seed-42 5-min release soak: 0 Starvation deaths; fox Resting plans 0.14× of 3c.2 (compression landed); Avoiding now re-dominates because cross-peer-group argmax (§3.3.2: "comparison is undefined by design" across peer groups) isn't resolvable until softmax selection lands in §8.5. The L1 Maslow-multiplier binding retires from `fox_scoring.rs` — every L1 fox DSE routes through the evaluator's internal pre-gate. |
 
 **Total Phases 3a + 3b + 3c test coverage to date:** 112+ unit tests on new primitives; 745 lib tests pass.
 
@@ -408,6 +411,90 @@ Full Hunting restoration waits on Phase 3c.3 porting `Sleep`,
 Resting's magnitude will cap at 1.0 and no longer starve out fox
 Hunting in the sated-fox decision space. Expected: fox Hunting
 plans re-appear at ≥ 3c.1a baseline (143 per 5-min soak).
+
+## Phase 3c.3 — landed
+
+Rest peer group ports together: `SleepDse` + `IdleDse` for the cat
+side, `FoxRestingDse` for the fox side. Each takes
+`&ScoringConstants` because their curve parameters (Piecewise
+day-phase knots / `idle_base` / `idle_minimum_floor` /
+`injury_rest_bonus`) are runtime-tunable.
+
+### Port shape
+
+- `SleepDse` (WS, 3 axes, `&ScoringConstants`): `energy_deficit`
+  via `sleep_dep()` (Logistic(10, 0.7) — the §2.3 sleep-dep anchor),
+  `day_phase` via `Piecewise` on `sleep_{dawn,day,dusk,night}_bonus`,
+  `health_deficit` via `Linear(slope=injury_rest_bonus)`. RtEO
+  weights `[0.5, 0.3, 0.2]`. Maslow tier 1. Preserves the
+  additive-not-multiplicative semantic from the old inline's
+  "pressure-release valve at low energy even during feeding peaks"
+  design note.
+- `IdleDse` (WS, 3 axes, `&ScoringConstants`): `one` via
+  `Composite { Linear(intercept=idle_base), ClampMin(idle_minimum_floor) }`
+  (base_rate + post-composition floor baked into the base axis per
+  §2.3), `incuriosity` (pre-inverted) via `Linear(slope=
+  idle_incuriosity_scale)`, `playfulness_invert` (pre-inverted) via
+  `Linear(slope=idle_playfulness_penalty)`. RtEO weights `[0.4,
+  0.35, 0.25]`. Maslow tier = `u8::MAX` (opt out of pre-gate — Idle
+  is always available regardless of Maslow level).
+- `FoxRestingDse` (WS, 3 axes, `&ScoringConstants`): `hunger`
+  (raw satiation) via `Linear`, `health_fraction` via `Linear`,
+  `day_phase` via `Piecewise` on `fox_rest_{…}_bonus`. RtEO
+  weights `[0.25, 0.25, 0.5]` — day_phase weight dominates because
+  §3.1.1 row 1518 specifies diurnal rest even when comfort is low.
+  Maslow tier 1.
+
+Scalar vocabulary additions:
+
+- **Cat:** `energy_deficit`, `health_deficit`, `incuriosity`,
+  `playfulness_invert`, `day_phase`.
+- **Fox:** raw `hunger` (satiation scalar, distinct from existing
+  `hunger_urgency`), raw `health_fraction`.
+
+The cat-side `day_phase` scalar uses the same 0/0.33/0.66/1.0
+Piecewise knot encoding already established for fox DSEs, so
+`Sleep` / fox `Hunting` / fox `Resting` can share the scalar key
+with per-DSE bonus values.
+
+### Observed drift (seed-42 `--duration 300 --release`)
+
+Per the "skip useless baselines during in-progress port" guidance:
+observed fox plan distribution is reported for qualitative
+verification only; quantitative drift measurement defers to the
+phase-final deep-soak after all peer groups land.
+
+| Metric | 3c.2 | 3c.3 | Verdict |
+|---|---|---|---|
+| Starvation deaths | 0 | 0 | ✓ hard gate |
+| Fox Resting plans (GOAP) | 35 306 | 5 088 | **0.14× — compression landed** |
+| Fox Avoiding plans (GOAP) | 34 437 | 54 855 | Now re-dominant post-Resting-compression |
+| Fox Hunting plans (GOAP) | 0 | 0 | cross-peer-group tension — see below |
+
+**Fox Hunting remains at 0.** The Rest-peer compression worked
+(7× reduction in Resting plans), but the argmax across Avoiding
+(Fatal-threat peer, peaks ~0.77 under CP compensation) vs.
+Hunting (Starvation peer, peaks ~0.66 for starving bold fox with
+prey nearby) now falls to Avoiding in the common
+`cats_nearby ≥ 1 && hunger > 0.3` zone.
+
+This is §3.3.2's explicit note — *"across groups, comparison is
+undefined by design"* — manifesting in runtime behavior. Argmax
+selection doesn't honor peer-group semantics. The spec's fix is
+§L2.10.6 softmax with temperature tuning, which lands in a later
+phase. Meanwhile the legacy `fox_ai_decision` priority-tree
+continues to feed foxes directly, preserving the Starvation=0
+hard gate.
+
+### Follow-on observation
+
+Porting remaining peer groups (Social, Territory, Work,
+Exploration, Lifecycle) won't by itself restore fox Hunting's
+GOAP share — the tension is argmax-across-peer-groups, not
+within-group magnitude. Softmax adoption + §L2.10.7 target-taking
+spatial bias (so Hunting scores higher when prey is genuinely
+adjacent) together close the loop. Tracked as a Phase 3 exit
+criterion rather than a per-sub-phase gate.
 
 ## Phase 3a → 3b boundary (landed)
 

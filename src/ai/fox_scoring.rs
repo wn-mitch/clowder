@@ -136,6 +136,12 @@ fn fox_ctx_scalars(ctx: &FoxScoringContext) -> HashMap<&'static str, f32> {
         "hunger_urgency",
         (1.0 - ctx.needs.hunger).clamp(0.0, 1.0),
     );
+    // Raw satiation/health scalars for fox Resting's WS axes.
+    m.insert("hunger", ctx.needs.hunger.clamp(0.0, 1.0));
+    m.insert(
+        "health_fraction",
+        ctx.needs.health_fraction.clamp(0.0, 1.0),
+    );
     m.insert("boldness", ctx.personality.boldness.clamp(0.0, 1.0));
     m.insert("cunning", ctx.personality.cunning.clamp(0.0, 1.0));
     m.insert(
@@ -254,7 +260,10 @@ pub fn score_fox_dispositions(
     // -----------------------------------------------------------------------
     // Level 1: Survival (never suppressed)
     // -----------------------------------------------------------------------
-    let l1 = needs.level_suppression(1); // always 1.0
+    // Every L1 DSE now routes through `score_fox_dse_by_id`, which
+    // applies `needs.level_suppression(tier)` inside `evaluate_single`.
+    // The old explicit `let l1 = needs.level_suppression(1)` binding
+    // retired with the last inline L1 branch in Phase 3c.3.
 
     // Hunting: §2.3 fox row — WS of 5 axes (hunger_urgency, prey_nearby,
     // prey_belief, day_phase, boldness) via `FoxHuntingDse`. Maslow
@@ -278,19 +287,12 @@ pub fn score_fox_dispositions(
         }
     }
 
-    // Resting: when well-fed and at/near den. Day phase bonus turns Day into
-    // the default rest window — mirroring the Hunting bias at the opposite end
-    // of the circadian cycle so foxes aren't forced to pick a survival-tier
-    // action when neither hunger nor health is critical.
+    // Resting: §2.3 WS of hunger + health_fraction + day_phase
+    // (Piecewise on fox_rest_*_bonus knots). Diurnal foxes rest by
+    // day even when comfort is low — the day_phase axis carries
+    // that signal independently (§3.1.1 row 1518 design note).
     if ctx.has_den && needs.hunger > 0.5 {
-        let comfort = needs.hunger * needs.health_fraction;
-        let phase_bonus = match ctx.day_phase {
-            DayPhase::Dawn => ctx.scoring.fox_rest_dawn_bonus,
-            DayPhase::Day => ctx.scoring.fox_rest_day_bonus,
-            DayPhase::Dusk => ctx.scoring.fox_rest_dusk_bonus,
-            DayPhase::Night => ctx.scoring.fox_rest_night_bonus,
-        };
-        let score = (comfort * 0.6 + phase_bonus) * l1;
+        let score = score_fox_dse_by_id("fox_resting", ctx, inputs);
         if score > 0.0 {
             scores.push((FoxDispositionKind::Resting, score + jitter(rng, j)));
         }
@@ -390,6 +392,7 @@ mod tests {
 
     use crate::ai::dses::{
         fox_avoiding_dse, fox_den_defense_dse, fox_fleeing_dse, fox_hunting_dse, fox_raiding_dse,
+        fox_resting_dse,
     };
     use crate::ai::eval::{DseRegistry, ModifierPipeline};
 
@@ -437,6 +440,7 @@ mod tests {
         r.fox_dses.push(fox_fleeing_dse());
         r.fox_dses.push(fox_avoiding_dse());
         r.fox_dses.push(fox_den_defense_dse());
+        r.fox_dses.push(fox_resting_dse(scoring));
         r
     }
 

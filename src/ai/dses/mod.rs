@@ -16,7 +16,10 @@ pub mod fox_den_defense;
 pub mod fox_fleeing;
 pub mod fox_hunting;
 pub mod fox_raiding;
+pub mod fox_resting;
 pub mod hunt;
+pub mod idle;
+pub mod sleep;
 
 pub use cook::cook_dse;
 pub use eat::eat_dse;
@@ -28,4 +31,7 @@ pub use fox_den_defense::fox_den_defense_dse;
 pub use fox_fleeing::fox_fleeing_dse;
 pub use fox_hunting::fox_hunting_dse;
 pub use fox_raiding::fox_raiding_dse;
+pub use fox_resting::fox_resting_dse;
 pub use hunt::hunt_dse;
+pub use idle::idle_dse;
+pub use sleep::sleep_dse;
