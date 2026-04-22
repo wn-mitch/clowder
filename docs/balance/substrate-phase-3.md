@@ -10,7 +10,8 @@ Phase 3c.1 (first peer-group port) is the next wave.
 | 3b.1 — evaluator plumbing | `DseRegistry` resource + `evaluate_single` + modifier pipeline + `DseRegistryAppExt` | **landed** |
 | 3b.2 — Eat reference port | `EatDse` registered in plugin + headless | **landed** |
 | 3c.0 — `score_actions` threading | `EvalInputs` bundle, call-site migration, dead-code `score_eat` helper | **landed** |
-| 3c.1 — Starvation-urgency peer group | Eat + Hunt + Forage + Cook + fox Hunting + fox Raiding together | pending |
+| 3c.1a — Cat Starvation-urgency port | Eat + Hunt + Forage + Cook via `score_dse_by_id` | **landed** |
+| 3c.1b — Fox Starvation-urgency port | fox Hunting + Raiding through `fox_scoring.rs` | pending |
 | 3c.2+ — remaining peer groups | Fatal-threat, Rest, Social, Territory, Work, Exploration, Lifecycle | pending |
 | 3c.last — sibling splits | Herbcraft × 3, PracticeMagic × 6 per §L2.10.10 | pending |
 | 3d — faction matrix + roster gap-fill | Authoring systems for §4.6 markers | pending |
@@ -181,18 +182,20 @@ Phase 3 exits when all of:
 6. §9 faction matrix loaded; 5 DSE-filter bindings resolved correctly.
 7. `Fertility` component emits phase transitions consistent with §7.M.7.2.
 
-## Phases 3a + 3b deliverables landed
+## Phases 3a + 3b + 3c deliverables landed
 
 | Commit | Scope |
 |---|---|
 | `03e9b23` | L2 primitives — `curves.rs` (7 primitives + named anchors), `composition.rs` (3 modes + compensation), `considerations.rs` (Consideration trait + 3 flavors). 40 tests. |
 | `01cb6e7` | `Dse` trait + `Intention` enum (Goal / Activity + CommitmentStrategy tag) + `Termination` + `EvalCtx` skeleton + `EligibilityFilter`; `FactionStance` stub + `StanceRequirement`. 7 tests. |
-| `e02121f` | §4 marker catalog — 49 new ZST components across 11 categories (LifeStage, State, Capability, Inventory, TargetExistence, Colony, Reproduction, Fox-specific, §9.2 faction overlays). 10 queryability tests. |
+| `e02121f` | §4 marker catalog — 49 new ZST components across 11 categories. 10 queryability tests. |
 | `1a50d30` | §9 faction model — flattened `FactionSpecies`, `FactionRelations` resource with 100-cell §9.1 matrix, `StanceOverlays` + `resolve_stance` most-negative-wins resolver, 4 `StanceRequirement` factory helpers. 26 tests. |
-| `d9cf47e` | Phase 3b.1 evaluator — `DseRegistry` + `ModifierPipeline` + `ScoreModifier` trait + 6-method `DseRegistryAppExt`. `evaluate_single` runs eligibility → consideration scoring → composition → Maslow pre-gate → modifier pipeline → Intention emit. 9 tests. |
-| `afe22f5` | Phase 3b.2 `EatDse` reference port — single hunger consideration through `Logistic(8, 0.75)`, CP composition, Maslow tier 1, Goal Intention with SingleMinded commitment. Registered in both `SimulationPlugin::build` and headless `build_new_world` + `setup_world` save-load path. 10 tests. |
+| `d9cf47e` | Phase 3b.1 evaluator — `DseRegistry` + `ModifierPipeline` + `ScoreModifier` trait + 6-method `DseRegistryAppExt`. 9 tests. |
+| `afe22f5` | Phase 3b.2 `EatDse` reference port — single hunger consideration through `Logistic(8, 0.75)`, CP composition, Maslow tier 1, Goal Intention with SingleMinded commitment. Registered in plugin + headless + save-load. 10 tests. |
+| `91e6b56` | Phase 3c.0 — `EvalInputs` threaded through `score_actions` (2 production + 24 test + 3 integration-test sites). Dead-code `score_eat` helper lands the pattern. |
+| `0a25d9b` | Phase 3c.1a — cat Starvation-urgency port. `HuntDse` + `ForageDse` + `CookDse` join `EatDse`; 4 inline `score_actions` blocks retire. Anchor resolution: option 1 (tuned WS weights). Seed-42 5-min smoke soak: 0 Starvation deaths, 42 grooming events. |
 
-**Total Phases 3a + 3b test coverage:** 102 unit tests on new primitives.
+**Total Phases 3a + 3b + 3c test coverage to date:** 112+ unit tests on new primitives; 745 lib tests pass.
 
 ## Phase 3b ↔ 3c boundary
 
@@ -254,33 +257,31 @@ primitive math makes that value depend on composition mode.
 The right answer likely falls out of a calibration soak. Phase 3c.1
 opens with option (1) as the default hypothesis, then measures.
 
-## Phase 3c.1 entry checklist
+## Phase 3c.1b entry checklist
 
-Before landing Phase 3c.1 (Starvation-urgency peer group):
+The cat Starvation-urgency port shipped in 3c.1a. 3c.1b closes the
+peer group by porting fox Hunting + fox Raiding through the same
+evaluator surface.
 
-1. Read §2.3 rows for Eat, Hunt, Forage, Cook, fox Hunting, Raiding
-   to gather curves + compositions.
-2. Read §3.1.1 rows for the same six DSEs to gather composition
-   modes + RtM/RtEO designations.
-3. Read §3.3.2 Starvation-urgency row — commit to option (1/2/3)
-   above explicitly in the commit message.
-4. Port all six DSEs in one commit:
-   - Define `hunt.rs`, `forage.rs`, `cook.rs`, `fox_hunting.rs`,
-     `fox_raiding.rs` alongside `eat.rs`.
-   - Register in `SimulationPlugin::build`, headless
-     `build_new_world`, save-load `setup_world`, and
-     `tests/integration.rs::setup_world` (manual-mirror rule —
-     missing one site breaks either tests or production).
-   - Replace the inline blocks for all six in `score_actions` and
-     `fox_scoring::score_actions`.
-   - Delete `scoring.rs::score_eat` and `eat_urgency_scale` (the
-     latter is not in §2.3's retired list but becomes dead weight).
-5. Run seed-42 deep-soak. Verify:
-   - `Starvation` canary = 0.
-   - `starving_cat_scores_eat_highest` passes (or is updated with
-     a documented hypothesis about the new tie-break).
-   - Per-DSE frame-diff against the pre-3c baseline.
-6. Update this doc's concordance section with observed drift.
+1. Read §2.3 fox rows for `Hunting` and `Raiding` — curves + axes.
+2. Read §3.1.1 fox rows — WS vs CP + axis lists.
+3. Fox side has its own `FoxScoringContext` + `FoxPersonality`
+   (boldness / cunning / territoriality / protectiveness). Build
+   `fox_ctx_scalars` parallel to `ctx_scalars`; scalar vocabulary
+   likely overlaps (hunger_urgency) plus fox-specific (cunning,
+   prey_belief).
+4. Define `fox_hunting.rs` + `fox_raiding.rs` under
+   `src/ai/dses/`; register via `add_fox_dse` — verify
+   `registry.fox_dse(id)` lookup path works.
+5. Thread `EvalInputs` equivalent through
+   `fox_scoring::score_fox_dispositions`; replace inline Hunting
+   + Raiding branches.
+6. Register in all 4 mirror sites.
+7. Run seed-42 deep-soak (15-min release build). Verify:
+   - `Starvation` canary = 0 (colony + fox).
+   - `FoxHunt`-family plan-failure counts within 2× baseline.
+   - `Hunt` / `Raiding` firing frequency holds.
+8. Update this doc's concordance section with observed drift.
 
 ## Phase 3a → 3b boundary (landed)
 
