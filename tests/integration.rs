@@ -110,6 +110,23 @@ fn setup_world(seed: u64) -> World {
         registry.cat_dses.push(clowder::ai::dses::caretake_dse());
         registry.cat_dses.push(clowder::ai::dses::mate_dse());
         registry
+            .cat_dses
+            .push(clowder::ai::dses::patrol_dse(&scoring));
+        registry
+            .cat_dses
+            .push(clowder::ai::dses::build_dse(&scoring));
+        registry.cat_dses.push(clowder::ai::dses::farm_dse());
+        registry
+            .cat_dses
+            .push(clowder::ai::dses::coordinate_dse(&scoring));
+        registry.cat_dses.push(clowder::ai::dses::explore_dse());
+        registry
+            .cat_dses
+            .push(clowder::ai::dses::wander_dse(&scoring));
+        registry
+            .fox_dses
+            .push(clowder::ai::dses::fox_patrolling_dse(&scoring));
+        registry
             .fox_dses
             .push(clowder::ai::dses::fox_hunting_dse(&scoring));
         registry.fox_dses.push(clowder::ai::dses::fox_raiding_dse());

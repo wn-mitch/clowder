@@ -168,6 +168,16 @@ fn fox_ctx_scalars(ctx: &FoxScoringContext) -> HashMap<&'static str, f32> {
         "cub_safety_deficit",
         (1.0 - ctx.needs.cub_safety).clamp(0.0, 1.0),
     );
+    // Fox Patrolling axes.
+    m.insert(
+        "territory_scent_deficit",
+        (1.0 - ctx.needs.territory_scent).clamp(0.0, 1.0),
+    );
+    m.insert("ticks_since_patrol", ctx.ticks_since_patrol as f32);
+    m.insert(
+        "territoriality",
+        ctx.personality.territoriality.clamp(0.0, 1.0),
+    );
     m
 }
 
@@ -311,22 +321,13 @@ pub fn score_fox_dispositions(
     // -----------------------------------------------------------------------
     // Level 2: Territory (suppressed by survival)
     // -----------------------------------------------------------------------
-    let l2 = needs.level_suppression(2);
-
-    // Patrolling: driven by low territory scent, weighted by territoriality.
-    // Time-since-last-patrol adds a steady upward pressure — if the fox hasn't
-    // patrolled in a while, this disposition eventually wins even when hunger
-    // is slightly unsatisfied.
+    // Patrolling: §2.3 WS of territory_scent_deficit (Logistic(5,
+    // 0.5)) + ticks_since_patrol (saturating) + day_phase
+    // (Piecewise on fox_patrol_*_bonus) + territoriality. Maslow
+    // tier 2 pre-gate applied inside `evaluate_single` — the old
+    // `let l2 = needs.level_suppression(2)` binding retires.
     if ctx.has_den {
-        let scent_urgency = 1.0 - needs.territory_scent;
-        let time_pressure = (ctx.ticks_since_patrol as f32 / 2000.0).min(1.0);
-        let phase_bonus = match ctx.day_phase {
-            DayPhase::Dawn => ctx.scoring.fox_patrol_dawn_bonus,
-            DayPhase::Day => ctx.scoring.fox_patrol_day_bonus,
-            DayPhase::Dusk => ctx.scoring.fox_patrol_dusk_bonus,
-            DayPhase::Night => ctx.scoring.fox_patrol_night_bonus,
-        };
-        let score = (scent_urgency + time_pressure + phase_bonus) * p.territoriality * l2;
+        let score = score_fox_dse_by_id("fox_patrolling", ctx, inputs);
         if score > 0.0 {
             scores.push((FoxDispositionKind::Patrolling, score + jitter(rng, j)));
         }
@@ -391,8 +392,8 @@ mod tests {
     use std::sync::LazyLock;
 
     use crate::ai::dses::{
-        fox_avoiding_dse, fox_den_defense_dse, fox_fleeing_dse, fox_hunting_dse, fox_raiding_dse,
-        fox_resting_dse,
+        fox_avoiding_dse, fox_den_defense_dse, fox_fleeing_dse, fox_hunting_dse, fox_patrolling_dse,
+        fox_raiding_dse, fox_resting_dse,
     };
     use crate::ai::eval::{DseRegistry, ModifierPipeline};
 
@@ -441,6 +442,7 @@ mod tests {
         r.fox_dses.push(fox_avoiding_dse());
         r.fox_dses.push(fox_den_defense_dse());
         r.fox_dses.push(fox_resting_dse(scoring));
+        r.fox_dses.push(fox_patrolling_dse(scoring));
         r
     }
 

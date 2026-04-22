@@ -1,0 +1,110 @@
+//! `Farm` — Work-urgency peer (§3.3.2 anchor = 1.0). Also the
+//! canonical "zero-to-nonzero" Phase 3 canary per the balance doc —
+//! Farm must fire ≥ 1× on seed 42 to prove substrate dormancy (not
+//! missing system) was the cause of its 0-fire baseline.
+//!
+//! Per §2.3 + §3.1.1 row 1494: `CompensatedProduct` of 2 axes —
+//! `food_scarcity` via `scarcity()` (Quadratic(exp=2)) and
+//! `diligence` via Linear. Both gate: no scarcity ⇒ no reason to
+//! farm; no diligence ⇒ cat won't bother.
+//!
+//! Eligibility: `has_garden` (outer gate until §4 port). Maslow
+//! tier 2.
+
+use bevy::prelude::*;
+
+use crate::ai::composition::Composition;
+use crate::ai::considerations::{Consideration, ScalarConsideration};
+use crate::ai::curves::{scarcity, Curve};
+use crate::ai::dse::{
+    CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
+};
+
+pub const FOOD_SCARCITY_INPUT: &str = "food_scarcity";
+pub const DILIGENCE_INPUT: &str = "diligence";
+
+pub struct FarmDse {
+    id: DseId,
+    considerations: Vec<Consideration>,
+    composition: Composition,
+    eligibility: EligibilityFilter,
+}
+
+impl FarmDse {
+    pub fn new() -> Self {
+        Self {
+            id: DseId("farm"),
+            considerations: vec![
+                Consideration::Scalar(ScalarConsideration::new(FOOD_SCARCITY_INPUT, scarcity())),
+                Consideration::Scalar(ScalarConsideration::new(
+                    DILIGENCE_INPUT,
+                    Curve::Linear {
+                        slope: 1.0,
+                        intercept: 0.0,
+                    },
+                )),
+            ],
+            composition: Composition::compensated_product(vec![1.0, 1.0]),
+            eligibility: EligibilityFilter::new(),
+        }
+    }
+}
+
+impl Default for FarmDse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Dse for FarmDse {
+    fn id(&self) -> DseId {
+        self.id
+    }
+    fn considerations(&self) -> &[Consideration] {
+        &self.considerations
+    }
+    fn composition(&self) -> &Composition {
+        &self.composition
+    }
+    fn eligibility(&self) -> &EligibilityFilter {
+        &self.eligibility
+    }
+    fn default_strategy(&self) -> CommitmentStrategy {
+        CommitmentStrategy::SingleMinded
+    }
+    fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
+        Intention::Goal {
+            state: GoalState {
+                label: "farmed",
+                achieved: |_, _| false,
+            },
+            strategy: CommitmentStrategy::SingleMinded,
+        }
+    }
+    fn maslow_tier(&self) -> u8 {
+        2
+    }
+}
+
+pub fn farm_dse() -> Box<dyn Dse> {
+    Box::new(FarmDse::new())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn farm_dse_id_stable() {
+        assert_eq!(FarmDse::new().id().0, "farm");
+    }
+
+    #[test]
+    fn farm_is_compensated_product() {
+        use crate::ai::composition::CompositionMode;
+        assert_eq!(
+            FarmDse::new().composition().mode,
+            CompositionMode::CompensatedProduct
+        );
+    }
+}

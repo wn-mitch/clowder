@@ -6,9 +6,13 @@
 //! remaining 20 cat DSEs, 9 fox DSEs, and 9 Herbcraft/PracticeMagic
 //! siblings through the same template.
 
+pub mod build;
 pub mod caretake;
 pub mod cook;
+pub mod coordinate;
 pub mod eat;
+pub mod explore;
+pub mod farm;
 pub mod fight;
 pub mod flee;
 pub mod forage;
@@ -16,6 +20,7 @@ pub mod fox_avoiding;
 pub mod fox_den_defense;
 pub mod fox_fleeing;
 pub mod fox_hunting;
+pub mod fox_patrolling;
 pub mod fox_raiding;
 pub mod fox_resting;
 pub mod groom_other;
@@ -24,12 +29,18 @@ pub mod hunt;
 pub mod idle;
 pub mod mate;
 pub mod mentor;
+pub mod patrol;
 pub mod sleep;
 pub mod socialize;
+pub mod wander;
 
+pub use build::build_dse;
 pub use caretake::caretake_dse;
 pub use cook::cook_dse;
+pub use coordinate::coordinate_dse;
 pub use eat::eat_dse;
+pub use explore::explore_dse;
+pub use farm::farm_dse;
 pub use fight::fight_dse;
 pub use flee::flee_dse;
 pub use forage::forage_dse;
@@ -37,6 +48,7 @@ pub use fox_avoiding::fox_avoiding_dse;
 pub use fox_den_defense::fox_den_defense_dse;
 pub use fox_fleeing::fox_fleeing_dse;
 pub use fox_hunting::fox_hunting_dse;
+pub use fox_patrolling::fox_patrolling_dse;
 pub use fox_raiding::fox_raiding_dse;
 pub use fox_resting::fox_resting_dse;
 pub use groom_other::groom_other_dse;
@@ -45,5 +57,7 @@ pub use hunt::hunt_dse;
 pub use idle::idle_dse;
 pub use mate::mate_dse;
 pub use mentor::mentor_dse;
+pub use patrol::patrol_dse;
 pub use sleep::sleep_dse;
 pub use socialize::socialize_dse;
+pub use wander::wander_dse;

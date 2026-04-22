@@ -295,6 +295,28 @@ fn ctx_scalars(ctx: &ScoringContext) -> HashMap<&'static str, f32> {
             0.0
         },
     );
+    // Exploration peer group.
+    m.insert(
+        "curiosity",
+        ctx.personality.curiosity.clamp(0.0, 1.0),
+    );
+    m.insert(
+        "unexplored_nearby",
+        ctx.unexplored_nearby.clamp(0.0, 1.0),
+    );
+    // Work peer group — Build presence axes are 0/1.
+    m.insert(
+        "has_construction_site",
+        if ctx.has_construction_site { 1.0 } else { 0.0 },
+    );
+    m.insert(
+        "has_damaged_building",
+        if ctx.has_damaged_building { 1.0 } else { 0.0 },
+    );
+    m.insert(
+        "pending_directive_count",
+        ctx.pending_directive_count as f32,
+    );
     // Pre-inverted personality scalars for Idle. `incuriosity` =
     // `1 − curiosity`; `playfulness_invert` = `1 − playfulness`. The
     // pre-inversion keeps the consuming curve as a plain Linear
@@ -472,21 +494,15 @@ pub fn score_actions(
         ));
     }
 
-    // --- Explore (curiosity-driven; gated by unexplored area and physiological needs) ---
+    // --- Explore (§2.3: CP of curiosity + unexplored_nearby) ---
     {
-        let score = ctx.personality.curiosity
-            * s.explore_curiosity_scale
-            * ctx.needs.level_suppression(2)
-            * ctx.unexplored_nearby;
+        let score = score_dse_by_id("explore", ctx, inputs);
         scores.push((Action::Explore, score + jitter(rng, s.jitter_range)));
     }
 
-    // --- Wander (light movement; suppressed only by unmet physiological needs) ---
+    // --- Wander (§2.3: WS of curiosity + base_rate + playfulness) ---
     {
-        let score =
-            ctx.personality.curiosity * s.wander_curiosity_scale * ctx.needs.level_suppression(2)
-                + s.wander_base
-                + ctx.personality.playfulness * s.wander_playfulness_bonus;
+        let score = score_dse_by_id("wander", ctx, inputs);
         scores.push((Action::Wander, score + jitter(rng, s.jitter_range)));
     }
 
@@ -508,51 +524,21 @@ pub fn score_actions(
         scores.push((Action::Fight, score + jitter(rng, s.jitter_range)));
     }
 
-    // --- Patrol (proactive safety-seeking; available when safety < threshold) ---
+    // --- Patrol (§2.3: CP of safety_deficit + boldness) ---
     if ctx.needs.safety < s.patrol_safety_threshold {
-        let score = ctx.personality.boldness
-            * s.patrol_boldness_scale
-            * (1.0 - ctx.needs.safety)
-            * ctx.needs.level_suppression(2);
+        let score = score_dse_by_id("patrol", ctx, inputs);
         scores.push((Action::Patrol, score + jitter(rng, s.jitter_range)));
     }
 
-    // --- Build (diligence-driven; scored when construction/repair is needed) ---
-    // Level 2 suppression (phys only) — Build erects safety/defense
-    // infrastructure (walls, wards, Hearth, Kitchen), so gating it on
-    // pre-existing safety satisfaction creates a chicken-and-egg: the cats
-    // who most need a wall never build one because they never feel safe.
-    // A hungry/exhausted cat still shouldn't build (level 2), but a fed cat
-    // under predator pressure should be able to.
+    // --- Build (§2.3: WS of diligence + site_presence + repair_presence) ---
     if ctx.has_construction_site || ctx.has_damaged_building {
-        let base =
-            ctx.personality.diligence * s.build_diligence_scale * ctx.needs.level_suppression(2);
-        let site_bonus = if ctx.has_construction_site {
-            s.build_site_bonus
-        } else {
-            0.0
-        };
-        let repair_bonus = if ctx.has_damaged_building {
-            s.build_repair_bonus
-        } else {
-            0.0
-        };
-        scores.push((
-            Action::Build,
-            base + site_bonus + repair_bonus + jitter(rng, s.jitter_range),
-        ));
+        let score = score_dse_by_id("build", ctx, inputs);
+        scores.push((Action::Build, score + jitter(rng, s.jitter_range)));
     }
 
-    // --- Farm (diligence-driven; scored when garden exists and food is low) ---
-    // Level 2 suppression (phys only) — Farm is the colony's response to food
-    // scarcity, same class as Hunt/Forage. Gating on safety would leave the
-    // garden unattended when the colony most needs it (predator pressure +
-    // empty stores is exactly when farming matters).
+    // --- Farm (§2.3: CP of food_scarcity + diligence) ---
     if ctx.has_garden {
-        let urgency = (1.0 - ctx.food_fraction)
-            * ctx.personality.diligence
-            * s.farm_diligence_scale
-            * ctx.needs.level_suppression(2);
+        let urgency = score_dse_by_id("farm", ctx, inputs);
         scores.push((Action::Farm, urgency + jitter(rng, s.jitter_range)));
     }
 
@@ -738,15 +724,9 @@ pub fn score_actions(
         }
     }
 
-    // --- Coordinate (coordinator with pending directives only) ---
+    // --- Coordinate (§2.3: WS of diligence + directive_count + ambition) ---
     if ctx.is_coordinator_with_directives {
-        let score = ctx.personality.diligence
-            * s.coordinate_diligence_scale
-            * (ctx.pending_directive_count as f32 * s.coordinate_directive_scale)
-            * ctx.needs.level_suppression(4)
-            + ctx.personality.ambition
-                * s.coordinate_ambition_bonus
-                * ctx.needs.level_suppression(4);
+        let score = score_dse_by_id("coordinate", ctx, inputs);
         scores.push((Action::Coordinate, score + jitter(rng, s.jitter_range)));
     }
 
@@ -1418,6 +1398,12 @@ mod tests {
             r.cat_dses.push(crate::ai::dses::mentor_dse());
             r.cat_dses.push(crate::ai::dses::caretake_dse());
             r.cat_dses.push(crate::ai::dses::mate_dse());
+            r.cat_dses.push(crate::ai::dses::patrol_dse(&scoring));
+            r.cat_dses.push(crate::ai::dses::build_dse(&scoring));
+            r.cat_dses.push(crate::ai::dses::farm_dse());
+            r.cat_dses.push(crate::ai::dses::coordinate_dse(&scoring));
+            r.cat_dses.push(crate::ai::dses::explore_dse());
+            r.cat_dses.push(crate::ai::dses::wander_dse(&scoring));
             r
         })
     }
