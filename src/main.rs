@@ -668,6 +668,9 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
             .cat_dses
             .push(clowder::ai::dses::idle_dse(&scoring));
         registry.cat_dses.push(clowder::ai::dses::socialize_dse());
+        registry
+            .target_taking_dses
+            .push(clowder::ai::dses::socialize_target_dse());
         registry.cat_dses.push(clowder::ai::dses::groom_self_dse());
         registry.cat_dses.push(clowder::ai::dses::groom_other_dse());
         registry.cat_dses.push(clowder::ai::dses::mentor_dse());
@@ -1355,6 +1358,9 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
             .cat_dses
             .push(clowder::ai::dses::idle_dse(&scoring));
         registry.cat_dses.push(clowder::ai::dses::socialize_dse());
+        registry
+            .target_taking_dses
+            .push(clowder::ai::dses::socialize_target_dse());
         registry.cat_dses.push(clowder::ai::dses::groom_self_dse());
         registry.cat_dses.push(clowder::ai::dses::groom_other_dse());
         registry.cat_dses.push(clowder::ai::dses::mentor_dse());

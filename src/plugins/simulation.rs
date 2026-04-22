@@ -60,6 +60,7 @@ impl Plugin for SimulationPlugin {
                 .add_dse(crate::ai::dses::sleep_dse(&default_scoring))
                 .add_dse(crate::ai::dses::idle_dse(&default_scoring))
                 .add_dse(crate::ai::dses::socialize_dse())
+                .add_target_taking_dse(crate::ai::dses::socialize_target_dse())
                 .add_dse(crate::ai::dses::groom_self_dse())
                 .add_dse(crate::ai::dses::groom_other_dse())
                 .add_dse(crate::ai::dses::mentor_dse())

@@ -198,6 +198,11 @@ pub struct ExecutorContext<'w, 's> {
         (Entity, &'static Position),
         (With<WildAnimal>, Without<Dead>, Without<PreyAnimal>),
     >,
+    /// §6.3 target-taking DSE lookup — the `SocializeWith` step (and
+    /// future per-DSE ports) route target resolution through the
+    /// registered DSE instead of divergent helpers like
+    /// `find_social_target`.
+    pub dse_registry: Res<'w, crate::ai::eval::DseRegistry>,
 }
 
 // ===========================================================================
@@ -757,9 +762,20 @@ pub fn evaluate_and_plan(
             t.foraging_yield() > 0.0
         });
 
-        let has_social_target = cat_positions.iter().any(|(other, other_pos)| {
-            *other != entity && pos.manhattan_distance(other_pos) <= d.social_target_range
-        });
+        // §6.5.1: the `has_social_target` bool gate reads through the
+        // target-taking DSE so the scorer and the downstream
+        // `SocializeWith` step both see the same "is a partner
+        // available?" verdict. Retires divergent range-bound plain
+        // filter gates.
+        let has_social_target = crate::ai::dses::socialize_target::resolve_socialize_target(
+            &res.dse_registry,
+            entity,
+            *pos,
+            &cat_positions,
+            &res.relationships,
+            res.time.tick,
+        )
+        .is_some();
 
         let nearest_threat = wildlife_positions
             .iter()
@@ -1710,10 +1726,22 @@ pub fn resolve_goap_plans(
             }
 
             GoapActionKind::SocializeWith => {
-                // Resolve social target on first tick.
+                // Resolve social target on first tick via the §6.5.1
+                // target-taking DSE. Phase 4c.1: replaces
+                // `find_social_target` (fondness-only) with the single
+                // source of truth `resolve_socialize_target` — closes
+                // the §6.2 silent-divergence gap with
+                // `disposition.rs::build_socializing_chain`.
                 if plan.step_state[step_idx].target_entity.is_none() {
                     plan.step_state[step_idx].target_entity =
-                        find_social_target(cat_entity, &pos, &cat_positions, &relationships, d);
+                        crate::ai::dses::socialize_target::resolve_socialize_target(
+                            &ec.dse_registry,
+                            cat_entity,
+                            *pos,
+                            &cat_positions,
+                            &relationships,
+                            ec.time.tick,
+                        );
                 }
                 let result = crate::steps::disposition::resolve_socialize(
                     ticks,

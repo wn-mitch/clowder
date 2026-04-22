@@ -38,6 +38,7 @@ pub mod patrol;
 pub mod practice_magic;
 pub mod sleep;
 pub mod socialize;
+pub mod socialize_target;
 pub mod wander;
 
 pub use build::build_dse;
@@ -74,4 +75,5 @@ pub use practice_magic::{
 };
 pub use sleep::sleep_dse;
 pub use socialize::socialize_dse;
+pub use socialize_target::socialize_target_dse;
 pub use wander::wander_dse;

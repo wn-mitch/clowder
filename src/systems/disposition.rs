@@ -77,6 +77,10 @@ pub struct ChainResources<'w> {
     /// Mutable ledger of frustrated action desires — chain builders record
     /// misses here so the coordinator's BuildPressure can respond.
     pub unmet_demand: ResMut<'w, crate::resources::UnmetDemand>,
+    /// §6.3 target-taking DSE lookup — chain builders route target
+    /// selection through the registered DSE (Phase 4c.1 onward).
+    pub dse_registry: Res<'w, crate::ai::eval::DseRegistry>,
+    pub time: Res<'w, TimeState>,
 }
 
 use crate::resources::narrative_templates::{
@@ -499,9 +503,20 @@ pub fn evaluate_dispositions(
             t.foraging_yield() > 0.0
         });
 
-        let has_social_target = cat_positions.iter().any(|(other, other_pos)| {
-            *other != entity && pos.manhattan_distance(other_pos) <= d.social_target_range
-        });
+        // §6.5.1 target-taking DSE: the `has_social_target` bool gate
+        // now reads through the same picker that disposition_to_chain's
+        // `build_socializing_chain` and `goap.rs::SocializeWith`
+        // consume. Retires the divergent fondness-only /
+        // fondness+novelty formulas that used to live in those callers.
+        let has_social_target = crate::ai::dses::socialize_target::resolve_socialize_target(
+            &side_effects.dse_registry,
+            entity,
+            *pos,
+            &cat_positions,
+            &relationships,
+            side_effects.time.tick,
+        )
+        .is_some();
 
         let nearest_threat = wildlife_positions
             .iter()
@@ -958,6 +973,20 @@ pub fn disposition_to_chain(
             .min_by_key(|(_, _, bp, _, _)| pos.manhattan_distance(bp))
             .map(|(e, _, bp, _, _)| (e, *bp));
 
+        // §6.5.1: resolve social partner once per tick via the
+        // target-taking DSE. Recomputed here (not threaded from
+        // `evaluate_dispositions`) because the two systems run as a
+        // pair per tick over the same frame-local state; the extra
+        // evaluator pass is cheap relative to chain construction.
+        let socialize_target = crate::ai::dses::socialize_target::resolve_socialize_target(
+            &res.dse_registry,
+            entity,
+            *pos,
+            &cat_pos_list,
+            &res.relationships,
+            res.time.tick,
+        );
+
         let chain = match disposition.kind {
             DispositionKind::Resting => build_resting_chain(
                 needs,
@@ -986,12 +1015,10 @@ pub fn disposition_to_chain(
                 &mut rng.rng,
             ),
             DispositionKind::Socializing => build_socializing_chain(
-                entity,
-                pos,
+                socialize_target,
+                &cat_pos_list,
                 personality,
                 skills,
-                &cat_pos_list,
-                &res.relationships,
                 &skills_query,
                 d,
             ),
@@ -1333,39 +1360,26 @@ fn build_guarding_chain(
     Some((chain, Action::Patrol))
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Build a task chain around a pre-resolved social target. §6.2 /
+/// §6.5.1: the target entity is chosen by
+/// [`crate::ai::dses::socialize_target::resolve_socialize_target`]
+/// upstream; this function owns only the chain shape (Mentor /
+/// Groom / Socialize sub-action pick, step sequencing), not partner
+/// selection. Legacy fondness+novelty mixer retired here to close the
+/// silent-divergence gap with `goap.rs::find_social_target`.
 fn build_socializing_chain(
-    entity: Entity,
-    pos: &Position,
+    socialize_target: Option<Entity>,
+    cat_positions: &[(Entity, Position)],
     personality: &Personality,
     skills: &Skills,
-    cat_positions: &[(Entity, Position)],
-    relationships: &Relationships,
     skills_query: &Query<&Skills, Without<Dead>>,
     d: &DispositionConstants,
 ) -> Option<(TaskChain, Action)> {
-    // Pick best social target.
-    let target = cat_positions
+    let target_entity = socialize_target?;
+    let target_pos = *cat_positions
         .iter()
-        .filter(|(other, other_pos)| {
-            *other != entity && pos.manhattan_distance(other_pos) <= d.social_chain_target_range
-        })
-        .max_by(|(e_a, _), (e_b, _)| {
-            let score_a = relationships.get(entity, *e_a).map_or(0.0, |r| {
-                r.fondness * d.fondness_social_weight
-                    + (1.0 - r.familiarity) * d.novelty_social_weight
-            });
-            let score_b = relationships.get(entity, *e_b).map_or(0.0, |r| {
-                r.fondness * d.fondness_social_weight
-                    + (1.0 - r.familiarity) * d.novelty_social_weight
-            });
-            score_a
-                .partial_cmp(&score_b)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        })
-        .map(|(e, p)| (*e, *p));
-
-    let (target_entity, target_pos) = target?;
+        .find(|(e, _)| *e == target_entity)
+        .map(|(_, p)| p)?;
 
     // Decide sub-action: mentor if applicable, groom if warm, otherwise socialize.
     let can_mentor = {
