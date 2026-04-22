@@ -8,23 +8,28 @@
 //! `src/resources/trace_log.rs` are the Phase-3 schema, so the replay
 //! format is stable across the refactor.
 //!
-//! Layer emission strategy (Phase 1 shim):
+//! Layer emission strategy:
 //!
-//! - **L1** — one record per (focal cat × tick) with the fox-scent sample
-//!   at the cat's position. Phase 2's `InfluenceMap` abstraction replaces
-//!   this with registry-walking enumeration across the 13 L1 maps.
+//! - **L1** (Phase 2 enrichment) — one record per (focal cat × registered
+//!   influence map × tick). Walks every `InfluenceMap`-implementing
+//!   resource (FoxScentMap, CatPresenceMap, ExplorationMap as of
+//!   Phase 2A) and emits a record carrying the map's metadata, base
+//!   sample at the focal cat's position, and per-channel attenuation
+//!   from the §5.6.6 pipeline. Scent-from-on-demand and corruption
+//!   migrations in Phase 2B/2C extend the walk to those maps.
 //!
-//! - **L2** — one record per (focal cat × eligible action × tick). The
-//!   shim walks `CurrentAction::last_scores` (the ranked, post-modifier
-//!   score list already populated by `goap::evaluate_and_plan`) and
-//!   emits a minimal record with `final_score` populated and
-//!   `considerations`/`modifiers` empty. Phase 3's Dse trait lets the
-//!   emitter capture per-consideration contributions.
+//! - **L2** (Phase 1 shim) — one record per (focal cat × eligible
+//!   action × tick). The shim walks `CurrentAction::last_scores` (the
+//!   ranked, post-modifier score list already populated by
+//!   `goap::evaluate_and_plan`) and emits a minimal record with
+//!   `final_score` populated and `considerations`/`modifiers` empty.
+//!   Phase 3's Dse trait lets the emitter capture per-consideration
+//!   contributions.
 //!
-//! - **L3** — one record per (focal cat × tick) with the full ranked
-//!   list, chosen action, and placeholder softmax/momentum summaries.
-//!   Phase 6 fills in real softmax probabilities and the §7.4
-//!   persistence-bonus-aware momentum trace.
+//! - **L3** (Phase 1 shim) — one record per (focal cat × tick) with
+//!   the full ranked list, chosen action, and placeholder softmax /
+//!   momentum summaries. Phase 6 fills in real softmax probabilities
+//!   and the §7.4 persistence-bonus-aware momentum trace.
 //!
 //! Schema slots that don't have values yet — top-N losing axes
 //! (§7.W.6) and apophenia pairwise distance (§8.6) — are emitted as
@@ -37,6 +42,9 @@ use crate::components::disposition::Disposition;
 use crate::components::goap_plan::GoapPlan;
 use crate::components::identity::{Name, Species};
 use crate::components::physical::{Dead, Position};
+use crate::components::sensing::SensorySpecies;
+use crate::resources::cat_presence_map::CatPresenceMap;
+use crate::resources::exploration_map::ExplorationMap;
 use crate::resources::fox_scent_map::FoxScentMap;
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::time::TimeState;
@@ -45,6 +53,7 @@ use crate::resources::trace_log::{
     FocalTraceTarget, IntentionSummary, ModifierApplication, MomentumSummary, SoftmaxSummary,
     TraceEntry, TraceLog, TraceRecord,
 };
+use crate::systems::influence_map::{channel_label, Attenuation, Faction, InfluenceMap, MapMetadata};
 
 /// Resolves the focal cat's entity and emits L1/L2/L3 records for the
 /// current tick. Gated on `FocalTraceTarget`; a no-op in every build
@@ -60,6 +69,8 @@ pub fn emit_focal_trace(
     time: Res<TimeState>,
     constants: Res<SimConstants>,
     fox_scent_map: Option<Res<FoxScentMap>>,
+    cat_presence_map: Option<Res<CatPresenceMap>>,
+    exploration_map: Option<Res<ExplorationMap>>,
     mut trace_log: ResMut<TraceLog>,
     cats: Query<
         (
@@ -96,25 +107,21 @@ pub fn emit_focal_trace(
     let cat_name = name.0.clone();
 
     // -----------------------------------------------------------------
-    // L1 — single fox-scent sample at the focal cat's position. Phase 2
-    // replaces this with an InfluenceMap walk across all registered maps.
+    // L1 — one record per registered InfluenceMap. Phase 2 walks the
+    // three Partial persistent-grid maps (FoxScentMap, CatPresenceMap,
+    // ExplorationMap) with Phase 2A's attenuation pipeline. Scent-
+    // from-on-demand-detection and corruption-from-TileMap come online
+    // in Phase 2B/2C. Cat is the observer species, hence species-sens
+    // is looked up against `SensorySpecies::Cat` on each channel.
     // -----------------------------------------------------------------
-    if let Some(ref scent) = fox_scent_map {
-        let base_sample = scent.get(pos.x, pos.y);
-        trace_log.push(TraceEntry {
-            tick,
-            cat: cat_name.clone(),
-            record: TraceRecord::L1 {
-                map: "fox_scent".into(),
-                faction: "fox".into(),
-                channel: "scent".into(),
-                pos: (pos.x, pos.y),
-                base_sample,
-                attenuation: AttenuationBreakdown::default(),
-                perceived: base_sample,
-                top_contributors: Vec::new(),
-            },
-        });
+    if let Some(ref m) = fox_scent_map {
+        emit_l1_for_map(&mut trace_log, tick, &cat_name, *pos, &**m, &constants);
+    }
+    if let Some(ref m) = cat_presence_map {
+        emit_l1_for_map(&mut trace_log, tick, &cat_name, *pos, &**m, &constants);
+    }
+    if let Some(ref m) = exploration_map {
+        emit_l1_for_map(&mut trace_log, tick, &cat_name, *pos, &**m, &constants);
     }
 
     // -----------------------------------------------------------------
@@ -197,4 +204,70 @@ pub fn emit_focal_trace(
             apophenia: None,
         },
     });
+}
+
+/// Emit one L1 record for a focal-cat read of an `InfluenceMap` —
+/// base sample at the cat's position + attenuation breakdown per
+/// §5.6.6 (species-sensitivity on the map's channel; role / injury /
+/// env at Phase 2A identity).
+///
+/// Kept generic over `M: InfluenceMap` so new map impls in Phase 2B/2C
+/// plug in without touching the caller. `top_contributors` stays
+/// empty at Phase 2A — populating it requires per-emitter reverse
+/// lookup (§5.1's "which fox drove this scent reading"), which is
+/// Phase 2B work.
+fn emit_l1_for_map<M: InfluenceMap + ?Sized>(
+    trace_log: &mut TraceLog,
+    tick: u64,
+    cat_name: &str,
+    pos: Position,
+    map: &M,
+    constants: &SimConstants,
+) {
+    let MapMetadata {
+        name,
+        channel,
+        faction,
+    } = map.metadata();
+    let base_sample = map.base_sample(pos);
+    let attenuation =
+        Attenuation::for_species_channel(&constants.sensory, SensorySpecies::Cat, channel);
+    let perceived = attenuation.apply(base_sample);
+
+    trace_log.push(TraceEntry {
+        tick,
+        cat: cat_name.to_string(),
+        record: TraceRecord::L1 {
+            map: name.to_string(),
+            faction: faction_slug(&faction),
+            channel: channel_label(channel).to_string(),
+            pos: (pos.x, pos.y),
+            base_sample,
+            attenuation: AttenuationBreakdown {
+                species_sens: attenuation.species_sens,
+                role_mod: attenuation.role_mod,
+                injury_deficit: attenuation.injury_deficit,
+                env_mul: attenuation.env_mul,
+            },
+            perceived,
+            top_contributors: Vec::new(),
+        },
+    });
+}
+
+/// Compact kebab-case slug for the `Faction` enum, used in the L1
+/// record's `faction` field. Keeps JSON output short and greppable;
+/// the full enum debug form (`"Species(Wild(Fox))"`) is noisier than
+/// downstream tooling wants.
+fn faction_slug(faction: &Faction) -> String {
+    match faction {
+        Faction::Species(s) => match s {
+            SensorySpecies::Cat => "cat".to_string(),
+            SensorySpecies::Wild(w) => format!("{w:?}").to_lowercase(),
+            SensorySpecies::Prey(p) => format!("{p:?}").to_lowercase(),
+        },
+        Faction::Neutral => "neutral".to_string(),
+        Faction::Colony => "colony".to_string(),
+        Faction::Observer => "observer".to_string(),
+    }
 }
