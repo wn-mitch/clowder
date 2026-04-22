@@ -26,6 +26,18 @@ impl Plugin for SimulationPlugin {
         app.add_message::<crate::components::goap_plan::PlanNarrative>();
         app.add_message::<crate::systems::magic::CorruptionPushback>();
 
+        // L2 substrate resources + DSE registrations (§9 faction + §L2.10).
+        // Phase 3b.2 registers the Eat reference DSE; Phase 3c fans out
+        // the remaining 29 cat/fox DSEs through the same app-extension
+        // trait. Mirrored in `src/main.rs::build_schedule`.
+        app.insert_resource(crate::ai::faction::FactionRelations::canonical());
+        app.init_resource::<crate::ai::eval::DseRegistry>();
+        app.init_resource::<crate::ai::eval::ModifierPipeline>();
+        {
+            use crate::ai::eval::DseRegistryAppExt;
+            app.add_dse(crate::ai::dses::eat_dse());
+        }
+
         // Snapshot positions before any simulation system moves entities.
         // The rendering layer interpolates between PreviousPosition and Position.
         app.add_systems(

@@ -635,6 +635,20 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
     if !world.contains_resource::<clowder::resources::ForcedConditions>() {
         world.insert_resource(clowder::resources::ForcedConditions::default());
     }
+    // L2 substrate resources + DSE registrations. Manual mirror of
+    // `SimulationPlugin::build()` — both load paths (fresh world below
+    // and save-load path here) must match.
+    if !world.contains_resource::<clowder::ai::faction::FactionRelations>() {
+        world.insert_resource(clowder::ai::faction::FactionRelations::canonical());
+    }
+    if !world.contains_resource::<clowder::ai::eval::DseRegistry>() {
+        let mut registry = clowder::ai::eval::DseRegistry::new();
+        registry.cat_dses.push(clowder::ai::dses::eat_dse());
+        world.insert_resource(registry);
+    }
+    if !world.contains_resource::<clowder::ai::eval::ModifierPipeline>() {
+        world.insert_resource(clowder::ai::eval::ModifierPipeline::new());
+    }
 
     Ok(world)
 }
@@ -1223,6 +1237,18 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
     bevy_ecs::message::MessageRegistry::register_message::<
         clowder::systems::magic::CorruptionPushback,
     >(&mut world);
+
+    // L2 substrate resources + DSE registrations. Manual mirror of
+    // `SimulationPlugin::build()` — both paths must register the same
+    // DSE set or headless and interactive builds diverge silently.
+    world.insert_resource(clowder::ai::faction::FactionRelations::canonical());
+    {
+        let mut registry = clowder::ai::eval::DseRegistry::new();
+        registry.cat_dses.push(clowder::ai::dses::eat_dse());
+        world.insert_resource(registry);
+    }
+    world.insert_resource(clowder::ai::eval::ModifierPipeline::new());
+
     // Seed `last_recorded_season` to the current season so `seasons_survived`
     // starts at 0 and counts real elapsed seasons, not the start_tick offset.
     let initial_season = start_tick / ticks_per_season;

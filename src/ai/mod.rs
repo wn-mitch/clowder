@@ -2,6 +2,7 @@ pub mod composition;
 pub mod considerations;
 pub mod curves;
 pub mod dse;
+pub mod dses;
 pub mod eval;
 pub mod faction;
 pub mod fox_planner;
