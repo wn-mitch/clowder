@@ -78,5 +78,49 @@ success_check(cat, herbs_gathered):
 object_name = random_adjective() + random_material_word(herbs) + random_form()
 ```
 
+## Relation to axis-capture
+
+The Calling is the canonical existing instance of the general
+axis-capture primitive defined in `docs/systems/ai-substrate-refactor.md`
+§7.W — not a standalone Phase-6 mechanic. Every property this doc
+specifies maps onto §7.W's vocabulary:
+
+| Calling property (this doc) | Axis-capture vocabulary (§7.W) |
+|---|---|
+| Trigger conditions (affinity + mood + spirit ≥ thresholds) | Externally-seeded axis activation |
+| Trance phase 1 Compulsion — "stops current action" | Captured axis abruptly wins scoring |
+| Trance phase 3 Creation — "refuses all interaction" | Captured axis wins every tick; other axes active-but-losing (§7.W.2) |
+| Herb gathering requirements + 100-tick timeout | `Blind` commitment on means (§7.1) |
+| Success → Named Object | Positive resolution of a bounded capture window |
+| Failure → corruption spike / Shaken | Pathological resolution of the same mechanism |
+| "Touched" narrative identity post-success | Persistent identity modifier as capture residue |
+| `Shaken` 2000-tick cooldown | Recovery window from pathological resolution |
+
+Seeing the Calling as one *content-variant* of axis-capture — rather
+than a bespoke system — has two consequences worth flagging:
+
+**Dark Callings fall out of the mechanism.** A Calling-shaped gate
+with corruption-tainted trigger conditions (high corruption + low
+mood + some affinity threshold) produces a compulsion to create a
+Named Curse or a shadow-pact object. Same trance mechanics, inverse
+valence. The existing corruption-spike failure mode already
+prefigures this shape. Implementation is Phase-6+ and explicitly
+out of scope for the current spec; noted here so the mechanism owner
+knows the capacity exists without requiring a new subsystem.
+
+**Other captures share the architecture.** The axis-capture primitive
+is not only for sanctioned / mythic content. Ordinary social bonds
+are healthy axis-captures (see `docs/systems/warmth-split.md` —
+`social_warmth` as a fulfillment-layer axis). Pathological captures
+— addiction-analogues, sadist-play escalation, spite cycles — are
+the same mechanism with sensitization (§7.W.1) and narrow-source
+capture. The Calling sits at the "sanctioned, time-limited,
+bivalent" corner of the capture space; design work on the rest of
+the space can reuse everything this doc specifies.
+
+**Architectural context:** see refactor doc §7.W (axis-capture and
+the warring self), particularly §7.W.4(a) for the mapping table and
+§7.W.5 for dark-Calling acknowledgment.
+
 ## Tuning Notes
 _Record observations and adjustments here during iteration._

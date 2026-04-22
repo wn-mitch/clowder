@@ -1,25 +1,57 @@
 # AI Substrate Refactor — Design Specification
 
-> **Status:** Second-pass draft (2026-04-20). §5 (influence maps) and
-> L2 sections §1 (Considerations), §2 (Response curves), §3
-> (Composition), §6 (Target selection), and §L2.10 (DSE catalog &
-> Intention output) are now well-formed against Mark's *Behavioral
-> Mathematics for Game AI* chapters 12–14
-> (`docs/reference/behavioral-math-ch{12,13,14}-*.md`), Mark's
+> **Status:** Second-pass draft (2026-04-21, §L2.10 closure pass).
+> §5 (influence maps) and L2 sections §1 (Considerations), §2
+> (Response curves), §3 (Composition), §6 (Target selection), and
+> §L2.10 (DSE catalog & Intention output) are well-formed against
+> Mark's *Behavioral Mathematics for Game AI* chapters 12–14
+> (`docs/reference/behavioral-math-ch{12,13,14}-*.md`) and Mark's
 > "Modular Tactical Influence Maps" (*Game AI Pro 2* ch. 30,
-> `docs/reference/modular_tactical_influence_maps.md`), Rao &
-> Georgeff's 1991 BDI paper (`docs/reference/rao91a.pdf`), and a Phase-1 audit
-> of the current scoring surface. §7 (momentum) and §8 (variation)
-> remain **stubs pending synthesis** of ch 15–16; cross-referenced
-> here for dependency clarity. L3 work (commitment, planner handoff)
-> begins after §7/§8 synthesis lands. §0 (four design principles) added
-> 2026-04-20 from Sylvester's RimWorld GDC 2017 talk — cross-cuts all of
-> §1–§L2.10; §0.4 is a scope-discipline filter on future mechanic
-> proposals and points forward to §10 feature-design work. §11
-> (instrumentation) added 2026-04-20 — per-layer Curvature-style
-> traces, focal-cat replay, sidecar JSONL; lands alongside the refactor
-> so `CLAUDE.md`'s balance rule can predict-and-verify rather than
-> change-and-see.
+> `docs/reference/modular_tactical_influence_maps.md`). §7
+> (commitment and persistence) is committed against Rao &
+> Georgeff 1991 (`docs/reference/bdi-rao-georgeff.md`) and Mark
+> ch 15 (`docs/reference/behavioral-math-ch15-changing-decisions.md`).
+> **This pass closes the §L2.10 enumeration cluster:** §L2.10.3
+> (full 45-row DSE registration catalog across 5 registration
+> methods) and §L2.10.10 (9-row Herbcraft / PracticeMagic sibling-
+> DSE curve specs — first use of §L2.10.5's `Goal | Activity`
+> split below the parent-DSE layer). **§7.M Mating closed as the
+> canonical three-layer aspiration → activity → goal showcase**
+> (`ReproduceAspiration` / `PairingActivity` / `MateWithGoal`);
+> cascades land in §7.3 strategy table, §7.4 persistence-tier
+> table + completion-fraction footer, §L2.10.7 Mate-row note, and
+> §6.5.2 per-target considerations — the first case that exercises
+> §7.7 nested Intentions end-to-end against a load-bearing
+> ecological function (generational continuity). Earlier passes
+> closed §7.4 (persistence-bonus tier table), §7.5 (Maslow-
+> interrupt catalog), and §L2.10.7 (30-row spatial-DSE roster),
+> and split §7.7 reconsideration-events into current-state vs.
+> emission-debt. §L2.10.7 is committed to candidate (a) per
+> ch 14 §"Which Dude to Kill?" §12 (beliefs, percepts, memory)
+> names the scope boundary between belief proxies and the
+> deferred Talk-of-the-Town layer. §8 (variation in choice)
+> remains a **stub pending synthesis** of ch 16. §0 (four design
+> principles) added 2026-04-20 from Sylvester's RimWorld GDC 2017
+> talk — cross-cuts all of §1–§L2.10; §0.4 is a scope-discipline
+> filter on future mechanic proposals and points forward to §10
+> feature-design work. §11 (instrumentation) added 2026-04-20 —
+> per-layer Curvature-style traces, focal-cat replay, sidecar
+> JSONL; lands alongside the refactor so `CLAUDE.md`'s balance
+> rule can predict-and-verify rather than change-and-see.
+> **Table of contents** (added 2026-04-21) sits above the
+> Enumeration Debt ledger for navigation through the doc's 5k+
+> lines. **Ledger pruned 2026-04-21 to spec-scope only:** seven
+> items that close in other systems (§7.7.b/c/d event-vocabulary
+> debts, §7.3 coordinator row, §7.7.1 aspiration-pair list, the
+> retired-constants code cleanup, the `needs.warmth` split) now
+> live in `docs/open-work.md` entry #13. The three in-scope holes
+> surfaced by the §7.M / §L2.10.3 closures were all burned down in
+> the 2026-04-21 pass: §9 faction-model enumeration (10×10 stance
+> matrix + marker overlay, §9.0–§9.3), §4.3 marker-catalog
+> completeness (Reproduction block for Fertility / Apprentice /
+> Parent), and §7.M.7 fertility state specification (five-variant
+> phase enum + `fertility.rs` state-machine + Gender↔role canon +
+> §6.5.2 / §7.M.4 wire-ups). No in-scope holes remain.
 >
 > **This is a design specification, not an implementation plan.** Phasing,
 > execution sequence, agent-team fan-out, and per-phase verification
@@ -28,15 +60,163 @@
 > end-state is well-specified is exactly how this thread ended up
 > needing a re-plan.
 
+## Table of contents
+
+**Front matter**
+- [Enumeration Debt (TODO)](#enumeration-debt-todo)
+- [What this document is for](#what-this-document-is-for)
+- [Motivation](#motivation)
+- [Current state](#current-state)
+- [Architectural vision](#architectural-vision)
+
+**§0 Design principles**
+- [§0.1 The simulation is the director is the player](#01-the-simulation-is-the-director-is-the-player)
+- [§0.2 Elastic failure](#02-elastic-failure)
+- [§0.3 Apophenia has two legs: abstracted feedback and long-term relevance](#03-apophenia-has-two-legs-abstracted-feedback-and-long-term-relevance)
+- [§0.4 Mechanics must express character, not just apply modifiers](#04-mechanics-must-express-character-not-just-apply-modifiers)
+- [§0.5 Cross-refs](#05-cross-refs)
+
+**§1 Considerations — the scoring atom**
+- [§1.1 Trait shape](#11-trait-shape)
+- [§1.2 Three flavors of consideration](#12-three-flavors-of-consideration)
+- [§1.3 Resolved open questions](#13-resolved-open-questions)
+- [§1.4 Size and shape guidance](#14-size-and-shape-guidance)
+
+**§2 Response curve primitives**
+- [§2.1 Curve primitive enum](#21-curve-primitive-enum)
+- [§2.2 LUT backing — start function-evaluated](#22-lut-backing--start-function-evaluated)
+- [§2.3 Curve-shape assignment table](#23-curve-shape-assignment-table)
+- [§2.4 Cross-refs](#24-cross-refs)
+
+**§3 Multi-consideration composition**
+- [§3.1 Three composition modes](#31-three-composition-modes)
+- [§3.1.1 Per-DSE composition mode assignment](#311-per-dse-composition-mode-assignment)
+- [§3.2 The compensation factor](#32-the-compensation-factor)
+- [§3.3 Weight rationalization](#33-weight-rationalization)
+- [§3.4 Maslow as a hierarchical pre-gate (keep)](#34-maslow-as-a-hierarchical-pre-gate-keep)
+- [§3.5 Post-scoring modifiers as a distinct layer](#35-post-scoring-modifiers-as-a-distinct-layer)
+- [§3.6 Granularity (ch 13 pain-scale discipline)](#36-granularity-ch-13-pain-scale-discipline)
+- [§3.7 Cross-refs](#37-cross-refs)
+
+**§4 Context tags — ECS markers as eligibility filters**
+- [§4.1 Tag categories](#41-tag-categories)
+- [§4.2 Catalog schema](#42-catalog-schema)
+- [§4.3 Marker catalog](#43-marker-catalog)
+- [§4.4 Crosswalk: ScoringContext → markers](#44-crosswalk-scoringcontext--markers)
+- [§4.5 Scalar carve-out](#45-scalar-carve-out)
+- [§4.6 Authoring-system roster](#46-authoring-system-roster)
+
+**§5 Influence-map substrate**
+- [§5.1 Base maps, templates, working maps](#51-base-maps-templates-working-maps)
+- [§5.2 Sensory channels (Clowder-specific extension)](#52-sensory-channels-clowder-specific-extension)
+- [§5.3 Decay](#53-decay)
+- [§5.4 Obstacle-aware propagation](#54-obstacle-aware-propagation)
+- [§5.5 Social influence (deferred to ToT phase)](#55-social-influence-deferred-to-tot-phase)
+- [§5.6 L1 context enumeration](#56-l1-context-enumeration)
+
+**§6 Target selection as inner optimization**
+- [§6.1 Anti-pattern inventory — worse than previously documented](#61-anti-pattern-inventory--worse-than-previously-documented)
+- [§6.2 Silent divergence — GOAP vs. disposition resolver](#62-silent-divergence--goap-vs-disposition-resolver)
+- [§6.3 `TargetTakingDse` shape](#63-targettakingdse-shape)
+- [§6.4 Personal-interest template formalized](#64-personal-interest-template-formalized)
+- [§6.5 Per-target consideration sets](#65-per-target-consideration-sets)
+- [§6.6 Aggregation choices](#66-aggregation-choices)
+- [§6.7 Cross-refs](#67-cross-refs)
+
+**§7 Decision persistence and momentum**
+- [§7.1 Commitment-strategy enum](#71-commitment-strategy-enum)
+- [§7.2 Drop-trigger reconsideration gate](#72-drop-trigger-reconsideration-gate)
+- [§7.3 Per-Intention-class strategy assignment](#73-per-intention-class-strategy-assignment)
+- [§7.4 Persistence bonus (ch 15 Finish Him!)](#74-persistence-bonus-ch-15-finish-him)
+- [§7.M Mating — canonical three-layer aspiration showcase](#7m-mating--canonical-three-layer-aspiration-showcase)
+- [§7.5 Maslow interrupt interaction](#75-maslow-interrupt-interaction)
+- [§7.6 Monitoring cadence](#76-monitoring-cadence)
+- [§7.7 Aspiration-level commitment (separate layer from §7.1–§7.6)](#77-aspiration-level-commitment-separate-layer-from-7177176)
+- [§7.W Axis-capture and the warring self](#7w-axis-capture-and-the-warring-self)
+- [§7.8 Residuals — open questions from the original stub, resolved inline](#78-residuals--open-questions-from-the-original-stub-resolved-inline)
+- [§7.9 Cross-refs](#79-cross-refs)
+
+**§8 Variation in choice**
+- [§8.1 Algorithm — softmax-over-all candidates](#81-algorithm--softmax-over-all-candidates)
+- [§8.2 Scope — softmax-over-Intentions](#82-scope--softmax-over-intentions)
+- [§8.3 Temperature — commit T = 0.15 default](#83-temperature--commit-t--015-default)
+- [§8.4 Order with §7 momentum — softmax first, persistence-bonus gating second](#84-order-with-7-momentum--softmax-first-persistence-bonus-gating-second)
+- [§8.5 Species variants — converge foxes onto softmax](#85-species-variants--converge-foxes-onto-softmax)
+- [§8.6 Apophenia calibration as continuity canary](#86-apophenia-calibration-as-continuity-canary)
+- [§8.7 Residuals — open questions from the original stub, resolved inline](#87-residuals--open-questions-from-the-original-stub-resolved-inline)
+- [§8.8 Out of scope for this spec](#88-out-of-scope-for-this-spec)
+- [§8.9 Cross-refs](#89-cross-refs)
+
+**§9 Faction model**
+- [§9.0 Vocabulary reconciliation with §5.6.6.1](#90-vocabulary-reconciliation-with-5661)
+- [§9.1 Biological base matrix (10 × 10)](#91-biological-base-matrix-10--10)
+- [§9.2 ECS-marker overlay (colony / visitor / banished / befriended)](#92-ecs-marker-overlay-colony--visitor--banished--befriended)
+- [§9.3 DSE filter binding](#93-dse-filter-binding)
+
+**§L2.10 DSE catalog & single invocation surface**
+- [§L2.10.1 Current landscape — scoring is scattered](#l2101-current-landscape--scoring-is-scattered)
+- [§L2.10.2 Unified evaluation surface](#l2102-unified-evaluation-surface)
+- [§L2.10.3 DSE registration](#l2103-dse-registration)
+- [§L2.10.4 DSE output: Intention, not Action](#l2104-dse-output-intention-not-action)
+- [§L2.10.5 Intention = `Goal | Activity` is Clowder-specific](#l2105-intention--goal--activity-is-clowder-specific)
+- [§L2.10.6 Softmax-over-Intentions is the right variation scope](#l2106-softmax-over-intentions-is-the-right-variation-scope)
+- [§L2.10.7 Plan-cost feedback — resolved via Mark ch 14](#l2107-plan-cost-feedback--resolved-via-mark-ch-14)
+- [§L2.10.8 Dependencies on §7 and §8](#l2108-dependencies-on-7-and-8)
+- [§L2.10.9 Cross-refs](#l2109-cross-refs)
+- [§L2.10.10 Herbcraft / PracticeMagic sibling-DSE curve specs](#l21010-herbcraft--practicemagic-sibling-dse-curve-specs)
+
+**§10 Baseline-feature unblock map**
+- [§10.1 Feature-design filter from §0.4](#101-feature-design-filter-from-04)
+
+**§11 Instrumentation and observability**
+- [§11.1 Design principle: Curvature at every layer](#111-design-principle-curvature-at-every-layer)
+- [§11.2 Sampling strategy: focal-cat replay](#112-sampling-strategy-focal-cat-replay)
+- [§11.3 Record format — sidecar JSONL](#113-record-format--sidecar-jsonl)
+- [§11.4 Joinability — the load-bearing invariant](#114-joinability--the-load-bearing-invariant)
+- [§11.5 Scope rules and defensive structuring](#115-scope-rules-and-defensive-structuring)
+- [§11.6 Out of scope (flagged for follow-on, not for this refactor)](#116-out-of-scope-flagged-for-follow-on-not-for-this-refactor)
+- [§11.7 Cross-refs](#117-cross-refs)
+
+**§12 Beliefs, percepts, and memory — scope boundary**
+- [§12.1 The three states Clowder maintains today](#121-the-three-states-clowder-maintains-today)
+- [§12.2 What a Rao & Georgeff Belief would be](#122-what-a-rao--georgeff-belief-would-be)
+- [§12.3 The belief proxies §7.2 consumes](#123-the-belief-proxies-72-consumes)
+- [§12.4 Why this is sufficient for L3](#124-why-this-is-sufficient-for-l3)
+- [§12.5 Cross-refs](#125-cross-refs)
+
+**Back matter**
+- [A2 — big-brain evaluation](#a2--big-brain-evaluation)
+- [Reading list](#reading-list)
+- [Key insights accumulated](#key-insights-accumulated)
+- [What's explicitly out of scope](#whats-explicitly-out-of-scope)
+
+> TOC lists `##` top-level and `###` numbered-section headings. Deeper
+> (`####` / `#####` — e.g., §5.6.6.1 species × channel, §7.7.a
+> life-stage, §3.3.1 weight-mode rows) are intentionally omitted to
+> keep this navigable at a glance; use `Grep "^#####? "` for the
+> deepest level when needed. §L2.10's subsections are included because
+> that parent is the doc's single largest section and its sub-numbering
+> is load-bearing for cross-references.
+
+---
+
 ## Enumeration Debt (TODO)
 
 This refactor's design principle: **every major decision is enumerated
 for every instance it applies to**, not illustrated with examples and
-deferred. Each open item below is a section where the doc currently
-shows a pattern + some rows and names further enumeration as future
-work. Burn them down as sessions allow; check the box in the commit
-that lands the enumeration. Already-enumerated decisions (e.g. §2.1
-curve primitive enum, §3.1 composition mode enum) are not on the list.
+deferred. Each open item below is a section of *this spec* that
+currently shows a pattern + some rows and names further enumeration
+as future work within this doc. Burn them down as sessions allow;
+check the box in the commit that lands the enumeration.
+Already-enumerated decisions (e.g. §2.1 curve primitive enum, §3.1
+composition mode enum) are not on the list.
+
+**Scope boundary.** This ledger tracks enumeration debt that closes
+*in this spec*. Spec-follow-on hooks that close in other systems
+(`src/systems/death.rs`, `fate.rs`, `mood.rs`, `coordination.rs`,
+aspirations) or in code (retired constants cleanup, `needs.warmth`
+split) live in `docs/open-work.md` entry #13. See the "Tracked
+elsewhere" footer below for the move-out list.
 
 **Full-enumeration debt — every instance committed, not sampled:**
 
@@ -83,53 +263,197 @@ curve primitive enum, §3.1 composition mode enum) are not on the list.
       channels with channel-feeder flags — Absent, coefficients TBD with
       body-zones build), §5.6.6.4 (8 weather + 4 phase + 7 terrain
       buckets × 4 channels = 76 env cells, all identity — Partial).
-- [ ] **§6.4** — Personal-interest template completeness: every
-      target-taking DSE has a max-range + curve row (today 8 rows;
-      verify against §6.5 list and against the Herbcraft/Magic sibling
-      split once §L2.10 lands).
-- [ ] **§6.5** — Per-target considerations: each listed consideration
-      declares its curve primitive + weight, not just a label.
-- [ ] **§L2.10.3** — DSE registration catalog: full list of
-      `app.add_dse(...)` / `add_target_taking_dse(...)` /
-      `add_fox_dse(...)` calls, each mapped to its constructor.
-- [ ] **Herbcraft / PracticeMagic sibling-DSE curve specs** — children
-      of the §L2.10 split (`gather` / `prepare` / `ward` / `scry` /
-      `durable_ward` / `cleanse` / `colony_cleanse` / `harvest` /
-      `commune`). Blocked on §L2.10 naming the final sibling set.
-- [ ] **Delete retired scoring constants + incapacitated branch** — per
-      §2.3's "Retired constants" subsection, remove the 5
-      `incapacitated_*` fields + the `if ctx.is_incapacitated` early-
-      return block in `scoring.rs:181–201`, plus
-      `ward_corruption_emergency_bonus`,
-      `cleanse_corruption_emergency_bonus`, and
-      `corruption_sensed_response_bonus` from `SimConstants`. Land in
-      the same PR that introduces the Logistic curves that replace
-      them — not before.
-- [ ] **Split `needs.warmth` into `needs.thermal` + `needs.affection`**
-      — today the field conflates body-temperature comfort (drained by
-      weather/season, hearth-restored) with social warmth (restored by
-      allogrooming). Both peak in winter and must be independently
-      observable — a cat alone by a hearth is thermally warm but
-      socially cold. Surfaces in `Groom (self)` and downstream
-      (`self_groom_warmth_gain`, `groom_other_warmth_gain`, weather
-      drain, hearth bonus). Substrate-layer change under §1
-      (Considerations) — rewires the Needs struct before §2.3's two
-      `Groom (self)` rows are actionable.
+- [x] **§6.4** — Personal-interest template completeness: 9 target-
+      taking DSEs, rows ordered by §6.1 severity (Critical 1–4, Partial
+      5–9). Each row carries `Backs ScoringContext (field:line) +
+      Resolver today (file:line) + Max range + Curve shape + Note`.
+      Sibling DSEs under Herbcraft/PracticeMagic remain deferred to
+      §L2.10 (see separate debt item below).
+- [x] **§6.5** — Per-target considerations split into §6.5.1–§6.5.9
+      (one per target-taking DSE). Each consideration declares
+      `(signal source, curve primitive, weight, rationale)` — 36
+      consideration rows total. Weights are first-pass commits;
+      balance iterations refine.
 
-**Synthesis debt — pending Mark ch 15 / 16 reading:**
+**Synthesis debt — Mark ch 15 / ch 16 reading:**
 
-- [ ] **§7** — Decision persistence and momentum: resolve the four
-      open `?` bullets; commit to a commitment-strength formula and
-      its decay curve.
-- [ ] **§8** — Variation in choice: commit to softmax-over-Intentions
-      scope, temperature range, and interaction with §7 momentum.
+- [x] **§7** — Decision persistence and momentum. Closed by BDI
+      (Rao & Georgeff 1991) + Mark ch 15 synthesis. Strategy
+      vocabulary (§7.1), drop triggers (§7.2), per-DispositionKind
+      strategy table (§7.3), persistence bonus (§7.4), Maslow
+      preemption (§7.5), monitoring cadence (§7.6), aspiration
+      commitment layer (§7.7), aspiration concurrency via
+      goal-consistency (§7.7.1), residual resolutions inline (§7.8).
+      Numeric tuning (Logistic `midpoint`/`steepness`, `base`
+      magnitudes) follows implementation, not spec.
+- [x] **§8** — Variation in choice. Closed by Mark ch 16 synthesis.
+      Algorithm committed (softmax-over-all, §8.1), scope committed
+      (softmax-over-Intentions, §8.2 inheriting §L2.10.6),
+      temperature band + default `T = 0.15` committed (§8.3), order
+      with §7.4 momentum resolved (softmax first, bonus second;
+      incumbent retained, §8.4), fox argmax+jitter converges onto
+      softmax (§8.5), apophenia calibration scoped as §11
+      continuity-canary work (§8.6). Numeric refinement is
+      balance-thread work per line 24–29.
 
 **Design-decision debt — pick one candidate:**
 
-- [ ] **§L2.10.7** — Plan-cost feedback: commit to (a) pre-estimated
-      cost via `SpatialConsideration` or (b) DSE → GOAP cost-query
-      handshake. Resolve the "should GOAP push back on DSE selection?"
-      sub-question before writing the API.
+- [x] **§L2.10.7** — Plan-cost feedback. Closed in favor of
+      candidate (a) `SpatialConsideration` with response curves,
+      citing Mark ch 14 §"Which Dude to Kill?" The `replan_count`
+      hard-fail channel supplements (a) for §7.2's
+      `achievable_believed` drop trigger.
+
+**Closed by the 2026-04-21 enumeration pass:**
+
+- [x] **§7.4** — Per-DispositionKind persistence-bonus tier.
+      14-row table committed (11 baseline tiers + 3 Mating-layer
+      tiers from §7.M: L1 High, L2 Medium, L3 High). Tiers are
+      categorical (Low / Medium / High / Indefinite); numeric
+      magnitudes remain balance-thread work per line 24–29.
+- [x] **§7.5** — Maslow-interrupt event catalog. 5-row table
+      committed (CriticalHealth / Starvation / Exhaustion /
+      ThreatDetected / CriticalSafety) with per-row exemption list,
+      boldness-scaled threshold note, and Hunt-action carve-out
+      note. Sourced from `src/systems/disposition.rs:180–253`.
+- [x] **§L2.10.7** — Spatially-sensitive DSE roster. 22-row cat
+      table (Groom splits self/other) + 9-row fox table committed
+      with (Today, Target landmark, Curve primitive, Rationale)
+      columns. Audit finding noted: no DSE currently uses continuous
+      distance-to-landmark scoring; roster is fully aspirational.
+- [x] **§L2.10.3** — DSE registration catalog. 45-row table
+      (6 blocks: Tier 1 cat / Tier 2 cat / Tier 2–5 cat / Mating
+      three-layer / Herbcraft–PracticeMagic siblings / fox /
+      scattered-site absorbents) with constructor, method,
+      subsumed source site(s), composition mode, Intention shape,
+      notes. Extends the API sketch to five registration methods
+      (`add_dse` / `add_target_taking_dse` / `add_fox_dse` /
+      `add_coordinator_dse` / `add_aspiration_dse` /
+      `add_narrative_dse`) and names target-ranking unification as
+      the mechanism that dissolves §6.2's silent-divergence bug.
+- [x] **§L2.10.10** — Herbcraft / PracticeMagic sibling-DSE curve
+      specs. 9 siblings (3 Herbcraft + 6 PracticeMagic) committed
+      with Intention shape, composition mode, and per-consideration
+      curve specs. `scry` and `commune` flagged Activity-shaped per
+      §L2.10.5; the other 7 Goal-shaped. All axis curves cite their
+      §2.3 anchor row.
+- [x] **§7.M** — Mating disposition, resolved as **canonical
+      three-layer aspiration → activity → goal showcase**, not
+      deferred to a separate stub. L1 `ReproduceAspiration`
+      (OpenMinded, High tier), L2 `PairingActivity`
+      (OpenMinded, Medium tier), L3 `MateWithGoal`
+      (SingleMinded, High tier). Cascades updated in §7.3 strategy
+      table, §7.4 persistence-tier table + completion-fraction
+      footer, §L2.10.7 Mate row note, §6.5.2 per-target
+      considerations. Motivation: Rao & Georgeff AI4 nested-intention
+      semantics applied end-to-end against the iter-2-observed
+      gate-starved Mate regression (0% snapshots / 0 matings in
+      `docs/balance/social-target-range.report.md`).
+- [x] **§9** — Faction model enumeration. §9.0 reconciles the
+      `Species` vocabulary with §5.6.6.1's 10-row species set
+      (Cat / Fox / Hawk / Snake / ShadowFox / Mouse / Rat / Rabbit /
+      Fish / Bird) backed by the code-level `SensorySpecies` union.
+      §9.1 commits a 10 × 10 directed-pair base matrix (100 / 100
+      stance cells) with 9 footnotes covering asymmetries (Snake ≠
+      Cat, Hawk-vs-Cat kitten carve-out, Fox × ShadowFox =
+      conservative Neutral pending a lore-hostility code path,
+      aquatic carve-out for Fish, rat-on-mouse). §9.2 adds a
+      four-marker overlay (`Visitor`, `HostileVisitor`, `Banished`,
+      `BefriendedAlly`) with committed most-negative-wins resolution
+      order, scoped against the §12 ToT belief boundary. §9.3 binds
+      five target-taking DSEs (`SocializeDse`, `AttackDse`,
+      `FleeDse`, `HuntDse`, `FoxRaidDse`) to their accepted stance
+      sets. §7.M.7 fertility remains the sole open "Holes identified"
+      item.
+
+**Holes identified 2026-04-21 — to be filled in a future pass of this
+spec:**
+
+- [x] **§7.M.7** — Fertility state specification. Resolved
+      2026-04-21: `Fertility { phase: FertilityPhase,
+      cycle_offset, post_partum_remaining_ticks }` lifecycle
+      committed. Gender↔role canon (§7.M.7.4): Queens gestate,
+      Toms sire, Nonbinaries do both. Toms never carry
+      `Fertility`; Queens and NBs carry it while Adult and
+      not-Pregnant. Insert on Young→Adult transition (`growth.rs`,
+      gender-gated to skip Toms); remove on Adult→Elder or
+      `MateConceived`. Phase expanded from 4 → 5 variants —
+      dedicated `Postpartum` added (§7.M.7.3, scoring-equivalent
+      to Anestrus but narratively distinguishable). Phase evolves
+      as a pure function of `(tick + cycle_offset, season,
+      post_partum)` evaluated by a new `src/systems/fertility.rs`
+      at 100-tick cadence. Winter → Anestrus for all carrying
+      cats. §7.M.7.5 phase→scalar mapping drives §6.5.2 Logistic
+      (with a Tom-target fallback for missing markers); §7.M.7.6
+      asymmetric hard gate ("at-least-one gestator in
+      non-`{Anestrus, Postpartum}` phase") + soft geometric-mean
+      Logistic drive §7.M.4 L2/L3 belief proxies. Implementing PR
+      also corrects `resolve_mate_with` to land `Pregnant` on the
+      gestator rather than the action-runner. New
+      `FertilityConstants` block (or flat `fertility_*` fields) on
+      `SimConstants`; existing `mating_fertility_*` season
+      multipliers retained as secondary environmental modulation.
+      Verisimilitude hypothesis: mating events ↓30–55%, kittens
+      stable, bond evolution unchanged, events cluster in
+      ~2000-tick Estrus windows per gestator; `Pregnant`-on-Tom
+      count drops to zero.
+- [x] **§4.3** — Marker catalog completeness for `Fertility` /
+      `Apprentice` / `Parent`. Closed 2026-04-21. A new Reproduction
+      subcategory lands between SpawnImmutable and Fox-specific with
+      two rows — `Fertility { phase }` (Absent, shape committed,
+      lifecycle pending §7.M.7) and `Parent` (Absent, active-not-
+      lifetime with `growth.rs::update_parent_markers` authoring
+      system). Apprentice's §6.5.3 "pending §4" flag was stale —
+      reconciled by pointing the row at the existing §4.3 Role block
+      entry (Partial — `Apprentice` derived from `skills.rs::Training`).
+      §6.5.2's fertility-window row now
+      cites the new Reproduction block; §6.5.6's kinship row reads
+      `target.KittenDependency` directly (the directed-pair predicate
+      is canonical on the child; `Parent` is the self-side query-
+      optimization counterpart, not the pair predicate's source).
+      Block prose commits active-parenthood semantics, the `Parent`-
+      vs-grief ordering contract (survivors_by_relationship in
+      `CatDied` payload is canonical, not `With<Parent>` post-death),
+      and the §7.M.7 deferral for fertility lifecycle. §5.6.8 summary
+      count bumped 42 → 44 Absent; §4.6 authoring-system roster
+      extended (growth.rs gains `Parent`, new TBD-per-§7.M.7 bullet
+      for `Fertility`).
+
+**Tracked in `docs/open-work.md` entry #13, not here (follow-on,
+code, or external-system work):**
+
+These items were previously carried in this ledger but close in
+other systems or in code, not in this spec. Each item's
+substrate-side contract is committed above; what remains is the
+target-system work.
+
+- **Retired scoring constants + incapacitated branch cleanup** —
+  code change. §2.3's "Retired constants" subsection names the
+  fields; the deletion lands in the A1 IAUS-refactor PR (open-work
+  cluster A, #5) — not before the Logistic curves that replace them.
+- **`needs.warmth` split** → `needs.temperature` + a
+  `social_warmth` fulfillment axis. Design committed in
+  `docs/systems/warmth-split.md` and referenced from §7.W.4(b);
+  tracked as open-work entry #12 with three landing phases.
+- **§7.7.b grief emission** — `src/systems/death.rs` vocabulary
+  expansion for `CatDied { cause, deceased,
+  survivors_by_relationship }`. ToT-adjacent; gated on formal
+  relationship modeling beyond the current three-tier `BondType`.
+- **§7.7.c fate event-vocabulary expansion** — `src/systems/fate.rs`
+  today emits only FatedLove / FatedRival. Blocked on the Calling
+  subsystem design per `docs/systems/the-calling.md`.
+- **§7.7.d mood drift-threshold detection** —
+  `src/systems/mood.rs` hysteresis + sustain-duration detection
+  layer. Gated on per-arc valence targets, which land with the
+  aspiration catalog.
+- **§7.7.1 aspiration-compatibility pair list** — the four
+  conflict classes are committed here; the specific
+  hard-logical / hard-identity pair list lands in the PR that
+  enumerates aspirations themselves.
+- **§7.3 coordinator-directive Intention strategy row** — commits
+  to `SingleMinded` with a coordinator-cancel override here; the
+  full specification lands with the coordinator DSE (open-work
+  #1 sub-3 / cluster C4).
 
 **Explicitly not on this list — open-set by design, not enumeration
 debt:**
@@ -1670,6 +1994,65 @@ DSE queries joining cat + colony use `(cat_q, colony_q.single())`.
 (`skills.rs`). Magic DSEs gate it via *thresholded response curves*
 (§2), not boolean eligibility. Listed in §4.5 scalar carve-out.
 
+#### Reproduction
+
+Reproduction is its own category because both rows below carry
+reproductive-lifecycle semantics that don't fit elsewhere in the
+catalog. `Fertility` is not a transient condition (vs. §4.3 State:
+`Injured`, `InCombat`) and not socially conferred (vs. §4.3 Role:
+`Coordinator`, `Mentor`) — it's a cycled physiological state whose
+phase feeds §6.5.2's Mate consideration. `Parent` likewise is
+lifecycle-scoped (active, not lifetime — see below) and query-used
+for aspiration routing, not for target-side kinship.
+
+Three design commitments the rows below depend on:
+
+- **`KittenDependency` remains the canonical data for parent-of-kitten
+  lookup.** §6.5.6's target-side `target.Parent == self` check reads
+  `KittenDependency { mother, father }` on the kitten directly;
+  `Parent` is a self-side query-optimization marker for "is this cat
+  a parent?", not a new source of truth for the pair predicate.
+- **`Fertility` catalog row commits the shape; §7.M.7 commits the
+  lifecycle.** §7.M.7 resolved (2026-04-21) as a phase-bearing
+  component with `fertility.rs`-maintained pure-function phase
+  transitions. The phase enum also expands from four to **five
+  variants** — §7.M.7.3 adds a dedicated `Postpartum` phase for
+  the nursing interval, enabling narrative templates and
+  event-filter queries to cleanly distinguish environmental
+  (winter) from biological (post-birth) suppression, even though
+  scoring treats both identically (§7.M.7.5). Gender mapping is
+  canon per §7.M.7.4: Queens gestate, Toms sire, Nonbinaries do
+  both; only Queens and NBs carry `Fertility`.
+- **`Parent` is active parenthood, not lifetime identity.** A cat
+  loses the marker when their last dependent kitten either matures
+  (`KittenDependency` dissolves at `maturity ≥ 1.0`) or dies.
+  Consumers that want lifetime-kin semantics — future `is_kin()`,
+  grief-of-parent queries, sibling detection — must not lean on
+  `Parent` as a lifetime-identity proxy. That information lives in
+  death-event payloads (§7.7.b's planned `CatDied { cause, deceased,
+  survivors_by_relationship }` vocabulary expansion) and in future
+  kinship-relation components, not in a sticky ZST. Rationale:
+  making `Parent` sticky would be a one-off break from the catalog's
+  lifecycle-scoped convention (compare `Pregnant`, `InCombat`,
+  `Incapacitated` — all transient, all removed when the generating
+  condition clears).
+
+**Ordering hazard — `Parent` removal vs. grief emission.** If
+`growth.rs::update_parent_markers` runs before any grief/death
+consumer in the same tick, the surviving cat loses `Parent` before a
+grief system could query "was this cat a parent of the deceased?" The
+catalog contract is: consumers MUST NOT infer grief-parent status by
+querying `With<Parent>` on survivors post-death. The canonical
+parent-at-time-of-death channel is the `CatDied` event payload
+(future §7.7.b `survivors_by_relationship` field). Implementation-side
+schedule ordering between `update_parent_markers` and the §7.7.b
+grief cascade is a follow-on when both land.
+
+| Marker | Predicate | Insert | Remove | Query | Status | Source |
+|---|---|---|---|---|---|---|
+| `Fertility { phase: FertilityPhase, cycle_offset, post_partum_remaining_ticks }` | Cat is cycle-capable; `phase` ∈ {Proestrus, Estrus, Diestrus, Anestrus, Postpartum} (5 variants — Postpartum added by §7.M.7.3 for the nursing interval, scoring-equivalent to Anestrus per §7.M.7.5 but narratively distinguishable). Mutually exclusive with `With<Pregnant>`. Only Queens and Nonbinaries carry it (§7.M.7.4 canon — Toms are sire-only and never carry the marker). **Lifecycle per §7.M.7** — four-phase cycling plus a dedicated Postpartum interval, maintained by `fertility.rs` as a pure function of `(tick + cycle_offset, season, post_partum_remaining)`. Winter forces Anestrus on every Fertility-bearing cat. | `tick:growth.rs::update_life_stage_markers` (Adult entry, gender-gated to skip Toms; alongside Kitten/Young/Adult/Elder life-stage markers) + `tick:fertility.rs::handle_post_partum_reinsert` (on `KittenBorn`, with `phase = Postpartum` and `post_partum_remaining_ticks` set to `fertility_post_partum_recovery_ticks` per §7.M.7.3). Initial phase computed by §7.M.7.2 at insert tick. | `tick:growth.rs::update_life_stage_markers` (Adult→Elder transition — tightens today's-Elders-can-mate per §7.M.7.1) OR `tick:fertility.rs::handle_conception_remove` on `event:MateConceived` (atomic with `Pregnant` insert). Re-insert path per Insert cell. | `Q<_, With<Fertility>>` (eligibility — Toms excluded by construction) or `Q<&Fertility>` (phase-scoped scoring per §6.5.2 fertility-window curve) | Absent | `ScoringContext: —` (no current field; verisimilitude gap flagged at `mating.rs:102–114` season-granularity; §7.M.7.5 phase→scalar mapping supersedes) |
+| `Parent` | **Active parenthood:** cat has ≥1 living entity with `KittenDependency.mother == self` or `KittenDependency.father == self`. Mutually compatible with `Pregnant`, `Mentor`, all life-stage markers ≥ Adult. See block prose for lifecycle-scoped rationale. | `tick:growth.rs::update_parent_markers` (new) — runs after `tick_kitten_growth`; single pass over `Query<&KittenDependency>` fans out markers onto referenced parent entities. | Same system removes `Parent` from any cat whose **last** dependent kitten matured (`maturity ≥ 1.0`) OR died this tick. Death-of-kitten path: listen for `CatDied` where deceased carried `KittenDependency`, then re-evaluate the named parents. | `Q<_, With<Parent>>` (aspiration-layer "is parent" filter — future `ProvideKittenAspiration` routing, post-§7.M-pattern kitten-care aspirations) | Absent | `ScoringContext: —` (only the self-side aggregate `is_parent_of_hungry_kitten:115` exists, which is strictly narrower: parent *and* kitten-hungry) |
+
 #### Fox-specific
 
 Fox-side tick systems (`fox_goap.rs`, `fox_spatial.rs`) maintain the
@@ -1807,12 +2190,25 @@ marker cluster, to know who the downstream query consumers are.
 - **`src/systems/items.rs`** → `HasHerbsInInventory`, `HasRemedyHerbs`,
   `HasWardHerbs`.
 - **`src/systems/growth.rs`** → `Kitten`, `Young`, `Adult`, `Elder`,
-  `IsParentOfHungryKitten`.
+  `IsParentOfHungryKitten`, `Parent`.
 - **`src/systems/mating.rs`** → `HasEligibleMate`.
 - **`src/systems/aspirations.rs`** → `Mentor`, `Apprentice`,
   `HasMentoringTarget`.
 - **`src/systems/death.rs`** → `Dead` (exists).
 - **`src/systems/pregnancy.rs`** → `Pregnant` (exists).
+- **`src/systems/fertility.rs`** *(new file)* → `Fertility`. Runs
+  three systems per §7.M.7.7: `update_fertility_phase` (100-tick
+  cadence; applies §7.M.7.2 transition function per Fertility-
+  bearing cat — Toms excluded by construction per §7.M.7.4),
+  `handle_post_partum_reinsert` (listens `KittenBorn`, re-inserts
+  `Fertility` on the birthing mother with `phase = Postpartum` and
+  `post_partum_remaining_ticks` set), `handle_conception_remove`
+  (listens `MateConceived`, atomically removes `Fertility` as
+  `Pregnant` lands via `pregnancy.rs`). Adult-entry insert and
+  Elder-exit remove live in `growth.rs` per §4.3 LifeStage-block
+  authoring convention; `fertility.rs` reacts to life-stage
+  transitions rather than authoring them. The Adult-entry insert
+  is gender-gated (Queens + NBs only).
 - **`src/systems/fate.rs`** → `FateAssigned` (exists).
 - **`src/ai/capabilities.rs`** *(new file)* → `CanHunt`, `CanForage`,
   `CanWard`, `CanCook`.
@@ -2319,7 +2715,7 @@ contract that keeps the marker set open to future additions lives in
 | Base maps (§5.6.3) | 0 | 5 (#1 scent, #2 corruption, #4 fox-scent, #11 exploration, #12 congregation) | 8 (wards, prey, carcass, food, herb, construction, garden, kitten-urgency) |
 | Propagation modes | 2 (sight LoS, hearing distance) | 3 (scent, tremor, pursuit-proximity) | 0 |
 | Attenuation layers | 1 (species — §5.6.6.1) | 3 (base-map substrate, role §5.6.6.2, environment §5.6.6.4) | 1 (injury deficit — §5.6.6.3) |
-| ECS markers | 7 (Species/PreyAnimal, Coordinator, Pregnant, Dead, FateAssigned, AspirationsInitialized) | 6 (Fox/Hawk/Snake/ShadowFox via `WildAnimal`, Mentor/Apprentice via `Training`) | 42 (LifeStage 4 + State 6 + Capability 4 + Inventory 7 + TargetExistence 10 + Colony 3 + Fox-specific 8) |
+| ECS markers | 7 (Species/PreyAnimal, Coordinator, Pregnant, Dead, FateAssigned, AspirationsInitialized) | 6 (Fox/Hawk/Snake/ShadowFox via `WildAnimal`, Mentor/Apprentice via `Training`) | 44 (LifeStage 4 + State 6 + Capability 4 + Inventory 7 + TargetExistence 10 + Colony 3 + Reproduction 2 + Fox-specific 8) |
 
 #### §5.6.9 Extensibility constraints — L1 surface must stay open to L2 evolution
 
@@ -2557,34 +2953,172 @@ can't reappear.
 Mark's personal-interest template (IAM ch 30) — the falloff curve
 centered on the evaluating agent's position — is a
 `SpatialConsideration` with `(center = self.pos, curve = Quadratic or
-Logistic)`. Parameterized per action:
+Logistic)`. Every target-taking DSE in §6.5 declares one row below;
+the same `SpatialConsideration` shape appears as the *distance*
+consideration in each §6.5 sub-table, parameterized per this row.
 
-| Action | Max range (tiles) | Curve shape |
-|---|---|---|
-| `Mate` | 1 (adjacency) | `Logistic(steepness=20, midpoint=0.5)` — near-step |
-| `Fight` | 2–3 | `Logistic(steepness=10, midpoint=2)` |
-| `Groom` (other) | 1–2 | `Logistic(steepness=15, midpoint=1)` |
-| `Socialize` | 8 | `Quadratic(exponent=2)` — gentle falloff |
-| `Mentor` | 8 | `Quadratic(exponent=2)` |
-| `Caretake` | 12 | `Quadratic(exponent=1.5)` — long reach for kittens |
-| `Hunt` | species-dependent (scent/sight range) | `Quadratic(exponent=2)` |
-| `ApplyRemedy` | 15 | `Quadratic(exponent=1.5)` |
+Rows ordered by §6.1 severity class (Critical first, then Partial) so
+the four scoring-blind DSEs (that today ignore target-quality
+entirely) surface before the four scalar-only ones.
+
+| # | Action | Backs ScoringContext (field:line) | Resolver today (file:line) | Max range (tiles) | Curve shape | Note (why this shape) |
+|---|---|---|---|---|---|---|
+| 1 | `Socialize` | `has_social_target:35` (bool) | `disposition.rs:1328–1347` + `goap.rs:3788–3810` | 8 | `Quadratic(exponent=2)` | Gentle convex falloff over colony range. §6.1 Critical: resolver today picks by `fondness × w + (1-familiarity) × w`; curve admits ranking over distance without nulling far partners. |
+| 2 | `Mate` | `has_eligible_mate:111` (bool) | `disposition.rs:1873–1919` | 1 (adjacency) | `Logistic(steepness=20, midpoint=0.5)` | Near-step — mating is physically colocated. Partners/Mates bond is an ECS eligibility filter (§4), not a consideration. §6.1 Critical. |
+| 3 | `Mentor` | `has_mentoring_target:93` (bool) | `disposition.rs:1352–1377` (sub-action of socializing chain) | 8 | `Quadratic(exponent=2)` | Matches `Socialize` reach — mentors find apprentices in the same colony cluster. §6.1 Critical: resolver today ignores skill-gap entirely; §6.5.3 installs it. |
+| 4 | `Groom` (other) | `has_social_target:35` (bool, shared with `Socialize`) | `disposition.rs:1379–1385` (sub-action of socializing chain) | 1–2 | `Logistic(steepness=15, midpoint=1)` | Close physical range — allogrooming needs adjacency. §6.1 Critical: shared existence-bool with `Socialize`; sibling-DSE split under §L2.10 assigns distinct curves. |
+| 5 | `Hunt` | `prey_nearby:95` (bool) + `hunt_prey_bonus` scalar (ScoringConstants, consumed at `scoring.rs:239`) | `disposition.rs:1172–1193` (chain skeleton); `HuntPrey` step handles target resolution internally via scent/sight | species-dependent (scent/sight range from §5.6.6.1 row `Cat`) | `Quadratic(exponent=2)` | Range bound is the cat's own sensory profile, not a fixed tile count — ties §6.4 to the sensory substrate. §6.1 Partial: resolver picks `min_distance` regardless of yield. |
+| 6 | `Fight` | `has_threat_nearby:37` (bool) | `disposition.rs:1229–1283` (`build_guarding_chain` → `nearest_threat`) | 2–3 | `Logistic(steepness=10, midpoint=2)` | Steep threshold at engagement range — cats engage or flee, not linger at mid-range. §6.1 Partial: threat-count aggregates via `SumTopN` (§6.6), not `Best`. |
+| 7 | `ApplyRemedy` | `colony_injury_count:72` (count) | `disposition.rs:1651–1662` (nearest injured, under `Herbcraft`/`PrepareRemedy` sub-mode) | 15 | `Quadratic(exponent=1.5)` | Long, gentle falloff — a healer walks across the colony for severe injury. §6.1 Partial: resolver picks nearest, ignores severity. Sibling-DSE under §L2.10 (child of `PracticeMagic` or `Herbcraft`). |
+| 8 | `Build` | `has_construction_site:47` (bool) + `has_damaged_building:49` (bool) | `disposition.rs:1413–1437` (`build_building_chain` → priority=site first, tie-break by distance) | 20 | `Linear(slope=-1/20, intercept=1)` | Near-flat falloff — builders commit to sites across the colony, distance is a tiebreaker not a driver. §6.1 Partial: resolver picks by `(site_priority, min_distance)`; quality (progress, condition) invisible to scoring. |
+| 9 | `Caretake` | `hungry_kitten_urgency:113` (scalar, already partial L2) | `disposition.rs:1925–1942` (chain picks nearest `Stores`; kitten resolved at `FeedKitten` step execution) | 12 | `Quadratic(exponent=1.5)` | Long reach for kittens — §6.1 Partial: max-of-kitten-urgencies is correct per Mark ch 13, but resolver then navigates to nearest Stores rather than the kitten whose urgency drove the score. L2 fix moves target commitment forward. |
+
+**Sibling DSEs deferred to §L2.10.** Herbcraft's `gather` / `prepare` /
+`ward` children and PracticeMagic's `scry` / `durable_ward` / `cleanse`
+/ `colony_cleanse` / `harvest` / `commune` children will each own a
+§6.4 row once §L2.10 lands the final sibling set (Enumeration Debt
+line 95–98). `ApplyRemedy` is the one sibling already enumerated here
+because it was surfaced by §6.1's inventory; the rest are blocked on
+naming.
+
+**Row-count invariant.** §6.4 and §6.5 must match row-for-row on the
+target-taking DSE set — every §6.4 row has a §6.5.n sub-table, and
+every §6.5.n sub-table has a §6.4 row. Drift between the two is an
+enumeration-debt regression.
 
 ### §6.5 Per-target consideration sets
 
-For each target-taking action, the per-target consideration bundle:
+Each target-taking DSE from §6.4 declares a bundle of
+per-target considerations below. Every consideration carries a
+`(curve primitive, weight, signal source)` tuple — not just a label —
+so the substrate can compose it via the §3.1.1 mode (default
+`CompensatedProduct`; see §6.6 for non-default aggregations).
 
-| Action | Considerations |
-|---|---|
-| `Socialize` | distance (Spatial), fondness, novelty `(1 - familiarity)`, species-compat |
-| `Mate` | distance (Spatial), romantic, bond-stage, fertility, genetic-compat |
-| `Mentor` | distance (Spatial), fondness, skill-gap-magnitude, apprentice-receptivity |
-| `Groom` (other) | distance (Spatial), fondness, target-need-warmth |
-| `Hunt` | distance (Spatial), prey-species-yield, prey-alertness, pursuit-cost |
-| `Caretake` | distance (Spatial), kitten-hunger, kinship, kitten-isolation |
-| `ApplyRemedy` | distance (Spatial), injury-severity, remedy-match, kinship |
-| `Build` | distance (Spatial), site-type, progress-urgency, structural-condition |
-| `Fight` | distance (Spatial), threat-level, combat-advantage, ally-proximity |
+Columns:
+- **Signal source** — the `Relationships`/`Health`/`Needs` field or
+  resolver variable the consideration reads. Cite `file:line` where
+  the signal is already computed; `—` where the signal is absent
+  today and the L2 implementation surfaces it.
+- **Curve** — primitive from §1 (Linear / Logistic / Quadratic /
+  Cliff / Exponential) with parameter tuple.
+- **Weight** — relative contribution within the per-DSE bundle.
+  Weights sum to ~1.0 per bundle; composition normalizes. These are
+  first-pass commits — balance iterations refine per the
+  `CLAUDE.md` Balance Methodology.
+- **Rationale** — why this curve/weight shape; flags Critical/Partial
+  from §6.1 where the consideration closes a target-quality blind
+  spot.
+
+Sub-tables ordered identically to §6.4 (§6.1 severity: Critical 1–4,
+then Partial 5–9). `distance (Spatial)` is the §6.4 personal-interest
+template row reified as a bundle member; its curve parameters come
+from §6.4, weight committed here.
+
+#### §6.5.1 `Socialize`
+
+| Consideration | Signal source | Curve | Weight | Rationale |
+|---|---|---|---|---|
+| distance (Spatial) | `self.pos` + target `Position` | Template §6.4 row #1 (`Quadratic(exponent=2)`, range=8) | 0.25 | Gentle falloff; far cats aren't zero-scored if bond is strong. |
+| fondness | `Relationships::get(self, target).fondness` — `disposition.rs:1335` | `Linear(slope=1, intercept=0)` | 0.35 | Direct use — fondness *is* the affinity axis. Matches today's resolver `fondness_social_weight = 0.6` dominance. |
+| novelty `(1 - familiarity)` | `Relationships::get(self, target).familiarity` — `disposition.rs:1337` | `Linear(slope=-1, intercept=1)` | 0.25 | Low-familiarity partners are interesting; high-familiarity are background. Matches `novelty_social_weight = 0.4`. |
+| species-compat | `SensorySpecies` pair match — `—` (today implicit: social chain filters to cats only) | `Cliff(threshold=0.5)` | 0.15 | Edge-case capability for cross-species socializing under future visitors/trade; step for now, ranged later. |
+
+#### §6.5.2 `Mate`
+
+| Consideration | Signal source | Curve | Weight | Rationale |
+|---|---|---|---|---|
+| distance (Spatial) | `self.pos` + target `Position` — `disposition.rs:1900` | Template §6.4 row #2 (`Logistic(steepness=20, midpoint=0.5)`, range=1) | 0.15 | Near-step at adjacency — mating is physically colocated. |
+| romantic | `Relationships::get(self, target).romantic` — `disposition.rs:1901` | `Linear(slope=1, intercept=0)` | 0.40 | Direct use; dominant axis per resolver's `romantic + fondness` sum. |
+| fondness | `Relationships::get(self, target).fondness` — `disposition.rs:1901` | `Linear(slope=1, intercept=0)` | 0.25 | Second summand in resolver; breaks ties between equally-romantic partners by affection. |
+| fertility-window | `target.Fertility { phase }` — §4.3 Reproduction block + §7.M.7 lifecycle; phase→scalar mapping per §7.M.7.5 (Tom-target fallback handles Toms who carry no marker). Absent pending the implementing PR. | `Logistic(steepness=10, midpoint=0.5)` | 0.20 | S-curve over cycle — proestrus ramps receptivity, diestrus suppresses, postpartum pins to 0 alongside anestrus. Closes a verisimilitude gap (today Mate fires any-time in Spring/Summer/Autumn per `mating.rs:102–114`). |
+
+Partners|Mates bond is an ECS eligibility filter (§4), not a
+consideration — resolver today filters at `disposition.rs:1893–1899`.
+
+**Cross-ref: §7.M three-layer Mating architecture.** These per-target
+considerations power the partner-selection scoring inside each of
+§7.M's three layers at different cadences:
+- **Layer 1 `ReproduceAspiration`** — runs this consideration set
+  across *all reachable cats* when driving aspiration-emitted
+  partner-seeking behavior; no bond-tier eligibility filter at this
+  layer (the aspiration is what *grows* the bond).
+- **Layer 2 `PairingActivity`** — runs against the *active partner
+  only*; the consideration set acts as a belief-proxy `still_goal`
+  check (romantic + fondness above retention threshold).
+- **Layer 3 `MateWithGoal`** — inherits the Layer 2 partner; the
+  set gates `achievable_believed` (partner in sensory range,
+  fertility-window axis above threshold).
+
+#### §6.5.3 `Mentor`
+
+| Consideration | Signal source | Curve | Weight | Rationale |
+|---|---|---|---|---|
+| distance (Spatial) | `self.pos` + target `Position` | Template §6.4 row #3 (`Quadratic(exponent=2)`, range=8) | 0.20 | Matches `Socialize` — mentors find apprentices in the same colony cluster. |
+| fondness | `Relationships::get(self, target).fondness` | `Linear(slope=1, intercept=0)` | 0.20 | Mentors gravitate to cats they like — realistic social dynamic. |
+| skill-gap-magnitude | `self.skills[k] - target.skills[k]` per-skill, max over k — `disposition.rs:1361–1376` (computed as boolean today) | `Logistic(steepness=8, midpoint=0.4)` | 0.40 | **§6.1 Critical fix**: the whole point of mentorship. Gap-too-small (near peer) or gap-too-large (overwhelming) both suppress via S-curve's upper saturation; peak at moderate gap. Resolver today *ignores this entirely*. |
+| apprentice-receptivity | `target.Apprentice` marker + `target.personality.ambition` — §4.3 Role block row `Apprentice` (Partial — component-derived from `skills.rs::Training { apprentice }`; insert system `aspirations.rs::update_training_markers` proposed) | `Linear(slope=1, intercept=0)` | 0.20 | Ambitious apprentices are receptive; the asymmetry (mentor's disposition × apprentice's receptivity) expresses mentorship as a two-sided transaction. |
+
+#### §6.5.4 `Groom` (other)
+
+| Consideration | Signal source | Curve | Weight | Rationale |
+|---|---|---|---|---|
+| distance (Spatial) | `self.pos` + target `Position` | Template §6.4 row #4 (`Logistic(steepness=15, midpoint=1)`, range=1–2) | 0.30 | Close physical range — allogrooming requires adjacency. |
+| fondness | `Relationships::get(self, target).fondness` | `Linear(slope=1, intercept=0)` | 0.30 | Cats groom cats they like; matches warmth-threshold sub-action pick at `disposition.rs:1381`. |
+| target-need-warmth | `target.needs.warmth` deficit (L1 `1 - warmth_level`) | `Quadratic(exponent=2)` | 0.30 | Convex: desperate-need amplifies outreach, mirrors `caretake`'s urgency axis. Requires `needs.warmth` split per Enumeration Debt line 108–117. |
+| kinship | `Relationships::is_kin(self, target)` | `Cliff(threshold=kin=1.0, non-kin=0.5)` | 0.10 | Mild kin bias — mothers groom kittens, siblings groom siblings. |
+
+#### §6.5.5 `Hunt`
+
+| Consideration | Signal source | Curve | Weight | Rationale |
+|---|---|---|---|---|
+| distance (Spatial) | `self.pos` + prey `Position`, attenuated by §5.6.6.1 `Cat` sensory profile | Template §6.4 row #5 (`Quadratic(exponent=2)`, range=species-dependent) | 0.25 | Species-bounded — a cat hunts what it can sense, no further. |
+| prey-species-yield | `PreyKind` calorie yield — `src/resources/prey.rs` yield constants | `Linear(slope=1, intercept=0, normalized)` | 0.25 | **§6.1 Partial fix**: larger prey (rabbit > mouse) preferred when equally accessible; resolver today picks `min_distance` regardless of yield. |
+| prey-alertness | `Prey::alertness` (fear level) — `wildlife.rs` | `Linear(slope=-1, intercept=1)` | 0.20 | Unaware prey is easier — inverts the alertness axis. |
+| pursuit-cost | Estimated chase path cost (plan-cost feedback per §L2.10.7) | `Logistic(steepness=10, midpoint=0.5, inverted)` | 0.30 | High-cost prey suppressed via S-curve cutoff. Blocks on §L2.10.7 (plan-cost feedback design). Until then, pursuit-cost proxies as `distance²`. |
+
+#### §6.5.6 `Caretake`
+
+| Consideration | Signal source | Curve | Weight | Rationale |
+|---|---|---|---|---|
+| distance (Spatial) | `self.pos` + kitten `Position` (via `KittenUrgencyMap` §5.6.3 row #13) | Template §6.4 row #9 (`Quadratic(exponent=1.5)`, range=12) | 0.20 | Long reach — parents cross the colony for a hungry kitten. |
+| kitten-hunger | `target.needs.hunger` (kitten) — already surfaced as `hungry_kitten_urgency:88` scalar | `Quadratic(exponent=2)` | 0.40 | Convex amplification — near-starving kittens dominate. Mark ch 13 §"Deciding on Dinner" max-of-urgencies pattern is preserved per §6.6 `Best` aggregation. |
+| kinship (parent of target) | `target.KittenDependency.mother == Some(self) \|\| target.KittenDependency.father == Some(self)` — §4.3 Reproduction block (kinship reads `KittenDependency` on the target directly; the self-side `Parent` marker is the query-optimization counterpart, not this consumer's source) | `Cliff(threshold=parent=1.0, non-parent=0.6)` | 0.25 | Parents preferentially feed their own kittens; non-parents still provision at lower weight (colony-raising pattern). |
+| kitten-isolation | target has no sibling/parent within 3 tiles | `Linear(slope=1, intercept=0)` | 0.15 | Isolated kitten (wandered off, orphaned) gets priority — protects the edge case that motivates per-kitten targeting over per-store. |
+
+#### §6.5.7 `ApplyRemedy`
+
+| Consideration | Signal source | Curve | Weight | Rationale |
+|---|---|---|---|---|
+| distance (Spatial) | `self.pos` + patient `Position` — `disposition.rs:1653` | Template §6.4 row #7 (`Quadratic(exponent=1.5)`, range=15) | 0.15 | Healers cross the colony for severe injury. |
+| injury-severity | `Health` deficit (today single-struct); future `BodyZone::Destroyed_count` when body-zones build lands | `Quadratic(exponent=2)` | 0.40 | **§6.1 Partial fix**: severe injuries triage higher. Resolver today picks nearest, ignores severity. |
+| remedy-match | `Inventory::has_herb(remedy_kind_for_injury)` match — `disposition.rs:1628–1634` | `Cliff(threshold=match=1.0, mismatch=0.0)` | 0.30 | Hard gate — a HealingPoultice doesn't treat a mood-injury. Gating-via-Cliff (not eligibility filter) because remedy match is per-candidate, not a fixed species filter. |
+| kinship | `Relationships::is_kin(self, target)` | `Linear(slope=0.5, intercept=0.5)` | 0.15 | Mild kin bias; healers treat the colony but kin gets a nudge. |
+
+Under §L2.10, `ApplyRemedy` becomes a sibling DSE of `PracticeMagic`
+or `Herbcraft`; this bundle migrates wholesale to the sibling spec.
+
+#### §6.5.8 `Build`
+
+| Consideration | Signal source | Curve | Weight | Rationale |
+|---|---|---|---|---|
+| distance (Spatial) | `self.pos` + site `Position` — `disposition.rs:1416,1420` | Template §6.4 row #8 (`Linear(slope=-1/20, intercept=1)`, range=20) | 0.20 | Near-flat falloff — site priority dominates distance. |
+| site-type | `ConstructionSite` marker vs `Structure::needs_repair` — `disposition.rs:1418–1421` | `Cliff(threshold=ConstructionSite=1.0, RepairNeeded=0.6)` | 0.30 | Categorical: new builds > repairs by design intent (matches resolver's `priority = 0` for sites, `1` for repair). |
+| progress-urgency | `ConstructionSite::progress_fraction` (close to complete = near-1) | `Quadratic(exponent=2)` | 0.30 | Convex: nearly-done sites pull builders to finish — "sunk-progress" effect. **§6.1 Partial fix** — invisible to scoring today. |
+| structural-condition | `Structure::health_fraction` (low = needs urgent repair) | `Linear(slope=-1, intercept=1)` | 0.20 | Damaged structures surface linearly; pairs with site-type Cliff to span build and repair semantics. |
+
+#### §6.5.9 `Fight`
+
+| Consideration | Signal source | Curve | Weight | Rationale |
+|---|---|---|---|---|
+| distance (Spatial) | `self.pos` + threat `Position` — `disposition.rs:1241` | Template §6.4 row #6 (`Logistic(steepness=10, midpoint=2)`, range=2–3) | 0.25 | Steep at engagement range — engage or don't, no lingering. |
+| threat-level | Wild-species combat rating × aggression — `src/resources/wildlife.rs` threat tables | `Quadratic(exponent=2)` | 0.30 | Convex amplification: a hawk is worth more attention than a snake at the same distance. |
+| combat-advantage | `self.skills.combat + self.health_fraction − target.threat_level` | `Logistic(steepness=10, midpoint=0.5)` | 0.25 | S-curve tips past parity — cats don't half-commit. Shares steepness with `Flee`'s safety axis (§2.3 anchor). |
+| ally-proximity | Count of ally cats within 4 tiles — bucketed via `CatPresenceMap` §5.6.3 row #12 | `Linear(slope=1, intercept=0, cap=3)` | 0.20 | Linear with cap: first 3 allies boost confidence linearly; more has diminishing returns. §3.1.1 names Fight's group-bonus as the WS motivator; this is its target-side reification. |
+
+Fight also uses `SumTopN(3)` aggregation (§6.6) over threats, not
+`Best` — the action score reflects *total* threat from the top-3
+adversaries, so a surrounded cat engages even if no single threat is
+maximal.
 
 ### §6.6 Aggregation choices
 
@@ -2611,7 +3145,7 @@ For each target-taking action, the per-target consideration bundle:
 
 ---
 
-## §7 Decision persistence and momentum — [STUB, pending Mark ch 15]
+## §7 Decision persistence and momentum
 
 Per-tick re-scoring from scratch causes "flipper" behavior near equal
 scores and prevents any commitment supply chain (courtship, skill
@@ -2619,56 +3153,1852 @@ progression, apprenticeship). Clowder's GOAP planner carries
 intra-plan commitment, but at the scoring layer every tick is
 independent.
 
-**Intended mechanism (to be refined from ch 15):** a momentum
-consideration bonuses the currently-active DSE's score proportional
-to commitment strength and time elapsed in the action. A new DSE
-must beat the current one by a *margin* ≥ commitment strength to
-preempt.
+This section synthesizes two reference sources to close the problem:
+Rao & Georgeff (1991) — extracted at `docs/reference/bdi-rao-georgeff.md`
+— supplies the **categorical commitment vocabulary** (which kind of
+commitment is this Intention under?). Mark *Behavioral Mathematics*
+ch 15 —
+`docs/reference/behavioral-math-ch15-changing-decisions.md` — supplies
+the **numeric momentum shape** (how heavy is the current commitment
+when a challenger tries to preempt?). The two layers are orthogonal
+and compose without contradiction: strategy decides *when* a drop is
+permitted, persistence bonus decides *how hard* it is to be preempted
+before the drop condition fires.
 
-**Open questions pending ch 15:**
-- Does Mark treat momentum as a consideration (axis inside the
-  product) or as a post-composition bonus?
-- What's the canonical decay curve for commitment strength? (Likely
-  not linear.)
-- How does momentum interact with Maslow override — hunger should
-  still preempt a committed "explore" action below the starvation
-  threshold.
-- **Commitment strategy is an elasticity × apophenia tradeoff** (§0.2,
-  §0.3). Momentum is the substrate mechanism behind apophenia's
-  long-term-relevance leg — committed Intentions produce arcs the
-  observer can read. Single-minded commitment (Rao & Georgeff) maximizes
-  arc legibility but is brittle to world-state change; open-minded is
-  elastic but risks flipper behavior. Ch 15 synthesis needs to pick per
-  Intention class, not globally (a hunt commitment and a courtship
-  commitment want different elasticity profiles).
+### §7.1 Commitment-strategy enum
 
-**Cross-ref:** `docs/reference/behavioral-math-ch15-changing-decisions.md`
+The Rao & Georgeff vocabulary, committed verbatim:
+
+```rust
+pub enum CommitmentStrategy {
+    /// Drop only on believed achievement (AI9a). AI8-capped.
+    /// Zealot posture — use for critical-need resting + territorial
+    /// guarding where mid-pursuit reconsideration is the failure mode.
+    Blind,
+    /// Drop on achievement OR believed unachievable (AI9b).
+    /// Pragmatist posture — default for goal-shaped Intentions.
+    /// Flipper-proof without being fanatical.
+    SingleMinded,
+    /// Drop on achievement OR no longer desired (AI9c).
+    /// Desire-drift-sensitive — default for activity-shaped Intentions
+    /// and for aspirations (§7.7), where the cat's own preference
+    /// drift should be able to end the arc.
+    OpenMinded,
+}
+```
+
+The strategy tag lives on the `Intention` (per §L2.10.4), not on the
+DSE. A DSE can emit Intentions with context-dependent strategies —
+e.g., a `Patrol` DSE under critical-threat context could emit a
+`Blind` Guarding Intention; under routine context, `SingleMinded`.
+
+### §7.2 Drop-trigger reconsideration gate
+
+Runs each tick **after** `check_anxiety_interrupts`
+(`src/systems/disposition.rs:93`) — Maslow override stays supreme.
+Three evaluations plus the AI8 cap; the strategy decides which
+combination triggers the drop:
+
+```
+fn should_drop(intention, cat, ctx) -> bool {
+    if intention.age >= intention.max_persistence_ticks { return true; }  // AI8
+
+    let achieved     = achievement_believed(intention, cat, ctx);
+    let unachievable = !achievable_believed(intention, cat, ctx);
+    let dropped_goal = !still_goal(intention, cat, ctx);
+
+    match intention.strategy {
+        Blind        => achieved,
+        SingleMinded => achieved || unachievable,
+        OpenMinded   => achieved || dropped_goal,
+    }
+}
+```
+
+Signal definitions (each is a **belief proxy** per §12 — Clowder has
+no formal beliefs):
+
+- **`achievement_believed`** — goal-state predicate evaluated against
+  current percepts. Percept ≈ belief for goal-achievement since the
+  cat trusts what it senses right now. Examples: hunger level below
+  threshold, carcass at stores, kitten's hunger sated, ward placed.
+- **`achievable_believed`** — two-channel signal:
+  1. DSE re-evaluated score above a retention threshold. Distance-
+     to-target landmark contributes via the `SpatialConsideration`
+     (§L2.10.7); as the target becomes inaccessible, the score
+     attenuates smoothly. This is ch 14 §"Which Dude to Kill?"
+     applied elastically per §0.2.
+  2. `GoapPlan::replan_count < max_replans` — the existing
+     (`src/components/goap_plan.rs:103`) hard-fail signal. If the
+     planner cannot route a step chain after the capped number of
+     retries, achievability is believed lost.
+  Channel 1 is elastic (smooth degradation); channel 2 is the hard
+  exit when elasticity isn't enough.
+- **`still_goal`** — DSE re-score against current context. Below the
+  retention threshold → the cat no longer goals this Intention. Only
+  load-bearing under `OpenMinded`.
+- **AI8 cap** — every Intention carries `max_persistence_ticks` at
+  cat-scale (minutes of sim time, not ticks-per-second). Per Rao &
+  Georgeff AI8, no Intention is held forever regardless of
+  strategy.
+
+### §7.3 Per-Intention-class strategy assignment
+
+Maps against the 12 `DispositionKind` variants in
+`src/components/disposition.rs:39–64`. Pattern: goals →
+single-minded, activities → open-minded, critical needs → blind.
+This is Rao & Georgeff's mixed-strategy example (page 14 —
+"open-minded on ends, single-minded on means") applied at the
+per-class level.
+
+| Disposition   | Strategy     | Rationale |
+|---------------|--------------|-----------|
+| Resting       | Blind        | Physiological completion; Maslow gate handles preemption already. AI8 caps runaway sleeps. |
+| Guarding      | Blind        | Territory defense shouldn't flinch mid-patrol. AI8 caps fixation. |
+| Hunting       | SingleMinded | Drop when prey dead/fled or plan fails past replan cap. Flipper-proof without fanaticism. |
+| Foraging      | SingleMinded | Drop when cache exhausted or trip target met. |
+| Coordinating  | SingleMinded | Drop when directive queue drained or role removed. |
+| Building      | SingleMinded | Drop when chain finishes or material source vanishes. |
+| Farming       | SingleMinded | Drop when crop harvested or plot destroyed. |
+| Crafting      | SingleMinded | Drop on recipe complete or ingredient unavailable. |
+| Caretaking    | SingleMinded | Drop when kitten's need met or kitten dies. |
+| Mating — L1 `ReproduceAspiration` | OpenMinded | Aspiration-layer default (§7.7). Grief, fate, mood drift, life-stage transitions should redirect a multi-year arc. See §7.M.1. |
+| Mating — L2 `PairingActivity`     | OpenMinded | Activity-shaped (`UntilCondition`, §L2.10.5). Mirrors Socializing — partner invalidation, desire drift, season-out all drop naturally. See §7.M.1. |
+| Mating — L3 `MateWithGoal`        | SingleMinded | Goal-shaped single event wrapping the existing 4-step chain. Drop on partner invalidation or `replan_count` cap. See §7.M.1. |
+| Socializing   | OpenMinded   | Activity-shaped; drops on sated-sociability or lost interest. |
+| Exploring     | OpenMinded   | Activity-shaped; curiosity drift drops it. |
+
+Coordinator-issued directive Intentions (future, blocked on the
+coordinator DSE design — see Enumeration Debt) default
+`SingleMinded` with a coordinator-cancel override that functions as
+an event-driven drop signal outside the normal gate.
+
+**Aspiration-emitted Intentions inherit this table for their
+short-horizon cadence** — if a "master hunter" aspiration emits a
+Hunt Intention, that Intention is `SingleMinded` per-tick. The
+aspiration itself is `OpenMinded` (§7.7). Two layers, two defaults,
+no contradiction.
+
+### §7.4 Persistence bonus (ch 15 Finish Him!)
+
+Post-composition bonus applied to the currently-held Intention's
+score during re-evaluation, sized by **task-completion fraction**
+through a non-linear response curve. Prevents strobing via Mark's
+bowling-ball-vs-billiard-ball metaphor: the challenger Intention
+must beat `current_score + persistence_bonus` to preempt, not just
+`current_score`.
+
+```
+persistence_bonus = base * logistic(completion_fraction, midpoint, steepness)
+```
+
+Uses the `Logistic` primitive from §2.1. Rationale from ch 15
+§"Just Gimme a Minute, Boss!": a 99%-completed building should not
+be abandoned for a slightly-better greenfield building, and the
+increasing-marginal-utility shape of a logistic delivers that
+behavior naturally. Ch 15 §"Finish Him!" applies the same logic to
+low-HP targets: each remaining percent of damage is worth more than
+the last.
+
+**`base` is per-DispositionKind.** The table below commits one of
+four categorical tiers (Low / Medium / High / Indefinite) per
+variant, aligned with the existing `target_completions`
+personality-scaling patterns in `src/components/disposition.rs:66–88`.
+Specific numeric magnitudes are balance-thread work (candidate
+bands: Low ≈ 0.05, Medium ≈ 0.10, High ≈ 0.20, Indefinite = N/A);
+the tier commitment is what this enumeration closes.
+
+| DispositionKind | Base tier     | Rationale |
+|-----------------|---------------|-----------|
+| Resting         | Indefinite    | Need-driven; `target_completions` returns `u32::MAX`. The Maslow gate ends Resting, not the persistence bonus — tier is moot. |
+| Guarding        | High          | Commitment should hold through noise. `Blind` strategy + High tier prevents mid-patrol flinching; AI8 cap guarantees termination. |
+| Hunting         | Medium        | Diligence-scaled `target_completions` (1 + `2·diligence`). Enough persistence to finish a chase; not so much that repeated prey-loss sticks past the `replan_count` hard-fail. |
+| Foraging        | Medium        | Same shape as Hunting; diligence-scaled trip count. |
+| Caretaking      | Medium        | Compassion-scaled (1 + `2·compassion`). A parent shouldn't abandon a hungry kitten for marginal score deltas. |
+| Socializing     | Medium        | Sociability + playfulness scaled (1 + `2·sociability` + `playfulness`). Activity-shaped; `OpenMinded` strategy means desire drift still drops naturally, Medium persistence keeps conversations from strobing. |
+| Exploring       | Medium-High   | Curiosity-scaled with the highest base (2 + `3·curiosity`). Exploration arcs are long; persistence should match — still `OpenMinded`, so curiosity drift can terminate. |
+| Building        | High          | Chain-driven. The 99%-done-building case from ch 15 §"Just Gimme a Minute, Boss!" lives here — High tier prevents abandonment for marginal score deltas. |
+| Farming         | High          | Same chain-driven Finish-Him logic as Building. |
+| Crafting        | High          | Same reasoning; herbcraft and magic chains fragment under preemption otherwise. |
+| Coordinating    | Medium        | Chain-driven but short; directive queues drain quickly. |
+| Mating — L1 `ReproduceAspiration` | High | Aspiration-layer default for multi-year commitments. Event-driven drops (grief, injury, life-stage, §7.7.1 conflict), not per-tick. See §7.M.1. |
+| Mating — L2 `PairingActivity`     | Medium | Activity mirror of Socializing (§7.4 row above) — `OpenMinded` strategy + Medium tier keeps the pair stable without fanaticism. See §7.M.1. |
+| Mating — L3 `MateWithGoal`        | High | Finish-Him logic. Courtship chain near-completion shouldn't restart over marginal deltas; `SingleMinded` drops on partner invalidation. See §7.M.1. |
+
+**Patience personality trait as tier multiplier.** Today, patience
+adds flat trips to `target_completions`
+(`disposition.rs:87`, `scoring.rs:695–704`). Post-refactor,
+patience applies as a **per-cat multiplier on the tier-derived
+`base` magnitude** — a patient cat's High tier is effectively
+higher than an impatient cat's High tier. This subsumes the
+existing patience-bonus code block; the flat-per-action bonus
+deletes when §7.4 lands in implementation.
+
+**`completion_fraction` is Intention-shape-specific:**
+- Goal Intentions (most rows above): `1 - (remaining_cost / initial_cost)`.
+  Cost here is GOAP path cost as estimated at Intention adoption.
+- Activity Intentions (`Socializing`, `Exploring`): `elapsed_ticks / termination.ticks`.
+- Chain-driven (`Building`, `Farming`, `Crafting`, `Coordinating`):
+  `chain.steps_completed / chain.total_steps`.
+- `Mating`: split per §7.M three-layer resolution.
+  - `ReproduceAspiration` (L1): `elapsed_seasons /
+    reproductive_window_seasons`. Aspiration-layer completion
+    fraction rises over the cat's reproductive window, giving
+    late-arc elders Finish-Him-scaled persistence on seeing the
+    arc through.
+  - `PairingActivity` (L2): `elapsed_ticks /
+    pairing_termination.ticks`. Even though L2 is
+    `OpenMinded`, the `UntilCondition` termination provides a
+    meaningful completion fraction (time-in-activity relative to
+    the partner-loss / season-close horizon).
+  - `MateWithGoal` (L3): `chain.steps_completed / 4`. The 4
+    chain steps (MoveTo → Socialize → GroomOther → MateWith,
+    `disposition.rs:1873–1919`) remain the execution unit;
+    Finish-Him applies in its canonical shape.
+
+### §7.M Mating — canonical three-layer aspiration showcase
+
+Mating is **the worked example** for this substrate's long-horizon
+BDI architecture. Two framings drive the placement:
+
+1. **Ecological load-bearing.** Without reproduction, the colony has
+   no kittens, no generational continuity, no aspiration-inheritance
+   narrative, and in the failure case no future at all. The
+   iter-2 instrumentation session
+   (`docs/balance/social-target-range.report.md`, commit `290a5d9`)
+   caught the current `Mating` disposition gate-starved at **0% of
+   snapshots** under a wider social-target-range treatment — 0
+   matings and 0 kittens in the canonical deep-soak. The substrate
+   has to express reproductive commitment in a shape that survives
+   partner death, season-out, and aspiration conflict elastically,
+   not as a brittle "do I have an eligible partner right now" gate.
+2. **Multi-timescale BDI.** Reproduction naturally spans three
+   timescales — the lifetime arc of wanting to raise offspring, the
+   multi-season rhythm of courting a partner, and the single
+   completed mating event. The substrate already names both layers
+   (§7.7 aspirations, §L2.10.5 Goal/Activity Intentions, §L2.10.4
+   strategy-on-Intention); mating is the first case that exercises
+   three nested layers end-to-end. Rao & Georgeff AI4 explicitly
+   allows `INTEND(INTEND(φ))` (`docs/reference/bdi-rao-georgeff.md`
+   §3 CI4), and this is where it earns its keep in the design.
+
+A Phase-1 audit of the current code surface (committed 2026-04-20)
+named three tensions in today's `DispositionKind::Mating`: a hybrid
+single-event-wrapping-a-4-step-chain shape
+(`disposition.rs:1873–1919`), ambient pair-bond state that already
+exists independently (`relationships.rs:14–17`, evolved by
+`social.rs:100–175`), and no post-mating consequence graph. All
+three dissolve under a three-layer nested-Intention design.
+
+#### §7.M.1 Three-layer architecture
+
+**Layer 1 — `ReproduceAspiration`** (lives in `aspirations.rs`
+alongside Mastery / Territory arcs).
+
+- **Scope.** Lifetime arc. A cat in its reproductive window adopts
+  a `Reproduce` aspiration; the arc terminates at elder life-stage,
+  on sustained injury below reproductive viability, on chosen
+  celibacy (personality interaction), or on
+  aspiration-compatibility conflict (§7.7.1).
+- **Strategy.** `OpenMinded` — §7.7 default for aspirations. Grief,
+  fate events, life-stage transitions, and mood drift *should* be
+  able to redirect a multi-year arc. That's character (§0.4), not a
+  bug.
+- **Persistence tier.** **High.** Aspiration-layer multi-year
+  commitments don't flip on marginal score deltas; they drop on
+  event-driven reconsideration (§7.7.a life-stage, §7.7.b grief,
+  §7.7.c fate, §7.7.d mood drift, §7.7.1 aspiration conflict).
+- **Drop events.**
+  - Life-stage transition into Elder (§7.7.a) — reproductive window
+    closed; arc terminates cleanly.
+  - Sustained injury below reproductive-viability threshold —
+    body-zone integrity tracked by the pending Body Zones work;
+    integrated here as a percept-backed drop condition.
+  - Bereavement of a long-term `Mates`-tier partner (§7.7.b grief
+    cascade) — personality-weighted redirect: seek new partner,
+    grief-celibacy drop, or care-pivot into surviving offspring.
+  - Hard-logical aspiration conflict per §7.7.1 (e.g., warrior-
+    mastery arc consuming all attention) — pair list committed
+    when §7.7.1 stabilizes.
+- **Emits.** Per-tick short-horizon Intentions at Layers 2 and 3.
+  When no Layer 2 bond exists, the aspiration biases partner-
+  seeking behavior through `Socialize` / `Wander` target-selection
+  weights (§6.5.1, §6.5.2) — the aspiration is *always active* for
+  reproductive cats, even when no specific candidate is in range.
+
+**Layer 2 — `PairingActivity`**: a new
+`Intention::Activity(Pairing, UntilCondition(...))` (§L2.10.5).
+
+- **Scope.** Multi-season, ambient once a `Partners+`-tier bond
+  exists (`relationships.rs:14` — Friends → Partners → Mates).
+  Biases proximity-to-partner, grooming-other, nest-sharing,
+  shared-travel, co-hunting — the "courting couple" behavioral
+  cluster as a sustained activity, not a discrete event.
+- **Strategy.** `OpenMinded` (§L2.10.5 Activity correlation —
+  `UntilCondition` pairs with desire-drift sensitivity). Partner
+  invalidation, desire drift, and season-out-of-fertile all drop
+  naturally without needing a hard gate.
+- **Persistence tier.** **Medium** (§7.4 row — mirrors Socializing).
+  Activity persistence keeps the pair from strobing between
+  "courting" and "independent" every tick, without tipping over
+  into the Building / Farming / Crafting "finish the chain" band.
+- **Termination conditions** (Activity completion signals for
+  §12.3 belief proxies):
+  - Partner dies or leaves the colony → Layer 2 ends, Layer 1
+    enters §7.7.b grief reconsideration.
+  - Bond drops below Partners tier (relationship decay at
+    `social.rs:60`'s `check_bonds` already maintains this).
+  - Cat transitions out-of-season (seasonal fertile-window
+    predicate, from `weather.rs` + life-stage).
+  - Layer 1 aspiration drops (cascade) → Pairing idles but does
+    not break the bond; an elder cat or a mastery-pivoted cat can
+    still hold `Mates`-tier bond, just stops *working toward*
+    reproduction.
+- **Character expression (§0.4).** *Which shape* courtship takes
+  says who each cat is. The Pairing activity doesn't prescribe
+  behavior — it biases the DSE weights of existing actions the
+  cat already scores:
+  - Playful cat initiates play-bouts and chase-games with partner
+    (Wander + Socialize weighting).
+  - Diligent cat provisions partner (Hunt targeting partner's
+    food-preference / Cook directed at shared Stores).
+  - Bold cat defends partner territory (Patrol + Fight weighting
+    scoped to partner's occupied tiles).
+  - Affectionate cat allogrooms constantly (Groom-other weight
+    multiplier).
+  No new mechanics are needed for any of these — they fall out of
+  Layer 2 as a weight modifier across the existing DSE set. This
+  is §0.4's "mechanics must express character" filter passing
+  cleanly: the same Pairing Intention produces four different
+  observable arcs for four different personalities.
+
+**Layer 3 — `MateWithGoal`**: a new
+`Intention::Goal(mating_event_completed)` (§L2.10.5).
+
+- **Scope.** A single completed mating event. Replaces today's
+  `DispositionKind::Mating` + `build_mating_chain`
+  (`disposition.rs:1873–1919`).
+- **Strategy.** `SingleMinded` — the classic goal-shaped default.
+  Drop on partner invalidation (moved out of range, died,
+  re-partnered) or `GoapPlan::replan_count ≥ max_replans`
+  (`goap_plan.rs:103`).
+- **Persistence tier.** **High** — Finish-Him logic per §7.4. A
+  courtship sequence near-completion (partner in adjacent tile,
+  allogrooming already underway) shouldn't restart over marginal
+  score deltas elsewhere. Patience multiplier from §7.4 footer
+  applies.
+- **Firing conditions** (evaluator gates Layer 3 as a candidate
+  Intention only when all hold):
+  - Layer 1 `ReproduceAspiration` is active.
+  - Layer 2 `PairingActivity` is active with a specific partner
+    (bond ≥ `Partners`).
+  - Both cats satiated (hunger + energy above `SimConstants`
+    thresholds; sourced from `needs.rs`).
+  - Both cats inside seasonal fertile window.
+  - Partner in §5.6.3 sensory range via the sensing pipeline.
+- **Executes.** The existing 4-step chain
+  (`MoveTo → Socialize → GroomOther → MateWith`) — **behavior
+  preserved**, just re-parented into the §L2.10.4 Intention
+  framework. GOAP plans from the goal state naturally per Jeff
+  Orkin (§L2.10.9 cross-ref); the chain-driven shape of the
+  execution unit remains chain-driven, only the commitment layer
+  changes.
+- **Completes.** Successful `MateWith` step → `pregnancy.rs`
+  (existing system) hooks in → post-consequence cascade begins.
+
+The three layers compose cleanly because Rao & Georgeff's
+commitment vocabulary was designed for exactly this kind of
+nesting: `INTEND(INTEND(φ))` is AI4 (commitment carries through
+nested intentions) and CI1 (strong realism at each layer
+independently). L1's horizon is years; L2's is seasons; L3's is
+ticks. Same vocabulary, three orders of magnitude.
+
+#### §7.M.2 Post-consequence cascade — elastic failure at three timescales
+
+§0.2 elastic failure applies at each layer's timescale:
+
+- **Successful mating** → `pregnancy.rs` system takes over for the
+  pregnant cat (existing). Layer 1 aspiration doesn't drop — a
+  cat can have multiple litters in its reproductive window;
+  aspiration persists until the window closes or grief/conflict
+  drops it. Post-partum, a `RaiseOffspringAspiration` (nested
+  inside or adjacent to `ReproduceAspiration` — §7.7.1 conflict
+  class TBD) emits Caretake Intentions; the partner's aspiration
+  shifts toward a provisioner role via personality-weighted pick
+  (diligent → Hunt-biased; compassionate → Caretake-biased).
+- **Partner death** → Layer 2 Pairing's `still_goal` proxy drops
+  immediately (the partner-reference invalidates); Layer 3 never
+  fires (firing condition unsatisfied). Layer 1 receives §7.7.b
+  grief event — reconsideration is personality-weighted:
+  high-romantic-attachment cats more likely to drop into
+  grief-celibacy; socially-resilient cats more likely to seek a
+  new partner after a mourning interval; parental cats more
+  likely to care-pivot into surviving offspring (if any).
+- **Seasonal fertile-window close** → Layer 2 idles (Activity
+  persists but `still_goal` evaluates low on the fertile-window
+  axis); Layer 3 stops firing as a candidate. Layer 1 persists.
+  When the window reopens, Layers 2 and 3 resume without Layer 1
+  ever having been disturbed — the three-layer shape is what
+  gives cats multi-season seasonal patience naturally.
+- **Aspiration conflict** (§7.7.1) — e.g., a mastery-arc
+  identity-pair — drops Layer 1 on the incompatibility event.
+  Layer 2 cascades to idle but doesn't force a bond downgrade;
+  the cat can still hold `Mates`-tier bond, just stops working
+  *toward* reproduction. Re-prioritized cats who never had
+  kittens with a long-term partner are a legitimate observable
+  character arc; the architecture allows it.
+
+Every failure mode above is elastic (§0.2): failure propagates
+consequence at the appropriate timescale rather than terminating
+the arc abruptly. A bereaved cat doesn't hard-stop
+relationship-seeking; it drifts through a grief interval. A
+seasonal cat doesn't forget its partner; it suspends active
+courtship. A conflicted cat doesn't break its bond; it
+de-prioritizes reproductive expression within it.
+
+#### §7.M.3 Why this solves the gate-starved Mate observation
+
+Iter-2 instrumentation (`docs/balance/social-target-range.report.md`):
+Mate scored 0% of snapshots under the range=25 treatment because
+`has_eligible_mate` hard-gated the DSE on binary partner presence.
+When no `Partners+`-tier bond existed, Mate was simply not a
+candidate, and the cat's scoring layer had no signal that
+partner-seeking was relevant. Under the three-layer design:
+
+- **Layer 1 is always active for reproductive cats.** The
+  aspiration never hard-gates on partner presence — its
+  expression when no partner exists *is* partner-seeking behavior
+  (Socialize toward cats with high romantic-potential via
+  §6.5.1's fondness + novelty weights, Wander biased toward
+  under-explored social space). The aspiration's score never
+  drops to 0 on bond-tier absence; only its concrete
+  intention-emissions shift.
+- **Layer 2 fires once bond ≥ Partners.** The aspiration's
+  partner-seeking behavior drives bond progression (fondness /
+  romantic drift at `social.rs:100–175`). The feedback loop
+  closes naturally: aspiration → proximity → social event →
+  bond advance → Layer 2 activation.
+- **Layer 3's strict firing conditions are fine.** Mating is a
+  rare ecological event by design — both cats fertile, both
+  satiated, both in proximity. Low firing frequency is correct.
+  The bug was never Layer 3's gating; it was the absence of
+  Layers 1 and 2 to drive cats toward the conditions that make
+  Layer 3 fireable.
+
+**Ecological viability canary (per `CLAUDE.md` Balance
+Methodology).** Hypothesis: under the three-layer design,
+seed-42 `--duration 900` produces ≥3 matings and ≥2 surviving
+kittens from a typical starter colony. Falsifiable via A/B soak
+diff when implementation lands. This becomes the operational
+version of the CLAUDE.md §Canaries "Generational continuity"
+continuity-canary, measured against the concrete substrate
+resolution committed here.
+
+#### §7.M.4 Belief proxies at each layer (§12.3 grounding)
+
+§12.3 names three belief proxies (`achievement_believed`,
+`achievable_believed`, `still_goal`) as Clowder's substitutes for
+Rao & Georgeff's formal Belief store. Each layer of the Mating
+architecture grounds all three:
+
+| Layer | `achievement_believed` | `achievable_believed` | `still_goal` |
+|---|---|---|---|
+| L1 `ReproduceAspiration` | Aspiration horizon exhausted (reproductive window closed; already-raised-offspring count crosses personal threshold) | Life-stage still reproductive; body-zone reproductive integrity intact | Personality-weighted grief / celibacy / conflict events drop the goal |
+| L2 `PairingActivity` | Not applicable for Activity-shaped Intentions (no terminal goal state) | Partner still present; partner in §5.6.6-attenuated sensory range; bond ≥ Partners | Romantic + fondness toward partner above retention threshold; `With<Fertility>` AND `Fertility.phase ∉ {Anestrus, Postpartum}` per §7.M.7.6 (Tom-sided cats at L2 drop on `season == Winter` only) |
+| L3 `MateWithGoal` | `MateWith` step completed successfully (pregnancy chance rolled) | `replan_count < max_replans`; target partner still exists; **at least one partner carries `Fertility` with `phase ∉ {Anestrus, Postpartum}`** (hard gate per §7.M.7.6); per-pair §6.5.2 fertility-window soft gate ≥ `l3_fertility_firing_threshold` | Inherits from L2 (OpenMinded outer layer drops cascade down L3's SingleMinded inner) |
+
+> Fertility predicates above expand per §7.M.7; gender-to-role
+> mapping is canon per §7.M.7.4 (Queens and Nonbinaries carry
+> `Fertility`, Toms do not); the L3 hard gate is **asymmetric**
+> ("at-least-one gestator in non-`{Anestrus, Postpartum}` phase")
+> rather than symmetric.
+
+No new belief-proxy mechanism is added — §12.3's catalog is
+sufficient as designed. The three layers are inline use of the
+existing vocabulary, which is the load-bearing proof that
+§L2.10 / §7 / §12 compose as intended: the hardest case the
+substrate will face (multi-timescale nested commitment) closes
+without extension.
+
+#### §7.M.5 Cascades into §7.3, §7.4, §L2.10.7
+
+The "TBD" cells in §7.3 and §7.4 are resolved in those tables
+directly — see rows for `ReproduceAspiration`, `PairingActivity`,
+`MateWithGoal`. Summary:
+
+- §7.3 strategy: OpenMinded / OpenMinded / SingleMinded.
+- §7.4 persistence tier: High / Medium / High.
+- §7.4 completion_fraction: `elapsed_seasons /
+  reproductive_window_seasons` / `elapsed_ticks /
+  pairing_termination.ticks` / `chain.steps_completed / 4`.
+- §L2.10.7 Mate row: `SpatialConsideration` curve applies to
+  Layer 3 MateWith's travel-to-partner step and Layer 2
+  Pairing's proximity-bias term. Layer 1's partner-seeking uses
+  the broader §6.5.2 `Mate` target-selection consideration set
+  (romantic + fondness + distance + fertility-window) against
+  all reachable cats, not a narrow distance-to-known-partner
+  projection.
+
+#### §7.M.6 The other relationship-embedded dispositions
+
+The Phase-1 audit flagged that similar tensions may apply to
+`Caretaking`, `Socializing`, and `Mentor target-taking`. The
+three-layer architecture *doesn't* automatically apply to them,
+and the short answer for each is:
+
+- **Caretaking** — already Activity-shaped in §L2.10.5's
+  classification (per §6.5.6's kitten-targeting). `Socializing`
+  and `Mentor` don't need a Layer-1 aspiration unless mastery-
+  stewardship or care-mastery becomes an explicit aspirational
+  arc (see the §10 "Substances / Mental Breaks / Recreation"
+  feature-design work and §7.7's mastery-aspiration framing).
+  When that happens, the three-layer shape ports directly.
+- **Socializing** — Activity at Layer 2; no Layer 3 needed. A
+  cat can have friendship aspirations (seed for Talk-of-the-
+  Town), but they're an optional future layer above the
+  already-existing Activity.
+- **Mentor** — Activity at Layer 2 (sustained teaching
+  relationship); Layer 3 would be individual `TeachSkill`
+  events, but today's mentor chain conflates Layer 2 and Layer
+  3 into one disposition. Splitting is deferred to the
+  aspiration-cataloging work (§7.7.1).
+
+In none of these cases is the ecological argument for inline
+resolution as strong as it is for Mating. Mating's
+ecological load-bearing (§7.M framing 1) is what pulled it into
+the substrate spec; the siblings stay in their stub docs until
+their own feature-design pass demands a similar resolution.
+
+#### §7.M.7 Fertility state specification
+
+§4.3's Reproduction block committed the `Fertility { phase:
+FertilityPhase }` marker shape (four-variant phase enum, mutually
+exclusive with `With<Pregnant>`, event-driven insert/remove) and
+deferred the **lifecycle** to this sub-section. §7.M.7 closes the
+deferral: when the marker enters and leaves a cat's archetype; how
+`phase` evolves while the marker is present; how `Gender` maps to
+reproductive role; how §7.M.4's belief proxies and §6.5.2's
+fertility-window consideration consume the state; and an expansion
+of the phase enum to **five variants** — a dedicated `Postpartum`
+variant is added alongside the original four `{Proestrus, Estrus,
+Diestrus, Anestrus}`, scoring-equivalent to `Anestrus` but
+narratively and log-query distinguishable.
+
+##### §7.M.7.1 Lifecycle (insert, remove, recover)
+
+| Event | Action | Author system | Phase on insert |
+|---|---|---|---|
+| Young → Adult life-stage transition (Queen / Nonbinary only) | Insert `Fertility` | `tick:growth.rs::update_life_stage_markers` (same system that maintains `Kitten/Young/Adult/Elder` per §4.3 LifeStage block; gender-gated) | Computed by §7.M.7.2 at transition tick |
+| Young → Adult life-stage transition (Tom) | No-op | — | — |
+| Adult → Elder life-stage transition | Remove `Fertility` if present | `tick:growth.rs::update_life_stage_markers` | — |
+| `event:MateConceived` | Remove `Fertility` atomically from the gestating partner; `Pregnant` replaces | `pregnancy.rs` (conception path, updated to select gestation-capable partner per §7.M.7.4) | — |
+| `event:KittenBorn` | Re-insert `Fertility` on the birthing mother | `tick:fertility.rs::handle_post_partum_reinsert` | `Postpartum` (dedicated phase; auto-transitions to normal cycle after `fertility_post_partum_recovery_ticks` elapse) |
+| Cat dies | Entity despawn removes marker implicitly | — | — |
+
+The Adult→Elder removal is new substrate behavior. Today's
+`has_eligible_mate` (`mating.rs:102–114`) permits Elder cats to
+mate; the refactor tightens this per §7.M.1 L1 ("Life-stage
+transition into Elder — reproductive window closed; arc terminates
+cleanly"). This is the ai-substrate framing principle in action:
+the old gate is a first-pass artifact, not a constraint. Balance
+Methodology applies — the drift from "Elders mate" to "Elders
+don't mate" is part of §7.M.7.8's hypothesis.
+
+##### §7.M.7.2 Phase transition function
+
+Phase is a **pure function** of three inputs, evaluated per-cat at
+`fertility_update_interval_ticks` cadence by `fertility.rs`:
+
+```
+phase(cat) = phase_from(
+    cycle_tick:  (current_tick + cat.fertility.cycle_offset)
+                 % fertility_cycle_length_ticks,
+    season:      time.season(&config),
+    post_partum: cat.fertility.post_partum_remaining_ticks,
+)
+```
+
+Evaluation order (first match wins):
+
+1. `season == Winter` → `Anestrus`.
+2. `post_partum > 0` → `Postpartum` (and `post_partum -= interval`).
+3. `cycle_tick < proestrus_end` → `Proestrus`.
+4. `cycle_tick < estrus_end` → `Estrus`.
+5. otherwise → `Diestrus`.
+
+Where `proestrus_end = cycle_length × proestrus_fraction` and
+`estrus_end = cycle_length × (proestrus_fraction +
+estrus_fraction)`. The `Diestrus` remainder is
+`cycle_length × (1 - proestrus_fraction - estrus_fraction)`.
+
+`Gender` is absent from the input vector because this function only
+runs for cats that already carry `Fertility` — the marker's
+presence *is* the gender gate (§7.M.7.4: Queens + Nonbinaries have
+the marker, Toms do not). The function is gender-agnostic at this
+layer; the gender filter lives in the §7.M.7.1 Adult-entry insert
+path, not in the transition function.
+
+The function is **pure** (same inputs → same phase) and
+**deterministic** (all inputs are either tick-derived,
+season-derived, spawn-immutable, or event-stamped). Two soaks with
+matching seed and matching `SimConstants` produce byte-identical
+fertility traces.
+
+`post_partum_remaining_ticks` is the only mutable per-cat state
+beyond `cycle_offset`. It lives on the `Fertility` component
+alongside the phase field; it's initialized to
+`fertility_post_partum_recovery_ticks` on `KittenBorn` re-insert
+and decremented every update tick until zero, after which it stays
+at zero and rule 2 above falls through to rule 3 onward.
+
+##### §7.M.7.3 Cycle parameters (new `SimConstants` tunables)
+
+Proposed initial values for a new `FertilityConstants` block on
+`SimConstants` (implementing PR may flatten to `fertility_*` fields
+to match the existing flat-field convention):
+
+| Field | Type | Default | Meaning |
+|---|---|---|---|
+| `cycle_length_ticks` | `u32` | `10_000` | Full cycle = half a season at `ticks_per_season = 20_000`. Each non-winter season sees ~2 full cycles per gestating cat. |
+| `proestrus_fraction` | `f32` | `0.15` | 1,500 ticks of rising receptivity per cycle. |
+| `estrus_fraction` | `f32` | `0.20` | 2,000 ticks of peak receptivity per cycle. |
+| `diestrus_fraction` | `f32` | `0.65` | Implied: `1.0 - proestrus - estrus`. 6,500 ticks refractory per cycle. Validated at `SimConstants::validate()`, not a free-floating field. |
+| `post_partum_recovery_ticks` | `u32` | `5_000` | Quarter-season forced `Postpartum` phase post-birth. |
+| `update_interval_ticks` | `u32` | `100` | Phase refresh cadence — matches needs-update cadence. Coarse enough to skip most ticks; fine enough not to jitter scoring. |
+| `cycle_offset_seed_mix` | `u64` | `0x9E37_79B9_7F4A_7C15` | Golden-ratio constant mixed into entity-id to derive per-cat `cycle_offset`. Deterministic, reproducible across seeds. |
+| `l3_fertility_firing_threshold` | `f32` | `0.15` | Soft-gate cut below which L3 `MateWithGoal` is not enumerated as a candidate Intention. See §7.M.7.6. |
+
+**`FertilityPhase` enum expansion — 4 → 5 variants.** The prior
+§4.3 commitment listed four phases `{Proestrus, Estrus, Diestrus,
+Anestrus}`. §7.M.7 adds a dedicated fifth `Postpartum` variant
+(nursing interval post-birth). `Postpartum` scores identically to
+`Anestrus` in §7.M.7.5's receptivity mapping (both `0.0`), but is
+narratively and for log-query purposes distinguishable —
+environmental (winter) vs biological (post-birth) suppression are
+different phenomena, and narrative templates / event filters
+should be able to treat them as such.
+
+The existing `mating_fertility_{spring,summer,autumn,winter}`
+multipliers (`ScoringConstants`) are **retained**. Winter's `0.0`
+is now belt-and-braces with the `Anestrus` phase gate;
+Spring/Summer/Autumn's `1.0/0.55/0.20` remain as **secondary
+environmental modulation** on the §6.5.2 Logistic output. The
+phase gate enforces biology; the season multiplier tunes ecology
+(Autumn still produces fewer matings than Spring even when a
+gestator is in Estrus on both).
+
+##### §7.M.7.4 Reproductive roles (canon)
+
+Clowder canon maps `Gender` to reproductive capacity via a small
+fixed table. **No separate biological-sex axis is introduced** —
+the absence is load-bearing for the simulation's identity.
+
+| Gender | Gestates | Sires | Cycles, carries `Fertility` | Typical phase trajectory |
+|---|---|---|---|---|
+| `Queen` | ✓ | — | ✓ | Proestrus → Estrus → Diestrus, repeating; Winter → Anestrus; post-birth → Postpartum |
+| `Tom` | — | ✓ | — | no cycle; no marker; implicit "always available in-season" receptivity via §7.M.7.5 fallback |
+| `Nonbinary` | ✓ | ✓ | ✓ | Same as Queen; eligible to be chosen as the gestator *or* the sirer of any pairing (magical-realism wildcard) |
+
+Interpretation:
+
+- **Toms do not carry `Fertility` at any life-stage.** Their
+  reproductive activity is always-on in non-winter seasons
+  (mirroring felid biology — toms respond to partner estrus rather
+  than cycling themselves). `Q<_, With<Fertility>>` excludes every
+  Tom by construction.
+- **Queens and Nonbinaries cycle identically** under §7.M.7.2. No
+  NB-specific rule; the cycling system doesn't distinguish them.
+- **`resolve_mate_with` needs an update.** Today's assignment
+  (`commands.entity(cat_entity).insert(Pregnant::new(...))` at
+  `disposition.rs:3053` and `goap.rs:1861`) lands `Pregnant` on
+  whoever ran the Mate action — which can be a Tom, producing a
+  pregnant Tom. The implementing PR for §7.M.7 picks the
+  gestation-capable partner (Queen or NB) as the `Pregnant` target.
+  For Queen×Queen / Queen×NB / NB×NB pairs, today's
+  initiator-gestates behavior is preserved (the cat who ran the
+  action gets `Pregnant`). For Tom-included pairs, the non-Tom
+  partner gestates. Tom×Tom pairs fail §7.M.7.6's hard gate and
+  never reach the Mate step, but the assignment logic must be
+  robust anyway — defensive fallback returns no-pregnancy.
+
+The role table sits inside `fertility.rs` and the updated
+`resolve_mate_with` as a two-line helper:
+
+```rust
+fn can_gestate(gender: Gender) -> bool { gender != Gender::Tom }
+fn can_sire(gender: Gender) -> bool    { gender != Gender::Queen }
+```
+
+Future-Gender-variant extensibility (e.g., magical alterations) is
+a one-line edit in two places — no substrate refactor.
+
+##### §7.M.7.5 Signal mapping for §6.5.2 `fertility-window`
+
+The per-target fertility-window consideration (§6.5.2 `Mate` row)
+reads the target cat's Fertility state and maps to a receptivity
+scalar before the Logistic curve. Two cases:
+
+```
+fertility_scalar_for(target, season) =
+    if target has Fertility {
+        match target.Fertility.phase {
+            Anestrus   => 0.0,
+            Postpartum => 0.0,
+            Diestrus   => 0.1,
+            Proestrus  => 0.5,
+            Estrus     => 1.0,
+        }
+    } else {
+        // Tom target per §7.M.7.4 — no cycle, implicit always-on
+        // in non-winter; Anestrus-equivalent in winter.
+        if season == Winter { 0.0 } else { 1.0 }
+    }
+```
+
+The scalar is multiplied by the environmental factor
+`mating_fertility_{season}` before entering the §2.3 Logistic:
+
+```
+signal = fertility_scalar_for(target, season)
+       × scoring.season_fertility(season)
+curve  = Logistic(steepness=10, midpoint=0.5)
+axis   = curve.evaluate(signal) × 0.20   // weight per §6.5.2
+```
+
+With the Logistic midpoint at `0.5` and steepness `10`, Diestrus
+scores `~0.02` (near-zero contribution), Proestrus scores `~0.5`
+(inflection), Estrus scores `~0.99` (near-full contribution), and
+Anestrus + Postpartum both pin to `0.0`. A non-winter Tom target
+scores `~0.99` — behaviorally equivalent to "always available."
+The multiplicative season factor preserves today's tuning hooks
+without double-gating.
+
+Anestrus and Postpartum share the `0.0` scoring but differ
+narratively and for log analysis — Anestrus is environmental
+(season-driven, colony-wide), Postpartum is biological (per-cat,
+birth-driven). Narrative emission and `events.jsonl` filtering can
+distinguish them; scoring treats them identically.
+
+##### §7.M.7.6 §7.M.4 belief-proxy wire-up (hard + soft gates)
+
+The §7.M.4 table cells that reference "seasonal fertile window" are
+replaced with concrete `Fertility.phase` predicates:
+
+| Layer | Cell | Wire-up |
+|---|---|---|
+| L2 `PairingActivity` | `still_goal` (gestating partner) | Was: "cat still inside fertile window." Now: if `With<Fertility>`, then `Fertility.phase ∉ {Anestrus, Postpartum}`; if no Fertility (Tom-sided cat at L2), then `season != Winter`. Drops at Winter onset and for the post-partum interval; resumes without touching L1. |
+| L3 `MateWithGoal` | firing-condition **hard gate** | At least one partner in the pair is gestation-capable (Queen or NB) with `Fertility.phase ∈ {Proestrus, Estrus, Diestrus}` (i.e., `∉ {Anestrus, Postpartum}`). Formally: `∃ p ∈ pair : With<Fertility>(p) ∧ p.Fertility.phase ∉ {Anestrus, Postpartum}`. Tom×Tom fails unconditionally. Winter fails because every gestator is Anestrus. Elder pairs fail because Elder removes Fertility per §7.M.7.1. Post-birth pairs fail until the mother's `Postpartum` interval elapses. |
+| L3 `MateWithGoal` | firing-condition **soft gate** | Geometric mean of per-partner §7.M.7.5 scalars: `firing_strength = sqrt(fertility_scalar_for(a, season) × fertility_scalar_for(b, season))`. Tom partners contribute their Tom-fallback scalar. Below `l3_fertility_firing_threshold` (§7.M.7.3 default `0.15`), L3 is not enumerated as a candidate Intention; above, enters the DSE score pool normally. |
+| L3 `MateWithGoal` | `still_goal` | Inherits from L2 — Anestrus / Postpartum onset on the gestating side cascades L2 drop cascades L3 drop per §L2.10.5 OpenMinded-outer/SingleMinded-inner layering. |
+
+The hard+soft split matches Mark's behavior-mathematics framing:
+hard-exclude the impossible, soft-weight the improbable. A pair
+with every gestator in `{Anestrus, Postpartum}` is biologically
+incapable of conception (hard); a pair with a Diestrus gestator
+is capable but low-probability (soft). Cats paired with a Diestrus
+gestator who score high enough on the other axes (romantic +
+fondness + proximity) can still attempt mating at rare moments;
+biology's probabilistic realism is expressed through the Logistic,
+not through a binary gate.
+
+**Asymmetric gate, symmetric query.** The hard gate reads as "at
+least one" rather than "both" because only the gestator's cycle
+state limits conception; the sirer's availability is modeled
+separately by the soft gate (via their Tom-fallback or own-cycle
+scalar). This keeps L3 firing viable for any pair with a Queen/NB
+in at-least-Proestrus, regardless of the partner's gender.
+
+##### §7.M.7.7 Authoring system
+
+Resolves §4.6's `<TBD per §7.M.7>` placeholder.
+
+- **`src/systems/fertility.rs`** *(new file)* → `Fertility`.
+  - `tick:fertility.rs::update_fertility_phase` —
+    `update_interval_ticks` cadence; iterates `Q<&mut Fertility,
+    With<Adult>>` (Toms are excluded by construction per §7.M.7.4);
+    applies §7.M.7.2 transition function.
+  - `tick:fertility.rs::handle_post_partum_reinsert` — listens for
+    `KittenBorn` events; re-inserts `Fertility` on the birthing
+    mother with `phase = Postpartum` and
+    `post_partum_remaining_ticks = fertility_post_partum_recovery_ticks`.
+    Postpartum auto-transitions back to cycle-based rules once the
+    counter expires (§7.M.7.2 rule 2 falls through).
+  - `tick:fertility.rs::handle_conception_remove` — listens for
+    `MateConceived` events; removes `Fertility` from the gestating
+    partner (atomic with `Pregnant` insert by `pregnancy.rs`).
+  - Adult-entry insert and Elder-exit remove live in `growth.rs`
+    per §4.3 LifeStage-block authoring convention — `fertility.rs`
+    reacts to life-stage transitions but doesn't author the
+    markers. The Adult-insert is **gender-gated**: `growth.rs`
+    inserts `Fertility` only for cats with `gender != Tom`; Toms
+    skip this path entirely.
+
+Rejected alternatives:
+
+- **Co-locate in `needs.rs`** — wrong concern. Needs are
+  decay/satiate; fertility is cyclical.
+- **Co-locate in `pregnancy.rs`** — tangles two state machines.
+  Pregnancy already owns a gestation-stage machine; adding cycle
+  management thickens an already-complex file.
+- **Compute per-consumer inline** — no savings. Per-cat variation
+  (`cycle_offset`) has to live somewhere spawn-immutable anyway;
+  at that point the component exists, just pretending not to.
+  Narrative emission of phase transitions requires per-tick change
+  detection which is a system regardless. DRY fails.
+
+##### §7.M.7.8 Verisimilitude hypothesis
+
+Per CLAUDE.md Balance Methodology, this substrate change ships with
+a testable ecological claim for the landing PR.
+
+- **Ecological claim.** Real felines exhibit estrous cyclicity —
+  receptive phases (proestrus + estrus) occupy roughly 30–35% of
+  cycle ticks; the non-receptive refractory (diestrus) dominates
+  the remainder. Gestating cats (Queens + Nonbinaries in Clowder
+  canon) are seasonally polyestrous with a winter anestrus.
+  Forcing mating to cluster in gestator-receptive phases should
+  produce more narratively legible courtship–mating arcs (cats
+  visibly "come into season" rather than firing any-tick-in-Spring)
+  without reducing generational continuity.
+- **Predicted direction + magnitude** (seed-42 `--duration 900`
+  release soak, A/B against today's `has_eligible_mate`):
+  - **Mating events per soak: ↓ 30–55%.** Hard gate ("at least one
+    gestator in non-Anestrus / non-Postpartum phase") opens for
+    ~65% of non-winter cycle ticks per gestating cat — Proestrus +
+    Estrus + Diestrus together. Soft-gate Logistic clustering
+    shifts events into Proestrus/Estrus (cumulative ~35% of cycle
+    ticks). Elder cats no longer eligible. Post-partum gestators
+    absent for ~5,000 ticks each. Tom×Tom pairs — previously
+    permitted by the symmetric today-gate and producing
+    anatomy-blind pregnancies — now fail the hard gate cleanly.
+  - **Kittens per soak: stable to ↓ 15%.** If `pregnancy.rs`'s
+    per-mating conception roll is fixed-probability, kittens scale
+    with matings. If conception is raised as follow-on to preserve
+    the Generational-continuity canary, kittens stay flat — see
+    acceptance below.
+  - **Bond progression (fondness / romantic / Partners-tier
+    count): stable to slightly ↑.** Bond evolution (`social.rs:
+    100–175`) is season-agnostic today and stays so; the phase
+    gate only fires at the mating-act scoring layer. Near-miss
+    "courting" arcs during Diestrus accumulate fondness normally.
+  - **Mating events clustered into season-week bands per
+    gestator.** Measurable via `events.jsonl` `MateWith`
+    timestamps — under today's flat gate, events are uniform in
+    non-winter ticks; under the phase gate, events bunch into
+    ~2000-tick Estrus windows ~2×/non-winter-season per gestating
+    cat, desynchronized across the colony via per-cat
+    `cycle_offset`.
+  - **`Pregnant` never lands on a Tom.** The prior code's
+    anatomy-blind assignment is corrected; Tom entities should
+    show zero `Pregnant` insert events in logs. Implementing PR
+    should add a debug assertion on the insert site.
+- **Canary.** Generational continuity (≥1 surviving kitten per
+  seed-42 `--duration 900`) **must hold**. If it fails, the tuning
+  levers are (a) raise `pregnancy.rs` per-mating conception
+  probability, or (b) reduce `cycle_length_ticks` so cycles repeat
+  more often. The lever is *not* reverting the substrate — the
+  substrate shape is load-bearing for the three-layer BDI and the
+  §6.5.2 consideration curve.
+- **Acceptance.** Direction matches prediction on all five
+  metrics; magnitude within 2× on mating-events-per-soak;
+  Generational-continuity canary passes; Starvation canary at 0;
+  ShadowFoxAmbush canary ≤ 5. A/B headless soaks with matching
+  `commit_hash` on both logs before/after.
+
+##### §7.M.7.9 Code-change implications (for the landing PR)
+
+This sub-section commits spec shape, not code. The implementing PR
+(bundles with open-work cluster A, entry #5 — A1 IAUS refactor)
+makes these concrete changes; listed here so the substrate
+contract is unambiguous:
+
+- **`src/systems/fertility.rs`** — new file; three tick systems
+  per §7.M.7.7.
+- **`src/steps/disposition/mate_with.rs::resolve_mate_with`** —
+  partner-selection fix per §7.M.7.4: return `Some((gestator,
+  litter_size))` where `gestator = can_gestate(a) ? a : b` with
+  initiator-preference on ties. For Tom×Tom, return `None`.
+- **`src/systems/growth.rs::update_life_stage_markers`** —
+  gender-gated `Fertility` insert on Young→Adult (skip Toms);
+  unconditional `Fertility` remove on Adult→Elder.
+- **`MateConceived` / `KittenBorn` event vocabulary** — if not
+  already emitted, added to wire up `fertility.rs`'s event
+  listeners.
+- **`src/resources/sim_constants.rs`** — new
+  `FertilityConstants` block (or flat `fertility_*` fields to
+  match existing style) per §7.M.7.3.
+- **`src/ai/mating.rs::has_eligible_mate`** — hard-gate amendment
+  per §7.M.7.6 (at-least-one gestator in non-Anestrus /
+  non-Postpartum phase). This may dissolve entirely in the A1
+  IAUS refactor; the predicate content moves into the DSE
+  definition regardless.
+
+The landing PR's `logs/events.jsonl` header will carry a new
+`commit_hash` *and* a different `constants` blob; the reference
+seed-42 soak must be re-baselined, and the verisimilitude
+hypothesis above evaluated against the new baseline.
+
+### §7.5 Maslow interrupt interaction
+
+Critical-need signals are **event-driven preemptions** per Mark
+ch 15 §"Event-Driven Recalculations" and §"Interrupting with an
+Event." They bypass the §7.2 reconsideration gate and the §7.4
+persistence bonus entirely; the replacement Intention installs
+with `Blind` commitment so it cannot itself be preempted by
+normal scoring until its achievement condition fires.
+
+This matches the existing `check_anxiety_interrupts` pipeline
+(`src/systems/disposition.rs:93`) — **no new path is added**;
+§7.5 just formally documents the placement and the exhaustive
+interrupt catalog.
+
+**Interrupt catalog.** Sourced from
+`src/systems/disposition.rs:180–253` (`InterruptReason` enum +
+`check_interrupt`). Five interrupts; three are flat-thresholded,
+one is personality-scaled, one is a computed-urgency signal.
+Exemptions are tracked per-DispositionKind at the category level.
+
+| Interrupt | Trigger | Replacement behavior | Exempt dispositions | Source |
+|---|---|---|---|---|
+| **CriticalHealth** | `health.current / health.max < critical_health_threshold` | Re-evaluate (anxiety-driven drop; no specific replacement Intention) | *None* — fires universally, including for Guarding. A cat below the health threshold must re-evaluate regardless of role. | `disposition.rs:202` |
+| **Starvation** | `needs.hunger < starvation_interrupt_threshold` | Re-evaluate | Resting, Hunting, Foraging — these *are* the solution path. | `disposition.rs:212` |
+| **Exhaustion** | `needs.energy < exhaustion_interrupt_threshold` | Re-evaluate | Resting, Hunting, Foraging (same reason as Starvation). | `disposition.rs:215` |
+| **ThreatDetected** | Sighted wildlife passing `cat_sees_threat_at`; `threat_urgency = 1 - (manhattan_dist / threat_urgency_divisor)` exceeds personality-scaled `flee_threshold_base + boldness · flee_threshold_boldness_scale` | `Flee` toward threat position, `Blind`-committed at install | Guarding — guards handle threats directly via the guard-threat detection range. | `disposition.rs:226` |
+| **CriticalSafety** | `needs.safety < critical_safety_threshold` | Re-evaluate | *None* — Guards are no longer exempt once safety is critical (recent change, see `disposition.rs:245` comment). | `disposition.rs:248` |
+
+**Boldness as interrupt modulator.** Bold cats have a higher
+`flee_threshold`, so threat detection must reach higher urgency
+before interrupting. This is the one personality-scaled interrupt;
+the other four are flat thresholds. Character-expressive future
+work (§0.4) can hook additional personality modulators here — e.g.,
+wounded-pride cats could lower their CriticalSafety threshold so
+they panic-retreat earlier.
+
+**Hunt-action carve-out.** Separate from the per-disposition
+exemption matrix, `src/systems/disposition.rs:135–138` protects
+**an active `Action::Hunt` step** from interruption even if the
+disposition is not category-exempt. This is a per-Action carve-out
+(not a per-Disposition one); semantically it prevents mid-pounce
+abandonment. The pipeline order remains:
+
+1. Maslow / anxiety interrupts (event-driven, bypass all gates) —
+   **except** Hunt-in-progress carve-out (line 135).
+2. §7.2 reconsideration gate (per-tick, strategy-dependent drop
+   check).
+3. §L2.10.6 softmax-over-Intentions for the challenger candidate.
+4. §7.4 persistence bonus applied to the current Intention's score.
+5. Compare challenger vs. `current + persistence_bonus`; preempt if
+   strictly greater.
+
+### §7.6 Monitoring cadence
+
+Per Mark ch 15 §"A Hybrid Approach": minimum-granularity polling
+plus event-driven interrupts for critical signals. Clowder's
+existing per-tick scoring cadence is the minimum-granularity layer;
+anxiety-interrupt events are the event-driven layer. Both are
+already in place.
+
+Mark's ch 15 benchmark of "human reaction time ≈ 240 ms / 12 frames"
+translates to Clowder's tick rate comfortably — the per-tick polling
+produces decisions within a Mark-appropriate responsiveness band
+without needing a separate reaction-time throttle. The persistence
+bonus + commitment strategy + retention threshold combination
+handles strobing at the scoring layer; timer-based throttling is
+not needed at the cat scale.
+
+### §7.7 Aspiration-level commitment (separate layer from §7.1–§7.6)
+
+Aspirations (`src/systems/aspirations.rs`) are **long-horizon
+Intentions that emit short-horizon Intentions.** Rao & Georgeff
+explicitly allow nested `INTEND(INTEND(φ))`; the same
+commitment-strategy vocabulary applies at both layers, but with
+different defaults and different reconsideration cadence.
+
+**Default strategy at the aspiration layer: `OpenMinded`.** At
+multi-season granularity, you *want* cats to reconsider. A cat
+stuck blind-committed to "become master hunter" through the death
+of its mate, the birth of its first kitten, and a prophetic vision
+telling it to tend herbs is not persevering — it's broken. The
+aspiration-level `OpenMinded` `still_goal` drop trigger is what
+makes midlife crises a first-class substrate feature rather than
+an absence of bug.
+
+**Aspiration reconsideration is event-driven, not timer-driven**
+(ch 15 §"Event-Driven Recalculations"). Per-tick re-evaluation of
+multi-year arcs *is* the strobing failure mode Mark warns about —
+just at a different timescale. The reconsideration gate runs only
+on the classes of "bowling balls" (ch 15 §"Building Decision
+Momentum") heavy enough to redirect a multi-year arc.
+
+> **Spec correction (2026-04-21):** a Phase-1 audit of the emitter
+> systems surfaced that several events named in the pre-correction
+> list do not exist in code. Specifically: death.rs has no per-
+> relationship grief events (generic-proximity + fated-bond-removal
+> only); fate.rs has only FatedLove / FatedRival (no Calling,
+> destiny modifier, or fated-pair-convergence as separate events);
+> mood.rs has no drift-threshold detection; aspirations.rs has
+> stagnation-abandon logic but no distinct plateau / achievement
+> signal. The enumeration below splits each class into **currently
+> emitted** (wirable today) and **aspiration emission debt** (what
+> the aspirations subsystem or the underlying emitter must add
+> before that class's reconsideration can fire).
+
+**The five reconsideration event classes:**
+
+##### §7.7.a Life-stage transitions
+
+- **Currently emitted.** `LifeStage` enum
+  (`src/components/identity.rs:31–36`) has four variants
+  (Kitten, Young, Adult, Elder). Three time-based transitions fire
+  today via age-check logic in `src/systems/growth.rs`:
+  Kitten→Young, Young→Adult, Adult→Elder. All three are valid
+  reconsideration triggers today.
+- **Aspiration emission debt.** None. Aspirations just need a hook
+  into the growth system's transition moment to observe these.
+  Note: the pre-correction plan listed "kitten → adult, adult →
+  elder" — the actual chain has three transitions (via Young),
+  not two.
+
+##### §7.7.b Grief cascade
+
+- **Currently emitted.** `src/systems/death.rs:124–185` emits two
+  distinct classes of grief event:
+  - *Generic-proximity grief* — any cat within
+    `grief_detection_range` of a death receives a mood penalty.
+    Not relationship-classified.
+  - *Fated-bond removal* — FatedLove / FatedRival component
+    stripped on partner's death, with a Danger-tier narrative line
+    ("The stars dim…" / "The challenge will never be answered…").
+  No per-relationship-class grief exists (no distinct "mate grief"
+  vs. "kitten grief" vs. "mentor grief" path).
+- **Aspiration emission debt.** death.rs needs to emit
+  relationship-classified grief events for aspirations to
+  meaningfully filter. A combat-mastery aspiration should redirect
+  on mate/kitten/mentor death specifically, not on any nearby
+  death. Candidate shape:
+  `CatDied { cause, deceased, survivors_by_relationship: HashMap<RelationshipKind, Vec<Entity>> }`.
+  This work is Talk-of-the-Town-adjacent (requires formal
+  relationship modeling beyond the current three-tier BondType)
+  and is named as Enumeration Debt §7.7.b.
+
+##### §7.7.c Prophetic visions (fate events)
+
+- **Currently emitted.** `src/systems/fate.rs:21–200` implements
+  two fate events — FatedLove assignment (stars-mark narrative at
+  line 131) and FatedRival assignment (lock-eyes narrative at
+  line 189). The pre-correction plan's "Calling," "destiny
+  modifier," and "fated-pair convergence" are not separate
+  emission surfaces in fate.rs today.
+- **Aspiration emission debt.** fate.rs needs an expanded event
+  vocabulary for aspiration-redirecting fate beyond mate/rival.
+  The Calling is named in `docs/systems/project-vision.md` and
+  `docs/systems/the_calling.md` (Aspirational per
+  `docs/wiki/systems.md`); wiring aspirations to respond to
+  Calling events requires Calling itself to emit events first.
+  Cross-cutting debt — tracked here as §7.7.c and duplicated
+  against `the_calling.md`'s own scope.
+
+##### §7.7.d Sustained mood-valence drift
+
+- **Currently emitted.** `src/systems/mood.rs:14–80` computes a
+  per-tick mood valence with decay-based modifiers (wounded pride
+  on low respect at line 59; contentment on physiological
+  satisfaction at line 70). The valence is a continuous scalar —
+  **there is no threshold-crossing or sustain-duration
+  detection**. Valence doesn't cross hysteresis bands; there's no
+  "drift sustained for N seasons" signal.
+- **Aspiration emission debt.** mood.rs needs a drift-detection
+  layer — e.g., "valence has been below X for N seasons AND the
+  cat's active aspiration's expected-mood-reward points the
+  opposite direction." This is the most design-heavy of the three
+  debts and should be its own balance-thread once the aspirations
+  catalog has per-arc valence targets. Named as §7.7.d.
+
+##### §7.7.e Skill-mastery plateau or achievement
+
+- **Currently emitted.** `src/systems/aspirations.rs:378–411`
+  already has an auto-abandon path on **stagnation + low
+  alignment** — effectively an `OpenMinded` `still_goal` drop
+  under the §7.7 framework. Partial coverage; semantically the
+  existing trigger is "you haven't made progress and you don't
+  care," not a dedicated plateau or achievement signal.
+- **Aspiration emission debt.** aspirations.rs needs distinct
+  *milestone* (arc-specific checkpoint reached) and *ceiling*
+  (skill-cap hit without further progression possible) signals.
+  Both differ semantically from the existing stagnation-abandon
+  and from the achievement-satisfies-aspiration normal drop.
+
+##### Summary
+
+Three of the five classes have non-trivial emission debt before
+aspiration reconsideration can fully fire: per-relationship grief
+(§7.7.b), fate-event vocabulary expansion (§7.7.c), and mood-drift
+threshold detection (§7.7.d). Life-stage transitions (§7.7.a) and
+aspiration-stagnation (§7.7.e partial) are wirable today. The
+aspirations follow-on epic consumes the wirable classes first and
+drives the emission debts in parallel.
+
+**Ch 15 Information Expiry at the sub-Intention layer.** The
+aspiration emits short-horizon Intentions biased by its projected-
+payoff-distance. A `ConfidenceConsideration` inside the
+aspiration-emitted DSE applies a `Logistic` or `Exponential`
+confidence-decay curve over projected-duration — Mark ch 15 Figure
+15.2 is the reference shape. *This is a DSE-layer mechanism, not a
+§7 commitment-layer mechanism.* Flagged here because aspirations
+consume it, but it lives inside `aspirations.rs` DSE construction,
+not in the commitment gate.
+
+**Crosswalk to §0 principles:**
+
+- *§0.3 (apophenia, long-term-relevance leg):* midlife crises are
+  peak apophenia fuel — the observer reads the arc. "She pursued
+  combat mastery, then her kitten died, now she tends the herb
+  garden." This is the substrate earning §0.3's long-term-relevance
+  leg by exposing coherent multi-year reversals rather than
+  flattening cats into interchangeable action loops.
+- *§0.4 (mechanics express character):* aspiration reconsideration
+  *is* character expression. A cat that redirects after grief is a
+  different cat than one that persists; the sim tells a different
+  story about them. Passes the §0.4 filter cleanly.
+- *§0.2 (elastic failure):* grief-driven aspiration change is the
+  failure-propagates-into-consequences shape §0.2 wants. The loss
+  doesn't terminate the arc — it redirects it.
+
+#### §7.7.1 Concurrent aspirations and conflict-check
+
+A cat holds an `AspirationSet` of zero-to-N concurrent aspirations.
+There is **no fixed N**; the bound is **mutual consistency**,
+directly from Rao & Georgeff's goal-consistency requirement (CI1/CI2
+— goals must be consistent; paper §3.2.2, see
+`docs/reference/bdi-rao-georgeff.md` §1). A new aspiration enters
+the set iff it is consistent with every aspiration already held.
+
+**Four conflict classes** (declared at aspiration authoring time,
+not runtime-inferred):
+
+| Class | Example | Resolution |
+|---|---|---|
+| Hard-logical — mutually exclusive end-states | "Achieve territorial dominance" vs. "Become pacifist mentor" | Rejected at adoption: cat cannot hold both. |
+| Hard-identity — incompatible life-paths | "Solitary wanderer" vs. "Colony coordinator" | Rejected at adoption. |
+| Soft-resource — compete for cat-hours but don't contradict | "Master hunter" + "Master gardener" | **Allowed.** Competition resolved at the emitted-Intention layer via normal softmax. |
+| Soft-emotional — tension but not contradiction | "Raise many kittens" + "Master combat" | **Allowed.** Tension is feature not bug (§0.4 — character expression); drops via normal §7.7 reconsideration events if sustained mood-drift fires. |
+
+Hard-logical and hard-identity conflicts are declared in a sparse
+compatibility matrix alongside the aspirations table in
+`src/systems/aspirations.rs`. Matrix default is *compatible*; only
+genuinely-contradictory pairs need listing. The matrix itself is
+Enumeration Debt (blocked on the aspiration catalog stabilizing —
+see Enumeration Debt section).
+
+**Runtime conflict-check at adoption:**
+
+```rust
+fn can_adopt(existing: &AspirationSet, candidate: &Aspiration) -> bool {
+    !existing.iter().any(|a| COMPATIBILITY.conflicts(a, candidate))
+}
+```
+
+No per-tick re-checking. Consistency holds by construction; the
+only way the set becomes inconsistent is via aspiration drift
+(§7.7 reconsideration events), and drift removes aspirations —
+never adds incompatibles.
+
+**Interaction with midlife crisis.** Reconsideration events operate
+on a **single aspiration at a time**, not the whole set. Grief
+over a kitten's death may drop the combat-mastery aspiration while
+leaving the herb-tending aspiration intact. The slot freed up can
+be filled by a new aspiration at the next life-stage transition or
+under a prophetic-vision event. One arc redirecting doesn't cascade
+the cat's whole identity.
+
+**Crosswalk to existing code.** `src/systems/aspirations.rs`
+currently uses domain-affinity scoring for aspiration *selection*
+(per-zodiac + personality). The compatibility matrix is a layer
+above that — affinity decides which aspirations *want* to be
+adopted; compatibility decides which *can* be. No scoring change
+needed, just an adoption gate.
+
+### §7.W Axis-capture and the warring self
+
+A second load-bearing pattern that §7's commitment vocabulary enables,
+parallel to §7.M's three-layer mating showcase. Where §7.M exercises
+the layering of Intentions across timescales, §7.W exercises the
+*semantic framing* of the Desire layer: Clowder permits the Desire
+set to contain genuinely conflicting pulls, and resolves the conflict
+at the Intention layer rather than the Desire layer. This unlocks
+**axis-capture** as a unified primitive for a class of phenomena that
+neither classical BDI nor classical IAUS names: compulsion, addiction,
+cruelty, fated pull, devotion, mastery, self-destructive spite. All
+of them are the same mechanism with different content.
+
+#### §7.W.0 Motivation — what neither framework natively handles
+
+Rao & Georgeff give us the commitment vocabulary (§7.1). Mark gives
+us the numeric composition machinery (§1–§3). Neither names a
+construct for *maligned* motives — desires that capture an agent's
+fulfillment pipeline while degrading its flourishing. Classical BDI's
+deliberation cycle includes a filter step that collapses Desires to a
+consistent Goal set; this is the mechanism that keeps a rational
+agent from simultaneously pursuing incompatible aims. IAUS, dually,
+is utility-as-number: axis values compete, highest wins, nothing in
+the architecture labels any axis as pathological.
+
+But the clinical reality of compulsion isn't "one desire won the
+filter." It's **the same action-execution loop that satisfies the
+compulsion continues to raise its future pull, even as the agent's
+overall situation degrades.** A sign-flip on the feedback term,
+essentially — ordinary drives are negative-feedback (satiation),
+compulsion is positive-feedback (sensitization). Neither BDI nor
+IAUS has a principled place to locate this sign flip, because
+neither has a register that is explicitly amoral and *retrospective*.
+
+Clowder's answer is to add exactly that register — the **fulfillment
+scalar** — and keep the Desire layer honestly inconsistent. The rest
+of §7.W unpacks the consequences.
+
+#### §7.W.1 Fulfillment as amoral retrospective scalar
+
+Rao & Georgeff themselves note that Desires may be inconsistent —
+"desires can be inconsistent with each other (wanting incompatible
+things is normal); goals are the consistent subset of desires the
+agent has chosen to actively pursue"
+(`docs/reference/bdi-rao-georgeff.md:20`). Classical BDI enforces
+consistency at the Desire→Goal filter. Clowder weakens the filter: a
+cat's Desires may remain inconsistent, and the competition happens at
+the scoring layer (per-tick DSE competition, §1.2) with final
+consistency only at the Intention layer (one enacted Intention per
+action horizon — an architectural necessity, since a cat can only do
+one thing at once).
+
+On top of that non-filtering Desire layer, Clowder adds a retrospective
+register:
+
+**Fulfillment** — a scalar, filled by any axis that successfully
+executed in the last window, regardless of valence. Spite-enforcement,
+kitten-grooming, Calling-trance, mastery-hunt, sensitization-capture,
+social-bond reinforcement all contribute. The framework itself is
+morally silent; the story of whether a cat is flourishing emerges from
+*which* axes are filling the bar and at what cost to the cat's other
+needs.
+
+Three per-axis dynamics drive the pathology surface:
+
+- **Decay modulated by source-diversity.** A cat whose fulfillment
+  inflow comes from many axes decays slower than a cat whose inflow is
+  narrow. Diversity-as-health is an emergent property, not a coded
+  flag. Compulsion produces narrow-source cats; mastery arcs produce
+  slightly-less-narrow-source cats (the mastery axis dominates but
+  social axes still contribute); well-integrated cats have the widest
+  spread.
+- **Sensitization.** Per-axis property (not global). An axis with
+  sensitization enabled has its weight *grow* with successful use —
+  the IAUS sign flip made explicit. Corruption-tainted axes sensitize;
+  ordinary axes don't. This is the knob that produces runaway
+  axis-capture; without it, any axis eventually saturates and the cat
+  moves on.
+- **Tolerance.** Per-unit fulfillment yield drops with repetition.
+  Partner to sensitization — together they produce the "needs more to
+  feel the same" signature. Cheap to implement, large narrative payoff.
+
+Specific curve shapes, coefficients, and the ordering between
+sensitization and tolerance are numeric-tuning balance-thread work
+(doc's line 24–29 scope discipline), not substrate spec.
+
+#### §7.W.2 Warring-self scoring — losing axes don't vanish
+
+The critical consequence of weakening the Desire→Goal filter: when
+one axis wins the tick, the losing axes *stay active*. Their pull
+persists; their fulfillment deficit accumulates. The cat hasn't
+decided that the losing desire doesn't matter — they just didn't act
+on it this tick.
+
+This lands in the existing mood cascade (`src/systems/mood.rs`)
+without architectural change: unrequited fulfillment-deficit on a
+still-active axis feeds the valence-drop pathway, which presents as
+*tension* or *ambivalence*. A cat with a captured axis winning
+repeatedly AND an active counter-axis starving is legibly torn — the
+architecture produces the signal, the narrative emitter reads it.
+
+The compulsion signature becomes mechanically visible: **narrow
+winning axis + active losing counter-axis + mood valence drop**.
+That's what distinguishes pathological capture from a cat who just
+likes doing one thing a lot. The hobbyist isn't starving a
+counter-axis; the addict is.
+
+#### §7.W.3 Second-order preferences collapse into first-order conflict
+
+Frankfurt-style second-order preferences ("I want to not want this")
+are a rich topic in philosophical accounts of addiction and agency.
+The natural question for a BDI-derived substrate is whether Clowder
+needs to represent preferences-over-preferences as a distinct
+mechanism.
+
+It does not. **The active-but-losing axis is the second-order
+preference.** The addict who wishes they didn't want heroin is
+mechanically a cat with an active anti-heroin axis that keeps losing
+to the pro-heroin axis. The architecture already contains the
+structural element the philosophical framing demands; no meta-
+cognition primitive is required.
+
+This is an explicit non-goal: Clowder does not implement
+preference-over-preferences as a separate store. The simpler
+architecture carries the same narrative payload. Cats don't need to
+*know* they're conflicted for the world to *show* them as conflicted —
+the mood cascade carries the signal, and the narrative emitter
+(§7.W.6 telemetry) can surface the winning/losing-axis pair directly.
+
+#### §7.W.4 Worked examples
+
+Two concrete instances of the axis-capture primitive, demonstrating
+that the mechanism is general across valence.
+
+##### §7.W.4(a) The Calling — externally-seeded, bivalent, time-limited
+
+`docs/systems/the-calling.md` already specifies a rare creative
+trance triggered by magic affinity + elevated mood + spirituality.
+Re-read through the axis-capture vocabulary, the Calling *is* the
+canonical existing instance of the primitive:
+
+| Calling property | Axis-capture vocabulary |
+|---|---|
+| Trigger conditions (affinity + mood + spirit threshold) | Externally-seeded axis activation |
+| "Refuses all interaction" during trance | Captured axis wins every tick; other axes active-but-losing |
+| Specific herb requirements within timeout | `Blind` commitment on means (see §7.1) |
+| 40–60 tick creation phase | Bounded capture window (not indefinite) |
+| Success → Named Object; failure → corruption spike | Bivalent resolution (positive / pathological outcomes share one mechanism) |
+| "Touched" identity post-success | Persistent identity modifier as capture residue |
+| `Shaken` 2000-tick cooldown post-failure | Recovery window from a pathological resolution |
+
+The Calling is not a separate Phase-6 mechanic waiting for its own
+architecture; it is the first-implemented instance of a general
+primitive. Seeing it this way changes the specification posture — new
+axis-captures (see §7.W.5 below) don't need new systems, they need
+new *content* plugged into the same mechanism.
+
+##### §7.W.4(b) The warmth split — healthy social axis-capture
+
+The `needs.warmth` axis currently in `src/systems/needs.rs` conflates
+two distinct phenomena: physiological body-heat (drained by weather
+and season, restored by hearth and den) and affective closeness
+(restored by grooming other cats, `src/steps/disposition/groom_other.rs:47`).
+The conflation means a cat near a hearth is immune to loneliness at
+the needs level — hearth-warmth and social-warmth fill the same bar.
+
+Under the axis-capture framing, the split is load-bearing: the
+warring-self dynamic of §7.W.2 requires that a cat be able to be
+physically warm and socially starving at the same time. Otherwise
+the losing-axis signal the narrative layer depends on is drowned out
+by the first shelter the cat finds.
+
+The split, specified in full in `docs/systems/warmth-split.md`:
+
+- `needs.temperature` — physiological, stays in Maslow L1 (§3.4),
+  drained by weather/season, restored by hearth/den/sleep/self-groom.
+- `social_warmth` — fulfillment-layer axis (§7.W.1), drained by
+  isolation/bond-loss, restored by grooming-others, huddling,
+  mating-partner proximity.
+
+This is the healthy-capture case, and it's the one that demonstrates
+the fulfillment primitive is not only for pathology. Ordinary social
+bonds are *also* axis-captures — a cat whose fulfillment comes
+predominantly from kin-grooming is doing exactly what the mechanism
+names, and it produces a flourishing life, not a compulsive one.
+The difference between the narc-cat and the devoted-mother is the
+*content* of the axis and the *breadth* of other contributing axes,
+not the mechanism.
+
+#### §7.W.5 Free consequences of the unification
+
+Four design affordances fall out of treating Calling / warmth /
+compulsion / mastery as the same primitive with different content.
+None require new systems; each is enumerated here so downstream work
+can draw on them without re-litigating.
+
+- **Dark Callings.** A Calling-shape gate with corruption-tainted
+  trigger conditions produces a compulsion to create something
+  destructive — a Named Curse, a shadow-pact object, a shadowfox
+  lure. Same trance mechanics, inverse valence. The existing corruption
+  spike failure mode (`the-calling.md:44–48`) is already the precursor
+  shape. Implementing dark Callings is Phase-6+ content; flagging it
+  here so the mechanism owners know the capacity exists.
+- **Persistent identity modifiers generalize beyond "Touched."**
+  Axis-capture residue accumulates on a cat's life trajectory.
+  Successful Calling produces "Touched"; narrow pathological capture
+  might produce "Hollow," "Marked," "Bitter"; sustained mastery
+  capture produces "Devoted" or a domain-specific title. These are
+  narrative-layer identity bits — no component change needed beyond
+  the existing `Touched` slot generalizing to an enum or tag-set.
+- **Sadist-play is not a new system.** A cat whose play axis has
+  sensitized around prey-distress as the fulfillment source is just
+  an axis-capture with particular content. No "sadism" system, no
+  "cruelty" trait — the mechanism produces the archetype from
+  sensitization + blind-on-means + narrow-source decay. The colony's
+  reaction (fear, banishment, shunning, attempts at redirection) is
+  the story the narrative system emits.
+- **Every capture is legible.** Because the losing-axis signal feeds
+  mood and telemetry (§7.W.6), the warring-self state is observable
+  to the narrative emitter. "Whisker-mother trembled at the workshop
+  doorway; her kitten cried in the den, but her paws moved of their
+  own accord" is free output from the mechanism — the capturing axis
+  and the starving counter-axis both have addresses.
+
+#### §7.W.6 Telemetry — losing-axis observation
+
+`CatSnapshot.last_scores` was extended in commit `290a5d9` to log
+all gate-open action scores per tick, not just the winner. §7.W
+relies on this: the narrative emitter reading only the winning
+disposition per tick cannot produce warring-self lines, because the
+counter-axis that makes the capture legible is the *losing* one.
+
+The instrumentation work of §11 therefore needs to preserve top-N
+losing-axis scores (suggested N=3) across snapshots, with a fixed
+schema column so narrative templates can bind to "axis X winning
+while axis Y losing above deficit-threshold." Not a new telemetry
+stream — an extension of the existing one. Exact N and
+deficit-threshold values are §11 instrumentation tuning.
+
+#### §7.W.7 Non-goals
+
+The following are deliberately *not* in §7.W's scope, and adding them
+would constitute architectural drift:
+
+- **Meta-cognition / preference-over-preferences as a separate store.**
+  Resolved by §7.W.3 (collapse into first-order conflict).
+- **Moral-valence labels on axes in the sim.** No "this axis is bad"
+  flag. The framework is morally silent (§7.W.1); story emerges from
+  content and colony reaction.
+- **Fulfillment as an override of survival needs.** Maslow pre-gate
+  (§3.4) remains supreme. Starving cats interrupt spite, interrupt
+  Calling trances at critical-need thresholds, interrupt mastery
+  pursuit for water. The `check_anxiety_interrupts` pipeline
+  (`src/systems/disposition.rs:93`) is unchanged. Fulfillment sits
+  *above* Maslow in priority order, not instead of it.
+- **Active avoidance of captured axes as a first-class mechanism.**
+  The cat doesn't "know" they're captured in any mechanical sense.
+  Avoidance emerges when the mood cascade's valence drop crosses an
+  interrupt threshold (§7.5 Maslow interrupt interaction), or when
+  another high-score axis wins the scoring competition and displaces
+  the capture. No "resist captured axis" primitive.
+
+#### §7.W.8 Cross-refs
+
+- §3.4 (Maslow pre-gate) — fulfillment sits above it; §7.W does not
+  weaken Maslow override.
+- §7.1–§7.3 — commitment strategies apply per-captured-axis.
+  Compulsion signature = narrow winning axis + `Blind` commitment on
+  means. Sadism-shape = `SingleMinded` on means, `OpenMinded` on
+  ends (Rao & Georgeff mixed-strategy licensing,
+  `docs/reference/bdi-rao-georgeff.md:88`).
+- §7.7 aspirations — a long-horizon aspiration can *be* a captured
+  axis over lifetime (healthy mastery) or become one by way of
+  sensitization (pathological). The aspiration layer is orthogonal
+  to capture valence.
+- §7.M mating — ordinary reproductive commitment is an axis-capture
+  in the healthy register, same mechanism.
+- §11 instrumentation — top-N losing-axis score logging (§7.W.6).
+- §12 belief proxies — "active-but-losing" is a scoring fact, not a
+  belief, so no belief-layer extension needed.
+- `docs/reference/bdi-rao-georgeff.md:20` — Rao & Georgeff on
+  Desire inconsistency; §7.W.1 extends this by not materializing
+  a separate consistent Goal set.
+- `docs/reference/bdi-rao-georgeff.md:88` — Rao & Georgeff mixed
+  commitment strategies; the per-axis commitment-strategy choice
+  §7.W relies on.
+- `docs/systems/the-calling.md` — canonical instance (§7.W.4(a)),
+  cross-linked from the Calling doc's "Relation to axis-capture"
+  section.
+- `docs/systems/warmth-split.md` — healthy-capture worked example
+  (§7.W.4(b)), cross-linked from the warmth-split doc's cross-refs.
+- `src/systems/mood.rs` — valence-drop pathway that converts
+  losing-axis deficit into legible tension (§7.W.2).
+- `src/steps/disposition/groom_other.rs:47` — the groom-other bleed
+  site where the warmth conflation lives today.
+
+### §7.8 Residuals — open questions from the original stub, resolved inline
+
+The four open `?` bullets from the pre-rewrite stub, with their
+resolutions so the history is preserved:
+
+- **"Does Mark treat momentum as a consideration (axis inside the
+  product) or as a post-composition bonus?"**
+  Resolution: **both, at different layers.** Post-composition
+  **persistence bonus** lives at the §7 commitment layer (§7.4),
+  applied to the active Intention's score during re-evaluation.
+  **Task-progress marginal utility** lives inside individual DSEs
+  as ordinary considerations (e.g., a Build DSE's "percent-complete"
+  axis gets a Logistic response curve from §2.1). Conflating the
+  two would force every DSE to reimplement the commitment-layer
+  gate or the commitment layer to leak DSE-specific progress
+  semantics.
+
+- **"What's the canonical decay curve for commitment strength?
+  (Likely not linear.)"**
+  Resolution: non-linear, increasing-marginal-utility on
+  task-completion fraction. **Logistic** primitive from §2.1 is the
+  clean fit and matches ch 15 §"Just Gimme a Minute, Boss!" and
+  §"Finish Him!" The specific `midpoint` and `steepness` are
+  numeric-tuning balance-thread work, not substrate spec (per the
+  doc's line 24–29 scope discipline). The `base` magnitude is
+  per-DispositionKind and is Enumeration Debt — 12 values.
+
+- **"How does momentum interact with Maslow override — hunger
+  should still preempt a committed 'explore' action below the
+  starvation threshold."**
+  Resolution: Maslow interrupts are **event-driven preemption**
+  (§7.5) that bypass the §7.2 gate and the §7.4 persistence bonus
+  entirely. The replacement Intention installs with `Blind`
+  commitment. Matches the existing `check_anxiety_interrupts`
+  pipeline exactly — no new path needed.
+
+- **"Commitment strategy is an elasticity × apophenia tradeoff."**
+  Resolution: the tradeoff is resolved via the **per-Intention-class
+  strategy table** (§7.3). `Blind` for critical needs where
+  elasticity is a liability (§0.2 would rather hold through noise);
+  `SingleMinded` for goals where both elasticity and arc-legibility
+  matter; `OpenMinded` for activities and aspirations where
+  character-drift is the long-term-relevance payoff (§0.3). The
+  table is not a global setting — different Intention classes get
+  different elasticity profiles. Aspirations (§7.7) apply the same
+  framework at a second timescale.
+
+### §7.9 Cross-refs
+
+- `docs/reference/bdi-rao-georgeff.md` — Rao & Georgeff extract;
+  commitment vocabulary (§7.1), drop triggers (§7.2), mixed
+  strategies (§7.3, §7.W.8), nested intentions (§7.7), Desire
+  inconsistency (§7.W.1).
+- `docs/systems/the-calling.md` — canonical axis-capture instance
+  (§7.W.4(a)).
+- `docs/systems/warmth-split.md` — healthy-capture worked example
+  (§7.W.4(b)).
+- `docs/reference/behavioral-math-ch15-changing-decisions.md` —
+  Mark ch 15; monitoring cadence (§7.6), event-driven interrupts
+  (§7.5), persistence bonus shape (§7.4), information expiry
+  (§7.7), decision momentum framing (§7.7 reconsideration events).
+- §0.2 (elastic failure), §0.3 (apophenia), §0.4 (character
+  expression) — principles §7 instantiates.
+- §L2.10.4, §L2.10.5 — Intention output and Goal | Activity split
+  that §7.1's strategy tag rides on.
+- §L2.10.6 — softmax scope; the challenger-Intention selection that
+  §7.4's persistence bonus biases.
+- §L2.10.7 — plan-cost feedback; the `SpatialConsideration` route
+  providing §7.2's `achievable_believed` signal (candidate (a)
+  resolution per ch 14).
+- §12 — belief proxy scope boundary for §7.2's signals.
+- `src/components/disposition.rs:39–64` — DispositionKind variants
+  §7.3 maps against.
+- `src/components/goap_plan.rs:103` — `replan_count` hard-fail signal
+  §7.2 consumes.
+- `src/ai/scoring.rs:695–704` — patience-bonus code §7.4 subsumes.
+- `src/systems/disposition.rs:93` — `check_anxiety_interrupts`
+  pipeline §7.5 documents placement of.
+- `src/systems/aspirations.rs`, `src/systems/growth.rs`,
+  `src/systems/death.rs`, `src/systems/fate.rs`,
+  `src/systems/mood.rs` — aspiration layer (§7.7) event emitters.
 
 ---
 
-## §8 Variation in choice — [STUB, pending Mark ch 16]
+## §8 Variation in choice
 
-Clowder already uses softmax: `action_softmax_temperature` and
-`disposition_softmax_temperature` in `ScoringConstants`. Ch 16 is
-Mark's canonical treatment; the goal is to calibrate our use against
-his vocabulary and verify the implementation is correct.
+Normative argmax collapses every cat with the same inputs onto the
+same action — Mark's "Stepford bank" failure mode (ch 16 opening
+vignette, extracted at
+`docs/reference/behavioral-math-ch16-variation.md`). The substrate
+needs variation because §0.1 collapses player / director / simulation
+into one: the observer is the sole consumer of behavioral diversity,
+and variation is what they pattern-match against. Too little variation
+reads as inert; too much reads as random. §0.3's two legs — abstracted
+feedback and long-term relevance — make both failures spec-level bugs,
+not tuning regrets.
 
-**Open questions pending ch 16:**
-- Does Mark recommend softmax-over-all or weighted-random-from-top-N?
-  (Clowder uses softmax-over-all currently.)
-- What's the right temperature range for behaviorally-realistic
-  variation vs. randomness?
-- How does softmax interact with momentum (§7)? Does committed
-  action get excluded from sampling, or retained with bonus?
-- **Temperature calibration is bounded by apophenia** (§0.3). Too cold
-  reads as inert (no variation for the observer to abstract over); too
-  hot reads as noise (no long-term relevance across ticks). Target feel
-  is "a cat that surprises but stays in character across weeks." This
-  is a qualitative bar for ch 16 synthesis, not a numeric one — the
-  canonical tuning test is whether a seed-42 deep-soak produces cats
-  distinguishable from each other by behavior alone.
+Ch 16 walks through three algorithm generations: random-from-top-N,
+weighted-random-from-top-N, then weighted-random-from-all. Only the
+third survives Mark's own critique of arbitrary cutoffs
+(ch 16 §"Weighted Random from All Choices"). This section commits
+Clowder's placement in that lineage and closes the four open
+questions the pre-synthesis stub carried.
 
-**Cross-ref:** `docs/reference/behavioral-math-ch16-variation.md`
+### §8.1 Algorithm — softmax-over-all candidates
+
+Commit: Boltzmann softmax weighting over the full candidate Intention
+pool, no cutoff. Weight for candidate `i`:
+
+```
+w_i = exp((score_i - max_score) / T)
+```
+
+Sampling draws one Intention proportional to `w_i`. This is the
+topology ch 16 settles on at chapter close (all candidates included,
+weighting biases toward high-score options, bad options are
+arithmetically suppressed rather than rule-based excluded). The one
+departure from Mark's literal treatment: exponential weighting
+instead of his linear `TotalScore / ThisScore` form (ch 16
+§"Automatic Scaling"). Rationale:
+
+- **Single-knob sharpness.** Temperature `T` collapses Mark's
+  per-step coefficient + response-curve + rescale machinery (ch 16
+  §"Scores and Weights", §"Use the Right Tool for the Job") into one
+  continuous parameter. `T → 0` is argmax; `T → ∞` is uniform;
+  intermediate values interpolate smoothly. This is easier to tune
+  and diagnose than picking a coefficient, a curve shape, and a
+  normalization strategy separately.
+- **Numerical stability from §1.3.** Considerations emit strictly
+  `[0, 1]` per §1.3 normalization; DSE scores compose into the
+  same range per §3. Subtracting `max_score` before `exp()` keeps
+  the weights in `[0, 1]` regardless of `T`, avoiding the
+  integer-overflow-and-rescale pitfall ch 16 walks through.
+- **Same family, not a departure.** Linear and exponential
+  weighting are both weighted-random-from-all; they differ only in
+  how steeply probability rises with score. The substrate-level
+  decision here is the *topology* (all candidates, no cutoff),
+  which matches ch 16's close. The specific weight shape is
+  defensible either way.
+
+**Rejected alternatives:**
+- *Top-N or top-N% cutoffs* (ch 16's §"Random from Top n Choices"
+  and §"Weighted Random from Top n Choices") — arbitrary thresholds
+  that ch 16 itself walks back. Weighted-random-from-all squeezes
+  low-score options to near-zero probability without needing a
+  rule-based cutoff.
+- *Linear weighting (Mark's literal form)* — lacks a single
+  sharpness knob; forces the tuner to choose between coefficient
+  magnitude and score-curve manipulation, which the §1.3
+  normalization makes unnecessary.
+- *Per-DSE temperature* — no current behavioral motivation; Clowder's
+  score scale is already uniform across DSEs. Flagged in §8.7 as a
+  possible future extension if balance work surfaces a need.
+
+### §8.2 Scope — softmax-over-Intentions
+
+Softmax runs once per cat per deliberation tick over the candidate
+Intention pool (§L2.10.4). Action selection inside a chosen
+Intention (GOAP step sequence for `Goal` Intentions, activity-runner
+tick execution for `Activity` Intentions per §L2.10.5) is
+deterministic. **Stochastic intent, deterministic execution.**
+
+This inherits §L2.10.6's scope decision verbatim; §8.1 is the formal
+resolution that §L2.10.6 flagged as pending. Two consequences for
+today's code:
+
+- `select_disposition_softmax` (`src/ai/scoring.rs:1194–1231`, hot
+  path via `disposition.rs:721` and `goap.rs:1019`) is the ancestor
+  of the post-refactor `select_intention_softmax`. Same algorithm,
+  renamed vocabulary.
+- `select_action_softmax` (`src/ai/scoring.rs:1039–1076`, exists
+  but off hot path) retires. The unified DSE surface (§L2.10.4)
+  emits Intentions, not Actions; action-layer softmax has no
+  remaining role.
+
+### §8.3 Temperature — commit T = 0.15 default
+
+Ch 16 declines to commit a numeric temperature — Mark's linear
+weighting has no temperature parameter — so calibration is
+Clowder-specific. Commit the current tuned value as the substrate
+default, with the bands that motivate it:
+
+| Temperature | Behavior | Failure mode |
+|---|---|---|
+| `T < 0.05` | Approaches argmax; primary wins ~100% of the time | Stepford bank (ch 16 opening) — §0.3 "inert" leg fails |
+| `T ≈ 0.10–0.20` | Personality-primary ~45–60%, coherent secondary runners-up | Target band |
+| `T ≈ 0.30–0.50` | Notable secondary behaviors; mercurial at day-scale | §0.3 "long-term relevance" leg degrades |
+| `T > 1.0` | Approaches uniform random | Noise; personality and scoring are irrelevant |
+
+**Default: `T = 0.15`.** Matches existing `action_softmax_temperature`
+and `disposition_softmax_temperature` in `ScoringConstants`
+(`src/resources/sim_constants.rs:1081–1082, 1244–1245`). This is the
+empirically-surviving value on seed-42 `--duration 900` soaks under
+current canaries; not a first-principles derivation. The substrate
+pins the band and the default; numeric refinement is balance-thread
+work per `CLAUDE.md` line 24–29.
+
+**Not personality-scaled.** Temperature describes how decisive the
+cat is *at the Intention-selection layer*. Personality already flows
+into scoring through per-consideration weights (§1, §4 markers).
+Layering a second personality-scaled variation source on top of
+score-embedded personality would double-count, collapsing the
+spec-level separation of "who the cat is" (scoring) from "how
+decisive they are" (selection). Character differences show up
+through score differences; softmax is a uniform observer-facing
+variation layer.
+
+### §8.4 Order with §7 momentum — softmax first, persistence-bonus gating second
+
+Per §L2.10.6: softmax runs over the freshly-scored candidate pool
+("what would I pick if starting fresh?"); §7.4's persistence bonus
+applies to the currently-held Intention; the challenger must beat
+`current_score + persistence_bonus` to preempt. The stub's
+"excluded from sampling vs. retained with bonus" sub-question
+resolves as follows:
+
+- **The committed Intention stays in the candidate pool.** Softmax
+  samples it alongside every other candidate.
+- If the sample draws the current Intention, the preemption check
+  is trivially a no-op (the challenger is the incumbent).
+- If the sample draws a different Intention, the challenger's
+  score is compared against `current_score + persistence_bonus`
+  per §7.4. Preemption fires only on strict-greater.
+- **Never exclude the incumbent.** Excluding would force preemption
+  every time softmax landed elsewhere — exactly the strobing
+  failure mode §7.4 exists to prevent. Retention with bonus is the
+  separation Mark ch 15 and Rao & Georgeff were pointing at: the
+  variation layer and the commitment layer are orthogonal.
+
+**Maslow interrupts (§7.5) bypass softmax entirely.** Event-driven
+preemption installs a `Blind`-committed replacement Intention
+without running the softmax path. Softmax lives on the normal
+per-tick deliberation path (pipeline step 3 in §7.5); interrupts
+live on step 1 and skip past the whole stack.
+
+### §8.5 Species variants — converge foxes onto softmax
+
+Today's fox pipeline uses `select_best_disposition`
+(`src/ai/fox_scoring.rs:252–258`) — a deterministic `max_by` over
+scores with additive pre-scoring jitter applied at scoring time. In
+ch 16 terms this is "argmax with observation noise," roughly the
+primitive form Mark walks away from across the chapter. It predates
+the cat softmax path and is a §8-of-*Key insight #8* artifact (the
+simpler approach that was good enough when the fox disposition set
+was small).
+
+Commit: **foxes converge to softmax** with a species-specific
+temperature constant. Reasons:
+
+- **Substrate uniformity.** The unified DSE surface (§L2.10) assumes
+  one selection path. A parallel argmax+jitter model forces every
+  future species (hawks, snakes, shadowfoxes, visitors) to pick a
+  side and inherits a species-count-sized decision surface the
+  substrate doesn't need.
+- **Elastic variation scales with disposition count.** The
+  argmax+jitter form works when the top candidate is obvious;
+  softmax's graded weighting extends cleanly as the fox disposition
+  roster grows (e.g., post-§L2.10 DSE additions for hunting
+  sub-modes, pack coordination).
+- **Matches *Key insight #8*.** Today's fox code is evidence of
+  what the old substrate permitted, not a normative spec that the
+  refactor must preserve.
+
+Implementation trails this spec (lands with §L2.10's broader
+DSE-surface unification). Spec-level commit: add
+`fox_softmax_temperature` to `ScoringConstants`, default `0.15`
+matching cats; fox-specific tuning is balance-thread work if
+divergence becomes warranted.
+
+The jitter-range term currently applied at fox scoring time
+(`fox_scoring.rs:103`, per-score) retires — softmax replaces its
+role entirely. Keeping both would stack two variation sources on
+one species.
+
+### §8.6 Apophenia calibration as continuity canary
+
+Temperature's behavioral band (§8.3) is ultimately calibrated
+against §0.3's two legs, not an information-theoretic target:
+
+- **Abstracted feedback leg.** A cat's behavior should read to an
+  observer as "she surprised me there," not "she acted randomly."
+  Softmax landing on a lower-scored Intention is a *surprise* when
+  it's in-character (personality-plausible, context-appropriate);
+  it's *noise* when it's out-of-character.
+- **Long-term relevance leg.** Same cat watched across multi-day
+  windows should read as coherent — variation at the moment-to-
+  moment scale does not dissolve character at the day scale.
+
+Qualitative bar — "a cat that surprises but stays in character
+across weeks" — makes temperature calibration a **continuity canary**
+in the `CLAUDE.md` sense. Sits alongside the existing Generational
+Continuity, Ecological Variety, and Mythic Texture canaries; hard
+gate when operationalized.
+
+Operationalization (pairwise behavioral distance across N sampled
+cats at tick T; same-cat behavioral autocorrelation across K-day
+windows) is §11 instrumentation work, not §8 substrate spec. Flagged
+here so the canary gets wired in with the rest of the per-cat replay
+tooling rather than invented separately later.
+
+### §8.7 Residuals — open questions from the original stub, resolved inline
+
+The four `?` bullets from the pre-rewrite stub, with their
+resolutions:
+
+- **"Does Mark recommend softmax-over-all or weighted-random-from-top-N?"**
+  Resolution: ch 16 recommends weighted-random-from-*all*; top-N is
+  an intermediate form ch 16 walks back. Clowder's existing
+  softmax-over-all matches the topology; exponential vs linear
+  weight shape is the only difference and the §8.1 single-knob
+  rationale makes exponential the cleaner fit. See §8.1.
+
+- **"What's the right temperature range for behaviorally-realistic
+  variation vs. randomness?"**
+  Resolution: `T = 0.10–0.20` band, committing `0.15` as the
+  substrate default matching existing constants. Numeric refinement
+  is balance-thread work. See §8.3.
+
+- **"How does softmax interact with momentum (§7)? Does committed
+  action get excluded from sampling, or retained with bonus?"**
+  Resolution: retained with bonus. Softmax runs first over the full
+  candidate pool; §7.4's persistence bonus applies to the incumbent
+  during the subsequent preemption check. Never exclude — excluding
+  forces the strobing §7.4 is built to prevent. Maslow interrupts
+  bypass softmax entirely. See §8.4.
+
+- **"Temperature calibration is bounded by apophenia."**
+  Resolution: operationalizes as a continuity canary per §0.3's
+  two legs, alongside `CLAUDE.md`'s existing continuity canary
+  suite. Instrumentation plan belongs in §11. See §8.6.
+
+### §8.8 Out of scope for this spec
+
+- **Score-level normal-distribution fuzzing** (ch 16's closing
+  "Use the Right Tool for the Job" suggestion). Clowder's
+  personality traits already live inside DSE scoring (§1, §4); a
+  second variation source at the score layer would double-count
+  against the softmax-layer variation. Parked as a balance-thread
+  experiment if §8.6 canary failures need more variation headroom.
+- **Per-Intention-class temperature.** Plausible future extension
+  (e.g., `Mating`-class Intentions softmax with sharper `T` because
+  the decision is higher-stakes; `Wander`-class with softer `T`
+  because variation is the whole point). No current behavioral
+  motivation; single-temperature default holds until a canary
+  failure demands otherwise.
+- **Stochastic execution** (softmax at the action or plan-step
+  layer). Explicitly not the scope — §8.2 commits to stochastic
+  intent, deterministic execution. Revisiting would reopen the
+  §7.4 momentum interaction; the substrate treats execution as a
+  commitment-obligation contract, not a re-rolled choice.
+
+### §8.9 Cross-refs
+
+- `docs/reference/behavioral-math-ch16-variation.md` — ch 16
+  extract; §"Weighted Random from All Choices" closes §8.1,
+  §"Reasons for Variation" anchors §8.0 framing.
+- §0.1 (director collapse — why variation matters to the observer),
+  §0.3 (apophenia — the calibration target for §8.3 and §8.6),
+  §0.4 (character expression — bounds what "in-character surprise"
+  means) — the principles §8 instantiates.
+- §1.3 (strict `[0, 1]` normalization) — what keeps `exp()`
+  numerically tame in §8.1.
+- §L2.10.4 (Intention output) — the object softmax samples over.
+- §L2.10.5 (Goal / Activity split) — execution stays deterministic
+  inside either shape.
+- §L2.10.6 (scope decision) — §8 is the formal resolution that
+  §L2.10.6 flagged pending.
+- §7.1 (commitment strategy), §7.2 (drop-trigger gate), §7.4
+  (persistence bonus), §7.5 (Maslow interrupts) — the commitment
+  layer that runs after softmax per §8.4's ordering.
+- §11 (instrumentation) — apophenia continuity-canary tooling for
+  §8.6.
+- `src/ai/scoring.rs:1039–1076` (`select_action_softmax`,
+  retiring), `:1194–1231` (`select_disposition_softmax`, renames to
+  `select_intention_softmax` post-refactor) — implementations §8.1
+  formalizes.
+- `src/ai/fox_scoring.rs:252–258` (`select_best_disposition`), `:103`
+  (per-score jitter, retiring) — the argmax-plus-jitter path §8.5
+  converges onto softmax.
+- `src/resources/sim_constants.rs:1081–1082, 1244–1245` — the two
+  existing temperature constants §8.3 commits; a third
+  (`fox_softmax_temperature`) lands with §8.5 implementation.
+- `src/systems/disposition.rs:721`, `src/systems/goap.rs:1019` —
+  hot-path softmax call sites that become Intention-layer call
+  sites post-refactor.
 
 ---
 
@@ -2695,9 +5025,153 @@ coexist without contradiction. Per-cat perception (which *specific*
 fox is known-as-dangerous vs. unknown-stranger) lives in the ToT
 belief layer, not here.
 
-DSE context filters query factions via stance:
-`Socialize` requires a candidate with `Same` stance; `Attack` requires
-`Enemy` or `Prey`; `Flee` requires `Predator`.
+### §9.0 Vocabulary reconciliation with §5.6.6.1
+
+`Species` in `(Species, Species)` is the flattened 10-variant set
+matching §5.6.6.1's row vocabulary: Cat, Fox, Hawk, Snake, ShadowFox,
+Mouse, Rat, Rabbit, Fish, Bird. The code-side substrate reaches the
+same value-shape through the existing nested enum union at
+`src/components/sensing.rs:19` (`SensorySpecies = Cat | Wild(WildSpecies) |
+Prey(PreyKind)`), with `WildSpecies` (`src/components/wildlife.rs:9`)
+and `PreyKind` (`src/components/prey.rs:17`) covering the eight
+non-cat species. Whether `FactionRelations` is keyed by a flattened
+`FactionSpecies` newtype or by the nested enum itself is an
+implementation detail of the L2 build; the spec commits only the
+*value-shape*: 100 stance cells, one per directed species pair.
+
+The two 10-species matrices (§5.6.6.1 sensory and §9.1 stance) must
+stay vocabulary-aligned — adding a species means extending both.
+
+### §9.1 Biological base matrix (10 × 10)
+
+Base stance by directed species pair. Rows = observer species;
+columns = target species. Diagonal is `Same` by convention.
+Abbreviations: `Sm` = Same, `Al` = Ally, `N` = Neutral, `Py` = Prey
+(hunt target), `Pd` = Predator (flee target), `E` = Enemy (combat
+target).
+
+|           | Cat  | Fox  | Hawk | Snake | ShFx | Mouse | Rat  | Rabbit | Fish | Bird |
+|-----------|------|------|------|-------|------|-------|------|--------|------|------|
+| **Cat**    | Sm¹  | Pd   | Pd²  | Pd³   | E    | Py    | Py   | Py     | Py   | Py   |
+| **Fox**    | Py   | Sm   | N    | N     | N⁴   | Py    | Py   | Py     | N⁶   | Py   |
+| **Hawk**   | Py²  | N    | Sm   | Py⁵   | N    | Py    | Py   | Py     | N⁶   | Py   |
+| **Snake**  | N³   | N    | Pd   | Sm    | N    | Py    | Py   | Py     | N⁶   | Py   |
+| **ShFx**   | E    | N⁴   | N    | N     | Sm⁷  | Py⁸   | Py⁸  | Py⁸    | N⁶   | Py⁸  |
+| **Mouse**  | Pd   | Pd   | Pd   | Pd    | Pd⁸  | Sm    | Pd⁹  | N      | N    | N    |
+| **Rat**    | Pd   | Pd   | Pd   | Pd    | Pd⁸  | Py⁹   | Sm   | N      | N    | N    |
+| **Rabbit** | Pd   | Pd   | Pd   | Pd    | Pd⁸  | N     | N    | Sm     | N    | N    |
+| **Fish**   | Pd   | N⁶   | N⁶   | N⁶    | N⁶   | N     | N    | N      | Sm   | N    |
+| **Bird**   | Pd   | Pd   | Pd   | Pd    | Pd⁸  | N     | N    | N      | N    | Sm   |
+
+100 / 100 directed species-pair stance cells committed.
+
+Footnotes:
+
+1. **Cat × Cat = Same** is the base; overlaid per §9.2 by `Visitor`,
+   `HostileVisitor`, `Banished`, and `BefriendedAlly` markers. All
+   cat-on-cat stance variation is expressed through the overlay, not
+   through widening `Species`.
+2. **Hawk → Cat = Prey** applies to kittens (carry-off) and injured
+   adults; healthy-adult cats are functionally ignored. Size / life-
+   stage scaling is carried by `AttackDse` target considerations
+   (`boldness × target_size`), not by the base matrix — the row
+   commits the ecological default and `FleeDse` eligibility filter.
+3. **Cat → Snake = Predator / Snake → Cat = Neutral** is asymmetric.
+   Cats respect snakes as dangerous (`FleeDse` triggers), snakes do
+   not actively hunt cats (`wildlife.rs:280,390,666` — snakes pursue
+   prey, not cats; coiling-near-cat narrative at `wildlife.rs:600–603`
+   is defensive, not offensive). A cornered snake becomes a combat
+   target via `AttackDse` using a `Threatened` eligibility marker, not
+   a base-stance upgrade.
+4. **Fox × ShadowFox = Neutral** on both rows. Lore (`docs/systems/
+   magic.md`, `src/systems/magic.rs:501`) frames shadowfox as a
+   corrupted double of a fox, which *suggests* Enemy; but no code path
+   today enforces fox-vs-shadowfox hostility (both share
+   `predator_hunt_range` and wildlife-morale logic at
+   `wildlife.rs:667–730`). Commit Neutral as the conservative stance;
+   upgrade to Enemy in a dedicated balance pass if/when a
+   fox-rejects-corruption system lands.
+5. **Hawk → Snake = Prey** reflects the ecological default (raptors
+   take snakes). No DSE currently consumes this cell; committed for
+   matrix completeness and future Hawk-AI extension.
+6. **Aquatic carve-out.** Terrestrial predators (Fox, Hawk, Snake,
+   ShFx) × Fish = Neutral — these species do not cross the water
+   boundary in Clowder's map today. Only Cat × Fish = Prey
+   (`Hunt` over water-edge). Reciprocal Fish → Cat = Predator
+   (fish flee cats at the water edge) but Fish → {Fox, Hawk, Snake,
+   ShFx} = Neutral for the same reason.
+7. **ShadowFox × ShadowFox = Same** is a matrix-completeness
+   convention; shadowfoxes are solitary and have no intra-species
+   interaction in the sim. No DSE consumes this cell.
+8. **ShadowFox × prey = Prey** (and reciprocally prey × ShadowFox =
+   Predator) because shadowfoxes run the same predator-hunt code as
+   regular foxes (`wildlife.rs:667` — `predator_hunt_range_shadow_fox`).
+   The motive differs (corruption-spread rather than satiation — `fox
+   satiation_ticks` gain is gated to non-shadowfox at
+   `wildlife.rs:721–725` and `wildlife.rs:702–717` occasionally
+   spawns a corrupting carcass instead of straight consumption), but
+   the stance toward prey is functionally `Py`.
+9. **Rat-mouse predation.** Adult rats opportunistically kill mice;
+   Rat→Mouse = `Py`, Mouse→Rat = `Pd`. Committed per §0 enumeration
+   discipline even though no DSE consumes this cell today. Flagged
+   as a latent ecology hook for a future prey-on-prey build.
+
+### §9.2 ECS-marker overlay (colony / visitor / banished / befriended)
+
+The `(Species, Species) → FactionStance` map cannot, by itself,
+express colony membership or per-entity social state — `Cat × Cat` is
+a single key. Four ECS markers refine the base stance at DSE-filter
+time. These live in the §4.3 vocabulary (same schema: Predicate /
+Insert / Remove / Status / Source system); §9.2 is their stance-
+refinement definer.
+
+| Marker | Predicate | Insert / Remove | Effect on stance | Status | Source system |
+|---|---|---|---|---|---|
+| `Visitor` | Non-colony cat present on map — Wandering Loner, Trader, or Scout per `docs/systems/trade.md:19–22` | `trade.rs::arrive_visitor` / `trade.rs::depart_visitor` (new) | Observer-Cat × target-Cat: demote `Same` → `Neutral`. No effect on other pairs. | Absent | `docs/systems/trade.md` |
+| `HostileVisitor` | Hostile-Loner variant (`trade.md:21`); attached on arrival or on stolen-from / drove-off-previously memory | as `Visitor` | Observer-Cat × target-Cat: demote `Same` → `Enemy`. | Absent | `docs/systems/trade.md` |
+| `Banished` | Cat exiled from the colony via social or combat consequence (`colony_score.banishments:41` already counts the event; the marker does not yet persist on the exiled entity) | `social.rs` / `combat.rs` — today's `pending_banishments` pattern at `combat.rs:120,242,356–395` is shadowfox-only, extend to cat-on-cat | Observer-Cat × target-Cat: demote `Same` → `Enemy`. | Absent | `src/systems/combat.rs:117–395` + `src/systems/social.rs` (new predicate) |
+| `BefriendedAlly` | Fox or prey-species target befriended through repeated non-hostile contact — subsumes the current §9 prose example "a befriended fox" | `social.rs::befriend_wildlife` (new) | Observer-Cat × target-Fox: upgrade `Predator` → `Ally`. Reciprocal target-Fox × observer-Cat: upgrade `Prey` → `Ally`. | Absent | `docs/systems/trade.md` befriending path |
+
+**Resolution order.** Overlay markers apply *after* the base lookup;
+if multiple markers coexist on a target, **most-negative wins**:
+`Banished` ≻ `HostileVisitor` ≻ `Visitor` ≻ base ≻ `BefriendedAlly`.
+This prevents "Banished + BefriendedAlly" from collapsing to `Ally`
+and "Visitor + Banished" from collapsing to `Neutral`. The order is
+committed here, not rediscovered per system, so the marker-insert
+systems can land independently without drift.
+
+**Scope boundary with §12 (beliefs).** §9.2 markers encode *facts
+about the target entity* authored by colony-scale systems (arrival
+event, banishment event, befriending event). Per-cat perceptual state
+— "this *specific* fox is known-as-dangerous to cat X but not to cat
+Y" — remains in the ToT belief layer per §12, not here. The practical
+split: if the fact is uniform across all observers (a Banished cat is
+Banished to everyone in the colony), it is a §9.2 marker. If the fact
+is per-observer (cat X has witnessed this fox kill a clanmate; cat Y
+has not), it is a §12 belief.
+
+### §9.3 DSE filter binding
+
+The stance matrix is testable against §L2.10.3's DSE registry —
+each DSE that operates on a candidate entity declares the
+`FactionStance` set it accepts as an eligibility filter. The
+substrate rejects candidates whose stance is not in the accepted set
+before scoring, so the matrix above is directly load-bearing for
+target-taking DSE output.
+
+| DSE | Required stance on candidate | Source §L2.10.3 row |
+|---|---|---|
+| `SocializeDse` | `Same` \| `Ally` | Tier-2 cat block |
+| `AttackDse` | `Enemy` \| `Prey` | Tier-2 cat block |
+| `FleeDse` | `Predator` | Tier-1 cat block |
+| `HuntDse` | `Prey` | Tier-2 cat block |
+| `FoxRaidDse` | `Prey` (with colony-adjacency `StoreVisible` marker refinement per §4.3) | Fox block |
+
+Five filter rows cover the target-taking DSEs that read stance
+today. A DSE not listed here (e.g., `EatDse`, `SleepDse`,
+`HerbcraftDse`) does not gate on stance — its target universe is
+defined by other §4.3 markers (`HasStoredFood`, terrain markers,
+herb-availability markers).
 
 ---
 
@@ -2759,7 +5233,12 @@ selection is a downstream step with its own (tunable) temperature.
 
 ### §L2.10.3 DSE registration
 
-DSEs are registered at plugin load, not hard-coded per-action:
+DSEs are registered at plugin load, not hard-coded per-action. The
+registration API is the single seam across which every scoring
+surface in the substrate ships, and its method set is **open by
+design** per §5.6.9 — a future species (hawks, snakes, prey, human
+visitors, shadowfoxes promoted to first-class) slots in as a new
+`add_*_dse` method without touching the evaluator.
 
 ```rust
 app.add_dse(eat_dse())
@@ -2770,19 +5249,161 @@ app.add_dse(eat_dse())
    .add_target_taking_dse(mate_dse())
    // ...
    .add_fox_dse(fox_patrol_dse())
-   .add_fox_dse(fox_hunt_dse());
+   .add_fox_dse(fox_hunt_dse())
+   // Scattered-site absorbents (§L2.10.1):
+   .add_coordinator_dse(coordinator_election_dse())
+   .add_coordinator_dse(directive_assessment_dse())
+   .add_aspiration_dse(reproduce_aspiration_dse())
+   .add_narrative_dse(narrative_template_selection_dse());
 ```
 
-This enables:
-- **Per-species DSE sets** — cat vs. fox vs. (eventual) hawk, snake,
-  shadowfox. No parallel `fox_scoring.rs` with its own Maslow;
-  species registers its DSE set, shares the evaluator.
-- **Per-role DSE sets** — coordinator cats register `Coordinate` DSE;
-  others don't. Avoids the 2,817-line
-  if-ctx.is_coordinator-then-branch pattern.
-- **Data-driven authoring (future)** — DSEs declared in RON/TOML
-  become feasible once the trait is stable and considerations are
-  named. Not a near-term goal, but not architecturally blocked.
+Five registration methods cover today's scoring surface:
+
+- `add_dse(...)` — plain cat DSEs without per-candidate target
+  ranking.
+- `add_target_taking_dse(...)` — DSEs that resolve among candidate
+  entities via §6.3 `TargetTakingDse`. The 9 target-taking DSEs from
+  §6.3 / §6.4 register here; per-target considerations live in
+  §6.5.
+- `add_fox_dse(...)` — per-species fox registrations. Replaces
+  today's parallel `src/ai/fox_scoring.rs` Maslow surface with a
+  registration set sharing the evaluator.
+- `add_coordinator_dse(...)` — coordinator-role DSEs (election,
+  directive assessment, urgent dispatch). Today scattered across
+  `src/systems/coordination.rs`; absorbed as first-class DSEs.
+- `add_narrative_dse(...)` — narrative-line selection as a DSE
+  consumer, per §L2.10.1's "narrative template specificity ×
+  weight" surface at `narrative_templates.rs:616–649`.
+
+The registration catalog below is **exhaustive** against commit
+`333fd7b`. Line-number citations match source today; Explore-agent
+verification confirmed no drift. Every row of §L2.10.1's
+"stranded utility islands" table appears as at least one row
+below; §L2.10.1 and §L2.10.3 form a one-to-one before/after pair.
+
+#### Cat DSEs — Tier 1 (physiological / survival)
+
+| Constructor | Method | Subsumes | Composition | Intention shape | Notes |
+|---|---|---|---|---|---|
+| `eat_dse()` | `add_dse` | `scoring.rs:203–208` | CompensatedProduct | `Goal(hunger < threshold)` | Need-driven; Maslow L1. |
+| `sleep_dse()` | `add_dse` | `scoring.rs:210–233` | CompensatedProduct | `Goal(energy > threshold)` | Diurnal-phase piecewise + injury axis per §2.3. |
+| `hunt_dse()` | `add_target_taking_dse` | `scoring.rs:235–249`; merges with `disposition.rs` prey-resolve path | CompensatedProduct | `Goal(prey_caught)` | §6.5.5 target set; §L2.10.7 Quadratic spatial curve. |
+| `forage_dse()` | `add_dse` | `scoring.rs:251–259` | CompensatedProduct | `Goal(food_at_stores)` | Food-scarcity axis via §2.3 Quadratic. |
+| `groom_self_dse()` | `add_dse` | `scoring.rs:283–300` (self branch) | WeightedSum | `Goal(thermal + affection deficit cleared)` | Sibling to `groom_other` (Max retires). Pending `needs.warmth` split. |
+| `flee_dse()` | `add_dse` | `scoring.rs:320–327` | CompensatedProduct | `Goal(threat_distance > safe)` | Steepest Logistic (§2.3); event-driven interrupt path (§7.5). |
+
+#### Cat DSEs — Tier 2 (safety / territory)
+
+| Constructor | Method | Subsumes | Composition | Intention shape | Notes |
+|---|---|---|---|---|---|
+| `fight_dse()` | `add_target_taking_dse` | `scoring.rs:329–353`; merges with `disposition.rs` combat-resolve path | CompensatedProduct | `Goal(threat_incapacitated)` | §6.5.9 target set; piecewise health/safety gating. |
+| `patrol_dse()` | `add_dse` | `scoring.rs:355–362` | CompensatedProduct | `Activity(Patrol, UntilCondition(scent_refreshed))` | Activity-shaped; territory-scent map consumer. |
+| `build_dse()` | `add_target_taking_dse` | `scoring.rs:364–388`; merges with `disposition.rs` site-resolve path | WeightedSum | `Goal(structure_complete)` | §6.5.8 target set; chain-driven completion. |
+| `farm_dse()` | `add_dse` | `scoring.rs:390–401` | WeightedSum | `Goal(crop_harvested)` | Chain-driven; Maslow L2 suppression on phys only. |
+| `socialize_dse()` | `add_target_taking_dse` | `scoring.rs:261–281`; unifies divergent resolvers at `disposition.rs:1329–1347` and `goap.rs:3788–3810` | WeightedSum | `Activity(Socialize, UntilCondition(sated))` | §6.5.1 target set; **resolves §6.2 silent divergence** — one resolver now. |
+| `groom_other_dse()` | `add_target_taking_dse` | `scoring.rs:283–300` (other branch) | WeightedSum | `Activity(Allogroom, Ticks(N))` | §6.5.4 target set; sibling to `groom_self` (Max retires). |
+| `explore_dse()` | `add_dse` | `scoring.rs:302–309` | WeightedSum | `Activity(Explore, UntilInterrupt)` | Exploration-map consumer; §7.4 Medium-High persistence. |
+| `wander_dse()` | `add_dse` | `scoring.rs:311–318` | WeightedSum | `Activity(Wander, UntilInterrupt)` | "Always available" sentinel with curiosity + playfulness. |
+| `cook_dse()` | `add_dse` | `scoring.rs:618–639` | WeightedSum | `Goal(food_cooked_at_kitchen)` | Chain-driven: move to kitchen, process raw → cooked. |
+
+#### Cat DSEs — Tier 2–5 (craft / leadership / reproduction / care / idle)
+
+| Constructor | Method | Subsumes | Composition | Intention shape | Notes |
+|---|---|---|---|---|---|
+| `coordinate_dse()` | `add_dse` (coordinator-role eligibility filter) | `scoring.rs:585–595` | WeightedSum | `Activity(Coordinate, UntilInterrupt)` | Per-role registration — non-coordinators don't register. |
+| `mentor_dse()` | `add_target_taking_dse` | `scoring.rs:597–605`; merges with `disposition.rs:1361–1376` apprentice-targeting | WeightedSum | `Activity(Mentor, UntilCondition(skill_gap_closed))` | §6.5.3 target set; skill-gap-magnitude is the **§6.1 critical fix**. |
+| `caretake_dse()` | `add_target_taking_dse` | `scoring.rs:641–654`; merges with `disposition.rs:1925–1943` + `feed_kitten.rs` | WeightedSum | `Goal(kitten_hunger_sated)` | §6.5.6 target set; Quadratic spatial curve (ch 14 "Which Dude"). |
+| `idle_dse()` | `add_dse` | `scoring.rs:656–662` | WeightedSum | `Activity(Idle, UntilInterrupt)` | Always-available fallback; floor-clamp curve. |
+| `apply_remedy_dse()` | `add_target_taking_dse` | `disposition.rs` remedy-target path | WeightedSum | `Goal(injury_healed)` | §6.5.7 target set; today chain lives in `ai/planner/actions.rs:221–262`. |
+
+**Incapacitated-retiring.** `scoring.rs:181–201` (incapacitated
+override) **does not** register a DSE — the branch retires per §2.3.
+The `Incapacitated` ECS marker (§4) filters ineligible DSEs; surviving
+candidates (Eat, Sleep, Idle) produce correct behavior on their own
+curves.
+
+#### Mating (three-layer — §7.M)
+
+| Constructor | Method | Subsumes | Composition | Intention shape | Notes |
+|---|---|---|---|---|---|
+| `reproduce_aspiration_dse()` | `add_aspiration_dse` | New — no single source site today | WeightedSum | `Aspiration(Reproduce, OpenMinded, ...)` | Layer 1 per §7.M.1. Emits L2 + L3. |
+| `pairing_activity_dse()` | `add_dse` (gated on `Partners+` bond marker, §4) | Absorbs ambient pair-bond drift in `social.rs:100–175` as an explicit activity | WeightedSum | `Activity(Pairing, UntilCondition(partner_lost_or_out_of_season))` | Layer 2 per §7.M.1. |
+| `mate_with_goal_dse()` | `add_target_taking_dse` | `scoring.rs:607–616` + `disposition.rs:1873–1919` mating chain | CompensatedProduct | `Goal(mating_event_completed)` | Layer 3 per §7.M.1. §6.5.2 target set for partner selection. |
+
+#### Herbcraft / PracticeMagic sibling DSEs (§L2.10.10)
+
+| Constructor | Method | Subsumes | Composition | Intention shape | Notes |
+|---|---|---|---|---|---|
+| `herbs_in_inventory_dse()` | `add_dse` | `scoring.rs:420–428` | WeightedSum | `Goal(herbs_in_inventory > threshold)` | Herbcraft sub-mode; per §L2.10.10. |
+| `remedy_applied_dse()` | `add_target_taking_dse` | `scoring.rs:429–437` | WeightedSum | `Goal(injury_healed)` | Herbcraft sub-mode; per §L2.10.10. |
+| `ward_placed_dse()` | `add_target_taking_dse` | `scoring.rs:451–464` | WeightedSum | `Goal(ward_at_tile)` | Herbcraft sub-mode; per §L2.10.10. |
+| `scry_dse()` | `add_dse` | `scoring.rs:485–488` | CompensatedProduct | `Activity(Scry, UntilCondition(vision_received))` | PracticeMagic sub-mode; Calling integration point. |
+| `durable_ward_dse()` | `add_target_taking_dse` | `scoring.rs:512–522` | WeightedSum | `Goal(durable_ward_at_tile)` | PracticeMagic sub-mode. |
+| `cleanse_dse()` | `add_target_taking_dse` | `scoring.rs:523–533` | CompensatedProduct | `Goal(tile_corruption == 0)` | PracticeMagic sub-mode. |
+| `colony_cleanse_dse()` | `add_dse` | `scoring.rs:535–541` | CompensatedProduct | `Goal(territory_max_corruption < threshold)` | PracticeMagic sub-mode. |
+| `harvest_dse()` | `add_target_taking_dse` | `scoring.rs:543–551` | WeightedSum | `Goal(harvested_from_carcass)` | PracticeMagic sub-mode. |
+| `commune_dse()` | `add_dse` | `scoring.rs:552–559` | CompensatedProduct | `Activity(Commune, UntilInterrupt)` | PracticeMagic sub-mode; special-terrain gate. |
+
+Retires the parent `herbcraft_dse` / `practice_magic_dse` `Max`-composed
+surface entirely — sibling registration is the mechanism by which the
+§L2.10.4 Intention framing dissolves the old parent-action bundling.
+
+#### Fox DSEs (`fox_scoring.rs`, 9 dispositions)
+
+| Constructor | Method | Subsumes | Composition | Intention shape | Notes |
+|---|---|---|---|---|---|
+| `fox_hunting_dse()` | `add_fox_dse` | `fox_scoring.rs:134–150` | CompensatedProduct | `Goal(prey_caught)` | L1 survival; shares prey-location map with cat Hunt (§5.6.3 row #5). |
+| `fox_raiding_dse()` | `add_fox_dse` | `fox_scoring.rs:152–159` | CompensatedProduct | `Goal(food_from_stores)` | L1 survival; store-visibility eligibility. |
+| `fox_resting_dse()` | `add_fox_dse` | `fox_scoring.rs:161–177` | WeightedSum | `Activity(Rest, UntilCondition(energy_restored))` | L1 survival; den-based comfort. |
+| `fox_fleeing_dse()` | `add_fox_dse` | `fox_scoring.rs:179–186` | CompensatedProduct | `Goal(threat_distance > safe)` | L1 survival; shares Flee anchor with cat. |
+| `fox_patrolling_dse()` | `add_fox_dse` | `fox_scoring.rs:193–210` | WeightedSum | `Activity(Patrol, UntilCondition(scent_refreshed))` | L2 territory; ticks-since-patrol saturation. |
+| `fox_avoiding_dse()` | `add_fox_dse` | `fox_scoring.rs:212–222` | WeightedSum | `Activity(Avoid, UntilCondition(cats_cleared))` | L2 territory; pre-threat avoidance. |
+| `fox_feeding_dse()` | `add_fox_dse` | `fox_scoring.rs:229–236` | CompensatedProduct | `Goal(cubs_satiated)` | L3 offspring; protectiveness-scaled. |
+| `fox_den_defense_dse()` | `add_fox_dse` | `fox_scoring.rs:238–245` | CompensatedProduct | `Goal(threat_cleared_from_den)` | L3 offspring; shares Flee anchor. |
+| `fox_dispersing_dse()` | `add_fox_dse` (juvenile life-stage eligibility) | `fox_scoring.rs:106–124` | — | `Goal(reached_new_territory)` | Lifecycle override; juveniles only. |
+
+Fox DSEs pointedly have **no** `add_target_taking_dse` entries today
+— §L2.10.7's audit found all 9 use binary range gates or
+aggregate-proximity scalars rather than per-candidate ranking. When
+the refactor lands, fox DSEs can opt into `add_target_taking_fox_dse`
+by row without per-species code changes.
+
+#### Scattered-site absorbents (§L2.10.1 → §L2.10.3)
+
+| Constructor | Method | Subsumes | Composition | Intention shape | Notes |
+|---|---|---|---|---|---|
+| `coordinator_election_dse()` | `add_coordinator_dse` | `coordination.rs:60–160` (`evaluate_coordinators`, every 100 ticks) | CompensatedProduct | `Goal(coordinator_role_assigned)` | Social-weight × diligence × sociability × ambition formula; runs on a slower cadence than per-tick DSEs. |
+| `directive_assessment_dse()` | `add_coordinator_dse` | `coordination.rs:179–543` (`assess_colony_needs`, every 20 ticks) | WeightedSum | `Goal(directive_queue_filled)` | 7 branches (Food, Threat, Building, Injury, Posse, Ward, Corruption); priorities merge into a single queue. Urgent dispatch at `559–700+` becomes an event-driven emission, not a separate DSE. |
+| `reproduce_aspiration_dse()` | `add_aspiration_dse` | See §7.M row above (this line is aspiration-layer for the Mating showcase). | WeightedSum | `Aspiration(Reproduce, OpenMinded, ...)` | First concrete user of `add_aspiration_dse`; framework ports to other aspirations. |
+| `aspiration_chain_dse()` | `add_aspiration_dse` | `aspirations.rs:49–96` (`score_chain`) | WeightedSum | `Aspiration(<domain>, OpenMinded, ...)` | Domain-affinity scoring (zodiac × personality × experience + jitter). One registration per domain; domain list lives in §7.7.1. |
+| `narrative_template_selection_dse()` | `add_narrative_dse` | `narrative_templates.rs:616–649` (`TemplateSet::select`) | WeightedSum | — (narrative output, no Intention) | Template specificity × template weight; filtered by context. Not a goal-directed DSE — the registration surface reuses the evaluation infrastructure for the selection math. |
+
+**Target-ranking unification.** Today, `disposition.rs:1329–1347`
+and `goap.rs:3788–3810` run divergent per-target scoring (fondness +
+novelty vs. fondness alone — §6.2 silent divergence). Neither
+appears as its own row above because **both are absorbed into the
+`add_target_taking_dse` rows** for `socialize_dse`, `mate_with_goal_dse`,
+`mentor_dse`, and `caretake_dse` via §6.3. The divergence is fixed at
+registration: one resolver, one source of truth.
+
+#### Catalog summary
+
+| Method | Rows | Notes |
+|---|---|---|
+| `add_dse` | 18 | Plain cat DSEs (Tier 1–5) + sibling singletons + cook/idle/wander sentinels. |
+| `add_target_taking_dse` | 13 | 9 headline target-taking DSEs (§6.3) + 4 herb/magic target-taking siblings. |
+| `add_aspiration_dse` | 2 | Reproduce + domain-affinity scaffold; one registration per future aspiration domain. |
+| `add_coordinator_dse` | 2 | Election + directive-assessment; urgent dispatch is event-driven. |
+| `add_fox_dse` | 9 | All 9 fox dispositions; no target-taking entries today. |
+| `add_narrative_dse` | 1 | Template selection; future expansion for scripted-narrative DSEs. |
+| **Total** | **45** | Versus today's 23+ scattered sites; one registration surface, one evaluator. |
+
+The registration API is open-set (§5.6.9). Adding a new species,
+role, or aspiration domain is one registration; adding a new
+registration method (e.g., `add_prey_dse`, `add_visitor_dse`) is
+one method on the app-extension trait. Neither touches the
+evaluator, the Intention vocabulary, or downstream commitment /
+softmax layers.
 
 ### §L2.10.4 DSE output: Intention, not Action
 
@@ -2815,6 +5436,16 @@ pub enum Termination {
 }
 ```
 
+Every emitted `Intention` additionally carries a
+`CommitmentStrategy` tag (§7.1; Rao & Georgeff commitment vocabulary
+per `docs/reference/bdi-rao-georgeff.md` §3) —
+`Blind | SingleMinded | OpenMinded` — that determines when the
+reconsideration gate drops it. The strategy tag rides on the
+Intention, not on the DSE, so a single DSE can emit
+context-dependent strategies (e.g., `Patrol` emits a `Blind`
+Guarding Intention under high-threat context, `SingleMinded` under
+routine).
+
 **Why this collapses problems:**
 
 - **Companion-action bundling dissolves.** `Caretake` as
@@ -2843,7 +5474,8 @@ pub enum Termination {
 
 ### §L2.10.5 Intention = `Goal | Activity` is Clowder-specific
 
-Classical BDI (Rao & Georgeff 1991 — `docs/reference/rao91a.pdf`) assumes every
+Classical BDI (Rao & Georgeff 1991 —
+`docs/reference/bdi-rao-georgeff.md`) assumes every
 Intention reduces to a goal state that expands to a plan. That fits
 `Caretake`, `Hunt`, `Herbcraft` sub-modes, `Build`, `Mate`, `ApplyRemedy`
 — each has a clean goal.
@@ -2864,6 +5496,17 @@ The benefit is that activity-shaped DSEs stop pretending to be goals
 — today's `Socialize` resolver already runs a scripted-duration
 interaction, the code just doesn't admit that's what it is.
 
+**Strategy-shape correlation.** `Activity` Intentions with
+`Termination::UntilCondition` or `UntilInterrupt` almost always
+pair with `OpenMinded` commitment (§7.3) — the activity's drop
+trigger *is* a desire-drift condition (sated-sociability, curiosity
+exhausted) rather than a goal-state predicate. `Activity` with
+`Termination::Ticks` pairs with `SingleMinded` by default (the
+tick budget is the achievability bound). This is not a hard rule —
+the strategy tag rides on the Intention per §L2.10.4 — but the
+correlation is strong enough that §7.3's OpenMinded rows all live
+in the `Activity` half of the Intention enum.
+
 ### §L2.10.6 Softmax-over-Intentions is the right variation scope
 
 Today's softmax runs over dispositions (`select_disposition_softmax`,
@@ -2874,10 +5517,21 @@ hot path. Given the Intention framing, the natural scope is
 attachment (commitment is to the Intention, not to individual plan
 steps).
 
-Formal resolution is §8's job (pending ch 16); this section flags the
-dependency so §8 doesn't assume a different scope later.
+Formal resolution lives in §8 (closed 2026-04-21 against Mark ch 16).
+This section named the scope commitment so §8 could inherit rather
+than re-litigate it — see §8.2.
 
-### §L2.10.7 Plan-cost feedback — open architectural thread
+**Order with §7.4's persistence bonus.** Softmax picks the challenger
+Intention from the freshly-scored candidate pool (the "what would I
+pick if starting fresh?" question). §7.4's persistence bonus is then
+applied to the *currently-held* Intention's score, and the challenger
+must beat `current_score + persistence_bonus` to preempt. Softmax
+runs first; persistence-bonus gating runs second. This order matters:
+variation lives at "decide what to want," not at "decide whether to
+abandon my current commitment." The commitment-layer gate is
+deterministic given the score inputs.
+
+### §L2.10.7 Plan-cost feedback — resolved via Mark ch 14
 
 Emitting Intentions doesn't make scoring cost-aware. If `Caretake`
 scores 0.9 but the kitten is 50 tiles away while food is 2 tiles
@@ -2885,40 +5539,155 @@ away, utility was blind to cost — GOAP will plan the long trip on an
 inflated score. Mark ch 14 §"Which Dude to Kill?" folds distance
 into the decision explicitly; Clowder needs the same.
 
-Two candidate shapes, both explicitly open:
+**Chosen: candidate (a) — `SpatialConsideration` with response curves.**
+Ch 14 (`docs/reference/behavioral-math-ch14-modeling-decisions.md`,
+§"Which Dude to Kill?" through §"Scoring the Option") folds distance
+into scoring via response curves — weapon accuracy falloff over
+range (Figure 14.6), urgency-vs-detonator-range via a parabolic
+curve (Figure 14.8) — without invoking a pathfinder at scoring time.
+Mark's agent does not ask "can I path there?" mid-score; it asks
+"what's the shaped-by-distance score?" and lets the score itself
+encode reachability implicitly through its curve shape.
 
-- **(a) Pre-estimated cost via `SpatialConsideration`s.** DSEs
-  include a distance-to-goal-landmark consideration with a
-  `Quadratic` falloff. Cheap, heuristic, doesn't require a GOAP query
-  at scoring time. Chicken-and-egg avoided, precision reduced —
-  Manhattan distance is a proxy, not actual plan cost.
-- **(b) DSE → GOAP cost-query handshake.** DSE requests "what would
-  it cost to achieve `Intention::Goal(X)`?" from GOAP at scoring
-  time. Precise, expensive, and creates the chicken-and-egg BDI
-  commitment-strategy papers address (Rao & Georgeff §"Commitment
-  Strategies" — blind / single-minded / open-minded). Probably
-  requires caching plan costs across ticks with invalidation on
-  world-state change.
+Clowder matches this pattern. Each spatially-sensitive DSE — the
+target-taking DSEs catalogued in §6.3 + §6.4, plus the non-target
+DSEs whose scoring is landmark-anchored (Forage-at-cache, Rest-at-
+hearth, etc.) — carries a `SpatialConsideration` with a curve
+primitive from §2.1. Appropriate curves:
 
-§7 (momentum) likely forces a choice: commitment strategies need to
-know when an Intention is "no longer achievable," which requires
-some plan-cost signal.
+- `Quadratic` or `Power` for "closer is better, falling off sharply"
+  (hunt, defend-territory, urgent-threat-response).
+- `Logistic` for "close enough is close enough, then falls off"
+  (routine errands, non-urgent socializing).
+- `Linear` as a fallback when the distance semantics don't warrant
+  a non-linear shape (e.g., exploration where the distance curve
+  *is* the incentive gradient).
 
-Plan-cost feedback also interacts with **elastic failure** (§0.2). If
-GOAP can't plan a scored Intention, the elastic response is lowering
-its effective score (marking it less achievable) so the next-best
-Intention takes over — not binary-rejecting the Intention or
-force-cancelling the cat's current pursuit. Both candidate shapes need
-to support this: (a)'s Manhattan proxy degrades smoothly as obstacles
-grow; (b)'s cached plan-cost invalidates smoothly on world-state
-change. A hard-fail path would be a §0.2 anti-goal.
+The full per-DSE roster of `SpatialConsideration` curve assignments
+is Enumeration Debt — see the doc's Enumeration Debt section.
+
+**Why candidate (b) is rejected.** Pathfinder-in-the-loop creates
+the chicken-and-egg that prior drafts of this section flagged: the
+scoring layer asks GOAP "what would this cost?" while GOAP is
+trying to decide whether this Intention is plannable. It's also
+expensive (pathfinder invocations per-DSE-per-tick-per-cat) and
+brittle under world-state change without a cache-and-invalidate
+layer that itself becomes a correctness surface. Mark ch 14 does
+not advocate this shape; §0.2 elastic failure prefers the smooth
+score-degradation that (a) naturally provides.
+
+**The `replan_count` hard-fail exit.** Repeated
+`GoapPlan::replan_count ≥ max_replans`
+(`src/components/goap_plan.rs:103`) remains the hard-fail signal for
+§7.2's `achievable_believed` ⇒ false path under `SingleMinded`
+commitment. This is a GOAP-layer signal, not a scoring-layer
+signal, and it fires only when an Intention is genuinely
+unplannable (impassable geometry, destroyed target, resource
+vanished mid-plan). The two-channel structure — elastic score
+attenuation via (a), plus hard-fail via `replan_count` — is what
+§7.2 consumes; see §7.2 for how they compose.
+
+**Elastic-failure preservation (§0.2).** Candidate (a) degrades
+smoothly as landmarks become less reachable (obstacle density
+grows, path distance increases). The `replan_count` hard-fail
+fires only when elasticity has run out — the score has already
+attenuated low but the cat is still committed under strategy
+rules. Both channels match §0.2's "consequence-rich failure that
+propagates, never arc-terminating failure" principle.
+
+**Spatially-sensitive DSE roster.** Full enumeration of the 21
+current cat DSEs (`src/ai/scoring.rs`) and 9 fox dispositions
+(`src/ai/fox_scoring.rs`). Each row commits the post-refactor
+shape: target landmark for the `SpatialConsideration` and the curve
+primitive from §2.1 that fits it. Numeric tuning (curve
+midpoint/steepness) is balance-thread work per line 24–29.
+
+> **Audit finding.** No cat or fox DSE currently uses continuous
+> distance-to-landmark scoring. All 13/21 cat DSEs with spatial
+> inputs and 6/9 fox dispositions with spatial inputs use binary
+> range gates or aggregate-proximity scalars (`unexplored_nearby`,
+> `tile_corruption`, `nearby_corruption_level`, `local_prey_belief`).
+> The refactor changes every row's shape, not just adds curves —
+> this roster is a full aspirational specification, not an audit of
+> current behavior. Consistent with *Insight #8* (evidence, not
+> specification): the binary-gate pattern reflects the old
+> substrate's constraints, not the target state.
+
+**Cat DSEs (22 rows — Groom splits into self and other post-refactor, per §L2.10.2's per-species registration surface; the other 21 map 1:1 to `scoring.rs` action blocks):**
+
+| DSE | Today | Target landmark | Curve | Rationale |
+|---|---|---|---|---|
+| Eat | binary `food_available` | Stores / Kitchen building | `Logistic` | Close-enough-is-close-enough; distant food viable but discounted. |
+| Sleep | N/A | Own Den / sleeping spot | `Power` | Strong preference for own den; sharp fall-off from it. |
+| Hunt | binary `prey_nearby` | Prey entity position | `Quadratic` | Ch14 weapon-accuracy shape — closer prey is disproportionately better. |
+| Forage | binary `can_forage` | Nearest forageable tile cluster | `Logistic` | Routine errand; sharp fall-off outside a reasonable radius. |
+| Socialize | binary `has_social_target` | Social partner position | `Logistic` | Routine social visibility; near partners saturated, far ones discounted. |
+| Groom (self) | N/A | N/A (self) | N/A — not spatial | Self-directed, no landmark. |
+| Groom (other) | binary `has_social_target` | Other-cat position | `Quadratic` | Intimate act; must be adjacent — sharp distance penalty. |
+| Explore | aggregate `unexplored_nearby` | Unexplored frontier | `Linear` | Distance *is* the incentive gradient; linear shape preserves gradient-following. |
+| Wander | N/A | N/A | N/A — not spatial | Curiosity baseline; no target. |
+| Flee | binary `has_threat_nearby` | Threat position (inverted) | `Power` | Inverse-distance-from-threat; closer threat is sharply more urgent. |
+| Fight | binary `has_threat_nearby` + `allies_fighting_threat` | Threat + ally cluster | `Quadratic` | Range + ally-proximity factor; commitment rises sharply when allies engaged nearby. |
+| Patrol | `needs.safety` (not spatial today) | Territory perimeter | `Linear` | Walking-the-beat pattern; even spacing along perimeter. |
+| Build | binary `has_construction_site` | Site position | `Logistic` | Commute-to-work pattern. |
+| Farm | binary `has_garden` | Garden tile | `Logistic` | Same commute shape as Build. |
+| Herbcraft | binary `has_herbs_nearby` / `has_remedy_herbs` / `thornbriar_available` | Herb patch / ward placement tile | `Logistic` | Herb commute; emergency-corruption boost handled by scalar, not spatial. |
+| PracticeMagic | aggregate `tile_corruption` / `nearby_corruption_level` | Corrupted tile cluster | `Power` | Corruption urgency rises sharply near epicenter per `magic.rs` scent-like spread (§5.6). |
+| Coordinate | N/A | Coordinator's perch / meeting tile | `Logistic` | Weakly spatial — coordinator works from location; distant cats discounted for participation. |
+| Mentor | binary `has_mentoring_target` | Mentee position | `Quadratic` | Requires sustained proximity; sharp fall-off. |
+| Mate | binary `has_eligible_mate` | Mate position | `Logistic` | Courtship commute pattern. **Note:** Mating now resolves as the three-layer aspiration → activity → goal showcase in §7.M. This row's `Logistic` spatial curve applies specifically to **Layer 3** `MateWithGoal`'s travel-to-partner step and to **Layer 2** `PairingActivity`'s proximity-bias term. **Layer 1** `ReproduceAspiration`'s partner-seeking is not landmark-anchored — it drives the broader §6.5.2 `Mate` target-selection consideration set (romantic + fondness + distance + fertility-window) across all reachable cats, not a narrow distance-to-known-partner curve. |
+| Cook | binary `has_functional_kitchen` + `has_raw_food_in_stores` | Kitchen building | `Logistic` | Travel-to-kitchen commute. |
+| Caretake | scalar `hungry_kitten_urgency` | Kitten position | `Quadratic` | Urgency × proximity; distant hungry kitten vs. near healthy one is exactly the ch14 §"Which Dude" shape. |
+| Idle | N/A | N/A | N/A — not spatial | Fallback; no target. |
+
+**Fox dispositions (9 rows):**
+
+| Disposition | Today | Target landmark | Curve | Rationale |
+|---|---|---|---|---|
+| Hunting | binary `prey_nearby` + `local_prey_belief` scalar | Prey-belief cluster centroid | `Quadratic` | Belief-grid provides soft location; same ch14 shape as cat Hunt. |
+| Feeding | binary `has_cubs` + `cubs_hungry` | Den position | `Power` | Return-to-den is highly localized. |
+| Patrolling | N/A | Territory perimeter | `Linear` | Even spacing along scent perimeter. |
+| Raiding | binary `store_visible` + `store_guarded` | Colony store | `Logistic` | Commute-to-target with guard-deterrent handled as a separate scalar. |
+| DenDefense | binary `cat_threatening_den` + `has_cubs` | Den position | `Power` | Inverse-distance-from-den; sharper than Flee because cubs anchor commitment. |
+| Resting | binary `has_den` | Den position | `Power` | Home-base pull; sharp fall-off. |
+| Dispersing | N/A (lifecycle) | Map edge / nearest unclaimed territory | `Linear` | Gradient-following from parent territory outward. |
+| Fleeing | `needs.health_fraction` / `cats_nearby` count | Nearest map edge | `Power` | Same inverse-distance-from-threat shape as cat Flee. |
+| Avoiding | `cats_nearby` count | Cat cluster centroid (inverted) | `Power` | Inverse-distance-from-cats; sharper than Flee because Avoiding is pre-threat. |
+
+**Non-spatial rows.** Five cat DSEs (Groom-self, Wander, Idle,
+Cook, Coordinate-minimal) and one fox disposition (Patrolling is
+weakly-spatial via perimeter; Dispersing is lifecycle) declare
+`not spatial` or gradient-based rather than landmark-anchored.
+This exhaustive declaration satisfies the doc's enumeration
+principle — every DSE is addressed, even if addressed as "not
+applicable."
+
+**Cross-refs:**
+- §6.3 `TargetTakingDse` — `SpatialConsideration` lives inside
+  per-target scoring, not outside it.
+- §6.4 personal-interest template — distance is already named as a
+  row in the existing per-target consideration enumeration.
+- §7.2 reconsideration gate — consumes both channels of the
+  `achievable_believed` signal.
+- §12.3 — names `achievable_believed` as the belief proxy grounded
+  in Rao & Georgeff's strong-realism axiom (CI1), see
+  `docs/reference/bdi-rao-georgeff.md` §2.
+- §7.M — notes that the Mate row's curve applies to the
+  travel-to-partner step only; Mating's overall substrate shape is
+  under reconsideration.
+- `docs/reference/behavioral-math-ch14-modeling-decisions.md`
+  §"Which Dude to Kill?" — reference pattern; Figures 14.6–14.8.
 
 ### §L2.10.8 Dependencies on §7 and §8
 
-- **§7 (momentum)** attaches commitment at the Intention layer, not
-  the Action layer. Rao & Georgeff's three commitment strategies
-  (blind / single-minded / open-minded) map directly: when should a
-  cat abandon its current Intention? The answer shapes §7's formula.
+- **§7 (commitment and persistence)** — resolved. The Rao & Georgeff
+  commitment strategies (§7.1, `Blind / SingleMinded / OpenMinded`)
+  tag Intentions; the Mark ch 15 persistence bonus (§7.4) gates
+  preemption during re-evaluation. The two-layer aspiration-vs-
+  Intention architecture (§7.7) uses the same vocabulary at
+  different timescales. §7 is no longer a dependency *blocker* —
+  the framework is specified and §L2.10.4's Intention output
+  carries the strategy tag directly.
 - **§8 (variation)** runs softmax over Intentions (§L2.10.6). Keeps
   micro-execution deterministic; variation lives at the
   decide-what-to-want layer, not the execute-what-I-chose layer.
@@ -2933,6 +5702,89 @@ change. A hard-fail path would be a §0.2 anti-goal.
   2006) — the GOAP template Clowder's planner descends from; the
   goal-shaped Intention framing here matches Orkin's goal-selection
   + planner split.
+
+### §L2.10.10 Herbcraft / PracticeMagic sibling-DSE curve specs
+
+§L2.10.4 named the sibling set that replaces the `Max`-composed
+parent `Herbcraft` and `PracticeMagic` DSEs: three Herbcraft
+siblings (`gather`, `prepare`, `ward`) and six PracticeMagic
+siblings (`scry`, `durable_ward`, `cleanse`, `colony_cleanse`,
+`harvest`, `commune`). Each sibling is a first-class DSE under
+§L2.10.4 — its own eligibility filter, its own composition mode,
+its own considerations — registered as a separate row per
+§L2.10.3. The parent `Max` wrappers retire entirely.
+
+This section commits curve specs per sibling. §2.3's curve-shape
+table names shapes per parent consideration axis grouped under
+`Herbcraft.*` and `PracticeMagic.*`; the view here is the
+*sibling* frame — each sibling as a complete DSE with its full
+consideration set. Rows cite the corresponding §2.3 anchor where
+shapes reuse established primitives.
+
+**Key decision recorded inline.** Two siblings (`scry`, `commune`)
+are **Activity-shaped** per §L2.10.5; the other seven are
+**Goal-shaped**. This is the first concrete application of the
+`Goal | Activity` split *below* the top-level DSE layer —
+§L2.10.5 named the split at parent-DSE granularity, and this
+subsection demonstrates that the split ports cleanly to siblings
+when their termination semantics diverge. `scry` is an
+observation-until-vision activity (Calling integration point per
+`docs/systems/the_calling.md`); `commune` is a presence-at-
+special-terrain activity that terminates on interrupt rather
+than a goal state.
+
+**Herbcraft siblings (3 rows):**
+
+| Sibling DSE | Today | Intention shape | Composition | Considerations → curves |
+|---|---|---|---|---|
+| `herbs_in_inventory` (today `Herbcraft.gather`) | `scoring.rs:420–428` | `Goal(inventory.herbs > per_cat_threshold)` | WeightedSum | `spirituality` → `Linear` (§2.3 personality anchor); `herbcraft_skill` → `Linear(intercept=herbcraft_gather_skill_offset)` (§2.3); `territory_max_corruption` → `Logistic(steepness=8, midpoint=0.1)` (§2.3 — retires `ward_corruption_emergency_bonus` / `cleanse_corruption_emergency_bonus` flat-bonus shape). Eligibility: `has_herbs_nearby` marker (§4). |
+| `remedy_applied` (today `Herbcraft.prepare`) | `scoring.rs:429–437` | `Goal(target_cat.injury_level < threshold)` | WeightedSum | `compassion` → `Linear`; `herbcraft_skill` → `Linear(intercept=herbcraft_prepare_skill_offset)`; `colony_injury_count` → `Composite { Linear(slope=herbcraft_prepare_injury_scale), Clamp(max=herbcraft_prepare_injury_cap) }` (§2.3 saturating-count anchor). Eligibility: `has_remedy_herbs` marker + at least one injured colony cat. Target-taking (registers via `add_target_taking_dse`) — per-target consideration set is §6.5.7's `ApplyRemedy` template. |
+| `ward_placed` (today `Herbcraft.ward`) | `scoring.rs:451–464` | `Goal(ward_at_tile && ward.strength > threshold)` | WeightedSum | `spirituality` → `Linear`; `herbcraft_skill` → `Linear`; `territory_max_corruption` → `Logistic(8, 0.1)` (§2.3); `ward_under_siege` → `Piecewise([(0, 0), (1, herbcraft_ward_siege_bonus)])` (§2.3 — keeps siege bonus as a named primitive). Eligibility: `thornbriar_available` marker; target tile resolved via §6.3 target-taking. |
+
+**PracticeMagic siblings (6 rows):**
+
+| Sibling DSE | Today | Intention shape | Composition | Considerations → curves |
+|---|---|---|---|---|
+| `scry` | `scoring.rs:485–488` | `Activity(Scry, UntilCondition(calling_vision_received))` | CompensatedProduct | `curiosity`, `spirituality`, `magic_skill` → all `Linear` (§2.3 personality + mastery anchors). Eligibility: `magic_affinity > gate` marker (per §4; today a hard gate at `scoring.rs:483` — the §L2.10.4 refactor softens this into a misfire filter rather than a DSE gate, per the 2026-04-19 follow-on note). No spatial input — introspective activity. |
+| `durable_ward` | `scoring.rs:512–522` | `Goal(durable_ward_at_tile)` | WeightedSum | `spirituality` → `Linear`; `magic_skill` → `Linear`; `nearby_corruption_level` → `Logistic(8, 0.1)` (§2.3 — collapses the old `corruption_sensed_response_bonus` flat gate + scale into one primitive). Eligibility: `durable_ward_herbs_prepared` marker + target tile from §6.3. |
+| `cleanse` | `scoring.rs:523–533` | `Goal(tile_corruption == 0)` | CompensatedProduct | `spirituality` → `Linear`; `magic_skill` → `Linear`; `tile_corruption` → `Logistic(steepness=8, midpoint=magic_cleanse_corruption_threshold)` (§2.3). Eligibility: `on_corrupted_tile` marker. Spatial target is the corrupted tile itself; target-taking registers via `add_target_taking_dse`. |
+| `colony_cleanse` | `scoring.rs:535–541` | `Goal(territory_max_corruption < threshold)` | CompensatedProduct | `spirituality` → `Linear`; `magic_skill` → `Linear`; `territory_max_corruption` → `Logistic(steepness=6, midpoint=0.3)` (§2.3 — softer than per-tile cleanse because territory-wide response is proactive, not emergency). No tile-presence gate — motivation is global; execution picks the hottest tile at step-resolution time. |
+| `harvest` | `scoring.rs:543–551` | `Goal(harvested_from_carcass)` | WeightedSum | `curiosity` → `Linear`; `herbcraft_skill` → `Linear(intercept=0.1)` (§2.3); `carcass_count` → `Composite { Linear, Clamp(max=3) }` (§2.3 saturating-count anchor). Eligibility: `carcass_nearby` marker; target-taking (carcass entity) via §6.3. |
+| `commune` | `scoring.rs:552–559` | `Activity(Commune, UntilInterrupt)` | CompensatedProduct | `spirituality` → `Linear`; `magic_skill` → `Linear`. Eligibility: `on_special_terrain` marker. **Spatial consideration deferred** — the special-terrain influence map (§5.6.3 row #13) is currently Absent; once built, a `Power` curve landmark-anchored at the nearest special-terrain tile applies (§L2.10.7 pattern). Flagged explicitly so the gap is visible. |
+
+**Retires on this subsection landing.** The `Herbcraft` and
+`PracticeMagic` parent rows in §3.1.1 already carry the
+"Max — retiring" tag; this subsection's sibling breakdown is what
+makes the retirement concrete. Parent `Max` composition disappears;
+each sibling carries its own composition mode (CP or WS per the
+table above). Parent `Herbcraft` / `PracticeMagic` DSE registrations
+(in §L2.10.3) do not exist — the nine sibling registrations replace
+them entirely.
+
+**Personality-coefficient anchors** across all nine rows reuse
+§2.3's Linear default for bounded `[0, 1]` coefficients
+(`spirituality`, `curiosity`, `compassion`, `herbcraft_skill`,
+`magic_skill`). Only the non-coefficient axes (`territory_max_corruption`,
+`nearby_corruption_level`, `tile_corruption`, `colony_injury_count`,
+`carcass_count`, `ward_under_siege`) pick non-`Linear` primitives,
+each citing its §2.3 anchor row.
+
+**Cross-refs:**
+- §L2.10.4 — the Intention framing that produces the sibling set
+  (parent `Max` dissolves into sibling DSEs).
+- §L2.10.5 — Goal | Activity classification; `scry` and `commune`
+  are the first sub-parent uses of the Activity path.
+- §L2.10.3 — the nine rows appear in the Herbcraft / PracticeMagic
+  sibling block of the registration catalog; total per-subsystem
+  row count there sums to 3 + 6 = 9.
+- §2.3 — anchor curves (hangry, scarcity, inverted-need-penalty,
+  saturating-count, piecewise-threshold) reused across sibling
+  axes.
+- §3.1.1 — composition-mode assignment sums to 4 CP + 5 WS for the
+  nine siblings; parent `Max` rows retire.
+- §6.5.7 `ApplyRemedy` target set — `remedy_applied` sibling uses
+  the existing §6.5 template; no new per-target considerations
+  needed.
 
 ---
 
@@ -3208,6 +6060,137 @@ path sees the trace emitter.
 
 ---
 
+## §12 Beliefs, percepts, and memory — scope boundary
+
+Rao & Georgeff's BDI architecture
+(`docs/reference/bdi-rao-georgeff.md`) treats **Belief** as a
+first-class mental store with formal semantics (belief-accessible
+worlds; possible-worlds set consistent with what the agent holds as
+true). Clowder does not maintain formal beliefs as a data
+structure, and this refactor explicitly does not add one.
+
+This section names the three states Clowder *does* maintain, the
+**belief proxies** §7.2's reconsideration gate consumes in place of
+formal beliefs, and the scope boundary separating what lives in
+this substrate from what lives in the deferred Talk-of-the-Town
+belief layer.
+
+### §12.1 The three states Clowder maintains today
+
+- **Percept** — this-frame sensing. `ScoringContext`
+  (`src/ai/scoring.rs:27–144`) booleans and scalars, fed by
+  `src/systems/sensing.rs`'s four-channel sensory model (sight,
+  hearing, scent, tremor). Ephemeral, not retained across frames.
+  What the cat senses *right now*.
+- **Memory** — `Memory` component
+  (`src/components/mental.rs:79`). Rolling buffer of `MemoryEntry`
+  (max 20 entries) with per-entry decay (firsthand −0.001/tick,
+  secondhand −0.002/tick). Retained across frames but **disconnected
+  from scoring today** — memory feeds narrative and colony-knowledge
+  promotion, not decision-making. Talk-of-the-Town integration work
+  would change this; this refactor does not.
+- **Colony knowledge** — per-colony episodic knowledge
+  (`src/systems/colony_knowledge.rs:22`). Promoted from individual
+  memories when carrier count crosses threshold. Decays over time.
+  Used for narrative emission and social transmission — not for
+  decision-making.
+
+### §12.2 What a Rao & Georgeff Belief would be
+
+A consistent set of propositions the cat holds as true about the
+world, queried by the reconsideration gate to determine whether a
+goal is achievable (strong realism, CI1) and whether achievement
+has occurred (drop triggers under all three strategies).
+
+Clowder does not have this. Adding it is the Talk-of-the-Town work
+(Ryan, Summerville, Mateas, Wardrip-Fruin, "Simulating Character
+Knowledge Phenomena in Talk of the Town," *Game AI Pro 3* ch. 37 —
+queued in the Reading list), which is a separate epic with its own
+design pass and is explicitly outside this substrate's scope (see
+§5.5 and the final "What's explicitly out of scope" section).
+
+### §12.3 The belief proxies §7.2 consumes
+
+In lieu of formal beliefs, §7.2's reconsideration gate uses three
+proxy signals, each derived from state the substrate already
+maintains:
+
+1. **`achievement_believed`** ← current percepts evaluated against
+   the Intention's goal predicate.
+   Percept ≈ belief for goal-achievement because the cat trusts
+   what it senses right now. Examples: hunger level below threshold
+   (`Needs::hunger < threshold`), carcass at stores (spatial
+   predicate), kitten's hunger sated (percepted kitten-state), ward
+   placed (direct tile-state check).
+2. **`achievable_believed`** ← two-channel signal, both load-
+   bearing per §L2.10.7:
+   - (a) DSE re-evaluated score above a retention threshold.
+     Spatial reachability contributes via the
+     `SpatialConsideration` response curve; as the target becomes
+     less reachable (obstacles, distance), the score attenuates
+     smoothly and eventually crosses under the retention threshold.
+   - (b) `GoapPlan::replan_count < max_replans`
+     (`src/components/goap_plan.rs:103`). Hard-fail signal when the
+     planner cannot route a step chain after the capped number of
+     retries.
+   Channel (a) is elastic (smooth degradation per §0.2); channel
+   (b) is the hard exit when elasticity is insufficient.
+3. **`still_goal`** ← DSE re-evaluation against current context
+   above the retention threshold. Below threshold → the cat no
+   longer goals this Intention. Only load-bearing under `OpenMinded`
+   commitment (§7.3).
+
+### §12.4 Why this is sufficient for L3
+
+Strong realism (Rao & Georgeff CI1) requires "a cat cannot intend
+what it doesn't believe achievable." The `achievable_believed`
+proxy — (a) + (b) together — covers this for every goal-shaped
+Intention: if no plan routes, the `replan_count` cap fires; if the
+target becomes unreachable via smooth degradation, the
+`SpatialConsideration` attenuation fires; either way the
+reconsideration gate drops the Intention under `SingleMinded`.
+
+Activity-shaped Intentions (§L2.10.5) don't need CI1 at all — they
+have no goal state to be unachievable. Achievement is termination
+(by ticks, condition, or interrupt), not a world-predicate. The
+belief-proxy architecture is therefore complete for both Intention
+shapes.
+
+What the proxy architecture **cannot** cover:
+
+- **Agent beliefs about other agents.** "Does cat A believe cat B
+  will cooperate?" requires a per-relationship belief store.
+- **Candidate revision / belief about past events.** "Does cat A
+  believe cat B betrayed cat C?" requires evidence typology and
+  revision rules.
+- **False beliefs.** "Cat A believes mate is alive when mate is
+  actually dead" requires distinguishing cat-A's belief store from
+  world-ground-truth.
+- **Gossip-driven belief propagation.** Related to colony knowledge
+  but semantically richer — colony knowledge is "fact X is known
+  to the colony"; belief propagation is "cat A's belief about fact
+  X shifted because of what cat B told them."
+
+All four are Talk-of-the-Town concerns and deferred to that epic.
+The refactor's §5.5 already stakes this position for pairwise
+social affinity specifically; §12 restates it for the general
+belief-layer question.
+
+### §12.5 Cross-refs
+
+- `docs/reference/bdi-rao-georgeff.md` §1, §2, §9 — BDI formalism
+  and crosswalk that motivates this boundary.
+- §5.5 — pairwise social affinity deferred to ToT.
+- §7.2 — consumer of the three belief proxies.
+- §L2.10.7 — plan-cost feedback resolution that provides channel
+  (a) of `achievable_believed`.
+- `docs/systems/project-vision.md` — magic and social weight are
+  ecological phenomena; the belief layer's absence here doesn't
+  deny that weight, it just defers its structured representation
+  to the ToT epic.
+
+---
+
 ## A2 — big-brain evaluation
 
 The `zkat/big-brain` Rust crate provides Bevy utility-AI primitives
@@ -3245,15 +6228,10 @@ Consolidated reading for this substrate, with current status:
   AI Pro 2* ch. 30 (canonical IAM reference, drives §5)
 - `docs/reference/behavioral-math-ch12-response-curves.md` — drives §2
 - `docs/reference/behavioral-math-ch13-factor-weighting.md` — drives §3
-- `docs/reference/behavioral-math-ch14-modeling-decisions.md` — drives §1, §4, §6 (integrated chapter)
-- `docs/reference/behavioral-math-ch15-changing-decisions.md` — drives §7
+- `docs/reference/behavioral-math-ch14-modeling-decisions.md` — drives §1, §4, §6, §L2.10.7 (integrated chapter; §"Which Dude to Kill?" closes §L2.10.7 in favor of candidate (a))
+- `docs/reference/behavioral-math-ch15-changing-decisions.md` — drives §7 (persistence bonus, event-driven interrupts, information expiry, decision-momentum framing)
 - `docs/reference/behavioral-math-ch16-variation.md` — drives §8
-
-**In-repo, not yet extracted to markdown:**
-- `docs/reference/rao91a.pdf` — Rao & Georgeff (1991). "Modeling
-  Rational Agents within a BDI-Architecture." KR 1991. (Commitment
-  theory foundation; drives §L2.10's Intention framing, §7's
-  commitment strategies.)
+- `docs/reference/bdi-rao-georgeff.md` — Rao & Georgeff (1991), "Modeling Rational Agents within a BDI-Architecture," KR 1991. Gameplay-first summary of the BDI formalism. Drives §L2.10.4 Intention framing, §L2.10.5 Goal|Activity split, §L2.10.7 strong-realism grounding, §7 commitment strategies, §7.7 nested-intention aspiration layer, §7.7.1 goal-consistency concurrency bound, §12 belief-proxy boundary. Original PDF remains at `docs/reference/rao91a.pdf`.
 
 **Watched (user recall, transcript unavailable):**
 - Dave Mark, "Building a Better Centaur: AI at Massive Scale" —
@@ -3359,12 +6337,17 @@ doc:
     `Goal`, activity runner for `Activity`) is the cost; honest
     shape-matching is the benefit. Flagged explicitly so future
     readers don't assume pure-BDI.
-13. **Plan-cost feedback is orthogonal, not solved.** Goal-emission
-    doesn't make scoring cost-aware (§L2.10.7). Mark ch 14 §"Which
-    Dude to Kill?" folds distance in; Clowder has two candidate
-    shapes (pre-estimated `SpatialConsideration` cost vs. DSE→GOAP
-    cost-query handshake), both open. §7 (momentum) likely forces
-    a choice because commitment strategies need plan-cost signals.
+13. **Plan-cost feedback folds into scoring via `SpatialConsideration`,
+    not a pathfinder handshake** (§L2.10.7). Mark ch 14 §"Which Dude
+    to Kill?" treats distance as a scoring input with a response
+    curve (Figures 14.6–14.8), not as a separate cost-query channel.
+    Clowder matches: each spatially-sensitive DSE carries a
+    `SpatialConsideration` with a `Quadratic` / `Power` / `Logistic`
+    curve; elastic score-attenuation (§0.2) handles reachability
+    degradation; `GoapPlan::replan_count ≥ max_replans` remains the
+    hard-fail exit for genuine unplannability. Candidate (b)
+    pathfinder-in-the-loop is rejected — chicken-and-egg under §7
+    commitment strategies, expensive, and §0.2-hostile.
 14. **The simulation is the director is the player** (§0.1). In
     conventional game design, player / director / simulation are three
     distinct roles; Clowder collapses all three into the simulation
@@ -3403,6 +6386,66 @@ doc:
     especially for the §10 queue (Disease, Recreation, Substances,
     Mental Breaks), where stat-buff framings are the path of least
     resistance.
+18. **Strong realism via plannability + score attenuation gives us
+    CI1 without formal beliefs** (§7.2, §12, §L2.10.7). Rao &
+    Georgeff's "an agent cannot intend what it doesn't believe
+    achievable" is the one BDI axiom with direct gameplay teeth. We
+    satisfy it with two existing signals: `SpatialConsideration` score
+    attenuation (elastic per §0.2) plus `GoapPlan::replan_count`
+    hard-fail (the brittleness backstop). No Belief data structure,
+    no pathfinder-in-the-loop (that's the rejected §L2.10.7
+    candidate (b)), no chicken-and-egg. The full Talk-of-the-Town
+    belief layer remains deferred (§12) — L3 commitment does not
+    require it.
+19. **Persistence bonus lives at the commitment layer; task-progress
+    marginal utility lives in the DSE** (§7.4, §7.8). Both mechanisms
+    come from Mark ch 15 — bowling-ball decision momentum and the
+    Finish Him! / Just Gimme a Minute framing — but they homo-
+    morphically live in two different places. The commitment-layer
+    bonus is generic (Logistic on task-completion-fraction, applied
+    once during re-evaluation to the active Intention). The DSE-layer
+    marginal utility is instance-specific (Build's "percent-complete"
+    axis; Farm's "crop maturity" axis). Conflating them produces
+    either commitment-layer code that leaks DSE internals or per-DSE
+    code that duplicates the commitment gate.
+20. **Midlife crisis is a nested-Intention OpenMinded drop fired by
+    event** (§7.7). Aspirations are a separate commitment layer from
+    per-tick Intentions. Per-tick defaults SingleMinded (flipper
+    prevention); aspirations default OpenMinded because grief, fate,
+    mood drift, and life-stage transitions *should* redirect
+    multi-year arcs — that's character, not a bug. Same Rao &
+    Georgeff vocabulary at a second timescale, with event-driven
+    reconsideration (not per-tick — per-tick reconsideration of
+    multi-year arcs *is* the strobing failure at a different
+    timescale). Connects directly to §0.3's long-term-relevance leg
+    of apophenia and §0.4's character-expression filter.
+21. **Concurrent-aspiration cap is consistency, not a number**
+    (§7.7.1). A cat holds as many aspirations as remain mutually
+    consistent — Rao & Georgeff's goal-consistency axiom (CI1/CI2)
+    applied directly. Hard-logical and hard-identity pairs are
+    declared incompatible in a sparse authoring-time matrix;
+    soft-resource and soft-emotional tensions are allowed and often
+    desirable (character expression). Reconsideration events drop
+    aspirations one at a time, so grief over a kitten's death can
+    redirect combat-mastery while leaving herb-tending intact. One
+    arc redirecting doesn't cascade the cat's whole identity.
+22. **Softmax-over-all is Mark ch 16's closing recommendation in
+    exponential-weight clothing** (§8.1). Ch 16's progression goes
+    argmax → random-top-n → weighted-random-top-n →
+    weighted-random-from-all; only the last survives Mark's own
+    critique of arbitrary cutoffs. Clowder's existing
+    softmax-over-all matches that topology — the departure is
+    exponential weighting instead of Mark's linear
+    `TotalScore / ThisScore`, justified by §1.3's strict `[0, 1]`
+    score normalization (keeps `exp()` stable) and by softmax's
+    single-knob temperature collapsing Mark's per-step coefficient
+    + curve + rescale machinery into one continuous parameter. The
+    decision to keep softmax is a topology match, not a departure
+    — and the temperature bound is two-sided, apophenia-anchored:
+    too cold reads as Stepford, too hot dissolves character at the
+    day scale (§0.3's two legs, §8.3, §8.6). This also names the
+    fox argmax-plus-jitter path as a *Key insight #8* artifact
+    converging onto the unified softmax under §8.5.
 
 ---
 
