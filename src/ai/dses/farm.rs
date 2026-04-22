@@ -8,8 +8,8 @@
 //! `diligence` via Linear. Both gate: no scarcity ⇒ no reason to
 //! farm; no diligence ⇒ cat won't bother.
 //!
-//! Eligibility: `has_garden` (outer gate until §4 port). Maslow
-//! tier 2.
+//! Eligibility: `.require("HasGarden")` per §4 port (Phase 4b.4).
+//! Maslow tier 2.
 
 use bevy::prelude::*;
 
@@ -45,7 +45,10 @@ impl FarmDse {
                 )),
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0]),
-            eligibility: EligibilityFilter::new(),
+            // §4 marker eligibility (Phase 4b.4): Farm only scores if
+            // the colony has a functional garden. Retires the inline
+            // `if ctx.has_garden` gate at `scoring.rs::score_actions`.
+            eligibility: EligibilityFilter::new().require("HasGarden"),
         }
     }
 }

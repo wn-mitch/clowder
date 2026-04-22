@@ -381,6 +381,7 @@ pub fn evaluate_dispositions(
     let has_garden = building_query
         .iter()
         .any(|(_, s, _, site, _)| s.kind == StructureType::Garden && site.is_none());
+    markers.set_colony("HasGarden", has_garden);
     let has_functional_kitchen = building_query.iter().any(|(_, s, _, site, _)| {
         s.kind == StructureType::Kitchen && site.is_none() && s.effectiveness() > 0.0
     });

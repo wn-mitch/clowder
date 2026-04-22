@@ -683,9 +683,14 @@ pub fn score_actions(
     }
 
     // --- Farm (§2.3: CP of food_scarcity + diligence) ---
-    if ctx.has_garden {
+    // §4 (Phase 4b.4): the outer `ctx.has_garden` gate retires — the
+    // Farm DSE's `.require("HasGarden")` eligibility filter resolves
+    // against the `HasGarden` colony marker populated by the caller.
+    {
         let urgency = score_dse_by_id("farm", ctx, inputs);
-        scores.push((Action::Farm, urgency + jitter(rng, s.jitter_range)));
+        if urgency > 0.0 {
+            scores.push((Action::Farm, urgency + jitter(rng, s.jitter_range)));
+        }
     }
 
     // --- Herbcraft (§L2.10.10 sibling split: gather + prepare + ward) ---
@@ -1608,12 +1613,14 @@ mod tests {
     fn cached_test_markers() -> &'static MarkerSnapshot {
         static M: OnceLock<MarkerSnapshot> = OnceLock::new();
         M.get_or_init(|| {
-            // Default snapshot for scoring tests: HasStoredFood set so
-            // the Eat DSE's `.require("HasStoredFood")` eligibility gate
-            // opens. Tests that explicitly check the empty-stores path
-            // override `markers` on the returned `EvalInputs`.
+            // Default snapshot for scoring tests: every ported §4
+            // colony marker is set so the corresponding DSE's
+            // `.require(...)` eligibility gate opens. Tests that
+            // explicitly check an absence path override `markers` on
+            // the returned `EvalInputs`.
             let mut s = MarkerSnapshot::new();
             s.set_colony("HasStoredFood", true);
+            s.set_colony("HasGarden", true);
             s
         })
     }

@@ -536,12 +536,14 @@ pub fn evaluate_and_plan(
     let food_available = !res.food.is_empty();
     let food_fraction = res.food.fraction();
 
-    // §4 marker snapshot (Phase 4b.2). Populated once at system start
-    // from Resources and Queries, then passed by reference through
-    // `EvalInputs` so `EligibilityFilter::require(marker)` rows resolve
-    // without each DSE carrying its own query bundle. Phase 4b.2 MVP
-    // ships the colony-scoped `HasStoredFood` reference row; per-cat
-    // markers extend this as authoring systems land per §4.6.
+    // §4 marker snapshot. Populated once at system start from Resources
+    // and Queries, then passed by reference through `EvalInputs` so
+    // `EligibilityFilter::require(marker)` rows resolve without each
+    // DSE carrying its own query bundle. Colony-scoped markers follow
+    // the same "compute from caller-visible state" pattern established
+    // in Phase 4b.2 — `ColonyState` singleton promotion is a later
+    // refactor. `HasGarden` is populated below after the existing
+    // `has_garden` binding computes the same predicate.
     let mut markers = crate::ai::scoring::MarkerSnapshot::new();
     markers.set_colony("HasStoredFood", food_available);
 
@@ -569,6 +571,7 @@ pub fn evaluate_and_plan(
         .building_query
         .iter()
         .any(|(_, s, _, site, _)| s.kind == StructureType::Garden && site.is_none());
+    markers.set_colony("HasGarden", has_garden);
     let has_functional_kitchen = world_state.building_query.iter().any(|(_, s, _, site, _)| {
         s.kind == StructureType::Kitchen && site.is_none() && s.effectiveness() > 0.0
     });
