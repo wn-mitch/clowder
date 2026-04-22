@@ -25,6 +25,7 @@ pub mod fate;
 pub mod fox_goap;
 pub mod goap;
 pub mod growth;
+pub mod influence_map;
 pub mod items;
 pub mod magic;
 pub mod memory;
