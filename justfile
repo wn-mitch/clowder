@@ -29,6 +29,97 @@ soak SEED="42":
 check-canaries LOGFILE="logs/events.jsonl":
     scripts/check_canaries.sh {{LOGFILE}}
 
+# Run the continuity-canary checks (grooming, play, mentoring, burial,
+# courtship, mythic-texture) against an events.jsonl footer. Exits
+# non-zero when any canary class fired zero times in the soak.
+# Continuity canaries gate behavioural range — substrate refactor
+# Phase 3+ requires them to strengthen (not just non-regress).
+check-continuity LOGFILE="logs/events.jsonl":
+    scripts/check_continuity.sh {{LOGFILE}}
+
+# Deep-soak with a focal-cat trace sidecar. Writes to
+# logs/tuned-<seed>/{events,narrative,trace-<focal>}.jsonl. Trace
+# records decompose per-tick L1/L2/L3 state for one focal cat per §11
+# of docs/systems/ai-substrate-refactor.md.
+soak-trace SEED="42" FOCAL_CAT="Simba":
+    mkdir -p logs/tuned-{{SEED}}
+    cargo run --release -- --headless --seed {{SEED}} --duration 900 \
+      --focal-cat {{FOCAL_CAT}} \
+      --log logs/tuned-{{SEED}}/narrative.jsonl \
+      --event-log logs/tuned-{{SEED}}/events.jsonl \
+      --trace-log logs/tuned-{{SEED}}/trace-{{FOCAL_CAT}}.jsonl
+
+# Pairwise frame-diff over two focal-cat traces, with optional
+# hypothesis overlay from a phase balance doc. Emits per-DSE drift
+# stats ranked by |Δ mean| and an overall concordance verdict.
+#
+# Example:
+#   just frame-diff logs/baseline-pre-substrate-refactor/trace-Simba.jsonl \
+#                   logs/tuned-42/trace-Simba.jsonl \
+#                   docs/balance/substrate-phase-3.md
+frame-diff BASELINE NEW HYPOTHESIS="":
+    #!/usr/bin/env bash
+    if [[ -n "{{HYPOTHESIS}}" ]]; then
+        uv run scripts/frame_diff.py {{BASELINE}} {{NEW}} --hypothesis {{HYPOTHESIS}}
+    else
+        uv run scripts/frame_diff.py {{BASELINE}} {{NEW}}
+    fi
+
+# Full verification loop for a seed: soak, survival canaries,
+# continuity canaries, constants diff against a baseline. Lands in
+# Phase 1 of the substrate refactor; Phase 3+ extends with frame-diff
+# against a baseline trace.
+#
+# Does NOT hard-abort on canary failures during pre-refactor runs —
+# the baseline Starvation canary is already failing (see
+# docs/balance/substrate-refactor-baseline.md). Prints a verdict line
+# at the end; operator decides whether numbers are acceptable against
+# the phase's balance doc. Exit code reflects worst observed status.
+autoloop SEED="42" FOCAL_CAT="Simba":
+    #!/usr/bin/env bash
+    set -uo pipefail
+    just soak-trace {{SEED}} {{FOCAL_CAT}}
+    echo ""
+    echo "== survival canaries =="
+    just check-canaries logs/tuned-{{SEED}}/events.jsonl
+    surv_rc=$?
+    echo ""
+    echo "== continuity canaries =="
+    just check-continuity logs/tuned-{{SEED}}/events.jsonl
+    cont_rc=$?
+    baseline="logs/baseline-pre-substrate-refactor/events.jsonl"
+    const_rc=0
+    if [[ -f "$baseline" ]]; then
+        echo ""
+        echo "== constants diff vs baseline =="
+        if just diff-constants "$baseline" logs/tuned-{{SEED}}/events.jsonl; then
+            echo "(identical)"
+        else
+            const_rc=$?
+            echo "(constants differ — phase's balance doc must explain)"
+        fi
+    fi
+    echo ""
+    echo "== autoloop verdict =="
+    if [ "$surv_rc" -ne 0 ]; then
+        echo "  survival canaries:  FAIL (exit $surv_rc) — pre-existing Starvation regression is inherited; see activation-1-status.md"
+    else
+        echo "  survival canaries:  pass"
+    fi
+    if [ "$cont_rc" -ne 0 ]; then
+        echo "  continuity canaries: FAIL (exit $cont_rc) — expected at Phase 1 entry; refactor Phases 3+ must strengthen"
+    else
+        echo "  continuity canaries: pass"
+    fi
+    if [ "$const_rc" -ne 0 ]; then
+        echo "  constants diff:     drift (exit $const_rc)"
+    else
+        echo "  constants diff:     clean"
+    fi
+    # Overall exit: 0 if survival passes; nonzero if survival regresses.
+    # Continuity + constants surface in the verdict but don't block.
+    exit "$surv_rc"
+
 # Multi-seed × multi-rep headless sweep for Phase 5b balance verification.
 # Writes to logs/sweep-<label>/<seed>-<rep>/{narrative,events}.jsonl.
 # Defaults: 5 seeds × 3 reps = 15 runs, 4-way parallel. Requires a release
