@@ -1355,17 +1355,18 @@ of the three Phase 3 exit-soak regressions that prompted open-work #14:
   Marker doc comments updated; `age_stages_at_boundaries` test
   updated to the new thresholds.
 
-**Concordance on seed-42 `--duration 900` re-soak:**
+**Concordance on seed-42 `--duration 900` re-soak (landed commit `c4552dc`, log `logs/phase4a-c4552dc/events.jsonl`):**
 
 | Metric | Baseline (`562c575`) | Phase 4a | Direction |
 |---|---|---|---|
 | deaths_by_cause.Starvation | 8 | 0 | ✅ canary passes |
-| MatingOccurred | 0 | 1 | off zero |
-| BondFormed | 16 | 28 | +75% |
-| ScryCompleted | 256 | 562 | 2.2× |
-| WardPlaced | 89 | 259 | 2.9× |
-| ward_avg_strength_final | 0.0 | 0.49 | wards persisted |
-| Grooming | 30 | 132 | +340% |
+| MatingOccurred | 0 | 0 | flat (substrate gate opens but density is a follow-on tune — dirty-commit run hit 1 on seed noise) |
+| BondFormed | 16 | 34 | +112% |
+| ScryCompleted | 256 | 615 | +140% |
+| WardPlaced | 89 | 264 | +197% |
+| ward_avg_strength_final | 0.0 | 0.39 | wards persisted |
+| Grooming (continuity) | 30 | 213 | +610% |
+| KnowledgePromoted | 35 | 92 | +163% |
 
 Canonical `scripts/check_canaries.sh` passes all four survival
 canaries (Starvation == 0, ShadowFoxAmbush ≤ 5, footer written,

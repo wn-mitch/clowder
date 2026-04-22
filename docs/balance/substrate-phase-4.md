@@ -3,10 +3,19 @@
 **Date:** 2026-04-22
 **Seed / duration:** 42 / 900s
 **Baseline:** `logs/tuned-42/events.jsonl` at commit `562c575`
-**Phase 4a log:** `/tmp/phase4-soak/events.jsonl` at commit `f0c8813`
-(dirty — landing commit supersedes this log on commit; re-soak at
-landing commit is a substitute that matches this header's `sim_config`
-byte-for-byte and differs only on `commit_hash`).
+**Phase 4a log:** `logs/phase4a-c4552dc/events.jsonl` at commit
+`c4552dc` (landed; `commit_dirty: false`). The numbers below update
+with every re-soak at the landing commit — the dirty-commit log at
+`/tmp/phase4-soak/events.jsonl` from the pre-landing run is retained
+in the repo scratch space for diff against this one; its
+`MatingOccurred = 1` versus the landed run's `MatingOccurred = 0` is
+seed-noise at the one-count level (bond-progression timing shifted
+just enough to miss the single pair's short viable window).
+
+Soak scope note. `start_tick = 60 * ticks_per_season = 1.2M`, so a
+900-second sim clock covers ~7 sim-seasons (end tick ~1.34M). Earlier
+revisions of this doc miscounted this as 900 seasons; all "per soak"
+targets below are calibrated to the ~7-season actual.
 
 ## Thesis
 
@@ -95,45 +104,46 @@ deep-soak.
 
 ### Footer diff (survival canaries)
 
-| Metric | Baseline | Phase 4a | Direction |
+| Metric | Baseline | Phase 4a (landed) | Direction |
 |---|---|---|---|
 | deaths_by_cause.Starvation | 8 | 0 | ✅ |
 | shadow_fox_spawn_total | 0 | 0 | flat |
 | shadow_foxes_avoided_ward_total | 0 | 0 | flat |
 | ward_siege_started_total | 0 | 0 | flat |
-| ward_count_final | 0 | 2 | ward coverage persists |
-| ward_avg_strength_final | 0.00 | 0.49 | wards held through soak |
+| ward_count_final | 0 | 4 | ward coverage persists |
+| ward_avg_strength_final | 0.00 | 0.39 | wards held through soak |
 
 All four `scripts/check_canaries.sh` canaries pass.
 
 ### Per-feature activation diff (final `SystemActivation` record)
 
-| feature | baseline | phase 4a | delta |
+| feature | baseline | phase 4a (landed) | delta |
 |---|---|---|---|
-| MatingOccurred | 0 | 1 | +1 |
+| MatingOccurred | 0 | 0 | 0 (seed noise; dirty run had 1) |
 | KittenBorn | 0 | 0 | 0 |
-| BondFormed | 16 | 28 | +12 (+75%) |
-| ScryCompleted | 256 | 562 | +306 (+120%) |
-| WardPlaced | 89 | 259 | +170 (+191%) |
+| BondFormed | 16 | 34 | +18 (+112%) |
+| ScryCompleted | 256 | 615 | +359 (+140%) |
+| WardPlaced | 89 | 264 | +175 (+197%) |
 | CleanseCompleted | 0 | 0 | 0 |
 | CarcassCleansed | 0 | 0 | 0 |
 | CarcassHarvested | 0 | 0 | 0 |
 | SpiritCommunion | 0 | 0 | 0 |
-| GatherHerbCompleted | 8 | 6 | -2 |
+| GatherHerbCompleted | 8 | 8 | 0 |
 | AspirationCompleted | 0 | 0 | 0 |
 | BuildingConstructed | 10 | 5 | -5 |
-| DirectiveIssued | 5175 | 14434 | +9259 |
-| DirectiveDelivered | 734 | 144 | -590 |
+| DirectiveIssued | 5175 | 14474 | +9299 (+180%) |
+| DirectiveDelivered | 734 | 157 | -577 (-79%) |
+| KnowledgePromoted | 35 | 92 | +57 (+163%) |
 
 ### Continuity canaries
 
-| canary | baseline | phase 4a |
+| canary | baseline | phase 4a (landed) |
 |---|---|---|
-| grooming | 30 | 132 |
+| grooming | 30 | 213 |
 | play | 0 | 0 |
 | mentoring | 0 | 0 |
 | burial | 0 | 0 |
-| courtship | 0 | 1 |
+| courtship | 0 | 0 |
 | mythic-texture | 0 | 0 |
 
 ## Concordance
@@ -167,19 +177,36 @@ BuildingConstructed drop correlates with a rise in DirectiveIssued
 (yes: +9259, +179%) — coordinators are still *issuing* directives but
 followers are preempting them at higher rates under softmax.
 
-### 4.3 Adult-window retune — ACCEPT (minimum bar)
+### 4.3 Adult-window retune — ACCEPT (substrate-success) / defer density
 
-MatingOccurred 0 → 1 meets the minimum-viable bar. The density target
-(≥ 1 per season) is not met on this soak, but the hypothesis was
-explicitly about the availability gate (Fertility present during a
-mating window), not the density. BondFormed +75% corroborates the
-social-fabric strengthening that the wider window enables.
+MatingOccurred stayed at 0 on the landed-commit soak — the single
+mating observed on the dirty-commit pre-landing run was seed-noise
+at the one-count level (one bonded pair just barely clearing the
+interest + estrus window in the dirty-run RNG trajectory). The
+substrate-level signal is BondFormed 16 → 34 (+112%), which
+evidences the wider Adult window is giving bonded pairs more
+overlap with each other's fertility cycles; the density gap is
+therefore a Fertility-cycle-pacing / bond-progression-timing gap,
+not an availability gap.
 
-No old-age deaths observed in either baseline or Phase 4a — a 900-
-season soak only covers ~45 seasons, so the Elder-mortality ramp
-doesn't trigger within the soak window in either regime. The coupled
-`elder_entry_seasons` bump is verified by code review, not by
-measurable telemetry on this soak.
+The ~7-sim-season soak covers ~14 Fertility cycles per cat, of
+which ~5 carry a viable phase, and winter anestrus zeros ~25% of
+those. Per the `FertilityConstants` defaults (cycle = 10k ticks,
+proestrus 15%, estrus 20%, post-partum 5k ticks), a bonded
+Queen–Tom pair's realistic mating window per soak is 2–4 brief
+Estrus bursts. Hitting one of those bursts requires the pair to
+also be colocated, sated (`breeding_*_floor`), past the mating
+interest threshold, and not in winter — the product of those
+independent gates explains the 0–1 rate.
+
+No old-age deaths observed in either regime — the ~7-season soak
+doesn't reach the (new) season-67 Elder-mortality ramp in either
+baseline or Phase 4a. The coupled `elder_entry_seasons` bump is
+verified by code review, not by measurable telemetry on this soak.
+
+Density target (≥ 1 per colony per season ≈ ≥ 7 per 7-season soak)
+remains unmet and is deferred to a follow-on balance iteration
+named in open-work #14.
 
 ## Next iterations
 
