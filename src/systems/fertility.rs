@@ -285,7 +285,7 @@ mod tests {
         world.insert_resource(SimConfig::default());
         world.insert_resource(TimeState::default());
         // Tick 300 000 = 15 seasons in → cat born at tick 0 is Adult
-        // (LifeStage::Adult spans seasons 12–47). Modulo 80 000-tick
+        // (LifeStage::Adult spans seasons 12–59). Modulo 80 000-tick
         // year puts us 60 000 ticks into the year = Winter onset.
         world.resource_mut::<TimeState>().tick = 300_000;
 

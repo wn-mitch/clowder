@@ -1135,68 +1135,72 @@ cold-death canaries must remain 0.
 Phase 3 is gated on §7.W (Fulfillment component) landing. Phase 4
 is gated on phase 3.
 
-### 14. Phase 3 exit regressions → Phase 4 balance thread [2026-04-22]
+### 14. Phase 4 follow-ons — target-taking registration + markers + mate-gender + Mating/PracticeMagic magnitude [2026-04-22]
 
-**Why it matters:** Phase 3 of the AI substrate refactor closed
-"substrate-complete, balance-gated" on commits `c8bb1c6` (§9.3 stance
-bindings) + `562c575` (Fertility + §7.M.7.2 transitions). The seed-42
-15-min exit soak shows three directional-concordant but
-magnitude-extreme regressions that each resolve against specific
-Phase 4 deliverables:
+**Why it matters:** Phase 4a landed three of the five Phase 4
+deliverables (softmax-over-Intentions, §3.5 modifier pipeline port of
+Herbcraft/PracticeMagic emergency bonuses, Adult-window retune). The
+seed-42 `--duration 900` re-soak clears every survival canary and
+reverses the three Phase-3-exit regressions, but two spec-committed
+Phase 4 deliverables + three balance gaps still stand.
 
-- **MatingOccurred 7 → 0** — downstream of §7.M.7.1 Elder-exit removal
-  of `Fertility`. Baseline's 7 matings were all Elder × Elder at tick
-  1.28M–1.37M; in a 15-min soak, bonded pairs are all Elder by the
-  time mating would fire. Fix = Adult-window retune (lower Elder
-  threshold or raise founder-age distribution); §7.M.7.8 prescribes
-  balance tuning, not substrate rollback.
-- **PracticeMagic sub-mode count 2 / 6 → 1 / 6** — downstream of the
-  Herbcraft + PracticeMagic emergency bonuses (`ward_corruption_*`,
-  `cleanse_*`, `sensed_rot_*`) staying inline additive in
-  `scoring.rs:576–712`. Fix = §3.5 modifier-pipeline port.
-- **Starvation deaths 3 → 8** — cross-peer-group argmax magnifies over
-  a 15-min soak. Fix = §L2.10.6 softmax selection.
+Phase 4a landing entry lives in the Landed section below; the
+remaining work is itemised here.
 
-Full Phase 3 doc: `docs/balance/substrate-phase-3.md` § Concordance.
-Exit-soak log: `logs/tuned-42/events.jsonl` at commit `562c575`.
+**Still outstanding (spec-committed, Phase 4 scope):**
 
-**Touch points (all Phase 4):**
+- **`add_target_taking_dse` + per-target considerations (§6.3,
+  §6.5).** The §9.3 stance bindings shipped in `c8bb1c6` are
+  declarative — their runtime-filtering consumption waits on this
+  registration method. `src/ai/dse.rs` needs a `TargetTakingDse`
+  trait; `eval.rs` gets a `add_target_taking_dse` method on
+  `DseRegistryAppExt`.
+- **§4 marker-eligibility authoring systems for roster gap-fill.**
+  New `src/systems/markers_authoring.rs` with per-tick systems that
+  insert/remove `CanHunt`, `CanFight`, `HasSocialTarget`,
+  `HasStoredFood`, `StoreVisible`, `ThreatNearby`, etc. Retires the
+  outer eligibility gates still live in `score_actions`. Unblocks
+  Cleanse / Harvest / Commune dormancy (0 fires on re-soak —
+  outer-gate eligibility is still the limiting factor, not the
+  modifier pipeline).
+- **§7.M.7.4 `resolve_mate_with` gender fix.** Today's pattern marks
+  the initiator `Pregnant`; spec fix is to pick the
+  gestation-capable partner. Independent of the three Phase 4a
+  deliverables; blocking nothing but touches
+  `src/steps/disposition/mate_with.rs`.
 
-- `src/ai/eval.rs` — add softmax selection alongside argmax; §L2.10.6
-  committed a temperature-tunable design.
-- `src/ai/modifier.rs` (new) — three `ScoreModifier` impls:
-  `PrideBoost`, `TraditionInertia`, `FoxSuppression`. Then the magic
-  emergency-bonus retargets: `WardCorruptionEmergency`,
-  `CleanseEmergency`, `SensedRotBoost` — each reads the same
-  `ctx.target_tile.corruption` that the inline path reads today.
-- `src/ai/dse.rs` — add `TargetTakingDse` trait + `add_target_taking_dse`
-  registration method. Consume the declarative stance bindings
-  shipped in `c8bb1c6`.
-- `src/systems/markers_authoring.rs` (new) — per-tick systems that
-  insert / remove `CanHunt`, `CanFight`, `HasSocialTarget`,
-  `HasStoredFood`, `StoreVisible`, `ThreatNearby`, etc. Retires outer
-  eligibility gates from `score_actions`.
-- `src/steps/disposition/mate_with.rs::resolve_mate_with` — §7.M.7.4
-  gender fix: select the gestation-capable partner for `Pregnant`
-  insertion instead of the initiator.
-- `src/resources/sim_constants.rs` — Adult-window retune (likely
-  change `LifeStage::Adult` upper bound from 47 seasons to 60+ so
-  Adult×Adult mating windows exist in 15-min soaks).
+**Balance gaps on the Phase 4a re-soak** (seed 42, `--duration 900`,
+commit TBD on landing):
 
-**Re-open condition:** if post-Phase-4 seed-42 `--duration 900` soak
-still fails MatingOccurred ≥ 1 per colony per season, Farming ≥ 1, or
-≥ 3 / 5 PracticeMagic sub-modes, re-open the Phase 3 hypothesis in
-`docs/balance/substrate-phase-3.md` rather than loading a new balance
-thread — those three are load-bearing for the Phase 3 refactor's
-validation.
+- **MatingOccurred = 1, target ≥ 1 per colony per season (45 per
+  soak).** Phase 4a recovered the zero but fell short of the density
+  target by ~45×. BondFormed 16 → 28 shows the social fabric
+  strengthened; mating-act scoring is still the bottleneck. Levers
+  from §7.M.7.8: raise per-mating conception roll (if needed for
+  Generational-continuity canary), reduce cycle period, or tune
+  `mating_interest_threshold`. Needs a separate balance iteration.
+- **PracticeMagic sub-mode count 2 / 5** (Scry + DurableWard fire;
+  Cleanse, ColonyCleanse, Harvest, Commune dormant). The three
+  still-dormant sub-modes are gated on outer eligibility (corrupted
+  tile, carcass nearby, special terrain) — unblocked by §4 marker
+  authoring, not by the modifier port that Phase 4a shipped.
+- **Farming = 0** (stayed dormant). Likely same outer-eligibility
+  symptom; resolution tracks with §4 marker authoring above.
 
 **Dependency graph:**
-- Softmax, modifier pipeline, and target-taking DSE can land in any
-  order — they're orthogonal.
-- Adult-window retune should follow modifier pipeline (lets the
-  Fertility emergency-bonus — if authored — compensate before the
-  window is widened).
-- `resolve_mate_with` gender fix is independent and blocking nothing.
+- `add_target_taking_dse` and `markers_authoring` can land in any
+  order — orthogonal but both unblock the Cleanse/Harvest/Commune
+  and Farming dormancies.
+- `resolve_mate_with` gender fix is independent and blocking nothing
+  (can land any time; contributes to MatingOccurred density via
+  correct gestation side but not the primary lever).
+
+**Re-open condition for Phase 3 hypothesis:** Phase 4a cleared the
+survival canaries (Starvation 8 → 0, ShadowFoxAmbush 0) and moved
+MatingOccurred off zero. The Phase 3 hypothesis in
+`docs/balance/substrate-phase-3.md` is not being re-opened — the
+three substrate mechanisms are validated. The remaining gaps route
+through this entry's outstanding items.
 
 ---
 
@@ -1296,6 +1300,68 @@ system owner satisfied it. Tag pattern: `substrate-follow-on`,
 ---
 
 ## Landed
+
+### Phase 4a — softmax-over-Intentions + §3.5 modifier port + Adult-window retune (2026-04-22)
+
+Three Phase 4 deliverables landed together on the
+`docs/balance/substrate-phase-4.md` balance thread. Each addresses one
+of the three Phase 3 exit-soak regressions that prompted open-work #14:
+
+- **§L2.10.6 softmax-over-Intentions** (`src/ai/eval.rs`,
+  `src/ai/scoring.rs`, `src/ai/fox_scoring.rs`, `src/systems/goap.rs`,
+  `src/systems/disposition.rs`, `src/systems/fox_goap.rs`). Replaced
+  the `aggregate_to_dispositions → select_disposition_softmax`
+  two-step and the fox-side argmax with direct softmax over the flat
+  Intention pool. New `select_intention_softmax` in `eval.rs` consumes
+  `&[ScoredDse]` per §L2.10.6; bridge helper
+  `select_disposition_via_intention_softmax` in `scoring.rs` operates
+  on the legacy `(Action, f32)` pool and maps via
+  `DispositionKind::from_action`. New
+  `ScoringConstants::intention_softmax_temperature` (default 0.15).
+- **§3.5 modifier-pipeline port** — new `src/ai/modifier.rs` with
+  three `ScoreModifier` impls (`WardCorruptionEmergency`,
+  `CleanseEmergency`, `SensedRotBoost`). `ScoreModifier::apply`
+  extended to take a `fetch_scalar` closure so modifiers read
+  trigger inputs through the same canonical scalar surface as DSE
+  considerations. `ctx_scalars` gained `nearby_corruption_level`,
+  `maslow_level_2_suppression`, `has_herbs_nearby`, `has_ward_herbs`,
+  `thornbriar_available`. The three emergency-bonus additions at
+  `scoring.rs:576–712` are retired; pipeline registered at all four
+  mirror sites (`plugins/simulation.rs` + `main.rs` setup_world /
+  run_new_game + test infra in scoring.rs).
+- **Adult life-stage window retune** — `Age::stage` Adult upper
+  bound 47 → 59, Elder 60+. Paired update: `DeathConstants::
+  elder_entry_seasons` 48 → 60 and `FounderAgeConstants::
+  elder_{min,max}_seasons` 48/50 → 60/62 to keep the stage /
+  old-age-mortality coupling and founder-runway invariants intact.
+  Marker doc comments updated; `age_stages_at_boundaries` test
+  updated to the new thresholds.
+
+**Concordance on seed-42 `--duration 900` re-soak:**
+
+| Metric | Baseline (`562c575`) | Phase 4a | Direction |
+|---|---|---|---|
+| deaths_by_cause.Starvation | 8 | 0 | ✅ canary passes |
+| MatingOccurred | 0 | 1 | off zero |
+| BondFormed | 16 | 28 | +75% |
+| ScryCompleted | 256 | 562 | 2.2× |
+| WardPlaced | 89 | 259 | 2.9× |
+| ward_avg_strength_final | 0.0 | 0.49 | wards persisted |
+| Grooming | 30 | 132 | +340% |
+
+Canonical `scripts/check_canaries.sh` passes all four survival
+canaries (Starvation == 0, ShadowFoxAmbush ≤ 5, footer written,
+features_at_zero informational). Generational-continuity canary still
+fails (0 kittens matured) but that tracks with the MatingOccurred
+density gap, not the substrate mechanisms shipped.
+
+**Remaining Phase 4 work** moved to open-work #14 (outstanding):
+target-taking DSE registration, §4 marker-eligibility authoring
+systems, §7.M.7.4 `resolve_mate_with` gender fix, and the
+MatingOccurred density + Cleanse/Harvest/Commune/Farming dormancy
+balance gaps unblocked by §4 marker authoring.
+
+Balance thread: `docs/balance/substrate-phase-4.md`.
 
 ### v0.2.0 release — `aca13acf` (2026-04-19)
 

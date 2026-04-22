@@ -44,13 +44,24 @@ impl Age {
     ///
     /// Season count is floored, so a cat born at tick 0 and queried at tick 0
     /// has lived 0 seasons → Kitten.
+    ///
+    /// The Adult window extends through season 59 (Phase 4.3 retune).
+    /// Prior to 2026-04-22 the cap was 47: combined with §7.M.7.1's
+    /// `Fertility` removal on Adult→Elder, a 15-min `--duration 900`
+    /// soak produced zero `MatingOccurred` because every bonded pair
+    /// aged into Elder before bonds matured. Extending Adult to 60
+    /// seasons keeps bonded pairs fertile for the duration of a
+    /// standard deep-soak window. Paired with
+    /// `DeathConstants::elder_entry_seasons: 48 → 60` so old-age
+    /// mortality opens at the new Elder boundary rather than inside
+    /// the widened Adult range.
     pub fn stage(&self, current_tick: u64, ticks_per_season: u64) -> LifeStage {
         let age_ticks = current_tick.saturating_sub(self.born_tick);
         let seasons = age_ticks / ticks_per_season;
         match seasons {
             0..=3 => LifeStage::Kitten,
             4..=11 => LifeStage::Young,
-            12..=47 => LifeStage::Adult,
+            12..=59 => LifeStage::Adult,
             _ => LifeStage::Elder,
         }
     }
@@ -142,12 +153,13 @@ mod tests {
         assert_eq!(stage_at_seasons(0, 4), LifeStage::Young);
         assert_eq!(stage_at_seasons(0, 11), LifeStage::Young);
 
-        // Adult: 12–47 seasons
+        // Adult: 12–59 seasons (Phase 4.3 window extension)
         assert_eq!(stage_at_seasons(0, 12), LifeStage::Adult);
         assert_eq!(stage_at_seasons(0, 47), LifeStage::Adult);
+        assert_eq!(stage_at_seasons(0, 59), LifeStage::Adult);
 
-        // Elder: 48+
-        assert_eq!(stage_at_seasons(0, 48), LifeStage::Elder);
+        // Elder: 60+
+        assert_eq!(stage_at_seasons(0, 60), LifeStage::Elder);
         assert_eq!(stage_at_seasons(0, 100), LifeStage::Elder);
     }
 

@@ -727,8 +727,17 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
             .push(clowder::ai::dses::fox_dispersing_dse());
         world.insert_resource(registry);
     }
-    if !world.contains_resource::<clowder::ai::eval::ModifierPipeline>() {
-        world.insert_resource(clowder::ai::eval::ModifierPipeline::new());
+    // §3.5 modifier pipeline — headless runs with live `SimConstants`
+    // values loaded from TOML, so pass them in rather than using
+    // `ScoringConstants::default()`. Unconditional insert: if an older
+    // pipeline resource exists (e.g. from a save-load hand-off), this
+    // replaces it with the current-constants build.
+    {
+        let scoring = world
+            .resource::<clowder::resources::SimConstants>()
+            .scoring
+            .clone();
+        world.insert_resource(clowder::ai::modifier::default_modifier_pipeline(&scoring));
     }
 
     Ok(world)
@@ -1405,7 +1414,16 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
             .push(clowder::ai::dses::fox_dispersing_dse());
         world.insert_resource(registry);
     }
-    world.insert_resource(clowder::ai::eval::ModifierPipeline::new());
+    // §3.5 modifier pipeline — mirrors simulation.rs registration but
+    // with live `SimConstants` values since SimConstants is already
+    // inserted at this point.
+    {
+        let scoring = world
+            .resource::<clowder::resources::SimConstants>()
+            .scoring
+            .clone();
+        world.insert_resource(clowder::ai::modifier::default_modifier_pipeline(&scoring));
+    }
 
     // Seed `last_recorded_season` to the current season so `seasons_survived`
     // starts at 0 and counts real elapsed seasons, not the start_tick offset.

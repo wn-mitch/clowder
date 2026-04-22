@@ -72,11 +72,11 @@ pub struct Kitten;
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Young;
 
-/// `Age::stage() == Adult` (12–47 seasons).
+/// `Age::stage() == Adult` (12–59 seasons).
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Adult;
 
-/// `Age::stage() == Elder` (48+ seasons).
+/// `Age::stage() == Elder` (60+ seasons).
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Elder;
 

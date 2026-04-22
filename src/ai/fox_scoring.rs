@@ -390,14 +390,57 @@ pub fn score_fox_dispositions(
     FoxScoringResult { scores }
 }
 
-/// Select the highest-scoring disposition. Returns `None` if no dispositions
-/// scored above 0.
+/// Select the highest-scoring disposition (argmax). Returns `None` if no
+/// dispositions scored above 0. Retained for tests and diagnostic paths;
+/// the production fox-planner hot path uses `select_fox_disposition_softmax`
+/// below, per §L2.10.6.
 pub fn select_best_disposition(result: &FoxScoringResult) -> Option<FoxDispositionKind> {
     result
         .scores
         .iter()
         .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
         .map(|(kind, _)| *kind)
+}
+
+/// Softmax-over-Intentions selection for fox dispositions (§L2.10.6).
+/// The cat-side hot path moved to softmax-over-actions in Phase 4.1; the
+/// fox side mirrors that at disposition granularity since fox DSEs are
+/// 1:1 with dispositions (there is no peer-group MAX-aggregation to
+/// dissolve). Temperature is `ScoringConstants::fox_softmax_temperature`.
+///
+/// Replaces the argmax-only `select_best_disposition` for the live
+/// planner, addressing the fox Hunting 0-plan regression documented in
+/// `docs/balance/substrate-phase-3.md` where Hunting was consistently
+/// outranked by Fleeing / Avoiding and argmax never let it win.
+pub fn select_fox_disposition_softmax(
+    result: &FoxScoringResult,
+    rng: &mut impl Rng,
+    sc: &ScoringConstants,
+) -> Option<FoxDispositionKind> {
+    let scores = &result.scores;
+    if scores.is_empty() {
+        return None;
+    }
+
+    let temperature = sc.fox_softmax_temperature;
+    let max_score = scores
+        .iter()
+        .map(|(_, s)| *s)
+        .fold(f32::NEG_INFINITY, f32::max);
+    let weights: Vec<f32> = scores
+        .iter()
+        .map(|(_, s)| ((s - max_score) / temperature).exp())
+        .collect();
+    let total: f32 = weights.iter().sum();
+
+    let mut roll: f32 = rng.random::<f32>() * total;
+    for (i, w) in weights.iter().enumerate() {
+        roll -= w;
+        if roll <= 0.0 {
+            return Some(scores[i].0);
+        }
+    }
+    scores.last().map(|(k, _)| *k)
 }
 
 // ---------------------------------------------------------------------------

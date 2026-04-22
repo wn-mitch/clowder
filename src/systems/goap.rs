@@ -10,10 +10,10 @@ use crate::ai::planner::{
     make_plan, Carrying, GoapActionKind, PlannerState, PlannerZone, ZoneDistances,
 };
 use crate::ai::scoring::{
-    aggregate_to_dispositions, apply_aspiration_bonuses, apply_cascading_bonuses,
-    apply_colony_knowledge_bonuses, apply_directive_bonus, apply_fated_bonuses,
-    apply_memory_bonuses, apply_preference_bonuses, apply_priority_bonus, enforce_survival_floor,
-    score_actions, select_disposition_softmax, ScoringContext,
+    apply_aspiration_bonuses, apply_cascading_bonuses, apply_colony_knowledge_bonuses,
+    apply_directive_bonus, apply_fated_bonuses, apply_memory_bonuses, apply_preference_bonuses,
+    apply_priority_bonus, enforce_survival_floor, score_actions,
+    select_disposition_via_intention_softmax, ScoringContext,
 };
 use crate::ai::{Action, CurrentAction};
 use crate::components::building::{
@@ -1017,20 +1017,19 @@ pub fn evaluate_and_plan(
         };
         let self_groom_won = self_groom_score >= other_groom_score;
 
-        let mut disposition_scores = aggregate_to_dispositions(&scores, self_groom_won);
-
-        // Independence penalty.
-        for (kind, score) in disposition_scores.iter_mut() {
-            if matches!(
-                kind,
-                DispositionKind::Coordinating | DispositionKind::Socializing
-            ) {
-                *score = (*score - personality.independence * d.disposition_independence_penalty)
-                    .max(0.0);
-            }
-        }
-
-        let chosen = select_disposition_softmax(&disposition_scores, &mut rng.rng, sc);
+        // §L2.10.6 softmax-over-Intentions: softmax the flat action pool
+        // directly, then map the winning Intention to its disposition. The
+        // helper preserves the legacy disposition-level independence penalty
+        // by applying it as an action-level transform on Coordinate /
+        // Socialize / Mentor (and Groom when socializing) before softmax.
+        let chosen = select_disposition_via_intention_softmax(
+            &scores,
+            self_groom_won,
+            personality.independence,
+            d.disposition_independence_penalty,
+            sc,
+            &mut rng.rng,
+        );
 
         // Store all gate-open action scores, sorted descending, for
         // diagnostics. Truncation removed 2026-04-20 so scoring-competition

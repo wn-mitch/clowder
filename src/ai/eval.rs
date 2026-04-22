@@ -180,11 +180,24 @@ impl DseRegistryAppExt for App {
 /// Modifiers apply in registered order; §3.5.1's catalog commits seven
 /// named passes (Pride, Independence solo, Independence group,
 /// Patience, Tradition, Fox-suppression, Corruption-suppression).
+///
+/// `fetch_scalar` is the same closure the evaluator uses for
+/// `ScalarConsideration` inputs — modifiers read their trigger inputs
+/// (e.g. corruption level, ward deficit, Maslow level-2 suppression)
+/// via named scalar lookups rather than carrying per-field context
+/// accessors. Each modifier names the scalars it depends on in its
+/// doc comment so the contract is auditable.
 pub trait ScoreModifier: Send + Sync + 'static {
     /// Apply the modifier to `score` for DSE `dse_id`. Return the
     /// transformed score. A modifier that doesn't apply to `dse_id`
     /// (per the §3.5.2 applicability matrix) returns `score` unchanged.
-    fn apply(&self, dse_id: DseId, score: f32, ctx: &EvalCtx) -> f32;
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch_scalar: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32;
 
     fn name(&self) -> &'static str;
 }
@@ -208,10 +221,16 @@ impl ModifierPipeline {
     }
 
     /// Apply every registered modifier in registration order. Pure
-    /// function of (dse_id, input_score, ctx).
-    pub fn apply(&self, dse_id: DseId, mut score: f32, ctx: &EvalCtx) -> f32 {
+    /// function of (dse_id, input_score, ctx, fetch_scalar).
+    pub fn apply(
+        &self,
+        dse_id: DseId,
+        mut score: f32,
+        ctx: &EvalCtx,
+        fetch_scalar: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
         for pass in &self.passes {
-            score = pass.apply(dse_id, score, ctx);
+            score = pass.apply(dse_id, score, ctx, fetch_scalar);
         }
         score
     }
@@ -316,8 +335,11 @@ pub fn evaluate_single(
         maslow_pre_gate(dse.maslow_tier()) * raw_score
     };
 
-    // Post-scoring modifier pipeline.
-    let final_score = modifiers.apply(dse.id(), gated_score, ctx);
+    // Post-scoring modifier pipeline. Shares the same scalar-fetch
+    // closure the considerations use, so modifier triggers (corruption
+    // readings, Maslow suppression, inventory booleans) resolve through
+    // the same canonical scalar surface as DSE inputs.
+    let final_score = modifiers.apply(dse.id(), gated_score, ctx, fetch_scalar);
 
     // Emit the Intention.
     let intention = dse.emit(final_score, ctx);
@@ -390,6 +412,53 @@ pub fn evaluate_all_cat_dses(
             )
         })
         .collect()
+}
+
+// ---------------------------------------------------------------------------
+// §L2.10.6 softmax-over-Intentions
+// ---------------------------------------------------------------------------
+
+/// Select one `ScoredDse` from a freshly-scored candidate pool via
+/// softmax (Boltzmann) sampling. §L2.10.6's canonical selection:
+/// stochastic *intent*, deterministic *execution*.
+///
+/// Returns `None` iff `pool` is empty. Non-empty pools always yield a
+/// pick (even if every score is negative — the softmax normalization
+/// handles that via the standard max-shift trick).
+///
+/// Order with §7.4's persistence bonus (not yet wired): softmax picks
+/// the *challenger* Intention from the freshly-scored candidate pool;
+/// the persistence bonus then applies to the currently-held Intention's
+/// score and gates preemption. Softmax runs first; persistence-bonus
+/// gating runs second. See §L2.10.6 in
+/// `docs/systems/ai-substrate-refactor.md`.
+pub fn select_intention_softmax<'a, R: rand::Rng + ?Sized>(
+    pool: &'a [ScoredDse],
+    rng: &mut R,
+    temperature: f32,
+) -> Option<&'a ScoredDse> {
+    if pool.is_empty() {
+        return None;
+    }
+
+    let max_score = pool
+        .iter()
+        .map(|s| s.final_score)
+        .fold(f32::NEG_INFINITY, f32::max);
+    let weights: Vec<f32> = pool
+        .iter()
+        .map(|s| ((s.final_score - max_score) / temperature).exp())
+        .collect();
+    let total: f32 = weights.iter().sum();
+
+    let mut roll: f32 = rng.random::<f32>() * total;
+    for (i, w) in weights.iter().enumerate() {
+        roll -= w;
+        if roll <= 0.0 {
+            return Some(&pool[i]);
+        }
+    }
+    pool.last()
 }
 
 // ---------------------------------------------------------------------------
@@ -634,7 +703,13 @@ mod tests {
     fn modifier_pipeline_applies_in_order() {
         struct AddOne;
         impl ScoreModifier for AddOne {
-            fn apply(&self, _: DseId, score: f32, _: &EvalCtx) -> f32 {
+            fn apply(
+                &self,
+                _: DseId,
+                score: f32,
+                _: &EvalCtx,
+                _: &dyn Fn(&str, Entity) -> f32,
+            ) -> f32 {
                 score + 0.1
             }
             fn name(&self) -> &'static str {
@@ -643,7 +718,13 @@ mod tests {
         }
         struct DoubleIt;
         impl ScoreModifier for DoubleIt {
-            fn apply(&self, _: DseId, score: f32, _: &EvalCtx) -> f32 {
+            fn apply(
+                &self,
+                _: DseId,
+                score: f32,
+                _: &EvalCtx,
+                _: &dyn Fn(&str, Entity) -> f32,
+            ) -> f32 {
                 score * 2.0
             }
             fn name(&self) -> &'static str {
@@ -667,8 +748,9 @@ mod tests {
             target: None,
             target_position: None,
         };
+        let fetch = |_: &str, _: Entity| 0.0;
         // 0.5 → 0.6 → 1.2
-        let out = pipeline.apply(DseId("eat"), 0.5, &ctx);
+        let out = pipeline.apply(DseId("eat"), 0.5, &ctx, &fetch);
         assert!((out - 1.2).abs() < 1e-6, "out: {out}");
     }
 
@@ -711,6 +793,80 @@ mod tests {
             default_strategy_for_intention(false),
             CommitmentStrategy::OpenMinded
         );
+    }
+
+    fn scored_dse(id: &'static str, score: f32) -> ScoredDse {
+        ScoredDse {
+            id: DseId(id),
+            per_consideration: vec![],
+            raw_score: score,
+            gated_score: score,
+            final_score: score,
+            intention: Intention::Activity {
+                kind: ActivityKind::Idle,
+                termination: Termination::UntilInterrupt,
+                strategy: CommitmentStrategy::OpenMinded,
+            },
+        }
+    }
+
+    #[test]
+    fn intention_softmax_empty_pool_returns_none() {
+        use rand_chacha::rand_core::SeedableRng;
+        let pool: Vec<ScoredDse> = Vec::new();
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(0);
+        assert!(select_intention_softmax(&pool, &mut rng, 0.15).is_none());
+    }
+
+    #[test]
+    fn intention_softmax_low_temperature_picks_near_argmax() {
+        // At T = 0.01 the softmax should converge to argmax. Sample many
+        // times under seeded RNG and confirm the winner is the top-scoring
+        // DSE in the overwhelming majority of draws.
+        use rand_chacha::rand_core::SeedableRng;
+        let pool = vec![
+            scored_dse("eat", 0.9),
+            scored_dse("sleep", 0.4),
+            scored_dse("idle", 0.05),
+        ];
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(7);
+        let mut eat_hits = 0usize;
+        for _ in 0..200 {
+            let pick = select_intention_softmax(&pool, &mut rng, 0.01)
+                .expect("non-empty pool");
+            if pick.id.0 == "eat" {
+                eat_hits += 1;
+            }
+        }
+        assert!(
+            eat_hits >= 195,
+            "low-T softmax should converge to argmax; got {eat_hits}/200 eat picks"
+        );
+    }
+
+    #[test]
+    fn intention_softmax_spreads_across_near_ties() {
+        // At T = 0.15 and three scores within ~0.05 of each other, the
+        // softmax should produce a visibly-mixed distribution — the whole
+        // point of spec §L2.10.6.
+        use rand_chacha::rand_core::SeedableRng;
+        let pool = vec![
+            scored_dse("eat", 0.7),
+            scored_dse("socialize", 0.68),
+            scored_dse("groom", 0.66),
+        ];
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(13);
+        let mut counts = std::collections::HashMap::<&'static str, usize>::new();
+        for _ in 0..500 {
+            let pick = select_intention_softmax(&pool, &mut rng, 0.15)
+                .expect("non-empty pool");
+            *counts.entry(pick.id.0).or_insert(0) += 1;
+        }
+        // Every candidate should get a meaningful share under near-ties.
+        for name in ["eat", "socialize", "groom"] {
+            let c = *counts.get(name).unwrap_or(&0);
+            assert!(c >= 50, "{name} got only {c}/500 picks under near-tie softmax");
+        }
     }
 
 }

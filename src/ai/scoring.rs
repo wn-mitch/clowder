@@ -338,6 +338,31 @@ fn ctx_scalars(ctx: &ScoringContext) -> HashMap<&'static str, f32> {
         "territory_max_corruption",
         ctx.territory_max_corruption.clamp(0.0, 1.0),
     );
+    // §3.5 modifier-pipeline inputs. The three emergency-bonus
+    // modifiers (WardCorruptionEmergency / CleanseEmergency /
+    // SensedRotBoost in `crate::ai::modifier`) read these scalars to
+    // decide whether and how much to add; all are clamp-safe floats
+    // or 0/1 presence flags.
+    m.insert(
+        "nearby_corruption_level",
+        ctx.nearby_corruption_level.clamp(0.0, 1.0),
+    );
+    m.insert(
+        "maslow_level_2_suppression",
+        ctx.needs.level_suppression(2).clamp(0.0, 1.0),
+    );
+    m.insert(
+        "has_herbs_nearby",
+        if ctx.has_herbs_nearby { 1.0 } else { 0.0 },
+    );
+    m.insert(
+        "has_ward_herbs",
+        if ctx.has_ward_herbs { 1.0 } else { 0.0 },
+    );
+    m.insert(
+        "thornbriar_available",
+        if ctx.thornbriar_available { 1.0 } else { 0.0 },
+    );
     // Saturating-count for Harvest carcass axis — cap at 3 per the
     // old inline `min(3)`.
     m.insert(
@@ -575,23 +600,16 @@ pub fn score_actions(
 
     // --- Herbcraft (§L2.10.10 sibling split: gather + prepare + ward) ---
     // Each sub-mode's base score comes from its sibling DSE; the
-    // corruption/ward emergency bonuses stay inline until the §3.5
-    // modifier pipeline lands in Phase 3d. The outer Max + hint
-    // selection is a selection-layer concern that stays here.
+    // `ward_corruption_emergency_bonus` additive on gather + ward now
+    // lives in the §3.5 `WardCorruptionEmergency` modifier (Phase 4.2
+    // port). The outer Max + hint selection is a selection-layer
+    // concern that stays here. The siege bonus remains inline — it's
+    // a narrower-scope siege response, not a modifier-candidate
+    // corruption trigger.
     let herbcraft_hint;
     {
-        let gather_emergency = if ctx.has_herbs_nearby
-            && ctx.ward_strength_low
-            && !ctx.has_ward_herbs
-            && ctx.thornbriar_available
-            && ctx.territory_max_corruption > 0.0
-        {
-            s.ward_corruption_emergency_bonus * ctx.needs.level_suppression(2)
-        } else {
-            0.0
-        };
         let gather = if ctx.has_herbs_nearby {
-            score_dse_by_id("herbcraft_gather", ctx, inputs) + gather_emergency
+            score_dse_by_id("herbcraft_gather", ctx, inputs)
         } else {
             0.0
         };
@@ -600,15 +618,15 @@ pub fn score_actions(
         } else {
             0.0
         };
-        let corruption_emergency = if ctx.ward_strength_low && ctx.territory_max_corruption > 0.0 {
-            s.ward_corruption_emergency_bonus * ctx.needs.level_suppression(2)
-        } else {
-            0.0
-        };
-        let ward_eligible = ctx.ward_strength_low
-            && (ctx.has_ward_herbs || (corruption_emergency > 0.0 && ctx.thornbriar_available));
+        // Ward requires ward herbs in inventory to execute. The earlier
+        // "corruption-detected + thornbriar-available" branch that
+        // scored ward via an inline emergency bonus is retired: the
+        // cat now scores gather (boosted by WardCorruptionEmergency
+        // on herbcraft_gather) to collect thornbriar first, then
+        // scores ward on a later tick once herbs are held.
+        let ward_eligible = ctx.ward_strength_low && ctx.has_ward_herbs;
         let mut ward = if ward_eligible {
-            score_dse_by_id("herbcraft_ward", ctx, inputs) + corruption_emergency
+            score_dse_by_id("herbcraft_ward", ctx, inputs)
         } else {
             0.0
         };
@@ -632,51 +650,29 @@ pub fn score_actions(
 
     // --- PracticeMagic (§L2.10.10 sibling split — 6 sub-modes) ---
     // Outer gate: `magic_affinity + magic_skill > thresholds`.
-    // Sub-mode base scores come from their sibling DSEs; emergency
-    // bonuses for ward/cleanse corruption response and "smells like
-    // rot" proactive sensing stay inline until the §3.5 modifier
-    // pipeline lands in Phase 3d. The outer Max + hint selection
-    // stays here.
+    // Sub-mode base scores come from their sibling DSEs; the three
+    // emergency bonuses (ward / cleanse / sensed-rot) now live in
+    // the §3.5 modifier pipeline (`WardCorruptionEmergency`,
+    // `CleanseEmergency`, `SensedRotBoost`) per Phase 4.2 port.
+    // The outer Max + hint selection stays here.
     let mut magic_hint: Option<CraftingHint> = None;
     if ctx.magic_affinity > s.magic_affinity_threshold && ctx.magic_skill > s.magic_skill_threshold
     {
-        let ward_emergency = if ctx.ward_strength_low && ctx.territory_max_corruption > 0.0 {
-            s.ward_corruption_emergency_bonus * ctx.needs.level_suppression(2)
-        } else {
-            0.0
-        };
-        let cleanse_emergency = if ctx.territory_max_corruption > 0.0 {
-            s.cleanse_corruption_emergency_bonus * ctx.needs.level_suppression(2)
-        } else {
-            0.0
-        };
-        let sensed_rot_bonus = if ctx.nearby_corruption_level > 0.1 {
-            s.corruption_sensed_response_bonus
-                * ctx.nearby_corruption_level
-                * ctx.needs.level_suppression(2)
-        } else {
-            0.0
-        };
-
         let scry = score_dse_by_id("magic_scry", ctx, inputs);
         let durable_ward =
             if ctx.ward_strength_low && ctx.magic_skill > s.magic_durable_ward_skill_threshold {
                 score_dse_by_id("magic_durable_ward", ctx, inputs)
-                    + ward_emergency
-                    + sensed_rot_bonus
             } else {
                 0.0
             };
         let cleanse = if ctx.on_corrupted_tile
             && ctx.tile_corruption > s.magic_cleanse_corruption_threshold
         {
-            score_dse_by_id("magic_cleanse", ctx, inputs) + cleanse_emergency
+            score_dse_by_id("magic_cleanse", ctx, inputs)
         } else {
             0.0
         };
-        let colony_cleanse = score_dse_by_id("magic_colony_cleanse", ctx, inputs)
-            + cleanse_emergency
-            + sensed_rot_bonus;
+        let colony_cleanse = score_dse_by_id("magic_colony_cleanse", ctx, inputs);
         let harvest = if ctx.carcass_nearby {
             score_dse_by_id("magic_harvest", ctx, inputs)
         } else {
@@ -1340,6 +1336,109 @@ pub fn select_disposition_softmax(
 }
 
 // ---------------------------------------------------------------------------
+// §L2.10.6 softmax-over-Intentions (flat-action-pool selection)
+// ---------------------------------------------------------------------------
+
+/// Select a disposition by running softmax over the flat action-score
+/// pool (spec §L2.10.6). Replaces the legacy
+/// `aggregate_to_dispositions → select_disposition_softmax` pipeline.
+///
+/// Peer-group aggregation (MAX across disposition constituents) concentrates
+/// weight on whichever peer-group's top score dominates, which magnifies
+/// into a monoculture over long soaks (the `Starvation 3 → 8` regression
+/// documented in `docs/balance/substrate-phase-3.md` § Concordance).
+/// Softmax-over-Intentions dissolves the peer-group collapse: each action
+/// competes equally in the softmax pool with temperature-controlled variety.
+///
+/// Current behavior vs. legacy path is preserved with two action-level
+/// transforms applied before softmax, so this function is a drop-in
+/// replacement for the 2-step aggregate/softmax dance (documented inline
+/// below).
+///
+/// `self_groom_won` disambiguates the Groom action's disposition (Resting
+/// when self-groom dominates, Socializing when other-groom does).
+/// `independence` is the cat's personality score; `sc` carries the
+/// `intention_softmax_temperature` and `disposition_independence_penalty`
+/// constants.
+pub fn select_disposition_via_intention_softmax(
+    scores: &[(Action, f32)],
+    self_groom_won: bool,
+    independence: f32,
+    disposition_independence_penalty: f32,
+    sc: &ScoringConstants,
+    rng: &mut impl Rng,
+) -> DispositionKind {
+    // Build the filtered pool: drop Flee and Idle (handled outside the
+    // disposition selection layer) and any zero-scoring actions (the legacy
+    // `aggregate_to_dispositions` also drops zero-scoring dispositions).
+    let mut pool: Vec<(Action, f32)> = scores
+        .iter()
+        .filter(|(a, s)| !matches!(a, Action::Flee | Action::Idle) && *s > 0.0)
+        .copied()
+        .collect();
+
+    // Port of the legacy disposition-level Independence penalty on
+    // Coordinating + Socializing peer-groups. Applied at action level here
+    // on the constituent actions of those dispositions. Groom routes to
+    // Socializing when `self_groom_won == false` and gets the penalty in
+    // that case only — matching legacy behavior where the penalty landed
+    // on `DispositionKind::Socializing` post-aggregation.
+    if independence > 0.0 {
+        let penalty = independence * disposition_independence_penalty;
+        for (action, score) in pool.iter_mut() {
+            let penalize = matches!(
+                action,
+                Action::Coordinate | Action::Socialize | Action::Mentor
+            ) || (*action == Action::Groom && !self_groom_won);
+            if penalize {
+                *score = (*score - penalty).max(0.0);
+            }
+        }
+        // After penalty, drop anything that just dropped to 0.
+        pool.retain(|(_, s)| *s > 0.0);
+    }
+
+    if pool.is_empty() {
+        return DispositionKind::Resting;
+    }
+
+    // Softmax over the flat Intention pool. Runs the standard max-shift
+    // Boltzmann sampler at `intention_softmax_temperature`.
+    let temperature = sc.intention_softmax_temperature;
+    let max_score = pool
+        .iter()
+        .map(|(_, s)| *s)
+        .fold(f32::NEG_INFINITY, f32::max);
+    let weights: Vec<f32> = pool
+        .iter()
+        .map(|(_, s)| ((s - max_score) / temperature).exp())
+        .collect();
+    let total: f32 = weights.iter().sum();
+
+    let mut roll: f32 = rng.random::<f32>() * total;
+    let mut chosen_idx = pool.len() - 1;
+    for (i, w) in weights.iter().enumerate() {
+        roll -= w;
+        if roll <= 0.0 {
+            chosen_idx = i;
+            break;
+        }
+    }
+    let chosen_action = pool[chosen_idx].0;
+
+    // Map the winning Intention → Disposition. Groom routes via
+    // `self_groom_won`; all other dispositioned actions have a 1:1 mapping.
+    if chosen_action == Action::Groom {
+        return if self_groom_won {
+            DispositionKind::Resting
+        } else {
+            DispositionKind::Socializing
+        };
+    }
+    DispositionKind::from_action(chosen_action).unwrap_or(DispositionKind::Resting)
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1407,7 +1506,13 @@ mod tests {
 
     fn cached_modifier_pipeline() -> &'static ModifierPipeline {
         static PIPELINE: OnceLock<ModifierPipeline> = OnceLock::new();
-        PIPELINE.get_or_init(ModifierPipeline::new)
+        PIPELINE.get_or_init(|| {
+            // Match the production pipeline shape — Phase 4.2 registers
+            // the three corruption-response modifiers. Scoring tests
+            // exercising the emergency-bonus behavior need the same set.
+            let scoring = crate::resources::sim_constants::ScoringConstants::default();
+            crate::ai::modifier::default_modifier_pipeline(&scoring)
+        })
     }
 
     fn test_eval_inputs() -> EvalInputs<'static> {

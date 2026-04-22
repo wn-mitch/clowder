@@ -634,7 +634,15 @@ pub struct DeathConstants {
 impl Default for DeathConstants {
     fn default() -> Self {
         Self {
-            elder_entry_seasons: 48,
+            // Paired with `LifeStage::Elder` boundary in
+            // `components/identity.rs::Age::stage` (Phase 4.3 retune:
+            // Adult extends through season 59, Elder begins at 60).
+            // Keeping these in lockstep is load-bearing — the old-age
+            // mortality check at `src/systems/death.rs:50` only fires
+            // for `stage == LifeStage::Elder`, so a mismatch between
+            // this value and the stage boundary silently disables the
+            // mortality ramp for a band of ages.
+            elder_entry_seasons: 60,
             grace_seasons: 7,
             chance_per_excess_season: 0.0002,
             grief_mood_penalty: -0.3,
@@ -675,13 +683,16 @@ impl Default for FounderAgeConstants {
             adult_min_seasons: 12,
             adult_max_seasons: 30,
             adult_probability: 0.30,
-            elder_min_seasons: 48,
-            // Capped below `DeathConstants::elder_entry_seasons +
-            // grace_seasons = 55` so founders have runway before the
-            // mortality ramp activates. Widening this into [55, ∞) will
-            // reintroduce the pre-Activation-1 baseline wipe regression
-            // (see docs/balance/activation-1-status.md).
-            elder_max_seasons: 50,
+            // Phase 4.3 retune: the `LifeStage::Elder` boundary moved
+            // from season 48 to 60, so the founder Elder range moves
+            // with it. Paired invariant still holds — the cap stays
+            // below `DeathConstants::elder_entry_seasons +
+            // grace_seasons = 67` so founders get runway before the
+            // mortality ramp. Widening this past 67 reintroduces the
+            // pre-Activation-1 baseline wipe regression (see
+            // docs/balance/activation-1-status.md).
+            elder_min_seasons: 60,
+            elder_max_seasons: 62,
         }
     }
 }
@@ -1116,6 +1127,16 @@ pub struct ScoringConstants {
     /// (§8.5 in `docs/systems/ai-substrate-refactor.md`).
     #[serde(default = "default_fox_softmax_temperature")]
     pub fox_softmax_temperature: f32,
+    /// Softmax temperature for §L2.10.6 softmax-over-Intentions selection.
+    /// Used by `select_intention_softmax` (eval.rs) and the flat-action softmax
+    /// path that replaces the legacy `aggregate_to_dispositions →
+    /// select_disposition_softmax` pipeline in goap.rs / disposition.rs.
+    /// Kept separate from `action_softmax_temperature` /
+    /// `disposition_softmax_temperature` so the Intention-layer temperature
+    /// can be tuned independently of the legacy per-Action / per-Disposition
+    /// softmaxes retained for diagnostics.
+    #[serde(default = "default_intention_softmax_temperature")]
+    pub intention_softmax_temperature: f32,
     pub gate_timid_fight_threshold: f32,
     pub gate_shy_socialize_threshold: f32,
     pub gate_reckless_flee_threshold: f32,
@@ -1280,6 +1301,7 @@ impl Default for ScoringConstants {
             action_softmax_temperature: 0.15,
             disposition_softmax_temperature: 0.15,
             fox_softmax_temperature: default_fox_softmax_temperature(),
+            intention_softmax_temperature: default_intention_softmax_temperature(),
             gate_timid_fight_threshold: 0.1,
             gate_shy_socialize_threshold: 0.15,
             gate_reckless_flee_threshold: 0.9,
@@ -1617,6 +1639,10 @@ fn default_gate_reckless_health_threshold() -> f32 {
 }
 
 fn default_fox_softmax_temperature() -> f32 {
+    0.15
+}
+
+fn default_intention_softmax_temperature() -> f32 {
     0.15
 }
 

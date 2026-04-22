@@ -32,7 +32,15 @@ impl Plugin for SimulationPlugin {
         // trait. Mirrored in `src/main.rs::build_schedule`.
         app.insert_resource(crate::ai::faction::FactionRelations::canonical());
         app.init_resource::<crate::ai::eval::DseRegistry>();
-        app.init_resource::<crate::ai::eval::ModifierPipeline>();
+        // §3.5 modifier pipeline — populated with the three Phase 4.2
+        // corruption-response emergency bonuses. Uses default scoring
+        // constants at plugin build time because `SimConstants` is
+        // inserted later at Startup; the live values are re-bound in
+        // the headless and save-load mirror sites per the same pattern
+        // as fox DSEs.
+        app.insert_resource(crate::ai::modifier::default_modifier_pipeline(
+            &crate::resources::sim_constants::ScoringConstants::default(),
+        ));
         {
             use crate::ai::eval::DseRegistryAppExt;
             // Plugin build runs before `setup_world_exclusive` (which

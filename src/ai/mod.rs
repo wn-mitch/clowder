@@ -8,6 +8,7 @@ pub mod faction;
 pub mod fox_planner;
 pub mod fox_scoring;
 pub mod mating;
+pub mod modifier;
 pub mod pathfinding;
 pub mod planner;
 pub mod scoring;

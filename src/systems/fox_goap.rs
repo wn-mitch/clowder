@@ -20,7 +20,9 @@ use crate::ai::fox_planner::{
     FoxDispositionKind, FoxDomain, FoxGoapActionKind, FoxPlannerState, FoxZone,
 };
 use crate::ai::eval::{DseRegistry, ModifierPipeline};
-use crate::ai::fox_scoring::{score_fox_dispositions, select_best_disposition, FoxScoringContext};
+use crate::ai::fox_scoring::{
+    score_fox_dispositions, select_fox_disposition_softmax, FoxScoringContext,
+};
 use crate::ai::planner::core::make_plan;
 use crate::ai::scoring::EvalInputs;
 use crate::components::fox_goap_plan::FoxGoapPlan;
@@ -330,7 +332,8 @@ pub fn fox_evaluate_and_plan(
         };
 
         let scoring_result = score_fox_dispositions(&ctx, &inputs, &mut rng.rng);
-        let Some(chosen) = select_best_disposition(&scoring_result) else {
+        let Some(chosen) = select_fox_disposition_softmax(&scoring_result, &mut rng.rng, sc)
+        else {
             continue;
         };
 
