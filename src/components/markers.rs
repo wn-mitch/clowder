@@ -212,8 +212,8 @@ pub struct HasDamagedBuilding;
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HasGarden;
 
-/// ≥1 other cat has a skill < 0.3 where this cat has the same skill
-/// > 0.6 (per-cat relative predicate).
+/// ≥1 other cat has a skill below 0.3 where this cat has the same
+/// skill above 0.6 (per-cat relative predicate).
 /// `aspirations.rs::update_mentoring_markers`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HasMentoringTarget;
