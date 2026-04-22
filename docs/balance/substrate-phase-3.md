@@ -1,15 +1,18 @@
 # AI Substrate Refactor — Phase 3 (L2 core: curves + composition + markers + faction)
 
-**Status:** Phases 3a + 3b landed — reference DSE live, evaluator
-registered as a Bevy Resource. Phase 3c (wholesale fan-out of the
-remaining 29 DSEs + sibling splits) is the next wave.
+**Status:** Phases 3a + 3b + 3c.0 landed — reference DSE live,
+evaluator resource live, plumbing threaded through `score_actions`.
+Phase 3c.1 (first peer-group port) is the next wave.
 
 | Sub-phase | Scope | Status |
 |---|---|---|
 | 3a — scaffolding | Types, curves, composition, markers, faction | **landed** |
 | 3b.1 — evaluator plumbing | `DseRegistry` resource + `evaluate_single` + modifier pipeline + `DseRegistryAppExt` | **landed** |
 | 3b.2 — Eat reference port | `EatDse` registered in plugin + headless | **landed** |
-| 3c — fan-out port | 29 remaining DSEs + sibling splits + Mate L3; deletes `score_actions` inline blocks | pending |
+| 3c.0 — `score_actions` threading | `EvalInputs` bundle, call-site migration, dead-code `score_eat` helper | **landed** |
+| 3c.1 — Starvation-urgency peer group | Eat + Hunt + Forage + Cook + fox Hunting + fox Raiding together | pending |
+| 3c.2+ — remaining peer groups | Fatal-threat, Rest, Social, Territory, Work, Exploration, Lifecycle | pending |
+| 3c.last — sibling splits | Herbcraft × 3, PracticeMagic × 6 per §L2.10.10 | pending |
 | 3d — faction matrix + roster gap-fill | Authoring systems for §4.6 markers | pending |
 
 ## Thesis
@@ -193,16 +196,91 @@ Phase 3 exits when all of:
 
 ## Phase 3b ↔ 3c boundary
 
-Phase 3b.2 registers `EatDse` but does **not** yet replace
-`score_actions`'s inline Eat arithmetic. The refactor plan's "action
-blocks delete as each new DSE lands" wave is Phase 3c — 3b.2
-establishes the pattern; 3c's fan-out port replaces all formulas
-together so `ScoringContext`'s 9 test-site constructors update once
-rather than incrementally.
+Phase 3b.2 registers `EatDse` and Phase 3c.0 threads the evaluator
+through `score_actions`, but neither commit yet **consumes** the
+evaluator's Eat score. The inline `(1 - hunger) * eat_urgency_scale`
+formula remains live; the `score_eat` helper that dispatches to
+`evaluate_single` is landed as dead code (`#[allow(dead_code)]`)
+because using it in isolation violates §3.3.2's peer-group anchor —
+see the "Peer-group anchor tension" section below.
 
-No behavior drift lands in production yet — `EatDse`'s score is
-computed on demand but not consumed. Drift lands with Phase 3c's
-wholesale port when the inline blocks delete.
+No behavior drift lands in production yet. Drift lands with Phase
+3c.1 when the Starvation-urgency peer group ports together.
+
+## Peer-group anchor tension (§3.3.2) — discovered in 3c.0
+
+**The constraint.** §3.3.2 commits each peer group's peak score as a
+cross-DSE magnitude contract. For the Starvation-urgency peer group
+(Eat, Hunt, Forage, Cook, fox Hunting, fox Raiding) the anchor is
+**1.0**. Ports that drop a member into `[0, 1]` while peers stay
+linear at >1.0 break cross-DSE comparisons — a starving cat sees
+Eat at 0.77 and Hunt at ~1.68 and picks Hunt, reversing the
+sanity invariant "starving cat with food prefers Eat."
+
+**Implication for Phase 3c porting.** DSEs port **by peer group**,
+not by individual DSE. Each commit must include every member of
+at least one peer group so the anchor holds inside the group.
+
+**Cross-curve ceiling mismatch.** `Logistic` is asymptotic — its
+ceiling at input 1.0 is `1 / (1 + exp(-steepness × (1 − midpoint)))`,
+which for the hangry anchor (`Logistic(8, 0.75)`) is ≈0.88, not
+1.0. Under `CompensatedProduct` composition with n=1 and weight=1.0,
+Eat's peak is 0.88. Under `WeightedSum` composition with weights
+summing to 1.0 (RtEO), Hunt's peak is 1.0 when every axis is 1.0.
+
+So even **inside** the Starvation-urgency group, CP-composed
+members (Eat, Raiding, …) cap at the curve's asymptotic ceiling
+while WS-composed members (Hunt, Forage, Cook, fox Hunting) cap at
+their weighted sum. The peer-group contract reads literally to
+require all members peak at the same anchor value — but the
+primitive math makes that value depend on composition mode.
+
+**Resolution options for 3c.1:**
+
+1. **Tune WS weights so members don't realistically hit 1.0.**
+   Axes rarely all max simultaneously (a starving bold cat at full
+   scarcity with nearby prey hits near-1.0 for Hunt, but typical
+   scenarios are much lower). Under this reading, "peer group
+   anchors at 1.0" means "theoretical ceiling in the worst-case
+   composition"; actual typical peaks are much lower and the
+   ordinals hold.
+2. **Add a modifier-layer scale to boost CP peaks** to match WS
+   ceilings. A `StarvationAnchor` modifier could multiply CP
+   members by ~1.14 so their peak matches WS's 1.0.
+3. **Accept the asymmetry** and document that CP DSEs in a peer
+   group cap ~12% below WS DSEs at the theoretical ceiling;
+   validate via deep-soak that ordinals still hold.
+
+The right answer likely falls out of a calibration soak. Phase 3c.1
+opens with option (1) as the default hypothesis, then measures.
+
+## Phase 3c.1 entry checklist
+
+Before landing Phase 3c.1 (Starvation-urgency peer group):
+
+1. Read §2.3 rows for Eat, Hunt, Forage, Cook, fox Hunting, Raiding
+   to gather curves + compositions.
+2. Read §3.1.1 rows for the same six DSEs to gather composition
+   modes + RtM/RtEO designations.
+3. Read §3.3.2 Starvation-urgency row — commit to option (1/2/3)
+   above explicitly in the commit message.
+4. Port all six DSEs in one commit:
+   - Define `hunt.rs`, `forage.rs`, `cook.rs`, `fox_hunting.rs`,
+     `fox_raiding.rs` alongside `eat.rs`.
+   - Register in `SimulationPlugin::build`, headless
+     `build_new_world`, save-load `setup_world`, and
+     `tests/integration.rs::setup_world` (manual-mirror rule —
+     missing one site breaks either tests or production).
+   - Replace the inline blocks for all six in `score_actions` and
+     `fox_scoring::score_actions`.
+   - Delete `scoring.rs::score_eat` and `eat_urgency_scale` (the
+     latter is not in §2.3's retired list but becomes dead weight).
+5. Run seed-42 deep-soak. Verify:
+   - `Starvation` canary = 0.
+   - `starving_cat_scores_eat_highest` passes (or is updated with
+     a documented hypothesis about the new tie-break).
+   - Per-DSE frame-diff against the pre-3c baseline.
+6. Update this doc's concordance section with observed drift.
 
 ## Phase 3a → 3b boundary (landed)
 
