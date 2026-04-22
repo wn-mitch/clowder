@@ -677,6 +677,9 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
         registry.cat_dses.push(clowder::ai::dses::caretake_dse());
         registry.cat_dses.push(clowder::ai::dses::mate_dse());
         registry
+            .target_taking_dses
+            .push(clowder::ai::dses::mate_target_dse());
+        registry
             .cat_dses
             .push(clowder::ai::dses::patrol_dse(&scoring));
         registry
@@ -1366,6 +1369,9 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
         registry.cat_dses.push(clowder::ai::dses::mentor_dse());
         registry.cat_dses.push(clowder::ai::dses::caretake_dse());
         registry.cat_dses.push(clowder::ai::dses::mate_dse());
+        registry
+            .target_taking_dses
+            .push(clowder::ai::dses::mate_target_dse());
         registry
             .cat_dses
             .push(clowder::ai::dses::patrol_dse(&scoring));

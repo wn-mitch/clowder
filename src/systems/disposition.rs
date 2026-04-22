@@ -973,12 +973,20 @@ pub fn disposition_to_chain(
             .min_by_key(|(_, _, bp, _, _)| pos.manhattan_distance(bp))
             .map(|(e, _, bp, _, _)| (e, *bp));
 
-        // §6.5.1: resolve social partner once per tick via the
-        // target-taking DSE. Recomputed here (not threaded from
+        // §6.5.1 + §6.5.2: resolve target-taking DSE winners once per
+        // tick. Recomputed here (not threaded from
         // `evaluate_dispositions`) because the two systems run as a
         // pair per tick over the same frame-local state; the extra
-        // evaluator pass is cheap relative to chain construction.
+        // evaluator passes are cheap relative to chain construction.
         let socialize_target = crate::ai::dses::socialize_target::resolve_socialize_target(
+            &res.dse_registry,
+            entity,
+            *pos,
+            &cat_pos_list,
+            &res.relationships,
+            res.time.tick,
+        );
+        let mate_target = crate::ai::dses::mate_target::resolve_mate_target(
             &res.dse_registry,
             entity,
             *pos,
@@ -1055,14 +1063,7 @@ pub fn disposition_to_chain(
                 &mut commands,
             ),
             DispositionKind::Exploring => build_exploring_chain(pos, &res.map, d, &mut rng.rng),
-            DispositionKind::Mating => build_mating_chain(
-                entity,
-                pos,
-                personality,
-                &cat_pos_list,
-                &res.relationships,
-                d,
-            ),
+            DispositionKind::Mating => build_mating_chain(mate_target, &cat_pos_list),
             DispositionKind::Caretaking => {
                 build_caretaking_chain(entity, pos, personality, nearest_store, d)
             }
@@ -1903,41 +1904,21 @@ fn build_exploring_chain(
 // build_mating_chain
 // ===========================================================================
 
+/// Build a Mate chain around a pre-resolved partner. §6.2 / §6.5.2:
+/// partner selection is owned by
+/// [`crate::ai::dses::mate_target::resolve_mate_target`] upstream;
+/// this function owns only the chain shape. The legacy
+/// `romantic + fondness - 0.05 × dist` mixer and its inline bond
+/// filter retire here in favor of the target-taking DSE's bundle.
 fn build_mating_chain(
-    entity: Entity,
-    pos: &Position,
-    _personality: &Personality,
+    mate_target: Option<Entity>,
     cat_positions: &[(Entity, Position)],
-    relationships: &Relationships,
-    _d: &DispositionConstants,
 ) -> Option<(TaskChain, Action)> {
-    // Find the best eligible partner: Partners+ bond, nearby.
-    let mut best: Option<(Entity, Position, f32)> = None;
-    for &(other, other_pos) in cat_positions {
-        if other == entity {
-            continue;
-        }
-        let Some(rel) = relationships.get(entity, other) else {
-            continue;
-        };
-        let bond = rel
-            .bond
-            .unwrap_or(crate::resources::relationships::BondType::Friends);
-        if !matches!(
-            bond,
-            crate::resources::relationships::BondType::Partners
-                | crate::resources::relationships::BondType::Mates
-        ) {
-            continue;
-        }
-        let dist = pos.manhattan_distance(&other_pos) as f32;
-        let score = rel.romantic + rel.fondness - dist * 0.05;
-        if best.as_ref().is_none_or(|(_, _, s)| score > *s) {
-            best = Some((other, other_pos, score));
-        }
-    }
-
-    let (partner, partner_pos, _) = best?;
+    let partner = mate_target?;
+    let partner_pos = *cat_positions
+        .iter()
+        .find(|(e, _)| *e == partner)
+        .map(|(_, p)| p)?;
 
     let chain = TaskChain::new(
         vec![

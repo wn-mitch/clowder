@@ -33,6 +33,7 @@ pub mod herbcraft_ward;
 pub mod hunt;
 pub mod idle;
 pub mod mate;
+pub mod mate_target;
 pub mod mentor;
 pub mod patrol;
 pub mod practice_magic;
@@ -68,6 +69,7 @@ pub use herbcraft_ward::herbcraft_ward_dse;
 pub use hunt::hunt_dse;
 pub use idle::idle_dse;
 pub use mate::mate_dse;
+pub use mate_target::mate_target_dse;
 pub use mentor::mentor_dse;
 pub use patrol::patrol_dse;
 pub use practice_magic::{

@@ -1947,9 +1947,22 @@ pub fn resolve_goap_plans(
             }
 
             GoapActionKind::MateWith => {
+                // §6.5.2: resolve mating partner on first tick via the
+                // target-taking DSE. Replaces `find_social_target`
+                // (fondness-only, **no bond filter**) — the silent
+                // divergence was the more dangerous variant since the
+                // goap path could pick a non-partner as the mating
+                // target once Mating disposition won selection.
                 if plan.step_state[step_idx].target_entity.is_none() {
                     plan.step_state[step_idx].target_entity =
-                        find_social_target(cat_entity, &pos, &cat_positions, &relationships, d);
+                        crate::ai::dses::mate_target::resolve_mate_target(
+                            &ec.dse_registry,
+                            cat_entity,
+                            *pos,
+                            &cat_positions,
+                            &relationships,
+                            ec.time.tick,
+                        );
                 }
                 let target = plan.step_state[step_idx].target_entity;
                 let target_gender = target.and_then(|t| gender_snapshot.get(&t).copied());

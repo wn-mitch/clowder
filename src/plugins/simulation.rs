@@ -66,6 +66,7 @@ impl Plugin for SimulationPlugin {
                 .add_dse(crate::ai::dses::mentor_dse())
                 .add_dse(crate::ai::dses::caretake_dse())
                 .add_dse(crate::ai::dses::mate_dse())
+                .add_target_taking_dse(crate::ai::dses::mate_target_dse())
                 .add_dse(crate::ai::dses::patrol_dse(&default_scoring))
                 .add_dse(crate::ai::dses::build_dse(&default_scoring))
                 .add_dse(crate::ai::dses::farm_dse())
