@@ -22,6 +22,7 @@ pub mod coordination;
 pub mod death;
 pub mod disposition;
 pub mod fate;
+pub mod fertility;
 pub mod fox_goap;
 pub mod goap;
 pub mod growth;

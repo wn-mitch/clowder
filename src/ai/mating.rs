@@ -10,6 +10,7 @@ use std::collections::HashMap;
 
 use bevy_ecs::prelude::*;
 
+use crate::components::fertility::{Fertility, FertilityPhase};
 use crate::components::identity::{Age, Gender, LifeStage, Orientation};
 use crate::components::mental::Mood;
 use crate::components::physical::{Dead, Needs, Position};
@@ -33,6 +34,11 @@ pub struct MatingFitness {
     pub hunger: f32,
     pub energy: f32,
     pub is_pregnant: bool,
+    /// Current `Fertility.phase` if the cat carries the component
+    /// (Queen / Nonbinary in Adult stage, not pregnant). `None` for
+    /// Toms and for any cat pre-/post-Fertility-marker (Kitten, Young,
+    /// Elder, pregnant). §7.M.7.6 hard-gate reads this field.
+    pub fertility_phase: Option<FertilityPhase>,
 }
 
 /// SystemParam bundle gathering everything the mating gate needs beyond what
@@ -53,6 +59,7 @@ pub struct MatingFitnessParams<'w, 's> {
             &'static Mood,
             &'static Needs,
             Option<&'static Pregnant>,
+            Option<&'static Fertility>,
         ),
         Without<Dead>,
     >,
@@ -67,7 +74,7 @@ impl<'w, 's> MatingFitnessParams<'w, 's> {
         let tps = self.config.ticks_per_season;
         self.query
             .iter()
-            .map(|(e, age, gender, orient, mood, needs, pregnant)| {
+            .map(|(e, age, gender, orient, mood, needs, pregnant, fertility)| {
                 (
                     e,
                     MatingFitness {
@@ -78,6 +85,7 @@ impl<'w, 's> MatingFitnessParams<'w, 's> {
                         hunger: needs.hunger,
                         energy: needs.energy,
                         is_pregnant: pregnant.is_some(),
+                        fertility_phase: fertility.map(|f| f.phase),
                     },
                 )
             })
@@ -104,6 +112,18 @@ fn is_fertile(f: &MatingFitness) -> bool {
     matches!(f.stage, LifeStage::Adult | LifeStage::Elder)
         && f.orientation != Orientation::Asexual
         && !f.is_pregnant
+}
+
+/// §7.M.7.6 viability: is this cat a gestation-capable partner in a
+/// phase that can conceive? Toms are always non-viable here — they
+/// contribute to a pair via their partner's viability (§7.M.7.5
+/// fallback), not their own.
+fn is_conception_viable(f: &MatingFitness) -> bool {
+    if matches!(f.gender, Gender::Tom) {
+        return false;
+    }
+    f.fertility_phase
+        .is_some_and(FertilityPhase::is_viable_for_conception)
 }
 
 /// Does this cat (by fitness snapshot) meet the "sated and happy" floor?
@@ -162,6 +182,14 @@ pub fn has_eligible_mate(
         ) {
             return false;
         }
+        // §7.M.7.6 hard gate: at least one partner must be gestation-
+        // capable (Queen or Nonbinary) with Fertility phase ∉
+        // {Anestrus, Postpartum}. Tom×Tom fails unconditionally.
+        // Queen×Tom / Queen×Queen requires at least one non-Tom's
+        // Fertility phase to pass `is_viable_for_conception`.
+        if !is_conception_viable(self_fit) && !is_conception_viable(other_fit) {
+            return false;
+        }
         relationships
             .get(self_entity, *other)
             .is_some_and(|r| matches!(r.bond, Some(BondType::Partners) | Some(BondType::Mates)))
@@ -181,6 +209,9 @@ mod tests {
             hunger: 0.9,
             energy: 0.9,
             is_pregnant: false,
+            // Default to Estrus so the §7.M.7.6 viability gate opens —
+            // tests that exercise the gate override this explicitly.
+            fertility_phase: Some(FertilityPhase::Estrus),
         }
     }
 
@@ -201,6 +232,8 @@ mod tests {
             b,
             MatingFitness {
                 gender: Gender::Tom,
+                // §7.M.7.4: Toms never carry Fertility.
+                fertility_phase: None,
                 ..default_fitness()
             },
         );
@@ -367,6 +400,64 @@ mod tests {
         let (a, b, fitness, mut relationships, positions) = setup_eligible_pair();
         relationships.get_or_insert(a, b).bond = Some(BondType::Friends);
 
+        assert!(!has_eligible_mate(
+            a,
+            0.3,
+            Season::Spring,
+            &scoring,
+            &fitness,
+            &positions,
+            &relationships
+        ));
+    }
+
+    #[test]
+    fn ineligible_when_no_partner_is_conception_viable() {
+        // §7.M.7.6 hard gate: with both partners in Anestrus or
+        // Postpartum, the pair cannot conceive — gate rejects.
+        let scoring = ScoringConstants::default();
+        let (a, b, mut fitness, relationships, positions) = setup_eligible_pair();
+        // Partner b is a Tom per `setup_eligible_pair` — make self (a)
+        // Anestrus. Neither partner is now conception-viable.
+        fitness.get_mut(&a).unwrap().fertility_phase = Some(FertilityPhase::Anestrus);
+        // Tom already has no Fertility marker (contributes nothing here).
+        fitness.get_mut(&b).unwrap().fertility_phase = None;
+
+        assert!(!has_eligible_mate(
+            a,
+            0.3,
+            Season::Spring,
+            &scoring,
+            &fitness,
+            &positions,
+            &relationships
+        ));
+    }
+
+    #[test]
+    fn eligible_when_queen_is_in_estrus_with_tom_partner() {
+        // §7.M.7.6 hard gate opens on a single viable Queen + Tom pair.
+        let scoring = ScoringConstants::default();
+        let (a, _, fitness, relationships, positions) = setup_eligible_pair();
+        assert!(has_eligible_mate(
+            a,
+            0.3,
+            Season::Spring,
+            &scoring,
+            &fitness,
+            &positions,
+            &relationships
+        ));
+    }
+
+    #[test]
+    fn ineligible_when_queen_is_postpartum() {
+        // Post-birth Postpartum phase pins receptivity to 0 — gate
+        // must reject the pair even though the Tom partner is viable
+        // in a seasonal sense.
+        let scoring = ScoringConstants::default();
+        let (a, _, mut fitness, relationships, positions) = setup_eligible_pair();
+        fitness.get_mut(&a).unwrap().fertility_phase = Some(FertilityPhase::Postpartum);
         assert!(!has_eligible_mate(
             a,
             0.3,

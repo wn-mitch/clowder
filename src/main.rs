@@ -436,6 +436,10 @@ fn build_schedule() -> Schedule {
                 clowder::systems::needs::decay_exploration,
                 clowder::systems::needs::bond_proximity_social,
                 clowder::systems::pregnancy::tick_pregnancy,
+                // Fertility transitions (§7.M.7) — mirrored from
+                // SimulationPlugin::build.
+                clowder::systems::fertility::handle_post_partum_reinsert,
+                clowder::systems::fertility::update_fertility_phase,
                 clowder::systems::growth::tick_kitten_growth,
                 clowder::systems::growth::kitten_mood_aura,
                 clowder::systems::mood::update_mood,

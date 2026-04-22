@@ -3,6 +3,7 @@ pub mod building;
 pub mod coordination;
 pub mod disposition;
 pub mod fate;
+pub mod fertility;
 pub mod fox_goap_plan;
 pub mod fox_personality;
 pub mod fox_spatial;
@@ -37,6 +38,7 @@ pub use coordination::{
 };
 pub use disposition::{ActionHistory, ActionOutcome, ActionRecord, Disposition, DispositionKind};
 pub use fate::{FateAssigned, FatedLove, FatedRival};
+pub use fertility::{Fertility, FertilityPhase};
 pub use goap_plan::{GoapPlan, PlanEvent, PlanNarrative, StepPhase};
 pub use grooming::GroomingCondition;
 pub use identity::{Age, Appearance, Gender, LifeStage, Name, Orientation, Species};

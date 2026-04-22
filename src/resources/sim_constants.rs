@@ -36,6 +36,8 @@ pub struct SimConstants {
     pub world_gen: WorldGenConstants,
     #[serde(default)]
     pub sensory: SensoryConstants,
+    #[serde(default)]
+    pub fertility: FertilityConstants,
 }
 
 // ---------- NeedsConstants ----------
@@ -2529,6 +2531,47 @@ impl Default for AspirationConstants {
             chain_complete_mood_ticks: 200,
             chain_complete_purpose_gain: 0.1,
         }
+    }
+}
+
+// ---------- FertilityConstants (§7.M.7.3) ----------
+
+/// Cycle parameters driving the `Fertility` phase-transition function
+/// (§7.M.7.2). Defaults committed in §7.M.7.3. Diestrus fraction is
+/// implied by `1.0 - proestrus_fraction - estrus_fraction` and is
+/// validated rather than stored as a free field.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FertilityConstants {
+    pub cycle_length_ticks: u32,
+    pub proestrus_fraction: f32,
+    pub estrus_fraction: f32,
+    pub post_partum_recovery_ticks: u32,
+    pub update_interval_ticks: u32,
+    /// Soft-gate firing threshold for L3 `MateWithGoal` (§7.M.7.6).
+    /// Used by the Phase 4 target-taking pass; declared here so the
+    /// tunable is already present in headers before it's consumed.
+    pub l3_firing_threshold: f32,
+}
+
+impl Default for FertilityConstants {
+    fn default() -> Self {
+        Self {
+            cycle_length_ticks: 10_000,
+            proestrus_fraction: 0.15,
+            estrus_fraction: 0.20,
+            post_partum_recovery_ticks: 5_000,
+            update_interval_ticks: 100,
+            l3_firing_threshold: 0.15,
+        }
+    }
+}
+
+impl FertilityConstants {
+    /// Diestrus fraction = `1.0 - proestrus - estrus` per §7.M.7.3.
+    /// Guards against pathological tunings where the other two
+    /// fractions exceed 1.0 by clamping at zero.
+    pub fn diestrus_fraction(&self) -> f32 {
+        (1.0 - self.proestrus_fraction - self.estrus_fraction).max(0.0)
     }
 }
 
