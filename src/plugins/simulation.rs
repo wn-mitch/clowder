@@ -85,7 +85,7 @@ impl Plugin for SimulationPlugin {
                 .add_dse(crate::ai::dses::herbcraft_ward_dse())
                 .add_dse(crate::ai::dses::scry_dse())
                 .add_dse(crate::ai::dses::durable_ward_dse())
-                .add_dse(crate::ai::dses::cleanse_dse())
+                .add_dse(crate::ai::dses::cleanse_dse(&default_scoring))
                 .add_dse(crate::ai::dses::colony_cleanse_dse())
                 .add_dse(crate::ai::dses::harvest_dse())
                 .add_dse(crate::ai::dses::commune_dse())

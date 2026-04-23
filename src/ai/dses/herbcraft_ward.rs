@@ -1,7 +1,8 @@
 //! `Herbcraft::SetWard` — sibling-DSE split from the retiring cat
 //! `Herbcraft` inline block.
 //!
-//! `CompensatedProduct` of spirituality + herbcraft_skill.
+//! `CompensatedProduct` of spirituality + herbcraft_skill +
+//! territory_max_corruption.
 //! Eligibility: `.require("WardStrengthLow")` per §4 port (Phase
 //! 4b.5). The outer `ctx.has_ward_herbs` conjunct in
 //! `scoring.rs::score_actions` stays inline until a per-cat inventory
@@ -9,6 +10,13 @@
 //! ward-siege bonus at the same site remains inline — it's an inner
 //! additive on a different marker (`WardsUnderSiege`), not on this
 //! DSE's eligibility. Maslow tier 2.
+//!
+//! The `territory_max_corruption` axis uses the §2.3 Logistic(8, 0.1)
+//! shape — threshold-gated surge that rises steeply past 0.1
+//! corruption. Absorbs the retiring
+//! `ward_corruption_emergency_bonus` modifier contribution: the old
+//! flat additive bonus-when-corruption-detected is now produced by
+//! the axis curve itself as a natural threshold response.
 
 use bevy::prelude::*;
 
@@ -21,6 +29,7 @@ use crate::ai::dse::{
 
 pub const SPIRITUALITY_INPUT: &str = "spirituality";
 pub const HERBCRAFT_SKILL_INPUT: &str = "herbcraft_skill";
+pub const TERRITORY_MAX_CORRUPTION_INPUT: &str = "territory_max_corruption";
 
 pub struct HerbcraftWardDse {
     id: DseId,
@@ -35,13 +44,24 @@ impl HerbcraftWardDse {
             slope: 1.0,
             intercept: 0.0,
         };
+        // §2.3 Logistic(8, 0.1) — retires
+        // `ward_corruption_emergency_bonus`'s flat additive bonus by
+        // absorbing the emergency surge at the axis level.
+        let territory_corruption = Curve::Logistic {
+            steepness: 8.0,
+            midpoint: 0.1,
+        };
         Self {
             id: DseId("herbcraft_ward"),
             considerations: vec![
                 Consideration::Scalar(ScalarConsideration::new(SPIRITUALITY_INPUT, linear.clone())),
                 Consideration::Scalar(ScalarConsideration::new(HERBCRAFT_SKILL_INPUT, linear)),
+                Consideration::Scalar(ScalarConsideration::new(
+                    TERRITORY_MAX_CORRUPTION_INPUT,
+                    territory_corruption,
+                )),
             ],
-            composition: Composition::compensated_product(vec![1.0, 1.0]),
+            composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
             // §4 marker eligibility (Phase 4b.5): SetWard only scores
             // when colony ward strength is low. Retires the
             // `ctx.ward_strength_low` conjunct from the
@@ -97,9 +117,63 @@ mod tests {
     use crate::ai::eval::{evaluate_single, ModifierPipeline};
     use crate::components::physical::Position;
 
+    fn approx(a: f32, b: f32, tol: f32) -> bool {
+        (a - b).abs() < tol
+    }
+
     #[test]
     fn herbcraft_ward_id_stable() {
         assert_eq!(HerbcraftWardDse::new().id().0, "herbcraft_ward");
+    }
+
+    #[test]
+    fn herbcraft_ward_has_territory_corruption_axis() {
+        let dse = HerbcraftWardDse::new();
+        let names: Vec<&str> = dse
+            .considerations()
+            .iter()
+            .map(|c| match c {
+                Consideration::Scalar(s) => s.name,
+                _ => "",
+            })
+            .collect();
+        assert!(names.contains(&TERRITORY_MAX_CORRUPTION_INPUT));
+        assert_eq!(dse.considerations().len(), 3);
+    }
+
+    #[test]
+    fn territory_corruption_axis_is_logistic_8_01() {
+        // §2.3 retired-constants row 4: Logistic(8, 0.1) absorbs the
+        // retiring `ward_corruption_emergency_bonus`. Sample analytical
+        // values to pin the curve shape.
+        let dse = HerbcraftWardDse::new();
+        let curve = dse
+            .considerations()
+            .iter()
+            .find_map(|c| match c {
+                Consideration::Scalar(s) if s.name == TERRITORY_MAX_CORRUPTION_INPUT => {
+                    Some(s.curve.clone())
+                }
+                _ => None,
+            })
+            .expect("territory_max_corruption axis must exist");
+        // 0.0 → 1/(1+exp(0.8)) ≈ 0.3100
+        assert!(approx(curve.evaluate(0.0), 0.3100, 1e-3));
+        // 0.1 (midpoint) → 0.5
+        assert!(approx(curve.evaluate(0.1), 0.5, 1e-4));
+        // 0.2 → 1/(1+exp(-0.8)) ≈ 0.6900
+        assert!(approx(curve.evaluate(0.2), 0.6900, 1e-3));
+        // 0.5 → 1/(1+exp(-3.2)) ≈ 0.9608
+        assert!(approx(curve.evaluate(0.5), 0.9608, 1e-3));
+        // 1.0 → 1/(1+exp(-7.2)) ≈ 0.99925
+        assert!(approx(curve.evaluate(1.0), 0.9993, 1e-3));
+        match curve {
+            Curve::Logistic { steepness, midpoint } => {
+                assert!(approx(steepness, 8.0, 1e-6));
+                assert!(approx(midpoint, 0.1, 1e-6));
+            }
+            other => panic!("expected Logistic(8, 0.1); got {other:?}"),
+        }
     }
 
     #[test]

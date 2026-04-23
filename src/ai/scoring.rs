@@ -444,30 +444,13 @@ fn ctx_scalars(ctx: &ScoringContext) -> HashMap<&'static str, f32> {
         "territory_max_corruption",
         ctx.territory_max_corruption.clamp(0.0, 1.0),
     );
-    // §3.5 modifier-pipeline inputs. The three emergency-bonus
-    // modifiers (WardCorruptionEmergency / CleanseEmergency /
-    // SensedRotBoost in `crate::ai::modifier`) read these scalars to
-    // decide whether and how much to add; all are clamp-safe floats
-    // or 0/1 presence flags.
+    // §2.3 row 6 axis input — consumed by `magic_durable_ward`'s
+    // `nearby_corruption_level` Logistic(8, 0.1) consideration,
+    // which absorbs the retired `corruption_sensed_response_bonus`
+    // modifier contribution by construction.
     m.insert(
         "nearby_corruption_level",
         ctx.nearby_corruption_level.clamp(0.0, 1.0),
-    );
-    m.insert(
-        "maslow_level_2_suppression",
-        ctx.needs.level_suppression(2).clamp(0.0, 1.0),
-    );
-    m.insert(
-        "has_herbs_nearby",
-        if ctx.has_herbs_nearby { 1.0 } else { 0.0 },
-    );
-    m.insert(
-        "has_ward_herbs",
-        if ctx.has_ward_herbs { 1.0 } else { 0.0 },
-    );
-    m.insert(
-        "thornbriar_available",
-        if ctx.thornbriar_available { 1.0 } else { 0.0 },
     );
     // Saturating-count for Harvest carcass axis — cap at 3 per the
     // old inline `min(3)`.
@@ -825,11 +808,13 @@ pub fn score_actions(
 
     // --- Herbcraft (§L2.10.10 sibling split: gather + prepare + ward) ---
     // Each sub-mode's base score comes from its sibling DSE; the
-    // `ward_corruption_emergency_bonus` additive on gather + ward now
-    // lives in the §3.5 `WardCorruptionEmergency` modifier (Phase 4.2
-    // port). The outer Max + hint selection is a selection-layer
-    // concern that stays here. The siege bonus remains inline — it's
-    // a narrower-scope siege response, not a modifier-candidate
+    // retired `ward_corruption_emergency_bonus` flat additive (Phase
+    // 4.2 ported it to a modifier; §13.1 retired the modifier) is
+    // absorbed into the Logistic(8, 0.1) axis on
+    // `territory_max_corruption` inside both `herbcraft_gather` and
+    // `herbcraft_ward`. The outer Max + hint selection is a
+    // selection-layer concern that stays here. The siege bonus
+    // remains inline — it's a narrower-scope siege response, not a
     // corruption trigger.
     let herbcraft_hint;
     {
@@ -846,9 +831,10 @@ pub fn score_actions(
         // Ward requires ward herbs in inventory to execute. The earlier
         // "corruption-detected + thornbriar-available" branch that
         // scored ward via an inline emergency bonus is retired: the
-        // cat now scores gather (boosted by WardCorruptionEmergency
-        // on herbcraft_gather) to collect thornbriar first, then
-        // scores ward on a later tick once herbs are held.
+        // cat now scores gather (boosted by the Logistic(8, 0.1) axis
+        // on `territory_max_corruption` inside `herbcraft_gather`) to
+        // collect thornbriar first, then scores ward on a later tick
+        // once herbs are held.
         // §4 marker eligibility (Phase 4b.5): the
         // `ctx.ward_strength_low` conjunct retires — HerbcraftWardDse
         // now carries `.require("WardStrengthLow")`. The
@@ -880,11 +866,15 @@ pub fn score_actions(
 
     // --- PracticeMagic (§L2.10.10 sibling split — 6 sub-modes) ---
     // Outer gate: `magic_affinity + magic_skill > thresholds`.
-    // Sub-mode base scores come from their sibling DSEs; the three
-    // emergency bonuses (ward / cleanse / sensed-rot) now live in
-    // the §3.5 modifier pipeline (`WardCorruptionEmergency`,
-    // `CleanseEmergency`, `SensedRotBoost`) per Phase 4.2 port.
-    // The outer Max + hint selection stays here.
+    // Sub-mode base scores come from their sibling DSEs. The three
+    // emergency bonuses (ward / cleanse / sensed-rot) retired in
+    // §13.1 once their axis-level Logistic replacements landed:
+    // `magic_durable_ward` grew a Logistic(8, 0.1) axis on
+    // `nearby_corruption_level`; `magic_cleanse` swapped its
+    // `tile_corruption` axis to `Logistic(8,
+    // magic_cleanse_corruption_threshold)`; `magic_colony_cleanse`
+    // swapped its `territory_max_corruption` axis to
+    // Logistic(6, 0.3). The outer Max + hint selection stays here.
     let mut magic_hint: Option<CraftingHint> = None;
     if ctx.magic_affinity > s.magic_affinity_threshold && ctx.magic_skill > s.magic_skill_threshold
     {
@@ -1730,7 +1720,7 @@ mod tests {
             r.cat_dses.push(crate::ai::dses::herbcraft_ward_dse());
             r.cat_dses.push(crate::ai::dses::scry_dse());
             r.cat_dses.push(crate::ai::dses::durable_ward_dse());
-            r.cat_dses.push(crate::ai::dses::cleanse_dse());
+            r.cat_dses.push(crate::ai::dses::cleanse_dse(&scoring));
             r.cat_dses.push(crate::ai::dses::colony_cleanse_dse());
             r.cat_dses.push(crate::ai::dses::harvest_dse());
             r.cat_dses.push(crate::ai::dses::commune_dse());
@@ -1741,9 +1731,11 @@ mod tests {
     fn cached_modifier_pipeline() -> &'static ModifierPipeline {
         static PIPELINE: OnceLock<ModifierPipeline> = OnceLock::new();
         PIPELINE.get_or_init(|| {
-            // Match the production pipeline shape — Phase 4.2 registers
-            // the three corruption-response modifiers. Scoring tests
-            // exercising the emergency-bonus behavior need the same set.
+            // Match the production pipeline shape — the seven §3.5.1
+            // foundational modifiers. The three corruption-emergency
+            // modifiers retired in §13.1; their contribution now lives
+            // in the axis-level Logistic curves on the corresponding
+            // sibling DSEs.
             let scoring = crate::resources::sim_constants::ScoringConstants::default();
             crate::ai::modifier::default_modifier_pipeline(&scoring)
         })
@@ -3366,62 +3358,70 @@ mod tests {
     }
 
     #[test]
-    fn ward_corruption_emergency_boosts_score() {
+    fn ward_score_rises_with_territory_corruption() {
+        // §13.1 rewritten: the `ward_corruption_emergency_bonus` flat
+        // additive retired in favor of a Logistic(8, 0.1) axis on
+        // `territory_max_corruption` in both `herbcraft_ward` and
+        // `herbcraft_gather`. Absolute-threshold assertions no longer
+        // apply (the modifier additive on top of a [0,1] CP is gone);
+        // the ecological relationship "more corruption ⇒ stronger
+        // ward pull" must still hold through the axis curve.
         let sc = default_scoring();
         let needs = Needs::default(); // all needs satisfied
         let mut personality = default_personality();
         personality.spirituality = 0.6;
 
-        let mut rng = seeded_rng(100);
+        let ward_score_with_corruption = {
+            let mut rng = seeded_rng(100);
+            let mut c = ctx(&needs, &personality, &sc);
+            c.has_ward_herbs = true;
+            c.ward_strength_low = true;
+            c.herbcraft_skill = 0.6;
+            c.territory_max_corruption = 0.5;
+            let result = score_actions(&c, &test_eval_inputs(), &mut rng);
+            result
+                .scores
+                .iter()
+                .find(|(a, _)| matches!(a, Action::Herbcraft))
+                .map(|(_, s)| *s)
+                .unwrap_or(0.0)
+        };
 
-        let mut c = ctx(&needs, &personality, &sc);
-        c.has_ward_herbs = true;
-        c.ward_strength_low = true;
-        c.herbcraft_skill = 0.1;
-        c.territory_max_corruption = 0.5; // corruption detected in territory ring
+        let ward_score_without_corruption = {
+            let mut rng = seeded_rng(100);
+            let mut c = ctx(&needs, &personality, &sc);
+            c.has_ward_herbs = true;
+            c.ward_strength_low = true;
+            c.herbcraft_skill = 0.6;
+            c.territory_max_corruption = 0.0;
+            let result = score_actions(&c, &test_eval_inputs(), &mut rng);
+            result
+                .scores
+                .iter()
+                .find(|(a, _)| matches!(a, Action::Herbcraft))
+                .map(|(_, s)| *s)
+                .unwrap_or(0.0)
+        };
 
-        let result = score_actions(&c, &test_eval_inputs(), &mut rng);
-        let ward_score = result
-            .scores
-            .iter()
-            .find(|(a, _)| matches!(a, Action::Herbcraft))
-            .map(|(_, s)| *s)
-            .unwrap_or(0.0);
-
-        // With emergency bonus (1.2) the ward score should be well above 1.0.
+        // Logistic(8, 0.1) on `territory_max_corruption` evaluates to
+        // ~0.31 at 0.0 and ~0.96 at 0.5 — a 3× axis-output gain. The
+        // CP composition blends that with the other axes, so the
+        // aggregate ward_score must rise meaningfully but not
+        // necessarily 3×. Assert strict monotone growth.
         assert!(
-            ward_score > 1.0,
-            "ward with corruption emergency should score > 1.0; got {ward_score:.3}"
+            ward_score_with_corruption > ward_score_without_corruption,
+            "ward with corruption ({ward_score_with_corruption:.3}) must beat \
+             ward without corruption ({ward_score_without_corruption:.3})"
         );
-    }
-
-    #[test]
-    fn ward_no_corruption_no_emergency() {
-        let sc = default_scoring();
-        let needs = Needs::default();
-        let mut personality = default_personality();
-        personality.spirituality = 0.6;
-
-        let mut rng = seeded_rng(101);
-
-        let mut c = ctx(&needs, &personality, &sc);
-        c.has_ward_herbs = true;
-        c.ward_strength_low = true;
-        c.herbcraft_skill = 0.1;
-        c.territory_max_corruption = 0.0; // no corruption
-
-        let result = score_actions(&c, &test_eval_inputs(), &mut rng);
-        let ward_score = result
-            .scores
-            .iter()
-            .find(|(a, _)| matches!(a, Action::Herbcraft))
-            .map(|(_, s)| *s)
-            .unwrap_or(0.0);
-
-        // Without corruption, base ward score should be small (no emergency bonus).
+        // Magnitude witness: at corruption 0.5 the axis saturates past
+        // its 0.1 midpoint, so the CP-composed score should pick up a
+        // clearly-above-baseline boost. 1.25× is the conservative
+        // lower bound that matches the axis shape without over-
+        // constraining the compensation math.
         assert!(
-            ward_score < 0.5,
-            "ward without corruption should score < 0.5; got {ward_score:.3}"
+            ward_score_with_corruption > 1.25 * ward_score_without_corruption,
+            "axis surge should lift ward score ≥ 1.25× baseline; \
+             got {ward_score_with_corruption:.3} vs {ward_score_without_corruption:.3}"
         );
     }
 

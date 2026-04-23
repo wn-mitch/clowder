@@ -1189,11 +1189,6 @@ pub struct ScoringConstants {
     pub magic_harvest_carcass_scale: f32,
     pub magic_cleanse_colony_scale: f32,
     pub herbcraft_ward_siege_bonus: f32,
-    /// Flat score bonus for ward-setting when territory corruption is detected
-    /// and ward coverage is low. Makes wards competitive with Hunt/Eat.
-    pub ward_corruption_emergency_bonus: f32,
-    /// Flat score bonus for cleansing when territory corruption is detected.
-    pub cleanse_corruption_emergency_bonus: f32,
     pub corruption_social_bonus: f32,
     pub corruption_suppression_threshold: f32,
     pub corruption_suppression_scale: f32,
@@ -1201,9 +1196,6 @@ pub struct ScoringConstants {
     /// Tile radius within which a cat "smells" corruption on nearby tiles.
     /// Corruption beyond this range is out of sensing reach.
     pub corruption_smell_range: i32,
-    /// Flat score bonus added to Cleanse/SetWard when a cat smells rot nearby
-    /// (nearby_corruption_level above the corruption_tile_mood_threshold).
-    pub corruption_sensed_response_bonus: f32,
 }
 
 impl Default for ScoringConstants {
@@ -1334,14 +1326,11 @@ impl Default for ScoringConstants {
             magic_harvest_carcass_scale: 0.6,
             magic_cleanse_colony_scale: 0.4,
             herbcraft_ward_siege_bonus: 0.4,
-            ward_corruption_emergency_bonus: 2.0,
-            cleanse_corruption_emergency_bonus: 0.8,
             corruption_social_bonus: 0.15,
             corruption_suppression_threshold: 0.3,
             corruption_suppression_scale: 0.6,
             carcass_detection_range: 15,
             corruption_smell_range: 5,
-            corruption_sensed_response_bonus: 0.6,
         }
     }
 }
