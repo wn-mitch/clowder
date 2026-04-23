@@ -1151,15 +1151,17 @@ remaining work is itemised here.
 
 - **`add_target_taking_dse` + per-target considerations (§6.3,
   §6.5).** **Phase 4b.3 foundation + Phase 4c.1 Socialize + Phase
-  4c.2 Mate reference ports landed** — `TargetTakingDse` struct,
-  `TargetAggregation` enum, `evaluate_target_taking` evaluator,
-  `add_target_taking_dse` registration; plus §6.5.1 Socialize and
-  §6.5.2 Mate per-DSE ports closing the §6.2 silent-divergences
+  4c.2 Mate + Phase 4c.5 Mentor reference ports landed** —
+  `TargetTakingDse` struct, `TargetAggregation` enum,
+  `evaluate_target_taking` evaluator, `add_target_taking_dse`
+  registration; plus §6.5.1 Socialize, §6.5.2 Mate, and §6.5.3
+  Mentor per-DSE ports closing the §6.2 silent-divergences
   between `disposition.rs::build_socializing_chain` /
   `build_mating_chain` (weighted mixers) and
-  `goap.rs::find_social_target` (fondness-only, no bond filter).
-  **Remaining:** seven per-DSE ports (Mentor, Groom-other, Hunt,
-  Fight, ApplyRemedy, Build, Caretake) following the Phase 4c.1
+  `goap.rs::find_social_target` (fondness-only, no bond filter /
+  no skill-gap ranking).
+  **Remaining:** six per-DSE ports (Groom-other, Hunt, Fight,
+  ApplyRemedy, Build, Caretake) following the Phase 4c.1
   pattern (see Landed). Each port needs:
     1. `TargetTakingDse` factory function (consideration bundle
        from §6.5.N, composition, aggregation).
@@ -1176,19 +1178,16 @@ remaining work is itemised here.
        `nearest_threat`) — silent-divergence fix per §6.2.
     5. Thread winning target through the downstream step's
        `target_entity` field so GOAP plans against it.
-  **Caretake (§6.5.6) is now BLOCKING further per-DSE ports** —
-  orphan-kitten starvation compounded from 1 (Phase 4c.1) to 5
-  (Phase 4c.2) as the Mate port tripled reproduction activity.
-  Root cause is `hungry_kitten_urgency` hardcoded to `0.0` in both
-  scoring paths (`disposition.rs:640` + `goap.rs:937`), which
-  nulls the Caretake DSE's dominant axis (weight 0.45) so no adult
-  ever fires Caretake. The fix is not purely a per-DSE port — it
-  also needs the urgency signal wired from a live scan of
-  kittens-in-range with unmet hunger. **Do not land the next
-  per-DSE §6.5 port until Caretake's orphan-starvation cascade
-  is fixed** — each port that enables more prosocial behavior
-  (reproduction, grooming, mentoring) will compound kitten
-  mortality against the hard-gate canary.
+  ~~**Caretake (§6.5.6) is now BLOCKING further per-DSE ports**~~
+  **Caretake blocker cleared** by Phase 4c.3's urgency-signal fix
+  + Phase 4c.4's alloparenting Reframe A + GOAP retrieve step +
+  target-entity persistence (`KittenFed = 55 / 10 / 79` across
+  recent soaks; see Landed). Phase 4c.5 (Mentor) landed on the
+  cleared gate with no starvation regression. The full §6.5.6
+  Caretake `TargetTakingDse` port remains outstanding (the
+  existing `resolve_caretake` helper in `caretake_targeting.rs`
+  pre-dates the target-DSE substrate and should migrate to match
+  the Socialize / Mate / Mentor pattern once scheduled).
 - **§4 marker-eligibility authoring systems for roster gap-fill.**
   **Phase 4b.2 MVP + 4b.4 landed** (lookup foundation +
   `HasStoredFood` + `HasGarden` reference ports — see Landed
@@ -1807,6 +1806,199 @@ pattern is proven.
 ---
 
 ## Landed
+
+### Phase 4c.5 — §6.5.3 `Mentor` target-taking DSE port (2026-04-22)
+
+Third per-DSE §6.5 target-taking port, landing on the
+Socialize / Mate reference pattern established in Phase 4c.1 /
+4c.2. Closes the §6.2 silent divergence on the MentorCat path
+and the §6.1-Critical "resolver ignores skill-gap entirely" gap.
+
+- New `src/ai/dses/mentor_target.rs`:
+    - `mentor_target_dse()` factory — three per-§6.5.3
+      considerations (`target_nearness` `Quadratic(exp=2)`,
+      `target_fondness` `Linear`, `target_skill_gap`
+      `Logistic(8, 0.4)`). Weights renormalized from the spec's
+      (0.20/0.20/0.40/0.20) → (0.25/0.25/0.50) by deferring the
+      `apprentice-receptivity` axis pending the §4.3 `Apprentice`
+      marker author system. `Best` aggregation. Intention:
+      `Activity { kind: Mentor, termination: UntilInterrupt,
+      strategy: SingleMinded }`.
+    - `resolve_mentor_target(registry, cat, cat_pos, cat_positions,
+      self_skills, skills_lookup, relationships, tick)` — the
+      single sanctioned target-picker for MentorCat. Skill-gap
+      signal: `max_k (self.skills[k] − target.skills[k]).max(0)`,
+      clamped to `[0, 1]` before the Logistic. Candidate filter:
+      cats in range ≤ 10 tiles with `Skills`, no bond filter
+      (mentoring grows bonds, doesn't require them).
+    - 13 unit tests covering id stability, axis count, weight
+      sum, `Best` aggregation, `max_skill_gap` edge cases
+      (largest-positive / negative-gaps-ignored / clamp-to-1),
+      no-registration → None, no-candidates-in-range → None,
+      self-exclusion, skill-less candidates skipped,
+      larger-gap-wins-all-else-equal, skill-gap-dominates-fondness-
+      bias (encodes §6.5.3 design-intent), and Mentor intention
+      factory.
+- Registration at `main.rs::build_app`, `main.rs::build_schedule`,
+  and `plugins/simulation.rs::SimulationPlugin::build` — three
+  registration sites per the headless-mirror rule. Per-site
+  ordering places `mentor_target_dse` immediately after
+  `mentor_dse()` so the self-state + target-taking pair sits
+  together in the registry vector.
+- `disposition.rs::disposition_to_chain` — resolves
+  `mentor_target` alongside `socialize_target` / `mate_target` at
+  the per-cat chain-building site, using a
+  `skills_query.get(e).ok().cloned()` closure for the candidate-
+  side skill lookup.
+- `disposition.rs::build_socializing_chain` — new
+  `mentor_target: Option<Entity>` parameter. The `can_mentor`
+  branch now prefers the skill-gap-picked `mentor_target` over
+  the fondness-picked `socialize_target`, preserving the paired
+  threshold check (`self > high && other < low` on the same
+  skill axis) as a defensive reconfirmation. Falls through to
+  Socialize's target for the groom / socialize branches.
+- `goap.rs::resolve_goap_plans::MentorCat` — replaces
+  `find_social_target` with `resolve_mentor_target`. New
+  `cat_skills_snapshot: HashMap<Entity, Skills>` built once per
+  tick before the mutable-borrow loop so the MentorCat branch
+  can rank apprentices without re-borrowing `cats`. Legacy
+  `find_social_target` remains in place for `GroomOther` only
+  until §6.5.4 ports.
+
+**Seed-42 `--duration 900` release deep-soak**
+(`logs/phase4c5-mentor-target/events.jsonl`):
+
+| Metric | 4c.4 (v3 run 1) | 4c.5 | Direction |
+|---|---|---|---|
+| `deaths_by_cause.Starvation` | 3 | 4 | noise-band (4c.4 v2/v3 range 0–5 across runs) |
+| `deaths_by_cause.ShadowFoxAmbush` | 0 | 0 | canary passes |
+| `continuity_tallies.grooming` | 174 | 211 | +21% noise |
+| `continuity_tallies.mentoring` | 0 | 0 | unchanged — paired-threshold skill gate pre-existing |
+| KittenFed | 110 | 79 | −28% noise |
+| MatingOccurred | 5 | 5 | stable |
+| KittenBorn | 3 | 4 | +1 |
+| CropTended / CropHarvested | 9777 / 155 | 15722 / 364 | +61% / +135% noise |
+
+**Hypothesis concordance — §6.5.3 port:**
+
+> Skill-gap-ranked apprentice selection retires the
+> fondness-only `find_social_target` MentorCat caller and the
+> `socialize_target`-as-apprentice legacy wiring. Prediction:
+> Mentor activity in soaks either stays at 0 (if no cat-pair
+> crosses the smoothed threshold) or ticks up slightly (0 → 1–3
+> events) as pairs with moderate gaps that previously failed the
+> binary threshold become reachable.
+
+- **Direction-neutral result.** MentoredCat still 0 after port.
+  Root cause is *not* target selection — the `can_mentor` gate
+  still requires a self-side skill above `mentor_skill_threshold_high`
+  (0.6), which cats only reach after substantial skill growth;
+  15 min of sim rarely produces a cat with skill > 0.6 in the
+  present colony. Port correctness verified by unit tests
+  (higher-skill-gap wins, skill-gap dominates fondness bias);
+  sim-level activity depends on balance tuning deferred per
+  open-work #14's post-refactor commitment.
+- **Silent-divergence closed.** Mentor target selection now
+  ranks on skill-gap magnitude (Logistic saturating near
+  gap≥0.5) instead of the pre-refactor fondness-only legacy.
+  When skill growth eventually unlocks the `can_mentor` gate,
+  the cat the planner commits to will be the highest-gap
+  apprentice in range — the §6.1-Critical gap closed
+  structurally.
+- **Survival canaries pass.** Starvation within 4c.4 noise
+  band; ShadowFoxAmbush = 0; no wipe; continuity grooming /
+  farming improvements within RNG variance.
+
+**Deferred (same envelope as 4c.1 / 4c.2 deferrals):**
+- Merging mentor target-quality into the action-pool scoring
+  layer (target-DSE still observational, not pool-modulating)
+- `apprentice-receptivity` axis — waits for §4.3 `Apprentice`
+  author system landing (open-work #14 marker-roster second
+  bullet)
+- `find_social_target` full retirement — waits for §6.5.4
+  Groom-other port (third and final caller)
+- Balance tuning of the `mentor_skill_threshold_high` /
+  `mentor_temperature_threshold` gates — covered by the
+  refactor-substrate-stability commitment in open-work #14
+
+**Remaining Phase 4 work** (open-work #14 outstanding list):
+Mentor struck from the 7-port remaining list; 6 per-DSE ports
+remain (Groom-other, Hunt, Fight, ApplyRemedy, Build,
+Caretake). No blocker sequencing imposed by Phase 4c.5 —
+MentoredCat activity still 0 but not because of mentor-target
+selection.
+
+---
+
+### Phase 5a — silent-advance audit: `StepOutcome<W>` + contract + never-fired canary (2026-04-22)
+
+Follow-on from the Phase 4c.3 / 4c.4 silent-advance pair (feed-
+kitten and tend-crops). Those two bugs shared a shape — step
+resolver silently returns `Advance` without producing its real-
+world effect, caller emits `Feature::*` unconditionally or not at
+all — and the Activation canary had no way to see the gap. Phase
+5a turns that class of bug into a type error.
+
+**Type contract.** New `src/steps/outcome.rs` defines
+`StepOutcome<W>` (return type of every `pub fn resolve_*`) with a
+`Witnessed` trait impl'd for `bool` and `Option<T>` but not for
+`()`. The `record_if_witnessed(activation, Feature)` helper is
+only callable on witness-carrying outcomes, so a resolver that
+wants a Positive Feature must declare a witness type at its
+signature. `#[must_use]` on the struct + clippy warnings catch
+discarded returns.
+
+**Documentation contract.** CLAUDE.md §"GOAP Step Resolver
+Contract" specifies the 5-heading rustdoc preamble required on
+every `resolve_*` (Real-world effect / Plan-level preconditions /
+Runtime preconditions / Witness / Feature emission).
+`scripts/check_step_contracts.sh` enforces it via `just check`.
+
+**Migrations.** All 30+ step resolvers now return
+`StepOutcome<_>` with the 5-heading docstring:
+- Exemplars (already correctly gated, 3 files):
+  `cook.rs`, `feed_kitten.rs`, `tend.rs`.
+- High-severity silent-advance fixes with new Features (7):
+  `eat_at_stores` → `FoodEaten`; `socialize` → `Socialized`;
+  `groom_other` → `GroomedOther`; `mentor_cat` → `MentoredCat`;
+  `fight_threat` → `ThreatEngaged`; `deliver` →
+  `MaterialsDelivered`; `retrieve_raw_food_from_stores` wires
+  existing `ItemRetrieved`.
+- Medium-severity gating fixes (3): `harvest` (Fail instead of
+  silent-reset on missing Stores; `CropHarvested` now gated on
+  items placed); `mate_with` (+ new `CourtshipInteraction` for
+  tom×tom); `deliver_directive` (gates existing
+  `DirectiveDelivered`).
+- Witness-less docs/uniformization: `sleep`, `self_groom`,
+  `survey`, `patrol_to`, `move_to`, `gather`, `construct`,
+  `repair` (+ new `BuildingRepaired`), `deposit_at_stores`,
+  `retrieve_from_stores`, `retrieve_any_food_from_stores`, plus
+  magic/* and fox/* resolvers (kept their plain `StepResult`
+  returns where Feature emission was already correctly gated
+  elsewhere; added contract preambles).
+
+**Never-fired canary.** New `Feature::expected_to_fire_per_soak()`
+predicate plus `SystemActivation::never_fired_expected_positives()`
+→ footer field `never_fired_expected_positives`. `scripts/
+check_canaries.sh` fails on non-empty list. Rare-legend features
+(`ShadowFoxBanished`, `FateAwakened`, `ScryCompleted`, etc.) are
+exempted. This is the canary that would have caught the farming
+bug in the first soak after it broke.
+
+**New Feature variants (8):** `FoodEaten`, `Socialized`,
+`GroomedOther`, `MentoredCat`, `ThreatEngaged`,
+`MaterialsDelivered`, `BuildingRepaired`, `CourtshipInteraction`.
+All Positive. Total Positive features: 44 (up from 36).
+
+**Drive-by:** fixed 10 pre-existing clippy warnings in
+`target_dse.rs`, `modifier.rs`, `practice_magic.rs` so `just
+check` comes up green with the new lint wired in.
+
+**Verification:** `just check` green; `cargo test --lib` 948
+passing (up from 945, +3 canary tests); canonical seed-42 900s
+soak TK.
+
+---
 
 ### Phase 4c.4 — Alloparenting Reframe A + GOAP Caretake fix + Farming canaries (2026-04-22)
 

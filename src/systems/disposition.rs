@@ -340,7 +340,15 @@ pub fn evaluate_dispositions(
             Option<&crate::components::fate::FatedLove>,
             Option<&crate::components::fate::FatedRival>,
         ),
-        (Without<Dead>, Without<Disposition>),
+        (
+            Without<Dead>,
+            Without<Disposition>,
+            // §Phase 5b — kittens are dependents, not planners. Mirror
+            // the filter in `goap.rs::evaluate_and_plan` so the
+            // disposition-chain path (if ever re-enabled) doesn't
+            // regress the feed-kitten fix.
+            Without<crate::components::KittenDependency>,
+        ),
     >,
     all_positions: Query<(Entity, &Position, Option<&PreyAnimal>), Without<Dead>>,
     wildlife: Query<(Entity, &Position), With<WildAnimal>>,
@@ -1072,6 +1080,25 @@ pub fn disposition_to_chain(
             &res.relationships,
             res.time.tick,
         );
+        // §6.5.3: resolve the mentor target-taking DSE. Skill-gap is the
+        // dominant axis; weights renormalized from spec by dropping the
+        // deferred `apprentice-receptivity` axis. Candidates share the
+        // Socialize candidate pool (cats in range, excluding self); the
+        // skill-lookup closure reads Skills from the frame-local query
+        // so apprentice selection ranks on max-across-skills gap.
+        let mentor_skills_lookup = |e: Entity| -> Option<Skills> {
+            skills_query.get(e).ok().cloned()
+        };
+        let mentor_target = crate::ai::dses::mentor_target::resolve_mentor_target(
+            &res.dse_registry,
+            entity,
+            *pos,
+            &cat_pos_list,
+            skills,
+            &mentor_skills_lookup,
+            &res.relationships,
+            res.time.tick,
+        );
 
         let chain = match disposition.kind {
             DispositionKind::Resting => build_resting_chain(
@@ -1102,6 +1129,7 @@ pub fn disposition_to_chain(
             ),
             DispositionKind::Socializing => build_socializing_chain(
                 socialize_target,
+                mentor_target,
                 &cat_pos_list,
                 personality,
                 skills,
@@ -1442,40 +1470,44 @@ fn build_guarding_chain(
 }
 
 /// Build a task chain around a pre-resolved social target. §6.2 /
-/// §6.5.1: the target entity is chosen by
-/// [`crate::ai::dses::socialize_target::resolve_socialize_target`]
-/// upstream; this function owns only the chain shape (Mentor /
-/// Groom / Socialize sub-action pick, step sequencing), not partner
-/// selection. Legacy fondness+novelty mixer retired here to close the
-/// silent-divergence gap with `goap.rs::find_social_target`.
+/// §6.5.1 / §6.5.3: `socialize_target` picks the Socialize / Groom
+/// partner via [`crate::ai::dses::socialize_target::resolve_socialize_target`];
+/// `mentor_target` picks the apprentice via
+/// [`crate::ai::dses::mentor_target::resolve_mentor_target`]. When
+/// the `can_mentor` branch fires, `mentor_target` is preferred so
+/// apprentice selection ranks on skill-gap (§6.1 Critical fix); the
+/// Socialize target is the fallback if no mentor candidate exists.
+/// This function owns only the chain shape (sub-action pick + step
+/// sequencing), not partner selection.
 fn build_socializing_chain(
     socialize_target: Option<Entity>,
+    mentor_target: Option<Entity>,
     cat_positions: &[(Entity, Position)],
     personality: &Personality,
     skills: &Skills,
     skills_query: &Query<&Skills, Without<Dead>>,
     d: &DispositionConstants,
 ) -> Option<(TaskChain, Action)> {
-    let target_entity = socialize_target?;
-    let target_pos = *cat_positions
+    // Decide sub-action: mentor if a skill-gap-picked apprentice exists
+    // and the paired threshold check passes + warmth permits; groom if
+    // warm; otherwise socialize. The paired threshold check preserves
+    // the pre-refactor selectivity (same axis where self > high && other
+    // < low); the mentor-target picker chooses *which* qualifying
+    // apprentice by skill-gap magnitude rather than legacy fondness.
+    let mentor_skills = [
+        skills.hunting,
+        skills.foraging,
+        skills.herbcraft,
+        skills.building,
+        skills.combat,
+        skills.magic,
+    ];
+    let self_has_mentor_level_skill = mentor_skills
         .iter()
-        .find(|(e, _)| *e == target_entity)
-        .map(|(_, p)| p)?;
-
-    // Decide sub-action: mentor if applicable, groom if warm, otherwise socialize.
-    let can_mentor = {
-        let mentor_skills = [
-            skills.hunting,
-            skills.foraging,
-            skills.herbcraft,
-            skills.building,
-            skills.combat,
-            skills.magic,
-        ];
-        mentor_skills
-            .iter()
-            .any(|&s| s > d.mentor_skill_threshold_high)
-            && skills_query.get(target_entity).is_ok_and(|other| {
+        .any(|&s| s > d.mentor_skill_threshold_high);
+    let can_mentor = self_has_mentor_level_skill
+        && mentor_target.is_some_and(|mt| {
+            skills_query.get(mt).is_ok_and(|other| {
                 let other_arr = [
                     other.hunting,
                     other.foraging,
@@ -1488,15 +1520,25 @@ fn build_socializing_chain(
                     m > d.mentor_skill_threshold_high && a < d.mentor_skill_threshold_low
                 })
             })
-    };
+        });
 
-    let (step_kind, action) = if can_mentor && personality.warmth > d.mentor_temperature_threshold {
-        (StepKind::MentorCat, Action::Mentor)
-    } else if personality.warmth > d.groom_temperature_threshold {
-        (StepKind::GroomOther, Action::Groom)
-    } else {
-        (StepKind::Socialize, Action::Socialize)
-    };
+    let (target_entity, step_kind, action) =
+        if can_mentor && personality.warmth > d.mentor_temperature_threshold {
+            (
+                mentor_target.expect("can_mentor implies mentor_target.is_some()"),
+                StepKind::MentorCat,
+                Action::Mentor,
+            )
+        } else if personality.warmth > d.groom_temperature_threshold {
+            (socialize_target?, StepKind::GroomOther, Action::Groom)
+        } else {
+            (socialize_target?, StepKind::Socialize, Action::Socialize)
+        };
+
+    let target_pos = *cat_positions
+        .iter()
+        .find(|(e, _)| *e == target_entity)
+        .map(|(_, p)| p)?;
 
     let chain = TaskChain::new(
         vec![
@@ -3213,7 +3255,7 @@ pub fn resolve_disposition_chains(
             StepKind::RetrieveFromStores { kind } => {
                 let kind = *kind;
                 let target = step.target_entity;
-                let (result, retrieved) = crate::steps::disposition::resolve_retrieve_from_stores(
+                let outcome = crate::steps::disposition::resolve_retrieve_from_stores(
                     ticks,
                     kind,
                     target,
@@ -3222,12 +3264,11 @@ pub fn resolve_disposition_chains(
                     &items_query,
                     &mut commands,
                 );
-                if retrieved {
-                    if let Some(ref mut act) = narr.activation {
-                        act.record(Feature::ItemRetrieved);
-                    }
-                }
-                apply_step_result(result, &mut chain, &mut current);
+                outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    Feature::ItemRetrieved,
+                );
+                apply_step_result(outcome.result, &mut chain, &mut current);
             }
 
             StepKind::RetrieveAnyFoodFromStores => {
@@ -3240,21 +3281,19 @@ pub fn resolve_disposition_chains(
                 // path is currently unscheduled (GOAP replaced it),
                 // the bug never surfaced, but the rename keeps the two
                 // systems aligned if the chain path is ever re-enabled.
-                let (result, retrieved) =
-                    crate::steps::disposition::resolve_retrieve_any_food_from_stores(
-                        ticks,
-                        target,
-                        &mut inventory,
-                        &mut stores_query,
-                        &items_query,
-                        &mut commands,
-                    );
-                if retrieved {
-                    if let Some(ref mut act) = narr.activation {
-                        act.record(Feature::ItemRetrieved);
-                    }
-                }
-                apply_step_result(result, &mut chain, &mut current);
+                let outcome = crate::steps::disposition::resolve_retrieve_any_food_from_stores(
+                    ticks,
+                    target,
+                    &mut inventory,
+                    &mut stores_query,
+                    &items_query,
+                    &mut commands,
+                );
+                outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    Feature::ItemRetrieved,
+                );
+                apply_step_result(outcome.result, &mut chain, &mut current);
             }
 
             // Non-disposition steps are handled elsewhere.

@@ -10,6 +10,26 @@ use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::sim_constants::{CombatConstants, MagicConstants};
 use crate::steps::StepResult;
 
+/// # GOAP step resolver: `SetWard`
+///
+/// **Real-world effect** — on first tick, rolls a misfire check;
+/// on completion, consumes a Thornbriar herb from inventory and
+/// spawns a `Ward` entity at the actor's position. Grows magic
+/// skill.
+///
+/// **Plan-level preconditions** — emitted by the magic planner
+/// for ward-placement DSEs.
+///
+/// **Runtime preconditions** — herb consumption may fail; Fail
+/// on `inventory.take_herb(Thornbriar)` miss or misfire fizzle.
+///
+/// **Witness** — returns plain `StepResult`. Predates the
+/// `StepOutcome<W>` convention. Advance is witness-equivalent
+/// (ward entity only spawns on success path).
+///
+/// **Feature emission** — caller records `Feature::WardPlaced`
+/// (Positive) on Advance at `src/systems/goap.rs:2259,2292` and
+/// `src/systems/magic.rs:719`.
 #[allow(clippy::too_many_arguments)]
 pub fn resolve_set_ward(
     ticks: u64,

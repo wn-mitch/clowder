@@ -10,10 +10,39 @@ use crate::components::physical::Position;
 use crate::components::skills::Skills;
 use crate::resources::colony_score::ColonyScore;
 use crate::resources::map::TileMap;
-use crate::steps::StepResult;
+use crate::steps::{StepOutcome, StepResult};
 
-/// Returns `(StepResult, should_continue)`. The `should_continue` flag indicates
-/// the dispatcher should `continue` to the next entity (used when walking to site).
+/// # GOAP step resolver: `Construct`
+///
+/// **Real-world effect** — paths the actor to a `ConstructionSite`,
+/// then increments `site.progress` by a rate scaled by
+/// `skills.building` + a group-build bonus for multiple concurrent
+/// builders. On completion (`progress >= 1.0`): removes the
+/// `ConstructionSite`, installs the final `Structure` and any
+/// required auxiliary components (`StoredItems` for Stores,
+/// `CropState` for Garden — missing-auxiliary was the §Phase 4c.4
+/// farming repair), and increments `ColonyScore.structures_built`.
+///
+/// **Plan-level preconditions** — emitted by the builder-chain
+/// planner in `src/systems/coordination.rs`. Requires that
+/// `Deliver` steps have already fulfilled the site's materials
+/// ledger — otherwise `Fail("materials not delivered")` drops the
+/// plan.
+///
+/// **Runtime preconditions** — `target_entity` must resolve to a
+/// site; if missing or not a ConstructionSite, returns Fail. The
+/// ConstructionSite-already-removed case returns `Advance`
+/// directly (idempotent completion).
+///
+/// **Witness** — `StepOutcome<()>`. The effect is either a real
+/// progress increment or a Fail; no silent-advance surface.
+///
+/// **Feature emission** — caller records
+/// `Feature::BuildingConstructed` (Positive) on `Advance` at
+/// `src/systems/goap.rs`. Since the step can only Advance when
+/// progress actually completed or the site was already removed,
+/// gating on `Advance` is acceptable here — no witness-less
+/// Advance path silently misfires.
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub fn resolve_construct(
     target_entity: Option<Entity>,
@@ -35,13 +64,13 @@ pub fn resolve_construct(
     map: &TileMap,
     commands: &mut Commands,
     colony_score: &mut Option<ResMut<ColonyScore>>,
-) -> StepResult {
+) -> StepOutcome<()> {
     let Some(target) = target_entity else {
-        return StepResult::Fail("no target for Construct".into());
+        return StepOutcome::bare(StepResult::Fail("no target for Construct".into()));
     };
 
     let Ok((_, _, maybe_site, _, building_pos)) = buildings.get_mut(target) else {
-        return StepResult::Fail("construction site not found".into());
+        return StepOutcome::bare(StepResult::Fail("construction site not found".into()));
     };
 
     if pos.manhattan_distance(building_pos) > 1 {
@@ -53,12 +82,12 @@ pub fn resolve_construct(
                 *pos = path.remove(0);
             }
         }
-        return StepResult::Continue;
+        return StepOutcome::bare(StepResult::Continue);
     }
 
     if let Some(mut site) = maybe_site {
         if !site.materials_complete() {
-            return StepResult::Fail("materials not delivered".into());
+            return StepOutcome::bare(StepResult::Fail("materials not delivered".into()));
         }
 
         let other_builders = builders_per_site.get(&target).copied().unwrap_or(1).max(1);
@@ -69,8 +98,6 @@ pub fn resolve_construct(
         if site.progress >= 1.0 {
             let blueprint = site.blueprint;
             commands.entity(target).remove::<ConstructionSite>();
-            // Remove sprite marker so the rendering system re-attaches at
-            // full opacity now that construction is complete.
             commands
                 .entity(target)
                 .remove::<crate::rendering::entity_sprites::EntitySpriteMarker>();
@@ -83,9 +110,6 @@ pub fn resolve_construct(
             // query (`has_crop` filter) never matched any Garden and
             // every Farming plan failed with "no target for Tend" —
             // 400+/soak silent failures, zero harvests ever logged.
-            // Same shape of bug as the half-shipped Caretake chain:
-            // the building was "constructed" but missing the auxiliary
-            // component that makes the action catalog functional.
             if blueprint == StructureType::Garden {
                 commands
                     .entity(target)
@@ -94,12 +118,11 @@ pub fn resolve_construct(
             if let Some(ref mut score) = colony_score {
                 score.structures_built += 1;
             }
-            StepResult::Advance
+            StepOutcome::bare(StepResult::Advance)
         } else {
-            StepResult::Continue
+            StepOutcome::bare(StepResult::Continue)
         }
     } else {
-        // ConstructionSite already removed — building is done.
-        StepResult::Advance
+        StepOutcome::bare(StepResult::Advance)
     }
 }

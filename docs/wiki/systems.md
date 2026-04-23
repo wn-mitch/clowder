@@ -29,6 +29,9 @@ Status of each design document cross-referenced against `SimulationPlugin::build
 | Environmental Quality | *[Aspirational]* | — | [doc](../systems/environmental-quality.md) |
 | Log Analytics Dashboard | *[Aspirational]* | — | [doc](../systems/log-analytics-dashboard.md) |
 | Mental Breaks | *[Aspirational]* | — | [doc](../systems/mental-breaks.md) |
+| Monuments — Civic & Memorial Structures | *[Aspirational]* | — | [doc](../systems/monuments.md) |
+| NamedLandmark Substrate — Event-Anchored Naming | *[Aspirational]* | — | [doc](../systems/naming.md) |
+| Happy Paths (Usage-worn Trails) | *[Aspirational]* | — | [doc](../systems/paths.md) |
 | Project vision | *[Aspirational]* | — | [doc](../systems/project-vision.md) |
 | Organized Raids | *[Aspirational]* | — | [doc](../systems/raids.md) |
 | Recreation & Grooming | *[Aspirational]* | — | [doc](../systems/recreation.md) |

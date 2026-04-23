@@ -674,6 +674,9 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
         registry.cat_dses.push(clowder::ai::dses::groom_self_dse());
         registry.cat_dses.push(clowder::ai::dses::groom_other_dse());
         registry.cat_dses.push(clowder::ai::dses::mentor_dse());
+        registry
+            .target_taking_dses
+            .push(clowder::ai::dses::mentor_target_dse());
         registry.cat_dses.push(clowder::ai::dses::caretake_dse());
         registry.cat_dses.push(clowder::ai::dses::mate_dse());
         registry
@@ -1013,6 +1016,12 @@ fn build_headless_footer(world: &mut World) -> String {
     let negative_events_total = activation.negative_event_count();
     let neutral_features_active = activation.features_active_in(FeatureCategory::Neutral);
     let neutral_features_total = SystemActivation::features_total_in(FeatureCategory::Neutral);
+    // §Phase 5a never-fired canary: Positive features that a
+    // canonical soak is *expected* to fire but didn't. Empty list
+    // on a healthy run; populated list means silently-dead
+    // subsystems (the farming bug's diagnostic blind spot before
+    // §Phase 4c.4).
+    let never_fired_expected_positives = activation.never_fired_expected_positives();
 
     let event_log = world.resource::<EventLog>();
     let footer = serde_json::json!({
@@ -1030,6 +1039,7 @@ fn build_headless_footer(world: &mut World) -> String {
         "negative_events_total": negative_events_total,
         "neutral_features_active": neutral_features_active,
         "neutral_features_total": neutral_features_total,
+        "never_fired_expected_positives": never_fired_expected_positives,
         "deaths_by_cause": event_log.deaths_by_cause,
         "plan_failures_by_reason": event_log.plan_failures_by_reason,
         "interrupts_by_reason": event_log.interrupts_by_reason,
@@ -1367,6 +1377,9 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
         registry.cat_dses.push(clowder::ai::dses::groom_self_dse());
         registry.cat_dses.push(clowder::ai::dses::groom_other_dse());
         registry.cat_dses.push(clowder::ai::dses::mentor_dse());
+        registry
+            .target_taking_dses
+            .push(clowder::ai::dses::mentor_target_dse());
         registry.cat_dses.push(clowder::ai::dses::caretake_dse());
         registry.cat_dses.push(clowder::ai::dses::mate_dse());
         registry

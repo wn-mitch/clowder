@@ -69,4 +69,18 @@ else
     echo "    zeroed features: $zeros"
 fi
 
+# 5. §Phase 5a Never-fired canary — Positive features expected to
+# fire per soak but didn't. Empty list = healthy. Non-empty =
+# silently-dead subsystem (the farming-bug blind spot).
+never_fired=$(jq -c 'select(._footer) | .never_fired_expected_positives // []' "$LOGFILE" | head -1)
+never_fired="${never_fired:-[]}"
+if [ "$never_fired" = "[]" ]; then
+    print_status "never_fired_expected" "0" "== 0" pass
+else
+    count=$(echo "$never_fired" | jq -r 'length')
+    print_status "never_fired_expected" "$count" "== 0" fail
+    echo "    features expected-but-never-fired: $never_fired"
+    fail=1
+fi
+
 exit "$fail"

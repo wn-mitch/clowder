@@ -35,6 +35,7 @@ pub mod idle;
 pub mod mate;
 pub mod mate_target;
 pub mod mentor;
+pub mod mentor_target;
 pub mod patrol;
 pub mod practice_magic;
 pub mod sleep;
@@ -71,6 +72,7 @@ pub use idle::idle_dse;
 pub use mate::mate_dse;
 pub use mate_target::mate_target_dse;
 pub use mentor::mentor_dse;
+pub use mentor_target::mentor_target_dse;
 pub use patrol::patrol_dse;
 pub use practice_magic::{
     cleanse_dse, colony_cleanse_dse, commune_dse, durable_ward_dse, harvest_dse, scry_dse,

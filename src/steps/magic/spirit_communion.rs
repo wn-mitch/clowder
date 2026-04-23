@@ -10,6 +10,25 @@ use crate::resources::sim_constants::{CombatConstants, MagicConstants};
 use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::steps::StepResult;
 
+/// # GOAP step resolver: `SpiritCommunion`
+///
+/// **Real-world effect** — on completion, applies a positive
+/// `MoodModifier` to the actor, grows magic skill, and records a
+/// `SpiritCommunion` feature directly via `SystemActivation`
+/// (unusual — most resolvers defer Feature emission to the
+/// caller).
+///
+/// **Plan-level preconditions** — emitted by the magic planner
+/// for spirit communion DSEs.
+///
+/// **Runtime preconditions** — misfire roll on first tick; Fail
+/// on fizzle.
+///
+/// **Witness** — returns plain `StepResult`. The Feature
+/// emission is inline in the resolver rather than caller-side.
+///
+/// **Feature emission** — `Feature::SpiritCommunion` (Positive),
+/// recorded inline in the resolver on the Advance path.
 #[allow(clippy::too_many_arguments)]
 pub fn resolve_spirit_communion(
     ticks: u64,

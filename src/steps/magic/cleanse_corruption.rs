@@ -10,6 +10,24 @@ use crate::resources::narrative::NarrativeLog;
 use crate::resources::sim_constants::{CombatConstants, MagicConstants};
 use crate::steps::StepResult;
 
+/// # GOAP step resolver: `CleanseCorruption`
+///
+/// **Real-world effect** — on completion, reduces the corruption
+/// tile value at the actor's position by a skill-scaled amount
+/// and grows magic skill. Includes a misfire roll on first tick.
+///
+/// **Plan-level preconditions** — emitted by the magic planner
+/// for cleanse DSEs.
+///
+/// **Runtime preconditions** — none; the tile-mutation path
+/// runs on the Advance branch unconditionally.
+///
+/// **Witness** — returns plain `StepResult`. Success is implicit
+/// on Advance (corruption mutation runs unconditionally at that
+/// branch).
+///
+/// **Feature emission** — caller records `Feature::CleanseCompleted`
+/// (Positive) on Advance.
 #[allow(clippy::too_many_arguments)]
 pub fn resolve_cleanse_corruption(
     ticks: u64,

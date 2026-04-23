@@ -64,6 +64,7 @@ impl Plugin for SimulationPlugin {
                 .add_dse(crate::ai::dses::groom_self_dse())
                 .add_dse(crate::ai::dses::groom_other_dse())
                 .add_dse(crate::ai::dses::mentor_dse())
+                .add_target_taking_dse(crate::ai::dses::mentor_target_dse())
                 .add_dse(crate::ai::dses::caretake_dse())
                 .add_dse(crate::ai::dses::mate_dse())
                 .add_target_taking_dse(crate::ai::dses::mate_target_dse())

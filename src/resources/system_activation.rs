@@ -369,6 +369,193 @@ impl Feature {
             Feature::FoxAvoidedPresence => Neutral,
         }
     }
+
+    /// Whether a healthy canonical soak (seed 42, 900s release) is
+    /// *expected* to fire this feature at least once.
+    ///
+    /// Used by the "never-fired-but-expected" canary introduced in
+    /// §Phase 5a to catch silently-dead subsystems: a Positive
+    /// feature returning `true` here must appear in the footer with
+    /// `count >= 1`, otherwise the canary fails.
+    ///
+    /// Features marked `false` are legitimately rare — colony-
+    /// defining events (a banishment, a shadow-fox ward save, a
+    /// fated awakening) that may not occur in every soak. They're
+    /// excluded from the canary rather than treated as dead.
+    pub const fn expected_to_fire_per_soak(self) -> bool {
+        match self {
+            // --- Rare legend / colony-defining events — exempt ---
+            Feature::ShadowFoxBanished => false,
+            Feature::FateAwakened => false,
+            Feature::SpiritCommunion => false,
+            Feature::ShadowFoxAvoidedWard => false,
+            Feature::ShadowFoxSpawn => false,
+            Feature::WardSiegeStarted => false,
+            Feature::DeathOldAge => false,
+            Feature::AspirationCompleted => false,
+            Feature::AspirationAbandoned => false,
+            // Fox-ecology ambient signals that depend on world state
+            // (a fox may or may not spawn / be in range in 15 min).
+            Feature::FoxStoreRaided => false,
+            Feature::FoxStandoffEscalated => false,
+            Feature::FoxRetreated => false,
+            Feature::FoxDenEstablished => false,
+            Feature::FoxBred => false,
+            Feature::FoxCubMatured => false,
+            Feature::FoxDied => false,
+            Feature::FoxAvoidedWard => false,
+            Feature::FoxAvoidedPresence => false,
+            Feature::FoxDenDefense => false,
+            // Corruption-specific: may not fire in a clean run.
+            Feature::CarcassSpawned => false,
+            Feature::CarcassCleansed => false,
+            Feature::CarcassHarvested => false,
+            Feature::CorruptionPushback => false,
+            Feature::HerbSuppressed => false,
+            Feature::CorruptionHealthDrain => false,
+            Feature::PersonalCorruptionEffect => false,
+            Feature::RemedyApplied => false,
+            Feature::InjuryHealed => false,
+            // Misc rare events.
+            Feature::PosseCandidateExcludedStarving => false,
+            Feature::DepositFailedNoStore => false,
+            Feature::GateProcessed => false,
+            // Magic that requires specific actor priors.
+            Feature::ScryCompleted => false,
+            Feature::CleanseCompleted => false,
+            Feature::WardPlaced => false,
+            Feature::WardDespawned => false,
+            // Building/craft that depends on plan cadence.
+            Feature::BuildingRepaired => false,
+            Feature::BuildingTidied => false,
+            Feature::StorageUpgraded => false,
+            Feature::CourtshipInteraction => false,
+            // §Phase 5a empirical calibration (seed-42 soak): these
+            // are exempt because they depend on conditions the sim
+            // can't guarantee in 15 min of wall-clock:
+            //
+            // - PreyDenFounded: multi-day event, rare in 15 min.
+            // - KittenMatured: maturation takes sim-days; depends on
+            //   kitten survival + enough sim-time to cross the threshold.
+            // - ThreatEngaged: requires wildlife in range + surviving
+            //   to fight_duration without morale break.
+            // - MaterialsDelivered: only produced by the unscheduled
+            //   task_chains::Deliver path (GOAP Construct handles its
+            //   own delivery internally). If task_chains is re-enabled,
+            //   reclassify as expected.
+            //
+            // `FoodCooked`, `GroomedOther`, `MentoredCat` deliberately
+            // stay in the expected set even though they fire at zero
+            // in current soaks — the canary flagging them RED is
+            // accurate: cooking / grooming / mentoring not happening
+            // is the ecological-variety / narrative-leisure gap
+            // tracked in open-work #1, #3, #13, not a noise-floor
+            // exemption.
+            Feature::PreyDenFounded => false,
+            Feature::KittenMatured => false,
+            Feature::ThreatEngaged => false,
+            Feature::MaterialsDelivered => false,
+            // Every other feature is expected to fire per soak.
+            _ => true,
+        }
+    }
+}
+
+/// Stable lower-snake-ish names for `Feature::*` variants used in
+/// diagnostic output (JSON-friendly, match the `serde` default of
+/// variant-name-as-string). Used by the never-fired canary so the
+/// offender list in the footer is human-readable rather than a
+/// Debug dump.
+pub fn feature_name(f: Feature) -> &'static str {
+    // Mirror serde's default (PascalCase variant name). Exhaustive
+    // match, so a new variant added without updating this table is a
+    // compile error.
+    match f {
+        Feature::CorruptionSpread => "CorruptionSpread",
+        Feature::CorruptionTileEffect => "CorruptionTileEffect",
+        Feature::ShadowFoxSpawn => "ShadowFoxSpawn",
+        Feature::WardDecay => "WardDecay",
+        Feature::HerbSeasonalCheck => "HerbSeasonalCheck",
+        Feature::RemedyApplied => "RemedyApplied",
+        Feature::PersonalCorruptionEffect => "PersonalCorruptionEffect",
+        Feature::CombatResolved => "CombatResolved",
+        Feature::InjuryHealed => "InjuryHealed",
+        Feature::FateAssigned => "FateAssigned",
+        Feature::FateAwakened => "FateAwakened",
+        Feature::AspirationSelected => "AspirationSelected",
+        Feature::AspirationCompleted => "AspirationCompleted",
+        Feature::AspirationAbandoned => "AspirationAbandoned",
+        Feature::BondFormed => "BondFormed",
+        Feature::CoordinatorElected => "CoordinatorElected",
+        Feature::DirectiveIssued => "DirectiveIssued",
+        Feature::BuildingConstructed => "BuildingConstructed",
+        Feature::BuildingTidied => "BuildingTidied",
+        Feature::GateProcessed => "GateProcessed",
+        Feature::MoodContagion => "MoodContagion",
+        Feature::PersonalityFriction => "PersonalityFriction",
+        Feature::AnxietyInterrupt => "AnxietyInterrupt",
+        Feature::PreyBred => "PreyBred",
+        Feature::PreyDenAbandoned => "PreyDenAbandoned",
+        Feature::PreyDenFounded => "PreyDenFounded",
+        Feature::DenRaided => "DenRaided",
+        Feature::WildlifeSpawned => "WildlifeSpawned",
+        Feature::DeathStarvation => "DeathStarvation",
+        Feature::DeathOldAge => "DeathOldAge",
+        Feature::DeathInjury => "DeathInjury",
+        Feature::KnowledgePromoted => "KnowledgePromoted",
+        Feature::KnowledgeForgotten => "KnowledgeForgotten",
+        Feature::SpiritCommunion => "SpiritCommunion",
+        Feature::StorageUpgraded => "StorageUpgraded",
+        Feature::DepositRejected => "DepositRejected",
+        Feature::DepositFailedNoStore => "DepositFailedNoStore",
+        Feature::ItemRetrieved => "ItemRetrieved",
+        Feature::FoodCooked => "FoodCooked",
+        Feature::KittenBorn => "KittenBorn",
+        Feature::GestationAdvanced => "GestationAdvanced",
+        Feature::KittenMatured => "KittenMatured",
+        Feature::MatingOccurred => "MatingOccurred",
+        Feature::KittenFed => "KittenFed",
+        Feature::CropTended => "CropTended",
+        Feature::CropHarvested => "CropHarvested",
+        Feature::FoxHuntedPrey => "FoxHuntedPrey",
+        Feature::FoxStoreRaided => "FoxStoreRaided",
+        Feature::FoxStandoff => "FoxStandoff",
+        Feature::FoxStandoffEscalated => "FoxStandoffEscalated",
+        Feature::FoxRetreated => "FoxRetreated",
+        Feature::FoxDenEstablished => "FoxDenEstablished",
+        Feature::FoxBred => "FoxBred",
+        Feature::FoxCubMatured => "FoxCubMatured",
+        Feature::FoxDied => "FoxDied",
+        Feature::FoxScentMarked => "FoxScentMarked",
+        Feature::FoxAvoidedCat => "FoxAvoidedCat",
+        Feature::FoxDenDefense => "FoxDenDefense",
+        Feature::FoxAvoidedWard => "FoxAvoidedWard",
+        Feature::FoxAvoidedPresence => "FoxAvoidedPresence",
+        Feature::ShadowFoxAvoidedWard => "ShadowFoxAvoidedWard",
+        Feature::DirectiveDelivered => "DirectiveDelivered",
+        Feature::CarcassSpawned => "CarcassSpawned",
+        Feature::WardSiegeStarted => "WardSiegeStarted",
+        Feature::CarcassCleansed => "CarcassCleansed",
+        Feature::CarcassHarvested => "CarcassHarvested",
+        Feature::CorruptionPushback => "CorruptionPushback",
+        Feature::HerbSuppressed => "HerbSuppressed",
+        Feature::CorruptionHealthDrain => "CorruptionHealthDrain",
+        Feature::GatherHerbCompleted => "GatherHerbCompleted",
+        Feature::WardPlaced => "WardPlaced",
+        Feature::WardDespawned => "WardDespawned",
+        Feature::ScryCompleted => "ScryCompleted",
+        Feature::CleanseCompleted => "CleanseCompleted",
+        Feature::ShadowFoxBanished => "ShadowFoxBanished",
+        Feature::PosseCandidateExcludedStarving => "PosseCandidateExcludedStarving",
+        Feature::FoodEaten => "FoodEaten",
+        Feature::Socialized => "Socialized",
+        Feature::GroomedOther => "GroomedOther",
+        Feature::MentoredCat => "MentoredCat",
+        Feature::ThreatEngaged => "ThreatEngaged",
+        Feature::MaterialsDelivered => "MaterialsDelivered",
+        Feature::BuildingRepaired => "BuildingRepaired",
+        Feature::CourtshipInteraction => "CourtshipInteraction",
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -393,6 +580,26 @@ impl SystemActivation {
             .iter()
             .filter(|f| self.counts.get(f).copied().unwrap_or(0) == 0)
             .copied()
+            .collect()
+    }
+
+    /// §Phase 5a never-fired canary: Positive features that a
+    /// canonical soak is expected to fire at least once, but
+    /// didn't. Returns the names as strings for direct JSON-
+    /// friendly emission in the footer.
+    ///
+    /// A non-empty list means a silently-dead subsystem — the
+    /// exact failure mode that kept the farming bug (CropTended
+    /// never firing) invisible for months before §Phase 4c.4.
+    pub fn never_fired_expected_positives(&self) -> Vec<&'static str> {
+        Feature::ALL
+            .iter()
+            .filter(|f| {
+                f.category() == FeatureCategory::Positive
+                    && f.expected_to_fire_per_soak()
+                    && self.counts.get(f).copied().unwrap_or(0) == 0
+            })
+            .map(|f| feature_name(*f))
             .collect()
     }
 
@@ -654,5 +861,47 @@ mod tests {
         let json = serde_json::to_string(&sa).unwrap();
         let sa2: SystemActivation = serde_json::from_str(&json).unwrap();
         assert_eq!(sa.counts, sa2.counts);
+    }
+
+    #[test]
+    fn never_fired_expected_positives_reports_silently_dead() {
+        // Empty SA: every expected-Positive is missing from counts,
+        // so the full expected set is reported.
+        let sa = SystemActivation::default();
+        let missing = sa.never_fired_expected_positives();
+        // Representative check: both pre-Phase-5a and Phase-5a
+        // features show up when the tracker is empty.
+        assert!(missing.contains(&"KittenFed"));
+        assert!(missing.contains(&"CropTended"));
+        assert!(missing.contains(&"FoodEaten"));
+        assert!(missing.contains(&"Socialized"));
+        // Rare-legend features are excluded.
+        assert!(!missing.contains(&"ShadowFoxBanished"));
+        assert!(!missing.contains(&"FateAwakened"));
+    }
+
+    #[test]
+    fn never_fired_expected_positives_shrinks_as_features_fire() {
+        let mut sa = SystemActivation::default();
+        let before = sa.never_fired_expected_positives();
+        sa.record(Feature::KittenFed);
+        sa.record(Feature::CropTended);
+        let after = sa.never_fired_expected_positives();
+        assert_eq!(after.len(), before.len() - 2);
+        assert!(!after.contains(&"KittenFed"));
+        assert!(!after.contains(&"CropTended"));
+    }
+
+    #[test]
+    fn expected_to_fire_per_soak_classification() {
+        // Core-subsystem Positives must be expected.
+        assert!(Feature::KittenFed.expected_to_fire_per_soak());
+        assert!(Feature::CropTended.expected_to_fire_per_soak());
+        assert!(Feature::FoodEaten.expected_to_fire_per_soak());
+        assert!(Feature::Socialized.expected_to_fire_per_soak());
+        // Rare-legend events must be exempted.
+        assert!(!Feature::ShadowFoxBanished.expected_to_fire_per_soak());
+        assert!(!Feature::FateAwakened.expected_to_fire_per_soak());
+        assert!(!Feature::ScryCompleted.expected_to_fire_per_soak());
     }
 }

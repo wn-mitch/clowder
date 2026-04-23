@@ -10,6 +10,26 @@ use crate::resources::narrative::NarrativeLog;
 use crate::resources::sim_constants::{CombatConstants, MagicConstants};
 use crate::steps::StepResult;
 
+/// # GOAP step resolver: `Scry`
+///
+/// **Real-world effect** — on first tick, rolls a misfire check;
+/// on completion (`ticks >= scry_ticks`), adds a
+/// `MemoryEntry { event_type: ResourceFound, location: random
+/// tile }` to the actor's memory and grows magic skill. A
+/// `MisfireEffect::Fizzle` causes `Fail`.
+///
+/// **Plan-level preconditions** — emitted by the magic planner
+/// for scrying DSEs.
+///
+/// **Runtime preconditions** — none beyond the misfire roll.
+///
+/// **Witness** — returns plain `StepResult`. Predates the
+/// `StepOutcome<W>` convention; success is implicit on Advance
+/// (memory insertion runs unconditionally on that path).
+///
+/// **Feature emission** — caller records
+/// `Feature::ScryCompleted` (Positive) on Advance at
+/// `src/systems/goap.rs:2377`.
 #[allow(clippy::too_many_arguments)]
 pub fn resolve_scry(
     ticks: u64,

@@ -152,23 +152,20 @@ pub fn resolve_task_chains(
         match &step.kind {
             StepKind::MoveTo => {
                 let cached = &mut step.cached_path;
-                apply(
-                    crate::steps::building::resolve_move_to(
-                        &mut pos,
-                        step_target_position,
-                        cached,
-                        &map,
-                        &cat_tile_counts,
-                    ),
-                    &mut chain,
+                let outcome = crate::steps::building::resolve_move_to(
+                    &mut pos,
+                    step_target_position,
+                    cached,
+                    &map,
+                    &cat_tile_counts,
                 );
+                apply(outcome.result, &mut chain);
             }
 
             StepKind::Gather { .. } => {
-                apply(
-                    crate::steps::building::resolve_gather(ticks, &mut skills, workshop_bonus),
-                    &mut chain,
-                );
+                let outcome =
+                    crate::steps::building::resolve_gather(ticks, &mut skills, workshop_bonus);
+                apply(outcome.result, &mut chain);
             }
 
             StepKind::Deliver { material, amount } => {
@@ -187,7 +184,7 @@ pub fn resolve_task_chains(
 
             StepKind::Construct => {
                 let cached = &mut step.cached_path;
-                let result = crate::steps::building::resolve_construct(
+                let outcome = crate::steps::building::resolve_construct(
                     step_target_entity,
                     &mut pos,
                     cached,
@@ -199,28 +196,30 @@ pub fn resolve_task_chains(
                     &mut commands,
                     &mut colony_score,
                 );
-                if matches!(result, crate::steps::StepResult::Advance) {
+                if matches!(outcome.result, crate::steps::StepResult::Advance) {
                     if let Some(ref mut act) = activation {
                         act.record(Feature::BuildingConstructed);
                     }
                 }
-                apply(result, &mut chain);
+                apply(outcome.result, &mut chain);
             }
 
             StepKind::Repair => {
                 let cached = &mut step.cached_path;
-                apply(
-                    crate::steps::building::resolve_repair(
-                        step_target_entity,
-                        &mut pos,
-                        cached,
-                        &mut skills,
-                        workshop_bonus,
-                        &mut buildings,
-                        &map,
-                    ),
-                    &mut chain,
+                let outcome = crate::steps::building::resolve_repair(
+                    step_target_entity,
+                    &mut pos,
+                    cached,
+                    &mut skills,
+                    workshop_bonus,
+                    &mut buildings,
+                    &map,
                 );
+                outcome.record_if_witnessed(
+                    activation.as_deref_mut(),
+                    Feature::BuildingRepaired,
+                );
+                apply(outcome.result, &mut chain);
             }
 
             StepKind::Tend => {

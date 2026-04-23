@@ -51,7 +51,9 @@ fi
 
 is_allowlisted() {
     local file="$1"
-    for entry in "${allowlist[@]}"; do
+    # Use `${arr[@]+…}` to avoid unbound-variable errors when the
+    # array is empty under `set -u`.
+    for entry in "${allowlist[@]+"${allowlist[@]}"}"; do
         if [ "$entry" = "$file" ]; then
             return 0
         fi
@@ -70,13 +72,13 @@ while IFS= read -r match; do
     rest="${match#*:}"
     line="${rest%%:*}"
 
-    # Collect the up-to-40-line `///` block immediately preceding the
+    # Collect the up-to-80-line `///` block immediately preceding the
     # fn signature. Stop at the first non-`///` line walking backwards.
     block="$(awk -v end="$line" '
-        NR < end && NR >= end - 40 { lines[NR] = $0 }
+        NR < end && NR >= end - 80 { lines[NR] = $0 }
         END {
             started = 0
-            for (i = end - 1; i >= end - 40; i--) {
+            for (i = end - 1; i >= end - 80; i--) {
                 ln = lines[i]
                 if (ln ~ /^[[:space:]]*\/\/\//) {
                     doc[i] = ln

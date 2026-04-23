@@ -3,20 +3,35 @@ use bevy_ecs::prelude::*;
 use crate::components::building::StoredItems;
 use crate::components::items::Item;
 use crate::components::magic::Inventory;
-use crate::steps::StepResult;
+use crate::steps::{StepOutcome, StepResult};
 
-/// Retrieve any food item (raw or cooked) from the target Stores building
-/// into the cat's inventory. Sibling to `resolve_retrieve_raw_food_from_stores`
-/// but without the `!cooked` filter — Caretake / FeedKitten accepts either
-/// form. Phase 4c.4 (wired after discovering Phase 4c.3 only fixed the
-/// disposition-chain path; the scheduled GOAP Caretake plan was still two
-/// steps `[TravelTo(Stores), FeedKitten]` with no retrieval step, causing
-/// `take_food()` in `resolve_feed_kitten` to return `None` every time and
-/// the kitten-feed to silently no-op — hence `KittenFed = 0` across both
-/// seed-42 soaks even when bond-boost made adults pick Caretake).
+/// # GOAP step resolver: `RetrieveFoodForKitten`
 ///
-/// Same ~5-tick budget as the raw-only sibling. Returns `(result, retrieved)`
-/// where `retrieved == true` means an item transferred.
+/// **Real-world effect** — transfers one food item (raw OR
+/// cooked) from the target Stores building into the actor's
+/// `Inventory`. Sibling to
+/// `resolve_retrieve_raw_food_from_stores` but without the
+/// `!cooked` filter — Caretake accepts either form.
+///
+/// **Plan-level preconditions** — emitted under
+/// `ZoneIs(Stores)` with a follow-on
+/// `SetCarrying(Carrying::RawFood)` in
+/// `src/ai/planner/actions.rs::caretaking_actions` (§Phase 4c.4).
+/// Without this step preceding `FeedKitten` in the Caretake plan,
+/// `take_food()` in `resolve_feed_kitten` silently returned
+/// `None` — the original silent-advance bug this audit is built
+/// around.
+///
+/// **Runtime preconditions** — waits `ticks >= 5`. Requires
+/// `target_entity` to resolve to a `StoredItems`, and for at
+/// least one `item.kind.is_food()` item to be present. Any miss
+/// returns `unwitnessed(Advance)`.
+///
+/// **Witness** — `StepOutcome<bool>`. `true` iff an item was
+/// actually transferred from Stores to inventory this call.
+///
+/// **Feature emission** — caller passes `Feature::ItemRetrieved`
+/// (Positive) to `record_if_witnessed`.
 pub fn resolve_retrieve_any_food_from_stores(
     ticks: u64,
     target_entity: Option<Entity>,
@@ -24,15 +39,15 @@ pub fn resolve_retrieve_any_food_from_stores(
     stores_query: &mut Query<&mut StoredItems>,
     items_query: &Query<&Item>,
     commands: &mut Commands,
-) -> (StepResult, bool) {
+) -> StepOutcome<bool> {
     if ticks < 5 {
-        return (StepResult::Continue, false);
+        return StepOutcome::unwitnessed(StepResult::Continue);
     }
     let Some(store_entity) = target_entity else {
-        return (StepResult::Advance, false);
+        return StepOutcome::unwitnessed(StepResult::Advance);
     };
     let Ok(mut stored) = stores_query.get_mut(store_entity) else {
-        return (StepResult::Advance, false);
+        return StepOutcome::unwitnessed(StepResult::Advance);
     };
     let target_item = stored
         .items
@@ -46,8 +61,8 @@ pub fn resolve_retrieve_any_food_from_stores(
             stored.remove(item_entity);
             inventory.add_item_with_modifiers(kind, modifiers);
             commands.entity(item_entity).despawn();
-            return (StepResult::Advance, true);
+            return StepOutcome::witnessed(StepResult::Advance);
         }
     }
-    (StepResult::Advance, false)
+    StepOutcome::unwitnessed(StepResult::Advance)
 }

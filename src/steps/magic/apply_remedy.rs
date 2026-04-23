@@ -9,8 +9,34 @@ use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::sim_constants::MagicConstants;
 use crate::steps::StepResult;
 
-/// Result includes an optional `(patient, healer, fondness_gain)` for deferred
-/// gratitude application.
+/// # GOAP step resolver: `ApplyRemedy`
+///
+/// **Real-world effect** — paths the healer to the patient, then
+/// applies a `RemedyEffect` component to the patient (healing,
+/// corruption cleanse, etc). Grows herbcraft skill. On
+/// completion, yields a deferred `(patient, healer, fondness)`
+/// gratitude tuple the caller applies to the patient's
+/// relationship with the healer.
+///
+/// **Plan-level preconditions** — emitted by herbcraft planner
+/// after a successful `PrepareRemedy` step populates the
+/// remedy's expected herb in inventory.
+///
+/// **Runtime preconditions** — `target_entity` + `target_position`
+/// must be `Some`; Fail if either missing or if the patient is
+/// dead (`!patient_alive`).
+///
+/// **Witness** — returns `(StepResult, Option<(Entity, Entity,
+/// f32)>)`; the `Option` payload is the gratitude deferred-
+/// effect, present iff the remedy was actually applied. This
+/// predates the `StepOutcome<W>` convention but the Option-
+/// witness shape maps cleanly to
+/// `StepOutcome<Option<(Entity, Entity, f32)>>` — a future
+/// refactor could migrate it.
+///
+/// **Feature emission** — caller records `Feature::RemedyApplied`
+/// (Positive) when the Option payload is `Some`, which is
+/// already the correctly-gated shape.
 #[allow(clippy::too_many_arguments)]
 pub fn resolve_apply_remedy(
     remedy: RemedyKind,

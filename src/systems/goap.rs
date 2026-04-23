@@ -218,6 +218,28 @@ pub struct ExecutorContext<'w, 's> {
     /// registered DSE instead of divergent helpers like
     /// `find_social_target`.
     pub dse_registry: Res<'w, crate::ai::eval::DseRegistry>,
+    /// §Phase 4c.4 kitten-feeding side effect: the main `cats` query
+    /// in `resolve_goap_plans` requires `&mut GoapPlan`, which
+    /// kittens don't have (see `src/systems/pregnancy.rs` — kittens
+    /// ship without a `GoapPlan` bundle). The deferred kitten-feeding
+    /// post-loop therefore must reach `&mut Needs` on kittens via a
+    /// disjoint query. `Without<GoapPlan>` proves disjointness from
+    /// the cats query for the borrow checker; `Without<Dead>`/
+    /// `Without<Structure>` mirror the cats query's base filters so
+    /// we don't accidentally grant +0.5 hunger to a dead cat or a
+    /// Structure. Previously, `cats.get_mut(kitten_entity)` silently
+    /// returned `Err(NoSuchEntity)` for every kitten — the
+    /// `KittenFed` activation would fire but the real-world hunger
+    /// credit was dropped, so every kitten that was "fed" still
+    /// starved (Pebblekit-34, Hazelkit-10, Reedkit-33 in the v3
+    /// soak; fourth silent-advance-class bug on this Caretake
+    /// pipeline in a week).
+    pub kitten_needs: bevy_ecs::prelude::Query<
+        'w,
+        's,
+        &'static mut crate::components::physical::Needs,
+        (Without<GoapPlan>, Without<Dead>, Without<Structure>),
+    >,
 }
 
 // ===========================================================================
@@ -539,7 +561,20 @@ pub fn evaluate_and_plan(
             Option<&crate::components::fate::FatedLove>,
             Option<&crate::components::fate::FatedRival>,
         ),
-        (Without<Dead>, Without<GoapPlan>),
+        (
+            Without<Dead>,
+            Without<GoapPlan>,
+            // §Phase 5b — kittens are dependents, not autonomous planners.
+            // Before this filter, `evaluate_and_plan` inserted GoapPlan
+            // on kittens too; the `kitten_needs` post-loop query
+            // (`Without<GoapPlan>`) then silently excluded them, so
+            // adults' `+0.5` hunger restoration from FeedKitten never
+            // landed. Maplekit-83 starved on seed 42 despite 12
+            // successful feedings — the activation fired every time
+            // but the query returned NoSuchEntity on every restoration
+            // call.
+            Without<crate::components::KittenDependency>,
+        ),
     >,
     world_state: WorldStateQueries,
     res: PlanResources,
@@ -1492,6 +1527,15 @@ pub fn resolve_goap_plans(
         .map(|((e, _, _, pos, _, _, _, _, _), _)| (e, *pos))
         .collect();
 
+    // §6.5.3 mentor-target DSE snapshot: candidate-side Skills lookup
+    // table. Built once per tick so the MentorCat branch can rank
+    // apprentices by skill-gap without re-borrowing `cats` (which is
+    // mutably held by the outer loop).
+    let cat_skills_snapshot: std::collections::HashMap<Entity, Skills> = cats
+        .iter()
+        .map(|((e, _, _, _, skills, _, _, _, _), _)| (e, (*skills).clone()))
+        .collect();
+
     for (
         (
             cat_entity,
@@ -1902,8 +1946,24 @@ pub fn resolve_goap_plans(
 
             GoapActionKind::MentorCat => {
                 if plan.step_state[step_idx].target_entity.is_none() {
+                    // §6.5.3: replace the fondness-only `find_social_target`
+                    // picker with the skill-gap-ranked mentor target DSE.
+                    // Closes the silent-divergence with disposition.rs's
+                    // sub-action pick and the §6.1-Critical skill-gap gap.
+                    let skills_lookup = |e: Entity| -> Option<Skills> {
+                        cat_skills_snapshot.get(&e).cloned()
+                    };
                     plan.step_state[step_idx].target_entity =
-                        find_social_target(cat_entity, &pos, &cat_positions, &relationships, d);
+                        crate::ai::dses::mentor_target::resolve_mentor_target(
+                            &ec.dse_registry,
+                            cat_entity,
+                            *pos,
+                            &cat_positions,
+                            &skills,
+                            &skills_lookup,
+                            &relationships,
+                            ec.time.tick,
+                        );
                 }
                 let outcome = crate::steps::disposition::resolve_mentor_cat(
                     ticks,
@@ -2187,21 +2247,19 @@ pub fn resolve_goap_plans(
                         .min_by_key(|(_, sp)| pos.manhattan_distance(sp))
                         .map(|(e, _)| *e);
                 }
-                let (result, retrieved) =
-                    crate::steps::disposition::resolve_retrieve_any_food_from_stores(
-                        ticks,
-                        plan.step_state[step_idx].target_entity,
-                        &mut inventory,
-                        &mut stores_query,
-                        &items_query,
-                        &mut commands,
-                    );
-                if retrieved {
-                    if let Some(ref mut act) = narr.activation {
-                        act.record(Feature::ItemRetrieved);
-                    }
-                }
-                result
+                let outcome = crate::steps::disposition::resolve_retrieve_any_food_from_stores(
+                    ticks,
+                    plan.step_state[step_idx].target_entity,
+                    &mut inventory,
+                    &mut stores_query,
+                    &items_query,
+                    &mut commands,
+                );
+                outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    Feature::ItemRetrieved,
+                );
+                outcome.result
             }
 
             GoapActionKind::GatherHerb => {
@@ -2598,7 +2656,7 @@ pub fn resolve_goap_plans(
                         .min_by_key(|(_, cp)| pos.manhattan_distance(cp))
                         .map(|(e, _)| *e);
                 }
-                let result = crate::steps::building::resolve_construct(
+                let outcome = crate::steps::building::resolve_construct(
                     plan.step_state[step_idx].target_entity,
                     &mut pos,
                     &mut plan.step_state[step_idx].cached_path,
@@ -2610,7 +2668,7 @@ pub fn resolve_goap_plans(
                     &mut commands,
                     &mut building_params.colony_score,
                 );
-                if matches!(result, crate::steps::StepResult::Advance) {
+                if matches!(outcome.result, crate::steps::StepResult::Advance) {
                     if let Some(ref mut act) = narr.activation {
                         act.record(Feature::BuildingConstructed);
                     }
@@ -2624,7 +2682,7 @@ pub fn resolve_goap_plans(
                         );
                     }
                 }
-                result
+                outcome.result
             }
 
             GoapActionKind::TendCrops => {
@@ -2689,7 +2747,7 @@ pub fn resolve_goap_plans(
             GoapActionKind::GatherMaterials => {
                 // Not produced by the planner (Construct is a single action).
                 // Skill growth fallback for enum exhaustiveness.
-                crate::steps::building::resolve_gather(ticks, &mut skills, workshop_bonus)
+                crate::steps::building::resolve_gather(ticks, &mut skills, workshop_bonus).result
             }
 
             GoapActionKind::DeliverMaterials => {
@@ -2985,9 +3043,16 @@ pub fn resolve_goap_plans(
         }
     }
 
-    // §Phase 4c.3: deferred kitten-feedings. +0.5 hunger per feed.
+    // §Phase 4c.4: deferred kitten-feedings. +0.5 hunger per feed.
+    // Uses the disjoint `ec.kitten_needs` query because kittens don't
+    // have `GoapPlan` — the previous version routed through `cats`,
+    // which requires `&mut GoapPlan` and therefore excluded every
+    // kitten. `KittenFed` activations fired (the adult consumed food
+    // from inventory) but the kitten-side hunger credit was silently
+    // dropped. See `ExecutorContext::kitten_needs` doc for the full
+    // diagnosis.
     for kitten_entity in kitten_feedings {
-        if let Ok(((_, _, _, _, _, mut k_needs, _, _, _), _)) = cats.get_mut(kitten_entity) {
+        if let Ok(mut k_needs) = ec.kitten_needs.get_mut(kitten_entity) {
             k_needs.hunger = (k_needs.hunger + 0.5).min(1.0);
         }
     }

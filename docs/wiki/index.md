@@ -22,7 +22,7 @@ Auto-generated reference for the Clowder cat colony simulation.
 |--------|-------|
 | Built | 4 |
 | Partial | 1 |
-| Aspirational | 19 |
+| Aspirational | 22 |
 
 ## Pages
 

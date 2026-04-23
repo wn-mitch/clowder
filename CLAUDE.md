@@ -113,12 +113,16 @@ Exemplars: `src/steps/disposition/cook.rs`, `src/steps/disposition/feed_kitten.r
 
 Enforcement: `just check` runs `scripts/check_step_contracts.sh` which greps every resolver for the five required headings.
 
+**Never-fired canary.** When adding a new Positive `Feature::*`, also classify it in `Feature::expected_to_fire_per_soak()` (`src/resources/system_activation.rs`). Features returning `true` there are enforced to fire at least once on the canonical seed-42 900s soak (`never_fired_expected_positives` in the footer; checked by `just check-canaries`). Rare-legend events (`ShadowFoxBanished`, `FateAwakened`, etc.) return `false` — they're exempt from the canary but still tracked in `ALL`.
+
 ## Systems inventory
 
 Design docs for each tunable system live in `docs/systems/`. Major modules and what they do:
 
-- **`src/systems/goap.rs`** — GOAP planner; turns a winning disposition into a concrete step sequence. Single largest file in the project (~4k lines). Central to cat decision-making.
-- **`src/systems/disposition.rs`** — Step resolvers: the concrete ECS effects of each action (eat, sleep, hunt, socialize, groom, etc.).
+- **`src/systems/goap.rs`** — GOAP planner; turns a winning disposition into a concrete step sequence. Single largest file in the project (~4.5k lines). Central to cat decision-making.
+- **`src/systems/disposition.rs`** — Dispositioner + chain building: scores actions via `ScoringContext`, picks the winning `Disposition`, then builds the `TaskChain` (move-to / sub-action) for the legacy unscheduled path. Not step resolvers — those live in `src/steps/`.
+- **`src/steps/`** — GOAP step resolvers (`resolve_*`). Sub-tree by domain: `disposition/` (socialize, mentor, groom, feed_kitten, mate, cook, …), `building/` (construct, repair, tend, gather, …), `magic/` (wards, cleanse, harvest, scry, commune, …), `fox/`. Each resolver returns `StepOutcome<W>` — see **GOAP Step Resolver Contract** above. `src/steps/outcome.rs` defines the witness type.
+- **`src/ai/dses/`** — Per-DSE scoring elements (Eat, Hunt, Socialize, …) + target-taking DSEs (§6.5 per-target consideration bundles — `*_target.rs` files). See **AI Substrate Refactor** below for the in-flight port work.
 - **`src/systems/coordination.rs`** — Coordinator governance, build-pressure directives, work assignment across the colony.
 - **`src/systems/magic.rs`** — Herbcraft, wards, corruption spread, shadowfox spawning from corruption, seasonal herb growth.
 - **`src/systems/fate.rs`** — Fated pairs, prophetic visions, destiny modifiers.
@@ -131,6 +135,23 @@ Design docs for each tunable system live in `docs/systems/`. Major modules and w
 - **`src/systems/combat.rs`, `death.rs`** — Combat resolution, injury, mortality, grief cascade.
 - **`src/systems/memory.rs`, `colony_knowledge.rs`** — Per-cat memory and colony-level shared knowledge (social transmission).
 - **`src/systems/narrative.rs`** — Template-driven narrative line emission across tiered severity (Micro / Action / Significant / Danger / Nature).
+
+## AI Substrate Refactor (in-flight)
+
+The major in-flight work is the AI substrate refactor. Two documents own state; CLAUDE.md owns none of it.
+
+- **[`docs/systems/ai-substrate-refactor.md`](docs/systems/ai-substrate-refactor.md)** — design specification. §6 (target-taking DSEs) and §4 (marker catalog) are load-bearing for the currently-active port work; §5 (influence maps) and §7 (commitment) are later-phase scope. Spec is the source of truth for axis definitions, weights, and composition modes — do not invent alternatives mid-port.
+- **[`docs/open-work.md` #14](docs/open-work.md)** — live status: what's landed, what's remaining, blockers, balance-tuning deferrals. Check this before proposing a port or marker; update it in the same commit that lands one.
+
+Balance-tuning on refactor-affected metrics (positive-feature density, mating cadence, magic sub-mode counts) is deferred until the substrate stabilizes — per-knob tuning now would need to be redone after each successor phase. #14 tracks the deferral.
+
+**Port workflow** (applies to per-DSE ports, marker author systems, and most refactor increments):
+
+1. Read #14 and the relevant spec section before writing code.
+2. Propose scope — axis set, deferrals, caller sites, non-goals — and confirm before implementing.
+3. Land as one commit: factory + resolver/author-system + registration + caller wiring + 10–15 unit tests + landing entry in `docs/open-work.md` Landed section (with hypothesis / concordance / deferred-item notes) + #14's "Remaining" list updated.
+4. Verification: `just check` + `just test` + seed-42 `--duration 900` release soak (survival canaries hold; continuity / activation deltas recorded in the landing entry).
+5. DSE registration sites: three — `SimulationPlugin::build` and both `build_schedule` paths in `main.rs`. Exemplar port: `src/ai/dses/socialize_target.rs` (factory + caller-side resolver + test suite).
 
 ## Headless Mode
 
@@ -174,31 +195,31 @@ Multi-seed sweeps (seeds 99/7/2025/314) are a follow-up for claims you want to g
 jq recipes for reading `events.jsonl` / `narrative.jsonl` live in
 `docs/diagnostics/log-queries.md`. For routine checks:
 
-- `just check-canaries LOGFILE` — runs the four canary queries, exits non-zero on failure.
+- `just check-canaries LOGFILE` — runs the five survival canary queries (starvation, shadow-fox ambush, footer-written, features-at-zero informational report, never-fired-expected-positives). Exits non-zero on any failure.
+- `just check-continuity LOGFILE` — runs the continuity-canary checks (grooming / play / mentoring / burial / courtship / mythic-texture) against the `continuity_tallies` footer field. Exits non-zero on zero-firing classes.
 - `just diff-constants BASE NEW` — verifies two runs are behaviorally comparable.
 
 ### Canaries
 
 Canaries split into two groups. **Survival canaries** catch the colony dying or degenerating. **Continuity canaries** catch the world showing only a narrow slice of its range (survival lock, flat mythic texture). Both classes are hard — a silent mythic register is a bug on par with a starvation cascade, per the ecological-magical-realist framing (see `docs/systems/project-vision.md`).
 
-**Survival canaries:**
+**Survival canaries** (enforced by `scripts/check_canaries.sh`):
 
-- **Starvation canary:** `deaths_by_cause.Starvation` climbing in the deep-soak is the fastest signal something is wrong. Target: 0 on seed 42.
-- **Shadowfox canary:** `deaths_by_cause.ShadowFoxAmbush` > 2 on a 15-min deep-soak means the ward/corruption defense pipeline is failing — see `docs/systems/shadowfox_wards.md` once created.
-- **Activation canary:** a previously-active `Feature::*` in the **Positive** or **Neutral** category dropping to 0 means a system went dead. Positive dormancy is the real concern (a healthy-colony signal stopped firing); negative dormancy is fine (no bad events). The `SystemActivation` event in `logs/events.jsonl` splits counts into `positive`/`negative`/`neutral` groups — compare each against a known-good baseline. See `src/resources/system_activation.rs` for the classification.
-- **Wipeout canary:** headless prints `All cats dead at tick N. Ending early.` to stderr and terminates — any run that wipes in under `--duration` is a regression.
+- **Starvation canary:** `deaths_by_cause.Starvation` climbing in the deep-soak is the fastest signal something is wrong. Target: `== 0` on seed 42.
+- **Shadowfox canary:** `deaths_by_cause.ShadowFoxAmbush` on a 15-min deep-soak. Target: `<= 5`. Anything higher means the ward/corruption defense pipeline is failing.
+- **Footer-written canary:** the soak must emit its `_footer` line before exit. Target: `>= 1`. Zero footers means the sim died before completing the `--duration` window (wipeout or crash).
+- **Features-at-zero canary (informational):** reports Positive/Neutral features that ended the soak at 0. Doesn't fail by itself — baselines diff this list. `Feature::*` classification in `src/resources/system_activation.rs`.
+- **Never-fired-expected canary:** `never_fired_expected_positives` footer field. Target: `== 0`. Positive features classified as "expected to fire per soak" (`Feature::expected_to_fire_per_soak() → true`) must fire at least once; rare-legend events (`ShadowFoxBanished`, `FateAwakened`, `ScryCompleted`, etc.) return `false` and are exempt.
 
-**Continuity canaries** (currently not all passing — drive follow-on balance work):
+**Continuity canaries** (wired — `continuity_tallies` emitted in the footer; enforced by `scripts/check_continuity.sh` / `just check-continuity`; currently not all passing — drive follow-on balance work):
 
-- **Generational continuity:** at least one kitten reaches adulthood on a seed-42 `--duration 900` soak. A colony that survives but doesn't reproduce is failing to show generational play.
-- **Ecological variety:** each of grooming, play, mentoring, burial, courtship must fire ≥1× per soak. All-zero on any means survival lock has collapsed the behavioral range.
-- **Mythic texture:** ≥1 named event per sim year (Calling fired, banishment, visitor arrival, named object crafted). A silent mythic register means the world's metaphysical weight has flattened.
-
-Telemetry for continuity canaries is not yet wired into `logs/events.jsonl` — that's a follow-on plan.
+- **Ecological variety:** each of `grooming`, `play`, `mentoring`, `burial`, `courtship` must fire ≥1× per soak. All-zero on any means survival lock has collapsed the behavioral range.
+- **Mythic texture:** `mythic-texture` class — ≥1 named event per sim year (Calling fired, banishment, visitor arrival, named object crafted). A silent mythic register means the world's metaphysical weight has flattened.
+- **Generational continuity** (not yet counted as a dedicated tally — track via `KittenMatured` in the activation block): at least one kitten reaches Juvenile. Currently failing on the seed-42 soak.
 
 ### What the interactive build shares with headless
 
-`build_schedule()` in `src/main.rs:346` is a manual mirror of `SimulationPlugin::build()` in `src/plugins/simulation.rs`. Any new system, message, or resource must be added to **both**; drift between them has caused silent divergence before (see the Headless Mode subsection above).
+`build_schedule()` in `src/main.rs` is a manual mirror of `SimulationPlugin::build()` in `src/plugins/simulation.rs`. Any new system, message, or resource must be added to **both**; drift between them has caused silent divergence before (see the Headless Mode subsection above). DSE registration happens at two sites inside `build_schedule` (fresh world + save-load paths) plus the plugin — three sites total for any `add_dse` / `add_target_taking_dse` / `add_fox_dse` call.
 
 ## Tuning Constants
 
@@ -221,7 +242,7 @@ Acceptance requires four artifacts:
 
 Drift ≤ ±10% on a characteristic metric is within measurement noise and does not require a written hypothesis. Drift > ±10% requires the full four artifacts. Drift > ±30% requires additional scrutiny before acceptance.
 
-Canaries (`Starvation` = 0, `ShadowFoxAmbush` ≤ 5, `banishments` ≥ 3, colony survives day 180 on seed 42) are hard gates — they must pass regardless of hypothesis or concordance.
+Survival canaries (see **Canaries** above: Starvation = 0, ShadowFoxAmbush ≤ 5, footer written, never-fired-expected = 0) are hard gates — they must pass regardless of hypothesis or concordance. Noise-band tolerance: seed-42 soak runs have shown Starvation drift across re-runs of the same commit due to Bevy parallel-scheduler variance, so a single deep-soak at the hard-gate target is acceptance; repeat runs of the same commit may land above 0 without constituting a regression.
 
 This rule applies to all balance work, not just the feature driving a given session. A refactor that changes sim behavior is a balance change and must tie out the same way.
 
