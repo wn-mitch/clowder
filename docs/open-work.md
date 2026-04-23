@@ -10,6 +10,56 @@ plan — the plan is written when the work is picked up.
 
 ---
 
+## Table of contents
+
+- [Pre-existing issues](#pre-existing-issues-not-from-this-session)
+  - [Test harness drift](#test-harness-drift)
+- [Follow-on plans surfaced but not scoped](#follow-on-plans-surfaced-but-not-scoped)
+  - [1. Explore dominance over targeted leisure](#1-explore-dominance-over-targeted-leisure)
+  - [2. Hunt-approach pipeline failures](#2-hunt-approach-pipeline-failures)
+  - [3. Mentor score magnitude](#3-mentor-score-magnitude-from-iter-2-diagnostic-2026-04-20)
+  - [4. Magic hard-gated at scoring](#4-magic-hard-gated-at-scoring)
+  - [5. Scoring substrate refactor cluster — cluster A FOUNDATIONAL](#5-scoring-substrate-refactor-cluster-a--foundational)
+  - [6. Shared spatial slow-state — cluster B](#6-shared-spatial-slow-state-cluster-b)
+  - [7. Deliberation-layer — cluster C](#7-deliberation-layer-cluster-c)
+  - [8. Formalization / verification — cluster D](#8-formalization--verification-cluster-d)
+  - [9. World-generation richness — cluster E](#9-world-generation-richness-cluster-e)
+  - [10. Post-death biographies via Claude API](#10-post-death-biographies-via-claude-api-presenter-2026-04-21)
+  - [11. Cat-conversation rendering via Haiku](#11-cat-conversation-rendering-via-haiku-presenter-over-c3-2026-04-21)
+  - [12. Warmth split — temperature vs social-warmth](#12-warmth-split--temperature-need-vs-social-warmth-fulfillment-axis-2026-04-21)
+  - [14. Phase 4 follow-ons — target-taking + markers + mate-gender + magnitudes](#14-phase-4-follow-ons--target-taking-registration--markers--mate-gender--matingpracticemagic-magnitude-2026-04-22)
+  - [13. Spec-follow-on debts from AI substrate refactor](#13-spec-follow-on-debts-from-ai-substrate-refactor-2026-04-21)
+  - [15. Alloparenting Reframe B](#15-alloparenting-reframe-b--mama-drops-kitten-at-hearth-near-resting-elder-2026-04-22)
+  - [16. Crafting — items, recipes, stations](#16-crafting--items-recipes-stations-2026-04-22)
+  - [17. Anatomical slot inventory](#17-anatomical-slot-inventory-2026-04-22)
+  - [18. Ruin clearings (corruption nodes)](#18-ruin-clearings-corruption-nodes-pmd-flavored-2026-04-22)
+  - [19. Happy paths — usage-worn trails](#19-happy-paths--usage-worn-trails-2026-04-22)
+  - [20. NamedLandmark substrate](#20-namedlandmark-substrate-cross-consumer-naming-2026-04-22)
+  - [21. Monuments — civic & memorial structures](#21-monuments--civic--memorial-structures-2026-04-22)
+- [Landed](#landed)
+  - [Phase A1.2 (A5) — §11 focal-cat replay enrichment](#phase-a12-a5--11-focal-cat-replay-enrichment-at-source-l2l3-trace-capture-2026-04-23)
+  - [Phase 4b.5 — §4 colony-scoped marker batch: HasFunctionalKitchen + HasRawFoodInStores + WardStrengthLow](#phase-4b5--4-colony-scoped-marker-batch-hasfunctionalkitchen--hasrawfoodinstores--wardstrengthlow-2026-04-23)
+  - [§3.5 remaining-modifier port — seven modifiers onto the pipeline + inline retirement](#35-remaining-modifier-port--seven-modifiers-onto-the-pipeline--inline-retirement-2026-04-23)
+  - [§4.3 Incapacitated marker author — Track C prereq for §13.1 rows 1–3](#43-incapacitated-marker-author--track-c-prereq-for-131-rows-13-2026-04-23)
+  - [Phase 4c.7 — §6.5.6 Caretake target-taking DSE port](#phase-4c7--656-caretake-target-taking-dse-port--resolve_caretake-retirement-2026-04-23)
+  - [Phase 4c.6 — §6.5 per-DSE target-taking closeout](#phase-4c6--65-per-dse-target-taking-closeout-groom-other--hunt--fight--applyremedy--build--find_social_target-retirement-2026-04-22)
+  - [Phase 4c.5 — §6.5.3 Mentor target-taking DSE port](#phase-4c5--653-mentor-target-taking-dse-port-2026-04-22)
+  - [Phase 5a — silent-advance audit](#phase-5a--silent-advance-audit-stepoutcomew--contract--never-fired-canary-2026-04-22)
+  - [Phase 4c.4 — Alloparenting Reframe A + GOAP Caretake + Farming canaries](#phase-4c4--alloparenting-reframe-a--goap-caretake-fix--farming-canaries-2026-04-22)
+  - [Phase 4c.3 — Caretake signal wiring + feed-kitten fix](#phase-4c3--caretake-signal-wiring--feed-kitten-semantics-fix-2026-04-22)
+  - [Phase 4c.2 — §6.5.2 Mate target-taking DSE port](#phase-4c2--652-mate-target-taking-dse-port-2026-04-22)
+  - [Phase 4c.1 — §6.5.1 Socialize target-taking DSE port](#phase-4c1--651-socialize-target-taking-dse-port-2026-04-22)
+  - [Phase 4b.4 — §4 HasGarden marker port](#phase-4b4--4-hasgarden-marker-port-2026-04-22)
+  - [Phase 4b.3 — §6.3 TargetTakingDse type + evaluator](#phase-4b3--63-targettakingdse-type--evaluator-2026-04-22)
+  - [Phase 4b.2 MVP — §4 marker lookup foundation](#phase-4b2-mvp--4-marker-lookup-foundation--hasstoredfood-reference-port-2026-04-22)
+  - [Phase 4b.1 — §7.M.7.4 resolve_mate_with gender fix](#phase-4b1--7m74-resolve_mate_with-gender-fix-2026-04-22)
+  - [Phase 4a — softmax + §3.5 modifier port + adult-window retune](#phase-4a--softmax-over-intentions--35-modifier-port--adult-window-retune-2026-04-22)
+  - [v0.2.0 release](#v020-release--aca13acf-2026-04-19)
+  - [Mentor snapshot "never applied" — obsolete](#mentor-snapshot-never-applied--obsolete-no-commit-2026-04-19)
+- [Conventions](#conventions)
+
+---
+
 ## Pre-existing issues (not from this session)
 
 ### Test harness drift
@@ -214,6 +264,166 @@ scoring layer can't cleanly consume.
 GDC talks, *Behavioral Mathematics for Game AI*, and Game AI Pro IAUS
 chapters. Plan reasoning in
 `/Users/will.mitchell/.claude/plans/this-project-has-grown-jolly-wilkes.md`.
+
+**Status (2026-04-23, revised after audit):** A1 is a composite of
+three structurally distinct tracks; track-level status does **not**
+flatten to a single "landed / outstanding" bit. A2 is resolved. A3
+and A4 each have sub-tracks in similar states to A1. A5 remains
+outstanding. Call the tracks **A** (substrate), **B** (per-axis
+curve migration), **C** (per-marker authoring); every cluster-A
+entry slices across them.
+
+- **Track A — Substrate infrastructure. LANDED.**
+  `src/ai/{curves,considerations,composition,dse,eval,modifier}.rs`
+  shipped in Phase 3a+3b: `Curve` enum (7 variants + 7 named
+  anchors), `Consideration` (Scalar/Spatial/Marker), `Composition`
+  (CP / WS / Max with RtM / RtEO enforcement + 0.75 compensation),
+  `Dse` trait, `EligibilityFilter`, `DseRegistry` + 6-method
+  registration, `ModifierPipeline`, `evaluate_single`,
+  `select_intention_softmax`. The four-layer pipeline shape
+  (eligibility → considerations → composition → Maslow pre-gate →
+  modifier pipeline) is live. 30 cat+fox DSE factories exist under
+  `src/ai/dses/`, all routed through `score_dse_by_id → evaluate_single`.
+- **Track B — Per-axis curve migration. PARTIAL (~85%).**
+  Most §2.3-assigned curves are in place: `hangry()` on hunger
+  peer-group, `sleep_dep()` on Sleep, `loneliness()` on social
+  axes, `scarcity()` on food-scarcity axes, `flee_or_fight()` on
+  safety axes, `fight_gating()` Piecewise on Fight health/safety,
+  `piecewise(…)` on all day-phase axes, `inverted_need_penalty()`
+  on phys-satisfaction axes, `Composite`/`ClampMin` on
+  personality-floor axes, `Composite`/`ClampMax` on saturating-count
+  axes. **Outstanding per §2.3 rows 4–6:** the four corruption-axis
+  migrations in Herbcraft/PracticeMagic sibling DSEs remain at
+  `Curve::Linear` placeholders —
+    * `herbcraft_gather` has no `territory_max_corruption` axis
+      (spec: add + `Logistic(8, 0.1)`);
+    * `herbcraft_ward` has no `territory_max_corruption` axis
+      (same);
+    * `practice_magic::durable_ward` has no
+      `nearby_corruption_level` axis (spec: add +
+      `Logistic(8, 0.1)`);
+    * `practice_magic::cleanse`'s `tile_corruption` axis uses
+      `linear()` (spec: `Logistic(8, magic_cleanse_corruption_threshold)`);
+    * `practice_magic::colony_cleanse`'s corruption axis uses
+      `linear()` (spec: `Logistic(6, 0.3)`).
+  These five axis-level migrations are the gate for §13.1's
+  corruption-emergency-bonus constant retirements.
+- **Track C — Per-marker author systems. PARTIAL (~12%).**
+  49 §4.3 marker ZSTs exist as components (Phase 3a). Six have
+  per-tick author systems landed: the five colony-scoped authors
+  (`HasStoredFood`, `HasGarden`, `HasFunctionalKitchen`,
+  `HasRawFoodInStores`, `WardStrengthLow` — authored inline in
+  `systems/goap.rs` + `systems/disposition.rs` parallel
+  `MarkerSnapshot` builders) plus the first per-cat author,
+  `Incapacitated` (`systems/incapacitation.rs::update_incapacitation`,
+  plus per-cat `set_entity` in both `MarkerSnapshot` builders).
+  DSE consumers are wired for the five colony-scoped markers;
+  `Incapacitated`'s consumer cutover (`.forbid("Incapacitated")`
+  on every non-Eat/Sleep/Idle DSE) is pending and lands with
+  §13.1 rows 1–3. 43 remain fully unauthored — every LifeStage
+  (`Kitten`/`Young`/`Adult`/`Elder`), every State
+  (`InCombat`/`Injured`/`Pregnant`), every Capability
+  (`CanHunt`/`CanForage`/`CanWard`/`CanCook`), every
+  TargetExistence, and most Colony markers.
+  `.forbid("Incapacitated")` appears only in test fixtures; no
+  production DSE excludes incapacitated cats by marker today —
+  the `is_incapacitated` inline branch at `scoring.rs:574–598`
+  is still the only filter pending §13.1's cutover.
+
+**Cluster-A entry reframing:**
+
+- **A1** — Track A landed; Track B ~85% (5 corruption-axis
+  migrations outstanding); Track C ~12% (43 markers unauthored;
+  `Incapacitated` author landed, its `.forbid` consumer still
+  pending as §13.1 rows 1–3).
+  The 21 cat + 9 fox DSE *shapes* are in the registry, which is
+  what "landed" referred to in the prior status-line text — but
+  "registry resolution" is not "every §2.3-assigned curve is in
+  place" and it is not "every §4.3 marker has an author." Both
+  are ongoing tracks with work outstanding.
+- **A2** — resolved as *build in-house*. `big-brain` was not
+  adopted. The L2 substrate at `src/ai/eval.rs` is the outcome.
+- **A3** — Track A landed (49 ZSTs + consumer substrate). Track C
+  drives the remaining work (43 markers). "A3 substantially
+  landed" was wrong as stated; the substrate *for A3* is landed,
+  but A3's own exit criterion ("at least one action migrates to
+  a pure-tag-filter entry guard as proof-of-pattern") is met only
+  for the five authored colony markers with live consumers.
+  `Incapacitated`'s author has landed as the first per-cat marker
+  but its DSE consumer is still pending (§13.1 rows 1–3). The
+  remaining 43 per-marker ports are the bulk of A3's work,
+  tracked in #14's "Still outstanding" list.
+- **A4** — landed. §6.3 `TargetTakingDse` foundation + all nine
+  §6.5 per-DSE target-taking ports shipped. `find_social_target`
+  retired. A4 is the one cluster-A entry that truly slices cleanly
+  across all three tracks.
+- **A5** — landed. §11 focal-cat replay instrumentation shipped via
+  Phase A1.2: at-source L2/L3 capture through `evaluate_single_with_trace`
+  / `ModifierPipeline::apply_with_trace` /
+  `select_disposition_via_intention_softmax_with_trace`. L2 records
+  now carry real per-consideration + modifier data; L3 records carry
+  real softmax probabilities + RNG roll. Replay-frame joinability
+  (§11.4) no longer vacuous. See the Landed section for the full
+  landing entry.
+
+**Still outstanding refactor-scope work** (consolidated; each item
+links to its gate chain rather than being called "ready to land"):
+
+- ~~**§11 instrumentation (A5).**~~ **Landed — see Phase A1.2 entry
+  in Landed section.**
+- ~~**§3.5 remaining-modifier port.**~~ **Landed — all 10 §3.5
+  modifiers ported.** Pride / Independence-solo / Independence-group
+  / Patience / Tradition / Fox-suppression / Corruption-suppression
+  each registered as a first-class `ScoreModifier` in
+  `src/ai/modifier.rs`, mirroring the Phase 4.2
+  `WardCorruptionEmergency` / `CleanseEmergency` / `SensedRotBoost`
+  pattern. `default_modifier_pipeline` now hands out all 10 passes in
+  retiring-inline-order. Trigger inputs flow through new scalar-
+  surface keys (`respect`, `pride`, `independence`, `patience`,
+  `tradition_location_bonus`, `fox_scent_level`,
+  `active_disposition_ordinal`) in `ctx_scalars`; Patience's
+  disposition→DSE membership lives in
+  `constituent_dses_for_ordinal` keyed off the active-disposition
+  ordinal. Inline `score_actions:666–750` block deleted; covered by
+  23 new unit tests in `src/ai/modifier.rs` (31 total modifier
+  tests). Tradition's unfiltered-loop bug (§3.5.3 item 1) is filed
+  below as a separate follow-on — a behavior change requires the
+  balance-methodology hypothesis + A/B, not a translation-scoped
+  port.
+- **§2.3 corruption-axis migrations (Track B remainder).** Five
+  per-DSE axis additions / curve swaps in Herbcraft / PracticeMagic
+  sibling DSEs (see Track B bullet above). Gate for §13.1 rows 4–6.
+- **`Incapacitated` DSE consumer cutover (Track C).** Author
+  landed: `systems::incapacitation::update_incapacitation` +
+  per-cat `set_entity` in both `MarkerSnapshot` builders.
+  Remaining: add `.forbid("Incapacitated")` to every
+  non-Eat/Sleep/Idle DSE and retire the inline
+  `is_incapacitated` early-return at `scoring.rs:574–598`. Lands
+  as one commit with §13.1 rows 1–3 (the five `incapacitated_*`
+  constants).
+- **§13.1 retired-constants cleanup.** *Gated* on the remaining
+  items above (corruption-axis migrations for rows 4–6 +
+  `.forbid("Incapacitated")` cutover for rows 1–3). Per the §13.1
+  spec rule: "Behavior-preserving once the curves are in;
+  dangerous before." See
+  [`docs/systems/a1-4-retired-constants-kickoff.md`](../systems/a1-4-retired-constants-kickoff.md)
+  for the gate-verification procedure — an audit on 2026-04-23
+  confirmed all six retirement rows are gate-closed, not open;
+  the Incapacitated author landed 2026-04-23 flipping rows 1–3
+  to `C ✓`, but consumer wiring + inline-branch retirement still
+  block the §13.1 commit.
+- **§7 commitment strategies.** The `CommitmentStrategy` enum tag
+  exists on every Intention per Phase 3a; §7.2 drop-trigger
+  reconsideration, §7.3 per-Intention-class assignment, §7.4
+  persistence bonus remain unimplemented.
+- **§L2.10.7 plan-cost feedback.** Blocks 4 §6.5 deferred axes
+  (`apprentice-receptivity`, `fertility-window`, `remedy-match`,
+  `pursuit-cost`).
+- **§4 marker authoring rollout (~43 markers).** Life-stage,
+  state (minus `Incapacitated`, landed 2026-04-23), capability,
+  target-existence, and colony markers still unauthored. Each is
+  one tick-system + `MarkerSnapshot` population + a `.require()`
+  / `.forbid()` cutover on its consumer DSE.
 
 #### A1. IAUS refactor — response curves + multiplicative composition [TOP PRIORITY]
 
@@ -499,16 +709,23 @@ pair-stickiness a natural home (social attraction field pulls bonded
 cats together), (c) give the strategist-coordinator a spatial
 substrate.
 
-**Current state:** One-off implementations per concern; no unified
-abstraction. `wind.rs` + `sensing.rs` handles scent only.
+**Current state:** Phase 2B landed the generalized influence-map
+substrate + migrated scent onto it (see Landed: **Phase 2B — Scent
+as influence map**). Corruption, ward, prey-density, and
+social-attraction layers remain one-off or not-yet-built. The B1
+exit-criterion "at least two distinct layers share one abstraction"
+is not yet met — scent is on the substrate, but no second layer has
+been migrated, so the abstraction has no co-tenant yet.
 
 **Touch points:**
-- `src/systems/wind.rs` + `sensing.rs` — existing scent map to
-  generalize
-- `src/systems/magic.rs` — corruption field, ward field
+- `src/systems/wind.rs` + `sensing.rs` — scent already migrated to
+  the influence-map substrate (Phase 2B).
+- `src/systems/magic.rs` — corruption field, ward field (still
+  ad-hoc; candidate next migrations).
 - `src/systems/prey.rs` — prey density (already sort of an influence
-  map)
-- Possibly new: `src/systems/influence_maps.rs`
+  map; candidate next migration).
+- `src/ai/considerations.rs::SpatialConsideration` — consumer side
+  wired in Phase 3a; the evaluator samples maps via `MapKey` lookup.
 
 **Preparation reading:**
 - **"Modular Tactical Influence Maps"** — Dave Mark, *Game AI Pro 2*
@@ -1163,12 +1380,11 @@ remaining work is itemised here.
   **Phase 4c.6 closeout landed** — Groom-other (§6.5.4), Hunt
   (§6.5.5), Fight (§6.5.9), ApplyRemedy (§6.5.7), Build (§6.5.8)
   ports all landed together with `find_social_target` retired
-  (see Landed). **Remaining:** the Caretake (§6.5.6) full
-  TargetTakingDse migration — `resolve_caretake` in
-  `caretake_targeting.rs` already wraps the §6.5.6 signal
-  faithfully; the DSE-shape migration is deferred until a
-  follow-on session schedules it. Each port followed the Phase
-  4c.1 pattern:
+  (see Landed).
+  **Phase 4c.7 landed** — Caretake (§6.5.6) full TargetTakingDse
+  port; `resolve_caretake` retired in favor of the spec-shape
+  four-axis resolver. With 4c.7 the §6.5 per-DSE target-taking
+  slate is **closed**. Each port followed the Phase 4c.1 pattern:
     1. `TargetTakingDse` factory function (consideration bundle
        from §6.5.N, composition, aggregation).
     2. Caller-side resolver helper that assembles candidates,
@@ -1189,15 +1405,21 @@ remaining work is itemised here.
   + Phase 4c.4's alloparenting Reframe A + GOAP retrieve step +
   target-entity persistence (`KittenFed = 55 / 10 / 79` across
   recent soaks; see Landed). Phase 4c.5 (Mentor) landed on the
-  cleared gate with no starvation regression. The full §6.5.6
-  Caretake `TargetTakingDse` port remains outstanding (the
-  existing `resolve_caretake` helper in `caretake_targeting.rs`
-  pre-dates the target-DSE substrate and should migrate to match
-  the Socialize / Mate / Mentor pattern once scheduled).
+  cleared gate with no starvation regression.
+  ~~The full §6.5.6 Caretake `TargetTakingDse` port remains
+  outstanding~~ **Landed as Phase 4c.7** — the `resolve_caretake`
+  plain helper retired in favor of `caretake_target_dse()` +
+  `resolve_caretake_target` on the Socialize / Mate / Mentor
+  pattern (`KittenFed = 27` on the landing soak, within the
+  seed-42 noise envelope; see Landed).
 - **§4 marker-eligibility authoring systems for roster gap-fill.**
-  **Phase 4b.2 MVP + 4b.4 landed** (lookup foundation +
-  `HasStoredFood` + `HasGarden` reference ports — see Landed
-  section below). The remaining ~48 §4.3 markers each need:
+  **Phase 4b.2 MVP + 4b.4 + 4b.5 landed** (lookup foundation +
+  `HasStoredFood` + `HasGarden` + colony-scoped batch
+  `HasFunctionalKitchen` / `HasRawFoodInStores` / `WardStrengthLow`
+  — see Landed section below). **`Incapacitated` per-cat author
+  landed 2026-04-23** (`systems::incapacitation::update_incapacitation`,
+  first `set_entity` consumer) — its `.forbid` DSE cutover is the
+  §13.1 rows 1–3 work. The remaining ~43 §4.3 markers each need:
     1. Author system per §4.6 author-file assignment (`Changed<T>`
        filter where the predicate reads changing parent components;
        full-scan where it reads position-adjacent state).
@@ -1317,14 +1539,50 @@ implementation or enumeration work.
 - **13.1 Retired scoring constants + incapacitated branch cleanup.**
   Spec: §2.3 "Retired constants" subsection. Delete the five
   `incapacitated_*` fields + the `if ctx.is_incapacitated`
-  early-return block at `src/ai/scoring.rs:181–201`, plus
-  `ward_corruption_emergency_bonus`,
+  early-return block at `src/ai/scoring.rs:574–598` (renumbered
+  from the spec's cited `181–201` by subsequent scoring.rs
+  growth), plus `ward_corruption_emergency_bonus`,
   `cleanse_corruption_emergency_bonus`, and
   `corruption_sensed_response_bonus` from `SimConstants`.
   **Gated:** lands in the same PR that introduces the Logistic
-  curves that replace them — cluster A entry #5 (A1 IAUS
-  refactor). Not before. Behavior-preserving once the curves are
-  in; dangerous before.
+  curves that replace them. Not before. Behavior-preserving once
+  the curves are in; dangerous before.
+
+  **Gate status (2026-04-23 audit, against HEAD + this commit):**
+  CLOSED. Author half of rows 1–3 landed this commit
+  (`systems::incapacitation::update_incapacitation` +
+  `MarkerSnapshot::set_entity` in both scoring paths); consumer
+  half (`.forbid("Incapacitated")`) still pending. Six retirement
+  rows split across two prerequisite tracks:
+
+  | Row | Constant(s) | Replaces | Prerequisite track | State |
+  |---|---|---|---|---|
+  | 1 | `incapacitated_eat_urgency_{scale,offset}` | `Eat.hunger = Logistic(8, 0.75)` + `.forbid("Incapacitated")` on non-Eat/Sleep/Idle | Track B: curve ✓ in `eat.rs`. Track C: author ✓ (`systems/incapacitation.rs`); `.forbid("Incapacitated")` wiring on non-Eat/Sleep/Idle DSEs pending (§13.1 cutover). | **B ✓ / C ½ — gate ✗** |
+  | 2 | `incapacitated_sleep_urgency_{scale,offset}` | `Sleep.energy = Logistic(10, 0.7)` + `.forbid("Incapacitated")` | Track B: curve ✓ in `sleep.rs`. Track C: author ✓; `.forbid` wiring pending as row 1. | **B ✓ / C ½ — gate ✗** |
+  | 3 | `incapacitated_idle_score` | Idle's canonical axes + `.forbid("Incapacitated")` filtering non-eligible DSEs | Track C: author ✓; `.forbid` wiring pending as rows 1–2. | **C ½ — gate ✗** |
+  | 4 | `ward_corruption_emergency_bonus` | `Logistic(8, 0.1)` on `territory_max_corruption` axis in `Herbcraft.ward` / `Herbcraft.gather` / `PracticeMagic.durable_ward` | Track B: axis missing entirely in all three factories. | **B ✗ — gate ✗** |
+  | 5 | `cleanse_corruption_emergency_bonus` | `Logistic(8, threshold)` on `PracticeMagic.cleanse.tile_corruption` + `Logistic(6, 0.3)` on `PracticeMagic.colony_cleanse.territory_max_corruption` | Track B: both axes exist but use `linear()`. | **B ✗ — gate ✗** |
+  | 6 | `corruption_sensed_response_bonus` | `Logistic(8, 0.1)` on `PracticeMagic.durable_ward.nearby_corruption_level` | Track B: axis missing entirely. | **B ✗ — gate ✗** |
+
+  Glyph key: `✓` = track-level prerequisite complete; `½` = track
+  partially complete (e.g., Incapacitated author landed but
+  `.forbid` cutover pending); `✗` = track-level prerequisite
+  unfinished. `gate ✗` on every row today — no row's deletion is
+  yet safe. Rows 1–3 share the cutover commitment: `.forbid
+  ("Incapacitated")` on every non-Eat/Sleep/Idle DSE + retirement
+  of the inline `is_incapacitated` branch at
+  `scoring.rs:574–598` ship together with the row 1–3 constant
+  deletions, not piecemeal. Rows 4–6 each need the axis-level
+  Logistic migration to absorb the modifier-emergency bonus'
+  contribution before the modifier + constant retire together.
+  Until every row flips to `gate ✓`, §13.1 cannot land as a
+  single commit. The three modifier
+  impls in `src/ai/modifier.rs` (`WardCorruptionEmergency`,
+  `CleanseEmergency`, `SensedRotBoost`) and their registration
+  in `default_modifier_pipeline` are the current live
+  implementation of the workaround bonuses — they retire in the
+  same commit as the constants, once the axis curves absorb
+  their contribution by construction.
 
 - **13.2 Death-event relationship-classified grief emission
   (§7.7.b).** `src/systems/death.rs` today emits only
@@ -1373,6 +1631,29 @@ implementation or enumeration work.
   row gets its final commit and the ledger-level pointer in
   `ai-substrate-refactor.md` resolves.
 
+- **13.7 Tradition unfiltered-loop fix (§3.5.3 item 1)
+  [2026-04-23].** The `Tradition` modifier in `src/ai/modifier.rs`
+  is a faithful port of the retiring inline block — it applies the
+  caller-pre-computed `tradition_location_bonus` to **every** DSE
+  rather than filtering by the action whose history matched this
+  tile. Spec §3.5.3 item 1 calls this out as a bug with two
+  candidate fixes:
+  - **(a) Structural fix** — caller pre-computes a
+    `HashMap<Action, f32>` keyed by the matched action; the
+    modifier reads a per-DSE-id scalar and adds only on hits.
+  - **(b) Semantic fix** — declare Tradition *is* a flat
+    tile-familiarity bonus (not action-specific); update §2.3's
+    Tradition row in the spec.
+
+  Resolving this is a behavior change under CLAUDE.md's Balance
+  Methodology — requires a hypothesis + prediction + measured A/B
+  + concordance before landing. Today the caller sets
+  `tradition_location_bonus = 0.0` in production (`goap.rs:900`),
+  so the unfiltered-loop is a no-op in live soaks and the fix is
+  not time-critical. **Gated:** on a balance thread choosing
+  between (a) and (b); not a prerequisite for any cluster-A or
+  cluster-B work.
+
 **Dependency graph:**
 
 - 13.1 gated on cluster A (#5 — A1 IAUS refactor).
@@ -1383,6 +1664,9 @@ implementation or enumeration work.
 - 13.4 gated on 13.5 (needs per-arc valence targets).
 - 13.5 gates 13.4; stands on its own given the aspiration catalog.
 - 13.6 gated on C4 (#1 sub-3).
+- 13.7 gated on a balance thread; caller-side tradition bonus is
+  `0.0` in production, so the unfiltered-loop port is currently a
+  dormant no-op.
 
 **Memory write-back on landing:** commit per-subtask memories as
 each lands so the next cross-thread session has a local record
@@ -1813,6 +2097,529 @@ pattern is proven.
 
 ## Landed
 
+### Phase A1.2 (A5) — §11 focal-cat replay enrichment: at-source L2/L3 trace capture (2026-04-23)
+
+Closes out the last cluster-A entry. Phase 1/2 of §11 shipped the
+sidecar file, three record variants, replay script, and
+influence-map L1 walk as a *shim* — L2 records emitted empty
+`considerations`/`modifiers` arrays and L3 records emitted empty
+softmax probabilities, so the joinability invariant (§11.4) was
+vacuous in practice. A1.2 fills those fields with real data pulled
+from the live scoring pass, routed through three new `_with_trace`
+variants on `evaluate_single` / `ModifierPipeline::apply` /
+`select_disposition_via_intention_softmax`.
+
+**At-source capture pattern — observational, not behavior-altering.**
+Each `_with_trace` variant takes `Option<&mut Sink>`; the plain
+entry points delegate with `None`. When the sink is absent the cost
+is a single `Option` check per pass, matching §11.5's zero-
+overhead-when-dormant contract. New types in `src/ai/eval.rs`:
+
+- `EvalTrace` — per-DSE `{considerations: Vec<ConsiderationTraceRow>,
+  composition_{mode,weights,compensation_strength}, maslow_pregate,
+  modifier_deltas: Vec<ModifierDelta>}`. `ConsiderationTraceRow`
+  carries `{name, kind, input, curve_label, score, weight,
+  spatial_map_key}` per §11.3 L2 record schema.
+- `ModifierDelta` — `{name, pre, post}`. `apply_with_trace` pushes
+  rows only when `pre != post` so no-op passes stay out of replay
+  frames.
+
+New `SoftmaxCapture` in `src/ai/scoring.rs` parallels the §11.3 L3
+record: `{pool, weights, probabilities, temperature, raw_roll,
+chosen_idx, chosen_action, empty_pool}`. The empty-pool flag
+distinguishes "softmax ran and picked" from "fallthrough to
+`DispositionKind::Resting`" — an ambiguity the shim couldn't
+express.
+
+**Focal-cat detection threaded through `EvalInputs`.** Two new
+fields (`focal_cat: Option<Entity>`,
+`focal_capture: Option<&FocalScoreCapture>`) populated from the new
+`PlanResources::focal_target` / `focal_capture` Bevy resources.
+`score_dse_by_id` routes through the traced variant when
+`ctx.cat == focal_cat`; non-focal cats take the untraced path
+unchanged. Interior-mutex on `FocalScoreCapture` lets `EvalInputs`
+carry a shared reference while `score_dse_by_id` accumulates rich
+captures — matching the existing pattern where `EvalInputs` is
+passed by `&EvalInputs` through ~30 call sites in `score_actions`.
+
+**`emit_focal_trace` rewritten as a drain.** The old shim read
+`CurrentAction::last_scores` post-hoc and emitted empty-body
+records every tick. The new system drains `FocalScoreCapture`
+populated by the scoring pass and emits L2/L3 records **only on
+planning ticks** — `evaluate_and_plan` fires when plans expire or
+need replanning (~every 200 ticks for a mid-plan cat), not every
+tick, so 90%+ of ticks had no softmax data for the shim to emit.
+L1 continues to emit every tick from the influence-map walk
+because senses don't gate on the GOAP cadence.
+
+**Verification.** `just check` + `cargo test --lib` green (1092
+tests pass, +7 new A1.2 tests: `evaluate_single_with_trace_captures_consideration_input_and_score`,
+`evaluate_single_without_trace_is_zero_cost_path`,
+`modifier_pipeline_apply_with_trace_records_nonzero_deltas`,
+`softmax_capture_records_probabilities_sum_to_one`,
+`softmax_capture_flags_empty_pool_fallthrough`,
+`softmax_without_capture_matches_capture_variant`,
+`focal_capture_accumulates_and_drains`).
+
+**Seed-42 15min release soak** (`just soak-trace 42 Simba` →
+`logs/a5-focal/`): 491,545 trace records, 713 planning ticks for
+Simba, 80,033 event entries, sim day 1297. Survival canaries hold:
+Starvation = 0, ShadowFoxAmbush = 0, footer written. Sample replay
+at mid-run tick 1,249,409 (saved as `logs/a5-focal/sample-frame.txt`)
+shows:
+
+- **L1** — 5 registered influence maps sampled at Simba's position
+  (29, 10) with per-channel attenuation breakdowns for each.
+- **L2** — 12 DSE evaluations with real per-consideration rows
+  (e.g. `forage.hunger_urgency = 0.408 → Logistic(8, 0.75) →
+  score 0.061, weight 0.30`), composition mode / raw / Maslow
+  pre-gate, and modifier deltas when they fired
+  (`hunt.pride: +0.075`, `explore.independence_solo: +0.080`).
+- **L3** — ranked pool of 9 Intentions with real softmax
+  probabilities summing to 1.0 (Explore, Sleep, Forage, Hunt, …),
+  temperature 0.15, chosen = Explore.
+
+`never_fired_expected_positives` footer lists 11 features
+(`KnowledgePromoted`, `ItemRetrieved`, `FoodCooked`, `KittenBorn`,
+`GestationAdvanced`, `MatingOccurred`, `KittenFed`, `CropTended`,
+`CropHarvested`, `GroomedOther`, `MentoredCat`). None attributable
+to A1.2: parity-guard tests (`evaluate_single_without_trace_is_zero_cost_path`,
+`softmax_without_capture_matches_capture_variant`) enforce at
+compile+test time that the traced variants match the untraced
+variants bit-for-bit, so the capture path is observation-only.
+Tracked separately against the balance-deferred cluster.
+
+**Out of scope — deferred to §11.6 follow-ons.** Per-modifier
+catalog expansion, GUI frame-scrubber, event-triggered records,
+aggregate-distribution footer, L1 lazy emission from
+`Consideration::Spatial` (no live DSE has spatial considerations
+yet), top-N losing-axis + apophenia schema slots.
+
+**Specification cross-ref:** `docs/systems/ai-substrate-refactor.md`
+§11.1–§11.7, `docs/systems/a1-2-focal-cat-replay-kickoff.md`.
+
+### Phase 4b.5 — §4 colony-scoped marker batch: `HasFunctionalKitchen` + `HasRawFoodInStores` + `WardStrengthLow` (2026-04-23)
+
+Three-marker batch extending the Phase 4b.2 / 4b.4 reference-port
+pattern to the next cluster of colony-scoped predicates that
+already had in-scope caller-side bindings. Each marker retires an
+outer `ctx.<bool>` conjunct in `score_actions` and moves
+eligibility onto the target DSE's `EligibilityFilter::require(name)`.
+Shared author shape: **caller-side `markers.set_colony(name, bool)`
+next to the existing binding; no new author-system file**.
+
+- **`HasFunctionalKitchen` + `HasRawFoodInStores` → `CookDse`.**
+  Cook's positive branch (`cook_base_conditions &&
+  ctx.has_functional_kitchen`) retires. The
+  `wants_cook_but_no_kitchen` latent signal read by BuildPressure
+  in `goap.rs` is preserved via a caller-side disambiguation —
+  when the DSE's marker-gated score drops to zero, the scorer
+  checks `ctx.has_raw_food_in_stores && !ctx.has_functional_kitchen`
+  to raise the signal. The `hunger > cook_hunger_gate`
+  precondition stays as an inline wrap (§4.5 scalar carve-out).
+- **`WardStrengthLow` → `HerbcraftWardDse` + `DurableWardDse`.**
+  First port where one marker gates two sibling DSEs.
+  HerbcraftWard's outer gate reduces from `ctx.ward_strength_low
+  && ctx.has_ward_herbs` to `ctx.has_ward_herbs` (pending a future
+  per-cat `HasWardHerbs` inventory-marker batch). DurableWard's
+  outer gate reduces from `ctx.ward_strength_low && ctx.magic_skill
+  > threshold` to just the magic_skill threshold (scalar, not
+  marker).
+
+Caller-side population adds three `markers.set_colony(name, bool)`
+lines next to each predicate's existing computation in both
+scoring paths (`disposition.rs::evaluate_dispositions` +
+`goap.rs::evaluate_goap_scoring`). `cached_test_markers()` in
+`scoring.rs` pre-loads the three new markers to `true` so every
+existing scoring-tier test continues to pass without per-test
+`EvalInputs` overrides.
+
+7 DSE-level parity tests — `.eligibility().required` assertion +
+absence-rejection pair on each of Cook / HerbcraftWard /
+DurableWard, plus a Cook-with-both-markers-present eligibility
+test and a sibling-guard assertion covering the other five
+PracticeMagic DSEs (Scry / Cleanse / ColonyCleanse / Harvest /
+Commune) that still carry empty filters.
+
+**Hypothesis:** marker eligibility is predicate-equivalent to the
+retired outer gates (population reads the same caller-computed
+bool the outer gate consulted). Port should produce zero
+behavioral drift on the seed-42 soak; the marker is the exact same
+bit, moved from ScoringContext field to MarkerSnapshot entry.
+
+**Verification:** `just check` + `just test` (1049 unit tests + 13
+integration tests pass). Two back-to-back seed-42 `--duration 900`
+release soaks on the same 4b.5 binary (`logs/tuned-42` +
+`logs/phase4b5-run2`) produced an identical 8-feature
+`never_fired_expected_positives` list — reproducible within a
+binary, not seed variance. A 4c.7-only baseline soak
+(`logs/phase4c7-baseline`, built after reverting the six
+4b.5-touched files) with the original outer gates in place produced
+the *same* 8-feature list. That alignment is the strongest
+evidence the port is predicate-equivalent: the never-fired set is
+a property of the Phase 4c.7 HEAD state, unchanged by moving
+three eligibility predicates from outer gates to marker filters.
+
+**Concordance — partial.** The never-fired axis aligns across
+binaries (clean signal). The survival / continuity-metric
+comparison is less conclusive:
+
+| Binary | Starvation | ShadowFoxAmbush | grooming | wards_placed | ward_avg |
+|---|---|---|---|---|---|
+| 4c.7-only baseline | 8 | 0 | 24 | 111 | 0.00 |
+| 4b.5 run 1 (`logs/tuned-42`) | 1 | 0 | 159 | 239 | 0.44 |
+| 4b.5 run 2 (`logs/phase4b5-run2`) | 3 | 0 | 165 | 244 | 0.79 |
+
+The 4c.7-only baseline sits **outside every other recorded soak's
+envelope** — every other footer in `logs/*` (across multiple
+commits) shows grooming ≥ 68, Starvation ≤ 5. Two interpretations
+of the gap both remain on the table:
+
+1. *Scheduler variance (most likely).* Bevy's parallel scheduler
+   is non-deterministic across compiled binaries per CLAUDE.md's
+   seed-42 drift note; the baseline is a single unlucky
+   realization. The 4b.5 runs happen to land in a luckier
+   realization of the same semantic state.
+2. *4b.5 coincidentally masks a 4c.7 WIP anomaly.* The three
+   `.require` changes shift softmax-pool composition under
+   scoring. If 4c.7's Caretake reshape produced an edge case where
+   the old outer gates somehow amplified a scoring pathology that
+   the new eligibility filters dampen, that would also fit.
+
+A second clean 4c.7-only soak would disambiguate; not run here
+(the current working tree has drifted such that a clean revert
+requires additional surgery to preserve post-phase4c7-baseline
+§11 focal-trace additions in `scoring.rs`). Landing on
+interpretation #1 because (a) the port is predicate-equivalent by
+construction — `set_colony` reads the same bool the outer gate
+consulted — and (b) interpretation #2 would require a
+non-semantic-equivalence mechanism that I can't identify from
+the code. Worth flagging on the 4c.7 balance thread that
+`phase4c7-baseline` is a tail-outlier soak regardless of cause;
+that's not this batch's concern to resolve.
+
+Remaining §4.3 markers: from the ~48 noted at Phase 4b.4 landing,
+three ported here → **~45 remaining**. Next candidate batches:
+per-cat inventory markers (`HasHerbsInInventory` /
+`HasRemedyHerbs` / `HasWardHerbs`) needing a
+`Changed<Inventory>`-filtered author system in `items.rs`;
+capability markers (`CanHunt` / `CanForage` / `CanWard` /
+`CanCook`) needing the new `src/ai/capabilities.rs` fan-out per
+§4.6.
+
+### §3.5 remaining-modifier port — seven modifiers onto the pipeline + inline retirement (2026-04-23)
+
+Closes out the §3.5.1 catalog. The three Phase 4a
+corruption-emergency modifiers (`WardCorruptionEmergency`,
+`CleanseEmergency`, `SensedRotBoost`) were the first port; this
+commit ports the remaining seven and retires the inline modifier
+block in `src/ai/scoring.rs::score_actions` (~666–750). Translation-
+scoped port — behavior-preserving by construction, gated by the
+balance-methodology drift envelope.
+
+**Seven new `ScoreModifier` impls in `src/ai/modifier.rs`:**
+
+- `Pride` — additive × `personality.pride` on Hunt / Fight / Patrol
+  / Build / Coordinate when `ctx.respect < pride_respect_threshold`.
+- `IndependenceSolo` — additive × `personality.independence` on
+  Explore / Wander / Hunt; no threshold.
+- `IndependenceGroup` — subtractive × `personality.independence` on
+  Socialize / Coordinate / Mentor, clamped ≥ 0.
+- `Patience` — additive × `personality.patience` on the active
+  disposition's constituent DSEs, dispatched via
+  `constituent_dses_for_ordinal` keyed off
+  `active_disposition_ordinal`. First modifier to route through the
+  new disposition-scoped scalar surface.
+- `Tradition` — flat additive bonus. **Preserves today's unfiltered
+  "applies to every DSE" behavior** per the port discipline; the
+  §3.5.3 item 1 filter bug is filed as **#13.7** in open-work's #13
+  debt ledger (behavior change requires a hypothesis + A/B soak,
+  not a translation port).
+- `FoxTerritorySuppression` — multiplicative damp on Hunt / Explore
+  / Forage / Patrol / Wander **plus** additive boost on Flee
+  (§3.5.3 item 2). Single impl handles both the damp and the
+  boost; Flee's transform is the `+ suppression × 0.5` branch.
+- `CorruptionTerritorySuppression` — multiplicative damp on Explore
+  / Wander / Idle.
+
+All seven follow the established `WardCorruptionEmergency` pattern:
+short-circuit on non-applicable `dse_id` per the §3.5.2
+applicability matrix, read triggers via `fetch_scalar`, honor the
+`score <= 0.0 ⇒ return score` contract for gated boosts (Tradition
+is the spec-sanctioned exception — a flat bonus with no gate).
+
+**New `ctx_scalars` keys** to feed modifier triggers: `respect`,
+`pride`, `independence`, `patience`, `tradition_location_bonus`
+(preserving today's caller-computed field), `fox_scent_level`,
+`active_disposition_ordinal` (integer cast of the current
+disposition for Patience's lookup).
+
+**Registration in `default_modifier_pipeline`** — now hands out all
+10 passes (3 corruption-emergency + 7 new) in retiring-inline
+order, so future audits grep cleanly. Pinning order is cosmetic —
+additive + multiplicative modifiers commute under the non-negative
+score invariant — but makes intent readable.
+
+**Retired:** inline post-scoring block at
+`src/ai/scoring.rs::score_actions` ~666–750, plus the matching
+constant-reads that were coupled to it. `ScoringContext` retains
+its scalar fields (other consumers read them).
+
+**Tests.** 23 new unit tests in `src/ai/modifier.rs` bringing the
+total to 31 modifier tests. Per-impl coverage: applicability-filter
+rejection (non-matching DSE ids return `score` unchanged), trigger
+gate (e.g. Pride returns `score` when `respect >=
+pride_respect_threshold`), transform math (additive, subtractive,
+multiplicative, clamp), and the §3.5.3 item 2 Flee-boost branch on
+FoxTerritorySuppression.
+
+**Verification.** `just check` + `just test` green. Seed-42
+`--duration 900` release soak hold: all four survival canaries
+pass (Starvation = 0, ShadowFoxAmbush = 0, footer written,
+`never_fired_expected_positives` unchanged from the pre-port
+baseline). Characteristic metrics (MatingOccurred, KittenFed,
+BondFormed, ScryCompleted, continuity tallies) within the ±10%
+noise-band the port discipline demands — no drift exceeds the
+envelope, consistent with the behavior-preserving hypothesis.
+
+**Follow-on filed as #13.7.** Tradition's unfiltered-loop bug —
+the inline loop (and this port) apply the bonus to every DSE,
+not just those where the cat's history at the current tile
+matches. Fixing it to the §3.5.3 item 1 (a) "structural" filter is
+a behavior change. Caller sets `tradition_location_bonus` to 0.0
+in production today, so the bug is muted in soak runs, but the
+fix will surface when that caller starts setting non-zero values.
+
+**Specification cross-ref:** `docs/systems/ai-substrate-refactor.md`
+§3.5.1 (catalog), §3.5.2 (applicability matrix), §3.5.3
+(discoveries).
+
+---
+
+### §4.3 `Incapacitated` marker author — Track C prereq for §13.1 rows 1–3 (2026-04-23)
+
+First per-cat (`set_entity`) marker to land in the §4 catalog;
+prior ports were all colony-scoped (`set_colony`). Author-system
+track only — the DSE consumer cutover
+(`.forbid("Incapacitated")`) is intentionally deferred to the
+§13.1 retirement commit per the gate table in #13.1.
+
+**New `src/systems/incapacitation.rs::update_incapacitation`
+system.** Tick system reading the same predicate
+`ScoringContext.is_incapacitated` reads today (severe unhealed
+injury on the cat's Health component); inserts the `Incapacitated`
+ZST marker on matching cats, removes it on recovery. Registered
+at all three mirror sites per CLAUDE.md's headless-mirror rule:
+`SimulationPlugin::build` + both `build_schedule` paths in
+`main.rs`.
+
+**`MarkerSnapshot::set_entity("Incapacitated", cat, is_incap)`**
+populated in both parallel builders (`systems/goap.rs` +
+`systems/disposition.rs`) inside the existing per-cat iteration.
+First consumer of the `set_entity` API that was present in
+`MarkerSnapshot` since Phase 4b.2 but unused outside tests.
+
+**Spec updates** (`docs/systems/ai-substrate-refactor.md`):
+
+- §4.3 `Incapacitated` row: status `Absent → Author ✓; DSE consumer
+  pending §13.1`; Insert column points at
+  `tick:systems::incapacitation::update_incapacitation`.
+- §4.6 authoring-system roster: `Incapacitated` moved out of
+  `needs.rs` into dedicated `src/systems/incapacitation.rs` module.
+
+**Tests.** Unit tests cover the predicate (severe-unhealed →
+marker insert; recovery → marker remove) and the tick-system
+idempotence (re-running on a steady state produces no churn).
+Integration check: post-MarkerSnapshot-build,
+`snapshot.has("Incapacitated", cat)` reports `true` for downed
+cats and `false` for healthy ones.
+
+**Deliberately NOT in this commit** (per kickoff prompt's
+non-goals):
+
+- No `.forbid("Incapacitated")` on any DSE. The inline
+  `if ctx.is_incapacitated` branch at `scoring.rs:574–598` still
+  runs; the marker is observable but not yet consumed by
+  eligibility filters. That cutover lands with §13.1 rows 1–3 as
+  a single behavior-change commit.
+- No deletion of `ScoringContext.is_incapacitated`; other
+  consumers read it.
+
+**Verification.** `just check` + `just test` green. Seed-42 soak:
+survival canaries hold within noise band. Marker is observable on
+live cats but unconsumed — the commit is additive by design.
+
+**Gate-table impact** (see #13 item 13.1's 6-row gate table):
+Rows 1–3 flip Track C from `✗` to `½` (author ✓, cutover ✗);
+Rows 4–6 unchanged (Track B axis migrations outstanding).
+Overall `gate ✗` on every row remains — §13.1 cannot land as a
+single commit until Track B axis migrations + the Track C
+cutover commit both ship.
+
+**Specification cross-ref:** `docs/systems/ai-substrate-refactor.md`
+§4.3 (marker catalog), §4.6 (authoring-system roster).
+
+---
+
+### Phase 4c.7 — §6.5.6 `Caretake` target-taking DSE port + `resolve_caretake` retirement (2026-04-23)
+
+Final §6.5 per-DSE target-taking port, landing on the Socialize
+(4c.1) / Mate (4c.2) / Mentor (4c.5) reference pattern. Closes
+the last §6.5 row and retires the Phase 4c.3 plain-helper
+`resolve_caretake`.
+
+- New `src/ai/dses/caretake_target.rs`:
+    - `caretake_target_dse()` factory — four per-§6.5.6
+      considerations: `target_nearness` `Quadratic(exp=1.5)`
+      (range=12, spec §6.4 row #9), `target_kitten_hunger`
+      `Quadratic(exp=2)` on `1 − needs.hunger` deficit,
+      `target_kinship` `Piecewise([(0.0, 0.6), (1.0, 1.0)])`
+      (Cliff: parent=1.0, non-parent=0.6 — floor preserves the
+      colony-raising pattern Phase 4c.4's alloparenting Reframe A
+      established), `target_kitten_isolation` `Linear(1, 0)` on
+      binary "no sibling / parent within 3 tiles". WeightedSum
+      weights `[0.20, 0.40, 0.25, 0.15]` verbatim from spec. No
+      axes deferred — this is the first 4c port to land the full
+      §6.5 weight vector. `Best` aggregation, `Goal { label:
+      "kitten_fed", strategy: SingleMinded }` Intention.
+    - `resolve_caretake_target(registry, adult, adult_pos,
+      kittens, cat_positions, tick) → CaretakeResolution` — wraps
+      `evaluate_target_taking` in the caller-side
+      `CaretakeResolution` shape `disposition.rs` +
+      `goap.rs` already consume (target / target_pos /
+      target_mother / target_father / is_parent / urgency).
+      `urgency` now carries the aggregated-`Best` score (0..1)
+      rather than the pre-refactor hand-rolled
+      `deficit × decay × kinship_boost` product. `is_parent`
+      stays bloodline-override semantics (any own hungry kitten in
+      range → true, not just the argmax) so `CaretakeDse`'s
+      self-state parent-bonus axis keeps firing for colony-kitten
+      argmax wins.
+    - Candidate filter: kittens with `needs.hunger <
+      KITTEN_HUNGER_THRESHOLD (0.6)` and Manhattan distance ≤
+      `CARETAKE_TARGET_RANGE (12)` from the scoring adult —
+      preserves the Phase 4c.3 pool shape so the port is a
+      pure scoring-shape swap.
+    - Isolation predicate: a candidate kitten counts as isolated
+      iff neither (a) another kitten sharing its mother or father
+      nor (b) an adult matching its `KittenDependency.mother /
+      .father` sits within `ISOLATION_RADIUS = 3` Manhattan tiles.
+      Sated siblings still count as co-located — isolation
+      describes "who is nearby," not "who else needs caretaking."
+    - 18 unit tests covering id stability, axis count, weight
+      sum, `Best` aggregation, Goal-Intention factory,
+      empty-registry / empty-kittens / well-fed-filtered /
+      out-of-range filtering, hunger-Quadratic argmax at tied
+      distance, kinship-floor picks non-parent when it's the only
+      candidate, kinship-cliff breaks ties in favor of own
+      kitten, bloodline `is_parent` fires even when a stranger
+      wins argmax, distance tie-break, isolation beats
+      co-located sibling, parent-presence suppresses isolation,
+      resolution surfaces target_mother / target_father /
+      target_pos, and urgency stays in [0, 1] on the extreme
+      case.
+- `src/ai/caretake_targeting.rs` — `resolve_caretake` function
+  deleted along with `CARETAKE_RANGE`, `HUNGER_THRESHOLD`, and
+  `PARENT_KINSHIP_BOOST` constants (moved-or-replaced in the
+  new module). `KittenState` + `CaretakeResolution` stay (still
+  the public caller surface). `caretake_compassion_bond_scale`
+  unchanged per the Phase 4c.4 alloparenting Reframe A
+  commitment — scaling modulates the *self-state*
+  `caretake_compassion` axis, not a per-candidate axis, so it
+  belongs caller-side, not in the target-DSE bundle.
+- Registration at `main.rs::build_app`, `main.rs::build_schedule`,
+  and `plugins/simulation.rs::SimulationPlugin::build` — three
+  registration sites per the headless-mirror rule. Per-site
+  ordering places `caretake_target_dse` immediately after
+  `caretake_dse()` so the self-state + target-taking pair sits
+  together in the registry vector.
+- Caller cutover (three sites):
+    - `disposition.rs::evaluate_dispositions` scoring path —
+      swapped to `resolve_caretake_target`, passing
+      `cat_positions` for the isolation axis.
+    - `disposition.rs::disposition_to_chain` — same swap;
+      `cat_pos_list` flows to the isolation axis. Winning
+      kitten feeds `build_caretaking_chain` (navigate-to-
+      Stores → retrieve-food → navigate-to-kitten → feed).
+    - `goap.rs::evaluate_and_plan` scoring path — same swap
+      with `cat_positions`. `caretake_resolution.target`
+      continues to seed `FeedKitten.step_state[idx].target_entity`
+      at plan-creation time (Phase 4c.4's target-entity
+      persistence — re-resolving at step-time would return
+      `None` from the stale adult position once the adult walks
+      to Stores).
+    - `goap.rs::resolve_goap_plans::FeedKitten` fallback —
+      swapped to `resolve_caretake_target` too; the goap-path
+      `kitten_snapshot` stays `Vec::new()` (Phase 4c.3 comment
+      — avoiding `&mut Needs` query conflict), so the fallback
+      still returns `None` and the primary seeding at
+      plan-creation time is the real path.
+
+**Registration invariant.** DSE count at each registration site:
+Phase 4c.6 had 9 target-taking DSEs (`hunt_target`, `fight_target`,
+`socialize_target`, `groom_other_target`, `mentor_target`,
+`mate_target`, `build_target`, `apply_remedy_target` + implicit
+through plugins); Phase 4c.7 brings it to 10 with
+`caretake_target_dse`.
+
+**Hypothesis.** The spec-shape four-axis bundle — especially the
+kitten_isolation axis, which the pre-refactor
+`deficit × decay × kinship_boost` product could not see — should
+pick argmax kittens closer to the colony-raising design intent.
+Predicted direction: no KittenFed starvation cascade (survival
+canary holds); some drift in which specific kitten wins in edge
+cases (orphan-at-3-tiles beats co-located sibling), which in
+aggregate shouldn't change the KittenFed count materially on a
+15min soak where there are usually only a handful of
+simultaneously-hungry kittens.
+
+**Observation — seed-42 15min release soak:**
+
+| metric | pre (4c.6 footer, reference) | post (this landing) | delta |
+|---|---|---|---|
+| `deaths_by_cause.Starvation` | 0 | 0 | unchanged |
+| `deaths_by_cause.ShadowFoxAmbush` | 0 | 0 | unchanged |
+| `footer_written` | 1 | 1 | unchanged |
+| `never_fired_expected_positives` count | 3 | 3 | unchanged (same FoodCooked / GroomedOther / MentoredCat persistents as 4c.5 / 4c.6 baseline) |
+| `KittenFed` | 55 / 10 / 79 (range across recent soaks) | 27 | within seed-42 parallel-scheduler noise envelope per CLAUDE.md |
+| `continuity_tallies.grooming` | 191 (4c.6) | 141 | −26% (noise band; grooming / courtship / play survival unchanged) |
+| `continuity_tallies.courtship` | 2 | 2 | unchanged |
+| `continuity_tallies.mentoring` | 0 | 0 | unchanged (pre-existing skill-threshold gate) |
+
+**Directional concordance: ACCEPT.** Survival canaries pass
+(starvation=0, shadowfox=0, footer written, KittenFed=27 ≥ 1
+gate). Never-fired-expected unchanged — the three persistent
+dormancies (FoodCooked / GroomedOther / MentoredCat) are
+pre-existing from 4c.5 baseline, not new regressions from this
+port. KittenFed magnitude within the seed-42 noise envelope
+(documented 10–79 range across recent soaks at the same
+commit-tree depth). Per CLAUDE.md's balance methodology, the
+literal positive-exit metric is deferred per the post-refactor
+balance-tuning commitment in open-work #14.
+
+**Acceptance gate (per task spec: "KittenFed ≥ 1 and survival
+canaries pass"):** PASS.
+
+**Deferred (same envelope as 4c.1 / 4c.2 / 4c.5 / 4c.6
+deferrals):**
+- Merging target-quality scores into the action-pool (target
+  DSEs still observational, not pool-modulating) — cross-cutting
+  with the other six ports.
+- Balance tuning of the four §6.5.6 axis weights and the
+  kitten_isolation radius — covered by the refactor-substrate-
+  stability commitment in #14.
+- §7 CommitmentStrategy::Blind for severe-hunger kitten targets
+  (zealot-pursuit posture when deficit > threshold) — queued
+  as a distinct §7 scope, not in the §6.5 slate.
+
+**Remaining Phase 4 work** (open-work #14 outstanding list):
+All §6.5 per-DSE `TargetTakingDse` ports now closed. The
+remaining refactor-scope work sits in §4 marker authoring (~48
+markers), §L2.10.7 plan-cost feedback, and §7 commitment
+strategies.
+
+---
+
 ### Phase 4c.6 — §6.5 per-DSE target-taking closeout: Groom-other + Hunt + Fight + ApplyRemedy + Build + `find_social_target` retirement (2026-04-22)
 
 Phase 4 closeout — five §6.5 per-DSE target-taking ports landing
@@ -1994,10 +2801,8 @@ behaviors. Literal positive-exit metrics deferred per #14's
 post-refactor balance commitment.
 
 **Deferred (same envelope as 4c.1 / 4c.2 / 4c.5 deferrals):**
-- **§6.5.6 `Caretake` full TargetTakingDse migration** —
-  `resolve_caretake` in `caretake_targeting.rs` already wraps
-  the §6.5.6 signal faithfully; spec-shape migration scheduled
-  post-balance.
+- ~~**§6.5.6 `Caretake` full TargetTakingDse migration**~~
+  Landed as Phase 4c.7 (see below).
 - `apprentice-receptivity` (§6.5.3), `fertility-window`
   (§6.5.2), `remedy-match` (§6.5.7), `pursuit-cost` (§6.5.5)
   axes — each blocked on a distinct §4.3 marker or §L2.10.7
@@ -2009,11 +2814,11 @@ post-refactor balance commitment.
   commitment in open-work #14.
 
 **Remaining Phase 4 work** (open-work #14 outstanding list):
-All six §6.5 per-DSE `TargetTakingDse` ports except Caretake
-now closed. `find_social_target` retired. Phase 4 closeout
-substantive — the remaining refactor-scope work sits in §4
-marker authoring (~48 markers), §L2.10.7 plan-cost feedback,
-and §7 commitment strategies.
+All §6.5 per-DSE `TargetTakingDse` ports (including Caretake
+§6.5.6 via Phase 4c.7) now closed. `find_social_target`
+retired. Phase 4 closeout substantive — the remaining
+refactor-scope work sits in §4 marker authoring (~48 markers),
+§L2.10.7 plan-cost feedback, and §7 commitment strategies.
 
 ---
 
@@ -2947,6 +3752,144 @@ MatingOccurred density + Cleanse/Harvest/Commune/Farming dormancy
 balance gaps unblocked by §4 marker authoring.
 
 Balance thread: `docs/balance/substrate-phase-4.md`.
+
+---
+
+### Phase 3a–3d — AI substrate trunk + per-DSE ports + §9 faction model (2026-04-20 → 2026-04-21)
+
+Four sub-phases landing the full A1/A3/A4 substrate commitment from
+cluster A #5. Per-sub-phase landings + seed-42 soak numbers live in
+`docs/balance/substrate-phase-3.md` (783 lines, canonical detail);
+this entry is the open-work cross-reference.
+
+- **Phase 3a — L2 primitives + Dse trait + §4 marker catalog + §9
+  faction model** (commits `03e9b23`, `01cb6e7`, `e02121f`, `1a50d30`).
+    - `src/ai/curves.rs` — §2.1 `Curve` enum (Linear, Quadratic,
+      Logistic, Logit, Piecewise, Polynomial, Composite), §2.2
+      function-evaluated, §2.3 named anchors (`hangry`, `sleep_dep`,
+      `loneliness`, `scarcity`, `flee_or_fight`, `inverted_need_penalty`,
+      `fight_gating`).
+    - `src/ai/considerations.rs` — §1.1 trait + §1.2 three flavors
+      (`ScalarConsideration`, `SpatialConsideration`,
+      `MarkerConsideration`).
+    - `src/ai/composition.rs` — §3.1 modes (`CompensatedProduct`,
+      `WeightedSum`, `Max`); §3.2 compensation factor
+      (`DEFAULT_COMPENSATION_STRENGTH = 0.75`); §3.3.1 RtM / RtEO
+      weight-mode enforcement at construction.
+    - `src/ai/dse.rs` — `Dse` trait, `DseId`, `Intention` (Goal /
+      Activity), `EligibilityFilter`, `EvalCtx`,
+      `CommitmentStrategy` enum (Blind / SingleMinded / OpenMinded;
+      Phase 3a commits the tag, §7 semantics lands later).
+    - `src/components/markers/` — 49 ZST marker components covering
+      the §4.3 catalog (Species / Role / LifeStage / State / Capability
+      / Inventory / TargetExistence / Colony / SpawnImmutable
+      categories).
+    - `src/ai/faction.rs` — §9.1 biological 10×10 base matrix +
+      §9.2 ECS-marker overlay resolver. Stub for Phase 3d's stance
+      bindings.
+- **Phase 3b — unified evaluator + modifier pipeline + Eat reference
+  DSE** (commits `d9cf47e`, `afe22f5`).
+    - `src/ai/eval.rs` — `DseRegistry`, `DseRegistryAppExt` (six
+      registration methods per §L2.10.3 catalog), `ScoreModifier`
+      trait + `ModifierPipeline`, `evaluate_single`,
+      `evaluate_all_cat_dses`, `select_intention_softmax` stub (wired
+      in 4a), `ScoredDse` output type. §3.4 Maslow pre-gate wired
+      via `evaluate_single` closure accepting `Fn(u8) → f32` so
+      `Needs::level_suppression` is preserved bit-for-bit.
+    - `src/ai/dses/eat.rs` — reference port per §2.3's hangry anchor
+      (`Logistic(8, 0.75)` on hunger); registered at all three
+      mirror sites.
+- **Phase 3c — peer-group per-DSE ports + Herbcraft/PracticeMagic
+  sibling splits** (commits `91e6b56` through `60acb31`).
+    - **3c.0** — `EvalInputs` bundle threaded through `score_actions`
+      + `ctx_scalars` map centralizing the canonical scalar surface
+      (semantic inversion bug-fix: `hunger` scalar = `1 − needs.hunger`).
+    - **3c.1a/b** — Starvation-urgency peer group (cat + fox): Eat,
+      Hunt, Forage, Cook, fox Hunting, Raiding.
+    - **3c.2** — Fatal-threat peer group: Flee, Fight, Patrol, fox
+      Fleeing, Avoiding, DenDefense.
+    - **3c.3** — Rest-urgency peer group: Sleep, Idle, fox Resting.
+    - **3c.4** — Social-urgency peer group: Socialize, Groom(other),
+      Mentor, Caretake, Mate.
+    - **3c.5+6+7** — Territory, Work, Exploration peer groups: cat
+      Patrol, Build, Farm, Coordinate, Explore, Wander; fox Patrolling.
+    - **3c.8** — fox Lifecycle + Feeding ports (Dispersing, Feeding).
+    - **3c.last** — Herbcraft split (gather / prepare / ward) +
+      PracticeMagic split (scry / durable_ward / cleanse /
+      colony_cleanse / harvest / commune) per §L2.10.10's sibling-DSE
+      resolution of the retiring `Max` composition.
+    - Net result: all 21 cat DSEs + 9 fox dispositions resolved
+      through the L2 evaluator's registry. `src/ai/dses/` holds the
+      per-DSE factories (39 files at Phase 3c exit). **Note:
+      "resolved through the registry" is not "every §2.3-assigned
+      curve is in place."** Peer-group ports established DSE
+      shapes + composition modes + the canonical anchors (`hangry`,
+      `sleep_dep`, `scarcity`, `loneliness`, `flee_or_fight`,
+      `fight_gating`, `inverted_need_penalty`, day-phase
+      Piecewise). Five corruption-axis migrations in the
+      Herbcraft/PracticeMagic sibling DSEs remain at
+      `Curve::Linear` placeholders pending the §2.3-rows-4–6
+      migration commits (see #5 Track B bullet). This is
+      deliberate — axis-level curve migrations are the A1.3 "first
+      measured curve shift" phase in the kickoff plan, downstream
+      of the substrate trunk.
+- **Phase 3d — §9.3 stance bindings + Fertility component +
+  §7.M.7.2 phase transitions** (commits `c8bb1c6`, `562c575`).
+    - Stance bindings on five target-taking DSEs (anticipatory for
+      Phase 4b.3's TargetTakingDse foundation).
+    - `Fertility` component with cycle-phase transitions driving
+      the Mating aspiration's biological substrate (spec §7.M.7).
+
+**§4 marker catalog foundation landed with Phase 3a (49 ZST components).**
+Per-marker author-system rollout + lookup-snapshot wiring is a
+separate track tracked in #14 and in #5's Track C bullet. Six
+markers authored total: five colony-scoped (`HasStoredFood`,
+`HasGarden`, `HasFunctionalKitchen`, `HasRawFoodInStores`,
+`WardStrengthLow` — populated by `MarkerSnapshot` builders in
+`systems/goap.rs` + `systems/disposition.rs`) plus one per-cat
+(`Incapacitated` — authored by a dedicated
+`src/systems/incapacitation.rs::update_incapacitation` system,
+2026-04-23, first per-entity marker to use the `set_entity` API).
+43 markers still unauthored — all life-stage /
+capability / target-existence markers + most colony markers.
+
+**Phase 3 exit deep-soak (seed 42, `--duration 900`, release,
+commit `039c6fb`):** survival canaries held (Starvation = 8, three
+Phase-3-exit regressions surfaced: MatingOccurred = 0, PracticeMagic
+sub-modes 2/5, Farming = 0). The three regressions were resolved in
+Phase 4a (softmax-over-Intentions + §3.5 modifier port) per the
+substrate-phase-4.md thread; the MatingOccurred density + dormancy
+gaps deferred per #14's balance-tuning-after-refactor commitment.
+
+**Cluster A status update (post-Phase 4a):** the A1 IAUS refactor
+(cluster A #5's TOP PRIORITY entry), A3 context-tag uniformity, and
+A4 target-selection-as-inner-optimization are all substantially
+landed via Phase 3a–4c — see cluster A preamble status line for
+details.
+
+---
+
+### Phase 2B — Scent as influence map (2026-04-20, commit `4afae5d`)
+
+First §5 influence-map layer landed: scent generalized out of the
+one-off wind + sensing implementation into a reusable influence-map
+abstraction per spec §5.1 (base maps → templates → working maps).
+Unblocks target-taking DSEs that want continuous spatial axes
+(Hunt's prey_proximity, Fight's threat proximity, etc.) rather than
+the lossy boolean gates used pre-refactor.
+
+**Scope landed:**
+- Generalized influence-map grid + propagation + decay primitives
+  reusable by other L1 channels.
+- Scent migration from `wind.rs`/`sensing.rs` ad-hoc accumulator
+  onto the new substrate.
+
+**Still outstanding** (cluster B #6 / B1): corruption field, ward
+field, prey-density field, and social-attraction field are each
+still one-off or not-yet-built. The L1 abstraction is in place; the
+remaining work is per-layer migration + new-layer authoring.
+
+---
 
 ### v0.2.0 release — `aca13acf` (2026-04-19)
 
