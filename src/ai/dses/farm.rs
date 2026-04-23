@@ -48,7 +48,10 @@ impl FarmDse {
             // §4 marker eligibility (Phase 4b.4): Farm only scores if
             // the colony has a functional garden. Retires the inline
             // `if ctx.has_garden` gate at `scoring.rs::score_actions`.
-            eligibility: EligibilityFilter::new().require("HasGarden"),
+            // §13.1: `.forbid("Incapacitated")` blocks downed cats.
+            eligibility: EligibilityFilter::new()
+                .require("HasGarden")
+                .forbid("Incapacitated"),
         }
     }
 }

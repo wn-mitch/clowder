@@ -44,7 +44,8 @@ impl ForageDse {
             // differentiation is what distinguishes the two
             // food-acquisition DSEs. Sum = 1.0.
             composition: Composition::weighted_sum(vec![0.3, 0.25, 0.45]),
-            eligibility: EligibilityFilter::new(),
+            // §13.1: incapacitated cats can only Eat/Sleep/Idle.
+            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
         }
     }
 }

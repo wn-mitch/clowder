@@ -665,33 +665,16 @@ pub fn score_actions(
     let s = ctx.scoring;
     let mut scores = Vec::with_capacity(12);
 
-    // Incapacitated cats can only Eat, Sleep, or Idle.
-    if ctx.is_incapacitated {
-        // §2.3 retires the incapacitated-Eat scale/offset constants:
-        // the Logistic hangry anchor alone spikes hard enough on
-        // low hunger to dominate without the bespoke multiplier. §4
-        // (Phase 4b.2) retires the outer `ctx.food_available` gate —
-        // the Eat DSE's `.require("HasStoredFood")` eligibility filter
-        // returns 0 when the colony has no food, matching the prior
-        // gated-off behavior.
-        let urgency = score_dse_by_id("eat", ctx, inputs);
-        if urgency > 0.0 {
-            scores.push((Action::Eat, urgency + jitter(rng, s.jitter_range)));
-        }
-        let urgency = (1.0 - ctx.needs.energy) * s.incapacitated_sleep_urgency_scale
-            + s.incapacitated_sleep_urgency_offset;
-        scores.push((Action::Sleep, urgency + jitter(rng, s.jitter_range)));
-        scores.push((
-            Action::Idle,
-            s.incapacitated_idle_score + jitter(rng, s.jitter_range),
-        ));
-        return ScoringResult {
-            scores,
-            herbcraft_hint: None,
-            magic_hint: None,
-            wants_cook_but_no_kitchen: false,
-        };
-    }
+    // §13.1 rows 1–3: the inline `if ctx.is_incapacitated` early-return
+    // retired. Incapacitation is now enforced as a per-cat §4.3 marker
+    // (`Incapacitated`, authored by `systems::incapacitation`) that
+    // gates every non-Eat/Sleep/Idle DSE via `.forbid("Incapacitated")`
+    // on its `EligibilityFilter`. The surviving Eat/Sleep/Idle DSEs
+    // stay eligible because their Logistic-anchored curves spike hard
+    // enough on hunger/energy to dominate selection without the
+    // bespoke `incapacitated_*_urgency_{scale,offset}` multipliers
+    // that rode this branch. The `ScoringContext.is_incapacitated`
+    // field is retained for non-scoring consumers.
 
     // --- Eat (§2.3 hangry anchor: Logistic(8, 0.75)) ---
     // §4 (Phase 4b.2) retired the outer `ctx.food_available` gate. The
@@ -2474,17 +2457,19 @@ mod tests {
     #[test]
     fn incapacitated_cat_only_scores_basic_actions() {
         let sc = default_scoring();
-        // Use a hungry / tired cat so Eat and Sleep have
-        // above-jitter scores under the new `Logistic` curves. Under
-        // the retired scale+offset formulas, a sated cat still got
-        // a `0.3` Eat offset and would register above the filter; the
-        // §2.3 anchor Logistic(8, 0.75) returns ~0 at `hunger=1.0`,
-        // which is the correct behavior (sated cat has no urge to
-        // eat) but breaks the branch-coverage assertion this test
-        // makes. The scenario adjustment below preserves the test's
-        // intent (verify the incapacitated branch restricts the
-        // action set to Eat/Sleep/Idle) while accommodating the new
-        // curve shape.
+        // §13.1: the inline `if ctx.is_incapacitated` early-return
+        // retired — incapacitation now flows through the §4.3
+        // `Incapacitated` marker and `.forbid("Incapacitated")` on
+        // every non-Eat/Sleep/Idle cat DSE. This test verifies the
+        // `.forbid` filter set gates the same action set the inline
+        // branch used to gate.
+        //
+        // Scenario: a hungry/tired cat so Eat and Sleep have
+        // above-jitter scores under the Logistic curves. The §2.3
+        // hangry anchor Logistic(8, 0.75) returns ~0 at `hunger=1.0`
+        // (sated), which is correct behavior but breaks the
+        // branch-coverage assertion this test makes; the adjustment
+        // preserves intent while accommodating the curve shape.
         let mut needs = Needs::default();
         needs.hunger = 0.4;
         needs.energy = 0.3;
@@ -2545,7 +2530,26 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
         };
-        let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
+        // Build a per-test MarkerSnapshot with Incapacitated set for
+        // this cat (the cached shared snapshot only carries colony
+        // markers). Copy the colony markers the cached snapshot sets
+        // so Eat's `HasStoredFood` requirement still passes.
+        let mut markers = MarkerSnapshot::new();
+        markers.set_colony("HasStoredFood", true);
+        markers.set_colony("HasGarden", true);
+        markers.set_colony("HasFunctionalKitchen", true);
+        markers.set_colony("HasRawFoodInStores", true);
+        markers.set_colony("WardStrengthLow", true);
+        let cat_entity = Entity::from_raw_u32(1).unwrap();
+        markers.set_entity("Incapacitated", cat_entity, true);
+
+        let base = test_eval_inputs();
+        let inputs = EvalInputs {
+            cat: cat_entity,
+            markers: &markers,
+            ..base
+        };
+        let scores = score_actions(&c, &inputs, &mut rng).scores;
         let actions: Vec<Action> = scores
             .iter()
             .filter(|(_, s)| *s > 0.0)

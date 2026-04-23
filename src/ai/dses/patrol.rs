@@ -50,7 +50,8 @@ impl PatrolDse {
                 )),
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0]),
-            eligibility: EligibilityFilter::new(),
+            // §13.1: incapacitated cats can only Eat/Sleep/Idle.
+            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
         }
     }
 }

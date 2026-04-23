@@ -977,11 +977,6 @@ impl Default for SpeciesConstants {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ScoringConstants {
     pub jitter_range: f32,
-    pub incapacitated_eat_urgency_scale: f32,
-    pub incapacitated_eat_urgency_offset: f32,
-    pub incapacitated_sleep_urgency_scale: f32,
-    pub incapacitated_sleep_urgency_offset: f32,
-    pub incapacitated_idle_score: f32,
     pub eat_urgency_scale: f32,
     pub sleep_urgency_scale: f32,
     /// Day-phase additive offsets to Sleep urgency. Encodes the cat's
@@ -1202,11 +1197,6 @@ impl Default for ScoringConstants {
     fn default() -> Self {
         Self {
             jitter_range: 0.05,
-            incapacitated_eat_urgency_scale: 2.0,
-            incapacitated_eat_urgency_offset: 0.3,
-            incapacitated_sleep_urgency_scale: 2.0,
-            incapacitated_sleep_urgency_offset: 0.3,
-            incapacitated_idle_score: 0.2,
             eat_urgency_scale: 2.0,
             sleep_urgency_scale: 1.2,
             sleep_dawn_bonus: default_sleep_dawn_bonus(),

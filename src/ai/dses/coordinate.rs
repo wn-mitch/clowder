@@ -58,7 +58,8 @@ impl CoordinateDse {
             // RtEO sum = 1.0. Directive count is the drive; diligence
             // + ambition modulate.
             composition: Composition::weighted_sum(vec![0.3, 0.4, 0.3]),
-            eligibility: EligibilityFilter::new(),
+            // §13.1: incapacitated cats can only Eat/Sleep/Idle.
+            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
         }
     }
 }

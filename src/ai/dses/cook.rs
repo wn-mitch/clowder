@@ -69,9 +69,11 @@ impl CookDse {
             // outer gate at `scoring.rs::score_actions`. The latent
             // `wants_cook_but_no_kitchen` signal survives via a
             // caller-side disambiguation when the DSE returns 0.
+            // §13.1: `.forbid("Incapacitated")` blocks downed cats.
             eligibility: EligibilityFilter::new()
                 .require("HasFunctionalKitchen")
-                .require("HasRawFoodInStores"),
+                .require("HasRawFoodInStores")
+                .forbid("Incapacitated"),
         }
     }
 }
@@ -150,7 +152,8 @@ mod tests {
             dse.eligibility().required,
             vec!["HasFunctionalKitchen", "HasRawFoodInStores"]
         );
-        assert!(dse.eligibility().forbidden.is_empty());
+        // §13.1: every non-Eat/Sleep/Idle cat DSE forbids Incapacitated.
+        assert_eq!(dse.eligibility().forbidden, vec!["Incapacitated"]);
     }
 
     fn evaluate_cook_with_markers(

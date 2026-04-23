@@ -50,7 +50,8 @@ impl CaretakeDse {
             // time-sensitive); compassion is the non-parent driver;
             // parent-axis 0/1 carries the bloodline-override signal.
             composition: Composition::weighted_sum(vec![0.45, 0.30, 0.25]),
-            eligibility: EligibilityFilter::new(),
+            // §13.1: incapacitated cats can only Eat/Sleep/Idle.
+            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
         }
     }
 }

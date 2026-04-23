@@ -50,7 +50,8 @@ impl WanderDse {
             // RtEO sum = 1.0. Curiosity dominates; base_rate keeps
             // Wander available at zero curiosity; playfulness rider.
             composition: Composition::weighted_sum(vec![0.5, 0.2, 0.3]),
-            eligibility: EligibilityFilter::new(),
+            // §13.1: incapacitated cats can only Eat/Sleep/Idle.
+            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
         }
     }
 }

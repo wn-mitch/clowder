@@ -87,7 +87,10 @@ impl FightDse {
             //   - ally_count 0.25: group-courage signal per §3.1.1.
             composition: Composition::weighted_sum(vec![0.25, 0.20, 0.15, 0.15, 0.25]),
             // §9.3 DSE filter binding — Fight (Attack) accepts `Enemy | Prey`.
-            eligibility: EligibilityFilter::new().with_stance(StanceRequirement::attack()),
+            // §13.1: `.forbid("Incapacitated")` blocks downed cats.
+            eligibility: EligibilityFilter::new()
+                .with_stance(StanceRequirement::attack())
+                .forbid("Incapacitated"),
         }
     }
 }

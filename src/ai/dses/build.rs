@@ -56,7 +56,8 @@ impl BuildDse {
             // RtEO sum = 1.0. Diligence is primary; site + repair are
             // binary presence bonuses.
             composition: Composition::weighted_sum(vec![0.5, 0.25, 0.25]),
-            eligibility: EligibilityFilter::new(),
+            // §13.1: incapacitated cats can only Eat/Sleep/Idle.
+            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
         }
     }
 }

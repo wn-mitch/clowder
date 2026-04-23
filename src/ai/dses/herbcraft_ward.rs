@@ -66,7 +66,10 @@ impl HerbcraftWardDse {
             // when colony ward strength is low. Retires the
             // `ctx.ward_strength_low` conjunct from the
             // `ward_eligible` gate at `scoring.rs:740`.
-            eligibility: EligibilityFilter::new().require("WardStrengthLow"),
+            // §13.1: `.forbid("Incapacitated")` blocks downed cats.
+            eligibility: EligibilityFilter::new()
+                .require("WardStrengthLow")
+                .forbid("Incapacitated"),
         }
     }
 }
@@ -183,7 +186,8 @@ mod tests {
         // DSE's eligibility filter.
         let dse = HerbcraftWardDse::new();
         assert_eq!(dse.eligibility().required, vec!["WardStrengthLow"]);
-        assert!(dse.eligibility().forbidden.is_empty());
+        // §13.1: every non-Eat/Sleep/Idle cat DSE forbids Incapacitated.
+        assert_eq!(dse.eligibility().forbidden, vec!["Incapacitated"]);
     }
 
     #[test]

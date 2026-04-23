@@ -44,7 +44,8 @@ impl MentorDse {
             // RtEO weights sum to 1.0. Warmth + diligence co-drive;
             // ambition is the status-seeking secondary driver.
             composition: Composition::weighted_sum(vec![0.4, 0.4, 0.2]),
-            eligibility: EligibilityFilter::new(),
+            // §13.1: incapacitated cats can only Eat/Sleep/Idle.
+            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
         }
     }
 }

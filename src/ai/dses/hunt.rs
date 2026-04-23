@@ -65,7 +65,10 @@ impl HuntDse {
             // value otherwise dominates the sum disproportionately.
             composition: Composition::weighted_sum(vec![0.5, 0.25, 0.15, 0.10]),
             // §9.3 DSE filter binding — Hunt targets `Prey` only.
-            eligibility: EligibilityFilter::new().with_stance(StanceRequirement::hunt()),
+            // §13.1: `.forbid("Incapacitated")` blocks downed cats.
+            eligibility: EligibilityFilter::new()
+                .with_stance(StanceRequirement::hunt())
+                .forbid("Incapacitated"),
         }
     }
 }

@@ -72,7 +72,10 @@ impl SocializeDse {
             // Corruption bonus is a small-weight additive rider.
             composition: Composition::weighted_sum(vec![0.35, 0.20, 0.05, 0.10, 0.20, 0.10]),
             // §9.3 DSE filter binding — Socialize accepts `Same | Ally`.
-            eligibility: EligibilityFilter::new().with_stance(StanceRequirement::socialize()),
+            // §13.1: `.forbid("Incapacitated")` blocks downed cats.
+            eligibility: EligibilityFilter::new()
+                .with_stance(StanceRequirement::socialize())
+                .forbid("Incapacitated"),
         }
     }
 }

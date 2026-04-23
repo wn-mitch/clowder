@@ -67,7 +67,12 @@ impl FleeDse {
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0]),
             // §9.3 DSE filter binding — Flee triggers on `Predator` stance.
-            eligibility: EligibilityFilter::new().with_stance(StanceRequirement::flee()),
+            // §13.1: `.forbid("Incapacitated")` blocks downed cats — a
+            // cat with an unhealed Severe injury can't flee, matching
+            // the retired inline `if ctx.is_incapacitated` early-return.
+            eligibility: EligibilityFilter::new()
+                .with_stance(StanceRequirement::flee())
+                .forbid("Incapacitated"),
         }
     }
 }

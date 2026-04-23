@@ -48,7 +48,8 @@ impl ScryDse {
                 Consideration::Scalar(ScalarConsideration::new("magic_skill", linear())),
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
-            eligibility: EligibilityFilter::new(),
+            // §13.1: incapacitated cats can only Eat/Sleep/Idle.
+            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
         }
     }
 }
@@ -132,7 +133,10 @@ impl DurableWardDse {
             // `magic_skill > magic_durable_ward_skill_threshold`
             // conjunct stays inline — magic_skill is a §4.5 scalar,
             // not a marker.
-            eligibility: EligibilityFilter::new().require("WardStrengthLow"),
+            // §13.1: `.forbid("Incapacitated")` blocks downed cats.
+            eligibility: EligibilityFilter::new()
+                .require("WardStrengthLow")
+                .forbid("Incapacitated"),
         }
     }
 }
@@ -205,7 +209,8 @@ impl CleanseDse {
                 Consideration::Scalar(ScalarConsideration::new("tile_corruption", tile_corruption)),
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
-            eligibility: EligibilityFilter::new(),
+            // §13.1: incapacitated cats can only Eat/Sleep/Idle.
+            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
         }
     }
 }
@@ -282,7 +287,8 @@ impl ColonyCleanseDse {
                 )),
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
-            eligibility: EligibilityFilter::new(),
+            // §13.1: incapacitated cats can only Eat/Sleep/Idle.
+            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
         }
     }
 }
@@ -349,7 +355,8 @@ impl HarvestDse {
                 )),
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
-            eligibility: EligibilityFilter::new(),
+            // §13.1: incapacitated cats can only Eat/Sleep/Idle.
+            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
         }
     }
 }
@@ -413,7 +420,8 @@ impl CommuneDse {
                 Consideration::Scalar(ScalarConsideration::new("on_special_terrain", linear())),
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
-            eligibility: EligibilityFilter::new(),
+            // §13.1: incapacitated cats can only Eat/Sleep/Idle.
+            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
         }
     }
 }
@@ -490,20 +498,49 @@ mod tests {
     fn durable_ward_requires_ward_strength_low() {
         // Phase 4b.5: the outer `ctx.ward_strength_low` conjunct at
         // `scoring.rs:775-780` retires; WardStrengthLow moves onto the
-        // DSE's eligibility filter. Siblings that are NOT ported —
-        // `magic_scry`, `magic_cleanse`, `magic_colony_cleanse`,
-        // `magic_harvest`, `magic_commune` — keep empty filters.
+        // DSE's eligibility filter. §13.1: every sibling DSE carries
+        // `.forbid("Incapacitated")` (required emptiness asserted
+        // separately below).
         let sc = ScoringConstants::default();
         let dse = DurableWardDse::new();
         assert_eq!(dse.eligibility().required, vec!["WardStrengthLow"]);
-        assert!(dse.eligibility().forbidden.is_empty());
+        assert_eq!(dse.eligibility().forbidden, vec!["Incapacitated"]);
 
-        // Guard against accidental spread to sibling DSEs in this file.
+        // Guard against accidental spread of `require` to sibling DSEs
+        // in this file — only DurableWard requires WardStrengthLow.
         assert!(ScryDse::new().eligibility().required.is_empty());
         assert!(CleanseDse::new(&sc).eligibility().required.is_empty());
         assert!(ColonyCleanseDse::new().eligibility().required.is_empty());
         assert!(HarvestDse::new().eligibility().required.is_empty());
         assert!(CommuneDse::new().eligibility().required.is_empty());
+    }
+
+    #[test]
+    fn every_practice_magic_dse_forbids_incapacitated() {
+        // §13.1: incapacitated cats retire the inline branch; the
+        // `.forbid("Incapacitated")` filter is the only remaining gate.
+        let sc = ScoringConstants::default();
+        assert_eq!(ScryDse::new().eligibility().forbidden, vec!["Incapacitated"]);
+        assert_eq!(
+            DurableWardDse::new().eligibility().forbidden,
+            vec!["Incapacitated"]
+        );
+        assert_eq!(
+            CleanseDse::new(&sc).eligibility().forbidden,
+            vec!["Incapacitated"]
+        );
+        assert_eq!(
+            ColonyCleanseDse::new().eligibility().forbidden,
+            vec!["Incapacitated"]
+        );
+        assert_eq!(
+            HarvestDse::new().eligibility().forbidden,
+            vec!["Incapacitated"]
+        );
+        assert_eq!(
+            CommuneDse::new().eligibility().forbidden,
+            vec!["Incapacitated"]
+        );
     }
 
     #[test]
