@@ -173,6 +173,15 @@ pub enum Feature {
     /// `MatingOccurred` which fires only when a `Pregnancy` was
     /// inserted.
     CourtshipInteraction,
+    /// Phase 6a §7.2 — drop-trigger gate fired for a cat's held
+    /// `GoapPlan`: the `CommitmentStrategy` dispatch said to drop
+    /// (achievement believed, planner hard-fail under SingleMinded,
+    /// or satiation under OpenMinded) and the plan was removed.
+    /// Distinct from `AnxietyInterrupt` (which is the Maslow
+    /// event-driven preemption that bypasses §7.2 entirely).
+    /// Neutral — the gate is a reconsideration signal, not a
+    /// healthy-colony win or adverse event by itself.
+    CommitmentDropTriggered,
 }
 
 impl Feature {
@@ -264,6 +273,8 @@ impl Feature {
         Feature::MaterialsDelivered,
         Feature::BuildingRepaired,
         Feature::CourtshipInteraction,
+        // §Phase 6a §7.2 drop-trigger gate
+        Feature::CommitmentDropTriggered,
     ];
 
     /// The valence of this feature.
@@ -367,6 +378,7 @@ impl Feature {
             Feature::FoxDenDefense => Neutral,
             Feature::FoxAvoidedWard => Neutral,
             Feature::FoxAvoidedPresence => Neutral,
+            Feature::CommitmentDropTriggered => Neutral,
         }
     }
 
@@ -555,6 +567,7 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::MaterialsDelivered => "MaterialsDelivered",
         Feature::BuildingRepaired => "BuildingRepaired",
         Feature::CourtshipInteraction => "CourtshipInteraction",
+        Feature::CommitmentDropTriggered => "CommitmentDropTriggered",
     }
 }
 
@@ -758,9 +771,10 @@ mod tests {
         // 36 pre-existing Positive + 8 added in §Phase 5a (FoodEaten,
         // Socialized, GroomedOther, MentoredCat, ThreatEngaged,
         // MaterialsDelivered, BuildingRepaired, CourtshipInteraction).
+        // Phase 6a added 1 Neutral (CommitmentDropTriggered).
         assert_eq!(positive, 44);
         assert_eq!(negative, 20);
-        assert_eq!(neutral, 20);
+        assert_eq!(neutral, 21);
     }
 
     #[test]
@@ -834,7 +848,7 @@ mod tests {
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Neutral),
-            20
+            21
         );
     }
 

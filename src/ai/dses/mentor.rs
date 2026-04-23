@@ -70,7 +70,9 @@ impl Dse for MentorDse {
         &self.eligibility
     }
     fn default_strategy(&self) -> CommitmentStrategy {
-        CommitmentStrategy::SingleMinded
+        // §7.3: Mentor is a constituent action of the Socializing
+        // disposition and rides Socializing's `OpenMinded` strategy.
+        CommitmentStrategy::OpenMinded
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
@@ -78,7 +80,7 @@ impl Dse for MentorDse {
                 label: "mentored_apprentice",
                 achieved: |_, _| false,
             },
-            strategy: CommitmentStrategy::SingleMinded,
+            strategy: CommitmentStrategy::OpenMinded,
         }
     }
     fn maslow_tier(&self) -> u8 {

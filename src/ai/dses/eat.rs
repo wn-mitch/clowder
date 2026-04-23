@@ -102,8 +102,12 @@ impl Dse for EatDse {
     }
 
     fn default_strategy(&self) -> CommitmentStrategy {
-        // Goal Intention → SingleMinded per §L2.10.5 correlation.
-        CommitmentStrategy::SingleMinded
+        // §7.3: Eat is a constituent action of the Resting disposition
+        // (`DispositionKind::constituent_actions`) and rides the Resting
+        // class's `Blind` strategy. Physiological completion is the
+        // only reason to drop mid-intention — the Maslow gate handles
+        // preemption already; AI8 caps runaway holds.
+        CommitmentStrategy::Blind
     }
 
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
@@ -112,7 +116,7 @@ impl Dse for EatDse {
                 label: "hunger_below_threshold",
                 achieved: eat_goal_achieved,
             },
-            strategy: CommitmentStrategy::SingleMinded,
+            strategy: CommitmentStrategy::Blind,
         }
     }
 
@@ -242,7 +246,7 @@ mod tests {
         };
         let intention = dse.emit(0.5, &ctx);
         assert!(intention.is_goal(), "expected Goal intention");
-        assert_eq!(intention.strategy(), CommitmentStrategy::SingleMinded);
+        assert_eq!(intention.strategy(), CommitmentStrategy::Blind);
     }
 
     #[test]

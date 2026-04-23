@@ -91,7 +91,11 @@ impl Dse for FleeDse {
         &self.eligibility
     }
     fn default_strategy(&self) -> CommitmentStrategy {
-        CommitmentStrategy::SingleMinded
+        // §7.5: Flee is the canonical Maslow-interrupt replacement.
+        // Event-driven preemption installs a `Blind`-committed Flee so
+        // it cannot itself be preempted by normal scoring until the
+        // achievement condition (safety restored) fires.
+        CommitmentStrategy::Blind
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
@@ -99,7 +103,7 @@ impl Dse for FleeDse {
                 label: "fled_to_safety",
                 achieved: |_, _| false,
             },
-            strategy: CommitmentStrategy::SingleMinded,
+            strategy: CommitmentStrategy::Blind,
         }
     }
     fn maslow_tier(&self) -> u8 {

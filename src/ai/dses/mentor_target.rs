@@ -117,10 +117,12 @@ fn mentor_candidate_query_doc(_cat: Entity) -> &'static str {
 }
 
 fn mentor_intention(_target: Entity) -> Intention {
+    // §7.3: Mentor is a constituent action of the Socializing
+    // disposition and rides Socializing's `OpenMinded` strategy.
     Intention::Activity {
         kind: ActivityKind::Mentor,
         termination: Termination::UntilInterrupt,
-        strategy: CommitmentStrategy::SingleMinded,
+        strategy: CommitmentStrategy::OpenMinded,
     }
 }
 

@@ -1,4 +1,5 @@
 pub mod caretake_targeting;
+pub mod commitment;
 pub mod composition;
 pub mod considerations;
 pub mod curves;

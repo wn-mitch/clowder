@@ -72,7 +72,9 @@ impl Dse for GroomSelfDse {
         &self.eligibility
     }
     fn default_strategy(&self) -> CommitmentStrategy {
-        CommitmentStrategy::SingleMinded
+        // §7.3: GroomSelf is a constituent action of the Resting
+        // disposition and rides Resting's `Blind` strategy.
+        CommitmentStrategy::Blind
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
@@ -80,7 +82,7 @@ impl Dse for GroomSelfDse {
                 label: "groomed_self",
                 achieved: |_, _| false,
             },
-            strategy: CommitmentStrategy::SingleMinded,
+            strategy: CommitmentStrategy::Blind,
         }
     }
     fn maslow_tier(&self) -> u8 {

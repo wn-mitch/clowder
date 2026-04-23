@@ -243,6 +243,20 @@ impl Plugin for SimulationPlugin {
             FixedUpdate,
             systems::goap::check_anxiety_interrupts.after(systems::items::sync_food_stores),
         );
+        // §7.2 drop-trigger reconsideration gate (Phase 6a). Runs
+        // *after* Maslow interrupts (`check_anxiety_interrupts`, §7.5)
+        // and *before* `evaluate_and_plan` so a dropped plan lets the
+        // next softmax pass install a replacement the same tick. Reads
+        // each held `GoapPlan`'s `CommitmentStrategy` via the §7.3
+        // table and drops the plan when the strategy's drop-trigger
+        // fires. Pure reconsideration — does not emit a
+        // PlanNarrative::Abandoned (that's reserved for plan failure).
+        app.add_systems(
+            FixedUpdate,
+            crate::ai::commitment::reconsider_held_intentions
+                .after(systems::goap::check_anxiety_interrupts)
+                .before(systems::goap::evaluate_and_plan),
+        );
         app.add_systems(
             FixedUpdate,
             systems::goap::evaluate_and_plan

@@ -160,12 +160,14 @@ fn fight_candidate_query_doc(_cat: Entity) -> &'static str {
 }
 
 fn fight_intention(_target: Entity) -> Intention {
+    // §7.3: FightTarget is a constituent action of the Guarding
+    // disposition and rides Guarding's `Blind` strategy.
     Intention::Goal {
         state: GoalState {
             label: "threat_engaged",
             achieved: |_, _| false,
         },
-        strategy: CommitmentStrategy::SingleMinded,
+        strategy: CommitmentStrategy::Blind,
     }
 }
 
@@ -374,7 +376,7 @@ mod tests {
         match intention {
             Intention::Goal { state, strategy } => {
                 assert_eq!(state.label, "threat_engaged");
-                assert_eq!(strategy, CommitmentStrategy::SingleMinded);
+                assert_eq!(strategy, CommitmentStrategy::Blind);
             }
             other => panic!("expected Goal intention, got {other:?}"),
         }

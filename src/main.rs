@@ -495,6 +495,14 @@ fn build_schedule() -> Schedule {
         clowder::systems::goap::check_anxiety_interrupts
             .after(clowder::systems::items::sync_food_stores),
     );
+    // §7.2 drop-trigger reconsideration gate (Phase 6a). Mirrors the
+    // SimulationPlugin registration; see its doc for the pipeline
+    // ordering (`check_anxiety_interrupts` → gate → `evaluate_and_plan`).
+    schedule.add_systems(
+        clowder::ai::commitment::reconsider_held_intentions
+            .after(clowder::systems::goap::check_anxiety_interrupts)
+            .before(clowder::systems::goap::evaluate_and_plan),
+    );
     schedule.add_systems(
         clowder::systems::goap::evaluate_and_plan
             .after(clowder::systems::goap::check_anxiety_interrupts)

@@ -62,7 +62,9 @@ impl Dse for ExploreDse {
         &self.eligibility
     }
     fn default_strategy(&self) -> CommitmentStrategy {
-        CommitmentStrategy::SingleMinded
+        // §7.3: Exploring → OpenMinded. Activity-shaped; curiosity
+        // drift drops it.
+        CommitmentStrategy::OpenMinded
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
@@ -70,7 +72,7 @@ impl Dse for ExploreDse {
                 label: "area_explored",
                 achieved: |_, _| false,
             },
-            strategy: CommitmentStrategy::SingleMinded,
+            strategy: CommitmentStrategy::OpenMinded,
         }
     }
     fn maslow_tier(&self) -> u8 {

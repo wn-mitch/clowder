@@ -12,7 +12,8 @@ Every query ends with a one-line shape note describing the output.
 Default logfile locations:
 - `logs/events.jsonl` — structured events (seed header, per-event JSON, footer)
 - `logs/narrative.jsonl` — human-facing narrative lines with tiers
-- `logs/tuned-<seed>/...` — convention for tuning-run outputs
+- `logs/trace-<focal>.jsonl` — focal-cat per-tick L1/L2/L3 trace records (headless only, emitted when `--focal-cat NAME` is supplied). See §11.
+- `logs/tuned-<seed>/...` — convention for tuning-run outputs. `just soak-trace` also writes `logs/tuned-<seed>/trace-<focal>.jsonl` in this tree.
 
 ---
 
@@ -352,3 +353,141 @@ jq -r 'select(.tier=="Legend") | .text' logs/narrative.jsonl \
 
 Shape: one text per line. Target: ≥ 2 distinct lines on a run with ≥ 2
 banishments.
+
+---
+
+## 11. Focal-cat trace queries
+
+Queries over `logs/trace-<focal>.jsonl` — the headless-only per-tick L1/L2/L3
+sidecar emitted when `just soak-trace SEED FOCAL_CAT` (or `--headless
+--focal-cat NAME`) is run. See `CLAUDE.md` §"Focal-cat trace" and
+`docs/systems/ai-substrate-refactor.md` §11 for record shapes. The header line
+shares commit / seed / constants fields with `events.jsonl` so the two files
+diff-lock as a pair.
+
+All non-header records carry `{tick, cat, layer, …variant fields}`; `layer` is
+one of `"L1"`, `"L2"`, `"L3"`.
+
+### Query: trace-header
+Seed, focal-cat name, and constants snapshot for a trace file. Must match the
+paired `events.jsonl` header on `constants` + `commit_hash` for the two to be
+comparable.
+
+```bash
+jq -c 'select(._header)' logs/tuned-42/trace-Simba.jsonl
+```
+
+Shape: one JSON object with `focal_cat`, `seed`, `duration_secs`,
+`commit_hash`, `sim_config`, `constants`.
+
+### Query: trace-l3-chosen
+Per-tick `(tick, chosen_dse, intention_kind)` — the winning-action timeline
+for the focal cat.
+
+```bash
+jq -c 'select(.layer=="L3") | {tick, chosen, kind: .intention.kind}' \
+  logs/tuned-42/trace-Simba.jsonl
+```
+
+Shape: one JSON object per tick.
+
+### Query: trace-l3-ranked-top3
+Top-3 ranked DSEs per tick — useful for spotting close-call ticks where the
+softmax almost flipped the pick.
+
+```bash
+jq -c 'select(.layer=="L3") | {tick, top3: (.ranked[0:3])}' \
+  logs/tuned-42/trace-Simba.jsonl
+```
+
+Shape: one JSON per tick with `top3` as an array of `[dse_name, score]`
+2-tuples.
+
+### Query: trace-dse-trajectory
+`(tick, final_score)` series for one DSE across the run. Useful for plotting a
+single DSE's score curve over time — drift, flat lines, or phase shifts show
+up immediately.
+
+```bash
+jq -c 'select(.layer=="L2" and .dse=="hunt") | {tick, score: .final_score}' \
+  logs/tuned-42/trace-Simba.jsonl
+```
+
+Shape: one JSON object per tick. Replace `hunt` with any DSE id.
+
+### Query: trace-l2-considerations
+Per-consideration breakdown for one DSE on one tick — the "why did Hunt beat
+Eat" decomposition. Use `trace-l3-chosen` to pick the tick first.
+
+```bash
+jq -c 'select(.layer=="L2" and .dse=="hunt" and .tick==8432) |
+       {tick, final: .final_score, considerations}' \
+  logs/tuned-42/trace-Simba.jsonl
+```
+
+Shape: one JSON with `final` score + `considerations` array of `{name, input,
+curve, score, weight, spatial?}`.
+
+### Query: trace-l1-map-samples
+All L1 samples for one influence map, across the run. The `top_contributors`
+array answers "which emitter drove the perceived value."
+
+```bash
+jq -c 'select(.layer=="L1" and .map=="fox_scent") |
+       {tick, pos, perceived, top: (.top_contributors[0:3])}' \
+  logs/tuned-42/trace-Simba.jsonl
+```
+
+Shape: one JSON per sample. Replace `fox_scent` with any map id (see
+`src/resources/trace_log.rs` `TraceRecord::L1.map`).
+
+### Query: trace-frame-at-tick
+All three layers for a single tick — full frame reconstruction. Mirrors what
+`scripts/replay_frame.py` does; useful for ad-hoc sanity checks.
+
+```bash
+jq -c 'select(.tick==8432)' logs/tuned-42/trace-Simba.jsonl
+```
+
+Shape: ordered JSON lines (L1 samples, then L2 rows, then one L3).
+
+### Query: trace-softmax-temperature
+Per-tick softmax temperature from L3 records. Flat temperature across the run
+suggests the momentum/commitment system isn't varying — expected at Phase 1
+entry (shim emits constants); Phase 3+ should show variation.
+
+```bash
+jq -c 'select(.layer=="L3") | {tick, temp: .softmax.temperature,
+       committed: .momentum.active_intention, preempted: .momentum.preempted}' \
+  logs/tuned-42/trace-Simba.jsonl
+```
+
+Shape: one JSON per tick.
+
+### Query: trace-eligibility-misses
+DSEs that were evaluated but failed their marker-eligibility gate. Non-empty
+output on a cat you expected to be *fully* eligible means you're on the wrong
+focal cat for the behavior you're investigating — re-read the "Picking a
+focal cat" note in `CLAUDE.md` §Focal-cat trace.
+
+```bash
+jq -c 'select(.layer=="L2" and .eligibility.passed==false) |
+       {tick, dse, markers: .eligibility.markers_required}' \
+  logs/tuned-42/trace-Simba.jsonl \
+  | head -20
+```
+
+Shape: one JSON per failed eligibility check, first 20 rows.
+
+### Query: trace-dse-catalog
+Which DSEs appear in the trace at all — the set of behaviors this focal cat
+actually exercised. Gaps here compared to the full catalog drive your choice
+of next focal cat for multi-focal coverage.
+
+```bash
+jq -r 'select(.layer=="L2") | .dse' logs/tuned-42/trace-Simba.jsonl \
+  | sort -u
+```
+
+Shape: sorted unique list of DSE ids. Compare across `trace-*.jsonl` files to
+see which focal covers which slice of the catalog.
