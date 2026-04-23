@@ -653,6 +653,9 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
         let mut registry = clowder::ai::eval::DseRegistry::new();
         registry.cat_dses.push(clowder::ai::dses::eat_dse());
         registry.cat_dses.push(clowder::ai::dses::hunt_dse());
+        registry
+            .target_taking_dses
+            .push(clowder::ai::dses::hunt_target_dse());
         registry.cat_dses.push(clowder::ai::dses::forage_dse());
         registry.cat_dses.push(clowder::ai::dses::cook_dse());
         registry
@@ -661,6 +664,9 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
         registry
             .cat_dses
             .push(clowder::ai::dses::fight_dse(&scoring));
+        registry
+            .target_taking_dses
+            .push(clowder::ai::dses::fight_target_dse());
         registry
             .cat_dses
             .push(clowder::ai::dses::sleep_dse(&scoring));
@@ -673,6 +679,9 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
             .push(clowder::ai::dses::socialize_target_dse());
         registry.cat_dses.push(clowder::ai::dses::groom_self_dse());
         registry.cat_dses.push(clowder::ai::dses::groom_other_dse());
+        registry
+            .target_taking_dses
+            .push(clowder::ai::dses::groom_other_target_dse());
         registry.cat_dses.push(clowder::ai::dses::mentor_dse());
         registry
             .target_taking_dses
@@ -688,6 +697,9 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
         registry
             .cat_dses
             .push(clowder::ai::dses::build_dse(&scoring));
+        registry
+            .target_taking_dses
+            .push(clowder::ai::dses::build_target_dse());
         registry.cat_dses.push(clowder::ai::dses::farm_dse());
         registry
             .cat_dses
@@ -702,6 +714,9 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
         registry
             .cat_dses
             .push(clowder::ai::dses::herbcraft_prepare_dse());
+        registry
+            .target_taking_dses
+            .push(clowder::ai::dses::apply_remedy_target_dse());
         registry
             .cat_dses
             .push(clowder::ai::dses::herbcraft_ward_dse());
@@ -1356,6 +1371,9 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
         let mut registry = clowder::ai::eval::DseRegistry::new();
         registry.cat_dses.push(clowder::ai::dses::eat_dse());
         registry.cat_dses.push(clowder::ai::dses::hunt_dse());
+        registry
+            .target_taking_dses
+            .push(clowder::ai::dses::hunt_target_dse());
         registry.cat_dses.push(clowder::ai::dses::forage_dse());
         registry.cat_dses.push(clowder::ai::dses::cook_dse());
         registry
@@ -1364,6 +1382,9 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
         registry
             .cat_dses
             .push(clowder::ai::dses::fight_dse(&scoring));
+        registry
+            .target_taking_dses
+            .push(clowder::ai::dses::fight_target_dse());
         registry
             .cat_dses
             .push(clowder::ai::dses::sleep_dse(&scoring));
@@ -1376,6 +1397,9 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
             .push(clowder::ai::dses::socialize_target_dse());
         registry.cat_dses.push(clowder::ai::dses::groom_self_dse());
         registry.cat_dses.push(clowder::ai::dses::groom_other_dse());
+        registry
+            .target_taking_dses
+            .push(clowder::ai::dses::groom_other_target_dse());
         registry.cat_dses.push(clowder::ai::dses::mentor_dse());
         registry
             .target_taking_dses
@@ -1391,6 +1415,9 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
         registry
             .cat_dses
             .push(clowder::ai::dses::build_dse(&scoring));
+        registry
+            .target_taking_dses
+            .push(clowder::ai::dses::build_target_dse());
         registry.cat_dses.push(clowder::ai::dses::farm_dse());
         registry
             .cat_dses
@@ -1405,6 +1432,9 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
         registry
             .cat_dses
             .push(clowder::ai::dses::herbcraft_prepare_dse());
+        registry
+            .target_taking_dses
+            .push(clowder::ai::dses::apply_remedy_target_dse());
         registry
             .cat_dses
             .push(clowder::ai::dses::herbcraft_ward_dse());

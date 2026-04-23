@@ -953,7 +953,7 @@ pub fn disposition_to_chain(
         ),
         (With<Disposition>, Without<Dead>, Without<TaskChain>),
     >,
-    cat_positions: Query<(Entity, &Position), Without<Dead>>,
+    cat_positions: Query<(Entity, &Position, &Needs), Without<Dead>>,
     wildlife: Query<(Entity, &Position), With<WildAnimal>>,
     building_query: Query<(
         Entity,
@@ -985,7 +985,22 @@ pub fn disposition_to_chain(
     let d = &constants.disposition;
     // Pre-collect cat position pairs for social target selection.
     let cat_pos_list: Vec<(Entity, Position)> =
-        cat_positions.iter().map(|(e, p)| (e, *p)).collect();
+        cat_positions.iter().map(|(e, p, _)| (e, *p)).collect();
+    // Snapshot per-cat `needs.temperature` for the §6.5.4 Groom-other
+    // target-taking DSE. Keyed by entity so the resolver's closure
+    // captures one HashMap<Entity, f32> rather than a whole query.
+    let cat_temperature_map: std::collections::HashMap<Entity, f32> = cat_positions
+        .iter()
+        .map(|(e, _, n)| (e, n.temperature))
+        .collect();
+    // Snapshot kitten → (mother, father) parent pointers for the
+    // §6.5.4 kinship axis. Bidirectional kinship is computed on the
+    // fly by the resolver's `is_kin` closure.
+    let kitten_parents_map: std::collections::HashMap<Entity, (Option<Entity>, Option<Entity>)> =
+        kitten_query
+            .iter()
+            .map(|(e, _, _, dep)| (e, (dep.mother, dep.father)))
+            .collect();
 
     // §Phase 4c.3: kitten snapshot for Caretake chain-building — the
     // winning kitten's Entity + Position thread into `build_caretaking_chain`
@@ -1016,7 +1031,26 @@ pub fn disposition_to_chain(
         }
     };
 
-    // Pre-collect injured cat positions for herbcraft targeting.
+    // Pre-collect injured cat positions for herbcraft targeting +
+    // §6.5.7 ApplyRemedy DSE patient snapshots (health_fraction for
+    // severity scoring). Both views read the same Health component
+    // in one pass.
+    let injured_patient_snapshot: Vec<crate::ai::dses::apply_remedy_target::PatientCandidate> =
+        injured_cat_query
+            .iter()
+            .filter(|(_, h, _)| h.current < h.max)
+            .map(
+                |(e, h, p)| crate::ai::dses::apply_remedy_target::PatientCandidate {
+                    entity: e,
+                    position: *p,
+                    health_fraction: if h.max > 0.0 {
+                        (h.current / h.max).clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    },
+                },
+            )
+            .collect();
     let injured_cat_list: Vec<(Entity, Position)> = injured_cat_query
         .iter()
         .filter(|(_, h, _)| h.current < 1.0)
@@ -1099,6 +1133,77 @@ pub fn disposition_to_chain(
             &res.relationships,
             res.time.tick,
         );
+        // §6.5.4: resolve the groom-other target-taking DSE. Adds
+        // target-need-warmth + kinship axes that the legacy
+        // `find_social_target` (fondness-only) could not see.
+        let temperature_lookup =
+            |e: Entity| -> Option<f32> { cat_temperature_map.get(&e).copied() };
+        let is_kin = |a: Entity, b: Entity| -> bool {
+            let a_parents = kitten_parents_map.get(&a);
+            let b_parents = kitten_parents_map.get(&b);
+            a_parents.is_some_and(|(m, f)| *m == Some(b) || *f == Some(b))
+                || b_parents.is_some_and(|(m, f)| *m == Some(a) || *f == Some(a))
+        };
+        let groom_other_target =
+            crate::ai::dses::groom_other_target::resolve_groom_other_target(
+                &res.dse_registry,
+                entity,
+                *pos,
+                &cat_pos_list,
+                &temperature_lookup,
+                &is_kin,
+                &res.relationships,
+                res.time.tick,
+            );
+        // §6.5.7: resolve patient for ApplyRemedy. Replaces the
+        // `injured_cats.min_by_key(distance)` legacy pick with the
+        // severity-weighted DSE ranking. The resolver returns None
+        // if no injured cat is in range; the crafting chain falls
+        // back to its legacy behavior in that case.
+        let apply_remedy_target =
+            crate::ai::dses::apply_remedy_target::resolve_apply_remedy_target(
+                &res.dse_registry,
+                entity,
+                *pos,
+                &injured_patient_snapshot,
+                &is_kin,
+                res.time.tick,
+            );
+        // §6.5.8: resolve work-site for Build. Replaces the
+        // `(priority, distance)` legacy pick with the progress-
+        // urgency + structural-condition weighted DSE.
+        let build_candidates: Vec<crate::ai::dses::build_target::BuildCandidate> =
+            building_query
+                .iter()
+                .filter_map(|(e, structure, bpos, site, _)| {
+                    if let Some(s) = site {
+                        Some(crate::ai::dses::build_target::BuildCandidate {
+                            entity: e,
+                            position: *bpos,
+                            kind: crate::ai::dses::build_target::BuildTargetKind::NewBuild,
+                            progress: s.progress,
+                            condition: 1.0,
+                        })
+                    } else if structure.condition < 1.0 {
+                        Some(crate::ai::dses::build_target::BuildCandidate {
+                            entity: e,
+                            position: *bpos,
+                            kind: crate::ai::dses::build_target::BuildTargetKind::Repair,
+                            progress: 0.0,
+                            condition: structure.condition,
+                        })
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+        let build_target = crate::ai::dses::build_target::resolve_build_target(
+            &res.dse_registry,
+            entity,
+            *pos,
+            &build_candidates,
+            res.time.tick,
+        );
 
         let chain = match disposition.kind {
             DispositionKind::Resting => build_resting_chain(
@@ -1130,15 +1235,21 @@ pub fn disposition_to_chain(
             DispositionKind::Socializing => build_socializing_chain(
                 socialize_target,
                 mentor_target,
+                groom_other_target,
                 &cat_pos_list,
                 personality,
                 skills,
                 &skills_query,
                 d,
             ),
-            DispositionKind::Building => {
-                build_building_chain(entity, pos, &building_query, d, &mut commands)
-            }
+            DispositionKind::Building => build_building_chain(
+                entity,
+                pos,
+                &building_query,
+                build_target,
+                d,
+                &mut commands,
+            ),
             DispositionKind::Farming => build_farming_chain(pos, &building_query),
             DispositionKind::Crafting => build_crafting_chain(
                 pos,
@@ -1152,6 +1263,7 @@ pub fn disposition_to_chain(
                 &ward_query,
                 &cat_pos_list,
                 &injured_cat_list,
+                apply_remedy_target,
                 &res.map,
                 ward_strength_low,
                 d,
@@ -1479,9 +1591,11 @@ fn build_guarding_chain(
 /// Socialize target is the fallback if no mentor candidate exists.
 /// This function owns only the chain shape (sub-action pick + step
 /// sequencing), not partner selection.
+#[allow(clippy::too_many_arguments)]
 fn build_socializing_chain(
     socialize_target: Option<Entity>,
     mentor_target: Option<Entity>,
+    groom_other_target: Option<Entity>,
     cat_positions: &[(Entity, Position)],
     personality: &Personality,
     skills: &Skills,
@@ -1522,6 +1636,13 @@ fn build_socializing_chain(
             })
         });
 
+    // §6.5.4: Groom branch prefers the warmth-/kinship-/adjacency-ranked
+    // `groom_other_target` when available, falling through to
+    // `socialize_target` if the groom-target DSE produced no winner
+    // (e.g. all cats out of the near-step range). The fallback preserves
+    // liveness — a cat who wants to groom still takes *some* partner
+    // rather than stalling — while the preferred pick gives the caller
+    // the §6.1-Critical warmth-responsive target.
     let (target_entity, step_kind, action) =
         if can_mentor && personality.warmth > d.mentor_temperature_threshold {
             (
@@ -1530,7 +1651,8 @@ fn build_socializing_chain(
                 Action::Mentor,
             )
         } else if personality.warmth > d.groom_temperature_threshold {
-            (socialize_target?, StepKind::GroomOther, Action::Groom)
+            let target = groom_other_target.or(socialize_target)?;
+            (target, StepKind::GroomOther, Action::Groom)
         } else {
             (socialize_target?, StepKind::Socialize, Action::Socialize)
         };
@@ -1553,6 +1675,7 @@ fn build_socializing_chain(
 }
 
 #[allow(clippy::type_complexity)]
+#[allow(clippy::too_many_arguments)]
 fn build_building_chain(
     _entity: Entity,
     pos: &Position,
@@ -1563,10 +1686,17 @@ fn build_building_chain(
         Option<&ConstructionSite>,
         Option<&CropState>,
     )>,
+    build_target: Option<Entity>,
     d: &DispositionConstants,
     _commands: &mut Commands,
 ) -> Option<(TaskChain, Action)> {
-    let target = building_query
+    // §6.5.8: prefer the build-target DSE's pick (progress-urgency +
+    // structural-condition aware). Falls back to the legacy
+    // `(priority, distance)` pick when the DSE returned None (e.g.
+    // no candidate in range at evaluation time but the chain-builder
+    // re-checks; or the DSE registry missing in tests).
+    let dse_target = build_target.and_then(|e| building_query.get(e).ok());
+    let legacy_target = building_query
         .iter()
         .filter(|(_, _, bpos, site, _)| {
             site.is_some() || pos.manhattan_distance(bpos) <= d.building_search_range
@@ -1576,6 +1706,7 @@ fn build_building_chain(
             let dist = pos.manhattan_distance(bpos);
             (priority, dist)
         });
+    let target = dse_target.or(legacy_target);
 
     let (target_entity, _structure, bpos, site, _) = target?;
 
@@ -1636,6 +1767,7 @@ fn build_crafting_chain(
     ward_query: &Query<(&Ward, &Position)>,
     _cat_positions: &[(Entity, Position)],
     injured_cats: &[(Entity, Position)],
+    apply_remedy_target: Option<Entity>,
     map: &TileMap,
     ward_strength_low: bool,
     d: &DispositionConstants,
@@ -1677,6 +1809,7 @@ fn build_crafting_chain(
             herb_query,
             building_query,
             injured_cats,
+            apply_remedy_target,
             map,
             ward_strength_low,
             ward_placement_pos,
@@ -1709,6 +1842,7 @@ fn build_crafting_chain(
             herb_query,
             building_query,
             injured_cats,
+            apply_remedy_target,
             map,
             ward_strength_low,
             ward_placement_pos,
@@ -1740,6 +1874,7 @@ fn try_crafting_sub_mode(
         Option<&CropState>,
     )>,
     injured_cats: &[(Entity, Position)],
+    apply_remedy_target: Option<Entity>,
     map: &TileMap,
     ward_strength_low: bool,
     ward_placement_pos: Option<Position>,
@@ -1803,11 +1938,22 @@ fn try_crafting_sub_mode(
                 remedy: remedy_kind,
             }));
 
-            // After preparing, deliver the remedy to the nearest injured cat.
-            if let Some((patient_entity, patient_pos)) = injured_cats
-                .iter()
-                .min_by_key(|(_, ip)| pos.manhattan_distance(ip))
-            {
+            // After preparing, deliver the remedy. §6.5.7: prefer the
+            // severity-weighted DSE-picked patient when available; fall
+            // back to nearest-injured pick if the DSE returned None
+            // (e.g. no injured cat in range). Wrong-direction
+            // regressions would show up in continuity canaries —
+            // RemedyApplied hasn't been firing in recent soaks, so the
+            // fallback preserves liveness while the DSE takes over the
+            // selection axis.
+            let patient = apply_remedy_target
+                .and_then(|e| injured_cats.iter().find(|(ie, _)| *ie == e))
+                .or_else(|| {
+                    injured_cats
+                        .iter()
+                        .min_by_key(|(_, ip)| pos.manhattan_distance(ip))
+                });
+            if let Some((patient_entity, patient_pos)) = patient {
                 steps.push(
                     TaskStep::new(StepKind::ApplyRemedy {
                         remedy: remedy_kind,
@@ -3712,6 +3858,7 @@ mod tests {
             &ward_query,
             &[],
             &injured_cats,
+            None,
             &map,
             false,
             &d,

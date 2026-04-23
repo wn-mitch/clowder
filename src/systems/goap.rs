@@ -213,10 +213,25 @@ pub struct ExecutorContext<'w, 's> {
         (Entity, &'static Position),
         (With<WildAnimal>, Without<Dead>, Without<PreyAnimal>),
     >,
-    /// §6.3 target-taking DSE lookup — the `SocializeWith` step (and
-    /// future per-DSE ports) route target resolution through the
-    /// registered DSE instead of divergent helpers like
-    /// `find_social_target`.
+    /// §6.5.9 fight-target DSE snapshot: read-only (Entity, Position,
+    /// WildAnimal) tuple for threat-level + combat-advantage axes.
+    /// Kept separate from `wildlife` above because that query is the
+    /// legacy shape consumed by unrelated callers; extending it would
+    /// ripple.
+    pub wildlife_with_stats: bevy_ecs::prelude::Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static Position,
+            &'static crate::components::wildlife::WildAnimal,
+        ),
+        (Without<Dead>, Without<PreyAnimal>),
+    >,
+    /// §6.3 target-taking DSE lookup — cat-on-cat step resolvers
+    /// (`SocializeWith`, `GroomOther`, `MentorCat`, `MateWith`) route
+    /// target resolution through the registered DSEs, which retires
+    /// the pre-4c `find_social_target` fondness-only helper.
     pub dse_registry: Res<'w, crate::ai::eval::DseRegistry>,
     /// §Phase 4c.4 kitten-feeding side effect: the main `cats` query
     /// in `resolve_goap_plans` requires `&mut GoapPlan`, which
@@ -239,6 +254,16 @@ pub struct ExecutorContext<'w, 's> {
         's,
         &'static mut crate::components::physical::Needs,
         (Without<GoapPlan>, Without<Dead>, Without<Structure>),
+    >,
+    /// §6.5.4 groom-other kinship lookup — read-only snapshot of
+    /// `(kitten_entity) → (mother, father)` pointers. Disjoint from
+    /// the mutable `cats` query by `With<KittenDependency>` (kittens
+    /// don't carry a `GoapPlan` so the cats query excludes them).
+    pub kitten_parentage: bevy_ecs::prelude::Query<
+        'w,
+        's,
+        (Entity, &'static crate::components::KittenDependency),
+        Without<Dead>,
     >,
 }
 
@@ -1536,6 +1561,29 @@ pub fn resolve_goap_plans(
         .map(|((e, _, _, _, skills, _, _, _, _), _)| (e, (*skills).clone()))
         .collect();
 
+    // §6.5.4 groom-other-target DSE snapshot: candidate-side
+    // `needs.temperature` lookup. Same rationale as skills — the outer
+    // loop mutably holds `cats`, so we materialize a read-only map for
+    // the GroomOther branch's `resolve_groom_other_target` call.
+    let cat_temperature_snapshot: std::collections::HashMap<Entity, f32> = cats
+        .iter()
+        .map(|((e, _, _, _, _, needs, _, _, _), _)| (e, needs.temperature))
+        .collect();
+
+    // §6.5.4 kinship lookup — `(kitten_entity) → (mother, father)`.
+    // Bidirectional `is_kin` is computed per-call by the resolver
+    // closure. Reads `ExecutorContext::kitten_parentage` — kittens
+    // don't carry `GoapPlan`, so this query is disjoint from the
+    // outer mutable `cats` iteration.
+    let kitten_parents_snapshot: std::collections::HashMap<
+        Entity,
+        (Option<Entity>, Option<Entity>),
+    > = ec
+        .kitten_parentage
+        .iter()
+        .map(|(e, dep)| (e, (dep.mother, dep.father)))
+        .collect();
+
     for (
         (
             cat_entity,
@@ -1705,6 +1753,7 @@ pub fn resolve_goap_plans(
                 &needs,
                 d,
                 &ec.constants.sensory.cat,
+                &ec.dse_registry,
             ),
 
             GoapActionKind::EngagePrey => {
@@ -1904,9 +1953,33 @@ pub fn resolve_goap_plans(
             }
 
             GoapActionKind::GroomOther => {
+                // §6.5.4: replace the fondness-only `find_social_target`
+                // picker with the warmth-/kinship-/adjacency-ranked
+                // groom-other target DSE. Closes the silent divergence
+                // with disposition.rs's sub-action pick and retires
+                // `find_social_target` (GroomOther was the last caller
+                // after the Socialize / Mate / Mentor ports).
                 if plan.step_state[step_idx].target_entity.is_none() {
+                    let temperature_lookup = |e: Entity| -> Option<f32> {
+                        cat_temperature_snapshot.get(&e).copied()
+                    };
+                    let is_kin = |a: Entity, b: Entity| -> bool {
+                        let a_parents = kitten_parents_snapshot.get(&a);
+                        let b_parents = kitten_parents_snapshot.get(&b);
+                        a_parents.is_some_and(|(m, f)| *m == Some(b) || *f == Some(b))
+                            || b_parents.is_some_and(|(m, f)| *m == Some(a) || *f == Some(a))
+                    };
                     plan.step_state[step_idx].target_entity =
-                        find_social_target(cat_entity, &pos, &cat_positions, &relationships, d);
+                        crate::ai::dses::groom_other_target::resolve_groom_other_target(
+                            &ec.dse_registry,
+                            cat_entity,
+                            *pos,
+                            &cat_positions,
+                            &temperature_lookup,
+                            &is_kin,
+                            &relationships,
+                            ec.time.tick,
+                        );
                 }
                 let outcome = crate::steps::disposition::resolve_groom_other(
                     ticks,
@@ -2026,18 +2099,51 @@ pub fn resolve_goap_plans(
             }
 
             GoapActionKind::EngageThreat => {
-                // Resolve nearest wildlife as the combat target on the first tick.
+                // §6.5.9: resolve the threat target via the fight-target
+                // DSE. Replaces the pre-refactor nearest-wildlife pick
+                // with a weighted (distance, threat-level, combat-
+                // advantage, ally-proximity) ranking. The coordinator
+                // Fight-directive path upstream still seeds
+                // `target_entity` before this branch runs, so posse
+                // cohesion is unaffected — this picker only fires for
+                // un-directed EngageThreat steps.
                 // step_state.target_entity is copied into CurrentAction.target_entity
                 // only at ticks_elapsed == 0 (before dispatch), so we must also write
                 // current.target_entity directly here for resolve_combat to pick it up.
                 if plan.step_state[step_idx].target_entity.is_none() {
-                    let nearest = ec
-                        .wildlife
+                    let candidates: Vec<crate::ai::dses::fight_target::ThreatCandidate> = ec
+                        .wildlife_with_stats
                         .iter()
-                        .min_by_key(|(_, wp)| pos.manhattan_distance(wp))
-                        .map(|(e, _)| e);
-                    plan.step_state[step_idx].target_entity = nearest;
-                    current.target_entity = nearest;
+                        .map(|(e, wp, wa)| {
+                            crate::ai::dses::fight_target::ThreatCandidate {
+                                entity: e,
+                                position: *wp,
+                                species: wa.species,
+                                threat_power: wa.threat_power,
+                            }
+                        })
+                        .collect();
+                    let ally_positions: Vec<Position> = cat_positions
+                        .iter()
+                        .filter_map(|(e, p)| if *e == cat_entity { None } else { Some(*p) })
+                        .collect();
+                    let self_health_fraction = if health.max > 0.0 {
+                        (health.current / health.max).clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
+                    let picked = crate::ai::dses::fight_target::resolve_fight_target(
+                        &ec.dse_registry,
+                        cat_entity,
+                        *pos,
+                        &candidates,
+                        skills.combat,
+                        self_health_fraction,
+                        &ally_positions,
+                        ec.time.tick,
+                    );
+                    plan.step_state[step_idx].target_entity = picked;
+                    current.target_entity = picked;
                 }
                 // Move toward the target until adjacent. Without this step,
                 // posse-directed cats would set Action::Fight where they
@@ -3376,6 +3482,7 @@ fn resolve_search_prey(
     needs: &Needs,
     d: &DispositionConstants,
     cat_profile: &crate::systems::sensing::SensoryProfile,
+    dse_registry: &crate::ai::eval::DseRegistry,
 ) -> crate::steps::StepResult {
     use crate::components::magic::ItemSlot;
 
@@ -3490,8 +3597,14 @@ fn resolve_search_prey(
         *pos = patrol_move(pos, ndx, ndy, map);
     }
 
-    // Visual detection.
-    let visible_prey = prey_query
+    // Visual detection → §6.5.5 hunt-target DSE. Replaces the
+    // pre-refactor `min_by_key(manhattan_distance)` pick — the legacy
+    // path picked the nearest prey regardless of yield, so a Mouse at
+    // range 5 was always chosen over a Rabbit at range 7 even though
+    // the Rabbit delivers 1.3× food value. §6.1 Partial fix: the DSE
+    // scores distance (quadratic falloff), species yield, and
+    // alertness together.
+    let visible: Vec<crate::ai::dses::hunt_target::PreyCandidate> = prey_query
         .iter()
         .filter(|(_, pp, _, _)| {
             crate::systems::sensing::observer_sees_at(
@@ -3503,11 +3616,28 @@ fn resolve_search_prey(
                 d.search_visual_detection_range as f32,
             )
         })
-        .min_by_key(|(_, pp, _, _)| pos.manhattan_distance(pp));
+        .map(
+            |(e, pp, pc, ps)| crate::ai::dses::hunt_target::PreyCandidate {
+                entity: e,
+                position: *pp,
+                kind: pc.kind,
+                alertness: ps.alertness,
+            },
+        )
+        .collect();
 
-    if let Some((prey_entity, _, _, _)) = visible_prey {
-        state.target_entity = Some(prey_entity);
-        return crate::steps::StepResult::Advance;
+    if !visible.is_empty() {
+        let picked = crate::ai::dses::hunt_target::resolve_hunt_target(
+            dse_registry,
+            _cat_entity,
+            *pos,
+            &visible,
+            time.tick,
+        );
+        if let Some(prey_entity) = picked {
+            state.target_entity = Some(prey_entity);
+            return crate::steps::StepResult::Advance;
+        }
     }
 
     // Scent detection via PreyScentMap (Phase 2B — grid-sampled
@@ -4160,30 +4290,6 @@ fn find_nearest_store(
         .filter(|(_, s, _, _, _)| s.kind == StructureType::Stores)
         .min_by_key(|(_, _, bp, _, _)| pos.manhattan_distance(bp))
         .map(|(e, _, _, _, _)| e)
-}
-
-fn find_social_target(
-    cat_entity: Entity,
-    pos: &Position,
-    cat_positions: &[(Entity, Position)],
-    relationships: &Relationships,
-    d: &DispositionConstants,
-) -> Option<Entity> {
-    cat_positions
-        .iter()
-        .filter(|(other, other_pos)| {
-            *other != cat_entity && pos.manhattan_distance(other_pos) <= d.social_target_range
-        })
-        .max_by(|(a, _), (b, _)| {
-            let fa = relationships
-                .get(cat_entity, *a)
-                .map_or(0.0, |r| r.fondness);
-            let fb = relationships
-                .get(cat_entity, *b)
-                .map_or(0.0, |r| r.fondness);
-            fa.partial_cmp(&fb).unwrap_or(std::cmp::Ordering::Equal)
-        })
-        .map(|(e, _)| *e)
 }
 
 #[allow(clippy::too_many_arguments)]
