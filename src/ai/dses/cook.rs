@@ -8,12 +8,15 @@
 //! food-buffer multiplier analogous to Farm, "Level 2 suppression
 //! (phys only)."
 //!
-//! **Cook-specific eligibility** — today gated at the outer level on
-//! `has_functional_kitchen && has_raw_food_in_stores && hunger >
-//! cook_hunger_gate`. The §4-driven port turns those into
-//! `HasFunctionalKitchen` + `HasRawFoodInStores` markers plus an
-//! implicit "not too starving" filter. Phase 3c.1a keeps the outer
-//! gate in `score_actions`; Phase 3d flips to marker filtering.
+//! **Cook-specific eligibility** — §4 port (Phase 4b.5) carries two
+//! colony-scoped markers: `.require("HasFunctionalKitchen")` and
+//! `.require("HasRawFoodInStores")`. The third precondition —
+//! `hunger > cook_hunger_gate` — is a scalar threshold, not a marker,
+//! and stays as an inline caller-side wrap so Cook isn't scored while
+//! the cat is too stuffed. The `wants_cook_but_no_kitchen` latent
+//! signal read by BuildPressure in `goap.rs` is preserved by the
+//! caller reading `ctx.has_raw_food_in_stores` / `has_functional_kitchen`
+//! directly when the DSE's marker-gated score drops to zero.
 
 use bevy::prelude::*;
 
@@ -59,7 +62,16 @@ impl CookDse {
             // doing" floor; scarcity escalates under colony stress;
             // diligence is the personality weight.
             composition: Composition::weighted_sum(vec![0.4, 0.3, 0.3]),
-            eligibility: EligibilityFilter::new(),
+            // §4 marker eligibility (Phase 4b.5): Cook only scores if
+            // the colony has a functional kitchen AND raw food in
+            // stores. Retires the inline
+            // `cook_base_conditions && ctx.has_functional_kitchen`
+            // outer gate at `scoring.rs::score_actions`. The latent
+            // `wants_cook_but_no_kitchen` signal survives via a
+            // caller-side disambiguation when the DSE returns 0.
+            eligibility: EligibilityFilter::new()
+                .require("HasFunctionalKitchen")
+                .require("HasRawFoodInStores"),
         }
     }
 }
@@ -107,6 +119,8 @@ pub fn cook_dse() -> Box<dyn Dse> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ai::eval::{evaluate_single, ModifierPipeline};
+    use crate::components::physical::Position;
 
     #[test]
     fn cook_dse_id_stable() {
@@ -123,5 +137,72 @@ mod tests {
     #[test]
     fn cook_is_maslow_tier_2() {
         assert_eq!(CookDse::new().maslow_tier(), 2);
+    }
+
+    #[test]
+    fn cook_dse_requires_both_colony_markers() {
+        // Phase 4b.5: Cook's outer `has_functional_kitchen &&
+        // has_raw_food_in_stores` gate at `scoring.rs::score_actions`
+        // retires; both colony markers move onto the DSE's eligibility
+        // filter.
+        let dse = CookDse::new();
+        assert_eq!(
+            dse.eligibility().required,
+            vec!["HasFunctionalKitchen", "HasRawFoodInStores"]
+        );
+        assert!(dse.eligibility().forbidden.is_empty());
+    }
+
+    fn evaluate_cook_with_markers(
+        has_kitchen: bool,
+        has_raw_food: bool,
+    ) -> Option<crate::ai::eval::ScoredDse> {
+        let dse = CookDse::new();
+        let entity = Entity::from_raw_u32(1).unwrap();
+        let has_marker = move |name: &str, _: Entity| match name {
+            "HasFunctionalKitchen" => has_kitchen,
+            "HasRawFoodInStores" => has_raw_food,
+            _ => false,
+        };
+        let sample = |_: &str, _: Position| 0.0;
+        let ctx = EvalCtx {
+            cat: entity,
+            tick: 0,
+            sample_map: &sample,
+            has_marker: &has_marker,
+            self_position: Position::new(0, 0),
+            target: None,
+            target_position: None,
+        };
+        let maslow = |_: u8| 1.0;
+        let modifiers = ModifierPipeline::new();
+        // Supply non-zero scalars so the DSE would score > 0 if eligible.
+        let fetch = |name: &str, _: Entity| match name {
+            "one" => 1.0,
+            "food_scarcity" => 0.8,
+            "diligence" => 0.6,
+            _ => 0.0,
+        };
+        evaluate_single(&dse, entity, &ctx, &maslow, &modifiers, &fetch)
+    }
+
+    #[test]
+    fn cook_dse_rejected_without_has_functional_kitchen_marker() {
+        // Raw food present, kitchen absent — the marker-gate rejects.
+        assert!(evaluate_cook_with_markers(false, true).is_none());
+    }
+
+    #[test]
+    fn cook_dse_rejected_without_has_raw_food_in_stores_marker() {
+        // Kitchen present, raw food absent — the marker-gate rejects.
+        assert!(evaluate_cook_with_markers(true, false).is_none());
+    }
+
+    #[test]
+    fn cook_dse_eligible_with_both_markers() {
+        // Inverse of the two rejection tests — confirms the DSE scores
+        // positively when both colony markers are set.
+        let scored = evaluate_cook_with_markers(true, true).expect("eligible with both markers");
+        assert!(scored.final_score > 0.0);
     }
 }

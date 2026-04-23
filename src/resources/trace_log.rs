@@ -10,9 +10,14 @@
 //! the shared header (§11.4 joinability invariant).
 
 use std::collections::VecDeque;
+use std::sync::Mutex;
 
 use bevy_ecs::entity::Entity;
 use bevy_ecs::prelude::Resource;
+
+use crate::ai::dse::{DseId, Intention};
+use crate::ai::eval::EvalTrace;
+use crate::ai::scoring::SoftmaxCapture;
 
 // ---------------------------------------------------------------------------
 // FocalTraceTarget
@@ -267,6 +272,96 @@ impl TraceLog {
 }
 
 // ---------------------------------------------------------------------------
+// FocalScoreCapture — per-tick rich L2/L3 capture surface
+// ---------------------------------------------------------------------------
+
+/// One DSE's worth of captured detail: the DSE id, its final score,
+/// the full `EvalTrace` per-consideration + modifier breakdown, and the
+/// emitted `Intention`. Populated by `score_dse_by_id` via
+/// `evaluate_single_with_trace` when the scoring cat is the focal cat.
+#[derive(Debug, Clone)]
+pub struct CapturedDse {
+    pub dse_id: DseId,
+    pub raw_score: f32,
+    pub gated_score: f32,
+    pub final_score: f32,
+    pub intention: Intention,
+    pub trace: EvalTrace,
+    /// §4 eligibility required-marker list, copied from the DSE's
+    /// filter so §11.3's `eligibility.markers_required` is emitted
+    /// verbatim. Ineligible DSEs are skipped before capture (§4.3 "skip
+    /// entirely"), so this list is always "required, all present" at
+    /// capture time — a passed-eligibility flag comes alongside.
+    pub eligibility_required: Vec<&'static str>,
+    pub eligibility_forbidden: Vec<&'static str>,
+}
+
+/// Per-tick focal-cat scoring capture. Populated during
+/// `evaluate_and_plan` / `cat_presence_tick` (whichever system's scoring
+/// pass runs for a given cat); drained and cleared by
+/// `emit_focal_trace`.
+///
+/// The `Mutex` wrapper lets `EvalInputs` carry an immutable reference
+/// that nonetheless mutates the capture — Bevy's `Resource` trait
+/// requires `Send + Sync`, which rules out `RefCell`. The mutex is
+/// uncontended in the single-threaded scoring path (no second writer
+/// within a tick); the lock cost is negligible relative to the scoring
+/// it guards. Making this a `Resource` means the plugin / main.rs
+/// insert it once per run (alongside `FocalTraceTarget` + `TraceLog`)
+/// and the capture persists across the system boundary from scoring to
+/// emission.
+#[derive(Resource, Debug, Default)]
+pub struct FocalScoreCapture {
+    pub inner: Mutex<FocalScoreCaptureInner>,
+}
+
+#[derive(Debug, Default)]
+pub struct FocalScoreCaptureInner {
+    /// One row per DSE scored this tick for the focal cat. Cleared on
+    /// drain. Preserves push order so replay's L2 block matches scoring
+    /// order.
+    pub dses: Vec<CapturedDse>,
+    /// Softmax capture — populated by `select_disposition_via_intention_softmax_with_trace`
+    /// when the focal cat makes its disposition pick.
+    pub softmax: Option<SoftmaxCapture>,
+    /// Tick the capture was populated on. `emit_focal_trace` reads this
+    /// to emit records with the correct `tick` field even when the
+    /// capture is drained on a later tick (shouldn't happen under normal
+    /// cadence, but we guard against drift).
+    pub captured_tick: Option<u64>,
+}
+
+impl FocalScoreCapture {
+    pub fn push_dse(&self, row: CapturedDse, tick: u64) {
+        let mut inner = self
+            .inner
+            .lock()
+            .expect("focal score capture mutex poisoned");
+        inner.dses.push(row);
+        inner.captured_tick = Some(tick);
+    }
+
+    pub fn set_softmax(&self, softmax: SoftmaxCapture, tick: u64) {
+        let mut inner = self
+            .inner
+            .lock()
+            .expect("focal score capture mutex poisoned");
+        inner.softmax = Some(softmax);
+        inner.captured_tick = Some(tick);
+    }
+
+    /// Drain captured data for emission. Returns the inner state by
+    /// value and resets the capture for the next tick.
+    pub fn drain(&self) -> FocalScoreCaptureInner {
+        let mut inner = self
+            .inner
+            .lock()
+            .expect("focal score capture mutex poisoned");
+        std::mem::take(&mut *inner)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -366,5 +461,54 @@ mod tests {
         let json = serde_json::to_string(&entry).unwrap();
         assert!(json.contains("\"layer\":\"L1\""));
         assert!(json.contains("\"species_sens\":1.0"));
+    }
+
+    #[test]
+    fn focal_capture_accumulates_and_drains() {
+        use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, Intention, Termination};
+        use crate::ai::eval::EvalTrace;
+
+        let capture = FocalScoreCapture::default();
+        let dummy_intention = Intention::Activity {
+            kind: ActivityKind::Idle,
+            termination: Termination::UntilInterrupt,
+            strategy: CommitmentStrategy::OpenMinded,
+        };
+
+        capture.push_dse(
+            CapturedDse {
+                dse_id: DseId("eat"),
+                raw_score: 0.4,
+                gated_score: 0.3,
+                final_score: 0.35,
+                intention: dummy_intention.clone(),
+                trace: EvalTrace::default(),
+                eligibility_required: vec!["HasStoredFood"],
+                eligibility_forbidden: vec![],
+            },
+            42,
+        );
+        capture.push_dse(
+            CapturedDse {
+                dse_id: DseId("sleep"),
+                raw_score: 0.2,
+                gated_score: 0.2,
+                final_score: 0.2,
+                intention: dummy_intention,
+                trace: EvalTrace::default(),
+                eligibility_required: vec![],
+                eligibility_forbidden: vec![],
+            },
+            42,
+        );
+
+        let drained = capture.drain();
+        assert_eq!(drained.dses.len(), 2);
+        assert_eq!(drained.captured_tick, Some(42));
+
+        // Second drain is empty — the first drain reset the state.
+        let drained = capture.drain();
+        assert!(drained.dses.is_empty());
+        assert!(drained.softmax.is_none());
     }
 }

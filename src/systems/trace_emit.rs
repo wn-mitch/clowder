@@ -51,9 +51,10 @@ use crate::resources::prey_scent_map::PreyScentMap;
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::time::TimeState;
 use crate::resources::trace_log::{
-    AttenuationBreakdown, CompositionSummary, ConsiderationContribution, EligibilitySummary,
-    FocalTraceTarget, IntentionSummary, ModifierApplication, MomentumSummary, SoftmaxSummary,
-    TraceEntry, TraceLog, TraceRecord,
+    AttenuationBreakdown, CapturedDse, CompositionSummary, ConsiderationContribution,
+    EligibilitySummary, FocalScoreCapture, FocalTraceTarget, IntentionSummary,
+    ModifierApplication, MomentumSummary, SoftmaxSummary, SpatialRef, TraceEntry, TraceLog,
+    TraceRecord,
 };
 use crate::systems::influence_map::{
     channel_label, Attenuation, CorruptionLens, Faction, InfluenceMap, MapMetadata,
@@ -78,6 +79,7 @@ pub fn emit_focal_trace(
     exploration_map: Option<Res<ExplorationMap>>,
     tile_map: Option<Res<TileMap>>,
     mut trace_log: ResMut<TraceLog>,
+    focal_capture: Res<FocalScoreCapture>,
     cats: Query<
         (
             Entity,
@@ -138,49 +140,50 @@ pub fn emit_focal_trace(
     }
 
     // -----------------------------------------------------------------
-    // L2 — one record per (action, score) in the ranked list. Phase 1
-    // shim populates `final_score` only; `considerations`, `modifiers`,
-    // `eligibility.markers_required` empty until Phase 3's Dse trait
-    // lands.
+    // Drain the tick's rich L2 + L3 capture. `score_dse_by_id` and
+    // `select_disposition_via_intention_softmax_with_trace` populated
+    // this during the scoring pass; we read it back post-`resolve_goap_plans`
+    // so everything emits in one coherent frame. `drain()` clears the
+    // capture for the next tick — the mutex is uncontested here since
+    // scoring has already finished for this tick.
+    //
+    // `evaluate_and_plan` only fires when a cat's plan expires or needs
+    // replanning (not every tick), so the capture is empty on ticks
+    // where the focal cat is mid-plan. On those ticks we skip L2/L3
+    // emission entirely — spec §11.4's "one record per tick-selection"
+    // means every *selection*, not every tick wall-clock. L1 emission
+    // (senses + influence maps) continues every tick and is the only
+    // trace surface that samples at full cadence.
     // -----------------------------------------------------------------
-    for (action, score) in &current.last_scores {
+    let captured = focal_capture.drain();
+    let planning_tick = !captured.dses.is_empty() || captured.softmax.is_some();
+
+    if !planning_tick {
+        return;
+    }
+
+    // -----------------------------------------------------------------
+    // L2 — one record per captured DSE. §11.3 schema: eligibility
+    // (markers_required + passed), per-consideration (name, input,
+    // curve-label, score, weight, optional spatial ref), composition
+    // (mode, raw), maslow_pregate, modifier deltas, final_score,
+    // intention summary. `top_losing` is schema-reserved for §7.W.6
+    // and stays empty until that layer lands.
+    // -----------------------------------------------------------------
+    for dse in &captured.dses {
         trace_log.push(TraceEntry {
             tick,
             cat: cat_name.clone(),
-            record: TraceRecord::L2 {
-                dse: format!("{action:?}"),
-                eligibility: EligibilitySummary {
-                    markers_required: Vec::new(),
-                    passed: true,
-                },
-                considerations: Vec::<ConsiderationContribution>::new(),
-                composition: CompositionSummary {
-                    mode: "WeightedSum".into(),
-                    raw: *score,
-                },
-                maslow_pregate: 1.0,
-                modifiers: Vec::<ModifierApplication>::new(),
-                final_score: *score,
-                intention: IntentionSummary {
-                    kind: "Activity".into(),
-                    target: None,
-                    goal_state: None,
-                },
-                top_losing: Vec::new(),
-            },
+            record: l2_record_for(dse),
         });
     }
 
     // -----------------------------------------------------------------
-    // L3 — selection record. Ranked list comes from last_scores;
-    // chosen action is CurrentAction. Softmax probabilities empty until
-    // Phase 6 wires them through from `select_intention_softmax`.
+    // L3 — selection record for the planning tick. Ranked list comes
+    // from the softmax pool (the post-bonus, post-penalty scores the
+    // softmax actually saw), probabilities from the captured
+    // distribution, roll from the RNG draw.
     // -----------------------------------------------------------------
-    let ranked: Vec<(String, f32)> = current
-        .last_scores
-        .iter()
-        .map(|(a, s)| (format!("{a:?}"), *s))
-        .collect();
     let chosen = format!("{:?}", current.action);
     let active_intention = disposition.map(|d| format!("{:?}", d.kind));
     let goap_plan_steps: Vec<String> = goap_plan
@@ -192,15 +195,41 @@ pub fn emit_focal_trace(
         })
         .unwrap_or_default();
 
+    let (ranked, softmax_summary) = if let Some(sm) = &captured.softmax {
+        let ranked: Vec<(String, f32)> = sm
+            .pool
+            .iter()
+            .map(|(a, s)| (format!("{a:?}"), *s))
+            .collect();
+        let summary = SoftmaxSummary {
+            temperature: sm.temperature,
+            probabilities: sm.probabilities.clone(),
+        };
+        (ranked, summary)
+    } else {
+        // Edge case: L2 captured but softmax didn't (e.g. ineligible
+        // pool after filtering). Fall back to the pre-softmax ranking
+        // from `current.last_scores`; probabilities stay empty so
+        // replay tooling can distinguish "softmax ran" from "softmax
+        // fallthrough".
+        let ranked: Vec<(String, f32)> = current
+            .last_scores
+            .iter()
+            .map(|(a, s)| (format!("{a:?}"), *s))
+            .collect();
+        let summary = SoftmaxSummary {
+            temperature: constants.scoring.intention_softmax_temperature,
+            probabilities: Vec::new(),
+        };
+        (ranked, summary)
+    };
+
     trace_log.push(TraceEntry {
         tick,
         cat: cat_name,
         record: TraceRecord::L3 {
             ranked,
-            softmax: SoftmaxSummary {
-                temperature: constants.scoring.disposition_softmax_temperature,
-                probabilities: Vec::new(),
-            },
+            softmax: softmax_summary,
             momentum: MomentumSummary {
                 active_intention,
                 commitment_strength: 0.0,
@@ -217,6 +246,93 @@ pub fn emit_focal_trace(
             apophenia: None,
         },
     });
+}
+
+/// Build a §11.3 L2 record from one captured DSE evaluation. Pulls
+/// consideration-trace rows (name, input, curve label, score, weight,
+/// optional spatial map key), composition summary, Maslow pre-gate,
+/// modifier deltas, and the emitted Intention. Factored out so the
+/// main emit loop reads as a forward-walk and the per-row conversions
+/// stay readable.
+fn l2_record_for(dse: &CapturedDse) -> TraceRecord {
+    let considerations = dse
+        .trace
+        .considerations
+        .iter()
+        .map(|row| ConsiderationContribution {
+            name: row.name.to_string(),
+            input: row.input,
+            curve: row.curve_label.clone(),
+            score: row.score,
+            weight: row.weight,
+            spatial: row.spatial_map_key.map(|map_key| SpatialRef {
+                map: map_key.to_string(),
+                best_target: None,
+            }),
+        })
+        .collect();
+    let composition = CompositionSummary {
+        mode: dse
+            .trace
+            .composition_mode
+            .unwrap_or("Unknown")
+            .to_string(),
+        raw: dse.raw_score,
+    };
+    let modifiers = dse
+        .trace
+        .modifier_deltas
+        .iter()
+        .map(|d| ModifierApplication {
+            name: d.name.to_string(),
+            // Emitted as an additive delta (`post - pre`); downstream
+            // tooling treats `delta`-only rows as additive and
+            // `multiplier`-only rows as multiplicative. The live
+            // §3.5.1 modifier catalog is additive-only today, so
+            // `multiplier` stays None.
+            delta: Some(d.post - d.pre),
+            multiplier: None,
+        })
+        .collect();
+    let intention = intention_summary(&dse.intention);
+    TraceRecord::L2 {
+        dse: dse.dse_id.0.to_string(),
+        eligibility: EligibilitySummary {
+            markers_required: dse
+                .eligibility_required
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            // All captured DSEs passed eligibility — ineligible DSEs
+            // are skipped entirely by `evaluate_single_with_trace`
+            // per §4's "avoid computing a score that can't win"
+            // principle.
+            passed: true,
+        },
+        considerations,
+        composition,
+        maslow_pregate: dse.trace.maslow_pregate,
+        modifiers,
+        final_score: dse.final_score,
+        intention,
+        top_losing: Vec::new(),
+    }
+}
+
+fn intention_summary(intention: &crate::ai::dse::Intention) -> IntentionSummary {
+    use crate::ai::dse::Intention;
+    match intention {
+        Intention::Goal { state, .. } => IntentionSummary {
+            kind: "Goal".to_string(),
+            target: None,
+            goal_state: Some(format!("{state:?}")),
+        },
+        Intention::Activity { kind, .. } => IntentionSummary {
+            kind: "Activity".to_string(),
+            target: None,
+            goal_state: Some(format!("{kind:?}")),
+        },
+    }
 }
 
 /// Emit one L1 record for a focal-cat read of an `InfluenceMap` —

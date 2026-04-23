@@ -108,7 +108,14 @@ impl DurableWardDse {
                 Consideration::Scalar(ScalarConsideration::new("ward_deficit", linear())),
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
-            eligibility: EligibilityFilter::new(),
+            // §4 marker eligibility (Phase 4b.5): DurableWard only
+            // scores when colony ward strength is low. Retires the
+            // `ctx.ward_strength_low` conjunct from the outer gate at
+            // `scoring.rs:775-780`. The
+            // `magic_skill > magic_durable_ward_skill_threshold`
+            // conjunct stays inline — magic_skill is a §4.5 scalar,
+            // not a marker.
+            eligibility: EligibilityFilter::new().require("WardStrengthLow"),
         }
     }
 }
@@ -418,6 +425,8 @@ pub fn commune_dse() -> Box<dyn Dse> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ai::eval::{evaluate_single, ModifierPipeline};
+    use crate::components::physical::Position;
 
     #[test]
     fn all_six_practice_magic_ids_stable() {
@@ -427,5 +436,45 @@ mod tests {
         assert_eq!(colony_cleanse_dse().id().0, "magic_colony_cleanse");
         assert_eq!(harvest_dse().id().0, "magic_harvest");
         assert_eq!(commune_dse().id().0, "magic_commune");
+    }
+
+    #[test]
+    fn durable_ward_requires_ward_strength_low() {
+        // Phase 4b.5: the outer `ctx.ward_strength_low` conjunct at
+        // `scoring.rs:775-780` retires; WardStrengthLow moves onto the
+        // DSE's eligibility filter. Siblings that are NOT ported —
+        // `magic_scry`, `magic_cleanse`, `magic_colony_cleanse`,
+        // `magic_harvest`, `magic_commune` — keep empty filters.
+        let dse = DurableWardDse::new();
+        assert_eq!(dse.eligibility().required, vec!["WardStrengthLow"]);
+        assert!(dse.eligibility().forbidden.is_empty());
+
+        // Guard against accidental spread to sibling DSEs in this file.
+        assert!(ScryDse::new().eligibility().required.is_empty());
+        assert!(CleanseDse::new().eligibility().required.is_empty());
+        assert!(ColonyCleanseDse::new().eligibility().required.is_empty());
+        assert!(HarvestDse::new().eligibility().required.is_empty());
+        assert!(CommuneDse::new().eligibility().required.is_empty());
+    }
+
+    #[test]
+    fn durable_ward_rejected_without_ward_strength_low_marker() {
+        let dse = DurableWardDse::new();
+        let entity = Entity::from_raw_u32(1).unwrap();
+        let has_marker = |_: &str, _: Entity| false;
+        let sample = |_: &str, _: Position| 0.0;
+        let ctx = EvalCtx {
+            cat: entity,
+            tick: 0,
+            sample_map: &sample,
+            has_marker: &has_marker,
+            self_position: Position::new(0, 0),
+            target: None,
+            target_position: None,
+        };
+        let maslow = |_: u8| 1.0;
+        let modifiers = ModifierPipeline::new();
+        let fetch = |_: &str, _: Entity| 0.7_f32;
+        assert!(evaluate_single(&dse, entity, &ctx, &maslow, &modifiers, &fetch).is_none());
     }
 }

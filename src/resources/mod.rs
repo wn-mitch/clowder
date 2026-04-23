@@ -47,7 +47,10 @@ pub use rng::SimRng;
 pub use sim_constants::SimConstants;
 pub use system_activation::{Feature, SystemActivation};
 pub use time::{DayPhase, Season, SimConfig, SimSpeed, TimeState, TransitionTracker};
-pub use trace_log::{FocalTraceTarget, TraceEntry, TraceLog, TraceRecord};
+pub use trace_log::{
+    CapturedDse, FocalScoreCapture, FocalScoreCaptureInner, FocalTraceTarget, TraceEntry,
+    TraceLog, TraceRecord,
+};
 pub use unmet_demand::UnmetDemand;
 pub use weather::{Weather, WeatherState};
 pub use zodiac::ZodiacData;

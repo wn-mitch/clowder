@@ -69,6 +69,7 @@ impl Plugin for SimulationPlugin {
                 .add_dse(crate::ai::dses::mentor_dse())
                 .add_target_taking_dse(crate::ai::dses::mentor_target_dse())
                 .add_dse(crate::ai::dses::caretake_dse())
+                .add_target_taking_dse(crate::ai::dses::caretake_target_dse())
                 .add_dse(crate::ai::dses::mate_dse())
                 .add_target_taking_dse(crate::ai::dses::mate_target_dse())
                 .add_dse(crate::ai::dses::patrol_dse(&default_scoring))
@@ -170,6 +171,11 @@ impl Plugin for SimulationPlugin {
                 // Chain 2: Cat needs, mood, decision-making
                 (
                     systems::needs::decay_needs,
+                    // §4.3 Incapacitated marker author. Runs before the
+                    // GOAP / scoring pipeline so consumers (inline
+                    // `is_incapacitated` today; `.forbid("Incapacitated")`
+                    // once §13.1 lands) observe a freshly-authored marker.
+                    systems::incapacitation::update_incapacitation,
                     systems::needs::decay_grooming,
                     systems::needs::eat_from_inventory,
                     systems::needs::decay_exploration,
@@ -298,6 +304,9 @@ impl Plugin for SimulationPlugin {
                 >)
                 .run_if(bevy_ecs::prelude::resource_exists::<
                     crate::resources::TraceLog,
+                >)
+                .run_if(bevy_ecs::prelude::resource_exists::<
+                    crate::resources::FocalScoreCapture,
                 >),
         );
     }

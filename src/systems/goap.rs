@@ -13,7 +13,7 @@ use crate::ai::scoring::{
     apply_aspiration_bonuses, apply_cascading_bonuses, apply_colony_knowledge_bonuses,
     apply_directive_bonus, apply_fated_bonuses, apply_memory_bonuses, apply_preference_bonuses,
     apply_priority_bonus, enforce_survival_floor, score_actions,
-    select_disposition_via_intention_softmax, ScoringContext,
+    ScoringContext,
 };
 use crate::ai::{Action, CurrentAction};
 use crate::components::building::{
@@ -142,6 +142,14 @@ pub struct PlanResources<'w> {
     pub colony_center: Res<'w, crate::resources::ColonyCenter>,
     pub dse_registry: Res<'w, crate::ai::eval::DseRegistry>,
     pub modifier_pipeline: Res<'w, crate::ai::eval::ModifierPipeline>,
+    /// §11 focal-cat target, absent in every interactive build and in
+    /// headless runs without `--focal-cat`. Read-only here so
+    /// `score_dse_by_id` can gate trace capture on
+    /// `focal_target.entity == Some(cat)`.
+    pub focal_target: Option<Res<'w, crate::resources::FocalTraceTarget>>,
+    /// §11 rich-trace capture sink. Same gating as `focal_target`.
+    /// Uses interior-`Mutex` so `EvalInputs` holds a shared reference.
+    pub focal_capture: Option<Res<'w, crate::resources::FocalScoreCapture>>,
 }
 
 /// Bundles magic resolver dependencies to keep resolve_goap_plans under 16 params.
@@ -668,6 +676,7 @@ pub fn evaluate_and_plan(
     let has_functional_kitchen = world_state.building_query.iter().any(|(_, s, _, site, _)| {
         s.kind == StructureType::Kitchen && site.is_none() && s.effectiveness() > 0.0
     });
+    markers.set_colony("HasFunctionalKitchen", has_functional_kitchen);
     let has_raw_food_in_stores = world_state.stored_items_query.iter().any(|stored| {
         stored.items.iter().copied().any(|e| {
             world_state
@@ -676,6 +685,7 @@ pub fn evaluate_and_plan(
                 .is_ok_and(|it| it.kind.is_food() && !it.modifiers.cooked)
         })
     });
+    markers.set_colony("HasRawFoodInStores", has_raw_food_in_stores);
 
     let herb_positions: Vec<(Entity, Position, HerbKind)> = world_state
         .herb_query
@@ -697,6 +707,7 @@ pub fn evaluate_and_plan(
             avg < d.ward_strength_low_threshold
         }
     };
+    markers.set_colony("WardStrengthLow", ward_strength_low);
 
     // Snapshot actionable carcasses for scoring.
     let carcass_positions: Vec<Position> = world_state
@@ -850,14 +861,18 @@ pub fn evaluate_and_plan(
             t.foraging_yield() > 0.0
         });
 
-        // §Phase 4c.3: Caretake urgency signal — find the most-urgent
-        // hungry kitten in range and populate the scoring axes. Retires
-        // the hardcoded `0.0` that kept `CaretakeDse` permanently
-        // null on its dominant axis.
-        let caretake_resolution = crate::ai::caretake_targeting::resolve_caretake(
+        // §6.5.6 target-taking DSE: four-axis bundle (nearness /
+        // kitten-hunger / kinship Piecewise / isolation) drives
+        // `hungry_kitten_urgency` and surfaces the argmax kitten for the
+        // FeedKitten step below. `is_parent_of_hungry_kitten` stays
+        // bloodline-override (any own-kitten in range, not just argmax).
+        let caretake_resolution = crate::ai::dses::caretake_target::resolve_caretake_target(
+            &res.dse_registry,
             entity,
             *pos,
             &kitten_snapshot,
+            &cat_positions,
+            res.time.tick,
         );
         // §Phase 4c.4 alloparenting Reframe A: bond-weighted compassion.
         // See disposition.rs companion site.
@@ -909,6 +924,12 @@ pub fn evaluate_and_plan(
             .injuries
             .iter()
             .any(|inj| inj.kind == InjuryKind::Severe && !inj.healed);
+        // §4.3 per-cat marker population. Bit-for-bit mirrors the
+        // inline `is_incapacitated` above — kept side-by-side so
+        // `MarkerSnapshot::has("Incapacitated", entity)` resolves
+        // identically to `ScoringContext.is_incapacitated` for any
+        // DSE that later wires `.forbid("Incapacitated")` (§13.1).
+        markers.set_entity("Incapacitated", entity, is_incapacitated);
 
         let has_herbs_nearby = herb_positions.iter().any(|(_, hp, _)| {
             crate::systems::sensing::observer_sees_at(
@@ -1059,6 +1080,11 @@ pub fn evaluate_and_plan(
             has_raw_food_in_stores,
         };
 
+        let focal_cat = res
+            .focal_target
+            .as_deref()
+            .and_then(|t| t.entity);
+        let focal_capture = res.focal_capture.as_deref();
         let eval_inputs = crate::ai::scoring::EvalInputs {
             cat: entity,
             position: *pos,
@@ -1066,6 +1092,8 @@ pub fn evaluate_and_plan(
             dse_registry: &res.dse_registry,
             modifier_pipeline: &res.modifier_pipeline,
             markers: &markers,
+            focal_cat,
+            focal_capture,
         };
         let result = score_actions(&ctx, &eval_inputs, &mut rng.rng);
         // Record latent Cook desire so the coordinator's BuildPressure
@@ -1158,14 +1186,25 @@ pub fn evaluate_and_plan(
         // helper preserves the legacy disposition-level independence penalty
         // by applying it as an action-level transform on Coordinate /
         // Socialize / Mentor (and Groom when socializing) before softmax.
-        let chosen = select_disposition_via_intention_softmax(
+        //
+        // §11.3 L3 capture — when the focal cat is selecting, surface
+        // the pool + probabilities + RNG roll to `FocalScoreCapture` so
+        // `emit_focal_trace` can reconstruct the full selection record.
+        let capture_this_cat = focal_capture.is_some() && focal_cat == Some(entity);
+        let mut softmax_trace = capture_this_cat
+            .then(crate::ai::scoring::SoftmaxCapture::default);
+        let chosen = crate::ai::scoring::select_disposition_via_intention_softmax_with_trace(
             &scores,
             self_groom_won,
             personality.independence,
             d.disposition_independence_penalty,
             sc,
             &mut rng.rng,
+            softmax_trace.as_mut(),
         );
+        if let (Some(capture), Some(trace)) = (focal_capture, softmax_trace) {
+            capture.set_softmax(trace, res.time.tick);
+        }
 
         // Store all gate-open action scores, sorted descending, for
         // diagnostics. Truncation removed 2026-04-20 so scoring-competition
@@ -1301,17 +1340,18 @@ pub fn evaluate_and_plan(
                 }
             }
             // §Phase 4c.4: persist the Caretake target kitten through
-            // the plan. `resolve_caretake` uses CARETAKE_RANGE=12 from
-            // the adult's position — by the time FeedKitten executes,
-            // the adult has walked to Stores and the kitten is typically
-            // out of range, so re-running resolve_caretake at step-time
-            // returns `target=None` and the feeding silently no-ops
-            // (StepResult::Advance, fed=None, no KittenFed activation).
-            // Seeding the FeedKitten step's target_entity now locks the
-            // kitten chosen at disposition-selection time, mirroring how
-            // socialize_target / mate_target flow their resolver output
-            // into the executor rather than asking the executor to
-            // re-resolve from a stale position.
+            // the plan. The §6.5.6 target-taking DSE uses
+            // `CARETAKE_TARGET_RANGE = 12` from the adult's position —
+            // by the time FeedKitten executes, the adult has walked to
+            // Stores and the kitten is typically out of range, so
+            // re-running the resolver at step-time returns `target=None`
+            // and the feeding silently no-ops (StepResult::Advance,
+            // fed=None, no KittenFed activation). Seeding the FeedKitten
+            // step's target_entity now locks the kitten chosen at
+            // disposition-selection time, mirroring how socialize_target /
+            // mate_target flow their resolver output into the executor
+            // rather than asking the executor to re-resolve from a stale
+            // position.
             if chosen == DispositionKind::Caretaking {
                 if let Some(kitten) = caretake_resolution.target {
                     if let Some(feed_idx) = plan
@@ -2308,19 +2348,25 @@ pub fn resolve_goap_plans(
             }
 
             GoapActionKind::FeedKitten => {
-                // §Phase 4c.3: resolve the target kitten via the
-                // caretake-urgency helper on first tick. Previously
-                // target_entity was set to nearest Stores, which
-                // combined with the broken feed-kitten step to
-                // credit only the adult's own social. The new
-                // resolver picks the most-urgent hungry kitten and
-                // the updated step transfers food from inventory.
+                // §6.5.6 target-taking DSE fallback. Primary seeding
+                // happens at plan-creation time in the disposition-chain
+                // path via `caretake_resolution.target`; this fallback
+                // fires only if the plan arrived here without a seeded
+                // target (e.g. save-load without the step_state field).
+                // The goap-path `kitten_snapshot` is intentionally empty
+                // (see above — avoiding &mut Needs query conflict), so
+                // the fallback typically returns `None` and the step
+                // no-ops cleanly. Retained so call-site shapes stay
+                // parallel to the `resolve_caretake`-era code.
                 if plan.step_state[step_idx].target_entity.is_none() {
                     plan.step_state[step_idx].target_entity =
-                        crate::ai::caretake_targeting::resolve_caretake(
+                        crate::ai::dses::caretake_target::resolve_caretake_target(
+                            &ec.dse_registry,
                             cat_entity,
                             *pos,
                             &kitten_snapshot,
+                            &[],
+                            ec.time.tick,
                         )
                         .target;
                 }

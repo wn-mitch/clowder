@@ -1906,7 +1906,7 @@ and the `Age::stage()` hot-call disappears. `KittenDependency`
 
 | Marker | Predicate | Insert | Remove | Query | Status | Source |
 |---|---|---|---|---|---|---|
-| `Incapacitated` | `health.injuries.iter().any(\|i\| i.kind == Severe && !i.healed)`. Early-return in scoring today. | `tick:needs.rs::update_incapacitation` (new) — runs after combat/injury resolution | same | `Q<_, With<Incapacitated>>` (emergency DSEs) or `Q<_, Without<Incapacitated>>` (non-emergency) | Absent | `ScoringContext.is_incapacitated:45` / `goap.rs:767` |
+| `Incapacitated` | `health.injuries.iter().any(\|i\| i.kind == Severe && !i.healed)`. Early-return in scoring still present; retires with §13.1 rows 1–3. | `tick:systems::incapacitation::update_incapacitation` (landed 2026-04-23) — Chain 2, before the GOAP scoring pipeline | same | `Q<_, With<Incapacitated>>` (emergency DSEs) or `Q<_, Without<Incapacitated>>` (non-emergency) | Author ✓; DSE consumer pending §13.1 | `ScoringContext.is_incapacitated:45` / `goap.rs:767` |
 | `Injured` | `health.current < 1.0` OR any unhealed injury. Weaker than `Incapacitated`. | `tick:needs.rs::update_injury_marker` (new) | same | `Q<_, With<Injured>>` | Absent | `goap.rs:627` |
 | `InCombat` | Cat's active plan is in a Fight step, or a hostile is attacking an adjacent cat. | `tick:combat.rs::update_combat_marker` (new) | same | `Q<_, With<InCombat>>` | Absent | action-level today; no component |
 | `Pregnant` | Cat is gestating. Data: `Pregnant { conceived_tick, partner, litter_size, … }`. | `event:MateConceived`: `pregnancy.rs` | `event:KittenBorn`: `pregnancy.rs` | `Q<_, With<Pregnant>>` | Built | `pregnancy.rs:17` |
@@ -2176,7 +2176,8 @@ Grouped by author file — answers *"when this file's tick runs, which
 markers does it maintain?"* Useful when scoping a PR touching any one
 marker cluster, to know who the downstream query consumers are.
 
-- **`src/systems/needs.rs`** → `Injured`, `Incapacitated`.
+- **`src/systems/needs.rs`** → `Injured`.
+- **`src/systems/incapacitation.rs`** → `Incapacitated` (landed 2026-04-23; hosted in a dedicated module rather than `needs.rs`).
 - **`src/systems/magic.rs`** → `OnCorruptedTile`, `WardStrengthLow`,
   `WardsUnderSiege`, `ThornbriarAvailable`.
 - **`src/systems/sensing.rs`** → `OnSpecialTerrain`, `HasThreatNearby`,

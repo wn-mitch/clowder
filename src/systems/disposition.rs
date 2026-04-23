@@ -8,7 +8,7 @@ use crate::ai::scoring::{
     apply_aspiration_bonuses, apply_cascading_bonuses, apply_colony_knowledge_bonuses,
     apply_directive_bonus, apply_fated_bonuses, apply_memory_bonuses, apply_preference_bonuses,
     apply_priority_bonus, enforce_survival_floor, score_actions,
-    select_disposition_via_intention_softmax, ScoringContext,
+    ScoringContext,
 };
 use crate::ai::{Action, CurrentAction};
 use crate::components::building::{
@@ -276,6 +276,9 @@ pub struct EvalDispositionSideEffects<'w, 's> {
     pub dse_registry: Res<'w, crate::ai::eval::DseRegistry>,
     pub modifier_pipeline: Res<'w, crate::ai::eval::ModifierPipeline>,
     pub time: Res<'w, crate::resources::time::TimeState>,
+    /// §11 focal-cat plumbing. Optional so non-traced runs pay nothing.
+    pub focal_target: Option<Res<'w, crate::resources::FocalTraceTarget>>,
+    pub focal_capture: Option<Res<'w, crate::resources::FocalScoreCapture>>,
 }
 
 /// Read-only queries over stored-item state + kitten state. Bundled
@@ -425,7 +428,9 @@ pub fn evaluate_dispositions(
     let has_functional_kitchen = building_query.iter().any(|(_, s, _, site, _)| {
         s.kind == StructureType::Kitchen && site.is_none() && s.effectiveness() > 0.0
     });
+    markers.set_colony("HasFunctionalKitchen", has_functional_kitchen);
     let has_raw_food_in_stores = cooking.has_raw_food_in_stores();
+    markers.set_colony("HasRawFoodInStores", has_raw_food_in_stores);
 
     let herb_positions: Vec<(Entity, Position)> =
         herb_query.iter().map(|(e, _, p)| (e, *p)).collect();
@@ -443,6 +448,7 @@ pub fn evaluate_dispositions(
             avg < d.ward_strength_low_threshold
         }
     };
+    markers.set_colony("WardStrengthLow", ward_strength_low);
 
     let colony_injury_count = query
         .iter()
@@ -539,13 +545,19 @@ pub fn evaluate_dispositions(
             t.foraging_yield() > 0.0
         });
 
-        // §Phase 4c.3: Caretake urgency signal. Scan kittens in range
-        // for hunger deficits so `hungry_kitten_urgency` + `is_parent_of_hungry_kitten`
-        // reflect reality instead of the stale hardcoded 0.0 / false.
-        let caretake_resolution = crate::ai::caretake_targeting::resolve_caretake(
+        // §6.5.6 target-taking DSE: replaces the Phase 4c.3 plain helper
+        // with the four-axis bundle (nearness / kitten-hunger / kinship
+        // Piecewise / isolation). `hungry_kitten_urgency` now reads the
+        // aggregated Best score; `is_parent_of_hungry_kitten` stays
+        // derived from any hungry own-kitten in range (bloodline override
+        // fires regardless of argmax).
+        let caretake_resolution = crate::ai::dses::caretake_target::resolve_caretake_target(
+            &side_effects.dse_registry,
             entity,
             *pos,
             &kitten_snapshot,
+            &cat_positions,
+            side_effects.time.tick,
         );
         // §Phase 4c.4 alloparenting Reframe A: bond-weighted compassion.
         // Non-parent adults with a positive bond to the kitten's mother
@@ -598,6 +610,8 @@ pub fn evaluate_dispositions(
             .injuries
             .iter()
             .any(|inj| inj.kind == InjuryKind::Severe && !inj.healed);
+        // §4.3 per-cat marker population — mirror of goap.rs.
+        markers.set_entity("Incapacitated", entity, is_incapacitated);
 
         let has_herbs_nearby = herb_positions.iter().any(|(_, hp)| {
             crate::systems::sensing::observer_sees_at(
@@ -710,6 +724,16 @@ pub fn evaluate_dispositions(
             has_raw_food_in_stores,
         };
 
+        // §11 trace plumbing — dormant except when running headless
+        // with `--focal-cat`. `cat_presence_tick` runs on a different
+        // cadence than `evaluate_and_plan`; both systems share the
+        // FocalScoreCapture mutex, so captures from one pass don't
+        // leak into another tick's replay frame.
+        let focal_cat = side_effects
+            .focal_target
+            .as_deref()
+            .and_then(|t| t.entity);
+        let focal_capture = side_effects.focal_capture.as_deref();
         let eval_inputs = crate::ai::scoring::EvalInputs {
             cat: entity,
             position: *pos,
@@ -717,6 +741,8 @@ pub fn evaluate_dispositions(
             dse_registry: &side_effects.dse_registry,
             modifier_pipeline: &side_effects.modifier_pipeline,
             markers: &markers,
+            focal_cat,
+            focal_capture,
         };
         let result = score_actions(&ctx, &eval_inputs, &mut rng.rng);
         let mut scores = result.scores;
@@ -800,14 +826,26 @@ pub fn evaluate_dispositions(
         // the legacy `aggregate_to_dispositions → select_disposition_softmax`
         // path. Disposition-level independence penalty is ported to an
         // action-level transform inside the helper so behavior is preserved.
-        let chosen = select_disposition_via_intention_softmax(
+        //
+        // §11.3 L3 capture — when `cat_presence_tick` is scoring the
+        // focal cat, surface the softmax distribution + RNG roll for
+        // replay. Mirror of the `evaluate_and_plan` capture block; both
+        // systems share `FocalScoreCapture` via the interior mutex.
+        let capture_this_cat = focal_capture.is_some() && focal_cat == Some(entity);
+        let mut softmax_trace = capture_this_cat
+            .then(crate::ai::scoring::SoftmaxCapture::default);
+        let chosen = crate::ai::scoring::select_disposition_via_intention_softmax_with_trace(
             &scores,
             self_groom_won,
             personality.independence,
             d.disposition_independence_penalty,
             sc,
             &mut rng.rng,
+            softmax_trace.as_mut(),
         );
+        if let (Some(capture), Some(trace)) = (focal_capture, softmax_trace) {
+            capture.set_softmax(trace, side_effects.time.tick);
+        }
 
         // Store all gate-open action scores for diagnostics (unchanged from
         // evaluate_actions). Truncation removed 2026-04-20 to match goap.rs.
@@ -1085,12 +1123,17 @@ pub fn disposition_to_chain(
             .min_by_key(|(_, _, bp, _, _)| pos.manhattan_distance(bp))
             .map(|(e, _, bp, _, _)| (e, *bp));
 
-        // §Phase 4c.3: Caretake resolution — the winning kitten flows
-        // into `build_caretaking_chain`'s navigate-TO-kitten step.
-        let caretake_resolution = crate::ai::caretake_targeting::resolve_caretake(
+        // §6.5.6 target-taking DSE: argmax kitten flows into
+        // `build_caretaking_chain`'s navigate-TO-kitten step. Same bundle
+        // as evaluate_dispositions so scoring + chain-building see the
+        // same winner.
+        let caretake_resolution = crate::ai::dses::caretake_target::resolve_caretake_target(
+            &res.dse_registry,
             entity,
             *pos,
             &kitten_snapshot,
+            &cat_pos_list,
+            res.time.tick,
         );
 
         // §6.5.1 + §6.5.2: resolve target-taking DSE winners once per

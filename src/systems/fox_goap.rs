@@ -336,6 +336,11 @@ pub fn fox_evaluate_and_plan(
             dse_registry: &dse_registry,
             modifier_pipeline: &modifier_pipeline,
             markers: &fox_markers,
+            // §11 focal-cat tracing keys off cat name; foxes never
+            // match, so unconditionally `None` here keeps fox-scoring
+            // on the zero-cost path.
+            focal_cat: None,
+            focal_capture: None,
         };
 
         let scoring_result = score_fox_dispositions(&ctx, &inputs, &mut rng.rng);

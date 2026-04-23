@@ -40,6 +40,20 @@ pub struct EvalInputs<'a> {
     /// marker support extends the snapshot when per-cat authoring
     /// systems land.
     pub markers: &'a MarkerSnapshot,
+    /// §11 focal-cat entity, when active. The caller resolves the
+    /// focal name against the live cat roster and populates this once
+    /// per tick; `score_dse_by_id` compares it against `cat` to gate
+    /// trace capture. `None` on every non-focal scoring call and on
+    /// every interactive build.
+    pub focal_cat: Option<Entity>,
+    /// §11 rich-trace sink. When `Some` and `focal_cat == Some(cat)`,
+    /// `score_dse_by_id` routes through `evaluate_single_with_trace` and
+    /// pushes the rich `CapturedDse` into this resource's inner mutex.
+    /// Kept as a `&'a FocalScoreCapture` (with interior `Mutex`) rather
+    /// than `&'a mut FocalScoreCapture` so `EvalInputs` can be passed by
+    /// shared reference through the existing 30+ `score_dse_by_id` call
+    /// sites without threading mutable borrows.
+    pub focal_capture: Option<&'a crate::resources::FocalScoreCapture>,
 }
 
 // ---------------------------------------------------------------------------
@@ -488,11 +502,67 @@ fn ctx_scalars(ctx: &ScoringContext) -> HashMap<&'static str, f32> {
         "day_phase",
         day_phase_scalar(ctx.day_phase),
     );
+    // §3.5.1 modifier-pipeline inputs for the seven foundational
+    // modifiers (Pride, Independence-solo / -group, Patience,
+    // Tradition, Fox-suppression, Corruption-suppression). Each modifier
+    // reads its trigger and transform inputs through the canonical
+    // scalar surface rather than carrying a per-field `ScoringContext`
+    // accessor — keeps `ScoreModifier` pure and `EvalCtx` unchanged.
+    m.insert("respect", ctx.respect.clamp(0.0, 1.0));
+    m.insert("pride", ctx.personality.pride.clamp(0.0, 1.0));
+    m.insert(
+        "independence",
+        ctx.personality.independence.clamp(0.0, 1.0),
+    );
+    m.insert("patience", ctx.personality.patience.clamp(0.0, 1.0));
+    m.insert(
+        "tradition_location_bonus",
+        ctx.tradition_location_bonus.max(0.0),
+    );
+    m.insert("fox_scent_level", ctx.fox_scent_level.clamp(0.0, 1.0));
+    // Active-disposition ordinal drives the Patience modifier's
+    // constituent-DSE membership check. 0.0 encodes `None`; 1.0..=12.0
+    // encode each `DispositionKind` variant. The Patience modifier owns
+    // the ordinal→kind decode + the `(kind, dse_id)` membership table,
+    // preserving the inline `DispositionKind::constituent_actions()`
+    // semantics without threading `Option<DispositionKind>` through
+    // `EvalCtx`.
+    m.insert(
+        "active_disposition_ordinal",
+        active_disposition_ordinal(ctx.active_disposition),
+    );
     // Dummy "one" input for DSEs with base-rate axes (Cook, Idle,
     // Wander). Carried as a scalar so the curve's weight slot is
     // uniform with the other axes.
     m.insert("one", 1.0);
     m
+}
+
+/// Encode the active `DispositionKind` as an `f32` ordinal for the
+/// Patience modifier's scalar surface. 0.0 = no active disposition;
+/// 1.0..=12.0 = each variant in declaration order. The
+/// `src/ai/modifier.rs::Patience` modifier decodes and uses the ordinal
+/// to look up the set of DSE ids that inherit Patience's additive bonus
+/// for the active disposition.
+fn active_disposition_ordinal(
+    active: Option<crate::components::disposition::DispositionKind>,
+) -> f32 {
+    use crate::components::disposition::DispositionKind;
+    match active {
+        None => 0.0,
+        Some(DispositionKind::Resting) => 1.0,
+        Some(DispositionKind::Hunting) => 2.0,
+        Some(DispositionKind::Foraging) => 3.0,
+        Some(DispositionKind::Guarding) => 4.0,
+        Some(DispositionKind::Socializing) => 5.0,
+        Some(DispositionKind::Building) => 6.0,
+        Some(DispositionKind::Farming) => 7.0,
+        Some(DispositionKind::Crafting) => 8.0,
+        Some(DispositionKind::Coordinating) => 9.0,
+        Some(DispositionKind::Exploring) => 10.0,
+        Some(DispositionKind::Mating) => 11.0,
+        Some(DispositionKind::Caretaking) => 12.0,
+    }
 }
 
 /// Day-phase scalar knots, keyed to the Piecewise curve in Sleep /
@@ -512,6 +582,14 @@ fn day_phase_scalar(phase: DayPhase) -> f32 {
 /// Score a registered cat DSE through the L2 evaluator. Returns the
 /// DSE's final score (post-Maslow, post-modifier-pipeline) or 0.0 if
 /// the DSE is missing or ineligible.
+///
+/// When `inputs.focal_cat == Some(inputs.cat)` and
+/// `inputs.focal_capture` is set, this routes the evaluator call
+/// through `evaluate_single_with_trace` and pushes the full §11.3 L2
+/// breakdown (per-consideration inputs + curve labels, composition
+/// mode/weights, Maslow pre-gate, per-modifier pre/post deltas) into
+/// the capture resource. Non-focal calls take the untraced path and
+/// incur zero capture cost beyond the two `Option` checks below.
 fn score_dse_by_id(
     dse_id: &str,
     ctx: &ScoringContext,
@@ -544,6 +622,40 @@ fn score_dse_by_id(
         target: None,
         target_position: None,
     };
+
+    let focal_active =
+        inputs.focal_capture.is_some() && inputs.focal_cat == Some(inputs.cat);
+
+    if focal_active {
+        let mut trace = crate::ai::eval::EvalTrace::default();
+        let scored = crate::ai::eval::evaluate_single_with_trace(
+            dse,
+            inputs.cat,
+            &eval_ctx,
+            &maslow,
+            inputs.modifier_pipeline,
+            &fetch_scalar,
+            Some(&mut trace),
+        );
+        if let (Some(scored), Some(capture)) = (scored, inputs.focal_capture) {
+            let filter = dse.eligibility();
+            capture.push_dse(
+                crate::resources::trace_log::CapturedDse {
+                    dse_id: scored.id,
+                    raw_score: scored.raw_score,
+                    gated_score: scored.gated_score,
+                    final_score: scored.final_score,
+                    intention: scored.intention.clone(),
+                    trace,
+                    eligibility_required: filter.required.to_vec(),
+                    eligibility_forbidden: filter.forbidden.to_vec(),
+                },
+                inputs.tick,
+            );
+            return scored.final_score;
+        }
+        return 0.0;
+    }
 
     evaluate_single(
         dse,
@@ -737,7 +849,12 @@ pub fn score_actions(
         // cat now scores gather (boosted by WardCorruptionEmergency
         // on herbcraft_gather) to collect thornbriar first, then
         // scores ward on a later tick once herbs are held.
-        let ward_eligible = ctx.ward_strength_low && ctx.has_ward_herbs;
+        // §4 marker eligibility (Phase 4b.5): the
+        // `ctx.ward_strength_low` conjunct retires — HerbcraftWardDse
+        // now carries `.require("WardStrengthLow")`. The
+        // `ctx.has_ward_herbs` check stays inline until a per-cat
+        // inventory-marker port lands `HasWardHerbs`.
+        let ward_eligible = ctx.has_ward_herbs;
         let mut ward = if ward_eligible {
             score_dse_by_id("herbcraft_ward", ctx, inputs)
         } else {
@@ -772,12 +889,16 @@ pub fn score_actions(
     if ctx.magic_affinity > s.magic_affinity_threshold && ctx.magic_skill > s.magic_skill_threshold
     {
         let scry = score_dse_by_id("magic_scry", ctx, inputs);
-        let durable_ward =
-            if ctx.ward_strength_low && ctx.magic_skill > s.magic_durable_ward_skill_threshold {
-                score_dse_by_id("magic_durable_ward", ctx, inputs)
-            } else {
-                0.0
-            };
+        // §4 marker eligibility (Phase 4b.5): the
+        // `ctx.ward_strength_low` conjunct retires —
+        // `DurableWardDse` now carries `.require("WardStrengthLow")`.
+        // The `magic_skill` threshold stays inline (it's a §4.5
+        // scalar, not a marker).
+        let durable_ward = if ctx.magic_skill > s.magic_durable_ward_skill_threshold {
+            score_dse_by_id("magic_durable_ward", ctx, inputs)
+        } else {
+            0.0
+        };
         let cleanse = if ctx.on_corrupted_tile
             && ctx.tile_corruption > s.magic_cleanse_corruption_threshold
         {
@@ -848,19 +969,26 @@ pub fn score_actions(
     //     (phys only) matches Hunt/Forage: a fed cat will cook; an exhausted
     //     cat will still sleep first, but safety doesn't gate the action.
     //     Receives a directive bonus if a `DirectiveKind::Cook` is active.
-    let cook_base_conditions =
-        ctx.has_raw_food_in_stores && ctx.needs.hunger > s.cook_hunger_gate;
+    //
+    // §4 marker eligibility (Phase 4b.5): `CookDse` now carries
+    // `.require("HasFunctionalKitchen").require("HasRawFoodInStores")`;
+    // the outer `cook_base_conditions && ctx.has_functional_kitchen`
+    // gate retires. The `hunger > cook_hunger_gate` threshold is a
+    // §4.5 scalar precondition and stays as an inline wrap so Cook
+    // isn't scored while the cat is stuffed. The
+    // `wants_cook_but_no_kitchen` latent signal (read by BuildPressure
+    // in `goap.rs`) is preserved by disambiguating the zero-score case
+    // against the raw ScoringContext booleans — "raw food is present
+    // but no kitchen" is still the only trigger.
+    let hungry_enough_to_cook = ctx.needs.hunger > s.cook_hunger_gate;
     let mut wants_cook_but_no_kitchen = false;
-    if cook_base_conditions && ctx.has_functional_kitchen {
-        // §3.1.1 Cook: WS of base_rate + scarcity + diligence. Maslow
-        // tier 2 (phys-only pre-gate) applied inside the evaluator.
-        let score = score_dse_by_id("cook", ctx, inputs) + jitter(rng, s.jitter_range);
-        scores.push((Action::Cook, score));
-    } else if cook_base_conditions && !ctx.has_functional_kitchen {
-        // Latent desire — the cat would cook if a Kitchen existed. Signal
-        // this up to the caller so colony-wide BuildPressure on Kitchen
-        // reflects the demand.
-        wants_cook_but_no_kitchen = true;
+    if hungry_enough_to_cook {
+        let score = score_dse_by_id("cook", ctx, inputs);
+        if score > 0.0 {
+            scores.push((Action::Cook, score + jitter(rng, s.jitter_range)));
+        } else if ctx.has_raw_food_in_stores && !ctx.has_functional_kitchen {
+            wants_cook_but_no_kitchen = true;
+        }
     }
 
     // --- Caretake (§2.3: WS of kitten_urgency + compassion + is_parent) ---
@@ -879,93 +1007,15 @@ pub fn score_actions(
         scores.push((Action::Idle, score + jitter(rng, s.jitter_range)));
     }
 
-    // --- Post-scoring personality modifiers ---
-
-    // Pride: boost status-granting actions when respect is low.
-    if ctx.respect < s.pride_respect_threshold {
-        let pride_bonus = ctx.personality.pride * s.pride_bonus;
-        for (action, score) in scores.iter_mut() {
-            if matches!(
-                action,
-                Action::Hunt | Action::Fight | Action::Patrol | Action::Build | Action::Coordinate
-            ) {
-                *score += pride_bonus;
-            }
-        }
-    }
-
-    // Independence: boost solo actions, penalize group actions.
-    {
-        let ind = ctx.personality.independence;
-        for (action, score) in scores.iter_mut() {
-            match action {
-                Action::Explore | Action::Wander | Action::Hunt => {
-                    *score += ind * s.independence_solo_bonus
-                }
-                Action::Socialize | Action::Coordinate | Action::Mentor => {
-                    *score = (*score - ind * s.independence_group_penalty).max(0.0);
-                }
-                _ => {}
-            }
-        }
-    }
-
-    // Patience: commitment bonus to actions within the active disposition.
-    if let Some(active_disp) = ctx.active_disposition {
-        let patience_bonus = ctx.personality.patience * s.patience_commitment_bonus;
-        let constituent = active_disp.constituent_actions();
-        for (action, score) in scores.iter_mut() {
-            if constituent.contains(action) {
-                *score += patience_bonus;
-            }
-        }
-    }
-
-    // Tradition: location preference bonus (pre-computed by caller).
-    if ctx.tradition_location_bonus > 0.0 {
-        // Apply to whichever action the caller pre-computed the bonus for.
-        // The caller sets this based on the best-matching action at this tile.
-        // For simplicity, boost all actions — the caller already scaled by tradition.
-        for (_, score) in scores.iter_mut() {
-            *score += ctx.tradition_location_bonus;
-        }
-    }
-
-    // Fox territory suppression: cats in fox-scented areas are less inclined
-    // to hunt, explore, forage, or patrol there. The suppression grows with
-    // scent intensity above the threshold — deep fox territory is dangerous.
-    if ctx.fox_scent_level > s.fox_scent_suppression_threshold {
-        let suppression = (ctx.fox_scent_level - s.fox_scent_suppression_threshold)
-            / (1.0 - s.fox_scent_suppression_threshold)
-            * s.fox_scent_suppression_scale;
-        for (action, score) in scores.iter_mut() {
-            if matches!(
-                action,
-                Action::Hunt | Action::Explore | Action::Forage | Action::Patrol | Action::Wander
-            ) {
-                *score *= (1.0 - suppression).max(0.0);
-            }
-        }
-        // Boost Flee score proportionally — cat wants to leave.
-        for (action, score) in scores.iter_mut() {
-            if matches!(action, Action::Flee) {
-                *score += suppression * 0.5;
-            }
-        }
-    }
-
-    // Corruption territory suppression: corrupted ground discourages aimless
-    // activity. Same pattern as fox scent — threshold, normalize, scale.
-    if ctx.tile_corruption > s.corruption_suppression_threshold {
-        let suppression = (ctx.tile_corruption - s.corruption_suppression_threshold)
-            / (1.0 - s.corruption_suppression_threshold)
-            * s.corruption_suppression_scale;
-        for (action, score) in scores.iter_mut() {
-            if matches!(action, Action::Explore | Action::Wander | Action::Idle) {
-                *score *= (1.0 - suppression).max(0.0);
-            }
-        }
-    }
+    // §3.5 post-scoring modifiers previously ran as imperative passes
+    // here — Pride, Independence (solo / group), Patience, Tradition,
+    // Fox-suppression, Corruption-suppression. All seven are now
+    // registered in `crate::ai::modifier::default_modifier_pipeline`
+    // and apply inside `evaluate_single` per-DSE. See
+    // `src/ai/modifier.rs` (Pride / IndependenceSolo /
+    // IndependenceGroup / Patience / Tradition /
+    // FoxTerritorySuppression / CorruptionTerritorySuppression) for
+    // the individual ports.
 
     ScoringResult {
         scores,
@@ -1481,6 +1531,34 @@ pub fn select_disposition_via_intention_softmax(
     sc: &ScoringConstants,
     rng: &mut impl Rng,
 ) -> DispositionKind {
+    select_disposition_via_intention_softmax_with_trace(
+        scores,
+        self_groom_won,
+        independence,
+        disposition_independence_penalty,
+        sc,
+        rng,
+        None,
+    )
+}
+
+/// §11.3 L3 softmax capture surface. When `sink` is `Some`, populates it
+/// with the filtered pool, softmax weights/probabilities, temperature,
+/// the RNG roll, and the picked Action. This is the only way to surface
+/// the softmax distribution for replay since `rng.random::<f32>()` is
+/// consumed in place and not recoverable post-hoc.
+///
+/// `sink` being `Some` is the load-bearing focal-cat detection gate.
+/// Non-focal cats pass `None` and incur zero capture cost.
+pub fn select_disposition_via_intention_softmax_with_trace(
+    scores: &[(Action, f32)],
+    self_groom_won: bool,
+    independence: f32,
+    disposition_independence_penalty: f32,
+    sc: &ScoringConstants,
+    rng: &mut impl Rng,
+    mut sink: Option<&mut SoftmaxCapture>,
+) -> DispositionKind {
     // Build the filtered pool: drop Flee and Idle (handled outside the
     // disposition selection layer) and any zero-scoring actions (the legacy
     // `aggregate_to_dispositions` also drops zero-scoring dispositions).
@@ -1512,6 +1590,10 @@ pub fn select_disposition_via_intention_softmax(
     }
 
     if pool.is_empty() {
+        if let Some(sink) = sink.as_mut() {
+            sink.temperature = sc.intention_softmax_temperature;
+            sink.empty_pool = true;
+        }
         return DispositionKind::Resting;
     }
 
@@ -1528,7 +1610,8 @@ pub fn select_disposition_via_intention_softmax(
         .collect();
     let total: f32 = weights.iter().sum();
 
-    let mut roll: f32 = rng.random::<f32>() * total;
+    let raw_roll: f32 = rng.random::<f32>();
+    let mut roll = raw_roll * total;
     let mut chosen_idx = pool.len() - 1;
     for (i, w) in weights.iter().enumerate() {
         roll -= w;
@@ -1538,6 +1621,20 @@ pub fn select_disposition_via_intention_softmax(
         }
     }
     let chosen_action = pool[chosen_idx].0;
+
+    if let Some(sink) = sink {
+        sink.temperature = temperature;
+        sink.pool = pool.clone();
+        sink.weights = weights;
+        // Probabilities = weights / total (guarded against total == 0
+        // by the empty-pool check above; Boltzmann weights with finite
+        // scores always sum > 0).
+        sink.probabilities = sink.weights.iter().map(|w| w / total).collect();
+        sink.raw_roll = raw_roll;
+        sink.chosen_idx = Some(chosen_idx);
+        sink.chosen_action = Some(chosen_action);
+        sink.empty_pool = false;
+    }
 
     // Map the winning Intention → Disposition. Groom routes via
     // `self_groom_won`; all other dispositioned actions have a 1:1 mapping.
@@ -1549,6 +1646,30 @@ pub fn select_disposition_via_intention_softmax(
         };
     }
     DispositionKind::from_action(chosen_action).unwrap_or(DispositionKind::Resting)
+}
+
+/// Captured snapshot of one softmax selection for §11.3 L3 replay.
+///
+/// `pool` / `weights` / `probabilities` are parallel arrays of length
+/// N (the surviving Intentions); `raw_roll` is the `rng.random::<f32>()`
+/// draw before scaling by the weight-sum so reruns can reproduce the
+/// pick deterministically; `chosen_idx` indexes into the three arrays.
+///
+/// `empty_pool == true` signals the fallthrough case where every
+/// Intention scored 0 — the caller returned `DispositionKind::Resting`
+/// without invoking the RNG. Keeping the default `Vec::new()` shapes
+/// lets consumers distinguish "softmax ran and picked" from
+/// "softmax skipped entirely".
+#[derive(Debug, Default, Clone)]
+pub struct SoftmaxCapture {
+    pub pool: Vec<(Action, f32)>,
+    pub weights: Vec<f32>,
+    pub probabilities: Vec<f32>,
+    pub temperature: f32,
+    pub raw_roll: f32,
+    pub chosen_idx: Option<usize>,
+    pub chosen_action: Option<Action>,
+    pub empty_pool: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -1639,6 +1760,10 @@ mod tests {
             let mut s = MarkerSnapshot::new();
             s.set_colony("HasStoredFood", true);
             s.set_colony("HasGarden", true);
+            // Phase 4b.5 additions.
+            s.set_colony("HasFunctionalKitchen", true);
+            s.set_colony("HasRawFoodInStores", true);
+            s.set_colony("WardStrengthLow", true);
             s
         })
     }
@@ -1651,6 +1776,8 @@ mod tests {
             dse_registry: cached_registry(),
             modifier_pipeline: cached_modifier_pipeline(),
             markers: cached_test_markers(),
+            focal_cat: None,
+            focal_capture: None,
         }
     }
 
@@ -3296,5 +3423,95 @@ mod tests {
             ward_score < 0.5,
             "ward without corruption should score < 0.5; got {ward_score:.3}"
         );
+    }
+
+    // -------------------------------------------------------------------
+    // §11 softmax capture tests — disposition-selection path parity +
+    // capture-sink population + no-pool fallthrough.
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn softmax_capture_records_probabilities_sum_to_one() {
+        // A two-action pool at modest temperature should produce a
+        // valid probability distribution (non-negative, sums to ~1).
+        // This is the first-line gate on the L3 record's softmax.probabilities.
+        let sc = ScoringConstants::default();
+        let scores = vec![(Action::Eat, 0.8), (Action::Sleep, 0.4)];
+        let mut rng = seeded_rng(1);
+        let mut capture = SoftmaxCapture::default();
+        let _ = select_disposition_via_intention_softmax_with_trace(
+            &scores,
+            false,
+            0.0,
+            0.0,
+            &sc,
+            &mut rng,
+            Some(&mut capture),
+        );
+        assert_eq!(capture.probabilities.len(), 2);
+        let sum: f32 = capture.probabilities.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-4, "probabilities sum to {sum}, expected ~1");
+        for p in &capture.probabilities {
+            assert!(*p >= 0.0);
+            assert!(*p <= 1.0);
+        }
+        assert!(capture.raw_roll >= 0.0 && capture.raw_roll <= 1.0);
+        assert!(capture.chosen_idx.is_some());
+        assert!(!capture.empty_pool);
+    }
+
+    #[test]
+    fn softmax_capture_flags_empty_pool_fallthrough() {
+        // When every action is Flee/Idle or zero-scoring the pool is
+        // empty and the softmax doesn't fire. The capture sink should
+        // still record the temperature + `empty_pool: true` so replay
+        // frames can distinguish "softmax ran" from "fallthrough to
+        // DispositionKind::Resting" unambiguously.
+        let sc = ScoringConstants::default();
+        let scores = vec![(Action::Flee, 0.9), (Action::Idle, 0.3)];
+        let mut rng = seeded_rng(2);
+        let mut capture = SoftmaxCapture::default();
+        let chosen = select_disposition_via_intention_softmax_with_trace(
+            &scores,
+            false,
+            0.0,
+            0.0,
+            &sc,
+            &mut rng,
+            Some(&mut capture),
+        );
+        assert_eq!(chosen, crate::components::disposition::DispositionKind::Resting);
+        assert!(capture.empty_pool);
+        assert!(capture.pool.is_empty());
+        assert!(capture.probabilities.is_empty());
+        assert!(capture.chosen_idx.is_none());
+    }
+
+    #[test]
+    fn softmax_without_capture_matches_capture_variant() {
+        // Parity check: calling the `_with_trace` variant with `None`
+        // must yield the same DispositionKind as the plain variant for
+        // the same (scores, rng-seed) inputs — proves the capture path
+        // is observation-only.
+        let sc = ScoringConstants::default();
+        let scores = vec![(Action::Eat, 0.6), (Action::Socialize, 0.5), (Action::Patrol, 0.4)];
+        let plain = select_disposition_via_intention_softmax(
+            &scores,
+            false,
+            0.0,
+            0.0,
+            &sc,
+            &mut seeded_rng(99),
+        );
+        let traced = select_disposition_via_intention_softmax_with_trace(
+            &scores,
+            false,
+            0.0,
+            0.0,
+            &sc,
+            &mut seeded_rng(99),
+            None,
+        );
+        assert_eq!(plain, traced);
     }
 }

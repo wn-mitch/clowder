@@ -238,12 +238,42 @@ impl ModifierPipeline {
     pub fn apply(
         &self,
         dse_id: DseId,
-        mut score: f32,
+        score: f32,
         ctx: &EvalCtx,
         fetch_scalar: &dyn Fn(&str, Entity) -> f32,
     ) -> f32 {
+        self.apply_with_trace(dse_id, score, ctx, fetch_scalar, None)
+    }
+
+    /// Apply every registered modifier, optionally capturing per-pass
+    /// `(name, pre, post)` deltas into the provided sink. When the sink
+    /// is `None` the cost is a single `Option` check per pass — this is
+    /// the zero-cost-when-not-tracing contract §11.5 requires.
+    ///
+    /// Only passes that actually changed the score (`pre != post`) are
+    /// recorded, so the sink carries signal rather than noise — the
+    /// seven §3.5.1 modifiers each apply to a narrow DSE slice and
+    /// leaving out no-op rows keeps replay frames readable.
+    pub fn apply_with_trace(
+        &self,
+        dse_id: DseId,
+        mut score: f32,
+        ctx: &EvalCtx,
+        fetch_scalar: &dyn Fn(&str, Entity) -> f32,
+        mut sink: Option<&mut Vec<ModifierDelta>>,
+    ) -> f32 {
         for pass in &self.passes {
+            let pre = score;
             score = pass.apply(dse_id, score, ctx, fetch_scalar);
+            if let Some(sink) = sink.as_mut() {
+                if (score - pre).abs() > f32::EPSILON {
+                    sink.push(ModifierDelta {
+                        name: pass.name(),
+                        pre,
+                        post: score,
+                    });
+                }
+            }
         }
         score
     }
@@ -255,6 +285,57 @@ impl ModifierPipeline {
     pub fn is_empty(&self) -> bool {
         self.passes.is_empty()
     }
+}
+
+// ---------------------------------------------------------------------------
+// EvalTrace — §11.3 L2 record capture shape
+// ---------------------------------------------------------------------------
+
+/// Per-modifier delta row captured during `ModifierPipeline::apply_with_trace`.
+/// Modifier names are `&'static str` (§3.5 `ScoreModifier::name` contract),
+/// so this clones on emit rather than per-tick.
+#[derive(Debug, Clone)]
+pub struct ModifierDelta {
+    pub name: &'static str,
+    pub pre: f32,
+    pub post: f32,
+}
+
+/// Per-consideration record captured during `evaluate_single_with_trace`.
+/// Covers the §11.3 L2 record's `considerations` row: the consideration's
+/// name, the input that fed its curve, a human-readable curve label, the
+/// post-curve score, and the composition weight this consideration was
+/// assigned. `spatial_map_key` is populated iff this is a
+/// `Consideration::Spatial` — downstream L1-to-L2 joinability keys off it.
+#[derive(Debug, Clone)]
+pub struct ConsiderationTraceRow {
+    pub name: &'static str,
+    pub kind: ConsiderationKind,
+    pub input: f32,
+    pub curve_label: String,
+    pub score: f32,
+    pub weight: f32,
+    pub spatial_map_key: Option<&'static str>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConsiderationKind {
+    Scalar,
+    Spatial,
+    Marker,
+}
+
+/// Full L2 decomposition captured during `evaluate_single_with_trace`. This
+/// is the data shape §11.3's L2 record pulls its fields from. Empty by
+/// default; populated only when the evaluator is invoked with a sink.
+#[derive(Debug, Clone, Default)]
+pub struct EvalTrace {
+    pub considerations: Vec<ConsiderationTraceRow>,
+    pub composition_mode: Option<&'static str>,
+    pub composition_weights: Vec<f32>,
+    pub composition_compensation_strength: f32,
+    pub maslow_pregate: f32,
+    pub modifier_deltas: Vec<ModifierDelta>,
 }
 
 // ---------------------------------------------------------------------------
@@ -324,6 +405,24 @@ pub fn evaluate_single(
     modifiers: &ModifierPipeline,
     fetch_scalar: &dyn Fn(&str, Entity) -> f32,
 ) -> Option<ScoredDse> {
+    evaluate_single_with_trace(dse, cat, ctx, maslow_pre_gate, modifiers, fetch_scalar, None)
+}
+
+/// Same as [`evaluate_single`] but, when `sink` is `Some`, records the
+/// full §11.3 L2 decomposition (per-consideration inputs + curve labels,
+/// composition mode/weights, Maslow pre-gate, per-modifier pre/post
+/// deltas). When `sink` is `None` the cost is an `Option` check in the
+/// consideration-scoring loop — §11.5's "no tracing cost when dormant"
+/// contract.
+pub fn evaluate_single_with_trace(
+    dse: &dyn Dse,
+    cat: Entity,
+    ctx: &EvalCtx,
+    maslow_pre_gate: &dyn Fn(u8) -> f32,
+    modifiers: &ModifierPipeline,
+    fetch_scalar: &dyn Fn(&str, Entity) -> f32,
+    mut sink: Option<&mut EvalTrace>,
+) -> Option<ScoredDse> {
     if !passes_eligibility(dse.eligibility(), cat, ctx) {
         return None;
     }
@@ -331,28 +430,62 @@ pub fn evaluate_single(
     let considerations = dse.considerations();
     let composition = dse.composition();
 
-    // Score each consideration via the appropriate input source.
-    let per_consideration: Vec<f32> = considerations
-        .iter()
-        .map(|c| score_consideration(c, cat, ctx, fetch_scalar))
-        .collect();
+    // Score each consideration via the appropriate input source. When a
+    // sink is attached, also record the pre-curve input and a curve
+    // label so replay frames show the full curvature per §11.1.
+    let mut per_consideration: Vec<f32> = Vec::with_capacity(considerations.len());
+    for (idx, c) in considerations.iter().enumerate() {
+        let (score, trace_row) = score_consideration_with_trace(c, cat, ctx, fetch_scalar, sink.is_some());
+        per_consideration.push(score);
+        if let (Some(sink), Some((input, curve_label, kind, spatial_map_key))) =
+            (sink.as_mut(), trace_row)
+        {
+            let weight = composition.weights.get(idx).copied().unwrap_or(0.0);
+            sink.considerations.push(ConsiderationTraceRow {
+                name: c.name(),
+                kind,
+                input,
+                curve_label,
+                score,
+                weight,
+                spatial_map_key,
+            });
+        }
+    }
 
     // Compose to raw score.
     let raw_score = composition.compose(&per_consideration);
 
     // Maslow pre-gate. u8::MAX opts out (non-Maslow DSEs — coordinator
     // election, narrative selection).
-    let gated_score = if dse.maslow_tier() == u8::MAX {
-        raw_score
+    let pregate = if dse.maslow_tier() == u8::MAX {
+        1.0
     } else {
-        maslow_pre_gate(dse.maslow_tier()) * raw_score
+        maslow_pre_gate(dse.maslow_tier())
     };
+    let gated_score = pregate * raw_score;
 
     // Post-scoring modifier pipeline. Shares the same scalar-fetch
     // closure the considerations use, so modifier triggers (corruption
     // readings, Maslow suppression, inventory booleans) resolve through
     // the same canonical scalar surface as DSE inputs.
-    let final_score = modifiers.apply(dse.id(), gated_score, ctx, fetch_scalar);
+    let final_score = modifiers.apply_with_trace(
+        dse.id(),
+        gated_score,
+        ctx,
+        fetch_scalar,
+        sink.as_mut().map(|s| &mut s.modifier_deltas),
+    );
+
+    // Populate trace-only composition + maslow metadata. These are
+    // pure restatement of the inputs to the composer + pre-gate; they
+    // don't cost anything to capture when the sink is absent.
+    if let Some(sink) = sink {
+        sink.composition_mode = Some(composition_mode_label(composition));
+        sink.composition_weights = composition.weights.clone();
+        sink.composition_compensation_strength = composition.compensation_strength;
+        sink.maslow_pregate = pregate;
+    }
 
     // Emit the Intention.
     let intention = dse.emit(final_score, ctx);
@@ -367,18 +500,52 @@ pub fn evaluate_single(
     })
 }
 
+fn composition_mode_label(c: &super::composition::Composition) -> &'static str {
+    use super::composition::CompositionMode;
+    match c.mode {
+        CompositionMode::CompensatedProduct => "CompensatedProduct",
+        CompositionMode::WeightedSum => "WeightedSum",
+        CompositionMode::Max => "Max",
+    }
+}
+
 /// Score one consideration by dispatching on its flavor. Scalar
 /// considerations pull from `fetch_scalar`; spatial considerations
 /// resolve a position + `ctx.sample_map`; marker considerations
-/// consult `ctx.has_marker`.
-fn score_consideration(
+/// consult `ctx.has_marker`. Returns a tuple `(score, trace_row)`
+/// where `trace_row` is populated when `capture` is true; callers that
+/// don't need the trace pass `false` and discard the second element.
+///
+/// `trace_row` carries the input fed to the curve, a human-readable
+/// curve label, the consideration kind, and (for `Spatial`) the map
+/// key so §11.3 L1-to-L2 joinability has a stable link. When `capture`
+/// is false the second slot is always `None` — the branch-predictor
+/// resolves the cost to a single conditional per call.
+#[allow(clippy::type_complexity)]
+fn score_consideration_with_trace(
     consideration: &Consideration,
     cat: Entity,
     ctx: &EvalCtx,
     fetch_scalar: &dyn Fn(&str, Entity) -> f32,
-) -> f32 {
+    capture: bool,
+) -> (
+    f32,
+    Option<(f32, String, ConsiderationKind, Option<&'static str>)>,
+) {
     match consideration {
-        Consideration::Scalar(s) => s.score(fetch_scalar(s.name, cat)),
+        Consideration::Scalar(s) => {
+            let input = fetch_scalar(s.name, cat);
+            let score = s.score(input);
+            let row = capture.then(|| {
+                (
+                    input,
+                    format!("{:?}", s.curve),
+                    ConsiderationKind::Scalar,
+                    None,
+                )
+            });
+            (score, row)
+        }
         Consideration::Spatial(s) => {
             let pos = match s.center {
                 CenterPolicy::SelfPosition => ctx.self_position,
@@ -387,12 +554,44 @@ fn score_consideration(
                     // Target-taking DSE scored without a target: zero.
                     // The target-taking evaluator (§6, Phase 4) must
                     // populate `ctx.target_position` before calling in.
-                    None => return 0.0,
+                    None => {
+                        let row = capture.then(|| {
+                            (
+                                0.0,
+                                format!("{:?}", s.curve),
+                                ConsiderationKind::Spatial,
+                                Some(s.map_key),
+                            )
+                        });
+                        return (0.0, row);
+                    }
                 },
             };
-            s.score((ctx.sample_map)(s.map_key, pos))
+            let input = (ctx.sample_map)(s.map_key, pos);
+            let score = s.score(input);
+            let row = capture.then(|| {
+                (
+                    input,
+                    format!("{:?}", s.curve),
+                    ConsiderationKind::Spatial,
+                    Some(s.map_key),
+                )
+            });
+            (score, row)
         }
-        Consideration::Marker(m) => m.score((ctx.has_marker)(m.marker, cat)),
+        Consideration::Marker(m) => {
+            let present = (ctx.has_marker)(m.marker, cat);
+            let score = m.score(present);
+            let row = capture.then(|| {
+                (
+                    if present { 1.0 } else { 0.0 },
+                    format!("Marker(present_score={:.3})", m.present_score),
+                    ConsiderationKind::Marker,
+                    None,
+                )
+            });
+            (score, row)
+        }
     }
 }
 
@@ -882,4 +1081,177 @@ mod tests {
         }
     }
 
+    // -------------------------------------------------------------------
+    // §11 trace-capture tests — evaluate_single_with_trace + modifier
+    // deltas + softmax capture parity.
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn evaluate_single_with_trace_captures_consideration_input_and_score() {
+        // Trace sink captures the scalar input fed to the curve + the
+        // curve-evaluated score. §11.3's joinability invariant: L2's
+        // `per_consideration` rows carry the raw input and the
+        // post-curve score so replay frames can reconstruct the
+        // transform.
+        let dse = test_dse("eat", "hunger");
+        let entity = Entity::from_raw_u32(1).unwrap();
+        let has_marker = |_: &str, _: Entity| false;
+        let sample = |_: &str, _: Position| 0.0;
+        let ctx = EvalCtx {
+            cat: entity,
+            tick: 0,
+            sample_map: &sample,
+            has_marker: &has_marker,
+            self_position: Position::new(0, 0),
+            target: None,
+            target_position: None,
+        };
+        let maslow = |_: u8| 1.0;
+        let modifiers = ModifierPipeline::new();
+        let fetch = |name: &str, _: Entity| if name == "hunger" { 0.75 } else { 0.0 };
+
+        let mut trace = EvalTrace::default();
+        let scored = evaluate_single_with_trace(
+            &dse,
+            entity,
+            &ctx,
+            &maslow,
+            &modifiers,
+            &fetch,
+            Some(&mut trace),
+        )
+        .expect("eligible");
+        assert_eq!(trace.considerations.len(), 1);
+        let row = &trace.considerations[0];
+        assert_eq!(row.name, "hunger");
+        assert_eq!(row.kind, ConsiderationKind::Scalar);
+        assert!(
+            (row.input - 0.75).abs() < 1e-6,
+            "raw input captured; got {}",
+            row.input
+        );
+        assert!((row.score - scored.per_consideration[0]).abs() < 1e-6);
+        assert!(row.curve_label.starts_with("Logistic"));
+        // Composition metadata populated.
+        assert_eq!(trace.composition_mode, Some("CompensatedProduct"));
+        assert_eq!(trace.composition_weights.len(), 1);
+        // Maslow pre-gate recorded (tier 1 → 1.0 from the closure above).
+        assert!((trace.maslow_pregate - 1.0).abs() < 1e-6);
+        // No modifiers registered → no deltas.
+        assert!(trace.modifier_deltas.is_empty());
+    }
+
+    #[test]
+    fn evaluate_single_without_trace_is_zero_cost_path() {
+        // Without a sink, evaluate_single returns the same ScoredDse
+        // as the traced variant and doesn't allocate any trace state.
+        // Regression guard: a future change that moved allocation into
+        // the untraced path would silently tax every scoring call.
+        let dse = test_dse("eat", "hunger");
+        let entity = Entity::from_raw_u32(1).unwrap();
+        let has_marker = |_: &str, _: Entity| false;
+        let sample = |_: &str, _: Position| 0.0;
+        let ctx = EvalCtx {
+            cat: entity,
+            tick: 0,
+            sample_map: &sample,
+            has_marker: &has_marker,
+            self_position: Position::new(0, 0),
+            target: None,
+            target_position: None,
+        };
+        let maslow = |_: u8| 1.0;
+        let modifiers = ModifierPipeline::new();
+        let fetch = |name: &str, _: Entity| if name == "hunger" { 0.6 } else { 0.0 };
+
+        let untraced = evaluate_single(&dse, entity, &ctx, &maslow, &modifiers, &fetch)
+            .expect("eligible");
+        let mut sink = EvalTrace::default();
+        let traced = evaluate_single_with_trace(
+            &dse,
+            entity,
+            &ctx,
+            &maslow,
+            &modifiers,
+            &fetch,
+            Some(&mut sink),
+        )
+        .expect("eligible");
+
+        assert!((untraced.raw_score - traced.raw_score).abs() < 1e-6);
+        assert!((untraced.gated_score - traced.gated_score).abs() < 1e-6);
+        assert!((untraced.final_score - traced.final_score).abs() < 1e-6);
+    }
+
+    #[test]
+    fn modifier_pipeline_apply_with_trace_records_nonzero_deltas() {
+        struct AddFive;
+        impl ScoreModifier for AddFive {
+            fn apply(
+                &self,
+                _: DseId,
+                score: f32,
+                _: &EvalCtx,
+                _: &dyn Fn(&str, Entity) -> f32,
+            ) -> f32 {
+                score + 0.05
+            }
+            fn name(&self) -> &'static str {
+                "add_five"
+            }
+        }
+        struct NoOpUnlessAbove05;
+        impl ScoreModifier for NoOpUnlessAbove05 {
+            fn apply(
+                &self,
+                _: DseId,
+                score: f32,
+                _: &EvalCtx,
+                _: &dyn Fn(&str, Entity) -> f32,
+            ) -> f32 {
+                if score > 0.5 { score * 0.5 } else { score }
+            }
+            fn name(&self) -> &'static str {
+                "cap"
+            }
+        }
+
+        let mut pipeline = ModifierPipeline::new();
+        pipeline.push(Box::new(AddFive));
+        pipeline.push(Box::new(NoOpUnlessAbove05));
+
+        let entity = Entity::from_raw_u32(1).unwrap();
+        let has_marker = |_: &str, _: Entity| false;
+        let sample = |_: &str, _: Position| 0.0;
+        let ctx = EvalCtx {
+            cat: entity,
+            tick: 0,
+            sample_map: &sample,
+            has_marker: &has_marker,
+            self_position: Position::new(0, 0),
+            target: None,
+            target_position: None,
+        };
+        let fetch = |_: &str, _: Entity| 0.0;
+
+        // Input 0.6 → AddFive takes it to 0.65 → cap halves to 0.325.
+        // Both passes should appear in the trace because both changed score.
+        let mut deltas = Vec::new();
+        let out =
+            pipeline.apply_with_trace(DseId("eat"), 0.6, &ctx, &fetch, Some(&mut deltas));
+        assert!((out - 0.325).abs() < 1e-6, "got {out}");
+        assert_eq!(deltas.len(), 2);
+        assert_eq!(deltas[0].name, "add_five");
+        assert!((deltas[0].post - deltas[0].pre - 0.05).abs() < 1e-6);
+        assert_eq!(deltas[1].name, "cap");
+
+        // Input 0.4 → AddFive takes it to 0.45 → cap no-ops at 0.45.
+        // Only AddFive should appear; cap's pre==post is filtered out.
+        let mut deltas = Vec::new();
+        let out =
+            pipeline.apply_with_trace(DseId("eat"), 0.4, &ctx, &fetch, Some(&mut deltas));
+        assert!((out - 0.45).abs() < 1e-6, "got {out}");
+        assert_eq!(deltas.len(), 1, "cap was a no-op, should be skipped");
+        assert_eq!(deltas[0].name, "add_five");
+    }
 }

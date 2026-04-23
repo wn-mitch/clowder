@@ -431,6 +431,9 @@ fn build_schedule() -> Schedule {
             // Cat needs, mood, and decision-making
             (
                 clowder::systems::needs::decay_needs,
+                // §4.3 Incapacitated marker author — mirror of
+                // SimulationPlugin::build Chain 2.
+                clowder::systems::incapacitation::update_incapacitation,
                 clowder::systems::needs::decay_grooming,
                 clowder::systems::needs::eat_from_inventory,
                 clowder::systems::needs::decay_exploration,
@@ -531,6 +534,9 @@ fn build_schedule() -> Schedule {
             >)
             .run_if(bevy_ecs::prelude::resource_exists::<
                 clowder::resources::TraceLog,
+            >)
+            .run_if(bevy_ecs::prelude::resource_exists::<
+                clowder::resources::FocalScoreCapture,
             >),
     );
     schedule.add_systems(
@@ -687,6 +693,9 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
             .target_taking_dses
             .push(clowder::ai::dses::mentor_target_dse());
         registry.cat_dses.push(clowder::ai::dses::caretake_dse());
+        registry
+            .target_taking_dses
+            .push(clowder::ai::dses::caretake_target_dse());
         registry.cat_dses.push(clowder::ai::dses::mate_dse());
         registry
             .target_taking_dses
@@ -912,6 +921,14 @@ fn run_headless(args: CliArgs) -> io::Result<()> {
             entity: None,
         });
         world.insert_resource(clowder::resources::TraceLog::default());
+        // §11 rich-trace capture sink. Populated by `score_dse_by_id`
+        // + `select_disposition_via_intention_softmax_with_trace` for
+        // the focal cat each tick; drained by `emit_focal_trace` at
+        // the end of the tick. Insertion gates the `evaluate_and_plan`
+        // / `cat_presence_tick` trace code paths via `Option<Res<_>>`
+        // checks — when the resource is absent those paths take the
+        // zero-capture branch unconditionally.
+        world.insert_resource(clowder::resources::FocalScoreCapture::default());
     }
 
     let duration = Duration::from_secs(args.duration_secs);
@@ -1405,6 +1422,9 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
             .target_taking_dses
             .push(clowder::ai::dses::mentor_target_dse());
         registry.cat_dses.push(clowder::ai::dses::caretake_dse());
+        registry
+            .target_taking_dses
+            .push(clowder::ai::dses::caretake_target_dse());
         registry.cat_dses.push(clowder::ai::dses::mate_dse());
         registry
             .target_taking_dses

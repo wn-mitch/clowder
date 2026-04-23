@@ -525,6 +525,8 @@ mod tests {
             dse_registry: registry,
             modifier_pipeline: modifiers,
             markers,
+            focal_cat: None,
+            focal_capture: None,
         }
     }
 

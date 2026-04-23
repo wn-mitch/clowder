@@ -84,10 +84,11 @@ pub struct Elder;
 // State markers (§4.3 State)
 // ---------------------------------------------------------------------------
 
-/// Severe unhealed injury — downed. `needs.rs::update_incapacitation`.
-/// Used as the eligibility gate that retires the §2.3 incapacitated
-/// branch: `Q<_, With<Incapacitated>>` picks the narrow DSE set (Eat,
-/// Sleep, Idle); every other DSE uses `Without<Incapacitated>`.
+/// Severe unhealed injury — downed.
+/// `systems::incapacitation::update_incapacitation`. Used as the
+/// eligibility gate that retires the §2.3 incapacitated branch:
+/// `Q<_, With<Incapacitated>>` picks the narrow DSE set (Eat, Sleep,
+/// Idle); every other DSE uses `Without<Incapacitated>`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Incapacitated;
 

@@ -26,6 +26,7 @@ pub mod fertility;
 pub mod fox_goap;
 pub mod goap;
 pub mod growth;
+pub mod incapacitation;
 pub mod influence_map;
 pub mod items;
 pub mod magic;
