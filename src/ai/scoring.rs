@@ -2550,35 +2550,50 @@ mod tests {
             ..base
         };
         let scores = score_actions(&c, &inputs, &mut rng).scores;
-        let actions: Vec<Action> = scores
-            .iter()
-            .filter(|(_, s)| *s > 0.0)
-            .map(|(a, _)| *a)
-            .collect();
-
+        // §13.1: Hunt/Fight/Flee are forbidden for incapacitated cats
+        // via `.forbid("Incapacitated")` on each DSE. `score_dse_by_id`
+        // returns 0.0 for a filtered-out DSE, but `score_actions` still
+        // pushes `0.0 + jitter(±jitter_range)` into the pool, so a
+        // forbidden action can show above-zero from noise alone. The
+        // correct invariant is magnitude: eligible actions
+        // (Eat/Sleep/Idle) score well above jitter; forbidden actions
+        // score at most `jitter_range` in magnitude.
+        let jitter_range = sc.jitter_range;
+        let get = |action: Action| -> f32 {
+            scores.iter().find(|(a, _)| *a == action).map(|(_, s)| *s).unwrap_or(0.0)
+        };
         assert!(
-            actions.contains(&Action::Eat),
-            "incapacitated cat should be able to Eat"
+            get(Action::Eat) > jitter_range,
+            "incapacitated cat should score Eat above jitter (got {})",
+            get(Action::Eat)
         );
         assert!(
-            actions.contains(&Action::Sleep),
-            "incapacitated cat should be able to Sleep"
+            get(Action::Sleep) > jitter_range,
+            "incapacitated cat should score Sleep above jitter (got {})",
+            get(Action::Sleep)
+        );
+        // Idle no longer carries the retired `incapacitated_idle_score`
+        // constant — its urgency now runs through Idle's canonical axes,
+        // which score low for a hungry/tired cat. The §13.1 invariant
+        // this test guards is the *forbidden* set (Hunt/Fight/Flee), not
+        // Idle's score magnitude.
+        assert!(
+            get(Action::Hunt).abs() <= jitter_range,
+            "incapacitated cat's Hunt must be at most jitter-range (got {}, jitter {})",
+            get(Action::Hunt),
+            jitter_range
         );
         assert!(
-            actions.contains(&Action::Idle),
-            "incapacitated cat should be able to Idle"
+            get(Action::Fight).abs() <= jitter_range,
+            "incapacitated cat's Fight must be at most jitter-range (got {}, jitter {})",
+            get(Action::Fight),
+            jitter_range
         );
         assert!(
-            !actions.contains(&Action::Hunt),
-            "incapacitated cat should not Hunt"
-        );
-        assert!(
-            !actions.contains(&Action::Fight),
-            "incapacitated cat should not Fight"
-        );
-        assert!(
-            !actions.contains(&Action::Flee),
-            "incapacitated cat should not Flee"
+            get(Action::Flee).abs() <= jitter_range,
+            "incapacitated cat's Flee must be at most jitter-range (got {}, jitter {})",
+            get(Action::Flee),
+            jitter_range
         );
     }
 

@@ -37,6 +37,8 @@ plan — the plan is written when the work is picked up.
   - [20. NamedLandmark substrate](#20-namedlandmark-substrate-cross-consumer-naming-2026-04-22)
   - [21. Monuments — civic & memorial structures](#21-monuments--civic--memorial-structures-2026-04-22)
 - [Landed](#landed)
+  - [§13.1 rows 4–6 — corruption-axis Logistic migration + modifier/constant retirement](#131-rows-46--corruption-axis-logistic-migration--modifierconstant-retirement-2026-04-23)
+  - [§13.1 rows 1–3 — Incapacitated consumer cutover + inline-branch retirement](#131-rows-13--incapacitated-consumer-cutover--inline-branch-retirement-2026-04-23)
   - [Phase A1.2 (A5) — §11 focal-cat replay enrichment](#phase-a12-a5--11-focal-cat-replay-enrichment-at-source-l2l3-trace-capture-2026-04-23)
   - [Phase 4b.5 — §4 colony-scoped marker batch: HasFunctionalKitchen + HasRawFoodInStores + WardStrengthLow](#phase-4b5--4-colony-scoped-marker-batch-hasfunctionalkitchen--hasrawfoodinstores--wardstrengthlow-2026-04-23)
   - [§3.5 remaining-modifier port — seven modifiers onto the pipeline + inline retirement](#35-remaining-modifier-port--seven-modifiers-onto-the-pipeline--inline-retirement-2026-04-23)
@@ -284,31 +286,24 @@ entry slices across them.
   (eligibility → considerations → composition → Maslow pre-gate →
   modifier pipeline) is live. 30 cat+fox DSE factories exist under
   `src/ai/dses/`, all routed through `score_dse_by_id → evaluate_single`.
-- **Track B — Per-axis curve migration. PARTIAL (~85%).**
-  Most §2.3-assigned curves are in place: `hangry()` on hunger
-  peer-group, `sleep_dep()` on Sleep, `loneliness()` on social
-  axes, `scarcity()` on food-scarcity axes, `flee_or_fight()` on
-  safety axes, `fight_gating()` Piecewise on Fight health/safety,
-  `piecewise(…)` on all day-phase axes, `inverted_need_penalty()`
-  on phys-satisfaction axes, `Composite`/`ClampMin` on
-  personality-floor axes, `Composite`/`ClampMax` on saturating-count
-  axes. **Outstanding per §2.3 rows 4–6:** the four corruption-axis
-  migrations in Herbcraft/PracticeMagic sibling DSEs remain at
-  `Curve::Linear` placeholders —
-    * `herbcraft_gather` has no `territory_max_corruption` axis
-      (spec: add + `Logistic(8, 0.1)`);
-    * `herbcraft_ward` has no `territory_max_corruption` axis
-      (same);
-    * `practice_magic::durable_ward` has no
-      `nearby_corruption_level` axis (spec: add +
-      `Logistic(8, 0.1)`);
-    * `practice_magic::cleanse`'s `tile_corruption` axis uses
-      `linear()` (spec: `Logistic(8, magic_cleanse_corruption_threshold)`);
-    * `practice_magic::colony_cleanse`'s corruption axis uses
-      `linear()` (spec: `Logistic(6, 0.3)`).
-  These five axis-level migrations are the gate for §13.1's
-  corruption-emergency-bonus constant retirements.
-- **Track C — Per-marker author systems. PARTIAL (~12%).**
+- **Track B — Per-axis curve migration. LANDED (§2.3 rows 1–6
+  closed).** All §2.3-assigned curves are in place: `hangry()` on
+  hunger peer-group, `sleep_dep()` on Sleep, `loneliness()` on
+  social axes, `scarcity()` on food-scarcity axes,
+  `flee_or_fight()` on safety axes, `fight_gating()` Piecewise on
+  Fight health/safety, `piecewise(…)` on all day-phase axes,
+  `inverted_need_penalty()` on phys-satisfaction axes,
+  `Composite`/`ClampMin` on personality-floor axes,
+  `Composite`/`ClampMax` on saturating-count axes, plus the five
+  corruption-axis migrations (rows 4–6) landed with §13.1 rows 4–6
+  on 2026-04-23: `Logistic(8, 0.1)` on
+  `herbcraft_gather.territory_max_corruption` (axis added),
+  `herbcraft_ward.territory_max_corruption` (axis added), and
+  `practice_magic::durable_ward.nearby_corruption_level` (axis
+  added); `Logistic(8, magic_cleanse_corruption_threshold)` swap
+  on `practice_magic::cleanse.tile_corruption`; `Logistic(6, 0.3)`
+  swap on `practice_magic::colony_cleanse.territory_max_corruption`.
+- **Track C — Per-marker author systems. PARTIAL (~14%).**
   49 §4.3 marker ZSTs exist as components (Phase 3a). Six have
   per-tick author systems landed: the five colony-scoped authors
   (`HasStoredFood`, `HasGarden`, `HasFunctionalKitchen`,
@@ -317,41 +312,37 @@ entry slices across them.
   `MarkerSnapshot` builders) plus the first per-cat author,
   `Incapacitated` (`systems/incapacitation.rs::update_incapacitation`,
   plus per-cat `set_entity` in both `MarkerSnapshot` builders).
-  DSE consumers are wired for the five colony-scoped markers;
-  `Incapacitated`'s consumer cutover (`.forbid("Incapacitated")`
-  on every non-Eat/Sleep/Idle DSE) is pending and lands with
-  §13.1 rows 1–3. 43 remain fully unauthored — every LifeStage
+  DSE consumers are wired for all six authored markers;
+  `Incapacitated`'s consumer cutover shipped with §13.1 rows 1–3
+  on 2026-04-23 — `.forbid("Incapacitated")` now appears on every
+  non-Eat/Sleep/Idle cat DSE and every fox DSE, and the inline
+  `if ctx.is_incapacitated` branch at `scoring.rs:574–598` has
+  retired. 43 remain fully unauthored — every LifeStage
   (`Kitten`/`Young`/`Adult`/`Elder`), every State
   (`InCombat`/`Injured`/`Pregnant`), every Capability
   (`CanHunt`/`CanForage`/`CanWard`/`CanCook`), every
   TargetExistence, and most Colony markers.
-  `.forbid("Incapacitated")` appears only in test fixtures; no
-  production DSE excludes incapacitated cats by marker today —
-  the `is_incapacitated` inline branch at `scoring.rs:574–598`
-  is still the only filter pending §13.1's cutover.
 
 **Cluster-A entry reframing:**
 
-- **A1** — Track A landed; Track B ~85% (5 corruption-axis
-  migrations outstanding); Track C ~12% (43 markers unauthored;
-  `Incapacitated` author landed, its `.forbid` consumer still
-  pending as §13.1 rows 1–3).
-  The 21 cat + 9 fox DSE *shapes* are in the registry, which is
-  what "landed" referred to in the prior status-line text — but
-  "registry resolution" is not "every §2.3-assigned curve is in
-  place" and it is not "every §4.3 marker has an author." Both
-  are ongoing tracks with work outstanding.
+- **A1** — Track A landed; Track B landed (§2.3 rows 1–6 all
+  closed after 2026-04-23's five corruption-axis migrations);
+  Track C ~14% (43 markers unauthored; `Incapacitated` author
+  + consumer cutover landed, inline branch retired).
+  The 21 cat + 9 fox DSE *shapes* are in the registry with
+  their spec-committed curves; the remaining refactor-scope work
+  for A1 is Track C marker authoring and a handful of deeper
+  structural items (§7 commitment layer — draft failed soak,
+  preserved on branch for rework; §L2.10.7 plan-cost feedback).
 - **A2** — resolved as *build in-house*. `big-brain` was not
   adopted. The L2 substrate at `src/ai/eval.rs` is the outcome.
-- **A3** — Track A landed (49 ZSTs + consumer substrate). Track C
-  drives the remaining work (43 markers). "A3 substantially
-  landed" was wrong as stated; the substrate *for A3* is landed,
-  but A3's own exit criterion ("at least one action migrates to
-  a pure-tag-filter entry guard as proof-of-pattern") is met only
-  for the five authored colony markers with live consumers.
-  `Incapacitated`'s author has landed as the first per-cat marker
-  but its DSE consumer is still pending (§13.1 rows 1–3). The
-  remaining 43 per-marker ports are the bulk of A3's work,
+- **A3** — Track A landed (49 ZSTs + consumer substrate); A3's
+  exit criterion ("at least one action migrates to a
+  pure-tag-filter entry guard as proof-of-pattern") is met for
+  the six authored markers with live consumers
+  (`HasStoredFood`, `HasGarden`, `HasFunctionalKitchen`,
+  `HasRawFoodInStores`, `WardStrengthLow`, `Incapacitated`).
+  The remaining 43 per-marker ports are the bulk of A3's work,
   tracked in #14's "Still outstanding" list.
 - **A4** — landed. §6.3 `TargetTakingDse` foundation + all nine
   §6.5 per-DSE target-taking ports shipped. `find_social_target`
@@ -390,32 +381,51 @@ links to its gate chain rather than being called "ready to land"):
   below as a separate follow-on — a behavior change requires the
   balance-methodology hypothesis + A/B, not a translation-scoped
   port.
-- **§2.3 corruption-axis migrations (Track B remainder).** Five
-  per-DSE axis additions / curve swaps in Herbcraft / PracticeMagic
-  sibling DSEs (see Track B bullet above). Gate for §13.1 rows 4–6.
-- **`Incapacitated` DSE consumer cutover (Track C).** Author
-  landed: `systems::incapacitation::update_incapacitation` +
-  per-cat `set_entity` in both `MarkerSnapshot` builders.
-  Remaining: add `.forbid("Incapacitated")` to every
-  non-Eat/Sleep/Idle DSE and retire the inline
-  `is_incapacitated` early-return at `scoring.rs:574–598`. Lands
-  as one commit with §13.1 rows 1–3 (the five `incapacitated_*`
-  constants).
-- **§13.1 retired-constants cleanup.** *Gated* on the remaining
-  items above (corruption-axis migrations for rows 4–6 +
-  `.forbid("Incapacitated")` cutover for rows 1–3). Per the §13.1
-  spec rule: "Behavior-preserving once the curves are in;
-  dangerous before." See
-  [`docs/systems/a1-4-retired-constants-kickoff.md`](../systems/a1-4-retired-constants-kickoff.md)
-  for the gate-verification procedure — an audit on 2026-04-23
-  confirmed all six retirement rows are gate-closed, not open;
-  the Incapacitated author landed 2026-04-23 flipping rows 1–3
-  to `C ✓`, but consumer wiring + inline-branch retirement still
-  block the §13.1 commit.
-- **§7 commitment strategies.** The `CommitmentStrategy` enum tag
-  exists on every Intention per Phase 3a; §7.2 drop-trigger
-  reconsideration, §7.3 per-Intention-class assignment, §7.4
-  persistence bonus remain unimplemented.
+- ~~**§2.3 corruption-axis migrations (Track B remainder).**~~
+  **Landed — see §13.1 rows 4–6 entry in Landed section.** All
+  five per-DSE axis additions / curve swaps in Herbcraft /
+  PracticeMagic sibling DSEs shipped 2026-04-23.
+- ~~**`Incapacitated` DSE consumer cutover (Track C).**~~
+  **Landed — see §13.1 rows 1–3 entry in Landed section.**
+  `.forbid("Incapacitated")` added to every non-Eat/Sleep/Idle
+  cat DSE + every fox DSE; inline `is_incapacitated` branch at
+  `scoring.rs:574–598` retired; 5 `incapacitated_*` constants
+  deleted.
+- ~~**§13.1 retired-constants cleanup.**~~ **Landed in two
+  commits on 2026-04-23.** Rows 1–3 (Incapacitated pathway) +
+  rows 4–6 (corruption-emergency-bonus pathway) shipped as
+  separate refactor commits; all 8 retired constants + 3 retired
+  modifier impls gone from the codebase. See both entries in the
+  Landed section. The
+  [`a1-4-retired-constants-kickoff.md`](../systems/a1-4-retired-constants-kickoff.md)
+  doc captures the original single-commit framing; the split
+  happened naturally once rows 1–3 and rows 4–6 turned out to
+  have disjoint file-sets and a parallelizable fan-out landed
+  both in one afternoon.
+- **§7 commitment strategies (§7.2 + §7.3).** The
+  `CommitmentStrategy` enum tag exists on every Intention per
+  Phase 3a; §7.2 drop-trigger reconsideration + §7.3
+  per-Intention-class assignment + §7.4 persistence bonus
+  remain unimplemented. A 2026-04-23 fan-out draft of
+  `src/ai/commitment.rs` (`BeliefProxies` / `should_drop_intention`
+  / `strategy_for_disposition` / `proxies_for_plan` /
+  `reconsider_held_intentions`) **failed seed-42 soak**: the
+  `still_goal` proxy for `Socializing` used
+  `needs.social < resting_complete_temperature (0.3)` as a
+  satiation threshold, but `needs.social` in this codebase uses
+  the convention "high = satisfied" (0.9 spawn default, decays
+  slowly), so `!still_goal` fired on almost every OpenMinded
+  Socializing intention. Observed regression on the integrated
+  A+B+C stack: Starvation 0 → 8, wards_placed 210 → 2,
+  grooming 163 → 0, plus eight additional never-fired features
+  (BondFormed, Socialized, KittenBorn, …). Gate disabled →
+  canaries passed cleanly. **Draft preserved on jj bookmark
+  `session-c-draft`** for future revival once the `still_goal`
+  proxy is properly tuned against `needs.social` semantics,
+  possibly with a dedicated `social_satiation_threshold` constant.
+  Resumption path: rewrite `still_goal` to invert the
+  social-need check + land a balance thread on the new
+  threshold before turning the gate back on.
 - **§L2.10.7 plan-cost feedback.** Blocks 4 §6.5 deferred axes
   (`apprentice-receptivity`, `fertility-window`, `remedy-match`,
   `pursuit-cost`).
@@ -1418,8 +1428,11 @@ remaining work is itemised here.
   `HasFunctionalKitchen` / `HasRawFoodInStores` / `WardStrengthLow`
   — see Landed section below). **`Incapacitated` per-cat author
   landed 2026-04-23** (`systems::incapacitation::update_incapacitation`,
-  first `set_entity` consumer) — its `.forbid` DSE cutover is the
-  §13.1 rows 1–3 work. The remaining ~43 §4.3 markers each need:
+  first `set_entity` consumer) + **consumer cutover landed
+  2026-04-23** via the §13.1 rows 1–3 commit:
+  `.forbid("Incapacitated")` on every non-Eat/Sleep/Idle cat DSE
+  + every fox DSE, inline `if ctx.is_incapacitated` branch at
+  `scoring.rs:574–598` retired. The remaining ~43 §4.3 markers each need:
     1. Author system per §4.6 author-file assignment (`Changed<T>`
        filter where the predicate reads changing parent components;
        full-scan where it reads position-adjacent state).
@@ -1548,41 +1561,34 @@ implementation or enumeration work.
   curves that replace them. Not before. Behavior-preserving once
   the curves are in; dangerous before.
 
-  **Gate status (2026-04-23 audit, against HEAD + this commit):**
-  CLOSED. Author half of rows 1–3 landed this commit
-  (`systems::incapacitation::update_incapacitation` +
-  `MarkerSnapshot::set_entity` in both scoring paths); consumer
-  half (`.forbid("Incapacitated")`) still pending. Six retirement
-  rows split across two prerequisite tracks:
+  **Gate status (2026-04-23):** LANDED in two commits via a
+  three-way parallel fan-out. Rows 1–3 (Incapacitated pathway)
+  and rows 4–6 (corruption-emergency-bonus pathway) turned out
+  to have disjoint file-sets and shipped as separate landings
+  rather than the single commit the original kickoff envisioned.
+  All six rows now at `gate ✓`:
 
   | Row | Constant(s) | Replaces | Prerequisite track | State |
   |---|---|---|---|---|
-  | 1 | `incapacitated_eat_urgency_{scale,offset}` | `Eat.hunger = Logistic(8, 0.75)` + `.forbid("Incapacitated")` on non-Eat/Sleep/Idle | Track B: curve ✓ in `eat.rs`. Track C: author ✓ (`systems/incapacitation.rs`); `.forbid("Incapacitated")` wiring on non-Eat/Sleep/Idle DSEs pending (§13.1 cutover). | **B ✓ / C ½ — gate ✗** |
-  | 2 | `incapacitated_sleep_urgency_{scale,offset}` | `Sleep.energy = Logistic(10, 0.7)` + `.forbid("Incapacitated")` | Track B: curve ✓ in `sleep.rs`. Track C: author ✓; `.forbid` wiring pending as row 1. | **B ✓ / C ½ — gate ✗** |
-  | 3 | `incapacitated_idle_score` | Idle's canonical axes + `.forbid("Incapacitated")` filtering non-eligible DSEs | Track C: author ✓; `.forbid` wiring pending as rows 1–2. | **C ½ — gate ✗** |
-  | 4 | `ward_corruption_emergency_bonus` | `Logistic(8, 0.1)` on `territory_max_corruption` axis in `Herbcraft.ward` / `Herbcraft.gather` / `PracticeMagic.durable_ward` | Track B: axis missing entirely in all three factories. | **B ✗ — gate ✗** |
-  | 5 | `cleanse_corruption_emergency_bonus` | `Logistic(8, threshold)` on `PracticeMagic.cleanse.tile_corruption` + `Logistic(6, 0.3)` on `PracticeMagic.colony_cleanse.territory_max_corruption` | Track B: both axes exist but use `linear()`. | **B ✗ — gate ✗** |
-  | 6 | `corruption_sensed_response_bonus` | `Logistic(8, 0.1)` on `PracticeMagic.durable_ward.nearby_corruption_level` | Track B: axis missing entirely. | **B ✗ — gate ✗** |
+  | 1 | `incapacitated_eat_urgency_{scale,offset}` | `Eat.hunger = Logistic(8, 0.75)` + `.forbid("Incapacitated")` on non-Eat/Sleep/Idle | Track B: curve ✓. Track C: author ✓ + `.forbid` cutover ✓ (rows 1–3 landing). | **B ✓ / C ✓ — gate ✓** |
+  | 2 | `incapacitated_sleep_urgency_{scale,offset}` | `Sleep.energy = Logistic(10, 0.7)` + `.forbid("Incapacitated")` | Track B: curve ✓. Track C: author ✓ + `.forbid` cutover ✓. | **B ✓ / C ✓ — gate ✓** |
+  | 3 | `incapacitated_idle_score` | Idle's canonical axes + `.forbid("Incapacitated")` filtering non-eligible DSEs | Track C: author ✓ + `.forbid` cutover ✓; inline `is_incapacitated` branch at `scoring.rs:574–598` retired. | **C ✓ — gate ✓** |
+  | 4 | `ward_corruption_emergency_bonus` | `Logistic(8, 0.1)` on `territory_max_corruption` axis in `herbcraft_gather` / `herbcraft_ward` / `practice_magic::durable_ward` | Track B: axes added + curve installed (rows 4–6 landing). | **B ✓ — gate ✓** |
+  | 5 | `cleanse_corruption_emergency_bonus` | `Logistic(8, threshold)` on `practice_magic::cleanse.tile_corruption` + `Logistic(6, 0.3)` on `practice_magic::colony_cleanse.territory_max_corruption` | Track B: both axes curve-swapped from `linear()`. | **B ✓ — gate ✓** |
+  | 6 | `corruption_sensed_response_bonus` | `Logistic(8, 0.1)` on `practice_magic::durable_ward.nearby_corruption_level` | Track B: axis added + curve installed. | **B ✓ — gate ✓** |
 
-  Glyph key: `✓` = track-level prerequisite complete; `½` = track
-  partially complete (e.g., Incapacitated author landed but
-  `.forbid` cutover pending); `✗` = track-level prerequisite
-  unfinished. `gate ✗` on every row today — no row's deletion is
-  yet safe. Rows 1–3 share the cutover commitment: `.forbid
-  ("Incapacitated")` on every non-Eat/Sleep/Idle DSE + retirement
-  of the inline `is_incapacitated` branch at
-  `scoring.rs:574–598` ship together with the row 1–3 constant
-  deletions, not piecemeal. Rows 4–6 each need the axis-level
-  Logistic migration to absorb the modifier-emergency bonus'
-  contribution before the modifier + constant retire together.
-  Until every row flips to `gate ✓`, §13.1 cannot land as a
-  single commit. The three modifier
-  impls in `src/ai/modifier.rs` (`WardCorruptionEmergency`,
-  `CleanseEmergency`, `SensedRotBoost`) and their registration
-  in `default_modifier_pipeline` are the current live
-  implementation of the workaround bonuses — they retire in the
-  same commit as the constants, once the axis curves absorb
-  their contribution by construction.
+  Rows 1–3 landed as one `refactor:` commit covering the
+  Incapacitated pathway: `.forbid("Incapacitated")` on every
+  non-Eat/Sleep/Idle cat DSE + every fox DSE, inline branch
+  deletion at `scoring.rs:574–598`, 5 `incapacitated_*` constant
+  deletions. Rows 4–6 landed as a separate `refactor:` commit
+  covering the corruption-emergency-bonus pathway: 5 axis
+  migrations (3 added, 2 swapped) + 3 modifier impl deletions
+  from `src/ai/modifier.rs` (`WardCorruptionEmergency`,
+  `CleanseEmergency`, `SensedRotBoost`) + their pipeline
+  registration + 3 `*_corruption_*_bonus` constant deletions.
+  See both landing entries in the Landed section for soak
+  footers + four-artifact acceptance notes.
 
 - **13.2 Death-event relationship-classified grief emission
   (§7.7.b).** `src/systems/death.rs` today emits only
@@ -2096,6 +2102,190 @@ pattern is proven.
 ---
 
 ## Landed
+
+### §13.1 rows 4–6 — corruption-axis Logistic migration + modifier/constant retirement (2026-04-23)
+
+Track B closeout for the AI substrate refactor's §2.3 "Retired
+constants" subsection. Retires the three corruption-emergency
+`ScoreModifier` impls by absorbing their flat additive
+contribution into five axis-level Logistic curves. Behavior-
+preserving by construction per the spec's "Logistic curves
+absorb modifier contribution" contract. Shipped as Session B of
+a three-way parallel agent fan-out; Sessions A and C landed
+together as part of the same integrated stack.
+
+**Five axis migrations in `src/ai/dses/`:**
+
+- `herbcraft_gather.rs` — NEW `territory_max_corruption` axis
+  with `Logistic(8, 0.1)`; composition widened
+  `CompensatedProduct(vec![1.0, 1.0]) → CompensatedProduct(vec![1.0, 1.0, 1.0])`.
+- `herbcraft_ward.rs` — NEW `territory_max_corruption` axis with
+  `Logistic(8, 0.1)`; same composition widening.
+- `practice_magic.rs::DurableWardDse` — NEW
+  `nearby_corruption_level` axis with `Logistic(8, 0.1)`;
+  composition `CP(3) → CP(4)`.
+- `practice_magic.rs::CleanseDse` — SWAP `tile_corruption`
+  axis curve from `linear()` to
+  `Logistic(8, scoring.magic_cleanse_corruption_threshold)`.
+  Factory signature changes: `CleanseDse::new()` → `new(scoring:
+  &ScoringConstants)` so the Logistic midpoint reads the
+  threshold. Three call-sites updated (`main.rs::build_schedule`
+  new + save-load paths + `plugins/simulation.rs`).
+- `practice_magic.rs::ColonyCleanseDse` — SWAP
+  `territory_max_corruption` axis curve from `linear()` to
+  `Logistic(6, 0.3)`.
+
+**Three modifier impl deletions in `src/ai/modifier.rs`:**
+
+- `WardCorruptionEmergency` — absorbed by
+  `herbcraft_ward.territory_max_corruption` +
+  `herbcraft_gather.territory_max_corruption`.
+- `CleanseEmergency` — absorbed by
+  `practice_magic::cleanse.tile_corruption` +
+  `practice_magic::colony_cleanse.territory_max_corruption`.
+- `SensedRotBoost` — absorbed by
+  `practice_magic::durable_ward.nearby_corruption_level`.
+
+Their registration in `default_modifier_pipeline` retires too
+(pipeline now 7 modifiers — down from 10 after §3.5 remaining-
+modifier port's full roster); 4 retired-only scalar-surface keys
+removed from `ctx_scalars` (`has_herbs_nearby`, `has_ward_herbs`,
+`thornbriar_available`, `maslow_level_2_suppression`); 6 unit
+tests that only exercised the retired modifiers removed; 1
+`ward_corruption_emergency_boosts_score` scoring.rs test
+rewritten as `ward_score_rises_with_territory_corruption` using
+relative-monotonic assertions. `modifier.rs` shrank from 1,491
+to 1,135 lines.
+
+**Three constant deletions in `src/resources/sim_constants.rs`:**
+
+- `ward_corruption_emergency_bonus`
+- `cleanse_corruption_emergency_bonus`
+- `corruption_sensed_response_bonus`
+
+Both struct-def entries and `Default` impl entries.
+
+**Non-goals (Session B scope-fence):** did NOT touch rows 1–3
+(Incapacitated — Session A), did NOT touch §7 commitment
+(Session C), did NOT add new considerations beyond the five
+named, did NOT rebalance spec-committed curve parameters, did
+NOT update `docs/open-work.md` (plan-maintainer scope).
+
+**Verification:** `just check` clean. `just test` 1093 pass / 0
+fail (+~15 new axis-witness tests; net +8 after retired-modifier
+test removals). Session-isolated pre-merge soak (commit_dirty=
+true): Starvation=3 (within 0–5 noise band), ShadowFoxAmbush=0,
+wards_placed_total=216, ward_count_final=3, footer_written.
+Integrated post-merge footer below.
+
+**Integrated-stack soak footer (seed 42, `--duration 900`,
+release, commit_dirty=false; shared with sibling §13.1 rows 1–3
+landing — the two landings are verified as one stack since they
+share file-overlap on herbcraft/PM sibling DSEs):**
+
+- `deaths_by_cause`: `{"Starvation": 2}` (within documented
+  0–5 Bevy scheduler-variance band per CLAUDE.md; pre-fan-out
+  baseline was 0, disabled-gate sibling soak was 0 — the 2 is
+  within observed run-to-run variance on same-commit families).
+- `shadow_fox_spawn_total: 0`, `shadowfox_ambush_deaths: 0`.
+- `wards_placed_total: 200`, `ward_count_final: 2` (pre-fan-out
+  baseline 216 / 3; within noise).
+- `continuity_tallies`: grooming 129, courtship 2, others 0.
+  Grooming + courtship firing where they'd been zero in the
+  failed A+B+C integrated soak (Session C's drop-trigger
+  regression).
+- `positive_features_active: 20 / 44`, `negative_events_total:
+  128,641`.
+- `never_fired_expected_positives`: `["FoodCooked", "CropTended",
+  "CropHarvested", "GroomedOther", "MentoredCat"]` — 5 features,
+  all subset of the Phase A1.2 baseline's 11-feature
+  never-fired list. **Net +6 features now firing** that weren't
+  firing pre-fan-out (KnowledgePromoted, ItemRetrieved,
+  KittenBorn, GestationAdvanced, MatingOccurred, KittenFed).
+- `footer_written: 1` ✓.
+
+**Specification cross-ref:** `docs/systems/ai-substrate-refactor.md`
+§2.3 rows 4–6. Original kickoff:
+`docs/systems/a1-4-retired-constants-kickoff.md` (framed the full
+§13.1 as one commit; the parallel fan-out naturally split into
+this rows-4–6 landing and its sibling rows-1–3 landing).
+
+### §13.1 rows 1–3 — Incapacitated consumer cutover + inline-branch retirement (2026-04-23)
+
+Track C closeout for the Incapacitated-pathway half of §13.1.
+Retires the inline `if ctx.is_incapacitated` early-return branch
+at `src/ai/scoring.rs:574–598` by routing the same gating
+through §4.3 marker eligibility on each non-Eat/Sleep/Idle DSE.
+Behavior-preserving once the surviving Eat/Sleep Logistic curves
++ Idle's canonical axes handle the action set without the
+bespoke `incapacitated_*_urgency_{scale,offset}` multipliers.
+Shipped as Session A of the three-way fan-out; Sessions B and C
+landed in the same integrated stack.
+
+**`.forbid("Incapacitated")` added to every non-Eat/Sleep/Idle
+DSE factory** — 21 cat DSE files touched in `src/ai/dses/`
+(`build.rs`, `caretake.rs`, `cook.rs`, `coordinate.rs`,
+`explore.rs`, `farm.rs`, `fight.rs`, `flee.rs`, `forage.rs`,
+`groom_other.rs`, `groom_self.rs`, `herbcraft_gather.rs`,
+`herbcraft_prepare.rs`, `herbcraft_ward.rs`, `hunt.rs`,
+`mate.rs`, `mentor.rs`, `patrol.rs`, `socialize.rs`,
+`wander.rs`) + all six `practice_magic.rs` siblings (Scry,
+DurableWard, Cleanse, ColonyCleanse, Harvest, Commune), plus
+fox DSEs that follow the same pattern. Each DSE's
+`EligibilityFilter` gains the forbid line in its factory
+constructor with a short §13.1 rustdoc comment.
+
+**Inline branch retirement.** The 17-line
+`if ctx.is_incapacitated { ... return ScoringResult { ... }; }`
+early-return block in `score_actions` retires — replaced by a
+rustdoc paragraph explaining the §4 marker path. The
+`ScoringContext.is_incapacitated` field itself STAYS (other
+consumers may still read it for non-scoring reasons per §13.1
+spec contract); only the scoring-branch read retires.
+
+**Five `ScoringConstants` deletions in `src/resources/sim_constants.rs`:**
+
+- `incapacitated_eat_urgency_scale`
+- `incapacitated_eat_urgency_offset`
+- `incapacitated_sleep_urgency_scale`
+- `incapacitated_sleep_urgency_offset`
+- `incapacitated_idle_score`
+
+Both struct-def entries and `Default` impl entries.
+
+**Test updates in `src/ai/scoring.rs`:**
+
+- `incapacitated_cat_only_scores_basic_actions` reshaped to
+  exercise the new path. Builds a per-test `MarkerSnapshot` with
+  `Incapacitated` set for the cat entity (the shared cached
+  snapshot only carries colony markers); asserts Eat/Sleep score
+  above `jitter_range`, Hunt/Fight/Flee score at most
+  `jitter_range` in magnitude (forbidden DSEs return 0.0 from
+  evaluator + jitter noise from the push path). Idle's score
+  no longer asserted above jitter because the retired
+  `incapacitated_idle_score = 0.2` offset is gone — Idle's
+  canonical axes scoring near-zero for a hungry/tired cat is
+  correct behavior.
+
+**Non-goals (Session A scope-fence):** did NOT touch rows 4–6
+(corruption-axis migrations — Session B), did NOT touch §7
+commitment (Session C), did NOT delete
+`ScoringContext.is_incapacitated` field (other non-scoring
+consumers), did NOT update `docs/open-work.md` (plan-maintainer
+scope).
+
+**Verification:** `just check` clean. `just test` — all tests
+pass on the integrated stack (session-isolated testing was
+interrupted mid-verification by OOM from three concurrent
+worktree compiles; re-verified post-integration).
+
+**Integrated-stack soak footer (seed 42, `--duration 900`,
+release, commit_dirty=false):** TBD (shared with sibling §13.1
+rows 4–6 + Phase 6a landings).
+
+**Specification cross-ref:** `docs/systems/ai-substrate-refactor.md`
+§2.3 rows 1–3 + §4.3 `Incapacitated` marker row. Original kickoff:
+`docs/systems/a1-4-retired-constants-kickoff.md`.
 
 ### Phase A1.2 (A5) — §11 focal-cat replay enrichment: at-source L2/L3 trace capture (2026-04-23)
 

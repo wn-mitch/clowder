@@ -136,7 +136,7 @@ fn setup_world(seed: u64) -> World {
         registry
             .cat_dses
             .push(clowder::ai::dses::durable_ward_dse());
-        registry.cat_dses.push(clowder::ai::dses::cleanse_dse());
+        registry.cat_dses.push(clowder::ai::dses::cleanse_dse(&scoring));
         registry
             .cat_dses
             .push(clowder::ai::dses::colony_cleanse_dse());
