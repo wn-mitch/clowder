@@ -939,6 +939,24 @@ pure implementation. No spec authoring.
 
 #### 6a. Commitment layer (§7.1–§7.6)
 
+> **Status (2026-04-23 PM):** **Attempted and deferred after soak
+> regression.** A parallel-fan-out draft of `src/ai/commitment.rs`
+> (BeliefProxies + should_drop_intention + strategy_for_disposition
+> + proxies_for_plan + reconsider_held_intentions Bevy system +
+> per-DSE `default_strategy()` tags across 14 factories) was
+> implemented against A+B substrate but failed seed-42 canaries:
+> Starvation 0 → 8, wards_placed 200 → 2, hunger drain ~10× faster,
+> Calcifer dies at tick 14k. Gate only fires 8× total colony-wide,
+> so direct-cause isn't the gate's drop logic — likely the
+> `achievement_believed` for Resting short-circuiting normal plan
+> cycling, or scheduler reshuffle from the new ResMut
+> serialization. Draft preserved on jj bookmark `session-c-draft`
+> (see `docs/open-work.md` #5 "§7 commitment strategies" for the
+> deep-dive + resumption path). A+B landed successfully on
+> 2026-04-23; §7 commitment is the **one remaining Phase 6a
+> blocker before persistence-bonus (§7.4) can be tackled as
+> balance iteration**.
+
 **Deliverables:**
 - **`CommitmentStrategy` semantics** (§7.1) — tag slot added in Phase 3a;
   Phase 6 adds the behavior:

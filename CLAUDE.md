@@ -163,7 +163,7 @@ Balance-tuning on refactor-affected metrics (positive-feature density, mating ca
 
 ### Invocation and flags
 
-`just headless [--seed N] [--duration SECS] [--log PATH] [--event-log PATH] [--snapshot-interval TICKS] [--trace-positions N] [--test-map]`
+`just headless [--seed N] [--duration SECS] [--log PATH] [--event-log PATH] [--snapshot-interval TICKS] [--trace-positions N] [--test-map] [--focal-cat NAME] [--trace-log PATH]`
 
 - `--seed N` — fixed RNG seed (default: random; printed to stderr). Required for reproducibility and diffs.
 - `--duration SECS` — wall-clock sim duration in seconds (default 600 = 10 min). `--duration 60` is a smoke-test; `--duration 900` (15 min) is the canonical deep-soak (see below).
@@ -171,6 +171,8 @@ Balance-tuning on refactor-affected metrics (positive-feature density, mating ca
 - `--event-log PATH` — structured event log output (default `logs/events.jsonl`). Machine-readable: spawns, deaths, plan failures, feature activations.
 - `--snapshot-interval TICKS` — per-cat snapshot cadence (default 100).
 - `--test-map`, `--trace-positions N` — seldom needed; see `parse_args` in `src/main.rs`.
+- `--focal-cat NAME` — headless-only. Enables per-tick L1/L2/L3 trace-record emission for the named cat. Ignored (with stderr warning) outside `--headless`. See **Focal-cat trace** below.
+- `--trace-log PATH` — trace sidecar output path. Default `logs/trace-<focal>.jsonl`; `just soak-trace` writes to `logs/tuned-<seed>/trace-<focal>.jsonl`.
 
 ### The constants-hash header
 
@@ -190,6 +192,33 @@ Debug mode is ~4× slower than release and produces far less sim time per second
 
 Multi-seed sweeps (seeds 99/7/2025/314) are a follow-up for claims you want to generalize — only do them once a single-seed deep-soak looks right.
 
+### Focal-cat trace (§11 substrate refactor)
+
+When the deep-soak isn't enough — when you need to know *why* one cat chose Hunt over Socialize at tick 8432 — turn on the focal trace. It's a headless-only diagnostic layer that emits per-tick records to a JSONL sidecar `logs/trace-<focal>.jsonl` (diff-joinable with `events.jsonl` via a shared `_header`). Three record layers, tagged by a top-level `layer` field:
+
+- **L1** — per influence-map sample: base sample, attenuation breakdown (species sensitivity / role / injury / environment), perceived value, top contributors (which emitter drove the sample).
+- **L2** — per eligible DSE: marker eligibility, per-consideration breakdown (input, response curve, score, weight), composition mode, Maslow pregate, modifiers, final score, intention.
+- **L3** — per tick: ranked DSE list, softmax distribution, momentum/commitment state, chosen action, GOAP plan steps.
+
+Full field shapes: `docs/systems/ai-substrate-refactor.md` §11.3. Record types live in `src/resources/trace_log.rs`.
+
+**Entry points:**
+
+- `just soak-trace SEED FOCAL_CAT` — canonical invocation (e.g. `just soak-trace 42 Simba`). Writes the four-file bundle `logs/tuned-<seed>/{events,narrative,trace-<focal>}.jsonl`.
+- `just frame-diff BASELINE NEW [HYPOTHESIS]` — per-DSE drift between two focal traces, ranked by |Δ mean|. Pass a balance doc as `HYPOTHESIS` to classify each DSE as ok / drift / wrong-direction against the predicted shift.
+- `just autoloop SEED FOCAL_CAT` — soak-trace + survival canaries + continuity canaries + constants diff, in one loop. Use after every substrate-refactor increment.
+
+**Helper scripts** (invoked by the recipes above; callable directly for ad-hoc use):
+
+- `scripts/replay_frame.py` — reconstructs a full (tick, cat) decision frame by filtering layers. Acceptance gate per §11.6: the ranked DSE list from the reconstructed frame must match the snapshot in `events.jsonl`.
+- `scripts/frame_diff.py` — backing for `just frame-diff`; emits per-DSE score-delta statistics.
+
+**Picking a focal cat — no single cat exercises every feature.** L2 records are only emitted for DSEs the cat is *eligible* to evaluate; marker-gated DSEs stay silent on cats without the marker. The default `Simba` (seed 42) is a generalist — good for Hunt / Eat / Socialize / Mentor — but **Simba does not place wards**, so Simba-focal traces carry no L2 for ward-placement DSEs. Similar gaps: non-parents skip FeedKitten / NurseKitten; non-Priestess cats skip Cleanse / Scry / Commune; juveniles skip Mate / Courtship; cats without the cook marker skip Cook.
+
+To verify coverage of the full behavioral range on a seed, **run multiple focal soaks against different cats** — pick a Priestess for the magic track, a mated adult for the reproduction track, a coordinator for build/directive traces. The trace filename encodes the focal cat, so `just soak-trace 42 Simba`, `just soak-trace 42 <priestess-name>`, `just soak-trace 42 <cook-name>` write disjoint files that coexist in `logs/tuned-42/`. This is the focal-cat analogue of multi-seed sweeps: one focal is a single slice; variation across focals is how you probe the whole DSE catalog.
+
+For ad-hoc jq queries over a trace file, see `docs/diagnostics/log-queries.md` §11.
+
 ### Diagnostic queries
 
 jq recipes for reading `events.jsonl` / `narrative.jsonl` live in
@@ -198,6 +227,9 @@ jq recipes for reading `events.jsonl` / `narrative.jsonl` live in
 - `just check-canaries LOGFILE` — runs the five survival canary queries (starvation, shadow-fox ambush, footer-written, features-at-zero informational report, never-fired-expected-positives). Exits non-zero on any failure.
 - `just check-continuity LOGFILE` — runs the continuity-canary checks (grooming / play / mentoring / burial / courtship / mythic-texture) against the `continuity_tallies` footer field. Exits non-zero on zero-firing classes.
 - `just diff-constants BASE NEW` — verifies two runs are behaviorally comparable.
+- `just soak-trace SEED FOCAL_CAT` — same as `just soak` plus a focal-cat L1/L2/L3 trace sidecar. See **Focal-cat trace** above.
+- `just frame-diff BASELINE NEW [HYPOTHESIS]` — per-DSE score drift between two focal traces; optional hypothesis classifies drift as ok / drift / wrong-direction.
+- `just autoloop SEED FOCAL_CAT` — soak-trace + survival + continuity canaries + constants diff in one loop.
 
 ### Canaries
 

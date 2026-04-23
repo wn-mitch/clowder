@@ -409,23 +409,84 @@ links to its gate chain rather than being called "ready to land"):
   remain unimplemented. A 2026-04-23 fan-out draft of
   `src/ai/commitment.rs` (`BeliefProxies` / `should_drop_intention`
   / `strategy_for_disposition` / `proxies_for_plan` /
-  `reconsider_held_intentions`) **failed seed-42 soak**: the
-  `still_goal` proxy for `Socializing` used
-  `needs.social < resting_complete_temperature (0.3)` as a
-  satiation threshold, but `needs.social` in this codebase uses
-  the convention "high = satisfied" (0.9 spawn default, decays
-  slowly), so `!still_goal` fired on almost every OpenMinded
-  Socializing intention. Observed regression on the integrated
-  A+B+C stack: Starvation 0 → 8, wards_placed 210 → 2,
-  grooming 163 → 0, plus eight additional never-fired features
-  (BondFormed, Socialized, KittenBorn, …). Gate disabled →
-  canaries passed cleanly. **Draft preserved on jj bookmark
-  `session-c-draft`** for future revival once the `still_goal`
-  proxy is properly tuned against `needs.social` semantics,
-  possibly with a dedicated `social_satiation_threshold` constant.
-  Resumption path: rewrite `still_goal` to invert the
-  social-need check + land a balance thread on the new
-  threshold before turning the gate back on.
+  `reconsider_held_intentions`) **failed seed-42 soak** with
+  severe regression. Draft preserved on jj bookmark
+  `session-c-draft` (commit hash mutable — head of the bookmark
+  when this note was written was `aa996a1c`).
+
+  **Regression shape (deep-dive, 2026-04-23 PM):**
+  Integrated A+B+C: Starvation 0 → 8, wards_placed 200 → 2,
+  grooming 129 → 0, plus 11 never-fired expected-positive
+  features vs. A+B's 5. Canonical focal-cat trace diagnostic
+  (Calcifer, seed-42, 15-min release soak):
+
+  - Calcifer dies of Starvation at tick 14,000 (baseline: full
+    sim survived, died to old age post-window).
+  - Hunger drain rate **~10× faster** in C-fixed vs. baseline
+    (0.07/1k ticks vs. 0.006/1k ticks). Calcifer never personally
+    fires `FoodEaten` in EITHER run — baseline's slow drain
+    keeps him alive; C's accelerated drain kills him.
+  - `CommitmentDropTriggered` fires only 8 times in 54,000
+    ticks colony-wide — the gate itself is not the direct
+    cause. The drain rate change implicates scheduler reshuffle
+    or drain-constant interaction.
+  - Plan-shape trace: Calcifer cycles between `disposition=Resting
+    steps=[]` plans and Exploring plans at ~1-tick cadence from
+    tick 1203822 onward — the gate drops each Resting plan as
+    `achievement_believed` fires (hunger 0.51 ≥ 0.5, energy 0.32
+    ≥ 0.3, temp 0.33 ≥ 0.3 all at threshold boundary), evaluate_
+    and_plan re-creates, gate drops again. Cat never progresses
+    to the Eat step.
+
+  **Two failed patch attempts documented for posterity:**
+  - `still_goal = true` for Socializing (single-line hack to
+    remove the `needs.social < threshold` bug) — reverted
+    2026-04-23. Made `Socialized` fire (463+ times) and pulled
+    grooming from 0 → 2, but Starvation stayed at 8 and wards
+    stayed at 2. Symptom-level patch; real regression survives.
+
+  **Resumption hypotheses** (all unverified — needs further
+  focal-cat trace diffs or targeted unit tests):
+
+  - **H1 (most likely): `achievement_believed` for Resting is
+    over-eager.** The `hunger >= 0.5 && energy >= 0.3 && temp >=
+    0.3` check matches cats right at critical-boundary needs
+    — they read as "achieved" before actually eating/sleeping
+    to fullness. Pre-C, Resting plans had `target_completions =
+    u32::MAX` meaning `resolve_goap_plans` never natural-
+    completes them; softmax re-selection cycles them when needs
+    rise naturally. Adding the gate's achievement check
+    short-circuits that.
+  - **H2: Scheduler reshuffle.** Adding `reconsider_held_intentions`
+    to the `ResMut<SystemActivation>` serialization chain (19
+    existing systems already take it) may force new parallelism
+    constraints that alter drain-per-tick cadence. Test by
+    removing the schedule registration, keeping only the
+    module — if canaries clear, the system's presence (not
+    its logic) is the issue.
+  - **H3: Command-buffer timing.** The gate's
+    `commands.entity.remove::<GoapPlan>()` applies at deferred
+    barrier. If `evaluate_and_plan` reads a stale GoapPlan
+    between the remove and the barrier, or replaces a plan
+    that's about to be dropped, chain coherence breaks.
+
+  **Resumption path:**
+  1. Start from `session-c-draft` (revert of the `still_goal`
+     hack is already squashed in; no latent band-aids).
+  2. Generate paired focal-cat traces (Calcifer-focal) on
+     **main** (A+B, clean baseline) and on `session-c-draft`.
+     `logs/a5-focal/trace-Simba.jsonl` is pre-A+B baseline for
+     Simba — NOT sufficient; needs a Calcifer baseline.
+  3. Test H1: in `proxies_for_plan`, make Resting's
+     `achievement_believed = false` unconditionally (so the gate
+     never drops Resting; natural softmax re-selection cycles
+     it as pre-C). Soak. If canaries clear, the Resting check
+     is the culprit.
+  4. If H1 doesn't clear it, test H2: remove the schedule
+     registration of `reconsider_held_intentions` (keep the
+     module code). Soak.
+  5. If neither, deeper instrumentation on `update_needs`:
+     count drain-per-tick explicitly to confirm the 10× figure.
 - **§L2.10.7 plan-cost feedback.** Blocks 4 §6.5 deferred axes
   (`apprentice-receptivity`, `fertility-window`, `remedy-match`,
   `pursuit-cost`).
