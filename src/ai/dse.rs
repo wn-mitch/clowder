@@ -77,6 +77,19 @@ pub enum CommitmentStrategy {
     OpenMinded,
 }
 
+impl CommitmentStrategy {
+    /// Stable string slug for JSON trace emission. Used by the §11.3
+    /// focal-cat L3Commitment record so tooling doesn't have to
+    /// depend on `Debug` format (which could silently change).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Blind => "Blind",
+            Self::SingleMinded => "SingleMinded",
+            Self::OpenMinded => "OpenMinded",
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // GoalState
 // ---------------------------------------------------------------------------
@@ -380,5 +393,12 @@ mod tests {
     fn dse_id_display() {
         let id = DseId("eat");
         assert_eq!(format!("{id}"), "eat");
+    }
+
+    #[test]
+    fn commitment_strategy_as_str_covers_all_variants() {
+        assert_eq!(CommitmentStrategy::Blind.as_str(), "Blind");
+        assert_eq!(CommitmentStrategy::SingleMinded.as_str(), "SingleMinded");
+        assert_eq!(CommitmentStrategy::OpenMinded.as_str(), "OpenMinded");
     }
 }

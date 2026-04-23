@@ -51,10 +51,10 @@ use crate::resources::prey_scent_map::PreyScentMap;
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::time::TimeState;
 use crate::resources::trace_log::{
-    AttenuationBreakdown, CapturedDse, CompositionSummary, ConsiderationContribution,
-    EligibilitySummary, FocalScoreCapture, FocalTraceTarget, IntentionSummary,
-    ModifierApplication, MomentumSummary, SoftmaxSummary, SpatialRef, TraceEntry, TraceLog,
-    TraceRecord,
+    AttenuationBreakdown, BeliefProxySummary, CapturedDse, CommitmentCapture, CompositionSummary,
+    ConsiderationContribution, EligibilitySummary, FocalScoreCapture, FocalTraceTarget,
+    IntentionSummary, ModifierApplication, MomentumSummary, PlanFailureCapture, PlanStateSummary,
+    SoftmaxSummary, SpatialRef, TraceEntry, TraceLog, TraceRecord,
 };
 use crate::systems::influence_map::{
     channel_label, Attenuation, CorruptionLens, Faction, InfluenceMap, MapMetadata,
@@ -156,10 +156,39 @@ pub fn emit_focal_trace(
     // trace surface that samples at full cadence.
     // -----------------------------------------------------------------
     let captured = focal_capture.drain();
-    let planning_tick = !captured.dses.is_empty() || captured.softmax.is_some();
+    // A "planning tick" used to mean scoring ran; with commitment /
+    // plan-failure capture we also need to emit on ticks where the
+    // gate fired but no re-score happened. Any captured data keeps
+    // the emitter active.
+    let has_capture = !captured.dses.is_empty()
+        || captured.softmax.is_some()
+        || !captured.commitment.is_empty()
+        || !captured.plan_failures.is_empty();
 
-    if !planning_tick {
+    if !has_capture {
         return;
+    }
+
+    // -----------------------------------------------------------------
+    // L3Commitment + L3PlanFailure — decision-point records captured
+    // by the de-facto commitment branches (§7.2) and plan-failure
+    // paths (§7.5 anxiety, replan-cap). Emitted first so a reader
+    // scanning by tick sees the gate decision before the resulting
+    // re-score, which matches the runtime order in `resolve_goap_plans`.
+    // -----------------------------------------------------------------
+    for row in &captured.commitment {
+        trace_log.push(TraceEntry {
+            tick,
+            cat: cat_name.clone(),
+            record: l3_commitment_record(row),
+        });
+    }
+    for row in &captured.plan_failures {
+        trace_log.push(TraceEntry {
+            tick,
+            cat: cat_name.clone(),
+            record: l3_plan_failure_record(row),
+        });
     }
 
     // -----------------------------------------------------------------
@@ -167,15 +196,21 @@ pub fn emit_focal_trace(
     // (markers_required + passed), per-consideration (name, input,
     // curve-label, score, weight, optional spatial ref), composition
     // (mode, raw), maslow_pregate, modifier deltas, final_score,
-    // intention summary. `top_losing` is schema-reserved for §7.W.6
-    // and stays empty until that layer lands.
+    // intention summary, optional target-ranking for target-taking
+    // DSEs (§6.3). `top_losing` stays empty until §7.W.6 lands.
     // -----------------------------------------------------------------
     for dse in &captured.dses {
         trace_log.push(TraceEntry {
             tick,
             cat: cat_name.clone(),
-            record: l2_record_for(dse),
+            record: l2_record_for(dse, &captured.target_rankings),
         });
+    }
+
+    // L3 emission requires DSE scoring or softmax capture — if only
+    // commitment / plan-failure rows were captured this tick, skip.
+    if captured.dses.is_empty() && captured.softmax.is_none() {
+        return;
     }
 
     // -----------------------------------------------------------------
@@ -254,7 +289,10 @@ pub fn emit_focal_trace(
 /// modifier deltas, and the emitted Intention. Factored out so the
 /// main emit loop reads as a forward-walk and the per-row conversions
 /// stay readable.
-fn l2_record_for(dse: &CapturedDse) -> TraceRecord {
+fn l2_record_for(
+    dse: &CapturedDse,
+    target_rankings: &std::collections::HashMap<&'static str, crate::resources::trace_log::TargetRanking>,
+) -> TraceRecord {
     let considerations = dse
         .trace
         .considerations
@@ -303,11 +341,7 @@ fn l2_record_for(dse: &CapturedDse) -> TraceRecord {
                 .iter()
                 .map(|s| s.to_string())
                 .collect(),
-            // All captured DSEs passed eligibility — ineligible DSEs
-            // are skipped entirely by `evaluate_single_with_trace`
-            // per §4's "avoid computing a score that can't win"
-            // principle.
-            passed: true,
+            passed: dse.eligible,
         },
         considerations,
         composition,
@@ -316,6 +350,40 @@ fn l2_record_for(dse: &CapturedDse) -> TraceRecord {
         final_score: dse.final_score,
         intention,
         top_losing: Vec::new(),
+        targets: target_rankings.get(dse.dse_id.0).cloned(),
+    }
+}
+
+/// Build a §11.3 L3Commitment record from one captured gate decision.
+fn l3_commitment_record(row: &CommitmentCapture) -> TraceRecord {
+    TraceRecord::L3Commitment {
+        disposition: row.disposition.clone(),
+        strategy: row.strategy.to_string(),
+        proxies: BeliefProxySummary {
+            achievement_believed: row.achievement_believed,
+            achievable_believed: row.achievable_believed,
+            still_goal: row.still_goal,
+        },
+        plan_state: PlanStateSummary {
+            trips_done: row.trips_done,
+            target_trips: row.target_trips,
+            replan_count: row.replan_count,
+            max_replans: row.max_replans,
+        },
+        branch: row.branch.to_string(),
+        dropped: row.dropped,
+    }
+}
+
+/// Build a §11.3 L3PlanFailure record from a captured plan-failure
+/// event. `detail` is free-form `serde_json::Value` because the
+/// replan-cap path and the anxiety-interrupt path carry different
+/// fields — the reason string discriminates.
+fn l3_plan_failure_record(row: &PlanFailureCapture) -> TraceRecord {
+    TraceRecord::L3PlanFailure {
+        reason: row.reason.to_string(),
+        disposition: row.disposition.clone(),
+        detail: row.detail.clone(),
     }
 }
 

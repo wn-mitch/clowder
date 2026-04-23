@@ -109,7 +109,9 @@ impl Dse for FightDse {
         &self.eligibility
     }
     fn default_strategy(&self) -> CommitmentStrategy {
-        CommitmentStrategy::SingleMinded
+        // §7.3: Fight is a constituent action of the Guarding
+        // disposition and rides Guarding's `Blind` strategy.
+        CommitmentStrategy::Blind
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
@@ -117,7 +119,7 @@ impl Dse for FightDse {
                 label: "threat_defeated",
                 achieved: |_, _| false,
             },
-            strategy: CommitmentStrategy::SingleMinded,
+            strategy: CommitmentStrategy::Blind,
         }
     }
     fn maslow_tier(&self) -> u8 {

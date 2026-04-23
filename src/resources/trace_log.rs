@@ -95,6 +95,35 @@ pub struct ConsiderationContribution {
     pub spatial: Option<SpatialRef>,
 }
 
+/// Per-candidate scoring breakdown for a target-taking DSE (§6.3).
+/// Attached to a `TraceRecord::L2` at emit time — a target-taking DSE
+/// scores multiple candidates through a single consideration bundle
+/// and aggregates them, so the ranking sits at the DSE level rather
+/// than the per-consideration level. `None` for non-target-taking
+/// DSEs.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct TargetRanking {
+    /// `"Best"` / `"SumTopN(3)"` / `"WeightedAverage"` (§6.3 modes).
+    pub aggregation: String,
+    pub candidates: Vec<TargetCandidate>,
+    /// Entity-ish label for the winning target (typically a `Name`
+    /// string or `Debug` representation). `None` when the candidate
+    /// set was empty.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub winner: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct TargetCandidate {
+    pub name: String,
+    pub score: f32,
+    /// True for the top-N candidates that contributed to the composed
+    /// action score under `SumTopN`; always true under `Best` for the
+    /// single winner; true for all under `WeightedAverage` (all
+    /// contribute with decaying weight).
+    pub contributed: bool,
+}
+
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct SpatialRef {
     pub map: String,
@@ -166,6 +195,28 @@ pub struct SoftmaxSummary {
     pub probabilities: Vec<f32>,
 }
 
+/// §7.2 belief-proxy triple emitted alongside the L3Commitment record.
+/// Mirrors `crate::ai::commitment::BeliefProxies` but keeps the trace
+/// schema independent of the internal type so downstream tooling
+/// doesn't break if the proxy set grows.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct BeliefProxySummary {
+    pub achievement_believed: bool,
+    pub achievable_believed: bool,
+    pub still_goal: bool,
+}
+
+/// Plan-state snapshot emitted alongside the L3Commitment record. Lets
+/// the trace reader reconstruct "was this a trip-counted achievement
+/// or a replan-cap hit?" without cross-referencing `events.jsonl`.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct PlanStateSummary {
+    pub trips_done: u32,
+    pub target_trips: u32,
+    pub replan_count: u32,
+    pub max_replans: u32,
+}
+
 /// Per-§7 commitment layer. Phase 6 fills this with CommitmentStrategy +
 /// persistence bonus; Phase 1 emits a best-effort shape with
 /// `commitment_strength` mapping to today's patience bonus where relevant.
@@ -209,6 +260,14 @@ pub enum TraceRecord {
         intention: IntentionSummary,
         /// Schema slot for §7.W.6 axis-capture logging — empty at Phase 1.
         top_losing: Vec<LosingAxisSlot>,
+        /// Optional per-candidate target breakdown — set when this DSE
+        /// is target-taking (§6.3) and the focal cat evaluated it this
+        /// tick. `None` for regular (non-target-taking) DSEs and for
+        /// target-taking DSEs that weren't evaluated against any
+        /// candidates. Lets replay answer "why was Target#3 picked
+        /// over Target#7?" without re-scoring.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        targets: Option<TargetRanking>,
     },
     /// L3 — one record per (focal cat × tick). Closes the curvature
     /// loop: what the cat saw → wanted → planned to get.
@@ -222,6 +281,52 @@ pub enum TraceRecord {
         /// Schema slot for §8.6 apophenia canary — `None` at Phase 1.
         #[serde(skip_serializing_if = "Option::is_none")]
         apophenia: Option<ApopheniaSummary>,
+    },
+    /// §7.2 commitment gate fired for the focal cat's held plan.
+    /// Emitted once per gate evaluation (per cat, per tick where the
+    /// gate ran). Captures which strategy and branch decided the
+    /// outcome so regressions that track the 2026-04-23 lifted-
+    /// condition bug class (pure helper passes tests, adjacent recipe
+    /// wrong) are visible in the trace without re-running a bisection.
+    ///
+    /// At the time of introduction the pluggable Phase 6a gate is
+    /// deferred (see `docs/systems/phase-6a-commitment-gate-attempt.md`)
+    /// and this record is emitted from the de-facto commitment checks
+    /// in `resolve_goap_plans`: the `disposition_complete` arm at
+    /// `goap.rs:~1681` (the `achievement_believed` branch) and the
+    /// `max_replans` exceeded arm at `goap.rs:~3144` (the
+    /// `achievable_believed == false` / unachievable branch).
+    L3Commitment {
+        disposition: String,
+        strategy: String,
+        proxies: BeliefProxySummary,
+        plan_state: PlanStateSummary,
+        /// Which gate arm fired — `"achieved"` / `"unachievable"` /
+        /// `"dropped_goal"` / `"retained"`. `"retained"` is emitted
+        /// when the gate evaluated but decided to keep the plan;
+        /// Phase 6a+ integrations should emit those rows too so the
+        /// trace isn't silent on hold decisions.
+        branch: String,
+        /// Output of the gate — `true` means the plan is being removed.
+        dropped: bool,
+    },
+    /// Plan-failure branch fired — a plan was terminated by something
+    /// other than `achievement_believed`. Distinct from `L3Commitment`
+    /// because §7.5 Maslow preemption (`check_anxiety_interrupts`)
+    /// bypasses the §7.2 gate entirely, and the `max_replans`-exceeded
+    /// path emits both records (one framing it as the §7.2
+    /// unachievable branch, one framing it as the executor-layer
+    /// abandon) so replay tooling can distinguish whether the plan's
+    /// own runtime or the commitment gate ended it.
+    L3PlanFailure {
+        /// `"replan_cap"` / `"anxiety_interrupt"` — the runtime cause
+        /// that dropped the plan.
+        reason: String,
+        disposition: String,
+        /// Tagged free-form detail — the replan path carries
+        /// `{replan_count, max_replans}`, the anxiety path carries
+        /// `{health_ratio, critical_threshold, preempted_step}`.
+        detail: serde_json::Value,
     },
 }
 
@@ -289,11 +394,16 @@ pub struct CapturedDse {
     pub trace: EvalTrace,
     /// §4 eligibility required-marker list, copied from the DSE's
     /// filter so §11.3's `eligibility.markers_required` is emitted
-    /// verbatim. Ineligible DSEs are skipped before capture (§4.3 "skip
-    /// entirely"), so this list is always "required, all present" at
-    /// capture time — a passed-eligibility flag comes alongside.
+    /// verbatim.
     pub eligibility_required: Vec<&'static str>,
     pub eligibility_forbidden: Vec<&'static str>,
+    /// Whether eligibility passed. `true` means the DSE was scored
+    /// and `trace`/`*_score` fields carry real numbers. `false` means
+    /// this is a stripped row emitted so "why didn't this DSE even
+    /// appear?" is answerable from the trace — `trace` is default /
+    /// empty, `final_score == 0.0`, and `intention` is a placeholder
+    /// the caller records at the skip site.
+    pub eligible: bool,
 }
 
 /// Per-tick focal-cat scoring capture. Populated during
@@ -324,11 +434,54 @@ pub struct FocalScoreCaptureInner {
     /// Softmax capture — populated by `select_disposition_via_intention_softmax_with_trace`
     /// when the focal cat makes its disposition pick.
     pub softmax: Option<SoftmaxCapture>,
+    /// §7.2 commitment-gate decisions observed this tick (§7.2 / de-
+    /// facto branches in `resolve_goap_plans`). Emitted as
+    /// `TraceRecord::L3Commitment` by `emit_focal_trace`. One cat can
+    /// produce ≥1 rows per tick if multiple gate evaluations fire.
+    pub commitment: Vec<CommitmentCapture>,
+    /// Plan-failure branches observed this tick (replan-cap,
+    /// anxiety-interrupt). Emitted as `TraceRecord::L3PlanFailure`.
+    pub plan_failures: Vec<PlanFailureCapture>,
+    /// Per-target-taking-DSE candidate rankings keyed by `DseId.0`.
+    /// Merged into the matching L2 record's `targets` field at emit
+    /// time — the DSE's own L2 capture carries the scalar score while
+    /// this map carries the per-candidate breakdown. Stored by
+    /// DseId key (not vec-index) because the scoring + target-
+    /// resolution calls aren't guaranteed to interleave in the same
+    /// order.
+    pub target_rankings: std::collections::HashMap<&'static str, TargetRanking>,
     /// Tick the capture was populated on. `emit_focal_trace` reads this
     /// to emit records with the correct `tick` field even when the
     /// capture is drained on a later tick (shouldn't happen under normal
     /// cadence, but we guard against drift).
     pub captured_tick: Option<u64>,
+}
+
+/// One commitment-gate decision. Fields mirror the §11.3 L3Commitment
+/// schema; the `FocalScoreCapture.push_commitment` API is the single
+/// write path used both by the pluggable Phase 6a gate (once wired)
+/// and by the de-facto branches in `resolve_goap_plans`.
+#[derive(Debug, Clone)]
+pub struct CommitmentCapture {
+    pub disposition: String,
+    pub strategy: &'static str,
+    pub achievement_believed: bool,
+    pub achievable_believed: bool,
+    pub still_goal: bool,
+    pub trips_done: u32,
+    pub target_trips: u32,
+    pub replan_count: u32,
+    pub max_replans: u32,
+    pub branch: &'static str,
+    pub dropped: bool,
+}
+
+/// One plan-failure event (replan cap or anxiety interrupt).
+#[derive(Debug, Clone)]
+pub struct PlanFailureCapture {
+    pub reason: &'static str,
+    pub disposition: String,
+    pub detail: serde_json::Value,
 }
 
 impl FocalScoreCapture {
@@ -347,6 +500,40 @@ impl FocalScoreCapture {
             .lock()
             .expect("focal score capture mutex poisoned");
         inner.softmax = Some(softmax);
+        inner.captured_tick = Some(tick);
+    }
+
+    /// Record a §7.2 commitment-gate decision for the focal cat.
+    /// Accumulates per tick; drained by `emit_focal_trace` into one
+    /// `TraceRecord::L3Commitment` row each.
+    pub fn push_commitment(&self, row: CommitmentCapture, tick: u64) {
+        let mut inner = self
+            .inner
+            .lock()
+            .expect("focal score capture mutex poisoned");
+        inner.commitment.push(row);
+        inner.captured_tick = Some(tick);
+    }
+
+    /// Record a plan-failure event (replan cap, anxiety interrupt).
+    pub fn push_plan_failure(&self, row: PlanFailureCapture, tick: u64) {
+        let mut inner = self
+            .inner
+            .lock()
+            .expect("focal score capture mutex poisoned");
+        inner.plan_failures.push(row);
+        inner.captured_tick = Some(tick);
+    }
+
+    /// Record a target-taking DSE's per-candidate ranking. Overwrites
+    /// any prior ranking captured for the same DSE this tick — the
+    /// final call wins, matching the cat's actual selection pick.
+    pub fn set_target_ranking(&self, dse_id: &'static str, ranking: TargetRanking, tick: u64) {
+        let mut inner = self
+            .inner
+            .lock()
+            .expect("focal score capture mutex poisoned");
+        inner.target_rankings.insert(dse_id, ranking);
         inner.captured_tick = Some(tick);
     }
 
@@ -485,6 +672,7 @@ mod tests {
                 trace: EvalTrace::default(),
                 eligibility_required: vec!["HasStoredFood"],
                 eligibility_forbidden: vec![],
+                eligible: true,
             },
             42,
         );
@@ -498,6 +686,7 @@ mod tests {
                 trace: EvalTrace::default(),
                 eligibility_required: vec![],
                 eligibility_forbidden: vec![],
+                eligible: true,
             },
             42,
         );

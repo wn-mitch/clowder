@@ -36,6 +36,7 @@ plan — the plan is written when the work is picked up.
   - [19. Happy paths — usage-worn trails](#19-happy-paths--usage-worn-trails-2026-04-22)
   - [20. NamedLandmark substrate](#20-namedlandmark-substrate-cross-consumer-naming-2026-04-22)
   - [21. Monuments — civic & memorial structures](#21-monuments--civic--memorial-structures-2026-04-22)
+  - [22. §11 decision-point trace fan-out](#22-11-decision-point-trace-fan-out--remaining-target-taking-dses--deep-soak-review-2026-04-23)
 - [Landed](#landed)
   - [§13.1 rows 4–6 — corruption-axis Logistic migration + modifier/constant retirement](#131-rows-46--corruption-axis-logistic-migration--modifierconstant-retirement-2026-04-23)
   - [§13.1 rows 1–3 — Incapacitated consumer cutover + inline-branch retirement](#131-rows-13--incapacitated-consumer-cutover--inline-branch-retirement-2026-04-23)
@@ -402,91 +403,26 @@ links to its gate chain rather than being called "ready to land"):
   happened naturally once rows 1–3 and rows 4–6 turned out to
   have disjoint file-sets and a parallelizable fan-out landed
   both in one afternoon.
-- **§7 commitment strategies (§7.2 + §7.3).** The
-  `CommitmentStrategy` enum tag exists on every Intention per
-  Phase 3a; §7.2 drop-trigger reconsideration + §7.3
-  per-Intention-class assignment + §7.4 persistence bonus
-  remain unimplemented. A 2026-04-23 fan-out draft of
-  `src/ai/commitment.rs` (`BeliefProxies` / `should_drop_intention`
-  / `strategy_for_disposition` / `proxies_for_plan` /
-  `reconsider_held_intentions`) **failed seed-42 soak** with
-  severe regression. Draft preserved on jj bookmark
-  `session-c-draft` (commit hash mutable — head of the bookmark
-  when this note was written was `aa996a1c`).
+- **§7 commitment strategies (§7.2 + §7.3).** Two sessions of
+  attempts across 2026-04-23 both failed seed-42 soak. Working-copy
+  state as of session 2 close is **H2-equivalent** (helpers + tests
+  + per-DSE strategy tags + `Feature::CommitmentDropTriggered` all
+  present; gate not wired into any schedule or execution loop).
+  Deep-dive + resumption path lives in
+  [`docs/systems/phase-6a-commitment-gate-attempt.md`](systems/phase-6a-commitment-gate-attempt.md).
+  TL;DR: H1 (proxy-recipe) falsified, H2 (scheduler presence) cleared
+  canaries with code inert, merge-inline into `resolve_goap_plans`
+  failed, empty-body probe at same insertion site cleared — the
+  regression lives in one of four helper calls; bisection was cut
+  short at handoff.
 
-  **Regression shape (deep-dive, 2026-04-23 PM):**
-  Integrated A+B+C: Starvation 0 → 8, wards_placed 200 → 2,
-  grooming 129 → 0, plus 11 never-fired expected-positive
-  features vs. A+B's 5. Canonical focal-cat trace diagnostic
-  (Calcifer, seed-42, 15-min release soak):
-
-  - Calcifer dies of Starvation at tick 14,000 (baseline: full
-    sim survived, died to old age post-window).
-  - Hunger drain rate **~10× faster** in C-fixed vs. baseline
-    (0.07/1k ticks vs. 0.006/1k ticks). Calcifer never personally
-    fires `FoodEaten` in EITHER run — baseline's slow drain
-    keeps him alive; C's accelerated drain kills him.
-  - `CommitmentDropTriggered` fires only 8 times in 54,000
-    ticks colony-wide — the gate itself is not the direct
-    cause. The drain rate change implicates scheduler reshuffle
-    or drain-constant interaction.
-  - Plan-shape trace: Calcifer cycles between `disposition=Resting
-    steps=[]` plans and Exploring plans at ~1-tick cadence from
-    tick 1203822 onward — the gate drops each Resting plan as
-    `achievement_believed` fires (hunger 0.51 ≥ 0.5, energy 0.32
-    ≥ 0.3, temp 0.33 ≥ 0.3 all at threshold boundary), evaluate_
-    and_plan re-creates, gate drops again. Cat never progresses
-    to the Eat step.
-
-  **Two failed patch attempts documented for posterity:**
-  - `still_goal = true` for Socializing (single-line hack to
-    remove the `needs.social < threshold` bug) — reverted
-    2026-04-23. Made `Socialized` fire (463+ times) and pulled
-    grooming from 0 → 2, but Starvation stayed at 8 and wards
-    stayed at 2. Symptom-level patch; real regression survives.
-
-  **Resumption hypotheses** (all unverified — needs further
-  focal-cat trace diffs or targeted unit tests):
-
-  - **H1 (most likely): `achievement_believed` for Resting is
-    over-eager.** The `hunger >= 0.5 && energy >= 0.3 && temp >=
-    0.3` check matches cats right at critical-boundary needs
-    — they read as "achieved" before actually eating/sleeping
-    to fullness. Pre-C, Resting plans had `target_completions =
-    u32::MAX` meaning `resolve_goap_plans` never natural-
-    completes them; softmax re-selection cycles them when needs
-    rise naturally. Adding the gate's achievement check
-    short-circuits that.
-  - **H2: Scheduler reshuffle.** Adding `reconsider_held_intentions`
-    to the `ResMut<SystemActivation>` serialization chain (19
-    existing systems already take it) may force new parallelism
-    constraints that alter drain-per-tick cadence. Test by
-    removing the schedule registration, keeping only the
-    module — if canaries clear, the system's presence (not
-    its logic) is the issue.
-  - **H3: Command-buffer timing.** The gate's
-    `commands.entity.remove::<GoapPlan>()` applies at deferred
-    barrier. If `evaluate_and_plan` reads a stale GoapPlan
-    between the remove and the barrier, or replaces a plan
-    that's about to be dropped, chain coherence breaks.
-
-  **Resumption path:**
-  1. Start from `session-c-draft` (revert of the `still_goal`
-     hack is already squashed in; no latent band-aids).
-  2. Generate paired focal-cat traces (Calcifer-focal) on
-     **main** (A+B, clean baseline) and on `session-c-draft`.
-     `logs/a5-focal/trace-Simba.jsonl` is pre-A+B baseline for
-     Simba — NOT sufficient; needs a Calcifer baseline.
-  3. Test H1: in `proxies_for_plan`, make Resting's
-     `achievement_believed = false` unconditionally (so the gate
-     never drops Resting; natural softmax re-selection cycles
-     it as pre-C). Soak. If canaries clear, the Resting check
-     is the culprit.
-  4. If H1 doesn't clear it, test H2: remove the schedule
-     registration of `reconsider_held_intentions` (keep the
-     module code). Soak.
-  5. If neither, deeper instrumentation on `update_needs`:
-     count drain-per-tick explicitly to confirm the 10× figure.
+  Adjacent pre-existing bug surfaced but not caused by this work:
+  `find_nearest_tile` at `goap.rs:4258` has a north-bias
+  (iterates `dy=-radius..=radius` outer, keeps via strict `<`,
+  so the tile directly north is picked for every Wilds target).
+  Fatal on merge runs because cats stuck in Explore loops all
+  walk north; mild on main because varied DSE picks bleed off.
+  Being fixed in a separate session — do not block Phase 6a on it.
 - **§L2.10.7 plan-cost feedback.** Blocks 4 §6.5 deferred axes
   (`apprentice-receptivity`, `fertility-window`, `remedy-match`,
   `pursuit-cost`).
@@ -2159,6 +2095,69 @@ well — pressure to add kinds over time creeping the launch-5 toward
 **Resume when:** #20 naming substrate has landed, A1 IAUS refactor
 has landed, and the #18 ruin-clearings multi-cat coordination
 pattern is proven.
+
+---
+
+### 22. §11 decision-point trace fan-out — remaining target-taking DSEs + deep-soak review [2026-04-23]
+
+**Status:** infrastructure landed this session (trace-log schema,
+Feature split, commitment + plan-failure capture, ineligibility
+capture, `socialize_target` hook wiring). Seven target-taking DSEs
+still lack per-candidate ranking capture and the seed-42 focal soak
+has not been reviewed beyond a "does it run, do the new rows appear"
+sanity check.
+
+**Remaining work:**
+
+- Wire the `FocalTargetHook` (or the `target_ranking_from_scored`
+  helper in `src/ai/target_dse.rs`) through the remaining seven
+  target-taking DSE resolvers: `mate_target`, `mentor_target`,
+  `groom_other_target`, `apply_remedy_target`, `build_target`,
+  `caretake_target`, `hunt_target`, `fight_target`. Each needs:
+  - `resolve_*_target` signature gains an `Option<FocalTargetHook>`
+    trailing param (mirror `socialize_target.rs:152`).
+  - Every caller in `goap.rs` / `disposition.rs` passes either
+    `None` or a focal-hook built from `ec.focal_capture` +
+    `ec_is_focal` + an `Entity → String` name lookup.
+  - Test call sites (local `evaluate_target_taking` unit tests
+    aren't affected; only `resolve_*_target` tests in each file).
+
+- Review the seed-42 deep-soak focal trace that the wiring session
+  produces. Specifically:
+  - `jq 'select(.layer == "L3Commitment")' logs/tuned-42/trace-Simba.jsonl`
+    should show `branch: "achieved"` rows for every disposition
+    Simba completes (Resting, Hunting, Foraging, etc.) plus
+    `branch: "unachievable"` rows on any replan-cap hit.
+  - `jq 'select(.layer == "L3PlanFailure")' logs/tuned-42/trace-Simba.jsonl`
+    should show `reason: "anxiety_interrupt"` rows if Simba takes
+    a CriticalHealth hit.
+  - `events.jsonl` footer: `Feature::CommitmentDropBlind` /
+    `…SingleMinded` / `…OpenMinded` / `…ReplanCap` counters each
+    should have non-zero counts on a 15-min seed-42 soak. A zero on
+    any of them is a canary for either the capture not firing or
+    the disposition mix not exercising that strategy.
+  - Confirm no regression in existing survival canaries (Starvation
+    == 0, ShadowFoxAmbush ≤ 5, footer-written, never-fired-expected
+    == 0) or continuity canaries.
+
+- If the pluggable Phase 6a commitment gate lands (currently deferred
+  — see `docs/systems/phase-6a-commitment-gate-attempt.md`), the
+  capture sites at `goap.rs:1681` (disposition_complete) and
+  `goap.rs:~3144` (max_replans) can be folded into the gate's own
+  `should_drop_intention` call path and the `retained: true` rows
+  (plans the gate evaluated but kept) can land in the same trace.
+  Today those retained decisions are invisible by design — the
+  de-facto branches only fire on drop.
+
+**Why it matters:** without the remaining 7 hooks, a focal-cat
+soak on a priestess, a mentor, a hunter etc. won't show per-target
+rankings for their signature activities. A socialize-only hook
+covers Simba but misses the §6.5 coverage matrix described in
+CLAUDE.md ("multi-focal runs against different cats").
+
+**Resume when:** next session that opens `trace-<focal>.jsonl` and
+wants the `targets` block on a non-socialize L2 record, or any
+session that re-attempts Phase 6a integration.
 
 ---
 

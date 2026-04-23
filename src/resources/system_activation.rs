@@ -173,6 +173,40 @@ pub enum Feature {
     /// `MatingOccurred` which fires only when a `Pregnancy` was
     /// inserted.
     CourtshipInteraction,
+    /// Phase 6a §7.2 — drop-trigger gate fired for a cat's held
+    /// `GoapPlan`: the `CommitmentStrategy` dispatch said to drop
+    /// (achievement believed, planner hard-fail under SingleMinded,
+    /// or satiation under OpenMinded) and the plan was removed.
+    /// Distinct from `AnxietyInterrupt` (which is the Maslow
+    /// event-driven preemption that bypasses §7.2 entirely).
+    /// Neutral — the gate is a reconsideration signal, not a
+    /// healthy-colony win or adverse event by itself.
+    ///
+    /// Aggregate counter — retained for back-compat with any
+    /// dashboard reading it. Branch-specific counters below replace
+    /// it for canary purposes.
+    CommitmentDropTriggered,
+    /// §7.2 gate dropped a `Blind` plan (Resting, Guarding). The
+    /// Blind strategy drops only on `achievement_believed`, so this
+    /// fires when a rest cycle or patrol completes. Expected to fire
+    /// at least once per 15-min soak when Resting is reached.
+    CommitmentDropBlind,
+    /// §7.2 gate dropped a `SingleMinded` plan on `achievement_believed`
+    /// (Hunt/Build/Forage/etc. goal met). Distinct from `…ReplanCap`
+    /// below, which covers the `achievable_believed == false` hard-
+    /// fail branch of the same strategy.
+    CommitmentDropSingleMinded,
+    /// §7.2 gate dropped an `OpenMinded` plan on `still_goal == false`
+    /// (satiation / desire drift). Fires for Socializing satiation
+    /// and future Exploring curiosity-drift.
+    CommitmentDropOpenMinded,
+    /// §7.2 `achievable_believed == false` hard-fail channel: the
+    /// planner exhausted `max_replans` retries on a goal-shaped plan
+    /// and the gate let it go. Fires alongside the executor's own
+    /// "abandoned" narrative event at `goap.rs:~3144`; tracking it
+    /// as a distinct Feature lets canaries catch planner collapse
+    /// separately from legitimate completion.
+    CommitmentDropReplanCap,
 }
 
 impl Feature {
@@ -264,6 +298,12 @@ impl Feature {
         Feature::MaterialsDelivered,
         Feature::BuildingRepaired,
         Feature::CourtshipInteraction,
+        // §Phase 6a §7.2 drop-trigger gate
+        Feature::CommitmentDropTriggered,
+        Feature::CommitmentDropBlind,
+        Feature::CommitmentDropSingleMinded,
+        Feature::CommitmentDropOpenMinded,
+        Feature::CommitmentDropReplanCap,
     ];
 
     /// The valence of this feature.
@@ -367,6 +407,11 @@ impl Feature {
             Feature::FoxDenDefense => Neutral,
             Feature::FoxAvoidedWard => Neutral,
             Feature::FoxAvoidedPresence => Neutral,
+            Feature::CommitmentDropTriggered => Neutral,
+            Feature::CommitmentDropBlind => Neutral,
+            Feature::CommitmentDropSingleMinded => Neutral,
+            Feature::CommitmentDropOpenMinded => Neutral,
+            Feature::CommitmentDropReplanCap => Neutral,
         }
     }
 
@@ -555,6 +600,11 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::MaterialsDelivered => "MaterialsDelivered",
         Feature::BuildingRepaired => "BuildingRepaired",
         Feature::CourtshipInteraction => "CourtshipInteraction",
+        Feature::CommitmentDropTriggered => "CommitmentDropTriggered",
+        Feature::CommitmentDropBlind => "CommitmentDropBlind",
+        Feature::CommitmentDropSingleMinded => "CommitmentDropSingleMinded",
+        Feature::CommitmentDropOpenMinded => "CommitmentDropOpenMinded",
+        Feature::CommitmentDropReplanCap => "CommitmentDropReplanCap",
     }
 }
 
@@ -758,9 +808,13 @@ mod tests {
         // 36 pre-existing Positive + 8 added in §Phase 5a (FoodEaten,
         // Socialized, GroomedOther, MentoredCat, ThreatEngaged,
         // MaterialsDelivered, BuildingRepaired, CourtshipInteraction).
+        // Phase 6a added 1 Neutral (CommitmentDropTriggered) +
+        // 4 branch-specific Neutrals (Blind / SingleMinded /
+        // OpenMinded / ReplanCap) for the §7.2 commitment-gate
+        // tracing split.
         assert_eq!(positive, 44);
         assert_eq!(negative, 20);
-        assert_eq!(neutral, 20);
+        assert_eq!(neutral, 25);
     }
 
     #[test]
@@ -834,7 +888,7 @@ mod tests {
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Neutral),
-            20
+            25
         );
     }
 

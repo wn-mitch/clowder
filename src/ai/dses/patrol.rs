@@ -70,7 +70,9 @@ impl Dse for PatrolDse {
         &self.eligibility
     }
     fn default_strategy(&self) -> CommitmentStrategy {
-        CommitmentStrategy::SingleMinded
+        // §7.3: Guarding → Blind. Territory defense shouldn't flinch
+        // mid-patrol. AI8 caps fixation.
+        CommitmentStrategy::Blind
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
@@ -78,7 +80,7 @@ impl Dse for PatrolDse {
                 label: "territory_patrolled",
                 achieved: |_, _| false,
             },
-            strategy: CommitmentStrategy::SingleMinded,
+            strategy: CommitmentStrategy::Blind,
         }
     }
     fn maslow_tier(&self) -> u8 {

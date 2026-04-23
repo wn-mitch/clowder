@@ -273,6 +273,25 @@ pub struct ExecutorContext<'w, 's> {
         (Entity, &'static crate::components::KittenDependency),
         Without<Dead>,
     >,
+    /// §11 focal-cat target. Present only when `--focal-cat` wired the
+    /// resource in the headless runner; absent in every interactive
+    /// build. Used to gate §7.2 commitment + plan-failure trace
+    /// capture at the de-facto branches inside this system.
+    pub focal_target: Option<Res<'w, crate::resources::FocalTraceTarget>>,
+    /// §11 rich-trace capture sink. Same gating as `focal_target`.
+    pub focal_capture: Option<Res<'w, crate::resources::FocalScoreCapture>>,
+}
+
+/// Returns true when `cat_entity` matches the registered focal cat.
+/// Zero-cost when `focal_target` isn't inserted (non-headless runs /
+/// headless without `--focal-cat`): the inner `Option` is None and
+/// the short-circuit returns false before any entity comparison.
+fn ec_is_focal(ec: &ExecutorContext, cat_entity: Entity) -> bool {
+    ec.focal_target
+        .as_ref()
+        .and_then(|t| t.entity)
+        .map(|e| e == cat_entity)
+        .unwrap_or(false)
 }
 
 // ===========================================================================
@@ -309,6 +328,8 @@ pub fn check_anxiety_interrupts(
     mut activation: ResMut<SystemActivation>,
     mut plan_writer: MessageWriter<PlanNarrative>,
     mut event_log: Option<ResMut<EventLog>>,
+    focal_target: Option<Res<crate::resources::FocalTraceTarget>>,
+    focal_capture: Option<Res<crate::resources::FocalScoreCapture>>,
 ) {
     let d = &constants.disposition;
 
@@ -337,6 +358,38 @@ pub fn check_anxiety_interrupts(
             && health.current / health.max < d.critical_health_threshold
         {
             activation.record(Feature::AnxietyInterrupt);
+
+            // §11 focal-cat trace capture for the §7.5 Maslow
+            // preemption path. Distinct from the §7.2 commitment
+            // branches — this preempts the gate entirely per spec,
+            // so the record surfaces as `L3PlanFailure` with
+            // `reason: "anxiety_interrupt"` rather than an
+            // `L3Commitment` row.
+            let is_focal = focal_target
+                .as_ref()
+                .and_then(|t| t.entity)
+                .map(|e| e == entity)
+                .unwrap_or(false);
+            if is_focal {
+                if let Some(capture) = focal_capture.as_deref() {
+                    let current_step = plan
+                        .current()
+                        .map(|s| format!("{:?}", s.action))
+                        .unwrap_or_else(|| "none".into());
+                    capture.push_plan_failure(
+                        crate::resources::trace_log::PlanFailureCapture {
+                            reason: "anxiety_interrupt",
+                            disposition: format!("{:?}", plan.kind),
+                            detail: serde_json::json!({
+                                "health_ratio": health.current / health.max,
+                                "critical_threshold": d.critical_health_threshold,
+                                "preempted_step": current_step,
+                            }),
+                        },
+                        time.tick,
+                    );
+                }
+            }
 
             if let Some(ref mut log) = event_log {
                 let current_step = plan
@@ -895,6 +948,12 @@ pub fn evaluate_and_plan(
             &cat_positions,
             &res.relationships,
             res.time.tick,
+            // This scorer-side call pre-checks whether a partner
+            // exists for the outer eligibility gate; the L2 record
+            // for `socialize_target` is captured at the step-
+            // resolution site below (goap.rs:~2038) where the cat
+            // actually picks a target. No double-capture here.
+            None,
         )
         .is_some();
 
@@ -1687,6 +1746,34 @@ pub fn resolve_goap_plans(
                         outcome: ActionOutcome::Success,
                     });
                 }
+                // §7.2 de-facto `achievement_believed` branch. The
+                // pluggable Phase 6a gate is deferred; this path is
+                // the effective "gate fired with achieved" until it
+                // lands. Telemetry + trace capture mirror what the
+                // pluggable gate will emit, so replay tooling won't
+                // need to diff the shapes later.
+                let strategy = crate::ai::commitment::strategy_for_disposition(plan.kind);
+                crate::ai::commitment::record_drop(
+                    narr.activation.as_deref_mut(),
+                    strategy,
+                    crate::ai::commitment::DropBranch::Achieved,
+                );
+                if ec_is_focal(&ec, cat_entity) {
+                    let proxies = crate::ai::commitment::proxies_for_plan(
+                        &plan,
+                        &needs,
+                        &ec.constants.disposition,
+                    );
+                    crate::ai::commitment::record_commitment_decision(
+                        ec.focal_capture.as_deref(),
+                        ec.time.tick,
+                        &plan,
+                        strategy,
+                        proxies,
+                        true,
+                        crate::ai::commitment::DropBranch::Achieved.as_str(),
+                    );
+                }
                 plan_writer.write(PlanNarrative {
                     entity: cat_entity,
                     kind: plan.kind,
@@ -1953,6 +2040,27 @@ pub fn resolve_goap_plans(
                 // the §6.2 silent-divergence gap with
                 // `disposition.rs::build_socializing_chain`.
                 if plan.step_state[step_idx].target_entity.is_none() {
+                    // §11 focal-cat hook: emits per-candidate ranking
+                    // into `FocalScoreCapture` on the focal cat's
+                    // turn, so the socialize_target L2 record
+                    // carries a `targets` block with every
+                    // candidate's score + the winner. Non-focal
+                    // cats pass `None` and pay zero cost.
+                    let focal_hook = if ec_is_focal(&ec, cat_entity) {
+                        ec.focal_capture.as_deref().map(|cap| {
+                            crate::ai::dses::socialize_target::FocalTargetHook {
+                                capture: cap,
+                                // `Entity::Debug` is the cheapest stable
+                                // label; name resolution would need a
+                                // snapshot this system doesn't carry.
+                                // Trace tooling can join against
+                                // events.jsonl on the same Entity id.
+                                name_lookup: &|e: Entity| format!("{e:?}"),
+                            }
+                        })
+                    } else {
+                        None
+                    };
                     plan.step_state[step_idx].target_entity =
                         crate::ai::dses::socialize_target::resolve_socialize_target(
                             &ec.dse_registry,
@@ -1961,6 +2069,7 @@ pub fn resolve_goap_plans(
                             &cat_positions,
                             &relationships,
                             ec.time.tick,
+                            focal_hook,
                         );
                 }
                 let outcome = crate::steps::disposition::resolve_socialize(
@@ -3143,6 +3252,47 @@ pub fn resolve_goap_plans(
                         });
                     } else {
                         // Max replans exceeded.
+                        // §7.2 `achievable_believed == false` hard-fail
+                        // channel. `record_drop` fires the branch-
+                        // specific `CommitmentDropReplanCap` counter
+                        // alongside the aggregate. Narrative emission
+                        // (`PlanEvent::Abandoned`) stays below so the
+                        // event log keeps its current shape.
+                        let strategy = crate::ai::commitment::strategy_for_disposition(plan.kind);
+                        crate::ai::commitment::record_drop(
+                            narr.activation.as_deref_mut(),
+                            strategy,
+                            crate::ai::commitment::DropBranch::ReplanCap,
+                        );
+                        if ec_is_focal(&ec, cat_entity) {
+                            let proxies = crate::ai::commitment::proxies_for_plan(
+                                &plan,
+                                &needs,
+                                &ec.constants.disposition,
+                            );
+                            crate::ai::commitment::record_commitment_decision(
+                                ec.focal_capture.as_deref(),
+                                ec.time.tick,
+                                &plan,
+                                strategy,
+                                proxies,
+                                true,
+                                crate::ai::commitment::DropBranch::ReplanCap.as_str(),
+                            );
+                            if let Some(capture) = ec.focal_capture.as_deref() {
+                                capture.push_plan_failure(
+                                    crate::resources::trace_log::PlanFailureCapture {
+                                        reason: "replan_cap",
+                                        disposition: format!("{:?}", plan.kind),
+                                        detail: serde_json::json!({
+                                            "replan_count": plan.replan_count,
+                                            "max_replans": plan.max_replans,
+                                        }),
+                                    },
+                                    ec.time.tick,
+                                );
+                            }
+                        }
                         plan_writer.write(PlanNarrative {
                             entity: cat_entity,
                             kind: plan.kind,
@@ -4244,28 +4394,54 @@ fn has_nearby_tile(
     find_nearest_tile(from, map, radius, predicate).is_some()
 }
 
+/// splitmix64 finalizer — pure function, no state, strong avalanche.
+/// Used to deterministically break ties among equidistant candidates in
+/// `find_nearest_tile` without consuming the global RNG stream.
+fn mix_hash(a: i32, b: i32, c: i32, d: i32) -> u64 {
+    let mut x = (a as u32 as u64)
+        ^ ((b as u32 as u64) << 32)
+        ^ (c as u32 as u64).rotate_left(16)
+        ^ ((d as u32 as u64) << 48);
+    x = x.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    x = (x ^ (x >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    x = (x ^ (x >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    x ^ (x >> 31)
+}
+
 fn find_nearest_tile(
     from: &Position,
     map: &TileMap,
     radius: i32,
     predicate: impl Fn(Terrain) -> bool,
 ) -> Option<Position> {
-    let mut best: Option<(Position, i32)> = None;
+    let mut best: Option<(Position, i32, u64)> = None;
     for dy in -radius..=radius {
         for dx in -radius..=radius {
             let p = Position::new(from.x + dx, from.y + dy);
-            if map.in_bounds(p.x, p.y) {
-                let tile = map.get(p.x, p.y);
-                if predicate(tile.terrain) {
-                    let dist = from.manhattan_distance(&p);
-                    if dist > 0 && best.is_none_or(|(_, d)| dist < d) {
-                        best = Some((p, dist));
-                    }
-                }
+            if !map.in_bounds(p.x, p.y) {
+                continue;
+            }
+            let tile = map.get(p.x, p.y);
+            if !predicate(tile.terrain) {
+                continue;
+            }
+            let dist = from.manhattan_distance(&p);
+            if dist == 0 {
+                continue;
+            }
+            let tie = mix_hash(from.x, from.y, p.x, p.y);
+            let replace = match best {
+                None => true,
+                Some((_, d, _)) if dist < d => true,
+                Some((_, d, t)) if dist == d && tie < t => true,
+                _ => false,
+            };
+            if replace {
+                best = Some((p, dist, tie));
             }
         }
     }
-    best.map(|(p, _)| p)
+    best.map(|(p, _, _)| p)
 }
 
 fn find_random_nearby_tile(
@@ -4641,4 +4817,132 @@ fn build_zone_distances(
     }
 
     distances
+}
+
+// ===========================================================================
+// Tests
+// ===========================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Regression: on an open map with a permissive predicate, the old
+    /// `find_nearest_tile` always returned `(from.x, from.y - 1)` because
+    /// the row-major scan visits -y neighbors first and the strict `<`
+    /// comparison never replaced them. The deterministic tiebreak must
+    /// pick a different tile for at least the canonical center origin.
+    #[test]
+    fn find_nearest_tile_not_north_biased_from_center() {
+        let map = TileMap::new(41, 41, Terrain::Grass);
+        let center = Position::new(20, 20);
+        let result = find_nearest_tile(&center, &map, 20, |t| t.is_passable())
+            .expect("open map must have a passable neighbor");
+        assert_ne!(
+            result,
+            Position::new(center.x, center.y - 1),
+            "tiebreak regressed: still returning the -y neighbor"
+        );
+    }
+
+    /// Across many origin positions on an all-passable map, the chosen
+    /// direction must spread across buckets — no single cardinal direction
+    /// captures more than 40% of results. Current (pre-fix) code lands
+    /// 100% in the (0, -1) bucket; the splitmix tiebreak should flatten
+    /// the distribution.
+    #[test]
+    fn find_nearest_tile_distributes_directions() {
+        let map = TileMap::new(41, 41, Terrain::Grass);
+        let mut buckets: std::collections::HashMap<(i32, i32), u32> =
+            std::collections::HashMap::new();
+        let mut total = 0u32;
+        for ox in 5..13 {
+            for oy in 5..13 {
+                let from = Position::new(ox, oy);
+                let Some(p) = find_nearest_tile(&from, &map, 20, |t| t.is_passable()) else {
+                    continue;
+                };
+                let key = ((p.x - from.x).signum(), (p.y - from.y).signum());
+                *buckets.entry(key).or_default() += 1;
+                total += 1;
+            }
+        }
+        assert!(total >= 60, "expected at least 60 sampled origins, got {total}");
+        let max_bucket = buckets.values().copied().max().unwrap_or(0);
+        let max_ratio = max_bucket as f32 / total as f32;
+        assert!(
+            max_ratio <= 0.4,
+            "direction distribution is still axis-biased: max bucket {max_bucket}/{total} = {max_ratio:.2}, buckets={buckets:?}"
+        );
+    }
+
+    /// Pure function: identical inputs must produce identical output
+    /// across repeated calls. This is the seed-42 reproducibility
+    /// contract for the tile picker.
+    #[test]
+    fn find_nearest_tile_is_deterministic() {
+        let map = TileMap::new(41, 41, Terrain::Grass);
+        let from = Position::new(12, 17);
+        let a = find_nearest_tile(&from, &map, 20, |t| t.is_passable());
+        let b = find_nearest_tile(&from, &map, 20, |t| t.is_passable());
+        assert_eq!(a, b);
+        assert!(a.is_some());
+    }
+
+    /// Existence semantics must survive the refactor: when only one
+    /// passable tile sits within the radius, both `find_nearest_tile` and
+    /// `has_nearby_tile` must report it. Guards against accidentally
+    /// dropping candidates through the new tiebreak arms.
+    #[test]
+    fn find_nearest_tile_returns_unique_candidate() {
+        let mut map = TileMap::new(10, 10, Terrain::Water);
+        map.set(5, 2, Terrain::Grass);
+        let from = Position::new(4, 2);
+        let found = find_nearest_tile(&from, &map, 5, |t| t.is_passable());
+        assert_eq!(found, Some(Position::new(5, 2)));
+        assert!(has_nearby_tile(&from, &map, 5, |t| t.is_passable()));
+
+        let far = Position::new(0, 9);
+        assert_eq!(find_nearest_tile(&far, &map, 2, |t| t.is_passable()), None);
+        assert!(!has_nearby_tile(&far, &map, 2, |t| t.is_passable()));
+    }
+
+    /// The tiebreak must not compromise the minimum-distance invariant:
+    /// the returned tile's manhattan distance equals the true minimum
+    /// over all predicate-satisfying tiles in the radius box.
+    #[test]
+    fn find_nearest_tile_preserves_minimum_distance() {
+        let mut map = TileMap::new(21, 21, Terrain::Water);
+        // A ring of passable tiles at manhattan distance 3 from (10, 10),
+        // plus one isolated passable tile at distance 5. The picker must
+        // return some distance-3 tile, never the distance-5 one.
+        let ring: Vec<(i32, i32)> = vec![
+            (10, 7), (10, 13), (7, 10), (13, 10),
+            (11, 8), (9, 12), (12, 9), (8, 11),
+        ];
+        for (x, y) in &ring {
+            map.set(*x, *y, Terrain::Grass);
+        }
+        map.set(15, 10, Terrain::Grass); // distance 5 decoy
+        let from = Position::new(10, 10);
+        let result = find_nearest_tile(&from, &map, 10, |t| t.is_passable())
+            .expect("ring is populated");
+        assert_eq!(from.manhattan_distance(&result), 3);
+        assert!(ring.contains(&(result.x, result.y)));
+    }
+
+    /// The mixing hash must avalanche well enough that small input
+    /// perturbations produce very different outputs — otherwise the
+    /// distribution test above is flaky by accident. Sanity check.
+    #[test]
+    fn mix_hash_varies_with_inputs() {
+        let h1 = mix_hash(10, 10, 10, 9);
+        let h2 = mix_hash(10, 10, 10, 11);
+        let h3 = mix_hash(10, 10, 9, 10);
+        let h4 = mix_hash(10, 10, 11, 10);
+        assert_ne!(h1, h2);
+        assert_ne!(h1, h3);
+        assert_ne!(h1, h4);
+        assert_ne!(h2, h3);
+    }
 }

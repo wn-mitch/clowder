@@ -581,6 +581,9 @@ pub fn evaluate_dispositions(
             &cat_positions,
             &relationships,
             side_effects.time.tick,
+            // Scorer pre-check; focal capture happens at the
+            // step-resolution site, not here.
+            None,
         )
         .is_some();
 
@@ -1148,6 +1151,9 @@ pub fn disposition_to_chain(
             &cat_pos_list,
             &res.relationships,
             res.time.tick,
+            // Chain-building side; the focal capture happens at the
+            // GOAP step-resolver site (goap.rs: SocializeWith step).
+            None,
         );
         let mate_target = crate::ai::dses::mate_target::resolve_mate_target(
             &res.dse_registry,

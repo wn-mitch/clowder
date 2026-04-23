@@ -94,7 +94,10 @@ impl Dse for SleepDse {
         &self.eligibility
     }
     fn default_strategy(&self) -> CommitmentStrategy {
-        CommitmentStrategy::SingleMinded
+        // §7.3: Sleep is a constituent action of the Resting
+        // disposition and rides Resting's `Blind` strategy. The
+        // Maslow gate handles preemption; AI8 caps runaway sleeps.
+        CommitmentStrategy::Blind
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
@@ -102,7 +105,7 @@ impl Dse for SleepDse {
                 label: "energy_restored",
                 achieved: |_, _| false,
             },
-            strategy: CommitmentStrategy::SingleMinded,
+            strategy: CommitmentStrategy::Blind,
         }
     }
     fn maslow_tier(&self) -> u8 {

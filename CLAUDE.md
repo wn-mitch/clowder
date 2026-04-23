@@ -153,6 +153,18 @@ Balance-tuning on refactor-affected metrics (positive-feature density, mating ca
 4. Verification: `just check` + `just test` + seed-42 `--duration 900` release soak (survival canaries hold; continuity / activation deltas recorded in the landing entry).
 5. DSE registration sites: three — `SimulationPlugin::build` and both `build_schedule` paths in `main.rs`. Exemplar port: `src/ai/dses/socialize_target.rs` (factory + caller-side resolver + test suite).
 
+### §7.2 commitment gate — mental model
+
+The drop-trigger gate (`src/ai/commitment.rs::reconsider_held_intentions`, Phase 6a) runs per tick between `check_anxiety_interrupts` (Maslow preemption, §7.5) and `evaluate_and_plan` (softmax re-selection). For each held `GoapPlan` it looks up the plan's `CommitmentStrategy` via the §7.3 table (`strategy_for_disposition`) and consumes three **belief proxies** (§12.3 — Clowder has no first-class belief layer):
+
+- `achievement_believed` — the plan's goal predicate currently resolves true.
+- `achievable_believed` — spatial-score retention (deferred) × `plan.replan_count < plan.max_replans` hard-fail. Gate consumes the AND.
+- `still_goal` — desire persists. Load-bearing only under `OpenMinded`.
+
+Strategy dispatch: `Blind => achieved`; `SingleMinded => achieved || unachievable`; `OpenMinded => achieved || dropped_goal`. Pure function, no ECS access — the 12-row strategy table is unit-testable without a `World`.
+
+**Proxy recipes must mirror the authoritative completion check *with its surrounding guards*.** The 2026-04-23 §7.2 regression (see `docs/open-work.md` #5) was a lifted-condition bug: `achievement_believed` for Resting copied the three-need threshold out of `resolve_goap_plans`'s post-trip block (`goap.rs:~1672`) but dropped the implicit `trips_done` guard — turning a transition check ("plan just closed a trip and needs are sated") into a state poll ("needs are sated right now"). Cats whose ambient needs sat above the thresholds read as "achieved" before any rest action had run; the gate cascaded plan-churn through `evaluate_and_plan` and seed-42 canaries collapsed. When porting a check out of a nested block, replicate the block's preconditions explicitly — a nested arm's guards are part of the condition's meaning.
+
 ## Headless Mode
 
 `build_schedule()` in `src/main.rs` is a **manual mirror** of `SimulationPlugin::build()` in `src/plugins/simulation.rs`. Change one, change both — they diverged silently before.

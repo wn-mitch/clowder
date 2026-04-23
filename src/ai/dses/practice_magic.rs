@@ -74,7 +74,9 @@ impl Dse for ScryDse {
         &self.eligibility
     }
     fn default_strategy(&self) -> CommitmentStrategy {
-        CommitmentStrategy::OpenMinded
+        // §7.3: Scry is a constituent action of the Crafting
+        // disposition and rides Crafting's `SingleMinded` strategy.
+        CommitmentStrategy::SingleMinded
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
@@ -82,7 +84,7 @@ impl Dse for ScryDse {
                 label: "scried",
                 achieved: |_, _| false,
             },
-            strategy: CommitmentStrategy::OpenMinded,
+            strategy: CommitmentStrategy::SingleMinded,
         }
     }
     fn maslow_tier(&self) -> u8 {
@@ -446,7 +448,9 @@ impl Dse for CommuneDse {
         &self.eligibility
     }
     fn default_strategy(&self) -> CommitmentStrategy {
-        CommitmentStrategy::OpenMinded
+        // §7.3: Commune is a constituent action of the Crafting
+        // disposition and rides Crafting's `SingleMinded` strategy.
+        CommitmentStrategy::SingleMinded
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
@@ -454,7 +458,7 @@ impl Dse for CommuneDse {
                 label: "communed",
                 achieved: |_, _| false,
             },
-            strategy: CommitmentStrategy::OpenMinded,
+            strategy: CommitmentStrategy::SingleMinded,
         }
     }
     fn maslow_tier(&self) -> u8 {

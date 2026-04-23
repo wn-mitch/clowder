@@ -156,6 +156,7 @@ pub fn resolve_socialize_target(
     cat_positions: &[(Entity, Position)],
     relationships: &Relationships,
     tick: u64,
+    focal_hook: Option<FocalTargetHook<'_>>,
 ) -> Option<Entity> {
     // Find the registered factory output. Fall back to `None` if
     // registration was skipped (tests / partial bootstraps) — callers
@@ -253,7 +254,32 @@ pub fn resolve_socialize_target(
         &fetch_self,
         &fetch_target,
     );
+
+    // §11 focal-cat per-candidate ranking capture (§6.3). Emitted only
+    // when the caller marks this resolve as the focal cat's tick.
+    // Non-focal paths pass `focal_hook: None` and pay zero cost.
+    if let Some(hook) = focal_hook {
+        if let Some(ranking) = crate::ai::target_dse::target_ranking_from_scored(
+            &scored,
+            dse.aggregation(),
+            hook.name_lookup,
+        ) {
+            hook.capture
+                .set_target_ranking("socialize_target", ranking, tick);
+        }
+    }
+
     scored.winning_target
+}
+
+/// Focal-cat target-ranking capture hook — passed by callers that want
+/// per-candidate scores emitted to the trace sidecar. Keeping this as
+/// a dedicated struct (rather than two optional params) makes it
+/// obvious at the call site that the resolver is operating in a
+/// focal-tracing context.
+pub struct FocalTargetHook<'a> {
+    pub capture: &'a crate::resources::FocalScoreCapture,
+    pub name_lookup: &'a dyn Fn(Entity) -> String,
 }
 
 #[cfg(test)]
@@ -412,6 +438,7 @@ mod tests {
             &cat_positions,
             &relationships,
             0,
+            None,
         );
         assert!(out.is_none());
     }
@@ -432,6 +459,7 @@ mod tests {
             &cat_positions,
             &relationships,
             0,
+            None,
         );
         assert!(out.is_none());
     }
@@ -462,6 +490,7 @@ mod tests {
             &cat_positions,
             &relationships,
             0,
+            None,
         );
         assert_eq!(out, Some(friend));
     }
@@ -481,6 +510,7 @@ mod tests {
             &cat_positions,
             &relationships,
             0,
+            None,
         );
         assert!(out.is_none());
     }
@@ -514,6 +544,7 @@ mod tests {
             &cat_positions,
             &relationships,
             0,
+            None,
         );
         assert_eq!(out, Some(novel));
     }

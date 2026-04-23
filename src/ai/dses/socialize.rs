@@ -100,7 +100,9 @@ impl Dse for SocializeDse {
         &self.eligibility
     }
     fn default_strategy(&self) -> CommitmentStrategy {
-        CommitmentStrategy::SingleMinded
+        // §7.3: Socializing → OpenMinded. Activity-shaped; drops on
+        // sated-sociability or lost interest.
+        CommitmentStrategy::OpenMinded
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
@@ -108,7 +110,7 @@ impl Dse for SocializeDse {
                 label: "socialized",
                 achieved: |_, _| false,
             },
-            strategy: CommitmentStrategy::SingleMinded,
+            strategy: CommitmentStrategy::OpenMinded,
         }
     }
     fn maslow_tier(&self) -> u8 {

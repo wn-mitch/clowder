@@ -243,6 +243,17 @@ impl Plugin for SimulationPlugin {
             FixedUpdate,
             systems::goap::check_anxiety_interrupts.after(systems::items::sync_food_stores),
         );
+        // §7.2 commitment gate (Phase 6a) is not a stand-alone system —
+        // it's inlined into `resolve_goap_plans`'s per-cat loop
+        // prologue via `crate::ai::commitment::{strategy_for_disposition,
+        // proxies_for_plan, should_drop_intention, record_drop}`. The
+        // 2026-04-23 PM attempt registered a `reconsider_held_intentions`
+        // system between `check_anxiety_interrupts` and
+        // `evaluate_and_plan`; its schedule presence reshuffled
+        // ordering enough to starve the colony (see
+        // `docs/open-work.md` #5). The inlined form shifts the gate's
+        // effect by one tick (replacement next tick instead of same
+        // tick) without new scheduler edges.
         app.add_systems(
             FixedUpdate,
             systems::goap::evaluate_and_plan

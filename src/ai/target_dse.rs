@@ -152,6 +152,49 @@ impl ScoredTargetTakingDse {
     }
 }
 
+/// Build a §11.3 `TargetRanking` from a scored target-taking DSE for
+/// focal-cat trace emission. Caller provides a `name_lookup` closure
+/// because this module has no ECS access — in practice callers resolve
+/// `Entity → Name` from a frame-local snapshot they've already built.
+/// Returns `None` when the candidate set was empty (no ranking to
+/// emit).
+///
+/// Wired by target-taking DSE resolvers at their call site: on a focal
+/// cat tick, after `evaluate_target_taking` returns, the caller pushes
+/// the resulting ranking into `FocalScoreCapture::set_target_ranking`
+/// and `emit_focal_trace` merges it into the matching L2 record's
+/// `targets` field at flush time.
+pub fn target_ranking_from_scored(
+    scored: &ScoredTargetTakingDse,
+    aggregation: TargetAggregation,
+    name_lookup: &dyn Fn(Entity) -> String,
+) -> Option<crate::resources::trace_log::TargetRanking> {
+    if scored.per_target.is_empty() {
+        return None;
+    }
+    let ranked = scored.ranked_candidates();
+    let (contributing_count, agg_slug) = match aggregation {
+        TargetAggregation::Best => (1usize, "Best".to_string()),
+        TargetAggregation::SumTopN(n) => (n.min(ranked.len()), format!("SumTopN({n})")),
+        TargetAggregation::WeightedAverage => (ranked.len(), "WeightedAverage".to_string()),
+    };
+    let candidates: Vec<crate::resources::trace_log::TargetCandidate> = ranked
+        .iter()
+        .enumerate()
+        .map(|(i, (entity, score))| crate::resources::trace_log::TargetCandidate {
+            name: name_lookup(*entity),
+            score: *score,
+            contributed: i < contributing_count,
+        })
+        .collect();
+    let winner = scored.winning_target.map(name_lookup);
+    Some(crate::resources::trace_log::TargetRanking {
+        aggregation: agg_slug,
+        candidates,
+        winner,
+    })
+}
+
 // ---------------------------------------------------------------------------
 // Evaluator
 // ---------------------------------------------------------------------------

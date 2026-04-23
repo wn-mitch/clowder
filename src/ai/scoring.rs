@@ -610,6 +610,43 @@ fn score_dse_by_id(
         inputs.focal_capture.is_some() && inputs.focal_cat == Some(inputs.cat);
 
     if focal_active {
+        let filter = dse.eligibility();
+        // Capture ineligible DSEs explicitly — without this, a
+        // permanently-ineligible DSE (e.g. Hunt for a cat whose
+        // `CanHunt` marker is never set) leaves no trace row at all,
+        // and "why didn't Hunt even appear?" has no answer in the
+        // focal trace. One stripped row per ineligible DSE per tick
+        // is bounded (DSE catalog ~20 items).
+        if !crate::ai::eval::passes_eligibility(filter, inputs.cat, &eval_ctx) {
+            if let Some(capture) = inputs.focal_capture {
+                capture.push_dse(
+                    crate::resources::trace_log::CapturedDse {
+                        dse_id: dse.id(),
+                        raw_score: 0.0,
+                        gated_score: 0.0,
+                        final_score: 0.0,
+                        // Placeholder Intention — the `eligible: false`
+                        // flag tells downstream tooling this field is
+                        // meaningless. `default_strategy()` keeps the
+                        // shape well-formed without calling `emit()`,
+                        // which would need inputs an ineligible DSE
+                        // doesn't have.
+                        intention: crate::ai::dse::Intention::Activity {
+                            kind: crate::ai::dse::ActivityKind::Idle,
+                            termination: crate::ai::dse::Termination::UntilInterrupt,
+                            strategy: dse.default_strategy(),
+                        },
+                        trace: crate::ai::eval::EvalTrace::default(),
+                        eligibility_required: filter.required.to_vec(),
+                        eligibility_forbidden: filter.forbidden.to_vec(),
+                        eligible: false,
+                    },
+                    inputs.tick,
+                );
+            }
+            return 0.0;
+        }
+
         let mut trace = crate::ai::eval::EvalTrace::default();
         let scored = crate::ai::eval::evaluate_single_with_trace(
             dse,
@@ -621,7 +658,6 @@ fn score_dse_by_id(
             Some(&mut trace),
         );
         if let (Some(scored), Some(capture)) = (scored, inputs.focal_capture) {
-            let filter = dse.eligibility();
             capture.push_dse(
                 crate::resources::trace_log::CapturedDse {
                     dse_id: scored.id,
@@ -632,6 +668,7 @@ fn score_dse_by_id(
                     trace,
                     eligibility_required: filter.required.to_vec(),
                     eligibility_forbidden: filter.forbidden.to_vec(),
+                    eligible: true,
                 },
                 inputs.tick,
             );

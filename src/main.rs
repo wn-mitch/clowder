@@ -495,6 +495,10 @@ fn build_schedule() -> Schedule {
         clowder::systems::goap::check_anxiety_interrupts
             .after(clowder::systems::items::sync_food_stores),
     );
+    // §7.2 commitment gate (Phase 6a) is inlined into
+    // `resolve_goap_plans`'s per-cat loop, not registered as a
+    // separate system — see the SimulationPlugin mirror for the
+    // H1/H2 diagnosis that motivated the inlined form.
     schedule.add_systems(
         clowder::systems::goap::evaluate_and_plan
             .after(clowder::systems::goap::check_anxiety_interrupts)
