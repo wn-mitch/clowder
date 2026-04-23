@@ -78,6 +78,19 @@ pub fn resolve_construct(
             if blueprint == StructureType::Stores {
                 commands.entity(target).insert(StoredItems::default());
             }
+            // §Phase 4c.4 farming repair: Gardens used to ship without a
+            // `CropState` component, so `TendCrops`'s target-resolution
+            // query (`has_crop` filter) never matched any Garden and
+            // every Farming plan failed with "no target for Tend" —
+            // 400+/soak silent failures, zero harvests ever logged.
+            // Same shape of bug as the half-shipped Caretake chain:
+            // the building was "constructed" but missing the auxiliary
+            // component that makes the action catalog functional.
+            if blueprint == StructureType::Garden {
+                commands
+                    .entity(target)
+                    .insert(crate::components::building::CropState::default());
+            }
             if let Some(ref mut score) = colony_score {
                 score.structures_built += 1;
             }

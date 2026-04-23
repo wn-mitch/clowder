@@ -49,6 +49,12 @@ impl ScryDse {
     }
 }
 
+impl Default for ScryDse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Dse for ScryDse {
     fn id(&self) -> DseId {
         DseId("magic_scry")
@@ -107,6 +113,12 @@ impl DurableWardDse {
     }
 }
 
+impl Default for DurableWardDse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Dse for DurableWardDse {
     fn id(&self) -> DseId {
         DseId("magic_durable_ward")
@@ -162,6 +174,12 @@ impl CleanseDse {
             composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
             eligibility: EligibilityFilter::new(),
         }
+    }
+}
+
+impl Default for CleanseDse {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -226,6 +244,12 @@ impl ColonyCleanseDse {
     }
 }
 
+impl Default for ColonyCleanseDse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Dse for ColonyCleanseDse {
     fn id(&self) -> DseId {
         DseId("magic_colony_cleanse")
@@ -287,6 +311,12 @@ impl HarvestDse {
     }
 }
 
+impl Default for HarvestDse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Dse for HarvestDse {
     fn id(&self) -> DseId {
         DseId("magic_harvest")
@@ -342,6 +372,12 @@ impl CommuneDse {
             composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
             eligibility: EligibilityFilter::new(),
         }
+    }
+}
+
+impl Default for CommuneDse {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

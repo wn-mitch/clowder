@@ -6,7 +6,19 @@
 > applying the `rank-sim-idea` skill retrospectively to the 2026-04-20
 > backlog, then extended 2026-04-21 with two presenter-layer ideas
 > (post-death biographies, cat-conversation rendering) that aren't
-> system stubs but are subject to the same rubric.
+> system stubs but are subject to the same rubric. Further extended
+> 2026-04-22 with three split-out features from a composite
+> "OSRS-style inventory + fantasy adventures" proposal — crafting
+> (`crafting.md`), slot inventory (`slot-inventory.md`), and ruin
+> clearings (`ruin-clearings.md`) — each priced independently so the
+> trim options are legible. Further extended later 2026-04-22 with
+> happy paths (4a, `paths.md`, 480), the NamedLandmark naming
+> substrate (4b, `naming.md`, 640 — shared scaffolding for six
+> convergent consumers), and monuments (4c, `monuments.md`, 540 —
+> civic/memorial structures); concurrently the crafting entry (#6)
+> was promoted from 288 → 540 when Phase 4 (decorations / place-
+> making) and Phase 5 (elevated cat-craft / collective multi-season)
+> were added to the crafting stub.
 >
 > **What this is not:** the design docs themselves. Ranking is a
 > price tag on each stub; the stubs remain the source of truth for
@@ -109,25 +121,39 @@ Risk *(higher = safer)* · **C** Implementation Cost *(higher = cheaper)* ·
 |  2 | Recreation & Grooming | 5 | 5 | 3 | 3 | 4 | 900 | Worthwhile |
 |  3 | The Calling | 5 | 5 | 3 | 3 | 3 | 675 | Worthwhile |
 |  4 | Body Zones — anatomical injury model *(perception slice folded → §5.2)* | 4 | 5 | 3 | 3 | 3 | 540 | Worthwhile |
-|  5 | Raids | 4 | 5 | 3 | 2 | 2 | 240 | Earn slot |
-|  6 | Log Analytics Dashboard | 1 | 3 | 5 | 3 | 5 | 225 | Earn slot |
-|  7 | Cat-conversation rendering (Haiku presenter over C3) † | 4 | 3 | 3 | 2 | 3 | 216 | Earn slot |
-|  8 | Mental Breaks | 4 | 4 | 2 | 3 | 2 | 192 | Earn slot |
-|  9 | Strategist Coordinator | 3 | 3 | 3 | 2 | 3 | 162 | Earn slot |
-| 10 | Trade & Visitors | 4 | 3 | 3 | 2 | 2 | 144 | Earn slot |
-| 11 | Disease | 3 | 4 | 2 | 2 | 2 | 96 | Earn slot |
-| 12 | Substances | 2 | 3 | 2 | 2 | 1 | **24** | **Defer** |
+|  5 | Anatomical slot inventory ‡ | 2 | 3 | 4 | 4 | 4 | 384 | Worthwhile |
+|  6 | Crafting — items, recipes, stations ‡ | 4 | 4 | 3 | 2 | 3 | 288 | Earn slot |
+|  7 | Raids | 4 | 5 | 3 | 2 | 2 | 240 | Earn slot |
+|  8 | Log Analytics Dashboard | 1 | 3 | 5 | 3 | 5 | 225 | Earn slot |
+|  9 | Cat-conversation rendering (Haiku presenter over C3) † | 4 | 3 | 3 | 2 | 3 | 216 | Earn slot |
+| 10 | Mental Breaks | 4 | 4 | 2 | 3 | 2 | 192 | Earn slot |
+| 11 | Strategist Coordinator | 3 | 3 | 3 | 2 | 3 | 162 | Earn slot |
+| 12 | Trade & Visitors | 4 | 3 | 3 | 2 | 2 | 144 | Earn slot |
+| 13 | Ruin clearings — corruption nodes ‡ | 4 | 4 | 2 | 2 | 2 | 128 | Earn slot |
+| 14 | Disease | 3 | 4 | 2 | 2 | 2 | 96 | Earn slot |
+| 15 | Substances | 2 | 3 | 2 | 2 | 1 | **24** | **Defer** |
 
 † Presenter-layer ideas (2026-04-21 extension). Not system stubs —
 LLM-rendering surfaces over finalized sim artifacts. Priced on the
 same rubric; see the "Presenter layer" subsection below for the
 discipline these scores assume.
 
+‡ Split-out features from the 2026-04-22 `/rank-sim-idea` triage of
+a composite "OSRS-style inventory + fantasy adventures" proposal.
+Crafting (rank 6) is the anchor and ships first; slot-inventory
+(rank 5) scores highest in the split but **does not ship standalone**
+— it's gated on a wearable producer (crafting Phase 3, the Calling,
+or trade); ruin-clearings (rank 13) is the scope-cut variant of the
+dungeon idea. See their stubs for the constraints that hold the
+scores in place.
+
 One cheap win (>1000) now exists as a standalone presenter-layer
-feature. Among the stub-level items the top three still fall in the
-"worthwhile; plan carefully" band. Everything below rank 4 needs a
-hypothesis + prediction per balance methodology before it gets a
-slot.
+feature. Among the stub-level items the worthwhile band now holds
+four entries (Recreation, Calling, Body Zones, Anatomical slot
+inventory). Slot inventory's rank-5 placement reflects its standalone
+score; its ship-order is bound to a wearable producer, not to the
+raw number. Everything at rank 6 and below needs a hypothesis +
+prediction per balance methodology before it gets a slot.
 
 ## Presenter layer
 
@@ -185,7 +211,7 @@ prompt (more isn't better — cost + quality are both sensitive).
 
 Landing this entry establishes the **presenter-layer infrastructure**
 (per-cat event indexing, Claude API client, sidecar routing, CI
-audit) that rank 7 (cat-conversation rendering) reuses when C3 ships.
+audit) that rank 9 (cat-conversation rendering) reuses when C3 ships.
 Do this one first.
 
 ## Worthwhile (300–1000) — plan carefully
@@ -227,9 +253,215 @@ systemic. **The perception slice is already folded into §5.2
 sensory-channel attenuation** (damaged nose → reduced scent reads);
 the remaining work is the combat/health side.
 
+### 4a. Happy paths — usage-worn trails + NamedLandmark substrate *(480)* [added 2026-04-22]
+
+Cats concentrate movement between high-utility destinations; repeated
+traversal compresses terrain into speed-boosted trails; prey learn to
+avoid them; and Significant-tier events near a fresh trail derive its
+name ("The Last Trace of {cat}") rather than a random generator.
+Worn enough, paths become a **civilizational marker** — the colony
+writing its own behavioral history into the world as physical grain.
+
+V=4 because event-driven naming directly lights the mythic-texture
+canary, and the feature advances the preservation / generational-
+knowledge axes of §5 as a first-order physical artefact (not a
+scoring tweak). F=5 because the thesis — ecology with metaphysical
+weight, emergent complexity, honest-world-no-director — lands
+one-to-one on "the world shows what the cats did." R=3 because path
+weight integration touches `pathfinding.rs::step_toward` (every
+agent's motion layer) and adds a new fear input to prey scoring; A/B
+verification per Balance Methodology is required. C=4 because path
+wear stamps an existing `InfluenceMap` (`src/systems/influence_map.rs`
+§5.6.9 — `(Channel, Faction)`-keyed registry; "14th map" is a
+registration, not a schema change) rather than introducing a new
+resource; the expensive substrate is already scaffolded. H=2 because
+the self-reinforcing feedback loop (wear→speed→preference→wear) and
+the new prey-fear input force bespoke canaries (formation,
+anti-monopoly, named-landmark, name-spam) and contribute tunables to
+future hunt-balance threads — but decisive shadowfox-differentiators
+(no mortality-spike failure mode, continuous not Poisson, canaries are
+formation-quality not survival) keep H=2 not H=1.
+
+**Leverage point — the NamedLandmark substrate** is a separate
+precursor scaffolding (rank 4b, `naming.md`) shared with five other
+consumers (`crafting.md` Phase 3, `crafting.md` Phase 4,
+`ruin-clearings.md` Phase 3, `the-calling.md`, `monuments.md`).
+Resolved 2026-04-22: substrate lives in its own stub as precursor.
+Named-path output soft-depends on 4b landing; can ship with
+neutral-fallback generator if needed.
+
+**Shadowfox watch:** shares self-reinforcing feedback loop and new
+prey-fear input with shadowfoxes; five scope disciplines (wear
+decays; speed boost ≤1.25× non-stacking; prey avoidance is
+proportional; ≤6 named segments per sim-year; paths don't gate hunt
+scoring) are the brakes against running away. Violations re-trigger
+ranking.
+
+### 4b. NamedLandmark substrate — event-anchored naming *(640)* [added 2026-04-22]
+
+Shared registry + event-proximity matcher + event-keyed name
+templates. Six convergent consumers (`paths.md`, `crafting.md` Phase
+3, `crafting.md` Phase 4, `ruin-clearings.md` Phase 3,
+`the-calling.md`, `monuments.md`) all need to produce named entities
+that outlive their makers; without a shared substrate each rolls its
+own name generator. The canonical scaffolding pattern (V=2, ship-
+order gated) applies — this mirrors `slot-inventory.md`'s structure.
+
+V=2 because the substrate has no in-world effect until a consumer
+ships; V rises to effective-4 once one consumer registers, to
+effective-5 at three or more consumers (cross-stub mythic-texture
+cascade). F=5 because the thesis — ≥1 named event per sim-year from
+live-sim sources — is *exactly* what this substrate enables. R=4
+because it's isolated scaffolding with no scoring interaction.
+C=4 because the matcher + registry + template table + six consumer
+registration contracts is ~500–800 LOC. H=4 because the shared
+name-spam ceiling (≤6 named landmarks per sim-year across all
+consumers) is a single constant to tune; per-consumer radius /
+cooldown tunables live in the consumer stubs, not here.
+
+**Ship-order discipline:** precursor to paths (4a) or to any other
+consumer that reaches the naming slot first. Do not ship stand-
+alone — V=2 pre-consumer. Paths is the canonical first consumer
+because path wear is spatially-anchored (matches the proximity
+matcher's strongest shape). Monument self-naming is a distinct
+zero-proximity flow, documented in `naming.md`.
+
+**Shadowfox watch:** minimal (no feedback loop, no scoring, no
+mortality). Main risk is the OSRS gravity-well analogue — consumers
+slipping numeric fields onto `NamedLandmark` over time. Type-level
+guardrail (no generic `effects: Vec<Modifier>` field on the
+registry type) is the brake. See `docs/systems/naming.md`.
+
+### 4c. Monuments — civic & memorial structures *(540)* [added 2026-04-22]
+
+Colonies raise physical structures that anchor narrative across
+generations in response to Significant-tier events — burial mounds,
+coming-of-age stones, defender's memorials, pact circles, founding
+stones. Monuments are **built events**: the act of building is the
+narrative, the built object is the artefact. Five kinds at launch
+(load-bearing cap).
+
+V=4 because monuments double-light the **burial axis** of the
+ecological-variety canary (currently ~0 firings/year) and the
+**mythic-texture** canary while advancing **generational knowledge**
+— the strongest burial vehicle in the backlog. V=5 is in play once
+telemetry confirms burial-axis zero-baseline. F=5 because the thesis
+in one line: honest ecology writing itself into the landscape with
+metaphysical weight. R=3 because the declaration → gather → raise
+pipeline touches coordination, naming, and pathfinding-at-the-margin
+— bounded but multi-axis. C=3 because the coordination-directive +
+tile-structure + naming-registration + rendering stack adds ~800
+LOC but rides on three existing substrates (`coordination.rs`,
+`fate.rs`, `naming.md` once shipped). H=3 because monuments are
+additive-permanent with no self-reinforcement loop (failure modes
+are monument-spam and monument-silence, both detectable).
+
+**Ship-order discipline:** hard-depends on 4b (naming substrate) and
+A1 IAUS refactor (multi-cat GOAP coordination, same gate as #13
+ruin-clearings). Phase 1 (Burial Mounds only) is the pilot — smallest
+scope, well-bounded triggering event. Phase 3 adds Founding Stones
+which need colony-founding to be a legible event (may require new
+work in `coordination.rs`).
+
+**Shadowfox watch:** no adversarial feedback loop, no new mortality
+category. Main risk is the "monumentalism" gravity-well — pressure
+to add kinds over time creeping the launch-5 toward 15 and diluting
+each. Scope rule 1 (hard cap at 5 kinds at launch; additions are a
+re-triage trigger) is the brake. See `docs/systems/monuments.md`.
+
+### 5. Anatomical slot inventory ‡ *(384)*
+
+Refactor of the flat `Inventory { slots: Vec<ItemSlot> }`
+(`src/components/magic.rs:242`) into anatomy-indexed wearable slots
+(drawn from `body-zones.md`'s 13-part enumeration) plus a stackable
+consumable pouch; crafted bags (from `crafting.md`) expand pouch
+capacity. V=2 because the feature scores well in isolation but has
+no in-world effect until a wearable producer ships — it's
+scaffolding. F=3 because the OSRS gravity well is real; the stub
+holds F=3 via a type-level guardrail (no numeric modifier fields on
+wearables). H=4 because the ongoing tax is bounded to one or two
+capacity-related constants.
+
+**Ship-order discipline:** do not ship standalone. Gated on at
+least one wearable producer — crafting Phase 3 (rank 6),
+the-calling.md, or trade.md. The score ranks it in the
+"worthwhile" band but the stub explicitly defers shipping until
+a producer exists. See `docs/systems/slot-inventory.md`.
+
+**Shadowfox watch:** the only shadowfox risk is the OSRS-misbuild
+trap. Type guardrail (no numeric fields on `WearableItem`) is the
+primary mitigation; violating it re-opens the ranking (F→2, H→2,
+composite falls to ~96).
+
 ## Earn the slot (80–300) — requires hypothesis per balance methodology
 
-### 5. Raids *(240)*
+### 6. Crafting — items, recipes, stations ‡ *(540, promoted from 288 on 2026-04-22)*
+
+> **Bucket move:** 2026-04-22 expansion of the stub to include
+> Phase 4 (Domestic refinement / folk-craft decorations) and Phase 5
+> (Elevated cat-craft / collective multi-season) promoted this entry
+> from "earn the slot" (80–300) into "worthwhile; plan carefully"
+> (300–1000). Numbering retained at 6 for stable cross-references;
+> score 540 places it adjacent to body-zones (540) and monuments
+> (540) despite appearing in the lower bucket section below. Reader
+> note: the bucket headers are advisory; the score is the source of
+> truth.
+
+General-purpose material economy — recipes + stations + craft
+actions — generalizing the existing narrow patterns (remedy prep at
+Workshop, ward-setting from thornbriar) into a unified substrate.
+**§5-first recipe catalog** is the load-bearing design constraint:
+every recipe targets grooming / play / courtship / burial /
+preservation / generational knowledge. Combat gear is excluded;
+drift from the constraint re-opens the ranking (F→2, H→2, composite
+falls to ~96).
+
+The 2026-04-22 expansion added two new phases:
+- **Phase 4 — Domestic refinement (folk-craft tier).** Place-anchored
+  decorations: reed mats, tallow lamps, scent censers, carved combs,
+  wall-hangings, nesting inlays. Effects live on the *tile*, not the
+  cat — a rug warms the hearth, not the cat carrying the rug.
+- **Phase 5 — Elevated cat-craft (collective, multi-season).**
+  Generational Tapestries, Shrine-Cairns, Bone-Lattice Lanterns,
+  Pigment-Deepened Textiles, Multi-Cat Nesting Alcoves, Kitten-
+  Cradle Baskets. Gated by three conditions (all required): colony-
+  age ≥3 sim-years, material-scarcity (ruins + exploration inputs),
+  and skill-via-aspirations (new mastery arcs in `aspirations.rs`).
+  Explicit not-DF guardrail: collective or cumulative, never
+  individual-rare-strike. `the-calling.md` owns that niche.
+
+V=5 (promoted from 4) because Phase 4 decorations are the strongest
+mythic-texture vehicle in the backlog — heritable named objects that
+literally outlive their makers, reinforced by generational use. F=4
+holds under the catalog constraint + place-anchored discipline. R=3
+unchanged. C=3 (promoted from 2) because Phase 4 adds ~400 LOC
+(placed-object rendering, env-quality interaction, naming
+registration for a new LandmarkKind) and Phase 5 adds skill-arc
+integration into `aspirations.rs`. H=3 holds — scoring-axis coupling
+is real but failure modes stay legible.
+
+**Ship-order note:** crafting is the anchor of the 2026-04-22
+three-way split. Ships **before** ranks 5 and 13 — it de-risks
+slot-inventory (first producer of wearables in Phase 3) and
+ruin-clearings (loot has a consumer once Phase 1 preservation
+recipes land). Phased delivery with per-phase hypothesis:
+
+- **Phase 1** — food preservation (drying/smoking racks).
+  Strongest canary linkage (starvation + winter buffer).
+- **Phase 2** — §5 behavioral tools (brush, play bundle, gift).
+  Targets ecological-variety canary.
+- **Phase 3** — identity & mentorship objects. Triggers
+  slot-inventory (rank 5) to ship. Registers with 4b (naming
+  substrate) as a consumer.
+- **Phase 4** — place-anchored decorations. Second naming-substrate
+  consumer; first tile-level environmental-quality producer. Soft-
+  depends on 4b.
+- **Phase 5** — elevated cat-craft. Hard-depends on `aspirations.rs`
+  mastery-arc extension. Long-horizon.
+
+See `docs/systems/crafting.md` and `docs/open-work.md` #16.
+
+### 7. Raids *(240)*
 
 Organized pack assaults (3–5 foxes, rat swarms, shadow-fox
 incursions) scaled to colony threat score. V=4 for mythic texture +
@@ -242,7 +474,7 @@ interaction). Budget the tuning slot before picking up. Benefits
 from §5 influence maps (raid pathing as an influence-map read) and
 §4 faction tags.
 
-### 6. Log Analytics Dashboard *(225)*
+### 8. Log Analytics Dashboard *(225)*
 
 Tooling win. Zero ongoing sim tax (H=5), zero regression risk (R=5),
 no canary moved (V=1). Completes `tools/narrative-editor/` with map
@@ -252,7 +484,7 @@ the H — a tool can't light a canary. Real value is force-multiplier
 on *future* balance work; worth the slot if the next several
 balance threads need better instrumentation.
 
-### 7. Cat-conversation rendering via Haiku (presenter over C3) *(216)*
+### 9. Cat-conversation rendering via Haiku (presenter over C3) *(216)*
 
 Once **C3** (subjective knowledge / ToT mental models,
 `docs/open-work.md` §7) lands, C3 will emit deterministic
@@ -291,7 +523,7 @@ is unusual for a balance hypothesis but appropriate: this isn't a
 balance change, it's a rendering change. Concordance criterion is
 *null in canaries, positive in qualitative experience*.
 
-### 8. Mental Breaks *(192)*
+### 10. Mental Breaks *(192)*
 
 Mood-threshold crisis cascade (sulking → hissing fit → feral
 episode) + inspiration mirror. V=4 because breaks create behavioral
@@ -303,7 +535,7 @@ lethal, but it will be a permanent tuning axis. Substantially cleaner
 to design once §2 response curves are available (mood→break probability
 is a classic logistic).
 
-### 9. Strategist Coordinator *(162)*
+### 11. Strategist Coordinator *(162)*
 
 The HTN-style two-layer planner above GOAP. V=3 as enabling
 infrastructure (doesn't light a canary itself but unblocks the Cook
@@ -314,7 +546,7 @@ C=2 for 1.2k+ LOC of coordination rework. Gated on Kitchen loop
 stability. Also benefits from §L2.10 (unified DSE surface) — strategic
 directives become first-class DSEs.
 
-### 10. Trade & Visitors *(144)*
+### 12. Trade & Visitors *(144)*
 
 Loners/traders/scouts/hostile visitors, reputation-driven spawn rate,
 fondness-threshold recruitment. V=4 (mythic texture + courtship +
@@ -325,7 +557,49 @@ larger colony). Architecturally big — new entity type, new state,
 new canary. §4 context tags (faction stance) is a prerequisite per
 the refactor doc's §10.
 
-### 11. Disease *(96)*
+### 13. Ruin clearings — corruption nodes ‡ *(128)*
+
+PMD-flavored dungeons-as-corruption-nodes: uncleared ruins emit
+corruption radially, the colony organizes multi-cat clearings
+(paths → pushback → interior hazards), loot routes to crafting
+materials + occasional Named Objects. **This is the scope-cut
+variant.** The full gear-modifier variant scores 64 (defer) and is
+explicitly rejected.
+
+V=4 because it adds a new colony-scale coordinated-action mode and
+contributes to mythic-texture via Named Object drops. F=4 because
+dungeons-as-ecological-pressure is thesis-aligned — especially
+under the 2026-04-22 clarification of `project-vision.md` §3 that
+"no protagonist shield" means *named cats can die*, not *cats
+aren't narrative leads* (the Stark framing). Cats can die in ruins.
+R=2 because it's architecturally significant — new overworld entity
+type, multi-cat GOAP coordination, real second-order mortality
+effects. C=2 under the scope cut. H=2 because three of five
+structural tells fire, but the dungeon-existence mechanic rides
+the **existing** `magic.rs` corruption substrate rather than
+inventing a new predator feedback loop — decisively lighter than
+shadowfox (H=1).
+
+**Scope discipline (violations drop score to 64):**
+1. Loot is crafting material or Named Objects — never gear.
+2. Corruption pushback reuses existing `magic.rs` substrate.
+3. Spawn rate is ecological (seasonal corruption + distance from
+   hearth), never reactive to colony threat-score.
+4. Clearing difficulty is environmental, never scaled to colony
+   power.
+
+**Shadowfox comparison:** structurally lighter than shadowfoxes
+despite being in the same ecological-threat family (F=4 vs 5, H=2
+vs 1). Still bespoke-canary territory — a new `ClearingAttempt`
+mortality cause and a `ruins_cleared_per_sim_year` footer tally
+are likely required.
+
+**Dependencies:** hard-gated on A1 IAUS refactor (multi-cat GOAP
+coordination) and on **rank 6 (crafting) Phase 1** shipping
+(otherwise loot has no consumer). See
+`docs/systems/ruin-clearings.md` and `docs/open-work.md` #18.
+
+### 14. Disease *(96)*
 
 Wound infection, seasonal illness, contagion, quarantine. V=3
 (supports §5 via healer role + generational knowledge but doesn't
@@ -340,7 +614,7 @@ than coordinator-gated healer role) to pull H up to 3.
 
 ## Defer (<80)
 
-### 12. Substances *(24)*
+### 15. Substances *(24)*
 
 Catnip, valerian, corrupted variants; tolerance / dependence /
 withdrawal / craving mechanics. V=2 (no canary hit; orthogonal
@@ -374,6 +648,16 @@ texture). As designed today: defer.
   goals like "defend", "heal", "host").
 - **Mental Breaks** — independent but compounds poorly with
   Substances if both ship; stagger them.
+- **Crafting (rank 6)** — independent. Benefits from A1 IAUS refactor
+  but does not hard-block. Anchor of the 2026-04-22 split; **ships
+  before ranks 5 and 13**.
+- **Anatomical slot inventory (rank 5)** — hard-gated on a wearable
+  producer. Candidates in thesis-fit order: crafting Phase 3 (rank 6),
+  the Calling (rank 3), trade & visitors (rank 12). Score reflects
+  standalone value; ship-order is bound to a producer.
+- **Ruin clearings (rank 13)** — hard-gated on A1 IAUS refactor
+  **and** crafting Phase 1 (rank 6) shipping. Scope discipline in
+  the stub is load-bearing — drift re-opens the ranking.
 - **Anything touching scoring (most of the above)** — renegotiates
   C and H once the **refactor** lands. Revisit this ranking at that
   milestone.
@@ -402,7 +686,7 @@ informed Disease and Raids (both zero iterations in `docs/balance/`
 despite being cascade-heavy designs — unpriced in lived balance work,
 which raises uncertainty rather than lowering H).
 
-**2026-04-21 extension.** Ranks 1 and 7 (the presenter-layer entries)
+**2026-04-21 extension.** Ranks 1 and 9 (the presenter-layer entries)
 were added prospectively — triaged before any design doc or code
 exists. Their scores are under the strict presenter contract
 documented in the "Presenter layer" subsection above; relaxing that
@@ -410,6 +694,19 @@ contract collapses both scores (cat conversations in particular drop
 from 216 to 4 if the LLM touches the belief-update loop). If the
 presenter contract ever needs to be loosened, re-rank these rows
 before proceeding.
+
+**2026-04-22 extension.** Ranks 5, 6, and 13 (split-out features from
+a composite "OSRS-style inventory + fantasy adventures" proposal)
+were added after the proposal triaged poorly as a unit (V=1/F=1,
+score ~2) but contained separable thesis-aligned pieces. Splitting
+surfaces the actual trim options: **crafting (rank 6) is the
+anchor**, slot-inventory (rank 5) is scaffolding gated on a
+producer, ruin-clearings (rank 13) is the scope-cut dungeon. Each
+score is held in place by a load-bearing constraint in its stub
+(§5-first recipe catalog for crafting; no-numeric-fields type
+guardrail for slot-inventory; four scope disciplines for
+ruin-clearings). Violations of any constraint re-open the relevant
+ranking.
 
 The fold into the refactor was driven by a separate signal:
 `docs/systems/ai-substrate-refactor.md` §10 already enumerates which

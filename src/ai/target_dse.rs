@@ -53,17 +53,12 @@ use super::dse::{DseId, EvalCtx, Intention};
 ///   decaying contribution of ranked targets. Used where the presence
 ///   of multiple mid-tier candidates matters more than the single
 ///   best. `winning_target = argmax`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TargetAggregation {
+    #[default]
     Best,
     SumTopN(usize),
     WeightedAverage,
-}
-
-impl Default for TargetAggregation {
-    fn default() -> Self {
-        Self::Best
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -253,8 +248,8 @@ pub fn evaluate_target_taking(
 /// Score one per-target consideration against a specific candidate.
 /// Matches `score_consideration` in [`super::eval`] but with `target`
 /// + `target_pos` threaded in so `CenterPolicy::TargetPosition` resolves
-/// against the candidate, and scalar-by-name considerations get the
-/// target-scoped fetcher.
+///   against the candidate, and scalar-by-name considerations get the
+///   target-scoped fetcher.
 fn score_target_consideration(
     consideration: &Consideration,
     cat: Entity,

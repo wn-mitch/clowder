@@ -174,9 +174,9 @@ build:
 test:
     cargo test
 
-# Check + clippy
+# Check + clippy + step-resolver contract lint
 check:
-    cargo check && cargo clippy -- -D warnings
+    cargo check && cargo clippy -- -D warnings && bash scripts/check_step_contracts.sh
 
 # Generate a random template authoring prompt
 template-prompt:

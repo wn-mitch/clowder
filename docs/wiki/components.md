@@ -2,7 +2,7 @@
 
 # Components
 
-76 component types derived from `#[derive(Component)]`.
+127 component types derived from `#[derive(Component)]`.
 
 ## `src/components/aspirations.rs`
 
@@ -177,6 +177,18 @@
 ### FateAssigned (struct)
 
 > Inserted after a cat's fated connections have been evaluated. Systems use `Without<FateAssigned>` to detect cats needing assignment.
+
+## `src/components/fertility.rs`
+
+### Fertility (struct)
+
+> Per-cat fertility state. Carried only by Queens + Nonbinaries in the Adult / Elder life stages (outside of pregnancy).  `cycle_offset` is spawn-immutable (per-cat constant derived at insertion from the entity index) so that no two colony cats peak simultaneously — desynchronization is load-bearing for the spec's "cats visibly come into season" narrative goal (§7.M.7.8).  `post_partum_remaining_ticks` counts down from `post_partum_recovery_ticks` on birth re-insert; when > 0 the transition function pins `phase = Postpartum` (rule 2 of §7.M.7.2).
+
+| Field | Type |
+|-------|------|
+| `phase` | `FertilityPhase` |
+| `cycle_offset` | `u64` |
+| `post_partum_remaining_ticks` | `u32` |
 
 ## `src/components/fox_goap_plan.rs`
 
@@ -428,6 +440,184 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 | `ticks_remaining` | `u64` |
 | `healer` | `Option<Entity>` |
 
+## `src/components/markers.rs`
+
+### Mentor (struct)
+
+> Cat is the mentor side of a `Training { mentor, apprentice }` relationship. Authoring: `aspirations.rs::update_training_markers`.
+
+### Apprentice (struct)
+
+> Cat is the apprentice side of a `Training` relationship. Authoring: as `Mentor`.
+
+### Kitten (struct)
+
+> `Age::stage() == Kitten` (0–3 seasons). Authoring: `growth.rs::update_life_stage_markers` — one marker mutually exclusive per cat.
+
+### Young (struct)
+
+> `Age::stage() == Young` (4–11 seasons).
+
+### Adult (struct)
+
+> `Age::stage() == Adult` (12–59 seasons).
+
+### Elder (struct)
+
+> `Age::stage() == Elder` (60+ seasons).
+
+### Incapacitated (struct)
+
+> Severe unhealed injury — downed. `needs.rs::update_incapacitation`. Used as the eligibility gate that retires the §2.3 incapacitated branch: `Q<_, With<Incapacitated>>` picks the narrow DSE set (Eat, Sleep, Idle); every other DSE uses `Without<Incapacitated>`.
+
+### Injured (struct)
+
+> Any injury present — weaker than `Incapacitated`. `needs.rs::update_injury_marker`.
+
+### InCombat (struct)
+
+> Cat is in an active combat step or hostile-adjacent. `combat.rs::update_combat_marker`.
+
+### OnCorruptedTile (struct)
+
+> Tile under cat has corruption > threshold. `magic.rs::update_corrupted_tile_markers`.
+
+### OnSpecialTerrain (struct)
+
+> Tile under cat is `FairyRing` or `StandingStone`. `sensing.rs::update_terrain_markers`.
+
+### HasThreatNearby (struct)
+
+> ≥1 wildlife hostile within species-attenuated detection range. `sensing.rs::update_threat_proximity_markers`.
+
+### CanHunt (struct)
+
+> Authoring for all four: `src/ai/capabilities.rs::update_capability_markers` (new file in Phase 3d). Predicates are conjunctions over life-stage, injury state, inventory, and nearby-tile checks — see §4.3 rows.
+
+### CanForage (struct)
+
+### CanWard (struct)
+
+### CanCook (struct)
+
+### HasHerbsInInventory (struct)
+
+> Authoring: `items.rs::update_inventory_markers` (with `Changed<Inventory>` filter for per-tick cost).
+
+### HasRemedyHerbs (struct)
+
+### HasWardHerbs (struct)
+
+### ColonyState (struct)
+
+> Marker for the single colony-state entity. Phase 3a introduces the type; the spawn path attaches exactly one entity with this marker in Phase 3d. Colony-scoped markers below (ThornbriarAvailable, HasFunctionalKitchen, …) attach to this entity so DSE queries joining cat + colony state use `(cat_q, colony_q.single())`.
+
+### HasFunctionalKitchen (struct)
+
+> Authoring: `buildings.rs::update_colony_building_markers`.
+
+### HasRawFoodInStores (struct)
+
+### HasStoredFood (struct)
+
+> Colony stores carry ≥1 food item (raw or cooked). Gates `Eat`.
+
+### ThornbriarAvailable (struct)
+
+> ≥1 harvestable Thornbriar exists in the world. `magic.rs::update_herb_availability_markers`.
+
+### HasSocialTarget (struct)
+
+### HasHerbsNearby (struct)
+
+### PreyNearby (struct)
+
+> Shared between cats and foxes via `With<Prey>` + distance.
+
+### CarcassNearby (struct)
+
+### HasConstructionSite (struct)
+
+> `buildings.rs::update_colony_building_markers`.
+
+### HasDamagedBuilding (struct)
+
+### HasGarden (struct)
+
+### HasMentoringTarget (struct)
+
+> ≥1 other cat has a skill below 0.3 where this cat has the same skill above 0.6 (per-cat relative predicate). `aspirations.rs::update_mentoring_markers`.
+
+### HasEligibleMate (struct)
+
+> Orientation-compatible partner with Partners+ bond exists. `mating.rs::update_mate_eligibility_markers`.
+
+### IsParentOfHungryKitten (struct)
+
+> Cat is the parent side of a `KittenDependency` whose kitten's hunger exceeds threshold. `growth.rs::update_parent_hungry_kitten_markers`.
+
+### IsCoordinatorWithDirectives (struct)
+
+> Per-coordinator-cat, not on `ColonyState`: `With<Coordinator> + DirectiveQueue.len() > 0`. `coordination.rs::update_directive_markers`.
+
+### WardStrengthLow (struct)
+
+> Colony ward coverage: no wards OR average strength < 0.3. `magic.rs::update_ward_coverage_markers`. Attaches to `ColonyState`.
+
+### WardsUnderSiege (struct)
+
+> Any colony ward has `WildlifeAiState::EncirclingWard` adjacent. `magic.rs::update_ward_siege_marker`. Attaches to `ColonyState`.
+
+### Parent (struct)
+
+> **Active parenthood** (not lifetime identity) — cat has ≥1 living entity with `KittenDependency.mother == self` or `…father == self`. Removed when the last dependent kitten matures or dies. See §4.3 prose on the ordering hazard: grief consumers MUST NOT infer grief-parent status from `With<Parent>` on survivors post-death. The canonical parent-at-time-of-death channel is the future `CatDied.survivors_by_relationship` event payload.  Authoring: `growth.rs::update_parent_markers` (new). Insert/remove in a single tick pass over `Query<&KittenDependency>`.
+
+### StoreVisible (struct)
+
+> Authoring: `fox_spatial.rs::update_store_awareness_markers`.
+
+### StoreGuarded (struct)
+
+### CatThreateningDen (struct)
+
+> Cat within 5 tiles of fox's den AND cubs present. `fox_spatial.rs::update_den_threat_markers`.
+
+### WardNearbyFox (struct)
+
+> Ward within fox detection radius (stubbed in `FoxScoringContext.ward_nearby` today — promote to ECS marker). `fox_spatial.rs::update_ward_detection_markers`.
+
+### HasCubs (struct)
+
+> Fox has ≥1 cub at its den. Event-driven (`CubsBorn` + on-despawn cleanup).
+
+### CubsHungry (struct)
+
+> `cub_satiation < 0.4`. `fox_goap.rs::update_cub_hunger_markers`.
+
+### IsDispersingJuvenile (struct)
+
+> Juvenile fox with no home den (dispersal eligibility). `fox_goap.rs::update_juvenile_dispersal_markers`.
+
+### HasDen (struct)
+
+> Fox has a home den. Event-driven (`DenClaimed` / `DenLost`).
+
+### Visitor (struct)
+
+> Non-colony cat present on the map (Wandering Loner / Trader / Scout per `docs/systems/trade.md`). Observer-Cat × target-Cat: demote `Same` → `Neutral`.
+
+### HostileVisitor (struct)
+
+> Hostile-Loner variant. Observer-Cat × target-Cat: demote `Same` → `Enemy`.
+
+### Banished (struct)
+
+> Cat exiled from the colony. Observer-Cat × target-Cat: demote `Same` → `Enemy`. See §9.2 — today's `combat.rs::pending_banishments` path is shadowfox-only; extending to cat-on-cat lands in Phase 3d.
+
+### BefriendedAlly (struct)
+
+> Fox or prey-species target befriended through repeated non-hostile contact. Observer-Cat × target-Fox: upgrade `Predator` → `Ally` (reciprocal on fox: `Prey` → `Ally`). `social.rs::befriend_wildlife`.
+
 ## `src/components/mental.rs`
 
 ### Mood (struct)
@@ -532,7 +722,7 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 |-------|------|
 | `hunger` | `f32` |
 | `energy` | `f32` |
-| `warmth` | `f32` |
+| `temperature` | `f32` |
 | `safety` | `f32` |
 | `social` | `f32` |
 | `acceptance` | `f32` |

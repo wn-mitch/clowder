@@ -114,6 +114,21 @@ pub struct WorldStateQueries<'w, 's> {
         Query<'w, 's, &'static crate::components::wildlife::WildlifeAiState, With<WildAnimal>>,
     pub stored_items_query: Query<'w, 's, &'static crate::components::building::StoredItems>,
     pub items_query: Query<'w, 's, &'static crate::components::items::Item>,
+    /// Phase 4c.3: kittens + their hunger + parentage for Caretake
+    /// urgency wiring. Disjoint from the adult cats query by
+    /// `With<KittenDependency>` — kittens carry the marker until the
+    /// growth system strips it.
+    pub kitten_query: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static Position,
+            &'static crate::components::physical::Needs,
+            &'static crate::components::KittenDependency,
+        ),
+        Without<Dead>,
+    >,
 }
 
 /// Bundles resources for evaluate_and_plan.
@@ -564,6 +579,19 @@ pub fn evaluate_and_plan(
     let wildlife_positions: Vec<(Entity, Position)> =
         world_state.wildlife.iter().map(|(e, p)| (e, *p)).collect();
 
+    // §Phase 4c.3: snapshot kittens for Caretake urgency wiring.
+    let kitten_snapshot: Vec<crate::ai::caretake_targeting::KittenState> = world_state
+        .kitten_query
+        .iter()
+        .map(|(e, p, needs, dep)| crate::ai::caretake_targeting::KittenState {
+            entity: e,
+            pos: *p,
+            hunger: needs.hunger,
+            mother: dep.mother,
+            father: dep.father,
+        })
+        .collect();
+
     let has_construction_site = world_state
         .building_query
         .iter()
@@ -762,6 +790,24 @@ pub fn evaluate_and_plan(
             t.foraging_yield() > 0.0
         });
 
+        // §Phase 4c.3: Caretake urgency signal — find the most-urgent
+        // hungry kitten in range and populate the scoring axes. Retires
+        // the hardcoded `0.0` that kept `CaretakeDse` permanently
+        // null on its dominant axis.
+        let caretake_resolution = crate::ai::caretake_targeting::resolve_caretake(
+            entity,
+            *pos,
+            &kitten_snapshot,
+        );
+        // §Phase 4c.4 alloparenting Reframe A: bond-weighted compassion.
+        // See disposition.rs companion site.
+        let caretake_bond_scale = crate::ai::caretake_targeting::caretake_compassion_bond_scale(
+            entity,
+            &caretake_resolution,
+            sc.caretake_bond_compassion_boost_max,
+            |a, b| res.relationships.get(a, b).map(|r| r.fondness),
+        );
+
         // §6.5.1: the `has_social_target` bool gate reads through the
         // target-taking DSE so the scorer and the downstream
         // `SocializeWith` step both see the same "is a partner
@@ -934,8 +980,9 @@ pub fn evaluate_and_plan(
             active_disposition: None,
             tradition_location_bonus: 0.0,
             has_eligible_mate,
-            hungry_kitten_urgency: 0.0,
-            is_parent_of_hungry_kitten: false,
+            hungry_kitten_urgency: caretake_resolution.urgency,
+            is_parent_of_hungry_kitten: caretake_resolution.is_parent,
+            caretake_compassion_bond_scale: caretake_bond_scale,
             unexplored_nearby: colony.exploration_map.unexplored_fraction_nearby(
                 pos.x,
                 pos.y,
@@ -1193,6 +1240,29 @@ pub fn evaluate_and_plan(
                     slot.target_entity = Some(target_entity);
                 }
             }
+            // §Phase 4c.4: persist the Caretake target kitten through
+            // the plan. `resolve_caretake` uses CARETAKE_RANGE=12 from
+            // the adult's position — by the time FeedKitten executes,
+            // the adult has walked to Stores and the kitten is typically
+            // out of range, so re-running resolve_caretake at step-time
+            // returns `target=None` and the feeding silently no-ops
+            // (StepResult::Advance, fed=None, no KittenFed activation).
+            // Seeding the FeedKitten step's target_entity now locks the
+            // kitten chosen at disposition-selection time, mirroring how
+            // socialize_target / mate_target flow their resolver output
+            // into the executor rather than asking the executor to
+            // re-resolve from a stale position.
+            if chosen == DispositionKind::Caretaking {
+                if let Some(kitten) = caretake_resolution.target {
+                    if let Some(feed_idx) = plan
+                        .steps
+                        .iter()
+                        .position(|s| s.action == GoapActionKind::FeedKitten)
+                    {
+                        plan.step_state[feed_idx].target_entity = Some(kitten);
+                    }
+                }
+            }
 
             if let Some(ref mut log) = event_log {
                 log.push(
@@ -1293,6 +1363,18 @@ pub fn resolve_goap_plans(
     }
     let mut mentor_effects: Vec<MentorEffect> = Vec::new();
     let mut plans_to_remove: Vec<Entity> = Vec::new();
+    // §Phase 4c.3: deferred kitten-feedings — the cats query already
+    // owns &mut Needs over every non-dead cat (including kittens), so
+    // updates are collected here and applied in a second pass.
+    let mut kitten_feedings: Vec<Entity> = Vec::new();
+
+    // §Phase 4c.3: kitten snapshot for goap-path Caretake / FeedKitten.
+    // Built from the main cats query itself (immutable pre-loop
+    // iteration) to avoid a separate kitten query that would conflict
+    // with `&mut Needs`. Only kittens with GoapPlan end up here; the
+    // disposition path (`resolve_disposition_chains`) captures
+    // kittens on the chain-building branch separately.
+    let kitten_snapshot: Vec<crate::ai::caretake_targeting::KittenState> = Vec::new();
 
     let grooming_snapshot: HashMap<Entity, f32> = cats
         .iter()
@@ -1674,7 +1756,7 @@ pub fn resolve_goap_plans(
                         .min_by_key(|(_, sp)| pos.manhattan_distance(sp))
                         .map(|(e, _)| *e);
                 }
-                crate::steps::disposition::resolve_eat_at_stores(
+                let outcome = crate::steps::disposition::resolve_eat_at_stores(
                     ticks,
                     plan.step_state[step_idx].target_entity,
                     &mut needs,
@@ -1682,7 +1764,12 @@ pub fn resolve_goap_plans(
                     &items_query,
                     &mut commands,
                     d,
-                )
+                );
+                outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    Feature::FoodEaten,
+                );
+                outcome.result
             }
 
             GoapActionKind::Sleep => {
@@ -1694,24 +1781,24 @@ pub fn resolve_goap_plans(
                 } else {
                     0.0
                 };
-                let result =
+                let outcome =
                     crate::steps::disposition::resolve_sleep(ticks, duration, &mut needs, d);
                 if tile_corruption > 0.0 {
                     let penalty =
                         tile_corruption * (1.0 - ec.constants.magic.corruption_rest_penalty);
                     needs.energy = (needs.energy - d.sleep_energy_per_tick * penalty).max(0.0);
                 }
-                result
+                outcome.result
             }
 
             GoapActionKind::SelfGroom => {
-                let result = crate::steps::disposition::resolve_self_groom(
+                let outcome = crate::steps::disposition::resolve_self_groom(
                     ticks,
                     &mut needs,
                     grooming.as_deref_mut(),
                     d,
                 );
-                if matches!(result, crate::steps::StepResult::Advance) {
+                if matches!(outcome.result, crate::steps::StepResult::Advance) {
                     if let Some(ref mut log) = ec.event_log {
                         log.push(
                             ec.time.tick,
@@ -1722,7 +1809,7 @@ pub fn resolve_goap_plans(
                         );
                     }
                 }
-                result
+                outcome.result
             }
 
             GoapActionKind::SocializeWith => {
@@ -1743,7 +1830,7 @@ pub fn resolve_goap_plans(
                             ec.time.tick,
                         );
                 }
-                let result = crate::steps::disposition::resolve_socialize(
+                let outcome = crate::steps::disposition::resolve_socialize(
                     ticks,
                     cat_entity,
                     plan.step_state[step_idx].target_entity,
@@ -1756,7 +1843,11 @@ pub fn resolve_goap_plans(
                     &ec.constants.social,
                     d,
                 );
-                if matches!(result, crate::steps::StepResult::Advance) {
+                outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    Feature::Socialized,
+                );
+                if matches!(outcome.result, crate::steps::StepResult::Advance) {
                     magic_params
                         .pushback_writer
                         .write(crate::systems::magic::CorruptionPushback {
@@ -1765,7 +1856,7 @@ pub fn resolve_goap_plans(
                             amount: 0.01,
                         });
                 }
-                result
+                outcome.result
             }
 
             GoapActionKind::GroomOther => {
@@ -1773,7 +1864,7 @@ pub fn resolve_goap_plans(
                     plan.step_state[step_idx].target_entity =
                         find_social_target(cat_entity, &pos, &cat_positions, &relationships, d);
                 }
-                let (result, restoration) = crate::steps::disposition::resolve_groom_other(
+                let outcome = crate::steps::disposition::resolve_groom_other(
                     ticks,
                     cat_entity,
                     plan.step_state[step_idx].target_entity,
@@ -1786,10 +1877,14 @@ pub fn resolve_goap_plans(
                     &ec.constants.social,
                     d,
                 );
-                if let Some(r) = restoration {
+                outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    Feature::GroomedOther,
+                );
+                if let Some(r) = outcome.witness {
                     grooming_restorations.push(r);
                 }
-                if matches!(result, crate::steps::StepResult::Advance) {
+                if matches!(outcome.result, crate::steps::StepResult::Advance) {
                     if let Some(ref mut log) = ec.event_log {
                         log.push(
                             ec.time.tick,
@@ -1802,7 +1897,7 @@ pub fn resolve_goap_plans(
                         );
                     }
                 }
-                result
+                outcome.result
             }
 
             GoapActionKind::MentorCat => {
@@ -1810,7 +1905,7 @@ pub fn resolve_goap_plans(
                     plan.step_state[step_idx].target_entity =
                         find_social_target(cat_entity, &pos, &cat_positions, &relationships, d);
                 }
-                let (result, effect) = crate::steps::disposition::resolve_mentor_cat(
+                let outcome = crate::steps::disposition::resolve_mentor_cat(
                     ticks,
                     cat_entity,
                     plan.step_state[step_idx].target_entity,
@@ -1820,7 +1915,12 @@ pub fn resolve_goap_plans(
                     ec.time.tick,
                     d,
                 );
-                if let Some((apprentice, mentor_skills)) = effect {
+                outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    Feature::MentoredCat,
+                );
+                let crate::steps::StepOutcome { result, witness } = outcome;
+                if let Some((apprentice, mentor_skills)) = witness {
                     mentor_effects.push(MentorEffect {
                         apprentice,
                         mentor_skills,
@@ -1862,6 +1962,7 @@ pub fn resolve_goap_plans(
                     d,
                     &cat_tile_counts,
                 )
+                .result
             }
 
             GoapActionKind::EngageThreat => {
@@ -1886,7 +1987,7 @@ pub fn resolve_goap_plans(
                 let target_pos_opt: Option<Position> = plan.step_state[step_idx]
                     .target_entity
                     .and_then(|t| ec.wildlife.get(t).ok().map(|(_, p)| *p));
-                if let Some(target_pos) = target_pos_opt {
+                let fight_outcome = if let Some(target_pos) = target_pos_opt {
                     let dist = pos.manhattan_distance(&target_pos);
                     if dist > 1 {
                         if plan.step_state[step_idx].cached_path.is_none()
@@ -1905,7 +2006,9 @@ pub fn resolve_goap_plans(
                                 *pos = next;
                             }
                         }
-                        crate::steps::StepResult::Continue
+                        crate::steps::StepOutcome::<bool>::unwitnessed(
+                            crate::steps::StepResult::Continue,
+                        )
                     } else {
                         crate::steps::disposition::resolve_fight_threat(
                             ticks,
@@ -1923,7 +2026,12 @@ pub fn resolve_goap_plans(
                         &health,
                         d,
                     )
-                }
+                };
+                fight_outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    Feature::ThreatEngaged,
+                );
+                fight_outcome.result
             }
 
             GoapActionKind::Survey => crate::steps::disposition::resolve_survey(
@@ -1932,18 +2040,20 @@ pub fn resolve_goap_plans(
                 &pos,
                 &mut prey_params.exploration_map,
                 d,
-            ),
+            )
+            .result,
 
             GoapActionKind::DeliverDirective => {
-                let result =
+                // TODO: resolve directive kind and target from the
+                // coordination system so witness can reflect actual
+                // delivery, not just time-out.
+                let outcome =
                     crate::steps::disposition::resolve_deliver_directive(ticks, &mut needs, d);
-                if matches!(result, crate::steps::StepResult::Advance) {
-                    // TODO: resolve directive kind and target from the coordination system.
-                    if let Some(ref mut act) = narr.activation {
-                        act.record(Feature::DirectiveDelivered);
-                    }
-                }
-                result
+                outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    Feature::DirectiveDelivered,
+                );
+                outcome.result
             }
 
             GoapActionKind::MateWith => {
@@ -1966,7 +2076,7 @@ pub fn resolve_goap_plans(
                 }
                 let target = plan.step_state[step_idx].target_entity;
                 let target_gender = target.and_then(|t| gender_snapshot.get(&t).copied());
-                let (result, pregnancy) = crate::steps::disposition::resolve_mate_with(
+                let outcome = crate::steps::disposition::resolve_mate_with(
                     ticks,
                     cat_entity,
                     *gender,
@@ -1975,7 +2085,25 @@ pub fn resolve_goap_plans(
                     &mut needs,
                     &mut relationships,
                 );
-                if let Some((gestator, litter_size)) = pregnancy {
+                // MatingOccurred fires only when a pregnancy was produced.
+                outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    Feature::MatingOccurred,
+                );
+                // §Phase 5a: CourtshipInteraction — the resolver's
+                // witness type can't distinguish "no target" from
+                // "target, no gestation" (Tom×Tom), so the caller
+                // emits this one directly when an Advance happened
+                // with a target but no pregnancy.
+                if matches!(outcome.result, crate::steps::StepResult::Advance)
+                    && outcome.witness.is_none()
+                    && target.is_some()
+                {
+                    if let Some(ref mut act) = narr.activation {
+                        act.record(Feature::CourtshipInteraction);
+                    }
+                }
+                if let Some((gestator, litter_size)) = outcome.witness {
                     // §7.M.7.4: Pregnant lands on the gestation-capable
                     // partner. `partner` on the Pregnant struct is the
                     // other mate — so if the initiator is the gestator,
@@ -1992,9 +2120,6 @@ pub fn resolve_goap_plans(
                             litter_size,
                         ),
                     );
-                    if let Some(ref mut act) = narr.activation {
-                        act.record(Feature::MatingOccurred);
-                    }
                     if let Some(ref mut elog) = ec.event_log {
                         elog.push(
                             ec.time.tick,
@@ -2013,24 +2138,70 @@ pub fn resolve_goap_plans(
                             amount: 0.03,
                         });
                 }
-                result
+                outcome.result
             }
 
             GoapActionKind::FeedKitten => {
+                // §Phase 4c.3: resolve the target kitten via the
+                // caretake-urgency helper on first tick. Previously
+                // target_entity was set to nearest Stores, which
+                // combined with the broken feed-kitten step to
+                // credit only the adult's own social. The new
+                // resolver picks the most-urgent hungry kitten and
+                // the updated step transfers food from inventory.
+                if plan.step_state[step_idx].target_entity.is_none() {
+                    plan.step_state[step_idx].target_entity =
+                        crate::ai::caretake_targeting::resolve_caretake(
+                            cat_entity,
+                            *pos,
+                            &kitten_snapshot,
+                        )
+                        .target;
+                }
+                let outcome = crate::steps::disposition::resolve_feed_kitten(
+                    ticks,
+                    plan.step_state[step_idx].target_entity,
+                    &mut needs,
+                    &mut inventory,
+                );
+                outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    Feature::KittenFed,
+                );
+                if let Some(kitten_entity) = outcome.witness {
+                    kitten_feedings.push(kitten_entity);
+                }
+                outcome.result
+            }
+
+            GoapActionKind::RetrieveFoodForKitten => {
+                // §Phase 4c.4: predecessor step for FeedKitten in the
+                // GOAP Caretake plan. Retrieves any food item (raw or
+                // cooked) from the nearest Stores so the adult's
+                // inventory has something to transfer in FeedKitten.
+                // Parallels RetrieveRawFood above but without the raw-
+                // only filter — kittens eat either form.
                 if plan.step_state[step_idx].target_entity.is_none() {
                     plan.step_state[step_idx].target_entity = stores_entities
                         .iter()
                         .min_by_key(|(_, sp)| pos.manhattan_distance(sp))
                         .map(|(e, _)| *e);
                 }
-                crate::steps::disposition::resolve_feed_kitten(
-                    ticks,
-                    plan.step_state[step_idx].target_entity,
-                    &mut needs,
-                    &mut stores_query,
-                    &items_query,
-                    &mut commands,
-                )
+                let (result, retrieved) =
+                    crate::steps::disposition::resolve_retrieve_any_food_from_stores(
+                        ticks,
+                        plan.step_state[step_idx].target_entity,
+                        &mut inventory,
+                        &mut stores_query,
+                        &items_query,
+                        &mut commands,
+                    );
+                if retrieved {
+                    if let Some(ref mut act) = narr.activation {
+                        act.record(Feature::ItemRetrieved);
+                    }
+                }
+                result
             }
 
             GoapActionKind::GatherHerb => {
@@ -2466,7 +2637,7 @@ pub fn resolve_goap_plans(
                         .min_by_key(|(_, _, gp, _, _)| pos.manhattan_distance(gp))
                         .map(|(e, _, _, _, _)| *e);
                 }
-                crate::steps::building::resolve_tend(
+                let outcome = crate::steps::building::resolve_tend(
                     plan.step_state[step_idx].target_entity,
                     &mut pos,
                     &mut plan.step_state[step_idx].cached_path,
@@ -2475,7 +2646,12 @@ pub fn resolve_goap_plans(
                     workshop_bonus,
                     &mut building_params.buildings,
                     &ec.map,
-                )
+                );
+                outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    Feature::CropTended,
+                );
+                outcome.result
             }
 
             GoapActionKind::HarvestCrops => {
@@ -2488,14 +2664,26 @@ pub fn resolve_goap_plans(
                         .min_by_key(|(_, _, gp, _, _)| pos.manhattan_distance(gp))
                         .map(|(e, _, _, _, _)| *e);
                 }
-                crate::steps::building::resolve_harvest(
+                let outcome = crate::steps::building::resolve_harvest(
                     plan.step_state[step_idx].target_entity,
                     &pos,
                     &stores_entities,
                     &mut building_params.buildings,
                     &mut stores_query,
                     &mut commands,
-                )
+                );
+                // §Phase 4c.4 + §Phase 5a: emit CropHarvested only
+                // when items actually landed in Stores (or a
+                // Thornbriar herb spawned). Paired with CropTended —
+                // a split between the two signals (tend firing,
+                // harvest never) would indicate the tend loop isn't
+                // actually advancing crops to full growth, which the
+                // canary surfaces.
+                outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    Feature::CropHarvested,
+                );
+                outcome.result
             }
 
             GoapActionKind::GatherMaterials => {
@@ -2521,30 +2709,32 @@ pub fn resolve_goap_plans(
                         .min_by_key(|(_, sp)| pos.manhattan_distance(sp))
                         .map(|(e, _)| *e);
                 }
-                let (result, _retrieved) =
-                    crate::steps::disposition::resolve_retrieve_raw_food_from_stores(
-                        ticks,
-                        plan.step_state[step_idx].target_entity,
-                        &mut inventory,
-                        &mut stores_query,
-                        &items_query,
-                        &mut commands,
-                    );
-                result
+                let outcome = crate::steps::disposition::resolve_retrieve_raw_food_from_stores(
+                    ticks,
+                    plan.step_state[step_idx].target_entity,
+                    &mut inventory,
+                    &mut stores_query,
+                    &items_query,
+                    &mut commands,
+                );
+                outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    Feature::ItemRetrieved,
+                );
+                outcome.result
             }
 
             GoapActionKind::Cook => {
-                let (result, cooked) = crate::steps::disposition::resolve_cook(
+                let outcome = crate::steps::disposition::resolve_cook(
                     ticks,
                     &mut inventory,
                     d,
                 );
-                if cooked {
-                    if let Some(ref mut act) = narr.activation {
-                        act.record(Feature::FoodCooked);
-                    }
-                }
-                result
+                outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    Feature::FoodCooked,
+                );
+                outcome.result
             }
 
             GoapActionKind::ExploreSurvey => {
@@ -2556,6 +2746,7 @@ pub fn resolve_goap_plans(
                     &mut prey_params.exploration_map,
                     d,
                 )
+                .result
             }
         };
 
@@ -2791,6 +2982,13 @@ pub fn resolve_goap_plans(
     for (target, delta) in grooming_restorations {
         if let Ok((_, (_, _, _, Some(mut g), _, _, _, _, _, _))) = cats.get_mut(target) {
             g.0 = (g.0 + delta).min(1.0);
+        }
+    }
+
+    // §Phase 4c.3: deferred kitten-feedings. +0.5 hunger per feed.
+    for kitten_entity in kitten_feedings {
+        if let Ok(((_, _, _, _, _, mut k_needs, _, _, _), _)) = cats.get_mut(kitten_entity) {
+            k_needs.hunger = (k_needs.hunger + 0.5).min(1.0);
         }
     }
 

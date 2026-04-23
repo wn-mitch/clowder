@@ -105,6 +105,13 @@ pub enum GoapActionKind {
     // Other dispositions
     MateWith,
     FeedKitten,
+    /// Retrieve any food (raw OR cooked) from Stores into the adult's
+    /// inventory so the subsequent FeedKitten step has something to
+    /// transfer. Phase 4c.4 — Phase 4c.3 wired the retrieve step in
+    /// the disposition-chain path (`StepKind::RetrieveAnyFoodFromStores`)
+    /// but forgot to add the GOAP mirror, so the scheduled planner built
+    /// `[TravelTo(Stores), FeedKitten]` with empty inventory and no-op'd.
+    RetrieveFoodForKitten,
     DeliverDirective,
     ExploreSurvey,
 }

@@ -2,7 +2,7 @@
 
 # Resources
 
-30 resource types derived from `#[derive(Resource)]`.
+33 resource types derived from `#[derive(Resource)]`.
 
 ## `src/components/coordination.rs`
 
@@ -108,6 +108,7 @@
 | `deaths_by_cause` | `HashMap<String, u64>` |
 | `plan_failures_by_reason` | `HashMap<String, u64>` |
 | `interrupts_by_reason` | `HashMap<String, u64>` |
+| `continuity_tallies` | `HashMap<String, u64>` |
 
 ## `src/resources/exploration_map.rs`
 
@@ -183,6 +184,19 @@
 
 ### TemplateRegistry (struct)
 
+## `src/resources/prey_scent_map.rs`
+
+### PreyScentMap (struct)
+
+> Spatial grid tracking prey scent. The grid-based sibling of `FoxScentMap`, introduced in Phase 2B of the AI substrate refactor (§5.6.3 row #1). Prey entities deposit scent on the tiles they occupy each tick; cats sample the grid to decide whether prey-scent is present at their position rather than running a point-to-point wind-aware formula against every prey entity.  **Behavioral change from the pre-Phase-2B path:** detection no longer uses the wind-direction dot-product test in `cat_smells_prey_windaware`. Scent diffuses symmetrically via the deposit pattern (for now — a directional plume under wind is a natural follow-up tuning). Range is carried implicitly in the decay rate + deposit intensity rather than as a per-read distance check.  One aggregate map covers all prey species (mouse / rat / rabbit / fish / bird). Per-species maps are a follow-up if target-selection needs to discriminate "smelled a mouse vs a rabbit."
+
+| Field | Type |
+|-------|------|
+| `marks` | `Vec<f32>` |
+| `grid_w` | `usize` |
+| `grid_h` | `usize` |
+| `bucket_size` | `i32` |
+
 ## `src/resources/relationships.rs`
 
 ### Relationships (struct)
@@ -227,6 +241,7 @@
 | `personality_friction` | `PersonalityFrictionConstants` |
 | `world_gen` | `WorldGenConstants` |
 | `sensory` | `SensoryConstants` |
+| `fertility` | `FertilityConstants` |
 
 ## `src/resources/snapshot_config.rs`
 
@@ -282,6 +297,27 @@
 | `tick` | `u64` |
 | `paused` | `bool` |
 | `speed` | `SimSpeed` |
+
+## `src/resources/trace_log.rs`
+
+### FocalTraceTarget (struct)
+
+> Marker resource. When present, trace-emitter systems produce layer-by-layer records for the named cat. Inserted only by the headless runner (see `run_headless` in `src/main.rs`); never by `SimulationPlugin`. Per §11.5 scope rule.  The target is identified by name at the CLI level; `entity` is resolved lazily on the first tick the named cat is queryable. Unresolved targets produce no records — the cat may not exist yet (pre-birth), may have died, or the name may be typo'd.
+
+| Field | Type |
+|-------|------|
+| `name` | `String` |
+| `entity` | `Option<Entity>` |
+
+### TraceLog (struct)
+
+> In-memory buffer drained every tick by the headless runner's `flush_trace_entries`. Follows the same `total_pushed` + ring-buffer convention as `EventLog` so that flush is a single forward-walk from `last_flushed` to `total_pushed`.  `capacity` is sized for one cat × ~30 DSEs × a handful of L1 samples × L3 record per tick; flush-every-tick keeps live memory bounded.
+
+| Field | Type |
+|-------|------|
+| `entries` | `VecDeque<TraceEntry>` |
+| `capacity` | `usize` |
+| `total_pushed` | `u64` |
 
 ## `src/resources/unmet_demand.rs`
 

@@ -1150,6 +1150,16 @@ pub struct ScoringConstants {
     pub mate_temperature_scale: f32,
     pub caretake_compassion_scale: f32,
     pub caretake_parent_bonus: f32,
+    /// Phase 4c.4 alloparenting Reframe A: per-unit-fondness boost to
+    /// the compassion axis used by `CaretakeDse` when the adult is not
+    /// a parent of the target kitten. With default 1.0 and fondness
+    /// clamped to [0, 1] on the positive side, bond-scale maxes out at
+    /// 2.0 — compassion axis is doubled for a cat that adores mama.
+    /// Negative fondness doesn't suppress (scale floors at 1.0) because
+    /// hostility toward mama shouldn't reduce baseline compassion for
+    /// the kitten itself below colony norm.
+    #[serde(default = "default_caretake_bond_compassion_boost_max")]
+    pub caretake_bond_compassion_boost_max: f32,
     /// Minimum hunger a cat (and its prospective partner) must have to be
     /// eligible to mate. Hungry cats breed hungry kittens.
     pub breeding_hunger_floor: f32,
@@ -1312,6 +1322,7 @@ impl Default for ScoringConstants {
             mate_temperature_scale: 5.0,
             caretake_compassion_scale: 1.8,
             caretake_parent_bonus: 0.5,
+            caretake_bond_compassion_boost_max: default_caretake_bond_compassion_boost_max(),
             breeding_hunger_floor: 0.6,
             breeding_energy_floor: 0.5,
             breeding_mood_floor: 0.2,
@@ -1725,6 +1736,10 @@ fn default_mating_fertility_autumn() -> f32 {
 
 fn default_mating_fertility_winter() -> f32 {
     0.0
+}
+
+fn default_caretake_bond_compassion_boost_max() -> f32 {
+    1.0
 }
 
 impl ScoringConstants {

@@ -31,8 +31,12 @@ graph TD
         needs_decay_exploration --> needs_bond_proximity_social
         pregnancy_tick_pregnancy["pregnancy::tick_pregnancy"]
         needs_bond_proximity_social --> pregnancy_tick_pregnancy
+        fertility_handle_post_partum_reinsert["fertility::handle_post_partum_reinsert"]
+        pregnancy_tick_pregnancy --> fertility_handle_post_partum_reinsert
+        fertility_update_fertility_phase["fertility::update_fertility_phase"]
+        fertility_handle_post_partum_reinsert --> fertility_update_fertility_phase
         growth_tick_kitten_growth["growth::tick_kitten_growth"]
-        pregnancy_tick_pregnancy --> growth_tick_kitten_growth
+        fertility_update_fertility_phase --> growth_tick_kitten_growth
         growth_kitten_mood_aura["growth::kitten_mood_aura"]
         growth_tick_kitten_growth --> growth_kitten_mood_aura
         mood_update_mood["mood::update_mood"]
@@ -138,6 +142,7 @@ graph TD
         prey_prey_population["prey::prey_population"]
         prey_prey_hunger["prey::prey_hunger"]
         prey_prey_ai["prey::prey_ai"]
+        prey_prey_scent_tick["prey::prey_scent_tick"]
         prey_prey_den_lifecycle["prey::prey_den_lifecycle"]
         wildlife_detect_threats["wildlife::detect_threats"]
         buildings_apply_building_effects["buildings::apply_building_effects"]
@@ -156,6 +161,7 @@ graph TD
         aspirations_check_second_aspiration_slot["aspirations::check_second_aspiration_slot"]
         aspirations_check_aspiration_abandonment["aspirations::check_aspiration_abandonment"]
         aspirations_track_milestones["aspirations::track_milestones"]
+        trace_emit_emit_focal_trace["trace_emit::emit_focal_trace"]
     end
 
     %% Cross-chain data flows

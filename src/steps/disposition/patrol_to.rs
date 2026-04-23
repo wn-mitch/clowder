@@ -4,8 +4,31 @@ use crate::ai::pathfinding::{find_free_adjacent, find_path};
 use crate::components::physical::{Needs, Position};
 use crate::resources::map::TileMap;
 use crate::resources::sim_constants::DispositionConstants;
-use crate::steps::StepResult;
+use crate::steps::{StepOutcome, StepResult};
 
+/// # GOAP step resolver: `PatrolTo`
+///
+/// **Real-world effect** — paths the actor toward a target
+/// position one tile per tick; applies per-tile and arrival
+/// safety bonuses to `needs.safety`. Jitters to an adjacent tile
+/// when stacked with other cats.
+///
+/// **Plan-level preconditions** — emitted by
+/// `src/ai/planner/actions.rs::patrol_actions` under
+/// `ZoneIs(PlannerZone::PatrolZone)`.
+///
+/// **Runtime preconditions** — requires `target_position` to be
+/// `Some`. Missing target or unreachable target both return
+/// `Fail(...)` — neither returns `Advance` silently. Path is
+/// cached on first tick.
+///
+/// **Witness** — `StepOutcome<()>`. The safety-need side-effects
+/// run on every tick the step is alive, and the Advance branch
+/// only fires when the actor has actually arrived; the design has
+/// no silent-advance surface.
+///
+/// **Feature emission** — none. Patrol is ubiquitous and not
+/// tracked as a Positive Feature.
 pub fn resolve_patrol_to(
     pos: &mut Position,
     target_position: Option<Position>,
@@ -14,34 +37,35 @@ pub fn resolve_patrol_to(
     map: &TileMap,
     d: &DispositionConstants,
     cat_tile_counts: &HashMap<Position, u32>,
-) -> StepResult {
+) -> StepOutcome<()> {
     let Some(target) = target_position else {
-        return StepResult::Fail("no patrol target".into());
+        return StepOutcome::bare(StepResult::Fail("no patrol target".into()));
     };
     if pos.manhattan_distance(&target) == 0 {
         jitter_if_stacked(pos, map, cat_tile_counts);
         needs.safety = (needs.safety + d.patrol_arrival_safety_gain).min(1.0);
-        return StepResult::Advance;
+        return StepOutcome::bare(StepResult::Advance);
     }
-    // Compute A* path on first tick; follow it thereafter.
     if cached_path.is_none() {
         match find_path(*pos, target, map) {
             Some(path) => *cached_path = Some(path),
-            None => return StepResult::Fail("no path to patrol target".into()),
+            None => {
+                return StepOutcome::bare(StepResult::Fail("no path to patrol target".into()));
+            }
         }
     }
     if let Some(ref mut path) = cached_path {
         if path.is_empty() {
             jitter_if_stacked(pos, map, cat_tile_counts);
             needs.safety = (needs.safety + d.patrol_arrival_safety_gain).min(1.0);
-            StepResult::Advance
+            StepOutcome::bare(StepResult::Advance)
         } else {
             *pos = path.remove(0);
             needs.safety = (needs.safety + d.patrol_per_tile_safety_gain).min(1.0);
-            StepResult::Continue
+            StepOutcome::bare(StepResult::Continue)
         }
     } else {
-        StepResult::Continue
+        StepOutcome::bare(StepResult::Continue)
     }
 }
 

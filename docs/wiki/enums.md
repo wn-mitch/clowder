@@ -25,11 +25,11 @@
 | [PreyKind](#preykind) | 5 | `src/components/prey.rs` |
 | [FleeStrategy](#fleestrategy) | 4 | `src/components/prey.rs` |
 | [WildSpecies](#wildspecies) | 4 | `src/components/wildlife.rs` |
-| [EventKind](#eventkind) | 179 | `src/resources/event_log.rs` |
+| [EventKind](#eventkind) | 195 | `src/resources/event_log.rs` |
 | [NarrativeTier](#narrativetier) | 6 | `src/resources/narrative.rs` |
 | [PriorityKind](#prioritykind) | 4 | `src/resources/colony_priority.rs` |
 | [DirectiveKind](#directivekind) | 10 | `src/components/coordination.rs` |
-| [StepKind](#stepkind) | 34 | `src/components/task_chain.rs` |
+| [StepKind](#stepkind) | 35 | `src/components/task_chain.rs` |
 | [ZoneKind](#zonekind) | 3 | `src/components/zone.rs` |
 | [AspirationDomain](#aspirationdomain) | 7 | `src/components/aspirations.rs` |
 
@@ -401,6 +401,22 @@
 | `ShadowFoxBanished` |
 | `posse` |
 | `location` |
+| `GroomingFired` |
+| `cat` |
+| `target` |
+| `MentoringFired` |
+| `mentor` |
+| `apprentice` |
+| `BurialFired` |
+| `cat` |
+| `deceased` |
+| `PlayFired` |
+| `cat` |
+| `partner` |
+| `MythicTexture` |
+| `subclass` |
+| `subject` |
+| `detail` |
 | `ColonyScore` |
 | `shelter` |
 | `nourishment` |
@@ -439,7 +455,7 @@
 | `steps` |
 | `hunger` |
 | `energy` |
-| `warmth` |
+| `temperature` |
 | `food_available` |
 | `FoxPlanCreated` |
 | `fox_id` |
@@ -457,7 +473,7 @@
 | `current_step` |
 | `hunger` |
 | `energy` |
-| `warmth` |
+| `temperature` |
 | `PlanStepFailed` |
 | `cat` |
 | `disposition` |
@@ -466,7 +482,7 @@
 | `reason` |
 | `hunger` |
 | `energy` |
-| `warmth` |
+| `temperature` |
 | `PlanReplanned` |
 | `cat` |
 | `disposition` |
@@ -474,7 +490,7 @@
 | `new_steps` |
 | `hunger` |
 | `energy` |
-| `warmth` |
+| `temperature` |
 
 ## NarrativeTier
 
@@ -557,6 +573,7 @@
 | `FeedKitten` |
 | `RetrieveFromStores` |
 | `kind` |
+| `RetrieveAnyFoodFromStores` |
 
 ## ZoneKind
 

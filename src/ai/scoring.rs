@@ -211,6 +211,15 @@ pub struct ScoringContext<'a> {
     pub hungry_kitten_urgency: f32,
     /// Whether this cat is a parent of the hungriest nearby kitten.
     pub is_parent_of_hungry_kitten: bool,
+    /// Phase 4c.4 alloparenting Reframe A: multiplier applied to the
+    /// `personality.compassion` input when scoring the Caretake DSE.
+    /// 1.0 = no boost (default); 1.25 = 25% boost for bonded friends
+    /// of the kitten's mother; 2.0 = doubled at max fondness × max
+    /// boost_max. See `caretake_compassion_bond_scale` +
+    /// `sim_constants.caretake_bond_compassion_boost_max`. Kept as
+    /// its own axis input (not shared with herbcraft_prepare's
+    /// `compassion`) so the bond-weighting is caretake-local.
+    pub caretake_compassion_bond_scale: f32,
     // --- Exploration context ---
     /// Fraction of tiles within explore_range that are unexplored (0.0–1.0).
     /// Gates the explore action score: when nearby area is fully explored,
@@ -330,6 +339,15 @@ fn ctx_scalars(ctx: &ScoringContext) -> HashMap<&'static str, f32> {
     m.insert(
         "compassion",
         ctx.personality.compassion.clamp(0.0, 1.0),
+    );
+    // Phase 4c.4 alloparenting Reframe A: bond-weighted compassion for
+    // Caretake. Shared-key `compassion` stays stable for herbcraft_prepare;
+    // CaretakeDse reads this caretake-local key instead. Scale ≥ 1 so
+    // unbonded adults retain baseline compassion, clamp keeps post-boost
+    // values in the [0, 1] input range the Linear curve expects.
+    m.insert(
+        "caretake_compassion",
+        (ctx.personality.compassion * ctx.caretake_compassion_bond_scale).clamp(0.0, 1.0),
     );
     // Social-urgency axis inputs. Social deficit = `1 - social`;
     // mating deficit = `1 - mating`; thermal deficit = `1 -
@@ -1710,6 +1728,7 @@ mod tests {
             has_eligible_mate: false,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
+            caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
             health: 1.0,
             fox_scent_level: 0.0,
@@ -1845,6 +1864,7 @@ mod tests {
             has_eligible_mate: false,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
+            caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
             health: 1.0,
             fox_scent_level: 0.0,
@@ -1974,6 +1994,7 @@ mod tests {
             has_eligible_mate: false,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
+            caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
             health: 1.0,
             fox_scent_level: 0.0,
@@ -2227,6 +2248,7 @@ mod tests {
             has_eligible_mate: false,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
+            caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
             health: 1.0,
             fox_scent_level: 0.0,
@@ -2301,6 +2323,7 @@ mod tests {
             has_eligible_mate: false,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
+            caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
             health: 1.0,
             fox_scent_level: 0.0,
@@ -2391,6 +2414,7 @@ mod tests {
             has_eligible_mate: false,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
+            caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
             health: 1.0,
             fox_scent_level: 0.0,
@@ -2663,6 +2687,7 @@ mod tests {
             has_eligible_mate: false,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
+            caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
             health: 1.0,
             fox_scent_level: 0.0,
@@ -2739,6 +2764,7 @@ mod tests {
             has_eligible_mate: false,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
+            caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
             health: 1.0,
             fox_scent_level: 0.0,

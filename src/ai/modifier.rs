@@ -269,9 +269,9 @@ impl ScoreModifier for SensedRotBoost {
 /// bonuses compose by addition and are order-invariant, but pinning
 /// order makes future audits grep-able.
 ///
-/// Mirror sites (`src/plugins/simulation.rs`, `src/main.rs` setup_world
-///   + run_new_game, save-load restore) each call this helper to produce
-///   the same pipeline shape.
+/// Mirror sites — `src/plugins/simulation.rs`, `src/main.rs`
+/// `setup_world` + `run_new_game`, save-load restore — each call
+/// this helper to produce the same pipeline shape.
 pub fn default_modifier_pipeline(sc: &ScoringConstants) -> ModifierPipeline {
     let mut pipeline = ModifierPipeline::new();
     pipeline.push(Box::new(WardCorruptionEmergency::new(sc)));

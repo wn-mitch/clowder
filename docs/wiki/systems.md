@@ -24,6 +24,7 @@ Status of each design document cross-referenced against `SimulationPlugin::build
 | System | Status | Registered Functions | Design Doc |
 |--------|--------|---------------------|------------|
 | AI Substrate Refactor — Design Specification | *[Aspirational]* | — | [doc](../systems/ai-substrate-refactor.md) |
+| Crafted Items & Recipes | *[Aspirational]* | — | [doc](../systems/crafting.md) |
 | Disease | *[Aspirational]* | — | [doc](../systems/disease.md) |
 | Environmental Quality | *[Aspirational]* | — | [doc](../systems/environmental-quality.md) |
 | Log Analytics Dashboard | *[Aspirational]* | — | [doc](../systems/log-analytics-dashboard.md) |
@@ -31,12 +32,16 @@ Status of each design document cross-referenced against `SimulationPlugin::build
 | Project vision | *[Aspirational]* | — | [doc](../systems/project-vision.md) |
 | Organized Raids | *[Aspirational]* | — | [doc](../systems/raids.md) |
 | Recreation & Grooming | *[Aspirational]* | — | [doc](../systems/recreation.md) |
+| AI Substrate Refactor — Implementation Plan | *[Aspirational]* | — | [doc](../systems/refactor-plan.md) |
+| Ruin Clearings (Corruption Nodes) | *[Aspirational]* | — | [doc](../systems/ruin-clearings.md) |
 | Sensory System — Detection, Channels, and Profiles | *[Aspirational]* | — | [doc](../systems/sensory.md) |
 | Sleep That Makes Sense — GOAP for Every Species | *[Aspirational]* | — | [doc](../systems/sleep-that-makes-sense.md) |
+| Anatomical Slot Inventory | *[Aspirational]* | — | [doc](../systems/slot-inventory.md) |
 | Strategist coordinator (stub) | *[Aspirational]* | — | [doc](../systems/strategist-coordinator.md) |
 | Substances | *[Aspirational]* | — | [doc](../systems/substances.md) |
 | The Calling | *[Aspirational]* | — | [doc](../systems/the-calling.md) |
 | Trade & Visitors | *[Aspirational]* | — | [doc](../systems/trade.md) |
+| Warmth Split — temperature need vs social warmth fulfillment axis | *[Aspirational]* | — | [doc](../systems/warmth-split.md) |
 
 ## Undocumented Modules
 
@@ -45,12 +50,14 @@ System modules with registered functions but no design doc:
 - **aspirations**: select_aspirations, check_second_aspiration_slot, check_aspiration_abandonment, track_milestones
 - **colony_score**: emit_colony_score
 - **fate**: assign_fated_connections, awaken_fated_connections
+- **fertility**: handle_post_partum_reinsert, update_fertility_phase
 - **fox_goap**: sync_fox_needs, fox_evaluate_and_plan, fox_resolve_goap_plans, feed_cubs_at_dens, resolve_paired_confrontations
 - **goap**: check_anxiety_interrupts, evaluate_and_plan, resolve_goap_plans, emit_plan_narrative
 - **growth**: tick_kitten_growth, kitten_mood_aura
 - **pregnancy**: tick_pregnancy
-- **prey**: prey_population, prey_hunger, prey_ai, prey_den_lifecycle, update_den_pressure, apply_den_raids, orphan_prey_adopt_or_found
+- **prey**: prey_population, prey_hunger, prey_ai, prey_scent_tick, prey_den_lifecycle, update_den_pressure, apply_den_raids, orphan_prey_adopt_or_found
 - **snapshot**: emit_cat_snapshots, emit_position_traces, emit_spatial_snapshots
 - **task_chains**: resolve_task_chains
+- **trace_emit**: emit_focal_trace
 - **wildlife**: spawn_wildlife, wildlife_ai, fox_movement, fox_needs_tick, fox_ai_decision, fox_scent_tick, predator_hunt_prey, carcass_decay, predator_stalk_cats, detect_threats, fox_lifecycle_tick, fox_confrontation_tick, fox_store_raid_tick, cleanup_wildlife
 

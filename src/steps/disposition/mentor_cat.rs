@@ -4,10 +4,36 @@ use crate::components::physical::Needs;
 use crate::components::skills::Skills;
 use crate::resources::relationships::Relationships;
 use crate::resources::sim_constants::DispositionConstants;
-use crate::steps::StepResult;
+use crate::steps::{StepOutcome, StepResult};
 
-/// Returns the step result and an optional deferred mentor effect
-/// `(apprentice_entity, mentor_skills_snapshot)` to apply after the main loop.
+/// # GOAP step resolver: `MentorCat`
+///
+/// **Real-world effect** — boosts mentor's mastery/social/respect
+/// needs, shifts relationships (fondness + familiarity +
+/// last_interaction) with the apprentice, and on completion yields
+/// a deferred `(apprentice_entity, mentor_skills_snapshot)` the
+/// caller uses to transfer skill XP to the apprentice outside the
+/// mentor's `&mut` borrow.
+///
+/// **Plan-level preconditions** — emitted under
+/// `ZoneIs(PlannerZone::SocialTarget)` by
+/// `src/ai/planner/actions.rs::mentor_actions`. Apprentice
+/// selection happens at disposition-scoring time; a plan can still
+/// arrive with `target_entity == None` if the apprentice was lost
+/// mid-plan.
+///
+/// **Runtime preconditions** — all mentor-side mutations are
+/// gated on `if let Some(target) = target_entity`. No target
+/// means no real mentoring happened: the step still Advances on
+/// time-out but the witness stays `None`.
+///
+/// **Witness** — `StepOutcome<Option<(Entity, Skills)>>`. `Some`
+/// iff the mentor-side mutations ran AND the step completed
+/// (`ticks >= mentor_duration`) — the caller uses the snapshot to
+/// apply the cross-entity skill transfer.
+///
+/// **Feature emission** — caller passes `Feature::MentoredCat`
+/// (Positive) to `record_if_witnessed`.
 #[allow(clippy::too_many_arguments)]
 pub fn resolve_mentor_cat(
     ticks: u64,
@@ -18,7 +44,7 @@ pub fn resolve_mentor_cat(
     relationships: &mut Relationships,
     tick: u64,
     d: &DispositionConstants,
-) -> (StepResult, Option<(Entity, Skills)>) {
+) -> StepOutcome<Option<(Entity, Skills)>> {
     if let Some(target) = target_entity {
         needs.mastery = (needs.mastery + d.mentor_mastery_per_tick).min(1.0);
         needs.social = (needs.social + d.mentor_social_per_tick).min(1.0);
@@ -29,10 +55,13 @@ pub fn resolve_mentor_cat(
             .get_or_insert(cat_entity, target)
             .last_interaction = tick;
     }
+
     if ticks >= d.mentor_duration {
-        let effect = target_entity.map(|t| (t, skills.clone()));
-        (StepResult::Advance, effect)
+        match target_entity {
+            Some(t) => StepOutcome::witnessed_with(StepResult::Advance, (t, skills.clone())),
+            None => StepOutcome::unwitnessed(StepResult::Advance),
+        }
     } else {
-        (StepResult::Continue, None)
+        StepOutcome::unwitnessed(StepResult::Continue)
     }
 }

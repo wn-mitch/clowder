@@ -1387,7 +1387,801 @@ system owner satisfied it. Tag pattern: `substrate-follow-on`,
 
 ---
 
+### 15. Alloparenting Reframe B — mama drops kitten at hearth near resting elder [2026-04-22]
+
+**Deferred after Reframe A landed (Phase 4c.4, 2026-04-22).**
+`KittenFed` is no longer zero (55 / 10 on seed-42 v3 soaks) — the
+any-adult-feeds-any-hungry-kitten pattern lit up on the back of
+(1) bond-weighted compassion, (2) the GOAP Caretake retrieve
+step, and (3) target-entity persistence. See Landed Phase 4c.4
+entry for the full bundle.
+
+The canary Reframe B was meant to unblock — generational
+continuity, a kitten reaching Juvenile in a soak — **is still
+zero**, but the A-vs-B diagnosis in Reframe A's hypothesis has
+shifted: more adults feeding kittens is no longer the bottleneck,
+since A established that dozens of feedings happen per soak. The
+gap between "kittens are fed" and "kittens reach Juvenile" is
+downstream of feeding frequency — either growth-rate tuning or
+the Phase 4c.3 literature anchor's milk-yield / nursing-quality
+model. Adding an elder-hearth handoff mechanic doesn't help the
+current bottleneck; it would add a communal-care texture without
+shifting the canary.
+
+**Resume when:** growth-tuning / milk-yield follow-ons have been
+attempted and KittenMatured is still blocked on "no adult is
+available to feed." Then B-elder's hypothesis becomes live again
+— handoff-to-elder unlocks mother-mortality relief specifically.
+Until then, defer.
+
+**Originally specified shape preserved below for when it resumes.**
+
+**Shape (~200–400 LOC):**
+
+1. **Mama-side DSE extension.** Add a sub-mode to Caretake scoring
+   (`src/ai/dses/caretake.rs`) that activates when mama has competing
+   Action-level needs (Eat + Mate + Sleep debts ≥ some threshold)
+   AND an eligible resting-elder is detectable near ColonyCenter.
+   Sub-mode resolves to a GOAP plan: `MoveTo(hearth) +
+   SettleKittens(near_elder) + release Caretake pressure`. Kittens
+   follow via existing group-movement pathfinding (verify it exists;
+   otherwise add a `FollowingMother` component that steers).
+2. **Elder-side scoring boost.** Elders in Resting disposition gain
+   a `near_kitten_at_hearth` urgency boost in their Caretake
+   scoring. Reads the existing `resolve_caretake()` signal
+   (`src/ai/caretake_targeting.rs` — post-4c.3). Elder doesn't
+   actively pick up the handoff role; their existing Caretake
+   scoring just gets pulled higher when a kitten is spatially
+   present while they're resting at the hearth.
+3. **Eligibility query.** Helper predicate:
+   `find_resting_elder_at_hearth(&cats_query, &colony_center) ->
+   Option<Entity>`. Three-line query over `With<Elder>`,
+   `DispositionKind::Resting`, distance-to-ColonyCenter ≤
+   `hearth_effect_radius`.
+4. **Narrative emission.** Wire a narrative template for the
+   hand-off event. `src/resources/narrative_templates.rs` already
+   has a `"communal"` template under `Independence`; repurpose or
+   add `ElderBabysit` tier.
+5. **Continuity canary telemetry.** Add
+   `continuity_tallies.elder_babysat_session` counter to the
+   event-log footer (`src/resources/event_log.rs`). Same shape as
+   grooming/play tallies — not a hard gate, just visibility.
+
+**Hypothesis (if proceeding):**
+
+> Post-Phase 4c.4 adults actively feed kittens (55/10 fed/soak)
+> but no kitten reaches Juvenile yet. If the residual bottleneck
+> is "mother's own Eat / Mate / Sleep debts drag her away from
+> nursing when a non-mother alloparent isn't within feeding
+> range", an elder-hearth handoff raises `KittenMatured` from 0
+> to ≥1 per soak without regressing KittenFed or Starvation.
+
+**Why not the full scruff-carry version.** That version scored
+**675** (adds an inter-cat transport primitive to the codebase).
+The physical-causality thesis favours it aesthetically — cats
+carry kittens the way cats carry anything, by explicit effort — but
+the carry primitive is new architecture with no current precedent
+and no second use case on the near-term roadmap. If a second
+carry-a-living-entity feature surfaces (corpse-handling per
+`docs/systems/corpse-handling.md` is aspirational; wounded-retrieval
+isn't stubbed), revisit the full version then. Until then, B-elder
+pays for the ecological outcome without the architectural debt.
+
+**Cross-reference:** `docs/systems-backlog-ranking.md` does not yet
+carry an alloparenting entry. If B lands, file a stub at
+`docs/systems/alloparenting.md` and add the ranked entry at the
+same time.
+
+### 16. Crafting — items, recipes, stations [2026-04-22]
+
+**Why it matters:** External proposal (user-sourced via
+`/rank-sim-idea`) split out from a composite "OSRS-style inventory +
+fantasy adventures" idea. Crafting is the load-bearing piece of the
+three-way split (this entry, #17 slot-inventory, #18 ruin-clearings).
+It's the only one of the three that is self-justifying on canary
+grounds: a §5-first recipe catalog (preservation, play toys,
+grooming tools, courtship gifts, mentorship tokens) targets the
+ecological-variety continuity canary directly, and Phase 3 produces
+wearables that unblock #17.
+
+**Design captured at:** `docs/systems/crafting.md` (Aspirational,
+2026-04-22). Phases 1–5 enumerated with required hypotheses per
+phase (Phase 4 and Phase 5 added 2026-04-22 via decoration / place-
+making expansion).
+
+**Score:** V=5 F=4 R=3 C=3 H=3 = **540** — "worthwhile; plan
+carefully" (300–1000 bucket). Promoted from 288 → 540 on 2026-04-22
+when Phase 4 (Domestic refinement / folk-craft decorations) and
+Phase 5 (Elevated cat-craft / collective multi-season) were added.
+Originally rank 6 in `docs/systems-backlog-ranking.md`.
+
+**Ship-order note:** Among the originally-split features, crafting
+is the anchor and ships first. It de-risks #17 (slot-inventory gets
+its first producer at Phase 3) and #18 (ruin-clearings loot has a
+consumer once Phase 1 preservation recipes land). Phase 4
+decorations become the second primary consumer of #20 (naming
+substrate); Phase 5 is gated on aspirations-mastery arcs and is
+long-horizon.
+
+**Design constraints (load-bearing — drift re-triggers ranking):**
+- §5-first catalog. No combat gear in the catalog. If a combat-gear
+  recipe is ever proposed, re-rank the stub — F and H both drop.
+- `CraftedItem` type carries narrative/identity fields only. No
+  numeric capability modifiers on items themselves; action
+  resolvers own the gameplay effect of using an item.
+- **Decorations are place-anchored, not cat-anchored** (Phase 4+).
+  A rug warms the hearth tile; a lamp illuminates a room. The cat
+  who placed the decoration gets no personal bonus.
+- Cat-native palette. Reed, bone, fur, feather, shell, rendered
+  fat, berry/clay pigment. No metalwork / milled lumber /
+  human-import materials.
+- **Not-DF guardrail for Phase 5.** Phase 5 is collective (multi-cat)
+  or cumulative (multi-season), never individual-rare-strike.
+  `the-calling.md` owns individual mood-strike craft.
+- Generalize `remedy_prep` and `ward_setting` into the unified
+  catalog in Phase 1. Do not leave parallel code paths.
+
+**Phase 5 gating (three conditions, all required):**
+1. Colony-age ≥3 sim-years (materials accrete across seasons).
+2. Material-scarcity (deep exploration / cleared ruins / cross-
+   season storage inputs).
+3. Skill-via-aspirations — new mastery arcs (`WeavingMastery`,
+   `BoneShapingMastery`, `PigmentMastery`, `CairnMastery`) defined
+   in `aspirations.rs`; at least one cat advanced on a relevant arc
+   enables the recipe for the whole colony.
+
+**Dependencies:** benefits from but does not hard-block on the A1
+IAUS refactor. Phase 1 is independent. Phase 3 soft-depends on #17
+existing. Phase 3 and 4 soft-depend on #20 (naming substrate) —
+can ship with neutral-fallback generator. Phase 4 soft-depends on
+`environmental-quality.md` (A-cluster refactor) — ships with a
+minimal `TileAmenities` interface otherwise. **Phase 5 hard-depends
+on** `aspirations.rs` skill-arc extension (new mastery arcs);
+ships in same PR as Phase 5 or as a precursor PR.
+
+**Required hypothesis per phase** (per `CLAUDE.md` Balance
+Methodology) is recorded in the stub.
+
+**Resume when:** picked up next in the §5-sideways work thread.
+Phase 1 (food preservation) is the recommended pilot since it hits
+the starvation canary most directly. Phase 4 should pair with #20
+(naming) landing.
+
+### 17. Anatomical slot inventory [2026-04-22]
+
+**Why it matters:** Split-out piece of the 2026-04-22 composite
+proposal. Refactors the flat `Inventory { slots: Vec<ItemSlot> }`
+(`src/components/magic.rs:242`) into an anatomy-indexed wearable-slot
+structure plus a stackable consumable-pouch. Anatomical slot
+enumeration imports from `body-zones.md`.
+
+**Design captured at:** `docs/systems/slot-inventory.md`
+(Aspirational, 2026-04-22).
+
+**Score:** V=2 F=3 R=4 C=4 H=4 = **384** — "worthwhile; plan
+carefully" (300–1000 bucket). Added as rank 5 in
+`docs/systems-backlog-ranking.md`.
+
+**Ship-order note: do not ship standalone.** Score reflects
+isolated-feature value, but lived utility is gated on at least one
+wearable producer existing. Candidate producers, thesis-fit
+ordered:
+1. `crafting.md` Phase 3 (mentorship tokens, heirlooms) — see #16.
+2. `the-calling.md` (Named Objects as wearable hooks).
+3. `trade.md` (visitor-sourced worn objects).
+
+Without a producer this is cost without benefit.
+
+**Type guardrail (load-bearing invariant):** `WearableItem` carries
+`name`, `origin_tick`, `creator_entity`, `narrative_template_id`
+only. No numeric capability modifiers. If a future PR adds modifier
+fields to the wearable type, F drops 3→2 and H drops 4→2 (composite
+falls from 384 to ~96) — treat such PRs as re-opening this ranking.
+
+**Dependencies:** hard-gated on a producer; otherwise migration is
+mechanical over a known finite consumer set (5–6 call sites:
+`persistence.rs`, `plugins/setup.rs`, `components/task_chain.rs`,
+`systems/needs.rs::eat_from_inventory`, relevant `magic.rs` sites).
+
+**Resume when:** #16 reaches Phase 3, or `the-calling.md` lands
+with Named Objects surfacing as wearable candidates. Do not pick
+up before either.
+
+### 18. Ruin clearings (corruption nodes, PMD-flavored) [2026-04-22]
+
+**Why it matters:** Third split-out piece. Dungeons-as-corruption-
+nodes: uncleared ruins emit corruption radially, the colony
+organizes multi-cat clearings (paths → pushback → interior hazards
+→ loot). Loot is crafting materials + occasional Named Objects —
+**not** gear. Honest-ecology version of "cats go somewhere weird
+and come back changed"; complements `the-calling.md`'s interior/
+trance version of the same motif.
+
+**Design captured at:** `docs/systems/ruin-clearings.md`
+(Aspirational, 2026-04-22).
+
+**Score (scope-cut variant):** V=4 F=4 R=2 C=2 H=2 = **128** —
+"earn the slot" (80–300 bucket). The full gear-modifier variant
+scores 64 ("defer") and is explicitly rejected. Added as rank 13
+in `docs/systems-backlog-ranking.md`.
+
+**Scope discipline (load-bearing — violations drop score to 64):**
+1. Loot is crafting material / Named Object only. Never gear.
+2. Corruption pushback reuses existing `magic.rs` substrate.
+3. Ruin spawn rate is ecological (seasonal corruption + distance
+   from hearth), never reactive to colony threat score.
+4. Clearing difficulty is environmental, never scaled to colony
+   power.
+
+**Dependencies:** hard-gated on A1 IAUS refactor (multi-cat GOAP
+coordination on a shared goal) **and** on #16 Phase 1 shipping
+(otherwise loot has no consumer). Reuses `magic.rs` corruption
+substrate (Built) and `coordination.rs` directives pattern.
+
+**Shadowfox watch:** structurally lighter than shadowfoxes (H=2
+vs H=1) because it rides the existing corruption/ward system,
+but still bespoke-canary territory. A new `ClearingAttempt`
+mortality cause in `logs/events.jsonl` and a
+`ruins_cleared_per_sim_year` footer tally are likely required.
+
+**Resume when:** A1 lands and #16 Phase 1 ships. Do not pick up
+before both.
+
+---
+
+### 19. Happy paths — usage-worn trails [2026-04-22]
+
+**Why it matters:** Cats concentrate movement between high-utility
+destinations; repeated traversal compresses terrain into speed-boosted
+trails, and prey learn to avoid them (ecology of fear extended to
+traffic). Worn enough, paths become a **civilizational marker** — the
+colony writing its own behavioral history into the world as physical
+grain. Path segments register with the `naming.md` substrate for
+event-anchored naming ("The Last Trace of Cedar"), turning routine
+geography into named ground.
+
+**Design captured at:** `docs/systems/paths.md` (Aspirational,
+2026-04-22).
+
+**Score:** V=4 F=5 R=3 C=4 H=2 = **480** — "worthwhile; plan
+carefully" (300–1000 bucket).
+
+**Substrate reuse (the cost-saver):** path wear is additive to the
+`InfluenceMap` scaffolding (`src/systems/influence_map.rs` §5.6.9 —
+`(Channel, Faction)`-keyed registry; "14th map" is a registration,
+not a schema change). Naming rides on #20 (see below), which is a
+precursor.
+
+**Scope discipline (load-bearing — keeps H=2):**
+1. Wear decays. No permanent tiles absent ongoing use.
+2. Speed boost ≤1.25×, non-stacking. No runaway.
+3. Prey avoidance is proportional, not binary.
+4. Max 6 named segments per sim-year (name-spam guardrail, lives in
+   `naming.md`'s shared ceiling).
+5. Paths don't gate hunt scoring.
+
+**Open scope questions (paths-local):**
+1. Anti-monopoly threshold (placeholder 15% pending Phase 1
+   observation).
+2. Whether foxes / prey benefit from path speed-boost (default: no).
+
+**Canaries to ship in same PR (4 total):**
+1. Path-formation — ≥1 trail segment ≥6 tiles persists day 90→180.
+2. Anti-monopoly — no single tile > 15% seasonal colony traversal.
+3. Named-landmark — ≥1 named path per sim-year, independent of
+   Calling.
+4. Name-spam — ≤6 named segments per sim-year (shared with #20).
+
+**Dependencies:** soft-gated on tilemap rendering stability. Named-
+path output soft-depends on #20 (naming substrate). No A1 hard-gate
+(pathfinding weight is below the GOAP layer). Added as rank 4a in
+`docs/systems-backlog-ranking.md`.
+
+**Shadowfox watch:** shares self-reinforcing feedback loop and new
+prey-fear input with shadowfoxes; decisive differences (no mortality-
+spike failure mode, continuous not Poisson, canaries are formation-
+quality not survival) keep H=2 not H=1. Scope disciplines 1, 2, and 5
+are the brakes.
+
+**Resume when:** tilemap rendering stable; #20 naming substrate has
+shipped or is shipping in the same PR.
+
+---
+
+### 20. NamedLandmark substrate (cross-consumer naming) [2026-04-22]
+
+**Why it matters:** Six stubs independently need to produce named
+entities that outlive their makers — paths, crafting Phase 3 Named
+Objects, crafting Phase 4 decorations, ruin-clearings Phase 3 drops,
+the-Calling wards/remedies/totems, monuments. Each rolling its own
+name generator produces six inconsistent grammars and six
+independent event-proximity matchers. A shared registry + matcher +
+event-keyed templates serves all six. Primary lever for the
+mythic-texture canary (≥1 named event per sim-year from live-sim
+sources, currently ~0).
+
+**Design captured at:** `docs/systems/naming.md` (Aspirational,
+2026-04-22).
+
+**Score:** V=2 F=5 R=4 C=4 H=4 = **640** — "worthwhile" scaffolding.
+V=2 (no in-world effect until a consumer ships) mirrors the pattern
+on `slot-inventory.md`. V rises to effective-4 once one consumer
+registers, to effective-5 at three or more.
+
+**Substrate scope:**
+- `NamedLandmark` registry resource keyed by `LandmarkId`.
+- `match_naming_events` system running after `narrative.rs`.
+- Event-kind → template mapping table, extensible per consumer.
+- Monument self-naming path (proximity radius 0) as a distinct flow.
+- Shared name-spam ceiling: ≤6 named landmarks per sim-year across
+  all consumers.
+
+**Scope discipline (load-bearing — keeps H=4):**
+1. Shared name-spam guardrail, counted across all consumers.
+2. Fallback generator always available per consumer (no hard block).
+3. Names carry no numeric modifiers (vocabulary, not stat sheet).
+4. Registry is additive; decayed landmarks flagged, never pruned.
+5. No player-directed naming.
+
+**Canaries to ship in same PR (4 total):**
+1. Named-landmark — ≥1 named landmark per sim-year from live-sim
+   events.
+2. Name-spam — ≤6 named landmarks per sim-year, aggregated.
+3. Consumer-diversity — after all six consumers land, ≥3 distinct
+   consumer kinds per sim-year.
+4. Fallback-rate — <20% of landmarks use neutral fallback generator.
+
+**Dependencies:** no hard deps. Benefits from one consumer shipping
+in the same PR to prove the registration contract. Paths (#19) is
+the canonical first consumer because path wear is spatially-
+anchored, matching the proximity matcher's strongest shape.
+
+**Shadowfox watch:** minimal — scaffolding with no feedback loop,
+no scoring interaction, no mortality surface. Main risk is the OSRS
+gravity-well analogue: consumers slipping numeric fields onto
+`NamedLandmark` over time. Scope discipline rule 3 is the
+type-level guardrail.
+
+**Resume when:** paths (#19) or any other consumer reaches the slot
+where the naming substrate becomes load-bearing. Ship as precursor
+to a consumer PR (lean) or bundled with first consumer.
+
+---
+
+### 21. Monuments — civic & memorial structures [2026-04-22]
+
+**Why it matters:** Colonies leave physical structures that anchor
+narrative across generations — burial mounds, coming-of-age stones,
+defender's memorials, pact circles, founding stones. Monuments are
+**built events**: the act of building is the narrative, the built
+object is the artefact. Directly lights the **burial axis** of
+ecological-variety canary (currently ~0 firings/year) and is the
+strongest burial + generational-knowledge vehicle in the backlog.
+
+**Design captured at:** `docs/systems/monuments.md` (Aspirational,
+2026-04-22).
+
+**Score:** V=4 F=5 R=3 C=3 H=3 = **540** — "worthwhile; plan
+carefully" (300–1000 bucket).
+
+**Five monument kinds at launch (load-bearing):** Burial Mound,
+Coming-of-Age Stone, Defender's Memorial, Pact Circle, Founding
+Stone. Each anchored to a specific Significant-tier triggering
+event. Additions are a re-triage trigger.
+
+**Scope discipline (load-bearing — keeps H=3):**
+1. ≤4 monuments per sim-year (monument-spam guardrail).
+2. All monuments are multi-cat (≥2 contributors).
+3. No authored / player-directed monument placement.
+4. No numeric modifiers on the cat passing a monument.
+5. No Strange-Moods-analogue (the-Calling owns that mechanism).
+
+**Build mechanic:** three phases — declaration (coordinator
+directive posted on qualifying event), gathering (multi-cat
+material transport to site), raising (simultaneous multi-cat action
+emitting a Significant narrative event that self-names the
+monument via #20).
+
+**Canaries to ship in same PR (4 total):**
+1. Burial-axis — ≥1 burial-axis firing per sim-year (currently ~0).
+2. Monument-rate — 1–4 per sim-year (detects silence and spam).
+3. Cross-kind diversity — ≥3 distinct kinds per 30-min soak.
+4. Mortality-drift — `deaths_by_cause` within ±10% of baseline (no
+   survival side-effects from monument-building).
+
+**Dependencies:** hard-gated on #20 (naming substrate) and on A1
+IAUS refactor (multi-cat GOAP coordination — same gate as
+#18 ruin-clearings). Benefits from `coordination.rs` (Built) and
+`fate.rs` (Built). Phase 3 needs colony-founding/splitting as a
+legible event.
+
+**Shadowfox watch:** no feedback loop in the adversarial direction,
+no new mortality category. Main risk is the "monumentalism" gravity
+well — pressure to add kinds over time creeping the launch-5 toward
+15 and diluting each. Scope rule 1 is the brake.
+
+**Resume when:** #20 naming substrate has landed, A1 IAUS refactor
+has landed, and the #18 ruin-clearings multi-cat coordination
+pattern is proven.
+
+---
+
 ## Landed
+
+### Phase 4c.4 — Alloparenting Reframe A + GOAP Caretake fix + Farming canaries (2026-04-22)
+
+Bundle of four structurally-related fixes, all discovered during
+the Reframe A hypothesis test. Phase 4c.3 had claimed to wire
+KittenFed but it had stayed `= 0` in every soak — this phase
+unblocked it across three distinct failure layers and lit the
+farming system that had been quietly dead since its introduction.
+
+**(1) Bond-weighted compassion — alloparenting Reframe A (~150 LOC).**
+- `CaretakeResolution` now surfaces the target kitten's mother /
+  father (`src/ai/caretake_targeting.rs:72-82`). New
+  `caretake_compassion_bond_scale` helper computes
+  `1 + max(0, fondness_with_mother) × boost_max` given a
+  closure-style fondness lookup. Non-parents with a strong bond to
+  mama get amplified compassion; hostility clamps at baseline 1.0
+  so "I hate mama" can't suppress compassion below colony norm.
+- New `ScoringContext.caretake_compassion_bond_scale` field flows
+  through `ctx_scalars` as a dedicated input key
+  (`"caretake_compassion"`), distinct from the shared `"compassion"`
+  axis that `herbcraft_prepare` reads. `CaretakeDse::COMPASSION_INPUT`
+  points at the caretake-local key — bond-weighting amplifies only
+  care-for-hungry-kitten decisions.
+- Populate sites wired at both `disposition.rs:evaluate_dispositions`
+  (+`:disposition_to_chain` for chain building) and
+  `goap.rs:evaluate_and_plan`. Reads `Relationships::get(adult,
+  mother).fondness`. New `SimConstants.caretake_bond_compassion_boost_max`
+  (default 1.0 → doubled compassion at max fondness).
+- 7 new unit tests on `caretake_compassion_bond_scale` covering
+  no-target / self-as-mother / fondness amplification / hostile
+  clamp / missing relationship / father-fallback.
+
+**(2) GOAP Caretake plan was silently half-shipped (Phase 4c.3
+remnant).** Phase 4c.3's landing entry claimed to "rewrite
+`build_caretaking_chain` for physical causality" into a 4-step
+retrieve→deliver chain — true, but only in the unscheduled
+disposition-chain path. The scheduled GOAP path's
+`caretaking_actions()` still emitted `[TravelTo(Stores),
+FeedKitten]` with no retrieval step, and `resolve_feed_kitten`
+advanced silently when `inventory.take_food()` returned `None`.
+This is why `KittenFed = 0` even across the pre-fix v2 soaks.
+- New `GoapActionKind::RetrieveFoodForKitten` + step handler in
+  `systems/goap.rs`; new `resolve_retrieve_any_food_from_stores`
+  step helper (mirrors the raw-only sibling but accepts cooked
+  food too — kittens eat either form).
+- `caretaking_actions()` now emits two actions: retrieve (precond
+  `ZoneIs(Stores)`; no `CarryingIs(Nothing)` — that gate blocked
+  plans when adults had herbs or foraged food on arrival) → feed
+  (precond `ZoneIs(Stores) + CarryingIs(RawFood)`; effect
+  `SetCarrying(Nothing) + IncrementTrips`). Planner unit tests
+  assert the three-step `[TravelTo(Stores),
+  RetrieveFoodForKitten, FeedKitten]` shape including the
+  "carrying herbs at start" regression case.
+
+**(3) Target-kitten entity persistence at plan creation.** Even
+with the retrieve step wired, the first soak still showed
+`KittenFed = 0` on 66 Caretake plans with the correct chain
+shape. Root cause: the FeedKitten handler re-ran `resolve_caretake`
+from the executor's position — the adult's Stores tile, 15-20
+tiles from the nursery — and the kitten was outside
+`CARETAKE_RANGE = 12`, so `target = None`, step advanced vacuously.
+The same silent-advance class as Phase 4c.3's original bug,
+different surface. Fix: in `evaluate_and_plan`, after plan
+creation, seed `plan.step_state[feed_idx].target_entity` from
+`caretake_resolution.target` (captured at scoring time from the
+adult's *original* position). Mirrors how `socialize_target` and
+`mate_target` already flowed their resolver output into the plan
+via `evaluate_and_plan` instead of asking the step executor to
+re-resolve from a stale position. Caretake was the outlier.
+
+**(4) Farming resurrected + canaries wired.** Collateral finding
+while inspecting the footer's plan-failure histogram during
+Caretake diagnosis — `450× TendCrops: no target for Tend` per
+baseline soak, 0 harvests ever logged, no `Feature::*Crop*`
+variant to catch it. Farming had been silently dead since it
+shipped because `src/steps/building/construct.rs` only attached
+`StoredItems` when `blueprint == StructureType::Stores` — Gardens
+never got their `CropState` component, so the TendCrops
+target-resolution query's `has_crop` filter was permanently false.
+Fix: mirror the `Stores → StoredItems` special case one line up
+(`blueprint == StructureType::Garden` → `CropState::default()`).
+Added `Feature::CropTended` + `Feature::CropHarvested` (both
+Positive) with wiring; `resolve_tend` return-shape adjusted so
+the canary only fires when the tend math actually ran, not while
+pathing toward the garden.
+
+**(5) StepOutcome<W> global refactor (parallel work).** The
+silent-advance class that produced bugs (2)-(4) motivated a
+substrate-wide type-level fix: `src/steps/outcome.rs::StepOutcome<W>`
+wraps `StepResult` with a witness parameter
+(`<()>` / `<bool>` / `<Option<T>>`). `record_if_witnessed` only
+exists on witness-carrying shapes; callers can no longer emit a
+positive `Feature::*` based on `StepResult::Advance` alone. The
+Phase 4c.4 bundle's `resolve_tend` and `resolve_feed_kitten`
+migrations are the first conversions; the audit also added 8 new
+silent-advance canaries — `FoodEaten`, `Socialized`,
+`GroomedOther`, `MentoredCat`, `ThreatEngaged`,
+`MaterialsDelivered`, `BuildingRepaired`, `CourtshipInteraction` —
+each backing a subsystem that previously advanced silently when
+its target was missing or its payload wasn't transferred.
+
+**Seed-42 `--duration 900` deep-soak (two runs for variance)**
+(`logs/phase4c4-alloparenting-a-v3/events-run{1,2}.jsonl`):
+
+| Metric | Baseline (4c.3) | v3 Run 1 | v3 Run 2 | Direction |
+|---|---|---|---|---|
+| `deaths_by_cause.Starvation` | 1 | 3 | 2 | stable within variance |
+| `deaths_by_cause.ShadowFoxAmbush` | 0 | 0 | 0 | canary passes |
+| `continuity_tallies.grooming` | 268 | 174 | 189 | noise band |
+| `continuity_tallies.courtship` | 4 | 5 | 3 | noise |
+| KittenBorn | 2 | 3 | 2 | stable |
+| **`KittenFed` activations** | **0** | **55** | **10** | **hypothesis validated** |
+| KittenMatured | 0 | 0 | 0 | still blocked (see below) |
+| `CropTended` activations | — | 4,076 | 16,667 | farming lit |
+| `CropHarvested` activations | — | 44 | 397 | farming lit |
+| `positive_features_active` / total | 16/34 | 20/36 | 20/36 | broader |
+
+**Hypothesis concordance — Reframe A:**
+
+> Bond-weighted compassion ⇒ `KittenFed ≥ 1` AND Starvation
+> stable AND at least one kitten reaches Juvenile.
+
+Partial validation:
+- **`KittenFed ≥ 1`: ✓** 55 and 10 respectively. Bond-boost makes
+  non-parents (Mallow, Ivy, Birch, Nettle — Mocha's bonded
+  friends) actually pick Caretake in softmax; the combined
+  (1)+(2)+(3) fixes make the chain actually transfer food.
+  Pre-fix soaks had these adults scoring Caretake 0.4-0.57 but
+  either not winning softmax or planning a silently-broken chain.
+- **Starvation stable: ✓** 1 → 2-3. Within noise band;
+  Bevy parallel-scheduler variance dominates at this seed.
+- **Kitten reaches Juvenile: ✗** 0 KittenMatured in both runs.
+  The first-born kitten (4445v8 at tick 1261224 in run 1) had
+  the most time (~70k ticks) and was fed 55 times, but didn't
+  hit Juvenile before sim end. **Two candidate causes — both
+  downstream of Phase 4c.4, to be investigated separately:**
+  (a) growth-rate tuning may not produce a Juvenile in a 900s
+  soak even with consistent feeding; `docs/systems/growth.md`
+  tuning is unexplored. (b) the Reedkit-33 and Duskkit-7/74
+  starvation deaths hint kittens can still out-hunger their
+  feeders at the low end; milk-yield scaling (the 4c.3 landing
+  entry's "Next concrete follow-on") is the literature-aligned
+  next step.
+
+**Generational continuity canary remains blocked.** Not a
+Reframe A failure — A was scoped specifically to make any adult
+feed any hungry kitten, and that succeeded. Reaching Juvenile is
+one growth-tuning or milk-quality follow-on away, and needs its
+own hypothesis + measurement cycle rather than more Caretake
+mechanism. Filing as a new open-work entry.
+
+**Farming first-soak-ever metrics.** First time in branch history
+that CropTended/CropHarvested have non-zero counts. `ForageItem:
+nothing found while foraging` dropped less than expected (713 →
+726/554) because cats now ALSO tend crops instead of only
+foraging, but per-cat food-income per tick rose enough to keep
+FoodLevel at 22-46 (run 1) and 41-46 (run 2) throughout, vs
+baseline which drained to 0 around tick 1317k. The Stores-empty
+famine-cluster mode (pre-fix run 1's 8-adult-cluster starvation)
+did not recur in either soak.
+
+**Retracting Reframe B-elder's implementation path.** Entry #15's
+Reframe A-vs-B sequencing said "if Reframe A fails the
+generational canary, Reframe B's hypothesis is live." Partial
+validation: A lit `KittenFed` but not `KittenMatured`. Reframe B
+(elder-hearth babysit) doesn't help here — more adults feeding
+kittens isn't the gap; the gap is downstream of feeding. Reframing
+B as **deferred** pending the growth/milk-yield follow-on, not
+escalated.
+
+**Follow-ons filed as new open-work:**
+- Growth-rate tuning investigation — do kittens need faster
+  life-stage advancement to hit Juvenile in a 900s soak, or is
+  the soak window too short regardless?
+- Milk-yield / nursing-quality model (Phase 4c.3 landing's
+  literature-anchored follow-on #1 — still load-bearing).
+- Multi-seed sweep (99, 7, 2025, 314) to confirm KittenFed > 0
+  generalizes beyond seed 42.
+
+### Phase 4c.3 — Caretake signal wiring + feed-kitten semantics fix (2026-04-22)
+
+Simplest-scope Caretake fix targeting the orphan-kitten starvation
+that Phase 4c.1 / 4c.2's reproduction-enabling ports surfaced.
+**Not** a §6.5.6 target-taking DSE port — this is the
+pre-requisite signal wire-up + step-handler fix. A future §6.5.6
+port can layer a declarative bundle over this same signal once
+the Maslow-tier balance lands.
+
+- New `src/ai/caretake_targeting.rs`:
+    - `KittenState` snapshot type + `CaretakeResolution` output.
+    - `resolve_caretake(adult, adult_pos, kittens)` — scans
+      kittens-in-range for hunger < 0.6, returns the argmax of
+      `hunger_deficit × distance_decay × kinship_boost` plus
+      `is_parent` flag and winning target (Entity + Position).
+      `CARETAKE_RANGE = 12` (matches §6.5.6 template), kinship
+      boost 1.25× for biological parents.
+    - 7 unit tests covering empty-kitten / well-fed / out-of-range
+      / argmax / parent-kinship / is_parent-only-when-hungry /
+      closer-kitten-ties.
+- Wire the urgency signal at both scoring-caller sites
+  (`disposition.rs:evaluate_dispositions` + `goap.rs:evaluate_and_plan`):
+  build a kitten snapshot at the top of each tick, call
+  `resolve_caretake` per adult, populate
+  `hungry_kitten_urgency` + `is_parent_of_hungry_kitten` in the
+  `ScoringContext` (was hardcoded `0.0` / `false`, which nulled
+  the existing `CaretakeDse`'s dominant axis at weight 0.45).
+  Kitten query lives in `CookingQueries` (existing bundle) for
+  `evaluate_dispositions`, in `WorldStateQueries` for
+  `evaluate_and_plan`.
+- Rewrote `build_caretaking_chain` for physical causality: old
+  chain `[MoveTo(stores), FeedKitten(stores)]` retires; new
+  chain `[MoveTo(stores), RetrieveAnyFoodFromStores(stores),
+  MoveTo(kitten), FeedKitten(kitten)]`. Takes the winning
+  kitten from a fresh `resolve_caretake` call in
+  `disposition_to_chain`'s per-cat loop.
+- New `StepKind::RetrieveAnyFoodFromStores` variant + handler
+  in `resolve_disposition_chains`. Wraps the existing
+  `resolve_retrieve_raw_food_from_stores` helper (any food kind,
+  raw/uncooked) so the Caretake chain doesn't commit to a
+  specific `ItemKind` variant that might be absent from Stores.
+- Fixed `resolve_feed_kitten` to actually feed the kitten:
+    - Old behavior: took `target = Stores`, removed food from
+      stores, credited the **adult's** `needs.social` by 0.05.
+      The kitten was never fed.
+    - New behavior: takes `target = kitten`, pulls food from
+      adult's inventory via `Inventory::take_food()`, returns
+      `(StepResult, Option<Entity>)` where the second value is
+      the kitten to credit. Hunger credit (`+0.5`, capped 1.0)
+      is applied in a post-loop pass to avoid a double-&mut on
+      `Needs` (the cats query already owns &mut Needs over all
+      non-dead cats). Adult's social bonus preserved.
+- Callers at both paths (`resolve_disposition_chains` +
+  `resolve_goap_plans`) updated to the new return shape. Goap
+  path's FeedKitten step-state target-resolution swapped from
+  nearest-Stores to `resolve_caretake`'s winning kitten.
+- New `Feature::KittenFed` positive-activation signal recorded
+  on each successful feeding (classified Positive in
+  `system_activation.rs`; `positive_features_total` bumped 33→34
+  with paired test updates).
+
+**Seed-42 `--duration 900` re-soak
+(`logs/phase4c3-caretake-wired/events.jsonl`):**
+
+| Metric | Phase 4c.2 | Phase 4c.3 | Direction |
+|---|---|---|---|
+| `deaths_by_cause.Starvation` | 5 | 1 | apparent improvement, see caveats below |
+| `deaths_by_cause.ShadowFoxAmbush` | 0 | 0 | ✅ canary passes |
+| `continuity_tallies.grooming` | 274 | 268 | noise |
+| `continuity_tallies.courtship` | 5 | 4 | noise |
+| MatingOccurred events | 5 | 4 | noise |
+| KittenBorn events | 5 | 2 | half — reproduction still noisy |
+| **KittenFed events** | — | **0** | **the primary metric the fix targets — still zero** |
+| BondFormed | — | 47 | climbed further |
+
+**Unvarnished concordance — the fix is partial.** `KittenFed=0`
+means no adult successfully completed a FeedKitten step in this
+soak, despite the signal firing and the chain being built
+correctly. Tracing the lone starvation (`Pebblekit-68`) shows
+the signal propagates (kittens appear in the scoring pool with
+Caretake scored at 0.24), but the `CaretakeDse`'s Maslow tier-3
+classification suppresses its score heavily when the adult's own
+tier-1 needs (hunger ~0.4) are unsatisfied. Maslow-gated
+Caretake at 0.26 loses softmax draws against Explore (0.70+) and
+Forage (0.54+) consistently. Mothers never pick Caretake over
+their own Eat / Explore while hungry themselves.
+
+The apparent Starvation improvement (5→1) is mostly
+reproduction-variance: this run had 2 kittens born vs 4c.2's 5.
+Run-to-run non-determinism is a pre-existing effect of Bevy's
+parallel system scheduler (surfaced while debugging Phase 4c.3 —
+one earlier run of the same seed produced an 8-adult-starvation
+wipeout; the re-run produced the 1-kitten baseline above).
+Non-determinism predates Phase 4c.3's changes — listed as an
+open-work follow-on below.
+
+**Ecological review — how feral queens actually react.**
+Before proposing a balance fix I asked "how do kitten mothers
+normally react when they and their kittens are both hungry?"
+The literature (Nutter et al. 2004; Crowell-Davis et al. 2004;
+Liberg et al. 2000; Macdonald et al. 2000; Veronesi & Fusi 2022;
+Bradshaw 2012; Vitale et al. 2022 review) says **the current
+Clowder wiring is ecologically correct for the feeding
+decision**. A feral queen's maternal strategy is "stay alive
+and lactating" — lactation roughly doubles her energy
+requirement, wild felids don't regurgitate, and kittens can't
+be provisioned with solid food until week 4. Her investment
+channel *is* her own body condition. A hungry queen who finds
+food at a patch eats first and returns to the den; milk yield
+drops with her cortisol / undernutrition. Behavioral rule:
+keep the queen viable; she is the bottleneck. The
+Caretake-tier-3 / Eat-tier-1 priority ordering matches this.
+
+**Where the realism gap actually is — four findings to track
+as separate follow-ons:**
+
+1. **Milk-yield / nursing-quality model, not priority
+   inversion.** What breaks down under scarcity is
+   *nursing quality* — milk yield scales with queen body
+   condition; kittens starve from thin milk and secondary
+   infection on depressed immunity, not from the queen
+   choosing her stomach over theirs at the food patch.
+   Model kitten hunger restoration as a function of the
+   queen's recent nutrient surplus rather than a constant
+   +0.5 per FeedKitten tick. Direct starvation is a
+   minority cause in the literature even when kittens die
+   in droves — infectious disease is ~66% of necropsied
+   neonatal deaths.
+
+2. **Alloparental care.** Feral colonies are matrilineal.
+   Sisters, mother-daughter pairs, aunt-niece dyads co-den
+   and **allonurse** each other's kittens; non-nursing
+   queens bring prey to nursing queens. All 12 breeding
+   dyads at Church Farm allonursed (Macdonald 2000). Co-
+   reared kittens are left alone less, wean ~10 days
+   earlier, and survive better. Prerequisite: a
+   concentrated food source sufficient to support grouping.
+   This is **the single most-cited feature of feral colony
+   life missing from Clowder today**, and maps cleanly onto
+   `docs/systems/project-vision.md` §5's sideways-broadening
+   list (kin-weighted grooming + provisioning). Worth a
+   dedicated system stub once Caretake stabilizes.
+
+3. **Graded abandonment, not hard threshold.** Maternal
+   collapse is a continuous drop-off: longer absences →
+   reduced nursing → differential neglect of the runt →
+   abandonment → (rarely) cannibalism of the non-viable
+   kitten (scent removal, adaptive). Hard-threshold "queen
+   abandons litter at X% body condition" would be less
+   realistic than "nursing frequency + grooming of kittens
+   decay smoothly with body condition; weakest kitten loses
+   attention first."
+
+4. **Male infanticide.** Unfamiliar toms entering a colony
+   kill ~6.6% of litters to reset queens to estrus
+   (Macdonald 2000). Distinct from maternal-care collapse;
+   a separate predator-style ecological pressure if
+   Clowder ever wants that mechanic.
+
+**Baseline mortality calibration point.** Feral colonies lose
+~75% of kittens before 6 months (Nutter, Levine & Stoskopf
+2004; JAVMA 225:1399). Peak windows are first 2 weeks and
+weaning (4–5 weeks). Leading identifiable causes: trauma
+(vehicles, predators), infectious disease (URI, panleukopenia,
+FeLV/FIV, parasites), congenital defects. If Clowder's
+eventual kitten survival rate sits near 20–30% it's in a
+realistic band; hitting 100% would be implausibly generous
+and 0% is the current broken state.
+
+**Retraction of earlier "let Caretake beat Eat" options.**
+The previous three options in this entry (lower Maslow tier,
+is_parent override, bump composition weights) would all push
+hungry queens toward feeding kittens instead of themselves.
+The literature says that's anti-realistic — it would model
+cats as altruists, when they are actually metabolically
+obligate and the realistic channel of investment is their own
+body condition feeding lactation. Retiring those options.
+
+**Next concrete follow-on (not yet blocking).** The highest-
+realism / highest-return follow-on is **alloparental care** —
+non-nursing queens bringing food to nursing mothers. That
+would let a well-fed aunt feed Mocha's kittens when Mocha
+herself can't. New Caretake sub-targets, a `nursing_queen`
+marker, and routing food-delivery to the nursing queen rather
+than directly to the kitten. Design stub belongs in
+`docs/systems/` paired with the §6.5.6 target-taking DSE port
+when it lands.
+
+Sources: Nutter FB et al. *JAVMA* 2004 (n=169 kittens, feral
+mortality); Crowell-Davis SL et al. *J Feline Med Surg* 2004;
+Liberg O, Sandell M, Pontier D, Natoli E (in Turner & Bateson
+eds. 2000); Macdonald DW, Yamaguchi N, Kerby G 2000 (farm-cat
+allonursing + infanticide); Veronesi MC, Fusi J *J Feline Med
+Surg* 2022; Bradshaw JWS 2012 (*The Behaviour of the Domestic
+Cat* 2nd ed., ch. 8); Vitale KR et al. 2022 review of
+free-ranging cat social lives. Alley Cat Allies field guides.
 
 ### Phase 4c.2 — §6.5.2 `Mate` target-taking DSE port (2026-04-22)
 

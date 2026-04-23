@@ -1,26 +1,57 @@
 use crate::components::physical::{Health, Needs};
 use crate::components::skills::Skills;
 use crate::resources::sim_constants::DispositionConstants;
-use crate::steps::StepResult;
+use crate::steps::{StepOutcome, StepResult};
 
+/// # GOAP step resolver: `EngageThreat`
+///
+/// **Real-world effect** — on completion (`ticks >= fight_duration`),
+/// grows the cat's `combat` skill by `growth_rate() *
+/// fight_combat_skill_growth` and boosts `needs.safety` by
+/// `fight_safety_gain`. If health drops below `fight_bail_health_threshold`
+/// at any tick, returns `Fail("morale_break")`.
+///
+/// **Plan-level preconditions** — emitted under
+/// `ZoneIs(PlannerZone::PatrolZone)` by
+/// `src/ai/planner/actions.rs::patrol_actions`. `ZoneIs` alone does
+/// **not** prove wildlife is present — the step relies on the
+/// scoring-layer having elevated EngageThreat because a sensed
+/// threat was nearby; a drifting plan can arrive with no live
+/// wildlife in range.
+///
+/// **Runtime preconditions** — no target-existence check in this
+/// step: the real "is there wildlife?" test lives in
+/// `src/systems/combat.rs`, which resolves actual damage. A follow-
+/// up could tighten this by taking a wildlife-nearby snapshot
+/// here; for now the witness fires whenever the skill/safety
+/// side-effect actually runs (`ticks >= fight_duration`).
+///
+/// **Witness** — `StepOutcome<bool>`. `true` iff the Advance
+/// branch ran (skill growth + safety gain applied). `false` on
+/// Continue (still engaging) or Fail (morale break).
+///
+/// **Feature emission** — caller passes `Feature::ThreatEngaged`
+/// (Positive) to `record_if_witnessed`. Distinct from the
+/// existing `Feature::CombatResolved` — ThreatEngaged = "the step
+/// reached its duration", CombatResolved = "combat terminated with
+/// a winner".
 pub fn resolve_fight_threat(
     ticks: u64,
     skills: &mut Skills,
     needs: &mut Needs,
     health: &Health,
     d: &DispositionConstants,
-) -> StepResult {
-    // Bail out if health drops below threshold — morale break.
+) -> StepOutcome<bool> {
     if health.current / health.max < d.fight_bail_health_threshold {
-        return StepResult::Fail("morale_break".into());
+        return StepOutcome::unwitnessed(StepResult::Fail("morale_break".into()));
     }
 
     if ticks >= d.fight_duration {
         skills.combat += skills.growth_rate() * d.fight_combat_skill_growth;
         needs.safety = (needs.safety + d.fight_safety_gain).min(1.0);
-        StepResult::Advance
+        StepOutcome::witnessed(StepResult::Advance)
     } else {
-        StepResult::Continue
+        StepOutcome::unwitnessed(StepResult::Continue)
     }
 }
 
@@ -37,17 +68,18 @@ mod tests {
         let d = defaults();
         let mut skills = Skills::default();
         let mut needs = Needs::default();
-        // Health well below the 0.35 bail threshold.
         let health = Health {
             current: 0.2,
             max: 1.0,
             injuries: Vec::new(),
         };
-        let result = resolve_fight_threat(0, &mut skills, &mut needs, &health, &d);
+        let outcome = resolve_fight_threat(0, &mut skills, &mut needs, &health, &d);
         assert!(
-            matches!(result, StepResult::Fail(ref reason) if reason == "morale_break"),
-            "expected morale_break Fail, got {result:?}"
+            matches!(outcome.result, StepResult::Fail(ref reason) if reason == "morale_break"),
+            "expected morale_break Fail, got {:?}",
+            outcome.result
         );
+        assert!(!outcome.witness, "bail path must not set witness");
     }
 
     #[test]
@@ -55,12 +87,10 @@ mod tests {
         let d = defaults();
         let mut skills = Skills::default();
         let mut needs = Needs::default();
-        let health = Health::default(); // 1.0 / 1.0 = 1.0, well above 0.35
-        let result = resolve_fight_threat(0, &mut skills, &mut needs, &health, &d);
-        assert!(
-            matches!(result, StepResult::Continue),
-            "expected Continue, got {result:?}"
-        );
+        let health = Health::default();
+        let outcome = resolve_fight_threat(0, &mut skills, &mut needs, &health, &d);
+        assert!(matches!(outcome.result, StepResult::Continue));
+        assert!(!outcome.witness, "mid-fight Continue must not set witness");
     }
 
     #[test]
@@ -72,11 +102,9 @@ mod tests {
             ..Default::default()
         };
         let health = Health::default();
-        let result = resolve_fight_threat(d.fight_duration, &mut skills, &mut needs, &health, &d);
-        assert!(
-            matches!(result, StepResult::Advance),
-            "expected Advance, got {result:?}"
-        );
+        let outcome = resolve_fight_threat(d.fight_duration, &mut skills, &mut needs, &health, &d);
+        assert!(matches!(outcome.result, StepResult::Advance));
+        assert!(outcome.witness, "Advance must set witness for Feature emission");
         assert!(needs.safety > 0.5, "safety should have increased");
     }
 
@@ -85,16 +113,16 @@ mod tests {
         let d = defaults();
         let mut skills = Skills::default();
         let mut needs = Needs::default();
-        // At duration tick but critically injured — bail takes priority.
         let health = Health {
             current: 0.1,
             max: 1.0,
             injuries: Vec::new(),
         };
-        let result = resolve_fight_threat(d.fight_duration, &mut skills, &mut needs, &health, &d);
+        let outcome = resolve_fight_threat(d.fight_duration, &mut skills, &mut needs, &health, &d);
         assert!(
-            matches!(result, StepResult::Fail(ref reason) if reason == "morale_break"),
+            matches!(outcome.result, StepResult::Fail(ref reason) if reason == "morale_break"),
             "bail should fire even at fight_duration tick"
         );
+        assert!(!outcome.witness);
     }
 }

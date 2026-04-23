@@ -17,7 +17,13 @@ use crate::ai::dse::{
 };
 
 pub const KITTEN_URGENCY_INPUT: &str = "kitten_urgency";
-pub const COMPASSION_INPUT: &str = "compassion";
+/// Caretake-local compassion axis (Phase 4c.4 alloparenting Reframe A).
+/// `ctx_scalars` populates this as `personality.compassion ×
+/// caretake_compassion_bond_scale`, clamped [0, 1]. The baseline
+/// `"compassion"` axis stays shared with herbcraft_prepare — Caretake
+/// gets its own key so bond-weighting only amplifies care-for-hungry-
+/// kitten decisions, not unrelated compassion-gated actions.
+pub const COMPASSION_INPUT: &str = "caretake_compassion";
 pub const IS_PARENT_INPUT: &str = "is_parent_of_hungry_kitten";
 
 pub struct CaretakeDse {

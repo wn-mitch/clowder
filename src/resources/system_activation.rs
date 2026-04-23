@@ -76,6 +76,22 @@ pub enum Feature {
     GestationAdvanced,
     KittenMatured,
     MatingOccurred,
+    /// An adult completed a FeedKitten step, transferring food from
+    /// inventory to a dependent kitten. Positive-feature signal for
+    /// the Caretake system's activity (Phase 4c.3).
+    KittenFed,
+    /// A cat advanced a Garden's `CropState.growth` via a TendCrops
+    /// step. Positive-feature signal for the Farming system's
+    /// activity (Phase 4c.4 — previously absent, which kept the
+    /// Activation canary from catching the silent-dead farming
+    /// pipeline for months).
+    CropTended,
+    /// A cat harvested a Garden at full growth, spawning food (or
+    /// Thornbriar) into Stores. Paired with `CropTended` — splits the
+    /// two distinct "farming is alive" signals so a partial failure
+    /// (tending fires but harvest never does, or vice versa) is
+    /// visible in the activation footer.
+    CropHarvested,
     // --- Fox ecology ---
     FoxHuntedPrey,
     FoxStoreRaided,
@@ -113,6 +129,50 @@ pub enum Feature {
     /// `dispatch_urgent_directives` so the starvation-respects-posse guard
     /// is observable in `events.jsonl`.
     PosseCandidateExcludedStarving,
+
+    // --- §Phase 5a: silent-advance audit (see StepOutcome<W>) ---
+    // Each of these was a "dead subsystem" candidate — the step resolver
+    // could Advance without doing its real-world work, and no Feature
+    // fired, so the Activation canary went blind to silent failures.
+    //
+    /// A cat consumed a food item at a Stores building, restoring
+    /// hunger. Gated on actual food consumption (store non-empty AND
+    /// a food item was found), not just time-out at the Stores zone.
+    FoodEaten,
+    /// Two cats completed a socialize-target interaction (non-groom,
+    /// non-mentor): relationships mutated, social need boosted. Gated
+    /// on a real target partner — a socialize step with no target no
+    /// longer fires this.
+    Socialized,
+    /// An adult groomed another cat: relationship + restoration
+    /// effect applied. Distinct from `self_groom` (cleanliness need).
+    GroomedOther,
+    /// A mentor-apprentice interaction occurred: skill/knowledge
+    /// transfer + relationship shift.
+    MentoredCat,
+    /// A cat engaged wildlife in combat-posture: safety-need swing +
+    /// combat-skill growth. Paired with the existing
+    /// `CombatResolved` (emitted from `src/systems/combat.rs` when a
+    /// fight resolves) — ThreatEngaged is "the step ran and found a
+    /// target", CombatResolved is "combat terminated with a winner".
+    ThreatEngaged,
+    /// A cat successfully delivered materials to a ConstructionSite
+    /// (incrementing a delivered-count on the site). Before this
+    /// Feature existed, the `Deliver` step returned Advance whether
+    /// or not the site actually accepted — so stuck construction
+    /// sites had no activation signal.
+    MaterialsDelivered,
+    /// A cat completed a building-repair pass (condition ≥ 1.0).
+    /// Not a silent-advance fix per se (repair already returns Fail
+    /// on missing target), but previously unsignalled — repairs were
+    /// invisible to the Activation canary.
+    BuildingRepaired,
+    /// A mating attempt completed without producing a pregnancy
+    /// (Tom×Tom, or Queen who is already pregnant, etc). The social
+    /// / belonging-tier interaction still occurred. Paired with
+    /// `MatingOccurred` which fires only when a `Pregnancy` was
+    /// inserted.
+    CourtshipInteraction,
 }
 
 impl Feature {
@@ -160,6 +220,9 @@ impl Feature {
         Feature::GestationAdvanced,
         Feature::KittenMatured,
         Feature::MatingOccurred,
+        Feature::KittenFed,
+        Feature::CropTended,
+        Feature::CropHarvested,
         // Fox ecology
         Feature::FoxHuntedPrey,
         Feature::FoxStoreRaided,
@@ -192,6 +255,15 @@ impl Feature {
         Feature::CleanseCompleted,
         Feature::ShadowFoxBanished,
         Feature::PosseCandidateExcludedStarving,
+        // §Phase 5a silent-advance audit
+        Feature::FoodEaten,
+        Feature::Socialized,
+        Feature::GroomedOther,
+        Feature::MentoredCat,
+        Feature::ThreatEngaged,
+        Feature::MaterialsDelivered,
+        Feature::BuildingRepaired,
+        Feature::CourtshipInteraction,
     ];
 
     /// The valence of this feature.
@@ -226,6 +298,9 @@ impl Feature {
             Feature::GestationAdvanced => Positive,
             Feature::KittenMatured => Positive,
             Feature::MatingOccurred => Positive,
+            Feature::KittenFed => Positive,
+            Feature::CropTended => Positive,
+            Feature::CropHarvested => Positive,
             Feature::CarcassCleansed => Positive,
             Feature::CarcassHarvested => Positive,
             Feature::GatherHerbCompleted => Positive,
@@ -239,6 +314,15 @@ impl Feature {
             // Defensive wins against corruption / shadowfoxes.
             Feature::CorruptionPushback => Positive,
             Feature::ShadowFoxAvoidedWard => Positive,
+            // §Phase 5a silent-advance audit — healthy-subsystem activity
+            Feature::FoodEaten => Positive,
+            Feature::Socialized => Positive,
+            Feature::GroomedOther => Positive,
+            Feature::MentoredCat => Positive,
+            Feature::ThreatEngaged => Positive,
+            Feature::MaterialsDelivered => Positive,
+            Feature::BuildingRepaired => Positive,
+            Feature::CourtshipInteraction => Positive,
 
             // --- Negative: adverse events, colony loss signals ---
             Feature::DeathStarvation => Negative,
@@ -464,7 +548,10 @@ mod tests {
             }
         }
         assert_eq!(positive + negative + neutral, Feature::ALL.len());
-        assert_eq!(positive, 33);
+        // 36 pre-existing Positive + 8 added in §Phase 5a (FoodEaten,
+        // Socialized, GroomedOther, MentoredCat, ThreatEngaged,
+        // MaterialsDelivered, BuildingRepaired, CourtshipInteraction).
+        assert_eq!(positive, 44);
         assert_eq!(negative, 20);
         assert_eq!(neutral, 20);
     }
@@ -532,7 +619,7 @@ mod tests {
     fn features_total_in_matches_category_counts() {
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            33
+            44
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),

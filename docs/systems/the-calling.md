@@ -78,6 +78,11 @@ success_check(cat, herbs_gathered):
 object_name = random_adjective() + random_material_word(herbs) + random_form()
 ```
 
+## NamedLandmark substrate
+Named Wards / Named Remedies / Spirit Totems / Woven Talismans are one of six convergent consumers of the shared naming substrate documented in `naming.md` (registry + event-proximity matcher + event-keyed name templates). Consumers: `paths.md`, `crafting.md` Phase 3, `crafting.md` Phase 4, `ruin-clearings.md` Phase 3, `the-calling.md` (this file), `monuments.md`.
+
+The current compound-name generator (`random_adjective() + random_material_word(herbs) + random_form()`) works standalone but produces generic names ("Moonwhisper Thornheart") that don't reference the cat or the event that produced them. Under the shared substrate, a successful Calling becomes a `Significant`-tier event that the matcher consumes — producing "Brackenstar's Dreaming Ward" (cat-anchored) rather than "Moonwhisper Talisman" (generator-anchored). Cat-anchored naming strengthens the mythic-texture canary signal without changing the underlying success rules above. The legacy generator stays as the fallback branch of the matcher for Callings whose Significant-event proximity window contains no qualifying event.
+
 ## Relation to axis-capture
 
 The Calling is the canonical existing instance of the general

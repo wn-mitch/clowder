@@ -1,0 +1,27 @@
+# Files exempt from scripts/check_step_contracts.sh on a temporary
+# basis — resolvers that have not yet been migrated to the
+# StepOutcome<W> + 5-heading rustdoc preamble contract
+# (CLAUDE.md §"GOAP Step Resolver Contract").
+#
+# Remove an entry when the corresponding file has been migrated.
+# Phase A landed the three exemplars (cook, feed_kitten, tend); the
+# rest of these migrate in Phases B (high-severity fixes with new
+# StepOutcome<_> signatures + new Features), C (medium), and E
+# (witness-less uniformization to StepOutcome<()>).
+#
+# When this file is empty, the allowlist mechanism can be removed
+# from the lint script entirely.
+src/steps/building/construct.rs
+src/steps/building/gather.rs
+src/steps/building/move_to.rs
+src/steps/building/repair.rs
+src/steps/disposition/retrieve_any_food_from_stores.rs
+src/steps/disposition/retrieve_from_stores.rs
+src/steps/fox/mod.rs
+src/steps/magic/apply_remedy.rs
+src/steps/magic/cleanse_corruption.rs
+src/steps/magic/gather_herb.rs
+src/steps/magic/prepare_remedy.rs
+src/steps/magic/scry.rs
+src/steps/magic/set_ward.rs
+src/steps/magic/spirit_communion.rs

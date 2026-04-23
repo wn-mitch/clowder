@@ -172,15 +172,17 @@ pub fn resolve_task_chains(
             }
 
             StepKind::Deliver { material, amount } => {
-                apply(
-                    crate::steps::building::resolve_deliver(
-                        *material,
-                        *amount,
-                        step_target_entity,
-                        &mut buildings,
-                    ),
-                    &mut chain,
+                let outcome = crate::steps::building::resolve_deliver(
+                    *material,
+                    *amount,
+                    step_target_entity,
+                    &mut buildings,
                 );
+                outcome.record_if_witnessed(
+                    activation.as_deref_mut(),
+                    Feature::MaterialsDelivered,
+                );
+                apply(outcome.result, &mut chain);
             }
 
             StepKind::Construct => {
@@ -223,33 +225,37 @@ pub fn resolve_task_chains(
 
             StepKind::Tend => {
                 let cached = &mut step.cached_path;
-                apply(
-                    crate::steps::building::resolve_tend(
-                        step_target_entity,
-                        &mut pos,
-                        cached,
-                        &mut skills,
-                        season_mod,
-                        workshop_bonus,
-                        &mut buildings,
-                        &map,
-                    ),
-                    &mut chain,
+                let outcome = crate::steps::building::resolve_tend(
+                    step_target_entity,
+                    &mut pos,
+                    cached,
+                    &mut skills,
+                    season_mod,
+                    workshop_bonus,
+                    &mut buildings,
+                    &map,
                 );
+                // Disposition-chain path is currently unscheduled (GOAP
+                // replaced it); if it's ever reinstated, wire the
+                // `outcome.witness` (bool tended) through to
+                // `SystemActivation` via `record_if_witnessed` here.
+                apply(outcome.result, &mut chain);
             }
 
             StepKind::Harvest => {
-                apply(
-                    crate::steps::building::resolve_harvest(
-                        step_target_entity,
-                        &pos,
-                        &stores_list,
-                        &mut buildings,
-                        &mut stored_items,
-                        &mut commands,
-                    ),
-                    &mut chain,
+                let outcome = crate::steps::building::resolve_harvest(
+                    step_target_entity,
+                    &pos,
+                    &stores_list,
+                    &mut buildings,
+                    &mut stored_items,
+                    &mut commands,
                 );
+                outcome.record_if_witnessed(
+                    activation.as_deref_mut(),
+                    Feature::CropHarvested,
+                );
+                apply(outcome.result, &mut chain);
             }
 
             // Magic/herbcraft and disposition steps are resolved by their own systems.

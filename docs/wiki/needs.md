@@ -24,7 +24,7 @@ Each satisfaction uses `smoothstep` (Hermite curve) for gradual transitions.
 |------|---------|
 | `hunger` | 1.0 |
 | `energy` | 0.8 |
-| `warmth` | 0.9 |
+| `temperature` | 0.9 |
 
 ## Level 2: Safety
 

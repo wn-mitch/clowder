@@ -145,6 +145,11 @@ pub enum StepKind {
     RetrieveFromStores {
         kind: crate::components::items::ItemKind,
     },
+    /// Retrieve any raw (uncooked) food item from a Stores building.
+    /// Used by the Caretake chain to fetch food to carry to a hungry
+    /// kitten without committing to a specific food variant (rabbit
+    /// vs. mouse vs. berries — any food will do). ~5 ticks.
+    RetrieveAnyFoodFromStores,
 }
 
 impl StepKind {
@@ -170,6 +175,7 @@ impl StepKind {
                 | StepKind::MateWith
                 | StepKind::FeedKitten
                 | StepKind::RetrieveFromStores { .. }
+                | StepKind::RetrieveAnyFoodFromStores
                 // Magic system (resolve_magic_task_chains)
                 | StepKind::GatherHerb
                 | StepKind::PrepareRemedy { .. }

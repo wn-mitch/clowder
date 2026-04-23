@@ -278,13 +278,28 @@ pub struct EvalDispositionSideEffects<'w, 's> {
     pub time: Res<'w, crate::resources::time::TimeState>,
 }
 
-/// Read-only queries over stored-item state. Bundled into a SystemParam so
-/// the cat scoring systems (evaluate_dispositions, evaluate_and_plan) can
-/// derive cooking eligibility without blowing Bevy's 16-param limit.
+/// Read-only queries over stored-item state + kitten state. Bundled
+/// into a SystemParam so the cat scoring systems
+/// (evaluate_dispositions, evaluate_and_plan) can derive cooking
+/// eligibility and Caretake urgency without blowing Bevy's 16-param
+/// limit. The `kittens` query is bundled here (rather than in its
+/// own SystemParam) purely as a 16-param workaround — the cooking
+/// vs. kitten axes are thematically unrelated.
 #[derive(bevy_ecs::system::SystemParam)]
 pub struct CookingQueries<'w, 's> {
     pub stored_items: Query<'w, 's, &'static StoredItems>,
     pub items: Query<'w, 's, &'static Item>,
+    pub kittens: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static Position,
+            &'static Needs,
+            &'static crate::components::KittenDependency,
+        ),
+        Without<Dead>,
+    >,
 }
 
 impl CookingQueries<'_, '_> {
@@ -375,6 +390,19 @@ pub fn evaluate_dispositions(
 
     let wildlife_positions: Vec<(Entity, Position)> =
         wildlife.iter().map(|(e, p)| (e, *p)).collect();
+
+    // §Phase 4c.3: snapshot kittens for Caretake urgency wiring.
+    let kitten_snapshot: Vec<crate::ai::caretake_targeting::KittenState> = cooking
+        .kittens
+        .iter()
+        .map(|(e, p, needs, dep)| crate::ai::caretake_targeting::KittenState {
+            entity: e,
+            pos: *p,
+            hunger: needs.hunger,
+            mother: dep.mother,
+            father: dep.father,
+        })
+        .collect();
 
     let has_construction_site = building_query
         .iter()
@@ -502,6 +530,24 @@ pub fn evaluate_dispositions(
         let can_forage = has_nearby_tile(pos, &map, d.forage_terrain_search_radius, |t| {
             t.foraging_yield() > 0.0
         });
+
+        // §Phase 4c.3: Caretake urgency signal. Scan kittens in range
+        // for hunger deficits so `hungry_kitten_urgency` + `is_parent_of_hungry_kitten`
+        // reflect reality instead of the stale hardcoded 0.0 / false.
+        let caretake_resolution = crate::ai::caretake_targeting::resolve_caretake(
+            entity,
+            *pos,
+            &kitten_snapshot,
+        );
+        // §Phase 4c.4 alloparenting Reframe A: bond-weighted compassion.
+        // Non-parent adults with a positive bond to the kitten's mother
+        // get amplified compassion so colony raising actually fires.
+        let caretake_bond_scale = crate::ai::caretake_targeting::caretake_compassion_bond_scale(
+            entity,
+            &caretake_resolution,
+            sc.caretake_bond_compassion_boost_max,
+            |a, b| relationships.get(a, b).map(|r| r.fondness),
+        );
 
         // §6.5.1 target-taking DSE: the `has_social_target` bool gate
         // now reads through the same picker that disposition_to_chain's
@@ -637,8 +683,9 @@ pub fn evaluate_dispositions(
             active_disposition: None,
             tradition_location_bonus: 0.0,
             has_eligible_mate,
-            hungry_kitten_urgency: 0.0,
-            is_parent_of_hungry_kitten: false,
+            hungry_kitten_urgency: caretake_resolution.urgency,
+            is_parent_of_hungry_kitten: caretake_resolution.is_parent,
+            caretake_compassion_bond_scale: caretake_bond_scale,
             unexplored_nearby: colony.exploration_map.unexplored_fraction_nearby(
                 pos.x,
                 pos.y,
@@ -913,6 +960,15 @@ pub fn disposition_to_chain(
     active_directive_query: Query<&ActiveDirective>,
     skills_query: Query<&Skills, Without<Dead>>,
     injured_cat_query: Query<(Entity, &Health, &Position), Without<Dead>>,
+    kitten_query: Query<
+        (
+            Entity,
+            &Position,
+            &Needs,
+            &crate::components::KittenDependency,
+        ),
+        Without<Dead>,
+    >,
     res: ChainResources,
     constants: Res<SimConstants>,
     mut rng: ResMut<SimRng>,
@@ -922,6 +978,20 @@ pub fn disposition_to_chain(
     // Pre-collect cat position pairs for social target selection.
     let cat_pos_list: Vec<(Entity, Position)> =
         cat_positions.iter().map(|(e, p)| (e, *p)).collect();
+
+    // §Phase 4c.3: kitten snapshot for Caretake chain-building — the
+    // winning kitten's Entity + Position thread into `build_caretaking_chain`
+    // so the adult navigates TO the kitten after retrieving food.
+    let kitten_snapshot: Vec<crate::ai::caretake_targeting::KittenState> = kitten_query
+        .iter()
+        .map(|(e, p, needs, dep)| crate::ai::caretake_targeting::KittenState {
+            entity: e,
+            pos: *p,
+            hunger: needs.hunger,
+            mother: dep.mother,
+            father: dep.father,
+        })
+        .collect();
 
     // Anti-stacking: tiles that already have a cat on them.
     let occupied_tiles: std::collections::HashSet<Position> =
@@ -972,6 +1042,14 @@ pub fn disposition_to_chain(
             .filter(|(_, s, _, site, _)| s.kind == StructureType::Stores && site.is_none())
             .min_by_key(|(_, _, bp, _, _)| pos.manhattan_distance(bp))
             .map(|(e, _, bp, _, _)| (e, *bp));
+
+        // §Phase 4c.3: Caretake resolution — the winning kitten flows
+        // into `build_caretaking_chain`'s navigate-TO-kitten step.
+        let caretake_resolution = crate::ai::caretake_targeting::resolve_caretake(
+            entity,
+            *pos,
+            &kitten_snapshot,
+        );
 
         // §6.5.1 + §6.5.2: resolve target-taking DSE winners once per
         // tick. Recomputed here (not threaded from
@@ -1064,9 +1142,11 @@ pub fn disposition_to_chain(
             ),
             DispositionKind::Exploring => build_exploring_chain(pos, &res.map, d, &mut rng.rng),
             DispositionKind::Mating => build_mating_chain(mate_target, &cat_pos_list),
-            DispositionKind::Caretaking => {
-                build_caretaking_chain(entity, pos, personality, nearest_store, d)
-            }
+            DispositionKind::Caretaking => build_caretaking_chain(
+                caretake_resolution.target,
+                caretake_resolution.target_pos,
+                nearest_store,
+            ),
         };
 
         if let Some((mut chain, action)) = chain {
@@ -1936,20 +2016,28 @@ fn build_mating_chain(
 // build_caretaking_chain
 // ===========================================================================
 
+/// Build a Caretake chain that retrieves food from the nearest
+/// Stores and delivers it to the caretake-target kitten. Phase 4c.3
+/// rewrite — the previous chain sent the adult to Stores with
+/// `FeedKitten { target_entity = stores }`, which coupled with the
+/// broken `resolve_feed_kitten` (credited the *adult's* social, not
+/// the kitten's hunger) meant no kitten was ever fed. This 4-step
+/// version models physical causality per CLAUDE.md: retrieve food,
+/// carry it, deliver it to the kitten entity.
 fn build_caretaking_chain(
-    _entity: Entity,
-    _pos: &Position,
-    _personality: &Personality,
+    target_kitten: Option<Entity>,
+    target_kitten_pos: Option<Position>,
     nearest_store: Option<(Entity, Position)>,
-    _d: &DispositionConstants,
 ) -> Option<(TaskChain, Action)> {
-    // For now, build a simple chain: go to stores, pick up food, find kitten.
-    // The actual kitten targeting is resolved at step execution time.
+    let kitten = target_kitten?;
+    let kitten_pos = target_kitten_pos?;
     let (store_entity, store_pos) = nearest_store?;
     let chain = TaskChain::new(
         vec![
             TaskStep::new(StepKind::MoveTo).with_position(store_pos),
-            TaskStep::new(StepKind::FeedKitten).with_entity(store_entity),
+            TaskStep::new(StepKind::RetrieveAnyFoodFromStores).with_entity(store_entity),
+            TaskStep::new(StepKind::MoveTo).with_position(kitten_pos),
+            TaskStep::new(StepKind::FeedKitten).with_entity(kitten),
         ],
         FailurePolicy::AbortChain,
     );
@@ -2058,6 +2146,10 @@ pub fn resolve_disposition_chains(
         mentor_skills: Skills,
     }
     let mut mentor_effects: Vec<MentorEffect> = Vec::new();
+    // Deferred kitten-feedings — collected during the main loop and
+    // applied in a second pass to avoid a double-&mut on `Needs` (the
+    // cats query already owns &mut Needs over all non-dead cats).
+    let mut kitten_feedings: Vec<Entity> = Vec::new();
     let mut chains_to_remove: Vec<Entity> = Vec::new();
 
     // Collect grooming snapshots for target lookups during social interactions.
@@ -2871,66 +2963,41 @@ pub fn resolve_disposition_chains(
 
             StepKind::EatAtStores => {
                 let target = step.target_entity;
-                apply_step_result(
-                    crate::steps::disposition::resolve_eat_at_stores(
-                        ticks,
-                        target,
-                        &mut needs,
-                        &mut stores_query,
-                        &items_query,
-                        &mut commands,
-                        d,
-                    ),
-                    &mut chain,
-                    &mut current,
+                let outcome = crate::steps::disposition::resolve_eat_at_stores(
+                    ticks,
+                    target,
+                    &mut needs,
+                    &mut stores_query,
+                    &items_query,
+                    &mut commands,
+                    d,
                 );
+                outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    Feature::FoodEaten,
+                );
+                apply_step_result(outcome.result, &mut chain, &mut current);
             }
 
             StepKind::Sleep { ticks: duration } => {
-                apply_step_result(
-                    crate::steps::disposition::resolve_sleep(ticks, *duration, &mut needs, d),
-                    &mut chain,
-                    &mut current,
-                );
+                let outcome =
+                    crate::steps::disposition::resolve_sleep(ticks, *duration, &mut needs, d);
+                apply_step_result(outcome.result, &mut chain, &mut current);
             }
 
             StepKind::SelfGroom => {
-                apply_step_result(
-                    crate::steps::disposition::resolve_self_groom(
-                        ticks,
-                        &mut needs,
-                        grooming.as_deref_mut(),
-                        d,
-                    ),
-                    &mut chain,
-                    &mut current,
+                let outcome = crate::steps::disposition::resolve_self_groom(
+                    ticks,
+                    &mut needs,
+                    grooming.as_deref_mut(),
+                    d,
                 );
+                apply_step_result(outcome.result, &mut chain, &mut current);
             }
 
             StepKind::Socialize => {
                 let target = step.target_entity;
-                apply_step_result(
-                    crate::steps::disposition::resolve_socialize(
-                        ticks,
-                        cat_entity,
-                        target,
-                        &mut needs,
-                        &mut hunting_priors,
-                        &mut relationships,
-                        &mut colony_map,
-                        &grooming_snapshot,
-                        time.tick,
-                        &constants.social,
-                        d,
-                    ),
-                    &mut chain,
-                    &mut current,
-                );
-            }
-
-            StepKind::GroomOther => {
-                let target = step.target_entity;
-                let (result, restoration) = crate::steps::disposition::resolve_groom_other(
+                let outcome = crate::steps::disposition::resolve_socialize(
                     ticks,
                     cat_entity,
                     target,
@@ -2943,15 +3010,41 @@ pub fn resolve_disposition_chains(
                     &constants.social,
                     d,
                 );
-                if let Some(r) = restoration {
+                outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    Feature::Socialized,
+                );
+                apply_step_result(outcome.result, &mut chain, &mut current);
+            }
+
+            StepKind::GroomOther => {
+                let target = step.target_entity;
+                let outcome = crate::steps::disposition::resolve_groom_other(
+                    ticks,
+                    cat_entity,
+                    target,
+                    &mut needs,
+                    &mut hunting_priors,
+                    &mut relationships,
+                    &mut colony_map,
+                    &grooming_snapshot,
+                    time.tick,
+                    &constants.social,
+                    d,
+                );
+                outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    Feature::GroomedOther,
+                );
+                if let Some(r) = outcome.witness {
                     grooming_restorations.push(r);
                 }
-                apply_step_result(result, &mut chain, &mut current);
+                apply_step_result(outcome.result, &mut chain, &mut current);
             }
 
             StepKind::MentorCat => {
                 let target = step.target_entity;
-                let (result, effect) = crate::steps::disposition::resolve_mentor_cat(
+                let outcome = crate::steps::disposition::resolve_mentor_cat(
                     ticks,
                     cat_entity,
                     target,
@@ -2961,7 +3054,12 @@ pub fn resolve_disposition_chains(
                     time.tick,
                     d,
                 );
-                if let Some((apprentice, mentor_skills)) = effect {
+                outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    Feature::MentoredCat,
+                );
+                let crate::steps::StepOutcome { result, witness } = outcome;
+                if let Some((apprentice, mentor_skills)) = witness {
                     mentor_effects.push(MentorEffect {
                         apprentice,
                         mentor_skills,
@@ -2973,19 +3071,16 @@ pub fn resolve_disposition_chains(
             StepKind::PatrolTo => {
                 let target = step.target_position;
                 let cached = &mut step.cached_path;
-                apply_step_result(
-                    crate::steps::disposition::resolve_patrol_to(
-                        &mut pos,
-                        target,
-                        cached,
-                        &mut needs,
-                        &map,
-                        d,
-                        &cat_tile_counts,
-                    ),
-                    &mut chain,
-                    &mut current,
+                let outcome = crate::steps::disposition::resolve_patrol_to(
+                    &mut pos,
+                    target,
+                    cached,
+                    &mut needs,
+                    &map,
+                    d,
+                    &cat_tile_counts,
                 );
+                apply_step_result(outcome.result, &mut chain, &mut current);
             }
 
             StepKind::FightThreat => {
@@ -2994,31 +3089,29 @@ pub fn resolve_disposition_chains(
                     .get(cat_entity)
                     .cloned()
                     .unwrap_or_default();
-                apply_step_result(
-                    crate::steps::disposition::resolve_fight_threat(
-                        ticks,
-                        &mut skills,
-                        &mut needs,
-                        &health,
-                        d,
-                    ),
-                    &mut chain,
-                    &mut current,
+                let outcome = crate::steps::disposition::resolve_fight_threat(
+                    ticks,
+                    &mut skills,
+                    &mut needs,
+                    &health,
+                    d,
                 );
+                outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    Feature::ThreatEngaged,
+                );
+                apply_step_result(outcome.result, &mut chain, &mut current);
             }
 
             StepKind::Survey => {
-                apply_step_result(
-                    crate::steps::disposition::resolve_survey(
-                        ticks,
-                        &mut needs,
-                        &pos,
-                        &mut prey_params.exploration_map,
-                        d,
-                    ),
-                    &mut chain,
-                    &mut current,
+                let outcome = crate::steps::disposition::resolve_survey(
+                    ticks,
+                    &mut needs,
+                    &pos,
+                    &mut prey_params.exploration_map,
+                    d,
                 );
+                apply_step_result(outcome.result, &mut chain, &mut current);
             }
 
             StepKind::DeliverDirective {
@@ -3026,9 +3119,9 @@ pub fn resolve_disposition_chains(
                 priority,
                 directive_target,
             } => {
-                let result =
+                let outcome =
                     crate::steps::disposition::resolve_deliver_directive(ticks, &mut needs, d);
-                if matches!(result, crate::steps::StepResult::Advance) {
+                if matches!(outcome.result, crate::steps::StepResult::Advance) {
                     // Insert ActiveDirective on the target cat.
                     if let Some(target) = step.target_entity {
                         commands.entity(target).insert(ActiveDirective {
@@ -3040,18 +3133,21 @@ pub fn resolve_disposition_chains(
                             target_position: *directive_target,
                             target_entity: None,
                         });
-                        if let Some(ref mut act) = narr.activation {
-                            act.record(Feature::DirectiveDelivered);
-                        }
+                        // Gate on both witness (time-based success)
+                        // AND a real directive target existing.
+                        outcome.record_if_witnessed(
+                            narr.activation.as_deref_mut(),
+                            Feature::DirectiveDelivered,
+                        );
                     }
                 }
-                apply_step_result(result, &mut chain, &mut current);
+                apply_step_result(outcome.result, &mut chain, &mut current);
             }
 
             StepKind::MateWith => {
                 let target = step.target_entity;
                 let target_gender = target.and_then(|t| gender_snapshot.get(&t).copied());
-                let (result, pregnancy) = crate::steps::disposition::resolve_mate_with(
+                let outcome = crate::steps::disposition::resolve_mate_with(
                     ticks,
                     cat_entity,
                     *gender,
@@ -3060,7 +3156,21 @@ pub fn resolve_disposition_chains(
                     &mut needs,
                     &mut relationships,
                 );
-                if let Some((gestator, litter_size)) = pregnancy {
+                outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    Feature::MatingOccurred,
+                );
+                // §Phase 5a: CourtshipInteraction for Tom×Tom or any
+                // target-present, no-pregnancy Advance.
+                if matches!(outcome.result, crate::steps::StepResult::Advance)
+                    && outcome.witness.is_none()
+                    && target.is_some()
+                {
+                    if let Some(ref mut act) = narr.activation {
+                        act.record(Feature::CourtshipInteraction);
+                    }
+                }
+                if let Some((gestator, litter_size)) = outcome.witness {
                     // §7.M.7.4: Pregnant lands on the gestation-capable
                     // partner, not the initiator. `partner` on the
                     // `Pregnant` struct is the other mate — so if the
@@ -3078,27 +3188,26 @@ pub fn resolve_disposition_chains(
                             litter_size,
                         ),
                     );
-                    if let Some(ref mut act) = narr.activation {
-                        act.record(Feature::MatingOccurred);
-                    }
                 }
-                apply_step_result(result, &mut chain, &mut current);
+                apply_step_result(outcome.result, &mut chain, &mut current);
             }
 
             StepKind::FeedKitten => {
                 let target = step.target_entity;
-                apply_step_result(
-                    crate::steps::disposition::resolve_feed_kitten(
-                        ticks,
-                        target,
-                        &mut needs,
-                        &mut stores_query,
-                        &items_query,
-                        &mut commands,
-                    ),
-                    &mut chain,
-                    &mut current,
+                let outcome = crate::steps::disposition::resolve_feed_kitten(
+                    ticks,
+                    target,
+                    &mut needs,
+                    &mut inventory,
                 );
+                outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    Feature::KittenFed,
+                );
+                if let Some(kitten_entity) = outcome.witness {
+                    kitten_feedings.push(kitten_entity);
+                }
+                apply_step_result(outcome.result, &mut chain, &mut current);
             }
 
             StepKind::RetrieveFromStores { kind } => {
@@ -3113,6 +3222,33 @@ pub fn resolve_disposition_chains(
                     &items_query,
                     &mut commands,
                 );
+                if retrieved {
+                    if let Some(ref mut act) = narr.activation {
+                        act.record(Feature::ItemRetrieved);
+                    }
+                }
+                apply_step_result(result, &mut chain, &mut current);
+            }
+
+            StepKind::RetrieveAnyFoodFromStores => {
+                let target = step.target_entity;
+                // §Phase 4c.4: swapped from the raw-only helper to the
+                // any-food helper to match the step's name. The previous
+                // call accepted only uncooked items, contradicting the
+                // `RetrieveAnyFoodFromStores` semantic promised to
+                // `build_caretaking_chain`. Since this disposition-chain
+                // path is currently unscheduled (GOAP replaced it),
+                // the bug never surfaced, but the rename keeps the two
+                // systems aligned if the chain path is ever re-enabled.
+                let (result, retrieved) =
+                    crate::steps::disposition::resolve_retrieve_any_food_from_stores(
+                        ticks,
+                        target,
+                        &mut inventory,
+                        &mut stores_query,
+                        &items_query,
+                        &mut commands,
+                    );
                 if retrieved {
                     if let Some(ref mut act) = narr.activation {
                         act.record(Feature::ItemRetrieved);
@@ -3164,6 +3300,15 @@ pub fn resolve_disposition_chains(
 
     for entity in chains_to_remove {
         commands.entity(entity).remove::<TaskChain>();
+    }
+
+    // Apply deferred kitten-feedings from FeedKitten steps (§Phase 4c.3).
+    for kitten_entity in kitten_feedings {
+        if let Ok((_, _, _, _, _, mut k_needs, _, _, _, _, _, _, _, _, _)) =
+            cats.get_mut(kitten_entity)
+        {
+            k_needs.hunger = (k_needs.hunger + 0.5).min(1.0);
+        }
     }
 
     // Apply deferred grooming restorations from GroomOther steps.

@@ -3,12 +3,36 @@ use bevy_ecs::prelude::*;
 use crate::components::building::StoredItems;
 use crate::components::items::Item;
 use crate::components::magic::Inventory;
-use crate::steps::StepResult;
+use crate::steps::{StepOutcome, StepResult};
 
-/// Retrieve any raw (uncooked) food item from the target Stores building into
-/// the cat's inventory. Returns `(result, retrieved)` where `retrieved` is
-/// `true` if an item transferred. Runs on the same ~5-tick budget as
-/// `resolve_retrieve_from_stores`.
+/// # GOAP step resolver: `RetrieveRawFood`
+///
+/// **Real-world effect** — transfers one raw (uncooked) food item
+/// from the target Stores building into the cat's `Inventory`.
+/// Paired with a subsequent `Cook` step that flips the cooked
+/// flag on the retrieved item.
+///
+/// **Plan-level preconditions** — emitted under `ZoneIs(Stores)`
+/// with a follow-on `SetCarrying(Carrying::RawFood)` effect in
+/// `src/ai/planner/actions.rs::cooking_actions`. `ZoneIs` alone
+/// does not guarantee raw food is actually present — the planner's
+/// `Carrying` state is a coarse abstraction.
+///
+/// **Runtime preconditions** — waits `ticks >= 5`. Requires
+/// `target_entity` to resolve to a `StoredItems`, and for at least
+/// one stored item to satisfy `kind.is_food() && !modifiers.cooked`.
+/// Any miss returns `unwitnessed(Advance)`: the chain moves on
+/// rather than stalling.
+///
+/// **Witness** — `StepOutcome<bool>`. `true` iff an item was
+/// actually transferred from Stores to inventory this call.
+///
+/// **Feature emission** — caller passes `Feature::ItemRetrieved`
+/// (Positive) to `record_if_witnessed`. Before §Phase 5a the
+/// caller at `goap.rs:2657` discarded the retrieval bool
+/// (`let (result, _retrieved) = …`) — Cook plans that began with a
+/// missing-Stores retrieval fired no Feature and left the
+/// retrieval pipeline invisible to the Activation canary.
 pub fn resolve_retrieve_raw_food_from_stores(
     ticks: u64,
     target_entity: Option<Entity>,
@@ -16,15 +40,15 @@ pub fn resolve_retrieve_raw_food_from_stores(
     stores_query: &mut Query<&mut StoredItems>,
     items_query: &Query<&Item>,
     commands: &mut Commands,
-) -> (StepResult, bool) {
+) -> StepOutcome<bool> {
     if ticks < 5 {
-        return (StepResult::Continue, false);
+        return StepOutcome::unwitnessed(StepResult::Continue);
     }
     let Some(store_entity) = target_entity else {
-        return (StepResult::Advance, false);
+        return StepOutcome::unwitnessed(StepResult::Advance);
     };
     let Ok(mut stored) = stores_query.get_mut(store_entity) else {
-        return (StepResult::Advance, false);
+        return StepOutcome::unwitnessed(StepResult::Advance);
     };
     let target_item = stored.items.iter().copied().find(|&e| {
         items_query
@@ -38,8 +62,8 @@ pub fn resolve_retrieve_raw_food_from_stores(
             stored.remove(item_entity);
             inventory.add_item_with_modifiers(kind, modifiers);
             commands.entity(item_entity).despawn();
-            return (StepResult::Advance, true);
+            return StepOutcome::witnessed(StepResult::Advance);
         }
     }
-    (StepResult::Advance, false)
+    StepOutcome::unwitnessed(StepResult::Advance)
 }

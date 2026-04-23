@@ -19,6 +19,41 @@ pub struct DepositResult {
     pub no_store: bool,
 }
 
+/// # GOAP step resolver: `DepositAtStores`
+///
+/// **Real-world effect** — transfers food items from the actor's
+/// `Inventory` into the target `StoredItems`. When no Stores
+/// exists, drops food on the ground at the actor's position (a
+/// fallback so cats aren't forced to carry indefinitely). Tracks
+/// three side-signals via `DepositResult`: a storage-upgrade item
+/// landed, some items were rejected for capacity, or no-store
+/// fallback fired.
+///
+/// **Plan-level preconditions** — emitted under
+/// `ZoneIs(Stores)` by
+/// `src/ai/planner/actions.rs::depositing_actions`.
+///
+/// **Runtime preconditions** — `target_entity` may be `None` (the
+/// no-store path handles this explicitly). If the store exists
+/// but has no capacity, items are rejected individually
+/// (`rejected` flag set).
+///
+/// **Witness** — this resolver predates the `StepOutcome<W>`
+/// convention; it returns a `DepositResult` struct with a
+/// `StepResult` field plus three boolean side-signals the caller
+/// routes to different Features (`StorageUpgraded`,
+/// `DepositRejected`, `DepositFailedNoStore`). Unlike the single-
+/// witness shape, deposit's three outcomes are simultaneous — a
+/// single call can upgrade capacity, reject overflow, AND handle
+/// no-store, so the design keeps the struct rather than
+/// collapsing to a single witness.
+///
+/// **Feature emission** — caller at `src/systems/goap.rs::Deposit`
+/// arm (and `src/systems/disposition.rs`) records
+/// `Feature::StorageUpgraded` on `storage_upgraded`,
+/// `Feature::DepositRejected` on `rejected`, and
+/// `Feature::DepositFailedNoStore` on `no_store` — each gated on
+/// the corresponding flag rather than on `StepResult::Advance`.
 #[allow(clippy::too_many_arguments)]
 pub fn resolve_deposit_at_stores(
     target_entity: Option<Entity>,

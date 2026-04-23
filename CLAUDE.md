@@ -66,6 +66,53 @@ new thread.
 - **Bevy 16-param limit**: systems with many parameters hit Bevy's tuple impl limit. Use `#[derive(SystemParam)]` bundles to group related params. Example: bundle all prey-related queries + message writers into a `PreySystemParams` struct. This is preferred over `Option<Res<T>>` hacks or removing needed params.
 - **Query disjointness**: when splitting `Query<&mut Component>` into separate data/marker patterns, add `With<Marker>` to restore disjointness for paired `Without<Marker>` filters in other queries.
 
+## GOAP Step Resolver Contract
+
+Every `pub fn resolve_*` under `src/steps/**` returns `StepOutcome<W>` (defined in `src/steps/outcome.rs`). This makes "silent-advance with no real-world effect" a type error — the bug pattern behind Phase 4c.3 (feed-kitten) and Phase 4c.4 (tend-crops), where a step's effect didn't happen but `StepResult::Advance` plus an unconditional `Feature::*` emission made the failure invisible to the Activation canary.
+
+**Witness shapes:**
+
+- `StepOutcome<()>` — unconditional effect once the precondition holds (e.g. `resolve_move_to`, `resolve_sleep`). `()` does **not** implement `Witnessed`, so `record_if_witnessed` is not callable — witness-less outcomes cannot emit positive Features. Build with `StepOutcome::bare(result)` or `StepOutcome::unwitnessed(result)`.
+- `StepOutcome<bool>` — effect may or may not occur this call (e.g. `resolve_tend` while walking; `resolve_cook` with no raw food). Build with `StepOutcome::witnessed(result)` or `StepOutcome::unwitnessed(result)`.
+- `StepOutcome<Option<T>>` — as above, but the witness carries a payload the caller consumes (kitten entity, `Pregnancy`, grooming restoration). Build with `StepOutcome::witnessed_with(result, payload)` or `StepOutcome::unwitnessed(result)`.
+
+**Caller contract:**
+
+```rust
+let outcome = resolve_foo(...);
+outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::Foo);
+// Consume witness (for Option<T> payload) and return result:
+if let Some(payload) = outcome.witness { ... }
+outcome.result
+```
+
+Never emit `Feature::*` directly on `StepResult::Advance` — always route through `record_if_witnessed`.
+
+**Required rustdoc preamble on every `pub fn resolve_*`:**
+
+```text
+/// # GOAP step resolver: `<StepKind>`
+///
+/// **Real-world effect** — what this mutates when it succeeds.
+///
+/// **Plan-level preconditions** — the `StatePredicate`s in
+/// `src/ai/planner/actions.rs` the planner guarantees before this
+/// step runs. Note real guarantees vs. coarse abstractions.
+///
+/// **Runtime preconditions** — what this function checks internally
+/// and what happens if the check fails. MUST NOT return a witnessed
+/// `Advance` when the effect didn't happen.
+///
+/// **Witness** — the `StepOutcome<W>` shape and what `W` records.
+///
+/// **Feature emission** — which `Feature::*` the caller passes to
+/// `record_if_witnessed` (Positive/Neutral/Negative).
+```
+
+Exemplars: `src/steps/disposition/cook.rs`, `src/steps/disposition/feed_kitten.rs`, `src/steps/building/tend.rs`.
+
+Enforcement: `just check` runs `scripts/check_step_contracts.sh` which greps every resolver for the five required headings.
+
 ## Systems inventory
 
 Design docs for each tunable system live in `docs/systems/`. Major modules and what they do:

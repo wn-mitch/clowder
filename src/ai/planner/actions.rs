@@ -414,12 +414,45 @@ pub fn mating_actions() -> Vec<GoapActionDef> {
 }
 
 pub fn caretaking_actions() -> Vec<GoapActionDef> {
-    vec![GoapActionDef {
-        kind: GoapActionKind::FeedKitten,
-        cost: 2,
-        preconditions: vec![StatePredicate::ZoneIs(PlannerZone::Stores)],
-        effects: vec![StateEffect::IncrementTrips],
-    }]
+    // Phase 4c.4: two-step retrieve→feed chain. Before this fix the
+    // planner emitted `[TravelTo(Stores), FeedKitten]` which silently
+    // no-op'd because `resolve_feed_kitten` calls `inventory.take_food()`
+    // with an empty inventory and advances anyway — kittens never got
+    // fed. Carrying::RawFood is used as the abstract "I have food"
+    // state even though the retrieve accepts cooked food too (the
+    // planner doesn't need to distinguish; only the real ECS inventory
+    // matters at execution time).
+    //
+    // RetrieveFoodForKitten intentionally has no `CarryingIs(Nothing)`
+    // precondition — a cat arriving at Stores with herbs, foraged food,
+    // or other inventory contents still produces a valid plan (the
+    // planner's `Carrying` state is a coarse abstraction over a
+    // richer real inventory; `inventory.add_item_with_modifiers` just
+    // appends another slot at runtime, and `take_food` picks any
+    // food-typed item). A first pass *did* include that precondition,
+    // which caused 0 Caretake plans in post-fix soaks: whenever a cat's
+    // real inventory was non-empty the planner couldn't satisfy
+    // `CarryingIs(Nothing)` and bailed out entirely.
+    vec![
+        GoapActionDef {
+            kind: GoapActionKind::RetrieveFoodForKitten,
+            cost: 2,
+            preconditions: vec![StatePredicate::ZoneIs(PlannerZone::Stores)],
+            effects: vec![StateEffect::SetCarrying(Carrying::RawFood)],
+        },
+        GoapActionDef {
+            kind: GoapActionKind::FeedKitten,
+            cost: 2,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::Stores),
+                StatePredicate::CarryingIs(Carrying::RawFood),
+            ],
+            effects: vec![
+                StateEffect::SetCarrying(Carrying::Nothing),
+                StateEffect::IncrementTrips,
+            ],
+        },
+    ]
 }
 
 // ---------------------------------------------------------------------------
@@ -692,6 +725,59 @@ mod tests {
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
         assert!(kinds.contains(&GoapActionKind::GatherHerb));
         assert!(kinds.contains(&GoapActionKind::SetWard));
+    }
+
+    #[test]
+    fn caretaking_plan_works_when_adult_carries_herbs() {
+        // Regression test: a first pass gated RetrieveFoodForKitten on
+        // `CarryingIs(Nothing)` which meant any cat holding herbs /
+        // foraged food / prey couldn't find a plan. Post-fix soaks
+        // produced 0 Caretake plans because of this. The planner's
+        // Carrying state is a coarse abstraction and shouldn't veto
+        // Caretake on non-empty runtime inventory.
+        let start = PlannerState {
+            carrying: Carrying::Herbs,
+            ..default_state()
+        };
+        let goal = GoalState {
+            predicates: vec![StatePredicate::TripsAtLeast(1)],
+        };
+        let distances = basic_distances();
+        let actions = actions_for_disposition(DispositionKind::Caretaking, None, &distances);
+
+        let plan = make_plan(start, &actions, &goal, 12, 1000)
+            .expect("caretaking plan should succeed even when carrying herbs");
+        let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
+        assert!(kinds.contains(&GoapActionKind::RetrieveFoodForKitten));
+        assert!(kinds.contains(&GoapActionKind::FeedKitten));
+    }
+
+    #[test]
+    fn caretaking_plan_retrieves_food_then_feeds() {
+        // §Phase 4c.4 regression test: before this fix the Caretake
+        // plan was `[TravelTo(Stores), FeedKitten]` which silently no-
+        // op'd because the adult's inventory was empty at FeedKitten
+        // time. The fixed catalog requires RetrieveFoodForKitten to
+        // precede FeedKitten, so the planner emits a three-step chain
+        // (travel in, retrieve, feed) when the adult starts from Wilds.
+        let start = default_state();
+        let goal = GoalState {
+            predicates: vec![StatePredicate::TripsAtLeast(1)],
+        };
+        let distances = basic_distances();
+        let actions = actions_for_disposition(DispositionKind::Caretaking, None, &distances);
+
+        let plan = make_plan(start, &actions, &goal, 12, 1000)
+            .expect("caretaking plan should succeed");
+        let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                GoapActionKind::TravelTo(PlannerZone::Stores),
+                GoapActionKind::RetrieveFoodForKitten,
+                GoapActionKind::FeedKitten,
+            ]
+        );
     }
 
     #[test]
