@@ -65,9 +65,13 @@ impl HuntDse {
             // out-score `Eat`'s direct path. The binary 0/1 prey_nearby
             // value otherwise dominates the sum disproportionately.
             composition: Composition::weighted_sum(vec![0.5, 0.25, 0.15, 0.10]),
+            // §4 batch 2: `.require(CanHunt)` gates on (Adult ∨ Young)
+            // ∧ ¬Injured ∧ ¬InCombat ∧ forest nearby. Retires the
+            // inline `ctx.can_hunt` guard in `scoring.rs`.
             // §9.3 DSE filter binding — Hunt targets `Prey` only.
-            // §13.1: `.forbid(markers::Incapacitated::KEY)` blocks downed cats.
+            // §13.1: `.forbid(Incapacitated)` blocks downed cats.
             eligibility: EligibilityFilter::new()
+                .require(markers::CanHunt::KEY)
                 .with_stance(StanceRequirement::hunt())
                 .forbid(markers::Incapacitated::KEY),
         }

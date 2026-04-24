@@ -141,8 +141,6 @@ pub struct ScoringContext<'a> {
     pub needs: &'a Needs,
     pub personality: &'a Personality,
     pub food_available: bool,
-    pub can_hunt: bool,
-    pub can_forage: bool,
     /// Whether there is at least one visible cat to interact with.
     pub has_social_target: bool,
     /// Whether a wildlife threat is within detection range.
@@ -176,8 +174,6 @@ pub struct ScoringContext<'a> {
     pub has_herbs_in_inventory: bool,
     /// Whether the cat has remedy herbs (HealingMoss/Moonpetal/Calmroot).
     pub has_remedy_herbs: bool,
-    /// Whether the cat has Thornbriar for ward-setting.
-    pub has_ward_herbs: bool,
     /// Whether harvestable Thornbriar exists anywhere in the world.
     pub thornbriar_available: bool,
     /// Number of injured cats in the colony.
@@ -747,15 +743,23 @@ pub fn score_actions(
     }
 
     // --- Hunt (§2.3: WS of hunger + scarcity + boldness + prey_nearby) ---
-    if ctx.can_hunt {
+    // §4 batch 2: inline `ctx.can_hunt` gate retired — HuntDse carries
+    // `.require(CanHunt::KEY)`; score_dse_by_id returns 0 on ineligibility.
+    {
         let urgency = score_dse_by_id("hunt", ctx, inputs);
-        scores.push((Action::Hunt, urgency + jitter(rng, s.jitter_range)));
+        if urgency > 0.0 {
+            scores.push((Action::Hunt, urgency + jitter(rng, s.jitter_range)));
+        }
     }
 
     // --- Forage (§2.3: WS of hunger + scarcity + diligence) ---
-    if ctx.can_forage {
+    // §4 batch 2: inline `ctx.can_forage` gate retired — ForageDse carries
+    // `.require(CanForage::KEY)`.
+    {
         let urgency = score_dse_by_id("forage", ctx, inputs);
-        scores.push((Action::Forage, urgency + jitter(rng, s.jitter_range)));
+        if urgency > 0.0 {
+            scores.push((Action::Forage, urgency + jitter(rng, s.jitter_range)));
+        }
     }
 
     // --- Socialize (§2.3: WS of 6 axes through loneliness + inverted_need_penalty) ---
@@ -859,25 +863,14 @@ pub fn score_actions(
         } else {
             0.0
         };
-        // Ward requires ward herbs in inventory to execute. The earlier
-        // "corruption-detected + thornbriar-available" branch that
-        // scored ward via an inline emergency bonus is retired: the
-        // cat now scores gather (boosted by the Logistic(8, 0.1) axis
-        // on `territory_max_corruption` inside `herbcraft_gather`) to
-        // collect thornbriar first, then scores ward on a later tick
-        // once herbs are held.
-        // §4 marker eligibility (Phase 4b.5): the
-        // `ctx.ward_strength_low` conjunct retires — HerbcraftWardDse
-        // now carries `.require("WardStrengthLow")`. The
-        // `ctx.has_ward_herbs` check stays inline until a per-cat
-        // inventory-marker port lands `HasWardHerbs`.
-        let ward_eligible = ctx.has_ward_herbs;
-        let mut ward = if ward_eligible {
-            score_dse_by_id("herbcraft_ward", ctx, inputs)
-        } else {
-            0.0
-        };
-        if ctx.wards_under_siege && ctx.has_ward_herbs {
+        // §4 batch 2: inline `ctx.has_ward_herbs` gate retired —
+        // HerbcraftWardDse carries `.require(CanWard::KEY)` which
+        // subsumes Adult ∧ ¬Injured ∧ HasWardHerbs. score_dse_by_id
+        // returns 0 when eligibility fails.
+        let mut ward = score_dse_by_id("herbcraft_ward", ctx, inputs);
+        // Siege bonus: only meaningful when ward scored > 0 (cat has
+        // CanWard → has ward herbs, colony wards are low, not downed).
+        if ward > 0.0 && ctx.wards_under_siege {
             ward += s.herbcraft_ward_siege_bonus * ctx.needs.level_suppression(2);
         }
         let best = gather.max(prepare).max(ward);
@@ -1794,6 +1787,13 @@ mod tests {
             s.set_colony(markers::HasFunctionalKitchen::KEY, true);
             s.set_colony(markers::HasRawFoodInStores::KEY, true);
             s.set_colony(markers::WardStrengthLow::KEY, true);
+            // §4 batch 2: capability markers — default test cat is
+            // capable of everything so DSE eligibility gates open.
+            let cat = Entity::from_raw_u32(1).unwrap();
+            s.set_entity(markers::CanHunt::KEY, cat, true);
+            s.set_entity(markers::CanForage::KEY, cat, true);
+            s.set_entity(markers::CanWard::KEY, cat, true);
+            s.set_entity(markers::CanCook::KEY, cat, true);
             s
         })
     }
@@ -1848,8 +1848,7 @@ mod tests {
             needs,
             personality,
             food_available: true,
-            can_hunt: true,
-            can_forage: true,
+
             has_social_target: false,
             has_threat_nearby: false,
             allies_fighting_threat: 0,
@@ -1865,7 +1864,7 @@ mod tests {
             has_herbs_nearby: false,
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
-            has_ward_herbs: false,
+
             thornbriar_available: false,
             colony_injury_count: 0,
             ward_strength_low: false,
@@ -1985,8 +1984,7 @@ mod tests {
             needs: &needs,
             personality: &personality,
             food_available: false,
-            can_hunt: false,
-            can_forage: false,
+
             has_social_target: false,
             has_threat_nearby: false,
             allies_fighting_threat: 0,
@@ -2002,7 +2000,7 @@ mod tests {
             has_herbs_nearby: false,
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
-            has_ward_herbs: false,
+
             thornbriar_available: false,
             colony_injury_count: 0,
             ward_strength_low: false,
@@ -2116,8 +2114,7 @@ mod tests {
             needs: &needs,
             personality: &personality,
             food_available: true,
-            can_hunt: true,
-            can_forage: true,
+
             has_social_target: true,
             has_threat_nearby: false,
             allies_fighting_threat: 0,
@@ -2133,7 +2130,7 @@ mod tests {
             has_herbs_nearby: false,
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
-            has_ward_herbs: false,
+
             thornbriar_available: false,
             colony_injury_count: 0,
             ward_strength_low: false,
@@ -2371,8 +2368,7 @@ mod tests {
             needs: &needs,
             personality: &personality,
             food_available: true,
-            can_hunt: true,
-            can_forage: true,
+
             has_social_target: false,
             has_threat_nearby: true,
             allies_fighting_threat: 0,
@@ -2388,7 +2384,7 @@ mod tests {
             has_herbs_nearby: false,
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
-            has_ward_herbs: false,
+
             thornbriar_available: false,
             colony_injury_count: 0,
             ward_strength_low: false,
@@ -2447,8 +2443,7 @@ mod tests {
             needs: &needs,
             personality: &personality,
             food_available: true,
-            can_hunt: true,
-            can_forage: true,
+
             has_social_target: false,
             has_threat_nearby: true,
             allies_fighting_threat: 2,
@@ -2464,7 +2459,7 @@ mod tests {
             has_herbs_nearby: false,
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
-            has_ward_herbs: false,
+
             thornbriar_available: false,
             colony_injury_count: 0,
             ward_strength_low: false,
@@ -2541,8 +2536,7 @@ mod tests {
             needs: &needs,
             personality: &personality,
             food_available: true,
-            can_hunt: true,
-            can_forage: true,
+
             has_social_target: true,
             has_threat_nearby: true,
             allies_fighting_threat: 0,
@@ -2558,7 +2552,7 @@ mod tests {
             has_herbs_nearby: false,
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
-            has_ward_herbs: false,
+
             thornbriar_available: false,
             colony_injury_count: 0,
             ward_strength_low: false,
@@ -2849,8 +2843,7 @@ mod tests {
             needs: &needs,
             personality: &personality,
             food_available: false,
-            can_hunt: false,
-            can_forage: false,
+
             has_social_target: false,
             has_threat_nearby: false,
             allies_fighting_threat: 0,
@@ -2866,7 +2859,7 @@ mod tests {
             has_herbs_nearby: false,
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
-            has_ward_herbs: false,
+
             thornbriar_available: false,
             colony_injury_count: 0,
             ward_strength_low: false,
@@ -2927,8 +2920,6 @@ mod tests {
             needs: &needs,
             personality: &personality,
             food_available: true,
-            can_hunt: true,
-            can_forage: false,
             has_social_target: false,
             has_threat_nearby: false,
             allies_fighting_threat: 0,
@@ -2944,7 +2935,7 @@ mod tests {
             has_herbs_nearby: false,
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
-            has_ward_herbs: false,
+
             thornbriar_available: false,
             colony_injury_count: 0,
             ward_strength_low: false,
@@ -3400,8 +3391,30 @@ mod tests {
         c.has_herbs_nearby = true;
         c.herbcraft_skill = 0.3;
         // No remedy herbs, no ward herbs — only gather is viable.
+        // §4 batch 2: override CanWard = false so ward DSE is ineligible.
+        let mut snap = MarkerSnapshot::new();
+        let cat = Entity::from_raw_u32(1).unwrap();
+        snap.set_colony(markers::HasStoredFood::KEY, true);
+        snap.set_colony(markers::HasGarden::KEY, true);
+        snap.set_colony(markers::HasFunctionalKitchen::KEY, true);
+        snap.set_colony(markers::HasRawFoodInStores::KEY, true);
+        snap.set_colony(markers::WardStrengthLow::KEY, true);
+        snap.set_entity(markers::CanHunt::KEY, cat, true);
+        snap.set_entity(markers::CanForage::KEY, cat, true);
+        // CanWard intentionally absent — cat has no ward herbs.
+        snap.set_entity(markers::CanCook::KEY, cat, true);
+        let inputs = EvalInputs {
+            cat,
+            position: Position::new(0, 0),
+            tick: 0,
+            dse_registry: cached_registry(),
+            modifier_pipeline: cached_modifier_pipeline(),
+            markers: &snap,
+            focal_cat: None,
+            focal_capture: None,
+        };
 
-        let result = score_actions(&c, &test_eval_inputs(), &mut rng);
+        let result = score_actions(&c, &inputs, &mut rng);
         assert_eq!(
             result.herbcraft_hint,
             Some(CraftingHint::GatherHerbs),
@@ -3424,7 +3437,7 @@ mod tests {
         let mut rng = seeded_rng(72);
 
         let mut c = ctx(&needs, &personality, &sc);
-        c.has_ward_herbs = true;
+
         c.has_herbs_in_inventory = true;
         c.ward_strength_low = true;
         c.herbcraft_skill = 0.3;
@@ -3456,7 +3469,7 @@ mod tests {
         let ward_score_with_corruption = {
             let mut rng = seeded_rng(100);
             let mut c = ctx(&needs, &personality, &sc);
-            c.has_ward_herbs = true;
+    
             c.ward_strength_low = true;
             c.herbcraft_skill = 0.6;
             c.territory_max_corruption = 0.5;
@@ -3472,7 +3485,7 @@ mod tests {
         let ward_score_without_corruption = {
             let mut rng = seeded_rng(100);
             let mut c = ctx(&needs, &personality, &sc);
-            c.has_ward_herbs = true;
+    
             c.ward_strength_low = true;
             c.herbcraft_skill = 0.6;
             c.territory_max_corruption = 0.0;

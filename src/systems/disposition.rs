@@ -1452,10 +1452,12 @@ fn respect_for_disposition(kind: DispositionKind, d: &DispositionConstants) -> f
 /// capped at `cap`. The actor itself is excluded.
 ///
 /// Backs the §respect-restoration witness-multiplier: respect from
-/// completing a task scales with social visibility. See
-/// `docs/balance/respect-restoration.md` for the hypothesis +
-/// concordance loop.
-fn count_witnesses_within_radius(
+/// completing a task scales with social visibility. The canonical
+/// live caller is `resolve_goap_plans`'s plan-completion block in
+/// `src/systems/goap.rs` (the test-scheduled `resolve_disposition_chains`
+/// below is not in production schedules; see
+/// `docs/balance/respect-restoration.md` for the relocation).
+pub fn count_witnesses_within_radius(
     actor_entity: Entity,
     actor_pos: &Position,
     positions: &[(Entity, Position)],
@@ -2458,11 +2460,6 @@ struct ChainStepSnapshots {
     grooming: std::collections::HashMap<Entity, f32>,
     gender: std::collections::HashMap<Entity, Gender>,
     cat_tile_counts: std::collections::HashMap<Position, u32>,
-    /// Live cat positions, used by the witness-multiplier respect bump
-    /// at chain completion (`docs/balance/respect-restoration.md`).
-    /// Snapshotted before the mutable iteration so we can count
-    /// nearby cats without double-borrowing `cats`.
-    positions: Vec<(Entity, Position)>,
 }
 
 /// Mutable accumulators written by [`dispatch_chain_step`], consumed by the
@@ -2578,12 +2575,6 @@ pub fn resolve_disposition_chains(
             }
             counts
         },
-        // Cat positions snapshot for witness-multiplier respect at
-        // chain completion (`docs/balance/respect-restoration.md`).
-        positions: cats
-            .iter()
-            .map(|((e, _, _, p, _, _, _, _), _)| (e, *p))
-            .collect(),
     };
 
     for (
@@ -2739,21 +2730,12 @@ pub fn resolve_disposition_chains(
                     if respect_gain > 0.0 {
                         needs.respect = (needs.respect + respect_gain).min(1.0);
                     }
-                    // §respect-restoration: witness-multiplier on top of
-                    // the baseline respect. Social visibility scales the
-                    // bump up to `respect_witness_cap` other cats.
-                    let witnesses = count_witnesses_within_radius(
-                        cat_entity,
-                        &pos,
-                        &snaps.positions,
-                        d.respect_witness_radius,
-                        d.respect_witness_cap,
-                    );
-                    if witnesses > 0 {
-                        needs.respect = (needs.respect
-                            + d.respect_per_witness * witnesses as f32)
-                            .min(1.0);
-                    }
+                    // NOTE: the §respect-restoration witness-multiplier used
+                    // to live here, but this function (`resolve_disposition_chains`)
+                    // is only registered in test schedules. The canonical live
+                    // site is `resolve_goap_plans`'s plan-completion block in
+                    // `src/systems/goap.rs`. See
+                    // `docs/balance/respect-restoration.md`.
                     ActionOutcome::Success
                 } else {
                     ActionOutcome::Failure
@@ -2863,21 +2845,10 @@ pub fn resolve_disposition_chains(
                     if respect_gain > 0.0 {
                         needs.respect = (needs.respect + respect_gain).min(1.0);
                     }
-                    // §respect-restoration: witness-multiplier on top of
-                    // the baseline respect. Mirror of the chain-exhausted
-                    // arm above — both completion paths feed witnesses.
-                    let witnesses = count_witnesses_within_radius(
-                        cat_entity,
-                        &pos,
-                        &snaps.positions,
-                        d.respect_witness_radius,
-                        d.respect_witness_cap,
-                    );
-                    if witnesses > 0 {
-                        needs.respect = (needs.respect
-                            + d.respect_per_witness * witnesses as f32)
-                            .min(1.0);
-                    }
+                    // NOTE: the §respect-restoration witness-multiplier moved
+                    // to `resolve_goap_plans`'s plan-completion block — this
+                    // function is only scheduled in tests. See
+                    // `docs/balance/respect-restoration.md`.
                     // Building completion grants extra mood boost ("built something").
                     if disp.kind == DispositionKind::Building {
                         mood.modifiers

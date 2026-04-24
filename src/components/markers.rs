@@ -150,12 +150,21 @@ impl CanHunt {
 
 #[derive(Component, Debug, Clone, Copy)]
 pub struct CanForage;
+impl CanForage {
+    pub const KEY: &str = "CanForage";
+}
 
 #[derive(Component, Debug, Clone, Copy)]
 pub struct CanWard;
+impl CanWard {
+    pub const KEY: &str = "CanWard";
+}
 
 #[derive(Component, Debug, Clone, Copy)]
 pub struct CanCook;
+impl CanCook {
+    pub const KEY: &str = "CanCook";
+}
 
 // ---------------------------------------------------------------------------
 // Inventory markers (§4.3 Inventory — per-cat)

@@ -1813,6 +1813,25 @@ pub fn resolve_goap_plans(
             if respect_gain > 0.0 {
                 needs.respect = (needs.respect + respect_gain).min(1.0);
             }
+            // §respect-restoration iter 1 (relocated): witness-multiplier
+            // on top of the baseline respect_for_disposition. Respect from
+            // completing a task scales with social visibility up to
+            // `respect_witness_cap` other cats within `respect_witness_radius`.
+            // The twin writes that used to live in `resolve_disposition_chains`
+            // were in a test-only schedule; this is the canonical live site.
+            // See `docs/balance/respect-restoration.md`.
+            let witnesses = crate::systems::disposition::count_witnesses_within_radius(
+                cat_entity,
+                &pos,
+                &snaps.cat_positions,
+                d.respect_witness_radius,
+                d.respect_witness_cap,
+            );
+            if witnesses > 0 {
+                needs.respect = (needs.respect
+                    + d.respect_per_witness * witnesses as f32)
+                    .min(1.0);
+            }
 
             // Building completion mood boost.
             if plan.kind == DispositionKind::Building {

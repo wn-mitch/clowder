@@ -45,8 +45,13 @@ impl ForageDse {
             // differentiation is what distinguishes the two
             // food-acquisition DSEs. Sum = 1.0.
             composition: Composition::weighted_sum(vec![0.3, 0.25, 0.45]),
-            // §13.1: incapacitated cats can only Eat/Sleep/Idle.
-            eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
+            // §4 batch 2: `.require(CanForage)` gates on ¬Kitten ∧
+            // ¬Injured ∧ forageable terrain nearby. Retires the
+            // inline `ctx.can_forage` guard in `scoring.rs`.
+            // §13.1: `.forbid(Incapacitated)` blocks downed cats.
+            eligibility: EligibilityFilter::new()
+                .require(markers::CanForage::KEY)
+                .forbid(markers::Incapacitated::KEY),
         }
     }
 }

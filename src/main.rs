@@ -441,6 +441,8 @@ fn build_schedule() -> Schedule {
                     clowder::systems::needs::update_injury_marker,
                     clowder::systems::items::update_inventory_markers,
                     clowder::systems::coordination::update_directive_markers,
+                    // §4 batch 2: capability markers.
+                    clowder::ai::capabilities::update_capability_markers,
                     clowder::systems::needs::decay_grooming,
                     clowder::systems::needs::eat_from_inventory,
                     clowder::systems::needs::decay_exploration,

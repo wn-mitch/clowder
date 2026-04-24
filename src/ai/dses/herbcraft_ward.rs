@@ -63,12 +63,13 @@ impl HerbcraftWardDse {
                 )),
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
-            // §4 marker eligibility (Phase 4b.5): SetWard only scores
-            // when colony ward strength is low. Retires the
-            // `ctx.ward_strength_low` conjunct from the
-            // `ward_eligible` gate at `scoring.rs:740`.
-            // §13.1: `.forbid(markers::Incapacitated::KEY)` blocks downed cats.
+            // §4 batch 2: `.require(CanWard)` gates on Adult ∧ ¬Injured
+            // ∧ HasWardHerbs. Retires the `ctx.has_ward_herbs` inline
+            // gate at `scoring.rs:874`.
+            // §4 Phase 4b.5: `.require(WardStrengthLow)` — colony gate.
+            // §13.1: `.forbid(Incapacitated)` blocks downed cats.
             eligibility: EligibilityFilter::new()
+                .require(markers::CanWard::KEY)
                 .require(markers::WardStrengthLow::KEY)
                 .forbid(markers::Incapacitated::KEY),
         }
@@ -181,12 +182,13 @@ mod tests {
     }
 
     #[test]
-    fn herbcraft_ward_requires_ward_strength_low() {
-        // Phase 4b.5: the outer `ctx.ward_strength_low` conjunct at
-        // `scoring.rs:740` retires; WardStrengthLow moves onto the
-        // DSE's eligibility filter.
+    fn herbcraft_ward_requires_can_ward_and_ward_strength_low() {
+        // §4 batch 2: CanWard (Adult ∧ ¬Injured ∧ HasWardHerbs) + WardStrengthLow.
         let dse = HerbcraftWardDse::new();
-        assert_eq!(dse.eligibility().required, vec![markers::WardStrengthLow::KEY]);
+        assert_eq!(
+            dse.eligibility().required,
+            vec![markers::CanWard::KEY, markers::WardStrengthLow::KEY]
+        );
         // §13.1: every non-Eat/Sleep/Idle cat DSE forbids Incapacitated.
         assert_eq!(dse.eligibility().forbidden, vec![markers::Incapacitated::KEY]);
     }

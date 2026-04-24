@@ -63,15 +63,14 @@ impl CookDse {
             // doing" floor; scarcity escalates under colony stress;
             // diligence is the personality weight.
             composition: Composition::weighted_sum(vec![0.4, 0.3, 0.3]),
-            // §4 marker eligibility (Phase 4b.5): Cook only scores if
-            // the colony has a functional kitchen AND raw food in
-            // stores. Retires the inline
-            // `cook_base_conditions && ctx.has_functional_kitchen`
-            // outer gate at `scoring.rs::score_actions`. The latent
-            // `wants_cook_but_no_kitchen` signal survives via a
-            // caller-side disambiguation when the DSE returns 0.
-            // §13.1: `.forbid("Incapacitated")` blocks downed cats.
+            // §4 batch 2: `.require(CanCook)` gates on Adult ∧ ¬Injured.
+            // Colony-scoped kitchen/food markers stay here (not bundled
+            // into CanCook) to preserve the `wants_cook_but_no_kitchen`
+            // build-pressure signal in `scoring.rs`.
+            // §4 Phase 4b.5: colony-scoped kitchen + raw food gates.
+            // §13.1: `.forbid(Incapacitated)` blocks downed cats.
             eligibility: EligibilityFilter::new()
+                .require(markers::CanCook::KEY)
                 .require(markers::HasFunctionalKitchen::KEY)
                 .require(markers::HasRawFoodInStores::KEY)
                 .forbid(markers::Incapacitated::KEY),
@@ -143,15 +142,17 @@ mod tests {
     }
 
     #[test]
-    fn cook_dse_requires_both_colony_markers() {
-        // Phase 4b.5: Cook's outer `has_functional_kitchen &&
-        // has_raw_food_in_stores` gate at `scoring.rs::score_actions`
-        // retires; both colony markers move onto the DSE's eligibility
-        // filter.
+    fn cook_dse_requires_capability_and_colony_markers() {
+        // §4 batch 2: Cook requires CanCook (Adult ∧ ¬Injured) plus
+        // both colony markers.
         let dse = CookDse::new();
         assert_eq!(
             dse.eligibility().required,
-            vec![markers::HasFunctionalKitchen::KEY, markers::HasRawFoodInStores::KEY]
+            vec![
+                markers::CanCook::KEY,
+                markers::HasFunctionalKitchen::KEY,
+                markers::HasRawFoodInStores::KEY,
+            ]
         );
         // §13.1: every non-Eat/Sleep/Idle cat DSE forbids Incapacitated.
         assert_eq!(dse.eligibility().forbidden, vec![markers::Incapacitated::KEY]);
@@ -164,6 +165,7 @@ mod tests {
         let dse = CookDse::new();
         let entity = Entity::from_raw_u32(1).unwrap();
         let has_marker = move |name: &str, _: Entity| match name {
+            n if n == markers::CanCook::KEY => true,
             n if n == markers::HasFunctionalKitchen::KEY => has_kitchen,
             n if n == markers::HasRawFoodInStores::KEY => has_raw_food,
             _ => false,

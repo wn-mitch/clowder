@@ -64,16 +64,34 @@ accomplishment.
   - `respect_witness_radius = 5` — Manhattan tiles.
   - `respect_witness_cap = 4` — diminishing returns above 4 witnesses.
 - New helper in `src/systems/disposition.rs`:
-  `count_witnesses_within_radius(actor, actor_pos, positions, radius, cap)`.
-  Pure function; unit-tested (`respect_witness_tests` module).
-- New `positions: Vec<(Entity, Position)>` field on `ChainStepSnapshots`,
-  populated from the same `cats.iter()` snapshot loop that already
-  builds the grooming / gender / cat_tile_counts snapshots.
-- Witness-multiplier applied at both chain-completion sites in
-  `resolve_disposition_chains` — the chain-exhausted arm
-  (`disposition.rs:~2658`) and the chain-completed-mid-step arm
-  (`~2767`). Layers on top of the existing
-  `respect_for_disposition` baseline.
+  `count_witnesses_within_radius(actor, actor_pos, positions, radius, cap)`
+  (now `pub`). Pure function; unit-tested (`respect_witness_tests` module).
+- Witness-multiplier applied at the plan-completion site in
+  `resolve_goap_plans` (`src/systems/goap.rs:~1812`), alongside the
+  existing `respect_for_disposition` baseline. Uses
+  `snaps.cat_positions`, which was already being built for other
+  purposes — no new snapshot field required.
+
+### Relocation note (2026-04-24 post-landing fix)
+
+The original iter-1 landing wrote the witness-multiplier into
+`resolve_disposition_chains` (both chain-completion arms). That
+function is registered only in test schedules (`tests/integration.rs`,
+`tests/mentor.rs`); production schedules (`src/plugins/simulation.rs`,
+`src/main.rs`) register `resolve_task_chains` instead, which does not
+read `&mut Needs`. The iter-1 writes never ran in soaks — batch 2
+(seed 42, 900s) showed respect mean = 0.291, essentially unchanged
+from the pre-iter-1 baseline of 0.287. Diagnosis in
+`docs/open-work/landed/2026-04.md` under the relocation entry.
+
+**Fix**: the witness-multiplier moved to `resolve_goap_plans`'s
+plan-completion block (`src/systems/goap.rs:~1812`), right next to
+the existing `respect_for_disposition` baseline write, so both fire
+from the same live schedule. The code blocks that used to live in
+`resolve_disposition_chains` are now replaced by pointer comments;
+the helper function and its unit tests remain in
+`src/systems/disposition.rs` unchanged. Hypothesis and prediction
+bands unchanged — measurement re-runs against the relocated code.
 
 ## Observation
 

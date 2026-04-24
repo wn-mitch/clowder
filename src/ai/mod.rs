@@ -1,3 +1,4 @@
+pub mod capabilities;
 pub mod caretake_targeting;
 pub mod commitment;
 pub mod composition;

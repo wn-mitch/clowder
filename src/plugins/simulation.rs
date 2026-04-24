@@ -182,6 +182,9 @@ impl Plugin for SimulationPlugin {
                         systems::needs::update_injury_marker,
                         systems::items::update_inventory_markers,
                         systems::coordination::update_directive_markers,
+                        // §4 batch 2: capability markers — reads life-stage,
+                        // injury, inventory markers authored above.
+                        crate::ai::capabilities::update_capability_markers,
                         systems::needs::decay_grooming,
                         systems::needs::eat_from_inventory,
                         systems::needs::decay_exploration,

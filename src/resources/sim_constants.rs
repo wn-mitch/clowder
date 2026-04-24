@@ -1342,6 +1342,17 @@ pub struct DispositionConstants {
     pub flee_threshold_base: f32,
     pub flee_threshold_boldness_scale: f32,
     pub critical_safety_threshold: f32,
+    /// Safety-recovery band above `critical_safety_threshold` that marks a
+    /// Guarding plan's `achievement_believed` as true. When a cat enters
+    /// Guarding (triggered by `safety < critical_safety_threshold`) and its
+    /// safety has climbed past `critical_safety_threshold + guarding_exit_epsilon`
+    /// after at least one patrol trip, the §7.2 commitment gate drops the
+    /// plan so the cat re-evaluates. Breaks the Patrol-loop pattern where
+    /// same-tier preempts can't abandon Guarding; see
+    /// `docs/balance/guarding-exit-recipe.md` (to be written) and the
+    /// Thistle seed-69 soak diagnosis.
+    #[serde(default = "default_guarding_exit_epsilon")]
+    pub guarding_exit_epsilon: f32,
     pub flee_distance: f32,
     pub flee_ticks: u64,
     pub damaged_building_threshold: f32,
@@ -1674,6 +1685,14 @@ fn default_true() -> bool {
     true
 }
 
+/// §respect-restoration iter 1 companion. Safety band above the
+/// `critical_safety_threshold` that marks a Guarding plan achieved.
+/// Default 0.15 → exit band 0.35 when `critical_safety_threshold = 0.2`.
+/// Tune downstream per `docs/balance/guarding-exit-recipe.md`.
+fn default_guarding_exit_epsilon() -> f32 {
+    0.15
+}
+
 fn default_threat_ward_dampening() -> f32 {
     0.3
 }
@@ -1866,6 +1885,7 @@ impl Default for DispositionConstants {
             flee_threshold_base: 0.15,
             flee_threshold_boldness_scale: 0.4,
             critical_safety_threshold: 0.2,
+            guarding_exit_epsilon: default_guarding_exit_epsilon(),
             flee_distance: 8.0,
             flee_ticks: 5,
             damaged_building_threshold: 0.4,

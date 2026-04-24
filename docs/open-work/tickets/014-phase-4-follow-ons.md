@@ -100,7 +100,14 @@ remaining work is itemised here.
   fields read from MarkerSnapshot, coordinate DSE
   `.require("IsCoordinatorWithDirectives")` cutover. 31 tests.
   `Injured` marker unblocks Capability markers (batch 2).
-  The remaining ~34 §4.3 markers each need:
+  **Batch 2 landed 2026-04-24** — `src/ai/capabilities.rs` authors
+  4 capability markers (`CanHunt`, `CanForage`, `CanWard`, `CanCook`)
+  with spec-intent life-stage rules: Young cats hunt (badly) and
+  forage, Elders forage only, Kittens excluded from all, Injured
+  excluded from all. DSE `.require()` cutover on Hunt, Forage,
+  HerbcraftWard, Cook. Retired `can_hunt`, `can_forage`,
+  `has_ward_herbs` from `ScoringContext` + inline gates. 23 tests.
+  The remaining ~30 §4.3 markers each need:
     1. Author system per §4.6 author-file assignment (`Changed<T>`
        filter where the predicate reads changing parent components;
        full-scan where it reads position-adjacent state).

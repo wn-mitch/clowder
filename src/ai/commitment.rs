@@ -263,6 +263,32 @@ pub fn proxies_for_plan(
                 && needs.temperature >= d.resting_complete_temperature
         }
         DispositionKind::Mating => plan.trips_done >= 1,
+        // Guarding is triggered by low safety (`CriticalSafety` urgency
+        // fires when `needs.safety < critical_safety_threshold`; the
+        // Patrol DSE's `safety_deficit` consideration gates on the same
+        // signal). Achievement therefore means "safety has recovered",
+        // not just "N patrol trips done". The gate is OR over two
+        // conditions: either the trip-target is met (the legacy
+        // completion predicate) OR safety has climbed past the exit
+        // band and at least one patrol trip has run. The `trips_done
+        // >= 1` guard is the §Resting-recipe lifted-condition protection
+        // ported over — a cat entering Guarding with ambient safety
+        // already above the exit band must not read as achieved before
+        // any patrol action has run, or the plan fires and drops on
+        // the same tick it was built.
+        //
+        // Guarding's strategy is `Blind` (see `strategy_for_disposition`),
+        // so `achievable_believed` is ignored — only this branch fires
+        // the drop. Without the safety-recovered arm the plan only drops
+        // on trips completion, which meant safety-collapse-driven
+        // Guarding plans could loop indefinitely on cats whose patrol
+        // gains kept them just above critical but far below sated.
+        DispositionKind::Guarding => {
+            let trips_complete = plan.trips_done >= plan.target_trips;
+            let safety_recovered = plan.trips_done >= 1
+                && needs.safety >= d.critical_safety_threshold + d.guarding_exit_epsilon;
+            trips_complete || safety_recovered
+        }
         _ => plan.trips_done >= plan.target_trips,
     };
 
@@ -844,12 +870,124 @@ mod tests {
         plan.max_replans = 3;
         plan.replan_count = 3;
 
+        // Use low safety so the safety-recovered arm of the Guarding
+        // achievement recipe doesn't fire — this test exercises the
+        // "still replanning, still below exit band, trips incomplete"
+        // holdfast case.
+        let mut needs = default_needs();
+        needs.safety = 0.1;
+
         let strategy = strategy_for_disposition(plan.kind);
-        let proxies = proxies_for_plan(&plan, &default_needs(), &d, 1.0);
+        let proxies = proxies_for_plan(&plan, &needs, &d, 1.0);
         assert_eq!(strategy, CommitmentStrategy::Blind);
         assert!(!proxies.achievable_believed);
+        assert!(!proxies.achievement_believed);
         // Blind ignores unachievable. Retain.
         assert!(!should_drop_intention(strategy, proxies));
+    }
+
+    // -----------------------------------------------------------------
+    // Guarding safety-recovered recipe — seed-69 Patrol-loop fix.
+    // See `docs/balance/guarding-exit-recipe.md` and the Thistle
+    // diagnosis under `docs/open-work/landed/2026-04.md`.
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn proxies_guarding_achievement_requires_trip_guard() {
+        // Regression guard for the lifted-condition pattern.
+        // A fresh Guarding plan (`trips_done == 0`) against a cat whose
+        // ambient safety already sits above the exit band must NOT
+        // read as achieved — the cat hasn't patrolled yet, and the gate
+        // would fire at plan-birth causing same-tick Guarding↔something
+        // oscillation (the structural analog of the 2026-04-23 Resting
+        // bug).
+        let d = default_d();
+        let plan = test_plan(DispositionKind::Guarding, 0);
+        assert_eq!(plan.trips_done, 0);
+
+        let mut needs = default_needs();
+        // Well above exit band (0.2 + 0.15 = 0.35).
+        needs.safety = 0.9;
+
+        let proxies = proxies_for_plan(&plan, &needs, &d, 1.0);
+        assert!(
+            !proxies.achievement_believed,
+            "trips_done == 0 must gate the safety-recovered recipe"
+        );
+    }
+
+    #[test]
+    fn proxies_guarding_unachieved_when_safety_below_exit_band() {
+        // One patrol trip done but safety is still just above the
+        // critical threshold — not yet past the exit band. Retain.
+        let d = default_d();
+        let mut plan = test_plan(DispositionKind::Guarding, 0);
+        plan.target_trips = 3;
+        plan.trips_done = 1;
+
+        let mut needs = default_needs();
+        // Exit band is `critical_safety_threshold + guarding_exit_epsilon`
+        // = 0.2 + 0.15 = 0.35. Land just below.
+        needs.safety = 0.25;
+
+        let proxies = proxies_for_plan(&plan, &needs, &d, 1.0);
+        assert!(!proxies.achievement_believed);
+    }
+
+    #[test]
+    fn proxies_guarding_achieved_when_safety_above_exit_band_after_trip() {
+        // Safety-recovered arm: ≥1 patrol trip has run AND safety has
+        // climbed past the exit band. Fires the drop under Blind.
+        let d = default_d();
+        let mut plan = test_plan(DispositionKind::Guarding, 0);
+        plan.target_trips = 3;
+        plan.trips_done = 1;
+
+        let mut needs = default_needs();
+        // Clear the exit band (0.35) comfortably.
+        needs.safety = 0.5;
+
+        let proxies = proxies_for_plan(&plan, &needs, &d, 1.0);
+        assert!(proxies.achievement_believed);
+    }
+
+    #[test]
+    fn proxies_guarding_achieved_on_legacy_trips_target() {
+        // Backward-compatible: even with safety still low, the plan
+        // drops when the trip target is met. Preserves the existing
+        // Guarding completion semantics from before the recipe change.
+        let d = default_d();
+        let mut plan = test_plan(DispositionKind::Guarding, 0);
+        plan.target_trips = 2;
+        plan.trips_done = 2;
+
+        let mut needs = default_needs();
+        needs.safety = 0.05; // well below exit band
+
+        let proxies = proxies_for_plan(&plan, &needs, &d, 1.0);
+        assert!(proxies.achievement_believed);
+    }
+
+    #[test]
+    fn gate_drops_blind_guarding_when_safety_recovers_mid_plan() {
+        // End-to-end: the loop-breaker. A Blind Guarding plan with
+        // trips remaining drops via the safety-recovered arm once the
+        // cat has patrolled at least once and safety has climbed past
+        // the exit band. Without this arm Thistle-pattern cats would
+        // loop indefinitely through Guarding/Patrol (seed-69 soak).
+        let d = default_d();
+        let mut plan = test_plan(DispositionKind::Guarding, 0);
+        plan.target_trips = 5;
+        plan.trips_done = 1;
+
+        let mut needs = default_needs();
+        needs.safety = 0.6;
+
+        let strategy = strategy_for_disposition(plan.kind);
+        let proxies = proxies_for_plan(&plan, &needs, &d, 1.0);
+        assert_eq!(strategy, CommitmentStrategy::Blind);
+        assert!(proxies.achievement_believed);
+        assert!(should_drop_intention(strategy, proxies));
     }
 
     #[test]
