@@ -81,6 +81,9 @@ pub struct NeedsSnapshot {
     pub temperature: f32,
     pub safety: f32,
     pub social: f32,
+    /// §7.W social_warmth fulfillment axis (not a Maslow need, but
+    /// displayed alongside needs for inspection convenience).
+    pub social_warmth: f32,
 }
 
 pub struct SkillsSnapshot {
@@ -99,13 +102,17 @@ pub struct RelationshipEntry {
 }
 
 impl NeedsSnapshot {
-    pub fn from_needs(needs: &Needs) -> Self {
+    pub fn from_needs(
+        needs: &Needs,
+        fulfillment: Option<&crate::components::fulfillment::Fulfillment>,
+    ) -> Self {
         Self {
             hunger: needs.hunger,
             energy: needs.energy,
             temperature: needs.temperature,
             safety: needs.safety,
             social: needs.social,
+            social_warmth: fulfillment.map_or(0.6, |f| f.social_warmth),
         }
     }
 }
@@ -132,6 +139,7 @@ pub fn build_inspect_data(
     name: &str,
     life_stage: LifeStage,
     needs: &Needs,
+    fulfillment: Option<&crate::components::fulfillment::Fulfillment>,
     mood_valence: f32,
     current: &CurrentAction,
     skills: &Skills,
@@ -180,7 +188,7 @@ pub fn build_inspect_data(
     CatInspectData {
         name: name.to_string(),
         life_stage,
-        needs: NeedsSnapshot::from_needs(needs),
+        needs: NeedsSnapshot::from_needs(needs, fulfillment),
         mood_valence,
         action: format!("{:?}", current.action),
         skills: SkillsSnapshot::from_skills(skills),

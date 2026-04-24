@@ -56,6 +56,17 @@
       ? decisionTickIndex($frameIndex, $focalTick)
       : -1,
   )
+
+  // Auto-snap the focal tick to the active run's first decision tick
+  // whenever no tick is pinned. Fires on initial mount and after every
+  // pickRun() reset. The panels already fall back via currentFrame's
+  // derivation, but the toolbar (tickInput, decisionIndex counter)
+  // needs focalTick set explicitly to reflect the true state.
+  $effect(() => {
+    if ($frameIndex && $focalTick === null && $frameIndex.decisionTicks.length > 0) {
+      focalTick.set($frameIndex.decisionTicks[0])
+    }
+  })
 </script>
 
 <svelte:window onkeydown={onKeyDown} />
@@ -86,50 +97,52 @@
       and drop <code>logs/tuned-42/trace-Simba.jsonl</code> above.
     </div>
   {:else}
-    <div class="flex flex-wrap items-center gap-3 text-sm">
-      <label class="flex items-center gap-2">
-        <span class="text-muted">Run:</span>
-        <select
-          value={$activeTraceRun?.id ?? ''}
-          onchange={pickRun}
-          class="bg-surface border border-border rounded px-2 py-1 text-sm"
-        >
-          {#each $runsWithTraces as r (r.id)}
-            <option value={r.id}>{runLabel(r)}</option>
-          {/each}
-        </select>
-      </label>
-
-      {#if $frameIndex}
-        <span class="text-muted">·</span>
+    <div class="sticky top-0 z-20 bg-bg/95 backdrop-blur-sm -mx-4 px-4 py-2 border-b border-border">
+      <div class="flex flex-wrap items-center gap-3 text-sm">
         <label class="flex items-center gap-2">
-          <span class="text-muted">Tick:</span>
-          <input
-            type="text"
-            inputmode="numeric"
-            class="w-28 bg-surface border border-border rounded px-2 py-1 text-sm font-mono"
-            bind:value={tickInput}
-            onkeydown={e => e.key === 'Enter' && submitTickInput()}
-            onblur={submitTickInput}
-          />
+          <span class="text-muted">Run:</span>
+          <select
+            value={$activeTraceRun?.id ?? ''}
+            onchange={pickRun}
+            class="bg-surface border border-border rounded px-2 py-1 text-sm"
+          >
+            {#each $runsWithTraces as r (r.id)}
+              <option value={r.id}>{runLabel(r)}</option>
+            {/each}
+          </select>
         </label>
-        <div class="flex items-center gap-1">
-          <button type="button" class="text-xs px-2 py-1" onclick={() => step(-10)}>«</button>
-          <button type="button" class="text-xs px-2 py-1" onclick={() => step(-1)}>‹</button>
-          <button type="button" class="text-xs px-2 py-1" onclick={() => step( 1)}>›</button>
-          <button type="button" class="text-xs px-2 py-1" onclick={() => step( 10)}>»</button>
-        </div>
-        <span class="text-xs text-muted">
-          {decisionIndex >= 0 ? decisionIndex + 1 : '?'} / {$frameIndex.decisionTicks.length}
-          decision ticks
-        </span>
-        {#if $frameIndex.commitmentTicks.length > 0}
-          <span class="text-xs text-muted">· {$frameIndex.commitmentTicks.length} commitment drops</span>
+
+        {#if $frameIndex}
+          <span class="text-muted">·</span>
+          <label class="flex items-center gap-2">
+            <span class="text-muted">Tick:</span>
+            <input
+              type="text"
+              inputmode="numeric"
+              class="w-28 bg-surface border border-border rounded px-2 py-1 text-sm font-mono"
+              bind:value={tickInput}
+              onkeydown={e => e.key === 'Enter' && submitTickInput()}
+              onblur={submitTickInput}
+            />
+          </label>
+          <div class="flex items-center gap-1">
+            <button type="button" class="text-xs px-2 py-1" onclick={() => step(-10)}>«</button>
+            <button type="button" class="text-xs px-2 py-1" onclick={() => step(-1)}>‹</button>
+            <button type="button" class="text-xs px-2 py-1" onclick={() => step( 1)}>›</button>
+            <button type="button" class="text-xs px-2 py-1" onclick={() => step( 10)}>»</button>
+          </div>
+          <span class="text-xs text-muted">
+            {decisionIndex >= 0 ? decisionIndex + 1 : '?'} / {$frameIndex.decisionTicks.length}
+            decision ticks
+          </span>
+          {#if $frameIndex.commitmentTicks.length > 0}
+            <span class="text-xs text-muted">· {$frameIndex.commitmentTicks.length} commitment drops</span>
+          {/if}
+          {#if $frameIndex.planFailureTicks.length > 0}
+            <span class="text-xs text-muted">· {$frameIndex.planFailureTicks.length} plan failures</span>
+          {/if}
         {/if}
-        {#if $frameIndex.planFailureTicks.length > 0}
-          <span class="text-xs text-muted">· {$frameIndex.planFailureTicks.length} plan failures</span>
-        {/if}
-      {/if}
+      </div>
     </div>
 
     {#if $frameIndex && $currentFrame}

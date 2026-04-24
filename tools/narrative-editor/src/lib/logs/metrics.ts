@@ -264,6 +264,65 @@ export function foodStoresSeries(
   return out
 }
 
+/** Per-run SystemActivation snapshot, grouped by feature valence. Prefers
+ *  the last in-stream `SystemActivation` event (which carries the full
+ *  Feature::ALL map with cumulative counts) and falls back to footer
+ *  aggregates when an older log predates the event. The `neverFiredExpected`
+ *  list is the footer's §Phase 5a canary — positive features expected to
+ *  fire at least once on a canonical soak that ended the run at zero. */
+export interface ActivationSummary {
+  positive: Record<string, number>
+  neutral: Record<string, number>
+  negative: Record<string, number>
+  neverFiredExpected: string[]
+  source: 'event' | 'footer' | 'none'
+}
+
+export function activationSummary(run: RunModel): ActivationSummary {
+  const neverFiredExpected = readNeverFiredExpected(run.footer)
+
+  const last = findLast<SystemActivationEvent>(run.events, e => e.type === 'SystemActivation')
+  if (last) {
+    return {
+      positive: { ...(last.positive ?? {}) },
+      neutral: { ...(last.neutral ?? {}) },
+      negative: { ...(last.negative ?? {}) },
+      neverFiredExpected,
+      source: 'event',
+    }
+  }
+
+  if (run.footer && hasActivationAggregates(run.footer)) {
+    return {
+      positive: {},
+      neutral: {},
+      negative: {},
+      neverFiredExpected,
+      source: 'footer',
+    }
+  }
+
+  return {
+    positive: {},
+    neutral: {},
+    negative: {},
+    neverFiredExpected,
+    source: 'none',
+  }
+}
+
+function readNeverFiredExpected(footer: RunModel['footer']): string[] {
+  const raw = footer?.never_fired_expected_positives
+  if (!Array.isArray(raw)) return []
+  return raw.filter((x): x is string => typeof x === 'string')
+}
+
+function hasActivationAggregates(footer: NonNullable<RunModel['footer']>): boolean {
+  return typeof footer.positive_features_active === 'number'
+    || typeof footer.neutral_features_active === 'number'
+    || typeof footer.negative_events_total === 'number'
+}
+
 /** Distinct cat names observed in CatSnapshot events, alphabetically sorted. */
 export function availableCatNames(events: LogEvent[]): string[] {
   const set = new Set<string>()
@@ -282,7 +341,7 @@ function emptyNeeds(): NeedsBlock {
   }
 }
 
-function findLast<T extends LogEvent>(events: LogEvent[], pred: (e: LogEvent) => boolean): T | undefined {
+export function findLast<T extends LogEvent>(events: LogEvent[], pred: (e: LogEvent) => boolean): T | undefined {
   for (let i = events.length - 1; i >= 0; i--) {
     if (pred(events[i])) return events[i] as T
   }

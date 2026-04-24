@@ -90,21 +90,26 @@ pub fn update_cat_inspect_panel(
     content_query: Query<Entity, With<CatInspectContent>>,
     cats: Query<
         (
-            &Name,
-            &Age,
-            &Needs,
-            &Mood,
-            &CurrentAction,
-            &Skills,
-            Option<&Coordinator>,
-            Option<&ActiveDirective>,
-            Option<&ZodiacSign>,
-            Option<&FatedLove>,
-            Option<&FatedRival>,
-            Option<&Aspirations>,
-            Option<&Preferences>,
-            Option<&GoapPlan>,
-            Option<&ActionHistory>,
+            (
+                &Name,
+                &Age,
+                &Needs,
+                &Mood,
+                &CurrentAction,
+                &Skills,
+                Option<&Coordinator>,
+                Option<&ActiveDirective>,
+            ),
+            (
+                Option<&ZodiacSign>,
+                Option<&FatedLove>,
+                Option<&FatedRival>,
+                Option<&Aspirations>,
+                Option<&Preferences>,
+                Option<&GoapPlan>,
+                Option<&ActionHistory>,
+                Option<&crate::components::fulfillment::Fulfillment>,
+            ),
         ),
         (With<Species>, Without<Dead>),
     >,
@@ -158,21 +163,8 @@ pub fn update_cat_inspect_panel(
 
     // If the cat is dead or despawned, dismiss.
     let Ok((
-        name,
-        age,
-        needs,
-        mood,
-        action,
-        skills,
-        coordinator,
-        directive,
-        zodiac,
-        fated_love,
-        fated_rival,
-        aspirations,
-        preferences,
-        disposition,
-        action_history,
+        (name, age, needs, mood, action, skills, coordinator, directive),
+        (zodiac, fated_love, fated_rival, aspirations, preferences, disposition, action_history, fulfillment),
     )) = cats.get(entity)
     else {
         // Entity gone — clear the panel.
@@ -337,6 +329,11 @@ pub fn update_cat_inspect_panel(
     children.push(spawn_bar_row(&mut commands, "Temperature", needs.temperature));
     children.push(spawn_bar_row(&mut commands, "Safety", needs.safety));
     children.push(spawn_bar_row(&mut commands, "Social", needs.social));
+    children.push(spawn_bar_row(
+        &mut commands,
+        "Social Warmth",
+        fulfillment.map_or(0.6, |f| f.social_warmth),
+    ));
 
     children.push(spawn_spacer(&mut commands));
 

@@ -1,7 +1,7 @@
 ---
 id: 024
 title: "§7.W Fulfillment register — MVP container + social_warmth axis"
-status: in-progress
+status: done
 cluster: C
 added: 2026-04-24
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, warmth-split.md]
 related-balance: [warmth-split.md]
-landed-at: null
-landed-on: null
+landed-at: 47047261
+landed-on: 2026-04-24
 ---
 
 ## Why

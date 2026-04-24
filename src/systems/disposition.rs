@@ -495,7 +495,7 @@ pub fn evaluate_dispositions(
     let action_snapshot: Vec<(Entity, Position, Action)> = query
         .iter()
         .map(
-            |(entity, _, _, _, pos, _, _, _, _, _, current, _, _, _, _)| {
+            |((entity, _, _, _, pos, _, _, _), (_, _, current, _, _, _, _, _))| {
                 (entity, *pos, current.action)
             },
         )
@@ -3563,11 +3563,18 @@ fn dispatch_chain_step(
         StepKind::Socialize => {
             let step = chain.current_mut().unwrap();
             let target = step.target_entity;
+            let mut fallback_fulfillment =
+                crate::components::fulfillment::Fulfillment::default();
+            let fulfillment_ref = match fulfillment_opt.as_mut() {
+                Some(f) => &mut **f,
+                None => &mut fallback_fulfillment,
+            };
             let outcome = crate::steps::disposition::resolve_socialize(
                 ticks,
                 cat_entity,
                 target,
                 &mut needs,
+                fulfillment_ref,
                 &mut hunting_priors,
                 &mut relationships,
                 &mut colony_map,
@@ -3575,6 +3582,7 @@ fn dispatch_chain_step(
                 time.tick,
                 &constants.social,
                 d,
+                &constants.fulfillment,
             );
             outcome.record_if_witnessed(
                 narr.activation.as_deref_mut(),

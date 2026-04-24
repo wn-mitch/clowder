@@ -69,7 +69,7 @@
     social: '#7ec87e', social_warmth: '#f0a0c0', acceptance: '#b4d474',
     mating: '#d474b4', respect: '#a0a0d4', mastery: '#74d4b4', purpose: '#d4d4a0',
   }
-  let visibleMaslow = $state<Set<string>>(new Set(['hunger', 'energy', 'temperature', 'safety']))
+  let visibleMaslow = $state<Set<string>>(new Set(['hunger', 'energy', 'temperature', 'safety', 'social_warmth']))
 
   let maslowDefs = $derived<SeriesDef[]>(
     NEED_KEYS.filter(k => visibleMaslow.has(k))

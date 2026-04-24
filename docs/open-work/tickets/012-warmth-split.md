@@ -1,7 +1,7 @@
 ---
 id: 012
 title: Warmth split — temperature need vs social-warmth fulfillment axis
-status: in-progress
+status: done
 cluster: null
 added: 2026-04-21
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [warmth-split.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 47047261
+landed-on: 2026-04-24
 ---
 
 **Status:** phase 1 (design) committed; phases 2–4 pending.

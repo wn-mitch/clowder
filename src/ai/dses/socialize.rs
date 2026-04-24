@@ -26,6 +26,7 @@ pub const TEMPER_INPUT: &str = "temper";
 pub const PHYS_SATISFACTION_INPUT: &str = "phys_satisfaction";
 pub const PLAYFULNESS_INPUT: &str = "playfulness";
 pub const TILE_CORRUPTION_INPUT: &str = "tile_corruption";
+pub const SOCIAL_WARMTH_DEFICIT_INPUT: &str = "social_warmth_deficit";
 
 pub struct SocializeDse {
     id: DseId,
@@ -63,6 +64,17 @@ impl SocializeDse {
                     TILE_CORRUPTION_INPUT,
                     corruption_curve,
                 )),
+                // §7.W: social_warmth fulfillment deficit. Small
+                // additive rider — socializing addresses social_warmth
+                // at a slower rate than grooming, so the weight is
+                // lower.
+                Consideration::Scalar(ScalarConsideration::new(
+                    SOCIAL_WARMTH_DEFICIT_INPUT,
+                    Curve::Linear {
+                        slope: 1.0,
+                        intercept: 0.1,
+                    },
+                )),
             ],
             // RtEO sum = 1.0. Loneliness dominates; sociability +
             // playfulness are secondary personality drivers. Temper
@@ -71,7 +83,8 @@ impl SocializeDse {
             // additive axes (both high ⇒ strong modulation of the
             // score downward via the non-social axes dominating).
             // Corruption bonus is a small-weight additive rider.
-            composition: Composition::weighted_sum(vec![0.35, 0.20, 0.05, 0.10, 0.20, 0.10]),
+            // Social-warmth deficit (0.08) is a gentle nudge.
+            composition: Composition::weighted_sum(vec![0.32, 0.19, 0.05, 0.09, 0.19, 0.08, 0.08]),
             // §9.3 DSE filter binding — Socialize accepts `Same | Ally`.
             // §13.1: `.forbid(markers::Incapacitated::KEY)` blocks downed cats.
             eligibility: EligibilityFilter::new()
@@ -133,8 +146,8 @@ mod tests {
     }
 
     #[test]
-    fn socialize_has_six_axes() {
-        assert_eq!(SocializeDse::new().considerations().len(), 6);
+    fn socialize_has_seven_axes() {
+        assert_eq!(SocializeDse::new().considerations().len(), 7);
     }
 
     #[test]

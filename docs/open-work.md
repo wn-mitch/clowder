@@ -14,24 +14,23 @@ _Last generated: 2026-04-24._
 
 | Status | Count |
 |---|---|
-| In progress | 5 |
+| In progress | 3 |
 | Ready | 8 |
 | Parked | 2 |
 | Blocked | 8 |
-| **Open total** | **23** |
+| Done (awaiting archive) | 2 |
+| **Open total** | **21** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-index` (regenerate this file).
 
-## In progress (5)
+## In progress (3)
 
 - **[005](docs/open-work/tickets/005-cluster-a-scoring-substrate-refactor.md)** — Scoring substrate refactor cluster (Cluster A — Foundational) — _[A] · added 2026-04-20_
-- **[012](docs/open-work/tickets/012-warmth-split.md)** — Warmth split — temperature need vs social-warmth fulfillment axis — _added 2026-04-21_
 - **[013](docs/open-work/tickets/013-spec-follow-on-debts-from-ai-substrate-refactor.md)** — Spec-follow-on debts from AI substrate refactor — _added 2026-04-21_
 - **[014](docs/open-work/tickets/014-phase-4-follow-ons.md)** — Phase 4 follow-ons — target-taking registration + markers + mate-gender + Mating/PracticeMagic magnitude — _added 2026-04-22_
-- **[024](docs/open-work/tickets/024-fulfillment-register.md)** — §7.W Fulfillment register — MVP container + social_warmth axis — _[C] · added 2026-04-24_
 
 ## Ready (8)
 
@@ -60,6 +59,11 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[019](docs/open-work/tickets/019-happy-paths-usage-worn-trails.md)** — Happy paths — usage-worn trails — _blocked-by 020 · added 2026-04-22_
 - **[021](docs/open-work/tickets/021-monuments.md)** — Monuments — civic & memorial structures — _blocked-by 005, 020 · added 2026-04-22_
 
+## Done (awaiting archive) (2)
+
+- **[012](docs/open-work/tickets/012-warmth-split.md)** — Warmth split — temperature need vs social-warmth fulfillment axis — _added 2026-04-21_
+- **[024](docs/open-work/tickets/024-fulfillment-register.md)** — §7.W Fulfillment register — MVP container + social_warmth axis — _[C] · added 2026-04-24_
+
 ## Pre-existing (2)
 
 - **[PE-001](docs/open-work/pre-existing/test-harness-drift.md)** — Test harness drift
@@ -69,7 +73,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/). Recent months:
 
-- [2026-04](docs/open-work/landed/2026-04.md) — 26 entries
+- [2026-04](docs/open-work/landed/2026-04.md) — 27 entries
 
 ## Conventions
 

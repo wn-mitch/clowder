@@ -29,7 +29,9 @@
   }
 
   /** Draws vertical rules for event ticks and the focal tick. Runs on
-   *  every uPlot redraw via the `draw` hook. */
+   *  every uPlot redraw via the `draw` hook. All input ticks are
+   *  absolute values from `props.index` / `props.focalTick`; the scale
+   *  operates in normalized (tick - tickBase) space. */
   function markerPlugin() {
     return {
       hooks: {
@@ -38,8 +40,8 @@
           const top = u.bbox.top
           const bottom = u.bbox.top + u.bbox.height
 
-          function rule(tick: number, color: string, width = 1, dash?: number[]) {
-            const x = Math.round(u.valToPos(tick, 'x', true))
+          function rule(absTick: number, color: string, width = 1, dash?: number[]) {
+            const x = Math.round(u.valToPos(absTick - tickBase, 'x', true))
             if (x < u.bbox.left || x > u.bbox.left + u.bbox.width) return
             ctx.save()
             ctx.strokeStyle = color
@@ -65,6 +67,13 @@
     }
   }
 
+  /** Offset used to zero-base the x-axis. uPlot has a long tail of
+   *  quirks when the data's x magnitude is large relative to its range
+   *  (e.g. ticks 1,200,211 → 1,325,859 — absolute ~1.2M, range ~125k).
+   *  Subtracting the first tick keeps the internal scale in a sane
+   *  range and we format labels back to absolute for display. */
+  let tickBase = 0
+
   function render() {
     if (!host) return
     if (chart) { chart.destroy(); chart = null }
@@ -78,29 +87,46 @@
       return
     }
 
-    const xs = props.index.decisionTicks
+    tickBase = props.index.decisionTicks[0]
+    const xs = props.index.decisionTicks.map(t => t - tickBase)
     const ys = props.index.dseSeries.map(s => s.scores)
     const data: uPlot.AlignedData = [xs, ...ys] as unknown as uPlot.AlignedData
 
+    if (import.meta.env.DEV) {
+      console.debug('[TimelineStrip] data shape', {
+        xs_len: xs.length,
+        xs_range: xs.length > 0 ? [xs[0], xs[xs.length - 1]] : null,
+        tick_base: tickBase,
+        series: data.length - 1,
+        lengths: data.map(col => col.length),
+        y0_sample: (data[1] ?? []).slice(0, 3),
+      })
+    }
+
     const width = host.clientWidth || 800
+    const linearPath = uPlot.paths.linear!()
     const opts: uPlot.Options = {
       width,
       height: props.height ?? 240,
       scales: { x: { time: false } },
       axes: [
-        { label: 'tick', stroke: '#8a8477' },
+        {
+          label: 'tick',
+          stroke: '#8a8477',
+          values: (_u, splits) => splits.map(s => formatTick(s + tickBase)),
+        },
         { label: 'L2 final_score', stroke: '#8a8477' },
       ],
-      cursor: { drag: { x: false, y: false }, points: { size: 4 } },
-      legend: { show: true, live: true },
       series: [
-        { label: 'tick' },
+        { label: 'tick', value: (_u, v) => formatTick(v + tickBase) },
         ...props.index.dseSeries.map(s => ({
           label: s.dse,
+          scale: 'y',
           stroke: dseColor(s.dse),
           width: 1.25,
-          spanGaps: false,
-          points: { show: false },
+          spanGaps: true,
+          points: { show: true, size: 3 },
+          paths: linearPath,
         })),
       ],
       plugins: [markerPlugin()],
@@ -108,6 +134,17 @@
 
     chart = new uPlot(opts, data, host)
     wireScrub(chart)
+    // Force a size pass after creation — RO fires initially too, but
+    // being explicit avoids one-frame layout quirks when the sticky
+    // toolbar or panel grid shift widths on first paint.
+    if (host.clientWidth > 0) {
+      chart.setSize({ width: host.clientWidth, height: props.height ?? 240 })
+    }
+  }
+
+  function formatTick(n: number): string {
+    if (!Number.isFinite(n)) return ''
+    return n.toLocaleString()
   }
 
   /** Attach click + drag handlers to the uPlot overlay so any pointer
@@ -121,7 +158,9 @@
       const rect = over.getBoundingClientRect()
       const x = ev.clientX - rect.left
       const tickVal = u.posToVal(x, 'x')
-      const snapped = nearestDecisionTick(props.index, Math.round(tickVal))
+      // posToVal returns normalized space; snap against absolute ticks.
+      const absolute = Math.round(tickVal) + tickBase
+      const snapped = nearestDecisionTick(props.index, absolute)
       if (snapped !== null) props.onScrub(snapped)
     }
 

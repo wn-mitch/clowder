@@ -632,21 +632,26 @@ fn evaluate_threat_context(
 pub fn evaluate_and_plan(
     mut query: Query<
         (
-            Entity,
-            &Name,
-            &Needs,
-            &Personality,
-            &Position,
-            &Memory,
-            &Skills,
-            &Health,
-            &MagicAffinity,
-            &Inventory,
-            &mut CurrentAction,
-            Option<&crate::components::aspirations::Aspirations>,
-            Option<&crate::components::aspirations::Preferences>,
-            Option<&crate::components::fate::FatedLove>,
-            Option<&crate::components::fate::FatedRival>,
+            (
+                Entity,
+                &Name,
+                &Needs,
+                &Personality,
+                &Position,
+                &Memory,
+                &Skills,
+                &Health,
+            ),
+            (
+                &MagicAffinity,
+                &Inventory,
+                &mut CurrentAction,
+                Option<&crate::components::aspirations::Aspirations>,
+                Option<&crate::components::aspirations::Preferences>,
+                Option<&crate::components::fate::FatedLove>,
+                Option<&crate::components::fate::FatedRival>,
+                Option<&crate::components::fulfillment::Fulfillment>,
+            ),
         ),
         (
             Without<Dead>,
@@ -809,7 +814,7 @@ pub fn evaluate_and_plan(
 
     let colony_injury_count = query
         .iter()
-        .filter(|(_, _, _, _, _, _, _, health, _, _, _, _, _, _, _)| health.current < 1.0)
+        .filter(|((_, _, _, _, _, _, _, health), _)| health.current < 1.0)
         .count();
 
     let directive_snapshot: HashMap<Entity, (usize, Option<Directive>)> = world_state
@@ -821,7 +826,7 @@ pub fn evaluate_and_plan(
     let action_snapshot: Vec<(Entity, Position, Action)> = query
         .iter()
         .map(
-            |(entity, _, _, _, pos, _, _, _, _, _, current, _, _, _, _)| {
+            |((entity, _, _, _, pos, _, _, _), (_, _, current, _, _, _, _, _))| {
                 (entity, *pos, current.action)
             },
         )
@@ -893,21 +898,8 @@ pub fn evaluate_and_plan(
     let current_day_phase = mating_fitness_params.current_day_phase();
 
     for (
-        entity,
-        name,
-        needs,
-        personality,
-        pos,
-        memory,
-        skills,
-        health,
-        magic_aff,
-        inventory,
-        mut current,
-        aspirations,
-        preferences,
-        fated_love,
-        fated_rival,
+        (entity, name, needs, personality, pos, memory, skills, health),
+        (magic_aff, inventory, mut current, aspirations, preferences, fated_love, fated_rival, fulfillment),
     ) in &mut query
     {
         if current.ticks_remaining != 0 {
@@ -1153,6 +1145,8 @@ pub fn evaluate_and_plan(
             day_phase: current_day_phase,
             has_functional_kitchen,
             has_raw_food_in_stores,
+            social_warmth_deficit: fulfillment
+                .map_or(0.4, |f| f.social_warmth_deficit()),
         };
 
         let focal_cat = res
@@ -2597,11 +2591,21 @@ fn dispatch_step_action(
                         focal_hook,
                     );
             }
+            // §7.W: construct a temporary Fulfillment for cats without the
+            // component (save-loaded before §7.W). The write-back is a no-op
+            // for those cats — only the inflow matters for the witness.
+            let mut fallback_fulfillment =
+                crate::components::fulfillment::Fulfillment::default();
+            let fulfillment_ref = match fulfillment_opt.as_mut() {
+                Some(f) => &mut **f,
+                None => &mut fallback_fulfillment,
+            };
             let outcome = crate::steps::disposition::resolve_socialize(
                 ticks,
                 cat_entity,
                 plan.step_state[step_idx].target_entity,
                 needs,
+                fulfillment_ref,
                 hunting_priors,
                 relationships,
                 colony_map,
@@ -2609,6 +2613,7 @@ fn dispatch_step_action(
                 ec.time.tick,
                 &ec.constants.social,
                 d,
+                &ec.constants.fulfillment,
             );
             outcome.record_if_witnessed(
                 narr.activation.as_deref_mut(),

@@ -3,12 +3,10 @@
 //!
 //! Per §2.3 rows 984–985: `CompensatedProduct` of `thermal_deficit`
 //! via `Logistic(7, 0.6)` (gentler than hangry — cats thermoregulate
-//! passively) and an `affection_deficit` sibling axis via the
-//! loneliness anchor. The affection axis is blocked on the
-//! "split `needs.warmth`" substrate TODO — today the conflated
-//! `needs.warmth` field doesn't separate thermal from affection, so
-//! we port with the thermal axis only and leave the affection-axis
-//! composition slot reserved.
+//! passively). The former affection-axis slot is now served by
+//! `social_warmth` on the §7.W Fulfillment register — self-grooming
+//! is thermal-only; social grooming feeds `social_warmth` via
+//! `GroomOther`.
 //!
 //! Not in any §3.3.2 peer group — Groom(self) stands alone, anchored
 //! to thermal-need dynamics.

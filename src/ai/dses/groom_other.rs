@@ -20,6 +20,7 @@ use crate::components::markers;
 pub const SOCIAL_DEFICIT_INPUT: &str = "social_deficit";
 pub const WARMTH_INPUT: &str = "warmth";
 pub const PHYS_SATISFACTION_INPUT: &str = "phys_satisfaction";
+pub const SOCIAL_WARMTH_DEFICIT_INPUT: &str = "social_warmth_deficit";
 
 pub struct GroomOtherDse {
     id: DseId,
@@ -45,11 +46,24 @@ impl GroomOtherDse {
                     PHYS_SATISFACTION_INPUT,
                     inverted_need_penalty(),
                 )),
+                // §7.W: social_warmth fulfillment deficit. 0.1 floor
+                // so groom_other isn't zeroed when social_warmth is
+                // full — cats still groom for relationship/social
+                // reasons. Lower weight (0.6) so it contributes
+                // without dominating the primary social-deficit drive.
+                Consideration::Scalar(ScalarConsideration::new(
+                    SOCIAL_WARMTH_DEFICIT_INPUT,
+                    Curve::Linear {
+                        slope: 1.0,
+                        intercept: 0.1,
+                    },
+                )),
             ],
-            // RtM weights [1.0, 1.0, 1.0]: all three axes gate. No
-            // lonely signal, no warmth, or high-phys-satisfaction
-            // (so low penalty) — any can zero the score.
-            composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
+            // RtM weights: social_deficit, warmth (personality),
+            // phys_satisfaction, social_warmth_deficit. The fourth
+            // axis at 0.6 contributes meaningfully but doesn't
+            // dominate the primary loneliness signal.
+            composition: Composition::compensated_product(vec![1.0, 1.0, 1.0, 0.6]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
             eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
         }

@@ -1890,6 +1890,7 @@ mod tests {
             day_phase: DayPhase::Dawn,
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
+            social_warmth_deficit: 0.4,
         }
     }
 
@@ -2026,6 +2027,7 @@ mod tests {
             day_phase: DayPhase::Dawn,
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
+            social_warmth_deficit: 0.4,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let best = select_best_action(&scores);
@@ -2156,6 +2158,7 @@ mod tests {
             day_phase: DayPhase::Dawn,
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
+            social_warmth_deficit: 0.4,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let socialize_score = scores
@@ -2410,6 +2413,7 @@ mod tests {
             day_phase: DayPhase::Dawn,
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
+            social_warmth_deficit: 0.4,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let best = select_best_action(&scores);
@@ -2485,6 +2489,7 @@ mod tests {
             day_phase: DayPhase::Dawn,
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
+            social_warmth_deficit: 0.4,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let fight_score = scores.iter().find(|(a, _)| *a == Action::Fight).unwrap().1;
@@ -2578,6 +2583,7 @@ mod tests {
             day_phase: DayPhase::Dawn,
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
+            social_warmth_deficit: 0.4,
         };
         // Build a per-test MarkerSnapshot with Incapacitated set for
         // this cat (the cached shared snapshot only carries colony
@@ -2885,6 +2891,7 @@ mod tests {
             day_phase: DayPhase::Dawn,
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
+            social_warmth_deficit: 0.4,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let wander = scores.iter().find(|(a, _)| *a == Action::Wander).unwrap().1;
@@ -2962,6 +2969,7 @@ mod tests {
             day_phase: DayPhase::Dawn,
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
+            social_warmth_deficit: 0.4,
         };
 
         let scores_full = score_actions(&base, &test_eval_inputs(), &mut rng_full).scores;
