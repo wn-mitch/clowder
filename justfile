@@ -207,6 +207,38 @@ wiki:
     uv run scripts/generate_wiki.py
     mdbook build docs/wiki
 
+# Summary of open work by status (reads docs/open-work/tickets/ frontmatter)
+open-work:
+    #!/usr/bin/env bash
+    for s in in-progress ready parked blocked; do
+      n=$(rg -l "^status: $s\b" docs/open-work/tickets/ -g '!_*.md' 2>/dev/null | wc -l | tr -d ' ')
+      printf "%-14s %s\n" "$s" "$n"
+    done
+    pe=$(ls docs/open-work/pre-existing/*.md 2>/dev/null | wc -l | tr -d ' ')
+    printf "%-14s %s\n" "pre-existing" "$pe"
+
+# List ready tickets with id and title
+open-work-ready:
+    #!/usr/bin/env bash
+    for f in $(rg -l '^status: ready\b' docs/open-work/tickets/ -g '!_*.md' 2>/dev/null | sort); do
+      id=$(rg '^id:' "$f" | head -1 | sed 's/id: *//')
+      title=$(rg '^title:' "$f" | head -1 | sed 's/title: *//')
+      printf "%-5s %s\n" "$id" "$title"
+    done
+
+# List in-progress tickets with id and title
+open-work-wip:
+    #!/usr/bin/env bash
+    for f in $(rg -l '^status: in-progress\b' docs/open-work/tickets/ -g '!_*.md' 2>/dev/null | sort); do
+      id=$(rg '^id:' "$f" | head -1 | sed 's/id: *//')
+      title=$(rg '^title:' "$f" | head -1 | sed 's/title: *//')
+      printf "%-5s %s\n" "$id" "$title"
+    done
+
+# Regenerate docs/open-work.md from per-ticket frontmatter
+open-work-index:
+    uv run scripts/generate_open_work.py
+
 # Generate wiki and open in browser
 wiki-serve:
     uv run scripts/generate_wiki.py
@@ -225,6 +257,12 @@ narrative-editor:
 # only — drop events.jsonl / narrative.jsonl from disk to compare runs.
 logs:
     cd tools/narrative-editor && npm install --silent && npm run dev -- --open /#/logs
+
+# Open the focal-cat trace scrubber (#/trace). Drop a `trace-<name>.jsonl`
+# produced by `just soak-trace <seed> <focal>` to step tick-by-tick through
+# the IAUS L1/L2/L3 decision pipeline for that cat.
+trace:
+    cd tools/narrative-editor && npm install --silent && npm run dev -- --open /#/trace
 
 # Build autotile atlases from Fan-tasy Tileset source images
 atlas-build:

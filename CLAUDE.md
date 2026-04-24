@@ -36,24 +36,36 @@ Three indexes track work across sessions. Read them before starting any new
 system, balance change, or non-trivial refactor — do not default to opening a
 new thread.
 
-- **`docs/open-work.md`** — tactical queue: uncommitted changes, follow-ons, pre-existing issues. Entries are pointers, not plans.
+- **`docs/open-work/tickets/*.md`** — one file per open ticket. Frontmatter
+  (`status`, `cluster`, `parked`, `blocked-by`) is the source of truth. See
+  `docs/open-work.md` for the auto-generated index.
+- **`docs/open-work/pre-existing/*.md`** — long-lived known issues (e.g. test-harness drift) that don't belong on the active queue but shouldn't be forgotten.
+- **`docs/open-work/landed/YYYY-MM.md`** — archive of landed work, one file per month. Preserves commit hashes and dates.
 - **`docs/wiki/systems.md`** — auto-generated status of every `docs/systems/*` stub (Built / Partial / Aspirational) with registered functions. Regenerate via `scripts/generate_wiki.py` if stale.
 - **`docs/balance/*.md`** — per-balance-thread iteration logs. New iterations append to the existing file (see `unified-difficulty-posture.md` for the Iteration 1 → 2 → 3 pattern).
 
+Queue-view commands (run from the repo root):
+
+- `just open-work` — counts by status
+- `just open-work-ready` — ready tickets with id + title
+- `just open-work-wip` — in-progress tickets
+- `just open-work-index` — regenerate `docs/open-work.md`
+
 ### Before starting new work
 
-1. Check `docs/open-work.md` for an in-flight entry matching the request.
+1. Run `just open-work-ready` (or `just open-work-wip`) and check whether the request matches an existing ticket.
 2. Check `docs/wiki/systems.md` — if the request names a system, confirm its current Built/Partial/Aspirational status before proposing changes.
-3. If the request advances an in-flight thread: proceed.
-4. If the request does not match any entry: say so, name whether it advances `docs/systems/project-vision.md` §5 (broaden sideways: grooming, play, mentoring, burial, courtship, preservation, generational knowledge) or a continuity canary, and confirm with the user before writing code.
+3. If the request advances an in-flight ticket: flip its `status: in-progress`, regenerate the index, and proceed.
+4. If the request does not match any ticket: say so, name whether it advances `docs/systems/project-vision.md` §5 (broaden sideways: grooming, play, mentoring, burial, courtship, preservation, generational knowledge) or a continuity canary, and confirm with the user before writing code. When confirmed, open a new ticket under `docs/open-work/tickets/NNN-slug.md` as the first commit of the work.
 
 ### When work completes, defers, or is opened
 
-- Landed work: move the entry from `docs/open-work.md` to a "Landed" section with commit hash, or delete if trivial — same commit that ships the change.
-- Deferred work: leave the entry in place; add a "Blocked by:" or "Resume when:" line.
-- New open items surfaced mid-session: append to the appropriate `open-work.md` section before closing out.
-- Balance changes that produce a new iteration: append the iteration to the thread's existing `docs/balance/*.md` file rather than creating a new one.
-- Any change to `SimulationPlugin::build()` (system added/removed): regenerate `docs/wiki/systems.md` in the same commit.
+- **Landed work:** set `status: done`, `landed-at: <sha>`, `landed-on: <date>` in the ticket's frontmatter; move the file into the current month's `docs/open-work/landed/YYYY-MM.md` as a `## ` entry; regenerate the index — same commit that ships the change. For trivial work you never opened a ticket for, add a brief `## ` entry directly to the current month's landed file.
+- **Deferred work:** set `status: parked`, `parked: <date>`, and append a `## Log` entry naming what blocks resumption. If a specific ticket blocks it, set `status: blocked` and populate `blocked-by: [id]`.
+- **New open items surfaced mid-session:** create a new ticket file under `docs/open-work/tickets/NNN-slug.md` before closing out. Minimum: `status`, `title`, `added`, one sentence of `## Why`.
+- **Balance changes that produce a new iteration:** append the iteration to the thread's existing `docs/balance/*.md` file rather than creating a new one.
+- **Any change to `SimulationPlugin::build()`** (system added/removed): regenerate `docs/wiki/systems.md` in the same commit.
+- **Every ticket status change** (open → in-progress → parked/blocked/done) regenerates `docs/open-work.md` via `just open-work-index` in the same commit.
 
 ## ECS Rules
 
@@ -141,15 +153,15 @@ Design docs for each tunable system live in `docs/systems/`. Major modules and w
 The major in-flight work is the AI substrate refactor. Two documents own state; CLAUDE.md owns none of it.
 
 - **[`docs/systems/ai-substrate-refactor.md`](docs/systems/ai-substrate-refactor.md)** — design specification. §6 (target-taking DSEs) and §4 (marker catalog) are load-bearing for the currently-active port work; §5 (influence maps) and §7 (commitment) are later-phase scope. Spec is the source of truth for axis definitions, weights, and composition modes — do not invent alternatives mid-port.
-- **[`docs/open-work.md` #14](docs/open-work.md)** — live status: what's landed, what's remaining, blockers, balance-tuning deferrals. Check this before proposing a port or marker; update it in the same commit that lands one.
+- **[`docs/open-work/tickets/014-phase-4-follow-ons.md`](docs/open-work/tickets/014-phase-4-follow-ons.md)** — live status: what's landed, what's remaining, blockers, balance-tuning deferrals. Check this before proposing a port or marker; update it in the same commit that lands one. Cluster A itself lives at `docs/open-work/tickets/005-cluster-a-scoring-substrate-refactor.md`.
 
-Balance-tuning on refactor-affected metrics (positive-feature density, mating cadence, magic sub-mode counts) is deferred until the substrate stabilizes — per-knob tuning now would need to be redone after each successor phase. #14 tracks the deferral.
+Balance-tuning on refactor-affected metrics (positive-feature density, mating cadence, magic sub-mode counts) is deferred until the substrate stabilizes — per-knob tuning now would need to be redone after each successor phase. Ticket 014 tracks the deferral.
 
 **Port workflow** (applies to per-DSE ports, marker author systems, and most refactor increments):
 
-1. Read #14 and the relevant spec section before writing code.
+1. Read ticket 014 (and 005 for cluster-A framing) and the relevant spec section before writing code.
 2. Propose scope — axis set, deferrals, caller sites, non-goals — and confirm before implementing.
-3. Land as one commit: factory + resolver/author-system + registration + caller wiring + 10–15 unit tests + landing entry in `docs/open-work.md` Landed section (with hypothesis / concordance / deferred-item notes) + #14's "Remaining" list updated.
+3. Land as one commit: factory + resolver/author-system + registration + caller wiring + 10–15 unit tests + landing entry appended to `docs/open-work/landed/YYYY-MM.md` (with hypothesis / concordance / deferred-item notes) + ticket 014's "Remaining" list updated + `just open-work-index` regenerating `docs/open-work.md`.
 4. Verification: `just check` + `just test` + seed-42 `--duration 900` release soak (survival canaries hold; continuity / activation deltas recorded in the landing entry).
 5. DSE registration sites: three — `SimulationPlugin::build` and both `build_schedule` paths in `main.rs`. Exemplar port: `src/ai/dses/socialize_target.rs` (factory + caller-side resolver + test suite).
 
@@ -163,7 +175,7 @@ The drop-trigger gate (`src/ai/commitment.rs::reconsider_held_intentions`, Phase
 
 Strategy dispatch: `Blind => achieved`; `SingleMinded => achieved || unachievable`; `OpenMinded => achieved || dropped_goal`. Pure function, no ECS access — the 12-row strategy table is unit-testable without a `World`.
 
-**Proxy recipes must mirror the authoritative completion check *with its surrounding guards*.** The 2026-04-23 §7.2 regression (see `docs/open-work.md` #5) was a lifted-condition bug: `achievement_believed` for Resting copied the three-need threshold out of `resolve_goap_plans`'s post-trip block (`goap.rs:~1672`) but dropped the implicit `trips_done` guard — turning a transition check ("plan just closed a trip and needs are sated") into a state poll ("needs are sated right now"). Cats whose ambient needs sat above the thresholds read as "achieved" before any rest action had run; the gate cascaded plan-churn through `evaluate_and_plan` and seed-42 canaries collapsed. When porting a check out of a nested block, replicate the block's preconditions explicitly — a nested arm's guards are part of the condition's meaning.
+**Proxy recipes must mirror the authoritative completion check *with its surrounding guards*.** The 2026-04-23 §7.2 regression (see `docs/open-work/tickets/005-cluster-a-scoring-substrate-refactor.md`) was a lifted-condition bug: `achievement_believed` for Resting copied the three-need threshold out of `resolve_goap_plans`'s post-trip block (`goap.rs:~1672`) but dropped the implicit `trips_done` guard — turning a transition check ("plan just closed a trip and needs are sated") into a state poll ("needs are sated right now"). Cats whose ambient needs sat above the thresholds read as "achieved" before any rest action had run; the gate cascaded plan-churn through `evaluate_and_plan` and seed-42 canaries collapsed. When porting a check out of a nested block, replicate the block's preconditions explicitly — a nested arm's guards are part of the condition's meaning.
 
 ## Headless Mode
 

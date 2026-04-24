@@ -1,5 +1,20 @@
-- shadowfoxes need to have motivations that don't align cleanly onto the normal
-  foxes
+---
+id: PE-002
+title: Three permanently dead features in activation tracker
+status: blocked
+cluster: null
+added: 2026-04-14
+parked: null
+priority: low
+blocked-by: []
+supersedes: []
+related-systems: []
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Current state
 
 ### G. Three permanently dead features in activation tracker (low)
 
