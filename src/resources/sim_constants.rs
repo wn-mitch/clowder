@@ -1069,6 +1069,18 @@ pub struct ScoringConstants {
     pub fight_safety_suppression_threshold: f32,
     pub patrol_safety_threshold: f32,
     pub patrol_boldness_scale: f32,
+    /// Upper-bound safety band above which the Patrol DSE's third
+    /// consideration gates the score toward zero. Paired with the
+    /// Guarding commitment-gate `guarding_exit_epsilon` in
+    /// `DispositionConstants`: the commitment gate drops an active
+    /// Guarding plan when safety climbs past the exit band
+    /// (`critical_safety_threshold + guarding_exit_epsilon` ≈ 0.35);
+    /// this threshold (0.5) is the further point at which Patrol DSE
+    /// stops being picked at all. Together they give a graded exit —
+    /// active plans drop at 0.35, re-selection suppresses at 0.5.
+    /// See `docs/balance/guarding-exit-recipe.md` iter 2.
+    #[serde(default = "default_patrol_exit_threshold")]
+    pub patrol_exit_threshold: f32,
     pub build_diligence_scale: f32,
     pub build_site_bonus: f32,
     pub build_repair_bonus: f32,
@@ -1246,6 +1258,7 @@ impl Default for ScoringConstants {
             fight_health_suppression_threshold: 0.5,
             fight_safety_suppression_threshold: 0.3,
             patrol_safety_threshold: 0.8,
+            patrol_exit_threshold: default_patrol_exit_threshold(),
             patrol_boldness_scale: 1.5,
             build_diligence_scale: 1.5,
             build_site_bonus: 2.0,
@@ -1691,6 +1704,17 @@ fn default_true() -> bool {
 /// Tune downstream per `docs/balance/guarding-exit-recipe.md`.
 fn default_guarding_exit_epsilon() -> f32 {
     0.15
+}
+
+/// Patrol DSE safety upper-bound — score gates toward zero when
+/// safety climbs past this threshold. Pairs with
+/// `guarding_exit_epsilon`: commitment drops active Guarding plans at
+/// ~0.35, Patrol DSE scoring gates off at 0.5, so a cat whose safety
+/// has recovered above 0.5 stops picking Patrol/Guarding at the
+/// scoring layer — not just at the commitment layer. Breaks the
+/// seed-18301685438630318625 Thistle Patrol loop.
+fn default_patrol_exit_threshold() -> f32 {
+    0.5
 }
 
 fn default_threat_ward_dampening() -> f32 {

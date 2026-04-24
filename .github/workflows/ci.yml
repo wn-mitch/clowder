@@ -27,8 +27,8 @@ jobs:
             pkg-config \
             libwayland-dev \
             libxkbcommon-dev
-      - run: cargo check
-      - run: cargo clippy -- -D warnings
+      - run: cargo check --all-targets
+      - run: cargo clippy --all-targets --all-features -- -D warnings
 
   test:
     name: Test

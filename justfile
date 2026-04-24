@@ -37,6 +37,32 @@ check-canaries LOGFILE="logs/events.jsonl":
 check-continuity LOGFILE="logs/events.jsonl":
     scripts/check_continuity.sh {{LOGFILE}}
 
+# Query tools over a sim run's JSONL logs. Wraps the jq recipes in
+# docs/diagnostics/log-queries.md as seven parameterized subtools with
+# a consistent envelope (query echo, scan stats, stable IDs, narrative,
+# next-query hints). Intended as an agent-friendly drill-down surface,
+# complementing /diagnose-run's fixed-shape report.
+#
+# Subtools: run-summary | events | deaths | narrative | trace |
+#           cat-timeline | anomalies
+# See `just q <subtool> --help` for flags, or .claude/skills/logq/SKILL.md.
+#
+# Examples:
+#   just q run-summary logs/tuned-42
+#   just q deaths logs/tuned-42 --cause=Starvation
+#   just q trace logs/tuned-42 Simba --layer=L3
+#   just q anomalies logs/tuned-42
+#   just q cat-timeline logs/tuned-42 Simba --tick-range=3800..4000
+q *ARGS:
+    python3 scripts/logq/logq.py {{ARGS}}
+
+# Run logq's envelope + subtool tests (stdlib unittest, no pytest dep).
+# Runs the file directly because `unittest discover` requires the
+# tests/ dir to be a Python package (which would mean adding an
+# __init__.py and polluting the Rust test layout).
+test-logq:
+    python3 tests/logq/test_envelope.py -v
+
 # Deep-soak with a focal-cat trace sidecar. Writes to
 # logs/tuned-<seed>/{events,narrative,trace-<focal>}.jsonl. Trace
 # records decompose per-tick L1/L2/L3 state for one focal cat per §11
@@ -176,7 +202,7 @@ test:
 
 # Check + clippy + step-resolver contract lint
 check:
-    cargo check && cargo clippy -- -D warnings && bash scripts/check_step_contracts.sh
+    cargo check --all-targets && cargo clippy --all-targets --all-features -- -D warnings && bash scripts/check_step_contracts.sh
 
 # Generate a random template authoring prompt
 template-prompt:
