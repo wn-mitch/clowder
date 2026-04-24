@@ -222,6 +222,18 @@ pub fn flee_or_fight(midpoint: f32) -> Curve {
     }
 }
 
+/// Explore-saturation anchor: `Logistic(10, 0.3)`. Sharp decay when
+/// the local unexplored fraction drops below ~0.3 (i.e. ~70% explored).
+/// Ticket 001 Sub-2. Same steepness as `flee_or_fight` / `sleep_dep`;
+/// midpoint at 0.3 puts the inflection right at the "area is familiar"
+/// threshold.
+pub fn explore_saturation() -> Curve {
+    Curve::Logistic {
+        steepness: 10.0,
+        midpoint: 0.3,
+    }
+}
+
 /// Inverted-need-penalty anchor:
 /// `Composite { Logistic(5, 0.3), Invert }`. Reused by Socialize
 /// phys-satisfaction and Groom(other) temper penalty.
@@ -421,6 +433,34 @@ mod tests {
         // Steepness 10: very sharp transition near midpoint.
         assert!(c.evaluate(0.4) < 0.3);
         assert!(c.evaluate(0.6) > 0.7);
+    }
+
+    #[test]
+    fn explore_saturation_midpoint() {
+        let c = explore_saturation();
+        assert!(approx(c.evaluate(0.3), 0.5, 1e-4));
+    }
+
+    #[test]
+    fn explore_saturation_suppressed_when_mostly_explored() {
+        let c = explore_saturation();
+        // At 90% explored (unexplored = 0.1), should be deeply suppressed.
+        assert!(
+            c.evaluate(0.1) < 0.15,
+            "expected < 0.15 at 0.1, got {}",
+            c.evaluate(0.1)
+        );
+    }
+
+    #[test]
+    fn explore_saturation_active_when_unexplored() {
+        let c = explore_saturation();
+        // At 20% explored (unexplored = 0.8), still fully motivated.
+        assert!(
+            c.evaluate(0.8) > 0.99,
+            "expected > 0.99 at 0.8, got {}",
+            c.evaluate(0.8)
+        );
     }
 
     #[test]

@@ -438,9 +438,13 @@ fn build_schedule() -> Schedule {
                     // §4.3 marker authors.
                     clowder::systems::incapacitation::update_incapacitation,
                     clowder::systems::growth::update_life_stage_markers,
+                    clowder::systems::needs::update_injury_marker,
+                    clowder::systems::items::update_inventory_markers,
+                    clowder::systems::coordination::update_directive_markers,
                     clowder::systems::needs::decay_grooming,
                     clowder::systems::needs::eat_from_inventory,
                     clowder::systems::needs::decay_exploration,
+                    clowder::systems::needs::stamp_passive_exploration,
                     clowder::systems::needs::bond_proximity_social,
                     clowder::systems::fulfillment::decay_fulfillment,
                     clowder::systems::fulfillment::bond_proximity_social_warmth,
@@ -728,7 +732,9 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
         registry
             .cat_dses
             .push(clowder::ai::dses::coordinate_dse(&scoring));
-        registry.cat_dses.push(clowder::ai::dses::explore_dse());
+        registry
+            .cat_dses
+            .push(clowder::ai::dses::explore_dse(&scoring));
         registry
             .cat_dses
             .push(clowder::ai::dses::wander_dse(&scoring));
@@ -1459,7 +1465,9 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
         registry
             .cat_dses
             .push(clowder::ai::dses::coordinate_dse(&scoring));
-        registry.cat_dses.push(clowder::ai::dses::explore_dse());
+        registry
+            .cat_dses
+            .push(clowder::ai::dses::explore_dse(&scoring));
         registry
             .cat_dses
             .push(clowder::ai::dses::wander_dse(&scoring));

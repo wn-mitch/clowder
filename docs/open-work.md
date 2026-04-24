@@ -14,23 +14,25 @@ _Last generated: 2026-04-24._
 
 | Status | Count |
 |---|---|
-| In progress | 3 |
+| In progress | 5 |
 | Ready | 8 |
-| Parked | 2 |
+| Parked | 1 |
 | Blocked | 8 |
 | Done (awaiting archive) | 2 |
-| **Open total** | **21** |
+| **Open total** | **22** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-index` (regenerate this file).
 
-## In progress (3)
+## In progress (5)
 
+- **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[005](docs/open-work/tickets/005-cluster-a-scoring-substrate-refactor.md)** — Scoring substrate refactor cluster (Cluster A — Foundational) — _[A] · added 2026-04-20_
 - **[013](docs/open-work/tickets/013-spec-follow-on-debts-from-ai-substrate-refactor.md)** — Spec-follow-on debts from AI substrate refactor — _added 2026-04-21_
 - **[014](docs/open-work/tickets/014-phase-4-follow-ons.md)** — Phase 4 follow-ons — target-taking registration + markers + mate-gender + Mating/PracticeMagic magnitude — _added 2026-04-22_
+- **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
 
 ## Ready (8)
 
@@ -43,9 +45,8 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[020](docs/open-work/tickets/020-namedlandmark-substrate.md)** — NamedLandmark substrate (cross-consumer naming) — _added 2026-04-22_
 - **[023](docs/open-work/tickets/023-shadowfox-distinct-motivations.md)** — Shadowfox motivations distinct from normal foxes — _added 2026-04-14_
 
-## Parked (2)
+## Parked (1)
 
-- **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[015](docs/open-work/tickets/015-alloparenting-reframe-b.md)** — Alloparenting Reframe B — mama drops kitten at hearth near resting elder — _parked 2026-04-22 · added 2026-04-22_
 
 ## Blocked (8)
@@ -73,7 +74,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/). Recent months:
 
-- [2026-04](docs/open-work/landed/2026-04.md) — 27 entries
+- [2026-04](docs/open-work/landed/2026-04.md) — 29 entries
 
 ## Conventions
 

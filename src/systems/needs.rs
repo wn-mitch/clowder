@@ -2,6 +2,7 @@ use bevy_ecs::prelude::*;
 
 use crate::components::identity::{Age, LifeStage, Orientation};
 use crate::components::magic::Inventory;
+use crate::components::markers::Injured;
 use crate::components::mental::{LocationPreferences, Mood, MoodModifier};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Health, Needs, Position};
@@ -287,6 +288,63 @@ pub fn decay_exploration(
     mut exploration_map: ResMut<crate::resources::ExplorationMap>,
 ) {
     exploration_map.decay(constants.disposition.exploration_decay_rate);
+}
+
+// ---------------------------------------------------------------------------
+// stamp_passive_exploration — passive perception (fog-of-war reveal)
+// ---------------------------------------------------------------------------
+
+/// Each living cat passively perceives its surroundings every tick, marking
+/// a small radius of tiles as explored.  This is the "passive perception"
+/// layer — cats notice their environment just by being in it, independent
+/// of the explicit Explore→Survey action ("active perception") which stamps
+/// a larger radius on completion.
+///
+/// Runs right after `decay_exploration` so that home-territory tiles are
+/// re-stamped before the next AI evaluation reads `unexplored_fraction_nearby`.
+pub fn stamp_passive_exploration(
+    cats: Query<&Position, Without<Dead>>,
+    mut exploration_map: ResMut<crate::resources::ExplorationMap>,
+    constants: Res<SimConstants>,
+) {
+    let radius = constants.disposition.passive_explore_radius;
+    for pos in &cats {
+        exploration_map.explore_area(pos.x, pos.y, radius);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// §4 per-cat Injured marker author
+// ---------------------------------------------------------------------------
+
+/// Author the `Injured` ZST on living cats with at least one unhealed
+/// injury of any severity; remove it otherwise.
+///
+/// **Predicate** — `health.injuries.iter().any(|inj| !inj.healed)`.
+/// Broader than `Incapacitated` (which requires `InjuryKind::Severe`);
+/// any unhealed Minor, Moderate, or Severe injury sets the marker.
+///
+/// **Ordering** — Chain 2a, after `update_incapacitation`. Both markers
+/// derive from `Health.injuries` but are independent predicates.
+///
+/// **Lifecycle** — transition-only insert/remove; idempotent in steady
+/// state. Dead cats filtered via `Without<Dead>`.
+pub fn update_injury_marker(
+    mut commands: Commands,
+    cats: Query<(Entity, &Health, Has<Injured>), Without<Dead>>,
+) {
+    for (entity, health, has_marker) in cats.iter() {
+        let is_injured = health.injuries.iter().any(|inj| !inj.healed);
+        match (is_injured, has_marker) {
+            (true, false) => {
+                commands.entity(entity).insert(Injured);
+            }
+            (false, true) => {
+                commands.entity(entity).remove::<Injured>();
+            }
+            _ => {}
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -836,5 +894,123 @@ mod tests {
             after, 1.0,
             "kittens should not decay mating; got {after}"
         );
+    }
+
+    // --- update_injury_marker ---
+
+    use crate::components::physical::{DeathCause, Injury, InjuryKind, InjurySource};
+
+    fn setup_injury_marker() -> (World, Schedule) {
+        let world = World::new();
+        let mut schedule = Schedule::default();
+        schedule.add_systems(update_injury_marker);
+        (world, schedule)
+    }
+
+    fn injury(kind: InjuryKind, healed: bool) -> Injury {
+        Injury {
+            kind,
+            tick_received: 0,
+            healed,
+            source: InjurySource::Unknown,
+        }
+    }
+
+    fn has_injured(world: &World, entity: Entity) -> bool {
+        world.get::<Injured>(entity).is_some()
+    }
+
+    #[test]
+    fn no_injuries_no_injured_marker() {
+        let (mut world, mut schedule) = setup_injury_marker();
+        let cat = world.spawn(Health::default()).id();
+        schedule.run(&mut world);
+        assert!(!has_injured(&world, cat));
+    }
+
+    #[test]
+    fn unhealed_minor_sets_injured() {
+        let (mut world, mut schedule) = setup_injury_marker();
+        let health = Health {
+            injuries: vec![injury(InjuryKind::Minor, false)],
+            ..Health::default()
+        };
+        let cat = world.spawn(health).id();
+        schedule.run(&mut world);
+        assert!(has_injured(&world, cat), "any unhealed injury sets Injured");
+    }
+
+    #[test]
+    fn unhealed_severe_sets_injured() {
+        let (mut world, mut schedule) = setup_injury_marker();
+        let health = Health {
+            injuries: vec![injury(InjuryKind::Severe, false)],
+            ..Health::default()
+        };
+        let cat = world.spawn(health).id();
+        schedule.run(&mut world);
+        assert!(has_injured(&world, cat));
+    }
+
+    #[test]
+    fn healed_injury_no_marker() {
+        let (mut world, mut schedule) = setup_injury_marker();
+        let health = Health {
+            injuries: vec![injury(InjuryKind::Minor, true)],
+            ..Health::default()
+        };
+        let cat = world.spawn(health).id();
+        schedule.run(&mut world);
+        assert!(!has_injured(&world, cat), "healed injury should not set marker");
+    }
+
+    #[test]
+    fn heal_transition_removes_injured() {
+        let (mut world, mut schedule) = setup_injury_marker();
+        let health = Health {
+            injuries: vec![injury(InjuryKind::Moderate, false)],
+            ..Health::default()
+        };
+        let cat = world.spawn(health).id();
+        schedule.run(&mut world);
+        assert!(has_injured(&world, cat));
+
+        world.get_mut::<Health>(cat).unwrap().injuries[0].healed = true;
+        schedule.run(&mut world);
+        assert!(!has_injured(&world, cat), "healing should remove Injured marker");
+    }
+
+    #[test]
+    fn dead_cats_skip_injured_marker() {
+        let (mut world, mut schedule) = setup_injury_marker();
+        let health = Health {
+            injuries: vec![injury(InjuryKind::Severe, false)],
+            ..Health::default()
+        };
+        let cat = world
+            .spawn((
+                health,
+                Dead {
+                    tick: 0,
+                    cause: DeathCause::Injury,
+                },
+            ))
+            .id();
+        schedule.run(&mut world);
+        assert!(!has_injured(&world, cat), "dead cats should not get Injured marker");
+    }
+
+    #[test]
+    fn injured_marker_idempotent() {
+        let (mut world, mut schedule) = setup_injury_marker();
+        let health = Health {
+            injuries: vec![injury(InjuryKind::Minor, false)],
+            ..Health::default()
+        };
+        let cat = world.spawn(health).id();
+        schedule.run(&mut world);
+        assert!(has_injured(&world, cat));
+        schedule.run(&mut world);
+        assert!(has_injured(&world, cat), "steady-state should not flap");
     }
 }

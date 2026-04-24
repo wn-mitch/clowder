@@ -214,6 +214,8 @@ just soak 42    # writes logs/tuned-42/{events,narrative}.jsonl
 
 Debug mode is ~4× slower than release and produces far less sim time per second of wall — **always `--release` for verification**; debug is for development-time feedback only. Save the footer from each run (grep `_footer` in the event log) before and after any tuning change to produce a diff.
 
+**Preserve prior runs.** When running ad-hoc soaks (outside `just soak`), write to a versioned subfolder (e.g., `logs/tuned-42-v2/`, `logs/tuned-42-v3/`) rather than overwriting `logs/tuned-42/`. Overwritten logs can't be diffed against. `just soak` itself always writes to `logs/tuned-<seed>/` — that's the canonical "latest" location; manual runs during iteration should use a suffix.
+
 Multi-seed sweeps (seeds 99/7/2025/314) are a follow-up for claims you want to generalize — only do them once a single-seed deep-soak looks right.
 
 ### Focal-cat trace (§11 substrate refactor)

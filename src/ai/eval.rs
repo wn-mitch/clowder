@@ -61,6 +61,8 @@ pub struct DseRegistry {
     /// aggregate per-candidate scores into (action_score, winning_target).
     pub target_taking_dses: Vec<super::target_dse::TargetTakingDse>,
     pub fox_dses: Vec<Box<dyn Dse>>,
+    pub hawk_dses: Vec<Box<dyn Dse>>,
+    pub snake_dses: Vec<Box<dyn Dse>>,
     pub aspiration_dses: Vec<Box<dyn Dse>>,
     pub coordinator_dses: Vec<Box<dyn Dse>>,
     pub narrative_dses: Vec<Box<dyn Dse>>,
@@ -89,10 +91,28 @@ impl DseRegistry {
             .map(|boxed| boxed.as_ref())
     }
 
+    /// Find a registered hawk DSE by its string id.
+    pub fn hawk_dse(&self, id: &str) -> Option<&dyn Dse> {
+        self.hawk_dses
+            .iter()
+            .find(|d| d.id().0 == id)
+            .map(|boxed| boxed.as_ref())
+    }
+
+    /// Find a registered snake DSE by its string id.
+    pub fn snake_dse(&self, id: &str) -> Option<&dyn Dse> {
+        self.snake_dses
+            .iter()
+            .find(|d| d.id().0 == id)
+            .map(|boxed| boxed.as_ref())
+    }
+
     pub fn total(&self) -> usize {
         self.cat_dses.len()
             + self.target_taking_dses.len()
             + self.fox_dses.len()
+            + self.hawk_dses.len()
+            + self.snake_dses.len()
             + self.aspiration_dses.len()
             + self.coordinator_dses.len()
             + self.narrative_dses.len()
@@ -126,6 +146,8 @@ pub trait DseRegistryAppExt {
         dse: super::target_dse::TargetTakingDse,
     ) -> &mut Self;
     fn add_fox_dse(&mut self, dse: Box<dyn Dse>) -> &mut Self;
+    fn add_hawk_dse(&mut self, dse: Box<dyn Dse>) -> &mut Self;
+    fn add_snake_dse(&mut self, dse: Box<dyn Dse>) -> &mut Self;
     fn add_aspiration_dse(&mut self, dse: Box<dyn Dse>) -> &mut Self;
     fn add_coordinator_dse(&mut self, dse: Box<dyn Dse>) -> &mut Self;
     fn add_narrative_dse(&mut self, dse: Box<dyn Dse>) -> &mut Self;
@@ -155,6 +177,22 @@ impl DseRegistryAppExt for App {
         self.world_mut()
             .get_resource_or_insert_with(DseRegistry::new)
             .fox_dses
+            .push(dse);
+        self
+    }
+
+    fn add_hawk_dse(&mut self, dse: Box<dyn Dse>) -> &mut Self {
+        self.world_mut()
+            .get_resource_or_insert_with(DseRegistry::new)
+            .hawk_dses
+            .push(dse);
+        self
+    }
+
+    fn add_snake_dse(&mut self, dse: Box<dyn Dse>) -> &mut Self {
+        self.world_mut()
+            .get_resource_or_insert_with(DseRegistry::new)
+            .snake_dses
             .push(dse);
         self
     }

@@ -964,9 +964,15 @@ pub fn score_actions(
     }
 
     // --- Coordinate (§2.3: WS of diligence + directive_count + ambition) ---
-    if ctx.is_coordinator_with_directives {
+    // §4 batch 1: inline `if ctx.is_coordinator_with_directives` guard
+    // retired. The coordinate DSE now carries
+    // `.require("IsCoordinatorWithDirectives")` on its EligibilityFilter,
+    // so `score_dse_by_id` returns 0.0 for non-coordinator cats.
+    {
         let score = score_dse_by_id("coordinate", ctx, inputs);
-        scores.push((Action::Coordinate, score + jitter(rng, s.jitter_range)));
+        if score > 0.0 {
+            scores.push((Action::Coordinate, score + jitter(rng, s.jitter_range)));
+        }
     }
 
     // --- Mentor (§2.3: WS of warmth + diligence + ambition) ---
@@ -1745,7 +1751,7 @@ mod tests {
             r.cat_dses.push(crate::ai::dses::build_dse(&scoring));
             r.cat_dses.push(crate::ai::dses::farm_dse());
             r.cat_dses.push(crate::ai::dses::coordinate_dse(&scoring));
-            r.cat_dses.push(crate::ai::dses::explore_dse());
+            r.cat_dses.push(crate::ai::dses::explore_dse(&scoring));
             r.cat_dses.push(crate::ai::dses::wander_dse(&scoring));
             r.cat_dses.push(crate::ai::dses::herbcraft_gather_dse());
             r.cat_dses.push(crate::ai::dses::herbcraft_prepare_dse());
@@ -3589,5 +3595,41 @@ mod tests {
             None,
         );
         assert_eq!(plain, traced);
+    }
+
+    #[test]
+    fn explore_score_drops_with_saturation() {
+        // Ticket 001 Sub-2: Explore's Logistic curve on unexplored_nearby
+        // should produce a meaningful score drop between fresh and familiar
+        // areas. CompensatedProduct softens the product, so the ratio won't
+        // be as dramatic as the raw curve — but the familiar-area score
+        // should be low enough that peers (Hunt, Socialize) can outcompete.
+        let sc = default_scoring();
+        let needs = Needs::default();
+        let mut personality = default_personality();
+        personality.curiosity = 0.7;
+
+        let mut ctx_fresh = ctx(&needs, &personality, &sc);
+        ctx_fresh.unexplored_nearby = 1.0;
+
+        let mut ctx_familiar = ctx(&needs, &personality, &sc);
+        ctx_familiar.unexplored_nearby = 0.1;
+
+        let inputs = test_eval_inputs();
+
+        let score_fresh = score_dse_by_id("explore", &ctx_fresh, &inputs);
+        let score_familiar = score_dse_by_id("explore", &ctx_familiar, &inputs);
+
+        // Fresh should be materially higher than familiar.
+        assert!(
+            score_fresh > score_familiar * 2.5,
+            "fresh ({score_fresh}) should be ≥2.5× familiar ({score_familiar})"
+        );
+        // Familiar-area score should be low enough to lose to typical
+        // peer DSEs (Hunt ~0.4, Socialize ~0.3 at moderate need).
+        assert!(
+            score_familiar < 0.30,
+            "familiar-area explore ({score_familiar}) should be < 0.30"
+        );
     }
 }

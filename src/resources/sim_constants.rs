@@ -1520,7 +1520,33 @@ pub struct DispositionConstants {
     pub survey_mastery_gain: f32,
     pub survey_colony_discovery_scale: f32,
     pub survey_personal_discovery_scale: f32,
+    /// Radius around the surveying cat that gets marked explored per
+    /// survey step. Cats can see around themselves — a single-tile stamp
+    /// doesn't model that. Default 4 (9×9 = 81 tiles).
+    #[serde(default = "default_survey_explore_radius")]
+    pub survey_explore_radius: i32,
     pub exploration_decay_rate: f32,
+    /// Radius around each living cat that gets marked explored every tick,
+    /// modelling passive awareness — cats notice their surroundings as they
+    /// move through the world.  Smaller than `survey_explore_radius` (active
+    /// perception).  Default 2 (5×5 = 25 tiles).
+    #[serde(default = "default_passive_explore_radius")]
+    pub passive_explore_radius: i32,
+    /// Radius used by `unexplored_fraction_nearby` to determine how
+    /// familiar a cat's local area feels.  Decoupled from `explore_range`
+    /// (action distance) — a cat's sense of "I know this place" should
+    /// cover a smaller area than "how far I could walk to explore."
+    /// Default 10 (21×21 = 441 tiles).
+    #[serde(default = "default_explore_perception_radius")]
+    pub explore_perception_radius: i32,
+    /// `still_goal` threshold for the §7.2 commitment gate on Exploring
+    /// plans.  When `unexplored_fraction_nearby` drops below this value,
+    /// the cat's desire to explore fades and an OpenMinded plan may be
+    /// dropped.  Set below the Logistic saturation midpoint (0.3) so
+    /// Explore plans survive in moderately-explored territory but drop
+    /// once the area is thoroughly familiar.  Default 0.15.
+    #[serde(default = "default_explore_satiation_threshold")]
+    pub explore_satiation_threshold: f32,
     pub explore_den_discovery_chance: f32,
     pub deliver_directive_duration: u64,
     pub deliver_directive_respect_gain: f32,
@@ -1912,7 +1938,11 @@ impl Default for DispositionConstants {
             survey_mastery_gain: 0.02,
             survey_colony_discovery_scale: 0.02,
             survey_personal_discovery_scale: 0.005,
-            exploration_decay_rate: 0.00005,
+            survey_explore_radius: default_survey_explore_radius(),
+            exploration_decay_rate: 0.0000125,
+            passive_explore_radius: default_passive_explore_radius(),
+            explore_perception_radius: default_explore_perception_radius(),
+            explore_satiation_threshold: default_explore_satiation_threshold(),
             explore_den_discovery_chance: 0.08,
             deliver_directive_duration: 50,
             deliver_directive_respect_gain: 0.005,
@@ -2463,6 +2493,22 @@ fn default_no_kitchen_pressure_multiplier() -> f32 {
 
 fn default_construct_site_directive_priority() -> f32 {
     0.85
+}
+
+fn default_survey_explore_radius() -> i32 {
+    4
+}
+
+fn default_passive_explore_radius() -> i32 {
+    2
+}
+
+fn default_explore_perception_radius() -> i32 {
+    10
+}
+
+fn default_explore_satiation_threshold() -> f32 {
+    0.15
 }
 
 impl Default for CoordinationConstants {

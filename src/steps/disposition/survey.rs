@@ -5,9 +5,10 @@ use crate::steps::{StepOutcome, StepResult};
 
 /// # GOAP step resolver: `Survey`
 ///
-/// **Real-world effect** — on completion, marks the tile explored
-/// in the `ExplorationMap` and adds respect + purpose need
-/// deltas proportional to the discovery value returned.
+/// **Real-world effect** — on completion, marks a disc of tiles
+/// (radius `survey_explore_radius`) as explored in the
+/// `ExplorationMap` and adds respect + purpose need deltas
+/// proportional to the mean discovery value across the disc.
 ///
 /// **Plan-level preconditions** — emitted under `ZoneIs(Wilds)` by
 /// `src/ai/planner/actions.rs::explore_actions`; a `ExploreSurvey`
@@ -29,7 +30,8 @@ pub fn resolve_survey(
     d: &DispositionConstants,
 ) -> StepOutcome<()> {
     if ticks >= d.survey_duration {
-        let discovery = exploration_map.explore_tile(pos.x, pos.y);
+        let discovery =
+            exploration_map.explore_area(pos.x, pos.y, d.survey_explore_radius);
 
         let colony_bonus = discovery * d.survey_colony_discovery_scale;
         needs.respect = (needs.respect + colony_bonus).min(1.0);

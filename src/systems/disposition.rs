@@ -66,6 +66,7 @@ pub struct NarrativeEmitter<'w> {
 /// hitting Bevy's 16-parameter system limit. Future marker batches
 /// add their queries here rather than as top-level system params.
 #[derive(bevy_ecs::system::SystemParam)]
+#[allow(clippy::type_complexity)]
 pub struct MarkerQueries<'w, 's> {
     pub life_stage: Query<
         'w,
@@ -75,6 +76,18 @@ pub struct MarkerQueries<'w, 's> {
             Has<markers::Young>,
             Has<markers::Adult>,
             Has<markers::Elder>,
+        ),
+    >,
+    /// §4 batch 1: per-cat inventory + state + role markers.
+    pub per_cat: Query<
+        'w,
+        's,
+        (
+            Has<markers::Injured>,
+            Has<markers::HasHerbsInInventory>,
+            Has<markers::HasRemedyHerbs>,
+            Has<markers::HasWardHerbs>,
+            Has<markers::IsCoordinatorWithDirectives>,
         ),
     >,
 }
@@ -441,19 +454,17 @@ pub fn evaluate_dispositions(
         })
         .collect();
 
-    let has_construction_site = building_query
-        .iter()
-        .any(|(_, _, _, site, _)| site.is_some());
-    let has_damaged_building = building_query
-        .iter()
-        .any(|(_, s, _, site, _)| site.is_none() && s.condition < d.damaged_building_threshold);
-    let has_garden = building_query
-        .iter()
-        .any(|(_, s, _, site, _)| s.kind == StructureType::Garden && site.is_none());
+    // §4 colony-scoped marker predicates — shared helpers eliminate
+    // duplication with goap.rs (previously computed identically in both).
+    let bldg_state = crate::systems::buildings::scan_colony_buildings(
+        building_query.iter().map(|(_, s, _, site, _)| (s, site)),
+        d.damaged_building_threshold,
+    );
+    let has_construction_site = bldg_state.has_construction_site;
+    let has_damaged_building = bldg_state.has_damaged_building;
+    let has_garden = bldg_state.has_garden;
+    let has_functional_kitchen = bldg_state.has_functional_kitchen;
     markers.set_colony(markers::HasGarden::KEY, has_garden);
-    let has_functional_kitchen = building_query.iter().any(|(_, s, _, site, _)| {
-        s.kind == StructureType::Kitchen && site.is_none() && s.effectiveness() > 0.0
-    });
     markers.set_colony(markers::HasFunctionalKitchen::KEY, has_functional_kitchen);
     let has_raw_food_in_stores = cooking.has_raw_food_in_stores();
     markers.set_colony(markers::HasRawFoodInStores::KEY, has_raw_food_in_stores);
@@ -464,16 +475,10 @@ pub fn evaluate_dispositions(
         .iter()
         .any(|(_, h, _)| h.kind == crate::components::magic::HerbKind::Thornbriar);
 
-    let ward_strength_low = {
-        let ward_count = ward_query.iter().count();
-        if ward_count == 0 {
-            true
-        } else {
-            let avg: f32 =
-                ward_query.iter().map(|(w, _)| w.strength).sum::<f32>() / ward_count as f32;
-            avg < d.ward_strength_low_threshold
-        }
-    };
+    let ward_strength_low = crate::systems::magic::is_ward_strength_low(
+        ward_query.iter().map(|(w, _)| w),
+        d.ward_strength_low_threshold,
+    );
     markers.set_colony(markers::WardStrengthLow::KEY, ward_strength_low);
 
     let colony_injury_count = query
@@ -544,7 +549,7 @@ pub fn evaluate_dispositions(
 
     for (
         (entity, _name, needs, personality, pos, memory, skills, health),
-        (magic_aff, inventory, mut current, aspirations, preferences, fated_love, fated_rival, fulfillment),
+        (magic_aff, _inventory, mut current, aspirations, preferences, fated_love, fated_rival, fulfillment),
     ) in &mut query
     {
         if current.ticks_remaining != 0 {
@@ -637,6 +642,20 @@ pub fn evaluate_dispositions(
             markers.set_entity(markers::Adult::KEY, entity, a);
             markers.set_entity(markers::Elder::KEY, entity, e);
         }
+        // §4 batch 1: per-cat markers read from authored ZSTs.
+        if let Ok((injured, has_herbs, has_remedy, has_ward, is_coord_dir)) =
+            side_effects.marker_queries.per_cat.get(entity)
+        {
+            markers.set_entity(markers::Injured::KEY, entity, injured);
+            markers.set_entity(markers::HasHerbsInInventory::KEY, entity, has_herbs);
+            markers.set_entity(markers::HasRemedyHerbs::KEY, entity, has_remedy);
+            markers.set_entity(markers::HasWardHerbs::KEY, entity, has_ward);
+            markers.set_entity(
+                markers::IsCoordinatorWithDirectives::KEY,
+                entity,
+                is_coord_dir,
+            );
+        }
 
         let has_herbs_nearby = herb_positions.iter().any(|(_, hp)| {
             crate::systems::sensing::observer_sees_at(
@@ -705,12 +724,13 @@ pub fn evaluate_dispositions(
             magic_skill: skills.magic,
             herbcraft_skill: skills.herbcraft,
             has_herbs_nearby,
-            has_herbs_in_inventory: inventory
-                .slots
-                .iter()
-                .any(|s| matches!(s, crate::components::ItemSlot::Herb(_))),
-            has_remedy_herbs: inventory.has_remedy_herb(),
-            has_ward_herbs: inventory.has_ward_herb(),
+            // §4 batch 1: read from authored markers via MarkerSnapshot.
+            has_herbs_in_inventory: markers.has(
+                crate::components::markers::HasHerbsInInventory::KEY,
+                entity,
+            ),
+            has_remedy_herbs: markers.has(crate::components::markers::HasRemedyHerbs::KEY, entity),
+            has_ward_herbs: markers.has(crate::components::markers::HasWardHerbs::KEY, entity),
             thornbriar_available,
             colony_injury_count,
             ward_strength_low,
@@ -718,9 +738,10 @@ pub fn evaluate_dispositions(
             tile_corruption,
             nearby_corruption_level: 0.0, // legacy disposition path — not wired yet
             on_special_terrain,
-            is_coordinator_with_directives: directive_snapshot
-                .get(&entity)
-                .is_some_and(|(len, _)| *len > 0),
+            is_coordinator_with_directives: markers.has(
+                crate::components::markers::IsCoordinatorWithDirectives::KEY,
+                entity,
+            ),
             pending_directive_count: directive_snapshot.get(&entity).map_or(0, |(len, _)| *len),
             has_mentoring_target: has_mentoring_target_fn(entity, pos, skills),
             prey_nearby,
@@ -736,7 +757,7 @@ pub fn evaluate_dispositions(
             unexplored_nearby: colony.exploration_map.unexplored_fraction_nearby(
                 pos.x,
                 pos.y,
-                d.explore_range,
+                d.explore_perception_radius,
                 0.5,
             ),
             fox_scent_level: colony.fox_scent_map.get(pos.x, pos.y),

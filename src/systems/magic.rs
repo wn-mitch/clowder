@@ -21,6 +21,26 @@ use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::resources::time::{Season, SimConfig, TimeState};
 
 // ---------------------------------------------------------------------------
+// §4 colony-scoped ward marker predicate
+// ---------------------------------------------------------------------------
+
+/// True when the colony has no wards at all, or the average ward strength
+/// is below `threshold`. Called from both scoring systems to populate the
+/// `MarkerSnapshot` without duplicating predicate logic.
+pub fn is_ward_strength_low<'a>(
+    wards: impl Iterator<Item = &'a Ward>,
+    threshold: f32,
+) -> bool {
+    let mut count = 0u32;
+    let mut sum = 0.0f32;
+    for ward in wards {
+        count += 1;
+        sum += ward.strength;
+    }
+    count == 0 || (sum / count as f32) < threshold
+}
+
+// ---------------------------------------------------------------------------
 // CorruptionPushback — message emitted by positive colony events
 // ---------------------------------------------------------------------------
 
@@ -1134,5 +1154,52 @@ mod tests {
             "health should increase by healing_poultice_rate per tick, got {}",
             health.current
         );
+    }
+
+    // --- is_ward_strength_low ---
+
+    #[test]
+    fn no_wards_is_low() {
+        assert!(is_ward_strength_low(std::iter::empty(), 0.3));
+    }
+
+    #[test]
+    fn strong_wards_not_low() {
+        let ward = Ward {
+            kind: WardKind::Thornward,
+            strength: 0.8,
+            decay_rate: 0.001,
+            inverted: false,
+        };
+        assert!(!is_ward_strength_low(std::iter::once(&ward), 0.3));
+    }
+
+    #[test]
+    fn weak_wards_is_low() {
+        let ward = Ward {
+            kind: WardKind::Thornward,
+            strength: 0.1,
+            decay_rate: 0.001,
+            inverted: false,
+        };
+        assert!(is_ward_strength_low(std::iter::once(&ward), 0.3));
+    }
+
+    #[test]
+    fn mixed_wards_average_above_threshold() {
+        let strong = Ward {
+            kind: WardKind::Thornward,
+            strength: 0.5,
+            decay_rate: 0.001,
+            inverted: false,
+        };
+        let weak = Ward {
+            kind: WardKind::Thornward,
+            strength: 0.2,
+            decay_rate: 0.001,
+            inverted: false,
+        };
+        // avg = 0.35, threshold 0.3 → NOT low
+        assert!(!is_ward_strength_low([&strong, &weak].into_iter(), 0.3));
     }
 }

@@ -240,7 +240,12 @@ pub fn strategy_for_disposition(kind: DispositionKind) -> CommitmentStrategy {
 ///   concrete threshold is balance-thread work. For goal-shaped
 ///   dispositions `still_goal` is uninteresting under `Blind` and
 ///   `SingleMinded` — reporting `true` is the safe default.
-pub fn proxies_for_plan(plan: &GoapPlan, needs: &Needs, d: &DispositionConstants) -> BeliefProxies {
+pub fn proxies_for_plan(
+    plan: &GoapPlan,
+    needs: &Needs,
+    d: &DispositionConstants,
+    unexplored_nearby: f32,
+) -> BeliefProxies {
     let achievement_believed = match plan.kind {
         // Mirrors `resolve_goap_plans`'s post-trip `disposition_complete`
         // arm (`goap.rs:~1672`). The `trips_done > 0` guard is the
@@ -280,10 +285,12 @@ pub fn proxies_for_plan(plan: &GoapPlan, needs: &Needs, d: &DispositionConstants
             needs.social < d.resting_complete_temperature
         }
         DispositionKind::Exploring => {
-            // Curiosity-drift proxy is mood-drift work (§7.7.d —
-            // `docs/open-work.md` §13.4). Always-true until that
-            // thread tunes a concrete threshold.
-            true
+            // Area-familiarity proxy — the cat still wants to explore
+            // when its local area feels unfamiliar.  Threshold matches
+            // the Logistic saturation curve midpoint (0.3) so the
+            // commitment gate releases plans at the same point the
+            // scoring layer suppresses the Explore DSE.
+            unexplored_nearby >= d.explore_satiation_threshold
         }
         _ => true,
     };
@@ -680,7 +687,7 @@ mod tests {
         plan.trips_done = 1; // past the guard; three-need recipe now active
 
         // Mid-band needs — not yet achieved.
-        let proxies = proxies_for_plan(&plan, &default_needs(), &d);
+        let proxies = proxies_for_plan(&plan, &default_needs(), &d, 1.0);
         assert!(!proxies.achievement_believed);
         assert!(proxies.achievable_believed);
 
@@ -689,7 +696,7 @@ mod tests {
         needs.hunger = 1.0;
         needs.energy = 1.0;
         needs.temperature = 1.0;
-        let proxies = proxies_for_plan(&plan, &needs, &d);
+        let proxies = proxies_for_plan(&plan, &needs, &d, 1.0);
         assert!(proxies.achievement_believed);
     }
 
@@ -709,7 +716,7 @@ mod tests {
         needs.hunger = 1.0;
         needs.energy = 1.0;
         needs.temperature = 1.0;
-        let proxies = proxies_for_plan(&plan, &needs, &d);
+        let proxies = proxies_for_plan(&plan, &needs, &d, 1.0);
         assert!(
             !proxies.achievement_believed,
             "trips_done == 0 must gate the three-need recipe"
@@ -723,11 +730,11 @@ mod tests {
         plan.target_trips = 2;
 
         // 0/2 trips — not achieved.
-        assert!(!proxies_for_plan(&plan, &default_needs(), &d).achievement_believed);
+        assert!(!proxies_for_plan(&plan, &default_needs(), &d, 1.0).achievement_believed);
 
         // 2/2 trips — achieved.
         plan.trips_done = 2;
-        assert!(proxies_for_plan(&plan, &default_needs(), &d).achievement_believed);
+        assert!(proxies_for_plan(&plan, &default_needs(), &d, 1.0).achievement_believed);
     }
 
     #[test]
@@ -735,9 +742,9 @@ mod tests {
         let d = default_d();
         let mut plan = test_plan(DispositionKind::Mating, 0);
 
-        assert!(!proxies_for_plan(&plan, &default_needs(), &d).achievement_believed);
+        assert!(!proxies_for_plan(&plan, &default_needs(), &d, 1.0).achievement_believed);
         plan.trips_done = 1;
-        assert!(proxies_for_plan(&plan, &default_needs(), &d).achievement_believed);
+        assert!(proxies_for_plan(&plan, &default_needs(), &d, 1.0).achievement_believed);
     }
 
     #[test]
@@ -746,13 +753,13 @@ mod tests {
         let mut plan = test_plan(DispositionKind::Hunting, 0);
         plan.max_replans = 3;
         plan.replan_count = 0;
-        assert!(proxies_for_plan(&plan, &default_needs(), &d).achievable_believed);
+        assert!(proxies_for_plan(&plan, &default_needs(), &d, 1.0).achievable_believed);
 
         plan.replan_count = 2;
-        assert!(proxies_for_plan(&plan, &default_needs(), &d).achievable_believed);
+        assert!(proxies_for_plan(&plan, &default_needs(), &d, 1.0).achievable_believed);
 
         plan.replan_count = 3;
-        assert!(!proxies_for_plan(&plan, &default_needs(), &d).achievable_believed);
+        assert!(!proxies_for_plan(&plan, &default_needs(), &d, 1.0).achievable_believed);
     }
 
     #[test]
@@ -763,11 +770,11 @@ mod tests {
         // Social below threshold → still goals.
         let mut needs = default_needs();
         needs.social = 0.1;
-        assert!(proxies_for_plan(&plan, &needs, &d).still_goal);
+        assert!(proxies_for_plan(&plan, &needs, &d, 1.0).still_goal);
 
         // Social above `resting_complete_temperature` → drifted.
         needs.social = d.resting_complete_temperature + 0.05;
-        assert!(!proxies_for_plan(&plan, &needs, &d).still_goal);
+        assert!(!proxies_for_plan(&plan, &needs, &d, 1.0).still_goal);
     }
 
     #[test]
@@ -787,7 +794,7 @@ mod tests {
         ] {
             let plan = test_plan(kind, 0);
             assert!(
-                proxies_for_plan(&plan, &default_needs(), &d).still_goal,
+                proxies_for_plan(&plan, &default_needs(), &d, 1.0).still_goal,
                 "{kind:?}: non-OpenMinded classes always report still_goal=true"
             );
         }
@@ -807,7 +814,7 @@ mod tests {
         plan.replan_count = 3;
 
         let strategy = strategy_for_disposition(plan.kind);
-        let proxies = proxies_for_plan(&plan, &default_needs(), &d);
+        let proxies = proxies_for_plan(&plan, &default_needs(), &d, 1.0);
         assert_eq!(strategy, CommitmentStrategy::SingleMinded);
         assert!(!proxies.achievable_believed);
         assert!(should_drop_intention(strategy, proxies));
@@ -822,7 +829,7 @@ mod tests {
         plan.replan_count = 1;
 
         let strategy = strategy_for_disposition(plan.kind);
-        let proxies = proxies_for_plan(&plan, &default_needs(), &d);
+        let proxies = proxies_for_plan(&plan, &default_needs(), &d, 1.0);
         assert!(!should_drop_intention(strategy, proxies));
     }
 
@@ -838,7 +845,7 @@ mod tests {
         plan.replan_count = 3;
 
         let strategy = strategy_for_disposition(plan.kind);
-        let proxies = proxies_for_plan(&plan, &default_needs(), &d);
+        let proxies = proxies_for_plan(&plan, &default_needs(), &d, 1.0);
         assert_eq!(strategy, CommitmentStrategy::Blind);
         assert!(!proxies.achievable_believed);
         // Blind ignores unachievable. Retain.
@@ -857,26 +864,42 @@ mod tests {
         needs.social = d.resting_complete_temperature + 0.1;
 
         let strategy = strategy_for_disposition(plan.kind);
-        let proxies = proxies_for_plan(&plan, &needs, &d);
+        let proxies = proxies_for_plan(&plan, &needs, &d, 1.0);
         assert_eq!(strategy, CommitmentStrategy::OpenMinded);
         assert!(!proxies.still_goal);
         assert!(should_drop_intention(strategy, proxies));
     }
 
     #[test]
-    fn gate_retains_open_minded_exploring_by_default() {
-        // Exploring's `still_goal` proxy is always-true until the
-        // curiosity-drift thread lands. Retain unless achieved.
+    fn gate_retains_exploring_when_area_unfamiliar() {
+        // Nearby area still mostly unexplored — cat wants to keep exploring.
         let d = default_d();
         let mut plan = test_plan(DispositionKind::Exploring, 0);
         plan.target_trips = 3;
         plan.trips_done = 1;
 
         let strategy = strategy_for_disposition(plan.kind);
-        let proxies = proxies_for_plan(&plan, &default_needs(), &d);
+        // 0.5 > threshold (0.3) → still_goal = true → retain.
+        let proxies = proxies_for_plan(&plan, &default_needs(), &d, 0.5);
         assert_eq!(strategy, CommitmentStrategy::OpenMinded);
         assert!(proxies.still_goal);
         assert!(!should_drop_intention(strategy, proxies));
+    }
+
+    #[test]
+    fn gate_drops_exploring_when_area_familiar() {
+        // Nearby area well-explored — desire to explore fades.
+        let d = default_d();
+        let mut plan = test_plan(DispositionKind::Exploring, 0);
+        plan.target_trips = 3;
+        plan.trips_done = 1;
+
+        let strategy = strategy_for_disposition(plan.kind);
+        // 0.1 < threshold (0.3) → still_goal = false → drop.
+        let proxies = proxies_for_plan(&plan, &default_needs(), &d, 0.1);
+        assert_eq!(strategy, CommitmentStrategy::OpenMinded);
+        assert!(!proxies.still_goal);
+        assert!(should_drop_intention(strategy, proxies));
     }
 
     // -----------------------------------------------------------------
@@ -900,14 +923,14 @@ mod tests {
         plan.replan_count = 1;
         assert!(!should_drop_intention(
             strategy,
-            proxies_for_plan(&plan, &default_needs(), &d)
+            proxies_for_plan(&plan, &default_needs(), &d, 1.0)
         ));
 
         // Flip: cap reached.
         plan.replan_count = 2;
         assert!(should_drop_intention(
             strategy,
-            proxies_for_plan(&plan, &default_needs(), &d)
+            proxies_for_plan(&plan, &default_needs(), &d, 1.0)
         ));
     }
 
@@ -928,7 +951,7 @@ mod tests {
         // Needs unsated → retain.
         assert!(!should_drop_intention(
             strategy,
-            proxies_for_plan(&plan, &default_needs(), &d)
+            proxies_for_plan(&plan, &default_needs(), &d, 1.0)
         ));
 
         // Needs sated → drop.
@@ -938,7 +961,7 @@ mod tests {
         needs.temperature = 1.0;
         assert!(should_drop_intention(
             strategy,
-            proxies_for_plan(&plan, &needs, &d)
+            proxies_for_plan(&plan, &needs, &d, 1.0)
         ));
     }
 }

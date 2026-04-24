@@ -1343,6 +1343,67 @@ pub(crate) fn compute_ward_placement(
 }
 
 // ---------------------------------------------------------------------------
+// §4 per-cat IsCoordinatorWithDirectives marker author
+// ---------------------------------------------------------------------------
+
+/// Author the `IsCoordinatorWithDirectives` ZST on cats that hold the
+/// `Coordinator` role AND have a non-empty `DirectiveQueue`.
+///
+/// **Predicate** — `With<Coordinator> && directive_queue.directives.len() > 0`.
+/// Bit-for-bit mirror of the inline `is_coordinator_with_directives`
+/// computation in `goap.rs` / `disposition.rs`.
+///
+/// **Ordering** — Chain 2a, after `update_inventory_markers`. The
+/// Coordinator component is stable within a tick (elections run in
+/// Chain 2b), so the marker reflects the same state the scoring
+/// pipeline would read.
+///
+/// **Lifecycle** — transition-only; idempotent in steady state. A second
+/// query handles cats that lost the `Coordinator` role (or died) —
+/// the marker is cleaned up in the same tick.
+pub fn update_directive_markers(
+    mut commands: Commands,
+    coordinators: Query<
+        (
+            Entity,
+            &DirectiveQueue,
+            Has<crate::components::markers::IsCoordinatorWithDirectives>,
+        ),
+        With<Coordinator>,
+    >,
+    non_coordinators: Query<
+        (
+            Entity,
+            Has<crate::components::markers::IsCoordinatorWithDirectives>,
+        ),
+        Without<Coordinator>,
+    >,
+) {
+    use crate::components::markers::IsCoordinatorWithDirectives;
+
+    for (entity, queue, has_marker) in coordinators.iter() {
+        let has_directives = !queue.directives.is_empty();
+        match (has_directives, has_marker) {
+            (true, false) => {
+                commands.entity(entity).insert(IsCoordinatorWithDirectives);
+            }
+            (false, true) => {
+                commands.entity(entity).remove::<IsCoordinatorWithDirectives>();
+            }
+            _ => {}
+        }
+    }
+    // Clean up stale markers on cats that lost coordinator status.
+    for (entity, has_marker) in non_coordinators.iter() {
+        if has_marker {
+            commands
+                .entity(entity)
+                .remove::<IsCoordinatorWithDirectives>();
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1814,5 +1875,133 @@ mod tests {
             pride: 0.5,
             independence: 0.5,
         }
+    }
+
+    // --- update_directive_markers ---
+
+    use crate::components::markers::IsCoordinatorWithDirectives;
+
+    fn setup_directive_markers() -> (World, Schedule) {
+        let world = World::new();
+        let mut schedule = Schedule::default();
+        schedule.add_systems(update_directive_markers);
+        (world, schedule)
+    }
+
+    fn has_coord_dir(world: &World, entity: Entity) -> bool {
+        world.get::<IsCoordinatorWithDirectives>(entity).is_some()
+    }
+
+    #[test]
+    fn coordinator_with_directives_gets_marker() {
+        let (mut world, mut schedule) = setup_directive_markers();
+        let cat = world
+            .spawn((
+                Coordinator,
+                DirectiveQueue {
+                    directives: vec![Directive {
+                        kind: DirectiveKind::Build,
+                        priority: 1.0,
+                        target_entity: None,
+                        target_position: None,
+                        blueprint: Some(crate::components::building::StructureType::Den),
+                    }],
+                },
+            ))
+            .id();
+        schedule.run(&mut world);
+        assert!(has_coord_dir(&world, cat));
+    }
+
+    #[test]
+    fn coordinator_empty_queue_no_marker() {
+        let (mut world, mut schedule) = setup_directive_markers();
+        let cat = world
+            .spawn((Coordinator, DirectiveQueue::default()))
+            .id();
+        schedule.run(&mut world);
+        assert!(!has_coord_dir(&world, cat));
+    }
+
+    #[test]
+    fn non_coordinator_never_gets_marker() {
+        let (mut world, mut schedule) = setup_directive_markers();
+        // Cat without Coordinator component — should never get the marker
+        // even if somehow given a DirectiveQueue.
+        let cat = world
+            .spawn(DirectiveQueue {
+                directives: vec![Directive {
+                    kind: DirectiveKind::Build,
+                    priority: 1.0,
+                    target_entity: None,
+                    target_position: None,
+                    blueprint: Some(crate::components::building::StructureType::Den),
+                }],
+            })
+            .id();
+        schedule.run(&mut world);
+        assert!(!has_coord_dir(&world, cat));
+    }
+
+    #[test]
+    fn losing_coordinator_removes_marker() {
+        let (mut world, mut schedule) = setup_directive_markers();
+        let cat = world
+            .spawn((
+                Coordinator,
+                DirectiveQueue {
+                    directives: vec![Directive {
+                        kind: DirectiveKind::Build,
+                        priority: 1.0,
+                        target_entity: None,
+                        target_position: None,
+                        blueprint: Some(crate::components::building::StructureType::Den),
+                    }],
+                },
+            ))
+            .id();
+        schedule.run(&mut world);
+        assert!(has_coord_dir(&world, cat));
+
+        // Remove Coordinator role.
+        world.entity_mut(cat).remove::<Coordinator>();
+        schedule.run(&mut world);
+        assert!(
+            !has_coord_dir(&world, cat),
+            "losing Coordinator should remove the directive marker"
+        );
+    }
+
+    #[test]
+    fn completing_directives_removes_marker() {
+        let (mut world, mut schedule) = setup_directive_markers();
+        let cat = world
+            .spawn((
+                Coordinator,
+                DirectiveQueue {
+                    directives: vec![Directive {
+                        kind: DirectiveKind::Build,
+                        priority: 1.0,
+                        target_entity: None,
+                        target_position: None,
+                        blueprint: Some(crate::components::building::StructureType::Den),
+                    }],
+                },
+            ))
+            .id();
+        schedule.run(&mut world);
+        assert!(has_coord_dir(&world, cat));
+
+        // Clear the directive queue.
+        world
+            .get_mut::<DirectiveQueue>(cat)
+            .unwrap()
+            .directives
+            .clear();
+        schedule.run(&mut world);
+        assert!(
+            !has_coord_dir(&world, cat),
+            "empty directive queue should remove marker"
+        );
     }
 }

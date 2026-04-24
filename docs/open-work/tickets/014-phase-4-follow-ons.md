@@ -92,7 +92,15 @@ remaining work is itemised here.
   `mate.rs` gates on `.forbid(Kitten::KEY).forbid(Young::KEY)`.
   Chain 2 split into 2a/2b sub-chains (Bevy 20-system tuple limit);
   `MarkerQueries` SystemParam bundle created for future batches.
-  The remaining ~39 §4.3 markers each need:
+  **Batch 1 landed 2026-04-24** — 3 per-cat author systems
+  (`update_injury_marker`, `update_inventory_markers`,
+  `update_directive_markers`) + colony-scoped shared helpers
+  (`scan_colony_buildings`, `is_ward_strength_low`). 5 new KEY
+  constants, `MarkerQueries::per_cat` extended, ScoringContext
+  fields read from MarkerSnapshot, coordinate DSE
+  `.require("IsCoordinatorWithDirectives")` cutover. 31 tests.
+  `Injured` marker unblocks Capability markers (batch 2).
+  The remaining ~34 §4.3 markers each need:
     1. Author system per §4.6 author-file assignment (`Changed<T>`
        filter where the predicate reads changing parent components;
        full-scan where it reads position-adjacent state).

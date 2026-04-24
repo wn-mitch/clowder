@@ -1,7 +1,7 @@
 ---
 id: 001
 title: Explore dominance over targeted leisure
-status: parked
+status: in-progress
 cluster: null
 added: 2026-04-20
 parked: 2026-04-21
@@ -15,23 +15,46 @@ landed-on: null
 
 ## Current state
 
-> **Parked 2026-04-21** for AI substrate refactor (see
-> `docs/systems/refactor-plan.md` pre-flight gate 1). Both sub-tasks
-> verified unresolved but outside the refactor's blast radius.
+> **2026-04-24 — Sub-2 addressed.** Four fixes across three layers:
+>
+> **Fog-of-war layer (inputs):**
+> 1. **Passive exploration stamping** — new `stamp_passive_exploration`
+>    system (`src/systems/needs.rs`) marks a radius-2 (5×5) area around
+>    every living cat each tick. RPG-style passive perception: cats
+>    notice their surroundings by existing somewhere. Home territory
+>    stays explored from cats walking through it.
+> 2. **Decay rate 4× slower** — `exploration_decay_rate` reduced from
+>    0.00005 to 0.0000125. Tiles take ~2 seasons to half-fade instead
+>    of ~0.5 seasons. Only genuinely unvisited frontier fades.
+> 3. **Decoupled perception radius** — new `explore_perception_radius = 6`
+>    (13×13 = 169 tiles) for `unexplored_fraction_nearby` queries,
+>    replacing `explore_range = 20` (41×41 = 1681 tiles). The action
+>    range and perception radius were conflated; passive stamp radius 2
+>    covering 25 tiles could never make a dent in a 1681-tile query area.
+>
+> **Commitment layer (plan retention):**
+> 4. **Explore `still_goal` wired to area familiarity** — the §7.2
+>    commitment gate's `still_goal` proxy for Exploring was a deferred
+>    TODO (always `true`). Now checks `unexplored_nearby >=
+>    explore_satiation_threshold` (default 0.3, matching the Logistic
+>    saturation curve midpoint). When a cat's local area is well-explored,
+>    the OpenMinded gate drops the Explore plan so re-evaluation can pick
+>    a higher-scoring action.
+>
+> The Logistic(10, 0.3) saturation curve on the scoring layer was already
+> correct — fixes 1–3 make its inputs realistic, fix 4 ensures the
+> commitment gate respects the signal.
+>
+> **Previous state (parked 2026-04-21)** for AI substrate refactor:
 > - **Sub-1 (social-target-range iter 3)** — superseded by refactor
 >   Phase 4 target-selection (§6 `TargetTakingDse` replaces
 >   `has_social_target` existence gate with target-quality scoring);
 >   the pair-stickiness alternative named in iter-2's report becomes
 >   a natural per-target consideration there.
-> - **Sub-2 (Explore saturation curve)** — re-evaluated post-Phase-3c
->   once Explore runs through the unified evaluator with a proper §2.1
->   response curve. The sharp-decay-past-0.7 shape becomes a Logistic
->   consideration on `unexplored_fraction_nearby` rather than a bespoke
->   patch to today's linear multiplier.
+> - **Sub-2 (Explore saturation curve)** — root causes now fixed at
+>   fog-of-war, scoring, and commitment layers. Soak pending.
 > - **Sub-3 (strategist-coordinator)** — unchanged; still C4 in the
 >   deliberation cluster, gated on cluster A.
-> - **Resume when:** refactor reaches Phase 4 entry (sub-1) / Phase 3c
->   exit (sub-2).
 
 **Why it matters:** Explore claims 44–47% of all action-time in a seed-42
 soak. Groom sits at 0.4–0.5%, Mentor / Caretake / Cook at exactly 0. The

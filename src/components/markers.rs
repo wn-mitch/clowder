@@ -111,6 +111,9 @@ impl Incapacitated {
 /// `needs.rs::update_injury_marker`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Injured;
+impl Injured {
+    pub const KEY: &str = "Injured";
+}
 
 /// Cat is in an active combat step or hostile-adjacent.
 /// `combat.rs::update_combat_marker`.
@@ -158,16 +161,24 @@ pub struct CanCook;
 // Inventory markers (§4.3 Inventory — per-cat)
 // ---------------------------------------------------------------------------
 
-/// Authoring: `items.rs::update_inventory_markers`
-/// (with `Changed<Inventory>` filter for per-tick cost).
+/// Authoring: `items.rs::update_inventory_markers`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HasHerbsInInventory;
+impl HasHerbsInInventory {
+    pub const KEY: &str = "HasHerbsInInventory";
+}
 
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HasRemedyHerbs;
+impl HasRemedyHerbs {
+    pub const KEY: &str = "HasRemedyHerbs";
+}
 
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HasWardHerbs;
+impl HasWardHerbs {
+    pub const KEY: &str = "HasWardHerbs";
+}
 
 // ---------------------------------------------------------------------------
 // Colony singleton
@@ -269,6 +280,9 @@ pub struct IsParentOfHungryKitten;
 /// `coordination.rs::update_directive_markers`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct IsCoordinatorWithDirectives;
+impl IsCoordinatorWithDirectives {
+    pub const KEY: &str = "IsCoordinatorWithDirectives";
+}
 
 /// Colony ward coverage: no wards OR average strength < 0.3.
 /// `magic.rs::update_ward_coverage_markers`. Attaches to `ColonyState`.

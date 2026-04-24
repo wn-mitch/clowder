@@ -683,6 +683,13 @@ pub fn evaluate_and_plan(
         Has<markers::Adult>,
         Has<markers::Elder>,
     )>,
+    per_cat_markers_q: Query<(
+        Has<markers::Injured>,
+        Has<markers::HasHerbsInInventory>,
+        Has<markers::HasRemedyHerbs>,
+        Has<markers::HasWardHerbs>,
+        Has<markers::IsCoordinatorWithDirectives>,
+    )>,
 ) {
     let sc = &res.constants.scoring;
     let d = &res.constants.disposition;
@@ -725,22 +732,20 @@ pub fn evaluate_and_plan(
         })
         .collect();
 
-    let has_construction_site = world_state
-        .building_query
-        .iter()
-        .any(|(_, _, _, site, _)| site.is_some());
-    let has_damaged_building = world_state
-        .building_query
-        .iter()
-        .any(|(_, s, _, site, _)| site.is_none() && s.condition < d.damaged_building_threshold);
-    let has_garden = world_state
-        .building_query
-        .iter()
-        .any(|(_, s, _, site, _)| s.kind == StructureType::Garden && site.is_none());
+    // §4 colony-scoped marker predicates — shared helpers eliminate
+    // duplication with disposition.rs (previously computed identically in both).
+    let bldg_state = crate::systems::buildings::scan_colony_buildings(
+        world_state
+            .building_query
+            .iter()
+            .map(|(_, s, _, site, _)| (s, site)),
+        d.damaged_building_threshold,
+    );
+    let has_construction_site = bldg_state.has_construction_site;
+    let has_damaged_building = bldg_state.has_damaged_building;
+    let has_garden = bldg_state.has_garden;
+    let has_functional_kitchen = bldg_state.has_functional_kitchen;
     markers.set_colony(markers::HasGarden::KEY, has_garden);
-    let has_functional_kitchen = world_state.building_query.iter().any(|(_, s, _, site, _)| {
-        s.kind == StructureType::Kitchen && site.is_none() && s.effectiveness() > 0.0
-    });
     markers.set_colony(markers::HasFunctionalKitchen::KEY, has_functional_kitchen);
     let has_raw_food_in_stores = world_state.stored_items_query.iter().any(|stored| {
         stored.items.iter().copied().any(|e| {
@@ -758,20 +763,10 @@ pub fn evaluate_and_plan(
         .map(|(e, herb, p)| (e, *p, herb.kind))
         .collect();
 
-    let ward_strength_low = {
-        let ward_count = world_state.ward_query.iter().count();
-        if ward_count == 0 {
-            true
-        } else {
-            let avg: f32 = world_state
-                .ward_query
-                .iter()
-                .map(|(w, _)| w.strength)
-                .sum::<f32>()
-                / ward_count as f32;
-            avg < d.ward_strength_low_threshold
-        }
-    };
+    let ward_strength_low = crate::systems::magic::is_ward_strength_low(
+        world_state.ward_query.iter().map(|(w, _)| w),
+        d.ward_strength_low_threshold,
+    );
     markers.set_colony(markers::WardStrengthLow::KEY, ward_strength_low);
 
     // Snapshot actionable carcasses for scoring.
@@ -997,6 +992,20 @@ pub fn evaluate_and_plan(
             markers.set_entity(markers::Adult::KEY, entity, a);
             markers.set_entity(markers::Elder::KEY, entity, e);
         }
+        // §4 batch 1: per-cat markers read from authored ZSTs.
+        if let Ok((injured, has_herbs, has_remedy, has_ward, is_coord_dir)) =
+            per_cat_markers_q.get(entity)
+        {
+            markers.set_entity(markers::Injured::KEY, entity, injured);
+            markers.set_entity(markers::HasHerbsInInventory::KEY, entity, has_herbs);
+            markers.set_entity(markers::HasRemedyHerbs::KEY, entity, has_remedy);
+            markers.set_entity(markers::HasWardHerbs::KEY, entity, has_ward);
+            markers.set_entity(
+                markers::IsCoordinatorWithDirectives::KEY,
+                entity,
+                is_coord_dir,
+            );
+        }
 
         let has_herbs_nearby = herb_positions.iter().any(|(_, hp, _)| {
             crate::systems::sensing::observer_sees_at(
@@ -1101,12 +1110,13 @@ pub fn evaluate_and_plan(
             magic_skill: skills.magic,
             herbcraft_skill: skills.herbcraft,
             has_herbs_nearby,
-            has_herbs_in_inventory: inventory
-                .slots
-                .iter()
-                .any(|s| matches!(s, crate::components::magic::ItemSlot::Herb(_))),
-            has_remedy_herbs: inventory.has_remedy_herb(),
-            has_ward_herbs: inventory.has_ward_herb(),
+            // §4 batch 1: read from authored markers via MarkerSnapshot.
+            has_herbs_in_inventory: markers.has(
+                markers::HasHerbsInInventory::KEY,
+                entity,
+            ),
+            has_remedy_herbs: markers.has(markers::HasRemedyHerbs::KEY, entity),
+            has_ward_herbs: markers.has(markers::HasWardHerbs::KEY, entity),
             thornbriar_available: herb_positions
                 .iter()
                 .any(|(_, _, kind)| *kind == HerbKind::Thornbriar),
@@ -1116,9 +1126,10 @@ pub fn evaluate_and_plan(
             tile_corruption,
             nearby_corruption_level,
             on_special_terrain,
-            is_coordinator_with_directives: directive_snapshot
-                .get(&entity)
-                .is_some_and(|(len, _)| *len > 0),
+            is_coordinator_with_directives: markers.has(
+                markers::IsCoordinatorWithDirectives::KEY,
+                entity,
+            ),
             pending_directive_count: directive_snapshot.get(&entity).map_or(0, |(len, _)| *len),
             has_mentoring_target: has_mentoring_target_fn(entity, pos, skills),
             prey_nearby,
@@ -1134,7 +1145,7 @@ pub fn evaluate_and_plan(
             unexplored_nearby: colony.exploration_map.unexplored_fraction_nearby(
                 pos.x,
                 pos.y,
-                d.explore_range,
+                d.explore_perception_radius,
                 0.5,
             ),
             fox_scent_level: colony.fox_scent_map.get(pos.x, pos.y),
@@ -1757,7 +1768,14 @@ pub fn resolve_goap_plans(
 
         // §7.2 commitment gate — evaluate whether to drop the held intention.
         let strategy = crate::ai::commitment::strategy_for_disposition(plan.kind);
-        let proxies = crate::ai::commitment::proxies_for_plan(&plan, &needs, d);
+        let unexplored_nearby = prey_params.exploration_map.unexplored_fraction_nearby(
+            pos.x,
+            pos.y,
+            d.explore_perception_radius,
+            0.5,
+        );
+        let proxies =
+            crate::ai::commitment::proxies_for_plan(&plan, &needs, d, unexplored_nearby);
         if crate::ai::commitment::should_drop_intention(strategy, proxies) {
             let branch = if proxies.achievement_believed {
                 crate::ai::commitment::DropBranch::Achieved
@@ -1830,6 +1848,7 @@ pub fn resolve_goap_plans(
                         &plan,
                         &needs,
                         &ec.constants.disposition,
+                        unexplored_nearby,
                     );
                     crate::ai::commitment::record_commitment_decision(
                         ec.focal_capture.as_deref(),
@@ -2129,6 +2148,7 @@ pub fn resolve_goap_plans(
                                 &plan,
                                 &needs,
                                 &ec.constants.disposition,
+                                unexplored_nearby,
                             );
                             crate::ai::commitment::record_commitment_decision(
                                 ec.focal_capture.as_deref(),

@@ -77,7 +77,7 @@ impl Plugin for SimulationPlugin {
                 .add_target_taking_dse(crate::ai::dses::build_target_dse())
                 .add_dse(crate::ai::dses::farm_dse())
                 .add_dse(crate::ai::dses::coordinate_dse(&default_scoring))
-                .add_dse(crate::ai::dses::explore_dse())
+                .add_dse(crate::ai::dses::explore_dse(&default_scoring))
                 .add_dse(crate::ai::dses::wander_dse(&default_scoring))
                 .add_dse(crate::ai::dses::herbcraft_gather_dse())
                 .add_dse(crate::ai::dses::herbcraft_prepare_dse())
@@ -179,9 +179,13 @@ impl Plugin for SimulationPlugin {
                         // pipeline so consumers see freshly-authored markers.
                         systems::incapacitation::update_incapacitation,
                         systems::growth::update_life_stage_markers,
+                        systems::needs::update_injury_marker,
+                        systems::items::update_inventory_markers,
+                        systems::coordination::update_directive_markers,
                         systems::needs::decay_grooming,
                         systems::needs::eat_from_inventory,
                         systems::needs::decay_exploration,
+                        systems::needs::stamp_passive_exploration,
                         systems::needs::bond_proximity_social,
                         systems::fulfillment::decay_fulfillment,
                         systems::fulfillment::bond_proximity_social_warmth,

@@ -3,10 +3,78 @@ use rand::Rng;
 
 use crate::components::building::{StoredItems, Structure, StructureType};
 use crate::components::items::{item_display_name, Item};
+use crate::components::magic::Inventory;
+use crate::components::markers::{HasHerbsInInventory, HasRemedyHerbs, HasWardHerbs};
+use crate::components::physical::Dead;
 use crate::resources::food::FoodStores;
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::rng::SimRng;
 use crate::resources::time::TimeState;
+
+// ---------------------------------------------------------------------------
+// §4 per-cat inventory marker author
+// ---------------------------------------------------------------------------
+
+/// Author `HasHerbsInInventory`, `HasRemedyHerbs`, and `HasWardHerbs`
+/// markers on living cats based on their current inventory contents.
+///
+/// **Predicate fidelity.** The booleans authored here must match the inline
+/// `ScoringContext` field computations in `goap.rs` / `disposition.rs`:
+/// - `has_herbs_in_inventory` → `inventory.has_any_herb()`
+/// - `has_remedy_herbs` → `inventory.has_remedy_herb()`
+/// - `has_ward_herbs` → `inventory.has_ward_herb()`
+///
+/// **Ordering.** Runs in Chain 2a before the GOAP/disposition scoring
+/// pipeline, so `MarkerSnapshot` population can read `Has<M>` booleans
+/// from freshly-authored markers.
+#[allow(clippy::type_complexity)]
+pub fn update_inventory_markers(
+    mut commands: Commands,
+    cats: Query<
+        (
+            Entity,
+            &Inventory,
+            Has<HasHerbsInInventory>,
+            Has<HasRemedyHerbs>,
+            Has<HasWardHerbs>,
+        ),
+        Without<Dead>,
+    >,
+) {
+    for (entity, inventory, has_herbs_marker, has_remedy_marker, has_ward_marker) in cats.iter() {
+        let has_herbs = inventory.has_any_herb();
+        let has_remedy = inventory.has_remedy_herb();
+        let has_ward = inventory.has_ward_herb();
+
+        match (has_herbs, has_herbs_marker) {
+            (true, false) => {
+                commands.entity(entity).insert(HasHerbsInInventory);
+            }
+            (false, true) => {
+                commands.entity(entity).remove::<HasHerbsInInventory>();
+            }
+            _ => {}
+        }
+        match (has_remedy, has_remedy_marker) {
+            (true, false) => {
+                commands.entity(entity).insert(HasRemedyHerbs);
+            }
+            (false, true) => {
+                commands.entity(entity).remove::<HasRemedyHerbs>();
+            }
+            _ => {}
+        }
+        match (has_ward, has_ward_marker) {
+            (true, false) => {
+                commands.entity(entity).insert(HasWardHerbs);
+            }
+            (false, true) => {
+                commands.entity(entity).remove::<HasWardHerbs>();
+            }
+            _ => {}
+        }
+    }
+}
 
 /// Advance decay on every item entity. Despawn items whose condition has
 /// reached zero or below. Narrates food spoilage at a low rate.
@@ -289,5 +357,133 @@ mod tests {
             "capacity should be {expected_capacity}; got {}",
             food.capacity
         );
+    }
+
+    // --- update_inventory_markers ---
+
+    use crate::components::magic::{HerbKind, ItemSlot};
+
+    fn setup_inventory_markers() -> (World, bevy_ecs::schedule::Schedule) {
+        let world = World::new();
+        let mut schedule = bevy_ecs::schedule::Schedule::default();
+        schedule.add_systems(update_inventory_markers);
+        (world, schedule)
+    }
+
+    fn spawn_cat_with_inventory(world: &mut World, slots: Vec<ItemSlot>) -> Entity {
+        world
+            .spawn(Inventory { slots })
+            .id()
+    }
+
+    fn has_marker<M: bevy_ecs::component::Component>(world: &World, entity: Entity) -> bool {
+        world.get::<M>(entity).is_some()
+    }
+
+    #[test]
+    fn empty_inventory_no_herb_markers() {
+        let (mut world, mut schedule) = setup_inventory_markers();
+        let cat = spawn_cat_with_inventory(&mut world, vec![]);
+        schedule.run(&mut world);
+        assert!(!has_marker::<HasHerbsInInventory>(&world, cat));
+        assert!(!has_marker::<HasRemedyHerbs>(&world, cat));
+        assert!(!has_marker::<HasWardHerbs>(&world, cat));
+    }
+
+    #[test]
+    fn healing_moss_sets_herbs_and_remedy() {
+        let (mut world, mut schedule) = setup_inventory_markers();
+        let cat = spawn_cat_with_inventory(
+            &mut world,
+            vec![ItemSlot::Herb(HerbKind::HealingMoss)],
+        );
+        schedule.run(&mut world);
+        assert!(has_marker::<HasHerbsInInventory>(&world, cat));
+        assert!(has_marker::<HasRemedyHerbs>(&world, cat));
+        assert!(!has_marker::<HasWardHerbs>(&world, cat));
+    }
+
+    #[test]
+    fn thornbriar_sets_herbs_and_ward() {
+        let (mut world, mut schedule) = setup_inventory_markers();
+        let cat = spawn_cat_with_inventory(
+            &mut world,
+            vec![ItemSlot::Herb(HerbKind::Thornbriar)],
+        );
+        schedule.run(&mut world);
+        assert!(has_marker::<HasHerbsInInventory>(&world, cat));
+        assert!(!has_marker::<HasRemedyHerbs>(&world, cat));
+        assert!(has_marker::<HasWardHerbs>(&world, cat));
+    }
+
+    #[test]
+    fn mixed_herbs_set_all_markers() {
+        let (mut world, mut schedule) = setup_inventory_markers();
+        let cat = spawn_cat_with_inventory(
+            &mut world,
+            vec![
+                ItemSlot::Herb(HerbKind::Thornbriar),
+                ItemSlot::Herb(HerbKind::HealingMoss),
+            ],
+        );
+        schedule.run(&mut world);
+        assert!(has_marker::<HasHerbsInInventory>(&world, cat));
+        assert!(has_marker::<HasRemedyHerbs>(&world, cat));
+        assert!(has_marker::<HasWardHerbs>(&world, cat));
+    }
+
+    #[test]
+    fn herb_removal_clears_markers() {
+        let (mut world, mut schedule) = setup_inventory_markers();
+        let cat = spawn_cat_with_inventory(
+            &mut world,
+            vec![ItemSlot::Herb(HerbKind::HealingMoss)],
+        );
+        schedule.run(&mut world);
+        assert!(has_marker::<HasHerbsInInventory>(&world, cat));
+
+        // Remove the herb.
+        world.get_mut::<Inventory>(cat).unwrap().slots.clear();
+        schedule.run(&mut world);
+        assert!(
+            !has_marker::<HasHerbsInInventory>(&world, cat),
+            "clearing inventory should remove HasHerbsInInventory"
+        );
+        assert!(!has_marker::<HasRemedyHerbs>(&world, cat));
+    }
+
+    #[test]
+    fn dead_cats_skip_inventory_markers() {
+        let (mut world, mut schedule) = setup_inventory_markers();
+        let cat = world
+            .spawn((
+                Inventory {
+                    slots: vec![ItemSlot::Herb(HerbKind::HealingMoss)],
+                },
+                crate::components::physical::Dead {
+                    tick: 0,
+                    cause: crate::components::physical::DeathCause::Injury,
+                },
+            ))
+            .id();
+        schedule.run(&mut world);
+        assert!(
+            !has_marker::<HasHerbsInInventory>(&world, cat),
+            "dead cats should not receive herb markers"
+        );
+    }
+
+    #[test]
+    fn inventory_markers_idempotent() {
+        let (mut world, mut schedule) = setup_inventory_markers();
+        let cat = spawn_cat_with_inventory(
+            &mut world,
+            vec![ItemSlot::Herb(HerbKind::Thornbriar)],
+        );
+        schedule.run(&mut world);
+        assert!(has_marker::<HasWardHerbs>(&world, cat));
+        // Run again — should not flap.
+        schedule.run(&mut world);
+        assert!(has_marker::<HasWardHerbs>(&world, cat));
     }
 }

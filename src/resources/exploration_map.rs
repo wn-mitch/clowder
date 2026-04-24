@@ -40,6 +40,29 @@ impl ExplorationMap {
         }
     }
 
+    /// Mark all tiles within `radius` of (cx, cy) as explored.
+    /// Returns the mean discovery value across the area (for need
+    /// bonuses). High return = mostly new territory; low = re-tread.
+    pub fn explore_area(&mut self, cx: i32, cy: i32, radius: i32) -> f32 {
+        let mut total = 0u32;
+        let mut discovery_sum = 0.0f32;
+        for dy in -radius..=radius {
+            for dx in -radius..=radius {
+                if let Some(idx) = self.index(cx + dx, cy + dy) {
+                    let prev = self.tiles[idx];
+                    self.tiles[idx] = 1.0;
+                    discovery_sum += 1.0 - prev;
+                    total += 1;
+                }
+            }
+        }
+        if total == 0 {
+            0.0
+        } else {
+            discovery_sum / total as f32
+        }
+    }
+
     /// Get the current exploration value of a tile.
     pub fn get(&self, x: i32, y: i32) -> f32 {
         self.index(x, y).map_or(0.0, |idx| self.tiles[idx])
@@ -148,5 +171,46 @@ mod tests {
         }
         let frac = map.unexplored_fraction_nearby(5, 5, 1, 0.5);
         assert!(frac.abs() < 1e-5, "all nearby tiles explored; got {frac}");
+    }
+
+    #[test]
+    fn explore_area_marks_disc() {
+        let mut map = ExplorationMap::new(20, 20);
+        map.explore_area(10, 10, 2);
+        // All tiles in 5×5 disc centered at (10,10) should be explored.
+        for dy in -2..=2 {
+            for dx in -2..=2 {
+                let val = map.get(10 + dx, 10 + dy);
+                assert!(
+                    (val - 1.0).abs() < 1e-5,
+                    "tile ({},{}) should be explored; got {val}",
+                    10 + dx,
+                    10 + dy
+                );
+            }
+        }
+        // A tile outside the radius should be untouched.
+        assert!(
+            map.get(10 + 3, 10).abs() < 1e-5,
+            "tile outside radius should be unexplored"
+        );
+    }
+
+    #[test]
+    fn explore_area_discovery_mean() {
+        let mut map = ExplorationMap::new(20, 20);
+        // Pre-explore half the disc so discovery is partial.
+        for dy in -2..=0 {
+            for dx in -2..=2 {
+                map.explore_tile(10 + dx, 10 + dy);
+            }
+        }
+        // 5×5 = 25 tiles total. Top 3 rows (15 tiles) already explored,
+        // bottom 2 rows (10 tiles) are new. Mean discovery = 10/25 = 0.4.
+        let discovery = map.explore_area(10, 10, 2);
+        assert!(
+            (discovery - 0.4).abs() < 1e-5,
+            "expected mean discovery ~0.4; got {discovery}"
+        );
     }
 }

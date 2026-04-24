@@ -10,6 +10,52 @@ use crate::resources::time::{Season, SimConfig, TimeState};
 use crate::resources::weather::{Weather, WeatherState};
 
 // ---------------------------------------------------------------------------
+// §4 colony-scoped building/food marker predicates
+// ---------------------------------------------------------------------------
+
+/// Colony-scoped boolean predicates derived from building and food state.
+/// Computed once per tick by [`scan_colony_buildings`] and consumed by
+/// both scoring systems (`goap.rs`, `disposition.rs`) to populate the
+/// `MarkerSnapshot` without duplicating predicate logic.
+pub struct ColonyBuildingState {
+    pub has_construction_site: bool,
+    pub has_damaged_building: bool,
+    pub has_garden: bool,
+    pub has_functional_kitchen: bool,
+}
+
+/// Single-pass scan over the building query to derive all colony-scoped
+/// building predicates. Replaces four separate `.any()` calls that were
+/// previously duplicated across `goap.rs` and `disposition.rs`.
+pub fn scan_colony_buildings<'a>(
+    buildings: impl Iterator<Item = (&'a Structure, Option<&'a ConstructionSite>)>,
+    damaged_threshold: f32,
+) -> ColonyBuildingState {
+    let mut state = ColonyBuildingState {
+        has_construction_site: false,
+        has_damaged_building: false,
+        has_garden: false,
+        has_functional_kitchen: false,
+    };
+    for (structure, site) in buildings {
+        if site.is_some() {
+            state.has_construction_site = true;
+        } else {
+            if structure.condition < damaged_threshold {
+                state.has_damaged_building = true;
+            }
+            if structure.kind == StructureType::Garden {
+                state.has_garden = true;
+            }
+            if structure.kind == StructureType::Kitchen && structure.effectiveness() > 0.0 {
+                state.has_functional_kitchen = true;
+            }
+        }
+    }
+    state
+}
+
+// ---------------------------------------------------------------------------
 // apply_building_effects
 // ---------------------------------------------------------------------------
 
@@ -423,5 +469,78 @@ mod tests {
             (food.spoilage_multiplier - 1.0).abs() < 1e-6,
             "multiplier should reset to 1.0 when no Stores exists"
         );
+    }
+
+    // --- scan_colony_buildings ---
+
+    #[test]
+    fn empty_buildings_all_false() {
+        let state = scan_colony_buildings(std::iter::empty(), 0.4);
+        assert!(!state.has_construction_site);
+        assert!(!state.has_damaged_building);
+        assert!(!state.has_garden);
+        assert!(!state.has_functional_kitchen);
+    }
+
+    #[test]
+    fn construction_site_detected() {
+        let site = ConstructionSite::new(StructureType::Den);
+        let structure = Structure::new(StructureType::Den);
+        let buildings: Vec<(&Structure, Option<&ConstructionSite>)> =
+            vec![(&structure, Some(&site))];
+        let state = scan_colony_buildings(buildings.into_iter(), 0.4);
+        assert!(state.has_construction_site);
+        assert!(!state.has_garden);
+    }
+
+    #[test]
+    fn garden_detected() {
+        let structure = Structure::new(StructureType::Garden);
+        let buildings: Vec<(&Structure, Option<&ConstructionSite>)> =
+            vec![(&structure, None)];
+        let state = scan_colony_buildings(buildings.into_iter(), 0.4);
+        assert!(state.has_garden);
+        assert!(!state.has_functional_kitchen);
+    }
+
+    #[test]
+    fn functional_kitchen_detected() {
+        let mut kitchen = Structure::new(StructureType::Kitchen);
+        kitchen.condition = 1.0; // effectiveness > 0 when condition > 0
+        let buildings: Vec<(&Structure, Option<&ConstructionSite>)> =
+            vec![(&kitchen, None)];
+        let state = scan_colony_buildings(buildings.into_iter(), 0.4);
+        assert!(state.has_functional_kitchen);
+    }
+
+    #[test]
+    fn kitchen_under_construction_not_functional() {
+        let kitchen = Structure::new(StructureType::Kitchen);
+        let site = ConstructionSite::new(StructureType::Kitchen);
+        let buildings: Vec<(&Structure, Option<&ConstructionSite>)> =
+            vec![(&kitchen, Some(&site))];
+        let state = scan_colony_buildings(buildings.into_iter(), 0.4);
+        assert!(!state.has_functional_kitchen);
+        assert!(state.has_construction_site);
+    }
+
+    #[test]
+    fn damaged_building_below_threshold() {
+        let mut structure = Structure::new(StructureType::Den);
+        structure.condition = 0.3; // below 0.4 threshold
+        let buildings: Vec<(&Structure, Option<&ConstructionSite>)> =
+            vec![(&structure, None)];
+        let state = scan_colony_buildings(buildings.into_iter(), 0.4);
+        assert!(state.has_damaged_building);
+    }
+
+    #[test]
+    fn building_above_threshold_not_damaged() {
+        let structure = Structure::new(StructureType::Den);
+        // Default condition is 1.0.
+        let buildings: Vec<(&Structure, Option<&ConstructionSite>)> =
+            vec![(&structure, None)];
+        let state = scan_colony_buildings(buildings.into_iter(), 0.4);
+        assert!(!state.has_damaged_building);
     }
 }

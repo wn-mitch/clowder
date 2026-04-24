@@ -92,19 +92,8 @@
     const ys = props.index.dseSeries.map(s => s.scores)
     const data: uPlot.AlignedData = [xs, ...ys] as unknown as uPlot.AlignedData
 
-    if (import.meta.env.DEV) {
-      console.debug('[TimelineStrip] data shape', {
-        xs_len: xs.length,
-        xs_range: xs.length > 0 ? [xs[0], xs[xs.length - 1]] : null,
-        tick_base: tickBase,
-        series: data.length - 1,
-        lengths: data.map(col => col.length),
-        y0_sample: (data[1] ?? []).slice(0, 3),
-      })
-    }
-
-    const width = host.clientWidth || 800
-    const linearPath = uPlot.paths.linear!()
+    const MIN_W = 640
+    const width = Math.max(host.clientWidth, MIN_W)
     const opts: uPlot.Options = {
       width,
       height: props.height ?? 240,
@@ -121,12 +110,9 @@
         { label: 'tick', value: (_u, v) => formatTick(v + tickBase) },
         ...props.index.dseSeries.map(s => ({
           label: s.dse,
-          scale: 'y',
           stroke: dseColor(s.dse),
-          width: 1.25,
-          spanGaps: true,
-          points: { show: true, size: 3 },
-          paths: linearPath,
+          width: 1.5,
+          spanGaps: false,
         })),
       ],
       plugins: [markerPlugin()],
@@ -134,12 +120,15 @@
 
     chart = new uPlot(opts, data, host)
     wireScrub(chart)
-    // Force a size pass after creation — RO fires initially too, but
-    // being explicit avoids one-frame layout quirks when the sticky
-    // toolbar or panel grid shift widths on first paint.
-    if (host.clientWidth > 0) {
-      chart.setSize({ width: host.clientWidth, height: props.height ?? 240 })
+    const applyRealSize = () => {
+      if (!chart || !host) return
+      const w = host.clientWidth
+      const h = props.height ?? 240
+      if (w > 0) chart.setSize({ width: w, height: h })
     }
+    applyRealSize()
+    requestAnimationFrame(applyRealSize)
+
   }
 
   function formatTick(n: number): string {
@@ -182,9 +171,26 @@
   }
 
   // Full re-render on index change (new run / different focal cat).
+  // Defer with requestAnimationFrame so the chart construction happens
+  // AFTER Svelte's update cycle completes. Constructing inside the
+  // effect synchronously causes uPlot's scale auto-range to silently
+  // produce null scales and [0,0] series idxs — verified empirically:
+  // the exact same data + options work when the construction is
+  // deferred or invoked outside the effect.
+  let pendingRenderFrame = 0
   $effect(() => {
     void props.index
-    render()
+    if (pendingRenderFrame) cancelAnimationFrame(pendingRenderFrame)
+    pendingRenderFrame = requestAnimationFrame(() => {
+      pendingRenderFrame = 0
+      render()
+    })
+    return () => {
+      if (pendingRenderFrame) {
+        cancelAnimationFrame(pendingRenderFrame)
+        pendingRenderFrame = 0
+      }
+    }
   })
 
   // Lightweight redraw when only the focal tick moves — avoids tearing
@@ -201,7 +207,10 @@
     const h = props.height ?? 240
     const ro = new ResizeObserver(() => {
       const w = el.clientWidth
-      if (chart) chart.setSize({ width: w, height: h })
+      // Guard against transient zero widths — uPlot's setSize(0,h)
+      // leaves the chart with null scales and breaks line drawing
+      // until re-construction.
+      if (w > 0 && chart) chart.setSize({ width: w, height: h })
     })
     ro.observe(el)
     return () => ro.disconnect()

@@ -60,7 +60,10 @@ impl CoordinateDse {
             // + ambition modulate.
             composition: Composition::weighted_sum(vec![0.3, 0.4, 0.3]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
-            eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
+            // §4: only coordinators with pending directives are eligible.
+            eligibility: EligibilityFilter::new()
+                .forbid(markers::Incapacitated::KEY)
+                .require(markers::IsCoordinatorWithDirectives::KEY),
         }
     }
 }

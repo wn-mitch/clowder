@@ -119,7 +119,9 @@ fn setup_world(seed: u64) -> World {
         registry
             .cat_dses
             .push(clowder::ai::dses::coordinate_dse(&scoring));
-        registry.cat_dses.push(clowder::ai::dses::explore_dse());
+        registry
+            .cat_dses
+            .push(clowder::ai::dses::explore_dse(&scoring));
         registry
             .cat_dses
             .push(clowder::ai::dses::wander_dse(&scoring));

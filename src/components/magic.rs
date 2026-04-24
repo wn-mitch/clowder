@@ -281,6 +281,13 @@ impl Inventory {
         true
     }
 
+    /// Whether the inventory contains any herb at all.
+    pub fn has_any_herb(&self) -> bool {
+        self.slots
+            .iter()
+            .any(|s| matches!(s, ItemSlot::Herb(_)))
+    }
+
     /// Whether the inventory has any herb usable for a remedy.
     pub fn has_remedy_herb(&self) -> bool {
         self.slots.iter().any(|s| {
