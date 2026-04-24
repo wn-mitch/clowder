@@ -51,7 +51,9 @@ use crate::ai::considerations::{Consideration, ScalarConsideration};
 use crate::ai::curves::Curve;
 use crate::ai::dse::{CommitmentStrategy, DseId, EvalCtx, GoalState, Intention};
 use crate::ai::eval::DseRegistry;
-use crate::ai::target_dse::{evaluate_target_taking, TargetAggregation, TargetTakingDse};
+use crate::ai::target_dse::{
+    evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,
+};
 use crate::components::physical::Position;
 use crate::components::prey::PreyKind;
 
@@ -169,6 +171,7 @@ pub fn resolve_hunt_target(
     cat_pos: Position,
     candidates: &[PreyCandidate],
     tick: u64,
+    focal_hook: Option<FocalTargetHook<'_>>,
 ) -> Option<Entity> {
     let dse = registry
         .target_taking_dses
@@ -233,7 +236,7 @@ pub fn resolve_hunt_target(
         target_position: None,
     };
 
-    evaluate_target_taking(
+    let scored = evaluate_target_taking(
         dse,
         cat,
         &entities,
@@ -241,8 +244,23 @@ pub fn resolve_hunt_target(
         &ctx,
         &fetch_self,
         &fetch_target,
-    )
-    .winning_target
+    );
+
+    // §11 focal-cat per-candidate ranking capture (§6.3). Emitted only
+    // when the caller marks this resolve as the focal cat's tick.
+    // Non-focal paths pass `focal_hook: None` and pay zero cost.
+    if let Some(hook) = focal_hook {
+        if let Some(ranking) = crate::ai::target_dse::target_ranking_from_scored(
+            &scored,
+            dse.aggregation(),
+            hook.name_lookup,
+        ) {
+            hook.capture
+                .set_target_ranking("hunt_target", ranking, tick);
+        }
+    }
+
+    scored.winning_target
 }
 
 #[cfg(test)]
@@ -315,7 +333,7 @@ mod tests {
     fn resolver_returns_none_with_no_registered_dse() {
         let registry = DseRegistry::new();
         let cat = Entity::from_raw_u32(1).unwrap();
-        let out = resolve_hunt_target(&registry, cat, Position::new(0, 0), &[], 0);
+        let out = resolve_hunt_target(&registry, cat, Position::new(0, 0), &[], 0, None);
         assert!(out.is_none());
     }
 
@@ -324,7 +342,7 @@ mod tests {
         let mut registry = DseRegistry::new();
         registry.target_taking_dses.push(hunt_target_dse());
         let cat = Entity::from_raw_u32(1).unwrap();
-        let out = resolve_hunt_target(&registry, cat, Position::new(0, 0), &[], 0);
+        let out = resolve_hunt_target(&registry, cat, Position::new(0, 0), &[], 0, None);
         assert!(out.is_none());
     }
 
@@ -344,6 +362,7 @@ mod tests {
             Position::new(0, 0),
             &[mouse, rabbit],
             0,
+            None,
         );
         assert_eq!(out, Some(rabbit.entity));
     }
@@ -368,6 +387,7 @@ mod tests {
             Position::new(0, 0),
             &[alert_rabbit, relaxed_mouse],
             0,
+            None,
         );
         assert_eq!(out, Some(relaxed_mouse.entity));
     }
@@ -386,6 +406,7 @@ mod tests {
             Position::new(0, 0),
             &[close, far],
             0,
+            None,
         );
         assert_eq!(out, Some(close.entity));
     }
@@ -409,6 +430,7 @@ mod tests {
             Position::new(0, 0),
             &[near_mouse, far_rat],
             0,
+            None,
         );
         assert_eq!(out, Some(near_mouse.entity));
     }
@@ -433,6 +455,7 @@ mod tests {
             Position::new(0, 0),
             &[near, far],
             0,
+            None,
         );
         assert_eq!(out, Some(near.entity));
     }

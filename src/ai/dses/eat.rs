@@ -36,6 +36,7 @@ use crate::ai::curves::hangry;
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
+use crate::components::markers;
 
 // ---------------------------------------------------------------------------
 // Eat DSE
@@ -73,7 +74,7 @@ impl EatDse {
             // inline `if ctx.food_available` gate at
             // `scoring.rs::score_actions`. Populated by the caller-side
             // `MarkerSnapshot::set_colony("HasStoredFood", ...)`.
-            eligibility: EligibilityFilter::new().require("HasStoredFood"),
+            eligibility: EligibilityFilter::new().require(markers::HasStoredFood::KEY),
         }
     }
 }
@@ -187,7 +188,7 @@ mod tests {
         // §4 (Phase 4b.2): Eat requires `HasStoredFood` — the test
         // closure stands in for the `MarkerSnapshot.has()` lookup
         // by returning true for that key.
-        let has_marker = |name: &str, _: Entity| name == "HasStoredFood";
+        let has_marker = |name: &str, _: Entity| name == markers::HasStoredFood::KEY;
         let sample = |_: &str, _: Position| 0.0;
         let ctx = EvalCtx {
             cat: entity,
@@ -284,7 +285,7 @@ mod tests {
         // `score_actions` retired; the DSE now consumes the
         // `HasStoredFood` colony marker via its eligibility filter.
         let dse = EatDse::new();
-        assert_eq!(dse.eligibility().required, vec!["HasStoredFood"]);
+        assert_eq!(dse.eligibility().required, vec![markers::HasStoredFood::KEY]);
         assert!(dse.eligibility().forbidden.is_empty());
     }
 

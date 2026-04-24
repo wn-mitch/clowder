@@ -61,7 +61,9 @@ use crate::ai::considerations::{Consideration, ScalarConsideration};
 use crate::ai::curves::Curve;
 use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination};
 use crate::ai::eval::DseRegistry;
-use crate::ai::target_dse::{evaluate_target_taking, TargetAggregation, TargetTakingDse};
+use crate::ai::target_dse::{
+    evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,
+};
 use crate::components::physical::Position;
 use crate::resources::relationships::Relationships;
 
@@ -172,6 +174,7 @@ pub fn resolve_groom_other_target(
     is_kin: &dyn Fn(Entity, Entity) -> bool,
     relationships: &Relationships,
     tick: u64,
+    focal_hook: Option<FocalTargetHook<'_>>,
 ) -> Option<Entity> {
     let dse = registry
         .target_taking_dses
@@ -251,7 +254,7 @@ pub fn resolve_groom_other_target(
         target_position: None,
     };
 
-    evaluate_target_taking(
+    let scored = evaluate_target_taking(
         dse,
         cat,
         &candidates,
@@ -259,8 +262,23 @@ pub fn resolve_groom_other_target(
         &ctx,
         &fetch_self,
         &fetch_target,
-    )
-    .winning_target
+    );
+
+    // §11 focal-cat per-candidate ranking capture (§6.3). Emitted only
+    // when the caller marks this resolve as the focal cat's tick.
+    // Non-focal paths pass `focal_hook: None` and pay zero cost.
+    if let Some(hook) = focal_hook {
+        if let Some(ranking) = crate::ai::target_dse::target_ranking_from_scored(
+            &scored,
+            dse.aggregation(),
+            hook.name_lookup,
+        ) {
+            hook.capture
+                .set_target_ranking("groom_other_target", ranking, tick);
+        }
+    }
+
+    scored.winning_target
 }
 
 #[cfg(test)]
@@ -325,6 +343,7 @@ mod tests {
             &is_kin,
             &relationships,
             0,
+            None,
         );
         assert!(out.is_none());
     }
@@ -348,6 +367,7 @@ mod tests {
             &is_kin,
             &relationships,
             0,
+            None,
         );
         assert!(out.is_none());
     }
@@ -370,6 +390,7 @@ mod tests {
             &is_kin,
             &relationships,
             0,
+            None,
         );
         assert!(out.is_none());
     }
@@ -396,6 +417,7 @@ mod tests {
             &is_kin,
             &relationships,
             0,
+            None,
         );
         assert!(out.is_none());
     }
@@ -436,6 +458,7 @@ mod tests {
             &is_kin,
             &relationships,
             0,
+            None,
         );
         assert_eq!(out, Some(cold));
     }
@@ -466,6 +489,7 @@ mod tests {
             &is_kin,
             &relationships,
             0,
+            None,
         );
         assert_eq!(out, Some(kin));
     }
@@ -504,6 +528,7 @@ mod tests {
             &is_kin,
             &relationships,
             0,
+            None,
         );
         assert_eq!(out, Some(near_acquaintance));
     }
@@ -535,6 +560,7 @@ mod tests {
             &is_kin,
             &relationships,
             0,
+            None,
         );
         assert_eq!(out, Some(friend));
     }
@@ -580,6 +606,7 @@ mod tests {
             &is_kin,
             &relationships,
             0,
+            None,
         );
         assert_eq!(out, Some(freezing));
     }
@@ -617,6 +644,7 @@ mod tests {
             &is_kin,
             &relationships,
             0,
+            None,
         );
         assert_eq!(out, Some(adjacent));
     }

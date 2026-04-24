@@ -555,6 +555,7 @@ impl FocalScoreCapture {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::components::markers;
 
     fn make_l3() -> TraceRecord {
         TraceRecord::L3 {
@@ -670,7 +671,7 @@ mod tests {
                 final_score: 0.35,
                 intention: dummy_intention.clone(),
                 trace: EvalTrace::default(),
-                eligibility_required: vec!["HasStoredFood"],
+                eligibility_required: vec![markers::HasStoredFood::KEY],
                 eligibility_forbidden: vec![],
                 eligible: true,
             },

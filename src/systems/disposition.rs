@@ -28,6 +28,7 @@ use crate::components::physical::{Dead, Health, InjuryKind, Needs, Position};
 use crate::components::prey::{
     DenRaided, PreyAnimal, PreyConfig, PreyDen, PreyDensity, PreyKilled, PreyState,
 };
+use crate::components::markers;
 use crate::components::skills::{MagicAffinity, Skills};
 use crate::components::task_chain::{FailurePolicy, StepKind, TaskChain, TaskStep};
 use crate::components::wildlife::WildAnimal;
@@ -61,6 +62,23 @@ pub struct NarrativeEmitter<'w> {
     pub weather: Res<'w, crate::resources::weather::WeatherState>,
     pub activation: Option<ResMut<'w, SystemActivation>>,
 }
+/// §4.3 marker queries for snapshot population. Bundled to avoid
+/// hitting Bevy's 16-parameter system limit. Future marker batches
+/// add their queries here rather than as top-level system params.
+#[derive(bevy_ecs::system::SystemParam)]
+pub struct MarkerQueries<'w, 's> {
+    pub life_stage: Query<
+        'w,
+        's,
+        (
+            Has<markers::Kitten>,
+            Has<markers::Young>,
+            Has<markers::Adult>,
+            Has<markers::Elder>,
+        ),
+    >,
+}
+
 use crate::resources::food::FoodStores;
 use crate::resources::fox_scent_map::FoxScentMap;
 use crate::resources::map::{Terrain, TileMap};
@@ -279,6 +297,9 @@ pub struct EvalDispositionSideEffects<'w, 's> {
     /// §11 focal-cat plumbing. Optional so non-traced runs pay nothing.
     pub focal_target: Option<Res<'w, crate::resources::FocalTraceTarget>>,
     pub focal_capture: Option<Res<'w, crate::resources::FocalScoreCapture>>,
+    /// §4.3 marker queries for snapshot population. Future marker
+    /// batches add their queries here.
+    pub marker_queries: MarkerQueries<'w, 's>,
 }
 
 /// Read-only queries over stored-item state + kitten state. Bundled
@@ -327,21 +348,26 @@ impl CookingQueries<'_, '_> {
 pub fn evaluate_dispositions(
     mut query: Query<
         (
-            Entity,
-            &Name,
-            &Needs,
-            &Personality,
-            &Position,
-            &Memory,
-            &Skills,
-            &Health,
-            &MagicAffinity,
-            &Inventory,
-            &mut CurrentAction,
-            Option<&crate::components::aspirations::Aspirations>,
-            Option<&crate::components::aspirations::Preferences>,
-            Option<&crate::components::fate::FatedLove>,
-            Option<&crate::components::fate::FatedRival>,
+            (
+                Entity,
+                &Name,
+                &Needs,
+                &Personality,
+                &Position,
+                &Memory,
+                &Skills,
+                &Health,
+            ),
+            (
+                &MagicAffinity,
+                &Inventory,
+                &mut CurrentAction,
+                Option<&crate::components::aspirations::Aspirations>,
+                Option<&crate::components::aspirations::Preferences>,
+                Option<&crate::components::fate::FatedLove>,
+                Option<&crate::components::fate::FatedRival>,
+                Option<&crate::components::fulfillment::Fulfillment>,
+            ),
         ),
         (
             Without<Dead>,
@@ -387,7 +413,7 @@ pub fn evaluate_dispositions(
     // paths must populate the same keys so the evaluator resolves
     // `EligibilityFilter::require` consistently across the two systems.
     let mut markers = crate::ai::scoring::MarkerSnapshot::new();
-    markers.set_colony("HasStoredFood", food_available);
+    markers.set_colony(markers::HasStoredFood::KEY, food_available);
 
     // Collect positions once.
     let mut cat_positions: Vec<(Entity, Position)> = Vec::new();
@@ -424,13 +450,13 @@ pub fn evaluate_dispositions(
     let has_garden = building_query
         .iter()
         .any(|(_, s, _, site, _)| s.kind == StructureType::Garden && site.is_none());
-    markers.set_colony("HasGarden", has_garden);
+    markers.set_colony(markers::HasGarden::KEY, has_garden);
     let has_functional_kitchen = building_query.iter().any(|(_, s, _, site, _)| {
         s.kind == StructureType::Kitchen && site.is_none() && s.effectiveness() > 0.0
     });
-    markers.set_colony("HasFunctionalKitchen", has_functional_kitchen);
+    markers.set_colony(markers::HasFunctionalKitchen::KEY, has_functional_kitchen);
     let has_raw_food_in_stores = cooking.has_raw_food_in_stores();
-    markers.set_colony("HasRawFoodInStores", has_raw_food_in_stores);
+    markers.set_colony(markers::HasRawFoodInStores::KEY, has_raw_food_in_stores);
 
     let herb_positions: Vec<(Entity, Position)> =
         herb_query.iter().map(|(e, _, p)| (e, *p)).collect();
@@ -448,11 +474,11 @@ pub fn evaluate_dispositions(
             avg < d.ward_strength_low_threshold
         }
     };
-    markers.set_colony("WardStrengthLow", ward_strength_low);
+    markers.set_colony(markers::WardStrengthLow::KEY, ward_strength_low);
 
     let colony_injury_count = query
         .iter()
-        .filter(|(_, _, _, _, _, _, _, health, _, _, _, _, _, _, _)| health.current < 1.0)
+        .filter(|((_, _, _, _, _, _, _, health), _)| health.current < 1.0)
         .count();
 
     let directive_snapshot: HashMap<Entity, (usize, Option<Directive>)> = directive_queue_query
@@ -517,21 +543,8 @@ pub fn evaluate_dispositions(
     };
 
     for (
-        entity,
-        _name,
-        needs,
-        personality,
-        pos,
-        memory,
-        skills,
-        health,
-        magic_aff,
-        inventory,
-        mut current,
-        aspirations,
-        preferences,
-        fated_love,
-        fated_rival,
+        (entity, _name, needs, personality, pos, memory, skills, health),
+        (magic_aff, inventory, mut current, aspirations, preferences, fated_love, fated_rival, fulfillment),
     ) in &mut query
     {
         if current.ticks_remaining != 0 {
@@ -558,6 +571,9 @@ pub fn evaluate_dispositions(
             &kitten_snapshot,
             &cat_positions,
             side_effects.time.tick,
+            // Scorer pre-check; focal capture happens at the
+            // step-resolution site, not here.
+            None,
         );
         // §Phase 4c.4 alloparenting Reframe A: bond-weighted compassion.
         // Non-parent adults with a positive bond to the kitten's mother
@@ -614,7 +630,13 @@ pub fn evaluate_dispositions(
             .iter()
             .any(|inj| inj.kind == InjuryKind::Severe && !inj.healed);
         // §4.3 per-cat marker population — mirror of goap.rs.
-        markers.set_entity("Incapacitated", entity, is_incapacitated);
+        markers.set_entity(markers::Incapacitated::KEY, entity, is_incapacitated);
+        if let Ok((k, y, a, e)) = side_effects.marker_queries.life_stage.get(entity) {
+            markers.set_entity(markers::Kitten::KEY, entity, k);
+            markers.set_entity(markers::Young::KEY, entity, y);
+            markers.set_entity(markers::Adult::KEY, entity, a);
+            markers.set_entity(markers::Elder::KEY, entity, e);
+        }
 
         let has_herbs_nearby = herb_positions.iter().any(|(_, hp)| {
             crate::systems::sensing::observer_sees_at(
@@ -725,6 +747,8 @@ pub fn evaluate_dispositions(
             day_phase: current_day_phase,
             has_functional_kitchen,
             has_raw_food_in_stores,
+            social_warmth_deficit: fulfillment
+                .map_or(0.4, |f| f.social_warmth_deficit()),
         };
 
         // §11 trace plumbing — dormant except when running headless
@@ -1137,6 +1161,9 @@ pub fn disposition_to_chain(
             &kitten_snapshot,
             &cat_pos_list,
             res.time.tick,
+            // Chain-building side; the focal capture happens at the
+            // GOAP step-resolver site (goap.rs: FeedKitten step).
+            None,
         );
 
         // §6.5.1 + §6.5.2: resolve target-taking DSE winners once per
@@ -1162,6 +1189,9 @@ pub fn disposition_to_chain(
             &cat_pos_list,
             &res.relationships,
             res.time.tick,
+            // Chain-building side; the focal capture happens at the
+            // GOAP step-resolver site (goap.rs: MateWith step).
+            None,
         );
         // §6.5.3: resolve the mentor target-taking DSE. Skill-gap is the
         // dominant axis; weights renormalized from spec by dropping the
@@ -1181,6 +1211,9 @@ pub fn disposition_to_chain(
             &mentor_skills_lookup,
             &res.relationships,
             res.time.tick,
+            // Chain-building side; the focal capture happens at the
+            // GOAP step-resolver site (goap.rs: MentorWith step).
+            None,
         );
         // §6.5.4: resolve the groom-other target-taking DSE. Adds
         // target-need-warmth + kinship axes that the legacy
@@ -1203,6 +1236,9 @@ pub fn disposition_to_chain(
                 &is_kin,
                 &res.relationships,
                 res.time.tick,
+                // Chain-building side; the focal capture happens at
+                // the GOAP step-resolver site (goap.rs: GroomOther step).
+                None,
             );
         // §6.5.7: resolve patient for ApplyRemedy. Replaces the
         // `injured_cats.min_by_key(distance)` legacy pick with the
@@ -1217,6 +1253,12 @@ pub fn disposition_to_chain(
                 &injured_patient_snapshot,
                 &is_kin,
                 res.time.tick,
+                // Chain-building side; apply_remedy has no dedicated
+                // GOAP step-resolver (the crafting chain embeds it),
+                // so the pre-check also carries None — focal-trace
+                // coverage for apply_remedy is tracked in the
+                // §6.5 multi-focal follow-on.
+                None,
             );
         // §6.5.8: resolve work-site for Build. Replaces the
         // `(priority, distance)` legacy pick with the progress-
@@ -1252,6 +1294,12 @@ pub fn disposition_to_chain(
             *pos,
             &build_candidates,
             res.time.tick,
+            // Chain-building side; build has no dedicated GOAP
+            // step-resolver picker (the construct-chain consumes the
+            // winner directly), so focal-trace coverage for
+            // build_target is tracked in the §6.5 multi-focal
+            // follow-on.
+            None,
         );
 
         let chain = match disposition.kind {
@@ -2308,6 +2356,28 @@ fn patrol_move(pos: &Position, dx: i32, dy: i32, map: &TileMap) -> Position {
 // resolve_disposition_chains
 // ===========================================================================
 
+/// Deferred mentor-skill transfer, collected during the main loop and applied
+/// in a post-loop pass to avoid double-borrowing `Skills`.
+struct MentorEffect {
+    apprentice: Entity,
+    mentor_skills: Skills,
+}
+
+/// Immutable pre-loop snapshots consumed by [`dispatch_chain_step`].
+struct ChainStepSnapshots {
+    grooming: std::collections::HashMap<Entity, f32>,
+    gender: std::collections::HashMap<Entity, Gender>,
+    cat_tile_counts: std::collections::HashMap<Position, u32>,
+}
+
+/// Mutable accumulators written by [`dispatch_chain_step`], consumed by the
+/// post-loop cleanup pass in [`resolve_disposition_chains`].
+struct ChainStepAccumulators {
+    mentor_effects: Vec<MentorEffect>,
+    grooming_restorations: Vec<crate::steps::disposition::GroomOutcome>,
+    kitten_feedings: Vec<Entity>,
+}
+
 /// Apply a step handler result to the task chain, syncing `CurrentAction`
 /// targets when the active step changes.
 fn apply_step_result(
@@ -2335,21 +2405,26 @@ fn apply_step_result(
 pub fn resolve_disposition_chains(
     mut cats: Query<
         (
-            Entity,
-            &mut TaskChain,
-            &mut CurrentAction,
-            &mut Position,
-            &mut Skills,
-            &mut Needs,
-            &mut Inventory,
-            &Personality,
-            &Name,
-            &Gender,
-            Option<&mut Disposition>,
-            Option<&mut ActionHistory>,
-            &mut HuntingPriors,
-            Option<&mut crate::components::grooming::GroomingCondition>,
-            &mut crate::components::mental::Mood,
+            (
+                Entity,
+                &mut TaskChain,
+                &mut CurrentAction,
+                &mut Position,
+                &mut Skills,
+                &mut Needs,
+                &mut Inventory,
+                &Personality,
+            ),
+            (
+                &Name,
+                &Gender,
+                Option<&mut Disposition>,
+                Option<&mut ActionHistory>,
+                &mut HuntingPriors,
+                Option<&mut crate::components::grooming::GroomingCondition>,
+                &mut crate::components::mental::Mood,
+                Option<&mut crate::components::fulfillment::Fulfillment>,
+            ),
         ),
         (
             Without<Dead>,
@@ -2377,58 +2452,60 @@ pub fn resolve_disposition_chains(
     mut commands: Commands,
 ) {
     let d = &constants.disposition;
-    // Deferred effects applied after the main loop (avoids mutable borrow conflicts).
-    struct MentorEffect {
-        apprentice: Entity,
-        mentor_skills: Skills,
-    }
-    let mut mentor_effects: Vec<MentorEffect> = Vec::new();
-    // Deferred kitten-feedings — collected during the main loop and
-    // applied in a second pass to avoid a double-&mut on `Needs` (the
-    // cats query already owns &mut Needs over all non-dead cats).
-    let mut kitten_feedings: Vec<Entity> = Vec::new();
+
+    let mut accum = ChainStepAccumulators {
+        mentor_effects: Vec::new(),
+        grooming_restorations: Vec::new(),
+        kitten_feedings: Vec::new(),
+    };
     let mut chains_to_remove: Vec<Entity> = Vec::new();
 
-    // Collect grooming snapshots for target lookups during social interactions.
-    let grooming_snapshot: std::collections::HashMap<Entity, f32> = cats
-        .iter()
-        .map(|(e, _, _, _, _, _, _, _, _, _, _, _, _, g, _)| (e, g.map_or(0.8, |g| g.0)))
-        .collect();
-    // Snapshot of each cat's gender — used by `MateWith` to look up the
-    // partner's gender for §7.M.7.4's gestator-selection fix without
-    // double-borrowing the mutable `cats` query.
-    let gender_snapshot: std::collections::HashMap<Entity, Gender> = cats
-        .iter()
-        .map(|(e, _, _, _, _, _, _, _, _, g, _, _, _, _, _)| (e, *g))
-        .collect();
-    // Deferred grooming restoration for targets of GroomOther steps.
-    let mut grooming_restorations: Vec<(Entity, f32)> = Vec::new();
-
-    // Snapshot tile occupancy for anti-stacking jitter on PatrolTo arrival.
-    let cat_tile_counts: std::collections::HashMap<Position, u32> = {
-        let mut counts = std::collections::HashMap::new();
-        for (_, _, _, pos, _, _, _, _, _, _, _, _, _, _, _) in &cats {
-            *counts.entry(*pos).or_insert(0) += 1;
-        }
-        counts
+    let snaps = ChainStepSnapshots {
+        // Grooming condition for target lookups during social interactions.
+        grooming: cats
+            .iter()
+            .map(|((e, _, _, _, _, _, _, _), (_, _, _, _, _, g, _, _))| {
+                (e, g.map_or(0.8, |g| g.0))
+            })
+            .collect(),
+        // Gender snapshot — used by `MateWith` to look up the partner's
+        // gender for §7.M.7.4's gestator-selection fix without double-
+        // borrowing the mutable `cats` query.
+        gender: cats
+            .iter()
+            .map(|((e, _, _, _, _, _, _, _), (_, g, _, _, _, _, _, _))| (e, *g))
+            .collect(),
+        // Tile occupancy for anti-stacking jitter on PatrolTo arrival.
+        cat_tile_counts: {
+            let mut counts = std::collections::HashMap::new();
+            for ((_, _, _, pos, _, _, _, _), _) in &cats {
+                *counts.entry(*pos).or_insert(0) += 1;
+            }
+            counts
+        },
     };
 
     for (
-        cat_entity,
-        mut chain,
-        mut current,
-        mut pos,
-        mut skills,
-        mut needs,
-        mut inventory,
-        personality,
-        name,
-        gender,
-        disposition,
-        history,
-        mut hunting_priors,
-        mut grooming,
-        mut mood,
+        (
+            cat_entity,
+            mut chain,
+            mut current,
+            mut pos,
+            mut skills,
+            mut needs,
+            mut inventory,
+            personality,
+        ),
+        (
+            name,
+            gender,
+            disposition,
+            history,
+            mut hunting_priors,
+            mut grooming,
+            mut mood,
+            mut fulfillment_opt,
+        ),
     ) in &mut cats
     {
         // Den discovery: peek at current step kind without mutable borrow.
@@ -2619,881 +2696,46 @@ pub fn resolve_disposition_chains(
             _ => continue,
         };
 
-        match &step.kind {
-            StepKind::HuntPrey { patrol_dir } => {
-                // Multi-phase hunt: Search → Stalk → Pounce.
-                // Phase is implicit from step.target_entity:
-                //   None = Search (scent-based) or Approach (scent locked)
-                //   Some = Stalk/Pounce (prey visible)
-                use crate::components::magic::ItemSlot;
-                use crate::components::prey::PreyAiState;
+        // Clone the step kind so the `step` borrow (from `chain.current_mut()`)
+        // can be dropped before we pass `&mut chain` to the dispatch function.
+        let step_kind = step.kind.clone();
 
-                if let Some(target_entity) = step.target_entity {
-                    // We have a locked target — check if it still exists.
-                    let Ok((_, prey_pos, prey_cfg, prey_state)) = prey_query.get(target_entity)
-                    else {
-                        step.target_entity = None;
-                        continue;
-                    };
-                    let prey_pos = *prey_pos;
-                    let prey_is_fleeing =
-                        matches!(prey_state.ai_state, PreyAiState::Fleeing { .. });
-                    let prey_awareness = prey_state.ai_state;
-                    let catch_mod = prey_cfg.catch_difficulty;
-                    let item_kind = prey_cfg.item_kind;
-                    let species_name = prey_cfg.name;
-                    let flee_strategy = prey_cfg.flee_strategy;
-                    let dist = pos.manhattan_distance(&prey_pos);
-
-                    // Bird-specific: if prey teleported away, give up immediately.
-                    if prey_is_fleeing
-                        && flee_strategy == crate::components::prey::FleeStrategy::Teleport
-                    {
-                        step.target_entity = None;
-                        continue;
-                    }
-
-                    // Dynamic stalk-start: slow down before entering detection zone.
-                    let stalk_start =
-                        (prey_cfg.alert_radius + d.stalk_start_buffer).max(d.stalk_start_minimum);
-
-                    // Determine pounce range from patience.
-                    let pounce_range: i32 = if personality.patience > 0.7 {
-                        d.pounce_range_patient
-                    } else if personality.patience < 0.3 {
-                        d.pounce_range_impatient
-                    } else {
-                        d.pounce_range_default
-                    };
-
-                    if dist <= pounce_range {
-                        // === POUNCE ===
-                        let awareness_base = match prey_awareness {
-                            PreyAiState::Idle | PreyAiState::Grazing { .. } => {
-                                d.pounce_awareness_idle
-                            }
-                            PreyAiState::Alert { .. } => d.pounce_awareness_alert,
-                            PreyAiState::Fleeing { .. } => d.pounce_awareness_fleeing,
-                        };
-                        let distance_mod = match dist {
-                            0..=1 => d.pounce_distance_close_mod,
-                            2 => d.pounce_distance_mid_mod,
-                            _ => d.pounce_distance_far_mod,
-                        };
-                        // Density-dependent vulnerability: crowded prey are easier to catch.
-                        let density = prey_params
-                            .density
-                            .0
-                            .get(&prey_cfg.kind)
-                            .copied()
-                            .unwrap_or(d.pounce_density_threshold);
-                        let density_bonus = if density > d.pounce_density_threshold {
-                            1.0 + (density - d.pounce_density_threshold)
-                        } else {
-                            1.0
-                        };
-
-                        let success_chance = awareness_base
-                            * (d.pounce_skill_base + skills.hunting * d.pounce_skill_scale)
-                            * distance_mod
-                            * catch_mod
-                            * density_bonus;
-
-                        if rng.rng.random::<f32>() < success_chance {
-                            // Catch!
-                            commands.entity(target_entity).despawn();
-                            let catch_corruption = if map.in_bounds(prey_pos.x, prey_pos.y) {
-                                map.get(prey_pos.x, prey_pos.y).corruption
-                            } else {
-                                0.0
-                            };
-
-                            if !inventory.is_full() {
-                                inventory.slots.push(ItemSlot::Item(
-                                    item_kind,
-                                    crate::components::items::ItemModifiers::with_corruption(
-                                        catch_corruption,
-                                    ),
-                                ));
-                            }
-                            skills.hunting += skills.growth_rate() * d.hunt_catch_skill_growth;
-
-                            // Send kill event for den pressure tracking.
-                            prey_params.kill_writer.write(PreyKilled {
-                                kind: prey_cfg.kind,
-                                position: prey_pos,
-                            });
-
-                            {
-                                let terrain = if map.in_bounds(pos.x, pos.y) {
-                                    map.get(pos.x, pos.y).terrain
-                                } else {
-                                    Terrain::Grass
-                                };
-                                let day_phase = DayPhase::from_tick(time.tick, &narr.config);
-                                let season = Season::from_tick(time.tick, &narr.config);
-                                let catch_desc = if catch_corruption > 0.3 {
-                                    format!("corrupted {}", species_name)
-                                } else {
-                                    species_name.to_string()
-                                };
-                                let ctx = TemplateContext {
-                                    action: crate::ai::Action::Hunt,
-                                    day_phase,
-                                    season,
-                                    weather: narr.weather.current,
-                                    mood_bucket: MoodBucket::Neutral,
-                                    life_stage: LifeStage::Adult,
-                                    has_target: true,
-                                    terrain,
-                                    event: Some("catch".into()),
-                                };
-                                let var_ctx = VariableContext {
-                                    name: &name.0,
-                                    gender: *gender,
-                                    weather: narr.weather.current,
-                                    day_phase,
-                                    season,
-                                    life_stage: LifeStage::Adult,
-                                    fur_color: "unknown",
-                                    other: None,
-                                    prey: Some(species_name),
-                                    item: None,
-                                    item_singular: None,
-                                    quality: None,
-                                };
-                                emit_event_narrative(
-                                    narr.registry.as_deref(),
-                                    &mut narr.log,
-                                    time.tick,
-                                    format!("{} catches a {}.", name.0, catch_desc),
-                                    crate::resources::narrative::NarrativeTier::Action,
-                                    &ctx,
-                                    &var_ctx,
-                                    personality,
-                                    &needs,
-                                    &mut rng.rng,
-                                );
-                            }
-
-                            hunting_priors.record_catch(&prey_pos);
-
-                            // Multi-kill: if inventory has room, hunt for more.
-                            if inventory.is_full() {
-                                chain.advance();
-                                chain.sync_targets(&mut current);
-                            } else {
-                                step.target_entity = None; // Search for another target.
-                            }
-                        } else {
-                            // Pounce failed — prey bolts.
-                            if let Ok((_, _, _, mut prey_st)) = prey_query.get_mut(target_entity) {
-                                prey_st.ai_state = PreyAiState::Fleeing {
-                                    from: cat_entity,
-                                    toward: None,
-                                    ticks: 0,
-                                };
-                            }
-
-                            {
-                                let terrain = if map.in_bounds(pos.x, pos.y) {
-                                    map.get(pos.x, pos.y).terrain
-                                } else {
-                                    Terrain::Grass
-                                };
-                                let day_phase = DayPhase::from_tick(time.tick, &narr.config);
-                                let season = Season::from_tick(time.tick, &narr.config);
-                                let ctx = TemplateContext {
-                                    action: crate::ai::Action::Hunt,
-                                    day_phase,
-                                    season,
-                                    weather: narr.weather.current,
-                                    mood_bucket: MoodBucket::Neutral,
-                                    life_stage: LifeStage::Adult,
-                                    has_target: true,
-                                    terrain,
-                                    event: Some("miss".into()),
-                                };
-                                let var_ctx = VariableContext {
-                                    name: &name.0,
-                                    gender: *gender,
-                                    weather: narr.weather.current,
-                                    day_phase,
-                                    season,
-                                    life_stage: LifeStage::Adult,
-                                    fur_color: "unknown",
-                                    other: None,
-                                    prey: Some(species_name),
-                                    item: None,
-                                    item_singular: None,
-                                    quality: None,
-                                };
-                                emit_event_narrative(
-                                    narr.registry.as_deref(),
-                                    &mut narr.log,
-                                    time.tick,
-                                    format!("{}'s quarry bolts.", name.0),
-                                    crate::resources::narrative::NarrativeTier::Micro,
-                                    &ctx,
-                                    &var_ctx,
-                                    personality,
-                                    &needs,
-                                    &mut rng.rng,
-                                );
-                            }
-
-                            let chase_limit = if personality.boldness > 0.7 {
-                                d.chase_limit_bold
-                            } else {
-                                d.chase_limit_default
-                            };
-                            if ticks > chase_limit {
-                                // Don't fail the whole chain — just drop target and
-                                // resume searching. Cats are persistent hunters.
-                                step.target_entity = None;
-                            }
-                        }
-                    } else if dist <= stalk_start {
-                        let mut moved = false;
-                        if prey_is_fleeing {
-                            // === CHASE === sprint burst.
-                            for _ in 0..d.chase_speed {
-                                if let Some(next) = step_toward(&pos, &prey_pos, &map) {
-                                    *pos = next;
-                                    moved = true;
-                                }
-                            }
-                        } else {
-                            // === STALK === Deliberate approach, 1 tile/tick.
-                            // Cats are agile ambush predators — they close quickly
-                            // while relying on stealth to avoid detection.
-                            if let Some(next) = step_toward(&pos, &prey_pos, &map) {
-                                *pos = next;
-                                moved = true;
-                            }
-                            // Anxiety check: nervous cat spooks prey.
-                            if personality.anxiety > d.anxiety_spook_threshold
-                                && rng.rng.random::<f32>() < d.anxiety_spook_chance
-                            {
-                                if let Ok((_, _, _, mut prey_st)) =
-                                    prey_query.get_mut(target_entity)
-                                {
-                                    prey_st.ai_state = PreyAiState::Fleeing {
-                                        from: cat_entity,
-                                        toward: None,
-                                        ticks: 0,
-                                    };
-                                }
-                                step.target_entity = None; // Resume searching.
-                            }
-                        }
-                        // Can't reach prey (terrain blocked) — give up after a few ticks.
-                        if !moved && ticks > 10 {
-                            step.target_entity = None;
-                        }
-                    } else {
-                        // === APPROACH === Trot toward scented prey.
-                        let mut moved = false;
-                        for _ in 0..d.approach_speed {
-                            if let Some(next) = step_toward(&pos, &prey_pos, &map) {
-                                *pos = next;
-                                moved = true;
-                            }
-                        }
-                        if dist > d.approach_give_up_distance || (!moved && ticks > 10) {
-                            step.target_entity = None;
-                        }
-                    }
-                } else {
-                    // === SEARCH === (no target yet — move toward best-known hunting ground)
-                    // Priority: personal belief > colony belief > wind > patrol_dir.
-                    let belief_dir = hunting_priors.best_direction(&pos, d.search_belief_radius);
-                    let colony_dir = colony_map
-                        .beliefs
-                        .best_direction(&pos, d.search_belief_radius);
-                    let (wx, wy) = wind.direction();
-                    let (mut dx, mut dy) = if let Some((bx, by)) = belief_dir {
-                        (bx, by)
-                    } else if let Some((cx, cy)) = colony_dir {
-                        (cx, cy)
-                    } else if wx.abs() > d.search_wind_direction_threshold
-                        || wy.abs() > d.search_wind_direction_threshold
-                    {
-                        (-(wx.signum() as i32), -(wy.signum() as i32))
-                    } else {
-                        *patrol_dir
-                    };
-                    // Jitter — enough to explore but not lose the gradient.
-                    if rng.rng.random::<f32>() < d.search_jitter_chance {
-                        dx = rng.rng.random_range(-1i32..=1);
-                        dy = rng.rng.random_range(-1i32..=1);
-                    }
-                    // Ensure we actually move (avoid 0,0).
-                    if dx == 0 && dy == 0 {
-                        dx = 1;
-                    }
-                    // Trot while searching to cover ground.
-                    for _ in 0..d.search_speed {
-                        *pos = patrol_move(&pos, dx, dy, &map);
-                    }
-
-                    // Visual detection: spot nearby prey within 15 tiles.
-                    let visible_prey = prey_query
-                        .iter()
-                        .filter(|(_, pp, _, _)| {
-                            crate::systems::sensing::observer_sees_at(
-                                crate::components::SensorySpecies::Cat,
-                                *pos,
-                                &constants.sensory.cat,
-                                **pp,
-                                crate::components::SensorySignature::PREY,
-                                d.search_visual_detection_range as f32,
-                            )
-                        })
-                        .min_by_key(|(_, pp, _, _)| pos.manhattan_distance(pp));
-
-                    if let Some((prey_entity, _prey_pos_ref, _, _)) = visible_prey {
-                        step.target_entity = Some(prey_entity);
-                    } else {
-                        // Scan for prey scent via PreyScentMap (Phase 2B —
-                        // grid-sampled influence map). Finds the strongest-
-                        // scent bucket within `scent_search_radius`; the
-                        // `min_by_key` below resolves to the prey entity
-                        // closest to that source tile.
-                        let scent_source = prey_params.prey_scent_map.highest_nearby(
-                            pos.x,
-                            pos.y,
-                            d.scent_search_radius,
-                        );
-                        let scent_above_threshold = scent_source
-                            .map(|(sx, sy)| {
-                                prey_params.prey_scent_map.get(sx, sy)
-                                    >= d.scent_detect_threshold
-                            })
-                            .unwrap_or(false);
-                        let scented_prey = if scent_above_threshold {
-                            let (sx, sy) = scent_source.unwrap();
-                            let source = Position::new(sx, sy);
-                            prey_query
-                                .iter()
-                                .min_by_key(|(_, pp, _, _)| source.manhattan_distance(pp))
-                        } else {
-                            None
-                        };
-
-                        if let Some((prey_entity, prey_pos_ref, _, _)) = scented_prey {
-                            step.target_entity = Some(prey_entity);
-                            hunting_priors.record_scent(prey_pos_ref);
-                            {
-                                let terrain = if map.in_bounds(pos.x, pos.y) {
-                                    map.get(pos.x, pos.y).terrain
-                                } else {
-                                    Terrain::Grass
-                                };
-                                let day_phase = DayPhase::from_tick(time.tick, &narr.config);
-                                let season = Season::from_tick(time.tick, &narr.config);
-                                let ctx = TemplateContext {
-                                    action: crate::ai::Action::Hunt,
-                                    day_phase,
-                                    season,
-                                    weather: narr.weather.current,
-                                    mood_bucket: MoodBucket::Neutral,
-                                    life_stage: LifeStage::Adult,
-                                    has_target: false,
-                                    terrain,
-                                    event: Some("scent".into()),
-                                };
-                                let var_ctx = VariableContext {
-                                    name: &name.0,
-                                    gender: *gender,
-                                    weather: narr.weather.current,
-                                    day_phase,
-                                    season,
-                                    life_stage: LifeStage::Adult,
-                                    fur_color: "unknown",
-                                    other: None,
-                                    prey: None,
-                                    item: None,
-                                    item_singular: None,
-                                    quality: None,
-                                };
-                                emit_event_narrative(
-                                    narr.registry.as_deref(),
-                                    &mut narr.log,
-                                    time.tick,
-                                    format!("{} catches a scent on the wind.", name.0),
-                                    crate::resources::narrative::NarrativeTier::Micro,
-                                    &ctx,
-                                    &var_ctx,
-                                    personality,
-                                    &needs,
-                                    &mut rng.rng,
-                                );
-                            }
-                        }
-                    }
-
-                    if ticks > d.search_timeout_ticks {
-                        // Multi-kill: if we already have food, head to stores.
-                        if inventory
-                            .slots
-                            .iter()
-                            .any(|s| matches!(s, ItemSlot::Item(k, _) if k.is_food()))
-                        {
-                            chain.advance();
-                            chain.sync_targets(&mut current);
-                        } else {
-                            hunting_priors.record_failed_search(&pos, ticks);
-                            chain.fail_current("no scent found".into());
-                        }
-                    }
-                }
-            }
-
-            StepKind::ForageItem { patrol_dir } => {
-                // Active foraging: directional patrol, check each tile.
-                // Use patrol_dir with jitter and reverse-on-blocked (wildlife pattern).
-                let mut dx = patrol_dir.0;
-                let mut dy = patrol_dir.1;
-                if dx == 0 && dy == 0 {
-                    dx = 1;
-                } // ensure movement
-                  // Forage jitter.
-                if rng.rng.random::<f32>() < d.forage_jitter_chance {
-                    dx = rng.rng.random_range(-1i32..=1);
-                    dy = rng.rng.random_range(-1i32..=1);
-                    if dx == 0 && dy == 0 {
-                        dx = 1;
-                    }
-                }
-                *pos = patrol_move(&pos, dx, dy, &map);
-
-                // Check current tile for forage yield.
-                if map.in_bounds(pos.x, pos.y) {
-                    let tile = map.get(pos.x, pos.y);
-                    let forage_yield = tile.terrain.foraging_yield();
-                    if forage_yield > 0.0
-                        && rng.rng.random::<f32>() < forage_yield * d.forage_yield_scale
-                    {
-                        use crate::components::items::ItemKind;
-                        use crate::components::magic::ItemSlot;
-                        let item_kind = match tile.terrain {
-                            Terrain::DenseForest => {
-                                if rng.rng.random::<bool>() {
-                                    ItemKind::Mushroom
-                                } else {
-                                    ItemKind::Nuts
-                                }
-                            }
-                            Terrain::LightForest => {
-                                if rng.rng.random::<bool>() {
-                                    ItemKind::Nuts
-                                } else {
-                                    ItemKind::Berries
-                                }
-                            }
-                            _ => {
-                                if rng.rng.random::<bool>() {
-                                    ItemKind::Berries
-                                } else {
-                                    ItemKind::Roots
-                                }
-                            }
-                        };
-                        let forage_corruption = if map.in_bounds(pos.x, pos.y) {
-                            map.get(pos.x, pos.y).corruption
-                        } else {
-                            0.0
-                        };
-                        if !inventory.is_full() {
-                            inventory.slots.push(ItemSlot::Item(
-                                item_kind,
-                                crate::components::items::ItemModifiers::with_corruption(
-                                    forage_corruption,
-                                ),
-                            ));
-                        }
-                        skills.foraging += skills.growth_rate() * d.forage_skill_growth;
-                        {
-                            let item_name = if forage_corruption > 0.3 {
-                                format!("corrupted {}", item_kind.name())
-                            } else {
-                                item_kind.name().to_string()
-                            };
-                            let terrain = if map.in_bounds(pos.x, pos.y) {
-                                map.get(pos.x, pos.y).terrain
-                            } else {
-                                Terrain::Grass
-                            };
-                            let day_phase = DayPhase::from_tick(time.tick, &narr.config);
-                            let season = Season::from_tick(time.tick, &narr.config);
-                            let ctx = TemplateContext {
-                                action: crate::ai::Action::Forage,
-                                day_phase,
-                                season,
-                                weather: narr.weather.current,
-                                mood_bucket: MoodBucket::Neutral,
-                                life_stage: LifeStage::Adult,
-                                has_target: false,
-                                terrain,
-                                event: Some("find".into()),
-                            };
-                            let var_ctx = VariableContext {
-                                name: &name.0,
-                                gender: *gender,
-                                weather: narr.weather.current,
-                                day_phase,
-                                season,
-                                life_stage: LifeStage::Adult,
-                                fur_color: "unknown",
-                                other: None,
-                                prey: None,
-                                item: Some(&item_name),
-                                item_singular: Some(item_kind.singular_name()),
-                                quality: None,
-                            };
-                            emit_event_narrative(
-                                narr.registry.as_deref(),
-                                &mut narr.log,
-                                time.tick,
-                                format!("{} finds {}.", name.0, item_name),
-                                crate::resources::narrative::NarrativeTier::Action,
-                                &ctx,
-                                &var_ctx,
-                                personality,
-                                &needs,
-                                &mut rng.rng,
-                            );
-                        }
-                        chain.advance();
-                        chain.sync_targets(&mut current);
-                    } else if ticks > d.forage_timeout_ticks {
-                        chain.fail_current("nothing found while foraging".into());
-                    }
-                }
-            }
-
-            StepKind::DepositAtStores => {
-                let target = step.target_entity;
-                let deposit = crate::steps::disposition::resolve_deposit_at_stores(
-                    target,
-                    &mut inventory,
-                    &skills,
-                    &pos,
-                    &mut stores_query,
-                    &items_query,
-                    &mut commands,
-                    d,
-                );
-                if deposit.storage_upgraded {
-                    if let Some(ref mut act) = narr.activation {
-                        act.record(Feature::StorageUpgraded);
-                    }
-                }
-                if deposit.rejected {
-                    if let Some(ref mut act) = narr.activation {
-                        act.record(Feature::DepositRejected);
-                    }
-                }
-                apply_step_result(deposit.step, &mut chain, &mut current);
-            }
-
-            StepKind::EatAtStores => {
-                let target = step.target_entity;
-                let outcome = crate::steps::disposition::resolve_eat_at_stores(
-                    ticks,
-                    target,
-                    &mut needs,
-                    &mut stores_query,
-                    &items_query,
-                    &mut commands,
-                    d,
-                );
-                outcome.record_if_witnessed(
-                    narr.activation.as_deref_mut(),
-                    Feature::FoodEaten,
-                );
-                apply_step_result(outcome.result, &mut chain, &mut current);
-            }
-
-            StepKind::Sleep { ticks: duration } => {
-                let outcome =
-                    crate::steps::disposition::resolve_sleep(ticks, *duration, &mut needs, d);
-                apply_step_result(outcome.result, &mut chain, &mut current);
-            }
-
-            StepKind::SelfGroom => {
-                let outcome = crate::steps::disposition::resolve_self_groom(
-                    ticks,
-                    &mut needs,
-                    grooming.as_deref_mut(),
-                    d,
-                );
-                apply_step_result(outcome.result, &mut chain, &mut current);
-            }
-
-            StepKind::Socialize => {
-                let target = step.target_entity;
-                let outcome = crate::steps::disposition::resolve_socialize(
-                    ticks,
-                    cat_entity,
-                    target,
-                    &mut needs,
-                    &mut hunting_priors,
-                    &mut relationships,
-                    &mut colony_map,
-                    &grooming_snapshot,
-                    time.tick,
-                    &constants.social,
-                    d,
-                );
-                outcome.record_if_witnessed(
-                    narr.activation.as_deref_mut(),
-                    Feature::Socialized,
-                );
-                apply_step_result(outcome.result, &mut chain, &mut current);
-            }
-
-            StepKind::GroomOther => {
-                let target = step.target_entity;
-                let outcome = crate::steps::disposition::resolve_groom_other(
-                    ticks,
-                    cat_entity,
-                    target,
-                    &mut needs,
-                    &mut hunting_priors,
-                    &mut relationships,
-                    &mut colony_map,
-                    &grooming_snapshot,
-                    time.tick,
-                    &constants.social,
-                    d,
-                );
-                outcome.record_if_witnessed(
-                    narr.activation.as_deref_mut(),
-                    Feature::GroomedOther,
-                );
-                if let Some(r) = outcome.witness {
-                    grooming_restorations.push(r);
-                }
-                apply_step_result(outcome.result, &mut chain, &mut current);
-            }
-
-            StepKind::MentorCat => {
-                let target = step.target_entity;
-                let outcome = crate::steps::disposition::resolve_mentor_cat(
-                    ticks,
-                    cat_entity,
-                    target,
-                    &mut needs,
-                    &skills,
-                    &mut relationships,
-                    time.tick,
-                    d,
-                );
-                outcome.record_if_witnessed(
-                    narr.activation.as_deref_mut(),
-                    Feature::MentoredCat,
-                );
-                let crate::steps::StepOutcome { result, witness } = outcome;
-                if let Some((apprentice, mentor_skills)) = witness {
-                    mentor_effects.push(MentorEffect {
-                        apprentice,
-                        mentor_skills,
-                    });
-                }
-                apply_step_result(result, &mut chain, &mut current);
-            }
-
-            StepKind::PatrolTo => {
-                let target = step.target_position;
-                let cached = &mut step.cached_path;
-                let outcome = crate::steps::disposition::resolve_patrol_to(
-                    &mut pos,
-                    target,
-                    cached,
-                    &mut needs,
-                    &map,
-                    d,
-                    &cat_tile_counts,
-                );
-                apply_step_result(outcome.result, &mut chain, &mut current);
-            }
-
-            StepKind::FightThreat => {
-                let health = prey_params
-                    .health_query
-                    .get(cat_entity)
-                    .cloned()
-                    .unwrap_or_default();
-                let outcome = crate::steps::disposition::resolve_fight_threat(
-                    ticks,
-                    &mut skills,
-                    &mut needs,
-                    &health,
-                    d,
-                );
-                outcome.record_if_witnessed(
-                    narr.activation.as_deref_mut(),
-                    Feature::ThreatEngaged,
-                );
-                apply_step_result(outcome.result, &mut chain, &mut current);
-            }
-
-            StepKind::Survey => {
-                let outcome = crate::steps::disposition::resolve_survey(
-                    ticks,
-                    &mut needs,
-                    &pos,
-                    &mut prey_params.exploration_map,
-                    d,
-                );
-                apply_step_result(outcome.result, &mut chain, &mut current);
-            }
-
-            StepKind::DeliverDirective {
-                kind,
-                priority,
-                directive_target,
-            } => {
-                let outcome =
-                    crate::steps::disposition::resolve_deliver_directive(ticks, &mut needs, d);
-                if matches!(outcome.result, crate::steps::StepResult::Advance) {
-                    // Insert ActiveDirective on the target cat.
-                    if let Some(target) = step.target_entity {
-                        commands.entity(target).insert(ActiveDirective {
-                            kind: *kind,
-                            priority: *priority,
-                            coordinator: cat_entity,
-                            coordinator_social_weight: needs.respect,
-                            delivered_tick: time.tick,
-                            target_position: *directive_target,
-                            target_entity: None,
-                        });
-                        // Gate on both witness (time-based success)
-                        // AND a real directive target existing.
-                        outcome.record_if_witnessed(
-                            narr.activation.as_deref_mut(),
-                            Feature::DirectiveDelivered,
-                        );
-                    }
-                }
-                apply_step_result(outcome.result, &mut chain, &mut current);
-            }
-
-            StepKind::MateWith => {
-                let target = step.target_entity;
-                let target_gender = target.and_then(|t| gender_snapshot.get(&t).copied());
-                let outcome = crate::steps::disposition::resolve_mate_with(
-                    ticks,
-                    cat_entity,
-                    *gender,
-                    target,
-                    target_gender,
-                    &mut needs,
-                    &mut relationships,
-                );
-                outcome.record_if_witnessed(
-                    narr.activation.as_deref_mut(),
-                    Feature::MatingOccurred,
-                );
-                // §Phase 5a: CourtshipInteraction for Tom×Tom or any
-                // target-present, no-pregnancy Advance.
-                if matches!(outcome.result, crate::steps::StepResult::Advance)
-                    && outcome.witness.is_none()
-                    && target.is_some()
-                {
-                    if let Some(ref mut act) = narr.activation {
-                        act.record(Feature::CourtshipInteraction);
-                    }
-                }
-                if let Some((gestator, litter_size)) = outcome.witness {
-                    // §7.M.7.4: Pregnant lands on the gestation-capable
-                    // partner, not the initiator. `partner` on the
-                    // `Pregnant` struct is the other mate — so if the
-                    // initiator is the gestator, partner = target; if
-                    // the target is the gestator, partner = initiator.
-                    let partner = if gestator == cat_entity {
-                        target.unwrap_or(cat_entity)
-                    } else {
-                        cat_entity
-                    };
-                    commands.entity(gestator).insert(
-                        crate::components::pregnancy::Pregnant::new(
-                            time.tick,
-                            partner,
-                            litter_size,
-                        ),
-                    );
-                }
-                apply_step_result(outcome.result, &mut chain, &mut current);
-            }
-
-            StepKind::FeedKitten => {
-                let target = step.target_entity;
-                let outcome = crate::steps::disposition::resolve_feed_kitten(
-                    ticks,
-                    target,
-                    &mut needs,
-                    &mut inventory,
-                );
-                outcome.record_if_witnessed(
-                    narr.activation.as_deref_mut(),
-                    Feature::KittenFed,
-                );
-                if let Some(kitten_entity) = outcome.witness {
-                    kitten_feedings.push(kitten_entity);
-                }
-                apply_step_result(outcome.result, &mut chain, &mut current);
-            }
-
-            StepKind::RetrieveFromStores { kind } => {
-                let kind = *kind;
-                let target = step.target_entity;
-                let outcome = crate::steps::disposition::resolve_retrieve_from_stores(
-                    ticks,
-                    kind,
-                    target,
-                    &mut inventory,
-                    &mut stores_query,
-                    &items_query,
-                    &mut commands,
-                );
-                outcome.record_if_witnessed(
-                    narr.activation.as_deref_mut(),
-                    Feature::ItemRetrieved,
-                );
-                apply_step_result(outcome.result, &mut chain, &mut current);
-            }
-
-            StepKind::RetrieveAnyFoodFromStores => {
-                let target = step.target_entity;
-                // §Phase 4c.4: swapped from the raw-only helper to the
-                // any-food helper to match the step's name. The previous
-                // call accepted only uncooked items, contradicting the
-                // `RetrieveAnyFoodFromStores` semantic promised to
-                // `build_caretaking_chain`. Since this disposition-chain
-                // path is currently unscheduled (GOAP replaced it),
-                // the bug never surfaced, but the rename keeps the two
-                // systems aligned if the chain path is ever re-enabled.
-                let outcome = crate::steps::disposition::resolve_retrieve_any_food_from_stores(
-                    ticks,
-                    target,
-                    &mut inventory,
-                    &mut stores_query,
-                    &items_query,
-                    &mut commands,
-                );
-                outcome.record_if_witnessed(
-                    narr.activation.as_deref_mut(),
-                    Feature::ItemRetrieved,
-                );
-                apply_step_result(outcome.result, &mut chain, &mut current);
-            }
-
-            // Non-disposition steps are handled elsewhere.
-            _ => {}
-        }
+        // ---- Dispatch on step kind ----
+        // Extracted to a separate function to keep `resolve_disposition_chains`
+        // under LLVM's optimization-cliff threshold (~4,500 lines).
+        // See docs/open-work.md §"resolve_disposition_chains split".
+        dispatch_chain_step(
+            step_kind,
+            ticks,
+            cat_entity,
+            &mut chain,
+            &mut current,
+            &mut pos,
+            &mut skills,
+            &mut needs,
+            &mut inventory,
+            personality,
+            name,
+            gender,
+            &mut hunting_priors,
+            grooming.as_deref_mut(),
+            &mut fulfillment_opt,
+            &mut prey_query,
+            &mut stores_query,
+            &items_query,
+            &mut prey_params,
+            &map,
+            &wind,
+            &mut relationships,
+            &mut narr,
+            &time,
+            &mut rng,
+            &mut colony_map,
+            &constants,
+            &mut commands,
+            &snaps,
+            &mut accum,
+        );
 
         if chain.is_complete() {
             chains_to_remove.push(cat_entity);
@@ -3537,24 +2779,42 @@ pub fn resolve_disposition_chains(
     }
 
     // Apply deferred kitten-feedings from FeedKitten steps (§Phase 4c.3).
-    for kitten_entity in kitten_feedings {
-        if let Ok((_, _, _, _, _, mut k_needs, _, _, _, _, _, _, _, _, _)) =
+    // Kitten also gains acceptance — being fed is the highest-signal
+    // "cared for" event in a kitten's life.
+    for kitten_entity in accum.kitten_feedings {
+        if let Ok(((_, _, _, _, _, mut k_needs, _, _), _)) =
             cats.get_mut(kitten_entity)
         {
             k_needs.hunger = (k_needs.hunger + 0.5).min(1.0);
+            k_needs.acceptance =
+                (k_needs.acceptance + d.acceptance_per_kitten_fed).min(1.0);
         }
     }
 
     // Apply deferred grooming restorations from GroomOther steps.
-    for (target, delta) in grooming_restorations {
-        if let Ok((_, _, _, _, _, _, _, _, _, _, _, _, _, Some(mut g), _)) = cats.get_mut(target) {
-            g.0 = (g.0 + delta).min(1.0);
+    // Recipient also gains acceptance — being groomed is the receiver side
+    // of social warmth, which otherwise has no sim-level restorer.
+    // §7.W: also apply social_warmth delta to the groomed target.
+    for groom in accum.grooming_restorations {
+        if let Ok((
+            (_, _, _, _, _, mut needs, _, _),
+            (_, _, _, _, _, grooming, _, fulfillment),
+        )) = cats.get_mut(groom.target)
+        {
+            if let Some(mut g) = grooming {
+                g.0 = (g.0 + groom.grooming_delta).min(1.0);
+            }
+            needs.acceptance = (needs.acceptance + d.acceptance_per_groomed).min(1.0);
+            if let Some(mut f) = fulfillment {
+                f.social_warmth =
+                    (f.social_warmth + groom.social_warmth_delta).min(1.0);
+            }
         }
     }
 
     // Apply deferred mentor effects: grow apprentice's weakest teachable skill.
     // The apprentice may have a TaskChain (in `cats`) or not (in `unchained_skills`).
-    for effect in &mentor_effects {
+    for effect in &accum.mentor_effects {
         // Try the unchained query first (more common — apprentice is usually idle).
         let app_skills_result = if let Ok(s) = unchained_skills.get(effect.apprentice) {
             Some((
@@ -3566,7 +2826,7 @@ pub fn resolve_disposition_chains(
                 s.magic,
                 s.growth_rate(),
             ))
-        } else if let Ok((_, _, _, _, s, _, _, _, _, _, _, _, _, _, _)) =
+        } else if let Ok(((_, _, _, _, s, _, _, _), _)) =
             cats.get(effect.apprentice)
         {
             Some((
@@ -3623,7 +2883,7 @@ pub fn resolve_disposition_chains(
                         5 => s.magic += growth,
                         _ => {}
                     }
-                } else if let Ok((_, _, _, _, mut s, _, _, _, _, _, _, _, _, _, _)) =
+                } else if let Ok(((_, _, _, _, mut s, _, _, _), _)) =
                     cats.get_mut(effect.apprentice)
                 {
                     match idx {
@@ -3641,6 +2901,944 @@ pub fn resolve_disposition_chains(
     }
 }
 
+
+// ===========================================================================
+// dispatch_chain_step — the step-resolution match dispatch, extracted from
+// `resolve_disposition_chains` to keep both functions under LLVM's
+// optimization-cliff threshold.
+// ===========================================================================
+
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn dispatch_chain_step(
+    step_kind: StepKind,
+    ticks: u64,
+    cat_entity: Entity,
+    mut chain: &mut TaskChain,
+    mut current: &mut CurrentAction,
+    mut pos: &mut Position,
+    mut skills: &mut Skills,
+    mut needs: &mut Needs,
+    mut inventory: &mut Inventory,
+    personality: &Personality,
+    name: &Name,
+    gender: &Gender,
+    mut hunting_priors: &mut HuntingPriors,
+    mut grooming: Option<&mut crate::components::grooming::GroomingCondition>,
+    fulfillment_opt: &mut Option<Mut<crate::components::fulfillment::Fulfillment>>,
+    prey_query: &mut Query<(Entity, &Position, &PreyConfig, &mut PreyState), With<PreyAnimal>>,
+    mut stores_query: &mut Query<&mut StoredItems>,
+    items_query: &Query<&Item>,
+    prey_params: &mut PreyHuntParams,
+    map: &TileMap,
+    wind: &crate::resources::wind::WindState,
+    mut relationships: &mut Relationships,
+    narr: &mut NarrativeEmitter,
+    time: &TimeState,
+    rng: &mut SimRng,
+    mut colony_map: &mut ColonyHuntingMap,
+    constants: &SimConstants,
+    mut commands: &mut Commands,
+    snaps: &ChainStepSnapshots,
+    accum: &mut ChainStepAccumulators,
+) {
+    let d = &constants.disposition;
+
+    match step_kind {
+        StepKind::HuntPrey { patrol_dir } => {
+            let step = chain.current_mut().unwrap();
+            // Multi-phase hunt: Search → Stalk → Pounce.
+            // Phase is implicit from step.target_entity:
+            //   None = Search (scent-based) or Approach (scent locked)
+            //   Some = Stalk/Pounce (prey visible)
+            use crate::components::magic::ItemSlot;
+            use crate::components::prey::PreyAiState;
+
+            if let Some(target_entity) = step.target_entity {
+                // We have a locked target — check if it still exists.
+                let Ok((_, prey_pos, prey_cfg, prey_state)) = prey_query.get(target_entity)
+                else {
+                    step.target_entity = None;
+                    return;
+                };
+                let prey_pos = *prey_pos;
+                let prey_is_fleeing =
+                    matches!(prey_state.ai_state, PreyAiState::Fleeing { .. });
+                let prey_awareness = prey_state.ai_state;
+                let catch_mod = prey_cfg.catch_difficulty;
+                let item_kind = prey_cfg.item_kind;
+                let species_name = prey_cfg.name;
+                let flee_strategy = prey_cfg.flee_strategy;
+                let dist = pos.manhattan_distance(&prey_pos);
+
+                // Bird-specific: if prey teleported away, give up immediately.
+                if prey_is_fleeing
+                    && flee_strategy == crate::components::prey::FleeStrategy::Teleport
+                {
+                    step.target_entity = None;
+                    return;
+                }
+
+                // Dynamic stalk-start: slow down before entering detection zone.
+                let stalk_start =
+                    (prey_cfg.alert_radius + d.stalk_start_buffer).max(d.stalk_start_minimum);
+
+                // Determine pounce range from patience.
+                let pounce_range: i32 = if personality.patience > 0.7 {
+                    d.pounce_range_patient
+                } else if personality.patience < 0.3 {
+                    d.pounce_range_impatient
+                } else {
+                    d.pounce_range_default
+                };
+
+                if dist <= pounce_range {
+                    // === POUNCE ===
+                    let awareness_base = match prey_awareness {
+                        PreyAiState::Idle | PreyAiState::Grazing { .. } => {
+                            d.pounce_awareness_idle
+                        }
+                        PreyAiState::Alert { .. } => d.pounce_awareness_alert,
+                        PreyAiState::Fleeing { .. } => d.pounce_awareness_fleeing,
+                    };
+                    let distance_mod = match dist {
+                        0..=1 => d.pounce_distance_close_mod,
+                        2 => d.pounce_distance_mid_mod,
+                        _ => d.pounce_distance_far_mod,
+                    };
+                    // Density-dependent vulnerability: crowded prey are easier to catch.
+                    let density = prey_params
+                        .density
+                        .0
+                        .get(&prey_cfg.kind)
+                        .copied()
+                        .unwrap_or(d.pounce_density_threshold);
+                    let density_bonus = if density > d.pounce_density_threshold {
+                        1.0 + (density - d.pounce_density_threshold)
+                    } else {
+                        1.0
+                    };
+
+                    let success_chance = awareness_base
+                        * (d.pounce_skill_base + skills.hunting * d.pounce_skill_scale)
+                        * distance_mod
+                        * catch_mod
+                        * density_bonus;
+
+                    if rng.rng.random::<f32>() < success_chance {
+                        // Catch!
+                        commands.entity(target_entity).despawn();
+                        let catch_corruption = if map.in_bounds(prey_pos.x, prey_pos.y) {
+                            map.get(prey_pos.x, prey_pos.y).corruption
+                        } else {
+                            0.0
+                        };
+
+                        if !inventory.is_full() {
+                            inventory.slots.push(ItemSlot::Item(
+                                item_kind,
+                                crate::components::items::ItemModifiers::with_corruption(
+                                    catch_corruption,
+                                ),
+                            ));
+                        }
+                        skills.hunting += skills.growth_rate() * d.hunt_catch_skill_growth;
+
+                        // Send kill event for den pressure tracking.
+                        prey_params.kill_writer.write(PreyKilled {
+                            kind: prey_cfg.kind,
+                            position: prey_pos,
+                        });
+
+                        {
+                            let terrain = if map.in_bounds(pos.x, pos.y) {
+                                map.get(pos.x, pos.y).terrain
+                            } else {
+                                Terrain::Grass
+                            };
+                            let day_phase = DayPhase::from_tick(time.tick, &narr.config);
+                            let season = Season::from_tick(time.tick, &narr.config);
+                            let catch_desc = if catch_corruption > 0.3 {
+                                format!("corrupted {}", species_name)
+                            } else {
+                                species_name.to_string()
+                            };
+                            let ctx = TemplateContext {
+                                action: crate::ai::Action::Hunt,
+                                day_phase,
+                                season,
+                                weather: narr.weather.current,
+                                mood_bucket: MoodBucket::Neutral,
+                                life_stage: LifeStage::Adult,
+                                has_target: true,
+                                terrain,
+                                event: Some("catch".into()),
+                            };
+                            let var_ctx = VariableContext {
+                                name: &name.0,
+                                gender: *gender,
+                                weather: narr.weather.current,
+                                day_phase,
+                                season,
+                                life_stage: LifeStage::Adult,
+                                fur_color: "unknown",
+                                other: None,
+                                prey: Some(species_name),
+                                item: None,
+                                item_singular: None,
+                                quality: None,
+                            };
+                            emit_event_narrative(
+                                narr.registry.as_deref(),
+                                &mut narr.log,
+                                time.tick,
+                                format!("{} catches a {}.", name.0, catch_desc),
+                                crate::resources::narrative::NarrativeTier::Action,
+                                &ctx,
+                                &var_ctx,
+                                personality,
+                                &needs,
+                                &mut rng.rng,
+                            );
+                        }
+
+                        hunting_priors.record_catch(&prey_pos);
+
+                        // Multi-kill: if inventory has room, hunt for more.
+                        if inventory.is_full() {
+                            chain.advance();
+                            chain.sync_targets(&mut current);
+                        } else {
+                            step.target_entity = None; // Search for another target.
+                        }
+                    } else {
+                        // Pounce failed — prey bolts.
+                        if let Ok((_, _, _, mut prey_st)) = prey_query.get_mut(target_entity) {
+                            prey_st.ai_state = PreyAiState::Fleeing {
+                                from: cat_entity,
+                                toward: None,
+                                ticks: 0,
+                            };
+                        }
+
+                        {
+                            let terrain = if map.in_bounds(pos.x, pos.y) {
+                                map.get(pos.x, pos.y).terrain
+                            } else {
+                                Terrain::Grass
+                            };
+                            let day_phase = DayPhase::from_tick(time.tick, &narr.config);
+                            let season = Season::from_tick(time.tick, &narr.config);
+                            let ctx = TemplateContext {
+                                action: crate::ai::Action::Hunt,
+                                day_phase,
+                                season,
+                                weather: narr.weather.current,
+                                mood_bucket: MoodBucket::Neutral,
+                                life_stage: LifeStage::Adult,
+                                has_target: true,
+                                terrain,
+                                event: Some("miss".into()),
+                            };
+                            let var_ctx = VariableContext {
+                                name: &name.0,
+                                gender: *gender,
+                                weather: narr.weather.current,
+                                day_phase,
+                                season,
+                                life_stage: LifeStage::Adult,
+                                fur_color: "unknown",
+                                other: None,
+                                prey: Some(species_name),
+                                item: None,
+                                item_singular: None,
+                                quality: None,
+                            };
+                            emit_event_narrative(
+                                narr.registry.as_deref(),
+                                &mut narr.log,
+                                time.tick,
+                                format!("{}'s quarry bolts.", name.0),
+                                crate::resources::narrative::NarrativeTier::Micro,
+                                &ctx,
+                                &var_ctx,
+                                personality,
+                                &needs,
+                                &mut rng.rng,
+                            );
+                        }
+
+                        let chase_limit = if personality.boldness > 0.7 {
+                            d.chase_limit_bold
+                        } else {
+                            d.chase_limit_default
+                        };
+                        if ticks > chase_limit {
+                            // Don't fail the whole chain — just drop target and
+                            // resume searching. Cats are persistent hunters.
+                            step.target_entity = None;
+                        }
+                    }
+                } else if dist <= stalk_start {
+                    let mut moved = false;
+                    if prey_is_fleeing {
+                        // === CHASE === sprint burst.
+                        for _ in 0..d.chase_speed {
+                            if let Some(next) = step_toward(&pos, &prey_pos, &map) {
+                                *pos = next;
+                                moved = true;
+                            }
+                        }
+                    } else {
+                        // === STALK === Deliberate approach, 1 tile/tick.
+                        // Cats are agile ambush predators — they close quickly
+                        // while relying on stealth to avoid detection.
+                        if let Some(next) = step_toward(&pos, &prey_pos, &map) {
+                            *pos = next;
+                            moved = true;
+                        }
+                        // Anxiety check: nervous cat spooks prey.
+                        if personality.anxiety > d.anxiety_spook_threshold
+                            && rng.rng.random::<f32>() < d.anxiety_spook_chance
+                        {
+                            if let Ok((_, _, _, mut prey_st)) =
+                                prey_query.get_mut(target_entity)
+                            {
+                                prey_st.ai_state = PreyAiState::Fleeing {
+                                    from: cat_entity,
+                                    toward: None,
+                                    ticks: 0,
+                                };
+                            }
+                            step.target_entity = None; // Resume searching.
+                        }
+                    }
+                    // Can't reach prey (terrain blocked) — give up after a few ticks.
+                    if !moved && ticks > 10 {
+                        step.target_entity = None;
+                    }
+                } else {
+                    // === APPROACH === Trot toward scented prey.
+                    let mut moved = false;
+                    for _ in 0..d.approach_speed {
+                        if let Some(next) = step_toward(&pos, &prey_pos, &map) {
+                            *pos = next;
+                            moved = true;
+                        }
+                    }
+                    if dist > d.approach_give_up_distance || (!moved && ticks > 10) {
+                        step.target_entity = None;
+                    }
+                }
+            } else {
+                // === SEARCH === (no target yet — move toward best-known hunting ground)
+                // Priority: personal belief > colony belief > wind > patrol_dir.
+                let belief_dir = hunting_priors.best_direction(&pos, d.search_belief_radius);
+                let colony_dir = colony_map
+                    .beliefs
+                    .best_direction(&pos, d.search_belief_radius);
+                let (wx, wy) = wind.direction();
+                let (mut dx, mut dy) = if let Some((bx, by)) = belief_dir {
+                    (bx, by)
+                } else if let Some((cx, cy)) = colony_dir {
+                    (cx, cy)
+                } else if wx.abs() > d.search_wind_direction_threshold
+                    || wy.abs() > d.search_wind_direction_threshold
+                {
+                    (-(wx.signum() as i32), -(wy.signum() as i32))
+                } else {
+                    patrol_dir
+                };
+                // Jitter — enough to explore but not lose the gradient.
+                if rng.rng.random::<f32>() < d.search_jitter_chance {
+                    dx = rng.rng.random_range(-1i32..=1);
+                    dy = rng.rng.random_range(-1i32..=1);
+                }
+                // Ensure we actually move (avoid 0,0).
+                if dx == 0 && dy == 0 {
+                    dx = 1;
+                }
+                // Trot while searching to cover ground.
+                for _ in 0..d.search_speed {
+                    *pos = patrol_move(&pos, dx, dy, &map);
+                }
+
+                // Visual detection: spot nearby prey within 15 tiles.
+                let visible_prey = prey_query
+                    .iter()
+                    .filter(|(_, pp, _, _)| {
+                        crate::systems::sensing::observer_sees_at(
+                            crate::components::SensorySpecies::Cat,
+                            *pos,
+                            &constants.sensory.cat,
+                            **pp,
+                            crate::components::SensorySignature::PREY,
+                            d.search_visual_detection_range as f32,
+                        )
+                    })
+                    .min_by_key(|(_, pp, _, _)| pos.manhattan_distance(pp));
+
+                if let Some((prey_entity, _prey_pos_ref, _, _)) = visible_prey {
+                    step.target_entity = Some(prey_entity);
+                } else {
+                    // Scan for prey scent via PreyScentMap (Phase 2B —
+                    // grid-sampled influence map). Finds the strongest-
+                    // scent bucket within `scent_search_radius`; the
+                    // `min_by_key` below resolves to the prey entity
+                    // closest to that source tile.
+                    let scent_source = prey_params.prey_scent_map.highest_nearby(
+                        pos.x,
+                        pos.y,
+                        d.scent_search_radius,
+                    );
+                    let scent_above_threshold = scent_source
+                        .map(|(sx, sy)| {
+                            prey_params.prey_scent_map.get(sx, sy)
+                                >= d.scent_detect_threshold
+                        })
+                        .unwrap_or(false);
+                    let scented_prey = if scent_above_threshold {
+                        let (sx, sy) = scent_source.unwrap();
+                        let source = Position::new(sx, sy);
+                        prey_query
+                            .iter()
+                            .min_by_key(|(_, pp, _, _)| source.manhattan_distance(pp))
+                    } else {
+                        None
+                    };
+
+                    if let Some((prey_entity, prey_pos_ref, _, _)) = scented_prey {
+                        step.target_entity = Some(prey_entity);
+                        hunting_priors.record_scent(prey_pos_ref);
+                        {
+                            let terrain = if map.in_bounds(pos.x, pos.y) {
+                                map.get(pos.x, pos.y).terrain
+                            } else {
+                                Terrain::Grass
+                            };
+                            let day_phase = DayPhase::from_tick(time.tick, &narr.config);
+                            let season = Season::from_tick(time.tick, &narr.config);
+                            let ctx = TemplateContext {
+                                action: crate::ai::Action::Hunt,
+                                day_phase,
+                                season,
+                                weather: narr.weather.current,
+                                mood_bucket: MoodBucket::Neutral,
+                                life_stage: LifeStage::Adult,
+                                has_target: false,
+                                terrain,
+                                event: Some("scent".into()),
+                            };
+                            let var_ctx = VariableContext {
+                                name: &name.0,
+                                gender: *gender,
+                                weather: narr.weather.current,
+                                day_phase,
+                                season,
+                                life_stage: LifeStage::Adult,
+                                fur_color: "unknown",
+                                other: None,
+                                prey: None,
+                                item: None,
+                                item_singular: None,
+                                quality: None,
+                            };
+                            emit_event_narrative(
+                                narr.registry.as_deref(),
+                                &mut narr.log,
+                                time.tick,
+                                format!("{} catches a scent on the wind.", name.0),
+                                crate::resources::narrative::NarrativeTier::Micro,
+                                &ctx,
+                                &var_ctx,
+                                personality,
+                                &needs,
+                                &mut rng.rng,
+                            );
+                        }
+                    }
+                }
+
+                if ticks > d.search_timeout_ticks {
+                    // Multi-kill: if we already have food, head to stores.
+                    if inventory
+                        .slots
+                        .iter()
+                        .any(|s| matches!(s, ItemSlot::Item(k, _) if k.is_food()))
+                    {
+                        chain.advance();
+                        chain.sync_targets(&mut current);
+                    } else {
+                        hunting_priors.record_failed_search(&pos, ticks);
+                        chain.fail_current("no scent found".into());
+                    }
+                }
+            }
+        }
+
+        StepKind::ForageItem { patrol_dir } => {
+            // Active foraging: directional patrol, check each tile.
+            // Use patrol_dir with jitter and reverse-on-blocked (wildlife pattern).
+            let mut dx = patrol_dir.0;
+            let mut dy = patrol_dir.1;
+            if dx == 0 && dy == 0 {
+                dx = 1;
+            } // ensure movement
+              // Forage jitter.
+            if rng.rng.random::<f32>() < d.forage_jitter_chance {
+                dx = rng.rng.random_range(-1i32..=1);
+                dy = rng.rng.random_range(-1i32..=1);
+                if dx == 0 && dy == 0 {
+                    dx = 1;
+                }
+            }
+            *pos = patrol_move(&pos, dx, dy, &map);
+
+            // Check current tile for forage yield.
+            if map.in_bounds(pos.x, pos.y) {
+                let tile = map.get(pos.x, pos.y);
+                let forage_yield = tile.terrain.foraging_yield();
+                if forage_yield > 0.0
+                    && rng.rng.random::<f32>() < forage_yield * d.forage_yield_scale
+                {
+                    use crate::components::items::ItemKind;
+                    use crate::components::magic::ItemSlot;
+                    let item_kind = match tile.terrain {
+                        Terrain::DenseForest => {
+                            if rng.rng.random::<bool>() {
+                                ItemKind::Mushroom
+                            } else {
+                                ItemKind::Nuts
+                            }
+                        }
+                        Terrain::LightForest => {
+                            if rng.rng.random::<bool>() {
+                                ItemKind::Nuts
+                            } else {
+                                ItemKind::Berries
+                            }
+                        }
+                        _ => {
+                            if rng.rng.random::<bool>() {
+                                ItemKind::Berries
+                            } else {
+                                ItemKind::Roots
+                            }
+                        }
+                    };
+                    let forage_corruption = if map.in_bounds(pos.x, pos.y) {
+                        map.get(pos.x, pos.y).corruption
+                    } else {
+                        0.0
+                    };
+                    if !inventory.is_full() {
+                        inventory.slots.push(ItemSlot::Item(
+                            item_kind,
+                            crate::components::items::ItemModifiers::with_corruption(
+                                forage_corruption,
+                            ),
+                        ));
+                    }
+                    skills.foraging += skills.growth_rate() * d.forage_skill_growth;
+                    {
+                        let item_name = if forage_corruption > 0.3 {
+                            format!("corrupted {}", item_kind.name())
+                        } else {
+                            item_kind.name().to_string()
+                        };
+                        let terrain = if map.in_bounds(pos.x, pos.y) {
+                            map.get(pos.x, pos.y).terrain
+                        } else {
+                            Terrain::Grass
+                        };
+                        let day_phase = DayPhase::from_tick(time.tick, &narr.config);
+                        let season = Season::from_tick(time.tick, &narr.config);
+                        let ctx = TemplateContext {
+                            action: crate::ai::Action::Forage,
+                            day_phase,
+                            season,
+                            weather: narr.weather.current,
+                            mood_bucket: MoodBucket::Neutral,
+                            life_stage: LifeStage::Adult,
+                            has_target: false,
+                            terrain,
+                            event: Some("find".into()),
+                        };
+                        let var_ctx = VariableContext {
+                            name: &name.0,
+                            gender: *gender,
+                            weather: narr.weather.current,
+                            day_phase,
+                            season,
+                            life_stage: LifeStage::Adult,
+                            fur_color: "unknown",
+                            other: None,
+                            prey: None,
+                            item: Some(&item_name),
+                            item_singular: Some(item_kind.singular_name()),
+                            quality: None,
+                        };
+                        emit_event_narrative(
+                            narr.registry.as_deref(),
+                            &mut narr.log,
+                            time.tick,
+                            format!("{} finds {}.", name.0, item_name),
+                            crate::resources::narrative::NarrativeTier::Action,
+                            &ctx,
+                            &var_ctx,
+                            personality,
+                            &needs,
+                            &mut rng.rng,
+                        );
+                    }
+                    chain.advance();
+                    chain.sync_targets(&mut current);
+                } else if ticks > d.forage_timeout_ticks {
+                    chain.fail_current("nothing found while foraging".into());
+                }
+            }
+        }
+
+        StepKind::DepositAtStores => {
+            let step = chain.current_mut().unwrap();
+            let target = step.target_entity;
+            let deposit = crate::steps::disposition::resolve_deposit_at_stores(
+                target,
+                &mut inventory,
+                &skills,
+                &pos,
+                &mut stores_query,
+                &items_query,
+                &mut commands,
+                d,
+            );
+            if deposit.storage_upgraded {
+                if let Some(ref mut act) = narr.activation {
+                    act.record(Feature::StorageUpgraded);
+                }
+            }
+            if deposit.rejected {
+                if let Some(ref mut act) = narr.activation {
+                    act.record(Feature::DepositRejected);
+                }
+            }
+            apply_step_result(deposit.step, &mut chain, &mut current);
+        }
+
+        StepKind::EatAtStores => {
+            let step = chain.current_mut().unwrap();
+            let target = step.target_entity;
+            let outcome = crate::steps::disposition::resolve_eat_at_stores(
+                ticks,
+                target,
+                &mut needs,
+                &mut stores_query,
+                &items_query,
+                &mut commands,
+                d,
+            );
+            outcome.record_if_witnessed(
+                narr.activation.as_deref_mut(),
+                Feature::FoodEaten,
+            );
+            apply_step_result(outcome.result, &mut chain, &mut current);
+        }
+
+        StepKind::Sleep { ticks: duration } => {
+            let outcome =
+                crate::steps::disposition::resolve_sleep(ticks, duration, &mut needs, d);
+            apply_step_result(outcome.result, &mut chain, &mut current);
+        }
+
+        StepKind::SelfGroom => {
+            let outcome = crate::steps::disposition::resolve_self_groom(
+                ticks,
+                &mut needs,
+                grooming.as_deref_mut(),
+                d,
+            );
+            apply_step_result(outcome.result, &mut chain, &mut current);
+        }
+
+        StepKind::Socialize => {
+            let step = chain.current_mut().unwrap();
+            let target = step.target_entity;
+            let outcome = crate::steps::disposition::resolve_socialize(
+                ticks,
+                cat_entity,
+                target,
+                &mut needs,
+                &mut hunting_priors,
+                &mut relationships,
+                &mut colony_map,
+                &snaps.grooming,
+                time.tick,
+                &constants.social,
+                d,
+            );
+            outcome.record_if_witnessed(
+                narr.activation.as_deref_mut(),
+                Feature::Socialized,
+            );
+            apply_step_result(outcome.result, &mut chain, &mut current);
+        }
+
+        StepKind::GroomOther => {
+            let step = chain.current_mut().unwrap();
+            let target = step.target_entity;
+            let mut fallback_fulfillment =
+                crate::components::fulfillment::Fulfillment::default();
+            let fulfillment_ref = match fulfillment_opt.as_mut() {
+                Some(f) => &mut **f,
+                None => &mut fallback_fulfillment,
+            };
+            let outcome = crate::steps::disposition::resolve_groom_other(
+                ticks,
+                cat_entity,
+                target,
+                &mut needs,
+                fulfillment_ref,
+                &mut hunting_priors,
+                &mut relationships,
+                &mut colony_map,
+                &snaps.grooming,
+                time.tick,
+                &constants.social,
+                d,
+                &constants.fulfillment,
+            );
+            outcome.record_if_witnessed(
+                narr.activation.as_deref_mut(),
+                Feature::GroomedOther,
+            );
+            if let Some(r) = outcome.witness {
+                accum.grooming_restorations.push(r);
+            }
+            apply_step_result(outcome.result, &mut chain, &mut current);
+        }
+
+        StepKind::MentorCat => {
+            let step = chain.current_mut().unwrap();
+            let target = step.target_entity;
+            let outcome = crate::steps::disposition::resolve_mentor_cat(
+                ticks,
+                cat_entity,
+                target,
+                &mut needs,
+                &skills,
+                &mut relationships,
+                time.tick,
+                d,
+            );
+            outcome.record_if_witnessed(
+                narr.activation.as_deref_mut(),
+                Feature::MentoredCat,
+            );
+            let crate::steps::StepOutcome { result, witness } = outcome;
+            if let Some((apprentice, mentor_skills)) = witness {
+                accum.mentor_effects.push(MentorEffect {
+                    apprentice,
+                    mentor_skills,
+                });
+            }
+            apply_step_result(result, &mut chain, &mut current);
+        }
+
+        StepKind::PatrolTo => {
+            let step = chain.current_mut().unwrap();
+            let target = step.target_position;
+            let cached = &mut step.cached_path;
+            let outcome = crate::steps::disposition::resolve_patrol_to(
+                &mut pos,
+                target,
+                cached,
+                &mut needs,
+                &map,
+                d,
+                &snaps.cat_tile_counts,
+            );
+            apply_step_result(outcome.result, &mut chain, &mut current);
+        }
+
+        StepKind::FightThreat => {
+            let health = prey_params
+                .health_query
+                .get(cat_entity)
+                .cloned()
+                .unwrap_or_default();
+            let outcome = crate::steps::disposition::resolve_fight_threat(
+                ticks,
+                &mut skills,
+                &mut needs,
+                &health,
+                d,
+            );
+            outcome.record_if_witnessed(
+                narr.activation.as_deref_mut(),
+                Feature::ThreatEngaged,
+            );
+            apply_step_result(outcome.result, &mut chain, &mut current);
+        }
+
+        StepKind::Survey => {
+            let outcome = crate::steps::disposition::resolve_survey(
+                ticks,
+                &mut needs,
+                &pos,
+                &mut prey_params.exploration_map,
+                d,
+            );
+            apply_step_result(outcome.result, &mut chain, &mut current);
+        }
+
+        StepKind::DeliverDirective {
+            kind,
+            priority,
+            directive_target,
+        } => {
+            let step = chain.current_mut().unwrap();
+            let outcome =
+                crate::steps::disposition::resolve_deliver_directive(ticks, &mut needs, d);
+            if matches!(outcome.result, crate::steps::StepResult::Advance) {
+                // Insert ActiveDirective on the target cat.
+                if let Some(target) = step.target_entity {
+                    commands.entity(target).insert(ActiveDirective {
+                        kind,
+                        priority,
+                        coordinator: cat_entity,
+                        coordinator_social_weight: needs.respect,
+                        delivered_tick: time.tick,
+                        target_position: directive_target,
+                        target_entity: None,
+                    });
+                    // Gate on both witness (time-based success)
+                    // AND a real directive target existing.
+                    outcome.record_if_witnessed(
+                        narr.activation.as_deref_mut(),
+                        Feature::DirectiveDelivered,
+                    );
+                }
+            }
+            apply_step_result(outcome.result, &mut chain, &mut current);
+        }
+
+        StepKind::MateWith => {
+            let step = chain.current_mut().unwrap();
+            let target = step.target_entity;
+            let target_gender = target.and_then(|t| snaps.gender.get(&t).copied());
+            let outcome = crate::steps::disposition::resolve_mate_with(
+                ticks,
+                cat_entity,
+                *gender,
+                target,
+                target_gender,
+                &mut needs,
+                &mut relationships,
+            );
+            outcome.record_if_witnessed(
+                narr.activation.as_deref_mut(),
+                Feature::MatingOccurred,
+            );
+            // §Phase 5a: CourtshipInteraction for Tom×Tom or any
+            // target-present, no-pregnancy Advance.
+            if matches!(outcome.result, crate::steps::StepResult::Advance)
+                && outcome.witness.is_none()
+                && target.is_some()
+            {
+                if let Some(ref mut act) = narr.activation {
+                    act.record(Feature::CourtshipInteraction);
+                }
+            }
+            if let Some((gestator, litter_size)) = outcome.witness {
+                // §7.M.7.4: Pregnant lands on the gestation-capable
+                // partner, not the initiator. `partner` on the
+                // `Pregnant` struct is the other mate — so if the
+                // initiator is the gestator, partner = target; if
+                // the target is the gestator, partner = initiator.
+                let partner = if gestator == cat_entity {
+                    target.unwrap_or(cat_entity)
+                } else {
+                    cat_entity
+                };
+                commands.entity(gestator).insert(
+                    crate::components::pregnancy::Pregnant::new(
+                        time.tick,
+                        partner,
+                        litter_size,
+                    ),
+                );
+            }
+            apply_step_result(outcome.result, &mut chain, &mut current);
+        }
+
+        StepKind::FeedKitten => {
+            let step = chain.current_mut().unwrap();
+            let target = step.target_entity;
+            let outcome = crate::steps::disposition::resolve_feed_kitten(
+                ticks,
+                target,
+                &mut needs,
+                &mut inventory,
+            );
+            outcome.record_if_witnessed(
+                narr.activation.as_deref_mut(),
+                Feature::KittenFed,
+            );
+            if let Some(kitten_entity) = outcome.witness {
+                accum.kitten_feedings.push(kitten_entity);
+            }
+            apply_step_result(outcome.result, &mut chain, &mut current);
+        }
+
+        StepKind::RetrieveFromStores { kind } => {
+            let step = chain.current_mut().unwrap();
+            let target = step.target_entity;
+            let outcome = crate::steps::disposition::resolve_retrieve_from_stores(
+                ticks,
+                kind,
+                target,
+                &mut inventory,
+                &mut stores_query,
+                &items_query,
+                &mut commands,
+            );
+            outcome.record_if_witnessed(
+                narr.activation.as_deref_mut(),
+                Feature::ItemRetrieved,
+            );
+            apply_step_result(outcome.result, &mut chain, &mut current);
+        }
+
+        StepKind::RetrieveAnyFoodFromStores => {
+            let step = chain.current_mut().unwrap();
+            let target = step.target_entity;
+            // §Phase 4c.4: swapped from the raw-only helper to the
+            // any-food helper to match the step's name. The previous
+            // call accepted only uncooked items, contradicting the
+            // `RetrieveAnyFoodFromStores` semantic promised to
+            // `build_caretaking_chain`. Since this disposition-chain
+            // path is currently unscheduled (GOAP replaced it),
+            // the bug never surfaced, but the rename keeps the two
+            // systems aligned if the chain path is ever re-enabled.
+            let outcome = crate::steps::disposition::resolve_retrieve_any_food_from_stores(
+                ticks,
+                target,
+                &mut inventory,
+                &mut stores_query,
+                &items_query,
+                &mut commands,
+            );
+            outcome.record_if_witnessed(
+                narr.activation.as_deref_mut(),
+                Feature::ItemRetrieved,
+            );
+            apply_step_result(outcome.result, &mut chain, &mut current);
+        }
+
+        // Non-disposition steps are handled elsewhere.
+        _ => {}
+    }
+}
 // ---------------------------------------------------------------------------
 // cat_presence_tick
 // ---------------------------------------------------------------------------

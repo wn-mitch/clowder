@@ -350,7 +350,15 @@ fn l2_record_for(
         final_score: dse.final_score,
         intention,
         top_losing: Vec::new(),
-        targets: target_rankings.get(dse.dse_id.0).cloned(),
+        // Target-taking DSEs emit their ranking under the suffixed id
+        // (`"socialize_target"`), but the matching L2 record comes from
+        // the self-state peer (`"socialize"`). Try the suffixed key
+        // first so a standalone target-taking DSE that *does* get its
+        // own L2 record still matches, then fall back to the bare id.
+        targets: target_rankings
+            .get(format!("{}_target", dse.dse_id.0).as_str())
+            .or_else(|| target_rankings.get(dse.dse_id.0))
+            .cloned(),
     }
 }
 

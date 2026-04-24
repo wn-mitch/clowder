@@ -428,32 +428,43 @@ fn build_schedule() -> Schedule {
                 clowder::systems::prey::orphan_prey_adopt_or_found,
             )
                 .chain(),
-            // Cat needs, mood, and decision-making
+            // Cat needs, markers, mood, coordination — mirrors
+            // SimulationPlugin::build Chain 2. Split into 2a/2b
+            // sub-chains (Bevy's 20-system tuple limit on `.chain()`).
             (
-                clowder::systems::needs::decay_needs,
-                // §4.3 Incapacitated marker author — mirror of
-                // SimulationPlugin::build Chain 2.
-                clowder::systems::incapacitation::update_incapacitation,
-                clowder::systems::needs::decay_grooming,
-                clowder::systems::needs::eat_from_inventory,
-                clowder::systems::needs::decay_exploration,
-                clowder::systems::needs::bond_proximity_social,
-                clowder::systems::pregnancy::tick_pregnancy,
-                // Fertility transitions (§7.M.7) — mirrored from
-                // SimulationPlugin::build.
-                clowder::systems::fertility::handle_post_partum_reinsert,
-                clowder::systems::fertility::update_fertility_phase,
-                clowder::systems::growth::tick_kitten_growth,
-                clowder::systems::growth::kitten_mood_aura,
-                clowder::systems::mood::update_mood,
-                clowder::systems::mood::mood_contagion,
-                clowder::systems::mood::bond_proximity_mood,
-                clowder::systems::memory::decay_memories,
-                clowder::systems::coordination::evaluate_coordinators,
-                clowder::systems::coordination::assess_colony_needs,
-                clowder::systems::coordination::dispatch_urgent_directives,
-                clowder::systems::coordination::accumulate_build_pressure,
-                clowder::systems::coordination::spawn_construction_sites,
+                // Chain 2a: needs + marker authors + reproduction + growth
+                (
+                    clowder::systems::needs::decay_needs,
+                    // §4.3 marker authors.
+                    clowder::systems::incapacitation::update_incapacitation,
+                    clowder::systems::growth::update_life_stage_markers,
+                    clowder::systems::needs::decay_grooming,
+                    clowder::systems::needs::eat_from_inventory,
+                    clowder::systems::needs::decay_exploration,
+                    clowder::systems::needs::bond_proximity_social,
+                    clowder::systems::fulfillment::decay_fulfillment,
+                    clowder::systems::fulfillment::bond_proximity_social_warmth,
+                    clowder::systems::pregnancy::tick_pregnancy,
+                    // Fertility transitions (§7.M.7).
+                    clowder::systems::fertility::handle_post_partum_reinsert,
+                    clowder::systems::fertility::update_fertility_phase,
+                    clowder::systems::growth::tick_kitten_growth,
+                    clowder::systems::growth::kitten_mood_aura,
+                )
+                    .chain(),
+                // Chain 2b: mood + memory + coordination
+                (
+                    clowder::systems::mood::update_mood,
+                    clowder::systems::mood::mood_contagion,
+                    clowder::systems::mood::bond_proximity_mood,
+                    clowder::systems::memory::decay_memories,
+                    clowder::systems::coordination::evaluate_coordinators,
+                    clowder::systems::coordination::assess_colony_needs,
+                    clowder::systems::coordination::dispatch_urgent_directives,
+                    clowder::systems::coordination::accumulate_build_pressure,
+                    clowder::systems::coordination::spawn_construction_sites,
+                )
+                    .chain(),
             )
                 .chain(),
             // Action resolution (disposition system handles all action selection/execution)
@@ -1549,6 +1560,7 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
                     Position::new(spawn_x, spawn_y),
                     Health::default(),
                     Needs::staggered(i, cat_count),
+                    clowder::components::fulfillment::Fulfillment::staggered(i, cat_count),
                     Mood::default(),
                     Memory::default(),
                 ),

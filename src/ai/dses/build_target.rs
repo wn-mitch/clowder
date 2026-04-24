@@ -62,7 +62,9 @@ use crate::ai::considerations::{Consideration, ScalarConsideration};
 use crate::ai::curves::Curve;
 use crate::ai::dse::{CommitmentStrategy, DseId, EvalCtx, GoalState, Intention};
 use crate::ai::eval::DseRegistry;
-use crate::ai::target_dse::{evaluate_target_taking, TargetAggregation, TargetTakingDse};
+use crate::ai::target_dse::{
+    evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,
+};
 use crate::components::physical::Position;
 
 pub const TARGET_NEARNESS_INPUT: &str = "target_nearness";
@@ -166,6 +168,7 @@ pub fn resolve_build_target(
     cat_pos: Position,
     candidates: &[BuildCandidate],
     tick: u64,
+    focal_hook: Option<FocalTargetHook<'_>>,
 ) -> Option<Entity> {
     let dse = registry
         .target_taking_dses
@@ -258,7 +261,7 @@ pub fn resolve_build_target(
         target_position: None,
     };
 
-    evaluate_target_taking(
+    let scored = evaluate_target_taking(
         dse,
         cat,
         &entities,
@@ -266,8 +269,23 @@ pub fn resolve_build_target(
         &ctx,
         &fetch_self,
         &fetch_target,
-    )
-    .winning_target
+    );
+
+    // §11 focal-cat per-candidate ranking capture (§6.3). Emitted only
+    // when the caller marks this resolve as the focal cat's tick.
+    // Non-focal paths pass `focal_hook: None` and pay zero cost.
+    if let Some(hook) = focal_hook {
+        if let Some(ranking) = crate::ai::target_dse::target_ranking_from_scored(
+            &scored,
+            dse.aggregation(),
+            hook.name_lookup,
+        ) {
+            hook.capture
+                .set_target_ranking("build_target", ranking, tick);
+        }
+    }
+
+    scored.winning_target
 }
 
 #[cfg(test)]
@@ -333,7 +351,7 @@ mod tests {
     fn resolver_returns_none_with_no_registered_dse() {
         let registry = DseRegistry::new();
         let cat = Entity::from_raw_u32(1).unwrap();
-        let out = resolve_build_target(&registry, cat, Position::new(0, 0), &[], 0);
+        let out = resolve_build_target(&registry, cat, Position::new(0, 0), &[], 0, None);
         assert!(out.is_none());
     }
 
@@ -342,7 +360,7 @@ mod tests {
         let mut registry = DseRegistry::new();
         registry.target_taking_dses.push(build_target_dse());
         let cat = Entity::from_raw_u32(1).unwrap();
-        let out = resolve_build_target(&registry, cat, Position::new(0, 0), &[], 0);
+        let out = resolve_build_target(&registry, cat, Position::new(0, 0), &[], 0, None);
         assert!(out.is_none());
     }
 
@@ -352,7 +370,7 @@ mod tests {
         registry.target_taking_dses.push(build_target_dse());
         let cat = Entity::from_raw_u32(1).unwrap();
         let far = new_build(2, 50, 0, 0.5);
-        let out = resolve_build_target(&registry, cat, Position::new(0, 0), &[far], 0);
+        let out = resolve_build_target(&registry, cat, Position::new(0, 0), &[far], 0, None);
         assert!(out.is_none());
     }
 
@@ -369,7 +387,7 @@ mod tests {
         // Let's make their progress/condition axes tie to isolate the
         // Cliff's effect.
         let rp = repair(3, 0, 3, 0.5);
-        let out = resolve_build_target(&registry, cat, Position::new(0, 0), &[nb, rp], 0);
+        let out = resolve_build_target(&registry, cat, Position::new(0, 0), &[nb, rp], 0, None);
         assert_eq!(out, Some(nb.entity));
     }
 
@@ -388,6 +406,7 @@ mod tests {
             Position::new(0, 0),
             &[finishing, breaking_ground],
             0,
+            None,
         );
         assert_eq!(out, Some(finishing.entity));
     }
@@ -408,6 +427,7 @@ mod tests {
             Position::new(0, 0),
             &[crumbling, scuffed],
             0,
+            None,
         );
         assert_eq!(out, Some(crumbling.entity));
     }
@@ -425,6 +445,7 @@ mod tests {
             Position::new(0, 0),
             &[close, far],
             0,
+            None,
         );
         assert_eq!(out, Some(close.entity));
     }
@@ -458,6 +479,7 @@ mod tests {
             Position::new(0, 0),
             &[finishing, damaged],
             0,
+            None,
         );
         assert_eq!(out, Some(finishing.entity));
     }

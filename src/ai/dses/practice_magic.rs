@@ -20,6 +20,7 @@ use crate::ai::curves::Curve;
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
+use crate::components::markers;
 use crate::resources::sim_constants::ScoringConstants;
 
 fn linear() -> Curve {
@@ -49,7 +50,7 @@ impl ScryDse {
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
-            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
+            eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
         }
     }
 }
@@ -135,10 +136,10 @@ impl DurableWardDse {
             // `magic_skill > magic_durable_ward_skill_threshold`
             // conjunct stays inline — magic_skill is a §4.5 scalar,
             // not a marker.
-            // §13.1: `.forbid("Incapacitated")` blocks downed cats.
+            // §13.1: `.forbid(markers::Incapacitated::KEY)` blocks downed cats.
             eligibility: EligibilityFilter::new()
-                .require("WardStrengthLow")
-                .forbid("Incapacitated"),
+                .require(markers::WardStrengthLow::KEY)
+                .forbid(markers::Incapacitated::KEY),
         }
     }
 }
@@ -212,7 +213,7 @@ impl CleanseDse {
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
-            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
+            eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
         }
     }
 }
@@ -290,7 +291,7 @@ impl ColonyCleanseDse {
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
-            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
+            eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
         }
     }
 }
@@ -358,7 +359,7 @@ impl HarvestDse {
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
-            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
+            eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
         }
     }
 }
@@ -423,7 +424,7 @@ impl CommuneDse {
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
-            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
+            eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
         }
     }
 }
@@ -503,12 +504,12 @@ mod tests {
         // Phase 4b.5: the outer `ctx.ward_strength_low` conjunct at
         // `scoring.rs:775-780` retires; WardStrengthLow moves onto the
         // DSE's eligibility filter. §13.1: every sibling DSE carries
-        // `.forbid("Incapacitated")` (required emptiness asserted
+        // `.forbid(markers::Incapacitated::KEY)` (required emptiness asserted
         // separately below).
         let sc = ScoringConstants::default();
         let dse = DurableWardDse::new();
-        assert_eq!(dse.eligibility().required, vec!["WardStrengthLow"]);
-        assert_eq!(dse.eligibility().forbidden, vec!["Incapacitated"]);
+        assert_eq!(dse.eligibility().required, vec![markers::WardStrengthLow::KEY]);
+        assert_eq!(dse.eligibility().forbidden, vec![markers::Incapacitated::KEY]);
 
         // Guard against accidental spread of `require` to sibling DSEs
         // in this file — only DurableWard requires WardStrengthLow.
@@ -522,28 +523,28 @@ mod tests {
     #[test]
     fn every_practice_magic_dse_forbids_incapacitated() {
         // §13.1: incapacitated cats retire the inline branch; the
-        // `.forbid("Incapacitated")` filter is the only remaining gate.
+        // `.forbid(markers::Incapacitated::KEY)` filter is the only remaining gate.
         let sc = ScoringConstants::default();
-        assert_eq!(ScryDse::new().eligibility().forbidden, vec!["Incapacitated"]);
+        assert_eq!(ScryDse::new().eligibility().forbidden, vec![markers::Incapacitated::KEY]);
         assert_eq!(
             DurableWardDse::new().eligibility().forbidden,
-            vec!["Incapacitated"]
+            vec![markers::Incapacitated::KEY]
         );
         assert_eq!(
             CleanseDse::new(&sc).eligibility().forbidden,
-            vec!["Incapacitated"]
+            vec![markers::Incapacitated::KEY]
         );
         assert_eq!(
             ColonyCleanseDse::new().eligibility().forbidden,
-            vec!["Incapacitated"]
+            vec![markers::Incapacitated::KEY]
         );
         assert_eq!(
             HarvestDse::new().eligibility().forbidden,
-            vec!["Incapacitated"]
+            vec![markers::Incapacitated::KEY]
         );
         assert_eq!(
             CommuneDse::new().eligibility().forbidden,
-            vec!["Incapacitated"]
+            vec![markers::Incapacitated::KEY]
         );
     }
 

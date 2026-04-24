@@ -341,6 +341,7 @@ pub trait Dse: Send + Sync + 'static {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::components::markers;
 
     fn always_false(_: &World, _: Entity) -> bool {
         false
@@ -375,10 +376,10 @@ mod tests {
     #[test]
     fn eligibility_builder() {
         let filter = EligibilityFilter::new()
-            .require("CanHunt")
-            .forbid("Incapacitated");
-        assert_eq!(filter.required, vec!["CanHunt"]);
-        assert_eq!(filter.forbidden, vec!["Incapacitated"]);
+            .require(markers::CanHunt::KEY)
+            .forbid(markers::Incapacitated::KEY);
+        assert_eq!(filter.required, vec![markers::CanHunt::KEY]);
+        assert_eq!(filter.forbidden, vec![markers::Incapacitated::KEY]);
         assert!(filter.required_stance.is_none());
     }
 

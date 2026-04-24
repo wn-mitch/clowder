@@ -49,6 +49,7 @@ pub fn resolve_fight_threat(
     if ticks >= d.fight_duration {
         skills.combat += skills.growth_rate() * d.fight_combat_skill_growth;
         needs.safety = (needs.safety + d.fight_safety_gain).min(1.0);
+        needs.mastery = (needs.mastery + d.fight_mastery_gain).min(1.0);
         StepOutcome::witnessed(StepResult::Advance)
     } else {
         StepOutcome::unwitnessed(StepResult::Continue)

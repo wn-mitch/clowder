@@ -26,6 +26,7 @@ use crate::ai::curves::{scarcity, Curve};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
+use crate::components::markers;
 
 pub struct CookDse {
     id: DseId,
@@ -71,9 +72,9 @@ impl CookDse {
             // caller-side disambiguation when the DSE returns 0.
             // §13.1: `.forbid("Incapacitated")` blocks downed cats.
             eligibility: EligibilityFilter::new()
-                .require("HasFunctionalKitchen")
-                .require("HasRawFoodInStores")
-                .forbid("Incapacitated"),
+                .require(markers::HasFunctionalKitchen::KEY)
+                .require(markers::HasRawFoodInStores::KEY)
+                .forbid(markers::Incapacitated::KEY),
         }
     }
 }
@@ -150,10 +151,10 @@ mod tests {
         let dse = CookDse::new();
         assert_eq!(
             dse.eligibility().required,
-            vec!["HasFunctionalKitchen", "HasRawFoodInStores"]
+            vec![markers::HasFunctionalKitchen::KEY, markers::HasRawFoodInStores::KEY]
         );
         // §13.1: every non-Eat/Sleep/Idle cat DSE forbids Incapacitated.
-        assert_eq!(dse.eligibility().forbidden, vec!["Incapacitated"]);
+        assert_eq!(dse.eligibility().forbidden, vec![markers::Incapacitated::KEY]);
     }
 
     fn evaluate_cook_with_markers(
@@ -163,8 +164,8 @@ mod tests {
         let dse = CookDse::new();
         let entity = Entity::from_raw_u32(1).unwrap();
         let has_marker = move |name: &str, _: Entity| match name {
-            "HasFunctionalKitchen" => has_kitchen,
-            "HasRawFoodInStores" => has_raw_food,
+            n if n == markers::HasFunctionalKitchen::KEY => has_kitchen,
+            n if n == markers::HasRawFoodInStores::KEY => has_raw_food,
             _ => false,
         };
         let sample = |_: &str, _: Position| 0.0;

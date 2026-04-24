@@ -22,6 +22,10 @@ export const selectedCatName = writable<string | null>(null)
 export type LogsSubTab = 'overview' | 'cat' | 'map'
 export const logsSubTab = writable<LogsSubTab>('overview')
 
+/** Run ID the Focal-trace page is currently scrubbing. Null = pick the
+ *  first run with a trace attached. */
+export const selectedTraceRunId = writable<string | null>(null)
+
 export const selectedRuns = derived(
   [runs, selectedRunIds],
   ([$runs, $ids]) => $runs.filter(r => $ids.has(r.id)),
@@ -95,6 +99,8 @@ function runFromFile(file: LoadedFile): RunModel {
     footer: file.footer,
     events: file.events,
     narrative: file.narrative,
+    traces: file.traces,
+    focalCat: file.header?.focal_cat ?? null,
     parseErrors: file.parseErrors.map(e => ({ ...e, message: `[${file.name}:${e.line}] ${e.message}` })),
   }
 }
@@ -110,6 +116,8 @@ function mergeRun(run: RunModel, file: LoadedFile): RunModel {
     footer: run.footer ?? file.footer,
     events: run.events.length > 0 ? run.events : file.events,
     narrative: run.narrative.length > 0 ? run.narrative : file.narrative,
+    traces: run.traces.length > 0 ? run.traces : file.traces,
+    focalCat: run.focalCat ?? file.header?.focal_cat ?? null,
     parseErrors: [
       ...run.parseErrors,
       ...file.parseErrors.map(e => ({ ...e, message: `[${file.name}:${e.line}] ${e.message}` })),
@@ -129,8 +137,17 @@ function findPairIndex(runs: RunModel[], file: LoadedFile): number {
     // Only pair if the existing run doesn't already have this kind.
     const hasEvents = r.files.some(f => f.kind === 'events')
     const hasNarrative = r.files.some(f => f.kind === 'narrative')
+    const hasTrace = r.files.some(f => f.kind === 'trace')
     if (file.kind === 'events' && hasEvents) return false
     if (file.kind === 'narrative' && hasNarrative) return false
+    // Trace files pair by focal-cat name too — a second trace with the
+    // same focal is a new run (re-run of the same seed/commit), a
+    // second trace with a different focal stays unpaired as its own
+    // run so the user can switch between focal cats.
+    if (file.kind === 'trace') {
+      if (hasTrace) return false
+      if (r.focalCat && h.focal_cat && r.focalCat !== h.focal_cat) return false
+    }
     return true
   })
 }

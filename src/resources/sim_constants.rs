@@ -38,6 +38,8 @@ pub struct SimConstants {
     pub sensory: SensoryConstants,
     #[serde(default)]
     pub fertility: FertilityConstants,
+    #[serde(default)]
+    pub fulfillment: FulfillmentConstants,
 }
 
 // ---------- NeedsConstants ----------
@@ -1484,6 +1486,14 @@ pub struct DispositionConstants {
     pub groom_other_personal_learn_rate: f32,
     pub groom_other_duration: u64,
     pub groom_other_temperature_gain: f32,
+    /// Recipient-side acceptance bump when a cat is groomed to completion.
+    /// Fires once per `groom_other_duration` session, on the same witness
+    /// that applies the grooming restoration. Models the felt sense of
+    /// being welcomed by the colony.
+    pub acceptance_per_groomed: f32,
+    /// Kitten-side acceptance bump when a kitten is successfully fed
+    /// (witnessed `FeedKitten` — adult inventory took a food item).
+    pub acceptance_per_kitten_fed: f32,
     pub mentor_mastery_per_tick: f32,
     pub mentor_social_per_tick: f32,
     pub mentor_respect_per_tick: f32,
@@ -1497,8 +1507,17 @@ pub struct DispositionConstants {
     pub fight_duration: u64,
     pub fight_combat_skill_growth: f32,
     pub fight_safety_gain: f32,
+    /// Actor mastery bump on completed fight engagement (ticks ≥
+    /// fight_duration, morale not broken). Models felt-competence from
+    /// holding one's ground — parallels the `acceptance_per_groomed`
+    /// pathway for needs that would otherwise be one-way drains.
+    pub fight_mastery_gain: f32,
     pub survey_duration: u64,
     pub survey_purpose_gain: f32,
+    /// Actor mastery bump on completed survey step. Fires once per
+    /// `survey_duration` completion, independent of the discovery value
+    /// (the skill is "I went and looked", not "I found something").
+    pub survey_mastery_gain: f32,
     pub survey_colony_discovery_scale: f32,
     pub survey_personal_discovery_scale: f32,
     pub exploration_decay_rate: f32,
@@ -1872,6 +1891,8 @@ impl Default for DispositionConstants {
             groom_other_personal_learn_rate: 0.012,
             groom_other_duration: 80,
             groom_other_temperature_gain: 0.005,
+            acceptance_per_groomed: 0.08,
+            acceptance_per_kitten_fed: 0.10,
             mentor_mastery_per_tick: 0.02,
             mentor_social_per_tick: 0.01,
             mentor_respect_per_tick: 0.002,
@@ -1885,8 +1906,10 @@ impl Default for DispositionConstants {
             fight_duration: 300,
             fight_combat_skill_growth: 0.0015,
             fight_safety_gain: 0.2,
+            fight_mastery_gain: 0.03,
             survey_duration: 50,
             survey_purpose_gain: 0.008,
+            survey_mastery_gain: 0.02,
             survey_colony_discovery_scale: 0.02,
             survey_personal_discovery_scale: 0.005,
             exploration_decay_rate: 0.00005,
@@ -2817,6 +2840,43 @@ impl Default for SensoryConstants {
                 tremor: Channel::new(2.0, 0.5, Falloff::Cliff),
                 scent_directional: true,
             },
+        }
+    }
+}
+
+// ---------- FulfillmentConstants (§7.W) ----------
+
+/// Constants for the §7.W Fulfillment register. MVP scope: `social_warmth`
+/// axis decay and restoration. Sensitization, tolerance, and diversity-decay
+/// mechanics are future work that adds fields here.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FulfillmentConstants {
+    /// Base per-tick decay rate for social_warmth when no social contact.
+    pub social_warmth_base_decay: f32,
+    /// Decay multiplier when no bonded cat is within proximity range.
+    pub social_warmth_isolation_multiplier: f32,
+    /// Manhattan distance to detect nearby bonded companions for isolation check.
+    pub social_warmth_isolation_range: i32,
+    /// social_warmth gain per groom-other completion (both parties).
+    pub social_warmth_groom_other_gain: f32,
+    /// Passive per-tick social_warmth gain when a bonded companion is nearby.
+    pub social_warmth_bond_proximity_rate: f32,
+    /// Manhattan range for bond-proximity social_warmth restoration.
+    pub social_warmth_bond_proximity_range: i32,
+    /// Per-tick social_warmth gain while actively socializing with a target.
+    pub social_warmth_socialize_per_tick: f32,
+}
+
+impl Default for FulfillmentConstants {
+    fn default() -> Self {
+        Self {
+            social_warmth_base_decay: 0.00008,
+            social_warmth_isolation_multiplier: 2.5,
+            social_warmth_isolation_range: 3,
+            social_warmth_groom_other_gain: 0.08,
+            social_warmth_bond_proximity_rate: 0.0002,
+            social_warmth_bond_proximity_range: 3,
+            social_warmth_socialize_per_tick: 0.001,
         }
     }
 }

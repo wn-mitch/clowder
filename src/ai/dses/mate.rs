@@ -19,6 +19,7 @@ use crate::ai::curves::Curve;
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
+use crate::components::markers;
 
 pub const MATING_DEFICIT_INPUT: &str = "mating_deficit";
 pub const WARMTH_INPUT: &str = "warmth";
@@ -52,7 +53,13 @@ impl MateDse {
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
-            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
+            // §4.3 LifeStage: mating requires Adult or Elder — forbid
+            // Kitten and Young as a forward-looking gate for eventual
+            // `Without<KittenDependency>` retirement.
+            eligibility: EligibilityFilter::new()
+                .forbid(markers::Incapacitated::KEY)
+                .forbid(markers::Kitten::KEY)
+                .forbid(markers::Young::KEY),
         }
     }
 }

@@ -22,7 +22,7 @@ pub use deposit_at_stores::resolve_deposit_at_stores;
 pub use eat_at_stores::resolve_eat_at_stores;
 pub use feed_kitten::resolve_feed_kitten;
 pub use fight_threat::resolve_fight_threat;
-pub use groom_other::resolve_groom_other;
+pub use groom_other::{resolve_groom_other, GroomOutcome};
 pub use mate_with::resolve_mate_with;
 pub use mentor_cat::resolve_mentor_cat;
 pub use patrol_to::resolve_patrol_to;

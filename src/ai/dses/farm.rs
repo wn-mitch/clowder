@@ -19,6 +19,7 @@ use crate::ai::curves::{scarcity, Curve};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
+use crate::components::markers;
 
 pub const FOOD_SCARCITY_INPUT: &str = "food_scarcity";
 pub const DILIGENCE_INPUT: &str = "diligence";
@@ -50,8 +51,8 @@ impl FarmDse {
             // `if ctx.has_garden` gate at `scoring.rs::score_actions`.
             // §13.1: `.forbid("Incapacitated")` blocks downed cats.
             eligibility: EligibilityFilter::new()
-                .require("HasGarden")
-                .forbid("Incapacitated"),
+                .require(markers::HasGarden::KEY)
+                .forbid(markers::Incapacitated::KEY),
         }
     }
 }

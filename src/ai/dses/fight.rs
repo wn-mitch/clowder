@@ -28,6 +28,7 @@ use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
 use crate::ai::faction::StanceRequirement;
+use crate::components::markers;
 use crate::resources::sim_constants::ScoringConstants;
 
 pub const BOLDNESS_INPUT: &str = "boldness";
@@ -87,10 +88,10 @@ impl FightDse {
             //   - ally_count 0.25: group-courage signal per §3.1.1.
             composition: Composition::weighted_sum(vec![0.25, 0.20, 0.15, 0.15, 0.25]),
             // §9.3 DSE filter binding — Fight (Attack) accepts `Enemy | Prey`.
-            // §13.1: `.forbid("Incapacitated")` blocks downed cats.
+            // §13.1: `.forbid(markers::Incapacitated::KEY)` blocks downed cats.
             eligibility: EligibilityFilter::new()
                 .with_stance(StanceRequirement::attack())
-                .forbid("Incapacitated"),
+                .forbid(markers::Incapacitated::KEY),
         }
     }
 }

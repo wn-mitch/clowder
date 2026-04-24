@@ -168,36 +168,47 @@ impl Plugin for SimulationPlugin {
                     systems::prey::orphan_prey_adopt_or_found,
                 )
                     .chain(),
-                // Chain 2: Cat needs, mood, decision-making
+                // Chain 2: Cat needs, markers, mood, coordination.
+                // Split into 2a/2b sub-chains to stay under Bevy's
+                // 20-system tuple limit on `.chain()`.
                 (
-                    systems::needs::decay_needs,
-                    // §4.3 Incapacitated marker author. Runs before the
-                    // GOAP / scoring pipeline so consumers (inline
-                    // `is_incapacitated` today; `.forbid("Incapacitated")`
-                    // once §13.1 lands) observe a freshly-authored marker.
-                    systems::incapacitation::update_incapacitation,
-                    systems::needs::decay_grooming,
-                    systems::needs::eat_from_inventory,
-                    systems::needs::decay_exploration,
-                    systems::needs::bond_proximity_social,
-                    systems::pregnancy::tick_pregnancy,
-                    // Fertility transitions (§7.M.7) — run after
-                    // tick_pregnancy so `RemovedComponents<Pregnant>`
-                    // from the birth path reaches
-                    // `handle_post_partum_reinsert` in the same frame.
-                    systems::fertility::handle_post_partum_reinsert,
-                    systems::fertility::update_fertility_phase,
-                    systems::growth::tick_kitten_growth,
-                    systems::growth::kitten_mood_aura,
-                    systems::mood::update_mood,
-                    systems::mood::mood_contagion,
-                    systems::mood::bond_proximity_mood,
-                    systems::memory::decay_memories,
-                    systems::coordination::evaluate_coordinators,
-                    systems::coordination::assess_colony_needs,
-                    systems::coordination::dispatch_urgent_directives,
-                    systems::coordination::accumulate_build_pressure,
-                    systems::coordination::spawn_construction_sites,
+                    // Chain 2a: needs + marker authors + reproduction + growth
+                    (
+                        systems::needs::decay_needs,
+                        // §4.3 marker authors — run before the GOAP/scoring
+                        // pipeline so consumers see freshly-authored markers.
+                        systems::incapacitation::update_incapacitation,
+                        systems::growth::update_life_stage_markers,
+                        systems::needs::decay_grooming,
+                        systems::needs::eat_from_inventory,
+                        systems::needs::decay_exploration,
+                        systems::needs::bond_proximity_social,
+                        systems::fulfillment::decay_fulfillment,
+                        systems::fulfillment::bond_proximity_social_warmth,
+                        systems::pregnancy::tick_pregnancy,
+                        // Fertility transitions (§7.M.7) — run after
+                        // tick_pregnancy so `RemovedComponents<Pregnant>`
+                        // from the birth path reaches
+                        // `handle_post_partum_reinsert` in the same frame.
+                        systems::fertility::handle_post_partum_reinsert,
+                        systems::fertility::update_fertility_phase,
+                        systems::growth::tick_kitten_growth,
+                        systems::growth::kitten_mood_aura,
+                    )
+                        .chain(),
+                    // Chain 2b: mood + memory + coordination
+                    (
+                        systems::mood::update_mood,
+                        systems::mood::mood_contagion,
+                        systems::mood::bond_proximity_mood,
+                        systems::memory::decay_memories,
+                        systems::coordination::evaluate_coordinators,
+                        systems::coordination::assess_colony_needs,
+                        systems::coordination::dispatch_urgent_directives,
+                        systems::coordination::accumulate_build_pressure,
+                        systems::coordination::spawn_construction_sites,
+                    )
+                        .chain(),
                 )
                     .chain(),
                 // Chain 3: Action resolution (disposition system handles all action selection)

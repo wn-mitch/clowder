@@ -74,7 +74,9 @@ use crate::ai::considerations::{Consideration, ScalarConsideration};
 use crate::ai::curves::Curve;
 use crate::ai::dse::{CommitmentStrategy, DseId, EvalCtx, GoalState, Intention};
 use crate::ai::eval::DseRegistry;
-use crate::ai::target_dse::{evaluate_target_taking, TargetAggregation, TargetTakingDse};
+use crate::ai::target_dse::{
+    evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,
+};
 use crate::components::physical::Position;
 
 pub const TARGET_NEARNESS_INPUT: &str = "target_nearness";
@@ -190,6 +192,7 @@ pub fn resolve_caretake_target(
     kittens: &[KittenState],
     cat_positions: &[(Entity, Position)],
     tick: u64,
+    focal_hook: Option<FocalTargetHook<'_>>,
 ) -> CaretakeResolution {
     let Some(dse) = registry
         .target_taking_dses
@@ -293,6 +296,20 @@ pub fn resolve_caretake_target(
         &fetch_self,
         &fetch_target,
     );
+
+    // §11 focal-cat per-candidate ranking capture (§6.3). Emitted only
+    // when the caller marks this resolve as the focal cat's tick.
+    // Non-focal paths pass `focal_hook: None` and pay zero cost.
+    if let Some(hook) = focal_hook {
+        if let Some(ranking) = crate::ai::target_dse::target_ranking_from_scored(
+            &scored,
+            dse.aggregation(),
+            hook.name_lookup,
+        ) {
+            hook.capture
+                .set_target_ranking("caretake_target", ranking, tick);
+        }
+    }
 
     let Some(winner) = scored.winning_target else {
         return CaretakeResolution::default();
@@ -438,6 +455,7 @@ mod tests {
             &[],
             &[],
             0,
+            None,
         );
         assert!(out.target.is_none());
         assert_eq!(out.urgency, 0.0);
@@ -456,6 +474,7 @@ mod tests {
             &[],
             &[],
             0,
+            None,
         );
         assert!(out.target.is_none());
     }
@@ -473,6 +492,7 @@ mod tests {
             &kittens,
             &[],
             0,
+            None,
         );
         assert!(out.target.is_none());
     }
@@ -491,6 +511,7 @@ mod tests {
             &kittens,
             &[],
             0,
+            None,
         );
         assert!(out.target.is_none());
     }
@@ -515,6 +536,7 @@ mod tests {
             &kittens,
             &[],
             0,
+            None,
         );
         assert_eq!(out.target, Some(Entity::from_raw_u32(11).unwrap()));
     }
@@ -543,6 +565,7 @@ mod tests {
             &kittens,
             &[],
             0,
+            None,
         );
         assert_eq!(out.target, Some(Entity::from_raw_u32(10).unwrap()));
         assert!(out.urgency > 0.0);
@@ -585,6 +608,7 @@ mod tests {
             &kittens,
             &[],
             0,
+            None,
         );
         assert_eq!(out.target, Some(Entity::from_raw_u32(11).unwrap()));
         assert!(out.is_parent, "own-kitten hit sets is_parent");
@@ -609,6 +633,7 @@ mod tests {
             &kittens,
             &[],
             0,
+            None,
         );
         assert_eq!(out.target, Some(Entity::from_raw_u32(10).unwrap()));
         assert!(
@@ -633,6 +658,7 @@ mod tests {
             &kittens,
             &[],
             0,
+            None,
         );
         assert_eq!(out.target, Some(Entity::from_raw_u32(10).unwrap()));
     }
@@ -662,6 +688,7 @@ mod tests {
             &kittens,
             &[],
             0,
+            None,
         );
         assert_eq!(
             out.target,
@@ -693,6 +720,7 @@ mod tests {
             &kittens,
             &cat_positions,
             0,
+            None,
         );
         assert_eq!(
             out.target,
@@ -725,6 +753,7 @@ mod tests {
             &kittens,
             &[],
             0,
+            None,
         );
         assert_eq!(out.target_mother, Some(mother));
         assert_eq!(out.target_father, Some(father));
@@ -752,6 +781,7 @@ mod tests {
             &kittens,
             &[],
             0,
+            None,
         );
         assert!(out.target.is_some());
         assert!(

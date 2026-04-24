@@ -102,6 +102,8 @@ pub enum EventKind {
         is_pregnant: bool,
         /// Season at snapshot time — lets `jq` slice mating-need trajectories.
         season: String,
+        /// §7.W social_warmth fulfillment axis (0.0–1.0).
+        social_warmth: f32,
     },
     FoodLevel {
         current: f32,

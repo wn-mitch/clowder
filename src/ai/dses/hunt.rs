@@ -26,6 +26,7 @@ use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
 use crate::ai::faction::StanceRequirement;
+use crate::components::markers;
 
 pub struct HuntDse {
     id: DseId,
@@ -65,10 +66,10 @@ impl HuntDse {
             // value otherwise dominates the sum disproportionately.
             composition: Composition::weighted_sum(vec![0.5, 0.25, 0.15, 0.10]),
             // §9.3 DSE filter binding — Hunt targets `Prey` only.
-            // §13.1: `.forbid("Incapacitated")` blocks downed cats.
+            // §13.1: `.forbid(markers::Incapacitated::KEY)` blocks downed cats.
             eligibility: EligibilityFilter::new()
                 .with_stance(StanceRequirement::hunt())
-                .forbid("Incapacitated"),
+                .forbid(markers::Incapacitated::KEY),
         }
     }
 }

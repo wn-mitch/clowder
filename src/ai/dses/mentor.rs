@@ -16,6 +16,7 @@ use crate::ai::curves::Curve;
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
+use crate::components::markers;
 
 pub const WARMTH_INPUT: &str = "warmth";
 pub const DILIGENCE_INPUT: &str = "diligence";
@@ -45,7 +46,7 @@ impl MentorDse {
             // ambition is the status-seeking secondary driver.
             composition: Composition::weighted_sum(vec![0.4, 0.4, 0.2]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
-            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
+            eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
         }
     }
 }

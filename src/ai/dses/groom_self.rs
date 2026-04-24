@@ -21,6 +21,7 @@ use crate::ai::curves::Curve;
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
+use crate::components::markers;
 
 pub const THERMAL_DEFICIT_INPUT: &str = "thermal_deficit";
 
@@ -47,7 +48,7 @@ impl GroomSelfDse {
             // as the §2.3 post-split substrate TODO).
             composition: Composition::compensated_product(vec![1.0]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
-            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
+            eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
         }
     }
 }

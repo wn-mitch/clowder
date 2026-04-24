@@ -3,7 +3,7 @@
 //!
 //! `CompensatedProduct` of spirituality + herbcraft_skill +
 //! territory_max_corruption.
-//! Eligibility: `.require("WardStrengthLow")` per §4 port (Phase
+//! Eligibility: `.require(markers::WardStrengthLow::KEY)` per §4 port (Phase
 //! 4b.5). The outer `ctx.has_ward_herbs` conjunct in
 //! `scoring.rs::score_actions` stays inline until a per-cat inventory
 //! marker port lands `HasWardHerbs` on a future batch. The
@@ -26,6 +26,7 @@ use crate::ai::curves::Curve;
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
+use crate::components::markers;
 
 pub const SPIRITUALITY_INPUT: &str = "spirituality";
 pub const HERBCRAFT_SKILL_INPUT: &str = "herbcraft_skill";
@@ -66,10 +67,10 @@ impl HerbcraftWardDse {
             // when colony ward strength is low. Retires the
             // `ctx.ward_strength_low` conjunct from the
             // `ward_eligible` gate at `scoring.rs:740`.
-            // §13.1: `.forbid("Incapacitated")` blocks downed cats.
+            // §13.1: `.forbid(markers::Incapacitated::KEY)` blocks downed cats.
             eligibility: EligibilityFilter::new()
-                .require("WardStrengthLow")
-                .forbid("Incapacitated"),
+                .require(markers::WardStrengthLow::KEY)
+                .forbid(markers::Incapacitated::KEY),
         }
     }
 }
@@ -185,9 +186,9 @@ mod tests {
         // `scoring.rs:740` retires; WardStrengthLow moves onto the
         // DSE's eligibility filter.
         let dse = HerbcraftWardDse::new();
-        assert_eq!(dse.eligibility().required, vec!["WardStrengthLow"]);
+        assert_eq!(dse.eligibility().required, vec![markers::WardStrengthLow::KEY]);
         // §13.1: every non-Eat/Sleep/Idle cat DSE forbids Incapacitated.
-        assert_eq!(dse.eligibility().forbidden, vec!["Incapacitated"]);
+        assert_eq!(dse.eligibility().forbidden, vec![markers::Incapacitated::KEY]);
     }
 
     #[test]

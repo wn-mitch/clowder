@@ -15,6 +15,7 @@ use crate::ai::curves::Curve;
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
+use crate::components::markers;
 
 pub const KITTEN_URGENCY_INPUT: &str = "kitten_urgency";
 /// Caretake-local compassion axis (Phase 4c.4 alloparenting Reframe A).
@@ -51,7 +52,7 @@ impl CaretakeDse {
             // parent-axis 0/1 carries the bloodline-override signal.
             composition: Composition::weighted_sum(vec![0.45, 0.30, 0.25]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
-            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
+            eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
         }
     }
 }

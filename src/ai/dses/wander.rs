@@ -17,6 +17,7 @@ use crate::ai::dse::{
     ActivityKind, CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, Intention,
     Termination,
 };
+use crate::components::markers;
 use crate::resources::sim_constants::ScoringConstants;
 
 pub const CURIOSITY_INPUT: &str = "curiosity";
@@ -51,7 +52,7 @@ impl WanderDse {
             // Wander available at zero curiosity; playfulness rider.
             composition: Composition::weighted_sum(vec![0.5, 0.2, 0.3]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
-            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
+            eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
         }
     }
 }

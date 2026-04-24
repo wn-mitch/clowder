@@ -81,7 +81,18 @@ remaining work is itemised here.
   2026-04-23** via the §13.1 rows 1–3 commit:
   `.forbid("Incapacitated")` on every non-Eat/Sleep/Idle cat DSE
   + every fox DSE, inline `if ctx.is_incapacitated` branch at
-  `scoring.rs:574–598` retired. The remaining ~43 §4.3 markers each need:
+  `scoring.rs:574–598` retired. **Marker string keys centralized
+  2026-04-24** — `impl Marker { pub const KEY: &str }` on each
+  marker component in `src/components/markers.rs`; all ~97 raw
+  string call sites replaced with `Marker::KEY` constants (typo →
+  compile error). **LifeStage markers authored 2026-04-24** —
+  `growth.rs::update_life_stage_markers` maintains exactly one of
+  {Kitten, Young, Adult, Elder} per living cat;
+  `MarkerSnapshot` population wired in both scoring loops;
+  `mate.rs` gates on `.forbid(Kitten::KEY).forbid(Young::KEY)`.
+  Chain 2 split into 2a/2b sub-chains (Bevy 20-system tuple limit);
+  `MarkerQueries` SystemParam bundle created for future batches.
+  The remaining ~39 §4.3 markers each need:
     1. Author system per §4.6 author-file assignment (`Changed<T>`
        filter where the predicate reads changing parent components;
        full-scan where it reads position-adjacent state).

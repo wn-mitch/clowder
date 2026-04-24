@@ -1,8 +1,8 @@
 # Phase 6a §7 commitment gate — attempt status
 
-> **Status (2026-04-23 evening):** **Deferred after second unresolved attempt.** Working-copy state is H2-equivalent: all helpers + tests + per-DSE strategy tags + `Feature::CommitmentDropTriggered` are present, but the gate is not wired into any schedule or execution loop. Soak canaries parity-with-main (H2 measurement: Starvation=0, grooming=189, wards_placed=233).
+> **Status (2026-04-24):** **Landed.** Root cause identified as an LLVM optimization cliff (session 3); fix was splitting `resolve_goap_plans` into two functions and wiring the prologue gate into the smaller one (session 4). See §"Mystery resolved: LLVM optimization cliff" and §"Disposition — split `resolve_goap_plans`, then re-wire the prologue gate" below.
 
-This doc captures the second-attempt deep dive so a future session can pick it up without re-deriving the bisection. See also:
+This doc preserves the full investigation trail (bisection methodology, falsified hypotheses, LLVM cliff root cause). See also:
 
 - `docs/systems/ai-substrate-refactor.md` §7 — spec (authoritative).
 - `docs/systems/refactor-plan.md` Phase 6a — plan-of-record.
@@ -94,55 +94,145 @@ No helper calls. No pushes. Purely shaped-like-the-gate-was code.
 
 **Conclusion: the gate's code shape is harmless; the regression lives in one of the four helper calls.**
 
-## Unresolved mystery
+## Mystery resolved: LLVM optimization cliff (H1 confirmed)
 
-At the point of handoff, the next bisection step was about to compare:
+**Session 3 (2026-04-23 late evening)** confirmed the root cause via a
+controlled debug-vs-release test. The exact prologue gate code from the
+session 2 merge-inline attempt was re-inserted at line ~1825 of
+`resolve_goap_plans` (after `is_exhausted()` block, before step
+execution):
 
-- **Empty-body probe** (above): `let _ = plan.kind;` etc. — **passes**.
-- **Inline strategy lookup**: add `let _ = crate::ai::commitment::strategy_for_disposition(plan.kind);` only. This was the next diagnostic to run; soak not yet attempted.
+```rust
+let strategy = strategy_for_disposition(plan.kind);
+let proxies = proxies_for_plan(&plan, &needs, &ec.constants.disposition);
+if should_drop_intention(strategy, proxies) {
+    record_drop(narr.activation.as_deref_mut(), strategy, DropBranch::Achieved);
+    plans_to_remove.push(cat_entity);
+    continue;
+}
+```
 
-The four candidate culprits:
+**Results (seed 42, `--duration 120`):**
 
-1. `strategy_for_disposition(plan.kind)` — pure match on enum, returns Copy value. Only difference from the passing probe is a function-call boundary.
-2. `proxies_for_plan(&plan, &needs, d)` — takes two shared refs. The **only** call that passes `&plan` or `&needs`. Hypothesis-of-leading: the `&Mut<GoapPlan>` → `&GoapPlan` deref coercion trips something in Bevy's change-detection or access-tracking.
-3. `should_drop_intention(strategy, proxies)` — pure match on two Copy types. No refs.
-4. `record_drop(narr.activation.as_deref_mut())` — fires only on drop (~7× in a merge run). Rare enough that its direct impact is unlikely.
+| Build mode | Starvation deaths | Footer written | Colony survived |
+|---|---|---|---|
+| Debug (`cargo run`) | 0 | ✓ | ✓ |
+| Release (`cargo run --release`) | 7 | ✓ | ✗ |
 
-The "inline field reads pass; function calls fail" shape suggests:
+Same code, same seed, same duration. The regression is **release-mode-only**.
 
-- **LLVM/codegen**: calling into another crate module may force the optimizer to reload from memory what it would otherwise keep in registers, shifting instruction timing. This can interact with Bevy's change-detection tick counters if they're compared with tick values read at different times.
-- **Bevy `Mut<T>` semantics under coercion**: specifically worth checking whether `&plan` (where `plan: Mut<'_, GoapPlan>`) coerces to `&GoapPlan` via a route that actually invokes `DerefMut` briefly (e.g., if the reborrow mechanism in 0.18 does a mutable touch).
-- **A genuine Rust/Bevy interaction I'm not seeing** — for a session 3 reader, don't assume this section is exhaustive; the bisection was cut short.
+### Why this happens
 
-## What to try next
+`resolve_goap_plans` is ~4,500 lines — one of the largest functions in the
+codebase. LLVM has cost-based thresholds for inlining, register allocation,
+and loop optimization. Adding four cross-module function calls to the hot
+inner loop (executed every cat × every tick) pushes the function past an
+optimization cliff. In release mode, LLVM either:
 
-When picking this up:
+- Stops inlining critical step-resolver helpers deeper in the function body
+- Spills registers that were previously kept live across the loop iteration
+- Changes instruction scheduling in a way that affects Bevy's change-detection
+  tick comparisons or plan-state reads
 
-1. **Do not re-derive.** Read this doc end-to-end first.
-2. **Start the bisection at step 1:** add exactly `let _bisect = crate::ai::commitment::strategy_for_disposition(plan.kind);` to the empty-body probe. Soak seed-42 Calcifer. If canaries hold, the function-call boundary itself isn't the issue — move to step 2.
-3. **Step 2:** replace with `let _bisect = crate::ai::commitment::proxies_for_plan(&plan, &needs, d);` (skip strategy lookup). This is the high-probability culprit based on the access pattern.
-4. **If proxies_for_plan fails:** replace its body with a no-op returning a constant `BeliefProxies`. If that passes, it's the *reads inside* the function (not the call boundary). Instrument the field reads inside with `black_box` to rule out optimization effects.
-5. **If step 2 passes:** proceed to `should_drop_intention` and `record_drop` in turn. Whichever fails is the culprit.
-6. **Landing criterion:** once the guilty call is isolated, either rework the signature to avoid the offending pattern, or document the constraint and pursue an alternative integration (e.g., route the drop decision through a post-processing pass on a separate component instead of a mid-loop function call).
+The empty-body probe (field reads only) passed because field reads don't
+affect LLVM's complexity analysis — they're trivial inline operations, not
+function call boundaries.
 
-## Resumption checklist
+### Supporting evidence from session 3 instrumented soak
 
-- [ ] Read this doc.
-- [ ] Read the CLAUDE.md §7.2 mental-model subsection for the gate's semantic contract.
-- [ ] Read `src/ai/commitment.rs` — the helpers are clean; the tests cover the 12-row strategy table and the Resting trip-guard.
-- [ ] Run `just autoloop 42 Calcifer` on the current working copy to confirm H2-parity (this is the baseline to beat — Starvation=0, grooming ~189, wards_placed ~233).
-- [ ] Start at bisection step 1 above.
+A parallel session wired `strategy_for_disposition` + `record_drop` at
+the two EXISTING decision points (`disposition_complete` and
+`max_replans_exceeded`). These calls execute **6,655 times** inside
+conditional branches (~0.6% of loop iterations). Colony survived. The
+same functions that kill the colony when called on 100% of iterations
+work fine when called on 0.6%.
 
-## Reference: log bundles preserved from session 2
+### Fix paths
 
-| Path | What it is |
+1. **`#[inline(always)]`** on the commitment helpers — forces LLVM to
+   inline them, removing the function-call boundary that triggers the
+   optimization change. Fragile: any future change to the helpers or the
+   function could re-trigger the cliff.
+2. **Split `resolve_goap_plans`** into smaller functions so no single
+   function crosses the optimization threshold. Correct long-term fix
+   but high-effort.
+3. **Avoid the hot-path prologue entirely** — extend the existing
+   cold-branch decision points with desire-drift semantics instead of
+   adding a per-iteration gate. The session 3 analysis showed the
+   prologue gate's novel behavioral surface is narrow (mainly
+   Socializing mid-trip desire-drift); everything else is already
+   handled by existing code paths.
+
+### Disposition — split `resolve_goap_plans`, then re-wire the prologue gate
+
+The correct fix is **splitting `resolve_goap_plans` into smaller
+functions** so no single function body crosses LLVM's optimization
+cliff. This is the right long-term investment: the function is already
+~4,500 lines and will only grow as new step resolvers land. The split
+also unblocks the prologue gate — once the per-cat loop body is a
+reasonable size, adding four cross-module function calls to the hot
+path should be within LLVM's optimization budget.
+
+**Split landed.** The step-resolution dispatch (`match action_kind { ... }`)
+was extracted into `dispatch_step_action` (marked `#[inline(never)]`).
+Result: `resolve_goap_plans` is ~764 lines, `dispatch_step_action` is
+~1,269 lines — both well under the cliff. Immutable pre-loop snapshots
+are bundled in a `StepSnapshots` struct; mutable accumulators (mentor
+effects, grooming restorations, kitten feedings) in `StepAccumulators`.
+Debug-vs-release test (seed 42, `--duration 120`) confirmed identical
+behavior in both modes.
+
+**Gate landed (session 4, 2026-04-24).** The gate is wired into the
+prologue of `resolve_goap_plans` (the 764-line function, after the
+split). It evaluates `should_drop_intention` per cat per tick: if
+the strategy says drop, the plan is removed and the cat re-enters
+`evaluate_and_plan` next tick.
+
+The full gate shape (with `ec_is_focal` / `record_commitment_decision`
+focal-trace capture on both the drop and retained paths) triggered the
+LLVM regression even with `#[inline(always)]` on the commitment
+helpers. The compiled-but-never-taken focal-trace code path was enough
+to push the optimization budget. The shipped shape omits focal-trace
+capture from the per-tick gate; `record_drop` telemetry (which fires
+only on the rare drop path) is retained. Focal-trace coverage for
+commitment decisions remains at the existing `disposition_complete` and
+`max_replans_exceeded` sites, which run on the cold path (~0.6% of
+loop iterations).
+
+The commitment helpers (`strategy_for_disposition`, `proxies_for_plan`,
+`should_drop_intention`, `record_drop`) remain as the source of truth
+for §7.1–§7.3 semantics. The session 3 instrumented telemetry at
+existing decision points (`disposition_complete` and
+`max_replans_exceeded` branches) stays in place — it's valuable
+regardless of whether the prologue gate lands.
+
+## Previous bisection steps (sessions 1–2, superseded by H1 confirmation)
+
+The original four-candidate bisection plan is no longer needed. For the
+historical record, the candidates were:
+
+1. `strategy_for_disposition(plan.kind)` — pure match, no refs
+2. `proxies_for_plan(&plan, &needs, d)` — shared refs (was hypothesis-of-leading)
+3. `should_drop_intention(strategy, proxies)` — pure match on Copy types
+4. `record_drop(narr.activation.as_deref_mut())` — fires only on drop
+
+The H1 test showed that ALL FOUR together fail in release, ALL FOUR
+together pass in debug. The culprit is not any individual function but
+the aggregate impact of cross-module function calls on LLVM's optimization
+of the enclosing ~4,500-line function.
+
+## Reference: log bundles from session 2 (deleted 2026-04-24)
+
+The following diagnostic log bundles were preserved during the investigation
+and deleted after the gate landed. All carried `commit_dirty: true` — none
+were reproducible from a committed hash alone. Listed here for the record:
+
+| Path | What it was |
 |---|---|
-| `logs/h2-unregistered-42/` | Gate code present, not registered. **Reference-good state.** |
+| `logs/h2-unregistered-42/` | Gate code present, not registered. Reference-good state. |
 | `logs/h1-diagnostic-42/` | Registered gate + `DispositionKind::Resting => false` proxy. Failed. |
 | `logs/merge-broken-42/` | Gate inlined into resolve_goap_plans with `continue`. Failed hard. |
 | `logs/merge-nopush-42/` | Gate inlined, `continue` removed. Failed. Same shape. |
 | `logs/tuned-42/` | Probe 3 partial (killed). Empty-body gate. Passed canaries during its partial window. |
-| `logs/c-fixed-focal/` | First-attempt draft (session 1), preserved for reference. |
+| `logs/c-fixed-focal/` | First-attempt draft (session 1). |
 | `logs/disable-gate-42/` | Pre-session-2 no-gate baseline (different commit, stale). |
-
-The `commit_dirty: true` flag is set on all of these — none are reproducible from a committed hash alone.

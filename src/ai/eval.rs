@@ -699,6 +699,7 @@ mod tests {
     use crate::ai::considerations::{Consideration, ScalarConsideration};
     use crate::ai::curves::hangry;
     use crate::ai::dse::{ActivityKind, DseId, Termination};
+    use crate::components::markers;
     use crate::components::physical::Position;
 
     // A minimal test DSE: one scalar consideration on a named input.
@@ -764,7 +765,7 @@ mod tests {
 
     #[test]
     fn eligibility_required_marker() {
-        let filter = EligibilityFilter::new().require("HasStoredFood");
+        let filter = EligibilityFilter::new().require(markers::HasStoredFood::KEY);
         let entity = Entity::from_raw_u32(1).unwrap();
 
         // Missing required → fail.
@@ -782,7 +783,7 @@ mod tests {
         assert!(!passes_eligibility(&filter, entity, &ctx));
 
         // Present required → pass.
-        let has_marker = |m: &str, _: Entity| m == "HasStoredFood";
+        let has_marker = |m: &str, _: Entity| m == markers::HasStoredFood::KEY;
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
@@ -797,11 +798,11 @@ mod tests {
 
     #[test]
     fn eligibility_forbidden_marker() {
-        let filter = EligibilityFilter::new().forbid("Incapacitated");
+        let filter = EligibilityFilter::new().forbid(markers::Incapacitated::KEY);
         let entity = Entity::from_raw_u32(1).unwrap();
         let sample = |_: &str, _: Position| 0.0;
 
-        let has_incap = |m: &str, _: Entity| m == "Incapacitated";
+        let has_incap = |m: &str, _: Entity| m == markers::Incapacitated::KEY;
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
@@ -829,7 +830,7 @@ mod tests {
     #[test]
     fn evaluate_single_returns_none_on_ineligible() {
         let mut dse = test_dse("eat", "hunger");
-        dse.eligibility = EligibilityFilter::new().require("HasStoredFood");
+        dse.eligibility = EligibilityFilter::new().require(markers::HasStoredFood::KEY);
         let entity = Entity::from_raw_u32(1).unwrap();
 
         let has_marker = |_: &str, _: Entity| false;

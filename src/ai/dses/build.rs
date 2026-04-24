@@ -19,6 +19,7 @@ use crate::ai::curves::{piecewise, Curve};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
+use crate::components::markers;
 use crate::resources::sim_constants::ScoringConstants;
 
 pub const DILIGENCE_INPUT: &str = "diligence";
@@ -57,7 +58,7 @@ impl BuildDse {
             // binary presence bonuses.
             composition: Composition::weighted_sum(vec![0.5, 0.25, 0.25]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
-            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
+            eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
         }
     }
 }

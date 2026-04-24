@@ -19,6 +19,7 @@ use crate::ai::curves::{Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
+use crate::components::markers;
 use crate::resources::sim_constants::ScoringConstants;
 
 pub const DILIGENCE_INPUT: &str = "diligence";
@@ -59,7 +60,7 @@ impl CoordinateDse {
             // + ambition modulate.
             composition: Composition::weighted_sum(vec![0.3, 0.4, 0.3]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
-            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
+            eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
         }
     }
 }

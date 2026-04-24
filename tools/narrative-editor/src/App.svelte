@@ -3,8 +3,9 @@
   import CatQuiz from './pages/CatQuiz.svelte'
   import TemplateEditor from './pages/TemplateEditor.svelte'
   import LogsDashboard from './pages/LogsDashboard.svelte'
+  import TraceDashboard from './pages/TraceDashboard.svelte'
 
-  const PAGES = ['templates', 'quiz', 'logs'] as const
+  const PAGES = ['templates', 'quiz', 'logs', 'trace'] as const
   type Page = typeof PAGES[number]
 
   let page = $state<Page>(getPageFromHash())
@@ -28,11 +29,13 @@
 
 <Nav currentPage={page} onNavigate={navigate} />
 
-<main class="max-w-6xl mx-auto p-6">
+<main class="{page === 'trace' ? 'max-w-none mx-auto p-4' : 'max-w-6xl mx-auto p-6'}">
   {#if page === 'quiz'}
     <CatQuiz />
   {:else if page === 'logs'}
     <LogsDashboard />
+  {:else if page === 'trace'}
+    <TraceDashboard />
   {:else}
     <TemplateEditor />
   {/if}

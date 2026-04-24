@@ -262,6 +262,11 @@ pub struct ScoringContext<'a> {
     pub has_functional_kitchen: bool,
     /// Whether Stores currently holds at least one raw (uncooked) food item.
     pub has_raw_food_in_stores: bool,
+    // --- §7.W Fulfillment context ---
+    /// Social-warmth deficit (1.0 - social_warmth). Drives grooming and
+    /// socializing urgency from the Fulfillment register, independent of
+    /// the Maslow social need.
+    pub social_warmth_deficit: f32,
 }
 
 // ---------------------------------------------------------------------------
@@ -518,6 +523,12 @@ fn ctx_scalars(ctx: &ScoringContext) -> HashMap<&'static str, f32> {
     // Wander). Carried as a scalar so the curve's weight slot is
     // uniform with the other axes.
     m.insert("one", 1.0);
+    // §7.W fulfillment deficit — drives grooming/socializing urgency
+    // from the Fulfillment register, independent of Maslow social.
+    m.insert(
+        "social_warmth_deficit",
+        ctx.social_warmth_deficit.clamp(0.0, 1.0),
+    );
     m
 }
 
@@ -1689,6 +1700,7 @@ pub struct SoftmaxCapture {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::components::markers;
     use rand_chacha::rand_core::SeedableRng;
     use rand_chacha::ChaCha8Rng;
     use std::sync::OnceLock;
@@ -1770,12 +1782,12 @@ mod tests {
             // explicitly check an absence path override `markers` on
             // the returned `EvalInputs`.
             let mut s = MarkerSnapshot::new();
-            s.set_colony("HasStoredFood", true);
-            s.set_colony("HasGarden", true);
+            s.set_colony(markers::HasStoredFood::KEY, true);
+            s.set_colony(markers::HasGarden::KEY, true);
             // Phase 4b.5 additions.
-            s.set_colony("HasFunctionalKitchen", true);
-            s.set_colony("HasRawFoodInStores", true);
-            s.set_colony("WardStrengthLow", true);
+            s.set_colony(markers::HasFunctionalKitchen::KEY, true);
+            s.set_colony(markers::HasRawFoodInStores::KEY, true);
+            s.set_colony(markers::WardStrengthLow::KEY, true);
             s
         })
     }
@@ -2572,13 +2584,13 @@ mod tests {
         // markers). Copy the colony markers the cached snapshot sets
         // so Eat's `HasStoredFood` requirement still passes.
         let mut markers = MarkerSnapshot::new();
-        markers.set_colony("HasStoredFood", true);
-        markers.set_colony("HasGarden", true);
-        markers.set_colony("HasFunctionalKitchen", true);
-        markers.set_colony("HasRawFoodInStores", true);
-        markers.set_colony("WardStrengthLow", true);
+        markers.set_colony(markers::HasStoredFood::KEY, true);
+        markers.set_colony(markers::HasGarden::KEY, true);
+        markers.set_colony(markers::HasFunctionalKitchen::KEY, true);
+        markers.set_colony(markers::HasRawFoodInStores::KEY, true);
+        markers.set_colony(markers::WardStrengthLow::KEY, true);
         let cat_entity = Entity::from_raw_u32(1).unwrap();
-        markers.set_entity("Incapacitated", cat_entity, true);
+        markers.set_entity(markers::Incapacitated::KEY, cat_entity, true);
 
         let base = test_eval_inputs();
         let inputs = EvalInputs {
@@ -3163,28 +3175,28 @@ mod tests {
     fn marker_snapshot_empty_returns_false() {
         let snap = MarkerSnapshot::new();
         let e = Entity::from_raw_u32(1).unwrap();
-        assert!(!snap.has("HasStoredFood", e));
+        assert!(!snap.has(markers::HasStoredFood::KEY, e));
     }
 
     #[test]
     fn marker_snapshot_colony_marker_true_for_any_entity() {
         let mut snap = MarkerSnapshot::new();
-        snap.set_colony("HasStoredFood", true);
+        snap.set_colony(markers::HasStoredFood::KEY, true);
         let a = Entity::from_raw_u32(1).unwrap();
         let b = Entity::from_raw_u32(99).unwrap();
-        assert!(snap.has("HasStoredFood", a));
-        assert!(snap.has("HasStoredFood", b));
-        assert!(!snap.has("Incapacitated", a));
+        assert!(snap.has(markers::HasStoredFood::KEY, a));
+        assert!(snap.has(markers::HasStoredFood::KEY, b));
+        assert!(!snap.has(markers::Incapacitated::KEY, a));
     }
 
     #[test]
     fn marker_snapshot_colony_marker_clears_cleanly() {
         let mut snap = MarkerSnapshot::new();
         let e = Entity::from_raw_u32(1).unwrap();
-        snap.set_colony("HasStoredFood", true);
-        assert!(snap.has("HasStoredFood", e));
-        snap.set_colony("HasStoredFood", false);
-        assert!(!snap.has("HasStoredFood", e));
+        snap.set_colony(markers::HasStoredFood::KEY, true);
+        assert!(snap.has(markers::HasStoredFood::KEY, e));
+        snap.set_colony(markers::HasStoredFood::KEY, false);
+        assert!(!snap.has(markers::HasStoredFood::KEY, e));
     }
 
     #[test]
@@ -3192,9 +3204,9 @@ mod tests {
         let mut snap = MarkerSnapshot::new();
         let a = Entity::from_raw_u32(1).unwrap();
         let b = Entity::from_raw_u32(2).unwrap();
-        snap.set_entity("Incapacitated", a, true);
-        assert!(snap.has("Incapacitated", a));
-        assert!(!snap.has("Incapacitated", b));
+        snap.set_entity(markers::Incapacitated::KEY, a, true);
+        assert!(snap.has(markers::Incapacitated::KEY, a));
+        assert!(!snap.has(markers::Incapacitated::KEY, b));
     }
 
     #[test]
@@ -3202,11 +3214,11 @@ mod tests {
         let mut snap = MarkerSnapshot::new();
         let a = Entity::from_raw_u32(1).unwrap();
         let b = Entity::from_raw_u32(2).unwrap();
-        snap.set_entity("Incapacitated", a, true);
-        snap.set_entity("Incapacitated", b, true);
-        snap.set_entity("Incapacitated", a, false);
-        assert!(!snap.has("Incapacitated", a));
-        assert!(snap.has("Incapacitated", b));
+        snap.set_entity(markers::Incapacitated::KEY, a, true);
+        snap.set_entity(markers::Incapacitated::KEY, b, true);
+        snap.set_entity(markers::Incapacitated::KEY, a, false);
+        assert!(!snap.has(markers::Incapacitated::KEY, a));
+        assert!(snap.has(markers::Incapacitated::KEY, b));
     }
 
     // --- Behavior gate tests ---

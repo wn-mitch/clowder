@@ -67,18 +67,30 @@ pub struct Apprentice;
 /// exclusive per cat.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Kitten;
+impl Kitten {
+    pub const KEY: &str = "Kitten";
+}
 
 /// `Age::stage() == Young` (4–11 seasons).
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Young;
+impl Young {
+    pub const KEY: &str = "Young";
+}
 
 /// `Age::stage() == Adult` (12–59 seasons).
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Adult;
+impl Adult {
+    pub const KEY: &str = "Adult";
+}
 
 /// `Age::stage() == Elder` (60+ seasons).
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Elder;
+impl Elder {
+    pub const KEY: &str = "Elder";
+}
 
 // ---------------------------------------------------------------------------
 // State markers (§4.3 State)
@@ -91,6 +103,9 @@ pub struct Elder;
 /// Idle); every other DSE uses `Without<Incapacitated>`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Incapacitated;
+impl Incapacitated {
+    pub const KEY: &str = "Incapacitated";
+}
 
 /// Any injury present — weaker than `Incapacitated`.
 /// `needs.rs::update_injury_marker`.
@@ -126,6 +141,9 @@ pub struct HasThreatNearby;
 /// injury state, inventory, and nearby-tile checks — see §4.3 rows.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct CanHunt;
+impl CanHunt {
+    pub const KEY: &str = "CanHunt";
+}
 
 #[derive(Component, Debug, Clone, Copy)]
 pub struct CanForage;
@@ -170,13 +188,22 @@ pub struct ColonyState;
 /// Authoring: `buildings.rs::update_colony_building_markers`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HasFunctionalKitchen;
+impl HasFunctionalKitchen {
+    pub const KEY: &str = "HasFunctionalKitchen";
+}
 
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HasRawFoodInStores;
+impl HasRawFoodInStores {
+    pub const KEY: &str = "HasRawFoodInStores";
+}
 
 /// Colony stores carry ≥1 food item (raw or cooked). Gates `Eat`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HasStoredFood;
+impl HasStoredFood {
+    pub const KEY: &str = "HasStoredFood";
+}
 
 /// ≥1 harvestable Thornbriar exists in the world.
 /// `magic.rs::update_herb_availability_markers`.
@@ -212,6 +239,9 @@ pub struct HasDamagedBuilding;
 
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HasGarden;
+impl HasGarden {
+    pub const KEY: &str = "HasGarden";
+}
 
 /// ≥1 other cat has a skill below 0.3 where this cat has the same
 /// skill above 0.6 (per-cat relative predicate).
@@ -244,6 +274,9 @@ pub struct IsCoordinatorWithDirectives;
 /// `magic.rs::update_ward_coverage_markers`. Attaches to `ColonyState`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct WardStrengthLow;
+impl WardStrengthLow {
+    pub const KEY: &str = "WardStrengthLow";
+}
 
 /// Any colony ward has `WildlifeAiState::EncirclingWard` adjacent.
 /// `magic.rs::update_ward_siege_marker`. Attaches to `ColonyState`.

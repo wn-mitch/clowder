@@ -47,7 +47,9 @@ use crate::ai::considerations::{Consideration, ScalarConsideration};
 use crate::ai::curves::Curve;
 use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination};
 use crate::ai::eval::DseRegistry;
-use crate::ai::target_dse::{evaluate_target_taking, TargetAggregation, TargetTakingDse};
+use crate::ai::target_dse::{
+    evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,
+};
 use crate::components::physical::Position;
 use crate::resources::relationships::Relationships;
 
@@ -270,16 +272,6 @@ pub fn resolve_socialize_target(
     }
 
     scored.winning_target
-}
-
-/// Focal-cat target-ranking capture hook — passed by callers that want
-/// per-candidate scores emitted to the trace sidecar. Keeping this as
-/// a dedicated struct (rather than two optional params) makes it
-/// obvious at the call site that the resolver is operating in a
-/// focal-tracing context.
-pub struct FocalTargetHook<'a> {
-    pub capture: &'a crate::resources::FocalScoreCapture,
-    pub name_lookup: &'a dyn Fn(Entity) -> String,
 }
 
 #[cfg(test)]

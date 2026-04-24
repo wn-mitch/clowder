@@ -12,6 +12,7 @@ use crate::ai::curves::Curve;
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
+use crate::components::markers;
 
 pub const CURIOSITY_INPUT: &str = "curiosity";
 pub const UNEXPLORED_NEARBY_INPUT: &str = "unexplored_nearby";
@@ -37,7 +38,7 @@ impl ExploreDse {
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
-            eligibility: EligibilityFilter::new().forbid("Incapacitated"),
+            eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
         }
     }
 }

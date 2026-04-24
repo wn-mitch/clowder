@@ -195,6 +195,25 @@ pub fn target_ranking_from_scored(
     })
 }
 
+/// Focal-cat target-ranking capture hook — passed by callers that want
+/// per-candidate scores emitted to the trace sidecar. Keeping this as
+/// a dedicated struct (rather than two optional params) makes it
+/// obvious at the call site that the resolver is operating in a
+/// focal-tracing context.
+///
+/// Every target-taking DSE resolver accepts `Option<FocalTargetHook<'_>>`
+/// as its trailing param; non-focal callers pass `None` and pay zero
+/// cost. On a focal tick, the resolver calls
+/// [`target_ranking_from_scored`] with `hook.name_lookup` and routes
+/// the result into [`FocalScoreCapture::set_target_ranking`] under the
+/// DSE's id.
+///
+/// [`FocalScoreCapture::set_target_ranking`]: crate::resources::FocalScoreCapture::set_target_ranking
+pub struct FocalTargetHook<'a> {
+    pub capture: &'a crate::resources::FocalScoreCapture,
+    pub name_lookup: &'a dyn Fn(Entity) -> String,
+}
+
 // ---------------------------------------------------------------------------
 // Evaluator
 // ---------------------------------------------------------------------------

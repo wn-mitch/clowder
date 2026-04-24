@@ -31,7 +31,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[012](docs/open-work/tickets/012-warmth-split.md)** — Warmth split — temperature need vs social-warmth fulfillment axis — _added 2026-04-21_
 - **[013](docs/open-work/tickets/013-spec-follow-on-debts-from-ai-substrate-refactor.md)** — Spec-follow-on debts from AI substrate refactor — _added 2026-04-21_
 - **[014](docs/open-work/tickets/014-phase-4-follow-ons.md)** — Phase 4 follow-ons — target-taking registration + markers + mate-gender + Mating/PracticeMagic magnitude — _added 2026-04-22_
-- **[022](docs/open-work/tickets/022-decision-point-trace-fan-out.md)** — §11 decision-point trace fan-out — remaining target-taking DSEs + deep-soak review — _added 2026-04-23_
+- **[024](docs/open-work/tickets/024-fulfillment-register.md)** — §7.W Fulfillment register — MVP container + social_warmth axis — _[C] · added 2026-04-24_
 
 ## Ready (8)
 
@@ -69,7 +69,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/). Recent months:
 
-- [2026-04](docs/open-work/landed/2026-04.md) — 25 entries
+- [2026-04](docs/open-work/landed/2026-04.md) — 26 entries
 
 ## Conventions
 

@@ -37,6 +37,8 @@ pub fn resolve_survey(
         let personal_bonus = discovery * d.survey_personal_discovery_scale;
         needs.purpose = (needs.purpose + d.survey_purpose_gain + personal_bonus).min(1.0);
 
+        needs.mastery = (needs.mastery + d.survey_mastery_gain).min(1.0);
+
         StepOutcome::bare(StepResult::Advance)
     } else {
         StepOutcome::bare(StepResult::Continue)

@@ -4,6 +4,7 @@ use crate::ai::CurrentAction;
 use crate::components::identity::{Age, Gender, Name, Orientation};
 use crate::components::mental::Mood;
 use crate::components::personality::Personality;
+use crate::components::fulfillment::Fulfillment;
 use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::components::pregnancy::Pregnant;
 use crate::components::skills::{Corruption, MagicAffinity, Skills};
@@ -24,21 +25,26 @@ pub fn emit_cat_snapshots(
     time: Res<TimeState>,
     query: Query<
         (
-            Entity,
-            &Name,
-            &Position,
-            &Personality,
-            &Needs,
-            &Skills,
-            &Mood,
-            &Health,
-            &Corruption,
-            &MagicAffinity,
-            &CurrentAction,
-            &Age,
-            &Gender,
-            &Orientation,
-            Option<&Pregnant>,
+            (
+                Entity,
+                &Name,
+                &Position,
+                &Personality,
+                &Needs,
+                &Skills,
+                &Mood,
+                &Health,
+            ),
+            (
+                &Corruption,
+                &MagicAffinity,
+                &CurrentAction,
+                &Age,
+                &Gender,
+                &Orientation,
+                Option<&Pregnant>,
+                Option<&Fulfillment>,
+            ),
         ),
         Without<Dead>,
     >,
@@ -54,21 +60,8 @@ pub fn emit_cat_snapshots(
     let season = time.season(&sim_config);
 
     for (
-        entity,
-        name,
-        pos,
-        personality,
-        needs,
-        skills,
-        mood,
-        health,
-        corruption,
-        magic_aff,
-        current,
-        age,
-        gender,
-        orientation,
-        pregnant,
+        (entity, name, pos, personality, needs, skills, mood, health),
+        (corruption, magic_aff, current, age, gender, orientation, pregnant, fulfillment),
     ) in &query
     {
         let life_stage = age.stage(time.tick, sim_config.ticks_per_season);
@@ -119,6 +112,7 @@ pub fn emit_cat_snapshots(
                 orientation: format!("{orientation:?}"),
                 is_pregnant: pregnant.is_some(),
                 season: format!("{season:?}"),
+                social_warmth: fulfillment.map_or(0.6, |f| f.social_warmth),
             },
         );
     }

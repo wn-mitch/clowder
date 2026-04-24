@@ -247,6 +247,7 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
                     Position::new(spawn_x, spawn_y),
                     Health::default(),
                     Needs::staggered(i, cat_count),
+                    crate::components::fulfillment::Fulfillment::staggered(i, cat_count),
                     Mood::default(),
                     Memory::default(),
                 ),

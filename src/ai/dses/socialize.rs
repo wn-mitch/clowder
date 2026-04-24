@@ -18,6 +18,7 @@ use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
 use crate::ai::faction::StanceRequirement;
+use crate::components::markers;
 
 pub const SOCIAL_DEFICIT_INPUT: &str = "social_deficit";
 pub const SOCIABILITY_INPUT: &str = "sociability";
@@ -72,10 +73,10 @@ impl SocializeDse {
             // Corruption bonus is a small-weight additive rider.
             composition: Composition::weighted_sum(vec![0.35, 0.20, 0.05, 0.10, 0.20, 0.10]),
             // §9.3 DSE filter binding — Socialize accepts `Same | Ally`.
-            // §13.1: `.forbid("Incapacitated")` blocks downed cats.
+            // §13.1: `.forbid(markers::Incapacitated::KEY)` blocks downed cats.
             eligibility: EligibilityFilter::new()
                 .with_stance(StanceRequirement::socialize())
-                .forbid("Incapacitated"),
+                .forbid(markers::Incapacitated::KEY),
         }
     }
 }

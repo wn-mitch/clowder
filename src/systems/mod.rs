@@ -24,6 +24,7 @@ pub mod disposition;
 pub mod fate;
 pub mod fertility;
 pub mod fox_goap;
+pub mod fulfillment;
 pub mod goap;
 pub mod growth;
 pub mod incapacitation;
