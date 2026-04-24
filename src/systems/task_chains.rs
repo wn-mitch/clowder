@@ -175,10 +175,7 @@ pub fn resolve_task_chains(
                     step_target_entity,
                     &mut buildings,
                 );
-                outcome.record_if_witnessed(
-                    activation.as_deref_mut(),
-                    Feature::MaterialsDelivered,
-                );
+                outcome.record_if_witnessed(activation.as_deref_mut(), Feature::MaterialsDelivered);
                 apply(outcome.result, &mut chain);
             }
 
@@ -215,10 +212,7 @@ pub fn resolve_task_chains(
                     &mut buildings,
                     &map,
                 );
-                outcome.record_if_witnessed(
-                    activation.as_deref_mut(),
-                    Feature::BuildingRepaired,
-                );
+                outcome.record_if_witnessed(activation.as_deref_mut(), Feature::BuildingRepaired);
                 apply(outcome.result, &mut chain);
             }
 
@@ -250,10 +244,7 @@ pub fn resolve_task_chains(
                     &mut stored_items,
                     &mut commands,
                 );
-                outcome.record_if_witnessed(
-                    activation.as_deref_mut(),
-                    Feature::CropHarvested,
-                );
+                outcome.record_if_witnessed(activation.as_deref_mut(), Feature::CropHarvested);
                 apply(outcome.result, &mut chain);
             }
 

@@ -164,7 +164,16 @@ pub fn update_cat_inspect_panel(
     // If the cat is dead or despawned, dismiss.
     let Ok((
         (name, age, needs, mood, action, skills, coordinator, directive),
-        (zodiac, fated_love, fated_rival, aspirations, preferences, disposition, action_history, fulfillment),
+        (
+            zodiac,
+            fated_love,
+            fated_rival,
+            aspirations,
+            preferences,
+            disposition,
+            action_history,
+            fulfillment,
+        ),
     )) = cats.get(entity)
     else {
         // Entity gone — clear the panel.
@@ -326,7 +335,11 @@ pub fn update_cat_inspect_panel(
     ));
     children.push(spawn_bar_row(&mut commands, "Hunger", needs.hunger));
     children.push(spawn_bar_row(&mut commands, "Energy", needs.energy));
-    children.push(spawn_bar_row(&mut commands, "Temperature", needs.temperature));
+    children.push(spawn_bar_row(
+        &mut commands,
+        "Temperature",
+        needs.temperature,
+    ));
     children.push(spawn_bar_row(&mut commands, "Safety", needs.safety));
     children.push(spawn_bar_row(&mut commands, "Social", needs.social));
     children.push(spawn_bar_row(

@@ -43,7 +43,10 @@ impl CaretakeDse {
         Self {
             id: DseId("caretake"),
             considerations: vec![
-                Consideration::Scalar(ScalarConsideration::new(KITTEN_URGENCY_INPUT, linear.clone())),
+                Consideration::Scalar(ScalarConsideration::new(
+                    KITTEN_URGENCY_INPUT,
+                    linear.clone(),
+                )),
                 Consideration::Scalar(ScalarConsideration::new(COMPASSION_INPUT, linear.clone())),
                 Consideration::Scalar(ScalarConsideration::new(IS_PARENT_INPUT, linear)),
             ],

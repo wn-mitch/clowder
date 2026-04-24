@@ -96,7 +96,8 @@ pub fn apply_building_effects(
             StructureType::Den => {
                 for (cat_pos, mut needs) in &mut cats {
                     if cat_pos.manhattan_distance(&center) <= b.den_effect_radius {
-                        needs.temperature = (needs.temperature + b.den_temperature_bonus * eff).min(1.0);
+                        needs.temperature =
+                            (needs.temperature + b.den_temperature_bonus * eff).min(1.0);
                         needs.safety = (needs.safety + b.den_safety_bonus * eff).min(1.0);
                     }
                 }
@@ -106,8 +107,9 @@ pub fn apply_building_effects(
                     if cat_pos.manhattan_distance(&center) <= b.hearth_effect_radius {
                         needs.social = (needs.social + b.hearth_social_bonus * eff).min(1.0);
                         if is_cold {
-                            needs.temperature =
-                                (needs.temperature + b.hearth_temperature_bonus_cold * eff).min(1.0);
+                            needs.temperature = (needs.temperature
+                                + b.hearth_temperature_bonus_cold * eff)
+                                .min(1.0);
                         }
                     }
                 }
@@ -293,7 +295,10 @@ mod tests {
         schedule.run(&mut world);
 
         let near_needs = world.get::<Needs>(near_cat).unwrap();
-        assert!(near_needs.temperature > 0.9, "near cat should get warmth bonus");
+        assert!(
+            near_needs.temperature > 0.9,
+            "near cat should get warmth bonus"
+        );
         assert!(
             near_needs.safety > 1.0 - f32::EPSILON,
             "near cat should get safety bonus"
@@ -496,8 +501,7 @@ mod tests {
     #[test]
     fn garden_detected() {
         let structure = Structure::new(StructureType::Garden);
-        let buildings: Vec<(&Structure, Option<&ConstructionSite>)> =
-            vec![(&structure, None)];
+        let buildings: Vec<(&Structure, Option<&ConstructionSite>)> = vec![(&structure, None)];
         let state = scan_colony_buildings(buildings.into_iter(), 0.4);
         assert!(state.has_garden);
         assert!(!state.has_functional_kitchen);
@@ -507,8 +511,7 @@ mod tests {
     fn functional_kitchen_detected() {
         let mut kitchen = Structure::new(StructureType::Kitchen);
         kitchen.condition = 1.0; // effectiveness > 0 when condition > 0
-        let buildings: Vec<(&Structure, Option<&ConstructionSite>)> =
-            vec![(&kitchen, None)];
+        let buildings: Vec<(&Structure, Option<&ConstructionSite>)> = vec![(&kitchen, None)];
         let state = scan_colony_buildings(buildings.into_iter(), 0.4);
         assert!(state.has_functional_kitchen);
     }
@@ -517,8 +520,7 @@ mod tests {
     fn kitchen_under_construction_not_functional() {
         let kitchen = Structure::new(StructureType::Kitchen);
         let site = ConstructionSite::new(StructureType::Kitchen);
-        let buildings: Vec<(&Structure, Option<&ConstructionSite>)> =
-            vec![(&kitchen, Some(&site))];
+        let buildings: Vec<(&Structure, Option<&ConstructionSite>)> = vec![(&kitchen, Some(&site))];
         let state = scan_colony_buildings(buildings.into_iter(), 0.4);
         assert!(!state.has_functional_kitchen);
         assert!(state.has_construction_site);
@@ -528,8 +530,7 @@ mod tests {
     fn damaged_building_below_threshold() {
         let mut structure = Structure::new(StructureType::Den);
         structure.condition = 0.3; // below 0.4 threshold
-        let buildings: Vec<(&Structure, Option<&ConstructionSite>)> =
-            vec![(&structure, None)];
+        let buildings: Vec<(&Structure, Option<&ConstructionSite>)> = vec![(&structure, None)];
         let state = scan_colony_buildings(buildings.into_iter(), 0.4);
         assert!(state.has_damaged_building);
     }
@@ -538,8 +539,7 @@ mod tests {
     fn building_above_threshold_not_damaged() {
         let structure = Structure::new(StructureType::Den);
         // Default condition is 1.0.
-        let buildings: Vec<(&Structure, Option<&ConstructionSite>)> =
-            vec![(&structure, None)];
+        let buildings: Vec<(&Structure, Option<&ConstructionSite>)> = vec![(&structure, None)];
         let state = scan_colony_buildings(buildings.into_iter(), 0.4);
         assert!(!state.has_damaged_building);
     }

@@ -1,3 +1,5 @@
+#![allow(clippy::field_reassign_with_default)]
+
 use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::Schedule;
 

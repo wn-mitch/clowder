@@ -177,7 +177,10 @@ mod tests {
             })
             .expect("territory_max_corruption axis must exist");
         match corruption_curve {
-            Curve::Logistic { steepness, midpoint } => {
+            Curve::Logistic {
+                steepness,
+                midpoint,
+            } => {
                 assert!(approx(*steepness, 8.0, 1e-6));
                 assert!(approx(*midpoint, 0.1, 1e-6));
             }

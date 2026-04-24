@@ -106,15 +106,9 @@ pub struct HawkScoringResult {
 
 fn hawk_ctx_scalars(ctx: &HawkScoringContext) -> HashMap<&'static str, f32> {
     let mut m = HashMap::new();
-    m.insert(
-        "hunger_urgency",
-        (1.0 - ctx.needs.hunger).clamp(0.0, 1.0),
-    );
+    m.insert("hunger_urgency", (1.0 - ctx.needs.hunger).clamp(0.0, 1.0));
     m.insert("hunger", ctx.needs.hunger.clamp(0.0, 1.0));
-    m.insert(
-        "health_fraction",
-        ctx.needs.health_fraction.clamp(0.0, 1.0),
-    );
+    m.insert("health_fraction", ctx.needs.health_fraction.clamp(0.0, 1.0));
     m.insert(
         "health_deficit",
         (1.0 - ctx.needs.health_fraction).clamp(0.0, 1.0),
@@ -131,18 +125,12 @@ fn hawk_ctx_scalars(ctx: &HawkScoringContext) -> HashMap<&'static str, f32> {
 // ---------------------------------------------------------------------------
 
 /// Score a registered hawk DSE through the L2 evaluator.
-pub fn score_hawk_dse_by_id(
-    dse_id: &str,
-    ctx: &HawkScoringContext,
-    inputs: &EvalInputs,
-) -> f32 {
+pub fn score_hawk_dse_by_id(dse_id: &str, ctx: &HawkScoringContext, inputs: &EvalInputs) -> f32 {
     let Some(dse) = inputs.dse_registry.hawk_dse(dse_id) else {
         return 0.0;
     };
     let scalars = hawk_ctx_scalars(ctx);
-    let fetch_scalar = |name: &str, _: Entity| -> f32 {
-        scalars.get(name).copied().unwrap_or(0.0)
-    };
+    let fetch_scalar = |name: &str, _: Entity| -> f32 { scalars.get(name).copied().unwrap_or(0.0) };
     let has_marker = |_: &str, _: Entity| false;
     let sample_map = |_: &str, _: Position| 0.0_f32;
     let needs_ref = ctx.needs;
@@ -311,6 +299,9 @@ mod tests {
 
         let mut rng = rand::rng();
         let result = score_hawk_dispositions(&ctx, &inputs, &mut rng);
-        assert!(result.scores.iter().any(|(k, _)| *k == HawkDispositionKind::Soaring));
+        assert!(result
+            .scores
+            .iter()
+            .any(|(k, _)| *k == HawkDispositionKind::Soaring));
     }
 }

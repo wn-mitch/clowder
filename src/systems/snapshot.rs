@@ -1,10 +1,10 @@
 use bevy_ecs::prelude::*;
 
 use crate::ai::CurrentAction;
+use crate::components::fulfillment::Fulfillment;
 use crate::components::identity::{Age, Gender, Name, Orientation};
 use crate::components::mental::Mood;
 use crate::components::personality::Personality;
-use crate::components::fulfillment::Fulfillment;
 use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::components::pregnancy::Pregnant;
 use crate::components::skills::{Corruption, MagicAffinity, Skills};

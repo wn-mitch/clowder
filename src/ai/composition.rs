@@ -134,10 +134,7 @@ impl Composition {
                 compensated_product(considerations, &self.weights, self.compensation_strength)
             }
             CompositionMode::WeightedSum => weighted_sum(considerations, &self.weights),
-            CompositionMode::Max => considerations
-                .iter()
-                .copied()
-                .fold(0.0_f32, f32::max),
+            CompositionMode::Max => considerations.iter().copied().fold(0.0_f32, f32::max),
         }
     }
 }

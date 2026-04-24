@@ -14,12 +14,12 @@
 use bevy_ecs::prelude::*;
 use rand::Rng;
 
+use crate::ai::eval::{DseRegistry, ModifierPipeline};
 use crate::ai::fox_planner::actions::actions_for_disposition;
 use crate::ai::fox_planner::goals::goal_for_disposition;
 use crate::ai::fox_planner::{
     FoxDispositionKind, FoxDomain, FoxGoapActionKind, FoxPlannerState, FoxZone,
 };
-use crate::ai::eval::{DseRegistry, ModifierPipeline};
 use crate::ai::fox_scoring::{
     score_fox_dispositions, select_fox_disposition_softmax, FoxScoringContext,
 };
@@ -33,10 +33,10 @@ use crate::components::wildlife::{
     ActiveConfrontation, ConfrontationReason, ConfrontationRole, FoxAiPhase, FoxDen, FoxLifeStage,
     FoxState, WildAnimal, WildlifeAiState,
 };
+use crate::resources::event_log::{EventKind, EventLog};
 use crate::resources::map::TileMap;
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::rng::SimRng;
-use crate::resources::event_log::{EventKind, EventLog};
 use crate::resources::sim_constants::{ScoringConstants, SimConstants};
 use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::resources::time::{DayPhase, SimConfig, TimeState};
@@ -344,8 +344,7 @@ pub fn fox_evaluate_and_plan(
         };
 
         let scoring_result = score_fox_dispositions(&ctx, &inputs, &mut rng.rng);
-        let Some(chosen) = select_fox_disposition_softmax(&scoring_result, &mut rng.rng, sc)
-        else {
+        let Some(chosen) = select_fox_disposition_softmax(&scoring_result, &mut rng.rng, sc) else {
             continue;
         };
 

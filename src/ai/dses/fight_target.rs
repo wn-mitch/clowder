@@ -139,7 +139,10 @@ pub fn fight_target_dse() -> TargetTakingDse {
         id: DseId("fight_target"),
         candidate_query: fight_candidate_query_doc,
         per_target_considerations: vec![
-            Consideration::Scalar(ScalarConsideration::new(TARGET_NEARNESS_INPUT, nearness_curve)),
+            Consideration::Scalar(ScalarConsideration::new(
+                TARGET_NEARNESS_INPUT,
+                nearness_curve,
+            )),
             Consideration::Scalar(ScalarConsideration::new(TARGET_THREAT_INPUT, threat_curve)),
             Consideration::Scalar(ScalarConsideration::new(
                 TARGET_COMBAT_ADV_INPUT,

@@ -129,8 +129,7 @@ mod tests {
         // Fondness with mother (== self) shouldn't apply; fondness with
         // father could apply but the helper skips mother == adult and
         // falls through to father. Make the father-fondness 0.5.
-        let scale =
-            caretake_compassion_bond_scale(adult, &res, 1.0, |_, _| Some(0.5));
+        let scale = caretake_compassion_bond_scale(adult, &res, 1.0, |_, _| Some(0.5));
         // Mother-is-self skip → fall through to father(+0.5) → 1.5.
         assert!((scale - 1.5).abs() < 1e-4, "got {scale}");
     }
@@ -144,10 +143,12 @@ mod tests {
             ..Default::default()
         };
         let scale = caretake_compassion_bond_scale(adult, &res, 1.0, |_, _| Some(1.0));
-        assert!((scale - 2.0).abs() < 1e-4, "fondness 1.0 + boost_max 1.0 → 2.0");
+        assert!(
+            (scale - 2.0).abs() < 1e-4,
+            "fondness 1.0 + boost_max 1.0 → 2.0"
+        );
 
-        let scale_half =
-            caretake_compassion_bond_scale(adult, &res, 1.0, |_, _| Some(0.5));
+        let scale_half = caretake_compassion_bond_scale(adult, &res, 1.0, |_, _| Some(0.5));
         assert!((scale_half - 1.5).abs() < 1e-4, "fondness 0.5 → 1.5");
     }
 

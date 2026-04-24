@@ -57,10 +57,7 @@ pub fn foraging_actions() -> Vec<ActionDef<SnakeDomain>> {
             kind: SnakeGoapActionKind::Strike,
             cost: 2,
             preconditions: vec![Pred::ZoneIs(SnakeZone::HuntingGround)],
-            effects: vec![
-                Eff::SetHungerOk(true),
-                Eff::IncrementTrips,
-            ],
+            effects: vec![Eff::SetHungerOk(true), Eff::IncrementTrips],
         },
     ]
 }

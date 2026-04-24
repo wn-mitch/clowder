@@ -105,7 +105,10 @@ mod tests {
         let health = Health::default();
         let outcome = resolve_fight_threat(d.fight_duration, &mut skills, &mut needs, &health, &d);
         assert!(matches!(outcome.result, StepResult::Advance));
-        assert!(outcome.witness, "Advance must set witness for Feature emission");
+        assert!(
+            outcome.witness,
+            "Advance must set witness for Feature emission"
+        );
         assert!(needs.safety > 0.5, "safety should have increased");
     }
 

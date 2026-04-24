@@ -155,7 +155,10 @@ mod tests {
             ]
         );
         // §13.1: every non-Eat/Sleep/Idle cat DSE forbids Incapacitated.
-        assert_eq!(dse.eligibility().forbidden, vec![markers::Incapacitated::KEY]);
+        assert_eq!(
+            dse.eligibility().forbidden,
+            vec![markers::Incapacitated::KEY]
+        );
     }
 
     fn evaluate_cook_with_markers(

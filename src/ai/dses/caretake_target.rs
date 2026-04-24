@@ -129,7 +129,10 @@ pub fn caretake_target_dse() -> TargetTakingDse {
         id: DseId("caretake_target"),
         candidate_query: caretake_candidate_query_doc,
         per_target_considerations: vec![
-            Consideration::Scalar(ScalarConsideration::new(TARGET_NEARNESS_INPUT, nearness_curve)),
+            Consideration::Scalar(ScalarConsideration::new(
+                TARGET_NEARNESS_INPUT,
+                nearness_curve,
+            )),
             Consideration::Scalar(ScalarConsideration::new(
                 TARGET_KITTEN_HUNGER_INPUT,
                 hunger_curve,
@@ -344,14 +347,8 @@ fn is_kitten_isolated(
         if other.entity == kitten.entity {
             continue;
         }
-        let shares_mother = kitten
-            .mother
-            .zip(other.mother)
-            .is_some_and(|(a, b)| a == b);
-        let shares_father = kitten
-            .father
-            .zip(other.father)
-            .is_some_and(|(a, b)| a == b);
+        let shares_mother = kitten.mother.zip(other.mother).is_some_and(|(a, b)| a == b);
+        let shares_father = kitten.father.zip(other.father).is_some_and(|(a, b)| a == b);
         if (shares_mother || shares_father)
             && kitten.pos.manhattan_distance(&other.pos) as f32 <= ISOLATION_RADIUS
         {
@@ -359,8 +356,7 @@ fn is_kitten_isolated(
         }
     }
     for (entity, pos) in cat_positions {
-        let is_parent =
-            kitten.mother == Some(*entity) || kitten.father == Some(*entity);
+        let is_parent = kitten.mother == Some(*entity) || kitten.father == Some(*entity);
         if is_parent && kitten.pos.manhattan_distance(pos) as f32 <= ISOLATION_RADIUS {
             return false;
         }
@@ -408,10 +404,7 @@ mod tests {
 
     #[test]
     fn caretake_target_has_four_axes() {
-        assert_eq!(
-            caretake_target_dse().per_target_considerations().len(),
-            4
-        );
+        assert_eq!(caretake_target_dse().per_target_considerations().len(), 4);
     }
 
     #[test]
@@ -422,10 +415,7 @@ mod tests {
 
     #[test]
     fn caretake_target_uses_best_aggregation() {
-        assert_eq!(
-            caretake_target_dse().aggregation(),
-            TargetAggregation::Best
-        );
+        assert_eq!(caretake_target_dse().aggregation(), TargetAggregation::Best);
     }
 
     #[test]
@@ -448,15 +438,7 @@ mod tests {
     fn resolver_returns_default_with_no_registered_dse() {
         let registry = DseRegistry::new();
         let adult = Entity::from_raw_u32(1).unwrap();
-        let out = resolve_caretake_target(
-            &registry,
-            adult,
-            Position::new(0, 0),
-            &[],
-            &[],
-            0,
-            None,
-        );
+        let out = resolve_caretake_target(&registry, adult, Position::new(0, 0), &[], &[], 0, None);
         assert!(out.target.is_none());
         assert_eq!(out.urgency, 0.0);
         assert!(!out.is_parent);
@@ -467,15 +449,7 @@ mod tests {
         let mut registry = DseRegistry::new();
         registry.target_taking_dses.push(caretake_target_dse());
         let adult = Entity::from_raw_u32(1).unwrap();
-        let out = resolve_caretake_target(
-            &registry,
-            adult,
-            Position::new(0, 0),
-            &[],
-            &[],
-            0,
-            None,
-        );
+        let out = resolve_caretake_target(&registry, adult, Position::new(0, 0), &[], &[], 0, None);
         assert!(out.target.is_none());
     }
 
@@ -550,14 +524,7 @@ mod tests {
         registry.target_taking_dses.push(caretake_target_dse());
         let adult = Entity::from_raw_u32(1).unwrap();
         let other = Entity::from_raw_u32(99).unwrap();
-        let kittens = vec![kitten_with_parents(
-            10,
-            1,
-            0,
-            0.2,
-            Some(other),
-            None,
-        )];
+        let kittens = vec![kitten_with_parents(10, 1, 0, 0.2, Some(other), None)];
         let out = resolve_caretake_target(
             &registry,
             adult,
@@ -569,10 +536,7 @@ mod tests {
         );
         assert_eq!(out.target, Some(Entity::from_raw_u32(10).unwrap()));
         assert!(out.urgency > 0.0);
-        assert!(
-            !out.is_parent,
-            "adult is not mother/father of candidate"
-        );
+        assert!(!out.is_parent, "adult is not mother/father of candidate");
     }
 
     #[test]
@@ -584,22 +548,8 @@ mod tests {
         registry.target_taking_dses.push(caretake_target_dse());
         let adult = Entity::from_raw_u32(1).unwrap();
         let kittens = vec![
-            kitten_with_parents(
-                10,
-                2,
-                0,
-                0.2,
-                None,
-                None,
-            ), // stranger
-            kitten_with_parents(
-                11,
-                0,
-                2,
-                0.2,
-                Some(adult),
-                None,
-            ), // own kitten
+            kitten_with_parents(10, 2, 0, 0.2, None, None), // stranger
+            kitten_with_parents(11, 0, 2, 0.2, Some(adult), None), // own kitten
         ];
         let out = resolve_caretake_target(
             &registry,
@@ -766,14 +716,7 @@ mod tests {
         registry.target_taking_dses.push(caretake_target_dse());
         let adult = Entity::from_raw_u32(1).unwrap();
         // Worst-case: near-starving own kitten, adjacent, isolated.
-        let kittens = vec![kitten_with_parents(
-            10,
-            1,
-            0,
-            0.0,
-            Some(adult),
-            None,
-        )];
+        let kittens = vec![kitten_with_parents(10, 1, 0, 0.0, Some(adult), None)];
         let out = resolve_caretake_target(
             &registry,
             adult,

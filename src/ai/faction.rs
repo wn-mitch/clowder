@@ -168,25 +168,25 @@ impl FactionRelations {
         // byte — verify against spec when the matrix changes.
         let cells = [
             // Cat:     Ct   Fx   Hw   Sn   ShFx Mo   Rt   Rb   Fi   Bd
-            [S,   Pd,  Pd,  Pd,  E,   Py,  Py,  Py,  Py,  Py],
+            [S, Pd, Pd, Pd, E, Py, Py, Py, Py, Py],
             // Fox:
-            [Py,  S,   N,   N,   N,   Py,  Py,  Py,  N,   Py],
+            [Py, S, N, N, N, Py, Py, Py, N, Py],
             // Hawk:
-            [Py,  N,   S,   Py,  N,   Py,  Py,  Py,  N,   Py],
+            [Py, N, S, Py, N, Py, Py, Py, N, Py],
             // Snake:
-            [N,   N,   Pd,  S,   N,   Py,  Py,  Py,  N,   Py],
+            [N, N, Pd, S, N, Py, Py, Py, N, Py],
             // ShadowFox:
-            [E,   N,   N,   N,   S,   Py,  Py,  Py,  N,   Py],
+            [E, N, N, N, S, Py, Py, Py, N, Py],
             // Mouse:
-            [Pd,  Pd,  Pd,  Pd,  Pd,  S,   Pd,  N,   N,   N],
+            [Pd, Pd, Pd, Pd, Pd, S, Pd, N, N, N],
             // Rat:
-            [Pd,  Pd,  Pd,  Pd,  Pd,  Py,  S,   N,   N,   N],
+            [Pd, Pd, Pd, Pd, Pd, Py, S, N, N, N],
             // Rabbit:
-            [Pd,  Pd,  Pd,  Pd,  Pd,  N,   N,   S,   N,   N],
+            [Pd, Pd, Pd, Pd, Pd, N, N, S, N, N],
             // Fish:
-            [Pd,  N,   N,   N,   N,   N,   N,   N,   S,   N],
+            [Pd, N, N, N, N, N, N, N, S, N],
             // Bird:
-            [Pd,  Pd,  Pd,  Pd,  Pd,  N,   N,   N,   N,   S],
+            [Pd, Pd, Pd, Pd, Pd, N, N, N, N, S],
         ];
         Self { cells }
     }
@@ -625,11 +625,7 @@ mod tests {
 
     #[test]
     fn overlay_no_markers_returns_base() {
-        let out = resolve_stance(
-            FactionStance::Neutral,
-            true,
-            StanceOverlays::default(),
-        );
+        let out = resolve_stance(FactionStance::Neutral, true, StanceOverlays::default());
         assert_eq!(out, FactionStance::Neutral);
     }
 

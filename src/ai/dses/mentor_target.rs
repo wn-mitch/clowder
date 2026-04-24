@@ -92,7 +92,10 @@ pub fn mentor_target_dse() -> TargetTakingDse {
         id: DseId("mentor_target"),
         candidate_query: mentor_candidate_query_doc,
         per_target_considerations: vec![
-            Consideration::Scalar(ScalarConsideration::new(TARGET_NEARNESS_INPUT, nearness_curve)),
+            Consideration::Scalar(ScalarConsideration::new(
+                TARGET_NEARNESS_INPUT,
+                nearness_curve,
+            )),
             Consideration::Scalar(ScalarConsideration::new(
                 TARGET_FONDNESS_INPUT,
                 linear.clone(),
@@ -306,10 +309,7 @@ mod tests {
 
     #[test]
     fn mentor_target_uses_best_aggregation() {
-        assert_eq!(
-            mentor_target_dse().aggregation(),
-            TargetAggregation::Best
-        );
+        assert_eq!(mentor_target_dse().aggregation(), TargetAggregation::Best);
     }
 
     #[test]

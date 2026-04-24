@@ -60,10 +60,7 @@ mod tests {
         };
         assert!(!goal.is_satisfied(&cold));
 
-        let warm = SnakePlannerState {
-            warm: true,
-            ..cold
-        };
+        let warm = SnakePlannerState { warm: true, ..cold };
         assert!(goal.is_satisfied(&warm));
     }
 

@@ -107,7 +107,10 @@ impl StepOutcome<()> {
     /// this shape — Feature emission must route through a witness-
     /// carrying outcome.
     pub fn bare(result: StepResult) -> Self {
-        Self { result, witness: () }
+        Self {
+            result,
+            witness: (),
+        }
     }
 }
 
@@ -118,7 +121,10 @@ impl StepOutcome<()> {
 impl StepOutcome<bool> {
     /// The step's real-world effect occurred this call.
     pub fn witnessed(result: StepResult) -> Self {
-        Self { result, witness: true }
+        Self {
+            result,
+            witness: true,
+        }
     }
 }
 
@@ -160,11 +166,7 @@ impl<W: Witnessed> StepOutcome<W> {
     /// );
     /// outcome.result
     /// ```
-    pub fn record_if_witnessed(
-        &self,
-        activation: Option<&mut SystemActivation>,
-        feature: Feature,
-    ) {
+    pub fn record_if_witnessed(&self, activation: Option<&mut SystemActivation>, feature: Feature) {
         if self.witness.is_witnessed() {
             if let Some(act) = activation {
                 act.record(feature);

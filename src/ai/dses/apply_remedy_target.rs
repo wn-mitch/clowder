@@ -100,7 +100,10 @@ pub fn apply_remedy_target_dse() -> TargetTakingDse {
         id: DseId("apply_remedy_target"),
         candidate_query: apply_remedy_candidate_query_doc,
         per_target_considerations: vec![
-            Consideration::Scalar(ScalarConsideration::new(TARGET_NEARNESS_INPUT, nearness_curve)),
+            Consideration::Scalar(ScalarConsideration::new(
+                TARGET_NEARNESS_INPUT,
+                nearness_curve,
+            )),
             Consideration::Scalar(ScalarConsideration::new(TARGET_INJURY_INPUT, injury_curve)),
             Consideration::Scalar(ScalarConsideration::new(
                 TARGET_KINSHIP_INPUT,
@@ -273,11 +276,7 @@ mod tests {
 
     #[test]
     fn apply_remedy_target_weights_sum_to_one() {
-        let sum: f32 = apply_remedy_target_dse()
-            .composition()
-            .weights
-            .iter()
-            .sum();
+        let sum: f32 = apply_remedy_target_dse().composition().weights.iter().sum();
         assert!((sum - 1.0).abs() < 1e-3);
     }
 
@@ -306,29 +305,18 @@ mod tests {
     #[test]
     fn resolver_returns_none_with_empty_candidates() {
         let mut registry = DseRegistry::new();
-        registry
-            .target_taking_dses
-            .push(apply_remedy_target_dse());
+        registry.target_taking_dses.push(apply_remedy_target_dse());
         let cat = Entity::from_raw_u32(1).unwrap();
         let is_kin = |_: Entity, _: Entity| -> bool { false };
-        let out = resolve_apply_remedy_target(
-            &registry,
-            cat,
-            Position::new(0, 0),
-            &[],
-            &is_kin,
-            0,
-            None,
-        );
+        let out =
+            resolve_apply_remedy_target(&registry, cat, Position::new(0, 0), &[], &is_kin, 0, None);
         assert!(out.is_none());
     }
 
     #[test]
     fn resolver_filters_out_of_range() {
         let mut registry = DseRegistry::new();
-        registry
-            .target_taking_dses
-            .push(apply_remedy_target_dse());
+        registry.target_taking_dses.push(apply_remedy_target_dse());
         let cat = Entity::from_raw_u32(1).unwrap();
         let far = patient(2, 50, 0, 0.3);
         let is_kin = |_: Entity, _: Entity| -> bool { false };
@@ -351,9 +339,7 @@ mod tests {
         // at equal distance. Weight ratio + Quadratic amplification
         // decides decisively.
         let mut registry = DseRegistry::new();
-        registry
-            .target_taking_dses
-            .push(apply_remedy_target_dse());
+        registry.target_taking_dses.push(apply_remedy_target_dse());
         let cat = Entity::from_raw_u32(1).unwrap();
         let severe = patient(2, 3, 0, 0.3);
         let mild = patient(3, 0, 3, 0.95);
@@ -379,9 +365,7 @@ mod tests {
         // dominates nearness's weight (0.214) × (nearness
         // contribution at dist=10 range=15 ≈ 0.33²·⁵ ≈ 0.06) ≈ 0.013.
         let mut registry = DseRegistry::new();
-        registry
-            .target_taking_dses
-            .push(apply_remedy_target_dse());
+        registry.target_taking_dses.push(apply_remedy_target_dse());
         let cat = Entity::from_raw_u32(1).unwrap();
         let critical_far = patient(2, 10, 0, 0.2);
         let mild_near = patient(3, 1, 0, 0.9);
@@ -401,9 +385,7 @@ mod tests {
     #[test]
     fn close_patient_outscores_distant_same_injury() {
         let mut registry = DseRegistry::new();
-        registry
-            .target_taking_dses
-            .push(apply_remedy_target_dse());
+        registry.target_taking_dses.push(apply_remedy_target_dse());
         let cat = Entity::from_raw_u32(1).unwrap();
         let close = patient(2, 2, 0, 0.5);
         let far = patient(3, 10, 0, 0.5);
@@ -423,9 +405,7 @@ mod tests {
     #[test]
     fn kin_beats_non_kin_when_other_axes_tied() {
         let mut registry = DseRegistry::new();
-        registry
-            .target_taking_dses
-            .push(apply_remedy_target_dse());
+        registry.target_taking_dses.push(apply_remedy_target_dse());
         let cat = Entity::from_raw_u32(1).unwrap();
         let kin = patient(2, 3, 0, 0.5);
         let stranger = patient(3, 0, 3, 0.5);

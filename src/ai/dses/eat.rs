@@ -285,7 +285,10 @@ mod tests {
         // `score_actions` retired; the DSE now consumes the
         // `HasStoredFood` colony marker via its eligibility filter.
         let dse = EatDse::new();
-        assert_eq!(dse.eligibility().required, vec![markers::HasStoredFood::KEY]);
+        assert_eq!(
+            dse.eligibility().required,
+            vec![markers::HasStoredFood::KEY]
+        );
         assert!(dse.eligibility().forbidden.is_empty());
     }
 
@@ -312,7 +315,10 @@ mod tests {
         let fetch = |_: &str, _: Entity| 0.8_f32;
 
         let out = evaluate_single(&dse, entity, &ctx, &maslow, &modifiers, &fetch);
-        assert!(out.is_none(), "Eat must be ineligible without HasStoredFood");
+        assert!(
+            out.is_none(),
+            "Eat must be ineligible without HasStoredFood"
+        );
     }
 
     #[test]

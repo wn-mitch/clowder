@@ -11,9 +11,9 @@ pub mod food;
 pub mod forced_conditions;
 pub mod fox_scent_map;
 pub mod map;
-pub mod prey_scent_map;
 pub mod narrative;
 pub mod narrative_templates;
+pub mod prey_scent_map;
 pub mod relationships;
 pub mod rng;
 pub mod sim_constants;
@@ -39,17 +39,17 @@ pub use food::FoodStores;
 pub use forced_conditions::ForcedConditions;
 pub use fox_scent_map::FoxScentMap;
 pub use map::{Terrain, Tile, TileMap};
-pub use prey_scent_map::PreyScentMap;
 pub use narrative::{NarrativeEntry, NarrativeLog, NarrativeTier};
 pub use narrative_templates::TemplateRegistry;
+pub use prey_scent_map::PreyScentMap;
 pub use relationships::{BondType, Relationship, Relationships};
 pub use rng::SimRng;
 pub use sim_constants::SimConstants;
 pub use system_activation::{Feature, SystemActivation};
 pub use time::{DayPhase, Season, SimConfig, SimSpeed, TimeState, TransitionTracker};
 pub use trace_log::{
-    CapturedDse, FocalScoreCapture, FocalScoreCaptureInner, FocalTraceTarget, TraceEntry,
-    TraceLog, TraceRecord,
+    CapturedDse, FocalScoreCapture, FocalScoreCaptureInner, FocalTraceTarget, TraceEntry, TraceLog,
+    TraceRecord,
 };
 pub use unmet_demand::UnmetDemand;
 pub use weather::{Weather, WeatherState};

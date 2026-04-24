@@ -508,8 +508,14 @@ mod tests {
         // separately below).
         let sc = ScoringConstants::default();
         let dse = DurableWardDse::new();
-        assert_eq!(dse.eligibility().required, vec![markers::WardStrengthLow::KEY]);
-        assert_eq!(dse.eligibility().forbidden, vec![markers::Incapacitated::KEY]);
+        assert_eq!(
+            dse.eligibility().required,
+            vec![markers::WardStrengthLow::KEY]
+        );
+        assert_eq!(
+            dse.eligibility().forbidden,
+            vec![markers::Incapacitated::KEY]
+        );
 
         // Guard against accidental spread of `require` to sibling DSEs
         // in this file — only DurableWard requires WardStrengthLow.
@@ -525,7 +531,10 @@ mod tests {
         // §13.1: incapacitated cats retire the inline branch; the
         // `.forbid(markers::Incapacitated::KEY)` filter is the only remaining gate.
         let sc = ScoringConstants::default();
-        assert_eq!(ScryDse::new().eligibility().forbidden, vec![markers::Incapacitated::KEY]);
+        assert_eq!(
+            ScryDse::new().eligibility().forbidden,
+            vec![markers::Incapacitated::KEY]
+        );
         assert_eq!(
             DurableWardDse::new().eligibility().forbidden,
             vec![markers::Incapacitated::KEY]
@@ -600,7 +609,10 @@ mod tests {
         assert!(approx(curve.evaluate(0.5), 0.9608, 1e-3));
         assert!(approx(curve.evaluate(1.0), 0.9993, 1e-3));
         match curve {
-            Curve::Logistic { steepness, midpoint } => {
+            Curve::Logistic {
+                steepness,
+                midpoint,
+            } => {
                 assert!(approx(steepness, 8.0, 1e-6));
                 assert!(approx(midpoint, 0.1, 1e-6));
             }
@@ -615,8 +627,7 @@ mod tests {
         // corruption-emergency midpoint anchor.
         let sc = ScoringConstants::default();
         let dse = CleanseDse::new(&sc);
-        let curve = scalar_curve(&dse, "tile_corruption")
-            .expect("tile_corruption axis must exist");
+        let curve = scalar_curve(&dse, "tile_corruption").expect("tile_corruption axis must exist");
         let midpoint = sc.magic_cleanse_corruption_threshold;
         assert!(approx(curve.evaluate(midpoint), 0.5, 1e-4));
         // Above the threshold the curve surges sharply.
@@ -624,7 +635,10 @@ mod tests {
         // Well below the threshold it is small but non-zero.
         assert!(curve.evaluate(0.0) < 0.5);
         match curve {
-            Curve::Logistic { steepness, midpoint: m } => {
+            Curve::Logistic {
+                steepness,
+                midpoint: m,
+            } => {
                 assert!(approx(steepness, 8.0, 1e-6));
                 assert!(approx(m, midpoint, 1e-6));
             }
@@ -661,7 +675,10 @@ mod tests {
         // 1.0 → 1/(1+exp(-4.2)) ≈ 0.9852
         assert!(approx(curve.evaluate(1.0), 0.9852, 1e-3));
         match curve {
-            Curve::Logistic { steepness, midpoint } => {
+            Curve::Logistic {
+                steepness,
+                midpoint,
+            } => {
                 assert!(approx(steepness, 6.0, 1e-6));
                 assert!(approx(midpoint, 0.3, 1e-6));
             }
@@ -677,8 +694,7 @@ mod tests {
         // which ramps earlier but less sharply.
         let sc = ScoringConstants::default();
         let cleanse = scalar_curve(&CleanseDse::new(&sc), "tile_corruption").unwrap();
-        let colony =
-            scalar_curve(&ColonyCleanseDse::new(), "territory_max_corruption").unwrap();
+        let colony = scalar_curve(&ColonyCleanseDse::new(), "territory_max_corruption").unwrap();
         // At x=0.2 (halfway between the two midpoints 0.1 and 0.3),
         // Cleanse is already surging (>0.6) while ColonyCleanse is
         // still ramping (<0.5).

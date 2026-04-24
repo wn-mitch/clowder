@@ -11,8 +11,8 @@ use rand::Rng;
 
 use crate::ai::dse::EvalCtx;
 use crate::ai::eval::evaluate_single;
-use crate::ai::snake_planner::SnakeDispositionKind;
 use crate::ai::scoring::EvalInputs;
+use crate::ai::snake_planner::SnakeDispositionKind;
 use crate::components::physical::Position;
 
 // ---------------------------------------------------------------------------
@@ -119,24 +119,15 @@ pub struct SnakeScoringResult {
 
 fn snake_ctx_scalars(ctx: &SnakeScoringContext) -> HashMap<&'static str, f32> {
     let mut m = HashMap::new();
-    m.insert(
-        "hunger_urgency",
-        (1.0 - ctx.needs.hunger).clamp(0.0, 1.0),
-    );
+    m.insert("hunger_urgency", (1.0 - ctx.needs.hunger).clamp(0.0, 1.0));
     m.insert("hunger", ctx.needs.hunger.clamp(0.0, 1.0));
-    m.insert(
-        "health_fraction",
-        ctx.needs.health_fraction.clamp(0.0, 1.0),
-    );
+    m.insert("health_fraction", ctx.needs.health_fraction.clamp(0.0, 1.0));
     m.insert(
         "health_deficit",
         (1.0 - ctx.needs.health_fraction).clamp(0.0, 1.0),
     );
     m.insert("warmth", ctx.needs.warmth.clamp(0.0, 1.0));
-    m.insert(
-        "warmth_deficit",
-        (1.0 - ctx.needs.warmth).clamp(0.0, 1.0),
-    );
+    m.insert("warmth_deficit", (1.0 - ctx.needs.warmth).clamp(0.0, 1.0));
     m.insert("aggression", ctx.personality.aggression.clamp(0.0, 1.0));
     m.insert("patience", ctx.personality.patience.clamp(0.0, 1.0));
     m.insert("prey_nearby", if ctx.prey_nearby { 1.0 } else { 0.0 });
@@ -153,18 +144,12 @@ fn snake_ctx_scalars(ctx: &SnakeScoringContext) -> HashMap<&'static str, f32> {
 // ---------------------------------------------------------------------------
 
 /// Score a registered snake DSE through the L2 evaluator.
-pub fn score_snake_dse_by_id(
-    dse_id: &str,
-    ctx: &SnakeScoringContext,
-    inputs: &EvalInputs,
-) -> f32 {
+pub fn score_snake_dse_by_id(dse_id: &str, ctx: &SnakeScoringContext, inputs: &EvalInputs) -> f32 {
     let Some(dse) = inputs.dse_registry.snake_dse(dse_id) else {
         return 0.0;
     };
     let scalars = snake_ctx_scalars(ctx);
-    let fetch_scalar = |name: &str, _: Entity| -> f32 {
-        scalars.get(name).copied().unwrap_or(0.0)
-    };
+    let fetch_scalar = |name: &str, _: Entity| -> f32 { scalars.get(name).copied().unwrap_or(0.0) };
     let has_marker = |_: &str, _: Entity| false;
     let sample_map = |_: &str, _: Position| 0.0_f32;
     let needs_ref = ctx.needs;

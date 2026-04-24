@@ -17,11 +17,7 @@ use crate::steps::{StepOutcome, StepResult};
 /// **Feature emission** — none. The step isn't active in the
 /// current planner; if reinstated, a `BuildingSkillGrew` Feature
 /// could be added.
-pub fn resolve_gather(
-    ticks: u64,
-    skills: &mut Skills,
-    workshop_bonus: f32,
-) -> StepOutcome<()> {
+pub fn resolve_gather(ticks: u64, skills: &mut Skills, workshop_bonus: f32) -> StepOutcome<()> {
     if ticks >= 5 {
         skills.building += skills.growth_rate() * 0.005 * workshop_bonus;
         StepOutcome::bare(StepResult::Advance)

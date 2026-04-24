@@ -67,8 +67,7 @@ pub fn resolve_eat_at_stores(
         } else {
             1.0
         };
-        needs.hunger =
-            (needs.hunger + item.kind.food_value() * freshness * cooked_mult).min(1.0);
+        needs.hunger = (needs.hunger + item.kind.food_value() * freshness * cooked_mult).min(1.0);
     }
     stored.remove(item_entity);
     commands.entity(item_entity).despawn();

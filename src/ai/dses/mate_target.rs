@@ -79,7 +79,10 @@ pub fn mate_target_dse() -> TargetTakingDse {
         id: DseId("mate_target"),
         candidate_query: mate_candidate_query_doc,
         per_target_considerations: vec![
-            Consideration::Scalar(ScalarConsideration::new(TARGET_NEARNESS_INPUT, nearness_curve)),
+            Consideration::Scalar(ScalarConsideration::new(
+                TARGET_NEARNESS_INPUT,
+                nearness_curve,
+            )),
             Consideration::Scalar(ScalarConsideration::new(
                 TARGET_ROMANTIC_INPUT,
                 linear.clone(),
@@ -270,8 +273,12 @@ mod tests {
         let cat = Entity::from_raw_u32(1).unwrap();
         let friend_not_partner = Entity::from_raw_u32(2).unwrap();
         let mut relationships = Relationships::default();
-        relationships.get_or_insert(cat, friend_not_partner).fondness = 0.9;
-        relationships.get_or_insert(cat, friend_not_partner).romantic = 0.9;
+        relationships
+            .get_or_insert(cat, friend_not_partner)
+            .fondness = 0.9;
+        relationships
+            .get_or_insert(cat, friend_not_partner)
+            .romantic = 0.9;
         relationships.get_or_insert(cat, friend_not_partner).bond = Some(BondType::Friends);
 
         let cat_positions = vec![(friend_not_partner, Position::new(1, 0))];

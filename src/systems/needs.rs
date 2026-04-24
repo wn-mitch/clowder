@@ -67,7 +67,8 @@ pub fn decay_needs(
         _ => 0.0,
     };
 
-    let temperature_drain = c.base_temperature_drain + weather_temperature_drain + season_temperature_drain;
+    let temperature_drain =
+        c.base_temperature_drain + weather_temperature_drain + season_temperature_drain;
 
     for (
         mut needs,
@@ -890,10 +891,7 @@ mod tests {
         schedule.run(&mut world);
 
         let after = world.get::<Needs>(entity).unwrap().mating;
-        assert_eq!(
-            after, 1.0,
-            "kittens should not decay mating; got {after}"
-        );
+        assert_eq!(after, 1.0, "kittens should not decay mating; got {after}");
     }
 
     // --- update_injury_marker ---
@@ -961,7 +959,10 @@ mod tests {
         };
         let cat = world.spawn(health).id();
         schedule.run(&mut world);
-        assert!(!has_injured(&world, cat), "healed injury should not set marker");
+        assert!(
+            !has_injured(&world, cat),
+            "healed injury should not set marker"
+        );
     }
 
     #[test]
@@ -977,7 +978,10 @@ mod tests {
 
         world.get_mut::<Health>(cat).unwrap().injuries[0].healed = true;
         schedule.run(&mut world);
-        assert!(!has_injured(&world, cat), "healing should remove Injured marker");
+        assert!(
+            !has_injured(&world, cat),
+            "healing should remove Injured marker"
+        );
     }
 
     #[test]
@@ -997,7 +1001,10 @@ mod tests {
             ))
             .id();
         schedule.run(&mut world);
-        assert!(!has_injured(&world, cat), "dead cats should not get Injured marker");
+        assert!(
+            !has_injured(&world, cat),
+            "dead cats should not get Injured marker"
+        );
     }
 
     #[test]

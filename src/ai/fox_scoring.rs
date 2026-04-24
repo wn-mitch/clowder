@@ -132,16 +132,10 @@ fn day_phase_scalar(phase: DayPhase) -> f32 {
 /// Piecewise knot encoding.
 fn fox_ctx_scalars(ctx: &FoxScoringContext) -> HashMap<&'static str, f32> {
     let mut m = HashMap::new();
-    m.insert(
-        "hunger_urgency",
-        (1.0 - ctx.needs.hunger).clamp(0.0, 1.0),
-    );
+    m.insert("hunger_urgency", (1.0 - ctx.needs.hunger).clamp(0.0, 1.0));
     // Raw satiation/health scalars for fox Resting's WS axes.
     m.insert("hunger", ctx.needs.hunger.clamp(0.0, 1.0));
-    m.insert(
-        "health_fraction",
-        ctx.needs.health_fraction.clamp(0.0, 1.0),
-    );
+    m.insert("health_fraction", ctx.needs.health_fraction.clamp(0.0, 1.0));
     m.insert("boldness", ctx.personality.boldness.clamp(0.0, 1.0));
     m.insert("cunning", ctx.personality.cunning.clamp(0.0, 1.0));
     m.insert(
@@ -149,10 +143,7 @@ fn fox_ctx_scalars(ctx: &FoxScoringContext) -> HashMap<&'static str, f32> {
         ctx.personality.protectiveness.clamp(0.0, 1.0),
     );
     m.insert("prey_nearby", if ctx.prey_nearby { 1.0 } else { 0.0 });
-    m.insert(
-        "prey_belief",
-        ctx.local_prey_belief.clamp(0.0, 1.0),
-    );
+    m.insert("prey_belief", ctx.local_prey_belief.clamp(0.0, 1.0));
     m.insert("day_phase", day_phase_scalar(ctx.day_phase));
     // Fatal-threat peer (3c.2): health deficit and raw cats_nearby
     // count. cats_nearby flows as raw f32 because the consuming DSEs
@@ -192,18 +183,12 @@ fn fox_ctx_scalars(ctx: &FoxScoringContext) -> HashMap<&'static str, f32> {
 /// Score a registered fox DSE through the L2 evaluator. Returns 0.0 if
 /// the DSE is missing or ineligible — same contract as the cat-side
 /// `score_dse_by_id`.
-pub fn score_fox_dse_by_id(
-    dse_id: &str,
-    ctx: &FoxScoringContext,
-    inputs: &EvalInputs,
-) -> f32 {
+pub fn score_fox_dse_by_id(dse_id: &str, ctx: &FoxScoringContext, inputs: &EvalInputs) -> f32 {
     let Some(dse) = inputs.dse_registry.fox_dse(dse_id) else {
         return 0.0;
     };
     let scalars = fox_ctx_scalars(ctx);
-    let fetch_scalar = |name: &str, _: Entity| -> f32 {
-        scalars.get(name).copied().unwrap_or(0.0)
-    };
+    let fetch_scalar = |name: &str, _: Entity| -> f32 { scalars.get(name).copied().unwrap_or(0.0) };
     let has_marker = |_: &str, _: Entity| false;
     let sample_map = |_: &str, _: Position| 0.0_f32;
     let needs_ref = ctx.needs;
@@ -256,10 +241,7 @@ pub fn score_fox_dispositions(
     // peer-group ceiling so it cannot be outvoted.
     if ctx.is_dispersing_juvenile {
         let score = score_fox_dse_by_id("fox_dispersing", ctx, inputs);
-        scores.push((
-            FoxDispositionKind::Dispersing,
-            score + jitter(rng, j),
-        ));
+        scores.push((FoxDispositionKind::Dispersing, score + jitter(rng, j)));
 
         // Still allow hunting if starving.
         if needs.hunger < 0.3 {
@@ -453,8 +435,8 @@ mod tests {
     use std::sync::LazyLock;
 
     use crate::ai::dses::{
-        fox_avoiding_dse, fox_den_defense_dse, fox_dispersing_dse, fox_feeding_dse, fox_fleeing_dse,
-        fox_hunting_dse, fox_patrolling_dse, fox_raiding_dse, fox_resting_dse,
+        fox_avoiding_dse, fox_den_defense_dse, fox_dispersing_dse, fox_feeding_dse,
+        fox_fleeing_dse, fox_hunting_dse, fox_patrolling_dse, fox_raiding_dse, fox_resting_dse,
     };
     use crate::ai::eval::{DseRegistry, ModifierPipeline};
 

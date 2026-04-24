@@ -181,9 +181,7 @@ mod tests {
     /// Spawn a living cat at the given position with the given marker
     /// components. Returns the entity.
     fn spawn_cat(world: &mut World, x: i32, y: i32) -> Entity {
-        world
-            .spawn((Species, Position::new(x, y)))
-            .id()
+        world.spawn((Species, Position::new(x, y))).id()
     }
 
     // -----------------------------------------------------------------------

@@ -27,10 +27,7 @@ use crate::resources::time::{Season, SimConfig, TimeState};
 /// True when the colony has no wards at all, or the average ward strength
 /// is below `threshold`. Called from both scoring systems to populate the
 /// `MarkerSnapshot` without duplicating predicate logic.
-pub fn is_ward_strength_low<'a>(
-    wards: impl Iterator<Item = &'a Ward>,
-    threshold: f32,
-) -> bool {
+pub fn is_ward_strength_low<'a>(wards: impl Iterator<Item = &'a Ward>, threshold: f32) -> bool {
     let mut count = 0u32;
     let mut sum = 0.0f32;
     for ward in wards {

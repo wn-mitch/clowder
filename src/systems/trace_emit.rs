@@ -291,7 +291,10 @@ pub fn emit_focal_trace(
 /// stay readable.
 fn l2_record_for(
     dse: &CapturedDse,
-    target_rankings: &std::collections::HashMap<&'static str, crate::resources::trace_log::TargetRanking>,
+    target_rankings: &std::collections::HashMap<
+        &'static str,
+        crate::resources::trace_log::TargetRanking,
+    >,
 ) -> TraceRecord {
     let considerations = dse
         .trace
@@ -310,11 +313,7 @@ fn l2_record_for(
         })
         .collect();
     let composition = CompositionSummary {
-        mode: dse
-            .trace
-            .composition_mode
-            .unwrap_or("Unknown")
-            .to_string(),
+        mode: dse.trace.composition_mode.unwrap_or("Unknown").to_string(),
         raw: dse.raw_score,
     };
     let modifiers = dse

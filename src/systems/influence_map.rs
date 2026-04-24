@@ -293,10 +293,7 @@ impl Attenuation {
     /// Apply this attenuation to a base sample. Returns the
     /// perceived value.
     pub fn apply(&self, base: f32) -> f32 {
-        base * self.species_sens
-            * self.role_mod
-            * (1.0 - self.injury_deficit)
-            * self.env_mul
+        base * self.species_sens * self.role_mod * (1.0 - self.injury_deficit) * self.env_mul
     }
 }
 

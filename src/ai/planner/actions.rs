@@ -767,8 +767,8 @@ mod tests {
         let distances = basic_distances();
         let actions = actions_for_disposition(DispositionKind::Caretaking, None, &distances);
 
-        let plan = make_plan(start, &actions, &goal, 12, 1000)
-            .expect("caretaking plan should succeed");
+        let plan =
+            make_plan(start, &actions, &goal, 12, 1000).expect("caretaking plan should succeed");
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
         assert_eq!(
             kinds,

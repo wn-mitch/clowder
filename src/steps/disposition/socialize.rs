@@ -7,7 +7,9 @@ use crate::components::hunting_priors::HuntingPriors;
 use crate::components::physical::Needs;
 use crate::resources::colony_hunting_map::ColonyHuntingMap;
 use crate::resources::relationships::Relationships;
-use crate::resources::sim_constants::{DispositionConstants, FulfillmentConstants, SocialConstants};
+use crate::resources::sim_constants::{
+    DispositionConstants, FulfillmentConstants, SocialConstants,
+};
 use crate::steps::{StepOutcome, StepResult};
 
 /// # GOAP step resolver: `Socialize`
@@ -103,7 +105,11 @@ mod tests {
 
     fn test_constants() -> (SocialConstants, DispositionConstants, FulfillmentConstants) {
         let sc = crate::resources::sim_constants::SimConstants::default();
-        (sc.social.clone(), sc.disposition.clone(), sc.fulfillment.clone())
+        (
+            sc.social.clone(),
+            sc.disposition.clone(),
+            sc.fulfillment.clone(),
+        )
     }
 
     fn make_deps() -> (
@@ -202,7 +208,9 @@ mod tests {
         let (social, disp, fc) = test_constants();
         let (mut rels, mut colony_map, mut priors, snapshot) = make_deps();
         let mut needs = Needs::default();
-        let mut fulfillment = Fulfillment { social_warmth: 0.9999 };
+        let mut fulfillment = Fulfillment {
+            social_warmth: 0.9999,
+        };
 
         let mut world = World::new();
         let cat = world.spawn_empty().id();

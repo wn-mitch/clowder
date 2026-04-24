@@ -32,7 +32,7 @@ mod tests {
     use bevy_ecs::schedule::Schedule;
 
     fn setup_world() -> (World, Schedule) {
-        let mut world = World::new();
+        let world = World::new();
         let mut schedule = Schedule::default();
         schedule.add_systems(decay_memories);
         (world, schedule)

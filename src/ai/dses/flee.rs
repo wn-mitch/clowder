@@ -197,8 +197,12 @@ mod tests {
             "boldness" => 1.0,
             _ => 0.0,
         };
-        let scored = evaluate_single(&dse, entity, &ctx, &maslow, &modifiers, &fetch)
-            .expect("eligible");
-        assert!(scored.raw_score < 0.01, "bold cat flees: {}", scored.raw_score);
+        let scored =
+            evaluate_single(&dse, entity, &ctx, &maslow, &modifiers, &fetch).expect("eligible");
+        assert!(
+            scored.raw_score < 0.01,
+            "bold cat flees: {}",
+            scored.raw_score
+        );
     }
 }

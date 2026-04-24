@@ -67,10 +67,7 @@ pub enum Curve {
     /// Wraps another curve and applies a post-op (clamp, invert, …).
     /// Used for `Composite { inner: Logistic, post: Invert }` (the
     /// §2.3 "inverted-need penalty" anchor) and for `Clamp(min)` floors.
-    Composite {
-        inner: Box<Curve>,
-        post: PostOp,
-    },
+    Composite { inner: Box<Curve>, post: PostOp },
 }
 
 /// Post-composition transform applied by `Curve::Composite`. Matches
@@ -95,9 +92,7 @@ impl Curve {
     /// wrapped by a `Composite` whose post-op lifts the ceiling.
     pub fn evaluate(&self, x: f32) -> f32 {
         match self {
-            Self::Linear { slope, intercept } => {
-                (slope * x + intercept).clamp(0.0, 1.0)
-            }
+            Self::Linear { slope, intercept } => (slope * x + intercept).clamp(0.0, 1.0),
             Self::Quadratic {
                 exponent,
                 divisor,
@@ -106,9 +101,10 @@ impl Curve {
                 let base = (x - shift) / divisor;
                 base.max(0.0).powf(*exponent).clamp(0.0, 1.0)
             }
-            Self::Logistic { steepness, midpoint } => {
-                (1.0 / (1.0 + (-steepness * (x - midpoint)).exp())).clamp(0.0, 1.0)
-            }
+            Self::Logistic {
+                steepness,
+                midpoint,
+            } => (1.0 / (1.0 + (-steepness * (x - midpoint)).exp())).clamp(0.0, 1.0),
             Self::Logit { slope, inflection } => {
                 (1.0 - 1.0 / (1.0 + (-slope * (x - inflection)).exp())).clamp(0.0, 1.0)
             }
@@ -323,7 +319,10 @@ mod tests {
         let c = hangry();
         let slope = (c.evaluate(0.8) - c.evaluate(0.7)) / 0.1;
         // Derivative of logistic at midpoint is steepness/4 = 2.0.
-        assert!(slope > 1.5, "expected steep slope near midpoint, got {slope}");
+        assert!(
+            slope > 1.5,
+            "expected steep slope near midpoint, got {slope}"
+        );
     }
 
     #[test]

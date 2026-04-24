@@ -74,21 +74,23 @@ impl<'w, 's> MatingFitnessParams<'w, 's> {
         let tps = self.config.ticks_per_season;
         self.query
             .iter()
-            .map(|(e, age, gender, orient, mood, needs, pregnant, fertility)| {
-                (
-                    e,
-                    MatingFitness {
-                        stage: age.stage(tick, tps),
-                        gender: *gender,
-                        orientation: *orient,
-                        mood_valence: mood.valence,
-                        hunger: needs.hunger,
-                        energy: needs.energy,
-                        is_pregnant: pregnant.is_some(),
-                        fertility_phase: fertility.map(|f| f.phase),
-                    },
-                )
-            })
+            .map(
+                |(e, age, gender, orient, mood, needs, pregnant, fertility)| {
+                    (
+                        e,
+                        MatingFitness {
+                            stage: age.stage(tick, tps),
+                            gender: *gender,
+                            orientation: *orient,
+                            mood_valence: mood.valence,
+                            hunger: needs.hunger,
+                            energy: needs.energy,
+                            is_pregnant: pregnant.is_some(),
+                            fertility_phase: fertility.map(|f| f.phase),
+                        },
+                    )
+                },
+            )
             .collect()
     }
 
@@ -215,6 +217,7 @@ mod tests {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     fn setup_eligible_pair() -> (
         Entity,
         Entity,

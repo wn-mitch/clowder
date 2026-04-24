@@ -106,7 +106,10 @@ pub fn hunt_target_dse() -> TargetTakingDse {
         id: DseId("hunt_target"),
         candidate_query: hunt_candidate_query_doc,
         per_target_considerations: vec![
-            Consideration::Scalar(ScalarConsideration::new(TARGET_NEARNESS_INPUT, nearness_curve)),
+            Consideration::Scalar(ScalarConsideration::new(
+                TARGET_NEARNESS_INPUT,
+                nearness_curve,
+            )),
             Consideration::Scalar(ScalarConsideration::new(PREY_YIELD_INPUT, linear.clone())),
             Consideration::Scalar(ScalarConsideration::new(PREY_CALM_INPUT, linear)),
         ],
@@ -194,10 +197,8 @@ pub fn resolve_hunt_target(
         .iter()
         .map(|c| (c.entity, c.alertness.clamp(0.0, 1.0)))
         .collect();
-    let pos_map: std::collections::HashMap<Entity, Position> = candidates
-        .iter()
-        .map(|c| (c.entity, c.position))
-        .collect();
+    let pos_map: std::collections::HashMap<Entity, Position> =
+        candidates.iter().map(|c| (c.entity, c.position)).collect();
 
     let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     let fetch_target = |name: &str, _cat: Entity, target: Entity| -> f32 {
@@ -215,10 +216,7 @@ pub fn resolve_hunt_target(
                 .copied()
                 .map(prey_yield_normalized)
                 .unwrap_or(0.0),
-            PREY_CALM_INPUT => alertness_map
-                .get(&target)
-                .map(|a| 1.0 - a)
-                .unwrap_or(0.5),
+            PREY_CALM_INPUT => alertness_map.get(&target).map(|a| 1.0 - a).unwrap_or(0.5),
             _ => 0.0,
         }
     };
@@ -400,14 +398,7 @@ mod tests {
         let close = candidate(2, 2, 0, PreyKind::Rabbit, 0.2);
         let far = candidate(3, 12, 0, PreyKind::Rabbit, 0.2);
 
-        let out = resolve_hunt_target(
-            &registry,
-            cat,
-            Position::new(0, 0),
-            &[close, far],
-            0,
-            None,
-        );
+        let out = resolve_hunt_target(&registry, cat, Position::new(0, 0), &[close, far], 0, None);
         assert_eq!(out, Some(close.entity));
     }
 
@@ -449,14 +440,7 @@ mod tests {
         let near = candidate(2, 1, 0, PreyKind::Mouse, 0.2);
         let far = candidate(3, 5, 0, PreyKind::Mouse, 0.2);
 
-        let out = resolve_hunt_target(
-            &registry,
-            cat,
-            Position::new(0, 0),
-            &[near, far],
-            0,
-            None,
-        );
+        let out = resolve_hunt_target(&registry, cat, Position::new(0, 0), &[near, far], 0, None);
         assert_eq!(out, Some(near.entity));
     }
 }

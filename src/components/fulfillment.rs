@@ -27,9 +27,7 @@ pub struct Fulfillment {
 
 impl Default for Fulfillment {
     fn default() -> Self {
-        Self {
-            social_warmth: 0.6,
-        }
+        Self { social_warmth: 0.6 }
     }
 }
 
@@ -68,9 +66,7 @@ mod tests {
 
     #[test]
     fn deficit_inverse_of_level() {
-        let f = Fulfillment {
-            social_warmth: 0.3,
-        };
+        let f = Fulfillment { social_warmth: 0.3 };
         assert!((f.social_warmth_deficit() - 0.7).abs() < f32::EPSILON);
     }
 
@@ -81,9 +77,7 @@ mod tests {
         };
         assert!((low.social_warmth_deficit() - 1.0).abs() < f32::EPSILON);
 
-        let high = Fulfillment {
-            social_warmth: 1.5,
-        };
+        let high = Fulfillment { social_warmth: 1.5 };
         assert!((high.social_warmth_deficit() - 0.0).abs() < f32::EPSILON);
     }
 

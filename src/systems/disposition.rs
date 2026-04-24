@@ -7,8 +7,7 @@ use crate::ai::pathfinding::{find_free_adjacent, step_toward};
 use crate::ai::scoring::{
     apply_aspiration_bonuses, apply_cascading_bonuses, apply_colony_knowledge_bonuses,
     apply_directive_bonus, apply_fated_bonuses, apply_memory_bonuses, apply_preference_bonuses,
-    apply_priority_bonus, enforce_survival_floor, score_actions,
-    ScoringContext,
+    apply_priority_bonus, enforce_survival_floor, score_actions, ScoringContext,
 };
 use crate::ai::{Action, CurrentAction};
 use crate::components::building::{
@@ -22,13 +21,13 @@ use crate::components::hunting_priors::HuntingPriors;
 use crate::components::identity::{Gender, LifeStage, Name};
 use crate::components::items::Item;
 use crate::components::magic::{Harvestable, Herb, Inventory, Ward};
+use crate::components::markers;
 use crate::components::mental::Memory;
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Health, InjuryKind, Needs, Position};
 use crate::components::prey::{
     DenRaided, PreyAnimal, PreyConfig, PreyDen, PreyDensity, PreyKilled, PreyState,
 };
-use crate::components::markers;
 use crate::components::skills::{MagicAffinity, Skills};
 use crate::components::task_chain::{FailurePolicy, StepKind, TaskChain, TaskStep};
 use crate::components::wildlife::WildAnimal;
@@ -450,13 +449,15 @@ pub fn evaluate_dispositions(
     let kitten_snapshot: Vec<crate::ai::caretake_targeting::KittenState> = cooking
         .kittens
         .iter()
-        .map(|(e, p, needs, dep)| crate::ai::caretake_targeting::KittenState {
-            entity: e,
-            pos: *p,
-            hunger: needs.hunger,
-            mother: dep.mother,
-            father: dep.father,
-        })
+        .map(
+            |(e, p, needs, dep)| crate::ai::caretake_targeting::KittenState {
+                entity: e,
+                pos: *p,
+                hunger: needs.hunger,
+                mother: dep.mother,
+                father: dep.father,
+            },
+        )
         .collect();
 
     // §4 colony-scoped marker predicates — shared helpers eliminate
@@ -554,7 +555,16 @@ pub fn evaluate_dispositions(
 
     for (
         (entity, _name, needs, personality, pos, memory, skills, health),
-        (magic_aff, _inventory, mut current, aspirations, preferences, fated_love, fated_rival, fulfillment),
+        (
+            magic_aff,
+            _inventory,
+            mut current,
+            aspirations,
+            preferences,
+            fated_love,
+            fated_rival,
+            fulfillment,
+        ),
     ) in &mut query
     {
         if current.ticks_remaining != 0 {
@@ -738,10 +748,8 @@ pub fn evaluate_dispositions(
             herbcraft_skill: skills.herbcraft,
             has_herbs_nearby,
             // §4 batch 1: read from authored markers via MarkerSnapshot.
-            has_herbs_in_inventory: markers.has(
-                crate::components::markers::HasHerbsInInventory::KEY,
-                entity,
-            ),
+            has_herbs_in_inventory: markers
+                .has(crate::components::markers::HasHerbsInInventory::KEY, entity),
             has_remedy_herbs: markers.has(crate::components::markers::HasRemedyHerbs::KEY, entity),
             thornbriar_available,
             colony_injury_count,
@@ -780,8 +788,7 @@ pub fn evaluate_dispositions(
             day_phase: current_day_phase,
             has_functional_kitchen,
             has_raw_food_in_stores,
-            social_warmth_deficit: fulfillment
-                .map_or(0.4, |f| f.social_warmth_deficit()),
+            social_warmth_deficit: fulfillment.map_or(0.4, |f| f.social_warmth_deficit()),
         };
 
         // §11 trace plumbing — dormant except when running headless
@@ -789,10 +796,7 @@ pub fn evaluate_dispositions(
         // cadence than `evaluate_and_plan`; both systems share the
         // FocalScoreCapture mutex, so captures from one pass don't
         // leak into another tick's replay frame.
-        let focal_cat = side_effects
-            .focal_target
-            .as_deref()
-            .and_then(|t| t.entity);
+        let focal_cat = side_effects.focal_target.as_deref().and_then(|t| t.entity);
         let focal_capture = side_effects.focal_capture.as_deref();
         let eval_inputs = crate::ai::scoring::EvalInputs {
             cat: entity,
@@ -873,8 +877,9 @@ pub fn evaluate_dispositions(
         enforce_survival_floor(&mut scores, needs, sc);
 
         // Determine Groom routing.
-        let self_groom_score =
-            (1.0 - needs.temperature) * sc.self_groom_temperature_scale * needs.level_suppression(1);
+        let self_groom_score = (1.0 - needs.temperature)
+            * sc.self_groom_temperature_scale
+            * needs.level_suppression(1);
         let other_groom_score = if has_social_target {
             personality.warmth * (1.0 - needs.social) * needs.level_suppression(2)
         } else {
@@ -892,8 +897,7 @@ pub fn evaluate_dispositions(
         // replay. Mirror of the `evaluate_and_plan` capture block; both
         // systems share `FocalScoreCapture` via the interior mutex.
         let capture_this_cat = focal_capture.is_some() && focal_cat == Some(entity);
-        let mut softmax_trace = capture_this_cat
-            .then(crate::ai::scoring::SoftmaxCapture::default);
+        let mut softmax_trace = capture_this_cat.then(crate::ai::scoring::SoftmaxCapture::default);
         let chosen = crate::ai::scoring::select_disposition_via_intention_softmax_with_trace(
             &scores,
             self_groom_won,
@@ -949,48 +953,6 @@ pub fn evaluate_dispositions(
 
         // Keep ticks_remaining = 0 so disposition_to_chain picks it up this tick.
     }
-}
-
-/// Find a random tile matching `predicate` within `radius`, weighted by inverse
-/// distance so closer tiles are more likely but cats don't all converge on the
-/// same nearest tile.
-#[allow(dead_code)]
-fn find_random_nearby_tile(
-    from: &Position,
-    map: &TileMap,
-    radius: i32,
-    predicate: impl Fn(Terrain) -> bool,
-    rng: &mut impl Rng,
-) -> Option<Position> {
-    let mut candidates: Vec<(Position, f32)> = Vec::new();
-    for dy in -radius..=radius {
-        for dx in -radius..=radius {
-            let p = Position::new(from.x + dx, from.y + dy);
-            if map.in_bounds(p.x, p.y) {
-                let tile = map.get(p.x, p.y);
-                if predicate(tile.terrain) {
-                    let dist = from.manhattan_distance(&p);
-                    if dist > 0 {
-                        // Weight: inverse distance squared — close tiles strongly
-                        // preferred, but not deterministically.
-                        candidates.push((p, 1.0 / (dist as f32 * dist as f32)));
-                    }
-                }
-            }
-        }
-    }
-    if candidates.is_empty() {
-        return None;
-    }
-    let total: f32 = candidates.iter().map(|(_, w)| w).sum();
-    let mut roll: f32 = rng.random::<f32>() * total;
-    for (pos, weight) in &candidates {
-        roll -= weight;
-        if roll <= 0.0 {
-            return Some(*pos);
-        }
-    }
-    Some(candidates.last().unwrap().0)
 }
 
 // ===========================================================================
@@ -1071,13 +1033,15 @@ pub fn disposition_to_chain(
     // so the adult navigates TO the kitten after retrieving food.
     let kitten_snapshot: Vec<crate::ai::caretake_targeting::KittenState> = kitten_query
         .iter()
-        .map(|(e, p, needs, dep)| crate::ai::caretake_targeting::KittenState {
-            entity: e,
-            pos: *p,
-            hunger: needs.hunger,
-            mother: dep.mother,
-            father: dep.father,
-        })
+        .map(
+            |(e, p, needs, dep)| crate::ai::caretake_targeting::KittenState {
+                entity: e,
+                pos: *p,
+                hunger: needs.hunger,
+                mother: dep.mother,
+                father: dep.father,
+            },
+        )
         .collect();
 
     // Anti-stacking: tiles that already have a cat on them.
@@ -1198,9 +1162,8 @@ pub fn disposition_to_chain(
         // Socialize candidate pool (cats in range, excluding self); the
         // skill-lookup closure reads Skills from the frame-local query
         // so apprentice selection ranks on max-across-skills gap.
-        let mentor_skills_lookup = |e: Entity| -> Option<Skills> {
-            skills_query.get(e).ok().cloned()
-        };
+        let mentor_skills_lookup =
+            |e: Entity| -> Option<Skills> { skills_query.get(e).ok().cloned() };
         let mentor_target = crate::ai::dses::mentor_target::resolve_mentor_target(
             &res.dse_registry,
             entity,
@@ -1225,68 +1188,65 @@ pub fn disposition_to_chain(
             a_parents.is_some_and(|(m, f)| *m == Some(b) || *f == Some(b))
                 || b_parents.is_some_and(|(m, f)| *m == Some(a) || *f == Some(a))
         };
-        let groom_other_target =
-            crate::ai::dses::groom_other_target::resolve_groom_other_target(
-                &res.dse_registry,
-                entity,
-                *pos,
-                &cat_pos_list,
-                &temperature_lookup,
-                &is_kin,
-                &res.relationships,
-                res.time.tick,
-                // Chain-building side; the focal capture happens at
-                // the GOAP step-resolver site (goap.rs: GroomOther step).
-                None,
-            );
+        let groom_other_target = crate::ai::dses::groom_other_target::resolve_groom_other_target(
+            &res.dse_registry,
+            entity,
+            *pos,
+            &cat_pos_list,
+            &temperature_lookup,
+            &is_kin,
+            &res.relationships,
+            res.time.tick,
+            // Chain-building side; the focal capture happens at
+            // the GOAP step-resolver site (goap.rs: GroomOther step).
+            None,
+        );
         // §6.5.7: resolve patient for ApplyRemedy. Replaces the
         // `injured_cats.min_by_key(distance)` legacy pick with the
         // severity-weighted DSE ranking. The resolver returns None
         // if no injured cat is in range; the crafting chain falls
         // back to its legacy behavior in that case.
-        let apply_remedy_target =
-            crate::ai::dses::apply_remedy_target::resolve_apply_remedy_target(
-                &res.dse_registry,
-                entity,
-                *pos,
-                &injured_patient_snapshot,
-                &is_kin,
-                res.time.tick,
-                // Chain-building side; apply_remedy has no dedicated
-                // GOAP step-resolver (the crafting chain embeds it),
-                // so the pre-check also carries None — focal-trace
-                // coverage for apply_remedy is tracked in the
-                // §6.5 multi-focal follow-on.
-                None,
-            );
+        let apply_remedy_target = crate::ai::dses::apply_remedy_target::resolve_apply_remedy_target(
+            &res.dse_registry,
+            entity,
+            *pos,
+            &injured_patient_snapshot,
+            &is_kin,
+            res.time.tick,
+            // Chain-building side; apply_remedy has no dedicated
+            // GOAP step-resolver (the crafting chain embeds it),
+            // so the pre-check also carries None — focal-trace
+            // coverage for apply_remedy is tracked in the
+            // §6.5 multi-focal follow-on.
+            None,
+        );
         // §6.5.8: resolve work-site for Build. Replaces the
         // `(priority, distance)` legacy pick with the progress-
         // urgency + structural-condition weighted DSE.
-        let build_candidates: Vec<crate::ai::dses::build_target::BuildCandidate> =
-            building_query
-                .iter()
-                .filter_map(|(e, structure, bpos, site, _)| {
-                    if let Some(s) = site {
-                        Some(crate::ai::dses::build_target::BuildCandidate {
-                            entity: e,
-                            position: *bpos,
-                            kind: crate::ai::dses::build_target::BuildTargetKind::NewBuild,
-                            progress: s.progress,
-                            condition: 1.0,
-                        })
-                    } else if structure.condition < 1.0 {
-                        Some(crate::ai::dses::build_target::BuildCandidate {
-                            entity: e,
-                            position: *bpos,
-                            kind: crate::ai::dses::build_target::BuildTargetKind::Repair,
-                            progress: 0.0,
-                            condition: structure.condition,
-                        })
-                    } else {
-                        None
-                    }
-                })
-                .collect();
+        let build_candidates: Vec<crate::ai::dses::build_target::BuildCandidate> = building_query
+            .iter()
+            .filter_map(|(e, structure, bpos, site, _)| {
+                if let Some(s) = site {
+                    Some(crate::ai::dses::build_target::BuildCandidate {
+                        entity: e,
+                        position: *bpos,
+                        kind: crate::ai::dses::build_target::BuildTargetKind::NewBuild,
+                        progress: s.progress,
+                        condition: 1.0,
+                    })
+                } else if structure.condition < 1.0 {
+                    Some(crate::ai::dses::build_target::BuildCandidate {
+                        entity: e,
+                        position: *bpos,
+                        kind: crate::ai::dses::build_target::BuildTargetKind::Repair,
+                        progress: 0.0,
+                        condition: structure.condition,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
         let build_target = crate::ai::dses::build_target::resolve_build_target(
             &res.dse_registry,
             entity,
@@ -1338,14 +1298,9 @@ pub fn disposition_to_chain(
                 &skills_query,
                 d,
             ),
-            DispositionKind::Building => build_building_chain(
-                entity,
-                pos,
-                &building_query,
-                build_target,
-                d,
-                &mut commands,
-            ),
+            DispositionKind::Building => {
+                build_building_chain(entity, pos, &building_query, build_target, d, &mut commands)
+            }
             DispositionKind::Farming => build_farming_chain(pos, &building_query),
             DispositionKind::Crafting => build_crafting_chain(
                 pos,
@@ -1518,7 +1473,7 @@ mod respect_witness_tests {
         let positions = vec![
             (near1, pos(7, 5)), // distance 2
             (near2, pos(5, 9)), // distance 4
-            (far, pos(20, 20)),  // distance 30
+            (far, pos(20, 20)), // distance 30
         ];
         assert_eq!(
             count_witnesses_within_radius(actor, &pos(5, 5), &positions, 5, 4),
@@ -2556,9 +2511,7 @@ pub fn resolve_disposition_chains(
         // Grooming condition for target lookups during social interactions.
         grooming: cats
             .iter()
-            .map(|((e, _, _, _, _, _, _, _), (_, _, _, _, _, g, _, _))| {
-                (e, g.map_or(0.8, |g| g.0))
-            })
+            .map(|((e, _, _, _, _, _, _, _), (_, _, _, _, _, g, _, _))| (e, g.map_or(0.8, |g| g.0)))
             .collect(),
         // Gender snapshot — used by `MateWith` to look up the partner's
         // gender for §7.M.7.4's gestator-selection fix without double-
@@ -2884,12 +2837,9 @@ pub fn resolve_disposition_chains(
     // Kitten also gains acceptance — being fed is the highest-signal
     // "cared for" event in a kitten's life.
     for kitten_entity in accum.kitten_feedings {
-        if let Ok(((_, _, _, _, _, mut k_needs, _, _), _)) =
-            cats.get_mut(kitten_entity)
-        {
+        if let Ok(((_, _, _, _, _, mut k_needs, _, _), _)) = cats.get_mut(kitten_entity) {
             k_needs.hunger = (k_needs.hunger + 0.5).min(1.0);
-            k_needs.acceptance =
-                (k_needs.acceptance + d.acceptance_per_kitten_fed).min(1.0);
+            k_needs.acceptance = (k_needs.acceptance + d.acceptance_per_kitten_fed).min(1.0);
         }
     }
 
@@ -2898,18 +2848,15 @@ pub fn resolve_disposition_chains(
     // of social warmth, which otherwise has no sim-level restorer.
     // §7.W: also apply social_warmth delta to the groomed target.
     for groom in accum.grooming_restorations {
-        if let Ok((
-            (_, _, _, _, _, mut needs, _, _),
-            (_, _, _, _, _, grooming, _, fulfillment),
-        )) = cats.get_mut(groom.target)
+        if let Ok(((_, _, _, _, _, mut needs, _, _), (_, _, _, _, _, grooming, _, fulfillment))) =
+            cats.get_mut(groom.target)
         {
             if let Some(mut g) = grooming {
                 g.0 = (g.0 + groom.grooming_delta).min(1.0);
             }
             needs.acceptance = (needs.acceptance + d.acceptance_per_groomed).min(1.0);
             if let Some(mut f) = fulfillment {
-                f.social_warmth =
-                    (f.social_warmth + groom.social_warmth_delta).min(1.0);
+                f.social_warmth = (f.social_warmth + groom.social_warmth_delta).min(1.0);
             }
         }
     }
@@ -2928,9 +2875,7 @@ pub fn resolve_disposition_chains(
                 s.magic,
                 s.growth_rate(),
             ))
-        } else if let Ok(((_, _, _, _, s, _, _, _), _)) =
-            cats.get(effect.apprentice)
-        {
+        } else if let Ok(((_, _, _, _, s, _, _, _), _)) = cats.get(effect.apprentice) {
             Some((
                 s.hunting,
                 s.foraging,
@@ -3003,7 +2948,6 @@ pub fn resolve_disposition_chains(
     }
 }
 
-
 // ===========================================================================
 // dispatch_chain_step — the step-resolution match dispatch, extracted from
 // `resolve_disposition_chains` to keep both functions under LLVM's
@@ -3016,31 +2960,31 @@ fn dispatch_chain_step(
     step_kind: StepKind,
     ticks: u64,
     cat_entity: Entity,
-    mut chain: &mut TaskChain,
-    mut current: &mut CurrentAction,
-    mut pos: &mut Position,
-    mut skills: &mut Skills,
-    mut needs: &mut Needs,
-    mut inventory: &mut Inventory,
+    chain: &mut TaskChain,
+    current: &mut CurrentAction,
+    pos: &mut Position,
+    skills: &mut Skills,
+    needs: &mut Needs,
+    inventory: &mut Inventory,
     personality: &Personality,
     name: &Name,
     gender: &Gender,
-    mut hunting_priors: &mut HuntingPriors,
-    mut grooming: Option<&mut crate::components::grooming::GroomingCondition>,
+    hunting_priors: &mut HuntingPriors,
+    grooming: Option<&mut crate::components::grooming::GroomingCondition>,
     fulfillment_opt: &mut Option<Mut<crate::components::fulfillment::Fulfillment>>,
     prey_query: &mut Query<(Entity, &Position, &PreyConfig, &mut PreyState), With<PreyAnimal>>,
-    mut stores_query: &mut Query<&mut StoredItems>,
+    stores_query: &mut Query<&mut StoredItems>,
     items_query: &Query<&Item>,
     prey_params: &mut PreyHuntParams,
     map: &TileMap,
     wind: &crate::resources::wind::WindState,
-    mut relationships: &mut Relationships,
+    relationships: &mut Relationships,
     narr: &mut NarrativeEmitter,
     time: &TimeState,
     rng: &mut SimRng,
-    mut colony_map: &mut ColonyHuntingMap,
+    colony_map: &mut ColonyHuntingMap,
     constants: &SimConstants,
-    mut commands: &mut Commands,
+    commands: &mut Commands,
     snaps: &ChainStepSnapshots,
     accum: &mut ChainStepAccumulators,
 ) {
@@ -3058,14 +3002,12 @@ fn dispatch_chain_step(
 
             if let Some(target_entity) = step.target_entity {
                 // We have a locked target — check if it still exists.
-                let Ok((_, prey_pos, prey_cfg, prey_state)) = prey_query.get(target_entity)
-                else {
+                let Ok((_, prey_pos, prey_cfg, prey_state)) = prey_query.get(target_entity) else {
                     step.target_entity = None;
                     return;
                 };
                 let prey_pos = *prey_pos;
-                let prey_is_fleeing =
-                    matches!(prey_state.ai_state, PreyAiState::Fleeing { .. });
+                let prey_is_fleeing = matches!(prey_state.ai_state, PreyAiState::Fleeing { .. });
                 let prey_awareness = prey_state.ai_state;
                 let catch_mod = prey_cfg.catch_difficulty;
                 let item_kind = prey_cfg.item_kind;
@@ -3097,9 +3039,7 @@ fn dispatch_chain_step(
                 if dist <= pounce_range {
                     // === POUNCE ===
                     let awareness_base = match prey_awareness {
-                        PreyAiState::Idle | PreyAiState::Grazing { .. } => {
-                            d.pounce_awareness_idle
-                        }
+                        PreyAiState::Idle | PreyAiState::Grazing { .. } => d.pounce_awareness_idle,
                         PreyAiState::Alert { .. } => d.pounce_awareness_alert,
                         PreyAiState::Fleeing { .. } => d.pounce_awareness_fleeing,
                     };
@@ -3199,7 +3139,7 @@ fn dispatch_chain_step(
                                 &ctx,
                                 &var_ctx,
                                 personality,
-                                &needs,
+                                needs,
                                 &mut rng.rng,
                             );
                         }
@@ -3209,7 +3149,7 @@ fn dispatch_chain_step(
                         // Multi-kill: if inventory has room, hunt for more.
                         if inventory.is_full() {
                             chain.advance();
-                            chain.sync_targets(&mut current);
+                            chain.sync_targets(current);
                         } else {
                             step.target_entity = None; // Search for another target.
                         }
@@ -3265,7 +3205,7 @@ fn dispatch_chain_step(
                                 &ctx,
                                 &var_ctx,
                                 personality,
-                                &needs,
+                                needs,
                                 &mut rng.rng,
                             );
                         }
@@ -3286,7 +3226,7 @@ fn dispatch_chain_step(
                     if prey_is_fleeing {
                         // === CHASE === sprint burst.
                         for _ in 0..d.chase_speed {
-                            if let Some(next) = step_toward(&pos, &prey_pos, &map) {
+                            if let Some(next) = step_toward(pos, &prey_pos, map) {
                                 *pos = next;
                                 moved = true;
                             }
@@ -3295,7 +3235,7 @@ fn dispatch_chain_step(
                         // === STALK === Deliberate approach, 1 tile/tick.
                         // Cats are agile ambush predators — they close quickly
                         // while relying on stealth to avoid detection.
-                        if let Some(next) = step_toward(&pos, &prey_pos, &map) {
+                        if let Some(next) = step_toward(pos, &prey_pos, map) {
                             *pos = next;
                             moved = true;
                         }
@@ -3303,9 +3243,7 @@ fn dispatch_chain_step(
                         if personality.anxiety > d.anxiety_spook_threshold
                             && rng.rng.random::<f32>() < d.anxiety_spook_chance
                         {
-                            if let Ok((_, _, _, mut prey_st)) =
-                                prey_query.get_mut(target_entity)
-                            {
+                            if let Ok((_, _, _, mut prey_st)) = prey_query.get_mut(target_entity) {
                                 prey_st.ai_state = PreyAiState::Fleeing {
                                     from: cat_entity,
                                     toward: None,
@@ -3323,7 +3261,7 @@ fn dispatch_chain_step(
                     // === APPROACH === Trot toward scented prey.
                     let mut moved = false;
                     for _ in 0..d.approach_speed {
-                        if let Some(next) = step_toward(&pos, &prey_pos, &map) {
+                        if let Some(next) = step_toward(pos, &prey_pos, map) {
                             *pos = next;
                             moved = true;
                         }
@@ -3335,10 +3273,10 @@ fn dispatch_chain_step(
             } else {
                 // === SEARCH === (no target yet — move toward best-known hunting ground)
                 // Priority: personal belief > colony belief > wind > patrol_dir.
-                let belief_dir = hunting_priors.best_direction(&pos, d.search_belief_radius);
+                let belief_dir = hunting_priors.best_direction(pos, d.search_belief_radius);
                 let colony_dir = colony_map
                     .beliefs
-                    .best_direction(&pos, d.search_belief_radius);
+                    .best_direction(pos, d.search_belief_radius);
                 let (wx, wy) = wind.direction();
                 let (mut dx, mut dy) = if let Some((bx, by)) = belief_dir {
                     (bx, by)
@@ -3362,7 +3300,7 @@ fn dispatch_chain_step(
                 }
                 // Trot while searching to cover ground.
                 for _ in 0..d.search_speed {
-                    *pos = patrol_move(&pos, dx, dy, &map);
+                    *pos = patrol_move(pos, dx, dy, map);
                 }
 
                 // Visual detection: spot nearby prey within 15 tiles.
@@ -3395,8 +3333,7 @@ fn dispatch_chain_step(
                     );
                     let scent_above_threshold = scent_source
                         .map(|(sx, sy)| {
-                            prey_params.prey_scent_map.get(sx, sy)
-                                >= d.scent_detect_threshold
+                            prey_params.prey_scent_map.get(sx, sy) >= d.scent_detect_threshold
                         })
                         .unwrap_or(false);
                     let scented_prey = if scent_above_threshold {
@@ -3454,7 +3391,7 @@ fn dispatch_chain_step(
                                 &ctx,
                                 &var_ctx,
                                 personality,
-                                &needs,
+                                needs,
                                 &mut rng.rng,
                             );
                         }
@@ -3469,9 +3406,9 @@ fn dispatch_chain_step(
                         .any(|s| matches!(s, ItemSlot::Item(k, _) if k.is_food()))
                     {
                         chain.advance();
-                        chain.sync_targets(&mut current);
+                        chain.sync_targets(current);
                     } else {
-                        hunting_priors.record_failed_search(&pos, ticks);
+                        hunting_priors.record_failed_search(pos, ticks);
                         chain.fail_current("no scent found".into());
                     }
                 }
@@ -3494,7 +3431,7 @@ fn dispatch_chain_step(
                     dx = 1;
                 }
             }
-            *pos = patrol_move(&pos, dx, dy, &map);
+            *pos = patrol_move(pos, dx, dy, map);
 
             // Check current tile for forage yield.
             if map.in_bounds(pos.x, pos.y) {
@@ -3589,12 +3526,12 @@ fn dispatch_chain_step(
                             &ctx,
                             &var_ctx,
                             personality,
-                            &needs,
+                            needs,
                             &mut rng.rng,
                         );
                     }
                     chain.advance();
-                    chain.sync_targets(&mut current);
+                    chain.sync_targets(current);
                 } else if ticks > d.forage_timeout_ticks {
                     chain.fail_current("nothing found while foraging".into());
                 }
@@ -3606,12 +3543,12 @@ fn dispatch_chain_step(
             let target = step.target_entity;
             let deposit = crate::steps::disposition::resolve_deposit_at_stores(
                 target,
-                &mut inventory,
-                &skills,
-                &pos,
-                &mut stores_query,
-                &items_query,
-                &mut commands,
+                inventory,
+                skills,
+                pos,
+                stores_query,
+                items_query,
+                commands,
                 d,
             );
             if deposit.storage_upgraded {
@@ -3631,10 +3568,9 @@ fn dispatch_chain_step(
                 && !deposit.rejected
                 && !deposit.no_store
             {
-                needs.purpose =
-                    (needs.purpose + d.purpose_per_deposit).min(1.0);
+                needs.purpose = (needs.purpose + d.purpose_per_deposit).min(1.0);
             }
-            apply_step_result(deposit.step, &mut chain, &mut current);
+            apply_step_result(deposit.step, chain, current);
         }
 
         StepKind::EatAtStores => {
@@ -3643,40 +3579,30 @@ fn dispatch_chain_step(
             let outcome = crate::steps::disposition::resolve_eat_at_stores(
                 ticks,
                 target,
-                &mut needs,
-                &mut stores_query,
-                &items_query,
-                &mut commands,
+                needs,
+                stores_query,
+                items_query,
+                commands,
                 d,
             );
-            outcome.record_if_witnessed(
-                narr.activation.as_deref_mut(),
-                Feature::FoodEaten,
-            );
-            apply_step_result(outcome.result, &mut chain, &mut current);
+            outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::FoodEaten);
+            apply_step_result(outcome.result, chain, current);
         }
 
         StepKind::Sleep { ticks: duration } => {
-            let outcome =
-                crate::steps::disposition::resolve_sleep(ticks, duration, &mut needs, d);
-            apply_step_result(outcome.result, &mut chain, &mut current);
+            let outcome = crate::steps::disposition::resolve_sleep(ticks, duration, needs, d);
+            apply_step_result(outcome.result, chain, current);
         }
 
         StepKind::SelfGroom => {
-            let outcome = crate::steps::disposition::resolve_self_groom(
-                ticks,
-                &mut needs,
-                grooming.as_deref_mut(),
-                d,
-            );
-            apply_step_result(outcome.result, &mut chain, &mut current);
+            let outcome = crate::steps::disposition::resolve_self_groom(ticks, needs, grooming, d);
+            apply_step_result(outcome.result, chain, current);
         }
 
         StepKind::Socialize => {
             let step = chain.current_mut().unwrap();
             let target = step.target_entity;
-            let mut fallback_fulfillment =
-                crate::components::fulfillment::Fulfillment::default();
+            let mut fallback_fulfillment = crate::components::fulfillment::Fulfillment::default();
             let fulfillment_ref = match fulfillment_opt.as_mut() {
                 Some(f) => &mut **f,
                 None => &mut fallback_fulfillment,
@@ -3685,29 +3611,25 @@ fn dispatch_chain_step(
                 ticks,
                 cat_entity,
                 target,
-                &mut needs,
+                needs,
                 fulfillment_ref,
-                &mut hunting_priors,
-                &mut relationships,
-                &mut colony_map,
+                hunting_priors,
+                relationships,
+                colony_map,
                 &snaps.grooming,
                 time.tick,
                 &constants.social,
                 d,
                 &constants.fulfillment,
             );
-            outcome.record_if_witnessed(
-                narr.activation.as_deref_mut(),
-                Feature::Socialized,
-            );
-            apply_step_result(outcome.result, &mut chain, &mut current);
+            outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::Socialized);
+            apply_step_result(outcome.result, chain, current);
         }
 
         StepKind::GroomOther => {
             let step = chain.current_mut().unwrap();
             let target = step.target_entity;
-            let mut fallback_fulfillment =
-                crate::components::fulfillment::Fulfillment::default();
+            let mut fallback_fulfillment = crate::components::fulfillment::Fulfillment::default();
             let fulfillment_ref = match fulfillment_opt.as_mut() {
                 Some(f) => &mut **f,
                 None => &mut fallback_fulfillment,
@@ -3716,25 +3638,22 @@ fn dispatch_chain_step(
                 ticks,
                 cat_entity,
                 target,
-                &mut needs,
+                needs,
                 fulfillment_ref,
-                &mut hunting_priors,
-                &mut relationships,
-                &mut colony_map,
+                hunting_priors,
+                relationships,
+                colony_map,
                 &snaps.grooming,
                 time.tick,
                 &constants.social,
                 d,
                 &constants.fulfillment,
             );
-            outcome.record_if_witnessed(
-                narr.activation.as_deref_mut(),
-                Feature::GroomedOther,
-            );
+            outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::GroomedOther);
             if let Some(r) = outcome.witness {
                 accum.grooming_restorations.push(r);
             }
-            apply_step_result(outcome.result, &mut chain, &mut current);
+            apply_step_result(outcome.result, chain, current);
         }
 
         StepKind::MentorCat => {
@@ -3744,16 +3663,13 @@ fn dispatch_chain_step(
                 ticks,
                 cat_entity,
                 target,
-                &mut needs,
-                &skills,
-                &mut relationships,
+                needs,
+                skills,
+                relationships,
                 time.tick,
                 d,
             );
-            outcome.record_if_witnessed(
-                narr.activation.as_deref_mut(),
-                Feature::MentoredCat,
-            );
+            outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::MentoredCat);
             let crate::steps::StepOutcome { result, witness } = outcome;
             if let Some((apprentice, mentor_skills)) = witness {
                 accum.mentor_effects.push(MentorEffect {
@@ -3761,7 +3677,7 @@ fn dispatch_chain_step(
                     mentor_skills,
                 });
             }
-            apply_step_result(result, &mut chain, &mut current);
+            apply_step_result(result, chain, current);
         }
 
         StepKind::PatrolTo => {
@@ -3769,15 +3685,15 @@ fn dispatch_chain_step(
             let target = step.target_position;
             let cached = &mut step.cached_path;
             let outcome = crate::steps::disposition::resolve_patrol_to(
-                &mut pos,
+                pos,
                 target,
                 cached,
-                &mut needs,
-                &map,
+                needs,
+                map,
                 d,
                 &snaps.cat_tile_counts,
             );
-            apply_step_result(outcome.result, &mut chain, &mut current);
+            apply_step_result(outcome.result, chain, current);
         }
 
         StepKind::FightThreat => {
@@ -3786,29 +3702,21 @@ fn dispatch_chain_step(
                 .get(cat_entity)
                 .cloned()
                 .unwrap_or_default();
-            let outcome = crate::steps::disposition::resolve_fight_threat(
-                ticks,
-                &mut skills,
-                &mut needs,
-                &health,
-                d,
-            );
-            outcome.record_if_witnessed(
-                narr.activation.as_deref_mut(),
-                Feature::ThreatEngaged,
-            );
-            apply_step_result(outcome.result, &mut chain, &mut current);
+            let outcome =
+                crate::steps::disposition::resolve_fight_threat(ticks, skills, needs, &health, d);
+            outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::ThreatEngaged);
+            apply_step_result(outcome.result, chain, current);
         }
 
         StepKind::Survey => {
             let outcome = crate::steps::disposition::resolve_survey(
                 ticks,
-                &mut needs,
-                &pos,
+                needs,
+                pos,
                 &mut prey_params.exploration_map,
                 d,
             );
-            apply_step_result(outcome.result, &mut chain, &mut current);
+            apply_step_result(outcome.result, chain, current);
         }
 
         StepKind::DeliverDirective {
@@ -3817,8 +3725,7 @@ fn dispatch_chain_step(
             directive_target,
         } => {
             let step = chain.current_mut().unwrap();
-            let outcome =
-                crate::steps::disposition::resolve_deliver_directive(ticks, &mut needs, d);
+            let outcome = crate::steps::disposition::resolve_deliver_directive(ticks, needs, d);
             if matches!(outcome.result, crate::steps::StepResult::Advance) {
                 // Insert ActiveDirective on the target cat.
                 if let Some(target) = step.target_entity {
@@ -3839,11 +3746,10 @@ fn dispatch_chain_step(
                     );
                     // §purpose-restoration: completing a directive
                     // delivery is explicit colony-coordinated work.
-                    needs.purpose =
-                        (needs.purpose + d.purpose_per_directive_completed).min(1.0);
+                    needs.purpose = (needs.purpose + d.purpose_per_directive_completed).min(1.0);
                 }
             }
-            apply_step_result(outcome.result, &mut chain, &mut current);
+            apply_step_result(outcome.result, chain, current);
         }
 
         StepKind::MateWith => {
@@ -3856,13 +3762,10 @@ fn dispatch_chain_step(
                 *gender,
                 target,
                 target_gender,
-                &mut needs,
-                &mut relationships,
+                needs,
+                relationships,
             );
-            outcome.record_if_witnessed(
-                narr.activation.as_deref_mut(),
-                Feature::MatingOccurred,
-            );
+            outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::MatingOccurred);
             // §Phase 5a: CourtshipInteraction for Tom×Tom or any
             // target-present, no-pregnancy Advance.
             if matches!(outcome.result, crate::steps::StepResult::Advance)
@@ -3884,34 +3787,27 @@ fn dispatch_chain_step(
                 } else {
                     cat_entity
                 };
-                commands.entity(gestator).insert(
-                    crate::components::pregnancy::Pregnant::new(
+                commands
+                    .entity(gestator)
+                    .insert(crate::components::pregnancy::Pregnant::new(
                         time.tick,
                         partner,
                         litter_size,
-                    ),
-                );
+                    ));
             }
-            apply_step_result(outcome.result, &mut chain, &mut current);
+            apply_step_result(outcome.result, chain, current);
         }
 
         StepKind::FeedKitten => {
             let step = chain.current_mut().unwrap();
             let target = step.target_entity;
-            let outcome = crate::steps::disposition::resolve_feed_kitten(
-                ticks,
-                target,
-                &mut needs,
-                &mut inventory,
-            );
-            outcome.record_if_witnessed(
-                narr.activation.as_deref_mut(),
-                Feature::KittenFed,
-            );
+            let outcome =
+                crate::steps::disposition::resolve_feed_kitten(ticks, target, needs, inventory);
+            outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::KittenFed);
             if let Some(kitten_entity) = outcome.witness {
                 accum.kitten_feedings.push(kitten_entity);
             }
-            apply_step_result(outcome.result, &mut chain, &mut current);
+            apply_step_result(outcome.result, chain, current);
         }
 
         StepKind::RetrieveFromStores { kind } => {
@@ -3921,16 +3817,13 @@ fn dispatch_chain_step(
                 ticks,
                 kind,
                 target,
-                &mut inventory,
-                &mut stores_query,
-                &items_query,
-                &mut commands,
+                inventory,
+                stores_query,
+                items_query,
+                commands,
             );
-            outcome.record_if_witnessed(
-                narr.activation.as_deref_mut(),
-                Feature::ItemRetrieved,
-            );
-            apply_step_result(outcome.result, &mut chain, &mut current);
+            outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::ItemRetrieved);
+            apply_step_result(outcome.result, chain, current);
         }
 
         StepKind::RetrieveAnyFoodFromStores => {
@@ -3947,16 +3840,13 @@ fn dispatch_chain_step(
             let outcome = crate::steps::disposition::resolve_retrieve_any_food_from_stores(
                 ticks,
                 target,
-                &mut inventory,
-                &mut stores_query,
-                &items_query,
-                &mut commands,
+                inventory,
+                stores_query,
+                items_query,
+                commands,
             );
-            outcome.record_if_witnessed(
-                narr.activation.as_deref_mut(),
-                Feature::ItemRetrieved,
-            );
-            apply_step_result(outcome.result, &mut chain, &mut current);
+            outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::ItemRetrieved);
+            apply_step_result(outcome.result, chain, current);
         }
 
         // Non-disposition steps are handled elsewhere.
@@ -4197,7 +4087,7 @@ mod tests {
             Query<'w, 's, &'static Item>,
         );
         let mut state: SystemState<CraftingQueries> = SystemState::new(&mut world);
-        let (herb_query, building_query, ward_query, stored_items_query, items_query) =
+        let (herb_query, building_query, ward_query, _stored_items_query, _items_query) =
             state.get(&world);
 
         let pos = Position { x: 2, y: 2 }; // close to the herb
@@ -4215,7 +4105,7 @@ mod tests {
         let map = TileMap::new(10, 10, Terrain::Grass);
         let d = SimConstants::default().disposition;
         let mut rng = ChaCha8Rng::seed_from_u64(99);
-        let mut unmet_demand = crate::resources::UnmetDemand::default();
+        let _unmet_demand = crate::resources::UnmetDemand::default();
 
         let result = build_crafting_chain(
             &pos,

@@ -456,8 +456,7 @@ pub fn assess_colony_needs(
             // stacking is rare; the seed varies each call, avoiding the need
             // to thread a shared SimRng (which would push the system past
             // Bevy's 16-param tuple limit).
-            let seed =
-                time.tick.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ coord_entity.to_bits();
+            let seed = time.tick.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ coord_entity.to_bits();
             let mut local_rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
             let ward_pos = compute_ward_placement(
                 &building_positions,
@@ -939,9 +938,10 @@ pub fn accumulate_build_pressure(
         // directly. Dedup on `kind == Build && blueprint.is_none()` so
         // the queue doesn't bloat across assess cycles.
         if has_unfinished_site {
-            let already_queued = queue.directives.iter().any(|d| {
-                d.kind == DirectiveKind::Build && d.blueprint.is_none()
-            });
+            let already_queued = queue
+                .directives
+                .iter()
+                .any(|d| d.kind == DirectiveKind::Build && d.blueprint.is_none());
             if !already_queued {
                 queue.directives.push(Directive {
                     kind: DirectiveKind::Build,
@@ -1388,7 +1388,9 @@ pub fn update_directive_markers(
                 commands.entity(entity).insert(IsCoordinatorWithDirectives);
             }
             (false, true) => {
-                commands.entity(entity).remove::<IsCoordinatorWithDirectives>();
+                commands
+                    .entity(entity)
+                    .remove::<IsCoordinatorWithDirectives>();
             }
             _ => {}
         }
@@ -1916,9 +1918,7 @@ mod tests {
     #[test]
     fn coordinator_empty_queue_no_marker() {
         let (mut world, mut schedule) = setup_directive_markers();
-        let cat = world
-            .spawn((Coordinator, DirectiveQueue::default()))
-            .id();
+        let cat = world.spawn((Coordinator, DirectiveQueue::default())).id();
         schedule.run(&mut world);
         assert!(!has_coord_dir(&world, cat));
     }

@@ -511,10 +511,7 @@ impl EventLog {
                     .or_insert(0) += 1;
             }
             EventKind::BurialFired { .. } => {
-                *self
-                    .continuity_tallies
-                    .entry("burial".into())
-                    .or_insert(0) += 1;
+                *self.continuity_tallies.entry("burial".into()).or_insert(0) += 1;
             }
             EventKind::PlayFired { .. } => {
                 *self.continuity_tallies.entry("play".into()).or_insert(0) += 1;

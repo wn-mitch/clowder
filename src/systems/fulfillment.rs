@@ -106,7 +106,6 @@ pub fn bond_proximity_social_warmth(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bevy_ecs::prelude::*;
 
     fn test_constants() -> SimConstants {
         SimConstants::default()
@@ -114,10 +113,7 @@ mod tests {
 
     fn spawn_cat(world: &mut World, x: i32, y: i32) -> Entity {
         world
-            .spawn((
-                Position::new(x, y),
-                Fulfillment::default(),
-            ))
+            .spawn((Position::new(x, y), Fulfillment::default()))
             .id()
     }
 

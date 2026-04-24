@@ -89,7 +89,10 @@ pub fn socialize_target_dse() -> TargetTakingDse {
         id: DseId("socialize_target"),
         candidate_query: socialize_candidate_query_doc,
         per_target_considerations: vec![
-            Consideration::Scalar(ScalarConsideration::new(TARGET_NEARNESS_INPUT, nearness_curve)),
+            Consideration::Scalar(ScalarConsideration::new(
+                TARGET_NEARNESS_INPUT,
+                nearness_curve,
+            )),
             Consideration::Scalar(ScalarConsideration::new(
                 TARGET_FONDNESS_INPUT,
                 linear.clone(),
@@ -277,9 +280,9 @@ pub fn resolve_socialize_target(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ai::dse::EvalCtx;
     use crate::ai::target_dse::evaluate_target_taking;
     use crate::components::physical::Position;
-    use crate::ai::dse::EvalCtx;
     use bevy::prelude::Entity;
 
     fn test_ctx(entity: Entity) -> EvalCtx<'static> {
@@ -308,11 +311,7 @@ mod tests {
 
     #[test]
     fn socialize_target_weights_sum_to_one() {
-        let sum: f32 = socialize_target_dse()
-            .composition()
-            .weights
-            .iter()
-            .sum();
+        let sum: f32 = socialize_target_dse().composition().weights.iter().sum();
         assert!((sum - 1.0).abs() < 1e-4);
     }
 
@@ -409,8 +408,7 @@ mod tests {
         let ctx = test_ctx(cat);
         let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = |_: &str, _: Entity, _: Entity| 0.0;
-        let out =
-            evaluate_target_taking(&dse, cat, &[], &[], &ctx, &fetch_self, &fetch_target);
+        let out = evaluate_target_taking(&dse, cat, &[], &[], &ctx, &fetch_self, &fetch_target);
         assert!(out.winning_target.is_none());
         assert!(out.intention.is_none());
         assert_eq!(out.aggregated_score, 0.0);
@@ -550,7 +548,9 @@ mod tests {
         let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = |name: &str, _: Entity, _: Entity| -> f32 {
             match name {
-                TARGET_NEARNESS_INPUT | TARGET_FONDNESS_INPUT | TARGET_NOVELTY_INPUT
+                TARGET_NEARNESS_INPUT
+                | TARGET_FONDNESS_INPUT
+                | TARGET_NOVELTY_INPUT
                 | TARGET_SPECIES_COMPAT_INPUT => 1.0,
                 _ => 0.0,
             }

@@ -12,14 +12,14 @@ pub mod fox_planner;
 pub mod fox_scoring;
 pub mod hawk_planner;
 pub mod hawk_scoring;
-pub mod snake_planner;
-pub mod snake_scoring;
 pub mod mating;
 pub mod modifier;
 pub mod pathfinding;
-pub mod target_dse;
 pub mod planner;
 pub mod scoring;
+pub mod snake_planner;
+pub mod snake_scoring;
+pub mod target_dse;
 
 use bevy_ecs::prelude::*;
 

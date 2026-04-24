@@ -246,7 +246,7 @@ pub fn prey_bundle(profile: &dyn crate::species::PreyProfile) -> PreyBundle {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::species::{self, PreyProfile};
+    use crate::species;
 
     #[test]
     fn all_species_produce_valid_configs() {

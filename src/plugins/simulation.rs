@@ -49,8 +49,7 @@ impl Plugin for SimulationPlugin {
             // default ScoringConstants here. The other three mirror
             // sites (headless, save-load, integration tests) register
             // after SimConstants is inserted and pass the live values.
-            let default_scoring =
-                crate::resources::sim_constants::ScoringConstants::default();
+            let default_scoring = crate::resources::sim_constants::ScoringConstants::default();
             app.add_dse(crate::ai::dses::eat_dse())
                 .add_dse(crate::ai::dses::hunt_dse())
                 .add_target_taking_dse(crate::ai::dses::hunt_target_dse())
@@ -328,15 +327,9 @@ impl Plugin for SimulationPlugin {
             FixedUpdate,
             systems::trace_emit::emit_focal_trace
                 .after(systems::goap::resolve_goap_plans)
-                .run_if(bevy_ecs::prelude::resource_exists::<
-                    crate::resources::FocalTraceTarget,
-                >)
-                .run_if(bevy_ecs::prelude::resource_exists::<
-                    crate::resources::TraceLog,
-                >)
-                .run_if(bevy_ecs::prelude::resource_exists::<
-                    crate::resources::FocalScoreCapture,
-                >),
+                .run_if(bevy_ecs::prelude::resource_exists::<crate::resources::FocalTraceTarget>)
+                .run_if(bevy_ecs::prelude::resource_exists::<crate::resources::TraceLog>)
+                .run_if(bevy_ecs::prelude::resource_exists::<crate::resources::FocalScoreCapture>),
         );
     }
 }

@@ -81,9 +81,7 @@ pub fn resolve_harvest(
                 // No Stores exist — don't reset growth; fail so the
                 // plan drops and the next plan can be re-evaluated
                 // once a Stores is built.
-                return StepOutcome::unwitnessed(StepResult::Fail(
-                    "no stores for harvest".into(),
-                ));
+                return StepOutcome::unwitnessed(StepResult::Fail("no stores for harvest".into()));
             };
             let mut items_placed = 0u32;
             for kind in [ItemKind::Berries, ItemKind::Roots] {

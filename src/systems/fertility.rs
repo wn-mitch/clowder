@@ -31,7 +31,7 @@ use crate::components::identity::{Age, Gender, LifeStage};
 use crate::components::physical::Dead;
 use crate::components::pregnancy::Pregnant;
 use crate::resources::sim_constants::{FertilityConstants, SimConstants};
-use crate::resources::time::{SimConfig, Season, TimeState};
+use crate::resources::time::{Season, SimConfig, TimeState};
 
 // ---------------------------------------------------------------------------
 // Phase transition function (§7.M.7.2) — pure, deterministic.
@@ -104,7 +104,10 @@ pub fn update_fertility_phase(
     mut commands: Commands,
 ) {
     let fertility = &constants.fertility;
-    if !time.tick.is_multiple_of(fertility.update_interval_ticks as u64) {
+    if !time
+        .tick
+        .is_multiple_of(fertility.update_interval_ticks as u64)
+    {
         return;
     }
 
@@ -165,9 +168,13 @@ pub fn update_fertility_phase(
 
         // Adult Queen/NB with Fertility: recompute phase, decrement
         // post_partum counter.
-        let cycle_tick =
-            cycle_tick_for(time.tick, fert.cycle_offset, fertility.cycle_length_ticks);
-        let phase = phase_from(cycle_tick, season, fert.post_partum_remaining_ticks, fertility);
+        let cycle_tick = cycle_tick_for(time.tick, fert.cycle_offset, fertility.cycle_length_ticks);
+        let phase = phase_from(
+            cycle_tick,
+            season,
+            fert.post_partum_remaining_ticks,
+            fertility,
+        );
         fert.phase = phase;
         if fert.post_partum_remaining_ticks > 0 {
             fert.post_partum_remaining_ticks = fert
@@ -259,12 +266,7 @@ mod tests {
         let current_tick = 12 * 20_000u64;
         let mut time = world.resource_mut::<TimeState>();
         time.tick = current_tick;
-        let queen = world
-            .spawn((
-                Age::new(born_tick),
-                Gender::Queen,
-            ))
-            .id();
+        let queen = world.spawn((Age::new(born_tick), Gender::Queen)).id();
 
         // Run the system.
         let mut schedule = bevy_ecs::schedule::Schedule::default();
@@ -370,8 +372,7 @@ mod tests {
     fn phase_cycles_proestrus_estrus_diestrus_in_non_winter() {
         let c = test_constants();
         let proestrus_end = (c.cycle_length_ticks as f32 * c.proestrus_fraction) as u32;
-        let estrus_end =
-            proestrus_end + (c.cycle_length_ticks as f32 * c.estrus_fraction) as u32;
+        let estrus_end = proestrus_end + (c.cycle_length_ticks as f32 * c.estrus_fraction) as u32;
         assert_eq!(
             phase_from(0, Season::Spring, 0, &c),
             FertilityPhase::Proestrus

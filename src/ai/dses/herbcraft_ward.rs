@@ -173,7 +173,10 @@ mod tests {
         // 1.0 → 1/(1+exp(-7.2)) ≈ 0.99925
         assert!(approx(curve.evaluate(1.0), 0.9993, 1e-3));
         match curve {
-            Curve::Logistic { steepness, midpoint } => {
+            Curve::Logistic {
+                steepness,
+                midpoint,
+            } => {
                 assert!(approx(steepness, 8.0, 1e-6));
                 assert!(approx(midpoint, 0.1, 1e-6));
             }
@@ -190,7 +193,10 @@ mod tests {
             vec![markers::CanWard::KEY, markers::WardStrengthLow::KEY]
         );
         // §13.1: every non-Eat/Sleep/Idle cat DSE forbids Incapacitated.
-        assert_eq!(dse.eligibility().forbidden, vec![markers::Incapacitated::KEY]);
+        assert_eq!(
+            dse.eligibility().forbidden,
+            vec![markers::Incapacitated::KEY]
+        );
     }
 
     #[test]

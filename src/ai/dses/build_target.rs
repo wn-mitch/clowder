@@ -114,14 +114,23 @@ pub fn build_target_dse() -> TargetTakingDse {
     // Piecewise cliff: signal=1.0 (ConstructionSite) → 1.0, signal=0.6
     // (Repair) → 0.6, signal=0.0 → 0.0. Matches spec §6.5.8 row #2.
     let site_type_curve = Curve::Piecewise {
-        knots: vec![(0.0, 0.0), (0.59, 0.0), (0.6, 0.6), (0.999, 0.6), (1.0, 1.0)],
+        knots: vec![
+            (0.0, 0.0),
+            (0.59, 0.0),
+            (0.6, 0.6),
+            (0.999, 0.6),
+            (1.0, 1.0),
+        ],
     };
 
     TargetTakingDse {
         id: DseId("build_target"),
         candidate_query: build_candidate_query_doc,
         per_target_considerations: vec![
-            Consideration::Scalar(ScalarConsideration::new(TARGET_NEARNESS_INPUT, linear.clone())),
+            Consideration::Scalar(ScalarConsideration::new(
+                TARGET_NEARNESS_INPUT,
+                linear.clone(),
+            )),
             Consideration::Scalar(ScalarConsideration::new(
                 TARGET_SITE_TYPE_INPUT,
                 site_type_curve,
@@ -183,8 +192,7 @@ pub fn resolve_build_target(
     let mut positions: Vec<Position> = Vec::new();
     let mut kind_map: std::collections::HashMap<Entity, BuildTargetKind> =
         std::collections::HashMap::new();
-    let mut progress_map: std::collections::HashMap<Entity, f32> =
-        std::collections::HashMap::new();
+    let mut progress_map: std::collections::HashMap<Entity, f32> = std::collections::HashMap::new();
     let mut condition_map: std::collections::HashMap<Entity, f32> =
         std::collections::HashMap::new();
     for c in candidates {
@@ -439,14 +447,7 @@ mod tests {
         let cat = Entity::from_raw_u32(1).unwrap();
         let close = new_build(2, 2, 0, 0.5);
         let far = new_build(3, 15, 0, 0.5);
-        let out = resolve_build_target(
-            &registry,
-            cat,
-            Position::new(0, 0),
-            &[close, far],
-            0,
-            None,
-        );
+        let out = resolve_build_target(&registry, cat, Position::new(0, 0), &[close, far], 0, None);
         assert_eq!(out, Some(close.entity));
     }
 

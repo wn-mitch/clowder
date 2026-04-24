@@ -144,7 +144,11 @@ mod tests {
     #[test]
     fn fox_raiding_cp_weights_in_unit_interval() {
         let dse = FoxRaidingDse::new();
-        assert!(dse.composition().weights.iter().all(|w| (0.0..=1.0).contains(w)));
+        assert!(dse
+            .composition()
+            .weights
+            .iter()
+            .all(|w| (0.0..=1.0).contains(w)));
     }
 
     #[test]

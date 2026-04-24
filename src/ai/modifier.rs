@@ -898,8 +898,8 @@ mod tests {
             _ => 0.0,
         };
         for dse in [
-            EAT, SLEEP, HUNT, FORAGE, SOCIALIZE, EXPLORE, WANDER, FLEE, FIGHT, PATROL, BUILD,
-            FARM, COORDINATE, MENTOR, MATE, COOK, CARETAKE, IDLE,
+            EAT, SLEEP, HUNT, FORAGE, SOCIALIZE, EXPLORE, WANDER, FLEE, FIGHT, PATROL, BUILD, FARM,
+            COORDINATE, MENTOR, MATE, COOK, CARETAKE, IDLE,
         ] {
             let out = modifier.apply(DseId(dse), 0.4, &ctx, &fetch);
             assert!((out - 0.45).abs() < 1e-6, "dse {dse}: got {out}");
@@ -937,7 +937,10 @@ mod tests {
         };
         let out = modifier.apply(DseId(HUNT), 0.5, &ctx, &fetch);
         let expected = 0.5_f32 * (1.0_f32 - ((0.8 - 0.3) / (1.0 - 0.3)) * 0.8).max(0.0);
-        assert!((out - expected).abs() < 1e-6, "got {out}, expected {expected}");
+        assert!(
+            (out - expected).abs() < 1e-6,
+            "got {out}, expected {expected}"
+        );
     }
 
     #[test]
@@ -956,7 +959,10 @@ mod tests {
         let out = modifier.apply(DseId(FLEE), 0.5, &ctx, &fetch);
         let suppression = ((0.8 - 0.3) / (1.0 - 0.3)) * 0.8;
         let expected = 0.5 + suppression * 0.5;
-        assert!((out - expected).abs() < 1e-6, "got {out}, expected {expected}");
+        assert!(
+            (out - expected).abs() < 1e-6,
+            "got {out}, expected {expected}"
+        );
     }
 
     #[test]
@@ -1099,8 +1105,7 @@ mod tests {
                 .iter()
                 .flat_map(|a| action_to_dse_ids(*a).iter().copied())
                 .collect();
-            let actual = constituent_dses_for_ordinal(ordinal as f32)
-                .expect("every variant maps");
+            let actual = constituent_dses_for_ordinal(ordinal as f32).expect("every variant maps");
             let actual_sorted = {
                 let mut v = actual.to_vec();
                 v.sort();

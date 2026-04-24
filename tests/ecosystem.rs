@@ -2,13 +2,13 @@ use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::Schedule;
 
 use clowder::components::physical::{Health, Position};
-use clowder::components::prey::{PreyAnimal, PreyConfig, PreyDen, PreyKind, PreyState};
+use clowder::components::prey::{PreyConfig, PreyDen, PreyKind};
 use clowder::components::wildlife::{WildAnimal, WildSpecies, WildlifeAiState};
 use clowder::resources::map::TileMap;
 use clowder::resources::narrative::NarrativeLog;
 use clowder::resources::rng::SimRng;
 use clowder::resources::time::{SimConfig, TimeState};
-use clowder::species::{self, PreyProfile, SpeciesRegistry};
+use clowder::species::{self, SpeciesRegistry};
 
 // ---------------------------------------------------------------------------
 // Setup

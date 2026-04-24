@@ -58,12 +58,15 @@ pub fn soaring_actions() -> Vec<ActionDef<HawkDomain>> {
 // ---------------------------------------------------------------------------
 
 pub fn fleeing_actions() -> Vec<ActionDef<HawkDomain>> {
-    vec![soar_to(HawkZone::MapEdge, 1), ActionDef {
-        kind: HawkGoapActionKind::FleeSky,
-        cost: 1,
-        preconditions: vec![Pred::ZoneIs(HawkZone::MapEdge)],
-        effects: vec![], // Plan complete once at map edge.
-    }]
+    vec![
+        soar_to(HawkZone::MapEdge, 1),
+        ActionDef {
+            kind: HawkGoapActionKind::FleeSky,
+            cost: 1,
+            preconditions: vec![Pred::ZoneIs(HawkZone::MapEdge)],
+            effects: vec![], // Plan complete once at map edge.
+        },
+    ]
 }
 
 // ---------------------------------------------------------------------------

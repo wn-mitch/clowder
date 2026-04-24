@@ -301,15 +301,9 @@ pub struct ScoringResult {
 fn ctx_scalars(ctx: &ScoringContext) -> HashMap<&'static str, f32> {
     let mut m = HashMap::new();
     // Needs-as-urgency (deficit form).
-    m.insert(
-        "hunger_urgency",
-        (1.0 - ctx.needs.hunger).clamp(0.0, 1.0),
-    );
+    m.insert("hunger_urgency", (1.0 - ctx.needs.hunger).clamp(0.0, 1.0));
     // Food-stores scarcity (deficit fraction in `[0, 1]`).
-    m.insert(
-        "food_scarcity",
-        (1.0 - ctx.food_fraction).clamp(0.0, 1.0),
-    );
+    m.insert("food_scarcity", (1.0 - ctx.food_fraction).clamp(0.0, 1.0));
     // Safety deficit — Flee axis. Safety is a satisfaction scalar; the
     // DSE wants urgency form so the Logistic midpoint semantics line
     // up with `flee_safety_threshold`.
@@ -322,17 +316,11 @@ fn ctx_scalars(ctx: &ScoringContext) -> HashMap<&'static str, f32> {
     // Energy/health deficits for Rest peer group. Sleep uses
     // `energy_deficit` through `sleep_dep()` Logistic and
     // `health_deficit` through injury-bonus Linear.
-    m.insert(
-        "energy_deficit",
-        (1.0 - ctx.needs.energy).clamp(0.0, 1.0),
-    );
+    m.insert("energy_deficit", (1.0 - ctx.needs.energy).clamp(0.0, 1.0));
     m.insert("health_deficit", (1.0 - ctx.health).clamp(0.0, 1.0));
     // Fight: combat_effective is already a `[0, 1]` composite index
     // upstream; flow through directly.
-    m.insert(
-        "combat_effective",
-        ctx.combat_effective.clamp(0.0, 1.0),
-    );
+    m.insert("combat_effective", ctx.combat_effective.clamp(0.0, 1.0));
     // Fight: ally_count is raw count — the DSE's saturating-count
     // Composite handles normalization.
     m.insert("ally_count", ctx.allies_fighting_threat as f32);
@@ -340,21 +328,12 @@ fn ctx_scalars(ctx: &ScoringContext) -> HashMap<&'static str, f32> {
     // inputs to each DSE's Linear identity curve.
     m.insert("boldness", ctx.personality.boldness.clamp(0.0, 1.0));
     m.insert("diligence", ctx.personality.diligence.clamp(0.0, 1.0));
-    m.insert(
-        "sociability",
-        ctx.personality.sociability.clamp(0.0, 1.0),
-    );
+    m.insert("sociability", ctx.personality.sociability.clamp(0.0, 1.0));
     m.insert("temper", ctx.personality.temper.clamp(0.0, 1.0));
-    m.insert(
-        "playfulness",
-        ctx.personality.playfulness.clamp(0.0, 1.0),
-    );
+    m.insert("playfulness", ctx.personality.playfulness.clamp(0.0, 1.0));
     m.insert("warmth", ctx.personality.warmth.clamp(0.0, 1.0));
     m.insert("ambition", ctx.personality.ambition.clamp(0.0, 1.0));
-    m.insert(
-        "compassion",
-        ctx.personality.compassion.clamp(0.0, 1.0),
-    );
+    m.insert("compassion", ctx.personality.compassion.clamp(0.0, 1.0));
     // Phase 4c.4 alloparenting Reframe A: bond-weighted compassion for
     // Caretake. Shared-key `compassion` stays stable for herbcraft_prepare;
     // CaretakeDse reads this caretake-local key instead. Scale ≥ 1 so
@@ -369,31 +348,16 @@ fn ctx_scalars(ctx: &ScoringContext) -> HashMap<&'static str, f32> {
     // temperature`. Phys-satisfaction flows through as raw so the
     // inverted-need-penalty Logistic sees the satisfaction scalar
     // directly (per §2.3 row 1021).
-    m.insert(
-        "social_deficit",
-        (1.0 - ctx.needs.social).clamp(0.0, 1.0),
-    );
-    m.insert(
-        "mating_deficit",
-        (1.0 - ctx.needs.mating).clamp(0.0, 1.0),
-    );
+    m.insert("social_deficit", (1.0 - ctx.needs.social).clamp(0.0, 1.0));
+    m.insert("mating_deficit", (1.0 - ctx.needs.mating).clamp(0.0, 1.0));
     m.insert(
         "thermal_deficit",
         (1.0 - ctx.needs.temperature).clamp(0.0, 1.0),
     );
-    m.insert(
-        "phys_satisfaction",
-        ctx.phys_satisfaction.clamp(0.0, 1.0),
-    );
-    m.insert(
-        "tile_corruption",
-        ctx.tile_corruption.clamp(0.0, 1.0),
-    );
+    m.insert("phys_satisfaction", ctx.phys_satisfaction.clamp(0.0, 1.0));
+    m.insert("tile_corruption", ctx.tile_corruption.clamp(0.0, 1.0));
     // Caretake axes.
-    m.insert(
-        "kitten_urgency",
-        ctx.hungry_kitten_urgency.clamp(0.0, 1.0),
-    );
+    m.insert("kitten_urgency", ctx.hungry_kitten_urgency.clamp(0.0, 1.0));
     m.insert(
         "is_parent_of_hungry_kitten",
         if ctx.is_parent_of_hungry_kitten {
@@ -403,14 +367,8 @@ fn ctx_scalars(ctx: &ScoringContext) -> HashMap<&'static str, f32> {
         },
     );
     // Exploration peer group.
-    m.insert(
-        "curiosity",
-        ctx.personality.curiosity.clamp(0.0, 1.0),
-    );
-    m.insert(
-        "unexplored_nearby",
-        ctx.unexplored_nearby.clamp(0.0, 1.0),
-    );
+    m.insert("curiosity", ctx.personality.curiosity.clamp(0.0, 1.0));
+    m.insert("unexplored_nearby", ctx.unexplored_nearby.clamp(0.0, 1.0));
     // Work peer group — Build presence axes are 0/1.
     m.insert(
         "has_construction_site",
@@ -425,14 +383,8 @@ fn ctx_scalars(ctx: &ScoringContext) -> HashMap<&'static str, f32> {
         ctx.pending_directive_count as f32,
     );
     // Herbcraft + PracticeMagic sibling-DSE axes.
-    m.insert(
-        "spirituality",
-        ctx.personality.spirituality.clamp(0.0, 1.0),
-    );
-    m.insert(
-        "herbcraft_skill",
-        ctx.herbcraft_skill.clamp(0.0, 1.0),
-    );
+    m.insert("spirituality", ctx.personality.spirituality.clamp(0.0, 1.0));
+    m.insert("herbcraft_skill", ctx.herbcraft_skill.clamp(0.0, 1.0));
     m.insert("magic_skill", ctx.magic_skill.clamp(0.0, 1.0));
     // Ward deficit: 1.0 when wards are low, 0 when fully warded.
     // `ward_strength_low` is the inline gate today; port as a 0/1
@@ -482,10 +434,7 @@ fn ctx_scalars(ctx: &ScoringContext) -> HashMap<&'static str, f32> {
     // Piecewise resolves these knot-xs to its cat-specific bonus
     // values; cross-species DSEs (Sleep, fox Hunting, fox Resting)
     // all consume the same encoding.
-    m.insert(
-        "day_phase",
-        day_phase_scalar(ctx.day_phase),
-    );
+    m.insert("day_phase", day_phase_scalar(ctx.day_phase));
     // §3.5.1 modifier-pipeline inputs for the seven foundational
     // modifiers (Pride, Independence-solo / -group, Patience,
     // Tradition, Fox-suppression, Corruption-suppression). Each modifier
@@ -494,10 +443,7 @@ fn ctx_scalars(ctx: &ScoringContext) -> HashMap<&'static str, f32> {
     // accessor — keeps `ScoreModifier` pure and `EvalCtx` unchanged.
     m.insert("respect", ctx.respect.clamp(0.0, 1.0));
     m.insert("pride", ctx.personality.pride.clamp(0.0, 1.0));
-    m.insert(
-        "independence",
-        ctx.personality.independence.clamp(0.0, 1.0),
-    );
+    m.insert("independence", ctx.personality.independence.clamp(0.0, 1.0));
     m.insert("patience", ctx.personality.patience.clamp(0.0, 1.0));
     m.insert(
         "tradition_location_bonus",
@@ -580,25 +526,18 @@ fn day_phase_scalar(phase: DayPhase) -> f32 {
 /// mode/weights, Maslow pre-gate, per-modifier pre/post deltas) into
 /// the capture resource. Non-focal calls take the untraced path and
 /// incur zero capture cost beyond the two `Option` checks below.
-fn score_dse_by_id(
-    dse_id: &str,
-    ctx: &ScoringContext,
-    inputs: &EvalInputs,
-) -> f32 {
+fn score_dse_by_id(dse_id: &str, ctx: &ScoringContext, inputs: &EvalInputs) -> f32 {
     let Some(dse) = inputs.dse_registry.cat_dse(dse_id) else {
         return 0.0;
     };
     let scalars = ctx_scalars(ctx);
-    let fetch_scalar = |name: &str, _entity: Entity| -> f32 {
-        scalars.get(name).copied().unwrap_or(0.0)
-    };
+    let fetch_scalar =
+        |name: &str, _entity: Entity| -> f32 { scalars.get(name).copied().unwrap_or(0.0) };
     // §4 marker lookup — consumes `EvalInputs::markers` populated by
     // the caller. `entity` is the evaluating cat when eligibility runs
     // against a per-cat marker; colony-scoped markers ignore it.
     let markers = inputs.markers;
-    let has_marker = |name: &str, entity: Entity| -> bool {
-        markers.has(name, entity)
-    };
+    let has_marker = |name: &str, entity: Entity| -> bool { markers.has(name, entity) };
     let sample_map = |_name: &str, _pos: Position| 0.0_f32;
     let needs_ref = ctx.needs;
     let maslow = |tier: u8| needs_ref.level_suppression(tier);
@@ -613,8 +552,7 @@ fn score_dse_by_id(
         target_position: None,
     };
 
-    let focal_active =
-        inputs.focal_capture.is_some() && inputs.focal_cat == Some(inputs.cat);
+    let focal_active = inputs.focal_capture.is_some() && inputs.focal_cat == Some(inputs.cat);
 
     if focal_active {
         let filter = dse.eligibility();
@@ -1723,8 +1661,7 @@ mod tests {
     fn cached_registry() -> &'static DseRegistry {
         static REG: OnceLock<DseRegistry> = OnceLock::new();
         REG.get_or_init(|| {
-            let scoring =
-                crate::resources::sim_constants::ScoringConstants::default();
+            let scoring = crate::resources::sim_constants::ScoringConstants::default();
             let mut r = DseRegistry::new();
             r.cat_dses.push(crate::ai::dses::eat_dse());
             r.cat_dses.push(crate::ai::dses::hunt_dse());
@@ -1910,7 +1847,12 @@ mod tests {
         let personality = default_personality();
         let mut rng = seeded_rng(1);
 
-        let scores = score_actions(&ctx(&needs, &personality, &sc), &test_eval_inputs(), &mut rng).scores;
+        let scores = score_actions(
+            &ctx(&needs, &personality, &sc),
+            &test_eval_inputs(),
+            &mut rng,
+        )
+        .scores;
         let best = select_best_action(&scores);
 
         assert_eq!(
@@ -1939,7 +1881,12 @@ mod tests {
         let personality = default_personality();
         let mut rng = seeded_rng(2);
 
-        let scores = score_actions(&ctx(&needs, &personality, &sc), &test_eval_inputs(), &mut rng).scores;
+        let scores = score_actions(
+            &ctx(&needs, &personality, &sc),
+            &test_eval_inputs(),
+            &mut rng,
+        )
+        .scores;
         let best = select_best_action(&scores);
 
         assert_eq!(
@@ -2061,7 +2008,12 @@ mod tests {
 
         let mut rng = seeded_rng(10);
 
-        let scores = score_actions(&ctx(&needs, &personality, &sc), &test_eval_inputs(), &mut rng).scores;
+        let scores = score_actions(
+            &ctx(&needs, &personality, &sc),
+            &test_eval_inputs(),
+            &mut rng,
+        )
+        .scores;
         let hunt_score = scores.iter().find(|(a, _)| *a == Action::Hunt).unwrap().1;
         let forage_score = scores.iter().find(|(a, _)| *a == Action::Forage).unwrap().1;
 
@@ -2084,7 +2036,12 @@ mod tests {
 
         let mut rng = seeded_rng(11);
 
-        let scores = score_actions(&ctx(&needs, &personality, &sc), &test_eval_inputs(), &mut rng).scores;
+        let scores = score_actions(
+            &ctx(&needs, &personality, &sc),
+            &test_eval_inputs(),
+            &mut rng,
+        )
+        .scores;
         let hunt_score = scores.iter().find(|(a, _)| *a == Action::Hunt).unwrap().1;
         let forage_score = scores.iter().find(|(a, _)| *a == Action::Forage).unwrap().1;
 
@@ -2189,7 +2146,12 @@ mod tests {
         let personality = default_personality();
         let mut rng = seeded_rng(21);
 
-        let scores = score_actions(&ctx(&needs, &personality, &sc), &test_eval_inputs(), &mut rng).scores;
+        let scores = score_actions(
+            &ctx(&needs, &personality, &sc),
+            &test_eval_inputs(),
+            &mut rng,
+        )
+        .scores;
         let groom_score = scores.iter().find(|(a, _)| *a == Action::Groom).unwrap().1;
         let idle_score = scores.iter().find(|(a, _)| *a == Action::Idle).unwrap().1;
 
@@ -2615,7 +2577,11 @@ mod tests {
         // score at most `jitter_range` in magnitude.
         let jitter_range = sc.jitter_range;
         let get = |action: Action| -> f32 {
-            scores.iter().find(|(a, _)| *a == action).map(|(_, s)| *s).unwrap_or(0.0)
+            scores
+                .iter()
+                .find(|(a, _)| *a == action)
+                .map(|(_, s)| *s)
+                .unwrap_or(0.0)
         };
         assert!(
             get(Action::Eat) > jitter_range,
@@ -3147,10 +3113,7 @@ mod tests {
         ];
         let disp = aggregate_to_dispositions(&scores, true);
         assert!(disp.iter().all(|(k, _)| *k != DispositionKind::Resting
-            || disp
-                .iter()
-                .find(|(dk, _)| *dk == DispositionKind::Resting)
-                .is_none()));
+            || !disp.iter().any(|(dk, _)| *dk == DispositionKind::Resting)));
         // No disposition should have the Flee score
         assert!(disp.iter().all(|(_, s)| *s <= 1.0));
     }
@@ -3469,7 +3432,7 @@ mod tests {
         let ward_score_with_corruption = {
             let mut rng = seeded_rng(100);
             let mut c = ctx(&needs, &personality, &sc);
-    
+
             c.ward_strength_low = true;
             c.herbcraft_skill = 0.6;
             c.territory_max_corruption = 0.5;
@@ -3485,7 +3448,7 @@ mod tests {
         let ward_score_without_corruption = {
             let mut rng = seeded_rng(100);
             let mut c = ctx(&needs, &personality, &sc);
-    
+
             c.ward_strength_low = true;
             c.herbcraft_skill = 0.6;
             c.territory_max_corruption = 0.0;
@@ -3545,7 +3508,10 @@ mod tests {
         );
         assert_eq!(capture.probabilities.len(), 2);
         let sum: f32 = capture.probabilities.iter().sum();
-        assert!((sum - 1.0).abs() < 1e-4, "probabilities sum to {sum}, expected ~1");
+        assert!(
+            (sum - 1.0).abs() < 1e-4,
+            "probabilities sum to {sum}, expected ~1"
+        );
         for p in &capture.probabilities {
             assert!(*p >= 0.0);
             assert!(*p <= 1.0);
@@ -3575,7 +3541,10 @@ mod tests {
             &mut rng,
             Some(&mut capture),
         );
-        assert_eq!(chosen, crate::components::disposition::DispositionKind::Resting);
+        assert_eq!(
+            chosen,
+            crate::components::disposition::DispositionKind::Resting
+        );
         assert!(capture.empty_pool);
         assert!(capture.pool.is_empty());
         assert!(capture.probabilities.is_empty());
@@ -3589,7 +3558,11 @@ mod tests {
         // the same (scores, rng-seed) inputs — proves the capture path
         // is observation-only.
         let sc = ScoringConstants::default();
-        let scores = vec![(Action::Eat, 0.6), (Action::Socialize, 0.5), (Action::Patrol, 0.4)];
+        let scores = vec![
+            (Action::Eat, 0.6),
+            (Action::Socialize, 0.5),
+            (Action::Patrol, 0.4),
+        ];
         let plain = select_disposition_via_intention_softmax(
             &scores,
             false,

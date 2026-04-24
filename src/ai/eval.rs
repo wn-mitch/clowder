@@ -141,10 +141,7 @@ pub trait DseRegistryAppExt {
     /// Register a §6.3 target-taking DSE. Distinct from `add_dse`
     /// because target-taking uses a struct-shape type (see
     /// [`crate::ai::target_dse::TargetTakingDse`]), not `Box<dyn Dse>`.
-    fn add_target_taking_dse(
-        &mut self,
-        dse: super::target_dse::TargetTakingDse,
-    ) -> &mut Self;
+    fn add_target_taking_dse(&mut self, dse: super::target_dse::TargetTakingDse) -> &mut Self;
     fn add_fox_dse(&mut self, dse: Box<dyn Dse>) -> &mut Self;
     fn add_hawk_dse(&mut self, dse: Box<dyn Dse>) -> &mut Self;
     fn add_snake_dse(&mut self, dse: Box<dyn Dse>) -> &mut Self;
@@ -162,10 +159,7 @@ impl DseRegistryAppExt for App {
         self
     }
 
-    fn add_target_taking_dse(
-        &mut self,
-        dse: super::target_dse::TargetTakingDse,
-    ) -> &mut Self {
+    fn add_target_taking_dse(&mut self, dse: super::target_dse::TargetTakingDse) -> &mut Self {
         self.world_mut()
             .get_resource_or_insert_with(DseRegistry::new)
             .target_taking_dses
@@ -443,7 +437,15 @@ pub fn evaluate_single(
     modifiers: &ModifierPipeline,
     fetch_scalar: &dyn Fn(&str, Entity) -> f32,
 ) -> Option<ScoredDse> {
-    evaluate_single_with_trace(dse, cat, ctx, maslow_pre_gate, modifiers, fetch_scalar, None)
+    evaluate_single_with_trace(
+        dse,
+        cat,
+        ctx,
+        maslow_pre_gate,
+        modifiers,
+        fetch_scalar,
+        None,
+    )
 }
 
 /// Same as [`evaluate_single`] but, when `sink` is `Some`, records the
@@ -473,7 +475,8 @@ pub fn evaluate_single_with_trace(
     // label so replay frames show the full curvature per §11.1.
     let mut per_consideration: Vec<f32> = Vec::with_capacity(considerations.len());
     for (idx, c) in considerations.iter().enumerate() {
-        let (score, trace_row) = score_consideration_with_trace(c, cat, ctx, fetch_scalar, sink.is_some());
+        let (score, trace_row) =
+            score_consideration_with_trace(c, cat, ctx, fetch_scalar, sink.is_some());
         per_consideration.push(score);
         if let (Some(sink), Some((input, curve_label, kind, spatial_map_key))) =
             (sink.as_mut(), trace_row)
@@ -914,10 +917,18 @@ mod tests {
         // Hunger = 0.75 → Logistic(8, 0.75) evaluates to ~0.5.
         let fetch = |name: &str, _: Entity| if name == "hunger" { 0.75 } else { 0.0 };
 
-        let scored = evaluate_single(&dse, entity, &ctx, &maslow, &modifiers, &fetch)
-            .expect("eligible");
-        assert!((scored.raw_score - 0.5).abs() < 0.01, "raw: {}", scored.raw_score);
-        assert!((scored.gated_score - 0.25).abs() < 0.01, "gated: {}", scored.gated_score);
+        let scored =
+            evaluate_single(&dse, entity, &ctx, &maslow, &modifiers, &fetch).expect("eligible");
+        assert!(
+            (scored.raw_score - 0.5).abs() < 0.01,
+            "raw: {}",
+            scored.raw_score
+        );
+        assert!(
+            (scored.gated_score - 0.25).abs() < 0.01,
+            "gated: {}",
+            scored.gated_score
+        );
         // No modifiers → final == gated.
         assert!((scored.final_score - scored.gated_score).abs() < 1e-6);
     }
@@ -945,8 +956,8 @@ mod tests {
         let modifiers = ModifierPipeline::new();
         let fetch = |_: &str, _: Entity| 0.75;
 
-        let scored = evaluate_single(&dse, entity, &ctx, &maslow, &modifiers, &fetch)
-            .expect("eligible");
+        let scored =
+            evaluate_single(&dse, entity, &ctx, &maslow, &modifiers, &fetch).expect("eligible");
         assert!((scored.gated_score - scored.raw_score).abs() < 1e-6);
     }
 
@@ -1083,8 +1094,7 @@ mod tests {
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(7);
         let mut eat_hits = 0usize;
         for _ in 0..200 {
-            let pick = select_intention_softmax(&pool, &mut rng, 0.01)
-                .expect("non-empty pool");
+            let pick = select_intention_softmax(&pool, &mut rng, 0.01).expect("non-empty pool");
             if pick.id.0 == "eat" {
                 eat_hits += 1;
             }
@@ -1109,14 +1119,16 @@ mod tests {
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(13);
         let mut counts = std::collections::HashMap::<&'static str, usize>::new();
         for _ in 0..500 {
-            let pick = select_intention_softmax(&pool, &mut rng, 0.15)
-                .expect("non-empty pool");
+            let pick = select_intention_softmax(&pool, &mut rng, 0.15).expect("non-empty pool");
             *counts.entry(pick.id.0).or_insert(0) += 1;
         }
         // Every candidate should get a meaningful share under near-ties.
         for name in ["eat", "socialize", "groom"] {
             let c = *counts.get(name).unwrap_or(&0);
-            assert!(c >= 50, "{name} got only {c}/500 picks under near-tie softmax");
+            assert!(
+                c >= 50,
+                "{name} got only {c}/500 picks under near-tie softmax"
+            );
         }
     }
 
@@ -1203,8 +1215,8 @@ mod tests {
         let modifiers = ModifierPipeline::new();
         let fetch = |name: &str, _: Entity| if name == "hunger" { 0.6 } else { 0.0 };
 
-        let untraced = evaluate_single(&dse, entity, &ctx, &maslow, &modifiers, &fetch)
-            .expect("eligible");
+        let untraced =
+            evaluate_single(&dse, entity, &ctx, &maslow, &modifiers, &fetch).expect("eligible");
         let mut sink = EvalTrace::default();
         let traced = evaluate_single_with_trace(
             &dse,
@@ -1248,7 +1260,11 @@ mod tests {
                 _: &EvalCtx,
                 _: &dyn Fn(&str, Entity) -> f32,
             ) -> f32 {
-                if score > 0.5 { score * 0.5 } else { score }
+                if score > 0.5 {
+                    score * 0.5
+                } else {
+                    score
+                }
             }
             fn name(&self) -> &'static str {
                 "cap"
@@ -1276,8 +1292,7 @@ mod tests {
         // Input 0.6 → AddFive takes it to 0.65 → cap halves to 0.325.
         // Both passes should appear in the trace because both changed score.
         let mut deltas = Vec::new();
-        let out =
-            pipeline.apply_with_trace(DseId("eat"), 0.6, &ctx, &fetch, Some(&mut deltas));
+        let out = pipeline.apply_with_trace(DseId("eat"), 0.6, &ctx, &fetch, Some(&mut deltas));
         assert!((out - 0.325).abs() < 1e-6, "got {out}");
         assert_eq!(deltas.len(), 2);
         assert_eq!(deltas[0].name, "add_five");
@@ -1287,8 +1302,7 @@ mod tests {
         // Input 0.4 → AddFive takes it to 0.45 → cap no-ops at 0.45.
         // Only AddFive should appear; cap's pre==post is filtered out.
         let mut deltas = Vec::new();
-        let out =
-            pipeline.apply_with_trace(DseId("eat"), 0.4, &ctx, &fetch, Some(&mut deltas));
+        let out = pipeline.apply_with_trace(DseId("eat"), 0.4, &ctx, &fetch, Some(&mut deltas));
         assert!((out - 0.45).abs() < 1e-6, "got {out}");
         assert_eq!(deltas.len(), 1, "cap was a no-op, should be skipped");
         assert_eq!(deltas[0].name, "add_five");

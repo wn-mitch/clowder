@@ -293,7 +293,12 @@ fn sensory_env_multipliers_snapshot() -> serde_json::Value {
         Weather::Wind,
         Weather::Storm,
     ];
-    let phase_variants = [DayPhase::Dawn, DayPhase::Day, DayPhase::Dusk, DayPhase::Night];
+    let phase_variants = [
+        DayPhase::Dawn,
+        DayPhase::Day,
+        DayPhase::Dusk,
+        DayPhase::Night,
+    ];
 
     let weather_block: serde_json::Map<String, serde_json::Value> = weather_variants
         .iter()
@@ -550,15 +555,9 @@ fn build_schedule() -> Schedule {
     schedule.add_systems(
         clowder::systems::trace_emit::emit_focal_trace
             .after(clowder::systems::goap::resolve_goap_plans)
-            .run_if(bevy_ecs::prelude::resource_exists::<
-                clowder::resources::FocalTraceTarget,
-            >)
-            .run_if(bevy_ecs::prelude::resource_exists::<
-                clowder::resources::TraceLog,
-            >)
-            .run_if(bevy_ecs::prelude::resource_exists::<
-                clowder::resources::FocalScoreCapture,
-            >),
+            .run_if(bevy_ecs::prelude::resource_exists::<clowder::resources::FocalTraceTarget>)
+            .run_if(bevy_ecs::prelude::resource_exists::<clowder::resources::TraceLog>)
+            .run_if(bevy_ecs::prelude::resource_exists::<clowder::resources::FocalScoreCapture>),
     );
     schedule.add_systems(
         clowder::systems::snapshot::emit_position_traces
@@ -772,7 +771,9 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
             .push(clowder::ai::dses::fox_hunting_dse(&scoring));
         registry.fox_dses.push(clowder::ai::dses::fox_raiding_dse());
         registry.fox_dses.push(clowder::ai::dses::fox_fleeing_dse());
-        registry.fox_dses.push(clowder::ai::dses::fox_avoiding_dse());
+        registry
+            .fox_dses
+            .push(clowder::ai::dses::fox_avoiding_dse());
         registry
             .fox_dses
             .push(clowder::ai::dses::fox_den_defense_dse());
@@ -881,8 +882,8 @@ fn run_headless(args: CliArgs) -> io::Result<()> {
         let c = world.resource::<clowder::resources::SimConstants>();
         serde_json::to_value(c.clone()).unwrap_or_default()
     };
-    let sim_config_json = serde_json::to_value(world.resource::<SimConfig>().clone())
-        .unwrap_or_default();
+    let sim_config_json =
+        serde_json::to_value(world.resource::<SimConfig>().clone()).unwrap_or_default();
     let forced_weather_json = args.force_weather.map(|w| w.label());
     let sensory_env_multipliers_json = sensory_env_multipliers_snapshot();
     let (map_width, map_height) = {
@@ -1505,7 +1506,9 @@ fn build_new_world(seed: u64, test_map: bool) -> io::Result<World> {
             .push(clowder::ai::dses::fox_hunting_dse(&scoring));
         registry.fox_dses.push(clowder::ai::dses::fox_raiding_dse());
         registry.fox_dses.push(clowder::ai::dses::fox_fleeing_dse());
-        registry.fox_dses.push(clowder::ai::dses::fox_avoiding_dse());
+        registry
+            .fox_dses
+            .push(clowder::ai::dses::fox_avoiding_dse());
         registry
             .fox_dses
             .push(clowder::ai::dses::fox_den_defense_dse());

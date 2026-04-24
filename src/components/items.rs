@@ -516,7 +516,8 @@ mod tests {
         };
         let freshness = 1.0 - raw_mods.corruption * penalty;
         let raw_value = base * freshness;
-        let cooked_value = base * freshness
+        let cooked_value = base
+            * freshness
             * if cooked_mods.cooked {
                 cooked_food_multiplier
             } else {

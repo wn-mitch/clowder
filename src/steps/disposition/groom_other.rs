@@ -7,7 +7,9 @@ use crate::components::hunting_priors::HuntingPriors;
 use crate::components::physical::Needs;
 use crate::resources::colony_hunting_map::ColonyHuntingMap;
 use crate::resources::relationships::Relationships;
-use crate::resources::sim_constants::{DispositionConstants, FulfillmentConstants, SocialConstants};
+use crate::resources::sim_constants::{
+    DispositionConstants, FulfillmentConstants, SocialConstants,
+};
 use crate::steps::{StepOutcome, StepResult};
 
 /// Deferred outcome from a completed groom-other action. The caller
@@ -124,7 +126,11 @@ mod tests {
 
     fn test_constants() -> (SocialConstants, DispositionConstants, FulfillmentConstants) {
         let sc = crate::resources::sim_constants::SimConstants::default();
-        (sc.social.clone(), sc.disposition.clone(), sc.fulfillment.clone())
+        (
+            sc.social.clone(),
+            sc.disposition.clone(),
+            sc.fulfillment.clone(),
+        )
     }
 
     fn make_deps() -> (
@@ -238,7 +244,9 @@ mod tests {
             &fc,
         );
 
-        let groom = outcome.witness.expect("should produce GroomOutcome with target");
+        let groom = outcome
+            .witness
+            .expect("should produce GroomOutcome with target");
         assert_eq!(groom.target, target);
         assert!(groom.grooming_delta > 0.0);
         assert!(groom.social_warmth_delta > 0.0);

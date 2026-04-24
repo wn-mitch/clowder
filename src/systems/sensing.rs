@@ -1062,10 +1062,7 @@ mod tests {
                     SensorySignature::CARCASS,
                     range as f32,
                 );
-                assert_eq!(
-                    old_detected, new_detected,
-                    "dx={dx} dy={dy} dist={dist}"
-                );
+                assert_eq!(old_detected, new_detected, "dx={dx} dy={dy} dist={dist}");
             }
         }
     }
@@ -1101,13 +1098,8 @@ mod tests {
                         } else {
                             1.0 - (dist as f32 / (alert_radius as f32 + 1.0))
                         };
-                        let new_proximity = prey_cat_proximity(
-                            prey_pos,
-                            *kind,
-                            profile,
-                            cat_pos,
-                            alert_radius,
-                        );
+                        let new_proximity =
+                            prey_cat_proximity(prey_pos, *kind, profile, cat_pos, alert_radius);
                         let diff = (old_proximity - new_proximity).abs();
                         assert!(
                             diff < 1e-6,

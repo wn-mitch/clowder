@@ -2346,12 +2346,6 @@ pub fn fox_scent_tick(
 mod tests {
     use super::*;
     use bevy_ecs::schedule::Schedule;
-    use rand_chacha::rand_core::SeedableRng;
-    use rand_chacha::ChaCha8Rng;
-
-    fn test_rng() -> ChaCha8Rng {
-        ChaCha8Rng::seed_from_u64(42)
-    }
 
     fn setup_world() -> (World, Schedule) {
         let mut world = World::new();

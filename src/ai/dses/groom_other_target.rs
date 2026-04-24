@@ -111,7 +111,10 @@ pub fn groom_other_target_dse() -> TargetTakingDse {
         id: DseId("groom_other_target"),
         candidate_query: groom_other_candidate_query_doc,
         per_target_considerations: vec![
-            Consideration::Scalar(ScalarConsideration::new(TARGET_NEARNESS_INPUT, nearness_curve)),
+            Consideration::Scalar(ScalarConsideration::new(
+                TARGET_NEARNESS_INPUT,
+                nearness_curve,
+            )),
             Consideration::Scalar(ScalarConsideration::new(
                 TARGET_FONDNESS_INPUT,
                 linear.clone(),
@@ -183,8 +186,7 @@ pub fn resolve_groom_other_target(
 
     let mut candidates: Vec<Entity> = Vec::new();
     let mut positions: Vec<Position> = Vec::new();
-    let mut temperatures: std::collections::HashMap<Entity, f32> =
-        std::collections::HashMap::new();
+    let mut temperatures: std::collections::HashMap<Entity, f32> = std::collections::HashMap::new();
     for (other, other_pos) in cat_positions {
         if *other == cat {
             continue;
@@ -300,11 +302,7 @@ mod tests {
 
     #[test]
     fn groom_other_target_weights_sum_to_one() {
-        let sum: f32 = groom_other_target_dse()
-            .composition()
-            .weights
-            .iter()
-            .sum();
+        let sum: f32 = groom_other_target_dse().composition().weights.iter().sum();
         assert!((sum - 1.0).abs() < 1e-4);
     }
 
@@ -507,9 +505,7 @@ mod tests {
         let near_acquaintance = Entity::from_raw_u32(2).unwrap();
         let far_dearest = Entity::from_raw_u32(3).unwrap();
         let mut relationships = Relationships::default();
-        relationships
-            .get_or_insert(cat, near_acquaintance)
-            .fondness = 0.4;
+        relationships.get_or_insert(cat, near_acquaintance).fondness = 0.4;
         relationships.get_or_insert(cat, far_dearest).fondness = 0.95;
 
         let temperature_lookup = |_: Entity| -> Option<f32> { Some(0.5) };

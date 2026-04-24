@@ -280,7 +280,7 @@ fn print_score_breakdown(snapshots: &[Value]) {
         .filter(|s| {
             s.get("last_scores")
                 .and_then(|v| v.as_array())
-                .map_or(false, |a| !a.is_empty())
+                .is_some_and(|a| !a.is_empty())
         })
         .collect();
     if scored.is_empty() {

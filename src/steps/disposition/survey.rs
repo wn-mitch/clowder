@@ -30,8 +30,7 @@ pub fn resolve_survey(
     d: &DispositionConstants,
 ) -> StepOutcome<()> {
     if ticks >= d.survey_duration {
-        let discovery =
-            exploration_map.explore_area(pos.x, pos.y, d.survey_explore_radius);
+        let discovery = exploration_map.explore_area(pos.x, pos.y, d.survey_explore_radius);
 
         let colony_bonus = discovery * d.survey_colony_discovery_scale;
         needs.respect = (needs.respect + colony_bonus).min(1.0);

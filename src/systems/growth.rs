@@ -134,28 +134,32 @@ pub fn update_life_stage_markers(
         let stage = age.stage(time.tick, config.ticks_per_season);
         match stage {
             LifeStage::Kitten if !has_k => {
-                commands
-                    .entity(entity)
-                    .insert(markers::Kitten)
-                    .remove::<(markers::Young, markers::Adult, markers::Elder)>();
+                commands.entity(entity).insert(markers::Kitten).remove::<(
+                    markers::Young,
+                    markers::Adult,
+                    markers::Elder,
+                )>();
             }
             LifeStage::Young if !has_y => {
-                commands
-                    .entity(entity)
-                    .insert(markers::Young)
-                    .remove::<(markers::Kitten, markers::Adult, markers::Elder)>();
+                commands.entity(entity).insert(markers::Young).remove::<(
+                    markers::Kitten,
+                    markers::Adult,
+                    markers::Elder,
+                )>();
             }
             LifeStage::Adult if !has_a => {
-                commands
-                    .entity(entity)
-                    .insert(markers::Adult)
-                    .remove::<(markers::Kitten, markers::Young, markers::Elder)>();
+                commands.entity(entity).insert(markers::Adult).remove::<(
+                    markers::Kitten,
+                    markers::Young,
+                    markers::Elder,
+                )>();
             }
             LifeStage::Elder if !has_e => {
-                commands
-                    .entity(entity)
-                    .insert(markers::Elder)
-                    .remove::<(markers::Kitten, markers::Young, markers::Adult)>();
+                commands.entity(entity).insert(markers::Elder).remove::<(
+                    markers::Kitten,
+                    markers::Young,
+                    markers::Adult,
+                )>();
             }
             _ => {} // already has the correct marker — no-op
         }
@@ -169,7 +173,6 @@ pub fn update_life_stage_markers(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bevy_ecs::prelude::*;
 
     /// Build a minimal world with TimeState + SimConfig, returning the
     /// world and a schedule containing only `update_life_stage_markers`.

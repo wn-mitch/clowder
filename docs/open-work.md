@@ -75,7 +75,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/). Recent months:
 
-- [2026-04](docs/open-work/landed/2026-04.md) — 30 entries
+- [2026-04](docs/open-work/landed/2026-04.md) — 32 entries
 
 ## Conventions
 

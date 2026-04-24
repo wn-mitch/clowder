@@ -181,11 +181,13 @@ pub fn target_ranking_from_scored(
     let candidates: Vec<crate::resources::trace_log::TargetCandidate> = ranked
         .iter()
         .enumerate()
-        .map(|(i, (entity, score))| crate::resources::trace_log::TargetCandidate {
-            name: name_lookup(*entity),
-            score: *score,
-            contributed: i < contributing_count,
-        })
+        .map(
+            |(i, (entity, score))| crate::resources::trace_log::TargetCandidate {
+                name: name_lookup(*entity),
+                score: *score,
+                contributed: i < contributing_count,
+            },
+        )
         .collect();
     let winner = scored.winning_target.map(name_lookup);
     Some(crate::resources::trace_log::TargetRanking {
@@ -351,10 +353,7 @@ fn score_target_consideration(
 }
 
 /// Aggregation dispatch — `(per_target, rule) → (score, winner)`.
-fn aggregate(
-    per_target: &[(Entity, f32)],
-    rule: TargetAggregation,
-) -> (f32, Option<Entity>) {
+fn aggregate(per_target: &[(Entity, f32)], rule: TargetAggregation) -> (f32, Option<Entity>) {
     match rule {
         TargetAggregation::Best => {
             let winner = per_target
@@ -462,15 +461,7 @@ mod tests {
         let ctx = test_ctx(cat);
         let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = |_: &str, _: Entity, _: Entity| 0.0;
-        let out = evaluate_target_taking(
-            &dse,
-            cat,
-            &[],
-            &[],
-            &ctx,
-            &fetch_self,
-            &fetch_target,
-        );
+        let out = evaluate_target_taking(&dse, cat, &[], &[], &ctx, &fetch_self, &fetch_target);
         assert_eq!(out.aggregated_score, 0.0);
         assert!(out.winning_target.is_none());
         assert!(out.intention.is_none());
@@ -561,7 +552,11 @@ mod tests {
             &fetch_target,
         );
         // Top 2: 0.6 + 0.4 = 1.0; winner is the argmax (a).
-        assert!((out.aggregated_score - 1.0).abs() < 1e-5, "got {}", out.aggregated_score);
+        assert!(
+            (out.aggregated_score - 1.0).abs() < 1e-5,
+            "got {}",
+            out.aggregated_score
+        );
         assert_eq!(out.winning_target, Some(a));
     }
 
