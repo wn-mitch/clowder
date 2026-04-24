@@ -1494,6 +1494,81 @@ pub struct DispositionConstants {
     /// Kitten-side acceptance bump when a kitten is successfully fed
     /// (witnessed `FeedKitten` — adult inventory took a food item).
     pub acceptance_per_kitten_fed: f32,
+    /// Iteration 2 of `docs/balance/acceptance-restoration.md` — per-tick
+    /// recipient bump on the GroomOther recipient. Mirror of the existing
+    /// `groom_other_social_per_tick` which restores the *groomer's* social.
+    /// Iter-1 mechanism correction: completion-witness was dormant because
+    /// 80-tick groom sessions get preempted; per-tick fires on actual
+    /// engagement, not just completion.
+    #[serde(default = "default_acceptance_per_groom_other_per_tick")]
+    pub acceptance_per_groom_other_per_tick: f32,
+    /// Iteration 2 — per-tick recipient bump on the FedKitten recipient
+    /// (the kitten). Same iter-1 mechanism-correction rationale.
+    #[serde(default = "default_acceptance_per_feed_kitten_per_tick")]
+    pub acceptance_per_feed_kitten_per_tick: f32,
+    /// Iteration 2 — per-tick apprentice bump on Mentor sessions.
+    /// Receiver-side acceptance pathway for the apprentice — paired with
+    /// the existing `mentor_mastery_per_tick` (mentor-side felt-competence).
+    #[serde(default = "default_acceptance_per_mentor_per_tick")]
+    pub acceptance_per_mentor_per_tick: f32,
+    /// Iteration 2 — per-tick recipient bump on Cleanse sessions
+    /// (target cat being cleansed of corruption).
+    #[serde(default = "default_acceptance_per_cleanse_per_tick")]
+    pub acceptance_per_cleanse_per_tick: f32,
+    /// New balance thread `docs/balance/respect-restoration.md` — per-witness
+    /// respect multiplier applied at chain completion on top of the
+    /// existing `respect_for_disposition` baseline. Models social visibility
+    /// of accomplishment.
+    #[serde(default = "default_respect_per_witness")]
+    pub respect_per_witness: f32,
+    /// Manhattan radius for counting witnesses to a chain completion.
+    #[serde(default = "default_respect_witness_radius")]
+    pub respect_witness_radius: i32,
+    /// Diminishing-returns cap on witness count.
+    #[serde(default = "default_respect_witness_cap")]
+    pub respect_witness_cap: u32,
+    /// New balance thread `docs/balance/purpose-restoration.md` — generic
+    /// per-action colony-positive bump baseline. Used for actions whose
+    /// colony-contribution pulse doesn't have a dedicated knob below.
+    #[serde(default = "default_purpose_per_colony_action")]
+    pub purpose_per_colony_action: f32,
+    /// Per-event purpose bump on a successful deposit-to-stores
+    /// (tangible asset added to colony pool).
+    #[serde(default = "default_purpose_per_deposit")]
+    pub purpose_per_deposit: f32,
+    /// Per-event purpose bump on a successful ward placement
+    /// (significant defensive contribution).
+    #[serde(default = "default_purpose_per_ward_set")]
+    pub purpose_per_ward_set: f32,
+    /// Per-event purpose bump on completing a coordinator directive.
+    #[serde(default = "default_purpose_per_directive_completed")]
+    pub purpose_per_directive_completed: f32,
+    /// Per-tick purpose bump while building (high-cadence; small).
+    #[serde(default = "default_purpose_per_build_tick")]
+    pub purpose_per_build_tick: f32,
+    /// Per-event mastery bump on successful magic outcomes (set ward,
+    /// cleanse corruption, scry, harvest carcass). STUB — placeholder
+    /// for ticket 016 Phase 5's per-skill crafting/experience table
+    /// which will replace this with per-action × per-quality resolution.
+    #[serde(default = "default_mastery_per_magic_success")]
+    pub mastery_per_magic_success: f32,
+    /// Per-event mastery bump on successful TendCrops completion.
+    /// Same STUB caveat as `mastery_per_magic_success`.
+    #[serde(default = "default_mastery_per_successful_tend")]
+    pub mastery_per_successful_tend: f32,
+    /// Per-tick mastery bump while constructing/building.
+    /// Same STUB caveat.
+    #[serde(default = "default_mastery_per_build_tick")]
+    pub mastery_per_build_tick: f32,
+    /// Per-event mastery bump on successful Cook (raw → cooked flip).
+    /// Same STUB caveat.
+    #[serde(default = "default_mastery_per_successful_cook")]
+    pub mastery_per_successful_cook: f32,
+    /// Per-event mastery bump on successful Hunt kill (HuntPrey
+    /// dispatch arm — inline in goap.rs, not a standalone resolver).
+    /// Same STUB caveat.
+    #[serde(default = "default_mastery_per_successful_hunt")]
+    pub mastery_per_successful_hunt: f32,
     pub mentor_mastery_per_tick: f32,
     pub mentor_social_per_tick: f32,
     pub mentor_respect_per_tick: f32,
@@ -1935,7 +2010,33 @@ impl Default for DispositionConstants {
             fight_mastery_gain: 0.03,
             survey_duration: 50,
             survey_purpose_gain: 0.008,
-            survey_mastery_gain: 0.02,
+            // Iteration 2 of `docs/balance/mastery-restoration.md` —
+            // dropped from 0.02 to 0.002 per the iter-1 mechanism
+            // correction (every cat saturated to 1.0 at 0.02; survey
+            // is a more common resolver completion than iter-1
+            // assumed).
+            survey_mastery_gain: 0.002,
+            // Iteration 2 — receiver-side per-tick acceptance.
+            acceptance_per_groom_other_per_tick: default_acceptance_per_groom_other_per_tick(),
+            acceptance_per_feed_kitten_per_tick: default_acceptance_per_feed_kitten_per_tick(),
+            acceptance_per_mentor_per_tick: default_acceptance_per_mentor_per_tick(),
+            acceptance_per_cleanse_per_tick: default_acceptance_per_cleanse_per_tick(),
+            // New thread — respect witness multiplier.
+            respect_per_witness: default_respect_per_witness(),
+            respect_witness_radius: default_respect_witness_radius(),
+            respect_witness_cap: default_respect_witness_cap(),
+            // New thread — purpose colony-action hooks.
+            purpose_per_colony_action: default_purpose_per_colony_action(),
+            purpose_per_deposit: default_purpose_per_deposit(),
+            purpose_per_ward_set: default_purpose_per_ward_set(),
+            purpose_per_directive_completed: default_purpose_per_directive_completed(),
+            purpose_per_build_tick: default_purpose_per_build_tick(),
+            // Iteration 2 — per-action mastery (STUB; ticket 016 Phase 5).
+            mastery_per_magic_success: default_mastery_per_magic_success(),
+            mastery_per_successful_tend: default_mastery_per_successful_tend(),
+            mastery_per_build_tick: default_mastery_per_build_tick(),
+            mastery_per_successful_cook: default_mastery_per_successful_cook(),
+            mastery_per_successful_hunt: default_mastery_per_successful_hunt(),
             survey_colony_discovery_scale: 0.02,
             survey_personal_discovery_scale: 0.005,
             survey_explore_radius: default_survey_explore_radius(),
@@ -2509,6 +2610,108 @@ fn default_explore_perception_radius() -> i32 {
 
 fn default_explore_satiation_threshold() -> f32 {
     0.15
+}
+
+// --- Iteration 2 of `docs/balance/acceptance-restoration.md` —
+// receiver-side per-tick acceptance accumulators. Sized so that an
+// uninterrupted action produces an acceptance bump comparable to
+// the iteration-1 completion-witness magnitudes (groomed=0.08,
+// fed=0.10), but cumulates across tick boundaries so that a
+// preempted action still confers partial credit.
+
+fn default_acceptance_per_groom_other_per_tick() -> f32 {
+    // 0.0008 × 80-tick groom_other_duration ≈ 0.064 if uninterrupted —
+    // close to iter-1's 0.08, but partial credit if preempted.
+    0.0008
+}
+
+fn default_acceptance_per_feed_kitten_per_tick() -> f32 {
+    // FeedKitten is short — 0.005/tick × ~10 ticks ≈ 0.05.
+    0.005
+}
+
+fn default_acceptance_per_mentor_per_tick() -> f32 {
+    // Mentor sessions are long; small per-tick keeps the apprentice
+    // from saturating in a single session while still rewarding
+    // sustained mentorship.
+    0.0005
+}
+
+fn default_acceptance_per_cleanse_per_tick() -> f32 {
+    // Cleanse is rare and high-signal — bigger per-tick.
+    0.001
+}
+
+// --- New balance thread `docs/balance/respect-restoration.md` —
+// witness-multiplier respect at chain completion.
+
+fn default_respect_per_witness() -> f32 {
+    // × 3 witnesses (typical) = 0.015 added on top of the
+    // disposition's baseline respect_for_disposition.
+    0.005
+}
+
+fn default_respect_witness_radius() -> i32 {
+    // Manhattan tiles. Mirrors hearth_effect_radius scale.
+    5
+}
+
+fn default_respect_witness_cap() -> u32 {
+    // Diminishing returns above 4 witnesses.
+    4
+}
+
+// --- New balance thread `docs/balance/purpose-restoration.md` —
+// per-action colony-positive purpose bumps.
+
+fn default_purpose_per_colony_action() -> f32 {
+    0.005
+}
+
+fn default_purpose_per_deposit() -> f32 {
+    // Tangible asset added to colony pool — a clear contribution.
+    0.02
+}
+
+fn default_purpose_per_ward_set() -> f32 {
+    // Significant defensive contribution.
+    0.03
+}
+
+fn default_purpose_per_directive_completed() -> f32 {
+    // Explicit colony-coordinated work completed.
+    0.04
+}
+
+fn default_purpose_per_build_tick() -> f32 {
+    // High-cadence per-tick during construction.
+    0.0003
+}
+
+// --- Iteration 2 of `docs/balance/mastery-restoration.md` —
+// per-action mastery STUBS (placeholder for ticket 016 Phase 5's
+// per-skill crafting/experience table). Magnitudes target a
+// colony-mean mastery in the 0.3-0.5 band against the existing
+// drain rate.
+
+fn default_mastery_per_magic_success() -> f32 {
+    0.015
+}
+
+fn default_mastery_per_successful_tend() -> f32 {
+    0.005
+}
+
+fn default_mastery_per_build_tick() -> f32 {
+    0.001
+}
+
+fn default_mastery_per_successful_cook() -> f32 {
+    0.01
+}
+
+fn default_mastery_per_successful_hunt() -> f32 {
+    0.02
 }
 
 impl Default for CoordinationConstants {

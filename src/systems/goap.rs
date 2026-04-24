@@ -689,6 +689,11 @@ pub fn evaluate_and_plan(
         Has<markers::HasRemedyHerbs>,
         Has<markers::HasWardHerbs>,
         Has<markers::IsCoordinatorWithDirectives>,
+        // §4 batch 2: capability markers.
+        Has<markers::CanHunt>,
+        Has<markers::CanForage>,
+        Has<markers::CanWard>,
+        Has<markers::CanCook>,
     )>,
 ) {
     let sc = &res.constants.scoring;
@@ -901,12 +906,8 @@ pub fn evaluate_and_plan(
             continue;
         }
 
-        let can_hunt = has_nearby_tile(pos, &res.map, d.hunt_terrain_search_radius, |t| {
-            matches!(t, Terrain::DenseForest | Terrain::LightForest)
-        });
-        let can_forage = has_nearby_tile(pos, &res.map, d.forage_terrain_search_radius, |t| {
-            t.foraging_yield() > 0.0
-        });
+        // §4 batch 2: can_hunt/can_forage retired — computed by
+        // `update_capability_markers` and read from MarkerSnapshot below.
 
         // §6.5.6 target-taking DSE: four-axis bundle (nearness /
         // kitten-hunger / kinship Piecewise / isolation) drives
@@ -992,9 +993,18 @@ pub fn evaluate_and_plan(
             markers.set_entity(markers::Adult::KEY, entity, a);
             markers.set_entity(markers::Elder::KEY, entity, e);
         }
-        // §4 batch 1: per-cat markers read from authored ZSTs.
-        if let Ok((injured, has_herbs, has_remedy, has_ward, is_coord_dir)) =
-            per_cat_markers_q.get(entity)
+        // §4 batch 1 + batch 2: per-cat markers read from authored ZSTs.
+        if let Ok((
+            injured,
+            has_herbs,
+            has_remedy,
+            has_ward,
+            is_coord_dir,
+            can_hunt,
+            can_forage,
+            can_ward,
+            can_cook,
+        )) = per_cat_markers_q.get(entity)
         {
             markers.set_entity(markers::Injured::KEY, entity, injured);
             markers.set_entity(markers::HasHerbsInInventory::KEY, entity, has_herbs);
@@ -1005,6 +1015,11 @@ pub fn evaluate_and_plan(
                 entity,
                 is_coord_dir,
             );
+            // §4 batch 2: capability markers.
+            markers.set_entity(markers::CanHunt::KEY, entity, can_hunt);
+            markers.set_entity(markers::CanForage::KEY, entity, can_forage);
+            markers.set_entity(markers::CanWard::KEY, entity, can_ward);
+            markers.set_entity(markers::CanCook::KEY, entity, can_cook);
         }
 
         let has_herbs_nearby = herb_positions.iter().any(|(_, hp, _)| {
@@ -1094,8 +1109,6 @@ pub fn evaluate_and_plan(
             needs,
             personality,
             food_available,
-            can_hunt,
-            can_forage,
             has_social_target,
             has_threat_nearby,
             allies_fighting_threat,
@@ -1116,7 +1129,6 @@ pub fn evaluate_and_plan(
                 entity,
             ),
             has_remedy_herbs: markers.has(markers::HasRemedyHerbs::KEY, entity),
-            has_ward_herbs: markers.has(markers::HasWardHerbs::KEY, entity),
             thornbriar_available: herb_positions
                 .iter()
                 .any(|(_, _, kind)| *kind == HerbKind::Thornbriar),
@@ -3225,6 +3237,14 @@ fn dispatch_step_action(
                         if let Some(ref mut act) = narr.activation {
                             act.record(Feature::WardPlaced);
                         }
+                        // Mastery iter 2 + purpose new-thread: SetWard
+                        // is a high-cadence skilled colony-positive
+                        // action. STUB — see ticket 016 Phase 5.
+                        let d = &ec.constants.disposition;
+                        needs.mastery =
+                            (needs.mastery + d.mastery_per_magic_success).min(1.0);
+                        needs.purpose =
+                            (needs.purpose + d.purpose_per_ward_set).min(1.0);
                     }
                     result
                 }
@@ -3258,6 +3278,11 @@ fn dispatch_step_action(
                     if let Some(ref mut act) = narr.activation {
                         act.record(Feature::WardPlaced);
                     }
+                    let d = &ec.constants.disposition;
+                    needs.mastery =
+                        (needs.mastery + d.mastery_per_magic_success).min(1.0);
+                    needs.purpose =
+                        (needs.purpose + d.purpose_per_ward_set).min(1.0);
                 }
                 result
             }
@@ -3441,6 +3466,13 @@ fn dispatch_step_action(
                                 }
                             }
                         }
+                        // Mastery iter 2 + purpose new-thread: Cleanse
+                        // is a high-skill colony-positive action.
+                        let d = &ec.constants.disposition;
+                        needs.mastery =
+                            (needs.mastery + d.mastery_per_magic_success).min(1.0);
+                        needs.purpose =
+                            (needs.purpose + d.purpose_per_colony_action).min(1.0);
                     }
                     result
                 }
@@ -3567,6 +3599,13 @@ fn dispatch_step_action(
                         },
                     );
                 }
+                // Mastery iter 2 + purpose new-thread: completing a
+                // building is a high-impact colony-positive action.
+                let d = &ec.constants.disposition;
+                needs.mastery =
+                    (needs.mastery + d.mastery_per_build_tick).min(1.0);
+                needs.purpose =
+                    (needs.purpose + d.purpose_per_colony_action).min(1.0);
             }
             outcome.result
         }
@@ -3595,6 +3634,16 @@ fn dispatch_step_action(
                 narr.activation.as_deref_mut(),
                 Feature::CropTended,
             );
+            // Mastery iter 2 + purpose new-thread: each tend tick
+            // (witnessed Advance) contributes a small per-event bump.
+            // Per-tick cadence keeps this from saturating quickly.
+            if matches!(outcome.result, crate::steps::StepResult::Advance) {
+                let d = &ec.constants.disposition;
+                needs.mastery =
+                    (needs.mastery + d.mastery_per_successful_tend).min(1.0);
+                needs.purpose =
+                    (needs.purpose + d.purpose_per_colony_action).min(1.0);
+            }
             outcome.result
         }
 
@@ -3674,6 +3723,17 @@ fn dispatch_step_action(
                 inventory,
                 d,
             );
+            // Mastery iter 2: Cook fires only when a real raw→cooked
+            // flip happens (witness = true). Witnessed Advance is the
+            // mastery gate; bare Advance with no witness means no
+            // food was actually flipped — no mastery.
+            if outcome.witness {
+                let dc = &ec.constants.disposition;
+                needs.mastery =
+                    (needs.mastery + dc.mastery_per_successful_cook).min(1.0);
+                needs.purpose =
+                    (needs.purpose + dc.purpose_per_colony_action).min(1.0);
+            }
             outcome.record_if_witnessed(
                 narr.activation.as_deref_mut(),
                 Feature::FoodCooked,
@@ -4660,6 +4720,9 @@ fn patrol_move(pos: &Position, dx: i32, dy: i32, map: &TileMap) -> Position {
     *pos
 }
 
+// §4 batch 2: scoring-path callers retired (capability markers replace them);
+// kept for test coverage of `find_nearest_tile`.
+#[cfg(test)]
 fn has_nearby_tile(
     from: &Position,
     map: &TileMap,

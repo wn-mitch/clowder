@@ -17,9 +17,9 @@ _Last generated: 2026-04-24._
 | In progress | 5 |
 | Ready | 8 |
 | Parked | 1 |
-| Blocked | 8 |
+| Blocked | 9 |
 | Done (awaiting archive) | 2 |
-| **Open total** | **22** |
+| **Open total** | **23** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -49,7 +49,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 - **[015](docs/open-work/tickets/015-alloparenting-reframe-b.md)** — Alloparenting Reframe B — mama drops kitten at hearth near resting elder — _parked 2026-04-22 · added 2026-04-22_
 
-## Blocked (8)
+## Blocked (9)
 
 - **[006](docs/open-work/tickets/006-cluster-b-shared-spatial-slow-state.md)** — Shared spatial slow-state (Cluster B) — _[B] · blocked-by 005 · added 2026-04-20_
 - **[007](docs/open-work/tickets/007-cluster-c-deliberation-layer.md)** — Deliberation-layer (Cluster C) — _[C] · blocked-by 005 · added 2026-04-20_
@@ -59,6 +59,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[018](docs/open-work/tickets/018-ruin-clearings.md)** — Ruin clearings (corruption nodes, PMD-flavored) — _blocked-by 005, 016 · added 2026-04-22_
 - **[019](docs/open-work/tickets/019-happy-paths-usage-worn-trails.md)** — Happy paths — usage-worn trails — _blocked-by 020 · added 2026-04-22_
 - **[021](docs/open-work/tickets/021-monuments.md)** — Monuments — civic & memorial structures — _blocked-by 005, 020 · added 2026-04-22_
+- **[026](docs/open-work/tickets/026-apprenticeship-xp-boost.md)** — Apprenticeship XP-boost on per-skill Skills component — _blocked-by mastery-restoration iteration 2 · added 2026-04-24_
 
 ## Done (awaiting archive) (2)
 

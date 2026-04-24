@@ -78,7 +78,7 @@ pub struct MarkerQueries<'w, 's> {
             Has<markers::Elder>,
         ),
     >,
-    /// §4 batch 1: per-cat inventory + state + role markers.
+    /// §4 batch 1 + batch 2: per-cat inventory, state, role, capability.
     pub per_cat: Query<
         'w,
         's,
@@ -88,6 +88,11 @@ pub struct MarkerQueries<'w, 's> {
             Has<markers::HasRemedyHerbs>,
             Has<markers::HasWardHerbs>,
             Has<markers::IsCoordinatorWithDirectives>,
+            // §4 batch 2: capability markers.
+            Has<markers::CanHunt>,
+            Has<markers::CanForage>,
+            Has<markers::CanWard>,
+            Has<markers::CanCook>,
         ),
     >,
 }
@@ -556,12 +561,8 @@ pub fn evaluate_dispositions(
             continue;
         }
 
-        let can_hunt = has_nearby_tile(pos, &map, d.hunt_terrain_search_radius, |t| {
-            matches!(t, Terrain::DenseForest | Terrain::LightForest)
-        });
-        let can_forage = has_nearby_tile(pos, &map, d.forage_terrain_search_radius, |t| {
-            t.foraging_yield() > 0.0
-        });
+        // §4 batch 2: can_hunt/can_forage retired — computed by
+        // `update_capability_markers` and read from MarkerSnapshot below.
 
         // §6.5.6 target-taking DSE: replaces the Phase 4c.3 plain helper
         // with the four-axis bundle (nearness / kitten-hunger / kinship
@@ -642,9 +643,18 @@ pub fn evaluate_dispositions(
             markers.set_entity(markers::Adult::KEY, entity, a);
             markers.set_entity(markers::Elder::KEY, entity, e);
         }
-        // §4 batch 1: per-cat markers read from authored ZSTs.
-        if let Ok((injured, has_herbs, has_remedy, has_ward, is_coord_dir)) =
-            side_effects.marker_queries.per_cat.get(entity)
+        // §4 batch 1 + batch 2: per-cat markers read from authored ZSTs.
+        if let Ok((
+            injured,
+            has_herbs,
+            has_remedy,
+            has_ward,
+            is_coord_dir,
+            can_hunt,
+            can_forage,
+            can_ward,
+            can_cook,
+        )) = side_effects.marker_queries.per_cat.get(entity)
         {
             markers.set_entity(markers::Injured::KEY, entity, injured);
             markers.set_entity(markers::HasHerbsInInventory::KEY, entity, has_herbs);
@@ -655,6 +665,11 @@ pub fn evaluate_dispositions(
                 entity,
                 is_coord_dir,
             );
+            // §4 batch 2: capability markers.
+            markers.set_entity(markers::CanHunt::KEY, entity, can_hunt);
+            markers.set_entity(markers::CanForage::KEY, entity, can_forage);
+            markers.set_entity(markers::CanWard::KEY, entity, can_ward);
+            markers.set_entity(markers::CanCook::KEY, entity, can_cook);
         }
 
         let has_herbs_nearby = herb_positions.iter().any(|(_, hp)| {
@@ -708,8 +723,6 @@ pub fn evaluate_dispositions(
             needs,
             personality,
             food_available,
-            can_hunt,
-            can_forage,
             has_social_target,
             has_threat_nearby,
             allies_fighting_threat,
@@ -730,7 +743,6 @@ pub fn evaluate_dispositions(
                 entity,
             ),
             has_remedy_herbs: markers.has(crate::components::markers::HasRemedyHerbs::KEY, entity),
-            has_ward_herbs: markers.has(crate::components::markers::HasWardHerbs::KEY, entity),
             thornbriar_available,
             colony_injury_count,
             ward_strength_low,
@@ -937,40 +949,6 @@ pub fn evaluate_dispositions(
 
         // Keep ticks_remaining = 0 so disposition_to_chain picks it up this tick.
     }
-}
-
-/// Find nearest tile matching a predicate within radius.
-fn find_nearest_tile(
-    from: &Position,
-    map: &TileMap,
-    radius: i32,
-    predicate: impl Fn(Terrain) -> bool,
-) -> Option<Position> {
-    let mut best: Option<(Position, i32)> = None;
-    for dy in -radius..=radius {
-        for dx in -radius..=radius {
-            let p = Position::new(from.x + dx, from.y + dy);
-            if map.in_bounds(p.x, p.y) {
-                let tile = map.get(p.x, p.y);
-                if predicate(tile.terrain) {
-                    let dist = from.manhattan_distance(&p);
-                    if dist > 0 && best.is_none_or(|(_, d)| dist < d) {
-                        best = Some((p, dist));
-                    }
-                }
-            }
-        }
-    }
-    best.map(|(p, _)| p)
-}
-
-fn has_nearby_tile(
-    from: &Position,
-    map: &TileMap,
-    radius: i32,
-    predicate: impl Fn(Terrain) -> bool,
-) -> bool {
-    find_nearest_tile(from, map, radius, predicate).is_some()
 }
 
 /// Find a random tile matching `predicate` within `radius`, weighted by inverse
@@ -1467,6 +1445,97 @@ fn respect_for_disposition(kind: DispositionKind, d: &DispositionConstants) -> f
         DispositionKind::Coordinating => d.respect_gain_coordinating,
         DispositionKind::Socializing => d.respect_gain_socializing,
         _ => 0.0,
+    }
+}
+
+/// Count witnesses (other cats) within Manhattan radius of `actor_pos`,
+/// capped at `cap`. The actor itself is excluded.
+///
+/// Backs the §respect-restoration witness-multiplier: respect from
+/// completing a task scales with social visibility. See
+/// `docs/balance/respect-restoration.md` for the hypothesis +
+/// concordance loop.
+fn count_witnesses_within_radius(
+    actor_entity: Entity,
+    actor_pos: &Position,
+    positions: &[(Entity, Position)],
+    radius: i32,
+    cap: u32,
+) -> u32 {
+    let mut count: u32 = 0;
+    for (e, p) in positions {
+        if *e == actor_entity {
+            continue;
+        }
+        if actor_pos.manhattan_distance(p) <= radius {
+            count += 1;
+            if count >= cap {
+                return cap;
+            }
+        }
+    }
+    count
+}
+
+#[cfg(test)]
+mod respect_witness_tests {
+    use super::*;
+
+    fn pos(x: i32, y: i32) -> Position {
+        Position::new(x, y)
+    }
+
+    #[test]
+    fn empty_positions_zero_witnesses() {
+        let mut world = bevy_ecs::world::World::new();
+        let actor = world.spawn_empty().id();
+        assert_eq!(
+            count_witnesses_within_radius(actor, &pos(5, 5), &[], 5, 4),
+            0
+        );
+    }
+
+    #[test]
+    fn excludes_self() {
+        let mut world = bevy_ecs::world::World::new();
+        let actor = world.spawn_empty().id();
+        let positions = vec![(actor, pos(5, 5))];
+        assert_eq!(
+            count_witnesses_within_radius(actor, &pos(5, 5), &positions, 5, 4),
+            0
+        );
+    }
+
+    #[test]
+    fn counts_in_radius_excludes_out_of_radius() {
+        let mut world = bevy_ecs::world::World::new();
+        let actor = world.spawn_empty().id();
+        let near1 = world.spawn_empty().id();
+        let near2 = world.spawn_empty().id();
+        let far = world.spawn_empty().id();
+        let positions = vec![
+            (near1, pos(7, 5)), // distance 2
+            (near2, pos(5, 9)), // distance 4
+            (far, pos(20, 20)),  // distance 30
+        ];
+        assert_eq!(
+            count_witnesses_within_radius(actor, &pos(5, 5), &positions, 5, 4),
+            2
+        );
+    }
+
+    #[test]
+    fn cap_applies() {
+        let mut world = bevy_ecs::world::World::new();
+        let actor = world.spawn_empty().id();
+        let positions: Vec<(Entity, Position)> = (0..10)
+            .map(|i| (world.spawn_empty().id(), pos(5 + i % 3, 5)))
+            .collect();
+        // All 10 are within radius 5, but cap=4 must apply.
+        assert_eq!(
+            count_witnesses_within_radius(actor, &pos(5, 5), &positions, 5, 4),
+            4
+        );
     }
 }
 
@@ -2389,6 +2458,11 @@ struct ChainStepSnapshots {
     grooming: std::collections::HashMap<Entity, f32>,
     gender: std::collections::HashMap<Entity, Gender>,
     cat_tile_counts: std::collections::HashMap<Position, u32>,
+    /// Live cat positions, used by the witness-multiplier respect bump
+    /// at chain completion (`docs/balance/respect-restoration.md`).
+    /// Snapshotted before the mutable iteration so we can count
+    /// nearby cats without double-borrowing `cats`.
+    positions: Vec<(Entity, Position)>,
 }
 
 /// Mutable accumulators written by [`dispatch_chain_step`], consumed by the
@@ -2504,6 +2578,12 @@ pub fn resolve_disposition_chains(
             }
             counts
         },
+        // Cat positions snapshot for witness-multiplier respect at
+        // chain completion (`docs/balance/respect-restoration.md`).
+        positions: cats
+            .iter()
+            .map(|((e, _, _, p, _, _, _, _), _)| (e, *p))
+            .collect(),
     };
 
     for (
@@ -2659,6 +2739,21 @@ pub fn resolve_disposition_chains(
                     if respect_gain > 0.0 {
                         needs.respect = (needs.respect + respect_gain).min(1.0);
                     }
+                    // §respect-restoration: witness-multiplier on top of
+                    // the baseline respect. Social visibility scales the
+                    // bump up to `respect_witness_cap` other cats.
+                    let witnesses = count_witnesses_within_radius(
+                        cat_entity,
+                        &pos,
+                        &snaps.positions,
+                        d.respect_witness_radius,
+                        d.respect_witness_cap,
+                    );
+                    if witnesses > 0 {
+                        needs.respect = (needs.respect
+                            + d.respect_per_witness * witnesses as f32)
+                            .min(1.0);
+                    }
                     ActionOutcome::Success
                 } else {
                     ActionOutcome::Failure
@@ -2767,6 +2862,21 @@ pub fn resolve_disposition_chains(
                     let respect_gain = respect_for_disposition(disp.kind, d);
                     if respect_gain > 0.0 {
                         needs.respect = (needs.respect + respect_gain).min(1.0);
+                    }
+                    // §respect-restoration: witness-multiplier on top of
+                    // the baseline respect. Mirror of the chain-exhausted
+                    // arm above — both completion paths feed witnesses.
+                    let witnesses = count_witnesses_within_radius(
+                        cat_entity,
+                        &pos,
+                        &snaps.positions,
+                        d.respect_witness_radius,
+                        d.respect_witness_cap,
+                    );
+                    if witnesses > 0 {
+                        needs.respect = (needs.respect
+                            + d.respect_per_witness * witnesses as f32)
+                            .min(1.0);
                     }
                     // Building completion grants extra mood boost ("built something").
                     if disp.kind == DispositionKind::Building {
@@ -3543,6 +3653,16 @@ fn dispatch_chain_step(
                     act.record(Feature::DepositRejected);
                 }
             }
+            // §purpose-restoration: a successful deposit (Advance, not
+            // rejected, not no-store) is a tangible asset added to the
+            // colony pool. Skip the bump on rejected/no-store paths.
+            if matches!(deposit.step, crate::steps::StepResult::Advance)
+                && !deposit.rejected
+                && !deposit.no_store
+            {
+                needs.purpose =
+                    (needs.purpose + d.purpose_per_deposit).min(1.0);
+            }
             apply_step_result(deposit.step, &mut chain, &mut current);
         }
 
@@ -3746,6 +3866,10 @@ fn dispatch_chain_step(
                         narr.activation.as_deref_mut(),
                         Feature::DirectiveDelivered,
                     );
+                    // §purpose-restoration: completing a directive
+                    // delivery is explicit colony-coordinated work.
+                    needs.purpose =
+                        (needs.purpose + d.purpose_per_directive_completed).min(1.0);
                 }
             }
             apply_step_result(outcome.result, &mut chain, &mut current);

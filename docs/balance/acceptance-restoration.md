@@ -138,6 +138,57 @@ the completion-witness path itself.
 **Survival canaries:** hold. Not a regression; the change is a no-op
 at the observed metric level, not harmful.
 
+## Iteration 2 — deferred (2026-04-24)
+
+**Status:** new constants added (`acceptance_per_groom_other_per_tick`,
+`acceptance_per_feed_kitten_per_tick`, `acceptance_per_mentor_per_tick`,
+`acceptance_per_cleanse_per_tick`) but the per-tick recipient hooks are
+not yet wired. The seed-42 v2 deep-soak that motivated this iteration
+showed acceptance still flatlined at 0.012 mean / 95.3% zero — the
+iter-1 receiver-side bumps remain dormant because their parent
+actions (Groom 66 snapshots, Mentor 0, Caretake 0) almost never fire.
+
+### Diagnosis
+
+Acceptance restoration is **not the binding constraint**. The receiver-
+side hooks are correctly designed; what's missing is the action firing
+itself. Action firing is suppressed because `social` need is passively
+saturated by `hearth_social_bonus = 0.001/tick` (10× the
+`social_base_drain = 0.0001/tick`) plus `bond_proximity_social_rate =
+0.0003/tick` from any nearby bonded companion. Cats never need to
+actively socialize, so Socializing/Groom/Mentor lose DSE selection,
+and the receiver-side acceptance hooks have nothing to fire on.
+
+Per the CLAUDE.md "Balance Methodology" — drift > ±10% on a
+characteristic metric requires a hypothesis that ties the cause to
+verisimilitude. Wiring iteration 2's per-tick accumulator hooks
+without first releasing the saturation lever would produce no
+measurable change (the actions still won't fire), so the four-artifact
+methodology can't tie out.
+
+### Decision
+
+Defer the per-tick wiring until the **saturation rebalance follow-on
+ticket** lands (separate ticket, not yet opened). Once `social`
+saturation is broken, Socialize/Groom/Mentor should re-enter DSE
+competition; at that point iter-2's per-tick accumulator pattern
+becomes meaningful and the receiver-side bumps stop being dormant.
+
+The new constants are checked in with `serde(default = ...)` defaults
+so a pre-saturation soak can wire and measure them without a
+constants migration.
+
+### Hypothesis (iter 2 — to be re-asserted after saturation rebalance)
+
+> Acceptance flatline is a two-stage problem: (a) receiver-side
+> witness hooks were dormant because actions didn't reach completion
+> (iter 1 mechanism correction); (b) actions don't reach completion
+> because they don't even start — `social` saturation suppresses the
+> demand signal. Iteration 2 ships the per-tick mechanism but it
+> needs the saturation lever release to take effect. Predicted
+> magnitude post-release: 0.05–0.15 colony-mean. Without the release,
+> 0 (the dormancy persists at a different witness altitude).
+
 ## Related work
 
 - `docs/open-work.md #12` (warmth-split phase 3) — planned `social_warmth`

@@ -174,14 +174,84 @@ over the predicted upper bound.
 **No regression.** Survival canaries hold. Welfare actually improves.
 The overshoot is a tuning issue, not a structural problem.
 
-## Iteration 2 — plan (not yet landed)
+## Iteration 2 — landed (2026-04-24)
 
-- `survey_mastery_gain`: 0.02 → 0.002.
-- Instrument `Feature::Surveyed` or similar so future soaks can verify
-  cadence directly rather than inferring it from saturation.
-- Expand plug-point set: add `&mut Needs` to cook/construct/tend/
-  harvest/gather/repair/magic resolvers once the parallel session's
-  disposition.rs split settles, per the "Deferred" section above.
+**Status:** landed alongside `acceptance-restoration.md` (deferred,
+see below), `respect-restoration.md` iter 1, and `purpose-restoration.md`
+iter 1. The seed-42 v2 deep-soak that motivated this iteration showed
+mastery flatlined at 0.020 mean / 90% zero — three orders of magnitude
+below iter-1's overshoot to 1.0. The intervening §4 marker work and
+hawk/snake GOAP scaffolding likely shifted DSE selection patterns
+enough to suppress the survey cadence iter 1 measured.
+
+### What landed
+
+- `survey_mastery_gain`: **0.02 → 0.002** per iter-1 mechanism
+  correction (over-saturation tuning).
+- **Per-action mastery hooks at the dispatch site** (no resolver
+  signature widening — the `&mut Needs` is already in scope at
+  `dispatch_step_action` in `goap.rs`, so adding `needs.mastery +=`
+  on the witnessed Advance arm is one-liner per step):
+  - `SetWard` (both branches, with and without explicit ward target):
+    `mastery_per_magic_success = 0.015`.
+  - `CleanseCorruption` Advance: same.
+  - `Construct` Advance: `mastery_per_build_tick = 0.001` per
+    build-event (per-tick cadence keeps from saturating fast).
+  - `TendCrops` Advance: `mastery_per_successful_tend = 0.005`.
+  - `Cook` (gated on the `outcome.witness == true` flag — only fires
+    when an actual raw→cooked flip happened):
+    `mastery_per_successful_cook = 0.01`.
+- Hunt is inline in the `disposition.rs` dispatch (`StepKind::HuntPrey`
+  is not a standalone resolver), and was not wired in this iteration —
+  follow-up.
+
+### What deferred
+
+- **Resolver signature widening** to `&mut Needs` for cook/construct/
+  tend/gather/harvest/repair/set_ward/cleanse/prepare_remedy/
+  apply_remedy. Iter 1 deferred this because of a parallel-session
+  collision; iter 2 took an equivalent dispatch-site approach instead
+  (the actor's `Needs` is in scope where the resolver is invoked, so
+  the per-need application can happen in `goap.rs` without touching
+  the resolver). This avoids resolver-API churn for what is
+  fundamentally a side-effect orchestration concern.
+- **`Feature::Surveyed` instrumentation** — deferred. The dispatch
+  site already classifies `Survey` Advance vs Continue, so cadence
+  visibility is achievable via a `_footer` tally without needing a new
+  Feature. Open as follow-on.
+- **`Feature::ThreatEngaged` cadence verification** — open question
+  whether `fight_mastery_gain = 0.03` ever actually fires; deferred to
+  separate diagnostic ticket.
+- **HuntPrey mastery hook** — separate ticket; the inline dispatch
+  arm in disposition.rs needs the same one-liner as the goap.rs sites.
+
+### Hypothesis (iter 2)
+
+> The iter-1 mastery hooks fire too narrowly (only `survey` and
+> `fight`) at cadences that swing wildly with DSE selection drift.
+> Wiring per-action mastery at every Advance arm of the high-cadence
+> magic/farm/build/cook resolvers gives mastery a steady restoration
+> signal that matches the actual ecology of what cats do, with
+> magnitudes calibrated against the 0.00002–0.00003/tick drain rate
+> to land in a 0.3–0.5 colony-mean band rather than 0.0 or 1.0.
+
+### Prediction (iter 2)
+
+| Metric | Direction | Rough magnitude |
+|---|---|---|
+| Colony-averaged mastery | ↑ from 0.020 | 0.3–0.5 band |
+| Mastery `=0%` over snapshots | ↓ from 90.2% | < 30% |
+| Welfare composite | ↑ slightly | esteem term recovers |
+| Survival canaries | unchanged | hard gates |
+
+### Observation
+
+Pending — to be filled in after the post-commit seed-42 deep-soak.
+
+### Concordance
+
+Pending. Document direction match + magnitude band per CLAUDE.md
+balance methodology.
 
 ## Related work
 
