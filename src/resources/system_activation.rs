@@ -474,7 +474,10 @@ impl Feature {
             Feature::BuildingRepaired => false,
             Feature::BuildingTidied => false,
             Feature::StorageUpgraded => false,
-            Feature::CourtshipInteraction => false,
+            // Ticket 027 Bug 1 wired this to `social::check_bonds`'s
+            // courtship-drift gate, so it now fires whenever any
+            // compatible adult pair drifts. Promoted out of the
+            // rare-legend list to gate the never-fired canary.
             // §Phase 5a empirical calibration (seed-42 soak): these
             // are exempt because they depend on conditions the sim
             // can't guarantee in 15 min of wall-clock:
@@ -953,6 +956,8 @@ mod tests {
         assert!(Feature::CropTended.expected_to_fire_per_soak());
         assert!(Feature::FoodEaten.expected_to_fire_per_soak());
         assert!(Feature::Socialized.expected_to_fire_per_soak());
+        // Promoted by ticket 027 Bug 1 (courtship-drift emits per-tick).
+        assert!(Feature::CourtshipInteraction.expected_to_fire_per_soak());
         // Rare-legend events must be exempted.
         assert!(!Feature::ShadowFoxBanished.expected_to_fire_per_soak());
         assert!(!Feature::FateAwakened.expected_to_fire_per_soak());

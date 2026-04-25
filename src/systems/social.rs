@@ -5,6 +5,7 @@ use bevy_ecs::prelude::*;
 use crate::components::building::Structure;
 use crate::components::identity::{Age, Gender, LifeStage, Name, Orientation};
 use crate::components::physical::{Dead, Position};
+use crate::resources::event_log::{EventKind, EventLog};
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::relationships::{BondType, Relationships};
 use crate::resources::sim_constants::SimConstants;
@@ -72,6 +73,7 @@ pub fn check_bonds(
     constants: Res<SimConstants>,
     mut activation: ResMut<SystemActivation>,
     mut pushback: MessageWriter<crate::systems::magic::CorruptionPushback>,
+    mut event_log: Option<ResMut<EventLog>>,
 ) {
     let c = &constants.social;
     // Only check every bond_check_interval ticks.
@@ -115,11 +117,29 @@ pub fn check_bonds(
 
         // Courtship drift: compatible close-friend pairs develop romantic
         // attraction over time, breaking the Partners/Mate chicken-and-egg.
+        //
+        // Ticket 027 Bug 1: emit `Feature::CourtshipInteraction` and push
+        // an `EventKind::CourtshipDrifted` event each time the gate fires.
+        // Without this the `continuity_tallies.courtship` canary tracks
+        // only `MatingOccurred` (which is currently zero per Bugs 2/3),
+        // hiding the fact that passive drift IS accumulating.
         if romantic_eligible
             && rel.fondness > c.courtship_fondness_gate
             && rel.familiarity > c.courtship_familiarity_gate
         {
             rel.romantic = (rel.romantic + c.courtship_romantic_rate).min(1.0);
+            activation.record(Feature::CourtshipInteraction);
+            if let Some(elog) = event_log.as_mut() {
+                if let (Ok(name_a), Ok(name_b)) = (names.get(a), names.get(b)) {
+                    elog.push(
+                        time.tick,
+                        EventKind::CourtshipDrifted {
+                            cat_a: name_a.0.clone(),
+                            cat_b: name_b.0.clone(),
+                        },
+                    );
+                }
+            }
         }
 
         let new_bond = if romantic_eligible
@@ -664,6 +684,119 @@ mod tests {
             bond,
             Some(BondType::Partners),
             "compatible adults with strong fondness/familiarity should reach Partners in ~{checks_needed} checks; got bond {bond:?}"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Ticket 027 Bug 1: courtship-drift gate emits Feature + EventKind so the
+    // continuity_tallies.courtship canary tracks passive drift independently
+    // of the deadlocked MateWith path.
+    // -----------------------------------------------------------------------
+
+    fn count_courtship_drifted(world: &World) -> usize {
+        world
+            .resource::<EventLog>()
+            .entries
+            .iter()
+            .filter(|e| matches!(e.kind, EventKind::CourtshipDrifted { .. }))
+            .count()
+    }
+
+    #[test]
+    fn courtship_drift_emits_feature_and_event_when_gate_fires() {
+        let adult_tick = 50 + 20_000 * 12;
+        let (mut world, mut schedule) = bond_test_world(adult_tick);
+        world.insert_resource(EventLog::default());
+        let a = spawn_adult(&mut world, "Fern", Gender::Queen, Orientation::Straight);
+        let b = spawn_adult(&mut world, "Reed", Gender::Tom, Orientation::Straight);
+
+        let mut rels = Relationships::default();
+        let rel = rels.get_or_insert(a, b);
+        rel.fondness = 0.5;
+        rel.familiarity = 0.5;
+        rel.romantic = 0.0;
+        world.insert_resource(rels);
+
+        schedule.run(&mut world);
+
+        let activation = world.resource::<SystemActivation>();
+        assert_eq!(
+            activation.counts.get(&Feature::CourtshipInteraction).copied().unwrap_or(0),
+            1,
+            "drift gate should record exactly one CourtshipInteraction this tick"
+        );
+        assert_eq!(
+            count_courtship_drifted(&world),
+            1,
+            "drift gate should push exactly one CourtshipDrifted event this tick"
+        );
+        let log = world.resource::<EventLog>();
+        assert_eq!(
+            log.continuity_tallies.get("courtship").copied().unwrap_or(0),
+            1,
+            "CourtshipDrifted should bump continuity_tallies.courtship"
+        );
+    }
+
+    #[test]
+    fn courtship_drift_emits_nothing_for_incompatible_orientation() {
+        let adult_tick = 50 + 20_000 * 12;
+        let (mut world, mut schedule) = bond_test_world(adult_tick);
+        world.insert_resource(EventLog::default());
+        // Two straight Toms — orientation-incompatible.
+        let a = spawn_adult(&mut world, "Flint", Gender::Tom, Orientation::Straight);
+        let b = spawn_adult(&mut world, "Reed", Gender::Tom, Orientation::Straight);
+
+        let mut rels = Relationships::default();
+        let rel = rels.get_or_insert(a, b);
+        rel.fondness = 0.5;
+        rel.familiarity = 0.5;
+        rel.romantic = 0.0;
+        world.insert_resource(rels);
+
+        schedule.run(&mut world);
+
+        let activation = world.resource::<SystemActivation>();
+        assert_eq!(
+            activation.counts.get(&Feature::CourtshipInteraction).copied().unwrap_or(0),
+            0,
+            "incompatible orientation should not record CourtshipInteraction"
+        );
+        assert_eq!(
+            count_courtship_drifted(&world),
+            0,
+            "incompatible orientation should not push CourtshipDrifted"
+        );
+    }
+
+    #[test]
+    fn courtship_drift_emits_nothing_below_gates() {
+        let adult_tick = 50 + 20_000 * 12;
+        let (mut world, mut schedule) = bond_test_world(adult_tick);
+        world.insert_resource(EventLog::default());
+        let a = spawn_adult(&mut world, "Fern", Gender::Queen, Orientation::Straight);
+        let b = spawn_adult(&mut world, "Reed", Gender::Tom, Orientation::Straight);
+
+        let mut rels = Relationships::default();
+        let rel = rels.get_or_insert(a, b);
+        // Below courtship_fondness_gate (0.3) and courtship_familiarity_gate (0.4).
+        rel.fondness = 0.1;
+        rel.familiarity = 0.1;
+        rel.romantic = 0.0;
+        world.insert_resource(rels);
+
+        schedule.run(&mut world);
+
+        let activation = world.resource::<SystemActivation>();
+        assert_eq!(
+            activation.counts.get(&Feature::CourtshipInteraction).copied().unwrap_or(0),
+            0,
+            "below-gate fondness/familiarity should not record CourtshipInteraction"
+        );
+        assert_eq!(
+            count_courtship_drifted(&world),
+            0,
+            "below-gate fondness/familiarity should not push CourtshipDrifted"
         );
     }
 }

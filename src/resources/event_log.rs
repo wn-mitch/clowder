@@ -267,6 +267,16 @@ pub enum EventKind {
         cat: String,
         partner: Option<String>,
     },
+    /// A pair of cats accumulated romantic attraction under the
+    /// courtship-drift gate in `social::check_bonds`. Lighter-weight
+    /// than `MatingOccurred` — registers an observable courtship tick,
+    /// not a consummation. Tallies as `continuity_tallies.courtship`
+    /// alongside `MatingOccurred`, decoupling the canary from the
+    /// MateWith path that ticket 027 Bug 2 / Bug 3 are still unblocking.
+    CourtshipDrifted {
+        cat_a: String,
+        cat_b: String,
+    },
     /// A mythic-texture event — Calling fired, named-object crafted,
     /// cat-on-cat banishment, or visitor arrival. ShadowFoxBanished
     /// tallies as mythic-texture too, without a separate variant.
@@ -492,6 +502,12 @@ impl EventLog {
                     .entry("courtship".into())
                     .or_insert(0) += 1;
             }
+            EventKind::CourtshipDrifted { .. } => {
+                *self
+                    .continuity_tallies
+                    .entry("courtship".into())
+                    .or_insert(0) += 1;
+            }
             EventKind::ShadowFoxBanished { .. } => {
                 *self
                     .continuity_tallies
@@ -579,5 +595,54 @@ mod tests {
         assert_eq!(log.entries.len(), 3);
         assert_eq!(log.entries[0].tick, 2);
         assert_eq!(log.total_pushed, 5);
+    }
+
+    #[test]
+    fn courtship_drifted_increments_courtship_tally() {
+        // Ticket 027 Bug 1: passive courtship-drift events must bump
+        // `continuity_tallies.courtship` so the canary tracks drift even
+        // before the MateWith path is unblocked by Bugs 2/3.
+        let mut log = EventLog::default();
+        assert_eq!(log.continuity_tallies.get("courtship").copied(), Some(0));
+        log.push(
+            42,
+            EventKind::CourtshipDrifted {
+                cat_a: "Fern".into(),
+                cat_b: "Reed".into(),
+            },
+        );
+        assert_eq!(log.continuity_tallies.get("courtship").copied(), Some(1));
+        log.push(
+            43,
+            EventKind::CourtshipDrifted {
+                cat_a: "Fern".into(),
+                cat_b: "Reed".into(),
+            },
+        );
+        assert_eq!(log.continuity_tallies.get("courtship").copied(), Some(2));
+    }
+
+    #[test]
+    fn mating_and_courtship_drift_share_the_courtship_bucket() {
+        // Ticket 027 Bug 1 piggybacks `CourtshipDrifted` onto the same
+        // bucket as `MatingOccurred` per the §11.3 design pattern. A run
+        // with both kinds of events should sum into a single tally.
+        let mut log = EventLog::default();
+        log.push(
+            10,
+            EventKind::MatingOccurred {
+                partner_a: "Fern".into(),
+                partner_b: "Reed".into(),
+                location: (0, 0),
+            },
+        );
+        log.push(
+            11,
+            EventKind::CourtshipDrifted {
+                cat_a: "Fern".into(),
+                cat_b: "Reed".into(),
+            },
+        );
+        assert_eq!(log.continuity_tallies.get("courtship").copied(), Some(2));
     }
 }

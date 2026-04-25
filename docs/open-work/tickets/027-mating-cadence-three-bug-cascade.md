@@ -1,7 +1,7 @@
 ---
 id: 027
 title: Mating cadence — three-bug cascade blocking MatingOccurred
-status: ready
+status: in-progress
 cluster: null
 added: 2026-04-25
 parked: null
@@ -176,3 +176,25 @@ Per-bug acceptance:
 - 2026-04-25: Ticket opened from baseline-dataset findings.
   See conversation transcript at conversation/run-launch trace
   for full causal-chain reasoning.
+- 2026-04-25: **Bug 1 landed** — `social::check_bonds` now records
+  `Feature::CourtshipInteraction` and pushes a new
+  `EventKind::CourtshipDrifted` variant inside the courtship-drift
+  gate. The variant tallies as `continuity_tallies.courtship`
+  alongside `MatingOccurred` per the §11.3 piggyback pattern.
+  `Feature::CourtshipInteraction` was promoted out of the rare-
+  legend exempt list (`expected_to_fire_per_soak() => true`) since
+  it now fires whenever any compatible Adult pair drifts.
+  Verification — single-seed seed-42 release deep-soak
+  (`logs/tuned-42-027bug1/`):
+
+  | metric | pre-Bug-1 | post-Bug-1 |
+  |---|---|---|
+  | `continuity_tallies.courtship` | 0 | 840 |
+  | `Feature::CourtshipInteraction` | rare-legend exempt | fires (expected) |
+  | shadowfox_ambush_deaths | 6 | 3 |
+  | starvation_deaths | 1 (noise band) | 1 (noise band) |
+  | never_fired_expected | 8 | 8 (CourtshipInteraction left the list as expected; MatingOccurred + downstream still 0 pending Bugs 2/3) |
+
+  Acceptance criterion (`continuity_tallies.courtship > 0`) cleared
+  by 840×. Multi-seed sweep deferred to after Bug 2 lands so the
+  sweep also confirms `mate` L2 records appear.
