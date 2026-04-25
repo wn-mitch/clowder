@@ -4552,7 +4552,15 @@ fn resolve_engage_prey(
         } else {
             state.no_move_ticks += 1;
         }
-        if dist > d.approach_give_up_distance || state.no_move_ticks > d.chase_stuck_ticks {
+        // Recompute distance after movement: `dist` was captured pre-movement
+        // at function entry, but the cat just stepped up to `approach_speed`
+        // tiles toward the prey. Using the stale value here over-fires
+        // "lost prey during approach" when the cat actually closed inside
+        // the give-up window this tick.
+        let post_move_dist = pos.manhattan_distance(&prey_pos);
+        if post_move_dist > d.approach_give_up_distance
+            || state.no_move_ticks > d.chase_stuck_ticks
+        {
             return crate::steps::StepResult::Fail("lost prey during approach".into());
         }
     }
