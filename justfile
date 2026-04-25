@@ -17,7 +17,19 @@ headless *ARGS:
 # Canonical 15-min deep-soak at a fixed seed. Release build, writes to
 # logs/tuned-<seed>/{events,narrative}.jsonl. See CLAUDE.md and
 # docs/diagnostics/log-queries.md for verification.
+#
+# Refuses to overwrite an existing logs/tuned-<seed>/events.jsonl —
+# rename it to a versioned name first (e.g.
+# `mv logs/tuned-42 logs/tuned-42-<suffix>`).
 soak SEED="42":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -s "logs/tuned-{{SEED}}/events.jsonl" ]; then
+      echo "REFUSED: logs/tuned-{{SEED}}/events.jsonl exists." >&2
+      echo "  Rename to a versioned name first, e.g.:" >&2
+      echo "    mv logs/tuned-{{SEED}} logs/tuned-{{SEED}}-\$(git rev-parse --short HEAD)" >&2
+      exit 2
+    fi
     mkdir -p logs/tuned-{{SEED}}
     cargo run --release -- --headless --seed {{SEED}} --duration 900 \
       --log logs/tuned-{{SEED}}/narrative.jsonl \
@@ -68,6 +80,14 @@ test-logq:
 # records decompose per-tick L1/L2/L3 state for one focal cat per §11
 # of docs/systems/ai-substrate-refactor.md.
 soak-trace SEED="42" FOCAL_CAT="Simba":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -s "logs/tuned-{{SEED}}/events.jsonl" ] || [ -s "logs/tuned-{{SEED}}/trace-{{FOCAL_CAT}}.jsonl" ]; then
+      echo "REFUSED: logs/tuned-{{SEED}}/ already has soak-trace output." >&2
+      echo "  Rename to a versioned name first, e.g.:" >&2
+      echo "    mv logs/tuned-{{SEED}} logs/tuned-{{SEED}}-\$(git rev-parse --short HEAD)" >&2
+      exit 2
+    fi
     mkdir -p logs/tuned-{{SEED}}
     cargo run --release -- --headless --seed {{SEED}} --duration 900 \
       --focal-cat {{FOCAL_CAT}} \

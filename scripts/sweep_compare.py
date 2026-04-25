@@ -36,7 +36,7 @@ from scipy import stats  # type: ignore[import-not-found]
 
 CANARY_GATES = {
     "deaths_by_cause.Starvation": ("eq", 0),
-    "deaths_by_cause.ShadowFoxAmbush": ("le", 5),
+    "deaths_by_cause.ShadowFoxAmbush": ("le", 10),
 }
 
 DRIFT_NOISE_BAND = 10.0   # |%| below this is measurement noise

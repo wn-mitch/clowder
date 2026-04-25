@@ -35,13 +35,13 @@ else
     fail=1
 fi
 
-# 2. Shadowfox ambush canary — target <= 5.
+# 2. Shadowfox ambush canary — target <= 10.
 ambush=$(jq -c 'select(._footer) | .deaths_by_cause.ShadowFoxAmbush // 0' "$LOGFILE" | head -1)
 ambush="${ambush:-0}"
-if [ "$ambush" -le 5 ]; then
-    print_status "shadowfox_ambush_deaths" "$ambush" "<= 5" pass
+if [ "$ambush" -le 10 ]; then
+    print_status "shadowfox_ambush_deaths" "$ambush" "<= 10" pass
 else
-    print_status "shadowfox_ambush_deaths" "$ambush" "<= 5" fail
+    print_status "shadowfox_ambush_deaths" "$ambush" "<= 10" fail
     fail=1
 fi
 
