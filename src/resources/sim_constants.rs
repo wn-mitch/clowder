@@ -441,11 +441,14 @@ impl Default for MagicConstants {
             corruption_twisted_herb_threshold: 0.3,
             shadow_fox_corruption_threshold: 0.85,
             shadow_fox_spawn_chance: 0.001,
-            // Temporarily disabled (cap = 0) while stabilising the cat
-            // population during balance tuning. Restore to 2 once the
-            // food/building/survival loops hold on seed 42 without
-            // predator churn obscuring the data.
-            shadow_fox_population_cap: 0,
+            // Restored to 2 (from 0) for the post-substrate-refactor
+            // baseline-dataset capture. The v0.2.0 disable was provisional
+            // — the food/building/survival loops have held green on seed 42
+            // through Phase 4 (target-taking ports, marker authoring, §7.2
+            // commitment gate, respect-iter-2). Re-engaging shadowfoxes is
+            // a precondition for the deferred corruption-defense balance
+            // work that the upcoming baseline dataset is meant to anchor.
+            shadow_fox_population_cap: 2,
             shadow_fox_spawn_interval: 10,
             gather_herb_ticks: 5,
             herbcraft_gather_skill_growth: 0.01,
