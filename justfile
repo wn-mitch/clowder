@@ -185,6 +185,27 @@ sweep LABEL FORCE_WEATHER="" SEEDS="42 99 7 2025 314" REPS="3" DURATION="900" PA
     xargs -P {{PARALLEL}} -I CMD -S 4096 bash -c CMD < "$jobs"
     echo "Sweep complete — outputs in $base/"
 
+# Capture a versioned baseline dataset under logs/baseline-<LABEL>/.
+# Five-phase orchestrator (probe → aggregate sweep → focal traces →
+# conditional weather → REPORT.md). Designed to be backgroundable;
+# writes STATUS.txt + STATUS.json after every phase. See
+# scripts/run_baseline_dataset.sh for env-var overrides
+# (SEEDS, REPS, DURATION, PROBE_DURATION, PARALLEL, ALLOW_DIRTY,
+# SKIP_PHASE_4).
+#
+# Examples:
+#   just baseline-dataset 2026-04-25
+#   SEEDS="42 99" REPS=1 DURATION=60 just baseline-dataset smoke
+#   nohup just baseline-dataset 2026-04-25 > /tmp/baseline.log 2>&1 &
+baseline-dataset LABEL:
+    bash scripts/run_baseline_dataset.sh {{LABEL}}
+
+# Render REPORT.md from an existing logs/baseline-<LABEL>/ tree without
+# re-running soaks. Useful after editing baseline_report.py or for
+# inspecting partial datasets that crashed mid-run.
+baseline-report LABEL:
+    python3 scripts/baseline_report.py --baseline-dir logs/baseline-{{LABEL}}
+
 # Diff tuning constants between two runs. Empty diff means the runs are
 # behaviorally comparable.
 diff-constants BASE NEW:
