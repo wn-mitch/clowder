@@ -17,6 +17,13 @@ pub struct SimulationPlugin;
 
 impl Plugin for SimulationPlugin {
     fn build(&self, app: &mut App) {
+        // World construction — terrain, cats, all sim resources. Owned
+        // by the plugin so any host (windowed App, headless App in
+        // ticket 030) gets the simulation populated by adding the
+        // single plugin. The system reads `AppArgs` (seed, load_path,
+        // …) which the host inserts before `add_plugins`.
+        app.add_systems(Startup, crate::plugins::setup::setup_world_exclusive);
+
         // Register personality event observers (cascade handlers).
         systems::personality_events::register_observers(app);
 
@@ -181,6 +188,14 @@ impl Plugin for SimulationPlugin {
                         systems::needs::update_injury_marker,
                         systems::items::update_inventory_markers,
                         systems::coordination::update_directive_markers,
+                        // §4 batch — Mate eligibility marker. Reads the
+                        // full `mating::has_eligible_mate` predicate
+                        // (season + sated/happy + fertility + Partners
+                        // bond + orientation compat) and writes
+                        // `HasEligibleMate`. `MateDse::eligibility()`
+                        // requires this marker, so the DSE returns 0.0
+                        // for cats whose gate is closed.
+                        crate::ai::mating::update_mate_eligibility_markers,
                         // §4 batch 2: capability markers — reads life-stage,
                         // injury, inventory markers authored above.
                         crate::ai::capabilities::update_capability_markers,

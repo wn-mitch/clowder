@@ -6,7 +6,7 @@ use bevy::app::AppExit;
 use bevy::input::keyboard::KeyCode;
 use bevy::prelude::{
     App, ButtonInput, ClearColor, Color, DefaultPlugins, Fixed, ImagePlugin, MessageWriter,
-    PluginGroup, Res, ResMut, Startup, Time, Update, Window, WindowPlugin,
+    PluginGroup, Res, ResMut, Time, Update, Window, WindowPlugin,
 };
 use bevy::window::WindowResolution;
 
@@ -93,7 +93,6 @@ fn main() {
             load_log_path: args.load_log_path,
             test_map: args.test_map,
         })
-        .add_systems(Startup, clowder::plugins::setup::setup_world_exclusive)
         .add_plugins(SimulationPlugin)
         .add_plugins(rendering::RenderingPlugin)
         .add_plugins(rendering::CameraPlugin)
@@ -446,6 +445,9 @@ fn build_schedule() -> Schedule {
                     clowder::systems::needs::update_injury_marker,
                     clowder::systems::items::update_inventory_markers,
                     clowder::systems::coordination::update_directive_markers,
+                    // §4 batch — Mate eligibility marker (mirror of
+                    // `SimulationPlugin::build`).
+                    clowder::ai::mating::update_mate_eligibility_markers,
                     // §4 batch 2: capability markers.
                     clowder::ai::capabilities::update_capability_markers,
                     clowder::systems::needs::decay_grooming,
