@@ -409,46 +409,61 @@ def section_population(runs: list[RunSummary]) -> str:
 
 
 def section_needs(runs: list[RunSummary]) -> str:
-    """Approximate need-cascade timeseries from CatSnapshot records."""
+    """Need-cascade timeseries: per-need mean/σ at quartile checkpoints.
+
+    Quartile placement is data-driven — the sim's absolute tick counter is
+    not anchored at zero (Bevy ``Time<Fixed>`` carries a ~1.2M-tick warmup
+    offset on fresh runs), so percentile-of-tick-range is the only portable
+    bucketing strategy.
+    """
     out = ["\n## 5. Need-cascade timeseries\n"]
     sweep_runs = [r for r in runs if r.kind == "sweep" and r.footer_written]
     if not sweep_runs:
         out.append("_No sweep runs with footer._\n")
         return "".join(out)
-    # Quartile ticks from any header's duration. Default 900s × 2000 ticks/s = 1_800_000.
-    duration = None
-    for r in sweep_runs:
-        if r.header and r.header.get("duration_secs"):
-            duration = r.header["duration_secs"]
-            break
-    if duration is None:
-        duration = 900
-    end_tick = duration * 2000
-    quartiles = [int(end_tick * q) for q in (0.25, 0.5, 0.75, 1.0)]
 
-    # Bucketed need samples per quartile across all sweep CatSnapshots.
     NEED_KEYS = ["hunger", "energy", "temperature", "safety", "social",
                  "acceptance", "mating", "respect", "mastery", "purpose"]
+
+    # First pass per run: collect all (tick, needs) tuples; second pass: bucket
+    # by min/max-relative quartile. Per-run bucketing keeps tick-range warmup
+    # offsets from leaking between runs.
     buckets: dict[str, list[list[float]]] = {k: [[], [], [], []] for k in NEED_KEYS}
     for r in sweep_runs:
+        per_run: list[tuple[int, dict[str, float]]] = []
         for ev in read_jsonl_streaming(r.events_path):
             if ev.get("type") != "CatSnapshot":
                 continue
             tick = ev.get("tick")
             if not isinstance(tick, int):
                 continue
-            # Pick the smallest quartile tick the sample is ≤.
-            for q_idx, q_tick in enumerate(quartiles):
-                if tick <= q_tick:
-                    needs = ev.get("needs") or {}
-                    for k in NEED_KEYS:
-                        v = needs.get(k)
-                        if isinstance(v, (int, float)):
-                            buckets[k][q_idx].append(float(v))
-                    break
-    out.append(f"\nQuartile checkpoints (assuming 2000 ticks/s, duration={duration}s): T={duration*0.25:.0f}s, {duration*0.5:.0f}s, {duration*0.75:.0f}s, {duration:.0f}s.\n")
-    out.append(f"\nMean (σ) per need bucket:\n\n")
-    out.append("| need | T₁ | T₂ | T₃ | T₄ |\n")
+            needs = ev.get("needs") or {}
+            cleaned = {k: float(needs[k]) for k in NEED_KEYS if isinstance(needs.get(k), (int, float))}
+            if cleaned:
+                per_run.append((tick, cleaned))
+        if not per_run:
+            continue
+        ticks = [t for t, _ in per_run]
+        t_min, t_max = min(ticks), max(ticks)
+        span = max(t_max - t_min, 1)
+        for tick, needs in per_run:
+            frac = (tick - t_min) / span
+            # Quartile index 0..3 (last quartile inclusive of t_max).
+            q_idx = min(3, int(frac * 4))
+            for k, v in needs.items():
+                buckets[k][q_idx].append(v)
+
+    # Header info for the human-readable label.
+    duration = None
+    for r in sweep_runs:
+        if r.header and r.header.get("duration_secs"):
+            duration = r.header["duration_secs"]
+            break
+
+    label = f"duration={duration}s" if duration else "duration=unknown"
+    out.append(f"\nData-driven quartile bucketing across {len(sweep_runs)} sweep runs ({label}). "
+               "Q1=earliest 25% of ticks, Q4=latest 25%.\n\n")
+    out.append("| need | Q1 mean (σ) | Q2 mean (σ) | Q3 mean (σ) | Q4 mean (σ) |\n")
     out.append("|---|---|---|---|---|\n")
     for k in NEED_KEYS:
         cells = []
