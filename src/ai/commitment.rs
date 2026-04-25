@@ -302,13 +302,15 @@ pub fn proxies_for_plan(
     // is semantically inert there.
     let still_goal = match plan.kind {
         DispositionKind::Socializing => {
-            // Satiated — social need above the resting-complete band.
-            // Reuses `resting_complete_temperature` as a generic
-            // "satiation floor" to avoid introducing a bespoke knob
-            // during a substrate refactor; the OpenMinded gate's
-            // first balance iteration can replace this with a
-            // dedicated `social_satiation_threshold`.
-            needs.social < d.resting_complete_temperature
+            // Satiated — social need above the social satiation band.
+            // Seed-42 soaks show social need never drops below 0.54
+            // (passive proximity restoration), so the original 0.3
+            // threshold (reused from resting_complete_temperature)
+            // prevented any Socializing plan from persisting — every
+            // plan was dropped as "goal drifted" before TravelTo +
+            // SocializeWith could complete.  Dedicated knob at 0.85
+            // lets plans hold until the cat is genuinely sated.
+            needs.social < d.social_satiation_threshold
         }
         DispositionKind::Exploring => {
             // Area-familiarity proxy — the cat still wants to explore
@@ -798,8 +800,8 @@ mod tests {
         needs.social = 0.1;
         assert!(proxies_for_plan(&plan, &needs, &d, 1.0).still_goal);
 
-        // Social above `resting_complete_temperature` → drifted.
-        needs.social = d.resting_complete_temperature + 0.05;
+        // Social above `social_satiation_threshold` → drifted.
+        needs.social = d.social_satiation_threshold + 0.05;
         assert!(!proxies_for_plan(&plan, &needs, &d, 1.0).still_goal);
     }
 
@@ -999,7 +1001,7 @@ mod tests {
         plan.replan_count = 0;
 
         let mut needs = default_needs();
-        needs.social = d.resting_complete_temperature + 0.1;
+        needs.social = d.social_satiation_threshold + 0.1;
 
         let strategy = strategy_for_disposition(plan.kind);
         let proxies = proxies_for_plan(&plan, &needs, &d, 1.0);

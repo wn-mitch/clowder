@@ -1646,6 +1646,19 @@ pub struct DispositionConstants {
     /// once the area is thoroughly familiar.  Default 0.15.
     #[serde(default = "default_explore_satiation_threshold")]
     pub explore_satiation_threshold: f32,
+    /// `still_goal` threshold for the §7.2 commitment gate on Socializing
+    /// plans.  When `needs.social` climbs above this value the cat considers
+    /// itself socially sated and an OpenMinded plan may be dropped.
+    ///
+    /// Phase 6a wired this as `resting_complete_temperature` (0.3) to avoid
+    /// a new knob mid-refactor.  Seed-42 soaks show social need never
+    /// drops below 0.54 (passive proximity restoration), so the 0.3
+    /// threshold prevented any Socializing plan from persisting past a
+    /// single commitment check — every plan was immediately dropped as
+    /// "goal drifted."  Raising to 0.85 lets plans hold until the cat is
+    /// genuinely sated, allowing TravelTo + SocializeWith to complete.
+    #[serde(default = "default_social_satiation_threshold")]
+    pub social_satiation_threshold: f32,
     pub explore_den_discovery_chance: f32,
     pub deliver_directive_duration: u64,
     pub deliver_directive_respect_gain: f32,
@@ -2088,6 +2101,7 @@ impl Default for DispositionConstants {
             passive_explore_radius: default_passive_explore_radius(),
             explore_perception_radius: default_explore_perception_radius(),
             explore_satiation_threshold: default_explore_satiation_threshold(),
+            social_satiation_threshold: default_social_satiation_threshold(),
             explore_den_discovery_chance: 0.08,
             deliver_directive_duration: 50,
             deliver_directive_respect_gain: 0.005,
@@ -2654,6 +2668,10 @@ fn default_explore_perception_radius() -> i32 {
 
 fn default_explore_satiation_threshold() -> f32 {
     0.15
+}
+
+fn default_social_satiation_threshold() -> f32 {
+    0.85
 }
 
 // --- Iteration 2 of `docs/balance/acceptance-restoration.md` —
