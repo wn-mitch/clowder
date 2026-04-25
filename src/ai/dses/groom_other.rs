@@ -11,7 +11,7 @@ use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
 use crate::ai::considerations::{Consideration, ScalarConsideration};
-use crate::ai::curves::{inverted_need_penalty, loneliness, Curve};
+use crate::ai::curves::{inverted_need_penalty, Curve};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
@@ -34,7 +34,18 @@ impl GroomOtherDse {
         Self {
             id: DseId("groom_other"),
             considerations: vec![
-                Consideration::Scalar(ScalarConsideration::new(SOCIAL_DEFICIT_INPUT, loneliness())),
+                // Gentler than the Socialize-shared `loneliness()` (Logistic
+                // midpoint 0.7). Real cats groom each other proactively as a
+                // bonding behavior, not just when desperately lonely.
+                // Midpoint 0.3 means moderate social deficits (~0.2-0.4)
+                // produce meaningful scores under the CompensatedProduct.
+                Consideration::Scalar(ScalarConsideration::new(
+                    SOCIAL_DEFICIT_INPUT,
+                    Curve::Logistic {
+                        steepness: 8.0,
+                        midpoint: 0.3,
+                    },
+                )),
                 Consideration::Scalar(ScalarConsideration::new(
                     WARMTH_INPUT,
                     Curve::Linear {
