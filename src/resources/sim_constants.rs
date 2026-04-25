@@ -2690,9 +2690,13 @@ fn default_acceptance_per_cleanse_per_tick() -> f32 {
 // witness-multiplier respect at chain completion.
 
 fn default_respect_per_witness() -> f32 {
-    // × 3 witnesses (typical) = 0.015 added on top of the
-    // disposition's baseline respect_for_disposition.
-    0.005
+    // Iter 2 (batch 3): probing the bistability cliff. 0.0015 → 0.996,
+    // 0.0003 → 0.982 — barely shifted mean despite 16× cut. The
+    // disposition baselines (`respect_gain_*`) plus any nonzero witness
+    // contribution stay above drain; .min(1.0) clips. Try 0.0001 to
+    // probe further toward the cliff edge.
+    // See docs/balance/respect-restoration.md.
+    0.0001
 }
 
 fn default_respect_witness_radius() -> i32 {

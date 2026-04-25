@@ -8,7 +8,7 @@
 > fresh. See `CLAUDE.md` §"Long-horizon coordination" for the request-time
 > checklist and maintenance rules.
 
-_Last generated: 2026-04-24._
+_Last generated: 2026-04-25._
 
 ## Summary
 
@@ -75,7 +75,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/). Recent months:
 
-- [2026-04](docs/open-work/landed/2026-04.md) — 32 entries
+- [2026-04](docs/open-work/landed/2026-04.md) — 33 entries
 
 ## Conventions
 
