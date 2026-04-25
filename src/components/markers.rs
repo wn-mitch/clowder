@@ -119,16 +119,25 @@ impl Injured {
 /// `combat.rs::update_combat_marker`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct InCombat;
+impl InCombat {
+    pub const KEY: &str = "InCombat";
+}
 
 /// Tile under cat has corruption > threshold.
 /// `magic.rs::update_corrupted_tile_markers`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct OnCorruptedTile;
+impl OnCorruptedTile {
+    pub const KEY: &str = "OnCorruptedTile";
+}
 
 /// Tile under cat is `FairyRing` or `StandingStone`.
 /// `sensing.rs::update_terrain_markers`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct OnSpecialTerrain;
+impl OnSpecialTerrain {
+    pub const KEY: &str = "OnSpecialTerrain";
+}
 
 /// ≥1 wildlife hostile within species-attenuated detection range.
 /// `sensing.rs::update_threat_proximity_markers`.

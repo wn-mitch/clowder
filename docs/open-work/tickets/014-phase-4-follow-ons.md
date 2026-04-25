@@ -107,7 +107,65 @@ remaining work is itemised here.
   excluded from all. DSE `.require()` cutover on Hunt, Forage,
   HerbcraftWard, Cook. Retired `can_hunt`, `can_forage`,
   `has_ward_herbs` from `ScoringContext` + inline gates. 23 tests.
-  The remaining ~30 §4.3 markers each need:
+  **State trio landed 2026-04-25** — three §4.2 State markers that
+  were pre-declared in `markers.rs` but had no author system, so
+  consumers reading `Has<Marker>` silently took the "false" branch
+  (notably `capabilities.rs:46` reading `Has<InCombat>` for `CanHunt`
+  / `CanForage`). Authors landed:
+    - `combat.rs::update_combat_marker` — `InCombat` ZST whenever
+      `current.action == Action::Fight && target_entity.is_some()`.
+      v1 covers active fight steps only; "hostile-adjacent" branch
+      from §4.2 rustdoc deferred together with `HasThreatNearby` to
+      a sensing-batch follow-up so the predicate stays a single
+      source of truth.
+    - `magic.rs::update_corrupted_tile_markers` — `OnCorruptedTile`
+      ZST whenever `tile.corruption > corrupted_tile_threshold`.
+    - `sensing.rs::update_terrain_markers` — `OnSpecialTerrain` ZST
+      whenever `tile.terrain` is `FairyRing` or `StandingStone`.
+  
+  All three are bit-for-bit mirrors of the existing inline computations
+  in `disposition.rs::evaluate_dispositions` (~:707–717) and
+  `goap.rs::evaluate_and_plan` (~:1071–1081). Snapshot population
+  wired into both scoring loops via a new `state` query in
+  `MarkerQueries` (disposition) + sibling `state_markers_q`
+  Query (goap). Three new `KEY` constants on the marker structs in
+  `markers.rs:121–141`. Chain 2a hit Bevy's 20-system tuple limit;
+  resolved by nesting the seven existing §4 marker authors plus the
+  new three into a sub-tuple `.chain()` so the outer tuple stays at
+  13. 21 new tests (7 per author). No DSE `.require()` cutover this
+  commit — `OnCorruptedTile` / `OnSpecialTerrain` would feed Cleanse
+  / Commune respectively, but those dormancies are spatial-routing
+  bugs (cats don't path TO corrupted tiles or fairy rings when they
+  carry intent), not authoring gaps. Authoring without the routing
+  fix would be a no-op cutover.
+  
+  **Hypothesis & predicted shift:** authoring three §4.2 State
+  markers replaces silent `Has<Marker>=false` reads with truthful
+  gating; capabilities now lose `CanHunt` / `CanForage` mid-fight
+  (truthful `Has<InCombat>`). Predicted shift on survival canaries:
+  none. Predicted shift on `CanHuntFired` / `CanForageFired`:
+  marginal drop on the cat-ticks where any cat is in active combat
+  (rare relative to total cat-ticks).
+  
+  **Verification status:** lib tests green (1293 / 1293, including
+  30 new author-module test functions across `combat.rs`, `magic.rs`,
+  `sensing.rs`). Seed-42 release deep-soak ran post-030 against the
+  unified `App + SimulationPlugin` pipeline; results preserved at
+  `logs/tuned-42-b9129a1-dirty-statetrio/` (commit_dirty=true since
+  the soak ran against the working tree on top of `b9129a1`):
+
+  | canary | result | notes |
+  |---|---|---|
+  | starvation_deaths | 1 | within Bevy scheduler-variance noise band per CLAUDE.md "Canaries" §; pre-030 baseline at `logs/baseline-2026-04-25/sweep/42-1/` had 0 |
+  | shadowfox_ambush_deaths | 6 | passes the raised ≤ 10 gate (raised 2026-04-25 from ≤ 5; pre-030 baseline rep-1 had 1) |
+  | footer_written | 1 | pass |
+  | features_at_zero | 0 | informational |
+  | never_fired_expected | 8 | identical list to pre-030 baseline: `ItemRetrieved, FoodCooked, KittenBorn, GestationAdvanced, MatingOccurred, KittenFed, GroomedOther, MentoredCat`. Net regression from State-trio: zero. Three are downstream of MatingOccurred=0 (ticket 027); cooking / gathering / grooming-feature / mentoring dormancies are pre-existing structural |
+
+  Continuity tallies: grooming 106, play 636, mythic-texture 42 (all
+  pass); mentoring 0 / burial 0 / courtship 0 (pre-existing dormancies,
+  unblock predicates land with ticket 027 + downstream balance work).
+  The remaining ~27 §4.3 markers each need:
     1. Author system per §4.6 author-file assignment (`Changed<T>`
        filter where the predicate reads changing parent components;
        full-scan where it reads position-adjacent state).

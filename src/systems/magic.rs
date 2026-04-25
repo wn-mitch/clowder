@@ -330,6 +330,72 @@ pub fn corruption_tile_effects(
 }
 
 // ---------------------------------------------------------------------------
+// update_corrupted_tile_markers system (§4.2 OnCorruptedTile)
+// ---------------------------------------------------------------------------
+
+/// Author the `OnCorruptedTile` ZST on living cats whose current tile has
+/// `corruption > corrupted_tile_threshold`; remove it otherwise.
+///
+/// **Predicate** — `tile.corruption > constants.disposition
+/// .corrupted_tile_threshold`. Bit-for-bit mirror of the inline
+/// `on_corrupted_tile` computations in
+/// `goap.rs::evaluate_and_plan` and
+/// `disposition.rs::evaluate_dispositions`. The threshold lives in
+/// `DispositionConstants` (not `MagicConstants`) for historical
+/// reasons — both inline call sites read it from the same field, and
+/// this author is consistent.
+///
+/// **Out-of-bounds positions** — if the cat's `Position` is outside
+/// the map (which shouldn't happen in practice but the inline
+/// predicates handle it) the predicate evaluates to `false` and the
+/// marker is removed if present.
+///
+/// **Ordering** — registered in Chain 2a alongside other §4 marker
+/// authors, before the GOAP scoring pipeline runs, so the
+/// `MarkerSnapshot` population in `evaluate_dispositions` and
+/// `evaluate_and_plan` sees the freshly-authored ZST.
+///
+/// **Lifecycle** — `Dead` cats are filtered out so no marker is
+/// authored on corpses during the narrative grace-period window
+/// before `cleanup_dead`.
+///
+/// **Non-goal:** this author does **not** unblock the Cleanse
+/// dormancy — magic_cleanse needs the cat to *path to* a corrupted
+/// tile, which is a spatial-routing problem documented in
+/// `docs/open-work/tickets/014-phase-4-follow-ons.md` lines
+/// 124–136. Wiring the marker pays down the §4 catalog without
+/// promising a Cleanse fix.
+pub fn update_corrupted_tile_markers(
+    mut commands: Commands,
+    cats: Query<
+        (
+            Entity,
+            &Position,
+            Has<crate::components::markers::OnCorruptedTile>,
+        ),
+        Without<Dead>,
+    >,
+    map: Res<TileMap>,
+    constants: Res<SimConstants>,
+) {
+    use crate::components::markers::OnCorruptedTile;
+    let threshold = constants.disposition.corrupted_tile_threshold;
+    for (entity, pos, has_marker) in cats.iter() {
+        let on_corrupted = map.in_bounds(pos.x, pos.y)
+            && map.get(pos.x, pos.y).corruption > threshold;
+        match (on_corrupted, has_marker) {
+            (true, false) => {
+                commands.entity(entity).insert(OnCorruptedTile);
+            }
+            (false, true) => {
+                commands.entity(entity).remove::<OnCorruptedTile>();
+            }
+            _ => {}
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // herb_seasonal_check
 // ---------------------------------------------------------------------------
 
@@ -1198,5 +1264,149 @@ mod tests {
         };
         // avg = 0.35, threshold 0.3 → NOT low
         assert!(!is_ward_strength_low([&strong, &weak].into_iter(), 0.3));
+    }
+
+    // -----------------------------------------------------------------------
+    // update_corrupted_tile_markers tests (§4.2 OnCorruptedTile)
+    // -----------------------------------------------------------------------
+
+    fn corrupted_tile_setup() -> (World, Schedule, f32) {
+        let mut world = World::new();
+        world.insert_resource(TileMap::new(10, 10, Terrain::Grass));
+        world.insert_resource(SimConstants::default());
+        let threshold = world
+            .resource::<SimConstants>()
+            .disposition
+            .corrupted_tile_threshold;
+        let mut schedule = Schedule::default();
+        schedule.add_systems(update_corrupted_tile_markers);
+        (world, schedule, threshold)
+    }
+
+    fn has_on_corrupted_tile(world: &World, entity: Entity) -> bool {
+        world
+            .get::<crate::components::markers::OnCorruptedTile>(entity)
+            .is_some()
+    }
+
+    fn set_corruption(world: &mut World, x: i32, y: i32, value: f32) {
+        world.resource_mut::<TileMap>().get_mut(x, y).corruption = value;
+    }
+
+    #[test]
+    fn corruption_above_threshold_inserts_marker() {
+        let (mut world, mut schedule, threshold) = corrupted_tile_setup();
+        set_corruption(&mut world, 5, 5, threshold + 0.05);
+        let cat = world.spawn(Position { x: 5, y: 5 }).id();
+        schedule.run(&mut world);
+        assert!(
+            has_on_corrupted_tile(&world, cat),
+            "tile corruption above threshold should insert marker"
+        );
+    }
+
+    #[test]
+    fn corruption_below_threshold_no_marker() {
+        let (mut world, mut schedule, threshold) = corrupted_tile_setup();
+        set_corruption(&mut world, 5, 5, threshold - 0.01);
+        let cat = world.spawn(Position { x: 5, y: 5 }).id();
+        schedule.run(&mut world);
+        assert!(
+            !has_on_corrupted_tile(&world, cat),
+            "tile corruption below threshold should not insert marker"
+        );
+    }
+
+    #[test]
+    fn corruption_at_threshold_no_marker() {
+        // Predicate is strict `>`, mirroring the inline computations
+        // in disposition.rs and goap.rs.
+        let (mut world, mut schedule, threshold) = corrupted_tile_setup();
+        set_corruption(&mut world, 5, 5, threshold);
+        let cat = world.spawn(Position { x: 5, y: 5 }).id();
+        schedule.run(&mut world);
+        assert!(
+            !has_on_corrupted_tile(&world, cat),
+            "tile corruption equal to threshold should not insert marker (strict gt)"
+        );
+    }
+
+    #[test]
+    fn position_change_crosses_threshold_boundary() {
+        let (mut world, mut schedule, threshold) = corrupted_tile_setup();
+        set_corruption(&mut world, 5, 5, threshold + 0.1);
+        let cat = world.spawn(Position { x: 1, y: 1 }).id();
+        schedule.run(&mut world);
+        assert!(!has_on_corrupted_tile(&world, cat));
+
+        world.get_mut::<Position>(cat).unwrap().x = 5;
+        world.get_mut::<Position>(cat).unwrap().y = 5;
+        schedule.run(&mut world);
+        assert!(
+            has_on_corrupted_tile(&world, cat),
+            "moving onto a corrupted tile should insert marker"
+        );
+
+        world.get_mut::<Position>(cat).unwrap().x = 1;
+        world.get_mut::<Position>(cat).unwrap().y = 1;
+        schedule.run(&mut world);
+        assert!(
+            !has_on_corrupted_tile(&world, cat),
+            "moving off a corrupted tile should remove marker"
+        );
+    }
+
+    #[test]
+    fn corruption_mutation_crosses_threshold_boundary() {
+        let (mut world, mut schedule, threshold) = corrupted_tile_setup();
+        let cat = world.spawn(Position { x: 5, y: 5 }).id();
+        schedule.run(&mut world);
+        assert!(!has_on_corrupted_tile(&world, cat));
+
+        set_corruption(&mut world, 5, 5, threshold + 0.2);
+        schedule.run(&mut world);
+        assert!(
+            has_on_corrupted_tile(&world, cat),
+            "rising tile corruption should insert marker"
+        );
+
+        set_corruption(&mut world, 5, 5, 0.0);
+        schedule.run(&mut world);
+        assert!(
+            !has_on_corrupted_tile(&world, cat),
+            "cleansed tile should remove marker"
+        );
+    }
+
+    #[test]
+    fn dead_cats_are_skipped_corrupted_tile() {
+        use crate::components::physical::DeathCause;
+        let (mut world, mut schedule, threshold) = corrupted_tile_setup();
+        set_corruption(&mut world, 5, 5, threshold + 0.1);
+        let cat = world
+            .spawn((
+                Position { x: 5, y: 5 },
+                Dead {
+                    tick: 0,
+                    cause: DeathCause::Injury,
+                },
+            ))
+            .id();
+        schedule.run(&mut world);
+        assert!(
+            !has_on_corrupted_tile(&world, cat),
+            "dead cats should not receive marker even on heavily corrupted tile"
+        );
+    }
+
+    #[test]
+    fn multiple_cats_at_different_tiles_independent() {
+        let (mut world, mut schedule, threshold) = corrupted_tile_setup();
+        set_corruption(&mut world, 5, 5, threshold + 0.1);
+        let on_corrupt = world.spawn(Position { x: 5, y: 5 }).id();
+        let off_corrupt = world.spawn(Position { x: 1, y: 1 }).id();
+        schedule.run(&mut world);
+        assert!(has_on_corrupted_tile(&world, on_corrupt));
+        assert!(!has_on_corrupted_tile(&world, off_corrupt));
     }
 }

@@ -94,6 +94,18 @@ pub struct MarkerQueries<'w, 's> {
             Has<markers::CanCook>,
         ),
     >,
+    /// §4.2 State markers — split into a separate query so the
+    /// per-cat tuple stays small and future State authors can extend
+    /// here.
+    pub state: Query<
+        'w,
+        's,
+        (
+            Has<markers::InCombat>,
+            Has<markers::OnCorruptedTile>,
+            Has<markers::OnSpecialTerrain>,
+        ),
+    >,
 }
 
 use crate::resources::food::FoodStores;
@@ -680,6 +692,17 @@ pub fn evaluate_dispositions(
             markers.set_entity(markers::CanForage::KEY, entity, can_forage);
             markers.set_entity(markers::CanWard::KEY, entity, can_ward);
             markers.set_entity(markers::CanCook::KEY, entity, can_cook);
+        }
+        // §4.2 State markers — InCombat / OnCorruptedTile /
+        // OnSpecialTerrain. Authored by `combat::update_combat_marker`,
+        // `magic::update_corrupted_tile_markers`, and
+        // `sensing::update_terrain_markers` in Chain 2a.
+        if let Ok((in_combat, on_corrupted_marker, on_special_marker)) =
+            side_effects.marker_queries.state.get(entity)
+        {
+            markers.set_entity(markers::InCombat::KEY, entity, in_combat);
+            markers.set_entity(markers::OnCorruptedTile::KEY, entity, on_corrupted_marker);
+            markers.set_entity(markers::OnSpecialTerrain::KEY, entity, on_special_marker);
         }
 
         let has_herbs_nearby = herb_positions.iter().any(|(_, hp)| {

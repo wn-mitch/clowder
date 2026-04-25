@@ -198,6 +198,18 @@ pub fn has_eligible_mate(
     })
 }
 
+/// **Stub — body deferred to ticket 027.** Ports the
+/// `has_eligible_mate` predicate above into a per-tick author system
+/// that maintains the `HasEligibleMate` ZST on living cats. Until the
+/// body lands, the system runs as a no-op so the codebase compiles
+/// (the system is referenced from `SimulationPlugin::build` and from
+/// the legacy headless `setup_world` / `register_dses_at_startup`
+/// paths in `main.rs`). `MateDse::eligibility()` requires
+/// `HasEligibleMate`, so cats stay below the eligibility gate while
+/// this stub is in place — matching the pre-stub behaviour where the
+/// marker was authored by no one.
+pub fn update_mate_eligibility_markers() {}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -694,6 +694,13 @@ pub fn evaluate_and_plan(
         Has<markers::CanWard>,
         Has<markers::CanCook>,
     )>,
+    // §4.2 State markers — split into a separate query so the per-cat
+    // tuple stays small and future State authors can extend here.
+    state_markers_q: Query<(
+        Has<markers::InCombat>,
+        Has<markers::OnCorruptedTile>,
+        Has<markers::OnSpecialTerrain>,
+    )>,
 ) {
     let sc = &res.constants.scoring;
     let d = &res.constants.disposition;
@@ -1030,6 +1037,18 @@ pub fn evaluate_and_plan(
             markers.set_entity(markers::CanForage::KEY, entity, can_forage);
             markers.set_entity(markers::CanWard::KEY, entity, can_ward);
             markers.set_entity(markers::CanCook::KEY, entity, can_cook);
+        }
+        // §4.2 State markers — InCombat / OnCorruptedTile /
+        // OnSpecialTerrain. Authored in Chain 2a alongside the other §4
+        // marker authors; predicate parity with the inline
+        // `on_corrupted_tile` / `on_special_terrain` computations
+        // below is enforced by the author systems' rustdoc and tests.
+        if let Ok((in_combat, on_corrupted_marker, on_special_marker)) =
+            state_markers_q.get(entity)
+        {
+            markers.set_entity(markers::InCombat::KEY, entity, in_combat);
+            markers.set_entity(markers::OnCorruptedTile::KEY, entity, on_corrupted_marker);
+            markers.set_entity(markers::OnSpecialTerrain::KEY, entity, on_special_marker);
         }
 
         let has_herbs_nearby = herb_positions.iter().any(|(_, hp, _)| {

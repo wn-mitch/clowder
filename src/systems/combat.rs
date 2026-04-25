@@ -714,6 +714,62 @@ pub fn heal_injuries(
 }
 
 // ---------------------------------------------------------------------------
+// update_combat_marker system (§4.2 InCombat)
+// ---------------------------------------------------------------------------
+
+/// Author the `InCombat` ZST on living cats whose `CurrentAction` is an
+/// active fight step (`Action::Fight` with a resolved target entity);
+/// remove it otherwise.
+///
+/// **Predicate** — `current.action == Action::Fight &&
+/// current.target_entity.is_some()`. Mirrors the fight-collection probe
+/// in `resolve_combat` (this file, ~line 90), so a cat that
+/// `resolve_combat` would treat as "currently fighting" carries the
+/// marker. Transition-only writes — idempotent on steady-state ticks.
+///
+/// **v1 scope** — covers only "actively in a fight step". The §4.2
+/// rustdoc on `markers::InCombat` also names "hostile-adjacent" as a
+/// trigger, but spotting hostile-adjacency requires the
+/// species-attenuated detection range that `HasThreatNearby`
+/// (`update_threat_proximity_markers`) is also waiting on. Both are
+/// deferred together to a sensing-batch follow-up so the predicate
+/// stays a single source of truth.
+///
+/// **Ordering** — registered in Chain 2a alongside the other §4.2 /
+/// §4.3 marker authors, before the GOAP scoring pipeline runs, so the
+/// `MarkerSnapshot` population in `evaluate_dispositions` and
+/// `evaluate_and_plan` sees the freshly-authored ZST.
+///
+/// **Lifecycle** — `Dead` cats are filtered out so no marker is
+/// authored on corpses during the narrative grace-period window
+/// before `cleanup_dead`.
+pub fn update_combat_marker(
+    mut commands: Commands,
+    cats: Query<
+        (
+            Entity,
+            &CurrentAction,
+            Has<crate::components::markers::InCombat>,
+        ),
+        Without<Dead>,
+    >,
+) {
+    use crate::components::markers::InCombat;
+    for (entity, current, has_marker) in cats.iter() {
+        let in_combat = current.action == Action::Fight && current.target_entity.is_some();
+        match (in_combat, has_marker) {
+            (true, false) => {
+                commands.entity(entity).insert(InCombat);
+            }
+            (false, true) => {
+                commands.entity(entity).remove::<InCombat>();
+            }
+            _ => {}
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -949,5 +1005,193 @@ mod tests {
             total < 1.1,
             "7-banishment total should be under 1.1, got {total}"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // update_combat_marker tests (§4.2 InCombat)
+    // -----------------------------------------------------------------------
+
+    use crate::components::markers::InCombat;
+    use crate::components::physical::DeathCause;
+    use bevy_ecs::schedule::Schedule;
+
+    fn setup_marker_world() -> (World, Schedule) {
+        let world = World::new();
+        let mut schedule = Schedule::default();
+        schedule.add_systems(update_combat_marker);
+        (world, schedule)
+    }
+
+    fn spawn_cat_with_action(world: &mut World, current: CurrentAction) -> Entity {
+        world.spawn(current).id()
+    }
+
+    fn has_in_combat(world: &World, entity: Entity) -> bool {
+        world.get::<InCombat>(entity).is_some()
+    }
+
+    #[test]
+    fn fight_with_target_inserts_marker() {
+        let (mut world, mut schedule) = setup_marker_world();
+        let target = world.spawn_empty().id();
+        let cat = spawn_cat_with_action(
+            &mut world,
+            CurrentAction {
+                action: Action::Fight,
+                target_entity: Some(target),
+                ..CurrentAction::default()
+            },
+        );
+        schedule.run(&mut world);
+        assert!(
+            has_in_combat(&world, cat),
+            "cat in active fight step should carry InCombat marker"
+        );
+    }
+
+    #[test]
+    fn fight_without_target_no_marker() {
+        let (mut world, mut schedule) = setup_marker_world();
+        let cat = spawn_cat_with_action(
+            &mut world,
+            CurrentAction {
+                action: Action::Fight,
+                target_entity: None,
+                ..CurrentAction::default()
+            },
+        );
+        schedule.run(&mut world);
+        assert!(
+            !has_in_combat(&world, cat),
+            "Action::Fight without a target_entity should not carry InCombat marker"
+        );
+    }
+
+    #[test]
+    fn non_fight_actions_no_marker() {
+        let (mut world, mut schedule) = setup_marker_world();
+        let target = world.spawn_empty().id();
+        let cases = [
+            Action::Hunt,
+            Action::Forage,
+            Action::Idle,
+            Action::Sleep,
+            Action::Flee,
+        ];
+        for action in cases {
+            let cat = spawn_cat_with_action(
+                &mut world,
+                CurrentAction {
+                    action,
+                    target_entity: Some(target),
+                    ..CurrentAction::default()
+                },
+            );
+            schedule.run(&mut world);
+            assert!(
+                !has_in_combat(&world, cat),
+                "Action::{action:?} should not carry InCombat marker"
+            );
+        }
+    }
+
+    #[test]
+    fn fight_to_idle_transition_removes_marker() {
+        let (mut world, mut schedule) = setup_marker_world();
+        let target = world.spawn_empty().id();
+        let cat = spawn_cat_with_action(
+            &mut world,
+            CurrentAction {
+                action: Action::Fight,
+                target_entity: Some(target),
+                ..CurrentAction::default()
+            },
+        );
+        schedule.run(&mut world);
+        assert!(has_in_combat(&world, cat));
+
+        // Wildlife dies / fight resolves → action flips to Idle.
+        let mut current = world.get_mut::<CurrentAction>(cat).unwrap();
+        current.action = Action::Idle;
+        current.target_entity = None;
+        schedule.run(&mut world);
+        assert!(
+            !has_in_combat(&world, cat),
+            "marker should drop on fight resolution"
+        );
+    }
+
+    #[test]
+    fn idempotent_no_flap_on_steady_fight() {
+        let (mut world, mut schedule) = setup_marker_world();
+        let target = world.spawn_empty().id();
+        let cat = spawn_cat_with_action(
+            &mut world,
+            CurrentAction {
+                action: Action::Fight,
+                target_entity: Some(target),
+                ..CurrentAction::default()
+            },
+        );
+        schedule.run(&mut world);
+        assert!(has_in_combat(&world, cat));
+        schedule.run(&mut world);
+        assert!(
+            has_in_combat(&world, cat),
+            "steady-state fight should not flap marker"
+        );
+    }
+
+    #[test]
+    fn dead_cats_are_skipped() {
+        let (mut world, mut schedule) = setup_marker_world();
+        let target = world.spawn_empty().id();
+        let cat = world
+            .spawn((
+                CurrentAction {
+                    action: Action::Fight,
+                    target_entity: Some(target),
+                    ..CurrentAction::default()
+                },
+                Dead {
+                    tick: 0,
+                    cause: DeathCause::Injury,
+                },
+            ))
+            .id();
+        schedule.run(&mut world);
+        assert!(
+            !has_in_combat(&world, cat),
+            "dead cats should not receive InCombat marker even mid-Fight"
+        );
+    }
+
+    #[test]
+    fn mixed_population_independent_authoring() {
+        let (mut world, mut schedule) = setup_marker_world();
+        let target = world.spawn_empty().id();
+        let fighter = spawn_cat_with_action(
+            &mut world,
+            CurrentAction {
+                action: Action::Fight,
+                target_entity: Some(target),
+                ..CurrentAction::default()
+            },
+        );
+        let hunter = spawn_cat_with_action(
+            &mut world,
+            CurrentAction {
+                action: Action::Hunt,
+                target_entity: Some(target),
+                ..CurrentAction::default()
+            },
+        );
+        let idler = spawn_cat_with_action(&mut world, CurrentAction::default());
+
+        schedule.run(&mut world);
+
+        assert!(has_in_combat(&world, fighter));
+        assert!(!has_in_combat(&world, hunter));
+        assert!(!has_in_combat(&world, idler));
     }
 }

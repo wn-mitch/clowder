@@ -10,9 +10,11 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::sync::{Mutex, OnceLock};
 
-use crate::components::physical::Position;
+use bevy_ecs::prelude::*;
+
+use crate::components::physical::{Dead, Position};
 use crate::components::sensing::{SensoryModifier, SensorySignature, SensorySpecies};
-use crate::resources::map::Terrain;
+use crate::resources::map::{Terrain, TileMap};
 use crate::resources::time::DayPhase;
 use crate::resources::weather::Weather;
 
@@ -675,6 +677,66 @@ fn species_tag(s: SensorySpecies) -> &'static str {
 }
 
 // ---------------------------------------------------------------------------
+// update_terrain_markers system (§4.2 OnSpecialTerrain)
+// ---------------------------------------------------------------------------
+
+/// Author the `OnSpecialTerrain` ZST on living cats whose current tile
+/// is `Terrain::FairyRing` or `Terrain::StandingStone`; remove it
+/// otherwise.
+///
+/// **Predicate** — `matches!(tile.terrain, Terrain::FairyRing |
+/// Terrain::StandingStone)`. Bit-for-bit mirror of the inline
+/// `on_special_terrain` computations in
+/// `goap.rs::evaluate_and_plan` and
+/// `disposition.rs::evaluate_dispositions`.
+///
+/// **Out-of-bounds positions** — predicate is `false`; marker is
+/// removed if present.
+///
+/// **Ordering** — registered in Chain 2a alongside other §4 marker
+/// authors, before the GOAP scoring pipeline runs.
+///
+/// **Lifecycle** — `Dead` cats filtered out so corpses don't carry
+/// the marker during the narrative grace-period window.
+///
+/// **Non-goal:** this author does **not** unblock the Commune
+/// dormancy — magic_commune needs the cat to *path to* a fairy
+/// ring or standing stone, a spatial-routing problem documented in
+/// `docs/open-work/tickets/014-phase-4-follow-ons.md` lines
+/// 124–136. Wiring the marker pays down the §4 catalog without
+/// promising a Commune fix.
+pub fn update_terrain_markers(
+    mut commands: Commands,
+    cats: Query<
+        (
+            Entity,
+            &Position,
+            Has<crate::components::markers::OnSpecialTerrain>,
+        ),
+        Without<Dead>,
+    >,
+    map: Res<TileMap>,
+) {
+    use crate::components::markers::OnSpecialTerrain;
+    for (entity, pos, has_marker) in cats.iter() {
+        let on_special = map.in_bounds(pos.x, pos.y)
+            && matches!(
+                map.get(pos.x, pos.y).terrain,
+                Terrain::FairyRing | Terrain::StandingStone
+            );
+        match (on_special, has_marker) {
+            (true, false) => {
+                commands.entity(entity).insert(OnSpecialTerrain);
+            }
+            (false, true) => {
+                commands.entity(entity).remove::<OnSpecialTerrain>();
+            }
+            _ => {}
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1176,5 +1238,141 @@ mod tests {
         assert_eq!(c.sight_range_bonus, 3.0);
         assert_eq!(c.hearing_acuity_bonus, 0.1);
         assert_eq!(c.scent_range_bonus, 3.0);
+    }
+
+    // -----------------------------------------------------------------------
+    // update_terrain_markers tests (§4.2 OnSpecialTerrain)
+    // -----------------------------------------------------------------------
+
+    use bevy_ecs::schedule::Schedule;
+
+    fn terrain_marker_setup() -> (World, Schedule) {
+        let mut world = World::new();
+        world.insert_resource(TileMap::new(10, 10, Terrain::Grass));
+        let mut schedule = Schedule::default();
+        schedule.add_systems(update_terrain_markers);
+        (world, schedule)
+    }
+
+    fn has_on_special_terrain(world: &World, entity: Entity) -> bool {
+        world
+            .get::<crate::components::markers::OnSpecialTerrain>(entity)
+            .is_some()
+    }
+
+    fn set_terrain(world: &mut World, x: i32, y: i32, terrain: Terrain) {
+        world.resource_mut::<TileMap>().get_mut(x, y).terrain = terrain;
+    }
+
+    #[test]
+    fn fairy_ring_inserts_marker() {
+        let (mut world, mut schedule) = terrain_marker_setup();
+        set_terrain(&mut world, 5, 5, Terrain::FairyRing);
+        let cat = world.spawn(Position { x: 5, y: 5 }).id();
+        schedule.run(&mut world);
+        assert!(
+            has_on_special_terrain(&world, cat),
+            "FairyRing tile should insert marker"
+        );
+    }
+
+    #[test]
+    fn standing_stone_inserts_marker() {
+        let (mut world, mut schedule) = terrain_marker_setup();
+        set_terrain(&mut world, 5, 5, Terrain::StandingStone);
+        let cat = world.spawn(Position { x: 5, y: 5 }).id();
+        schedule.run(&mut world);
+        assert!(
+            has_on_special_terrain(&world, cat),
+            "StandingStone tile should insert marker"
+        );
+    }
+
+    #[test]
+    fn ordinary_terrain_no_marker() {
+        let (mut world, mut schedule) = terrain_marker_setup();
+        let cat_grass = world.spawn(Position { x: 1, y: 1 }).id();
+        set_terrain(&mut world, 2, 1, Terrain::LightForest);
+        let cat_forest = world.spawn(Position { x: 2, y: 1 }).id();
+        set_terrain(&mut world, 3, 1, Terrain::WardPost);
+        let cat_wardpost = world.spawn(Position { x: 3, y: 1 }).id();
+        schedule.run(&mut world);
+        assert!(!has_on_special_terrain(&world, cat_grass));
+        assert!(!has_on_special_terrain(&world, cat_forest));
+        assert!(!has_on_special_terrain(&world, cat_wardpost));
+    }
+
+    #[test]
+    fn position_change_crosses_terrain_boundary() {
+        let (mut world, mut schedule) = terrain_marker_setup();
+        set_terrain(&mut world, 5, 5, Terrain::FairyRing);
+        let cat = world.spawn(Position { x: 1, y: 1 }).id();
+        schedule.run(&mut world);
+        assert!(!has_on_special_terrain(&world, cat));
+
+        world.get_mut::<Position>(cat).unwrap().x = 5;
+        world.get_mut::<Position>(cat).unwrap().y = 5;
+        schedule.run(&mut world);
+        assert!(
+            has_on_special_terrain(&world, cat),
+            "moving onto FairyRing should insert marker"
+        );
+
+        world.get_mut::<Position>(cat).unwrap().x = 1;
+        world.get_mut::<Position>(cat).unwrap().y = 1;
+        schedule.run(&mut world);
+        assert!(
+            !has_on_special_terrain(&world, cat),
+            "moving off FairyRing should remove marker"
+        );
+    }
+
+    #[test]
+    fn dead_cats_skipped_terrain() {
+        use crate::components::physical::DeathCause;
+        let (mut world, mut schedule) = terrain_marker_setup();
+        set_terrain(&mut world, 5, 5, Terrain::FairyRing);
+        let cat = world
+            .spawn((
+                Position { x: 5, y: 5 },
+                Dead {
+                    tick: 0,
+                    cause: DeathCause::Starvation,
+                },
+            ))
+            .id();
+        schedule.run(&mut world);
+        assert!(
+            !has_on_special_terrain(&world, cat),
+            "dead cats should not receive marker even on a FairyRing"
+        );
+    }
+
+    #[test]
+    fn multiple_cats_independent_terrain() {
+        let (mut world, mut schedule) = terrain_marker_setup();
+        set_terrain(&mut world, 5, 5, Terrain::FairyRing);
+        set_terrain(&mut world, 6, 6, Terrain::StandingStone);
+        let on_ring = world.spawn(Position { x: 5, y: 5 }).id();
+        let on_stone = world.spawn(Position { x: 6, y: 6 }).id();
+        let on_grass = world.spawn(Position { x: 1, y: 1 }).id();
+        schedule.run(&mut world);
+        assert!(has_on_special_terrain(&world, on_ring));
+        assert!(has_on_special_terrain(&world, on_stone));
+        assert!(!has_on_special_terrain(&world, on_grass));
+    }
+
+    #[test]
+    fn idempotent_no_flap_terrain() {
+        let (mut world, mut schedule) = terrain_marker_setup();
+        set_terrain(&mut world, 5, 5, Terrain::FairyRing);
+        let cat = world.spawn(Position { x: 5, y: 5 }).id();
+        schedule.run(&mut world);
+        assert!(has_on_special_terrain(&world, cat));
+        schedule.run(&mut world);
+        assert!(
+            has_on_special_terrain(&world, cat),
+            "steady-state on special terrain should not flap marker"
+        );
     }
 }
