@@ -14,28 +14,27 @@ _Last generated: 2026-04-25._
 
 | Status | Count |
 |---|---|
-| In progress | 6 |
-| Ready | 11 |
+| In progress | 5 |
+| Ready | 10 |
 | Parked | 1 |
 | Blocked | 9 |
 | Done (awaiting archive) | 2 |
-| **Open total** | **27** |
+| **Open total** | **25** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-index` (regenerate this file).
 
-## In progress (6)
+## In progress (5)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[005](docs/open-work/tickets/005-cluster-a-scoring-substrate-refactor.md)** — Scoring substrate refactor cluster (Cluster A — Foundational) — _[A] · added 2026-04-20_
 - **[013](docs/open-work/tickets/013-spec-follow-on-debts-from-ai-substrate-refactor.md)** — Spec-follow-on debts from AI substrate refactor — _added 2026-04-21_
 - **[014](docs/open-work/tickets/014-phase-4-follow-ons.md)** — Phase 4 follow-ons — target-taking registration + markers + mate-gender + Mating/PracticeMagic magnitude — _added 2026-04-22_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
-- **[028](docs/open-work/tickets/028-headless-observer-registration-regression.md)** — Headless build silently drops 4 personality-event observer cascades — _added 2026-04-25_
 
-## Ready (11)
+## Ready (10)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -47,7 +46,6 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[023](docs/open-work/tickets/023-shadowfox-distinct-motivations.md)** — Shadowfox motivations distinct from normal foxes — _added 2026-04-14_
 - **[027](docs/open-work/tickets/027-mating-cadence-three-bug-cascade.md)** — Mating cadence — three-bug cascade blocking MatingOccurred — _added 2026-04-25_
 - **[029](docs/open-work/tickets/029-cross-run-log-database.md)** — Cross-run log database — collate baseline + diagnostic archives for SQL-style queries — _added 2026-04-25_
-- **[030](docs/open-work/tickets/030-unify-headless-and-windowed-build-pipeline.md)** — Unify headless and windowed build pipeline — kill the manual mirror — _added 2026-04-25_
 
 ## Parked (1)
 
@@ -79,7 +77,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/). Recent months:
 
-- [2026-04](docs/open-work/landed/2026-04.md) — 33 entries
+- [2026-04](docs/open-work/landed/2026-04.md) — 35 entries
 
 ## Conventions
 

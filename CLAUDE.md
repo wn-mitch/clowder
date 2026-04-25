@@ -72,7 +72,7 @@ Queue-view commands (run from the repo root):
 - Prefer `run_if` guards over early returns — gated systems skip query iteration entirely.
 - Never `.clone()` resource data in per-tick systems. Borrow via `Res<T>`/`ResMut<T>`.
 - Events are verbs: `SpawnCat`, `CatDied` — not `DeathEvent`. Define centrally, no circular flows.
-- Bevy 0.18 uses **Messages** not Events: `#[derive(Message)]`, `MessageWriter<T>`, `MessageReader<T>`, `app.add_message::<T>()`. Register in both `SimulationPlugin` and headless `build_new_world`. Headless also needs `bevy_ecs::message::message_update_system` in the schedule and `MessageRegistry::register_message::<T>(&mut world)`.
+- Bevy 0.18 uses **Messages** not Events: `#[derive(Message)]`, `MessageWriter<T>`, `MessageReader<T>`, `app.add_message::<T>()`. Register messages in `SimulationPlugin::build()` — both windowed and headless build paths share that plugin (ticket 030).
 - Components: plain structs/enums with `#[derive(Component)]`. Resources: `#[derive(Resource)]`.
 - Prefer `Query<>` with explicit component access over broad world access.
 - **Bevy 16-param limit**: systems with many parameters hit Bevy's tuple impl limit. Use `#[derive(SystemParam)]` bundles to group related params. Example: bundle all prey-related queries + message writers into a `PreySystemParams` struct. This is preferred over `Option<Res<T>>` hacks or removing needed params.
@@ -163,7 +163,7 @@ Balance-tuning on refactor-affected metrics (positive-feature density, mating ca
 2. Propose scope — axis set, deferrals, caller sites, non-goals — and confirm before implementing.
 3. Land as one commit: factory + resolver/author-system + registration + caller wiring + 10–15 unit tests + landing entry appended to `docs/open-work/landed/YYYY-MM.md` (with hypothesis / concordance / deferred-item notes) + ticket 014's "Remaining" list updated + `just open-work-index` regenerating `docs/open-work.md`.
 4. Verification: `just check` + `just test` + seed-42 `--duration 900` release soak (survival canaries hold; continuity / activation deltas recorded in the landing entry).
-5. DSE registration sites: three — `SimulationPlugin::build` and both `build_schedule` paths in `main.rs`. Exemplar port: `src/ai/dses/socialize_target.rs` (factory + caller-side resolver + test suite).
+5. DSE registration site: one — `populate_dse_registry` in `src/plugins/simulation.rs`, called by the plugin's `register_dses_at_startup` Startup system (ticket 030 unified the headless and windowed pipelines). Exemplar port: `src/ai/dses/socialize_target.rs` (factory + caller-side resolver + test suite).
 
 ### §7.2 commitment gate — mental model
 
@@ -179,11 +179,11 @@ Strategy dispatch: `Blind => achieved`; `SingleMinded => achieved || unachievabl
 
 ## Headless Mode
 
-`build_schedule()` in `src/main.rs` is a **manual mirror** of `SimulationPlugin::build()` in `src/plugins/simulation.rs`. Change one, change both — they diverged silently before.
+Headless and windowed builds share the same `App + SimulationPlugin` pipeline (ticket 030). `run_headless` mounts `MinimalPlugins + SimulationPlugin + HeadlessIoPlugin`; the windowed `main()` mounts `DefaultPlugins + SimulationPlugin + RenderingPlugin`. Add new systems / messages / observers / DSEs to `SimulationPlugin::build()` and both paths pick them up.
 
 ## Simulation Verification
 
-**`just headless` is the canonical diagnostic tool.** It's a thin wrapper over `cargo run -- --headless`, runs the sim under the same Bevy schedule as the interactive build (see Headless Mode above — the schedule is mirrored, not shared), writes two JSONL files, and exits early if the colony wipes. Everything else (`score-track`, `score-diff`, `balance-report`) is a Python convenience script layered on top — the JSONL output is ground truth.
+**`just headless` is the canonical diagnostic tool.** It's a thin wrapper over `cargo run -- --headless`, runs the sim through `App::update()` driven by `HeadlessIoPlugin`'s tick-budget exit, writes two JSONL files, and exits early if the colony wipes. Everything else (`score-track`, `score-diff`, `balance-report`) is a Python convenience script layered on top — the JSONL output is ground truth.
 
 ### Invocation and flags
 
@@ -277,7 +277,7 @@ Canaries split into two groups. **Survival canaries** catch the colony dying or 
 
 ### What the interactive build shares with headless
 
-`build_schedule()` in `src/main.rs` is a manual mirror of `SimulationPlugin::build()` in `src/plugins/simulation.rs`. Any new system, message, or resource must be added to **both**; drift between them has caused silent divergence before (see the Headless Mode subsection above). DSE registration happens at two sites inside `build_schedule` (fresh world + save-load paths) plus the plugin — three sites total for any `add_dse` / `add_target_taking_dse` / `add_fox_dse` call.
+Both builds mount `SimulationPlugin` and run the same Bevy schedule. New systems, messages, observers, and DSEs go into `SimulationPlugin::build()` (or, for the DSE catalog, into `populate_dse_registry`) — once. Headless adds `HeadlessIoPlugin` for JSONL writers + tick-budget exit; windowed adds `RenderingPlugin` + camera + UI. There is no `build_schedule` mirror to keep in sync — ticket 030 retired it.
 
 ## Tuning Constants
 

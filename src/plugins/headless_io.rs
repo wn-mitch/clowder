@@ -177,15 +177,18 @@ impl Plugin for HeadlessIoPlugin {
         app.init_resource::<HeadlessTickCount>();
         app.init_resource::<HeadlessExitSignaled>();
 
-        // Headers run once at Startup, ordered after
+        // Post-world-setup Startup systems. Both run after
         // `setup_world_exclusive` so SimConstants / SimConfig /
-        // TileMap are populated. The header rows are the
-        // constants-hash anchor for cross-run reproducibility — see
-        // CLAUDE.md "Simulation Verification → The constants-hash
-        // header".
+        // TileMap / WeatherState / ForcedConditions are populated.
+        //   - apply_headless_overrides: force_weather pin and CLI
+        //     snapshot/trace intervals on SnapshotConfig.
+        //   - write_jsonl_headers: constants-hash anchor for
+        //     cross-run reproducibility per CLAUDE.md.
         app.add_systems(
             Startup,
-            write_jsonl_headers.after(crate::plugins::setup::setup_world_exclusive),
+            (apply_headless_overrides, write_jsonl_headers)
+                .chain()
+                .after(crate::plugins::setup::setup_world_exclusive),
         );
 
         // Per-tick flush — `Last` runs after every other system so
@@ -202,6 +205,40 @@ impl Plugin for HeadlessIoPlugin {
                 tick_budget_check_and_exit,
             ),
         );
+    }
+}
+
+/// One-shot Startup system that applies headless-only diagnostic
+/// overrides: `--force-weather` pin (also pins `WeatherState::current`
+/// so tick-0 readers don't see the default) and the CLI
+/// `--snapshot-interval` / `--trace-positions` values written into
+/// [`crate::resources::snapshot_config::SnapshotConfig`]. Runs after
+/// `setup_world_exclusive` so the resources it touches are populated.
+///
+/// `--load-log` is handled separately by `setup_world_exclusive` via
+/// [`crate::plugins::setup::AppArgs::load_log_path`], so this system
+/// does not re-implement narrative-log import.
+pub fn apply_headless_overrides(world: &mut World) {
+    let config = world.resource::<HeadlessConfig>().clone();
+
+    if let Some(w) = config.force_weather {
+        if let Some(mut forced) = world.get_resource_mut::<crate::resources::ForcedConditions>() {
+            forced.weather = Some(w);
+        }
+        if let Some(mut weather) = world.get_resource_mut::<crate::resources::WeatherState>() {
+            weather.current = w;
+        }
+    }
+
+    {
+        use crate::resources::snapshot_config::SnapshotConfig;
+        if !world.contains_resource::<SnapshotConfig>() {
+            world.insert_resource(SnapshotConfig::default());
+        }
+        let mut snap = world.resource_mut::<SnapshotConfig>();
+        snap.full_snapshot_interval = config.snapshot_interval;
+        snap.position_trace_interval = config.trace_positions;
+        snap.economy_interval = config.snapshot_interval;
     }
 }
 
@@ -417,7 +454,7 @@ pub fn tick_budget_check_and_exit(
 /// access for the live `Ward` count and the same access pattern
 /// today's `build_headless_footer` uses — easier to call from the
 /// post-loop tail than to coerce into Bevy's system signature.
-pub fn emit_headless_footer(world: &mut World) {
+pub fn emit_headless_footer(world: &mut World) -> String {
     use crate::components::magic::Ward;
     use crate::resources::system_activation::Feature;
 
@@ -462,11 +499,13 @@ pub fn emit_headless_footer(world: &mut World) {
         "continuity_tallies": event_log.continuity_tallies,
     });
 
+    let footer_str = footer.to_string();
     let mut writer = world.resource_mut::<EventJsonlWriter>();
-    if let Err(e) = writeln!(writer.writer, "{footer}") {
+    if let Err(e) = writeln!(writer.writer, "{footer_str}") {
         eprintln!("Warning: failed to write headless footer: {e}");
     }
     let _ = writer.writer.flush();
+    footer_str
 }
 
 /// Sensory-environment multiplier snapshot embedded in the events

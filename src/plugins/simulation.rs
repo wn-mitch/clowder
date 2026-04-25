@@ -1,6 +1,89 @@
 use bevy::prelude::*;
 
+use crate::ai::eval::DseRegistry;
+use crate::ai::modifier::default_modifier_pipeline;
+use crate::resources::sim_constants::ScoringConstants;
+use crate::resources::SimConstants;
 use crate::systems;
+
+/// Populates a [`DseRegistry`] with the canonical 30 cat-DSE + 9
+/// fox-DSE catalog plus all target-taking DSEs, using the supplied
+/// [`ScoringConstants`].
+///
+/// Single source of truth for DSE catalog membership. Tests that
+/// build a `DseRegistry` inline (`tests/integration.rs`) intentionally
+/// do *not* call this function — they cherry-pick a subset.
+pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConstants) {
+    use crate::ai::dses;
+    registry.cat_dses.push(dses::eat_dse());
+    registry.cat_dses.push(dses::hunt_dse());
+    registry.target_taking_dses.push(dses::hunt_target_dse());
+    registry.cat_dses.push(dses::forage_dse());
+    registry.cat_dses.push(dses::cook_dse());
+    registry.cat_dses.push(dses::flee_dse(scoring));
+    registry.cat_dses.push(dses::fight_dse(scoring));
+    registry.target_taking_dses.push(dses::fight_target_dse());
+    registry.cat_dses.push(dses::sleep_dse(scoring));
+    registry.cat_dses.push(dses::idle_dse(scoring));
+    registry.cat_dses.push(dses::socialize_dse());
+    registry
+        .target_taking_dses
+        .push(dses::socialize_target_dse());
+    registry.cat_dses.push(dses::groom_self_dse());
+    registry.cat_dses.push(dses::groom_other_dse());
+    registry
+        .target_taking_dses
+        .push(dses::groom_other_target_dse());
+    registry.cat_dses.push(dses::mentor_dse());
+    registry.target_taking_dses.push(dses::mentor_target_dse());
+    registry.cat_dses.push(dses::caretake_dse());
+    registry
+        .target_taking_dses
+        .push(dses::caretake_target_dse());
+    registry.cat_dses.push(dses::mate_dse());
+    registry.target_taking_dses.push(dses::mate_target_dse());
+    registry.cat_dses.push(dses::patrol_dse(scoring));
+    registry.cat_dses.push(dses::build_dse(scoring));
+    registry.target_taking_dses.push(dses::build_target_dse());
+    registry.cat_dses.push(dses::farm_dse());
+    registry.cat_dses.push(dses::coordinate_dse(scoring));
+    registry.cat_dses.push(dses::explore_dse(scoring));
+    registry.cat_dses.push(dses::wander_dse(scoring));
+    registry.cat_dses.push(dses::herbcraft_gather_dse());
+    registry.cat_dses.push(dses::herbcraft_prepare_dse());
+    registry
+        .target_taking_dses
+        .push(dses::apply_remedy_target_dse());
+    registry.cat_dses.push(dses::herbcraft_ward_dse());
+    registry.cat_dses.push(dses::scry_dse());
+    registry.cat_dses.push(dses::durable_ward_dse());
+    registry.cat_dses.push(dses::cleanse_dse(scoring));
+    registry.cat_dses.push(dses::colony_cleanse_dse());
+    registry.cat_dses.push(dses::harvest_dse());
+    registry.cat_dses.push(dses::commune_dse());
+    registry.fox_dses.push(dses::fox_patrolling_dse(scoring));
+    registry.fox_dses.push(dses::fox_hunting_dse(scoring));
+    registry.fox_dses.push(dses::fox_raiding_dse());
+    registry.fox_dses.push(dses::fox_fleeing_dse());
+    registry.fox_dses.push(dses::fox_avoiding_dse());
+    registry.fox_dses.push(dses::fox_den_defense_dse());
+    registry.fox_dses.push(dses::fox_resting_dse(scoring));
+    registry.fox_dses.push(dses::fox_feeding_dse());
+    registry.fox_dses.push(dses::fox_dispersing_dse());
+}
+
+/// Startup system that populates [`DseRegistry`] and the §3.5
+/// modifier pipeline from live [`SimConstants`]. Runs after
+/// `setup_world_exclusive` so SimConstants is in place.
+pub fn register_dses_at_startup(
+    constants: Res<SimConstants>,
+    mut registry: ResMut<DseRegistry>,
+    mut commands: Commands,
+) {
+    let scoring = &constants.scoring;
+    populate_dse_registry(&mut registry, scoring);
+    commands.insert_resource(default_modifier_pipeline(scoring));
+}
 
 /// Registers all simulation systems on `FixedUpdate` in the same order as the
 /// original `build_schedule()`.
@@ -33,78 +116,20 @@ impl Plugin for SimulationPlugin {
         app.add_message::<crate::components::goap_plan::PlanNarrative>();
         app.add_message::<crate::systems::magic::CorruptionPushback>();
 
-        // L2 substrate resources + DSE registrations (§9 faction + §L2.10).
-        // Phase 3b.2 registers the Eat reference DSE; Phase 3c fans out
-        // the remaining 29 cat/fox DSEs through the same app-extension
-        // trait. Mirrored in `src/main.rs::build_schedule`.
+        // L2 substrate resources (§9 faction + §L2.10). FactionRelations
+        // is a constant lookup — fine to insert at build time.
+        // DseRegistry starts empty; populated by `register_dses_at_startup`
+        // (Startup-after-`setup_world_exclusive`) so fox DSEs etc. read
+        // live `SimConstants` instead of `ScoringConstants::default()`.
+        // The §3.5 modifier pipeline is also built by that Startup
+        // system. Single-site registration — eliminates the prior
+        // three-mirror burden flagged in CLAUDE.md.
         app.insert_resource(crate::ai::faction::FactionRelations::canonical());
-        app.init_resource::<crate::ai::eval::DseRegistry>();
-        // §3.5 modifier pipeline — populated with the three Phase 4.2
-        // corruption-response emergency bonuses. Uses default scoring
-        // constants at plugin build time because `SimConstants` is
-        // inserted later at Startup; the live values are re-bound in
-        // the headless and save-load mirror sites per the same pattern
-        // as fox DSEs.
-        app.insert_resource(crate::ai::modifier::default_modifier_pipeline(
-            &crate::resources::sim_constants::ScoringConstants::default(),
-        ));
-        {
-            use crate::ai::eval::DseRegistryAppExt;
-            // Plugin build runs before `setup_world_exclusive` (which
-            // inserts SimConstants at the Startup schedule), so fox
-            // DSEs that depend on tunable knot values read from a
-            // default ScoringConstants here. The other three mirror
-            // sites (headless, save-load, integration tests) register
-            // after SimConstants is inserted and pass the live values.
-            let default_scoring = crate::resources::sim_constants::ScoringConstants::default();
-            app.add_dse(crate::ai::dses::eat_dse())
-                .add_dse(crate::ai::dses::hunt_dse())
-                .add_target_taking_dse(crate::ai::dses::hunt_target_dse())
-                .add_dse(crate::ai::dses::forage_dse())
-                .add_dse(crate::ai::dses::cook_dse())
-                .add_dse(crate::ai::dses::flee_dse(&default_scoring))
-                .add_dse(crate::ai::dses::fight_dse(&default_scoring))
-                .add_target_taking_dse(crate::ai::dses::fight_target_dse())
-                .add_dse(crate::ai::dses::sleep_dse(&default_scoring))
-                .add_dse(crate::ai::dses::idle_dse(&default_scoring))
-                .add_dse(crate::ai::dses::socialize_dse())
-                .add_target_taking_dse(crate::ai::dses::socialize_target_dse())
-                .add_dse(crate::ai::dses::groom_self_dse())
-                .add_dse(crate::ai::dses::groom_other_dse())
-                .add_target_taking_dse(crate::ai::dses::groom_other_target_dse())
-                .add_dse(crate::ai::dses::mentor_dse())
-                .add_target_taking_dse(crate::ai::dses::mentor_target_dse())
-                .add_dse(crate::ai::dses::caretake_dse())
-                .add_target_taking_dse(crate::ai::dses::caretake_target_dse())
-                .add_dse(crate::ai::dses::mate_dse())
-                .add_target_taking_dse(crate::ai::dses::mate_target_dse())
-                .add_dse(crate::ai::dses::patrol_dse(&default_scoring))
-                .add_dse(crate::ai::dses::build_dse(&default_scoring))
-                .add_target_taking_dse(crate::ai::dses::build_target_dse())
-                .add_dse(crate::ai::dses::farm_dse())
-                .add_dse(crate::ai::dses::coordinate_dse(&default_scoring))
-                .add_dse(crate::ai::dses::explore_dse(&default_scoring))
-                .add_dse(crate::ai::dses::wander_dse(&default_scoring))
-                .add_dse(crate::ai::dses::herbcraft_gather_dse())
-                .add_dse(crate::ai::dses::herbcraft_prepare_dse())
-                .add_target_taking_dse(crate::ai::dses::apply_remedy_target_dse())
-                .add_dse(crate::ai::dses::herbcraft_ward_dse())
-                .add_dse(crate::ai::dses::scry_dse())
-                .add_dse(crate::ai::dses::durable_ward_dse())
-                .add_dse(crate::ai::dses::cleanse_dse(&default_scoring))
-                .add_dse(crate::ai::dses::colony_cleanse_dse())
-                .add_dse(crate::ai::dses::harvest_dse())
-                .add_dse(crate::ai::dses::commune_dse())
-                .add_fox_dse(crate::ai::dses::fox_patrolling_dse(&default_scoring))
-                .add_fox_dse(crate::ai::dses::fox_hunting_dse(&default_scoring))
-                .add_fox_dse(crate::ai::dses::fox_raiding_dse())
-                .add_fox_dse(crate::ai::dses::fox_fleeing_dse())
-                .add_fox_dse(crate::ai::dses::fox_avoiding_dse())
-                .add_fox_dse(crate::ai::dses::fox_den_defense_dse())
-                .add_fox_dse(crate::ai::dses::fox_resting_dse(&default_scoring))
-                .add_fox_dse(crate::ai::dses::fox_feeding_dse())
-                .add_fox_dse(crate::ai::dses::fox_dispersing_dse());
-        }
+        app.init_resource::<DseRegistry>();
+        app.add_systems(
+            Startup,
+            register_dses_at_startup.after(crate::plugins::setup::setup_world_exclusive),
+        );
 
         // Snapshot positions before any simulation system moves entities.
         // The rendering layer interpolates between PreviousPosition and Position.
@@ -181,24 +206,45 @@ impl Plugin for SimulationPlugin {
                     // Chain 2a: needs + marker authors + reproduction + growth
                     (
                         systems::needs::decay_needs,
-                        // §4.3 marker authors — run before the GOAP/scoring
-                        // pipeline so consumers see freshly-authored markers.
-                        systems::incapacitation::update_incapacitation,
-                        systems::growth::update_life_stage_markers,
-                        systems::needs::update_injury_marker,
-                        systems::items::update_inventory_markers,
-                        systems::coordination::update_directive_markers,
-                        // §4 batch — Mate eligibility marker. Reads the
-                        // full `mating::has_eligible_mate` predicate
-                        // (season + sated/happy + fertility + Partners
-                        // bond + orientation compat) and writes
-                        // `HasEligibleMate`. `MateDse::eligibility()`
-                        // requires this marker, so the DSE returns 0.0
-                        // for cats whose gate is closed.
-                        crate::ai::mating::update_mate_eligibility_markers,
-                        // §4 batch 2: capability markers — reads life-stage,
-                        // injury, inventory markers authored above.
-                        crate::ai::capabilities::update_capability_markers,
+                        // §4 marker authors — run before the GOAP/scoring
+                        // pipeline so consumers see freshly-authored
+                        // markers. Grouped as a nested sub-tuple to keep
+                        // the outer Chain 2a under Bevy's 20-system tuple
+                        // limit; sub-chain order matches the dependency
+                        // chain (life-stage / injury / inventory /
+                        // directive feed into capability + mate
+                        // eligibility).
+                        (
+                            systems::incapacitation::update_incapacitation,
+                            systems::growth::update_life_stage_markers,
+                            systems::needs::update_injury_marker,
+                            systems::items::update_inventory_markers,
+                            systems::coordination::update_directive_markers,
+                            // §4 batch — Mate eligibility marker. Reads
+                            // the full `mating::has_eligible_mate`
+                            // predicate (season + sated/happy + fertility
+                            // + Partners bond + orientation compat) and
+                            // writes `HasEligibleMate`.
+                            // `MateDse::eligibility()` requires this
+                            // marker, so the DSE returns 0.0 for cats
+                            // whose gate is closed.
+                            crate::ai::mating::update_mate_eligibility_markers,
+                            // §4 batch 2: capability markers — reads
+                            // life-stage, injury, inventory markers
+                            // authored above.
+                            crate::ai::capabilities::update_capability_markers,
+                            // §4.2 State markers — InCombat reads
+                            // CurrentAction; OnCorruptedTile and
+                            // OnSpecialTerrain read TileMap. Independent
+                            // of each other and of the upstream marker
+                            // authors, but registered here so the
+                            // MarkerSnapshot population in the GOAP /
+                            // disposition scoring loops sees them.
+                            systems::combat::update_combat_marker,
+                            systems::magic::update_corrupted_tile_markers,
+                            systems::sensing::update_terrain_markers,
+                        )
+                            .chain(),
                         systems::needs::decay_grooming,
                         systems::needs::eat_from_inventory,
                         systems::needs::decay_exploration,
