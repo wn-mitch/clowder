@@ -457,12 +457,21 @@ impl Default for EventLog {
         ] {
             continuity_tallies.insert(key.to_string(), 0);
         }
+        // Pre-init the two EngagePrey hunt-approach failure keys (ticket 002)
+        // so footer diffs distinguish "key absent" from "value 0".
+        let mut plan_failures_by_reason = HashMap::new();
+        for key in [
+            "EngagePrey: lost prey during approach",
+            "EngagePrey: stuck while stalking",
+        ] {
+            plan_failures_by_reason.insert(key.to_string(), 0);
+        }
         Self {
             entries: VecDeque::new(),
             capacity: 500,
             total_pushed: 0,
             deaths_by_cause: HashMap::new(),
-            plan_failures_by_reason: HashMap::new(),
+            plan_failures_by_reason,
             interrupts_by_reason: HashMap::new(),
             continuity_tallies,
         }
@@ -644,5 +653,25 @@ mod tests {
             },
         );
         assert_eq!(log.continuity_tallies.get("courtship").copied(), Some(2));
+    }
+
+    #[test]
+    fn engage_prey_failure_keys_preinitialized() {
+        // Ticket 002: footer must always carry these two counters even on
+        // soaks where the failures never fire, so baseline-vs-treatment
+        // diffs distinguish "key absent" from "value 0". The keys must
+        // match the composite shape `"{step:?}: {reason}"` written by
+        // push() for PlanStepFailed events from the EngagePrey resolver.
+        let log = EventLog::default();
+        assert_eq!(
+            log.plan_failures_by_reason
+                .get("EngagePrey: lost prey during approach"),
+            Some(&0)
+        );
+        assert_eq!(
+            log.plan_failures_by_reason
+                .get("EngagePrey: stuck while stalking"),
+            Some(&0)
+        );
     }
 }
