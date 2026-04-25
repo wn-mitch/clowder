@@ -198,3 +198,38 @@ Per-bug acceptance:
   Acceptance criterion (`continuity_tallies.courtship > 0`) cleared
   by 840×. Multi-seed sweep deferred to after Bug 2 lands so the
   sweep also confirms `mate` L2 records appear.
+- 2026-04-25: **Bug 2 landed** — `mating::update_mate_eligibility_markers`
+  is now a real per-tick author of the `HasEligibleMate` ZST, wrapping
+  the existing `has_eligible_mate` predicate. `MateDse.eligibility()`
+  carries `.require(HasEligibleMate::KEY)`, retiring the lifted
+  `if ctx.has_eligible_mate { ... }` wrapper at `scoring.rs:916`.
+  `ScoringContext.has_eligible_mate` field deleted; inline computation
+  + 8 test fixture rows + redundant `mating_fitness` / `current_season`
+  let-bindings in `disposition.rs` and `goap.rs` removed. New
+  `mate_eligibility` query in `MarkerQueries` (disposition) +
+  sibling `mate_eligibility_q` in `goap.rs` populates the snapshot
+  via `markers.set_entity(HasEligibleMate::KEY, entity, has)` per cat.
+
+  Verification — survival (`logs/tuned-42-027bug2/`) + focal-trace
+  (`logs/tuned-42-027bug2-trace/`):
+
+  | metric | pre-Bug-2 baseline | post-Bug-2 |
+  |---|---|---|
+  | `mate` L2 records (Simba focal trace) | 0 / 3.3M | **34,949** |
+  | mate L2 with `passed:true` | 0 | 0 (Simba never reaches Partners in 900s — Bug 3 territory) |
+  | continuity_tallies.courtship | 840 | 1175 (Bug 1 still emitting) |
+  | shadowfox_ambush_deaths | 6 | 4 |
+  | starvation_deaths | 1 (noise) | 0 |
+  | never_fired_expected | 8 | 8 (MatingOccurred + downstream still 0; pending Bug 3) |
+
+  Acceptance criterion ("`mate` L2 records > 0 in every focal trace
+  where the cat is Adult / not-Incapacitated") cleared. The DSE is
+  now visible to the L2 trace pipeline; once Bug 3 (PairingActivity
+  L2) drives cats to a Partners bond, the same trace machinery will
+  show `passed: true` records and a real `final_score` landscape.
+
+  4 new tests: 3 in `mating.rs` exercising the author system
+  (insert on eligible pair / skip on no bond / remove when partner
+  becomes Dead); 1 in `mate.rs` asserting the EligibilityFilter
+  carries the `.require(HasEligibleMate::KEY)`. 1303 / 1303 lib tests
+  green.

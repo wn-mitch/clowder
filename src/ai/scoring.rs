@@ -215,8 +215,9 @@ pub struct ScoringContext<'a> {
     /// matches a previously successful action at this tile, else 0.0.
     pub tradition_location_bonus: f32,
     // --- Reproduction context ---
-    /// Whether an orientation-compatible partner with Partners+ bond exists.
-    pub has_eligible_mate: bool,
+    // Ticket 027 Bug 2: `has_eligible_mate` field retired — read via
+    // the `HasEligibleMate` marker now (`ai::dses::mate::MateDse`
+    // requires it on its EligibilityFilter).
     /// Urgency of nearby hungry kittens (0.0 if none).
     pub hungry_kitten_urgency: f32,
     /// Whether this cat is a parent of the hungriest nearby kitten.
@@ -913,7 +914,12 @@ pub fn score_actions(
     }
 
     // --- Mate (§2.3: CP of mating_deficit + warmth — Logistic(6, 0.6)) ---
-    if ctx.has_eligible_mate {
+    // Ticket 027 Bug 2: inline `if ctx.has_eligible_mate` guard
+    // retired. The mate DSE now carries `.require(HasEligibleMate::KEY)`
+    // on its EligibilityFilter, so `score_dse_by_id` returns 0.0 for
+    // cats without the marker. (Mirrors the `coordinate` retire pattern
+    // ~20 lines above.)
+    {
         let urgency = score_dse_by_id("mate", ctx, inputs);
         if urgency > 0.0 {
             scores.push((Action::Mate, urgency + jitter(rng, s.jitter_range)));
@@ -1818,7 +1824,6 @@ mod tests {
             has_active_disposition: false,
             active_disposition: None,
             tradition_location_bonus: 0.0,
-            has_eligible_mate: false,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
             caretake_compassion_bond_scale: 1.0,
@@ -1964,7 +1969,6 @@ mod tests {
             has_active_disposition: false,
             active_disposition: None,
             tradition_location_bonus: 0.0,
-            has_eligible_mate: false,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
             caretake_compassion_bond_scale: 1.0,
@@ -2104,7 +2108,6 @@ mod tests {
             has_active_disposition: false,
             active_disposition: None,
             tradition_location_bonus: 0.0,
-            has_eligible_mate: false,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
             caretake_compassion_bond_scale: 1.0,
@@ -2363,7 +2366,6 @@ mod tests {
             has_active_disposition: false,
             active_disposition: None,
             tradition_location_bonus: 0.0,
-            has_eligible_mate: false,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
             caretake_compassion_bond_scale: 1.0,
@@ -2438,7 +2440,6 @@ mod tests {
             has_active_disposition: false,
             active_disposition: None,
             tradition_location_bonus: 0.0,
-            has_eligible_mate: false,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
             caretake_compassion_bond_scale: 1.0,
@@ -2531,7 +2532,6 @@ mod tests {
             has_active_disposition: false,
             active_disposition: None,
             tradition_location_bonus: 0.0,
-            has_eligible_mate: false,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
             caretake_compassion_bond_scale: 1.0,
@@ -2842,7 +2842,6 @@ mod tests {
             has_active_disposition: false,
             active_disposition: None,
             tradition_location_bonus: 0.0,
-            has_eligible_mate: false,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
             caretake_compassion_bond_scale: 1.0,
@@ -2918,7 +2917,6 @@ mod tests {
             has_active_disposition: false,
             active_disposition: None,
             tradition_location_bonus: 0.0,
-            has_eligible_mate: false,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
             caretake_compassion_bond_scale: 1.0,

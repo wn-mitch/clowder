@@ -56,10 +56,16 @@ impl MateDse {
             // §4.3 LifeStage: mating requires Adult or Elder — forbid
             // Kitten and Young as a forward-looking gate for eventual
             // `Without<KittenDependency>` retirement.
+            // Ticket 027 Bug 2: require HasEligibleMate so the lifted
+            // `if ctx.has_eligible_mate { ... }` wrapper at
+            // `scoring.rs:916` retires — the marker carries the same
+            // semantics as the old gate (orientation-compatible
+            // Partners/Mates with both sides sated + happy + fertile).
             eligibility: EligibilityFilter::new()
                 .forbid(markers::Incapacitated::KEY)
                 .forbid(markers::Kitten::KEY)
-                .forbid(markers::Young::KEY),
+                .forbid(markers::Young::KEY)
+                .require(markers::HasEligibleMate::KEY),
         }
     }
 }
@@ -119,6 +125,21 @@ mod tests {
         assert_eq!(
             MateDse::new().composition().mode,
             CompositionMode::CompensatedProduct
+        );
+    }
+
+    #[test]
+    fn mate_requires_eligibility_marker() {
+        // Ticket 027 Bug 2: MateDse.eligibility() must require
+        // HasEligibleMate so `score_dse_by_id("mate", ...)` returns 0
+        // for cats without the marker. Replaces the lifted-condition
+        // wrapper at scoring.rs:916.
+        let dse = MateDse::new();
+        assert!(
+            dse.eligibility()
+                .required
+                .contains(&markers::HasEligibleMate::KEY),
+            "MateDse must require HasEligibleMate"
         );
     }
 }

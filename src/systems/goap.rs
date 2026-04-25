@@ -701,6 +701,11 @@ pub fn evaluate_and_plan(
         Has<markers::OnCorruptedTile>,
         Has<markers::OnSpecialTerrain>,
     )>,
+    // Ticket 027 Bug 2 — HasEligibleMate authored by
+    // `mating::update_mate_eligibility_markers`. Solo query so future
+    // related markers (HasEligiblePartnerCandidate per §7.M Bug 3) can
+    // sit alongside without disturbing the State tuple.
+    mate_eligibility_q: Query<Has<markers::HasEligibleMate>>,
 ) {
     let sc = &res.constants.scoring;
     let d = &res.constants.disposition;
@@ -901,8 +906,6 @@ pub fn evaluate_and_plan(
         .collect();
 
     // Snapshot per-cat fields needed by the mating eligibility gate.
-    let mating_fitness = mating_fitness_params.snapshot();
-    let current_season = mating_fitness_params.current_season();
     let current_day_phase = mating_fitness_params.current_day_phase();
 
     for (
@@ -1050,6 +1053,11 @@ pub fn evaluate_and_plan(
             markers.set_entity(markers::OnCorruptedTile::KEY, entity, on_corrupted_marker);
             markers.set_entity(markers::OnSpecialTerrain::KEY, entity, on_special_marker);
         }
+        // Ticket 027 Bug 2 — HasEligibleMate authored by
+        // `mating::update_mate_eligibility_markers`.
+        if let Ok(has_mate) = mate_eligibility_q.get(entity) {
+            markers.set_entity(markers::HasEligibleMate::KEY, entity, has_mate);
+        }
 
         let has_herbs_nearby = herb_positions.iter().any(|(_, hp, _)| {
             crate::systems::sensing::observer_sees_at(
@@ -1123,15 +1131,10 @@ pub fn evaluate_and_plan(
             max_c
         };
 
-        let has_eligible_mate = crate::ai::mating::has_eligible_mate(
-            entity,
-            needs.mating,
-            current_season,
-            sc,
-            &mating_fitness,
-            &cat_positions,
-            &res.relationships,
-        );
+        // Ticket 027 Bug 2: inline `has_eligible_mate` retired —
+        // `mating::update_mate_eligibility_markers` authors the
+        // `HasEligibleMate` ZST per tick; `MateDse.eligibility()`
+        // requires it via the marker snapshot populated above.
 
         let ctx = ScoringContext {
             scoring: sc,
@@ -1174,7 +1177,6 @@ pub fn evaluate_and_plan(
             has_active_disposition: false,
             active_disposition: None,
             tradition_location_bonus: 0.0,
-            has_eligible_mate,
             hungry_kitten_urgency: caretake_resolution.urgency,
             is_parent_of_hungry_kitten: caretake_resolution.is_parent,
             caretake_compassion_bond_scale: caretake_bond_scale,

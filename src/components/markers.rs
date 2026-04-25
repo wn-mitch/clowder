@@ -282,6 +282,9 @@ pub struct HasMentoringTarget;
 /// `mating.rs::update_mate_eligibility_markers`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HasEligibleMate;
+impl HasEligibleMate {
+    pub const KEY: &str = "HasEligibleMate";
+}
 
 /// Cat is the parent side of a `KittenDependency` whose kitten's
 /// hunger exceeds threshold.
