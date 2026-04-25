@@ -15,11 +15,11 @@ _Last generated: 2026-04-25._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 8 |
+| Ready | 12 |
 | Parked | 1 |
 | Blocked | 9 |
 | Done (awaiting archive) | 2 |
-| **Open total** | **23** |
+| **Open total** | **27** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -34,7 +34,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[014](docs/open-work/tickets/014-phase-4-follow-ons.md)** — Phase 4 follow-ons — target-taking registration + markers + mate-gender + Mating/PracticeMagic magnitude — _added 2026-04-22_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
 
-## Ready (8)
+## Ready (12)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -44,6 +44,10 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** — Crafting — items, recipes, stations — _added 2026-04-22_
 - **[020](docs/open-work/tickets/020-namedlandmark-substrate.md)** — NamedLandmark substrate (cross-consumer naming) — _added 2026-04-22_
 - **[023](docs/open-work/tickets/023-shadowfox-distinct-motivations.md)** — Shadowfox motivations distinct from normal foxes — _added 2026-04-14_
+- **[027](docs/open-work/tickets/027-mating-cadence-three-bug-cascade.md)** — Mating cadence — three-bug cascade blocking MatingOccurred — _added 2026-04-25_
+- **[028](docs/open-work/tickets/028-headless-observer-registration-regression.md)** — Headless build silently drops 4 personality-event observer cascades — _added 2026-04-25_
+- **[029](docs/open-work/tickets/029-cross-run-log-database.md)** — Cross-run log database — collate baseline + diagnostic archives for SQL-style queries — _added 2026-04-25_
+- **[030](docs/open-work/tickets/030-unify-headless-and-windowed-build-pipeline.md)** — Unify headless and windowed build pipeline — kill the manual mirror — _added 2026-04-25_
 
 ## Parked (1)
 

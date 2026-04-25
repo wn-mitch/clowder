@@ -137,15 +137,38 @@ remaining work is itemised here.
 - ~~**§7.M.7.4 `resolve_mate_with` gender fix.**~~ Landed as Phase
   4b.1 — see Landed section below.
 
-**Balance-tuning observations — deferred to post-refactor.**
+**Balance-tuning observations — deferral status updated 2026-04-25.**
 
 Several positive-feature metrics remain below their literal
-Phase 4 exit targets on the seed-42 `--duration 900` soak at HEAD
-(`logs/phase4b4-db7362b/events.jsonl`):
+Phase 4 exit targets. The 2026-04-25 multi-soak baseline dataset
+(`logs/baseline-2026-04-25/`, 27 footer-complete runs at commit
+`cba19bd`) supersedes the single-seed snapshot at
+`logs/phase4b4-db7362b/events.jsonl` and resolves several deferral
+predicates. Updated status per metric:
 
-- MatingOccurred = 0 (literal target ≥ 7 per 7-season soak).
+- ~~MatingOccurred = 0 (literal target ≥ 7 per 7-season soak).~~
+  **No longer deferred.** Diagnosed across 15 sweep runs: the gap
+  is structural, not coefficient-tunable. Three layered bugs
+  (lifted-condition outer gate at `scoring.rs:916`, missing L2
+  PairingActivity per §7.M, misnamed `CourtshipInteraction`
+  canary). Active work tracked in
+  [ticket 027](027-mating-cadence-three-bug-cascade.md).
+  Substrate stability predicate satisfied per the §6.5 target-taking
+  port closeout in Phase 4c.7 + §7.2 commitment-gate landing in
+  Phase 6a — the "wait for substrate" justification no longer holds.
 - PracticeMagic sub-mode count = 2 / 5 (literal target ≥ 3 / 5).
+  **Status revision.** Baseline shows `CleanseCompleted` mean 215.7
+  across 15/15 runs, `CarcassHarvested` mean 6.3 (12/15 non-zero),
+  `SpiritCommunion` mean 0.6 (6/15 non-zero, dormant per §6.3
+  spatial-target routing). Cleanse and Harvest are firing
+  vigorously; only Commune remains dormant. The "2/5" framing
+  needs updating against the new measurement.
 - Farming = 0 (literal target ≥ 1).
+  **Resolved.** `CropTended` mean 17,191.6 across 14/15 runs;
+  `CropHarvested` mean 873.7 across 13/15 runs. The original
+  measurement at `phase4b4-db7362b` predated marker authoring
+  for `HasGarden` / `HasFunctionalKitchen`. Farming is no longer
+  a deferred metric.
 
 These are **not** treated as Phase 4 blockers. Rationale:
 
@@ -166,13 +189,13 @@ These are **not** treated as Phase 4 blockers. Rationale:
    Tuning against a moving substrate wastes artifacts on shapes
    that will change.
 
-**Commitment:** balance iterations on positive-feature density
-(mating, magic sub-modes, farming) wait until the refactor's
-substrate changes have stabilized. At that point, each of the
-three gaps gets a dedicated balance thread with its own
-hypothesis-prediction-observation-concordance record. Until
-then, the metrics are tracked in soak footers for trend
-visibility but not tuned.
+**Updated commitment (2026-04-25):** the substrate-stable predicate
+is satisfied. Mating cadence has its own ticket (027) covering the
+three structural bugs blocking it. Magic sub-mode density now
+narrows to Commune-only, blocked by §6.3 spatial-target routing
+(track separately if a magic balance thread opens). Farming is
+resolved. The soak-footer trend tracking continues but is no longer
+a "wait for substrate" item.
 
 Causally, the dormancy gaps (Cleanse / Harvest / Commune /
 Farming) also trace to refactor-layer missing plumbing — the
