@@ -1,7 +1,7 @@
 ---
 id: 028
 title: Headless build silently drops 4 personality-event observer cascades
-status: ready
+status: in-progress
 cluster: null
 added: 2026-04-25
 parked: null
@@ -175,3 +175,23 @@ After the patch:
   User noted "play definitely had an implementation and regressed";
   investigation traced the gap to headless missing observer
   registration since the observer pattern was introduced.
+- 2026-04-25 (phase A): Landed Fix 1 (interim) +  Fix 2 (durable).
+  - Fix 1: added `register_observers_world(&mut World)` sibling fn
+    in `src/systems/personality_events.rs` and wired it into
+    `src/main.rs::setup_world` after the message-registry block.
+    The four observers now run in headless. This is interim per the
+    ticket's Note on durability — once ticket 030 lands the unified
+    App pipeline, the world-flavored fn is deleted.
+  - Fix 2: added `EventLog::push(EventKind::PlayFired { cat, partner })`
+    inside `on_play_initiated` after the partner-search loop.
+    Pattern matches `goap.rs::GroomingFired` /
+    `goap.rs::MentoringFired`. The `play` continuity canary now
+    tallies on every fired event, not just narrative-only.
+  - Fix 3 audit (no code change): the other three cascades
+    (`on_temper_flared`, `on_directive_refused`, `on_pride_crisis`)
+    emit narrative + relationship/mood mutations. None target a
+    continuity-canary class today. Leaving them as-is is intentional;
+    if a future canary class wants to track temper outbursts or
+    directive refusals, those events would be added at that time.
+  - Fix 4 (regression guard) intentionally **not** added — ticket 030
+    is landing in the same work session and supersedes the need.

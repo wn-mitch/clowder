@@ -653,6 +653,16 @@ fn setup_world(args: &CliArgs) -> io::Result<World> {
     bevy_ecs::message::MessageRegistry::register_message::<
         clowder::systems::magic::CorruptionPushback,
     >(&mut world);
+
+    // Personality-event observer cascades — must mirror
+    // `SimulationPlugin::build`'s `register_observers(app)` call.
+    // Without this, `commands.trigger(PlayInitiated)` etc. fire each
+    // tick but no observer is listening, so the cascades (mood boost,
+    // narrative, `EventKind::PlayFired` push) silently never run in
+    // headless. See ticket 028. Retired in ticket 030 once headless
+    // moves to the unified App pipeline.
+    clowder::systems::personality_events::register_observers_world(&mut world);
+
     if !world.contains_resource::<clowder::resources::ColonyScore>() {
         world.insert_resource(clowder::resources::ColonyScore::default());
     }

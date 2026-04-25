@@ -8,6 +8,7 @@ use crate::components::mental::{Mood, MoodModifier, PrideCooldown};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Needs, Position};
 use crate::events::personality::{DirectiveRefused, PlayInitiated, PrideCrisis, TemperFlared};
+use crate::resources::event_log::{EventKind, EventLog};
 use crate::resources::map::TileMap;
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::narrative_templates::{
@@ -119,6 +120,19 @@ pub fn register_observers(app: &mut bevy::prelude::App) {
     app.add_observer(on_directive_refused);
     app.add_observer(on_play_initiated);
     app.add_observer(on_pride_crisis);
+}
+
+/// World-flavored sibling of [`register_observers`] for the headless
+/// path, which builds a raw [`World`] + [`Schedule`] rather than an
+/// [`App`]. Without this, `commands.trigger(...)` calls in
+/// `emit_personality_events` fire each tick but no observer is
+/// listening — the events drop silently. (Ticket 028.) Retired in
+/// ticket 030 once headless moves to the unified App pipeline.
+pub fn register_observers_world(world: &mut bevy::prelude::World) {
+    world.add_observer(on_temper_flared);
+    world.add_observer(on_directive_refused);
+    world.add_observer(on_play_initiated);
+    world.add_observer(on_pride_crisis);
 }
 
 // ---------------------------------------------------------------------------
@@ -245,7 +259,8 @@ fn on_directive_refused(
     );
 }
 
-/// PlayInitiated cascade: mood boost to nearby cats, template-driven narrative.
+/// PlayInitiated cascade: mood boost to nearby cats, template-driven narrative,
+/// and a `play` continuity-canary tally via [`EventKind::PlayFired`].
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn on_play_initiated(
     trigger: On<PlayInitiated>,
@@ -253,6 +268,7 @@ fn on_play_initiated(
     needs_q: Query<&Needs, Without<Dead>>,
     mut moods: Query<&mut Mood>,
     mut log: ResMut<NarrativeLog>,
+    mut event_log: Option<ResMut<EventLog>>,
     time: Res<TimeState>,
     constants: Res<SimConstants>,
     config: Res<SimConfig>,
@@ -291,6 +307,23 @@ fn on_play_initiated(
         if play_partner.is_none() {
             play_partner = Some(other_name.0.clone());
         }
+    }
+
+    // Tally for the `play` continuity canary. Mirrors the GroomingFired
+    // / MentoringFired pattern in `goap.rs` — the cascade emits a
+    // narrative entry *and* an EventLog record so the footer's
+    // `continuity_tallies.play` field counts each fired event.
+    // Without this push the canary stays at zero even when the
+    // observer fires (the trigger / observer flow only routes through
+    // narrative). See ticket 028.
+    if let Some(ref mut events) = event_log {
+        events.push(
+            time.tick,
+            EventKind::PlayFired {
+                cat: cat_name.clone(),
+                partner: play_partner.clone(),
+            },
+        );
     }
 
     // Build template context from available state.
