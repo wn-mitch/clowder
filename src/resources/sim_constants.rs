@@ -1496,6 +1496,11 @@ pub struct DispositionConstants {
     pub chase_stuck_ticks: u64,
     pub chase_speed: i32,
     pub approach_speed: i32,
+    /// Cat's stalk-phase closing rate, in tiles/tick. Stochastic when
+    /// fractional: `floor(stalk_speed)` guaranteed steps plus a single
+    /// extra step with probability `stalk_speed - floor(stalk_speed)`.
+    /// Resolved in the STALK arm of `resolve_engage_prey` (ticket 002).
+    pub stalk_speed: f32,
     pub approach_give_up_distance: i32,
     pub search_belief_radius: i32,
     pub search_wind_direction_threshold: f32,
@@ -2054,6 +2059,7 @@ impl Default for DispositionConstants {
             chase_stuck_ticks: 10,
             chase_speed: 3,
             approach_speed: 3,
+            stalk_speed: 1.25,
             approach_give_up_distance: 60,
             search_belief_radius: 25,
             search_wind_direction_threshold: 0.3,

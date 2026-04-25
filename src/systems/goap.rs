@@ -4512,10 +4512,24 @@ fn resolve_engage_prey(
             }
         } else {
             // === STALK ===
+            // Stochastic fractional speed: floor(stalk_speed) guaranteed
+            // steps + one extra step with probability frac. Lets us tune
+            // stalk closing rate finer than the i32 chase/approach loops
+            // (ticket 002 lever 1).
+            let full_steps = d.stalk_speed.floor() as i32;
+            let frac = d.stalk_speed - (full_steps as f32);
             let mut moved = false;
-            if let Some(next) = step_toward(pos, &prey_pos, map) {
-                *pos = next;
-                moved = true;
+            for _ in 0..full_steps {
+                if let Some(next) = step_toward(pos, &prey_pos, map) {
+                    *pos = next;
+                    moved = true;
+                }
+            }
+            if frac > 0.0 && rng.rng.random::<f32>() < frac {
+                if let Some(next) = step_toward(pos, &prey_pos, map) {
+                    *pos = next;
+                    moved = true;
+                }
             }
             if personality.anxiety > d.anxiety_spook_threshold
                 && rng.rng.random::<f32>() < d.anxiety_spook_chance
