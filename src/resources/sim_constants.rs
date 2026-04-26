@@ -56,6 +56,13 @@ pub struct NeedsConstants {
     pub weather_temperature_light_rain: f32,
     pub season_temperature_winter: f32,
     pub season_temperature_autumn: f32,
+    /// Health drained per tick while a cat is at `hunger == 0.0` (the
+    /// starvation cliff in `src/systems/needs.rs:95`). At 0.0005, a
+    /// continuously-starving cat dies from this drain in ~2000 ticks
+    /// (~2 in-sim days). Pair with `starvation_safety_drain` and
+    /// `starvation_mood_penalty` for the full cascade. See ticket 032
+    /// for the open work to soften this cliff into a graded
+    /// body-condition axis.
     pub starvation_health_drain: f32,
     pub starvation_safety_drain: f32,
     pub starvation_mood_penalty: f32,
@@ -362,6 +369,13 @@ pub struct MagicConstants {
     pub gratitude_fondness_gain: f32,
     pub herbcraft_apply_skill_growth: f32,
     pub set_ward_ticks: u64,
+    /// Per-tick strength loss for a thornward at the unsieged baseline
+    /// (`Ward::strength` starts at 1.0; decay is linear in
+    /// `src/systems/magic.rs:158`). 1 in-sim day = `ticks_per_day_phase
+    /// × 4 = 1000` ticks, so decay 0.0005 = 2-day lifetime, 0.001 =
+    /// 1-day, etc. Under siege, `effective_decay += siege_pressure ×
+    /// ward_siege_decay_bonus` so a sieged ward burns faster than the
+    /// baseline lifetime suggests.
     pub thornward_decay_rate: f32,
     pub herbcraft_ward_skill_growth: f32,
     pub magic_ward_skill_growth: f32,
@@ -549,7 +563,16 @@ impl Default for SocialConstants {
             mates_fondness_threshold: 0.7,
             mates_familiarity_threshold: 0.6,
             partners_romantic_threshold: 0.5,
-            partners_fondness_threshold: 0.6,
+            // Lowered 0.6 → 0.55 (ticket 027 Bug 3 partial). Mocha+Birch
+            // in `logs/tuned-42-027bug3-trace` reached romantic=1.0 yet
+            // their bond stayed Friends because fondness plateaued
+            // below 0.6 — the courtship-drift loop only accumulates
+            // `romantic`, not `fondness`. Pairing with the bond-bias on
+            // socialize_target's target picker, this lower gate lets
+            // sustained partner-directed socialization actually carry a
+            // Friends bond to Partners. `mates_fondness_threshold = 0.7`
+            // remains untouched as the deeper-affection ceiling.
+            partners_fondness_threshold: 0.55,
             partners_familiarity_threshold: 0.5,
             friends_fondness_threshold: 0.3,
             friends_familiarity_threshold: 0.4,
@@ -562,13 +585,18 @@ impl Default for SocialConstants {
             fondness_grooming_scale: 0.3,
             romantic_grooming_floor: 0.5,
             romantic_grooming_scale: 0.5,
-            // Per bond_check_interval=50: 0.0025 × 20 checks/day = 0.05/day.
-            // Reaches Partners threshold (0.5) in ~10 in-game days; Mates (0.7)
-            // in ~14 days. Compatible close-friend pairs become Partners within
-            // their first fertile Spring, Mates by their second. The fondness
-            // gate sits at the Friends threshold (0.3) so drift engages the
-            // moment a Friends bond forms — no dead zone between tiers.
-            courtship_romantic_rate: 0.0025,
+            // Per bond_check_interval=50: 0.0035 × 20 checks/day = 0.07/day.
+            // Reaches Partners threshold (0.5) in ~7.1 in-game days; Mates
+            // (0.7) in ~10. Compatible close-friend pairs become Partners
+            // within their first fertile Spring, Mates by their second. The
+            // fondness gate sits at the Friends threshold (0.3) so drift
+            // engages the moment a Friends bond forms — no dead zone between
+            // tiers. Bumped 0.0025 → 0.0035 (ticket 027 Bug 3 partial,
+            // 1.4× — inside the ±30% noise band): the prior rate left
+            // late-spawning pairs short of the Partners threshold by the
+            // end of the 900s soak window even when their fondness /
+            // familiarity were already gate-passing.
+            courtship_romantic_rate: 0.0035,
             courtship_fondness_gate: 0.3,
             courtship_familiarity_gate: 0.4,
         }
@@ -732,6 +760,10 @@ pub struct PreyConstants {
     pub store_raid_cleanliness_drain: f32,
     pub store_raid_narrative_chance: f32,
     pub passive_hunger_relief: f32,
+    /// Per-tick health drain for a *prey animal* (rabbit, etc.) at full
+    /// hunger — the prey-side analogue of `NeedsConstants::starvation_health_drain`.
+    /// Drives prey mortality in lean seasons; combined with
+    /// `den_refill_base_chance` this is the prey-population governor.
     pub starvation_health_drain: f32,
     pub starvation_threshold: f32,
     pub starvation_narrative_chance: f32,
@@ -2905,6 +2937,15 @@ impl Default for AspirationConstants {
 pub struct FertilityConstants {
     pub cycle_length_ticks: u32,
     pub proestrus_fraction: f32,
+    /// Fraction of `cycle_length_ticks` spent in fertile estrus (the
+    /// breedable window). The remaining cycle is split between
+    /// `proestrus_fraction` and the implicit diestrus
+    /// (`1.0 - proestrus - estrus`, see `diestrus_fraction()` method).
+    /// AND-gated against `breeding_hunger_floor`,
+    /// `breeding_energy_floor`, `breeding_mood_floor`, and the partner's
+    /// own estrus state — narrow values here compose with the gates to
+    /// collapse the mating window. Ticket 032 §3 tracks the
+    /// hunger-floor angle of this entanglement.
     pub estrus_fraction: f32,
     pub post_partum_recovery_ticks: u32,
     pub update_interval_ticks: u32,

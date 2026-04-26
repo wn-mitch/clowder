@@ -1,0 +1,20 @@
+# Hypothesize spec — pin thornward lifetime to 2 in-sim days.
+#
+# Math: initial strength 1.0, linear decay per tick (src/systems/magic.rs:158),
+# 1 day = ticks_per_day_phase × 4 = 250 × 4 = 1000 ticks. 2 days = 2000 ticks.
+# Decay rate for 2-day baseline = 1.0 / 2000 = 0.0005/tick. Sieged wards
+# decay faster (effective_decay += siege_pressure × ward_siege_decay_bonus,
+# magic.rs:156) — the 2-day number is the unsieged defensive baseline.
+
+hypothesis: "Thornwards lasting 2 in-sim days lets ward defense compound at corruption hot spots without driving placement churn"
+constants_patch:
+  magic:
+    thornward_decay_rate: 0.0005   # was 0.001 (1-day lifetime); now 2-day
+prediction:
+  metric: wards_placed_total
+  direction: decrease
+  rough_magnitude_pct: [30, 60]    # roughly half the placement churn
+
+seeds: [42, 99, 7]
+reps: 3
+duration: 900

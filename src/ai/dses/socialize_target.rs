@@ -18,14 +18,16 @@
 //!   target-quality merging into the action pool is deferred until the
 //!   scoring substrate's other §6 ports stabilize.
 //!
-//! Four per-target considerations per §6.5.1:
+//! Five per-target considerations (§6.5.1 + ticket 027 Bug 3 partner-bond
+//! bias):
 //!
 //! | # | Consideration          | Scalar name             | Curve                           | Weight |
 //! |---|------------------------|-------------------------|---------------------------------|--------|
-//! | 1 | distance               | `target_nearness`       | `Quadratic(exp=2)` over range=8 | 0.25   |
-//! | 2 | fondness               | `target_fondness`       | `Linear(1, 0)`                  | 0.35   |
-//! | 3 | novelty (1-familiarity)| `target_novelty`        | `Linear(1, 0)`                  | 0.25   |
-//! | 4 | species-compat         | `target_species_compat` | `Cliff(threshold=0.5)`          | 0.15   |
+//! | 1 | distance               | `target_nearness`       | `Quadratic(exp=2)` over range=8 | 0.20   |
+//! | 2 | fondness               | `target_fondness`       | `Linear(1, 0)`                  | 0.28   |
+//! | 3 | novelty (1-familiarity)| `target_novelty`        | `Linear(1, 0)`                  | 0.20   |
+//! | 4 | species-compat         | `target_species_compat` | `Cliff(threshold=0.5)`          | 0.12   |
+//! | 5 | partner bond           | `target_partner_bond`   | `Linear(1, 0)`                  | 0.20   |
 //!
 //! Distance is encoded as a target-scoped scalar rather than a
 //! `Spatial` consideration because no influence map represents
@@ -39,6 +41,18 @@
 //! a `Linear(-1, 1)` curve so the fetcher is the single source of
 //! "novelty signal", matching the spec's naming of `target_novelty`
 //! as a first-class axis.
+//!
+//! **Partner-bond axis** (ticket 027 Bug 3 partial implementation).
+//! Maps `Relationships::get(cat, target).bond` to a graduated scalar
+//! — `None`: 0.0, `Friends`: 0.5, `Partners`/`Mates`: 1.0. Biases
+//! Socialize's target picker toward a bonded partner so repeated
+//! socialization concentrates with the same cat, accelerating
+//! fondness and familiarity past the Partners-bond gate that the
+//! courtship-drift loop in `social.rs::check_bonds` cannot cross on
+//! its own (only `romantic` accumulates passively). The original
+//! four weights renormalized by ×0.8 to make room. The full L2
+//! `PairingActivity` self-state DSE per §7.M is deferred — see
+//! ticket 027 §"Out of scope".
 
 use bevy::prelude::Entity;
 
@@ -51,12 +65,13 @@ use crate::ai::target_dse::{
     evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,
 };
 use crate::components::physical::Position;
-use crate::resources::relationships::Relationships;
+use crate::resources::relationships::{BondType, Relationships};
 
 pub const TARGET_NEARNESS_INPUT: &str = "target_nearness";
 pub const TARGET_FONDNESS_INPUT: &str = "target_fondness";
 pub const TARGET_NOVELTY_INPUT: &str = "target_novelty";
 pub const TARGET_SPECIES_COMPAT_INPUT: &str = "target_species_compat";
+pub const TARGET_PARTNER_BOND_INPUT: &str = "target_partner_bond";
 
 /// Candidate-pool range in Manhattan tiles. Matches the existing
 /// `DispositionConstants::social_target_range` outer-gate semantic —
@@ -97,17 +112,21 @@ pub fn socialize_target_dse() -> TargetTakingDse {
                 TARGET_FONDNESS_INPUT,
                 linear.clone(),
             )),
-            Consideration::Scalar(ScalarConsideration::new(TARGET_NOVELTY_INPUT, linear)),
+            Consideration::Scalar(ScalarConsideration::new(TARGET_NOVELTY_INPUT, linear.clone())),
             Consideration::Scalar(ScalarConsideration::new(
                 TARGET_SPECIES_COMPAT_INPUT,
                 species_cliff,
             )),
+            Consideration::Scalar(ScalarConsideration::new(TARGET_PARTNER_BOND_INPUT, linear)),
         ],
         // WeightedSum matches the pre-refactor resolver's linear mixer
         // (`fondness × w1 + (1 - familiarity) × w2`). CompensatedProduct
         // would gate any low axis (a 0.0 novelty nulls the candidate
         // entirely) which over-punishes familiar-but-beloved partners.
-        composition: Composition::weighted_sum(vec![0.25, 0.35, 0.25, 0.15]),
+        // Partner-bond axis added at weight 0.20; original four weights
+        // (0.25/0.35/0.25/0.15) renormalized by ×0.80 to keep the sum
+        // at 1.0.
+        composition: Composition::weighted_sum(vec![0.20, 0.28, 0.20, 0.12, 0.20]),
         aggregation: TargetAggregation::Best,
         intention: socialize_intention,
     }
@@ -130,6 +149,24 @@ fn socialize_intention(_target: Entity) -> Intention {
         kind: ActivityKind::Socialize,
         termination: Termination::UntilInterrupt,
         strategy: CommitmentStrategy::OpenMinded,
+    }
+}
+
+/// Map `Relationships::get(cat, target).bond` to a graduated scalar.
+///
+/// `None` → 0.0 (unbonded acquaintance), `Friends` → 0.5 (significant
+/// boost — the courtship-drift loop in `social.rs::check_bonds` uses
+/// this tier as the romantic-accumulation gate), `Partners` /
+/// `Mates` → 1.0 (already at or past mating-eligibility; keep the
+/// bias maxed so the cat doesn't drift away mid-pairing). The
+/// graduated shape (rather than a Cliff at any-bond) means a
+/// Mates-bonded partner outscores a Friends-bonded one, so a cat
+/// with both in range stays oriented toward the deeper bond.
+fn bond_score(relationships: &Relationships, cat: Entity, target: Entity) -> f32 {
+    match relationships.get(cat, target).and_then(|r| r.bond) {
+        Some(BondType::Mates) | Some(BondType::Partners) => 1.0,
+        Some(BondType::Friends) => 0.5,
+        None => 0.0,
     }
 }
 
@@ -231,6 +268,7 @@ pub fn resolve_socialize_target(
             // Future cross-species socializing routes a compatibility
             // class here; curve-cliff gates on ≥ 0.5.
             TARGET_SPECIES_COMPAT_INPUT => 1.0,
+            TARGET_PARTNER_BOND_INPUT => bond_score(relationships, cat, target),
             _ => 0.0,
         }
     };
@@ -305,8 +343,8 @@ mod tests {
     }
 
     #[test]
-    fn socialize_target_dse_has_four_axes() {
-        assert_eq!(socialize_target_dse().per_target_considerations().len(), 4);
+    fn socialize_target_dse_has_five_axes() {
+        assert_eq!(socialize_target_dse().per_target_considerations().len(), 5);
     }
 
     #[test]
@@ -399,6 +437,160 @@ mod tests {
             &fetch_target,
         );
         assert_eq!(out.winning_target, Some(novel_stranger));
+    }
+
+    #[test]
+    fn bond_score_maps_bond_tiers_to_graduated_scalar() {
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let stranger = Entity::from_raw_u32(2).unwrap();
+        let friend = Entity::from_raw_u32(3).unwrap();
+        let partner = Entity::from_raw_u32(4).unwrap();
+        let mate = Entity::from_raw_u32(5).unwrap();
+        let mut relationships = Relationships::default();
+        // No entry → bond=None → 0.0.
+        assert_eq!(bond_score(&relationships, cat, stranger), 0.0);
+        relationships.get_or_insert(cat, friend).bond = Some(BondType::Friends);
+        relationships.get_or_insert(cat, partner).bond = Some(BondType::Partners);
+        relationships.get_or_insert(cat, mate).bond = Some(BondType::Mates);
+        assert_eq!(bond_score(&relationships, cat, friend), 0.5);
+        assert_eq!(bond_score(&relationships, cat, partner), 1.0);
+        assert_eq!(bond_score(&relationships, cat, mate), 1.0);
+    }
+
+    #[test]
+    fn picks_friend_over_higher_fondness_unbonded_acquaintance() {
+        // Ticket 027 Bug 3 partial — partner-bond bias must beat a
+        // small fondness lead from an unbonded peer. Here the friend
+        // has 0.4 fondness, the stranger has 0.6, both equally near /
+        // novel / cat. Without the bond bias the stranger wins; with
+        // the 0.20 weight × 0.5 (Friends scalar) the friend wins.
+        let dse = socialize_target_dse();
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let friend = Entity::from_raw_u32(10).unwrap();
+        let stranger = Entity::from_raw_u32(11).unwrap();
+        let ctx = test_ctx(cat);
+        let fetch_self = |_: &str, _: Entity| 0.0;
+        let fetch_target = move |name: &str, _: Entity, target: Entity| -> f32 {
+            match name {
+                TARGET_NEARNESS_INPUT => 1.0,
+                TARGET_FONDNESS_INPUT => {
+                    if target == friend {
+                        0.4
+                    } else {
+                        0.6
+                    }
+                }
+                TARGET_NOVELTY_INPUT => 0.5,
+                TARGET_SPECIES_COMPAT_INPUT => 1.0,
+                TARGET_PARTNER_BOND_INPUT => {
+                    if target == friend {
+                        0.5
+                    } else {
+                        0.0
+                    }
+                }
+                _ => 0.0,
+            }
+        };
+        let positions = vec![Position::new(1, 0), Position::new(2, 0)];
+        let out = evaluate_target_taking(
+            &dse,
+            cat,
+            &[friend, stranger],
+            &positions,
+            &ctx,
+            &fetch_self,
+            &fetch_target,
+        );
+        assert_eq!(out.winning_target, Some(friend));
+    }
+
+    #[test]
+    fn picks_partner_over_friend_when_both_bonded() {
+        // Graduated bond scalar (Partners=1.0, Friends=0.5) means the
+        // partners-bonded cat outscores the friends-bonded one ceteris
+        // paribus — keeps a paired cat oriented toward the deeper bond.
+        let dse = socialize_target_dse();
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let friend = Entity::from_raw_u32(10).unwrap();
+        let partner = Entity::from_raw_u32(11).unwrap();
+        let ctx = test_ctx(cat);
+        let fetch_self = |_: &str, _: Entity| 0.0;
+        let fetch_target = move |name: &str, _: Entity, target: Entity| -> f32 {
+            match name {
+                TARGET_NEARNESS_INPUT => 1.0,
+                TARGET_FONDNESS_INPUT => 0.5,
+                TARGET_NOVELTY_INPUT => 0.5,
+                TARGET_SPECIES_COMPAT_INPUT => 1.0,
+                TARGET_PARTNER_BOND_INPUT => {
+                    if target == partner {
+                        1.0
+                    } else {
+                        0.5
+                    }
+                }
+                _ => 0.0,
+            }
+        };
+        let positions = vec![Position::new(1, 0), Position::new(2, 0)];
+        let out = evaluate_target_taking(
+            &dse,
+            cat,
+            &[friend, partner],
+            &positions,
+            &ctx,
+            &fetch_self,
+            &fetch_target,
+        );
+        assert_eq!(out.winning_target, Some(partner));
+    }
+
+    #[test]
+    fn bond_bias_does_not_dominate_large_fondness_gap() {
+        // Sanity: a +0.6 fondness gap on the unbonded candidate beats
+        // the 0.20 × 0.5 = 0.10 bond bonus on the Friends-bonded peer.
+        // Confirms the bond axis is a bias, not an override — a
+        // beloved-but-unbonded peer still wins over a barely-liked
+        // friend, matching the spec's "additive bias not gate" intent.
+        let dse = socialize_target_dse();
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let friend = Entity::from_raw_u32(10).unwrap();
+        let beloved_stranger = Entity::from_raw_u32(11).unwrap();
+        let ctx = test_ctx(cat);
+        let fetch_self = |_: &str, _: Entity| 0.0;
+        let fetch_target = move |name: &str, _: Entity, target: Entity| -> f32 {
+            match name {
+                TARGET_NEARNESS_INPUT => 1.0,
+                TARGET_FONDNESS_INPUT => {
+                    if target == friend {
+                        0.3
+                    } else {
+                        0.9
+                    }
+                }
+                TARGET_NOVELTY_INPUT => 0.5,
+                TARGET_SPECIES_COMPAT_INPUT => 1.0,
+                TARGET_PARTNER_BOND_INPUT => {
+                    if target == friend {
+                        0.5
+                    } else {
+                        0.0
+                    }
+                }
+                _ => 0.0,
+            }
+        };
+        let positions = vec![Position::new(1, 0), Position::new(2, 0)];
+        let out = evaluate_target_taking(
+            &dse,
+            cat,
+            &[friend, beloved_stranger],
+            &positions,
+            &ctx,
+            &fetch_self,
+            &fetch_target,
+        );
+        assert_eq!(out.winning_target, Some(beloved_stranger));
     }
 
     #[test]

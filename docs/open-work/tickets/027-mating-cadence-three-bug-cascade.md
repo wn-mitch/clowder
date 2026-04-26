@@ -233,3 +233,76 @@ Per-bug acceptance:
   becomes Dead); 1 in `mate.rs` asserting the EligibilityFilter
   carries the `.require(HasEligibleMate::KEY)`. 1303 / 1303 lib tests
   green.
+- 2026-04-26: **Bug 3 partial — target-picker bias attempt (NOT
+  acceptance-clearing)**. The full L2 `PairingActivity` self-state
+  DSE described in the ticket scope (with `DispositionKind::Pairing`,
+  `pairing_activity.rs`, GOAP step resolver, and target-taking
+  sibling) was scoped during exploration and judged a multi-commit
+  feature with open design questions — see `commitment.rs:175–183`'s
+  doc-comment ("L1/L2 strategies are carried inline on the
+  Intention, not [in `DispositionKind`]") and the discovery that
+  target-taking DSEs are *not* independent score competitors today
+  (per `socialize_target.rs:14–19`'s "target-quality merging into
+  the action pool is deferred"). A standalone `pairing_activity_target.rs`
+  would have been inert.
+
+  Pivoted to the smallest intervention that addresses the
+  Mocha+Birch failure mode found in `tuned-42-027bug3-trace`: the
+  pair reached `romantic = 1.0` but stayed Friends because the
+  Partners promotion gate at `social.rs:146` requires
+  `fondness > 0.6 ∧ familiarity > 0.5 ∧ romantic > 0.5` — and the
+  passive courtship-drift loop only accumulates `romantic`. Two
+  layered changes:
+
+  1. **Bond-bias added to `socialize_target`** as a fifth
+     consideration (`target_partner_bond`, Linear curve, weight
+     0.20; existing four weights renormalized ×0.80 to keep the
+     RtEO sum at 1.0). Graduated scalar: None=0.0, Friends=0.5,
+     Partners/Mates=1.0 — keeps a paired cat oriented toward the
+     deeper bond. Fetcher resolves via a new `bond_score(...)`
+     helper. SocializeDse fires reliably (565 courtship events in
+     the bug3-trace, 484 play, 151 grooming) so this rides on an
+     existing high-frequency selection path; cats that choose to
+     socialize now preferentially pick a Friends-bonded compatible
+     peer, concentrating fondness/familiarity accumulation with the
+     same partner. 4 new tests + retrofitted "five axes" length
+     test.
+  2. **Two constants tweaked** in `SocialConstants`. `partners_fondness_threshold`
+     0.60 → 0.55 (direct response to Mocha+Birch — fondness was the
+     wall, not romantic). `courtship_romantic_rate` 0.0025 → 0.0035
+     (1.4×, inside the ±30% noise band — late-spawning pairs were
+     timing out before reaching the romantic threshold).
+     `mates_fondness_threshold = 0.7` left untouched as the deeper-
+     affection ceiling.
+
+  Verification — `just check` clean, `just test` 1308 / 1308 green
+  (including `compatible_adults_reach_partners_bond_in_expected_time`
+  which exercises the courtship timing). Single-seed deep-soak
+  (`logs/tuned-42-027bug3-bias-5a5506e-dirty/`): **inconclusive**.
+  Run landed in the unlucky tail of seed-42 scheduler-noise
+  (`continuity_tallies.courtship = 0`, `BondFormed = 0`,
+  `MatingOccurred = 0`) — the same noise CLAUDE.md flags as a
+  re-run-of-same-commit phenomenon. Comparable bracket: bug2-trace
+  had `courtship = 0`, bug3-trace had `courtship = 565` — same
+  code, different runs. `Starvation = 0` (improvement vs baseline);
+  `ShadowFoxAmbush = 7` (within the ≤10 cap). The single-run signal
+  cannot distinguish a regression from a noise-tail draw; multi-seed
+  sweep validation is required.
+
+  **Bug 3 acceptance NOT cleared** — `MatingOccurred > 0` is the
+  hard gate, and there is no run yet showing it. Recommended next
+  step: `just baseline-dataset 2026-04-26-bug3-bias` (3-rep ×
+  4-seed sweep) to average over the noise band, then
+  `just sweep-stats … --vs logs/baseline-2026-04-25` for the
+  Welch's-t / Cohen's d direction-of-drift check. Promote
+  `logs/baseline-2026-04-25` (or the post-bias sweep, depending on
+  which represents healthy state) to `logs/baselines/current.json`
+  via `just promote-baseline` — the missing pointer is why
+  `verdict` falls back to a 5-version-stale baseline today, drowning
+  real signal in substrate-refactor drift noise.
+
+  Status remains `in-progress`. Do not move to `landed` until the
+  multi-seed sweep clears `MatingOccurred > 0`. The full L2
+  `PairingActivity` DSE remains as a possible follow-up if the
+  bias-only intervention is insufficient — open as ticket 027b
+  rather than nesting a fourth bug here.

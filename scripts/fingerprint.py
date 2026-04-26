@@ -44,6 +44,11 @@ HEALTHY_COLONY = REPO_ROOT / "docs" / "balance" / "healthy-colony.md"
 # metric isn't flagged for trivial drift. 0.5 in the field's natural unit.
 MIN_BAND_WIDTH = 0.5
 
+# A baseline-mean above this floor is "expected to be active". When a metric
+# has baseline mean ≥ this and observed = 0, that's a silent-subsystem signal
+# distinct from "below band" — flag it as `silent`.
+SILENT_FLOOR = 1.0
+
 
 @dataclass
 class Band:
@@ -168,6 +173,14 @@ def evaluate(b: Band, observed: Any) -> tuple[str, str]:
         return "below-floor", f"floor is {b.floor}; observed {o}"
 
     if b.mean is not None and b.stdev is not None:
+        # Silent-subsystem detection: a metric whose baseline mean is well
+        # above zero (SILENT_FLOOR) but is observed at 0 is unambiguously
+        # "the subsystem stopped firing", not just "low end of the band".
+        # This used to slip through because the lower band was clamped to 0
+        # and any zero observation looked in-range. Distinct verdict so an
+        # agent can act on it.
+        if o == 0 and b.mean >= SILENT_FLOOR:
+            return "silent", f"baseline mean {b.mean:.2f}; observed 0 (subsystem stopped firing?)"
         width = max(2 * b.stdev, MIN_BAND_WIDTH)
         lo = max(0.0, b.mean - width)
         hi = b.mean + width
@@ -182,7 +195,7 @@ def evaluate(b: Band, observed: Any) -> tuple[str, str]:
 def derive_overall(rows: list[FingerprintRow]) -> str:
     if any(r.verdict in ("failure", "above-cap") for r in rows):
         return "fail"
-    if any(r.verdict in ("below-floor", "high", "low") for r in rows):
+    if any(r.verdict in ("silent", "below-floor", "high", "low") for r in rows):
         return "concern"
     return "pass"
 
@@ -238,7 +251,7 @@ def main(argv: list[str]) -> int:
         groups: dict[str, list[FingerprintRow]] = {}
         for r in rows:
             groups.setdefault(r.verdict, []).append(r)
-        for v in ("failure", "above-cap", "below-floor", "low", "high",
+        for v in ("failure", "above-cap", "silent", "below-floor", "low", "high",
                   "in-range", "unknown"):
             group = groups.get(v, [])
             if not group:

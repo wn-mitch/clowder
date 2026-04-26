@@ -25,6 +25,7 @@ Exit codes: 0 if found, 1 if path not present, 2 on hard error.
 from __future__ import annotations
 
 import argparse
+import difflib
 import json
 import re
 import subprocess
@@ -74,6 +75,30 @@ def lookup(d: dict[str, Any], dotted: str) -> Any:
             return None
         cur = cur[part]
     return cur
+
+
+def round_value(v: Any) -> Any:
+    """Strip f32→f64 precision noise from numeric leaves.
+
+    SimConstants stores floats as f32; serializing to JSON re-encodes via
+    f64 and surfaces 7-digit noise (`0.001` → `0.0010000000474974513`).
+    Round to 6 significant figures — generous enough to preserve every
+    real tuning value, tight enough to hide the noise."""
+    if isinstance(v, float):
+        if v == 0.0:
+            return 0.0
+        from math import floor, log10
+        digits = 6 - int(floor(log10(abs(v)))) - 1
+        digits = max(0, min(digits, 12))
+        return round(v, digits)
+    return v
+
+
+def nearest_paths(target: str, all_paths: list[str], n: int = 3) -> list[str]:
+    """`difflib.get_close_matches` over the dotted-path catalog. Used to
+    suggest fixes when the user passes `social.bond_proximity_social_rate`
+    but the field actually lives at `needs.bond_proximity_social_rate`."""
+    return difflib.get_close_matches(target, all_paths, n=n, cutoff=0.5)
 
 
 def list_paths(d: dict[str, Any], prefix: str = "") -> list[str]:
@@ -165,14 +190,21 @@ def main(argv: list[str]) -> int:
         return 2
 
     value = lookup(constants, args.path) if constants else None
+    sub_paths: list[str] = []
+    if isinstance(value, dict):
+        # Caller pointed at a non-leaf (e.g. `magic` when meaning
+        # `magic.thornward_decay_rate`) — surface the available leaves.
+        sub_paths = sorted(p for p in list_paths(constants) if p.startswith(f"{args.path}."))
+        value = None
     field_name = args.path.rsplit(".", 1)[-1]
     doc = find_doc_comment(field_name)
     sites = find_read_sites(field_name)
     sensitivity = load_sensitivity(args.path)
+    rounded_value = round_value(value)
 
     envelope: dict[str, Any] = {
         "constant": args.path,
-        "value": value,
+        "value": rounded_value,
         "doc": doc,
         "read_sites": sites,
         "sensitivity": sensitivity,
@@ -183,10 +215,41 @@ def main(argv: list[str]) -> int:
         envelope["note"] = ("no events.jsonl with constants block was found — "
                             "value resolution skipped. Run a soak (`just soak`) "
                             "first or pass `--run <path>`.")
+    elif value is None and constants:
+        # Distinguish "method/non-field" (read sites exist for the leaf
+        # name) from "no such path" (no read sites either). Both surface
+        # nearest-match suggestions so a misspelled subtree is recoverable
+        # in one turn.
+        catalog = list_paths(constants)
+        suggestions = nearest_paths(args.path, catalog)
+        if sites and not sub_paths:
+            envelope["note"] = ("path resolves to no constants leaf; the field "
+                                "name has read sites in src/, suggesting it's a "
+                                "method or fn rather than a struct field.")
+        elif sub_paths:
+            envelope["note"] = (f"path is a sub-tree, not a leaf — "
+                                f"{len(sub_paths)} child paths available.")
+            envelope["children"] = sub_paths
+        else:
+            envelope["note"] = "no such constant path"
+        if suggestions and not sub_paths:
+            envelope["nearest"] = suggestions
 
     if args.text:
         sys.stdout.write(f"explain: {args.path}\n")
-        sys.stdout.write(f"  value:    {value}\n")
+        sys.stdout.write(f"  value:    {rounded_value}\n")
+        if envelope.get("note"):
+            sys.stdout.write(f"  note:     {envelope['note']}\n")
+        if envelope.get("children"):
+            sys.stdout.write("  children:\n")
+            for c in envelope["children"][:10]:
+                sys.stdout.write(f"    {c}\n")
+            if len(envelope["children"]) > 10:
+                sys.stdout.write(f"    ... ({len(envelope['children']) - 10} more)\n")
+        if envelope.get("nearest"):
+            sys.stdout.write("  did you mean:\n")
+            for n in envelope["nearest"]:
+                sys.stdout.write(f"    {n}\n")
         if doc:
             sys.stdout.write("  doc:      " + doc.replace("\n", "\n            ") + "\n")
         else:
@@ -202,7 +265,8 @@ def main(argv: list[str]) -> int:
     else:
         sys.stdout.write(json.dumps(envelope, indent=2) + "\n")
 
-    return 0 if (value is not None or sites or doc) else 1
+    return 0 if (rounded_value is not None or sites or doc or envelope.get("nearest")
+                 or envelope.get("children")) else 1
 
 
 if __name__ == "__main__":
