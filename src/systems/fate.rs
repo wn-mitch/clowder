@@ -11,7 +11,7 @@ use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::rng::SimRng;
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::system_activation::{Feature, SystemActivation};
-use crate::resources::time::{SimConfig, TimeState};
+use crate::resources::time::{SimConfig, TimeScale, TimeState};
 use crate::resources::zodiac::ZodiacData;
 
 // ---------------------------------------------------------------------------
@@ -21,8 +21,9 @@ use crate::resources::zodiac::ZodiacData;
 /// Assigns fated love and fated rival connections to cats reaching Young stage.
 ///
 /// Runs every tick but only processes cats that lack the `FateAssigned` marker.
-/// Throttled to assign at most one cat per cooldown ticks so narrative messages
-/// trickle in rather than arriving in a burst at game start.
+/// Throttled to one fate event per in-game day so narrative beats trickle in
+/// rather than arriving as a burst at game start (cadence governed by
+/// `FateConstants::assign_cooldown`).
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub fn assign_fated_connections(
     query: Query<
@@ -33,6 +34,7 @@ pub fn assign_fated_connections(
     existing_loves: Query<Entity, With<FatedLove>>,
     existing_rivals: Query<Entity, With<FatedRival>>,
     time: Res<TimeState>,
+    time_scale: Res<TimeScale>,
     config: Res<SimConfig>,
     constants: Res<SimConstants>,
     zodiac_data: Option<Res<ZodiacData>>,
@@ -47,8 +49,8 @@ pub fn assign_fated_connections(
     };
     let c = &constants.fate;
 
-    // Throttle: wait at least assign_cooldown ticks between assignments.
-    if time.tick < *last_assign_tick + c.assign_cooldown {
+    // Throttle: minimum-gap of one in-game day between assignments.
+    if time.tick < *last_assign_tick + c.assign_cooldown.ticks(&time_scale) {
         return;
     }
 
@@ -352,10 +354,12 @@ mod tests {
             paused: false,
             speed: crate::resources::time::SimSpeed::Normal,
         });
-        world.insert_resource(SimConfig {
+        let config = SimConfig {
             ticks_per_season: 2000,
             ..SimConfig::default()
-        });
+        };
+        world.insert_resource(TimeScale::from_config(&config, 16.6667));
+        world.insert_resource(config);
         world.insert_resource(SimConstants::default());
         world.insert_resource(SimRng::new(42));
         world.insert_resource(NarrativeLog::default());
@@ -367,6 +371,17 @@ mod tests {
         let mut schedule = Schedule::default();
         schedule.add_systems(assign_fated_connections);
         (world, schedule)
+    }
+
+    /// Tick gap matching `FateConstants::assign_cooldown` at default
+    /// scale (1000 ticks/day = once per in-game day).
+    fn assign_cooldown_ticks() -> u64 {
+        let config = SimConfig {
+            ticks_per_season: 2000,
+            ..SimConfig::default()
+        };
+        let ts = TimeScale::from_config(&config, 16.6667);
+        SimConstants::default().fate.assign_cooldown.ticks(&ts)
     }
 
     fn spawn_cat(world: &mut World, name: &str, sign: ZodiacSign, born_tick: u64) -> Entity {
@@ -421,7 +436,7 @@ mod tests {
 
         // First run assigns one cat; second run (after cooldown) assigns the other.
         schedule.run(&mut world);
-        advance_tick(&mut world, SimConstants::default().fate.assign_cooldown);
+        advance_tick(&mut world, assign_cooldown_ticks());
         schedule.run(&mut world);
 
         let love_count = world.query::<&FatedLove>().iter(&world).count();
@@ -452,7 +467,7 @@ mod tests {
         let b = spawn_cat(&mut world, "Fern", ZodiacSign::StormFur, 90_000);
 
         schedule.run(&mut world);
-        advance_tick(&mut world, SimConstants::default().fate.assign_cooldown);
+        advance_tick(&mut world, assign_cooldown_ticks());
         schedule.run(&mut world);
 
         let love_a = world.get::<FatedLove>(a).expect("A should have love");
@@ -484,7 +499,7 @@ mod tests {
         );
 
         // After cooldown, one more should be assigned.
-        advance_tick(&mut world, SimConstants::default().fate.assign_cooldown);
+        advance_tick(&mut world, assign_cooldown_ticks());
         schedule.run(&mut world);
         let assigned = world.query::<&FateAssigned>().iter(&world).count();
         assert_eq!(assigned, 2, "second cat should be assigned after cooldown");

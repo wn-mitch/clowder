@@ -10,7 +10,8 @@
 //! The phase is a **pure function** of (cycle_tick, season,
 //! post_partum) per §7.M.7.2, evaluated by
 //! `src/systems/fertility.rs::update_fertility_phase` at
-//! `fertility_update_interval_ticks` cadence.
+//! `FertilityConstants::update_interval` cadence (once per in-game
+//! day).
 
 use bevy_ecs::prelude::*;
 

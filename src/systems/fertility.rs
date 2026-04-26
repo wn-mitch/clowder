@@ -4,8 +4,8 @@
 //! Two systems:
 //!
 //! 1. [`update_fertility_phase`] — runs at
-//!    `FertilityConstants::update_interval_ticks` cadence (100 ticks
-//!    default). Iterates all cats, inserts `Fertility` on Queens +
+//!    `FertilityConstants::update_interval` cadence (once per in-game
+//!    day). Iterates all cats, inserts `Fertility` on Queens +
 //!    Nonbinaries entering `Adult`, removes it on `Elder` / `Pregnant`
 //!    / `Kitten|Young` regression, and recomputes `phase` via the
 //!    pure-function [`phase_from`] for cats that carry it.
@@ -31,7 +31,7 @@ use crate::components::identity::{Age, Gender, LifeStage};
 use crate::components::physical::Dead;
 use crate::components::pregnancy::Pregnant;
 use crate::resources::sim_constants::{FertilityConstants, SimConstants};
-use crate::resources::time::{Season, SimConfig, TimeState};
+use crate::resources::time::{Season, SimConfig, TimeScale, TimeState};
 
 // ---------------------------------------------------------------------------
 // Phase transition function (§7.M.7.2) — pure, deterministic.
@@ -40,6 +40,11 @@ use crate::resources::time::{Season, SimConfig, TimeState};
 /// Evaluate the §7.M.7.2 phase function. Inputs are all tick-derived,
 /// season-derived, spawn-immutable, or event-stamped — two soaks with
 /// matching seed and constants produce byte-identical traces.
+///
+/// `cycle_length_ticks` is passed as a precomputed `u32` (typically
+/// `constants.cycle_length.ticks(&time_scale) as u32`) so this function
+/// remains pure on scalars and stays unit-testable without a
+/// `TimeScale` resource.
 ///
 /// Rule order (first match wins):
 /// 1. `season == Winter` → `Anestrus`.
@@ -51,6 +56,7 @@ pub fn phase_from(
     cycle_tick: u32,
     season: Season,
     post_partum_remaining: u32,
+    cycle_length_ticks: u32,
     constants: &FertilityConstants,
 ) -> FertilityPhase {
     if season == Season::Winter {
@@ -59,7 +65,7 @@ pub fn phase_from(
     if post_partum_remaining > 0 {
         return FertilityPhase::Postpartum;
     }
-    let cycle_len = constants.cycle_length_ticks as f32;
+    let cycle_len = cycle_length_ticks as f32;
     let proestrus_end = (cycle_len * constants.proestrus_fraction) as u32;
     let estrus_end = proestrus_end + (cycle_len * constants.estrus_fraction) as u32;
     if cycle_tick < proestrus_end {
@@ -83,13 +89,14 @@ pub fn cycle_tick_for(current_tick: u64, cycle_offset: u64, cycle_length: u32) -
 // ---------------------------------------------------------------------------
 
 /// Insert / remove / update `Fertility` on every eligible cat once
-/// per `update_interval_ticks`. Gender-gated per §7.M.7.4: Toms skip
-/// this path entirely (they use the §7.M.7.5 Tom-fallback for
-/// scoring, with no marker).
+/// per `update_interval` (= once per in-game day). Gender-gated per
+/// §7.M.7.4: Toms skip this path entirely (they use the §7.M.7.5
+/// Tom-fallback for scoring, with no marker).
 #[allow(clippy::type_complexity)]
 pub fn update_fertility_phase(
     time: Res<TimeState>,
     config: Res<SimConfig>,
+    time_scale: Res<TimeScale>,
     constants: Res<SimConstants>,
     mut query: Query<
         (
@@ -104,12 +111,14 @@ pub fn update_fertility_phase(
     mut commands: Commands,
 ) {
     let fertility = &constants.fertility;
-    if !time
-        .tick
-        .is_multiple_of(fertility.update_interval_ticks as u64)
-    {
+    if !fertility.update_interval.fires_at(time.tick, &time_scale) {
         return;
     }
+
+    // Precompute the converted tick values once per cadence run; they're
+    // identical for every cat in this sweep.
+    let interval_ticks = fertility.update_interval.ticks(&time_scale) as u32;
+    let cycle_length_ticks = fertility.cycle_length.ticks(&time_scale) as u32;
 
     let season = time.season(&config);
     let tps = config.ticks_per_season;
@@ -156,8 +165,8 @@ pub fn update_fertility_phase(
         let Some(mut fert) = maybe_fert else {
             let offset_mix = 0x9E37_79B9_7F4A_7C15_u64;
             let cycle_offset = entity.to_bits().wrapping_mul(offset_mix);
-            let cycle_tick = cycle_tick_for(time.tick, cycle_offset, fertility.cycle_length_ticks);
-            let phase = phase_from(cycle_tick, season, 0, fertility);
+            let cycle_tick = cycle_tick_for(time.tick, cycle_offset, cycle_length_ticks);
+            let phase = phase_from(cycle_tick, season, 0, cycle_length_ticks, fertility);
             commands.entity(entity).insert(Fertility {
                 phase,
                 cycle_offset,
@@ -168,18 +177,19 @@ pub fn update_fertility_phase(
 
         // Adult Queen/NB with Fertility: recompute phase, decrement
         // post_partum counter.
-        let cycle_tick = cycle_tick_for(time.tick, fert.cycle_offset, fertility.cycle_length_ticks);
+        let cycle_tick = cycle_tick_for(time.tick, fert.cycle_offset, cycle_length_ticks);
         let phase = phase_from(
             cycle_tick,
             season,
             fert.post_partum_remaining_ticks,
+            cycle_length_ticks,
             fertility,
         );
         fert.phase = phase;
         if fert.post_partum_remaining_ticks > 0 {
             fert.post_partum_remaining_ticks = fert
                 .post_partum_remaining_ticks
-                .saturating_sub(fertility.update_interval_ticks);
+                .saturating_sub(interval_ticks);
         }
     }
 }
@@ -244,10 +254,30 @@ pub fn handle_post_partum_reinsert(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::resources::time::{SimConfig, TimeState};
+    use crate::resources::time::{SimConfig, TimeScale, TimeState};
 
     fn test_constants() -> FertilityConstants {
         FertilityConstants::default()
+    }
+
+    /// Default time scale used in unit tests — matches the
+    /// `time_units::tests::default_scale` exemplar (1000 ticks/day,
+    /// 20000 ticks/season, 16.6667s/day = 60 Hz).
+    fn test_time_scale() -> TimeScale {
+        TimeScale::from_config(&SimConfig::default(), 16.6667)
+    }
+
+    /// Tick count for one fertility cycle at default scale —
+    /// `DurationSeasons::new(0.5).ticks(&default_scale) = 10000`.
+    fn test_cycle_length_ticks() -> u32 {
+        test_constants().cycle_length.ticks(&test_time_scale()) as u32
+    }
+
+    /// Tick at which `update_fertility_phase`'s `IntervalPerDay::new(1.0)`
+    /// cadence guard fires for the first time after tick 0
+    /// (= `ticks_per_day = 1000` at default scale).
+    fn first_cadence_tick() -> u64 {
+        test_time_scale().ticks_per_day()
     }
 
     /// Drive `update_fertility_phase` once against a freshly-built
@@ -259,9 +289,13 @@ mod tests {
         world.insert_resource(SimConstants::default());
         world.insert_resource(TimeState::default());
         world.insert_resource(SimConfig::default());
+        world.insert_resource(test_time_scale());
 
         // Spawn an Adult Queen — born far enough back that Age::stage
         // resolves to Adult (12+ seasons at ticks_per_season=20000).
+        // Tick must land on a once-per-day cadence boundary so the
+        // gate fires; 12 seasons = 240 game days, which is a multiple
+        // of the 1000-tick cadence.
         let born_tick = 0u64;
         let current_tick = 12 * 20_000u64;
         let mut time = world.resource_mut::<TimeState>();
@@ -286,9 +320,11 @@ mod tests {
         world.insert_resource(SimConstants::default());
         world.insert_resource(SimConfig::default());
         world.insert_resource(TimeState::default());
+        world.insert_resource(test_time_scale());
         // Tick 300 000 = 15 seasons in → cat born at tick 0 is Adult
         // (LifeStage::Adult spans seasons 12–59). Modulo 80 000-tick
         // year puts us 60 000 ticks into the year = Winter onset.
+        // 300 000 is also a multiple of the 1000-tick cadence.
         world.resource_mut::<TimeState>().tick = 300_000;
 
         let queen = world
@@ -328,6 +364,7 @@ mod tests {
         world.insert_resource(SimConstants::default());
         world.insert_resource(SimConfig::default());
         world.insert_resource(TimeState::default());
+        world.insert_resource(test_time_scale());
         world.resource_mut::<TimeState>().tick = 12 * 20_000;
 
         let tom = world.spawn((Age::new(0), Gender::Tom)).id();
@@ -343,13 +380,39 @@ mod tests {
     }
 
     #[test]
+    fn update_fertility_phase_skips_off_cadence_ticks() {
+        // Verifies the once-per-day cadence: at a non-cadence tick the
+        // system must no-op (the Queen does not get Fertility inserted).
+        let mut world = World::new();
+        world.insert_resource(SimConstants::default());
+        world.insert_resource(TimeState::default());
+        world.insert_resource(SimConfig::default());
+        world.insert_resource(test_time_scale());
+
+        // 12 seasons = 240 000 ticks (cadence boundary). Off-cadence:
+        // +500 ticks = mid-day. The cadence guard should refuse.
+        world.resource_mut::<TimeState>().tick = 12 * 20_000 + 500;
+        let queen = world.spawn((Age::new(0), Gender::Queen)).id();
+
+        let mut schedule = bevy_ecs::schedule::Schedule::default();
+        schedule.add_systems(update_fertility_phase);
+        schedule.run(&mut world);
+
+        assert!(
+            world.get::<Fertility>(queen).is_none(),
+            "Cadence guard must skip non-cadence ticks"
+        );
+    }
+
+    #[test]
     fn phase_winter_is_anestrus_regardless_of_cycle() {
         let c = test_constants();
+        let cycle_len = test_cycle_length_ticks();
         // Peak cycle tick in winter still returns Anestrus per rule 1.
         let mid_estrus =
-            (c.cycle_length_ticks as f32 * (c.proestrus_fraction + c.estrus_fraction * 0.5)) as u32;
+            (cycle_len as f32 * (c.proestrus_fraction + c.estrus_fraction * 0.5)) as u32;
         assert_eq!(
-            phase_from(mid_estrus, Season::Winter, 0, &c),
+            phase_from(mid_estrus, Season::Winter, 0, cycle_len, &c),
             FertilityPhase::Anestrus
         );
     }
@@ -357,13 +420,14 @@ mod tests {
     #[test]
     fn phase_postpartum_overrides_cycle_in_non_winter() {
         let c = test_constants();
+        let cycle_len = test_cycle_length_ticks();
         // With post_partum > 0 and any non-winter season, Postpartum wins.
         assert_eq!(
-            phase_from(0, Season::Spring, 100, &c),
+            phase_from(0, Season::Spring, 100, cycle_len, &c),
             FertilityPhase::Postpartum
         );
         assert_eq!(
-            phase_from(0, Season::Summer, 100, &c),
+            phase_from(0, Season::Summer, 100, cycle_len, &c),
             FertilityPhase::Postpartum
         );
     }
@@ -371,55 +435,59 @@ mod tests {
     #[test]
     fn phase_cycles_proestrus_estrus_diestrus_in_non_winter() {
         let c = test_constants();
-        let proestrus_end = (c.cycle_length_ticks as f32 * c.proestrus_fraction) as u32;
-        let estrus_end = proestrus_end + (c.cycle_length_ticks as f32 * c.estrus_fraction) as u32;
+        let cycle_len = test_cycle_length_ticks();
+        let proestrus_end = (cycle_len as f32 * c.proestrus_fraction) as u32;
+        let estrus_end = proestrus_end + (cycle_len as f32 * c.estrus_fraction) as u32;
         assert_eq!(
-            phase_from(0, Season::Spring, 0, &c),
+            phase_from(0, Season::Spring, 0, cycle_len, &c),
             FertilityPhase::Proestrus
         );
         assert_eq!(
-            phase_from(proestrus_end - 1, Season::Spring, 0, &c),
+            phase_from(proestrus_end - 1, Season::Spring, 0, cycle_len, &c),
             FertilityPhase::Proestrus
         );
         assert_eq!(
-            phase_from(proestrus_end, Season::Spring, 0, &c),
+            phase_from(proestrus_end, Season::Spring, 0, cycle_len, &c),
             FertilityPhase::Estrus
         );
         assert_eq!(
-            phase_from(estrus_end - 1, Season::Spring, 0, &c),
+            phase_from(estrus_end - 1, Season::Spring, 0, cycle_len, &c),
             FertilityPhase::Estrus
         );
         assert_eq!(
-            phase_from(estrus_end, Season::Spring, 0, &c),
+            phase_from(estrus_end, Season::Spring, 0, cycle_len, &c),
             FertilityPhase::Diestrus
         );
         assert_eq!(
-            phase_from(c.cycle_length_ticks - 1, Season::Spring, 0, &c),
+            phase_from(cycle_len - 1, Season::Spring, 0, cycle_len, &c),
             FertilityPhase::Diestrus
         );
     }
 
     #[test]
     fn cycle_tick_wraps_at_cycle_length() {
-        let c = test_constants();
+        let cycle_len = test_cycle_length_ticks();
         // current_tick = cycle_length → cycle_tick = cycle_offset.
         let offset = 42u64;
-        let ct = cycle_tick_for(c.cycle_length_ticks as u64, offset, c.cycle_length_ticks);
+        let ct = cycle_tick_for(cycle_len as u64, offset, cycle_len);
         assert_eq!(ct, offset as u32);
     }
 
     #[test]
     fn two_cats_with_different_offsets_desynchronize() {
-        let c = test_constants();
+        let cycle_len = test_cycle_length_ticks();
         let tick = 1000u64;
-        let cat_a = cycle_tick_for(tick, 0, c.cycle_length_ticks);
-        let cat_b = cycle_tick_for(
-            tick,
-            (c.cycle_length_ticks as u64) / 2,
-            c.cycle_length_ticks,
-        );
+        let cat_a = cycle_tick_for(tick, 0, cycle_len);
+        let cat_b = cycle_tick_for(tick, (cycle_len as u64) / 2, cycle_len);
         // Half-cycle offset → about 5000 ticks apart.
-        assert!(cat_a.abs_diff(cat_b) > c.cycle_length_ticks / 3);
+        assert!(cat_a.abs_diff(cat_b) > cycle_len / 3);
+    }
+
+    #[test]
+    fn first_cadence_tick_is_one_day() {
+        // Sanity check: the once-per-day cadence first fires at tick 1000
+        // (= ticks_per_day at default scale), not at tick 0.
+        assert_eq!(first_cadence_tick(), 1000);
     }
 
     #[test]

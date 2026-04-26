@@ -292,6 +292,25 @@ mod tests {
         assert!(blistering.fires_at(1, &ts));
     }
 
+    #[test]
+    fn interval_per_day_one_per_day_fires_at_day_boundaries() {
+        // Phase 1 of ticket 033 settles
+        // CoordinationConstants::evaluate_interval,
+        // AspirationConstants::second_slot_check_interval, and
+        // FertilityConstants::update_interval at IntervalPerDay::new(1.0).
+        // This test pins the once-per-day semantics at the canonical
+        // default scale (1000 ticks/day) so a stray rescale doesn't
+        // silently turn it back into a many-times-per-day cadence.
+        let ts = default_scale();
+        let once_per_day = IntervalPerDay::new(1.0);
+        assert!(!once_per_day.fires_at(0, &ts), "tick 0 never fires");
+        assert!(!once_per_day.fires_at(999, &ts));
+        assert!(once_per_day.fires_at(1000, &ts), "first day boundary");
+        assert!(!once_per_day.fires_at(1500, &ts));
+        assert!(once_per_day.fires_at(2000, &ts));
+        assert!(once_per_day.fires_at(20_000, &ts));
+    }
+
     // ---- Ticks ----
 
     #[test]

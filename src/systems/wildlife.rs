@@ -22,7 +22,7 @@ use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::rng::SimRng;
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::system_activation::{Feature, SystemActivation};
-use crate::resources::time::{Season, SimConfig, TimeState};
+use crate::resources::time::{Season, SimConfig, TimeScale, TimeState};
 
 /// Per-cat cooldown tracking for threat detection narratives.
 /// Suppresses repeated detection lines for the same cat for 100 ticks (~1 day).
@@ -2314,12 +2314,13 @@ pub fn fox_scent_tick(
     foxes: Query<(&FoxState, &FoxAiPhase, &Position)>,
     mut scent_map: ResMut<FoxScentMap>,
     constants: Res<SimConstants>,
+    time_scale: Res<TimeScale>,
     mut activation: ResMut<SystemActivation>,
 ) {
     let fc = &constants.fox_ecology;
 
-    // Global decay.
-    scent_map.decay_all(fc.scent_decay_per_tick);
+    // Global decay (territorial mark, ~10 in-game days at default scale).
+    scent_map.decay_all(fc.scent_decay_rate.per_tick(&time_scale));
 
     // Fox deposits.
     for (fox, phase, pos) in &foxes {

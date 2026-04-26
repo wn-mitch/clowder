@@ -15,7 +15,7 @@ use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::rng::SimRng;
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::system_activation::{Feature, SystemActivation};
-use crate::resources::time::{SimConfig, TimeState};
+use crate::resources::time::{SimConfig, TimeScale, TimeState};
 use crate::species::SpeciesRegistry;
 
 // ---------------------------------------------------------------------------
@@ -553,11 +553,13 @@ pub fn prey_scent_tick(
     prey: Query<&Position, (With<PreyAnimal>, Without<Dead>)>,
     mut scent_map: ResMut<crate::resources::PreyScentMap>,
     constants: Res<SimConstants>,
+    time_scale: Res<TimeScale>,
 ) {
     let p = &constants.prey;
     // Global decay first — prior-tick deposits fade before this tick's
-    // stamps land, matching FoxScentMap's ordering.
-    scent_map.decay_all(p.scent_decay_per_tick);
+    // stamps land, matching FoxScentMap's ordering. Activity-trail
+    // semantics (~1 in-game day to detect threshold), not territorial.
+    scent_map.decay_all(p.scent_decay_rate.per_tick(&time_scale));
     for pos in &prey {
         scent_map.deposit(pos.x, pos.y, p.scent_deposit_per_tick);
     }

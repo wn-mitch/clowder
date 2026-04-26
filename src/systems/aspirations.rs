@@ -16,7 +16,7 @@ use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::rng::SimRng;
 use crate::resources::sim_constants::{AspirationConstants, SimConstants};
 use crate::resources::system_activation::{Feature, SystemActivation};
-use crate::resources::time::{SimConfig, TimeState};
+use crate::resources::time::{SimConfig, TimeScale, TimeState};
 use crate::resources::zodiac::ZodiacData;
 
 // ---------------------------------------------------------------------------
@@ -297,6 +297,7 @@ pub fn check_second_aspiration_slot(
     registry: Option<Res<AspirationRegistry>>,
     zodiac_data: Option<Res<ZodiacData>>,
     time: Res<TimeState>,
+    time_scale: Res<TimeScale>,
     config: Res<SimConfig>,
     mut log: ResMut<NarrativeLog>,
     mut rng: ResMut<SimRng>,
@@ -307,8 +308,11 @@ pub fn check_second_aspiration_slot(
     };
     let c = &constants.aspirations;
 
-    // Rate-limit: only check every 100 ticks.
-    if !time.tick.is_multiple_of(c.second_slot_check_interval) {
+    // Rate-limit: once per in-game day.
+    if !c
+        .second_slot_check_interval
+        .fires_at(time.tick, &time_scale)
+    {
         return;
     }
 

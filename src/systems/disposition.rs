@@ -142,7 +142,7 @@ use crate::resources::relationships::Relationships;
 use crate::resources::rng::SimRng;
 use crate::resources::sim_constants::{DispositionConstants, SimConstants};
 use crate::resources::system_activation::{Feature, SystemActivation};
-use crate::resources::time::{DayPhase, Season, TimeState};
+use crate::resources::time::{DayPhase, Season, TimeScale, TimeState};
 
 // ===========================================================================
 // check_anxiety_interrupts
@@ -4181,10 +4181,11 @@ pub fn cat_presence_tick(
     cats: Query<(&Position, &CurrentAction), Without<Dead>>,
     mut presence_map: ResMut<crate::resources::CatPresenceMap>,
     constants: Res<SimConstants>,
+    time_scale: Res<TimeScale>,
 ) {
     let fc = &constants.fox_ecology;
-    // Global decay — same rate as fox scent decay for symmetry.
-    presence_map.decay_all(fc.scent_decay_per_tick);
+    // Global decay — same per-day rate as fox scent decay for territorial-mark symmetry.
+    presence_map.decay_all(fc.scent_decay_rate.per_tick(&time_scale));
 
     // Patrolling/guarding cats deposit presence at their position.
     let deposit = fc.scent_deposit; // reuse fox deposit rate for symmetry

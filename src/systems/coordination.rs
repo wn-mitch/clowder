@@ -15,7 +15,7 @@ use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::relationships::Relationships;
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::system_activation::{Feature, SystemActivation};
-use crate::resources::time::TimeState;
+use crate::resources::time::{TimeScale, TimeState};
 
 // ---------------------------------------------------------------------------
 // Social weight (pure function, not a system)
@@ -55,11 +55,13 @@ pub fn social_weight(
 // ---------------------------------------------------------------------------
 
 /// Identify the top 1–2 cats as coordinators based on social weight, diligence,
-/// and sociability. Runs every 100 ticks or immediately when a coordinator dies.
+/// and sociability. Runs once per in-game day or immediately when a coordinator
+/// dies (cadence governed by `CoordinationConstants::evaluate_interval`).
 #[allow(clippy::too_many_arguments)]
 pub fn evaluate_coordinators(
     mut commands: Commands,
     time: Res<TimeState>,
+    time_scale: Res<TimeScale>,
     coordinator_died: Option<Res<CoordinatorDied>>,
     query: Query<(Entity, &Personality, &Memory, &Name), Without<Dead>>,
     existing_coordinators: Query<Entity, With<Coordinator>>,
@@ -70,8 +72,8 @@ pub fn evaluate_coordinators(
     mut activation: ResMut<SystemActivation>,
 ) {
     let c = &constants.coordination;
-    let should_run = coordinator_died.is_some()
-        || (time.tick > 0 && time.tick.is_multiple_of(c.evaluate_interval));
+    let should_run =
+        coordinator_died.is_some() || c.evaluate_interval.fires_at(time.tick, &time_scale);
     if !should_run {
         return;
     }
@@ -1539,14 +1541,20 @@ mod tests {
         use bevy_ecs::schedule::Schedule;
 
         let mut world = World::new();
+        // Tick 1000 = first once-per-day cadence boundary at default
+        // TimeScale (1000 ticks/day).
         world.insert_resource(TimeState {
-            tick: 100,
+            tick: 1000,
             ..Default::default()
         });
         world.insert_resource(Relationships::default());
         world.insert_resource(NarrativeLog::default());
         world.insert_resource(crate::resources::SimConstants::default());
         world.insert_resource(SystemActivation::default());
+        world.insert_resource(TimeScale::from_config(
+            &crate::resources::time::SimConfig::default(),
+            16.6667,
+        ));
 
         let high_diligence = Personality {
             diligence: 0.9,
@@ -1598,12 +1606,16 @@ mod tests {
 
         let mut world = World::new();
         world.insert_resource(TimeState {
-            tick: 100,
+            tick: 1000,
             ..Default::default()
         });
         world.insert_resource(NarrativeLog::default());
         world.insert_resource(crate::resources::SimConstants::default());
         world.insert_resource(SystemActivation::default());
+        world.insert_resource(TimeScale::from_config(
+            &crate::resources::time::SimConfig::default(),
+            16.6667,
+        ));
 
         let strong = Personality {
             diligence: 0.9,

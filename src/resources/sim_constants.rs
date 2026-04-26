@@ -4,6 +4,7 @@ use crate::components::prey::PreyKind;
 use crate::components::sensing::SensorySpecies;
 use crate::components::wildlife::WildSpecies;
 use crate::resources::time::Season;
+use crate::resources::time_units::{DurationSeasons, IntervalPerDay, RatePerDay};
 use crate::systems::sensing::{Channel, Falloff, SensoryProfile};
 
 // ---------- SimConstants (top-level resource) ----------
@@ -798,22 +799,31 @@ pub struct PreyConstants {
     /// tune per §5.6.5 decay-rationale.
     #[serde(default = "default_prey_scent_deposit_per_tick")]
     pub scent_deposit_per_tick: f32,
-    /// Per-tick global decay on `PreyScentMap`. §5.6.5 row for
-    /// scent-proximity calls for `0.0` (full re-stamp), but the
-    /// symmetry with FoxScentMap's 0.90 fast-fade is a more
-    /// defensible baseline until per-tile directional plume
-    /// stamping lands. Baseline is deliberately close to fox so the
-    /// two scent grids behave comparably.
-    #[serde(default = "default_prey_scent_decay_per_tick")]
-    pub scent_decay_per_tick: f32,
+    /// Global decay on `PreyScentMap`, expressed per in-game day.
+    ///
+    /// Prey scent is an *activity trail* — not a territorial mark
+    /// (those are `FoxEcologyConstants::scent_decay_rate` and the cat
+    /// presence map). At deposit `0.1` and detect threshold `0.05`,
+    /// a peak (1.0) bucket needs to persist a usable fraction of an
+    /// in-game day to make the `goap.rs:4159` scent-led hunt path do
+    /// real work. `RatePerDay::new(1.0)` lands a peak deposit at the
+    /// detection threshold (~0.05) after roughly one in-game day —
+    /// "yesterday's trail" semantics, no supernatural multi-day
+    /// memory.
+    ///
+    /// Pre-ticket-033 value was `0.02/tick = 20/day`, which faded a
+    /// fresh deposit below threshold in ~3 ticks (functionally
+    /// inert). See ticket 033 / `docs/balance/time-anchor-iteration-1.md`.
+    #[serde(rename = "scent_decay_rate", alias = "scent_decay_per_tick", default = "default_prey_scent_decay_rate")]
+    pub scent_decay_rate: RatePerDay,
 }
 
 fn default_prey_scent_deposit_per_tick() -> f32 {
     0.1
 }
 
-fn default_prey_scent_decay_per_tick() -> f32 {
-    0.02
+fn default_prey_scent_decay_rate() -> RatePerDay {
+    RatePerDay::new(1.0)
 }
 
 impl Default for PreyConstants {
@@ -870,7 +880,7 @@ impl Default for PreyConstants {
             initial_den_count_fish: 2,
             initial_den_count_bird: 2,
             scent_deposit_per_tick: default_prey_scent_deposit_per_tick(),
-            scent_decay_per_tick: default_prey_scent_decay_per_tick(),
+            scent_decay_rate: default_prey_scent_decay_rate(),
         }
     }
 }
@@ -2361,8 +2371,20 @@ pub struct FoxEcologyConstants {
     pub territory_radius: i32,
     /// Scent amount deposited per marking event.
     pub scent_deposit: f32,
-    /// Per-tick global scent decay.
-    pub scent_decay_per_tick: f32,
+    /// Global scent decay on `FoxScentMap` (and the symmetric
+    /// `CatPresenceMap` at `disposition.rs:cat_presence_tick`),
+    /// expressed per in-game day.
+    ///
+    /// Fox scent is a *territorial mark* — long persistence (days),
+    /// in contrast to `PreyConstants::scent_decay_rate`'s
+    /// activity-trail semantics. `RatePerDay::new(0.1)` decays a
+    /// peak (1.0) bucket to zero over ~10 in-game days, enough for a
+    /// claimed territory to register against passing prey, cats, and
+    /// rival foxes. Pre-ticket-033 value was `0.0001/tick = 0.1/day`,
+    /// numerically identical at the default scale; the typed wrapper
+    /// makes the unit explicit and lets the peg control downstream.
+    #[serde(rename = "scent_decay_rate", alias = "scent_decay_per_tick")]
+    pub scent_decay_rate: RatePerDay,
     /// Hard cap on fox dens in the world.
     pub max_dens: usize,
     /// Minimum tile distance between fox dens.
@@ -2431,7 +2453,7 @@ impl Default for FoxEcologyConstants {
             // Territory
             territory_radius: 18,
             scent_deposit: 0.1,
-            scent_decay_per_tick: 0.0001,
+            scent_decay_rate: RatePerDay::new(0.1),
             max_dens: 3,
             min_den_spacing: 25,
 
@@ -2463,7 +2485,15 @@ impl Default for FoxEcologyConstants {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FateConstants {
-    pub assign_cooldown: u64,
+    /// Maximum rate at which `assign_fated_connections` issues new
+    /// fated love / rival assignments. Acts as a minimum-gap throttle —
+    /// once an assignment fires, no further fate event will land for
+    /// `assign_cooldown.ticks(&time_scale)` ticks. Pre-ticket-033
+    /// value was `50` raw ticks (= 20×/day at default scale), which
+    /// burst all colony fate events in the first ~1 in-game day.
+    /// Once-per-day matches the "fate trickles in" narrative intent.
+    #[serde(alias = "assign_cooldown")]
+    pub assign_cooldown: IntervalPerDay,
     pub love_zodiac_score: f32,
     pub love_personality_weight: f32,
     pub love_jitter: f32,
@@ -2477,7 +2507,7 @@ pub struct FateConstants {
 impl Default for FateConstants {
     fn default() -> Self {
         Self {
-            assign_cooldown: 50,
+            assign_cooldown: IntervalPerDay::new(1.0),
             love_zodiac_score: 0.5,
             love_personality_weight: 0.3,
             love_jitter: 0.05,
@@ -2496,7 +2526,14 @@ impl Default for FateConstants {
 pub struct CoordinationConstants {
     pub social_weight_familiarity_scale: f32,
     pub social_weight_event_scale: f32,
-    pub evaluate_interval: u64,
+    /// Cadence at which `evaluate_coordinators` re-scores all cats and
+    /// promotes/demotes the Coordinator role. Coordinator promotion is
+    /// a slow process — once per in-game day matches the timescale.
+    /// Pre-ticket-033 value was `100` (raw ticks; legacy from the
+    /// 100-ticks/day era), which silently behaved as 10×/day after the
+    /// 2026-04-10 overhaul.
+    #[serde(alias = "evaluate_interval")]
+    pub evaluate_interval: IntervalPerDay,
     pub small_colony_threshold: usize,
     pub promotion_threshold: f32,
     pub ambition_bonus: f32,
@@ -2820,7 +2857,7 @@ impl Default for CoordinationConstants {
         Self {
             social_weight_familiarity_scale: 0.5,
             social_weight_event_scale: 0.1,
-            evaluate_interval: 100,
+            evaluate_interval: IntervalPerDay::new(1.0),
             small_colony_threshold: 6,
             promotion_threshold: 0.15,
             ambition_bonus: 0.3,
@@ -2890,7 +2927,13 @@ pub struct AspirationConstants {
     pub scoring_jitter: f32,
     pub strong_personality_threshold: f32,
     pub weak_personality_threshold: f32,
-    pub second_slot_check_interval: u64,
+    /// Cadence at which the second-slot population probe runs in
+    /// `tick_aspirations`. Aspiration unlocks are a slow process —
+    /// once per in-game day matches the timescale. Pre-ticket-033
+    /// value was `100` (raw ticks); silently behaved as 10×/day after
+    /// the 2026-04-10 overhaul.
+    #[serde(alias = "second_slot_check_interval")]
+    pub second_slot_check_interval: IntervalPerDay,
     pub stagnation_ticks: u64,
     pub min_alignment: f32,
     pub milestone_mood_bonus: f32,
@@ -2913,7 +2956,7 @@ impl Default for AspirationConstants {
             scoring_jitter: 0.05,
             strong_personality_threshold: 0.7,
             weak_personality_threshold: 0.3,
-            second_slot_check_interval: 100,
+            second_slot_check_interval: IntervalPerDay::new(1.0),
             stagnation_ticks: 2000,
             min_alignment: 0.3,
             milestone_mood_bonus: 0.2,
@@ -2935,9 +2978,18 @@ impl Default for AspirationConstants {
 /// validated rather than stored as a free field.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FertilityConstants {
-    pub cycle_length_ticks: u32,
+    /// Length of one full proestrus → estrus → diestrus cycle,
+    /// expressed as a fraction of an in-game season.
+    /// `DurationSeasons::new(0.5)` = half a season = ~10 in-game days
+    /// at default scale, which lets the §7.M.7.3 fractions
+    /// (15% / 20% / 65%) read narratively as ~1.5d proestrus, ~2d
+    /// estrus, ~6.5d refractory — multiple cycles per season.
+    /// Pre-ticket-033 value was `10000` raw ticks (= 0.5 seasons at
+    /// default `ticks_per_season = 20000`).
+    #[serde(alias = "cycle_length_ticks")]
+    pub cycle_length: DurationSeasons,
     pub proestrus_fraction: f32,
-    /// Fraction of `cycle_length_ticks` spent in fertile estrus (the
+    /// Fraction of `cycle_length` spent in fertile estrus (the
     /// breedable window). The remaining cycle is split between
     /// `proestrus_fraction` and the implicit diestrus
     /// (`1.0 - proestrus - estrus`, see `diestrus_fraction()` method).
@@ -2948,7 +3000,13 @@ pub struct FertilityConstants {
     /// hunger-floor angle of this entanglement.
     pub estrus_fraction: f32,
     pub post_partum_recovery_ticks: u32,
-    pub update_interval_ticks: u32,
+    /// Cadence at which `update_fertility_phase` re-resolves a cat's
+    /// `Fertility::phase`. Phase resolution is bounded by once-per-day
+    /// phase progression — anything more frequent is wasted work.
+    /// Pre-ticket-033 value was `100` (raw ticks); silently behaved as
+    /// 10×/day after the 2026-04-10 overhaul.
+    #[serde(alias = "update_interval_ticks")]
+    pub update_interval: IntervalPerDay,
     /// Soft-gate firing threshold for L3 `MateWithGoal` (§7.M.7.6).
     /// Used by the Phase 4 target-taking pass; declared here so the
     /// tunable is already present in headers before it's consumed.
@@ -2958,11 +3016,11 @@ pub struct FertilityConstants {
 impl Default for FertilityConstants {
     fn default() -> Self {
         Self {
-            cycle_length_ticks: 10_000,
+            cycle_length: DurationSeasons::new(0.5),
             proestrus_fraction: 0.15,
             estrus_fraction: 0.20,
             post_partum_recovery_ticks: 5_000,
-            update_interval_ticks: 100,
+            update_interval: IntervalPerDay::new(1.0),
             l3_firing_threshold: 0.15,
         }
     }
