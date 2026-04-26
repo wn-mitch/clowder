@@ -156,12 +156,17 @@ pub enum Feature {
     /// fight resolves) — ThreatEngaged is "the step ran and found a
     /// target", CombatResolved is "combat terminated with a winner".
     ThreatEngaged,
-    /// A cat successfully delivered materials to a ConstructionSite
-    /// (incrementing a delivered-count on the site). Before this
-    /// Feature existed, the `Deliver` step returned Advance whether
-    /// or not the site actually accepted — so stuck construction
-    /// sites had no activation signal.
+    /// A cat successfully delivered one unit of build material from
+    /// inventory to a ConstructionSite (incrementing the site's
+    /// delivered ledger by one). Ticket 038 promoted this from a
+    /// dead-wired emission to a real per-unit witness: each haul of
+    /// the founding wagon-dismantling pile produces one event.
     MaterialsDelivered,
+    /// A cat picked up a build-material `Item` from the ground
+    /// (location flipped from `OnGround` to `Carried(cat)`, slot
+    /// added to inventory). Paired with `MaterialsDelivered` —
+    /// every delivery is preceded by exactly one pickup. Ticket 038.
+    MaterialPickedUp,
     /// A cat completed a building-repair pass (condition ≥ 1.0).
     /// Not a silent-advance fix per se (repair already returns Fail
     /// on missing target), but previously unsignalled — repairs were
@@ -296,6 +301,7 @@ impl Feature {
         Feature::MentoredCat,
         Feature::ThreatEngaged,
         Feature::MaterialsDelivered,
+        Feature::MaterialPickedUp,
         Feature::BuildingRepaired,
         Feature::CourtshipInteraction,
         // §Phase 6a §7.2 drop-trigger gate
@@ -361,6 +367,7 @@ impl Feature {
             Feature::MentoredCat => Positive,
             Feature::ThreatEngaged => Positive,
             Feature::MaterialsDelivered => Positive,
+            Feature::MaterialPickedUp => Positive,
             Feature::BuildingRepaired => Positive,
             Feature::CourtshipInteraction => Positive,
 
@@ -485,24 +492,59 @@ impl Feature {
             // - PreyDenFounded: multi-day event, rare in 15 min.
             // - KittenMatured: maturation takes sim-days; depends on
             //   kitten survival + enough sim-time to cross the threshold.
+            //   Also a cascade dependency on `KittenBorn` firing first.
             // - ThreatEngaged: requires wildlife in range + surviving
             //   to fight_duration without morale break.
-            // - MaterialsDelivered: only produced by the unscheduled
-            //   task_chains::Deliver path (GOAP Construct handles its
-            //   own delivery internally). If task_chains is re-enabled,
-            //   reclassify as expected.
+            // - BuildingRepaired: routing gap — the GOAP path
+            //   internalises repair without emitting the Feature, so
+            //   the legacy disposition-chain path is the only emitter.
+            //   Tracked separately (no current ticket).
             //
-            // `FoodCooked`, `GroomedOther`, `MentoredCat` deliberately
-            // stay in the expected set even though they fire at zero
-            // in current soaks — the canary flagging them RED is
-            // accurate: cooking / grooming / mentoring not happening
-            // is the ecological-variety / narrative-leisure gap
-            // tracked in open-work #1, #3, #13, not a noise-floor
-            // exemption.
+            // - MaterialsDelivered / MaterialPickedUp: ticket 038 wired
+            //   the full Pickup → Carry → Deliver pipeline (planner +
+            //   step resolvers + executor dispatch) but parked the
+            //   founding wagon-dismantling spawn behind the
+            //   CLOWDER_FOUNDING_HAUL env var while balance work
+            //   resolves an early-game starvation regression. With the
+            //   spawn parked, no cat encounters a build-material pile,
+            //   so neither Feature fires. When the spawn is activated
+            //   (post-tuning), promote both back to `true`.
+            //
+            // The four "trunk" Features `FoodCooked`, `MatingOccurred`,
+            // `GroomedOther`, `MentoredCat` deliberately stay in the
+            // expected set even though they fire at zero in current
+            // soaks — the canary flagging them RED is accurate and
+            // tracks load-bearing tickets:
+            // - FoodCooked   → ticket 036 (no kitchen built)
+            // - GroomedOther → ticket 037 (silent-advance via GroomingFired)
+            // - MentoredCat  → known mastery-decay dynamic
+            // - MatingOccurred → ticket 027 (mating cadence cascade)
+            //
+            // Cascade-exempt: each entry below is silent strictly
+            // because its trunk Feature is silent. Listing them as
+            // `expected_to_fire_per_soak()` would multiply a single
+            // root-cause failure into N canary entries; demoting them
+            // to `false` keeps the canary signal one-per-trunk. When
+            // the trunk's ticket lands, these will start firing and
+            // can be promoted back to `true` if you want to track
+            // them as independent canaries.
+            // - GestationAdvanced / KittenBorn / KittenFed: cascade
+            //   from MatingOccurred (ticket 027).
+            // - ItemRetrieved: cascade from FoodCooked (ticket 036) —
+            //   nothing in stores worth retrieving until cooking
+            //   produces output.
             Feature::PreyDenFounded => false,
             Feature::KittenMatured => false,
             Feature::ThreatEngaged => false,
+            // Ticket 038 — parked behind CLOWDER_FOUNDING_HAUL. See
+            // block comment above.
             Feature::MaterialsDelivered => false,
+            Feature::MaterialPickedUp => false,
+            // Cascade-exempt (see block comment above).
+            Feature::GestationAdvanced => false,
+            Feature::KittenBorn => false,
+            Feature::KittenFed => false,
+            Feature::ItemRetrieved => false,
             // Every other feature is expected to fire per soak.
             _ => true,
         }
@@ -601,6 +643,7 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::MentoredCat => "MentoredCat",
         Feature::ThreatEngaged => "ThreatEngaged",
         Feature::MaterialsDelivered => "MaterialsDelivered",
+        Feature::MaterialPickedUp => "MaterialPickedUp",
         Feature::BuildingRepaired => "BuildingRepaired",
         Feature::CourtshipInteraction => "CourtshipInteraction",
         Feature::CommitmentDropTriggered => "CommitmentDropTriggered",
@@ -814,8 +857,10 @@ mod tests {
         // Phase 6a added 1 Neutral (CommitmentDropTriggered) +
         // 4 branch-specific Neutrals (Blind / SingleMinded /
         // OpenMinded / ReplanCap) for the §7.2 commitment-gate
-        // tracing split.
-        assert_eq!(positive, 44);
+        // tracing split. Ticket 038 added 1 Positive
+        // (MaterialPickedUp, paired with the resurrected
+        // MaterialsDelivered).
+        assert_eq!(positive, 45);
         assert_eq!(negative, 20);
         assert_eq!(neutral, 25);
     }
@@ -883,7 +928,7 @@ mod tests {
     fn features_total_in_matches_category_counts() {
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            44
+            45
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),
@@ -926,41 +971,60 @@ mod tests {
         // so the full expected set is reported.
         let sa = SystemActivation::default();
         let missing = sa.never_fired_expected_positives();
-        // Representative check: both pre-Phase-5a and Phase-5a
-        // features show up when the tracker is empty.
-        assert!(missing.contains(&"KittenFed"));
+        // Representative check: trunk Features (each one independent)
+        // show up when the tracker is empty.
+        assert!(missing.contains(&"MatingOccurred"));
         assert!(missing.contains(&"CropTended"));
         assert!(missing.contains(&"FoodEaten"));
         assert!(missing.contains(&"Socialized"));
+        assert!(missing.contains(&"MentoredCat"));
         // Rare-legend features are excluded.
         assert!(!missing.contains(&"ShadowFoxBanished"));
         assert!(!missing.contains(&"FateAwakened"));
+        // Cascade-exempt features are excluded — they cascade from
+        // their trunk and don't add independent canary signal.
+        assert!(!missing.contains(&"KittenFed"));
+        assert!(!missing.contains(&"GestationAdvanced"));
+        assert!(!missing.contains(&"KittenBorn"));
+        assert!(!missing.contains(&"ItemRetrieved"));
     }
 
     #[test]
     fn never_fired_expected_positives_shrinks_as_features_fire() {
         let mut sa = SystemActivation::default();
         let before = sa.never_fired_expected_positives();
-        sa.record(Feature::KittenFed);
+        sa.record(Feature::FoodEaten);
         sa.record(Feature::CropTended);
         let after = sa.never_fired_expected_positives();
         assert_eq!(after.len(), before.len() - 2);
-        assert!(!after.contains(&"KittenFed"));
+        assert!(!after.contains(&"FoodEaten"));
         assert!(!after.contains(&"CropTended"));
     }
 
     #[test]
     fn expected_to_fire_per_soak_classification() {
-        // Core-subsystem Positives must be expected.
-        assert!(Feature::KittenFed.expected_to_fire_per_soak());
+        // Core-subsystem trunks must be expected.
         assert!(Feature::CropTended.expected_to_fire_per_soak());
         assert!(Feature::FoodEaten.expected_to_fire_per_soak());
         assert!(Feature::Socialized.expected_to_fire_per_soak());
+        assert!(Feature::MentoredCat.expected_to_fire_per_soak());
+        // Trunks of chains-with-open-tickets stay expected so the
+        // canary keeps flagging them RED until their tickets land.
+        assert!(Feature::MatingOccurred.expected_to_fire_per_soak());
+        assert!(Feature::FoodCooked.expected_to_fire_per_soak());
+        assert!(Feature::GroomedOther.expected_to_fire_per_soak());
         // Promoted by ticket 027 Bug 1 (courtship-drift emits per-tick).
         assert!(Feature::CourtshipInteraction.expected_to_fire_per_soak());
         // Rare-legend events must be exempted.
         assert!(!Feature::ShadowFoxBanished.expected_to_fire_per_soak());
         assert!(!Feature::FateAwakened.expected_to_fire_per_soak());
         assert!(!Feature::ScryCompleted.expected_to_fire_per_soak());
+        // Cascade-exempt: silent strictly because their trunk is
+        // silent. Promoting them to expected would multiply one
+        // root-cause failure into N canary entries.
+        assert!(!Feature::GestationAdvanced.expected_to_fire_per_soak());
+        assert!(!Feature::KittenBorn.expected_to_fire_per_soak());
+        assert!(!Feature::KittenFed.expected_to_fire_per_soak());
+        assert!(!Feature::ItemRetrieved.expected_to_fire_per_soak());
     }
 }

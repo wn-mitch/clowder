@@ -46,6 +46,11 @@ pub enum ItemKind {
     Barrel,
     Crate,
     Shelf,
+
+    // --- Build materials (bridge into the construction `Material` enum;
+    // physical-causality form of materials cats haul to ConstructionSites). ---
+    Wood,
+    Stone,
 }
 
 impl ItemKind {
@@ -82,6 +87,21 @@ impl ItemKind {
             Self::ShinyPebble | Self::GlassShard | Self::ColorfulShell | Self::ShadowBone => 0.0,
 
             Self::Barrel | Self::Crate | Self::Shelf => 0.0,
+
+            Self::Wood | Self::Stone => 0.0,
+        }
+    }
+
+    /// Bridge to the construction `Material` enum. Returns `Some(_)` for the
+    /// item kinds that can be delivered to a `ConstructionSite`. Used by
+    /// `resolve_pickup_material` and `resolve_deliver` to identify carried
+    /// build-material units.
+    pub fn material(self) -> Option<crate::components::task_chain::Material> {
+        use crate::components::task_chain::Material;
+        match self {
+            Self::Wood => Some(Material::Wood),
+            Self::Stone => Some(Material::Stone),
+            _ => None,
         }
     }
 
@@ -144,6 +164,8 @@ impl ItemKind {
             Self::Barrel => "barrel",
             Self::Crate => "crate",
             Self::Shelf => "shelf",
+            Self::Wood => "wood",
+            Self::Stone => "stone",
         }
     }
 
@@ -276,6 +298,20 @@ impl ItemLocation {
         Self::OnGround
     }
 }
+
+// ---------------------------------------------------------------------------
+// Build-material marker
+// ---------------------------------------------------------------------------
+
+/// Marker stamped on ground `Item` entities whose `kind` is a build
+/// material (`Wood` / `Stone`). Used to make the planner's mutable
+/// build-material query (`BuildingResolverParams::material_items`)
+/// statically disjoint from the read-only `items_query` consumed by
+/// food/herb resolvers (`eat_at_stores`, `deposit_at_stores`, etc).
+/// Without it, both queries overlap on the same `Item` entities and
+/// Bevy's borrow checker (B0001) rejects the system.
+#[derive(Component, Debug, Clone, Copy, Default, serde::Serialize, serde::Deserialize)]
+pub struct BuildMaterialItem;
 
 // ---------------------------------------------------------------------------
 // Item component

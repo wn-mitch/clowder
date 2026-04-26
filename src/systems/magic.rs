@@ -381,8 +381,8 @@ pub fn update_corrupted_tile_markers(
     use crate::components::markers::OnCorruptedTile;
     let threshold = constants.disposition.corrupted_tile_threshold;
     for (entity, pos, has_marker) in cats.iter() {
-        let on_corrupted = map.in_bounds(pos.x, pos.y)
-            && map.get(pos.x, pos.y).corruption > threshold;
+        let on_corrupted =
+            map.in_bounds(pos.x, pos.y) && map.get(pos.x, pos.y).corruption > threshold;
         match (on_corrupted, has_marker) {
             (true, false) => {
                 commands.entity(entity).insert(OnCorruptedTile);

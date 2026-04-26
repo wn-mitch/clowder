@@ -112,7 +112,10 @@ pub fn socialize_target_dse() -> TargetTakingDse {
                 TARGET_FONDNESS_INPUT,
                 linear.clone(),
             )),
-            Consideration::Scalar(ScalarConsideration::new(TARGET_NOVELTY_INPUT, linear.clone())),
+            Consideration::Scalar(ScalarConsideration::new(
+                TARGET_NOVELTY_INPUT,
+                linear.clone(),
+            )),
             Consideration::Scalar(ScalarConsideration::new(
                 TARGET_SPECIES_COMPAT_INPUT,
                 species_cliff,

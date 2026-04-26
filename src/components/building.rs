@@ -248,6 +248,24 @@ impl ConstructionSite {
         }
     }
 
+    /// Construct a site with a custom (non-blueprint-default) materials
+    /// requirement. Used by the founding wagon-dismantling spawn (ticket
+    /// 038) — the founding act ships a smaller-than-default materials
+    /// load so cats can finish hauling in the first few in-game days
+    /// without starving while the long-term build economy comes online.
+    pub fn new_with_custom_cost(
+        blueprint: StructureType,
+        materials_needed: Vec<(Material, u32)>,
+    ) -> Self {
+        let materials_delivered = materials_needed.iter().map(|(m, _)| (*m, 0u32)).collect();
+        Self {
+            blueprint,
+            progress: 0.0,
+            materials_needed,
+            materials_delivered,
+        }
+    }
+
     /// Whether all required materials have been delivered.
     pub fn materials_complete(&self) -> bool {
         self.materials_needed
@@ -335,7 +353,10 @@ impl StoredItems {
     pub fn effective_capacity_with_items(
         kind: StructureType,
         stored: &[Entity],
-        items_q: &Query<&Item>,
+        items_q: &Query<
+            &Item,
+            bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
+        >,
     ) -> usize {
         let base = Self::capacity(kind);
         let bonus: usize = stored
@@ -347,7 +368,14 @@ impl StoredItems {
     }
 
     /// Whether this building is at effective capacity (accounting for storage upgrades).
-    pub fn is_effectively_full(&self, kind: StructureType, items_q: &Query<&Item>) -> bool {
+    pub fn is_effectively_full(
+        &self,
+        kind: StructureType,
+        items_q: &Query<
+            &Item,
+            bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
+        >,
+    ) -> bool {
         self.items.len() >= Self::effective_capacity_with_items(kind, &self.items, items_q)
     }
 
@@ -356,7 +384,10 @@ impl StoredItems {
         &mut self,
         item: Entity,
         kind: StructureType,
-        items_q: &Query<&Item>,
+        items_q: &Query<
+            &Item,
+            bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
+        >,
     ) -> bool {
         if self.is_effectively_full(kind, items_q) {
             return false;

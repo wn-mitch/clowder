@@ -171,16 +171,58 @@ pub fn socializing_actions() -> Vec<GoapActionDef> {
     ]
 }
 
-/// Building uses a single Construct action in the planner. The executor handles
-/// the internal gather/deliver/construct loop — the planner just plans "go to
-/// site, construct" as a high-level action.
+/// Building plans a haul→deliver→construct sequence. The planner emits
+/// `[TravelTo(MaterialPile), GatherMaterials, TravelTo(ConstructionSite),
+/// DeliverMaterials, Construct]` for an unfunded site with reachable
+/// material piles. Multi-trip delivery is handled via iterative replanning
+/// — `materials_available` is authored from the site's true
+/// `materials_complete()` status each tick, so a single Deliver that
+/// doesn't fully fund the site results in another haul cycle next replan.
 pub fn building_actions() -> Vec<GoapActionDef> {
-    vec![GoapActionDef {
-        kind: GoapActionKind::Construct,
-        cost: 6,
-        preconditions: vec![StatePredicate::ZoneIs(PlannerZone::ConstructionSite)],
-        effects: vec![StateEffect::SetConstructionDone(true)],
-    }]
+    vec![
+        // Pickup: cat at a material pile, hands empty → carrying build
+        // materials. Real-world effect (in the executor) is item.location
+        // → Carried(cat) and an Inventory slot insert.
+        GoapActionDef {
+            kind: GoapActionKind::GatherMaterials,
+            cost: 3,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::MaterialPile),
+                StatePredicate::CarryingIs(Carrying::Nothing),
+            ],
+            effects: vec![StateEffect::SetCarrying(Carrying::BuildMaterials)],
+        },
+        // Deliver: cat at the site carrying materials → drops one unit
+        // into the site's ledger. Optimistically flips
+        // `materials_available` true; the next state author rereads from
+        // ECS and corrects to false if the site needs more.
+        GoapActionDef {
+            kind: GoapActionKind::DeliverMaterials,
+            cost: 1,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::ConstructionSite),
+                StatePredicate::CarryingIs(Carrying::BuildMaterials),
+            ],
+            effects: vec![
+                StateEffect::SetCarrying(Carrying::Nothing),
+                StateEffect::SetMaterialsAvailable(true),
+                StateEffect::IncrementTrips,
+            ],
+        },
+        // Construct: gated on materials_available. Pre-038, this had no
+        // gate — the executor would Fail when materials weren't ready and
+        // the plan dropped. Now the planner reasons about the dependency
+        // explicitly.
+        GoapActionDef {
+            kind: GoapActionKind::Construct,
+            cost: 6,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::ConstructionSite),
+                StatePredicate::MaterialsAvailable(true),
+            ],
+            effects: vec![StateEffect::SetConstructionDone(true)],
+        },
+    ]
 }
 
 pub fn farming_actions() -> Vec<GoapActionDef> {
@@ -508,6 +550,7 @@ mod tests {
             prey_found: false,
             farm_tended: false,
             thornbriar_available: false,
+            materials_available: false,
         }
     }
 
@@ -525,6 +568,7 @@ mod tests {
             PlannerZone::SocialTarget,
             PlannerZone::Wilds,
             PlannerZone::PatrolZone,
+            PlannerZone::MaterialPile,
         ];
         // Set uniform distance of 2 between all distinct zone pairs.
         for &from in &zones {
@@ -626,8 +670,41 @@ mod tests {
     }
 
     #[test]
-    fn building_travel_and_construct() {
+    fn building_haul_then_construct() {
+        // Ticket 038 — building plans now thread through a real haul:
+        // [TravelTo(MaterialPile), GatherMaterials, TravelTo(ConstructionSite),
+        //  DeliverMaterials, Construct].
         let start = default_state();
+        let goal = GoalState {
+            predicates: vec![StatePredicate::ConstructionDone(true)],
+        };
+        let distances = basic_distances();
+        let actions = actions_for_disposition(DispositionKind::Building, None, &distances);
+
+        let plan = make_plan(start, &actions, &goal, 12, 1000).expect("plan found");
+        let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                GoapActionKind::TravelTo(PlannerZone::MaterialPile),
+                GoapActionKind::GatherMaterials,
+                GoapActionKind::TravelTo(PlannerZone::ConstructionSite),
+                GoapActionKind::DeliverMaterials,
+                GoapActionKind::Construct,
+            ]
+        );
+    }
+
+    #[test]
+    fn building_construct_short_circuit_when_materials_already_available() {
+        // If the state author has already flipped `materials_available`
+        // (the executor saw the site complete from a previous haul cycle),
+        // the planner should skip the haul leg and go straight to
+        // TravelTo + Construct.
+        let start = PlannerState {
+            materials_available: true,
+            ..default_state()
+        };
         let goal = GoalState {
             predicates: vec![StatePredicate::ConstructionDone(true)],
         };

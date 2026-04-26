@@ -61,7 +61,10 @@ pub fn resolve_deposit_at_stores(
     skills: &Skills,
     cat_pos: &Position,
     stores_query: &mut Query<&mut StoredItems>,
-    items_query: &Query<&Item>,
+    items_query: &Query<
+        &Item,
+        bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
+    >,
     commands: &mut Commands,
     d: &DispositionConstants,
 ) -> DepositResult {

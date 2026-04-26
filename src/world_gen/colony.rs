@@ -2,9 +2,9 @@ use bevy_ecs::prelude::World;
 use rand::seq::SliceRandom;
 use rand::Rng;
 
-use crate::components::building::{Structure, StructureType};
+use crate::components::building::{ConstructionSite, Structure, StructureType};
 use crate::components::identity::Name;
-use crate::components::items::{Item, ItemKind, ItemLocation};
+use crate::components::items::{BuildMaterialItem, Item, ItemKind, ItemLocation};
 use crate::components::{
     Appearance, Gender, Orientation, Personality, Position, Skills, ZodiacSign,
 };
@@ -388,25 +388,47 @@ pub fn spawn_starting_buildings(world: &mut World, colony_site: Position, map: &
     ));
 
     // Scatter starting food on the ground between den and hearth — the
-    // supplies the colony carried with them. Reduced from the old 30 to 15;
-    // the rest was lost in transit. Food on the ground spoils and attracts
-    // wildlife, creating pressure to build a store.
+    // supplies the colony carried with them. Ticket 038/041: bumped 15 → 35
+    // so the founding wagon-dismantling haul cycle (`CLOWDER_FOUNDING_HAUL`)
+    // doesn't push hunger over the edge in the early game while cats are
+    // hauling Wood instead of hunting. Food still spoils and attracts
+    // wildlife, preserving the build-a-store pressure.
     let starting_food: &[ItemKind] = &[
         ItemKind::RawRat,
         ItemKind::RawRat,
         ItemKind::RawRat,
+        ItemKind::RawRat,
+        ItemKind::RawRat,
+        ItemKind::RawRat,
+        ItemKind::RawFish,
+        ItemKind::RawFish,
+        ItemKind::RawFish,
         ItemKind::RawFish,
         ItemKind::RawFish,
         ItemKind::RawFish,
         ItemKind::RawBird,
         ItemKind::RawBird,
+        ItemKind::RawBird,
+        ItemKind::RawBird,
         ItemKind::RawMouse,
         ItemKind::RawMouse,
         ItemKind::RawMouse,
+        ItemKind::RawMouse,
+        ItemKind::RawMouse,
+        ItemKind::RawRabbit,
+        ItemKind::RawRabbit,
+        ItemKind::RawRabbit,
+        ItemKind::Berries,
+        ItemKind::Berries,
         ItemKind::Berries,
         ItemKind::Berries,
         ItemKind::Nuts,
+        ItemKind::Nuts,
+        ItemKind::Nuts,
         ItemKind::Roots,
+        ItemKind::Roots,
+        ItemKind::Roots,
+        ItemKind::WildOnion,
     ];
 
     // Scatter items in the walkable gap between den and hearth.
@@ -421,6 +443,85 @@ pub fn spawn_starting_buildings(world: &mut World, colony_site: Position, map: &
             (scatter_y_base + dy).min(map.height - 1),
         );
         world.spawn((Item::new(kind, 0.8, ItemLocation::OnGround), food_pos));
+    }
+
+    // Ticket 038 — founding wagon-dismantling spawn. Disabled by
+    // default pending balance tuning: the haul cycle competes with
+    // hunting/eating in the first few in-game days, pushing seed-42
+    // starvation 0 → 5 in the canonical soak even with a small (4 Wood)
+    // founding cost. The infrastructure (Pickup/Deliver step resolvers,
+    // PlannerZone::MaterialPile, materials_available state, GOAP
+    // dispatch) is wired and tested; only the spawn anchor is parked.
+    // Activate via env var until a balance pass clears the regression.
+    if std::env::var("CLOWDER_FOUNDING_HAUL").is_ok() {
+        spawn_founding_construction_site(world, map, colony_site);
+    }
+}
+
+/// Spawn the founding ConstructionSite plus its on-the-ground material
+/// pile. The site uses a small custom Wood-only cost (4 Wood) so cats
+/// finish the founding act in the first few in-game days without
+/// starving while the long-term build economy comes online —
+/// `resolve_construct` Fails on `!materials_complete()`. See ticket 038.
+fn spawn_founding_construction_site(world: &mut World, map: &mut TileMap, colony_site: Position) {
+    let blueprint = StructureType::Stores;
+    let site_size = blueprint.default_size();
+
+    // Place the site north of the colony center, leaving a 1-tile gap so
+    // the south edge is reachable by cats spawned at colony_site.
+    let site_anchor = Position::new(colony_site.x, (colony_site.y - site_size.1 - 1).max(0));
+
+    // Stamp footprint terrain so the site renders correctly.
+    stamp_footprint(map, site_anchor, blueprint.terrain(), site_size);
+
+    // Founding cost — see fn doc. Smaller than the Stores blueprint
+    // default (10 Wood + 5 Stone) so cats can clear the haul cycle
+    // without sacrificing the early hunting / eating phase.
+    let founding_cost = vec![(crate::components::task_chain::Material::Wood, 4u32)];
+    let site = ConstructionSite::new_with_custom_cost(blueprint, founding_cost);
+    let materials_needed = site.materials_needed.clone();
+
+    // Spawn the construction site entity.
+    world.spawn((
+        Name(format!("Construction: {blueprint:?}")),
+        site_anchor,
+        Structure {
+            kind: blueprint,
+            condition: 0.0,
+            cleanliness: 0.0,
+            size: site_size,
+        },
+        site,
+    ));
+
+    // Spawn matching ground-item piles immediately south of the site
+    // (between the colony spawn and the site, so cats encounter them on
+    // the path to the site). Each unit becomes one Item entity — the
+    // single-unit-per-pickup invariant keeps the cat→pile→site dance
+    // physically honest.
+    let pile_origin_x = site_anchor.x;
+    let pile_origin_y = (site_anchor.y + site_size.1).min(map.height - 1);
+    let mut spawned: i32 = 0;
+    for (mat, count) in &materials_needed {
+        let item_kind = match mat {
+            crate::components::task_chain::Material::Wood => ItemKind::Wood,
+            crate::components::task_chain::Material::Stone => ItemKind::Stone,
+            crate::components::task_chain::Material::Herbs => continue, // not part of build economy
+        };
+        for _ in 0..*count {
+            let dx = spawned % 3;
+            let dy = spawned / 3;
+            let pile_pos = Position::new(
+                (pile_origin_x + dx).clamp(0, map.width - 1),
+                (pile_origin_y + dy).clamp(0, map.height - 1),
+            );
+            world.spawn((
+                Item::new(item_kind, 1.0, ItemLocation::OnGround),
+                pile_pos,
+                BuildMaterialItem,
+            ));
+            spawned += 1;
+        }
     }
 }
 
@@ -706,7 +807,7 @@ mod tests {
             }
         }
 
-        assert_eq!(food_count, 15, "should scatter 15 starting food items");
+        assert_eq!(food_count, 35, "should scatter 35 starting food items");
         assert!(all_on_ground, "all starting food should be on the ground");
     }
 }

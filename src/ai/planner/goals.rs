@@ -64,6 +64,7 @@ mod tests {
             prey_found: false,
             farm_tended: false,
             thornbriar_available: false,
+            materials_available: false,
         }
     }
 

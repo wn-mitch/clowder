@@ -785,7 +785,10 @@ pub fn accumulate_build_pressure(
         &crate::components::building::StoredItems,
     )>,
     wildlife: Query<&Position, With<crate::components::wildlife::WildAnimal>>,
-    items_query: Query<&crate::components::items::Item>,
+    items_query: Query<
+        &crate::components::items::Item,
+        bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
+    >,
     mut unmet_demand: ResMut<crate::resources::UnmetDemand>,
     mut log: ResMut<NarrativeLog>,
     constants: Res<SimConstants>,

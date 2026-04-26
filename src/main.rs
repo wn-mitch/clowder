@@ -20,9 +20,7 @@ use clowder::plugins::simulation::SimulationPlugin;
 use clowder::rendering;
 
 use clowder::resources::weather::Weather;
-use clowder::resources::{
-    SimConfig, TimeScale, TimeState,
-};
+use clowder::resources::{SimConfig, TimeScale, TimeState};
 
 /// Parsed CLI arguments.
 struct CliArgs {
@@ -258,9 +256,7 @@ fn parse_args() -> CliArgs {
                     std::process::exit(2);
                 });
                 if !(parsed > 0.0 && parsed.is_finite()) {
-                    eprintln!(
-                        "Error: --game-day-seconds must be > 0 and finite (got {parsed})"
-                    );
+                    eprintln!("Error: --game-day-seconds must be > 0 and finite (got {parsed})");
                     std::process::exit(2);
                 }
                 game_day_seconds = parsed;
@@ -329,8 +325,6 @@ fn parse_weather(s: &str) -> Option<Weather> {
 // ---------------------------------------------------------------------------
 
 const SAVE_PATH: &str = "saves/autosave.json";
-
-
 
 // ---------------------------------------------------------------------------
 // Headless mode
@@ -540,12 +534,6 @@ fn print_headless_summary(footer: &str) {
     }
 }
 
-
-
 // ---------------------------------------------------------------------------
 // World construction helpers
 // ---------------------------------------------------------------------------
-
-
-
-

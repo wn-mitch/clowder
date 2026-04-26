@@ -32,6 +32,7 @@ pub fn resolve_task_chains(
             &mut Position,
             &mut Skills,
             &mut Needs,
+            &mut crate::components::magic::Inventory,
         ),
         (Without<Dead>, Without<Structure>),
     >,
@@ -64,7 +65,7 @@ pub fn resolve_task_chains(
     // Count builders per construction site for cooperative bonus.
     let mut builders_per_site: std::collections::HashMap<Entity, usize> =
         std::collections::HashMap::new();
-    for (_, chain, _, _, _, _) in &cats {
+    for (_, chain, _, _, _, _, _) in &cats {
         if let Some(step) = chain.current() {
             if matches!(step.kind, StepKind::Construct) {
                 if let Some(target) = step.target_entity {
@@ -93,7 +94,7 @@ pub fn resolve_task_chains(
     // Snapshot tile occupancy for anti-stacking jitter on arrival.
     let cat_tile_counts: HashMap<Position, u32> = {
         let mut counts = HashMap::new();
-        for (_, _, _, pos, _, _) in &cats {
+        for (_, _, _, pos, _, _, _) in &cats {
             *counts.entry(*pos).or_insert(0) += 1;
         }
         counts
@@ -101,7 +102,9 @@ pub fn resolve_task_chains(
 
     let mut chains_to_remove: Vec<Entity> = Vec::new();
 
-    for (cat_entity, mut chain, mut current, mut pos, mut skills, _needs) in &mut cats {
+    for (cat_entity, mut chain, mut current, mut pos, mut skills, _needs, mut inventory) in
+        &mut cats
+    {
         let Some(step) = chain.current_mut() else {
             chains_to_remove.push(cat_entity);
             current.ticks_remaining = 0;
@@ -169,10 +172,16 @@ pub fn resolve_task_chains(
             }
 
             StepKind::Deliver { material, amount } => {
-                let outcome = crate::steps::building::resolve_deliver(
+                // Legacy disposition-chain path. Currently starved (no
+                // system produces Deliver chains), but kept wired so
+                // future on-the-ground delivery flows can reinstate it
+                // without re-plumbing. Routes through the legacy-chain
+                // shim that consumes `amount` units from inventory.
+                let outcome = crate::steps::building::deliver::deliver_legacy_chain_adapter(
                     *material,
                     *amount,
                     step_target_entity,
+                    &mut inventory,
                     &mut buildings,
                 );
                 outcome.record_if_witnessed(activation.as_deref_mut(), Feature::MaterialsDelivered);
@@ -319,6 +328,7 @@ mod tests {
                 Position::new(0, 0),
                 Skills::default(),
                 Needs::default(),
+                crate::components::magic::Inventory::default(),
             ))
             .id();
 
@@ -352,6 +362,7 @@ mod tests {
                 Position::new(5, 5),
                 Skills::default(),
                 Needs::default(),
+                crate::components::magic::Inventory::default(),
             ))
             .id();
 
@@ -405,6 +416,7 @@ mod tests {
                 ..Skills::default()
             },
             Needs::default(),
+            crate::components::magic::Inventory::default(),
         ));
 
         let mut schedule = Schedule::default();
@@ -463,6 +475,7 @@ mod tests {
             Position::new(5, 5),
             Skills::default(),
             Needs::default(),
+            crate::components::magic::Inventory::default(),
         ));
 
         let mut schedule = Schedule::default();

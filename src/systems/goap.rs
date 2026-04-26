@@ -28,7 +28,7 @@ use crate::components::goap_plan::{
 };
 use crate::components::hunting_priors::HuntingPriors;
 use crate::components::identity::{Gender, LifeStage, Name};
-use crate::components::items::{Item, ItemLocation};
+use crate::components::items::{Item, ItemKind, ItemLocation};
 use crate::components::magic::{Harvestable, Herb, HerbKind, Inventory, Ward};
 use crate::components::markers;
 use crate::components::mental::Memory;
@@ -113,7 +113,34 @@ pub struct WorldStateQueries<'w, 's> {
     pub wildlife_ai_query:
         Query<'w, 's, &'static crate::components::wildlife::WildlifeAiState, With<WildAnimal>>,
     pub stored_items_query: Query<'w, 's, &'static crate::components::building::StoredItems>,
-    pub items_query: Query<'w, 's, &'static crate::components::items::Item>,
+    /// Read-only items query. Excludes ground-build-material items via
+    /// `Without<BuildMaterialItem>` so it stays disjoint from
+    /// `BuildingResolverParams::material_items` (mutable). Build-material
+    /// items are not relevant to food/herb resolvers anyway.
+    pub items_query: Query<
+        'w,
+        's,
+        &'static crate::components::items::Item,
+        Without<crate::components::items::BuildMaterialItem>,
+    >,
+    /// Ground build-material entities, used to author the `MaterialPile`
+    /// planner zone in `evaluate_and_plan`. Disjoint from cats via
+    /// `Without<GoapPlan>` and from buildings via `Without<Structure>`;
+    /// disjoint from `items_query` via `With<BuildMaterialItem>`.
+    pub material_items_query: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static crate::components::items::Item,
+            &'static Position,
+        ),
+        (
+            Without<GoapPlan>,
+            Without<Structure>,
+            With<crate::components::items::BuildMaterialItem>,
+        ),
+    >,
     /// Phase 4c.3: kittens + their hunger + parentage for Caretake
     /// urgency wiring. Disjoint from the adult cats query by
     /// `With<KittenDependency>` — kittens carry the marker until the
@@ -202,6 +229,28 @@ pub struct BuildingResolverParams<'w, 's> {
         Without<crate::components::task_chain::TaskChain>,
     >,
     pub colony_score: Option<ResMut<'w, crate::resources::colony_score::ColonyScore>>,
+    /// Ground build-material entities with positions and mutable Item
+    /// access. Used both to author the `MaterialPile` planner zone
+    /// (read-only iter) and to flip `Item::location` to `Carried(cat)`
+    /// in `resolve_pickup_material` (mutable iter). Disjoint from cats
+    /// via `Without<GoapPlan>`, from buildings via `Without<Structure>`,
+    /// and from non-material items via `With<BuildMaterialItem>` (so
+    /// the `&mut Item` access doesn't conflict with `items_query`'s
+    /// read-only access).
+    pub material_items: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static mut crate::components::items::Item,
+            &'static Position,
+        ),
+        (
+            Without<GoapPlan>,
+            Without<Structure>,
+            With<crate::components::items::BuildMaterialItem>,
+        ),
+    >,
 }
 
 /// Bundles resources for resolve_goap_plans.
@@ -1046,8 +1095,7 @@ pub fn evaluate_and_plan(
         // marker authors; predicate parity with the inline
         // `on_corrupted_tile` / `on_special_terrain` computations
         // below is enforced by the author systems' rustdoc and tests.
-        if let Ok((in_combat, on_corrupted_marker, on_special_marker)) =
-            state_markers_q.get(entity)
+        if let Ok((in_combat, on_corrupted_marker, on_special_marker)) = state_markers_q.get(entity)
         {
             markers.set_entity(markers::InCombat::KEY, entity, in_combat);
             markers.set_entity(markers::OnCorruptedTile::KEY, entity, on_corrupted_marker);
@@ -1355,7 +1403,22 @@ pub fn evaluate_and_plan(
                     .find(|(a, _)| *a == Action::PracticeMagic)
                     .map(|(_, s)| *s)
                     .unwrap_or(0.0);
-                if magic_score > herbcraft_score {
+                let cook_score = scores
+                    .iter()
+                    .find(|(a, _)| *a == Action::Cook)
+                    .map(|(_, s)| *s)
+                    .unwrap_or(0.0);
+                // Cook must strictly dominate both peers — ties go to the
+                // legacy Magic/Herbcraft routing. Mirrors the dead-code
+                // reference at `disposition.rs:947-969` which had this
+                // branch but was never ported when `evaluate_and_plan`
+                // took over from `evaluate_dispositions`. Without it,
+                // softmax-picked Cook intentions silently route to
+                // PracticeMagic and `Feature::FoodCooked` never fires
+                // (ticket 036).
+                if cook_score > herbcraft_score && cook_score > magic_score {
+                    Some(CraftingHint::Cook)
+                } else if magic_score > herbcraft_score {
                     result.magic_hint.or(Some(CraftingHint::Magic))
                 } else {
                     result.herbcraft_hint
@@ -1378,6 +1441,22 @@ pub fn evaluate_and_plan(
             .filter(|(_, s, _, site, _)| s.kind == StructureType::Garden && site.is_none())
             .map(|(_, _, p, _, _)| *p)
             .collect();
+        let material_pile_positions: Vec<(Entity, Position, ItemKind)> = world_state
+            .material_items_query
+            .iter()
+            .filter(|(_, item, _)| {
+                matches!(
+                    item.location,
+                    crate::components::items::ItemLocation::OnGround
+                ) && item.kind.material().is_some()
+            })
+            .map(|(e, item, p)| (e, *p, item.kind))
+            .collect();
+        let construction_materials_complete: HashMap<Entity, bool> = world_state
+            .building_query
+            .iter()
+            .filter_map(|(e, _, _, site, _)| site.map(|s| (e, s.materials_complete())))
+            .collect();
         let planner_state = build_planner_state(
             pos,
             needs,
@@ -1386,8 +1465,10 @@ pub fn evaluate_and_plan(
             &res.map,
             &stores_positions,
             &construction_pos,
+            &construction_materials_complete,
             &farm_pos,
             &herb_positions,
+            &material_pile_positions,
             d,
         );
         let zone_distances = build_zone_distances(
@@ -1399,6 +1480,7 @@ pub fn evaluate_and_plan(
             &herb_positions,
             &kitchen_positions,
             &cat_positions,
+            &material_pile_positions,
             entity,
             d,
         );
@@ -1529,8 +1611,22 @@ struct StepSnapshots {
     stores_entities: Vec<(Entity, Position)>,
     kitchen_positions: Vec<Position>,
     construction_positions: Vec<(Entity, Position)>,
+    /// Per-site materials-complete state (Entity → bool). Used by
+    /// `build_planner_state` to author the cat's `materials_available`
+    /// flag from the *nearest* site rather than a colony-wide OR.
+    /// Founding non-prefunded sites read `false`; coordinator-spawned
+    /// `new_prefunded` sites read `true` from spawn. Without this
+    /// per-site shape, a cat near the unfunded founding site would see
+    /// `materials_available=true` (because some other prefunded site is
+    /// complete) and the planner would emit `[TravelTo, Construct]`,
+    /// which Fails at `resolve_construct`'s materials check.
+    construction_materials_complete: HashMap<Entity, bool>,
     farm_positions: Vec<Position>,
     herb_positions: Vec<(Entity, Position, HerbKind)>,
+    /// Ground items whose `kind.material()` is `Some(_)`. Authored each
+    /// tick from a `Without<GoapPlan>` items query so the planner's
+    /// `PlannerZone::MaterialPile` resolves to the nearest haulable pile.
+    material_pile_positions: Vec<(Entity, Position, ItemKind)>,
     workshop_bonus: f32,
     season_mod: f32,
     builders_per_site: HashMap<Entity, usize>,
@@ -1592,7 +1688,7 @@ pub fn resolve_goap_plans(
     >,
     mut prey_query: Query<(Entity, &Position, &PreyConfig, &mut PreyState), With<PreyAnimal>>,
     mut stores_query: Query<&mut StoredItems>,
-    items_query: Query<&Item>,
+    items_query: Query<&Item, Without<crate::components::items::BuildMaterialItem>>,
     mut unchained_skills: Query<&mut Skills, (Without<GoapPlan>, Without<Structure>)>,
     mut relationships: ResMut<Relationships>,
     mut narr: NarrativeEmitter<'_>,
@@ -1653,6 +1749,32 @@ pub fn resolve_goap_plans(
         .map(|(e, herb, p)| (e, *p, herb.kind))
         .collect();
 
+    // Ground material piles (Wood / Stone laid out by the founding wagon-
+    // dismantling spawn or any future on-the-ground deposit). Filter to
+    // items whose kind maps to a build `Material` and that are still
+    // `OnGround` (not yet picked up).
+    let material_pile_positions: Vec<(Entity, Position, ItemKind)> = building_params
+        .material_items
+        .iter()
+        .filter(|(_, item, _)| {
+            matches!(
+                item.location,
+                crate::components::items::ItemLocation::OnGround
+            ) && item.kind.material().is_some()
+        })
+        .map(|(e, item, p)| (e, *p, item.kind))
+        .collect();
+
+    // Per-site materials_complete map (see StepSnapshots::
+    // construction_materials_complete). Coordinator-spawned sites are
+    // prefunded → true; founding wagon-dismantling sites are non-
+    // prefunded → false until cats finish hauling.
+    let construction_materials_complete: HashMap<Entity, bool> = building_params
+        .buildings
+        .iter()
+        .filter_map(|(e, _, site, _, _)| site.map(|s| (e, s.materials_complete())))
+        .collect();
+
     // Count cats adjacent to each construction site (for multi-builder bonuses).
     let builders_per_site: HashMap<Entity, usize> = {
         let cat_pos_list: Vec<Position> = cats
@@ -1701,8 +1823,10 @@ pub fn resolve_goap_plans(
         stores_entities,
         kitchen_positions,
         construction_positions,
+        construction_materials_complete,
         farm_positions,
         herb_positions,
+        material_pile_positions,
         workshop_bonus: if building_snapshot
             .iter()
             .any(|(_, kind, _, _, _)| *kind == StructureType::Workshop)
@@ -1922,8 +2046,10 @@ pub fn resolve_goap_plans(
                     &ec.map,
                     &snaps.stores_positions,
                     &snaps.construction_positions,
+                    &snaps.construction_materials_complete,
                     &snaps.farm_positions,
                     &snaps.herb_positions,
+                    &snaps.material_pile_positions,
                     d,
                 );
                 let zone_distances = build_zone_distances(
@@ -1935,6 +2061,7 @@ pub fn resolve_goap_plans(
                     &snaps.herb_positions,
                     &snaps.kitchen_positions,
                     &snaps.cat_positions,
+                    &snaps.material_pile_positions,
                     cat_entity,
                     d,
                 );
@@ -2086,6 +2213,44 @@ pub fn resolve_goap_plans(
                             // Mark plan exhausted so it flows through the normal
                             // completion path for cleanup.
                             plan.current_step = plan.steps.len();
+                            // Reset the CurrentAction gate so next tick's
+                            // `evaluate_and_plan` actually re-evaluates.
+                            // The ThreatNearby sub-block above sets this
+                            // to 0 alongside `Action::Flee`; without the
+                            // unconditional reset here, every other
+                            // urgency kind (CriticalSafety / CriticalHunger
+                            // / Exhaustion) drops the GoapPlan but leaves
+                            // `ticks_remaining = u64::MAX` (set at plan
+                            // creation, line ~1588). `evaluate_and_plan`'s
+                            // `if current.ticks_remaining != 0 { continue }`
+                            // filter (line ~974) then silently skips the
+                            // cat forever. Ticket 041: Mallow stuck with
+                            // `action=Cook` at the kitchen for 13,000+
+                            // ticks after a CriticalSafety preempt of a
+                            // Crafting plan — RetrieveRawFood maps to
+                            // `Action::Cook` per `to_action()`, so the
+                            // stale `current.action` tells the snapshot
+                            // logger she's cooking even though no plan
+                            // step has run since the preempt.
+                            current.ticks_remaining = 0;
+                            // Force GoapPlan removal this tick so
+                            // `evaluate_and_plan` (which filters
+                            // `Without<GoapPlan>`) picks the cat up next
+                            // tick. Without this, a ThreatNearby preempt
+                            // sets `Action::Flee` and marks the plan
+                            // exhausted, but the cat retains its
+                            // GoapPlan. The trip-completion branch then
+                            // replans (since trips_done < target_trips),
+                            // so `is_exhausted()` flips back to false
+                            // and the cat carries the same plan
+                            // indefinitely. Action::Flee is set-and-
+                            // forget — no resolver releases it — so the
+                            // cat freezes in Flee even as hunger
+                            // collapses. Witnessed in ticket 038
+                            // verification: cats locked in Flee for
+                            // 5000+ ticks → starvation deaths despite
+                            // ample on-the-ground food.
+                            plans_to_remove.push(cat_entity);
 
                             plan_writer.write(PlanNarrative {
                                 entity: cat_entity,
@@ -2150,8 +2315,10 @@ pub fn resolve_goap_plans(
                     &ec.map,
                     &snaps.stores_positions,
                     &snaps.construction_positions,
+                    &snaps.construction_materials_complete,
                     &snaps.farm_positions,
                     &snaps.herb_positions,
+                    &snaps.material_pile_positions,
                     d,
                 );
                 let zone_distances = build_zone_distances(
@@ -2163,6 +2330,7 @@ pub fn resolve_goap_plans(
                     &snaps.herb_positions,
                     &snaps.kitchen_positions,
                     &snaps.cat_positions,
+                    &snaps.material_pile_positions,
                     cat_entity,
                     d,
                 );
@@ -2431,7 +2599,10 @@ fn dispatch_step_action(
     colony_map: &mut ColonyHuntingMap,
     prey_query: &mut Query<(Entity, &Position, &PreyConfig, &mut PreyState), With<PreyAnimal>>,
     stores_query: &mut Query<&mut StoredItems>,
-    items_query: &Query<&Item>,
+    items_query: &Query<
+        &Item,
+        bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
+    >,
     den_query: &Query<(Entity, &PreyDen, &Position), Without<PreyAnimal>>,
     prey_params: &mut PreyHuntParams,
     commands: &mut Commands,
@@ -2456,6 +2627,7 @@ fn dispatch_step_action(
             &snaps.herb_positions,
             &snaps.kitchen_positions,
             &snaps.cat_positions,
+            &snaps.material_pile_positions,
             cat_entity,
             d,
         ),
@@ -3676,18 +3848,72 @@ fn dispatch_step_action(
         }
 
         GoapActionKind::GatherMaterials => {
-            // Not produced by the planner (Construct is a single action).
-            // Skill growth fallback for enum exhaustiveness.
-            crate::steps::building::resolve_gather(ticks, skills, snaps.workshop_bonus).result
+            // Pick up a material pile from the ground. Founding wagon-
+            // dismantling pipeline: the nearest pile is captured the
+            // first time this step is reached, then the resolver paths
+            // toward it and flips the item to Carried(cat).
+            if plan.step_state[step_idx].target_entity.is_none() {
+                plan.step_state[step_idx].target_entity = snaps
+                    .material_pile_positions
+                    .iter()
+                    .min_by_key(|(_, mp, _)| pos.manhattan_distance(mp))
+                    .map(|(e, _, _)| *e);
+            }
+            let target = plan.step_state[step_idx].target_entity;
+            let cached = &mut plan.step_state[step_idx].cached_path;
+            let outcome = crate::steps::building::resolve_pickup_material(
+                target,
+                cat_entity,
+                pos,
+                cached,
+                inventory,
+                &mut building_params.material_items,
+                &ec.map,
+            );
+            outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::MaterialPickedUp);
+            outcome.result
         }
 
         GoapActionKind::DeliverMaterials => {
-            // Not produced by the planner (Construct handles delivery internally).
-            // Fallback for enum exhaustiveness.
-            if ticks >= 20 {
-                crate::steps::StepResult::Advance
-            } else {
-                crate::steps::StepResult::Continue
+            // Drop one carried material unit at the nearest unfunded
+            // ConstructionSite. The cat's inventory may carry Wood or
+            // Stone (or both); we deliver the first build-material slot
+            // that the site still needs, falling back to the first
+            // build-material slot we find if the per-material check
+            // doesn't constrain it.
+            if plan.step_state[step_idx].target_entity.is_none() {
+                plan.step_state[step_idx].target_entity = snaps
+                    .construction_positions
+                    .iter()
+                    .min_by_key(|(_, cp)| pos.manhattan_distance(cp))
+                    .map(|(e, _)| *e);
+            }
+            let material_carried = inventory.slots.iter().find_map(|s| match s {
+                crate::components::magic::ItemSlot::Item(k, _) => k.material(),
+                _ => None,
+            });
+            match material_carried {
+                Some(material) => {
+                    let outcome = crate::steps::building::resolve_deliver(
+                        material,
+                        plan.step_state[step_idx].target_entity,
+                        inventory,
+                        &mut building_params.buildings,
+                    );
+                    outcome.record_if_witnessed(
+                        narr.activation.as_deref_mut(),
+                        Feature::MaterialsDelivered,
+                    );
+                    outcome.result
+                }
+                None => {
+                    // Reached the site empty-handed — planner believed
+                    // we'd be carrying. Fail so the plan re-routes
+                    // through Pickup.
+                    crate::steps::StepResult::Fail(
+                        "no build-material in inventory to deliver".into(),
+                    )
+                }
             }
         }
 
@@ -3879,6 +4105,7 @@ fn resolve_travel_to(
     herb_positions: &[(Entity, Position, HerbKind)],
     kitchen_positions: &[Position],
     cat_positions: &[(Entity, Position)],
+    material_pile_positions: &[(Entity, Position, ItemKind)],
     cat_entity: Entity,
     d: &DispositionConstants,
 ) -> crate::steps::StepResult {
@@ -3893,6 +4120,7 @@ fn resolve_travel_to(
             herb_positions,
             kitchen_positions,
             cat_positions,
+            material_pile_positions,
             cat_entity,
             d,
         );
@@ -4831,6 +5059,7 @@ fn resolve_zone_position(
     herb_positions: &[(Entity, Position, HerbKind)],
     kitchen_positions: &[Position],
     cat_positions: &[(Entity, Position)],
+    material_pile_positions: &[(Entity, Position, ItemKind)],
     cat_entity: Entity,
     d: &DispositionConstants,
 ) -> Option<Position> {
@@ -4881,6 +5110,10 @@ fn resolve_zone_position(
             .min_by_key(|sp| pos.manhattan_distance(sp))
             .map(|sp| Position::new(sp.x + d.guard_patrol_radius as i32, sp.y))
             .or(Some(*pos)),
+        PlannerZone::MaterialPile => material_pile_positions
+            .iter()
+            .min_by_key(|(_, mp, _)| pos.manhattan_distance(mp))
+            .map(|(_, p, _)| *p),
     }
 }
 
@@ -4915,8 +5148,10 @@ fn build_planner_state(
     map: &TileMap,
     stores_positions: &[Position],
     construction_positions: &[(Entity, Position)],
+    construction_materials_complete: &HashMap<Entity, bool>,
     farm_positions: &[Position],
     herb_positions: &[(Entity, Position, HerbKind)],
+    material_pile_positions: &[(Entity, Position, ItemKind)],
     d: &DispositionConstants,
 ) -> PlannerState {
     let zone = classify_zone(
@@ -4926,8 +5161,29 @@ fn build_planner_state(
         construction_positions,
         farm_positions,
         herb_positions,
+        material_pile_positions,
     );
-    let carrying = if inventory
+    // `materials_available` is per-cat: read off the nearest site's
+    // ledger. If no site is reachable, default true so non-Building
+    // dispositions don't accidentally see materials_available=false.
+    let materials_available = construction_positions
+        .iter()
+        .min_by_key(|(_, cp)| pos.manhattan_distance(cp))
+        .map(|(entity, _)| {
+            construction_materials_complete
+                .get(entity)
+                .copied()
+                .unwrap_or(true)
+        })
+        .unwrap_or(true);
+    let carrying = if inventory.slots.iter().any(|s| {
+        matches!(
+            s,
+            crate::components::magic::ItemSlot::Item(k, _) if k.material().is_some()
+        )
+    }) {
+        Carrying::BuildMaterials
+    } else if inventory
         .slots
         .iter()
         .any(|s| matches!(s, crate::components::magic::ItemSlot::Item(k, _) if k.is_food()))
@@ -4973,6 +5229,7 @@ fn build_planner_state(
         thornbriar_available: herb_positions
             .iter()
             .any(|(_, _, kind)| *kind == HerbKind::Thornbriar),
+        materials_available,
     }
 }
 
@@ -4983,12 +5240,23 @@ fn classify_zone(
     construction_positions: &[(Entity, Position)],
     farm_positions: &[Position],
     herb_positions: &[(Entity, Position, HerbKind)],
+    material_pile_positions: &[(Entity, Position, ItemKind)],
 ) -> PlannerZone {
     if stores_positions
         .iter()
         .any(|sp| pos.manhattan_distance(sp) <= 2)
     {
         return PlannerZone::Stores;
+    }
+    // MaterialPile classifies before ConstructionSite — a pile placed
+    // adjacent to a founding site (the wagon-dismantling layout) sits
+    // within the site's classify radius too. The cat's plan needs to
+    // see "I'm at a pile" first to gate the pickup action.
+    if material_pile_positions
+        .iter()
+        .any(|(_, mp, _)| pos.manhattan_distance(mp) <= 1)
+    {
+        return PlannerZone::MaterialPile;
     }
     if construction_positions
         .iter()
@@ -5030,6 +5298,7 @@ fn build_zone_distances(
     herb_positions: &[(Entity, Position, HerbKind)],
     kitchen_positions: &[Position],
     cat_positions: &[(Entity, Position)],
+    material_pile_positions: &[(Entity, Position, ItemKind)],
     cat_entity: Entity,
     d: &DispositionConstants,
 ) -> ZoneDistances {
@@ -5105,6 +5374,13 @@ fn build_zone_distances(
                 .iter()
                 .min_by_key(|sp| pos.manhattan_distance(sp))
                 .map(|sp| Position::new(sp.x + d.guard_patrol_radius as i32, sp.y)),
+        ),
+        (
+            PlannerZone::MaterialPile,
+            material_pile_positions
+                .iter()
+                .min_by_key(|(_, mp, _)| pos.manhattan_distance(mp))
+                .map(|(_, p, _)| *p),
         ),
     ];
 

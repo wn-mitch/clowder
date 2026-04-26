@@ -23,6 +23,12 @@ pub enum PlannerZone {
     SocialTarget,
     Wilds,
     PatrolZone,
+    /// On-the-ground material pile. Resolves to the nearest `Item` entity
+    /// whose kind maps to a build `Material` and whose location is
+    /// `OnGround`. The wagon-dismantling founding flow spawns these next
+    /// to founding sites; cats haul them in via the
+    /// `PickupMaterial` → `DeliverMaterials` plan leg.
+    MaterialPile,
 }
 
 /// What the cat is carrying.
@@ -53,6 +59,12 @@ pub struct PlannerState {
     pub prey_found: bool,
     pub farm_tended: bool,
     pub thornbriar_available: bool,
+    /// True iff at least one reachable `ConstructionSite` has
+    /// `materials_complete() == true`. Construct gates on this; founding
+    /// builds only flip true after enough Pickup→Deliver cycles fill the
+    /// site's materials ledger. Coarse for the founding-only scope (one
+    /// site at a time); per-site tracking is the open follow-on.
+    pub materials_available: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -137,6 +149,7 @@ pub enum StatePredicate {
     FarmTended(bool),
     ThornbriarAvailable(bool),
     TripsAtLeast(u32),
+    MaterialsAvailable(bool),
 }
 
 impl StatePredicate {
@@ -155,6 +168,7 @@ impl StatePredicate {
             Self::FarmTended(v) => state.farm_tended == *v,
             Self::ThornbriarAvailable(v) => state.thornbriar_available == *v,
             Self::TripsAtLeast(n) => state.trips_done >= *n,
+            Self::MaterialsAvailable(v) => state.materials_available == *v,
         }
     }
 }
@@ -172,6 +186,7 @@ pub enum StateEffect {
     SetConstructionDone(bool),
     SetFarmTended(bool),
     IncrementTrips,
+    SetMaterialsAvailable(bool),
 }
 
 impl StateEffect {
@@ -187,6 +202,7 @@ impl StateEffect {
             Self::SetConstructionDone(v) => state.construction_done = *v,
             Self::SetFarmTended(v) => state.farm_tended = *v,
             Self::IncrementTrips => state.trips_done += 1,
+            Self::SetMaterialsAvailable(v) => state.materials_available = *v,
         }
     }
 }
@@ -443,6 +459,7 @@ mod tests {
             prey_found: false,
             farm_tended: false,
             thornbriar_available: false,
+            materials_available: false,
         }
     }
 
@@ -703,6 +720,7 @@ mod tests {
             prey_found: false,
             farm_tended: false,
             thornbriar_available: false,
+            materials_available: false,
         };
         let goal = GoalState {
             predicates: vec![StatePredicate::TripsAtLeast(3)],

@@ -286,7 +286,7 @@ mod tests {
     #[test]
     fn interval_per_day_clamps_to_minimum_tick() {
         let ts = default_scale(); // 1000 ticks/day.
-        // 100000/day → would be 0.01 ticks, clamps to 1.
+                                  // 100000/day → would be 0.01 ticks, clamps to 1.
         let blistering = IntervalPerDay::new(100_000.0);
         assert_eq!(blistering.ticks(&ts), 1);
         assert!(blistering.fires_at(1, &ts));

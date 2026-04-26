@@ -969,6 +969,9 @@ fn item_sprite_index(kind: ItemKind) -> usize {
         ItemKind::Barrel => 30, // LARGEBROWNJAR
         ItemKind::Crate => 35,  // STONEBRICK
         ItemKind::Shelf => 34,  // PLANK
+        // Build materials
+        ItemKind::Wood => 34,  // PLANK
+        ItemKind::Stone => 35, // STONEBRICK
     }
 }
 

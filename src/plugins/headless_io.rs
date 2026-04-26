@@ -31,12 +31,12 @@ use crate::resources::event_log::EventLog;
 use crate::resources::map::TileMap;
 use crate::resources::narrative::NarrativeLog;
 use crate::resources::sim_constants::SimConstants;
+use crate::resources::system_activation::FeatureCategory;
 use crate::resources::time::{SimConfig, TimeScale, TimeState};
 use crate::resources::trace_log::TraceLog;
 use crate::resources::weather::Weather;
-use crate::resources::{FocalScoreCapture, FocalTraceTarget};
 use crate::resources::SystemActivation;
-use crate::resources::system_activation::FeatureCategory;
+use crate::resources::{FocalScoreCapture, FocalTraceTarget};
 
 /// Headless CLI args, threaded into the App as a resource.
 ///
@@ -137,10 +137,8 @@ impl Plugin for HeadlessIoPlugin {
         // call `writer.flush()` after each batch so consumers
         // (downstream tooling tailing the file mid-run) see fresh
         // content without waiting for buffer fill.
-        let narrative_file =
-            File::create(&config.log_path).expect("create narrative log file");
-        let event_file =
-            File::create(&config.event_log_path).expect("create event log file");
+        let narrative_file = File::create(&config.log_path).expect("create narrative log file");
+        let event_file = File::create(&config.event_log_path).expect("create event log file");
 
         app.insert_resource(NarrativeJsonlWriter {
             writer: BufWriter::new(narrative_file),
@@ -199,8 +197,7 @@ impl Plugin for HeadlessIoPlugin {
             (
                 flush_narrative_jsonl,
                 flush_events_jsonl,
-                flush_trace_jsonl
-                    .run_if(bevy::prelude::resource_exists::<TraceJsonlWriter>),
+                flush_trace_jsonl.run_if(bevy::prelude::resource_exists::<TraceJsonlWriter>),
                 bump_headless_tick_count,
                 tick_budget_check_and_exit,
             ),
@@ -526,18 +523,19 @@ pub fn emit_headless_footer(world: &mut World) -> String {
         };
 
         // §7.W social_warmth (Fulfillment register).
-        let social_warmth = mk("social_warmth",
-            full_vals.iter().map(|f| f.social_warmth).collect());
+        let social_warmth = mk(
+            "social_warmth",
+            full_vals.iter().map(|f| f.social_warmth).collect(),
+        );
 
         // Maslow welfare-tier needs (the higher-order axes).
-        let acceptance = mk("acceptance",
-            needs_vals.iter().map(|n| n.acceptance).collect());
-        let respect = mk("respect",
-            needs_vals.iter().map(|n| n.respect).collect());
-        let mastery = mk("mastery",
-            needs_vals.iter().map(|n| n.mastery).collect());
-        let purpose = mk("purpose",
-            needs_vals.iter().map(|n| n.purpose).collect());
+        let acceptance = mk(
+            "acceptance",
+            needs_vals.iter().map(|n| n.acceptance).collect(),
+        );
+        let respect = mk("respect", needs_vals.iter().map(|n| n.respect).collect());
+        let mastery = mk("mastery", needs_vals.iter().map(|n| n.mastery).collect());
+        let purpose = mk("purpose", needs_vals.iter().map(|n| n.purpose).collect());
 
         serde_json::json!({
             "social_warmth": social_warmth,
@@ -607,7 +605,12 @@ fn sensory_env_multipliers_snapshot() -> serde_json::Value {
         Weather::Wind,
         Weather::Storm,
     ];
-    let phase_variants = [DayPhase::Dawn, DayPhase::Day, DayPhase::Dusk, DayPhase::Night];
+    let phase_variants = [
+        DayPhase::Dawn,
+        DayPhase::Day,
+        DayPhase::Dusk,
+        DayPhase::Night,
+    ];
 
     let weather_block: serde_json::Map<String, serde_json::Value> = weather_variants
         .iter()

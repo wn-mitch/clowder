@@ -37,7 +37,10 @@ pub fn resolve_eat_at_stores(
     target_entity: Option<Entity>,
     needs: &mut Needs,
     stores_query: &mut Query<&mut StoredItems>,
-    items_query: &Query<&Item>,
+    items_query: &Query<
+        &Item,
+        bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
+    >,
     commands: &mut Commands,
     d: &DispositionConstants,
 ) -> StepOutcome<bool> {

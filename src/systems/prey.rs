@@ -924,7 +924,10 @@ pub fn prey_hunger(
         Without<PreyAnimal>,
     >,
     cat_positions: Query<&Position, (With<Needs>, Without<Dead>, Without<PreyAnimal>)>,
-    items_query: Query<&Item>,
+    items_query: Query<
+        &Item,
+        bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
+    >,
     mut log: ResMut<NarrativeLog>,
     mut rng: ResMut<SimRng>,
     time: Res<TimeState>,

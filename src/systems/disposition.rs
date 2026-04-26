@@ -2505,7 +2505,10 @@ pub fn resolve_disposition_chains(
     >,
     mut prey_query: Query<(Entity, &Position, &PreyConfig, &mut PreyState), With<PreyAnimal>>,
     mut stores_query: Query<&mut StoredItems>,
-    items_query: Query<&Item>,
+    items_query: Query<
+        &Item,
+        bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
+    >,
     // Disjoint from `cats` (which requires TaskChain) — reads skills of non-chain
     // entities like apprentices being mentored.
     mut unchained_skills: Query<&mut Skills, (Without<TaskChain>, Without<Structure>)>,
@@ -2997,7 +3000,10 @@ fn dispatch_chain_step(
     fulfillment_opt: &mut Option<Mut<crate::components::fulfillment::Fulfillment>>,
     prey_query: &mut Query<(Entity, &Position, &PreyConfig, &mut PreyState), With<PreyAnimal>>,
     stores_query: &mut Query<&mut StoredItems>,
-    items_query: &Query<&Item>,
+    items_query: &Query<
+        &Item,
+        bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
+    >,
     prey_params: &mut PreyHuntParams,
     map: &TileMap,
     wind: &crate::resources::wind::WindState,

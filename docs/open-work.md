@@ -14,19 +14,19 @@ _Last generated: 2026-04-26._
 
 | Status | Count |
 |---|---|
-| In progress | 7 |
-| Ready | 11 |
+| In progress | 8 |
+| Ready | 16 |
 | Parked | 1 |
 | Blocked | 9 |
 | Done (awaiting archive) | 2 |
-| **Open total** | **28** |
+| **Open total** | **34** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-index` (regenerate this file).
 
-## In progress (7)
+## In progress (8)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[005](docs/open-work/tickets/005-cluster-a-scoring-substrate-refactor.md)** — Scoring substrate refactor cluster (Cluster A — Foundational) — _[A] · added 2026-04-20_
@@ -35,8 +35,9 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
 - **[027](docs/open-work/tickets/027-mating-cadence-three-bug-cascade.md)** — Mating cadence — three-bug cascade blocking MatingOccurred — _added 2026-04-25_
 - **[033](docs/open-work/tickets/033-time-unit-typing.md)** — Time-unit typing — make ticks ↔ in-game time ↔ wall-clock a compile-time invariant — _added 2026-04-26_
+- **[042](docs/open-work/tickets/042-non-threat-urgency-preempt-stale-ticks-remaining.md)** — Non-ThreatNearby urgency preempt left ticks_remaining stale, locking cats out of evaluate_and_plan forever — _added 2026-04-26_
 
-## Ready (11)
+## Ready (16)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -49,6 +50,11 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[029](docs/open-work/tickets/029-cross-run-log-database.md)** — Cross-run log database — collate baseline + diagnostic archives for SQL-style queries — _added 2026-04-25_
 - **[032](docs/open-work/tickets/032-starvation-cat-biology-realignment.md)** — Starvation rebalance — align with IRL cat biology, interesting not cutthroat — _added 2026-04-26_
 - **[034](docs/open-work/tickets/034-time-anchor-continuity-rebalance.md)** — Time-anchor continuity rebalance — restore play/grooming/mythic-texture under fixed prey-scent — _added 2026-04-26_
+- **[035](docs/open-work/tickets/035-burial-not-implemented.md)** — Burial — implement the §5 broaden-sideways capability so the continuity canary can pass — _added 2026-04-26_
+- **[037](docs/open-work/tickets/037-grooming-fired-masks-silent-advance.md)** — GroomingFired event masks silent-advance — continuity canary lies when target picker returns None — _added 2026-04-26_
+- **[039](docs/open-work/tickets/039-foodcooked-still-silent-post-036.md)** — FoodCooked still silent after 036 — Cook chain execution failure downstream of CraftingHint::Cook — _added 2026-04-26_
+- **[040](docs/open-work/tickets/040-disposition-shift-courtship-grooming-regression.md)** — Disposition shift after 036 collapsed Courtship / Grooming / Mythic-texture continuity — _added 2026-04-26_
+- **[041](docs/open-work/tickets/041-founding-haul-balance-tuning.md)** — Founding wagon-dismantling haul — balance the early-game cost so cats don't starve while hauling — _added 2026-04-26_
 
 ## Parked (1)
 
@@ -80,7 +86,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/). Recent months:
 
-- [2026-04](docs/open-work/landed/2026-04.md) — 43 entries
+- [2026-04](docs/open-work/landed/2026-04.md) — 45 entries
 
 ## Conventions
 

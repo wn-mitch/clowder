@@ -113,7 +113,10 @@ pub fn decay_items(
 /// Prune dead entity IDs from StoredItems so despawned items don't occupy capacity.
 pub fn prune_stored_items(
     mut stores_query: Query<(&Structure, &mut StoredItems)>,
-    items_query: Query<&Item>,
+    items_query: Query<
+        &Item,
+        bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
+    >,
 ) {
     for (structure, mut stored) in stores_query.iter_mut() {
         if structure.kind == StructureType::Stores {
@@ -126,7 +129,10 @@ pub fn prune_stored_items(
 pub fn sync_food_stores(
     mut food: ResMut<FoodStores>,
     stores_query: Query<(&Structure, &StoredItems)>,
-    items_query: Query<&Item>,
+    items_query: Query<
+        &Item,
+        bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
+    >,
 ) {
     let mut total_food_count = 0u32;
     let mut total_capacity = 0.0f32;

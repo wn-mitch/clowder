@@ -225,8 +225,7 @@ pub fn update_mate_eligibility_markers(
     let fitness = mating.snapshot();
     let season = mating.current_season();
     let scoring = &constants.scoring;
-    let cat_positions: Vec<(Entity, Position)> =
-        cats.iter().map(|(e, p, _, _)| (e, *p)).collect();
+    let cat_positions: Vec<(Entity, Position)> = cats.iter().map(|(e, p, _, _)| (e, *p)).collect();
 
     for (entity, _pos, needs, has_marker) in cats.iter() {
         let eligible = has_eligible_mate(
@@ -619,7 +618,9 @@ mod tests {
         let mut world = marker_world();
         // Default season for tick 20_000 * 13 must land in Spring; force
         // it explicitly by setting season_started_tick.
-        world.resource_mut::<crate::resources::time::TimeState>().tick = 20_000 * 12 + 5;
+        world
+            .resource_mut::<crate::resources::time::TimeState>()
+            .tick = 20_000 * 12 + 5;
 
         let a = spawn_eligible_adult(
             &mut world,
@@ -655,7 +656,9 @@ mod tests {
     #[test]
     fn update_marker_skips_unbonded_compatible_pair() {
         let mut world = marker_world();
-        world.resource_mut::<crate::resources::time::TimeState>().tick = 20_000 * 12 + 5;
+        world
+            .resource_mut::<crate::resources::time::TimeState>()
+            .tick = 20_000 * 12 + 5;
 
         let a = spawn_eligible_adult(
             &mut world,
@@ -684,7 +687,9 @@ mod tests {
     #[test]
     fn update_marker_removes_when_partner_dies() {
         let mut world = marker_world();
-        world.resource_mut::<crate::resources::time::TimeState>().tick = 20_000 * 12 + 5;
+        world
+            .resource_mut::<crate::resources::time::TimeState>()
+            .tick = 20_000 * 12 + 5;
 
         let a = spawn_eligible_adult(
             &mut world,

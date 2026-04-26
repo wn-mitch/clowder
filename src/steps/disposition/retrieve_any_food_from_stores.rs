@@ -37,7 +37,10 @@ pub fn resolve_retrieve_any_food_from_stores(
     target_entity: Option<Entity>,
     inventory: &mut Inventory,
     stores_query: &mut Query<&mut StoredItems>,
-    items_query: &Query<&Item>,
+    items_query: &Query<
+        &Item,
+        bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
+    >,
     commands: &mut Commands,
 ) -> StepOutcome<bool> {
     if ticks < 5 {

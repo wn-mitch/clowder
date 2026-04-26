@@ -721,7 +721,11 @@ mod tests {
 
         let activation = world.resource::<SystemActivation>();
         assert_eq!(
-            activation.counts.get(&Feature::CourtshipInteraction).copied().unwrap_or(0),
+            activation
+                .counts
+                .get(&Feature::CourtshipInteraction)
+                .copied()
+                .unwrap_or(0),
             1,
             "drift gate should record exactly one CourtshipInteraction this tick"
         );
@@ -732,7 +736,10 @@ mod tests {
         );
         let log = world.resource::<EventLog>();
         assert_eq!(
-            log.continuity_tallies.get("courtship").copied().unwrap_or(0),
+            log.continuity_tallies
+                .get("courtship")
+                .copied()
+                .unwrap_or(0),
             1,
             "CourtshipDrifted should bump continuity_tallies.courtship"
         );
@@ -758,7 +765,11 @@ mod tests {
 
         let activation = world.resource::<SystemActivation>();
         assert_eq!(
-            activation.counts.get(&Feature::CourtshipInteraction).copied().unwrap_or(0),
+            activation
+                .counts
+                .get(&Feature::CourtshipInteraction)
+                .copied()
+                .unwrap_or(0),
             0,
             "incompatible orientation should not record CourtshipInteraction"
         );
@@ -789,7 +800,11 @@ mod tests {
 
         let activation = world.resource::<SystemActivation>();
         assert_eq!(
-            activation.counts.get(&Feature::CourtshipInteraction).copied().unwrap_or(0),
+            activation
+                .counts
+                .get(&Feature::CourtshipInteraction)
+                .copied()
+                .unwrap_or(0),
             0,
             "below-gate fondness/familiarity should not record CourtshipInteraction"
         );

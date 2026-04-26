@@ -1,0 +1,104 @@
+{
+  "label": "post-033-time-fix",
+  "run_dir": "/Users/will.mitchell/clowder/logs/tuned-42",
+  "events_path": "/Users/will.mitchell/clowder/logs/tuned-42/events.jsonl",
+  "commit_hash_short": "a879f43",
+  "commit_dirty": false,
+  "seed": 42,
+  "duration_secs": 900,
+  "promoted_at": "2026-04-26T23:26:49Z",
+  "footer_snapshot": {
+    "_footer": true,
+    "anxiety_interrupt_total": 13294,
+    "continuity_tallies": {
+      "burial": 0,
+      "courtship": 804,
+      "grooming": 71,
+      "mentoring": 0,
+      "mythic-texture": 48,
+      "play": 111
+    },
+    "deaths_by_cause": {
+      "ShadowFoxAmbush": 4,
+      "Starvation": 2,
+      "WildlifeCombat": 1
+    },
+    "interrupts_by_reason": {
+      "CriticalHealth": 13294,
+      "urgency ThreatNearby (level 2) preempted level 4 plan": 32
+    },
+    "negative_events_total": 74512,
+    "neutral_features_active": 18,
+    "neutral_features_total": 25,
+    "never_fired_expected_positives": [
+      "ItemRetrieved",
+      "FoodCooked",
+      "KittenBorn",
+      "GestationAdvanced",
+      "MatingOccurred",
+      "KittenFed",
+      "GroomedOther",
+      "MentoredCat"
+    ],
+    "plan_failures_by_reason": {
+      "Construct: no target for Construct": 2,
+      "EngageThreat: global step timeout": 4,
+      "EngageThreat: morale_break": 30,
+      "HarvestCarcass: global step timeout": 1,
+      "HarvestCarcass: no carcass nearby": 2,
+      "PrepareRemedy: missing herb for remedy": 1,
+      "TravelTo(SocialTarget): no reachable zone target": 40
+    },
+    "positive_features_active": 28,
+    "positive_features_total": 44,
+    "shadow_fox_spawn_total": 26,
+    "shadow_foxes_avoided_ward_total": 1632,
+    "ward_avg_strength_final": 0.0,
+    "ward_count_final": 0,
+    "ward_siege_started_total": 274,
+    "wards_despawned_total": 113,
+    "wards_placed_total": 113,
+    "welfare_axes": {
+      "acceptance": {
+        "axis": "acceptance",
+        "max": 0.0,
+        "mean": 0.0,
+        "min": 0.0,
+        "n": 1,
+        "stdev": 0.0
+      },
+      "mastery": {
+        "axis": "mastery",
+        "max": 0.9999725222587585,
+        "mean": 0.9999725222587585,
+        "min": 0.9999725222587585,
+        "n": 1,
+        "stdev": 0.0
+      },
+      "purpose": {
+        "axis": "purpose",
+        "max": 0.9999852180480957,
+        "mean": 0.9999852180480957,
+        "min": 0.9999852180480957,
+        "n": 1,
+        "stdev": 0.0
+      },
+      "respect": {
+        "axis": "respect",
+        "max": 0.8456315994262695,
+        "mean": 0.8456315994262695,
+        "min": 0.8456315994262695,
+        "n": 1,
+        "stdev": 0.0
+      },
+      "social_warmth": {
+        "axis": "social_warmth",
+        "max": 0.0,
+        "mean": 0.0,
+        "min": 0.0,
+        "n": 1,
+        "stdev": 0.0
+      }
+    }
+  }
+}

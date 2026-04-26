@@ -814,7 +814,11 @@ pub struct PreyConstants {
     /// Pre-ticket-033 value was `0.02/tick = 20/day`, which faded a
     /// fresh deposit below threshold in ~3 ticks (functionally
     /// inert). See ticket 033 / `docs/balance/time-anchor-iteration-1.md`.
-    #[serde(rename = "scent_decay_rate", alias = "scent_decay_per_tick", default = "default_prey_scent_decay_rate")]
+    #[serde(
+        rename = "scent_decay_rate",
+        alias = "scent_decay_per_tick",
+        default = "default_prey_scent_decay_rate"
+    )]
     pub scent_decay_rate: RatePerDay,
 }
 
@@ -3328,9 +3332,7 @@ impl SimConstants {
                     Self::default()
                 }
                 Ok(patch) => Self::default_with_overrides(&patch).unwrap_or_else(|e| {
-                    eprintln!(
-                        "Warning: CLOWDER_OVERRIDES failed to apply ({e}); using defaults."
-                    );
+                    eprintln!("Warning: CLOWDER_OVERRIDES failed to apply ({e}); using defaults.");
                     Self::default()
                 }),
             },
@@ -3350,8 +3352,8 @@ impl SimConstants {
     }
 
     fn default_with_overrides(patch: &serde_json::Value) -> Result<Self, String> {
-        let mut base = serde_json::to_value(Self::default())
-            .map_err(|e| format!("serialize default: {e}"))?;
+        let mut base =
+            serde_json::to_value(Self::default()).map_err(|e| format!("serialize default: {e}"))?;
         deep_merge(&mut base, patch);
         serde_json::from_value(base).map_err(|e| format!("deserialize merged: {e}"))
     }
@@ -3420,17 +3422,18 @@ mod tests {
 
     #[test]
     fn env_override_deep_merges_nested_field() {
-        let patch: serde_json::Value = serde_json::from_str(
-            r#"{"fulfillment":{"social_warmth_socialize_per_tick":0.0042}}"#,
-        )
-        .expect("parse patch");
+        let patch: serde_json::Value =
+            serde_json::from_str(r#"{"fulfillment":{"social_warmth_socialize_per_tick":0.0042}}"#)
+                .expect("parse patch");
         let merged = SimConstants::default_with_overrides(&patch).expect("merge ok");
         // Patched field changed.
         assert_eq!(merged.fulfillment.social_warmth_socialize_per_tick, 0.0042);
         // Sibling field in same struct unchanged.
         assert_eq!(
             merged.fulfillment.social_warmth_groom_other_gain,
-            SimConstants::default().fulfillment.social_warmth_groom_other_gain,
+            SimConstants::default()
+                .fulfillment
+                .social_warmth_groom_other_gain,
         );
         // Unrelated sub-struct unchanged.
         assert_eq!(
@@ -3454,7 +3457,9 @@ mod tests {
         // Real field unchanged from default.
         assert_eq!(
             merged.fulfillment.social_warmth_socialize_per_tick,
-            SimConstants::default().fulfillment.social_warmth_socialize_per_tick,
+            SimConstants::default()
+                .fulfillment
+                .social_warmth_socialize_per_tick,
         );
     }
 }
