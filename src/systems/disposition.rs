@@ -106,11 +106,12 @@ pub struct MarkerQueries<'w, 's> {
             Has<markers::OnSpecialTerrain>,
         ),
     >,
-    /// Ticket 027 Bug 2 — eligibility marker for `MateDse`. Solo query
-    /// so future related markers (HasEligiblePartnerCandidate per
-    /// §7.M Bug 3 PairingActivity) can sit alongside without disturbing
-    /// the State tuple.
+    /// Ticket 027 Bug 2 — eligibility marker for `MateDse`.
     pub mate_eligibility: Query<'w, 's, Has<markers::HasEligibleMate>>,
+    /// Ticket 027 Bug 3 — eligibility marker for `pairing_activity` DSE
+    /// (§7.M.1 L2). Authored by
+    /// [`crate::ai::pairing::update_pairing_candidate_markers`].
+    pub pairing_candidate: Query<'w, 's, Has<markers::HasPairingCandidate>>,
 }
 
 use crate::resources::food::FoodStores;
@@ -712,6 +713,12 @@ pub fn evaluate_dispositions(
         if let Ok(has_mate) = side_effects.marker_queries.mate_eligibility.get(entity) {
             markers.set_entity(markers::HasEligibleMate::KEY, entity, has_mate);
         }
+        // Ticket 027 Bug 3 — HasPairingCandidate authored by
+        // `pairing::update_pairing_candidate_markers`. Drives the
+        // L2 PairingActivity DSE's eligibility (§7.M.1).
+        if let Ok(has_pair) = side_effects.marker_queries.pairing_candidate.get(entity) {
+            markers.set_entity(markers::HasPairingCandidate::KEY, entity, has_pair);
+        }
 
         let has_herbs_nearby = herb_positions.iter().any(|(_, hp)| {
             crate::systems::sensing::observer_sees_at(
@@ -1002,7 +1009,16 @@ pub fn disposition_to_chain(
         ),
         (With<Disposition>, Without<Dead>, Without<TaskChain>),
     >,
-    cat_positions: Query<(Entity, &Position, &Needs), Without<Dead>>,
+    cat_positions: Query<
+        (
+            Entity,
+            &Position,
+            &Needs,
+            &crate::components::identity::Gender,
+            &crate::components::identity::Orientation,
+        ),
+        Without<Dead>,
+    >,
     wildlife: Query<(Entity, &Position), With<WildAnimal>>,
     building_query: Query<(
         Entity,
@@ -1034,13 +1050,27 @@ pub fn disposition_to_chain(
     let d = &constants.disposition;
     // Pre-collect cat position pairs for social target selection.
     let cat_pos_list: Vec<(Entity, Position)> =
-        cat_positions.iter().map(|(e, p, _)| (e, *p)).collect();
+        cat_positions.iter().map(|(e, p, _, _, _)| (e, *p)).collect();
     // Snapshot per-cat `needs.temperature` for the §6.5.4 Groom-other
     // target-taking DSE. Keyed by entity so the resolver's closure
     // captures one HashMap<Entity, f32> rather than a whole query.
     let cat_temperature_map: std::collections::HashMap<Entity, f32> = cat_positions
         .iter()
-        .map(|(e, _, n)| (e, n.temperature))
+        .map(|(e, _, n, _, _)| (e, n.temperature))
+        .collect();
+    // §7.M.1 L2 PairingActivity orientation lookup. The L2 pairing
+    // candidate filter is Friends-bonded *and* orientation-compatible;
+    // Friends bonds form between any-orientation pairs (per
+    // `social.rs::check_bonds`), so the filter is load-bearing.
+    let cat_orientation_map: std::collections::HashMap<
+        Entity,
+        (
+            crate::components::identity::Gender,
+            crate::components::identity::Orientation,
+        ),
+    > = cat_positions
+        .iter()
+        .map(|(e, _, _, g, o)| (e, (*g, *o)))
         .collect();
     // Snapshot kitten → (mother, father) parent pointers for the
     // §6.5.4 kinship axis. Bidirectional kinship is computed on the
@@ -1179,6 +1209,30 @@ pub fn disposition_to_chain(
             // GOAP step-resolver site (goap.rs: MateWith step).
             None,
         );
+        // §7.M.1 L2 target-taking DSE — pick a Friends-bonded compat
+        // partner for active courtship. Returns None when no Friends
+        // candidate is in `PAIRING_TARGET_RANGE`; the chain dispatcher
+        // drops the disposition in that case.
+        let pairing_target = if let Some(&(self_gender, self_orient)) =
+            cat_orientation_map.get(&entity)
+        {
+            crate::ai::dses::pairing_activity_target::resolve_pairing_target(
+                &res.dse_registry,
+                entity,
+                *pos,
+                self_gender,
+                self_orient,
+                &cat_pos_list,
+                &cat_orientation_map,
+                &res.relationships,
+                res.time.tick,
+                // Chain-building side; focal capture happens at the
+                // GOAP step-resolver site (goap.rs: Pair step).
+                None,
+            )
+        } else {
+            None
+        };
         // §6.5.3: resolve the mentor target-taking DSE. Skill-gap is the
         // dominant axis; weights renormalized from spec by dropping the
         // deferred `apprentice-receptivity` axis. Candidates share the
@@ -1356,6 +1410,7 @@ pub fn disposition_to_chain(
             ),
             DispositionKind::Exploring => build_exploring_chain(pos, &res.map, d, &mut rng.rng),
             DispositionKind::Mating => build_mating_chain(mate_target, &cat_pos_list),
+            DispositionKind::Pairing => build_pairing_chain(pairing_target, &cat_pos_list),
             DispositionKind::Caretaking => build_caretaking_chain(
                 caretake_resolution.target,
                 caretake_resolution.target_pos,
@@ -2368,6 +2423,35 @@ fn build_mating_chain(
 }
 
 // ===========================================================================
+// build_pairing_chain
+// ===========================================================================
+
+/// Build a Pair chain around a pre-resolved Friends-bonded courtship
+/// target. §7.M.1 L2: partner selection is owned by
+/// [`crate::ai::dses::pairing_activity_target::resolve_pairing_target`]
+/// upstream (Friends bond + orientation-compatible filter); this
+/// function owns only the chain shape — `[MoveTo(target_pos), Pair]`.
+fn build_pairing_chain(
+    pairing_target: Option<Entity>,
+    cat_positions: &[(Entity, Position)],
+) -> Option<(TaskChain, Action)> {
+    let partner = pairing_target?;
+    let partner_pos = *cat_positions
+        .iter()
+        .find(|(e, _)| *e == partner)
+        .map(|(_, p)| p)?;
+
+    let chain = TaskChain::new(
+        vec![
+            TaskStep::new(StepKind::MoveTo).with_position(partner_pos),
+            TaskStep::new(StepKind::Pair).with_entity(partner),
+        ],
+        FailurePolicy::AbortChain,
+    );
+    Some((chain, Action::Pair))
+}
+
+// ===========================================================================
 // build_caretaking_chain
 // ===========================================================================
 
@@ -2437,6 +2521,10 @@ struct MentorEffect {
 struct ChainStepSnapshots {
     grooming: std::collections::HashMap<Entity, f32>,
     gender: std::collections::HashMap<Entity, Gender>,
+    /// Position lookup keyed by entity. Used by `StepKind::Pair` to
+    /// fetch the partner's tile each tick (drift checks against
+    /// `pairing_proximity_threshold`).
+    position: std::collections::HashMap<Entity, Position>,
     cat_tile_counts: std::collections::HashMap<Position, u32>,
 }
 
@@ -2542,6 +2630,13 @@ pub fn resolve_disposition_chains(
         gender: cats
             .iter()
             .map(|((e, _, _, _, _, _, _, _), (_, g, _, _, _, _, _, _))| (e, *g))
+            .collect(),
+        // Position snapshot — used by `Pair` so the resolver can
+        // verify the courtship target is still adjacent without
+        // re-querying the mutable `cats` query.
+        position: cats
+            .iter()
+            .map(|((e, _, _, p, _, _, _, _), _)| (e, *p))
             .collect(),
         // Tile occupancy for anti-stacking jitter on PatrolTo arrival.
         cat_tile_counts: {
@@ -3818,6 +3913,27 @@ fn dispatch_chain_step(
                         litter_size,
                     ));
             }
+            apply_step_result(outcome.result, chain, current);
+        }
+
+        StepKind::Pair => {
+            let step = chain.current_mut().unwrap();
+            let target = step.target_entity;
+            let target_pos = target.and_then(|t| snaps.position.get(&t).copied());
+            let outcome = crate::steps::disposition::resolve_pairing(
+                ticks,
+                cat_entity,
+                target,
+                target_pos,
+                *pos,
+                relationships,
+                &constants.social,
+                d,
+            );
+            outcome.record_if_witnessed(
+                narr.activation.as_deref_mut(),
+                Feature::CourtshipInteraction,
+            );
             apply_step_result(outcome.result, chain, current);
         }
 

@@ -702,10 +702,13 @@ pub fn evaluate_and_plan(
         Has<markers::OnSpecialTerrain>,
     )>,
     // Ticket 027 Bug 2 — HasEligibleMate authored by
-    // `mating::update_mate_eligibility_markers`. Solo query so future
-    // related markers (HasEligiblePartnerCandidate per §7.M Bug 3) can
-    // sit alongside without disturbing the State tuple.
+    // `mating::update_mate_eligibility_markers`.
     mate_eligibility_q: Query<Has<markers::HasEligibleMate>>,
+    // Ticket 027 Bug 3 — HasPairingCandidate authored by
+    // `pairing::update_pairing_candidate_markers`. Snapshotted into
+    // the MarkerSnapshot below so `pairing_activity_dse`'s
+    // `EligibilityFilter::require(HasPairingCandidate::KEY)` resolves.
+    pairing_candidate_q: Query<Has<markers::HasPairingCandidate>>,
 ) {
     let sc = &res.constants.scoring;
     let d = &res.constants.disposition;
@@ -1057,6 +1060,12 @@ pub fn evaluate_and_plan(
         // `mating::update_mate_eligibility_markers`.
         if let Ok(has_mate) = mate_eligibility_q.get(entity) {
             markers.set_entity(markers::HasEligibleMate::KEY, entity, has_mate);
+        }
+        // Ticket 027 Bug 3 — HasPairingCandidate authored by
+        // `pairing::update_pairing_candidate_markers`. Drives the
+        // L2 PairingActivity DSE's eligibility (§7.M.1).
+        if let Ok(has_pair) = pairing_candidate_q.get(entity) {
+            markers.set_entity(markers::HasPairingCandidate::KEY, entity, has_pair);
         }
 
         let has_herbs_nearby = herb_positions.iter().any(|(_, hp, _)| {
@@ -1524,6 +1533,12 @@ struct MentorEffect {
 struct StepSnapshots {
     grooming: HashMap<Entity, f32>,
     gender: HashMap<Entity, Gender>,
+    /// §7.M.1 L2 PairingActivity: gender + orientation snapshot for
+    /// the candidate filter in `resolve_pairing_target`. Friends-bonded
+    /// pairs may not be orientation-compatible (Friends bonds form
+    /// regardless of orientation per `social.rs::check_bonds`); the
+    /// orientation gate is load-bearing here.
+    orientations: HashMap<Entity, (Gender, crate::components::identity::Orientation)>,
     cat_tile_counts: HashMap<Position, u32>,
     stores_positions: Vec<Position>,
     stores_entities: Vec<(Entity, Position)>,
@@ -1578,6 +1593,7 @@ pub fn resolve_goap_plans(
                 &mut Memory,
                 &mut PendingUrgencies,
                 Option<&mut crate::components::fulfillment::Fulfillment>,
+                &crate::components::identity::Orientation,
             ),
         ),
         (
@@ -1678,7 +1694,7 @@ pub fn resolve_goap_plans(
         grooming: cats
             .iter()
             .map(
-                |((e, _, _, _, _, _, _, _, _), (_, _, _, g, _, _, _, _, _, _, _))| {
+                |((e, _, _, _, _, _, _, _, _), (_, _, _, g, _, _, _, _, _, _, _, _))| {
                     (e, g.as_ref().map_or(0.8, |g| g.0))
                 },
             )
@@ -1688,7 +1704,15 @@ pub fn resolve_goap_plans(
         // double-borrowing the mutable `cats` query.
         gender: cats
             .iter()
-            .map(|((e, _, _, _, _, _, _, _, _), (g, _, _, _, _, _, _, _, _, _, _))| (e, *g))
+            .map(|((e, _, _, _, _, _, _, _, _), (g, _, _, _, _, _, _, _, _, _, _, _))| (e, *g))
+            .collect(),
+        orientations: cats
+            .iter()
+            .map(
+                |((e, _, _, _, _, _, _, _, _), (g, _, _, _, _, _, _, _, _, _, _, o))| {
+                    (e, (*g, *o))
+                },
+            )
             .collect(),
         cat_tile_counts: {
             let mut counts = HashMap::new();
@@ -1721,7 +1745,7 @@ pub fn resolve_goap_plans(
             .collect(),
         injured_cat_positions: cats
             .iter()
-            .filter(|(_, (_, _, _, _, _, health, _, _, _, _, _))| health.current < health.max)
+            .filter(|(_, (_, _, _, _, _, health, _, _, _, _, _, _))| health.current < health.max)
             .map(|((e, _, _, pos, _, _, _, _, _), _)| (e, *pos))
             .collect(),
         // §6.5.3 mentor-target DSE snapshot: candidate-side Skills lookup
@@ -1793,6 +1817,7 @@ pub fn resolve_goap_plans(
             mut memory,
             mut urgencies,
             mut fulfillment_opt,
+            orientation,
         ),
     ) in &mut cats
     {
@@ -1987,6 +2012,7 @@ pub fn resolve_goap_plans(
             personality,
             name,
             gender,
+            orientation,
             &mut hunting_priors,
             grooming.as_deref_mut(),
             &mut mood,
@@ -2291,7 +2317,7 @@ pub fn resolve_goap_plans(
     // Deferred grooming restorations — apply grooming condition delta and
     // §7.W social_warmth delta to the groomed target.
     for groom in accum.grooming_restorations {
-        if let Ok((_, (_, _, _, grooming, _, _, _, _, _, _, fulfillment))) =
+        if let Ok((_, (_, _, _, grooming, _, _, _, _, _, _, fulfillment, _))) =
             cats.get_mut(groom.target)
         {
             if let Some(mut g) = grooming {
@@ -2417,6 +2443,7 @@ fn dispatch_step_action(
     personality: &Personality,
     name: &Name,
     gender: &Gender,
+    orientation: &crate::components::identity::Orientation,
     hunting_priors: &mut HuntingPriors,
     grooming: Option<&mut crate::components::grooming::GroomingCondition>,
     mood: &mut crate::components::mental::Mood,
@@ -3091,6 +3118,61 @@ fn dispatch_step_action(
                         amount: 0.03,
                     });
             }
+            outcome.result
+        }
+
+        GoapActionKind::Pair => {
+            // §7.M.1 L2 PairingActivity — sustained courtship of a
+            // Friends-bonded compatible partner. Mirrors the SocializeWith
+            // / MateWith first-tick target resolution: pick a partner via
+            // the §6.5 target-taking DSE, then drive proximity + emit
+            // `Feature::CourtshipInteraction` per adjacency tick.
+            if plan.step_state[step_idx].target_entity.is_none() {
+                let focal_hook = if ec_is_focal(ec, cat_entity) {
+                    ec.focal_capture
+                        .as_deref()
+                        .map(|cap| crate::ai::target_dse::FocalTargetHook {
+                            capture: cap,
+                            name_lookup: &|e: Entity| format!("{e:?}"),
+                        })
+                } else {
+                    None
+                };
+                plan.step_state[step_idx].target_entity =
+                    crate::ai::dses::pairing_activity_target::resolve_pairing_target(
+                        &ec.dse_registry,
+                        cat_entity,
+                        *pos,
+                        *gender,
+                        *orientation,
+                        &snaps.cat_positions,
+                        &snaps.orientations,
+                        relationships,
+                        ec.time.tick,
+                        focal_hook,
+                    );
+            }
+            let target = plan.step_state[step_idx].target_entity;
+            let target_pos = target.and_then(|t| {
+                snaps
+                    .cat_positions
+                    .iter()
+                    .find_map(|(e, p)| (*e == t).then_some(*p))
+            });
+            let outcome = crate::steps::disposition::resolve_pairing(
+                ticks,
+                cat_entity,
+                target,
+                target_pos,
+                *pos,
+                relationships,
+                &ec.constants.social,
+                d,
+            );
+            outcome.record_if_witnessed(
+                narr.activation.as_deref_mut(),
+                Feature::CourtshipInteraction,
+            );
             outcome.result
         }
 

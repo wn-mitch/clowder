@@ -63,6 +63,7 @@ fn main() {
             Action::Coordinate => "coordinate.ron",
             Action::Mentor => "mentor.ron",
             Action::Mate => "socialize.ron",
+            Action::Pair => "socialize.ron",
             Action::Caretake => "socialize.ron",
             Action::Cook => "cook.ron",
         };

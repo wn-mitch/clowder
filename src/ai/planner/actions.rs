@@ -413,6 +413,21 @@ pub fn mating_actions() -> Vec<GoapActionDef> {
     }]
 }
 
+/// §7.M.1 L2 PairingActivity (ticket 027 Bug 3) — courtship of a
+/// Friends-bonded compatible partner. The chain shape mirrors
+/// Mating's `[TravelTo(SocialTarget), Pair]` but feeds an
+/// `IncrementTrips` effect instead of `SetInteractionDone(true)`,
+/// so a held Pairing plan accumulates completion the same way
+/// Socializing does — count-based per `target_completions`.
+pub fn pairing_actions() -> Vec<GoapActionDef> {
+    vec![GoapActionDef {
+        kind: GoapActionKind::Pair,
+        cost: 2,
+        preconditions: vec![StatePredicate::ZoneIs(PlannerZone::SocialTarget)],
+        effects: vec![StateEffect::IncrementTrips],
+    }]
+}
+
 pub fn caretaking_actions() -> Vec<GoapActionDef> {
     // Phase 4c.4: two-step retrieve→feed chain. Before this fix the
     // planner emitted `[TravelTo(Stores), FeedKitten]` which silently
@@ -480,6 +495,7 @@ pub fn actions_for_disposition(
         DispositionKind::Coordinating => coordinating_actions(),
         DispositionKind::Exploring => exploring_actions(),
         DispositionKind::Mating => mating_actions(),
+        DispositionKind::Pairing => pairing_actions(),
         DispositionKind::Caretaking => caretaking_actions(),
     };
     actions.extend(domain_actions);

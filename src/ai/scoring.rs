@@ -499,6 +499,7 @@ fn active_disposition_ordinal(
         Some(DispositionKind::Exploring) => 10.0,
         Some(DispositionKind::Mating) => 11.0,
         Some(DispositionKind::Caretaking) => 12.0,
+        Some(DispositionKind::Pairing) => 13.0,
     }
 }
 
@@ -923,6 +924,20 @@ pub fn score_actions(
         let urgency = score_dse_by_id("mate", ctx, inputs);
         if urgency > 0.0 {
             scores.push((Action::Mate, urgency + jitter(rng, s.jitter_range)));
+        }
+    }
+
+    // --- Pair (§7.M.1 L2 PairingActivity, ticket 027 Bug 3) ---
+    // The pairing_activity DSE is gated by HasPairingCandidate (a
+    // Friends-bonded compat partner exists in proximity), so
+    // `score_dse_by_id` returns 0.0 when no marker is present and
+    // the action is omitted from the softmax pool. Without this call
+    // Action::Pair never enters the pool — the L2 disposition is
+    // dead-wired and cats can't reach the chain dispatcher.
+    {
+        let urgency = score_dse_by_id("pairing_activity", ctx, inputs);
+        if urgency > 0.0 {
+            scores.push((Action::Pair, urgency + jitter(rng, s.jitter_range)));
         }
     }
 

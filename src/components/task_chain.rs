@@ -139,6 +139,13 @@ pub enum StepKind {
     },
     /// Mate with target cat. ~10 ticks. Requires proximity.
     MateWith,
+    /// §7.M.1 L2 PairingActivity — sustained courtship. Requires
+    /// adjacency to target cat each interaction tick; bumps
+    /// `rel.romantic` at `SocialConstants::pairing_romantic_rate` and
+    /// emits `Feature::CourtshipInteraction`. Loops (Continue) until
+    /// the chain's count budget runs out or §7.2 commitment drops it
+    /// (target invalidated, desire drift). Externally timed.
+    Pair,
     /// Feed a dependent kitten from stores. ~10 ticks.
     FeedKitten,
     /// Retrieve an item of the given kind from a Stores building. ~5 ticks.
@@ -173,6 +180,7 @@ impl StepKind {
                 | StepKind::Survey
                 | StepKind::DeliverDirective { .. }
                 | StepKind::MateWith
+                | StepKind::Pair
                 | StepKind::FeedKitten
                 | StepKind::RetrieveFromStores { .. }
                 | StepKind::RetrieveAnyFoodFromStores

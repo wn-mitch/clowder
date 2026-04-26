@@ -341,6 +341,17 @@ pub fn generate_narrative(
                 )
             }
 
+            Action::Pair => {
+                let other = other_name.as_deref().unwrap_or("a friend");
+                let options = [
+                    format!("{cat} stays close to {other}, tail flicking."),
+                    format!("{cat} grooms beside {other} in the late sun."),
+                    format!("{cat} matches {other}'s pace through the grass."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
+
             Action::Caretake => (
                 format!("{cat} tends to a hungry kitten."),
                 NarrativeTier::Action,

@@ -4,6 +4,51 @@
 > framing retired. Changes from the draft are logged under
 > "Decisions log" below.
 
+## Landed phases (read this first)
+
+The plan body below is preserved as-authored — it remains the design
+record for phases that have not shipped yet. The items listed here have
+**landed**; sections describing them should be read as historical rather
+than as work-to-do. Verify against `docs/open-work.md` and the
+landed-work archive (`docs/open-work/landed/2026-04.md`) for canonical
+status.
+
+- **Pre-flight gates 1–6 (2026-04-19 → 2026-04-21).** Gate 3
+  ✅ `a869ef1` (2026-04-21) restored the integration test harness; the
+  underlying drift class was retired four days later by ticket 030.
+  Other gates cleared as the substrate work began.
+- **Phase 1 — §11 instrumentation scaffold.** ✅ Trace-record scaffolding
+  shipped via `c49056f` (AI decision-point trace records); focal-cat soak
+  path is stable (`just soak-trace`).
+- **Phase 3 — L2 core (§1–§4, §9, §L2.10).** ✅ Sub-phases 3a–3d landed
+  (`afe22f5` Eat reference DSE, `91e6b56` evaluator plumbing,
+  `0a25d9b`/`3254ab7`/`c32b550`/`cbca266`/`da98244`/`62ba8ec`/`0607039`
+  per-DSE peer-group ports, `60acb31` Herbcraft/PracticeMagic splits,
+  `562c575` Phase 3d Fertility, `c8bb1c6` faction stance bindings).
+  Phase 3 exit captured in `2e066b6`.
+- **Phase 4 — L2 target selection (§6, §L2.10.7).** ✅ Sub-phases
+  4a–4c landed (`c4552dc` Phase 4a softmax+modifiers, `89d6b81` 4b.2
+  marker lookup, `f009ec6` 4b.3 `TargetTakingDse`, `e5b46e5` 4b.4
+  HasGarden, `89dd832`/`80e134c`/`dadd632`/`4f74e34`/`b6fac99`/`fc5d6bd`
+  4c per-DSE target-taking ports). Per-DSE follow-ons tracked in
+  ticket 014.
+- **Pipeline unification (out-of-band, ticket 030 / 028, `b9129a1`,
+  2026-04-25).** `build_schedule` and the headless/windowed manual
+  mirror were retired in favor of `App + SimulationPlugin +
+  HeadlessIoPlugin`. Wherever this doc references `build_schedule`, the
+  manual-mirror invariant, or "register in both `build_schedule` and
+  `SimulationPlugin::build()`," **the constraint no longer exists** —
+  `SimulationPlugin::build()` is the single registration site. Inline
+  notes flag these spots.
+- **Phase 6a — §7.1–§7.3 commitment gate.** ✅ Landed merged-in-place
+  inside `resolve_goap_plans`'s per-cat loop after the 2026-04-23
+  stand-alone-system attempt failed canaries; see the Phase 6a section's
+  status block below and `src/ai/commitment.rs` module rustdoc for the
+  post-mortem and the current shape.
+
+Phases 2, 5, 6b/6c, 7, and the §7.W fulfillment pieces remain in flight
+or unstarted; their sections describe live design.
+
 ## Context
 
 The spec at `docs/systems/ai-substrate-refactor.md` (~6,450 lines, second-pass
@@ -226,6 +271,10 @@ line of L2 code lands, or every A/B comparison will be noisy.
    `docs/balance/substrate-refactor-baseline.md`.
 3. **Fix the 3 failing integration tests** (`cats_eat_when_hungry`,
    `simulation_is_deterministic`, `simulation_runs_1000_ticks_without_panic`).
+   ✅ **Landed `a869ef1` (2026-04-21).** See
+   `docs/open-work/pre-existing/test-harness-drift.md` for the resolved
+   write-up; the diagnostic and "fix" detail below describes the original
+   investigation, kept for archeology.
    Red tests are toxic to a refactor of this size. Verified root
    cause: `ColonyCenter` resource is inserted by `build_new_world`
    (`src/main.rs:1034`) but not by `tests/integration.rs::setup_world`;
@@ -277,6 +326,10 @@ fulfillment; Phase 7 is cleanup + §10 feature-queue handoff.
   candidates).
 
 ### Phase 1 — §11 instrumentation scaffold
+
+> ✅ **Landed.** Trace records (`c49056f`); focal-cat soak path stable.
+> See "Landed phases" header at top of file. Section preserved for
+> design-record continuity.
 
 **Why first:** §11 is how every subsequent phase proves concordance.
 Building the new substrate without layer traces is the "change-and-see"
@@ -347,11 +400,15 @@ slot reserved.
 
 **Critical files:**
 - `src/main.rs` — add `--focal-cat NAME` flag, `FocalTraceTarget`
-  insertion. Remember manual-mirror rule vs. `build_schedule`.
+  insertion. *(Post-030: focal-cat plumbing now lives in
+  `src/plugins/headless_io.rs`; `FocalTraceTarget`/`TraceLog`/
+  `FocalScoreCapture` are inserted there. The manual-mirror caveat
+  no longer applies — `SimulationPlugin::build()` is the single
+  registration site for the trace emitter system.)*
 - `src/resources/trace_log.rs` (new)
 - `src/systems/trace_emit.rs` (new)
-- `src/plugins/simulation.rs` + `src/main.rs::build_schedule` (manual
-  mirror)
+- `src/plugins/simulation.rs` *(post-030: sole registration site;
+  `src/main.rs::build_schedule` no longer exists)*
 - `scripts/replay_frame.py`, `scripts/frame_diff.py` (new)
 - `docs/balance/substrate-phase-1.md` (new)
 
@@ -425,6 +482,10 @@ contract).
 - `docs/balance/substrate-phase-2.md` (new)
 
 ### Phase 3 — L2 core: trait, curves, composition, modifiers, markers, Maslow pre-gate, faction (§1–§4, §9, §L2.10)
+
+> ✅ **Landed.** Sub-phases 3a–3d shipped (see "Landed phases" header for
+> commit list). Section preserved for design-record continuity; per-DSE
+> follow-ons live in ticket 014.
 
 **The critical phase.** Whole L2 substrate lands as one unit so each DSE
 reaches the new evaluator with its proper curve + composition mode at the
@@ -755,6 +816,10 @@ spec ambiguities, or pick commitment strategies. Those stay with main.
 
 ### Phase 4 — L2 target selection (§6, §7.M.2, §L2.10.7)
 
+> ✅ **Landed.** Sub-phases 4a–4c shipped (see "Landed phases" header
+> for commit list). Section preserved for design-record continuity;
+> per-DSE follow-ons live in ticket 014.
+
 **Fixes the resolver-divergence bug** (§6.2). Today `disposition.rs` ranks
 by fondness+novelty, `goap.rs` by fondness only. One `TargetTakingDse`
 owns target-quality; both paths consume its result.
@@ -939,6 +1004,12 @@ pure implementation. No spec authoring.
 
 #### 6a. Commitment layer (§7.1–§7.6)
 
+> ✅ **Resolved (post-2026-04-23):** the gate landed merged-in-place
+> inside `resolve_goap_plans`'s per-cat loop prologue rather than as a
+> stand-alone Bevy system. See `src/ai/commitment.rs` module rustdoc for
+> the current shape and the H2 bisection note that drove the reframe.
+> The 2026-04-23 attempt write-up below is preserved as the post-mortem.
+>
 > **Status (2026-04-23 PM):** **Attempted and deferred after soak
 > regression.** A parallel-fan-out draft of `src/ai/commitment.rs`
 > (BeliefProxies + should_drop_intention + strategy_for_disposition
@@ -1442,10 +1513,13 @@ Phases 3 and 4, where they must *strengthen*.
 `spec-revision/` branch, merged deliberately between phases. Mid-phase
 spec edits are a re-plan trigger, not a shortcut.
 
-**R3. Bevy 0.18 Messages/Events boundary.** Adding trace emitters and
-new messages happens in both `SimulationPlugin::build()` and headless
-`build_schedule` per CLAUDE.md ECS Rules. Mitigation: lint script greps
-for `add_message` / `register_message` asymmetry in `just ci`.
+**R3. Bevy 0.18 Messages/Events boundary.** ✅ **Risk retired by ticket
+030 (`b9129a1`, 2026-04-25).** Originally: adding trace emitters and new
+messages would have to happen in both `SimulationPlugin::build()` and
+headless `build_schedule`, with a lint script greping for
+`add_message` / `register_message` asymmetry in `just ci`. After 030,
+`SimulationPlugin::build()` is the single registration site shared by
+both hosts; `build_schedule` no longer exists.
 
 **R4. Instrumentation overhead crashing 60 TPS.** §11.2's
 focal-cat-replay strategy mitigates in design; measure in Phase 1's

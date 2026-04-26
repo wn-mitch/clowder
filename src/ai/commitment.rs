@@ -32,17 +32,26 @@
 //!
 //! # Why no stand-alone system
 //!
-//! Phase 6a shipped a `reconsider_held_intentions` system
+//! The gate runs embedded in `resolve_goap_plans`'s per-cat loop prologue
+//! (`src/systems/goap.rs:~1652`) rather than as its own scheduled system.
+//! Each held plan dispatches into `should_drop_intention`; drops batch
+//! into the existing `plans_to_remove` list and the plan is removed at
+//! the tail of `resolve_goap_plans`, with `evaluate_and_plan` selecting
+//! a replacement next tick. Searching for a `reconsider_held_intentions`
+//! system will turn up nothing — that name is only present in commit
+//! history.
+//!
+//! *History.* Phase 6a originally shipped a stand-alone
+//! `reconsider_held_intentions` system
 //! (`.after(check_anxiety_interrupts).before(evaluate_and_plan)`) that
 //! failed seed-42 canaries with a dead colony. The H2 bisection
 //! (2026-04-23 PM; `docs/open-work.md` #5) showed the gate's schedule
 //! *presence* — not its proxy logic — disrupted Bevy's ordering enough
-//! that cats stopped being re-evaluated. Merging the logic into
-//! `resolve_goap_plans`'s existing per-cat loop eliminates the new
-//! system and the corresponding `&GoapPlan` reader +
-//! `ResMut<SystemActivation>` writer + `.before(evaluate_and_plan)` edge.
-//! The semantic shifts by one tick (replacement lands next tick instead
-//! of same-tick) — ~0.7 ms at 1389 Hz, below decision cadence.
+//! that cats stopped being re-evaluated. The merged-in-place layout
+//! eliminates the extra `&GoapPlan` reader, `ResMut<SystemActivation>`
+//! writer, and `.before(evaluate_and_plan)` ordering edge. The semantic
+//! shifts by one tick (replacement lands next tick instead of same-tick)
+//! — ~0.7 ms at 1389 Hz, below decision cadence.
 //!
 //! # What §7.2's three proxies mean here (§12.3 cross-ref)
 //!
@@ -205,6 +214,12 @@ pub fn strategy_for_disposition(kind: DispositionKind) -> CommitmentStrategy {
         DispositionKind::Caretaking => SingleMinded,
         // L3 layer — goal-shaped single event.
         DispositionKind::Mating => SingleMinded,
+        // L2 layer — sustained courtship of a Friends-bonded compatible
+        // partner. OpenMinded so the §7.2 commitment gate drops the
+        // plan when desire drifts (target invalidated, mating need
+        // sated, fertile season closes). See §7.M.1 for the three-
+        // layer Mating model.
+        DispositionKind::Pairing => OpenMinded,
         // Activity-shaped — desire drift should terminate.
         DispositionKind::Socializing => OpenMinded,
         DispositionKind::Exploring => OpenMinded,
@@ -312,6 +327,12 @@ pub fn proxies_for_plan(
             // lets plans hold until the cat is genuinely sated.
             needs.social < d.social_satiation_threshold
         }
+        // L2 PairingActivity desire-drift gate. Pairing persists
+        // while the cat's mating need stays below the satiation
+        // band; once mating need drifts above (cat is sated on
+        // courtship — partner-seeking complete), the OpenMinded
+        // strategy drops the plan.
+        DispositionKind::Pairing => needs.mating < d.pairing_satiation_threshold,
         DispositionKind::Exploring => {
             // Area-familiarity proxy — the cat still wants to explore
             // when its local area feels unfamiliar.  Threshold matches
@@ -655,6 +676,7 @@ mod tests {
         assert_eq!(strategy_for_disposition(Crafting), SingleMinded);
         assert_eq!(strategy_for_disposition(Caretaking), SingleMinded);
         assert_eq!(strategy_for_disposition(Mating), SingleMinded);
+        assert_eq!(strategy_for_disposition(Pairing), OpenMinded);
         assert_eq!(strategy_for_disposition(Socializing), OpenMinded);
         assert_eq!(strategy_for_disposition(Exploring), OpenMinded);
 
@@ -672,6 +694,7 @@ mod tests {
             Crafting,
             Caretaking,
             Mating,
+            Pairing,
             Socializing,
             Exploring,
         ];

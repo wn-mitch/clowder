@@ -103,6 +103,10 @@ pub enum GoapActionKind {
     CleanseCorruption,
     HarvestCarcass,
     // Other dispositions
+    /// §7.M.1 L2 PairingActivity step (ticket 027 Bug 3) — sustained
+    /// courtship of a Friends-bonded compatible partner. Distinct from
+    /// `MateWith` (L3 single mating event); maps to `StepKind::Pair`.
+    Pair,
     MateWith,
     FeedKitten,
     /// Retrieve any food (raw OR cooked) from Stores into the adult's

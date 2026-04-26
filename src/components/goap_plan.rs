@@ -267,6 +267,7 @@ impl GoapActionKind {
                 Action::PracticeMagic
             }
             Self::MateWith => Action::Mate,
+            Self::Pair => Action::Pair,
             Self::FeedKitten | Self::RetrieveFoodForKitten => Action::Caretake,
             Self::DeliverDirective => Action::Coordinate,
             Self::ExploreSurvey => Action::Explore,

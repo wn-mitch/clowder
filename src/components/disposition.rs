@@ -57,6 +57,11 @@ pub enum DispositionKind {
     Coordinating,
     /// Explore distant tiles, survey surroundings.
     Exploring,
+    /// §7.M.1 L2 PairingActivity — sustained courtship with a
+    /// Friends-bonded compatible partner. OpenMinded activity that
+    /// drives proximity + accelerated romantic drift toward the
+    /// Partners threshold. Distinct from `Mating` (L3 goal event).
+    Pairing,
     /// Court and mate with a partner.
     Mating,
     /// Feed and groom dependent kittens.
@@ -76,6 +81,13 @@ impl DispositionKind {
                 1 + (personality.sociability * 2.0 + personality.playfulness * 1.0).round() as u32
             }
             Self::Caretaking => 1 + (personality.compassion * 2.0).round() as u32,
+            // Pairing is sustained-Activity (OpenMinded) — completion is
+            // count-based like Socializing so a courtship session has a
+            // visible upper bound, but desire drift / partner invalidation
+            // drops it earlier via §7.2 anxiety-break completion.
+            Self::Pairing => {
+                1 + (personality.sociability * 2.0 + personality.warmth * 1.0).round() as u32
+            }
             // Single-event dispositions.
             Self::Mating => return 1,
             // Chain-driven dispositions complete when their chain finishes.
@@ -104,6 +116,7 @@ impl DispositionKind {
             Action::Explore | Action::Wander => Some(Self::Exploring),
             Action::Mate => Some(Self::Mating),
             Action::Caretake => Some(Self::Caretaking),
+            Action::Pair => Some(Self::Pairing),
             Action::Idle | Action::Flee => None,
         }
     }
@@ -123,6 +136,7 @@ impl DispositionKind {
             Self::Exploring => &[Action::Explore, Action::Wander],
             Self::Mating => &[Action::Mate],
             Self::Caretaking => &[Action::Caretake],
+            Self::Pairing => &[Action::Pair],
         }
     }
 
@@ -140,6 +154,12 @@ impl DispositionKind {
         Self::Exploring,
         Self::Mating,
         Self::Caretaking,
+        // §7.M.1 L2 PairingActivity (ticket 027 Bug 3) appended at
+        // ordinal 13 to match `scoring.rs::active_disposition_ordinal`
+        // and the Patience modifier's `constituent_dses_for_ordinal`
+        // table — both append rather than insert to preserve the
+        // pre-Bug-3 ordinals on the existing 12 variants.
+        Self::Pairing,
     ];
 
     /// Human-readable label for the inspect panel.
@@ -157,6 +177,7 @@ impl DispositionKind {
             Self::Exploring => "Exploring",
             Self::Mating => "Mating",
             Self::Caretaking => "Caretaking",
+            Self::Pairing => "Pairing",
         }
     }
 
@@ -167,7 +188,7 @@ impl DispositionKind {
         match self {
             Self::Resting | Self::Hunting | Self::Foraging => 1,
             Self::Guarding => 2,
-            Self::Socializing | Self::Caretaking | Self::Mating => 3,
+            Self::Socializing | Self::Caretaking | Self::Mating | Self::Pairing => 3,
             Self::Crafting | Self::Coordinating | Self::Building | Self::Farming => 4,
             Self::Exploring => 5,
         }
@@ -188,6 +209,7 @@ impl DispositionKind {
             Self::Exploring => "explore",
             Self::Mating => "find a mate",
             Self::Caretaking => "tend the young",
+            Self::Pairing => "court a partner",
         }
     }
 }
@@ -396,6 +418,39 @@ mod tests {
         assert_eq!(
             DispositionKind::from_action(Action::Build),
             Some(DispositionKind::Building)
+        );
+        // §7.M.1 L2 / L3 split — Action::Mate routes to L3 Mating;
+        // Action::Pair routes to the new L2 Pairing disposition.
+        assert_eq!(
+            DispositionKind::from_action(Action::Mate),
+            Some(DispositionKind::Mating)
+        );
+        assert_eq!(
+            DispositionKind::from_action(Action::Pair),
+            Some(DispositionKind::Pairing)
+        );
+    }
+
+    #[test]
+    fn pairing_target_completions_scales_with_sociability_and_warmth() {
+        let cold_loner = Personality {
+            sociability: 0.0,
+            warmth: 0.0,
+            ..test_personality()
+        };
+        let warm_social = Personality {
+            sociability: 1.0,
+            warmth: 1.0,
+            ..test_personality()
+        };
+        // 1 + (0*2 + 0*1) + patience(1) = 2 vs. 1 + (1*2 + 1*1) + patience(1) = 5.
+        assert_eq!(
+            DispositionKind::Pairing.target_completions(&cold_loner),
+            2
+        );
+        assert_eq!(
+            DispositionKind::Pairing.target_completions(&warm_social),
+            5
         );
     }
 

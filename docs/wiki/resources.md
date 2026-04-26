@@ -2,7 +2,7 @@
 
 # Resources
 
-33 resource types derived from `#[derive(Resource)]`.
+34 resource types derived from `#[derive(Resource)]`.
 
 ## `src/components/coordination.rs`
 
@@ -242,6 +242,7 @@
 | `world_gen` | `WorldGenConstants` |
 | `sensory` | `SensoryConstants` |
 | `fertility` | `FertilityConstants` |
+| `fulfillment` | `FulfillmentConstants` |
 
 ## `src/resources/snapshot_config.rs`
 
@@ -318,6 +319,14 @@
 | `entries` | `VecDeque<TraceEntry>` |
 | `capacity` | `usize` |
 | `total_pushed` | `u64` |
+
+### FocalScoreCapture (struct)
+
+> Per-tick focal-cat scoring capture. Populated during `evaluate_and_plan` / `cat_presence_tick` (whichever system's scoring pass runs for a given cat); drained and cleared by `emit_focal_trace`.  The `Mutex` wrapper lets `EvalInputs` carry an immutable reference that nonetheless mutates the capture — Bevy's `Resource` trait requires `Send + Sync`, which rules out `RefCell`. The mutex is uncontended in the single-threaded scoring path (no second writer within a tick); the lock cost is negligible relative to the scoring it guards. Making this a `Resource` means the plugin / main.rs insert it once per run (alongside `FocalTraceTarget` + `TraceLog`) and the capture persists across the system boundary from scoring to emission.
+
+| Field | Type |
+|-------|------|
+| `inner` | `Mutex<FocalScoreCaptureInner>` |
 
 ## `src/resources/unmet_demand.rs`
 

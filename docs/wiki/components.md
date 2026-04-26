@@ -2,7 +2,7 @@
 
 # Components
 
-127 component types derived from `#[derive(Component)]`.
+129 component types derived from `#[derive(Component)]`.
 
 ## `src/components/aspirations.rs`
 
@@ -270,6 +270,16 @@
 | `grid_h` | `usize` |
 | `bucket_size` | `i32` |
 
+## `src/components/fulfillment.rs`
+
+### Fulfillment (struct)
+
+> Per-cat fulfillment register. Architecturally distinct from `Needs` — fulfillment sits *above* Maslow in priority (a cat can be physically comfortable and socially starved) and is morally silent (the framework doesn't label any axis as pathological).  All values are `f32` in `[0.0, 1.0]` where 1.0 = fully satisfied.
+
+| Field | Type |
+|-------|------|
+| `social_warmth` | `f32` |
+
 ## `src/components/goap_plan.rs`
 
 ### GoapPlan (struct)
@@ -468,7 +478,7 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 ### Incapacitated (struct)
 
-> Severe unhealed injury — downed. `needs.rs::update_incapacitation`. Used as the eligibility gate that retires the §2.3 incapacitated branch: `Q<_, With<Incapacitated>>` picks the narrow DSE set (Eat, Sleep, Idle); every other DSE uses `Without<Incapacitated>`.
+> Severe unhealed injury — downed. `systems::incapacitation::update_incapacitation`. Used as the eligibility gate that retires the §2.3 incapacitated branch: `Q<_, With<Incapacitated>>` picks the narrow DSE set (Eat, Sleep, Idle); every other DSE uses `Without<Incapacitated>`.
 
 ### Injured (struct)
 
@@ -502,7 +512,7 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 ### HasHerbsInInventory (struct)
 
-> Authoring: `items.rs::update_inventory_markers` (with `Changed<Inventory>` filter for per-tick cost).
+> Authoring: `items.rs::update_inventory_markers`.
 
 ### HasRemedyHerbs (struct)
 
@@ -551,6 +561,10 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 ### HasEligibleMate (struct)
 
 > Orientation-compatible partner with Partners+ bond exists. `mating.rs::update_mate_eligibility_markers`.
+
+### HasPairingCandidate (struct)
+
+> Orientation-compatible partner with `Friends`-tier bond exists in proximity (§7.M.1 L2 PairingActivity gate). Distinct from `HasEligibleMate` (Partners/Mates bond). Authored by `pairing.rs::update_pairing_candidate_markers`.
 
 ### IsParentOfHungryKitten (struct)
 

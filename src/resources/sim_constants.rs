@@ -537,6 +537,16 @@ pub struct SocialConstants {
     pub courtship_romantic_rate: f32,
     pub courtship_fondness_gate: f32,
     pub courtship_familiarity_gate: f32,
+    // --- §7.M.1 L2 PairingActivity (ticket 027 Bug 3) ---
+    // Active courtship escalates Friends → Partners by holding compatible
+    // adults colocated. When `resolve_pairing` finds the partner adjacent
+    // (Manhattan ≤ `pairing_proximity_threshold`), it bumps `rel.romantic`
+    // at `pairing_romantic_rate` per interaction tick — distinct from the
+    // passive `courtship_romantic_rate` that ticks at `bond_check_interval`
+    // cadence regardless of distance. Candidate-pool range is
+    // `PAIRING_TARGET_RANGE` (DSE-level const, mirrors `MATE_TARGET_RANGE`).
+    pub pairing_proximity_threshold: i32,
+    pub pairing_romantic_rate: f32,
 }
 
 impl Default for SocialConstants {
@@ -571,6 +581,15 @@ impl Default for SocialConstants {
             courtship_romantic_rate: 0.0025,
             courtship_fondness_gate: 0.3,
             courtship_familiarity_gate: 0.4,
+            // Adjacency (Manhattan ≤ 1) to count as an "interaction tick".
+            // Same threshold socialize/groom-other use for in-range work.
+            pairing_proximity_threshold: 1,
+            // 3× courtship_romantic_rate. Active courtship is roughly
+            // three times faster than passive drift; combined with
+            // adjacency-only firing this still requires sustained
+            // presence (cats wandering off lose the rate). Tuning
+            // deferred to post-Bug-3 baseline (ticket 027 "Out of scope").
+            pairing_romantic_rate: 0.0075,
         }
     }
 }
@@ -1506,6 +1525,15 @@ pub struct DispositionConstants {
     pub socialize_colony_absorb_rate: f32,
     pub socialize_personal_learn_rate: f32,
     pub socialize_duration: u64,
+    /// §7.M.1 L2 PairingActivity step duration in ticks. Each `Pair`
+    /// step session runs for this many ticks (Continue while
+    /// adjacent), then Advances and counts toward the disposition's
+    /// `target_completions` budget. Tuned ~80 (between socialize 100
+    /// and groom-other 80) so a courting pair completes ~3 sessions
+    /// per disposition adoption — enough to push `rel.romantic` from
+    /// the Friends floor toward the Partners threshold without
+    /// monopolizing the disposition's entire window.
+    pub pair_duration: u64,
     pub groom_other_social_per_tick: f32,
     pub groom_other_fondness_per_tick: f32,
     pub groom_other_familiarity_per_tick: f32,
@@ -1662,6 +1690,15 @@ pub struct DispositionConstants {
     /// genuinely sated, allowing TravelTo + SocializeWith to complete.
     #[serde(default = "default_social_satiation_threshold")]
     pub social_satiation_threshold: f32,
+    /// L2 PairingActivity desire-drift gate (§7.M.1, ticket 027 Bug 3).
+    /// `still_goal` for a held Pairing plan stays true while
+    /// `needs.mating < pairing_satiation_threshold`; once drained
+    /// past this point the OpenMinded commitment drops the plan and
+    /// the cat re-evaluates. Mirrors `mating_interest_threshold` in
+    /// purpose but lives on `DispositionConstants` to keep the
+    /// commitment-layer signature scoped.
+    #[serde(default = "default_pairing_satiation_threshold")]
+    pub pairing_satiation_threshold: f32,
     pub explore_den_discovery_chance: f32,
     pub deliver_directive_duration: u64,
     pub deliver_directive_respect_gain: f32,
@@ -2045,6 +2082,7 @@ impl Default for DispositionConstants {
             socialize_colony_absorb_rate: 0.005,
             socialize_personal_learn_rate: 0.01,
             socialize_duration: 100,
+            pair_duration: 80,
             groom_other_social_per_tick: 0.002,
             groom_other_fondness_per_tick: 0.0008,
             groom_other_familiarity_per_tick: 0.0003,
@@ -2105,6 +2143,7 @@ impl Default for DispositionConstants {
             explore_perception_radius: default_explore_perception_radius(),
             explore_satiation_threshold: default_explore_satiation_threshold(),
             social_satiation_threshold: default_social_satiation_threshold(),
+            pairing_satiation_threshold: default_pairing_satiation_threshold(),
             explore_den_discovery_chance: 0.08,
             deliver_directive_duration: 50,
             deliver_directive_respect_gain: 0.005,
@@ -2675,6 +2714,12 @@ fn default_explore_satiation_threshold() -> f32 {
 
 fn default_social_satiation_threshold() -> f32 {
     0.85
+}
+
+fn default_pairing_satiation_threshold() -> f32 {
+    // Same operational meaning as `mating_interest_threshold` (0.6) —
+    // courtship loses interest when mating need climbs above this band.
+    0.6
 }
 
 // --- Iteration 2 of `docs/balance/acceptance-restoration.md` —

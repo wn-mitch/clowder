@@ -106,6 +106,7 @@ const MAGIC_COMMUNE: &str = "magic_commune";
 const COORDINATE: &str = "coordinate";
 const MENTOR: &str = "mentor";
 const MATE: &str = "mate";
+const PAIRING_ACTIVITY: &str = "pairing_activity";
 const CARETAKE: &str = "caretake";
 const IDLE: &str = "idle";
 
@@ -399,6 +400,9 @@ fn constituent_dses_for_ordinal(ordinal: f32) -> Option<&'static [&'static str]>
         11 => Some(&[MATE]),
         // Caretaking → Caretake.
         12 => Some(&[CARETAKE]),
+        // Pairing → PairingActivity (the L2 self-state DSE; the
+        // target-taking sibling is not score-contributing).
+        13 => Some(&[PAIRING_ACTIVITY]),
         _ => None,
     }
 }
@@ -1093,6 +1097,7 @@ mod tests {
                 Action::Coordinate => &[COORDINATE],
                 Action::Mentor => &[MENTOR],
                 Action::Mate => &[MATE],
+                Action::Pair => &[PAIRING_ACTIVITY],
                 Action::Caretake => &[CARETAKE],
                 Action::Cook => &[COOK],
                 Action::Idle => &[IDLE],

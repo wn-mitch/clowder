@@ -14,6 +14,7 @@ pub mod hawk_planner;
 pub mod hawk_scoring;
 pub mod mating;
 pub mod modifier;
+pub mod pairing;
 pub mod pathfinding;
 pub mod planner;
 pub mod scoring;
@@ -55,6 +56,11 @@ pub enum Action {
     /// Prepare raw food at a Kitchen structure, transforming it into a cooked
     /// item that restores more hunger when eaten. Fulfillment-tier.
     Cook,
+    /// §7.M.1 L2 PairingActivity — sustained courtship with a
+    /// Friends-bonded compatible partner. Distinct from `Action::Mate`
+    /// (the L3 mating goal event). Drives proximity and accelerated
+    /// `rel.romantic` accumulation toward the Partners threshold.
+    Pair,
 }
 
 // ---------------------------------------------------------------------------

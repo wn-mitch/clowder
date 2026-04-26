@@ -45,6 +45,8 @@ pub mod mate;
 pub mod mate_target;
 pub mod mentor;
 pub mod mentor_target;
+pub mod pairing_activity;
+pub mod pairing_activity_target;
 pub mod patrol;
 pub mod practice_magic;
 pub mod sleep;
@@ -95,6 +97,8 @@ pub use mate::mate_dse;
 pub use mate_target::mate_target_dse;
 pub use mentor::mentor_dse;
 pub use mentor_target::mentor_target_dse;
+pub use pairing_activity::pairing_activity_dse;
+pub use pairing_activity_target::{pairing_activity_target_dse, resolve_pairing_target};
 pub use patrol::patrol_dse;
 pub use practice_magic::{
     cleanse_dse, colony_cleanse_dse, commune_dse, durable_ward_dse, harvest_dse, scry_dse,

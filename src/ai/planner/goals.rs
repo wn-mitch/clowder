@@ -36,6 +36,7 @@ pub fn goal_for_disposition(kind: DispositionKind, current_trips: u32) -> GoalSt
         | DispositionKind::Farming
         | DispositionKind::Crafting
         | DispositionKind::Exploring
+        | DispositionKind::Pairing
         | DispositionKind::Caretaking => GoalState {
             predicates: vec![StatePredicate::TripsAtLeast(current_trips + 1)],
         },

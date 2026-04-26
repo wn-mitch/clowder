@@ -8,10 +8,10 @@ Auto-generated reference for the Clowder cat colony simulation.
 
 | Metric | Count |
 |--------|-------|
-| Registered system functions | 100 |
-| System modules | 32 |
-| Component types | 127 |
-| Resource types | 33 |
+| Registered system functions | 111 |
+| System modules | 35 |
+| Component types | 129 |
+| Resource types | 34 |
 | Message types | 3 |
 | Prey species | 5 |
 | Gameplay enums | 24 |
@@ -22,7 +22,7 @@ Auto-generated reference for the Clowder cat colony simulation.
 |--------|-------|
 | Built | 4 |
 | Partial | 1 |
-| Aspirational | 22 |
+| Aspirational | 26 |
 
 ## Pages
 

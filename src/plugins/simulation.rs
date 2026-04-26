@@ -42,6 +42,15 @@ pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConsta
         .push(dses::caretake_target_dse());
     registry.cat_dses.push(dses::mate_dse());
     registry.target_taking_dses.push(dses::mate_target_dse());
+    // §7.M.1 L2 PairingActivity (ticket 027 Bug 3) — sustained courtship
+    // with a Friends-bonded compatible partner. Sibling pair to mate*
+    // above; `pairing_activity_dse` owns the desire (mating-deficit),
+    // `pairing_activity_target_dse` owns partner selection (Friends-bond
+    // filter, fondness/romantic/distance scoring).
+    registry.cat_dses.push(dses::pairing_activity_dse());
+    registry
+        .target_taking_dses
+        .push(dses::pairing_activity_target_dse());
     registry.cat_dses.push(dses::patrol_dse(scoring));
     registry.cat_dses.push(dses::build_dse(scoring));
     registry.target_taking_dses.push(dses::build_target_dse());
@@ -85,8 +94,8 @@ pub fn register_dses_at_startup(
     commands.insert_resource(default_modifier_pipeline(scoring));
 }
 
-/// Registers all simulation systems on `FixedUpdate` in the same order as the
-/// original `build_schedule()`.
+/// Registers all simulation systems on `FixedUpdate`. Sole authoritative
+/// schedule definition shared by both hosts (windowed App and headless App).
 ///
 /// Four chained groups run sequentially:
 ///   1. World simulation (weather, corruption, wildlife, buildings, items)
@@ -101,10 +110,10 @@ pub struct SimulationPlugin;
 impl Plugin for SimulationPlugin {
     fn build(&self, app: &mut App) {
         // World construction — terrain, cats, all sim resources. Owned
-        // by the plugin so any host (windowed App, headless App in
-        // ticket 030) gets the simulation populated by adding the
-        // single plugin. The system reads `AppArgs` (seed, load_path,
-        // …) which the host inserts before `add_plugins`.
+        // by the plugin so any host (windowed App, headless App) gets
+        // the simulation populated by adding the single plugin. The
+        // system reads `AppArgs` (seed, load_path, …) which the host
+        // inserts before `add_plugins`.
         app.add_systems(Startup, crate::plugins::setup::setup_world_exclusive);
 
         // Register personality event observers (cascade handlers).
@@ -229,6 +238,13 @@ impl Plugin for SimulationPlugin {
                             // marker, so the DSE returns 0.0 for cats
                             // whose gate is closed.
                             crate::ai::mating::update_mate_eligibility_markers,
+                            // §7.M.1 L2 — `HasPairingCandidate` marker
+                            // (ticket 027 Bug 3). Reads orientation +
+                            // life-stage + Friends bond + proximity
+                            // and writes `HasPairingCandidate`.
+                            // `PairingActivityDse::eligibility()`
+                            // requires this marker.
+                            crate::ai::pairing::update_pairing_candidate_markers,
                             // §4 batch 2: capability markers — reads
                             // life-stage, injury, inventory markers
                             // authored above.
@@ -379,11 +395,11 @@ impl Plugin for SimulationPlugin {
         );
 
         // §11 trace emitter — headless-only in practice. Gated on
-        // FocalTraceTarget + TraceLog resources; neither is inserted by
-        // the interactive setup path, so this system never fires outside
-        // headless runs that pass --focal-cat. Registered here (not just
-        // in build_schedule) to satisfy the manual-mirror invariant in
-        // CLAUDE.md's Headless Mode section.
+        // FocalTraceTarget + TraceLog + FocalScoreCapture resources;
+        // none of the three is inserted by the windowed setup path, so
+        // this system never fires outside headless runs that pass
+        // --focal-cat (HeadlessIoPlugin inserts them when the focal-cat
+        // arg is present).
         app.add_systems(
             FixedUpdate,
             systems::trace_emit::emit_focal_trace

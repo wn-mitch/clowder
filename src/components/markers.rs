@@ -286,6 +286,16 @@ impl HasEligibleMate {
     pub const KEY: &str = "HasEligibleMate";
 }
 
+/// Orientation-compatible partner with `Friends`-tier bond exists in
+/// proximity (§7.M.1 L2 PairingActivity gate). Distinct from
+/// `HasEligibleMate` (Partners/Mates bond). Authored by
+/// `pairing.rs::update_pairing_candidate_markers`.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasPairingCandidate;
+impl HasPairingCandidate {
+    pub const KEY: &str = "HasPairingCandidate";
+}
+
 /// Cat is the parent side of a `KittenDependency` whose kitten's
 /// hunger exceeds threshold.
 /// `growth.rs::update_parent_hungry_kitten_markers`.
