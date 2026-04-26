@@ -726,6 +726,11 @@ impl Default for FounderAgeConstants {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PreyConstants {
     pub detection_base_chance: f32,
+    /// Per-prey detection-roll cadence in ticks (ticket 002 lever 2).
+    /// `try_detect_cat` rolls every Nth prey-AI tick (staggered per-prey
+    /// via `PreyState.detection_cooldown_ticks`) instead of every tick.
+    /// Default 3.
+    pub detection_cadence_ticks: u8,
     pub alertness_base: f32,
     pub alertness_range: f32,
     pub alertness_recovery: f32,
@@ -807,6 +812,7 @@ impl Default for PreyConstants {
     fn default() -> Self {
         Self {
             detection_base_chance: 0.10,
+            detection_cadence_ticks: 3,
             alertness_base: 0.5,
             alertness_range: 0.5,
             alertness_recovery: 0.005,

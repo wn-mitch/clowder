@@ -79,6 +79,26 @@ fn find_nearby_habitat_tile(
 /// on the prey's sight channel (Linear falloff). The Bernoulli gate
 /// stays here; alertness and vigilance remain prey-state-dependent
 /// factors outside the sensory model.
+/// Per-prey detection-cooldown gate (ticket 002 lever 2).
+///
+/// Returns `true` if a detection roll should fire this tick (and resets
+/// the cooldown to `cadence - 1` so the next `cadence - 1` calls skip).
+/// Returns `false` if the cooldown is still counting down — the caller
+/// should skip the roll. Cooldown is decremented in the false branch.
+///
+/// The reset is unconditional once the gate opens — a cat passing
+/// through a prey's alert radius doesn't get a free run by virtue of
+/// the roll returning `None` previously. Cadence 0 and 1 both reduce
+/// to "fire every call" via `saturating_sub(1)`.
+fn consume_detection_cooldown(cooldown: &mut u8, cadence: u8) -> bool {
+    if *cooldown > 0 {
+        *cooldown -= 1;
+        return false;
+    }
+    *cooldown = cadence.saturating_sub(1);
+    true
+}
+
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn try_detect_cat(
     pos: &Position,
@@ -90,9 +110,16 @@ fn try_detect_cat(
     detection_base_chance: f32,
     alertness_base: f32,
     alertness_range: f32,
+    detection_cooldown_ticks: &mut u8,
+    detection_cadence_ticks: u8,
     cat_positions: &Query<(Entity, &Position), (With<Needs>, Without<Dead>, Without<PreyAnimal>)>,
     rng: &mut SimRng,
 ) -> Option<Entity> {
+    // Ticket 002 lever 2: per-prey detection cooldown gate. Skip when
+    // it returns false; the cooldown was decremented in that case.
+    if !consume_detection_cooldown(detection_cooldown_ticks, detection_cadence_ticks) {
+        return None;
+    }
     for (entity, cat_pos) in cat_positions.iter() {
         let proximity = crate::systems::sensing::prey_cat_proximity(
             *pos,
@@ -239,6 +266,8 @@ pub fn prey_ai(
                     p.detection_base_chance,
                     p.alertness_base,
                     p.alertness_range,
+                    &mut state.detection_cooldown_ticks,
+                    p.detection_cadence_ticks,
                     &cat_positions,
                     &mut rng,
                 ) {
@@ -292,6 +321,8 @@ pub fn prey_ai(
                     p.detection_base_chance,
                     p.alertness_base,
                     p.alertness_range,
+                    &mut state.detection_cooldown_ticks,
+                    p.detection_cadence_ticks,
                     &cat_positions,
                     &mut rng,
                 ) {
@@ -1340,6 +1371,15 @@ mod tests {
     fn prey_alert_detects_nearby_cat() {
         let (mut world, mut schedule) = setup_ai();
 
+        // Ticket 002 lever 2: this test exercises the detection-roll path,
+        // not the cadence gate (which has its own dedicated tests). Reset
+        // the cadence to 1 so every tick rolls — keeps the original
+        // assertion timing meaningful before the rabbit wanders out of
+        // alert radius.
+        let mut constants = world.resource::<SimConstants>().clone();
+        constants.prey.detection_cadence_ticks = 1;
+        world.insert_resource(constants);
+
         // Spawn a "cat" (needs Needs component for detection).
         world.spawn((Needs::default(), Health::default(), Position::new(10, 10)));
 
@@ -1528,5 +1568,46 @@ mod tests {
             den_count, 1,
             "den should persist after depletion (refills naturally)"
         );
+    }
+
+    // --- ticket 002 lever 2: detection-cooldown gate ---
+
+    #[test]
+    fn detection_cooldown_fires_at_cadence_and_skips_between() {
+        // Ticket 002 lever 2: cadence = 3 means roll fires once, then two
+        // skipped calls, then roll again. Sequence verifies the staggered
+        // pattern across the cycle.
+        let mut cooldown = 0u8;
+        let cadence = 3u8;
+
+        // Initial state: cooldown 0, gate fires; resets to cadence - 1 = 2.
+        assert!(consume_detection_cooldown(&mut cooldown, cadence));
+        assert_eq!(cooldown, 2);
+
+        // Cooldown decrements on each gated call.
+        assert!(!consume_detection_cooldown(&mut cooldown, cadence));
+        assert_eq!(cooldown, 1);
+        assert!(!consume_detection_cooldown(&mut cooldown, cadence));
+        assert_eq!(cooldown, 0);
+
+        // Back to 0 → next call fires.
+        assert!(consume_detection_cooldown(&mut cooldown, cadence));
+        assert_eq!(cooldown, 2);
+    }
+
+    #[test]
+    fn detection_cooldown_cadence_zero_or_one_fires_every_call() {
+        // Cadence 0 and 1 both reduce to "no skip" — saturating_sub(1)
+        // keeps cooldown at 0 after each fire so every call rolls.
+        for cadence in [0u8, 1u8] {
+            let mut cooldown = 0u8;
+            for _ in 0..5 {
+                assert!(
+                    consume_detection_cooldown(&mut cooldown, cadence),
+                    "cadence={cadence} should fire on every call"
+                );
+                assert_eq!(cooldown, 0);
+            }
+        }
     }
 }

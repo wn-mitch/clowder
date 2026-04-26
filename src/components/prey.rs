@@ -107,6 +107,13 @@ pub struct PreyState {
     /// lookups of predation pressure, flee direction, and roaming limits.
     #[serde(skip, default)]
     pub home_den: Option<Entity>,
+    /// Per-prey detection-roll cooldown (ticket 002 lever 2). Decrements
+    /// every prey-AI tick; the detection roll fires only when this hits 0
+    /// and resets to `prey.detection_cadence_ticks - 1`. Staggered across
+    /// prey, so detect-and-bolt events don't synchronize into waves the
+    /// way a tick-modulo gate would.
+    #[serde(skip, default)]
+    pub detection_cooldown_ticks: u8,
 }
 
 impl Default for PreyState {
@@ -116,6 +123,7 @@ impl Default for PreyState {
             alertness: 0.0,
             ai_state: PreyAiState::Idle,
             home_den: None,
+            detection_cooldown_ticks: 0,
         }
     }
 }
