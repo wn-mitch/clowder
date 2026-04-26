@@ -31,7 +31,7 @@ use crate::resources::event_log::EventLog;
 use crate::resources::map::TileMap;
 use crate::resources::narrative::NarrativeLog;
 use crate::resources::sim_constants::SimConstants;
-use crate::resources::time::{SimConfig, TimeState};
+use crate::resources::time::{SimConfig, TimeScale, TimeState};
 use crate::resources::trace_log::TraceLog;
 use crate::resources::weather::Weather;
 use crate::resources::{FocalScoreCapture, FocalTraceTarget};
@@ -251,6 +251,7 @@ pub fn write_jsonl_headers(
     config: Res<HeadlessConfig>,
     sim_constants: Res<SimConstants>,
     sim_config: Res<SimConfig>,
+    time_scale: Res<TimeScale>,
     tile_map: Res<TileMap>,
     mut narrative_writer: ResMut<NarrativeJsonlWriter>,
     mut event_writer: ResMut<EventJsonlWriter>,
@@ -284,6 +285,15 @@ pub fn write_jsonl_headers(
         eprintln!("Warning: failed to write narrative header: {e}");
     }
 
+    // Real-time peg (ticket 033). Two runs are only behaviorally
+    // comparable iff their `constants` block matches AND
+    // `wall_seconds_per_game_day` matches — `tick_rate_hz` is a
+    // dependent value, redundant with the peg, but emitted for
+    // downstream tooling that wants to convert tick deltas to
+    // wall-clock without knowing the formula.
+    let wall_seconds_per_game_day = time_scale.wall_seconds_per_game_day();
+    let tick_rate_hz = time_scale.tick_rate_hz();
+
     // Events: full header with constants + map size.
     let event_header = serde_json::json!({
         "_header": true,
@@ -294,6 +304,8 @@ pub fn write_jsonl_headers(
         "commit_dirty": commit_dirty,
         "commit_time": commit_time,
         "sim_config": sim_config_json,
+        "wall_seconds_per_game_day": wall_seconds_per_game_day,
+        "tick_rate_hz": tick_rate_hz,
         "map_width": tile_map.width,
         "map_height": tile_map.height,
         "constants": constants_json,
@@ -320,6 +332,8 @@ pub fn write_jsonl_headers(
             "commit_dirty": commit_dirty,
             "commit_time": commit_time,
             "sim_config": sim_config_json,
+            "wall_seconds_per_game_day": wall_seconds_per_game_day,
+            "tick_rate_hz": tick_rate_hz,
             "map_width": tile_map.width,
             "map_height": tile_map.height,
             "constants": constants_json,

@@ -42,6 +42,80 @@ impl Default for SimConfig {
 }
 
 // ---------------------------------------------------------------------------
+// TimeScale
+// ---------------------------------------------------------------------------
+
+/// The single anchor connecting in-game time to wall-clock time.
+///
+/// Holds two facts:
+/// 1. The in-game tick scale (`ticks_per_day`, `ticks_per_season`),
+///    derived from [`SimConfig`].
+/// 2. The user-facing real-time peg `wall_seconds_per_game_day` —
+///    "how many wall-clock seconds equal one in-game day."
+///
+/// The headless build's `Time<Fixed>` Hz and the windowed build's
+/// `sync_sim_speed` both derive their tick rate from
+/// [`TimeScale::tick_rate_hz`]. Two runs are only behaviorally
+/// comparable iff their `TimeScale` matches.
+///
+/// Inserted as a [`Resource`] by the host (headless `run_headless` from
+/// the `--game-day-seconds N` CLI flag; windowed `main` from
+/// [`SimSpeed`]). Consumed by the typed-units module
+/// [`super::time_units`] to convert per-day rates / day-durations /
+/// per-day intervals into raw tick values.
+///
+/// See `docs/systems/time-anchor.md` for the canonical reference.
+#[derive(Resource, Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct TimeScale {
+    ticks_per_day: u64,
+    ticks_per_season: u64,
+    wall_seconds_per_game_day: f32,
+}
+
+impl TimeScale {
+    /// Build a [`TimeScale`] from the live [`SimConfig`] and a
+    /// host-supplied real-time peg.
+    pub fn from_config(config: &SimConfig, wall_seconds_per_game_day: f32) -> Self {
+        Self {
+            ticks_per_day: config.ticks_per_day_phase * 4,
+            ticks_per_season: config.ticks_per_season,
+            wall_seconds_per_game_day,
+        }
+    }
+
+    pub fn ticks_per_day(&self) -> u64 {
+        self.ticks_per_day
+    }
+
+    pub fn ticks_per_season(&self) -> u64 {
+        self.ticks_per_season
+    }
+
+    pub fn wall_seconds_per_game_day(&self) -> f32 {
+        self.wall_seconds_per_game_day
+    }
+
+    /// Mutate the real-time peg without rebuilding the resource.
+    /// Used by the windowed build's `sync_sim_speed` when [`SimSpeed`]
+    /// changes.
+    pub fn set_wall_seconds_per_game_day(&mut self, secs: f32) {
+        self.wall_seconds_per_game_day = secs;
+    }
+
+    /// Tick rate in Hz: how many ticks the [`Time<Fixed>`] schedule
+    /// must advance per wall-clock second to honor the peg.
+    pub fn tick_rate_hz(&self) -> f32 {
+        // Guard against pathological pegs; minimum 1 Hz so neither
+        // headless nor windowed grinds to zero on an inadvertent
+        // `--game-day-seconds 0`.
+        if self.wall_seconds_per_game_day <= 0.0 {
+            return 1.0;
+        }
+        self.ticks_per_day as f32 / self.wall_seconds_per_game_day
+    }
+}
+
+// ---------------------------------------------------------------------------
 // DayPhase
 // ---------------------------------------------------------------------------
 
@@ -192,6 +266,16 @@ impl SimSpeed {
             Self::VeryFast => Self::Normal,
         }
     }
+
+    /// Map a speed preset to a `wall_seconds_per_game_day` peg given a
+    /// fixed tick scale (1000 ticks/day at default). Inverts
+    /// [`Self::ticks_per_second`]: Normal = 1 Hz means 1000 wall-secs
+    /// per in-game day, Fast = 5 Hz means 200 wall-secs/day, VeryFast
+    /// = 20 Hz means 50 wall-secs/day.
+    pub fn wall_seconds_per_game_day(self, config: &SimConfig) -> f32 {
+        let ticks_per_day = (config.ticks_per_day_phase * 4) as f32;
+        ticks_per_day / self.ticks_per_second() as f32
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -306,6 +390,45 @@ mod tests {
         assert!((TimeState::day_progress(999, &config) - 0.999).abs() < 1e-6);
         // Wraps at day boundary
         assert!((TimeState::day_progress(1000, &config) - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn time_scale_derives_ticks_per_day_from_config() {
+        let config = SimConfig::default();
+        let ts = TimeScale::from_config(&config, 16.6667);
+        assert_eq!(ts.ticks_per_day(), 1000);
+        assert_eq!(ts.ticks_per_season(), 20_000);
+    }
+
+    #[test]
+    fn time_scale_tick_rate_hz_default() {
+        let config = SimConfig::default();
+        // Default headless peg: 16.6667s/day → 60 Hz.
+        let ts = TimeScale::from_config(&config, 16.6667);
+        assert!((ts.tick_rate_hz() - 60.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn time_scale_tick_rate_hz_windowed_normal() {
+        let config = SimConfig::default();
+        // Windowed Normal: 1000s/day → 1 Hz, preserves prior behavior.
+        let ts = TimeScale::from_config(&config, 1000.0);
+        assert!((ts.tick_rate_hz() - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn time_scale_clamps_zero_peg_to_one_hz() {
+        let config = SimConfig::default();
+        let ts = TimeScale::from_config(&config, 0.0);
+        assert_eq!(ts.tick_rate_hz(), 1.0);
+    }
+
+    #[test]
+    fn sim_speed_wall_seconds_inverts_ticks_per_second() {
+        let config = SimConfig::default();
+        assert!((SimSpeed::Normal.wall_seconds_per_game_day(&config) - 1000.0).abs() < 1e-6);
+        assert!((SimSpeed::Fast.wall_seconds_per_game_day(&config) - 200.0).abs() < 1e-6);
+        assert!((SimSpeed::VeryFast.wall_seconds_per_game_day(&config) - 50.0).abs() < 1e-6);
     }
 
     #[test]

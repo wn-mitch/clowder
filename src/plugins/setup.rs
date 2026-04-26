@@ -12,7 +12,8 @@ use crate::components::skills::{Corruption, MagicAffinity, Training};
 use crate::persistence;
 use crate::resources::{
     ColonyHuntingMap, ColonyKnowledge, ColonyPriority, EventLog, FoodStores, NarrativeLog,
-    NarrativeTier, Relationships, SimConfig, SimRng, TemplateRegistry, TimeState, WeatherState,
+    NarrativeTier, Relationships, SimConfig, SimRng, TemplateRegistry, TimeScale, TimeState,
+    WeatherState,
 };
 use crate::world_gen::colony::{
     find_colony_site, generate_starting_cats, spawn_starting_buildings,
@@ -27,6 +28,11 @@ pub struct AppArgs {
     pub load_path: Option<PathBuf>,
     pub load_log_path: Option<PathBuf>,
     pub test_map: bool,
+    /// Wall-seconds-per-in-game-day peg used to construct [`TimeScale`]
+    /// during Startup. Headless: from `--game-day-seconds`. Windowed:
+    /// derived from the initial `SimSpeed` (Normal → 1000s/day at the
+    /// 1000-ticks/day default). Ticket 033.
+    pub wall_seconds_per_game_day: f32,
 }
 
 /// Exclusive startup system — has direct `&mut World` access for complex
@@ -36,6 +42,7 @@ pub fn setup_world_exclusive(world: &mut World) {
     let args_load_path;
     let args_load_log_path;
     let args_test_map;
+    let args_wall_seconds_per_game_day;
 
     // Extract args before mutating world.
     {
@@ -44,6 +51,7 @@ pub fn setup_world_exclusive(world: &mut World) {
         args_load_path = args.load_path.clone();
         args_load_log_path = args.load_log_path.clone();
         args_test_map = args.test_map;
+        args_wall_seconds_per_game_day = args.wall_seconds_per_game_day;
     }
 
     // Insert the species registry early — spawn_initial_prey needs it during build_new_world.
@@ -88,6 +96,16 @@ pub fn setup_world_exclusive(world: &mut World) {
         if let Err(e) = load_log_file(world, path) {
             eprintln!("Warning: failed to load log file: {e}");
         }
+    }
+
+    // Build the TimeScale anchor from the live SimConfig + the host
+    // peg. SimConfig is in place either via build_new_world or via
+    // load_world above. Ticket 033 — single source of truth for the
+    // ticks ↔ in-game time ↔ wall-clock conversion.
+    {
+        let sim_config = world.resource::<SimConfig>().clone();
+        let time_scale = TimeScale::from_config(&sim_config, args_wall_seconds_per_game_day);
+        world.insert_resource(time_scale);
     }
 
     // Always insert the event log for mechanical debugging.

@@ -1,0 +1,9 @@
+# Files exempt from scripts/check_time_units.sh while ticket 033's
+# constant migrations are in flight. Format: file:line per entry.
+# Phase 0 starts empty — the only literal `tick % N` in the codebase
+# today is in a comment (src/systems/colony_knowledge.rs:273).
+#
+# Subsequent phases (1–5) of ticket 033 may temporarily allowlist
+# during the migration churn but must shrink the list to zero by
+# Phase 6, at which point this file is deleted alongside the
+# allowlist mechanism in the gate script.

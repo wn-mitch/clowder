@@ -21,7 +21,7 @@ use clowder::rendering;
 
 use clowder::resources::weather::Weather;
 use clowder::resources::{
-    SimConfig, TimeState,
+    SimConfig, TimeScale, TimeState,
 };
 
 /// Parsed CLI arguments.
@@ -44,6 +44,11 @@ struct CliArgs {
     /// the first tick if the flag is omitted.
     focal_cat: Option<String>,
     trace_log_path: Option<PathBuf>,
+    /// Wall-seconds-per-in-game-day peg (ticket 033). Default 16.6667
+    /// preserves the historical headless 60 Hz tick rate at the
+    /// canonical 1000 ticks/day. Honored only by `--headless` runs;
+    /// the windowed build derives its peg from `SimSpeed`.
+    game_day_seconds: f32,
 }
 
 fn main() {
@@ -76,6 +81,12 @@ fn main() {
             load_path: args.load_path,
             load_log_path: args.load_log_path,
             test_map: args.test_map,
+            // Windowed default: SimSpeed::Normal at the canonical
+            // 1000 ticks/day → 1000 wall-secs/day (= 1 Hz, matches
+            // pre-ticket-033 behavior). `sync_sim_speed` updates this
+            // when the player cycles speed presets.
+            wall_seconds_per_game_day: clowder::resources::SimSpeed::Normal
+                .wall_seconds_per_game_day(&clowder::resources::SimConfig::default()),
         })
         .add_plugins(SimulationPlugin)
         .add_plugins(rendering::RenderingPlugin)
@@ -113,11 +124,25 @@ fn handle_input(
 }
 
 /// Keeps Bevy's FixedUpdate timestep in sync with the SimSpeed setting.
-fn sync_sim_speed(time_state: Res<TimeState>, mut fixed_time: ResMut<Time<Fixed>>) {
+///
+/// Routes through [`TimeScale`] so the headless and windowed builds
+/// share the same anchor. SimSpeed maps onto `wall_seconds_per_game_day`
+/// via [`SimSpeed::wall_seconds_per_game_day`]; the FixedUpdate Hz then
+/// derives from `TimeScale::tick_rate_hz()`. Preserves prior behavior:
+/// Normal = 1 Hz, Fast = 5 Hz, VeryFast = 20 Hz at the default
+/// 1000 ticks/day scale.
+fn sync_sim_speed(
+    time_state: Res<TimeState>,
+    config: Res<SimConfig>,
+    mut time_scale: ResMut<TimeScale>,
+    mut fixed_time: ResMut<Time<Fixed>>,
+) {
     if !time_state.is_changed() {
         return;
     }
-    let hz = time_state.speed.ticks_per_second();
+    let secs = time_state.speed.wall_seconds_per_game_day(&config);
+    time_scale.set_wall_seconds_per_game_day(secs);
+    let hz = time_scale.tick_rate_hz() as f64;
     fixed_time.set_timestep(Duration::from_secs_f64(1.0 / hz));
 }
 
@@ -140,6 +165,8 @@ fn parse_args() -> CliArgs {
     let mut force_weather: Option<Weather> = None;
     let mut focal_cat: Option<String> = None;
     let mut trace_log_path: Option<PathBuf> = None;
+    // Default preserves 60 Hz at 1000 ticks/day (1000 / 60 ≈ 16.6667).
+    let mut game_day_seconds: f32 = 16.666_667;
     let mut iter = args.iter().skip(1);
     while let Some(arg) = iter.next() {
         match arg.as_str() {
@@ -221,6 +248,23 @@ fn parse_args() -> CliArgs {
                     trace_log_path = Some(PathBuf::from(path));
                 }
             }
+            "--game-day-seconds" => {
+                let Some(val) = iter.next() else {
+                    eprintln!("Error: --game-day-seconds requires a value");
+                    std::process::exit(2);
+                };
+                let parsed: f32 = val.parse().unwrap_or_else(|_| {
+                    eprintln!("Error: --game-day-seconds: cannot parse {val:?}");
+                    std::process::exit(2);
+                });
+                if !(parsed > 0.0 && parsed.is_finite()) {
+                    eprintln!(
+                        "Error: --game-day-seconds must be > 0 and finite (got {parsed})"
+                    );
+                    std::process::exit(2);
+                }
+                game_day_seconds = parsed;
+            }
             _ => {}
         }
     }
@@ -233,6 +277,12 @@ fn parse_args() -> CliArgs {
     }
     if !headless && (focal_cat.is_some() || trace_log_path.is_some()) {
         eprintln!("Warning: --focal-cat / --trace-log have no effect without --headless");
+    }
+    if !headless && (game_day_seconds - 16.666_667).abs() > f32::EPSILON {
+        eprintln!(
+            "Warning: --game-day-seconds has no effect without --headless \
+             (windowed builds derive the peg from SimSpeed)"
+        );
     }
 
     eprintln!("seed: {seed}");
@@ -254,6 +304,7 @@ fn parse_args() -> CliArgs {
         force_weather,
         focal_cat,
         trace_log_path,
+        game_day_seconds,
     }
 }
 
@@ -332,17 +383,30 @@ fn run_headless(args: CliArgs) -> io::Result<()> {
         load_path: args.load_path.clone(),
         load_log_path: args.load_log_path.clone(),
         test_map: args.test_map,
+        // Headless peg from `--game-day-seconds`. Default 16.6667
+        // preserves the prior 60 Hz tick rate at 1000 ticks/day.
+        // `setup_world_exclusive` reads this back to construct the
+        // [`TimeScale`] resource during Startup.
+        wall_seconds_per_game_day: args.game_day_seconds,
     });
     app.insert_resource(headless_config);
     app.add_plugins(SimulationPlugin);
     app.add_plugins(HeadlessIoPlugin);
+
+    // FixedUpdate Hz must be set before `app.update()` runs, but
+    // `TimeScale` itself doesn't land in the world until Startup.
+    // Compute the same Hz here from the same inputs so the two stay
+    // in lockstep — the canonical value will be re-derivable from
+    // the world's `TimeScale` once Startup runs.
+    let preview_scale = TimeScale::from_config(&SimConfig::default(), args.game_day_seconds);
+    let hz = preview_scale.tick_rate_hz() as f64;
 
     // Drive Time<Virtual> manually so each app.update() advances Time
     // by exactly one fixed-timestep — one App update == one sim tick,
     // matching today's schedule.run() cadence and keeping the run
     // wall-clock-bounded by the duration_secs gate in
     // `tick_budget_check_and_exit`.
-    let fixed_timestep = Duration::from_secs_f64(1.0 / 60.0);
+    let fixed_timestep = Duration::from_secs_f64(1.0 / hz);
     app.insert_resource(TimeUpdateStrategy::ManualDuration(fixed_timestep));
     app.world_mut()
         .resource_mut::<Time<Fixed>>()
