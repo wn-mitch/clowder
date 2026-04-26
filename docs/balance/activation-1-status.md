@@ -23,7 +23,7 @@
 Three rounds of 15-run sweeps were captured. Activation was **not
 merged**. `Weather::Fog::sight_multiplier()` remains `1.0` in HEAD.
 The infrastructure built to measure the activation (`--force-weather`,
-`just sweep`, `scripts/sweep_compare.py`, event-log header snapshot
+`just sweep`, `just sweep-stats --vs`, event-log header snapshot
 of env multipliers, per-multiplier canary test) is intact and
 orthogonal to the activation decision.
 
@@ -135,9 +135,10 @@ Pre-computed reports:
   `sensory_env_multipliers_snapshot()` in `src/main.rs`.
 - **`just sweep <label> [force-weather] [seeds] [reps] [duration]
   [parallel]`** in `justfile` — BSD-xargs-safe 4-way parallel.
-- **`scripts/sweep_compare.py`** — per-metric mean ± sd,
-  Mann-Whitney U, Wilcoxon signed-rank per-seed pairing,
-  env-multiplier delta printer, canary gate check.
+- **`just sweep-stats <dir> [--vs <baseline>]`** — per-metric mean
+  ± sd, 95% CI, Welch's t / Cohen's d / effect-size bands. Replaced
+  the retired `sweep_compare.py` (Mann-Whitney U; less robust to
+  non-normal distributions).
 - **Per-activation canary test** — the Phase 1 identity canary
   `env_from_environment_is_identity_in_phase_1` was replaced by
   `env_multipliers_match_activation_schedule` in
@@ -177,10 +178,12 @@ Pre-computed reports:
    magnitude is *acceptable*, because every run collapsed before
    accumulating enough cat-ticks for noise to average out.
 
-4. **When re-running, use `sweep_compare.py` with
-   `--predictions docs/balance/activation-1-fog-sight.predictions.json
-   --top 30`.** Focus on the per-seed paired section, not the pooled
-   Mann-Whitney row — pooled tests wash out signal because
+4. **When re-running, use `just sweep-stats <treatment> --vs <baseline>`** —
+   per-metric Welch's t / Cohen's d / effect-size bands. Originally
+   planned with `sweep_compare.py --predictions ... --top 30`; that
+   script has been retired in favor of the structured-JSON
+   `sweep-stats` envelope. Focus on the per-DSE drift signal, not
+   pooled p-values — pooled tests wash out signal because
    seed-driven variance dominates rep-driven variance by ~10×
    (observed in baseline: seed 99 ambush CV 10%, seed 2025 ambush
    CV 173%).

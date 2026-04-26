@@ -8,18 +8,18 @@
 > fresh. See `CLAUDE.md` §"Long-horizon coordination" for the request-time
 > checklist and maintenance rules.
 
-_Last generated: 2026-04-25._
+_Last generated: 2026-04-26._
 
 ## Summary
 
 | Status | Count |
 |---|---|
 | In progress | 7 |
-| Ready | 8 |
+| Ready | 9 |
 | Parked | 1 |
 | Blocked | 9 |
 | Done (awaiting archive) | 2 |
-| **Open total** | **25** |
+| **Open total** | **26** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -29,15 +29,16 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 ## In progress (7)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
-- **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[005](docs/open-work/tickets/005-cluster-a-scoring-substrate-refactor.md)** — Scoring substrate refactor cluster (Cluster A — Foundational) — _[A] · added 2026-04-20_
 - **[013](docs/open-work/tickets/013-spec-follow-on-debts-from-ai-substrate-refactor.md)** — Spec-follow-on debts from AI substrate refactor — _added 2026-04-21_
 - **[014](docs/open-work/tickets/014-phase-4-follow-ons.md)** — Phase 4 follow-ons — target-taking registration + markers + mate-gender + Mating/PracticeMagic magnitude — _added 2026-04-22_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
 - **[027](docs/open-work/tickets/027-mating-cadence-three-bug-cascade.md)** — Mating cadence — three-bug cascade blocking MatingOccurred — _added 2026-04-25_
+- **[031](docs/open-work/tickets/031-balance-tooling-composition.md)** — Balance-tooling composition layer (verdict / hypothesize / sweep-stats / fingerprint / explain / bisect-canary / promote) — _added 2026-04-26_
 
-## Ready (8)
+## Ready (9)
 
+- **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _added 2026-04-20_
 - **[008](docs/open-work/tickets/008-cluster-d-formalization-verification.md)** — Formalization and verification (Cluster D) — _[D] · added 2026-04-20_

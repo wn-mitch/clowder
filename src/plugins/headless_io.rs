@@ -265,6 +265,10 @@ pub fn write_jsonl_headers(
     let sim_config_json = serde_json::to_value((*sim_config).clone()).unwrap_or_default();
     let forced_weather_json = config.force_weather.map(|w| w.label());
     let sensory_env_multipliers_json = sensory_env_multipliers_snapshot();
+    // CLOWDER_OVERRIDES patch applied at boot, if any. Echoed verbatim
+    // into the header so a treatment run records its own delta against
+    // defaults without needing a separate sidecar.
+    let applied_overrides_json = crate::resources::SimConstants::applied_overrides_snapshot();
 
     // Narrative: lighter header (no constants block).
     let narrative_header = serde_json::json!({
@@ -293,6 +297,7 @@ pub fn write_jsonl_headers(
         "map_width": tile_map.width,
         "map_height": tile_map.height,
         "constants": constants_json,
+        "applied_overrides": applied_overrides_json,
         "forced_weather": forced_weather_json,
         "sensory_env_multipliers": sensory_env_multipliers_json,
     });
@@ -318,6 +323,7 @@ pub fn write_jsonl_headers(
             "map_width": tile_map.width,
             "map_height": tile_map.height,
             "constants": constants_json,
+            "applied_overrides": applied_overrides_json,
             "forced_weather": forced_weather_json,
             "sensory_env_multipliers": sensory_env_multipliers_json,
         });

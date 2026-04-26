@@ -325,7 +325,7 @@ loop CLAUDE.md forbids.
   - `just frame-diff BASELINE NEW --hypothesis PATH` — pairwise
     frame-diff with hypothesis overlay.
   - `just check-continuity LOGFILE` — exits non-zero on canary=0.
-  - `just autoloop SEED` — full gate (see Verification loop).
+  - `just verdict logs/tuned-<seed>` — full gate (see Verification loop).
 
 **Agent-team assignment:**
 - **Main session** owns: `FocalTraceTarget` design, L2 record format
@@ -394,7 +394,7 @@ land with the features that need them.
   Partial map (corruption, fox-scent, exploration, congregation). Each
   ports the ad-hoc accumulator to `InfluenceMap` following the scent
   reference.
-- **Soak-runner sub-agent** — runs `just autoloop` on each sub-port
+- **Soak-runner sub-agent** — runs `just verdict <run-dir>` on each sub-port
   landing; reports gate status.
 - **Balance-log sub-agent** — drafts phase-2 balance doc.
 
@@ -658,7 +658,7 @@ sharper around hunger=0.75 midpoint; canary Starvation holds at 0.
 - **Curve-assigner sub-agents** (×N, one per §2.3 row, parallel with
   DSE-porters) — assigns primitive + parameters for each consideration;
   updates tests; cross-checks §3.3.2 absolute-anchor peer groups.
-- **Soak-runner sub-agent** — runs `just autoloop` on each DSE-port
+- **Soak-runner sub-agent** — runs `just verdict <run-dir>` on each DSE-port
   landing; reports gate status, per-DSE frame-diff, and hypothesis-table
   direction match.
 - **Balance-log sub-agent** — maintains per-DSE table in
@@ -812,7 +812,7 @@ owns target-quality; both paths consume its result.
   §6.5 rows.
 - **Consideration-assigner sub-agents** (parallel with target-port):
   for each per-target consideration, commit curve + parameters + test.
-- **Soak-runner sub-agent** — runs `just autoloop`.
+- **Soak-runner sub-agent** — runs `just verdict <run-dir>`.
 - **Balance-log sub-agent** — phase-4 balance doc.
 
 **Acceptance:**
@@ -900,7 +900,7 @@ island becomes a DSE registration.
 - **Scattered-port sub-agents** (×6, one per sub-phase 5a–5f, parallel
   once main session delivers 5a + 5b designs): each sub-agent owns one
   site's mechanical port.
-- **Soak-runner sub-agent** — runs `just autoloop` per sub-phase
+- **Soak-runner sub-agent** — runs `just verdict <run-dir>` per sub-phase
   landing.
 - **Balance-log sub-agent** — phase-5 balance doc.
 
@@ -1284,7 +1284,7 @@ Three layers: a **gate** that exits non-zero on regression, a **signal**
 that tells us *what* drifted and by how much, and a **hypothesis
 ledger** that accumulates.
 
-### The gate — `just autoloop SEED`
+### The gate — `just verdict logs/tuned-<seed>`
 
 Lands in Phase 1. One recipe, two modes:
 
@@ -1395,7 +1395,7 @@ sub-agent's output goes through a phase-exit concordance check.
 | **Consideration-assigner sub-agent** | 4 | Commits curve + parameters + test for one per-target consideration | 36 (one per §6.5 row) |
 | **Scattered-port sub-agent** | 5a–5f | Ports one scattered-scoring site to its DSE | 6 (sequential within 5a + 5b designs; others parallel) |
 | **Axis-wiring sub-agent** | 6d | Wires one fulfillment axis into `Fulfillment` register | 15+ (one per disposition + mastery domain + Calling + social-warmth) |
-| **Soak-runner sub-agent** | all | Runs `just autoloop`, reports gate status | 1 (per-iteration) |
+| **Soak-runner sub-agent** | all | Runs `just verdict <run-dir>`, reports gate status | 1 (per-iteration) |
 | **Balance-log sub-agent** | all | Drafts phase-kickoff + phase-exit in `docs/balance/substrate-phase-N.md` | 1 per phase |
 | **Wiki-regen sub-agent** | 7 | Runs `scripts/generate_wiki.py`, reports drift | 1 |
 | **Spec-cleanup sub-agent** | 7 | Prunes external-author references from spec | 1 |
@@ -1602,7 +1602,7 @@ verify at a glance that nothing dropped.
 
 ## Verification summary
 
-End-to-end test after each phase, via `just autoloop 42`:
+End-to-end test after each phase, via `just verdict logs/tuned-42`:
 
 1. Build passes (`just check`).
 2. `cargo test` passes (all 3 pre-existing failures fixed in

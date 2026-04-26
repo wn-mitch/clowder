@@ -116,7 +116,12 @@ pub fn setup_world_exclusive(world: &mut World) {
         world.insert_resource(crate::systems::wildlife::DetectionCooldowns::default());
     }
     if !world.contains_resource::<crate::resources::SimConstants>() {
-        world.insert_resource(crate::resources::SimConstants::default());
+        // `from_env` reads the optional `CLOWDER_OVERRIDES` JSON env var
+        // and deep-merges it into the defaults. Used by
+        // `scripts/hypothesize.py` to drive treatment runs without
+        // rebuilding the binary; the applied patch is echoed into the
+        // events.jsonl header by `write_jsonl_headers`.
+        world.insert_resource(crate::resources::SimConstants::from_env());
     }
     if !world.contains_resource::<crate::resources::SystemActivation>() {
         world.insert_resource(crate::resources::SystemActivation::default());
@@ -145,7 +150,8 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     let colony_site = find_colony_site(&map, &mut sim_rng.rng);
 
     // Place special terrain tiles (ruins, fairy rings, standing stones, deep pools).
-    let constants = crate::resources::SimConstants::default();
+    // Use `from_env` so worldgen constants honor any CLOWDER_OVERRIDES patch.
+    let constants = crate::resources::SimConstants::from_env();
     crate::world_gen::special_tiles::place_special_tiles(
         &mut map,
         colony_site,

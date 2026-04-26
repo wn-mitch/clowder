@@ -3199,6 +3199,82 @@ impl Default for FulfillmentConstants {
     }
 }
 
+// ---------- env-var override hook ----------
+
+/// Reads the `CLOWDER_OVERRIDES` env var (if set) as a JSON object and
+/// deep-merges it into [`SimConstants::default`]. Used by
+/// `scripts/hypothesize.py` and ad-hoc balance tuning to drive a
+/// treatment run without rebuilding the binary. Format mirrors the
+/// `_header.constants` block, e.g.
+///
+/// ```text
+/// CLOWDER_OVERRIDES='{"fulfillment":{"social_warmth_socialize_per_tick":0.002}}'
+/// ```
+///
+/// On parse error the override is dropped with a stderr warning and
+/// defaults are used — never silently corrupts a run. The applied
+/// patch (or `null` when no override) is exposed via
+/// [`SimConstants::applied_overrides_snapshot`] so the events.jsonl
+/// header can echo it for downstream reproducibility.
+impl SimConstants {
+    pub fn from_env() -> Self {
+        match std::env::var("CLOWDER_OVERRIDES") {
+            Err(_) => Self::default(),
+            Ok(s) if s.trim().is_empty() => Self::default(),
+            Ok(raw) => match serde_json::from_str::<serde_json::Value>(&raw) {
+                Err(e) => {
+                    eprintln!(
+                        "Warning: CLOWDER_OVERRIDES is not valid JSON ({e}); using defaults."
+                    );
+                    Self::default()
+                }
+                Ok(patch) => Self::default_with_overrides(&patch).unwrap_or_else(|e| {
+                    eprintln!(
+                        "Warning: CLOWDER_OVERRIDES failed to apply ({e}); using defaults."
+                    );
+                    Self::default()
+                }),
+            },
+        }
+    }
+
+    /// Returns the parsed `CLOWDER_OVERRIDES` JSON value (or
+    /// `serde_json::Value::Null` if unset/empty/malformed) so callers
+    /// can record what was applied. This is what
+    /// `write_jsonl_headers` echoes into the events log header.
+    pub fn applied_overrides_snapshot() -> serde_json::Value {
+        match std::env::var("CLOWDER_OVERRIDES") {
+            Err(_) => serde_json::Value::Null,
+            Ok(s) if s.trim().is_empty() => serde_json::Value::Null,
+            Ok(raw) => serde_json::from_str(&raw).unwrap_or(serde_json::Value::Null),
+        }
+    }
+
+    fn default_with_overrides(patch: &serde_json::Value) -> Result<Self, String> {
+        let mut base = serde_json::to_value(Self::default())
+            .map_err(|e| format!("serialize default: {e}"))?;
+        deep_merge(&mut base, patch);
+        serde_json::from_value(base).map_err(|e| format!("deserialize merged: {e}"))
+    }
+}
+
+/// Recursively merges `patch` into `target`. Object keys in `patch`
+/// overwrite or extend `target`; non-object values replace whatever
+/// is at the same path.
+fn deep_merge(target: &mut serde_json::Value, patch: &serde_json::Value) {
+    use serde_json::Value;
+    match (target, patch) {
+        (Value::Object(t), Value::Object(p)) => {
+            for (k, v) in p {
+                deep_merge(t.entry(k.clone()).or_insert(Value::Null), v);
+            }
+        }
+        (slot, other) => {
+            *slot = other.clone();
+        }
+    }
+}
+
 // ---------- Tests ----------
 
 #[cfg(test)]
@@ -3241,5 +3317,45 @@ mod tests {
         // Re-serialize and compare strings to confirm full fidelity
         let json2 = serde_json::to_string_pretty(&deserialized).expect("re-serialize");
         assert_eq!(json, json2);
+    }
+
+    #[test]
+    fn env_override_deep_merges_nested_field() {
+        let patch: serde_json::Value = serde_json::from_str(
+            r#"{"fulfillment":{"social_warmth_socialize_per_tick":0.0042}}"#,
+        )
+        .expect("parse patch");
+        let merged = SimConstants::default_with_overrides(&patch).expect("merge ok");
+        // Patched field changed.
+        assert_eq!(merged.fulfillment.social_warmth_socialize_per_tick, 0.0042);
+        // Sibling field in same struct unchanged.
+        assert_eq!(
+            merged.fulfillment.social_warmth_groom_other_gain,
+            SimConstants::default().fulfillment.social_warmth_groom_other_gain,
+        );
+        // Unrelated sub-struct unchanged.
+        assert_eq!(
+            merged.needs.hunger_decay,
+            SimConstants::default().needs.hunger_decay
+        );
+    }
+
+    #[test]
+    fn env_override_silently_drops_unknown_fields() {
+        // serde_json::from_value is lenient by default — unknown fields
+        // are silently dropped rather than rejected. Documented caveat:
+        // hypothesize.py validates field paths against the constants
+        // dump in the events.jsonl header before treating an override
+        // as applied. Don't tighten this with `deny_unknown_fields` —
+        // several sub-structs use `#[serde(default)]` for forward-compat
+        // and would break under stricter parsing.
+        let patch: serde_json::Value =
+            serde_json::from_str(r#"{"fulfillment":{"not_a_real_field":0.5}}"#).expect("parse");
+        let merged = SimConstants::default_with_overrides(&patch).expect("merge ok");
+        // Real field unchanged from default.
+        assert_eq!(
+            merged.fulfillment.social_warmth_socialize_per_tick,
+            SimConstants::default().fulfillment.social_warmth_socialize_per_tick,
+        );
     }
 }

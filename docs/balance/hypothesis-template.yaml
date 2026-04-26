@@ -1,0 +1,55 @@
+# Template for `just hypothesize <yaml>` (ticket 031 Phase A.4).
+#
+# Formalizes the four-artifact balance methodology CLAUDE.md mandates:
+# every balance-affecting change ships with hypothesis / prediction /
+# observation / concordance.
+#
+# Required fields:
+#   hypothesis      — one-line ecological/behavioral claim being modeled.
+#                     Should answer "why would real cats / a real
+#                     ecosystem behave this way?".
+#   constants_patch — nested object mirroring SimConstants. Applied to
+#                     the treatment run via CLOWDER_OVERRIDES env var.
+#                     Field paths must match the live constants schema;
+#                     hypothesize.py validates by re-serializing.
+#   prediction      — the testable claim:
+#                       metric            : dotted path into the events.jsonl
+#                                           footer (e.g. deaths_by_cause.Starvation
+#                                           or wards_placed_total).
+#                       direction         : "increase" | "decrease" | "unchanged".
+#                       rough_magnitude_pct : [low, high] band the observed
+#                                             shift must land in to count
+#                                             as concordant.
+#
+# Optional fields:
+#   seeds      — list of integer seeds (default: [42, 99, 7]).
+#   reps       — runs per seed (default: 3 → 9 runs per side).
+#   duration   — seconds per run (default: 900 = 15 min canonical soak).
+#   parked     — set to a date (YYYY-MM-DD) to pause without rerunning.
+#
+# Example:
+#   hypothesis: "Cooked-food bonus too small to overcome fog mood-debuff"
+#   constants_patch:
+#     fulfillment:
+#       social_warmth_socialize_per_tick: 0.002
+#   prediction:
+#     metric: continuity_tallies.courtship
+#     direction: increase
+#     rough_magnitude_pct: [50, 200]
+#   seeds: [42, 99, 7]
+#   reps: 3
+
+hypothesis: "Replace this with the ecological claim under test"
+constants_patch:
+  # Mirror SimConstants paths. Examples:
+  # fulfillment:
+  #   social_warmth_socialize_per_tick: 0.002
+  # magic:
+  #   ward_decay_per_tick: 0.0006
+prediction:
+  metric: deaths_by_cause.Starvation   # dotted path into the footer
+  direction: decrease                  # increase | decrease | unchanged
+  rough_magnitude_pct: [20, 60]        # acceptance band; widen if uncertain
+seeds: [42, 99, 7]
+reps: 3
+duration: 900

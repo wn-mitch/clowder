@@ -5918,11 +5918,11 @@ Traces write to `logs/trace-<focal>.jsonl`, a separate file from
 (`commit_hash`, `sim_config`, `constants`) so the two diff-lock as a
 pair — a trace from one run is comparable to another only when both
 sidecar and events headers agree. Reason for sidecar over promoting
-into events.jsonl: today's tooling (`scripts/balance_report.py`,
-`scripts/check_canaries.sh`) assumes events.jsonl is a colony-wide
-aggregate at a stable cadence. Promoting focal-only records inline
-would bloat events.jsonl 10–20× and break those scripts' cadence
-assumptions.
+into events.jsonl: today's tooling (`just verdict`,
+`scripts/check_canaries.sh`, `just sweep-stats`) assumes events.jsonl
+is a colony-wide aggregate at a stable cadence. Promoting focal-only
+records inline would bloat events.jsonl 10–20× and break those
+scripts' cadence assumptions.
 
 Record shapes (sketch; exact schema refined at implementation):
 

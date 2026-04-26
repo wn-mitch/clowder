@@ -85,7 +85,7 @@ in working copy, pre-flight gates 1–6 committed). Seed 42, 900s.
 | Play / Burial / Mythic-texture tallies | not measured | 0 / 0 / 0 | expected — no emitting systems yet |
 | Trace sidecar size | n/a | 849 MB (2.75M records) | viable; larger than anticipated — enrichment follow-up candidate |
 | Trace replay-vs-snapshot agreement | n/a | ✓ verified at tick 1300000 (n=11 DSEs matched) | Phase 1 acceptance gate |
-| `just check-canaries` | FAIL (Starvation) | FAIL (Starvation) | inherited failure; autoloop now continues past it per updated recipe |
+| `just check-canaries` | FAIL (Starvation) | FAIL (Starvation) | inherited failure; verdict surfaces it without hard-aborting |
 | `just check-continuity` | n/a | FAIL (play/mentoring/burial/mythic-texture = 0) | expected at Phase 1 entry; refactor Phases 3+ must strengthen |
 | `just diff-constants` | n/a | identical | pre-flight rename-only changes preserved byte-equal constants block |
 
@@ -170,8 +170,8 @@ ready to start.
 - `just soak-trace SEED FOCAL_CAT` — soak + emit focal trace.
 - `just frame-diff BASELINE NEW [HYPOTHESIS]` — pairwise diff.
 - `just check-continuity LOGFILE` — canary gate.
-- `just autoloop SEED FOCAL_CAT` — full gate (soak + canaries +
-  continuity + constants diff).
+- `just verdict logs/tuned-<seed>` — full gate (soak + canaries +
+  continuity + constants diff + footer-drift, structured JSON).
 
 ## Cross-refs
 

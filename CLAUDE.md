@@ -237,7 +237,7 @@ Full field shapes: `docs/systems/ai-substrate-refactor.md` §11.3. Record types 
 
 - `just soak-trace SEED FOCAL_CAT` — canonical invocation (e.g. `just soak-trace 42 Simba`). Writes the four-file bundle `logs/tuned-<seed>/{events,narrative,trace-<focal>}.jsonl`.
 - `just frame-diff BASELINE NEW [HYPOTHESIS]` — per-DSE drift between two focal traces, ranked by |Δ mean|. Pass a balance doc as `HYPOTHESIS` to classify each DSE as ok / drift / wrong-direction against the predicted shift.
-- `just autoloop SEED FOCAL_CAT` — soak-trace + survival canaries + continuity canaries + constants diff, in one loop. Use after every substrate-refactor increment.
+- `just verdict <run-dir>` — one-call run validation: survival canaries + continuity canaries + constants drift + footer-vs-baseline drift, all in one structured JSON envelope. Exit 0/1/2 = pass/concern/fail. Use after every soak. (Replaces the retired `just autoloop`.)
 
 **Helper scripts** (invoked by the recipes above; callable directly for ad-hoc use):
 
@@ -255,12 +255,13 @@ For ad-hoc jq queries over a trace file, see `docs/diagnostics/log-queries.md` �
 jq recipes for reading `events.jsonl` / `narrative.jsonl` live in
 `docs/diagnostics/log-queries.md`. For routine checks:
 
-- `just check-canaries LOGFILE` — runs the five survival canary queries (starvation, shadow-fox ambush, footer-written, features-at-zero informational report, never-fired-expected-positives). Exits non-zero on any failure.
-- `just check-continuity LOGFILE` — runs the continuity-canary checks (grooming / play / mentoring / burial / courtship / mythic-texture) against the `continuity_tallies` footer field. Exits non-zero on zero-firing classes.
-- `just diff-constants BASE NEW` — verifies two runs are behaviorally comparable.
+- `just verdict <run-dir>` — **primary one-call gate.** Composes the canary + continuity + constants checks below into a single structured JSON envelope with `next_steps` hints. Exit 0/1/2 = pass/concern/fail. Reads `logs/baselines/current.json` for the active baseline.
+- `just sweep-stats <dir> [--vs <baseline>]` — per-metric mean / stdev / 95% CI, with Welch's t / Cohen's d / effect-size bands when comparing two sweeps. The `--charts` flag opts into matplotlib boxplots. (Replaces retired `balance-report`, `score-diff`, `sweep_compare.py`.)
+- `just check-canaries LOGFILE` — primitive: five survival canary queries (starvation, shadow-fox ambush, footer-written, features-at-zero informational report, never-fired-expected-positives). Wrapped by `verdict`; rarely needed standalone.
+- `just check-continuity LOGFILE` — primitive: continuity-canary checks (grooming / play / mentoring / burial / courtship / mythic-texture). Wrapped by `verdict`.
+- `just diff-constants BASE NEW` — primitive: confirms two runs are behaviorally comparable. Wrapped by `verdict`.
 - `just soak-trace SEED FOCAL_CAT` — same as `just soak` plus a focal-cat L1/L2/L3 trace sidecar. See **Focal-cat trace** above.
 - `just frame-diff BASELINE NEW [HYPOTHESIS]` — per-DSE score drift between two focal traces; optional hypothesis classifies drift as ok / drift / wrong-direction.
-- `just autoloop SEED FOCAL_CAT` — soak-trace + survival + continuity canaries + constants diff in one loop.
 
 ### Canaries
 

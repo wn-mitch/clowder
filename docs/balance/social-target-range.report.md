@@ -213,5 +213,8 @@ always next up in the open-work.md ordering.
   (range=25). Commit `290a5d9` + one-line dirty edit.
 - `docs/balance/social-target-range.predictions.json` — iter-1
   predictions, superseded but kept for provenance.
-- `scripts/analyze_score_competition.py` — per-action score analysis.
-  Usage: `scripts/analyze_score_competition.py --compare <base> <treat>`.
+- Per-DSE score-competition analysis (formerly
+  `scripts/analyze_score_competition.py`, now retired) is covered by
+  `just frame-diff <baseline-trace> <treatment-trace>` plus
+  `just sweep-stats <treatment-sweep> --vs <baseline-sweep>` for the
+  aggregate metric drift.

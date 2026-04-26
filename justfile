@@ -111,60 +111,36 @@ frame-diff BASELINE NEW HYPOTHESIS="":
         uv run scripts/frame_diff.py {{BASELINE}} {{NEW}}
     fi
 
-# Full verification loop for a seed: soak, survival canaries,
-# continuity canaries, constants diff against a baseline. Lands in
-# Phase 1 of the substrate refactor; Phase 3+ extends with frame-diff
-# against a baseline trace.
+# One-call run validation. Composes check-canaries + check-continuity +
+# diff-constants + footer-vs-baseline drift into a structured JSON
+# envelope (or a human summary with --text). Exit codes:
+#   0 = pass, 1 = concern, 2 = fail.
+# Reads the active baseline from logs/baselines/current.json; falls back
+# to logs/baseline-pre-substrate-refactor/events.jsonl. Pass --baseline
+# to override.
 #
-# Does NOT hard-abort on canary failures during pre-refactor runs —
-# the baseline Starvation canary is already failing (see
-# docs/balance/substrate-refactor-baseline.md). Prints a verdict line
-# at the end; operator decides whether numbers are acceptable against
-# the phase's balance doc. Exit code reflects worst observed status.
-autoloop SEED="42" FOCAL_CAT="Simba":
-    #!/usr/bin/env bash
-    set -uo pipefail
-    just soak-trace {{SEED}} {{FOCAL_CAT}}
-    echo ""
-    echo "== survival canaries =="
-    just check-canaries logs/tuned-{{SEED}}/events.jsonl
-    surv_rc=$?
-    echo ""
-    echo "== continuity canaries =="
-    just check-continuity logs/tuned-{{SEED}}/events.jsonl
-    cont_rc=$?
-    baseline="logs/baseline-pre-substrate-refactor/events.jsonl"
-    const_rc=0
-    if [[ -f "$baseline" ]]; then
-        echo ""
-        echo "== constants diff vs baseline =="
-        if just diff-constants "$baseline" logs/tuned-{{SEED}}/events.jsonl; then
-            echo "(identical)"
-        else
-            const_rc=$?
-            echo "(constants differ — phase's balance doc must explain)"
-        fi
-    fi
-    echo ""
-    echo "== autoloop verdict =="
-    if [ "$surv_rc" -ne 0 ]; then
-        echo "  survival canaries:  FAIL (exit $surv_rc) — pre-existing Starvation regression is inherited; see activation-1-status.md"
-    else
-        echo "  survival canaries:  pass"
-    fi
-    if [ "$cont_rc" -ne 0 ]; then
-        echo "  continuity canaries: FAIL (exit $cont_rc) — expected at Phase 1 entry; refactor Phases 3+ must strengthen"
-    else
-        echo "  continuity canaries: pass"
-    fi
-    if [ "$const_rc" -ne 0 ]; then
-        echo "  constants diff:     drift (exit $const_rc)"
-    else
-        echo "  constants diff:     clean"
-    fi
-    # Overall exit: 0 if survival passes; nonzero if survival regresses.
-    # Continuity + constants surface in the verdict but don't block.
-    exit "$surv_rc"
+# Examples:
+#   just verdict logs/tuned-42
+#   just verdict logs/tuned-42 --text
+#   just verdict logs/tuned-42 --baseline logs/baseline-2026-04-25/events.jsonl
+verdict *ARGS:
+    uv run scripts/verdict.py {{ARGS}}
+
+# Run a balance hypothesis end-to-end: baseline + treatment sweeps,
+# concordance check, draft balance doc. Formalizes the four-artifact
+# methodology (hypothesis / prediction / observation / concordance).
+# Treatment runs read CLOWDER_OVERRIDES env var; the binary's
+# SimConstants::from_env() applies the patch at boot, no rebuild.
+#
+# Spec template: docs/balance/hypothesis-template.yaml.
+# Exit codes: 0 concordant, 1 inconclusive/off-magnitude, 2 wrong-direction.
+#
+# Examples:
+#   just hypothesize docs/balance/my-hypothesis.yaml
+#   just hypothesize SPEC --duration 60 --seeds 42 --reps 1   # smoke test
+#   just hypothesize SPEC --text                              # human summary
+hypothesize *ARGS:
+    uv run scripts/hypothesize.py {{ARGS}}
 
 # Multi-seed × multi-rep headless sweep for Phase 5b balance verification.
 # Writes to logs/sweep-<label>/<seed>-<rep>/{narrative,events}.jsonl.
@@ -257,17 +233,22 @@ template-audit:
 inspect name *ARGS:
     cargo run --example inspect_cat -- {{name}} {{ARGS}}
 
-# Run multi-seed benchmark and record scores against current changeset
-score-track *ARGS:
-    uv run scripts/score_track.py {{ARGS}}
-
-# Compare scores between recent changesets
-score-diff *ARGS:
-    uv run scripts/score_diff.py {{ARGS}}
-
-# Generate balance report from most recent diagnostic run
-balance-report *ARGS:
-    uv run scripts/balance_report.py {{ARGS}}
+# Per-metric statistical summary of a sweep directory, optionally
+# comparing two sweeps with Welch's t / Cohen's d / effect-size bands.
+# Replaces the retired `balance-report`, `score-diff`, and `sweep_compare.py`.
+#
+# Bands:
+#   significant — |Δ| ≥ 30% AND p < 0.05 AND |d| > 0.5
+#   drift       — 10% ≤ |Δ| < 30% (worth investigating)
+#   noise       — |Δ| < 10%
+#
+# Examples:
+#   just sweep-stats logs/sweep-baseline-5b
+#   just sweep-stats logs/sweep-fog-activation-1 --vs logs/sweep-baseline-5b
+#   just sweep-stats logs/sweep-X --text
+#   just sweep-stats logs/sweep-X --charts          # opt-in matplotlib boxplots
+sweep-stats *ARGS:
+    uv run scripts/sweep_stats.py {{ARGS}}
 
 # Generate game wiki and build mdBook site
 wiki:

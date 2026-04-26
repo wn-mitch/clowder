@@ -6,7 +6,7 @@
 # Paired with `scripts/check_canaries.sh`: canaries gate survival
 # ("colony didn't starve"); continuity gates range ("colony showed
 # the behavioural repertoire the design promises"). Both are hard
-# gates for the substrate refactor's autoloop.
+# gates wrapped by `just verdict`.
 #
 # Source of truth for the canary set: docs/systems/ai-substrate-refactor.md
 # §11.3, propagated into refactor-plan.md Phase 1 deliverables.

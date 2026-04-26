@@ -22,7 +22,7 @@ The balance pass analysis required bespoke Python scripts to extract hunger traj
   - `PreyPositions { positions: [{species, x, y}, ...] }` — same cadence as wildlife.
   - `DenSnapshot { prey_dens: [...], fox_dens: [...] }` — every `den_snapshot_interval` ticks (default 1000). Dens move rarely.
   - `HuntingBeliefSnapshot { cat, width, height, values }` — colony aggregate, downsampled to at most 32×32 cells; every `hunting_belief_interval` ticks (default 1000). `cat: null` for colony aggregate; per-cat snapshots are reserved for a future extension (would 10× the log).
-- The `score_schema_version` field on `logs/score_history.jsonl` rows tags when this split landed; `scripts/score_diff.py` warns on cross-schema comparisons. Dashboards should do the same.
+- Historical sweep comparisons may carry `score_schema_version` tags from the retired `score_track`/`score_diff` pipeline; dashboards should warn on cross-schema comparisons. The current statistical comparison surface is `just sweep-stats --vs`.
 
 ## Views (implemented)
 
@@ -45,4 +45,4 @@ Lives as a new page inside the existing `tools/narrative-editor/` Svelte 5 + Vit
 - **Fully client-side.** No backend, no storage, no uploads-to-server. Users drag-and-drop (or pick) JSONL files; parsing happens in-tab via `File.stream()` → `TextDecoderStream` → line split → `JSON.parse`. Data never leaves the machine and is discarded on page unload.
 - **Charting:** [uPlot](https://github.com/leeoniya/uPlot) — small (~45 KB), fast enough to render 100k+ points from a 15-min deep-soak without noticeable jank. Wrapped in a Svelte component.
 - **No new dependency on the sim binary.** The dashboard reads only the JSONL outputs that `just headless` / `just soak` already produce.
-- **Sibling CLI tools stay in place:** `scripts/check_canaries.sh` remains the CI gate, `scripts/balance_report.py` remains the "save PNGs for PR descriptions" tool, and `scripts/score_track.py` / `score_diff.py` remain for git-hook / pipeline use. The dashboard *complements* them for interactive exploration across many runs.
+- **Sibling CLI tools stay in place:** `just verdict <run-dir>` is the one-call gate, `just sweep-stats <dir> [--vs <baseline>]` is the per-metric statistical surface (with `--charts` for matplotlib output, replacing the retired `balance_report.py`), and `just check-canaries` / `just check-continuity` remain as primitives. The dashboard *complements* them for interactive exploration across many runs.
