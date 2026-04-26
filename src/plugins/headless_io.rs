@@ -461,7 +461,9 @@ pub fn tick_budget_check_and_exit(
 /// today's `build_headless_footer` uses — easier to call from the
 /// post-loop tail than to coerce into Bevy's system signature.
 pub fn emit_headless_footer(world: &mut World) -> String {
+    use crate::components::fulfillment::Fulfillment;
     use crate::components::magic::Ward;
+    use crate::components::physical::Needs;
     use crate::resources::system_activation::Feature;
 
     let (ward_count_final, ward_avg_strength_final) = {
@@ -471,6 +473,65 @@ pub fn emit_headless_footer(world: &mut World) -> String {
             .fold((0u64, 0.0f32), |(c, s), w| (c + 1, s + w.strength));
         let avg = if count == 0 { 0.0 } else { sum / count as f32 };
         (count, avg)
+    };
+
+    // Welfare-axis aggregate over alive cats. Each axis becomes a small
+    // map {n, mean, stdev, min, max} so `just verdict` and
+    // `just fingerprint` can read the colony's end-of-soak welfare
+    // distribution without trace-dives. Survives gracefully when zero
+    // alive cats — emits zeros rather than NaN.
+    let welfare_axes = {
+        // Take owned values up front so we can reference them without
+        // overlapping borrows on `world`.
+        let needs_vals: Vec<Needs> = {
+            let mut needs_q = world.query::<&Needs>();
+            needs_q.iter(world).cloned().collect()
+        };
+        let full_vals: Vec<Fulfillment> = {
+            let mut full_q = world.query::<&Fulfillment>();
+            full_q.iter(world).cloned().collect()
+        };
+
+        let mk = |label: &str, values: Vec<f32>| -> serde_json::Value {
+            let n = values.len();
+            if n == 0 {
+                return serde_json::json!({
+                    "axis": label, "n": 0,
+                    "mean": 0.0, "stdev": 0.0, "min": 0.0, "max": 0.0,
+                });
+            }
+            let mean = values.iter().sum::<f32>() / n as f32;
+            let var = values.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / n as f32;
+            let stdev = var.sqrt();
+            let mn = values.iter().cloned().fold(f32::INFINITY, f32::min);
+            let mx = values.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+            serde_json::json!({
+                "axis": label, "n": n,
+                "mean": mean, "stdev": stdev, "min": mn, "max": mx,
+            })
+        };
+
+        // §7.W social_warmth (Fulfillment register).
+        let social_warmth = mk("social_warmth",
+            full_vals.iter().map(|f| f.social_warmth).collect());
+
+        // Maslow welfare-tier needs (the higher-order axes).
+        let acceptance = mk("acceptance",
+            needs_vals.iter().map(|n| n.acceptance).collect());
+        let respect = mk("respect",
+            needs_vals.iter().map(|n| n.respect).collect());
+        let mastery = mk("mastery",
+            needs_vals.iter().map(|n| n.mastery).collect());
+        let purpose = mk("purpose",
+            needs_vals.iter().map(|n| n.purpose).collect());
+
+        serde_json::json!({
+            "social_warmth": social_warmth,
+            "acceptance":    acceptance,
+            "respect":       respect,
+            "mastery":       mastery,
+            "purpose":       purpose,
+        })
     };
 
     let activation = world.resource::<SystemActivation>();
@@ -503,6 +564,7 @@ pub fn emit_headless_footer(world: &mut World) -> String {
         "plan_failures_by_reason": event_log.plan_failures_by_reason,
         "interrupts_by_reason": event_log.interrupts_by_reason,
         "continuity_tallies": event_log.continuity_tallies,
+        "welfare_axes": welfare_axes,
     });
 
     let footer_str = footer.to_string();

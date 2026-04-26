@@ -192,6 +192,19 @@ promote *ARGS:
 bisect-canary *ARGS:
     bash scripts/bisect_canary.sh {{ARGS}}
 
+# Build logs/sensitivity-map.json by perturbing every SimConstants leaf
+# ±20% across a 3-seed sweep and recording Spearman rho between the knob
+# and each footer metric. Costly (~5–10h wall) — run on a quiet weekend
+# and commit the output; refresh quarterly. `just explain` reads it to
+# show the top affected metrics per knob.
+#
+# Examples:
+#   just rebuild-sensitivity-map
+#   just rebuild-sensitivity-map magic.*       # only magic.* leaves
+#   just rebuild-sensitivity-map --duration 30 # cheaper smoke variant
+rebuild-sensitivity-map *ARGS:
+    bash scripts/build_sensitivity_map.sh {{ARGS}}
+
 # Multi-seed × multi-rep headless sweep for Phase 5b balance verification.
 # Writes to logs/sweep-<label>/<seed>-<rep>/{narrative,events}.jsonl.
 # Defaults: 5 seeds × 3 reps = 15 runs, 4-way parallel. Requires a release

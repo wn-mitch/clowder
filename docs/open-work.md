@@ -14,19 +14,19 @@ _Last generated: 2026-04-26._
 
 | Status | Count |
 |---|---|
-| In progress | 7 |
+| In progress | 6 |
 | Ready | 9 |
 | Parked | 1 |
 | Blocked | 9 |
 | Done (awaiting archive) | 2 |
-| **Open total** | **26** |
+| **Open total** | **25** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-index` (regenerate this file).
 
-## In progress (7)
+## In progress (6)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[005](docs/open-work/tickets/005-cluster-a-scoring-substrate-refactor.md)** — Scoring substrate refactor cluster (Cluster A — Foundational) — _[A] · added 2026-04-20_
@@ -34,7 +34,6 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[014](docs/open-work/tickets/014-phase-4-follow-ons.md)** — Phase 4 follow-ons — target-taking registration + markers + mate-gender + Mating/PracticeMagic magnitude — _added 2026-04-22_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
 - **[027](docs/open-work/tickets/027-mating-cadence-three-bug-cascade.md)** — Mating cadence — three-bug cascade blocking MatingOccurred — _added 2026-04-25_
-- **[031](docs/open-work/tickets/031-balance-tooling-composition.md)** — Balance-tooling composition layer (verdict / hypothesize / sweep-stats / fingerprint / explain / bisect-canary / promote) — _added 2026-04-26_
 
 ## Ready (9)
 
@@ -78,7 +77,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/). Recent months:
 
-- [2026-04](docs/open-work/landed/2026-04.md) — 35 entries
+- [2026-04](docs/open-work/landed/2026-04.md) — 43 entries
 
 ## Conventions
 
