@@ -9,8 +9,12 @@
 # Saves
 /saves
 
-# Logs
-/logs
+# Logs — ignore contents but preserve the baseline registry
+# (labels are committed so other workstations can adopt the same
+# baseline; current.json is per-machine and gitignored inside
+# logs/baselines/).
+/logs/*
+!/logs/baselines/
 
 # OS
 .DS_Store

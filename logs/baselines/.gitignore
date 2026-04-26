@@ -1,0 +1,4 @@
+# current.json is a per-machine pointer to the active baseline.
+# Per-label files (<label>.json) are committed so other workstations
+# can adopt the same baseline.
+current.json

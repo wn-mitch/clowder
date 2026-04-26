@@ -168,6 +168,30 @@ fingerprint *ARGS:
 explain *ARGS:
     uv run scripts/explain_constant.py {{ARGS}}
 
+# Promote a soak directory to a named first-class baseline. Writes
+# logs/baselines/<label>.json + (unless --no-current) updates
+# logs/baselines/current.json so `just verdict` auto-reads it as the
+# active baseline. Run this after a soak you want as a checkpoint.
+#
+# Examples:
+#   just promote logs/tuned-42 post-state-trio
+#   just promote logs/tuned-42 post-state-trio --no-current
+#   just promote logs/tuned-42 post-state-trio --force
+promote *ARGS:
+    bash scripts/promote.sh {{ARGS}}
+
+# Find the commit that introduced a canary regression. Builds a test
+# script that rebuilds + soaks + probes the metric at each candidate;
+# the loop is run via `jj edit` (or `git bisect run`) until the
+# offending commit is isolated. Defaults to a 60s probe at seed 42.
+#
+# Examples:
+#   just bisect-canary deaths_by_cause.Starvation @
+#   just bisect-canary deaths_by_cause.ShadowFoxAmbush @ --threshold 10
+#   just bisect-canary wards_placed_total @ --threshold 50 --duration 300
+bisect-canary *ARGS:
+    bash scripts/bisect_canary.sh {{ARGS}}
+
 # Multi-seed × multi-rep headless sweep for Phase 5b balance verification.
 # Writes to logs/sweep-<label>/<seed>-<rep>/{narrative,events}.jsonl.
 # Defaults: 5 seeds × 3 reps = 15 runs, 4-way parallel. Requires a release
