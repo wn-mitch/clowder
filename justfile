@@ -142,6 +142,32 @@ verdict *ARGS:
 hypothesize *ARGS:
     uv run scripts/hypothesize.py {{ARGS}}
 
+# Per-metric "is this run in band?" verdict against
+# docs/balance/healthy-colony.md. Pure sense-making companion to
+# `just verdict` — emits per-field verdict (in-range / low / high /
+# below-floor / above-cap) so a non-game-dev can read a soak.
+#
+# Exit codes: 0 every metric in band, 1 concerns, 2 failures (continuity
+# tally at 0, starvation > 0, etc.).
+#
+# Examples:
+#   just fingerprint logs/tuned-42
+#   just fingerprint logs/tuned-42 --text
+fingerprint *ARGS:
+    uv run scripts/fingerprint.py {{ARGS}}
+
+# Explain a SimConstants field: doc comment, current value (read from a
+# recent events.jsonl header), every read site in src/, and (if Tier 4.2
+# sensitivity map exists) per-metric Spearman rho. Resolves dotted paths
+# (e.g. `magic.ward_decay_per_tick`).
+#
+# Examples:
+#   just explain magic.ward_decay_per_tick
+#   just explain fulfillment.social_warmth_socialize_per_tick --text
+#   just explain --list                                # every constant path
+explain *ARGS:
+    uv run scripts/explain_constant.py {{ARGS}}
+
 # Multi-seed × multi-rep headless sweep for Phase 5b balance verification.
 # Writes to logs/sweep-<label>/<seed>-<rep>/{narrative,events}.jsonl.
 # Defaults: 5 seeds × 3 reps = 15 runs, 4-way parallel. Requires a release
