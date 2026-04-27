@@ -14,26 +14,25 @@ _Last generated: 2026-04-27._
 
 | Status | Count |
 |---|---|
-| In progress | 4 |
-| Ready | 25 |
+| In progress | 3 |
+| Ready | 28 |
 | Parked | 1 |
-| Blocked | 6 |
+| Blocked | 9 |
 | Done (awaiting archive) | 2 |
-| **Open total** | **36** |
+| **Open total** | **41** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-index` (regenerate this file).
 
-## In progress (4)
+## In progress (3)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
-- **[013](docs/open-work/tickets/013-spec-follow-on-debts-from-ai-substrate-refactor.md)** — Spec-follow-on debts from AI substrate refactor — _added 2026-04-21_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
 - **[027](docs/open-work/tickets/027-mating-cadence-three-bug-cascade.md)** — Mating cadence — three-bug cascade blocking MatingOccurred — _added 2026-04-25_
 
-## Ready (25)
+## Ready (28)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -60,12 +59,15 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[050](docs/open-work/tickets/050-marker-predicate-refinements.md)** — §4 marker predicate refinements — species-attenuated threat, ward-near-fox truth, event-driven cubs/den — _added 2026-04-27_
 - **[051](docs/open-work/tickets/051-fox-dse-eligibility-migration.md)** — Fox DSE eligibility migration — `.require()`/`.forbid()` cutover for §4 fox markers — _added 2026-04-27_
 - **[052](docs/open-work/tickets/052-l2-10-7-plan-cost-feedback.md)** — §L2.10.7 plan-cost feedback — `SpatialConsideration` curves on spatially-sensitive DSEs — _added 2026-04-27_
+- **[054](docs/open-work/tickets/054-fate-event-vocabulary-expansion.md)** — §7.7.c Fate event-vocabulary expansion — Calling, destiny, fated-pair convergence — _added 2026-04-27_
+- **[056](docs/open-work/tickets/056-aspiration-compatibility-matrix.md)** — §7.7.1 aspiration compatibility matrix — hard/soft conflict enumeration — _added 2026-04-27_
+- **[058](docs/open-work/tickets/058-tradition-unfiltered-loop-fix.md)** — §3.5.3 item 1 Tradition modifier — fix unfiltered-loop port — _added 2026-04-27_
 
 ## Parked (1)
 
 - **[015](docs/open-work/tickets/015-alloparenting-reframe-b.md)** — Alloparenting Reframe B — mama drops kitten at hearth near resting elder — _parked 2026-04-22 · added 2026-04-22_
 
-## Blocked (6)
+## Blocked (9)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _blocked-by 007, 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _blocked-by 016 · added 2026-04-22_
@@ -73,6 +75,9 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[019](docs/open-work/tickets/019-happy-paths-usage-worn-trails.md)** — Happy paths — usage-worn trails — _blocked-by 020 · added 2026-04-22_
 - **[021](docs/open-work/tickets/021-monuments.md)** — Monuments — civic & memorial structures — _blocked-by 020 · added 2026-04-22_
 - **[026](docs/open-work/tickets/026-apprenticeship-xp-boost.md)** — Apprenticeship XP-boost on per-skill Skills component — _blocked-by mastery-restoration iteration 2 · added 2026-04-24_
+- **[053](docs/open-work/tickets/053-death-event-grief-emission.md)** — §7.7.b death-event grief emission — relationship-classified survivors payload — _blocked-by 007 · added 2026-04-27_
+- **[055](docs/open-work/tickets/055-mood-drift-threshold-detection.md)** — §7.7.d mood drift-threshold detection — sustain-duration + arc-misalignment trigger — _blocked-by 056 · added 2026-04-27_
+- **[057](docs/open-work/tickets/057-coordinator-directive-intention-strategy-row.md)** — §7.3 coordinator-directive Intention strategy row — `SingleMinded` with override — _blocked-by 007 · added 2026-04-27_
 
 ## Done (awaiting archive) (2)
 
@@ -88,7 +93,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/). Recent months:
 
-- [2026-04](docs/open-work/landed/2026-04.md) — 53 entries
+- [2026-04](docs/open-work/landed/2026-04.md) — 54 entries
 
 ## Conventions
 
