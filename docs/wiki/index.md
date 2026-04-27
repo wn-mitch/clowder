@@ -8,8 +8,8 @@ Auto-generated reference for the Clowder cat colony simulation.
 
 | Metric | Count |
 |--------|-------|
-| Registered system functions | 113 |
-| System modules | 35 |
+| Registered system functions | 125 |
+| System modules | 36 |
 | Component types | 129 |
 | Resource types | 35 |
 | Message types | 3 |

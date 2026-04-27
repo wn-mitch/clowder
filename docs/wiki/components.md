@@ -560,7 +560,7 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 ### HasMentoringTarget (struct)
 
-> ≥1 other cat has a skill below 0.3 where this cat has the same skill above 0.6 (per-cat relative predicate). `aspirations.rs::update_mentoring_markers`.
+> ≥1 other cat has a skill below 0.3 where this cat has the same skill above 0.6 (per-cat relative predicate). `aspirations.rs::update_mentoring_target_markers`.
 
 ### HasEligibleMate (struct)
 
@@ -602,35 +602,35 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 ### HasCubs (struct)
 
-> Fox has ≥1 cub at its den. Event-driven (`CubsBorn` + on-despawn cleanup).
+> Fox has ≥1 cub at its den. Per-tick author scan today (`fox_spatial.rs::update_cub_marker`); event-driven follow-on (`CubsBorn` / on-despawn) deferred to a separate ticket.
 
 ### CubsHungry (struct)
 
-> `cub_satiation < 0.4`. `fox_goap.rs::update_cub_hunger_markers`.
+> `cub_satiation < 0.4`. `fox_spatial.rs::update_cub_hunger_markers`.
 
 ### IsDispersingJuvenile (struct)
 
-> Juvenile fox with no home den (dispersal eligibility). `fox_goap.rs::update_juvenile_dispersal_markers`.
+> Juvenile fox with no home den (dispersal eligibility). `fox_spatial.rs::update_juvenile_dispersal_markers`.
 
 ### HasDen (struct)
 
-> Fox has a home den. Event-driven (`DenClaimed` / `DenLost`).
+> Fox has a home den. Per-tick author scan today (`fox_spatial.rs::update_den_marker`); event-driven follow-on (`DenClaimed` / `DenLost`) deferred to a separate ticket.
 
 ### Visitor (struct)
 
-> Non-colony cat present on the map (Wandering Loner / Trader / Scout per `docs/systems/trade.md`). Observer-Cat × target-Cat: demote `Same` → `Neutral`.
+> Non-colony cat present on the map (Wandering Loner / Trader / Scout per `docs/systems/trade.md`). Observer-Cat × target-Cat: demote `Same` → `Neutral`. Authoritative-on-arrival: the trade subsystem (Aspirational) inserts on spawn / removes on depart; no per-tick author system.
 
 ### HostileVisitor (struct)
 
-> Hostile-Loner variant. Observer-Cat × target-Cat: demote `Same` → `Enemy`.
+> Hostile-Loner variant. Observer-Cat × target-Cat: demote `Same` → `Enemy`. Same authoritative-on-arrival lifecycle as `Visitor`.
 
 ### Banished (struct)
 
-> Cat exiled from the colony. Observer-Cat × target-Cat: demote `Same` → `Enemy`. See §9.2 — today's `combat.rs::pending_banishments` path is shadowfox-only; extending to cat-on-cat lands in Phase 3d.
+> Cat exiled from the colony. Observer-Cat × target-Cat: demote `Same` → `Enemy`. Inserted by `combat.rs::resolve_combat` when a cat appears in the `pending_banishments` list (today's shadowfox path despawns wildlife; the cat-on-cat branch tags rather than despawns). The trigger that pushes a cat onto `pending_banishments` is left to a future ticket.
 
 ### BefriendedAlly (struct)
 
-> Fox or prey-species target befriended through repeated non-hostile contact. Observer-Cat × target-Fox: upgrade `Predator` → `Ally` (reciprocal on fox: `Prey` → `Ally`). `social.rs::befriend_wildlife`.
+> Fox or prey-species target befriended through repeated non-hostile contact. Observer-Cat × target-Fox: upgrade `Predator` → `Ally` (reciprocal on fox: `Prey` → `Ally`). Authored by `social.rs::befriend_wildlife` from a cat ↔ wildlife familiarity threshold.
 
 ## `src/components/mental.rs`
 

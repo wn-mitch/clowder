@@ -37,8 +37,32 @@ graph TD
         combat_update_combat_marker --> magic_update_corrupted_tile_markers
         sensing_update_terrain_markers["sensing::update_terrain_markers"]
         magic_update_corrupted_tile_markers --> sensing_update_terrain_markers
+        aspirations_update_training_markers["aspirations::update_training_markers"]
+        sensing_update_terrain_markers --> aspirations_update_training_markers
+        aspirations_update_mentoring_target_markers["aspirations::update_mentoring_target_markers"]
+        aspirations_update_training_markers --> aspirations_update_mentoring_target_markers
+        growth_update_parent_markers["growth::update_parent_markers"]
+        aspirations_update_mentoring_target_markers --> growth_update_parent_markers
+        sensing_update_target_existence_markers["sensing::update_target_existence_markers"]
+        growth_update_parent_markers --> sensing_update_target_existence_markers
+        fox_spatial_update_store_awareness_markers["fox_spatial::update_store_awareness_markers"]
+        sensing_update_target_existence_markers --> fox_spatial_update_store_awareness_markers
+        fox_spatial_update_den_threat_markers["fox_spatial::update_den_threat_markers"]
+        fox_spatial_update_store_awareness_markers --> fox_spatial_update_den_threat_markers
+        fox_spatial_update_ward_detection_markers["fox_spatial::update_ward_detection_markers"]
+        fox_spatial_update_den_threat_markers --> fox_spatial_update_ward_detection_markers
+        fox_spatial_update_cub_marker["fox_spatial::update_cub_marker"]
+        fox_spatial_update_ward_detection_markers --> fox_spatial_update_cub_marker
+        fox_spatial_update_cub_hunger_markers["fox_spatial::update_cub_hunger_markers"]
+        fox_spatial_update_cub_marker --> fox_spatial_update_cub_hunger_markers
+        fox_spatial_update_juvenile_dispersal_markers["fox_spatial::update_juvenile_dispersal_markers"]
+        fox_spatial_update_cub_hunger_markers --> fox_spatial_update_juvenile_dispersal_markers
+        fox_spatial_update_den_marker["fox_spatial::update_den_marker"]
+        fox_spatial_update_juvenile_dispersal_markers --> fox_spatial_update_den_marker
+        social_befriend_wildlife["social::befriend_wildlife"]
+        fox_spatial_update_den_marker --> social_befriend_wildlife
         needs_decay_grooming["needs::decay_grooming"]
-        sensing_update_terrain_markers --> needs_decay_grooming
+        social_befriend_wildlife --> needs_decay_grooming
         needs_eat_from_inventory["needs::eat_from_inventory"]
         needs_decay_grooming --> needs_eat_from_inventory
         needs_decay_exploration["needs::decay_exploration"]

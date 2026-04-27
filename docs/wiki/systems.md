@@ -55,18 +55,19 @@ Status of each design document cross-referenced against `SimulationPlugin::build
 
 System modules with registered functions but no design doc:
 
-- **aspirations**: select_aspirations, check_second_aspiration_slot, check_aspiration_abandonment, track_milestones
+- **aspirations**: update_training_markers, update_mentoring_target_markers, select_aspirations, check_second_aspiration_slot, check_aspiration_abandonment, track_milestones
 - **colony_score**: emit_colony_score
 - **fate**: assign_fated_connections, awaken_fated_connections
 - **fertility**: handle_post_partum_reinsert, update_fertility_phase
 - **fox_goap**: sync_fox_needs, fox_evaluate_and_plan, fox_resolve_goap_plans, feed_cubs_at_dens, resolve_paired_confrontations
+- **fox_spatial**: update_store_awareness_markers, update_den_threat_markers, update_ward_detection_markers, update_cub_marker, update_cub_hunger_markers, update_juvenile_dispersal_markers, update_den_marker
 - **fulfillment**: decay_fulfillment, bond_proximity_social_warmth
 - **goap**: check_anxiety_interrupts, evaluate_and_plan, resolve_goap_plans, emit_plan_narrative
-- **growth**: update_life_stage_markers, tick_kitten_growth, kitten_mood_aura
+- **growth**: update_life_stage_markers, update_parent_markers, tick_kitten_growth, kitten_mood_aura
 - **incapacitation**: update_incapacitation
 - **pregnancy**: tick_pregnancy
 - **prey**: prey_population, prey_hunger, prey_ai, prey_scent_tick, prey_den_lifecycle, update_den_pressure, apply_den_raids, orphan_prey_adopt_or_found
-- **sensing**: update_terrain_markers
+- **sensing**: update_terrain_markers, update_target_existence_markers
 - **snapshot**: emit_cat_snapshots, emit_position_traces, emit_spatial_snapshots
 - **task_chains**: resolve_task_chains
 - **trace_emit**: emit_focal_trace
