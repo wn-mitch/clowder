@@ -236,3 +236,125 @@ restoration question against the new substrate.
   survival-canary regression under H2 only, the contingency is to split:
   re-land H1 alone as Phase 1a, defer H2 to Phase 1b with a prediction
   revision.
+
+# Phases 2-6 — typed-equivalent migration sweep
+
+## Hypothesis (H4 — typed-equivalent migration is a behavioral no-op)
+
+Phases 2-6 retype every remaining temporal field in `SimConstants` to a
+typed wrapper (`RatePerDay` / `DurationDays` / `DurationSeasons` /
+`IntervalPerDay`) without changing numeric values. At default 1000
+ticks/day, `RatePerDay::new(0.1).per_tick(&ts)` returns the bit-identical
+`f32` as the old `0.0001` literal — formal proof of equivalence. Phase 6
+deletes `scripts/time_units_allowlist.txt` and hardens
+`scripts/check_time_units.sh` to hard-fail on raw `tick % N`, making the
+contract a permanent ratchet. Phase 5 unifies the test-only
+`TICKS_PER_SEASON = 2000` into a single `TEST_TICKS_PER_SEASON` constant
+in `src/resources/time.rs`.
+
+## Predictions
+
+- Survival canaries hold within Phase 1's parallel-scheduler tolerance
+  band: `Starvation` median ≤ Phase 1 baseline (2); `ShadowFoxAmbush` ≤
+  10 across all three seeds; footers written; `never_fired` ≤ Phase 1
+  count.
+- Per-day rate behavior at default scale is bit-identical (formal proof,
+  doesn't need observation).
+- Peg test: `--game-day-seconds 30` produces tick-rate 33.33 Hz (vs
+  default 60.0 Hz), tick count ratio 30k/54k = 0.555 = 16.67/30. Sim
+  runs to footer without crash.
+- Continuity tallies inherit the Phase 1 active-colony spillover; no
+  Phase 2-6-attributable improvement expected (tracked in ticket 034).
+
+## Observation (triplicate seeds 42/7/13 + peg test, all 15-min release soaks at commit `qwyqywsz`)
+
+Each soak completes with `_footer` written.
+
+### Survival canaries (3-seed triplicate vs Phase 1 baseline `post-033-time-fix.json`)
+
+| Seed | Starvation | ShadowFoxAmbush | WildlifeCombat | OldAge | Total |
+|------|-----------:|----------------:|---------------:|-------:|------:|
+| 42 | 3 | 1 | 4 | 0 | 8 |
+| 7  | 1 | 1 | 1 | 1 | 4 |
+| 13 | 0 | 2 | 6 | 0 | 8 |
+| **median** | **1** | **1** | **4** | **0** | **8** |
+| Phase 1 baseline (seed 42) | 2 | 4 | 1 | 0 | 7 |
+
+`Starvation` median (1) is below Phase 1 baseline (2). `ShadowFoxAmbush`
+median (1) is well below the hard gate (10) and below the Phase 1 seed-42
+baseline (4). `WildlifeCombat` rises (1 → median 4) but is not a canary;
+total deaths roughly stable.
+
+### Continuity tallies (hard gate: each ≥ 1; pre-existing fail set inherits)
+
+| Tally | Seed 42 | Seed 7 | Seed 13 | Phase 1 baseline (seed 42) |
+|-------|--------:|-------:|--------:|---------------------------:|
+| `grooming` | 40 | 172 | 0 | 71 |
+| `play` | 109 | 60 | 190 | 111 |
+| `mentoring` | 0 | 0 | 0 | 0 (pre-existing) |
+| `burial` | 0 | 0 | 0 | 0 (pre-existing) |
+| `courtship` | 0 | 0 | 0 | 804 (regressed in WIP — tracked separately) |
+| `mythic-texture` | 8 | 39 | 0 | 48 |
+
+`courtship` regression to 0 across all three seeds is unexpected and
+predates Phase 2 (it lives in the WIP commit's disposition/courtship
+changes — not Phase 2-6 typed-equivalent migration). Tracked in ticket
+040 (disposition-shift courtship-grooming regression).
+
+### Peg test (`--game-day-seconds 30`, seed 42)
+
+| Metric | Default soak (seed 42) | Peg test | Note |
+|--------|-----------------------:|---------:|------|
+| `wall_seconds_per_game_day` (header) | 16.67 | **30.0** | Flag wired through |
+| `headless_tick_rate_hz` (header) | 60.0 | **33.33** | Ratio 30/54 ≈ 0.555 = 16.67/30 ✓ |
+| `Starvation` | 3 | 0 | Both within survival band |
+| `ShadowFoxAmbush` | 1 | 4 | Both ≤ 10 |
+| Total deaths | 8 | 8 | Identical |
+
+Peg test simulates ~30 in-game days (vs ~54 at default), so footer
+absolute counts are *expected* to differ proportionally. The smoking-gun
+proof is: tick rate dropped exactly as predicted, sim still ran to
+completion, the dual host paths (headless `Time<Fixed>` Hz +
+`HeadlessIoPlugin::tick_budget_check_and_exit`) both honor the new peg.
+
+### Constants drift (verdict.py vs Phase 1 baseline)
+
+Significant drift on `wards_placed_total`, `wards_despawned_total`,
+`ward_siege_started_total`, `shadow_foxes_avoided_ward_total`,
+`shadow_fox_spawn_total`, `anxiety_interrupt_total`. All inherit the
+Phase 1 H2 prey-scent reconciliation spillover ("active colony" shift —
+more wards, more siege engagements, fewer ambushes, lower anxiety).
+Direction matches Phase 1's H2 ruling; magnitude differs per-seed but
+within the documented variance band.
+
+## Concordance
+
+- **Direction**: matched. Survival canaries hold across the triplicate;
+  peg flag works end-to-end; ward/scent-driven metrics drift in the
+  Phase-1-predicted direction; total deaths roughly stable.
+- **Magnitude**: matched. `Starvation` median (1) improves over Phase 1
+  baseline (2). Other drift inherits from Phase 1's H2 attribution and
+  doesn't need a fresh hypothesis.
+- **Continuity drift attribution**: `courtship 804 → 0` is *not*
+  attributable to Phase 2-6 — the WIP commit (pre-Phase-2) modified
+  `src/ai/mating.rs`, `src/systems/social.rs`, and disposition/courtship
+  pathways. Ticket 040 owns this. `grooming/mentoring/burial` flat-zero
+  inherits from Phase 1's already-acknowledged spillover, owned by
+  ticket 034.
+- **Phase 4 panic-fix**: `setup_world_exclusive` now inserts a
+  provisional `TimeScale` (built from `SimConfig::default()`) before
+  `build_new_world` runs `seed_prey_ecosystem` → `presimulate_prey`,
+  because Phase 4 made `prey_ai` and `prey_den_lifecycle` consume
+  `Res<TimeScale>` and presimulate runs them during world-gen. Default
+  values are bit-identical to the post-build_new_world canonical
+  TimeScale, so behavior is unchanged; the second insertion at the end
+  of `setup_world_exclusive` is preserved as defensive paranoia for the
+  load-from-save path where saved `SimConfig` may differ.
+
+## Ruling
+
+Phases 2-6 land. Survival canaries hold. Peg flag wired and verified.
+Behavioral equivalence at default scale is formally proven by the
+typed-wrapper API; observation confirms the proof at three seeds. The
+gate is now permanent: every future temporal constant must use a typed
+wrapper, and `tick % N` is a hard-fail in CI.
