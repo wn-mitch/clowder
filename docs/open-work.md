@@ -8,25 +8,25 @@
 > fresh. See `CLAUDE.md` §"Long-horizon coordination" for the request-time
 > checklist and maintenance rules.
 
-_Last generated: 2026-04-26._
+_Last generated: 2026-04-27._
 
 ## Summary
 
 | Status | Count |
 |---|---|
-| In progress | 8 |
+| In progress | 6 |
 | Ready | 16 |
 | Parked | 1 |
 | Blocked | 9 |
 | Done (awaiting archive) | 2 |
-| **Open total** | **34** |
+| **Open total** | **32** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-index` (regenerate this file).
 
-## In progress (8)
+## In progress (6)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[005](docs/open-work/tickets/005-cluster-a-scoring-substrate-refactor.md)** — Scoring substrate refactor cluster (Cluster A — Foundational) — _[A] · added 2026-04-20_
@@ -34,8 +34,6 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[014](docs/open-work/tickets/014-phase-4-follow-ons.md)** — Phase 4 follow-ons — target-taking registration + markers + mate-gender + Mating/PracticeMagic magnitude — _added 2026-04-22_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
 - **[027](docs/open-work/tickets/027-mating-cadence-three-bug-cascade.md)** — Mating cadence — three-bug cascade blocking MatingOccurred — _added 2026-04-25_
-- **[033](docs/open-work/tickets/033-time-unit-typing.md)** — Time-unit typing — make ticks ↔ in-game time ↔ wall-clock a compile-time invariant — _added 2026-04-26_
-- **[042](docs/open-work/tickets/042-non-threat-urgency-preempt-stale-ticks-remaining.md)** — Non-ThreatNearby urgency preempt left ticks_remaining stale, locking cats out of evaluate_and_plan forever — _added 2026-04-26_
 
 ## Ready (16)
 
@@ -86,7 +84,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/). Recent months:
 
-- [2026-04](docs/open-work/landed/2026-04.md) — 45 entries
+- [2026-04](docs/open-work/landed/2026-04.md) — 47 entries
 
 ## Conventions
 
