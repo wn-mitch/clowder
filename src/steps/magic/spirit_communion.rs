@@ -8,6 +8,7 @@ use crate::components::skills::{Corruption, MagicAffinity, Skills};
 use crate::resources::narrative::NarrativeLog;
 use crate::resources::sim_constants::{CombatConstants, MagicConstants};
 use crate::resources::system_activation::{Feature, SystemActivation};
+use crate::resources::time::TimeScale;
 use crate::steps::StepResult;
 
 /// # GOAP step resolver: `SpiritCommunion`
@@ -46,6 +47,7 @@ pub fn resolve_spirit_communion(
     activation: &mut SystemActivation,
     m: &MagicConstants,
     combat: &CombatConstants,
+    time_scale: &TimeScale,
 ) -> StepResult {
     if ticks == 1 {
         if let Some(misfire) =
@@ -53,17 +55,18 @@ pub fn resolve_spirit_communion(
         {
             crate::systems::magic::apply_misfire(
                 misfire, cat_name, mood, corruption, health, pos, commands, log, tick, m, combat,
+                time_scale,
             );
             if matches!(misfire, MisfireEffect::Fizzle) {
                 return StepResult::Fail("misfire: fizzle".into());
             }
         }
     }
-    if ticks >= m.spirit_communion_ticks {
+    if ticks >= m.spirit_communion_duration.ticks(time_scale) {
         activation.record(Feature::SpiritCommunion);
         mood.modifiers.push_back(MoodModifier {
             amount: m.spirit_communion_mood_bonus,
-            ticks_remaining: m.spirit_communion_mood_ticks,
+            ticks_remaining: m.spirit_communion_mood_duration.ticks(time_scale),
             source: "spirit communion".to_string(),
         });
         skills.magic += skills.growth_rate() * m.spirit_communion_skill_growth;

@@ -64,7 +64,7 @@ pub fn corruption_spread(
     mut activation: ResMut<SystemActivation>,
 ) {
     let m = &constants.magic;
-    if !time.tick.is_multiple_of(m.corruption_spread_interval) {
+    if !m.corruption_spread_cadence.fires_at(time.tick, &time_scale) {
         return;
     }
     let corruption_spread_rate = m.corruption_spread_rate.per_tick(&time_scale);
@@ -208,6 +208,7 @@ pub fn apply_remedy_effects(
     let m = &constants.magic;
     let healing_poultice_rate = m.healing_poultice_rate.per_tick(&time_scale);
     let energy_tonic_rate = m.energy_tonic_rate.per_tick(&time_scale);
+    let mood_tonic_ticks = m.mood_tonic_duration.ticks(&time_scale);
     for (entity, mut remedy, mut health, mut needs, mut mood) in &mut query {
         activation.record(Feature::RemedyApplied);
         match remedy.kind {
@@ -222,7 +223,7 @@ pub fn apply_remedy_effects(
                 if remedy.ticks_remaining == remedy.kind.duration() {
                     mood.modifiers.push_back(MoodModifier {
                         amount: m.mood_tonic_bonus,
-                        ticks_remaining: m.mood_tonic_ticks,
+                        ticks_remaining: mood_tonic_ticks,
                         source: "herbal remedy".to_string(),
                     });
                 }
@@ -246,9 +247,11 @@ pub fn personal_corruption_effects(
     _relationships: Res<Relationships>,
     mut rng: ResMut<SimRng>,
     constants: Res<SimConstants>,
+    time_scale: Res<TimeScale>,
     mut activation: ResMut<SystemActivation>,
 ) {
     let m = &constants.magic;
+    let personal_corruption_mood_ticks = m.personal_corruption_mood_duration.ticks(&time_scale);
     // TODO: corruption > 0.5 should also decay fondness toward all known cats
     // in Relationships. This requires mutable access to Relationships plus
     // multi-entity iteration (needs to know *which* cats this cat knows),
@@ -262,7 +265,7 @@ pub fn personal_corruption_effects(
             activation.record(Feature::PersonalCorruptionEffect);
             mood.modifiers.push_back(MoodModifier {
                 amount: m.personal_corruption_mood_penalty,
-                ticks_remaining: m.personal_corruption_mood_ticks,
+                ticks_remaining: personal_corruption_mood_ticks,
                 source: "corruption".to_string(),
             });
         }
@@ -294,6 +297,7 @@ pub fn corruption_tile_effects(
 ) {
     let m = &constants.magic;
     let corruption_health_drain = m.corruption_health_drain.per_tick(&time_scale);
+    let corruption_tile_mood_ticks = m.corruption_tile_mood_duration.ticks(&time_scale);
     for (pos, mut mood, mut health) in &mut cats {
         if !map.in_bounds(pos.x, pos.y) {
             continue;
@@ -308,7 +312,7 @@ pub fn corruption_tile_effects(
                 activation.record(Feature::CorruptionTileEffect);
                 mood.modifiers.push_back(MoodModifier {
                     amount: -m.corruption_tile_mood_threshold * corruption,
-                    ticks_remaining: m.corruption_tile_mood_ticks,
+                    ticks_remaining: corruption_tile_mood_ticks,
                     source: "corrupted ground".to_string(),
                 });
             }
@@ -440,16 +444,17 @@ pub fn herb_seasonal_check(
 // advance_herb_growth
 // ---------------------------------------------------------------------------
 
-/// Every `herb_growth_interval` ticks, advance the growth stage of in-season herbs.
+/// Every `herb_growth_cadence` firing, advance the growth stage of in-season herbs.
 /// Plants start as Sprout and grow toward Blossom while their season is active.
 pub fn advance_herb_growth(
     mut herbs: Query<&mut Herb, With<Harvestable>>,
     time: Res<TimeState>,
+    time_scale: Res<TimeScale>,
     constants: Res<SimConstants>,
     mut activation: ResMut<SystemActivation>,
 ) {
-    let interval = constants.magic.herb_growth_interval;
-    if !time.tick.is_multiple_of(interval) {
+    let cadence = constants.magic.herb_growth_cadence;
+    if !cadence.fires_at(time.tick, &time_scale) {
         return;
     }
 
@@ -470,10 +475,11 @@ pub fn advance_herb_growth(
 pub fn advance_flavor_growth(
     mut plants: Query<&mut FlavorPlant, With<Seasonal>>,
     time: Res<TimeState>,
+    time_scale: Res<TimeScale>,
     constants: Res<SimConstants>,
 ) {
-    let interval = constants.magic.herb_growth_interval;
-    if !time.tick.is_multiple_of(interval) {
+    let cadence = constants.magic.herb_growth_cadence;
+    if !cadence.fires_at(time.tick, &time_scale) {
         return;
     }
 
@@ -490,7 +496,7 @@ pub fn advance_flavor_growth(
 // herb_regrowth — periodically respawn depleted herbs
 // ---------------------------------------------------------------------------
 
-/// Every `herb_regrowth_interval` ticks, check Thornbriar population and
+/// Every `herb_regrowth_cadence` firing, check Thornbriar population and
 /// attempt to spawn a replacement on a random eligible tile if below cap.
 /// Prevents permanent thornbriar depletion from making wards impossible.
 #[allow(clippy::too_many_arguments)]
@@ -498,6 +504,7 @@ pub fn herb_regrowth(
     herbs: Query<&Herb>,
     map: Res<TileMap>,
     time: Res<TimeState>,
+    time_scale: Res<TimeScale>,
     config: Res<SimConfig>,
     constants: Res<SimConstants>,
     mut rng: ResMut<SimRng>,
@@ -507,7 +514,7 @@ pub fn herb_regrowth(
     use crate::components::magic::HerbKind;
 
     let m = &constants.magic;
-    if !time.tick.is_multiple_of(m.herb_regrowth_interval) {
+    if !m.herb_regrowth_cadence.fires_at(time.tick, &time_scale) {
         return;
     }
 
@@ -576,13 +583,14 @@ pub fn spawn_shadow_fox_from_corruption(
     mut rng: ResMut<SimRng>,
     wildlife: Query<&WildAnimal>,
     time: Res<TimeState>,
+    time_scale: Res<TimeScale>,
     mut commands: Commands,
     constants: Res<SimConstants>,
     mut activation: ResMut<SystemActivation>,
     mut event_log: Option<ResMut<crate::resources::event_log::EventLog>>,
 ) {
     let m = &constants.magic;
-    if !time.tick.is_multiple_of(m.shadow_fox_spawn_interval) {
+    if !m.shadow_fox_spawn_cadence.fires_at(time.tick, &time_scale) {
         return;
     }
 
@@ -760,6 +768,7 @@ pub fn resolve_magic_task_chains(
                         &herb_entities,
                         &mut commands,
                         m,
+                        &time_scale,
                     ),
                     &mut chain,
                 );
@@ -774,6 +783,7 @@ pub fn resolve_magic_task_chains(
                         &mut inventory,
                         &mut skills,
                         m,
+                        &time_scale,
                     ),
                     &mut chain,
                 );
@@ -850,6 +860,7 @@ pub fn resolve_magic_task_chains(
                         time.tick,
                         m,
                         &constants.combat,
+                        &time_scale,
                     ),
                     &mut chain,
                 );
@@ -897,6 +908,7 @@ pub fn resolve_magic_task_chains(
                         &mut activation,
                         m,
                         &constants.combat,
+                        &time_scale,
                     ),
                     &mut chain,
                 );
@@ -939,12 +951,13 @@ pub fn apply_misfire(
     tick: u64,
     m: &MagicConstants,
     combat: &crate::resources::sim_constants::CombatConstants,
+    time_scale: &TimeScale,
 ) {
     match effect {
         MisfireEffect::Fizzle => {
             mood.modifiers.push_back(MoodModifier {
                 amount: m.misfire_fizzle_mood_penalty,
-                ticks_remaining: m.misfire_fizzle_mood_ticks,
+                ticks_remaining: m.misfire_fizzle_mood_duration.ticks(time_scale),
                 source: "embarrassment".to_string(),
             });
             log.push(

@@ -3369,6 +3369,7 @@ fn dispatch_step_action(
                 &magic_params.herb_query,
                 commands,
                 &ec.constants.magic,
+                &ec.time_scale,
             );
             if matches!(result, crate::steps::StepResult::Advance) {
                 if let Some(ref mut act) = narr.activation {
@@ -3486,6 +3487,7 @@ fn dispatch_step_action(
                 inventory,
                 skills,
                 &ec.constants.magic,
+                &ec.time_scale,
             )
         }
 
@@ -3547,6 +3549,7 @@ fn dispatch_step_action(
                 ec.time.tick,
                 &ec.constants.magic,
                 &ec.constants.combat,
+                &ec.time_scale,
             );
             if matches!(result, crate::steps::StepResult::Advance) {
                 if let Some(ref mut act) = narr.activation {
@@ -3574,6 +3577,7 @@ fn dispatch_step_action(
                 act.as_deref_mut().unwrap(),
                 &ec.constants.magic,
                 &ec.constants.combat,
+                &ec.time_scale,
             );
             if matches!(result, crate::steps::StepResult::Advance) {
                 magic_params
@@ -3717,7 +3721,7 @@ fn dispatch_step_action(
                         }
                     }
                     crate::steps::StepResult::Continue
-                } else if ticks >= ec.constants.magic.harvest_carcass_ticks {
+                } else if ticks >= ec.constants.magic.harvest_carcass_duration.ticks(&ec.time_scale) {
                     if let Ok((_, mut carcass, _)) =
                         magic_params.carcass_query.get_mut(carcass_entity)
                     {

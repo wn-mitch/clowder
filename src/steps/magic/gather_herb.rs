@@ -3,12 +3,13 @@ use bevy_ecs::prelude::*;
 use crate::components::magic::{Harvestable, Herb, Inventory};
 use crate::components::skills::Skills;
 use crate::resources::sim_constants::MagicConstants;
+use crate::resources::time::TimeScale;
 use crate::steps::StepResult;
 
 /// # GOAP step resolver: `GatherHerb`
 ///
 /// **Real-world effect** — on completion (`ticks >=
-/// gather_herb_ticks`), removes a target `Herb` entity from the
+/// gather_herb_duration.ticks(...)`), removes a target `Herb` entity from the
 /// world and adds it to the actor's `Inventory.herbs`; grows
 /// herbcraft skill.
 ///
@@ -28,6 +29,7 @@ use crate::steps::StepResult;
 ///
 /// **Feature emission** — `Feature::GatherHerbCompleted`
 /// (Positive) on `Advance`.
+#[allow(clippy::too_many_arguments)]
 pub fn resolve_gather_herb(
     ticks: u64,
     target_entity: Option<Entity>,
@@ -39,8 +41,9 @@ pub fn resolve_gather_herb(
     >,
     commands: &mut Commands,
     m: &MagicConstants,
+    time_scale: &TimeScale,
 ) -> StepResult {
-    if ticks >= m.gather_herb_ticks {
+    if ticks >= m.gather_herb_duration.ticks(time_scale) {
         if let Some(herb_e) = target_entity {
             if let Ok((_, herb, _)) = herb_entities.get(herb_e) {
                 if inventory.add_herb(herb.kind) {

@@ -1,6 +1,7 @@
 use crate::components::magic::{Inventory, RemedyKind};
 use crate::components::skills::Skills;
 use crate::resources::sim_constants::MagicConstants;
+use crate::resources::time::TimeScale;
 use crate::steps::StepResult;
 
 /// # GOAP step resolver: `PrepareRemedy`
@@ -33,11 +34,12 @@ pub fn resolve_prepare_remedy(
     inventory: &mut Inventory,
     skills: &mut Skills,
     m: &MagicConstants,
+    time_scale: &TimeScale,
 ) -> StepResult {
     let required_ticks = if at_workshop {
-        m.prepare_remedy_ticks_workshop
+        m.prepare_remedy_duration_workshop.ticks(time_scale)
     } else {
-        m.prepare_remedy_ticks_default
+        m.prepare_remedy_duration_default.ticks(time_scale)
     };
     if ticks >= required_ticks {
         let herb_needed = remedy.required_herb();

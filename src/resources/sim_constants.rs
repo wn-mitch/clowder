@@ -4,7 +4,7 @@ use crate::components::prey::PreyKind;
 use crate::components::sensing::SensorySpecies;
 use crate::components::wildlife::WildSpecies;
 use crate::resources::time::Season;
-use crate::resources::time_units::{DurationSeasons, IntervalPerDay, RatePerDay};
+use crate::resources::time_units::{DurationDays, DurationSeasons, IntervalPerDay, RatePerDay};
 use crate::systems::sensing::{Channel, Falloff, SensoryProfile};
 
 // ---------- SimConstants (top-level resource) ----------
@@ -353,36 +353,10 @@ impl Default for CombatConstants {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MagicConstants {
-    pub corruption_spread_interval: u64,
-    pub corruption_spread_threshold: f32,
+    // --- RatePerDay rates (ticket 033 Phase 2) ---
     pub corruption_spread_rate: RatePerDay,
-    pub corruption_new_tile_threshold: f32,
-    pub ward_post_decay_multiplier: f32,
     pub healing_poultice_rate: RatePerDay,
     pub energy_tonic_rate: RatePerDay,
-    pub mood_tonic_bonus: f32,
-    pub mood_tonic_ticks: u64,
-    pub personal_corruption_mood_threshold: f32,
-    pub personal_corruption_mood_chance: f32,
-    pub personal_corruption_mood_penalty: f32,
-    pub personal_corruption_mood_ticks: u64,
-    pub personal_corruption_erratic_threshold: f32,
-    pub personal_corruption_erratic_chance: f32,
-    pub corruption_tile_mood_threshold: f32,
-    pub corruption_tile_mood_ticks: u64,
-    pub corruption_twisted_herb_threshold: f32,
-    pub shadow_fox_corruption_threshold: f32,
-    pub shadow_fox_spawn_chance: f32,
-    pub shadow_fox_population_cap: usize,
-    pub shadow_fox_spawn_interval: u64,
-    pub gather_herb_ticks: u64,
-    pub herbcraft_gather_skill_growth: f32,
-    pub prepare_remedy_ticks_workshop: u64,
-    pub prepare_remedy_ticks_default: u64,
-    pub herbcraft_prepare_skill_growth: f32,
-    pub gratitude_fondness_gain: f32,
-    pub herbcraft_apply_skill_growth: f32,
-    pub set_ward_ticks: u64,
     /// Per-day strength loss for a thornward at the unsieged baseline
     /// (`Ward::strength` starts at 1.0; decay is linear in
     /// `src/systems/magic.rs:158`). `RatePerDay::new(1.0)` = 1-day
@@ -393,19 +367,110 @@ pub struct MagicConstants {
     /// (`src/steps/magic/set_ward.rs`); the resulting per-tick rate
     /// is stored on `Ward::decay_rate`.
     pub thornward_decay_rate: RatePerDay,
-    pub herbcraft_ward_skill_growth: f32,
-    pub magic_ward_skill_growth: f32,
-    pub scry_ticks: u64,
-    pub scry_memory_strength: f32,
-    pub scry_magic_skill_growth: f32,
     pub cleanse_corruption_rate: RatePerDay,
     pub cleanse_personal_corruption_rate: RatePerDay,
+    /// Health drain per in-game day on tiles with corruption > 0.8.
+    /// Per-day = per-tick × 1000 at the default scale.
+    pub corruption_health_drain: RatePerDay,
+
+    // --- DurationDays durations (ticket 033 Phase 3) ---
+    /// Duration of the mood-tonic positive modifier applied on remedy use.
+    /// Pre-ticket-033 value was `500` raw ticks (= 0.5 days at default scale).
+    #[serde(alias = "mood_tonic_ticks")]
+    pub mood_tonic_duration: DurationDays,
+    /// Duration of the mood penalty applied each time personal corruption
+    /// triggers a mood roll. Pre-ticket-033 value was `10` raw ticks.
+    #[serde(alias = "personal_corruption_mood_ticks")]
+    pub personal_corruption_mood_duration: DurationDays,
+    /// Duration of the mood penalty applied per tick a cat stands on a
+    /// corrupted tile. Pre-ticket-033 value was `5` raw ticks.
+    #[serde(alias = "corruption_tile_mood_ticks")]
+    pub corruption_tile_mood_duration: DurationDays,
+    /// Time required to gather one herb. Pre-ticket-033 value was `5` raw ticks.
+    #[serde(alias = "gather_herb_ticks")]
+    pub gather_herb_duration: DurationDays,
+    /// Time required to prepare a remedy at a workshop. Pre-ticket-033 value
+    /// was `10` raw ticks.
+    #[serde(alias = "prepare_remedy_ticks_workshop")]
+    pub prepare_remedy_duration_workshop: DurationDays,
+    /// Time required to prepare a remedy without a workshop. Pre-ticket-033
+    /// value was `15` raw ticks.
+    #[serde(alias = "prepare_remedy_ticks_default")]
+    pub prepare_remedy_duration_default: DurationDays,
+    /// Time required to set a ward. Pre-ticket-033 value was `8` raw ticks.
+    #[serde(alias = "set_ward_ticks")]
+    pub set_ward_duration: DurationDays,
+    /// Time required to complete a scrying. Pre-ticket-033 value was `10`
+    /// raw ticks.
+    #[serde(alias = "scry_ticks")]
+    pub scry_duration: DurationDays,
+    /// Maximum time spent on a single CleanseCorruption step before the
+    /// step Advances even if the tile isn't fully cleansed. Pre-ticket-033
+    /// value was `100` raw ticks.
+    #[serde(alias = "cleanse_max_ticks")]
+    pub cleanse_max_duration: DurationDays,
+    /// Time required to complete a SpiritCommunion. Pre-ticket-033 value
+    /// was `15` raw ticks.
+    #[serde(alias = "spirit_communion_ticks")]
+    pub spirit_communion_duration: DurationDays,
+    /// Duration of the mood bonus applied on a successful SpiritCommunion.
+    /// Pre-ticket-033 value was `100` raw ticks.
+    #[serde(alias = "spirit_communion_mood_ticks")]
+    pub spirit_communion_mood_duration: DurationDays,
+    /// Duration of the mood penalty applied on a misfire fizzle.
+    /// Pre-ticket-033 value was `20` raw ticks.
+    #[serde(alias = "misfire_fizzle_mood_ticks")]
+    pub misfire_fizzle_mood_duration: DurationDays,
+    /// Time required to harvest a carcass for shadow bone.
+    /// Pre-ticket-033 value was `15` raw ticks.
+    #[serde(alias = "harvest_carcass_ticks")]
+    pub harvest_carcass_duration: DurationDays,
+
+    // --- IntervalPerDay cadences (ticket 033 Phase 3) ---
+    /// Cadence at which `corruption_spread` runs. Pre-ticket-033 value was
+    /// `10` (raw ticks; 10×/day at the new 1000-ticks/day scale, behaviour
+    /// is preserved by `IntervalPerDay::new(100.0)`). Flagged for follow-on
+    /// rebalancing — see ticket 033 spec for context.
+    #[serde(alias = "corruption_spread_interval")]
+    pub corruption_spread_cadence: IntervalPerDay,
+    /// Cadence at which `spawn_shadow_fox_from_corruption` rolls. Pre-ticket-033
+    /// value was `10` raw ticks (= 100/day). Flagged for follow-on rebalancing.
+    #[serde(alias = "shadow_fox_spawn_interval")]
+    pub shadow_fox_spawn_cadence: IntervalPerDay,
+    /// Cadence at which herb / flavor-plant growth advances by one stage.
+    /// Pre-ticket-033 value was `200` raw ticks (= 5/day).
+    #[serde(alias = "herb_growth_interval")]
+    pub herb_growth_cadence: IntervalPerDay,
+    /// Cadence at which herb regrowth is attempted. Pre-ticket-033 value was
+    /// `500` raw ticks (= 2/day).
+    #[serde(alias = "herb_regrowth_interval")]
+    pub herb_regrowth_cadence: IntervalPerDay,
+
+    // --- Scalar tuning (non-temporal) ---
+    pub corruption_spread_threshold: f32,
+    pub corruption_new_tile_threshold: f32,
+    pub ward_post_decay_multiplier: f32,
+    pub mood_tonic_bonus: f32,
+    pub personal_corruption_mood_threshold: f32,
+    pub personal_corruption_mood_chance: f32,
+    pub personal_corruption_mood_penalty: f32,
+    pub personal_corruption_erratic_threshold: f32,
+    pub personal_corruption_erratic_chance: f32,
+    pub corruption_tile_mood_threshold: f32,
+    pub corruption_twisted_herb_threshold: f32,
+    pub shadow_fox_corruption_threshold: f32,
+    pub shadow_fox_spawn_chance: f32,
+    pub herbcraft_gather_skill_growth: f32,
+    pub herbcraft_prepare_skill_growth: f32,
+    pub gratitude_fondness_gain: f32,
+    pub herbcraft_apply_skill_growth: f32,
+    pub herbcraft_ward_skill_growth: f32,
+    pub magic_ward_skill_growth: f32,
+    pub scry_memory_strength: f32,
+    pub scry_magic_skill_growth: f32,
     pub cleanse_magic_skill_growth: f32,
     pub cleanse_done_threshold: f32,
-    pub cleanse_max_ticks: u64,
-    pub spirit_communion_ticks: u64,
     pub spirit_communion_mood_bonus: f32,
-    pub spirit_communion_mood_ticks: u64,
     pub spirit_communion_skill_growth: f32,
     pub misfire_skill_safe_ratio: f32,
     pub misfire_chance_scale: f32,
@@ -414,33 +479,26 @@ pub struct MagicConstants {
     pub misfire_inverted_ward_threshold: f32,
     pub misfire_wound_transfer_threshold: f32,
     pub misfire_fizzle_mood_penalty: f32,
-    pub misfire_fizzle_mood_ticks: u64,
     pub misfire_corruption_backsplash_amount: f32,
     /// Multiplier on ward repel radius for shadow foxes (corrupted creatures).
     pub shadow_fox_ward_repel_multiplier: f32,
-    /// Ticks between each growth stage advance for herbs and flavor plants.
-    pub herb_growth_interval: u64,
-    /// Ticks between herb regrowth attempts.
-    pub herb_regrowth_interval: u64,
     /// Chance per attempt that a regrowth herb actually spawns.
     pub herb_regrowth_chance: f32,
-    /// Max concurrent Thornbriar herbs allowed (prevents unbounded growth).
-    pub thornbriar_regrowth_cap: u32,
     /// Growth rate multiplier for thornbriar in gardens (slower than food crops).
     pub thornbriar_farm_growth_modifier: f32,
-    /// Ticks to harvest a carcass for shadow bone.
-    pub harvest_carcass_ticks: u64,
     /// Personal corruption gained when harvesting a carcass.
     pub harvest_corruption_gain: f32,
     /// Corruption above this threshold suppresses herb harvestability.
     pub herb_suppression_threshold: f32,
-    /// Health drain per in-game day on tiles with corruption > 0.8.
-    /// Per-day = per-tick × 1000 at the default scale.
-    pub corruption_health_drain: RatePerDay,
     /// Corruption threshold above which health drain applies.
     pub corruption_health_drain_threshold: f32,
     /// Rest quality multiplier on corrupted tiles (lower = worse rest).
     pub corruption_rest_penalty: f32,
+
+    // --- Counts / radii ---
+    pub shadow_fox_population_cap: usize,
+    /// Max concurrent Thornbriar herbs allowed (prevents unbounded growth).
+    pub thornbriar_regrowth_cap: u32,
     /// Inner radius (manhattan) of the territory corruption ring query.
     /// Tiles closer than this to colony center are ignored (safe core).
     pub territory_corruption_inner_radius: i32,
@@ -452,57 +510,65 @@ pub struct MagicConstants {
 impl Default for MagicConstants {
     fn default() -> Self {
         Self {
-            corruption_spread_interval: 10,
-            corruption_spread_threshold: 0.3,
+            // RatePerDay rates (Phase 2)
             corruption_spread_rate: RatePerDay::new(0.1),
-            corruption_new_tile_threshold: 0.05,
-            ward_post_decay_multiplier: 0.3,
             healing_poultice_rate: RatePerDay::new(8.0),
             energy_tonic_rate: RatePerDay::new(3.0),
+            thornward_decay_rate: RatePerDay::new(1.0),
+            cleanse_corruption_rate: RatePerDay::new(1.0),
+            cleanse_personal_corruption_rate: RatePerDay::new(0.5),
+            corruption_health_drain: RatePerDay::new(0.5),
+
+            // DurationDays durations (Phase 3) — preserve raw-tick numerics at
+            // default 1000 ticks/day.
+            mood_tonic_duration: DurationDays::new(0.5),
+            personal_corruption_mood_duration: DurationDays::new(0.01),
+            corruption_tile_mood_duration: DurationDays::new(0.005),
+            gather_herb_duration: DurationDays::new(0.005),
+            prepare_remedy_duration_workshop: DurationDays::new(0.01),
+            prepare_remedy_duration_default: DurationDays::new(0.015),
+            set_ward_duration: DurationDays::new(0.008),
+            scry_duration: DurationDays::new(0.01),
+            cleanse_max_duration: DurationDays::new(0.1),
+            spirit_communion_duration: DurationDays::new(0.015),
+            spirit_communion_mood_duration: DurationDays::new(0.1),
+            misfire_fizzle_mood_duration: DurationDays::new(0.02),
+            harvest_carcass_duration: DurationDays::new(0.015),
+
+            // IntervalPerDay cadences (Phase 3) — preserve raw-tick numerics at
+            // default 1000 ticks/day. Values 100/day (= every 10 ticks) for
+            // corruption-spread + shadow-fox-spawn are flagged for follow-on
+            // rebalancing per ticket 033 spec; migrating preserves behavior.
+            corruption_spread_cadence: IntervalPerDay::new(100.0),
+            shadow_fox_spawn_cadence: IntervalPerDay::new(100.0),
+            herb_growth_cadence: IntervalPerDay::new(5.0),
+            herb_regrowth_cadence: IntervalPerDay::new(2.0),
+
+            // Scalar tuning
+            corruption_spread_threshold: 0.3,
+            corruption_new_tile_threshold: 0.05,
+            ward_post_decay_multiplier: 0.3,
             mood_tonic_bonus: 0.2,
-            mood_tonic_ticks: 500,
             personal_corruption_mood_threshold: 0.3,
             personal_corruption_mood_chance: 0.05,
             personal_corruption_mood_penalty: -0.15,
-            personal_corruption_mood_ticks: 10,
             personal_corruption_erratic_threshold: 0.7,
             personal_corruption_erratic_chance: 0.02,
             corruption_tile_mood_threshold: 0.1,
-            corruption_tile_mood_ticks: 5,
             corruption_twisted_herb_threshold: 0.3,
             shadow_fox_corruption_threshold: 0.85,
             shadow_fox_spawn_chance: 0.001,
-            // Restored to 2 (from 0) for the post-substrate-refactor
-            // baseline-dataset capture. The v0.2.0 disable was provisional
-            // — the food/building/survival loops have held green on seed 42
-            // through Phase 4 (target-taking ports, marker authoring, §7.2
-            // commitment gate, respect-iter-2). Re-engaging shadowfoxes is
-            // a precondition for the deferred corruption-defense balance
-            // work that the upcoming baseline dataset is meant to anchor.
-            shadow_fox_population_cap: 2,
-            shadow_fox_spawn_interval: 10,
-            gather_herb_ticks: 5,
             herbcraft_gather_skill_growth: 0.01,
-            prepare_remedy_ticks_workshop: 10,
-            prepare_remedy_ticks_default: 15,
             herbcraft_prepare_skill_growth: 0.01,
             gratitude_fondness_gain: 0.1,
             herbcraft_apply_skill_growth: 0.005,
-            set_ward_ticks: 8,
-            thornward_decay_rate: RatePerDay::new(1.0),
             herbcraft_ward_skill_growth: 0.01,
             magic_ward_skill_growth: 0.01,
-            scry_ticks: 10,
             scry_memory_strength: 0.6,
             scry_magic_skill_growth: 0.01,
-            cleanse_corruption_rate: RatePerDay::new(1.0),
-            cleanse_personal_corruption_rate: RatePerDay::new(0.5),
             cleanse_magic_skill_growth: 0.005,
             cleanse_done_threshold: 0.05,
-            cleanse_max_ticks: 100,
-            spirit_communion_ticks: 15,
             spirit_communion_mood_bonus: 0.3,
-            spirit_communion_mood_ticks: 100,
             spirit_communion_skill_growth: 0.01,
             misfire_skill_safe_ratio: 0.8,
             misfire_chance_scale: 0.5,
@@ -511,24 +577,29 @@ impl Default for MagicConstants {
             misfire_inverted_ward_threshold: 0.7,
             misfire_wound_transfer_threshold: 0.9,
             misfire_fizzle_mood_penalty: -0.1,
-            misfire_fizzle_mood_ticks: 20,
             misfire_corruption_backsplash_amount: 0.1,
             // Bumped from 2.0 to 3.0: the 15-min sim showed wards deflecting
             // shadow foxes but still allowing kills because cat activity zones
             // were outside the effective radius. 3.0 makes a ward cover a cat
             // cluster rather than just the ward itself.
             shadow_fox_ward_repel_multiplier: 3.0,
-            herb_growth_interval: 200,
-            herb_regrowth_interval: 500,
             herb_regrowth_chance: 0.3,
-            thornbriar_regrowth_cap: 30,
             thornbriar_farm_growth_modifier: 0.5,
-            harvest_carcass_ticks: 15,
             harvest_corruption_gain: 0.05,
             herb_suppression_threshold: 0.5,
-            corruption_health_drain: RatePerDay::new(0.5),
             corruption_health_drain_threshold: 0.8,
             corruption_rest_penalty: 0.5,
+
+            // Counts / radii
+            // Restored to 2 (from 0) for the post-substrate-refactor
+            // baseline-dataset capture. The v0.2.0 disable was provisional
+            // — the food/building/survival loops have held green on seed 42
+            // through Phase 4 (target-taking ports, marker authoring, §7.2
+            // commitment gate, respect-iter-2). Re-engaging shadowfoxes is
+            // a precondition for the deferred corruption-defense balance
+            // work that the upcoming baseline dataset is meant to anchor.
+            shadow_fox_population_cap: 2,
+            thornbriar_regrowth_cap: 30,
             territory_corruption_inner_radius: 15,
             territory_corruption_outer_radius: 35,
         }
@@ -641,6 +712,21 @@ impl Default for SocialConstants {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoodConstants {
+    // --- DurationDays durations (ticket 033 Phase 3) ---
+    /// Duration of a contagion mood modifier pushed onto a nearby cat.
+    /// Pre-ticket-033 value was `5` raw ticks (= 0.005 days at default scale).
+    #[serde(alias = "contagion_modifier_ticks")]
+    pub contagion_modifier_duration: DurationDays,
+    /// Duration of the contentment mood bonus applied to well-fed cats.
+    /// Pre-ticket-033 value was `10` raw ticks.
+    #[serde(alias = "contentment_mood_ticks")]
+    pub contentment_mood_duration: DurationDays,
+    /// Duration of the social-warmth mood bonus from being near a bonded
+    /// companion. Pre-ticket-033 value was `5` raw ticks.
+    #[serde(alias = "bond_proximity_mood_ticks")]
+    pub bond_proximity_mood_duration: DurationDays,
+
+    // --- Scalar tuning (non-temporal) ---
     pub baseline_optimism_weight: f32,
     pub baseline_offset: f32,
     pub anxiety_amplification: f32,
@@ -648,21 +734,27 @@ pub struct MoodConstants {
     pub wounded_pride_respect_threshold: f32,
     pub wounded_pride_scale: f32,
     pub patience_extension_scale: f32,
-    pub contagion_range: i32,
     pub contagion_base_influence: f32,
     pub contagion_stubbornness_resistance: f32,
-    pub contagion_modifier_ticks: u64,
     pub contentment_phys_threshold: f32,
     pub contentment_mood_bonus: f32,
-    pub contentment_mood_ticks: u64,
     pub bond_proximity_mood: f32,
-    pub bond_proximity_mood_ticks: u64,
+
+    // --- Counts / radii ---
+    pub contagion_range: i32,
     pub bond_proximity_range: i32,
 }
 
 impl Default for MoodConstants {
     fn default() -> Self {
         Self {
+            // DurationDays durations (Phase 3) — preserve raw-tick numerics at
+            // default 1000 ticks/day.
+            contagion_modifier_duration: DurationDays::new(0.005),
+            contentment_mood_duration: DurationDays::new(0.01),
+            bond_proximity_mood_duration: DurationDays::new(0.005),
+
+            // Scalar tuning
             baseline_optimism_weight: 0.4,
             baseline_offset: -0.05,
             anxiety_amplification: 0.5,
@@ -670,15 +762,14 @@ impl Default for MoodConstants {
             wounded_pride_respect_threshold: 0.3,
             wounded_pride_scale: 0.15,
             patience_extension_scale: 0.3,
-            contagion_range: 3,
             contagion_base_influence: 0.002,
             contagion_stubbornness_resistance: 0.2,
-            contagion_modifier_ticks: 5,
             contentment_phys_threshold: 0.85,
             contentment_mood_bonus: 0.05,
-            contentment_mood_ticks: 10,
             bond_proximity_mood: 0.03,
-            bond_proximity_mood_ticks: 5,
+
+            // Counts / radii
+            contagion_range: 3,
             bond_proximity_range: 3,
         }
     }

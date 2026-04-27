@@ -52,7 +52,7 @@ pub fn resolve_set_ward(
     combat: &CombatConstants,
     time_scale: &TimeScale,
 ) -> StepResult {
-    if ticks >= m.set_ward_ticks {
+    if ticks >= m.set_ward_duration.ticks(time_scale) {
         // Consume thornbriar if setting a thornward.
         if kind == WardKind::Thornward
             && !inventory.take_herb(crate::components::magic::HerbKind::Thornbriar)
@@ -67,7 +67,7 @@ pub fn resolve_set_ward(
             {
                 crate::systems::magic::apply_misfire(
                     misfire, cat_name, mood, corruption, health, pos, commands, log, tick, m,
-                    combat,
+                    combat, time_scale,
                 );
                 if matches!(misfire, MisfireEffect::Fizzle) {
                     return StepResult::Fail("misfire: fizzle".into());

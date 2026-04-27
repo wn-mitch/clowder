@@ -6,6 +6,7 @@ use crate::components::physical::{Dead, Needs, Position};
 use crate::resources::relationships::Relationships;
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::system_activation::{Feature, SystemActivation};
+use crate::resources::time::TimeScale;
 
 // ---------------------------------------------------------------------------
 // update_mood system
@@ -19,8 +20,10 @@ use crate::resources::system_activation::{Feature, SystemActivation};
 pub fn update_mood(
     mut query: Query<(&mut Mood, &Personality, &Needs), Without<Dead>>,
     constants: Res<SimConstants>,
+    time_scale: Res<TimeScale>,
 ) {
     let c = &constants.mood;
+    let contentment_mood_ticks = c.contentment_mood_duration.ticks(&time_scale);
     for (mut mood, personality, needs) in &mut query {
         // Tick down and remove expired modifiers.
         mood.modifiers.retain_mut(|m| {
@@ -72,7 +75,7 @@ pub fn update_mood(
         {
             mood.modifiers.push_back(MoodModifier {
                 amount: c.contentment_mood_bonus,
-                ticks_remaining: c.contentment_mood_ticks,
+                ticks_remaining: contentment_mood_ticks,
                 source: "contentment".to_string(),
             });
         }
@@ -109,9 +112,11 @@ pub fn mood_contagion(
     mut query: Query<(Entity, &Position, &mut Mood, &Personality), Without<Dead>>,
     relationships: Res<Relationships>,
     constants: Res<SimConstants>,
+    time_scale: Res<TimeScale>,
     mut activation: ResMut<SystemActivation>,
 ) {
     let c = &constants.mood;
+    let contagion_modifier_ticks = c.contagion_modifier_duration.ticks(&time_scale);
     // Read pass: snapshot all positions and valences.
     let snapshot: Vec<(Entity, Position, f32)> = query
         .iter()
@@ -143,7 +148,7 @@ pub fn mood_contagion(
             activation.record(Feature::MoodContagion);
             mood.modifiers.push_back(MoodModifier {
                 amount: influence,
-                ticks_remaining: c.contagion_modifier_ticks,
+                ticks_remaining: contagion_modifier_ticks,
                 source: "contagion".to_string(),
             });
         }
@@ -160,8 +165,10 @@ pub fn bond_proximity_mood(
     mut query: Query<(Entity, &Position, &mut Mood), Without<Dead>>,
     relationships: Res<Relationships>,
     constants: Res<SimConstants>,
+    time_scale: Res<TimeScale>,
 ) {
     let c = &constants.mood;
+    let bond_proximity_mood_ticks = c.bond_proximity_mood_duration.ticks(&time_scale);
     // Read pass: snapshot positions of all living cats.
     let snapshot: Vec<(Entity, Position)> = query.iter().map(|(e, p, _)| (e, *p)).collect();
 
@@ -188,7 +195,7 @@ pub fn bond_proximity_mood(
         if has_nearby_bond {
             mood.modifiers.push_back(MoodModifier {
                 amount: c.bond_proximity_mood,
-                ticks_remaining: c.bond_proximity_mood_ticks,
+                ticks_remaining: bond_proximity_mood_ticks,
                 source: "social warmth".to_string(),
             });
         }
@@ -232,6 +239,10 @@ mod tests {
     fn setup_mood_world() -> (World, Schedule) {
         let mut world = World::new();
         world.insert_resource(crate::resources::SimConstants::default());
+        world.insert_resource(TimeScale::from_config(
+            &crate::resources::time::SimConfig::default(),
+            16.6667,
+        ));
         let mut schedule = Schedule::default();
         schedule.add_systems(update_mood);
         (world, schedule)
@@ -421,6 +432,10 @@ mod tests {
         let mut world = World::new();
         world.insert_resource(Relationships::default());
         world.insert_resource(crate::resources::SimConstants::default());
+        world.insert_resource(TimeScale::from_config(
+            &crate::resources::time::SimConfig::default(),
+            16.6667,
+        ));
         world.insert_resource(SystemActivation::default());
         let mut schedule = Schedule::default();
         schedule.add_systems(mood_contagion);

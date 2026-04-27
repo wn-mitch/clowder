@@ -54,6 +54,7 @@ pub fn resolve_cleanse_corruption(
         {
             crate::systems::magic::apply_misfire(
                 misfire, cat_name, mood, corruption, health, pos, commands, log, tick, m, combat,
+                time_scale,
             );
             if matches!(misfire, MisfireEffect::Fizzle) {
                 return StepResult::Fail("misfire: fizzle".into());
@@ -79,7 +80,7 @@ pub fn resolve_cleanse_corruption(
     } else {
         true
     };
-    if done || ticks >= m.cleanse_max_ticks {
+    if done || ticks >= m.cleanse_max_duration.ticks(time_scale) {
         StepResult::Advance
     } else {
         StepResult::Continue

@@ -8,12 +8,13 @@ use crate::components::skills::{Corruption, MagicAffinity, Skills};
 use crate::resources::map::TileMap;
 use crate::resources::narrative::NarrativeLog;
 use crate::resources::sim_constants::{CombatConstants, MagicConstants};
+use crate::resources::time::TimeScale;
 use crate::steps::StepResult;
 
 /// # GOAP step resolver: `Scry`
 ///
 /// **Real-world effect** — on first tick, rolls a misfire check;
-/// on completion (`ticks >= scry_ticks`), adds a
+/// on completion (`ticks >= scry_duration.ticks(...)`), adds a
 /// `MemoryEntry { event_type: ResourceFound, location: random
 /// tile }` to the actor's memory and grows magic skill. A
 /// `MisfireEffect::Fizzle` causes `Fail`.
@@ -48,6 +49,7 @@ pub fn resolve_scry(
     tick: u64,
     m: &MagicConstants,
     combat: &CombatConstants,
+    time_scale: &TimeScale,
 ) -> StepResult {
     if ticks == 1 {
         if let Some(misfire) =
@@ -55,13 +57,14 @@ pub fn resolve_scry(
         {
             crate::systems::magic::apply_misfire(
                 misfire, cat_name, mood, corruption, health, pos, commands, log, tick, m, combat,
+                time_scale,
             );
             if matches!(misfire, MisfireEffect::Fizzle) {
                 return StepResult::Fail("misfire: fizzle".into());
             }
         }
     }
-    if ticks >= m.scry_ticks {
+    if ticks >= m.scry_duration.ticks(time_scale) {
         let rx = rng.random_range(0..map.width);
         let ry = rng.random_range(0..map.height);
         memory.remember(MemoryEntry {
