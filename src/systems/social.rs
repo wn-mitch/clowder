@@ -38,6 +38,135 @@ pub fn passive_familiarity(
 }
 
 // ---------------------------------------------------------------------------
+// befriend_wildlife author (§9.2 BefriendedAlly)
+// ---------------------------------------------------------------------------
+
+/// §9.2 / ticket 049 — author the `BefriendedAlly` marker on cats and
+/// wildlife once their cross-species relationship familiarity crosses
+/// `constants.social.befriend_familiarity_threshold`. Tags both sides
+/// of the pair (a befriended fox carries the marker on the fox; the
+/// cat that befriended it also carries it).
+///
+/// Hysteresis: removed when familiarity drops below
+/// `(threshold - hysteresis)`. Without the band, repeated socialize
+/// vs. avoid would flicker the marker each tick at the boundary.
+///
+/// **Note**: `Relationships` accepts cat ↔ wildlife pairs at the
+/// storage layer, but no production system writes familiarity for
+/// such pairs today. The author runs each tick and produces a
+/// no-op until a follow-on (or test fixtures) seed familiarity.
+///
+/// Algorithm: for each (cat, wildlife) pair where familiarity ≥
+/// upgrade-threshold, tag both. If either side carries the marker
+/// but the highest pairwise familiarity drops below the
+/// downgrade-threshold, remove the marker. Per-entity decision —
+/// the marker is *per-entity*, not per-pair (consumers like
+/// fox_raiding read off the fox itself; the per-pair "befriended-by-
+/// whom" model is a follow-on per ticket 049 D5).
+#[allow(clippy::type_complexity)]
+pub fn befriend_wildlife(
+    mut commands: Commands,
+    cats: Query<
+        (
+            Entity,
+            bevy::prelude::Has<crate::components::markers::BefriendedAlly>,
+        ),
+        (
+            With<crate::components::identity::Species>,
+            Without<Dead>,
+            Without<Structure>,
+            Without<crate::components::wildlife::WildAnimal>,
+        ),
+    >,
+    wildlife: Query<
+        (
+            Entity,
+            bevy::prelude::Has<crate::components::markers::BefriendedAlly>,
+        ),
+        (
+            With<crate::components::wildlife::WildAnimal>,
+            Without<Dead>,
+        ),
+    >,
+    relationships: Res<Relationships>,
+    constants: Res<SimConstants>,
+) {
+    let s = &constants.social;
+    let upgrade = s.befriend_familiarity_threshold;
+    let downgrade = (upgrade - s.befriend_familiarity_hysteresis).max(0.0);
+
+    let cat_list: Vec<(Entity, bool)> = cats.iter().collect();
+    let wildlife_list: Vec<(Entity, bool)> = wildlife.iter().collect();
+
+    // Per-entity max familiarity over all cross-species pairs the
+    // entity participates in. The marker is per-entity, so a cat with
+    // *any* befriended wildlife counterpart carries it; same for a
+    // wildlife creature with any befriending cat.
+    let mut cat_max_fam: HashMap<Entity, f32> = HashMap::new();
+    let mut wild_max_fam: HashMap<Entity, f32> = HashMap::new();
+    for (cat_entity, _) in &cat_list {
+        for (wild_entity, _) in &wildlife_list {
+            let fam = relationships
+                .get(*cat_entity, *wild_entity)
+                .map(|r| r.familiarity)
+                .unwrap_or(0.0);
+            let cmax = cat_max_fam.entry(*cat_entity).or_insert(0.0);
+            if fam > *cmax {
+                *cmax = fam;
+            }
+            let wmax = wild_max_fam.entry(*wild_entity).or_insert(0.0);
+            if fam > *wmax {
+                *wmax = fam;
+            }
+        }
+    }
+
+    for (cat_entity, has_marker) in &cat_list {
+        let fam = cat_max_fam.get(cat_entity).copied().unwrap_or(0.0);
+        toggle_marker(&mut commands, *cat_entity, *has_marker, fam, upgrade, downgrade);
+    }
+    for (wild_entity, has_marker) in &wildlife_list {
+        let fam = wild_max_fam.get(wild_entity).copied().unwrap_or(0.0);
+        toggle_marker(
+            &mut commands,
+            *wild_entity,
+            *has_marker,
+            fam,
+            upgrade,
+            downgrade,
+        );
+    }
+}
+
+fn toggle_marker(
+    commands: &mut Commands,
+    entity: Entity,
+    has: bool,
+    familiarity: f32,
+    upgrade: f32,
+    downgrade: f32,
+) {
+    let want = if has {
+        familiarity >= downgrade
+    } else {
+        familiarity >= upgrade
+    };
+    match (want, has) {
+        (true, false) => {
+            commands
+                .entity(entity)
+                .insert(crate::components::markers::BefriendedAlly);
+        }
+        (false, true) => {
+            commands
+                .entity(entity)
+                .remove::<crate::components::markers::BefriendedAlly>();
+        }
+        _ => {}
+    }
+}
+
+// ---------------------------------------------------------------------------
 // check_bonds system
 // ---------------------------------------------------------------------------
 
@@ -832,6 +961,170 @@ mod tests {
             count_courtship_drifted(&world),
             0,
             "below-gate fondness/familiarity should not push CourtshipDrifted"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // §9.2 / ticket 049 befriend_wildlife author tests
+    // -----------------------------------------------------------------------
+
+    fn befriend_test_world() -> (World, Schedule) {
+        let mut world = World::new();
+        world.insert_resource(Relationships::default());
+        world.insert_resource(SimConstants::default());
+        let mut schedule = Schedule::default();
+        schedule.add_systems(befriend_wildlife);
+        (world, schedule)
+    }
+
+    fn spawn_test_cat(world: &mut World) -> Entity {
+        world
+            .spawn((crate::components::identity::Species, Position::new(0, 0)))
+            .id()
+    }
+
+    fn spawn_test_fox(world: &mut World) -> Entity {
+        world
+            .spawn((
+                crate::components::wildlife::WildAnimal::new(
+                    crate::components::wildlife::WildSpecies::Fox,
+                ),
+                Position::new(0, 0),
+            ))
+            .id()
+    }
+
+    #[test]
+    fn befriend_inserts_marker_on_cat_and_fox_when_familiarity_crosses_threshold() {
+        let (mut world, mut schedule) = befriend_test_world();
+        let cat = spawn_test_cat(&mut world);
+        let fox = spawn_test_fox(&mut world);
+        // Threshold is 0.6; push familiarity to 0.7.
+        world
+            .resource_mut::<Relationships>()
+            .modify_familiarity(cat, fox, 0.7);
+        schedule.run(&mut world);
+        assert!(
+            world
+                .get::<crate::components::markers::BefriendedAlly>(cat)
+                .is_some(),
+            "cat should carry BefriendedAlly after familiarity crosses 0.6"
+        );
+        assert!(
+            world
+                .get::<crate::components::markers::BefriendedAlly>(fox)
+                .is_some(),
+            "fox should carry BefriendedAlly reciprocally"
+        );
+    }
+
+    #[test]
+    fn befriend_omits_marker_below_threshold() {
+        let (mut world, mut schedule) = befriend_test_world();
+        let cat = spawn_test_cat(&mut world);
+        let fox = spawn_test_fox(&mut world);
+        // Familiarity 0.4 — below the 0.6 upgrade threshold.
+        world
+            .resource_mut::<Relationships>()
+            .modify_familiarity(cat, fox, 0.4);
+        schedule.run(&mut world);
+        assert!(world
+            .get::<crate::components::markers::BefriendedAlly>(cat)
+            .is_none());
+        assert!(world
+            .get::<crate::components::markers::BefriendedAlly>(fox)
+            .is_none());
+    }
+
+    #[test]
+    fn befriend_hysteresis_keeps_marker_until_below_band() {
+        // Threshold 0.6, hysteresis 0.1 → downgrade at 0.5.
+        let (mut world, mut schedule) = befriend_test_world();
+        let cat = spawn_test_cat(&mut world);
+        let fox = spawn_test_fox(&mut world);
+
+        // Cross threshold → marker on.
+        world
+            .resource_mut::<Relationships>()
+            .modify_familiarity(cat, fox, 0.7);
+        schedule.run(&mut world);
+        assert!(world
+            .get::<crate::components::markers::BefriendedAlly>(cat)
+            .is_some());
+
+        // Decay to 0.55 — still above downgrade band, marker persists.
+        let mut rels = world.resource_mut::<Relationships>();
+        rels.get_or_insert(cat, fox).familiarity = 0.55;
+        schedule.run(&mut world);
+        assert!(
+            world
+                .get::<crate::components::markers::BefriendedAlly>(cat)
+                .is_some(),
+            "marker should persist within hysteresis band"
+        );
+
+        // Drop below downgrade — marker comes off.
+        let mut rels = world.resource_mut::<Relationships>();
+        rels.get_or_insert(cat, fox).familiarity = 0.4;
+        schedule.run(&mut world);
+        assert!(
+            world
+                .get::<crate::components::markers::BefriendedAlly>(cat)
+                .is_none(),
+            "marker should clear once familiarity drops below threshold-hysteresis"
+        );
+    }
+
+    #[test]
+    fn befriend_marker_stable_when_no_wildlife_present() {
+        let (mut world, mut schedule) = befriend_test_world();
+        let cat = spawn_test_cat(&mut world);
+        // No wildlife in the world — author runs as a no-op.
+        schedule.run(&mut world);
+        assert!(world
+            .get::<crate::components::markers::BefriendedAlly>(cat)
+            .is_none());
+    }
+
+    #[test]
+    fn befriend_marker_stable_when_no_familiarity_written() {
+        let (mut world, mut schedule) = befriend_test_world();
+        let _cat = spawn_test_cat(&mut world);
+        let _fox = spawn_test_fox(&mut world);
+        // Relationships unwritten — fam defaults to 0.0, no markers.
+        schedule.run(&mut world);
+        let mut q = world.query_filtered::<
+            Entity,
+            With<crate::components::markers::BefriendedAlly>,
+        >();
+        assert_eq!(q.iter(&world).count(), 0);
+    }
+
+    #[test]
+    fn befriend_per_entity_max_familiarity_promotes_a_cat_with_any_partner() {
+        // A cat with one wildlife partner above threshold and another
+        // below — the cat carries the marker (per-entity max is taken).
+        let (mut world, mut schedule) = befriend_test_world();
+        let cat = spawn_test_cat(&mut world);
+        let fox_a = spawn_test_fox(&mut world);
+        let fox_b = spawn_test_fox(&mut world);
+        {
+            let mut rels = world.resource_mut::<Relationships>();
+            rels.modify_familiarity(cat, fox_a, 0.4);
+            rels.modify_familiarity(cat, fox_b, 0.7);
+        }
+        schedule.run(&mut world);
+        assert!(world
+            .get::<crate::components::markers::BefriendedAlly>(cat)
+            .is_some());
+        assert!(world
+            .get::<crate::components::markers::BefriendedAlly>(fox_b)
+            .is_some());
+        assert!(
+            world
+                .get::<crate::components::markers::BefriendedAlly>(fox_a)
+                .is_none(),
+            "fox_a's max familiarity (0.4) is below threshold; should not carry marker"
         );
     }
 }

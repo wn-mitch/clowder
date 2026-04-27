@@ -282,6 +282,14 @@ impl Plugin for SimulationPlugin {
                                 systems::fox_spatial::update_den_marker,
                             )
                                 .chain(),
+                            // Ticket 049 §9.2 BefriendedAlly author —
+                            // toggles the marker on cats and wildlife
+                            // when their cross-species familiarity
+                            // crosses the threshold (no production
+                            // signal source today; runs as a no-op
+                            // until trade or a non-hostile-contact
+                            // accumulator lands).
+                            systems::social::befriend_wildlife,
                         )
                             .chain(),
                         systems::needs::decay_grooming,

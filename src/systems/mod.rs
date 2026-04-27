@@ -46,6 +46,7 @@ pub mod social;
 pub mod task_chains;
 pub mod time;
 pub mod trace_emit;
+pub mod visitors;
 pub mod weather;
 pub mod wildlife;
 pub mod wind;

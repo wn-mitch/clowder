@@ -657,6 +657,17 @@ pub struct SocialConstants {
     // close-friend pairs develop romantic attraction passively over time.
     pub courtship_fondness_gate: f32,
     pub courtship_familiarity_gate: f32,
+    // --- §9.2 BefriendedAlly authoring (ticket 049) ---
+    /// Cat ↔ wildlife familiarity at or above this threshold flips
+    /// `BefriendedAlly` on both entities. Today no system writes
+    /// cat ↔ wildlife familiarity in production, so the marker fires
+    /// only via test fixtures or a future "non-hostile contact"
+    /// signal source.
+    pub befriend_familiarity_threshold: f32,
+    /// Hysteresis band — the marker is removed when familiarity
+    /// drops below `(threshold - hysteresis)`, preventing flicker
+    /// at the boundary.
+    pub befriend_familiarity_hysteresis: f32,
 }
 
 impl Default for SocialConstants {
@@ -710,6 +721,12 @@ impl Default for SocialConstants {
             // tiers.
             courtship_fondness_gate: 0.3,
             courtship_familiarity_gate: 0.4,
+            // §9.2 BefriendedAlly threshold mirrors the trade.md
+            // recruitment fondness gate (0.6) — a cat that has built
+            // enough familiarity with a wildlife creature to recruit
+            // it is the same gate as befriending it.
+            befriend_familiarity_threshold: 0.6,
+            befriend_familiarity_hysteresis: 0.1,
         }
     }
 }
