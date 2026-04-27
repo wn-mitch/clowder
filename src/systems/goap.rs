@@ -765,6 +765,17 @@ pub fn evaluate_and_plan(
         Has<markers::Apprentice>,
         Has<markers::HasMentoringTarget>,
     )>,
+    // Ticket 014 §4 sensing batch — broad-phase target-existence markers
+    // authored by `sensing::update_target_existence_markers`. Populating
+    // the snapshot here is required for the `markers.has(KEY, entity)`
+    // reads in the per-cat ScoringContext below to resolve truthfully.
+    target_existence_q: Query<(
+        Has<markers::HasThreatNearby>,
+        Has<markers::HasSocialTarget>,
+        Has<markers::HasHerbsNearby>,
+        Has<markers::PreyNearby>,
+        Has<markers::CarcassNearby>,
+    )>,
 ) {
     let sc = &res.constants.scoring;
     let d = &res.constants.disposition;
@@ -1084,6 +1095,15 @@ pub fn evaluate_and_plan(
                 entity,
                 has_mentoring_target,
             );
+        }
+        // Ticket 014 §4 sensing batch — broad-phase target-existence
+        // markers authored by `sensing::update_target_existence_markers`.
+        if let Ok((threat, social, herbs, prey, carcass)) = target_existence_q.get(entity) {
+            markers.set_entity(markers::HasThreatNearby::KEY, entity, threat);
+            markers.set_entity(markers::HasSocialTarget::KEY, entity, social);
+            markers.set_entity(markers::HasHerbsNearby::KEY, entity, herbs);
+            markers.set_entity(markers::PreyNearby::KEY, entity, prey);
+            markers.set_entity(markers::CarcassNearby::KEY, entity, carcass);
         }
 
         // Ticket 014 §4 sensing batch — `has_herbs_nearby` /
