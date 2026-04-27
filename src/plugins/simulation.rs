@@ -267,6 +267,12 @@ impl Plugin for SimulationPlugin {
                             // CarcassNearby. Single author owns five
                             // markers to amortize the per-cat sensing scans.
                             systems::sensing::update_target_existence_markers,
+                            // Ticket 014 §4 fox spatial batch — three
+                            // fox markers (StoreVisible/StoreGuarded,
+                            // CatThreateningDen, WardNearbyFox stub).
+                            systems::fox_spatial::update_store_awareness_markers,
+                            systems::fox_spatial::update_den_threat_markers,
+                            systems::fox_spatial::update_ward_detection_markers,
                         )
                             .chain(),
                         systems::needs::decay_grooming,

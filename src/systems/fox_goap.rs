@@ -292,18 +292,53 @@ pub fn fox_evaluate_and_plan(
     dse_registry: Res<DseRegistry>,
     modifier_pipeline: Res<ModifierPipeline>,
     mut event_log: Option<ResMut<EventLog>>,
+    // Ticket 014 §4 fox spatial batch — markers authored by
+    // `fox_spatial::update_*_markers`. Bundled here so `EvalCtx::has_marker`
+    // sees the truthful values once the snapshot is populated below.
+    fox_marker_q: Query<(
+        bevy::prelude::Has<crate::components::markers::StoreVisible>,
+        bevy::prelude::Has<crate::components::markers::StoreGuarded>,
+        bevy::prelude::Has<crate::components::markers::CatThreateningDen>,
+        bevy::prelude::Has<crate::components::markers::WardNearbyFox>,
+    )>,
 ) {
     let cat_positions: Vec<Position> = cats.iter().copied().collect();
     let store_positions: Vec<Position> = stores.iter().copied().collect();
     let prey_positions: Vec<Position> = prey.iter().copied().collect();
     let day_phase = DayPhase::from_tick(time.tick, &config);
     let sc = &constants.scoring;
-    // §4 marker snapshot — foxes don't consume the HasStoredFood
-    // colony marker, but the `EvalInputs` surface is shared across
-    // species. Empty snapshot is correct for the fox-scoring path
-    // until fox-side markers (`CubsHungry`, `StoreVisible`, etc.)
-    // get authoring systems.
-    let fox_markers = crate::ai::scoring::MarkerSnapshot::new();
+    // Ticket 014 §4 fox spatial batch — populate per-fox snapshot from
+    // the authored ZSTs (StoreVisible / StoreGuarded / CatThreateningDen
+    // / WardNearbyFox). The snapshot was empty before; it's wired up now
+    // so `EvalCtx::has_marker` resolves truthfully when fox DSEs migrate
+    // to `.require()` filters.
+    let mut fox_markers = crate::ai::scoring::MarkerSnapshot::new();
+    for (fox_entity, _, _, _, _, _) in &foxes {
+        if let Ok((store_visible, store_guarded, cat_threatening_den, ward_nearby)) =
+            fox_marker_q.get(fox_entity)
+        {
+            fox_markers.set_entity(
+                crate::components::markers::StoreVisible::KEY,
+                fox_entity,
+                store_visible,
+            );
+            fox_markers.set_entity(
+                crate::components::markers::StoreGuarded::KEY,
+                fox_entity,
+                store_guarded,
+            );
+            fox_markers.set_entity(
+                crate::components::markers::CatThreateningDen::KEY,
+                fox_entity,
+                cat_threatening_den,
+            );
+            fox_markers.set_entity(
+                crate::components::markers::WardNearbyFox::KEY,
+                fox_entity,
+                ward_nearby,
+            );
+        }
+    }
 
     for (fox_entity, fox_state, fox_pos, needs, personality, hunting_beliefs) in &foxes {
         let den_info = fox_state

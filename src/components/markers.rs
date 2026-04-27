@@ -378,20 +378,32 @@ impl Parent {
 /// Authoring: `fox_spatial.rs::update_store_awareness_markers`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct StoreVisible;
+impl StoreVisible {
+    pub const KEY: &str = "StoreVisible";
+}
 
 #[derive(Component, Debug, Clone, Copy)]
 pub struct StoreGuarded;
+impl StoreGuarded {
+    pub const KEY: &str = "StoreGuarded";
+}
 
 /// Cat within 5 tiles of fox's den AND cubs present.
 /// `fox_spatial.rs::update_den_threat_markers`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct CatThreateningDen;
+impl CatThreateningDen {
+    pub const KEY: &str = "CatThreateningDen";
+}
 
 /// Ward within fox detection radius (stubbed in
 /// `FoxScoringContext.ward_nearby` today — promote to ECS marker).
 /// `fox_spatial.rs::update_ward_detection_markers`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct WardNearbyFox;
+impl WardNearbyFox {
+    pub const KEY: &str = "WardNearbyFox";
+}
 
 /// Fox has ≥1 cub at its den. Event-driven (`CubsBorn` +
 /// on-despawn cleanup).
