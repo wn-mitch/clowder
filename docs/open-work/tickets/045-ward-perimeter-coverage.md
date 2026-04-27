@@ -1,14 +1,14 @@
 ---
 id: 045
 title: Ward perimeter is a fiction — 1-day decay × reactive-only placement leaves 0-2 wards alive across the entire map
-status: ready
+status: in-progress
 cluster: null
 added: 2026-04-27
 parked: null
 blocked-by: []
 supersedes: []
 related-systems: [magic.md]
-related-balance: [healthy-colony.md]
+related-balance: [healthy-colony.md, ward-perimeter-placement.md]
 landed-at: null
 landed-on: null
 ---
@@ -84,3 +84,4 @@ The right next step is probably (A) as a probe, then decide whether to invest in
 ## Log
 
 - 2026-04-27: Ticket opened during post-043+044 collapse-probe analysis. User confirmed ward placement pattern matches what's visible in the UI soak — this is a real, observable design issue, not a headless quirk.
+- 2026-04-27: Direction shifted from fix (A) lifetime-probe to fix (B) placement-via-influence-maps after user flagged placement as the load-bearing miss. Implemented in three commits: (1) new `ward_coverage` L1 influence map closing one of §5.6.3's Absent maps, (2) rewrite `compute_ward_placement` to sample fox_scent + corruption + cat_presence + ward_coverage at candidate tiles, (3) balance hypothesis doc + verification soak. Plan simplified mid-implementation: dropped the planned target-taking DSE machinery (would have needed synthetic tile-entity scaffolding for a pure function) in favor of rewriting the placement function body. Balance doc: `docs/balance/ward-perimeter-placement.md`.
