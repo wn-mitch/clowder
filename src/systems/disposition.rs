@@ -514,15 +514,26 @@ pub fn evaluate_dispositions(
 
     let herb_positions: Vec<(Entity, Position)> =
         herb_query.iter().map(|(e, _, p)| (e, *p)).collect();
-    let thornbriar_available = herb_query
-        .iter()
-        .any(|(_, h, _)| h.kind == crate::components::magic::HerbKind::Thornbriar);
+    // Ticket 014 Magic colony batch: shared helper + colony-scoped
+    // marker. Retires the inline `herb_query.iter().any(...)` scan that
+    // duplicated identical logic across this file and goap.rs.
+    let thornbriar_available =
+        crate::systems::magic::is_thornbriar_available(herb_query.iter().map(|(_, h, _)| h));
+    markers.set_colony(markers::ThornbriarAvailable::KEY, thornbriar_available);
 
     let ward_strength_low = crate::systems::magic::is_ward_strength_low(
         ward_query.iter().map(|(w, _)| w),
         d.ward_strength_low_threshold,
     );
     markers.set_colony(markers::WardStrengthLow::KEY, ward_strength_low);
+    // Ticket 014 Magic colony batch: `WardsUnderSiege` is left
+    // unpopulated in the disposition path. The legacy
+    // `evaluate_dispositions` doesn't carry a `wildlife_ai_query` system
+    // param and this code path is no longer registered in the schedule
+    // (substrate-refactor moved scoring into `goap::evaluate_and_plan`).
+    // The previous behavior set `wards_under_siege: false` unconditionally
+    // here; the missing snapshot entry preserves that — `markers.has`
+    // returns false when the marker isn't set.
 
     let colony_injury_count = query
         .iter()
@@ -774,7 +785,6 @@ pub fn evaluate_dispositions(
             has_herbs_in_inventory: markers
                 .has(crate::components::markers::HasHerbsInInventory::KEY, entity),
             has_remedy_herbs: markers.has(crate::components::markers::HasRemedyHerbs::KEY, entity),
-            thornbriar_available,
             colony_injury_count,
             ward_strength_low,
             on_corrupted_tile,
@@ -805,7 +815,11 @@ pub fn evaluate_dispositions(
             carcass_nearby: false,
             nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
-            wards_under_siege: false,
+            // Ticket 014 Magic colony batch — read via marker. Disposition
+            // path doesn't populate WardsUnderSiege (no wildlife_ai_query
+            // system param + path is unregistered), so this resolves to
+            // false, matching pre-refactor behavior.
+            wards_under_siege: markers.has(markers::WardsUnderSiege::KEY, entity),
             day_phase: current_day_phase,
             has_functional_kitchen,
             has_raw_food_in_stores,

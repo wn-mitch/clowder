@@ -840,6 +840,14 @@ pub fn evaluate_and_plan(
         .map(|(e, herb, p)| (e, *p, herb.kind))
         .collect();
 
+    // Ticket 014 Magic colony batch: shared helper + colony-scoped
+    // marker. Retires the per-cat inline scan at the ScoringContext
+    // assignment below by computing once at the colony scope.
+    let thornbriar_available = crate::systems::magic::is_thornbriar_available(
+        world_state.herb_query.iter().map(|(_, h, _)| h),
+    );
+    markers.set_colony(markers::ThornbriarAvailable::KEY, thornbriar_available);
+
     let ward_strength_low = crate::systems::magic::is_ward_strength_low(
         world_state.ward_query.iter().map(|(w, _)| w),
         d.ward_strength_low_threshold,
@@ -876,13 +884,12 @@ pub fn evaluate_and_plan(
         max_c
     };
 
-    // Detect if any shadow fox is actively sieging a ward.
-    let wards_under_siege = world_state.wildlife_ai_query.iter().any(|s| {
-        matches!(
-            s,
-            crate::components::wildlife::WildlifeAiState::EncirclingWard { .. }
-        )
-    });
+    // Ticket 014 Magic colony batch: shared helper + colony-scoped
+    // marker. Retires the inline `wildlife_ai_query.iter().any(...)`
+    // scan.
+    let wards_under_siege =
+        crate::systems::magic::is_any_ward_under_siege(world_state.wildlife_ai_query.iter());
+    markers.set_colony(markers::WardsUnderSiege::KEY, wards_under_siege);
 
     let colony_injury_count = query
         .iter()
@@ -1190,9 +1197,6 @@ pub fn evaluate_and_plan(
             // §4 batch 1: read from authored markers via MarkerSnapshot.
             has_herbs_in_inventory: markers.has(markers::HasHerbsInInventory::KEY, entity),
             has_remedy_herbs: markers.has(markers::HasRemedyHerbs::KEY, entity),
-            thornbriar_available: herb_positions
-                .iter()
-                .any(|(_, _, kind)| *kind == HerbKind::Thornbriar),
             colony_injury_count,
             ward_strength_low,
             on_corrupted_tile,
@@ -1221,7 +1225,8 @@ pub fn evaluate_and_plan(
             carcass_nearby: nearby_carcass_count > 0,
             nearby_carcass_count,
             territory_max_corruption,
-            wards_under_siege,
+            // Ticket 014 Magic colony batch — read via marker.
+            wards_under_siege: markers.has(markers::WardsUnderSiege::KEY, entity),
             day_phase: current_day_phase,
             has_functional_kitchen,
             has_raw_food_in_stores,

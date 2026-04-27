@@ -37,6 +37,26 @@ pub fn is_ward_strength_low<'a>(wards: impl Iterator<Item = &'a Ward>, threshold
     count == 0 || (sum / count as f32) < threshold
 }
 
+/// True when at least one harvestable Thornbriar exists in the world.
+/// Mirrors the inline `herb_query.iter().any(|...kind == Thornbriar)`
+/// scans previously living in `disposition::evaluate_dispositions` and
+/// `goap::evaluate_and_plan`. Authors the `ThornbriarAvailable` colony
+/// marker via the caller's `MarkerSnapshot::set_colony` site.
+pub fn is_thornbriar_available<'a>(mut herbs: impl Iterator<Item = &'a Herb>) -> bool {
+    herbs.any(|h| h.kind == crate::components::magic::HerbKind::Thornbriar)
+}
+
+/// True when at least one shadow fox is in the `EncirclingWard` AI
+/// state — i.e. some colony ward is actively under siege. Mirrors the
+/// inline `wildlife_ai_query.iter().any(...)` scan previously living in
+/// `goap::evaluate_and_plan`. Authors the `WardsUnderSiege` colony
+/// marker via the caller's `MarkerSnapshot::set_colony` site.
+pub fn is_any_ward_under_siege<'a>(
+    mut wildlife_ai: impl Iterator<Item = &'a WildlifeAiState>,
+) -> bool {
+    wildlife_ai.any(|s| matches!(s, WildlifeAiState::EncirclingWard { .. }))
+}
+
 // ---------------------------------------------------------------------------
 // CorruptionPushback — message emitted by positive colony events
 // ---------------------------------------------------------------------------
@@ -1322,6 +1342,77 @@ mod tests {
         };
         // avg = 0.35, threshold 0.3 → NOT low
         assert!(!is_ward_strength_low([&strong, &weak].into_iter(), 0.3));
+    }
+
+    // --- is_thornbriar_available (Ticket 014 Magic colony batch) ---
+
+    fn herb(kind: crate::components::magic::HerbKind) -> Herb {
+        Herb {
+            kind,
+            growth_stage: GrowthStage::Blossom,
+            magical: false,
+            twisted: false,
+        }
+    }
+
+    #[test]
+    fn no_herbs_thornbriar_unavailable() {
+        assert!(!is_thornbriar_available(std::iter::empty()));
+    }
+
+    #[test]
+    fn only_other_herbs_thornbriar_unavailable() {
+        let h = herb(crate::components::magic::HerbKind::HealingMoss);
+        assert!(!is_thornbriar_available(std::iter::once(&h)));
+    }
+
+    #[test]
+    fn one_thornbriar_makes_available() {
+        let h = herb(crate::components::magic::HerbKind::Thornbriar);
+        assert!(is_thornbriar_available(std::iter::once(&h)));
+    }
+
+    #[test]
+    fn mixed_herbs_with_thornbriar_available() {
+        let moss = herb(crate::components::magic::HerbKind::HealingMoss);
+        let briar = herb(crate::components::magic::HerbKind::Thornbriar);
+        assert!(is_thornbriar_available([&moss, &briar].into_iter()));
+    }
+
+    // --- is_any_ward_under_siege (Ticket 014 Magic colony batch) ---
+
+    #[test]
+    fn no_wildlife_no_siege() {
+        assert!(!is_any_ward_under_siege(std::iter::empty()));
+    }
+
+    #[test]
+    fn idle_wildlife_no_siege() {
+        let s = WildlifeAiState::Patrolling { dx: 1, dy: 0 };
+        assert!(!is_any_ward_under_siege(std::iter::once(&s)));
+    }
+
+    #[test]
+    fn encircling_ward_yields_siege() {
+        let s = WildlifeAiState::EncirclingWard {
+            ward_x: 0,
+            ward_y: 0,
+            angle: 0.0,
+            ticks: 5,
+        };
+        assert!(is_any_ward_under_siege(std::iter::once(&s)));
+    }
+
+    #[test]
+    fn one_encircling_among_many_yields_siege() {
+        let idle = WildlifeAiState::Patrolling { dx: 1, dy: 0 };
+        let encircle = WildlifeAiState::EncirclingWard {
+            ward_x: 0,
+            ward_y: 0,
+            angle: 0.0,
+            ticks: 5,
+        };
+        assert!(is_any_ward_under_siege([&idle, &encircle].into_iter()));
     }
 
     // -----------------------------------------------------------------------

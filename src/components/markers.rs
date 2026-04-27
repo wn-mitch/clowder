@@ -244,6 +244,9 @@ impl HasStoredFood {
 /// `magic.rs::update_herb_availability_markers`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct ThornbriarAvailable;
+impl ThornbriarAvailable {
+    pub const KEY: &str = "ThornbriarAvailable";
+}
 
 // ---------------------------------------------------------------------------
 // TargetExistence markers (§4.3 TargetExistence — gates target-taking DSEs)
@@ -326,6 +329,9 @@ impl WardStrengthLow {
 /// `magic.rs::update_ward_siege_marker`. Attaches to `ColonyState`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct WardsUnderSiege;
+impl WardsUnderSiege {
+    pub const KEY: &str = "WardsUnderSiege";
+}
 
 // ---------------------------------------------------------------------------
 // Reproduction markers (§4.3 Reproduction)

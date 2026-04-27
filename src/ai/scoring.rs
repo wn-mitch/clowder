@@ -174,8 +174,13 @@ pub struct ScoringContext<'a> {
     pub has_herbs_in_inventory: bool,
     /// Whether the cat has remedy herbs (HealingMoss/Moonpetal/Calmroot).
     pub has_remedy_herbs: bool,
-    /// Whether harvestable Thornbriar exists anywhere in the world.
-    pub thornbriar_available: bool,
+    // Ticket 014 Magic colony batch: `thornbriar_available` field
+    // retired — was assigned in disposition.rs / goap.rs but never
+    // read. The marker `ThornbriarAvailable` is authored colony-scope
+    // by `magic::is_thornbriar_available` for any future DSE
+    // eligibility consumer; the GOAP planner's `WorldState` carries
+    // its own `thornbriar_available` for `StatePredicate` matching
+    // (separate state machine, not migrated).
     /// Number of injured cats in the colony.
     pub colony_injury_count: usize,
     /// Whether colony ward coverage is low (no wards or average strength < 0.3).
@@ -1817,7 +1822,6 @@ mod tests {
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
 
-            thornbriar_available: false,
             colony_injury_count: 0,
             ward_strength_low: false,
             on_corrupted_tile: false,
@@ -1961,7 +1965,6 @@ mod tests {
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
 
-            thornbriar_available: false,
             colony_injury_count: 0,
             ward_strength_low: false,
             on_corrupted_tile: false,
@@ -2109,7 +2112,6 @@ mod tests {
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
 
-            thornbriar_available: false,
             colony_injury_count: 0,
             ward_strength_low: false,
             on_corrupted_tile: false,
@@ -2366,7 +2368,6 @@ mod tests {
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
 
-            thornbriar_available: false,
             colony_injury_count: 0,
             ward_strength_low: false,
             on_corrupted_tile: false,
@@ -2439,7 +2440,6 @@ mod tests {
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
 
-            thornbriar_available: false,
             colony_injury_count: 0,
             ward_strength_low: false,
             on_corrupted_tile: false,
@@ -2531,7 +2531,6 @@ mod tests {
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
 
-            thornbriar_available: false,
             colony_injury_count: 0,
             ward_strength_low: false,
             on_corrupted_tile: false,
@@ -2840,7 +2839,6 @@ mod tests {
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
 
-            thornbriar_available: false,
             colony_injury_count: 0,
             ward_strength_low: false,
             on_corrupted_tile: false,
@@ -2914,7 +2912,6 @@ mod tests {
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
 
-            thornbriar_available: false,
             colony_injury_count: 0,
             ward_strength_low: false,
             on_corrupted_tile: false,
