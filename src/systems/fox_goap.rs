@@ -118,6 +118,7 @@ fn build_scoring_context<'a>(
     store_positions: &[Position],
     prey_positions: &[Position],
     hunting_beliefs: Option<&FoxHuntingBeliefs>,
+    befriended_ally: bool,
     now: u64,
     day_phase: DayPhase,
 ) -> FoxScoringContext<'a> {
@@ -171,6 +172,7 @@ fn build_scoring_context<'a>(
         cubs_hungry: has_cubs && needs.cub_satiation < 0.4,
         is_dispersing_juvenile,
         has_den: fox_state.home_den.is_some(),
+        befriended_ally,
         ticks_since_patrol,
         day_phase,
         self_position: fox_pos,
@@ -305,6 +307,10 @@ pub fn fox_evaluate_and_plan(
         bevy::prelude::Has<crate::components::markers::IsDispersingJuvenile>,
         bevy::prelude::Has<crate::components::markers::HasDen>,
     )>,
+    // Ticket 049 §9.2 — `BefriendedAlly` on a fox suppresses its
+    // §9.3 raiding gate (`fox_scoring.rs:289`). Per-fox coarsening
+    // of the per-pair befriending model committed in the §9.2 spec.
+    fox_befriended_q: Query<bevy::prelude::Has<crate::components::markers::BefriendedAlly>>,
 ) {
     let cat_positions: Vec<Position> = cats.iter().copied().collect();
     let store_positions: Vec<Position> = stores.iter().copied().collect();
@@ -349,6 +355,7 @@ pub fn fox_evaluate_and_plan(
         let den_pos = den_info.map(|(p, _)| p);
         let cubs_present_count = den_info.map(|(_, c)| c).unwrap_or(0);
 
+        let befriended_ally = fox_befriended_q.get(fox_entity).unwrap_or(false);
         let ctx = build_scoring_context(
             needs,
             personality,
@@ -361,6 +368,7 @@ pub fn fox_evaluate_and_plan(
             &store_positions,
             &prey_positions,
             hunting_beliefs,
+            befriended_ally,
             time.tick,
             day_phase,
         );

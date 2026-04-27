@@ -25,7 +25,6 @@ use crate::ai::curves::{hangry, scarcity, Curve};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
-use crate::ai::faction::StanceRequirement;
 use crate::components::markers;
 
 pub struct HuntDse {
@@ -68,11 +67,11 @@ impl HuntDse {
             // §4 batch 2: `.require(CanHunt)` gates on (Adult ∨ Young)
             // ∧ ¬Injured ∧ ¬InCombat ∧ forest nearby. Retires the
             // inline `ctx.can_hunt` guard in `scoring.rs`.
-            // §9.3 DSE filter binding — Hunt targets `Prey` only.
             // §13.1: `.forbid(Incapacitated)` blocks downed cats.
+            // §9.3 stance binding migrated to `hunt_target_dse` —
+            // candidate-prefilter happens in the target-taking resolver.
             eligibility: EligibilityFilter::new()
                 .require(markers::CanHunt::KEY)
-                .with_stance(StanceRequirement::hunt())
                 .forbid(markers::Incapacitated::KEY),
         }
     }
@@ -139,17 +138,4 @@ mod tests {
         assert!((sum - 1.0).abs() < 1e-4, "sum was {sum}");
     }
 
-    #[test]
-    fn hunt_stance_requirement_is_prey_only() {
-        use crate::ai::faction::FactionStance;
-        let req = HuntDse::new()
-            .eligibility()
-            .required_stance
-            .clone()
-            .expect("§9.3 binding must populate required_stance");
-        assert!(req.accepts(FactionStance::Prey));
-        assert!(!req.accepts(FactionStance::Enemy));
-        assert!(!req.accepts(FactionStance::Predator));
-        assert!(!req.accepts(FactionStance::Same));
-    }
 }

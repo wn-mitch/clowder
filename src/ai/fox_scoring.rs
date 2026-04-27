@@ -77,6 +77,13 @@ pub struct FoxScoringContext<'a> {
     /// Whether this fox has a home den.
     pub has_den: bool,
 
+    // --- §9.2 faction overlay ---
+    /// Whether this fox carries the `BefriendedAlly` marker. Suppresses
+    /// the §9.3 fox-raiding gate so a befriended fox does not raid.
+    /// Per-fox coarsening of the spec's per-pair befriending — see
+    /// ticket 049 D5 / §9.2.
+    pub befriended_ally: bool,
+
     // --- Patrolling pressure ---
     /// Ticks since this fox last patrolled. Provides a steady upward pressure
     /// so Patrolling wins periodically even when hunger is never fully sated.
@@ -285,8 +292,9 @@ pub fn score_fox_dispositions(
     // `FoxRaidingDse`. The `store_visible && !store_guarded` gate stays
     // outer (same pattern as cat `Eat`'s `food_available` outer gate
     // through Phase 3c.1a); Phase 3d flips it to marker-driven
-    // eligibility inside `EligibilityFilter`.
-    if ctx.store_visible && !ctx.store_guarded {
+    // eligibility inside `EligibilityFilter`. §9.2 BefriendedAlly
+    // suppresses the gate — a befriended fox does not raid.
+    if ctx.store_visible && !ctx.store_guarded && !ctx.befriended_ally {
         let score = score_fox_dse_by_id("fox_raiding", ctx, inputs);
         if score > 0.0 {
             scores.push((FoxDispositionKind::Raiding, score + jitter(rng, j)));
@@ -466,6 +474,7 @@ mod tests {
             cubs_hungry: false,
             is_dispersing_juvenile: false,
             has_den: true,
+            befriended_ally: false,
             ticks_since_patrol: 0,
             day_phase: DayPhase::Night, // hunt-favorable default; tests override
             self_position: Position::new(0, 0),
@@ -694,6 +703,44 @@ mod tests {
             .iter()
             .any(|(k, _)| *k == FoxDispositionKind::Raiding);
         assert!(has_raiding);
+    }
+
+    #[test]
+    fn befriended_fox_does_not_raid() {
+        // §9.2 ticket 049: a fox carrying `BefriendedAlly` skips the
+        // §9.3 raiding gate, even with hunger high and store visible.
+        let needs = FoxNeeds {
+            hunger: 0.9,
+            health_fraction: 0.9,
+            territory_scent: 0.8,
+            den_security: 0.9,
+            cub_satiation: 1.0,
+            cub_safety: 1.0,
+        };
+        let personality = FoxPersonality {
+            cunning: 0.9,
+            boldness: 0.3,
+            ..FoxPersonality::balanced()
+        };
+        let mut ctx = default_context(&needs, &personality, &SCORING);
+        ctx.store_visible = true;
+        ctx.store_guarded = false;
+        ctx.prey_nearby = false;
+        ctx.befriended_ally = true;
+        let registry = test_fox_registry(&SCORING);
+        let modifiers = ModifierPipeline::new();
+        let markers = crate::ai::scoring::MarkerSnapshot::new();
+        let inputs = test_eval_inputs(&registry, &modifiers, &markers);
+
+        let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
+        let has_raiding = result
+            .scores
+            .iter()
+            .any(|(k, _)| *k == FoxDispositionKind::Raiding);
+        assert!(
+            !has_raiding,
+            "befriended fox should not raise Raiding even with store visible"
+        );
     }
 
     #[test]

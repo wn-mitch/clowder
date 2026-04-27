@@ -331,6 +331,44 @@ pub struct ExecutorContext<'w, 's> {
     pub focal_target: Option<Res<'w, crate::resources::FocalTraceTarget>>,
     /// §11 rich-trace capture sink. Same gating as `focal_target`.
     pub focal_capture: Option<Res<'w, crate::resources::FocalScoreCapture>>,
+    /// §9.1 base stance matrix; consumed by every target-taking DSE
+    /// call site that pre-filters candidates by stance.
+    pub faction_relations: Res<'w, crate::ai::faction::FactionRelations>,
+    /// §9.2 overlay marker presence per entity. Read per-candidate to
+    /// build a [`StanceOverlays`](crate::ai::faction::StanceOverlays)
+    /// that feeds `resolve_stance` inside the §9.3 prefilter.
+    pub faction_overlay_q: bevy_ecs::prelude::Query<
+        'w,
+        's,
+        (
+            Entity,
+            Has<crate::components::markers::Visitor>,
+            Has<crate::components::markers::HostileVisitor>,
+            Has<crate::components::markers::Banished>,
+            Has<crate::components::markers::BefriendedAlly>,
+        ),
+        Without<Dead>,
+    >,
+}
+
+impl<'w, 's> ExecutorContext<'w, 's> {
+    /// Read §9.2 overlay markers off `e` from the ECS, returning a
+    /// [`StanceOverlays`](crate::ai::faction::StanceOverlays) the §9.3
+    /// prefilter can consume. Defaults to an all-`false` overlay when
+    /// the entity is not in the query (despawned, dead, etc.).
+    pub fn stance_overlays_of(&self, e: Entity) -> crate::ai::faction::StanceOverlays {
+        match self.faction_overlay_q.get(e) {
+            Ok((_, visitor, hostile_visitor, banished, befriended_ally)) => {
+                crate::ai::faction::StanceOverlays {
+                    visitor,
+                    hostile_visitor,
+                    banished,
+                    befriended_ally,
+                }
+            }
+            Err(_) => crate::ai::faction::StanceOverlays::default(),
+        }
+    }
 }
 
 /// Returns true when `cat_entity` matches the registered focal cat.
@@ -2647,6 +2685,8 @@ fn dispatch_step_action(
             d,
             &ec.constants.sensory.cat,
             &ec.dse_registry,
+            &ec.faction_relations,
+            &|e: Entity| ec.stance_overlays_of(e),
             ec_is_focal(ec, cat_entity),
             ec.focal_capture.as_deref(),
         ),
@@ -2821,6 +2861,7 @@ fn dispatch_step_action(
                 } else {
                     None
                 };
+                let stance_overlays = |e: Entity| ec.stance_overlays_of(e);
                 plan.step_state[step_idx].target_entity =
                     crate::ai::dses::socialize_target::resolve_socialize_target(
                         &ec.dse_registry,
@@ -2828,6 +2869,8 @@ fn dispatch_step_action(
                         *pos,
                         &snaps.cat_positions,
                         relationships,
+                        &ec.faction_relations,
+                        &stance_overlays,
                         ec.time.tick,
                         focal_hook,
                     );
@@ -3086,6 +3129,7 @@ fn dispatch_step_action(
                 } else {
                     None
                 };
+                let stance_overlays = |e: Entity| ec.stance_overlays_of(e);
                 let picked = crate::ai::dses::fight_target::resolve_fight_target(
                     &ec.dse_registry,
                     cat_entity,
@@ -3094,6 +3138,8 @@ fn dispatch_step_action(
                     skills.combat,
                     self_health_fraction,
                     &ally_positions,
+                    &ec.faction_relations,
+                    &stance_overlays,
                     ec.time.tick,
                     focal_hook,
                 );
@@ -4211,6 +4257,10 @@ fn resolve_search_prey(
     d: &DispositionConstants,
     cat_profile: &crate::systems::sensing::SensoryProfile,
     dse_registry: &crate::ai::eval::DseRegistry,
+    // §9.3 stance prefilter inputs: required by `resolve_hunt_target`
+    // to drop befriended prey (Prey → Ally upgrade rejects Hunt).
+    relations: &crate::ai::faction::FactionRelations,
+    stance_overlays: &dyn Fn(Entity) -> crate::ai::faction::StanceOverlays,
     // §11 focal-cat hook inputs: the two pieces needed to build a
     // `FocalTargetHook` locally without threading the ExecutorContext.
     is_focal: bool,
@@ -4373,6 +4423,8 @@ fn resolve_search_prey(
             _cat_entity,
             *pos,
             &visible,
+            relations,
+            stance_overlays,
             time.tick,
             focal_hook,
         );

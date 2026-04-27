@@ -67,6 +67,7 @@ use crate::ai::considerations::{Consideration, ScalarConsideration};
 use crate::ai::curves::Curve;
 use crate::ai::dse::{CommitmentStrategy, DseId, EvalCtx, GoalState, Intention};
 use crate::ai::eval::DseRegistry;
+use crate::ai::faction::StanceRequirement;
 use crate::ai::target_dse::{
     evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,
 };
@@ -157,7 +158,10 @@ pub fn fight_target_dse() -> TargetTakingDse {
         // plans a path to its #1 threat, not to a phantom centroid.
         aggregation: TargetAggregation::SumTopN(3),
         intention: fight_intention,
-        required_stance: None,
+        // §9.3 Fight (Attack) accepts `Enemy | Prey`. Migrated from
+        // the cat-action FightDse — candidate-prefilter happens here
+        // before evaluate_target_taking.
+        required_stance: Some(StanceRequirement::attack()),
     }
 }
 
@@ -245,6 +249,8 @@ pub fn resolve_fight_target(
     self_combat: f32,
     self_health_fraction: f32,
     ally_positions: &[Position],
+    relations: &crate::ai::faction::FactionRelations,
+    stance_overlays: &dyn Fn(Entity) -> crate::ai::faction::StanceOverlays,
     tick: u64,
     focal_hook: Option<FocalTargetHook<'_>>,
 ) -> Option<Entity> {
@@ -256,6 +262,21 @@ pub fn resolve_fight_target(
     if candidates.is_empty() {
         return None;
     }
+
+    // Per-candidate species lookup table — built once, reused by the
+    // §9.3 prefilter closure.
+    let species_map: std::collections::HashMap<Entity, crate::ai::faction::FactionSpecies> =
+        candidates
+            .iter()
+            .map(|c| {
+                (
+                    c.entity,
+                    crate::ai::faction::FactionSpecies::from_sensory(
+                        crate::components::sensing::SensorySpecies::Wild(c.species),
+                    ),
+                )
+            })
+            .collect();
 
     // Filter by range + build lookup tables.
     let mut entities: Vec<Entity> = Vec::new();
@@ -273,6 +294,27 @@ pub fn resolve_fight_target(
 
     if entities.is_empty() {
         return None;
+    }
+
+    // §9.3 stance prefilter — drop wildlife candidates whose resolved
+    // stance fails the requirement. Uses `species_map` to map each
+    // candidate's `WildSpecies` onto a `FactionSpecies` row.
+    if let Some(req) = dse.required_stance() {
+        let species_of = |e: Entity| species_map.get(&e).copied();
+        let (filtered, filtered_pos) = crate::ai::faction::filter_candidates_by_stance(
+            relations,
+            crate::ai::faction::FactionSpecies::Cat,
+            &entities,
+            &positions,
+            &species_of,
+            stance_overlays,
+            req,
+        );
+        if filtered.is_empty() {
+            return None;
+        }
+        entities = filtered;
+        positions = filtered_pos;
     }
 
     let pos_map: std::collections::HashMap<Entity, Position> = entities
@@ -472,6 +514,8 @@ mod tests {
             0.5,
             1.0,
             &[],
+            &crate::ai::faction::FactionRelations::canonical(),
+            &|_| crate::ai::faction::StanceOverlays::default(),
             0,
             None,
         );
@@ -491,6 +535,8 @@ mod tests {
             0.5,
             1.0,
             &[],
+            &crate::ai::faction::FactionRelations::canonical(),
+            &|_| crate::ai::faction::StanceOverlays::default(),
             0,
             None,
         );
@@ -511,6 +557,8 @@ mod tests {
             0.5,
             1.0,
             &[],
+            &crate::ai::faction::FactionRelations::canonical(),
+            &|_| crate::ai::faction::StanceOverlays::default(),
             0,
             None,
         );
@@ -533,6 +581,8 @@ mod tests {
             0.5,
             1.0,
             &[],
+            &crate::ai::faction::FactionRelations::canonical(),
+            &|_| crate::ai::faction::StanceOverlays::default(),
             0,
             None,
         );
@@ -541,16 +591,18 @@ mod tests {
 
     #[test]
     fn sum_top_n_scores_surrounding_higher_than_single_threat() {
-        // A cat surrounded by three Foxes scores higher than a single
-        // Fox — the aggregated score sums top-3. Winner stays the
-        // argmax (here: ties go to first-in-order).
+        // A cat surrounded by three ShadowFoxes scores higher than a
+        // single ShadowFox — the aggregated score sums top-3. Winner
+        // stays the argmax (here: ties go to first-in-order). Uses
+        // ShadowFox because §9.3 fight_target accepts Enemy|Prey;
+        // Cat→Fox base = Predator (filtered out), Cat→ShadowFox = Enemy.
         let mut registry = DseRegistry::new();
         registry.target_taking_dses.push(fight_target_dse());
         let cat = Entity::from_raw_u32(1).unwrap();
         let surrounding = vec![
-            candidate(2, 2, 0, WildSpecies::Fox, 0.15),
-            candidate(3, 0, 2, WildSpecies::Fox, 0.15),
-            candidate(4, -2, 0, WildSpecies::Fox, 0.15),
+            candidate(2, 2, 0, WildSpecies::ShadowFox, 0.15),
+            candidate(3, 0, 2, WildSpecies::ShadowFox, 0.15),
+            candidate(4, -2, 0, WildSpecies::ShadowFox, 0.15),
         ];
         // Just the argmax: winner is one of the Foxes (first-in-order
         // for tied scores). The interesting invariant is that the
@@ -563,6 +615,8 @@ mod tests {
             0.5,
             1.0,
             &[],
+            &crate::ai::faction::FactionRelations::canonical(),
+            &|_| crate::ai::faction::StanceOverlays::default(),
             0,
             None,
         );
@@ -571,11 +625,14 @@ mod tests {
 
     #[test]
     fn close_threat_outscores_distant_same_species() {
+        // ShadowFox = Enemy under Cat→target faction. Cat→Fox = Predator
+        // would fail §9.3's Enemy|Prey requirement; the test scenario is
+        // about distance-vs-threat scoring, not the predator-flee path.
         let mut registry = DseRegistry::new();
         registry.target_taking_dses.push(fight_target_dse());
         let cat = Entity::from_raw_u32(1).unwrap();
-        let close = candidate(2, 1, 0, WildSpecies::Fox, 0.15);
-        let far = candidate(3, 8, 0, WildSpecies::Fox, 0.15);
+        let close = candidate(2, 1, 0, WildSpecies::ShadowFox, 0.15);
+        let far = candidate(3, 8, 0, WildSpecies::ShadowFox, 0.15);
         let out = resolve_fight_target(
             &registry,
             cat,
@@ -584,9 +641,24 @@ mod tests {
             0.5,
             1.0,
             &[],
+            &crate::ai::faction::FactionRelations::canonical(),
+            &|_| crate::ai::faction::StanceOverlays::default(),
             0,
             None,
         );
         assert_eq!(out, Some(close.entity));
+    }
+
+    #[test]
+    fn fight_target_stance_requirement_is_enemy_or_prey() {
+        use crate::ai::faction::FactionStance;
+        let req = fight_target_dse()
+            .required_stance
+            .expect("§9.3 binding must populate required_stance");
+        assert!(req.accepts(FactionStance::Enemy));
+        assert!(req.accepts(FactionStance::Prey));
+        assert!(!req.accepts(FactionStance::Same));
+        assert!(!req.accepts(FactionStance::Ally));
+        assert!(!req.accepts(FactionStance::Predator));
     }
 }

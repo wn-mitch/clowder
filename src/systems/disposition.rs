@@ -164,6 +164,12 @@ pub struct ChainResources<'w> {
     /// §6.3 target-taking DSE lookup — chain builders route target
     /// selection through the registered DSE (Phase 4c.1 onward).
     pub dse_registry: Res<'w, crate::ai::eval::DseRegistry>,
+    /// §9.1 base stance matrix — passed into target-taking resolvers
+    /// for §9.3 candidate prefiltering. (Note: `evaluate_dispositions`
+    /// is not registered in the schedule today; this resource is
+    /// threaded for type-correctness, the no-op overlay closure
+    /// below makes the prefilter a pass-through here.)
+    pub faction_relations: Res<'w, crate::ai::faction::FactionRelations>,
     pub time: Res<'w, TimeState>,
 }
 
@@ -1177,12 +1183,20 @@ pub fn disposition_to_chain(
         // `evaluate_dispositions`) because the two systems run as a
         // pair per tick over the same frame-local state; the extra
         // evaluator passes are cheap relative to chain construction.
+        // §9.3 prefilter inputs — `evaluate_dispositions` is not
+        // registered in the schedule today (chain-building runs through
+        // GOAP). The resolver requires the parameters for
+        // type-correctness; the no-op overlay closure leaves the
+        // prefilter as a pass-through here.
+        let stance_overlays_noop = |_: Entity| crate::ai::faction::StanceOverlays::default();
         let socialize_target = crate::ai::dses::socialize_target::resolve_socialize_target(
             &res.dse_registry,
             entity,
             *pos,
             &cat_pos_list,
             &res.relationships,
+            &res.faction_relations,
+            &stance_overlays_noop,
             res.time.tick,
             // Chain-building side; the focal capture happens at the
             // GOAP step-resolver site (goap.rs: SocializeWith step).

@@ -51,6 +51,7 @@ use crate::ai::considerations::{Consideration, ScalarConsideration};
 use crate::ai::curves::Curve;
 use crate::ai::dse::{CommitmentStrategy, DseId, EvalCtx, GoalState, Intention};
 use crate::ai::eval::DseRegistry;
+use crate::ai::faction::StanceRequirement;
 use crate::ai::target_dse::{
     evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,
 };
@@ -121,7 +122,10 @@ pub fn hunt_target_dse() -> TargetTakingDse {
         composition: Composition::weighted_sum(vec![0.357, 0.357, 0.286]),
         aggregation: TargetAggregation::Best,
         intention: hunt_intention,
-        required_stance: None,
+        // §9.3 Hunt accepts `Prey` only. Migrated from the cat-action
+        // HuntDse — candidate-prefilter happens here before
+        // evaluate_target_taking.
+        required_stance: Some(StanceRequirement::hunt()),
     }
 }
 
@@ -169,11 +173,14 @@ pub fn prey_yield_normalized(kind: PreyKind) -> f32 {
 /// sensing filters the caller applies. The resolver does not re-filter
 /// by range — it re-computes distance for the nearness axis, but trusts
 /// the candidate list's eligibility.
+#[allow(clippy::too_many_arguments)]
 pub fn resolve_hunt_target(
     registry: &DseRegistry,
     cat: Entity,
     cat_pos: Position,
     candidates: &[PreyCandidate],
+    relations: &crate::ai::faction::FactionRelations,
+    stance_overlays: &dyn Fn(Entity) -> crate::ai::faction::StanceOverlays,
     tick: u64,
     focal_hook: Option<FocalTargetHook<'_>>,
 ) -> Option<Entity> {
@@ -187,8 +194,43 @@ pub fn resolve_hunt_target(
     }
 
     // Pull entity + position parallel-vecs for the evaluator.
-    let entities: Vec<Entity> = candidates.iter().map(|c| c.entity).collect();
-    let positions: Vec<Position> = candidates.iter().map(|c| c.position).collect();
+    let mut entities: Vec<Entity> = candidates.iter().map(|c| c.entity).collect();
+    let mut positions: Vec<Position> = candidates.iter().map(|c| c.position).collect();
+
+    // §9.3 stance prefilter — drop prey candidates whose resolved
+    // stance fails the requirement. `BefriendedAlly` upgrades a Prey
+    // base to Ally, which Hunt's `Prey`-only requirement rejects.
+    if let Some(req) = dse.required_stance() {
+        let species_lookup: std::collections::HashMap<
+            Entity,
+            crate::ai::faction::FactionSpecies,
+        > = candidates
+            .iter()
+            .map(|c| {
+                (
+                    c.entity,
+                    crate::ai::faction::FactionSpecies::from_sensory(
+                        crate::components::sensing::SensorySpecies::Prey(c.kind),
+                    ),
+                )
+            })
+            .collect();
+        let species_of = |e: Entity| species_lookup.get(&e).copied();
+        let (filtered, filtered_pos) = crate::ai::faction::filter_candidates_by_stance(
+            relations,
+            crate::ai::faction::FactionSpecies::Cat,
+            &entities,
+            &positions,
+            &species_of,
+            stance_overlays,
+            req,
+        );
+        if filtered.is_empty() {
+            return None;
+        }
+        entities = filtered;
+        positions = filtered_pos;
+    }
 
     // Lookup-table for the target fetchers. O(N) size; tiny — hunt
     // candidate pools are bounded by visual range × prey density.
@@ -328,11 +370,28 @@ mod tests {
         assert!(mouse > 0.0);
     }
 
+    fn noop_relations() -> crate::ai::faction::FactionRelations {
+        crate::ai::faction::FactionRelations::canonical()
+    }
+
+    fn noop_overlays() -> impl Fn(Entity) -> crate::ai::faction::StanceOverlays {
+        |_| crate::ai::faction::StanceOverlays::default()
+    }
+
     #[test]
     fn resolver_returns_none_with_no_registered_dse() {
         let registry = DseRegistry::new();
         let cat = Entity::from_raw_u32(1).unwrap();
-        let out = resolve_hunt_target(&registry, cat, Position::new(0, 0), &[], 0, None);
+        let out = resolve_hunt_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &[],
+            &noop_relations(),
+            &noop_overlays(),
+            0,
+            None,
+        );
         assert!(out.is_none());
     }
 
@@ -341,7 +400,16 @@ mod tests {
         let mut registry = DseRegistry::new();
         registry.target_taking_dses.push(hunt_target_dse());
         let cat = Entity::from_raw_u32(1).unwrap();
-        let out = resolve_hunt_target(&registry, cat, Position::new(0, 0), &[], 0, None);
+        let out = resolve_hunt_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &[],
+            &noop_relations(),
+            &noop_overlays(),
+            0,
+            None,
+        );
         assert!(out.is_none());
     }
 
@@ -360,6 +428,8 @@ mod tests {
             cat,
             Position::new(0, 0),
             &[mouse, rabbit],
+            &noop_relations(),
+            &noop_overlays(),
             0,
             None,
         );
@@ -385,6 +455,8 @@ mod tests {
             cat,
             Position::new(0, 0),
             &[alert_rabbit, relaxed_mouse],
+            &noop_relations(),
+            &noop_overlays(),
             0,
             None,
         );
@@ -399,7 +471,16 @@ mod tests {
         let close = candidate(2, 2, 0, PreyKind::Rabbit, 0.2);
         let far = candidate(3, 12, 0, PreyKind::Rabbit, 0.2);
 
-        let out = resolve_hunt_target(&registry, cat, Position::new(0, 0), &[close, far], 0, None);
+        let out = resolve_hunt_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &[close, far],
+            &noop_relations(),
+            &noop_overlays(),
+            0,
+            None,
+        );
         assert_eq!(out, Some(close.entity));
     }
 
@@ -421,6 +502,8 @@ mod tests {
             cat,
             Position::new(0, 0),
             &[near_mouse, far_rat],
+            &noop_relations(),
+            &noop_overlays(),
             0,
             None,
         );
@@ -441,7 +524,28 @@ mod tests {
         let near = candidate(2, 1, 0, PreyKind::Mouse, 0.2);
         let far = candidate(3, 5, 0, PreyKind::Mouse, 0.2);
 
-        let out = resolve_hunt_target(&registry, cat, Position::new(0, 0), &[near, far], 0, None);
+        let out = resolve_hunt_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &[near, far],
+            &noop_relations(),
+            &noop_overlays(),
+            0,
+            None,
+        );
         assert_eq!(out, Some(near.entity));
+    }
+
+    #[test]
+    fn hunt_target_stance_requirement_is_prey_only() {
+        use crate::ai::faction::FactionStance;
+        let req = hunt_target_dse()
+            .required_stance
+            .expect("§9.3 binding must populate required_stance");
+        assert!(req.accepts(FactionStance::Prey));
+        assert!(!req.accepts(FactionStance::Enemy));
+        assert!(!req.accepts(FactionStance::Same));
+        assert!(!req.accepts(FactionStance::Predator));
     }
 }

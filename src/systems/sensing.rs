@@ -810,6 +810,7 @@ pub fn update_target_existence_markers(
     carcass_q: Query<(&crate::components::wildlife::Carcass, &Position), Without<Dead>>,
     relationships: Res<crate::resources::relationships::Relationships>,
     dse_registry: Res<crate::ai::eval::DseRegistry>,
+    faction_relations: Res<crate::ai::faction::FactionRelations>,
     time: Res<crate::resources::time::TimeState>,
     constants: Res<crate::resources::sim_constants::SimConstants>,
 ) {
@@ -841,12 +842,23 @@ pub fn update_target_existence_markers(
             .iter()
             .any(|wp| pos.manhattan_distance(wp) <= threat_range);
 
+        // The existence-check uses a no-op stance overlay closure: a
+        // pre-check that returns "yes, candidate exists" for a Banished
+        // cat is harmless because the actual resolver call in
+        // `goap.rs::dispose_cat` will pass the real overlay closure and
+        // drop the candidate. Refining `HasSocialTarget` to read §9.2
+        // overlays directly is a follow-on (the existence marker is
+        // intentionally cheap; threading the four `Has<...>` queries
+        // through this system bumps its SystemParam count).
+        let stance_overlays_noop = |_: Entity| crate::ai::faction::StanceOverlays::default();
         let want_social = crate::ai::dses::socialize_target::resolve_socialize_target(
             &dse_registry,
             entity,
             *pos,
             &cat_positions,
             &relationships,
+            &faction_relations,
+            &stance_overlays_noop,
             time.tick,
             None,
         )
@@ -1593,6 +1605,9 @@ mod tests {
         world.insert_resource(SimConstants::default());
         world.insert_resource(TimeState::default());
         world.insert_resource(Relationships::default());
+        // §9.1 base stance matrix — required by `update_target_existence_markers`
+        // since it threads `&res.faction_relations` into `resolve_socialize_target`.
+        world.insert_resource(crate::ai::faction::FactionRelations::canonical());
         // Bootstrap a DseRegistry containing socialize_target so
         // resolve_socialize_target finds its DSE. Other registries
         // come up empty — sensible since the test isolates the

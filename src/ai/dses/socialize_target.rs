@@ -61,6 +61,7 @@ use crate::ai::considerations::{Consideration, ScalarConsideration};
 use crate::ai::curves::Curve;
 use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination};
 use crate::ai::eval::DseRegistry;
+use crate::ai::faction::StanceRequirement;
 use crate::ai::target_dse::{
     evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,
 };
@@ -132,7 +133,10 @@ pub fn socialize_target_dse() -> TargetTakingDse {
         composition: Composition::weighted_sum(vec![0.20, 0.28, 0.20, 0.12, 0.20]),
         aggregation: TargetAggregation::Best,
         intention: socialize_intention,
-        required_stance: None,
+        // §9.3 Socialize accepts `Same | Ally`. Migrated from the
+        // cat-action SocializeDse (where it was metadata-only) — the
+        // candidate-prefilter happens here before evaluate_target_taking.
+        required_stance: Some(StanceRequirement::socialize()),
     }
 }
 
@@ -195,12 +199,15 @@ fn bond_score(relationships: &Relationships, cat: Entity, target: Entity) -> f32
 /// `build_socializing_chain`'s inline picker must switch to this
 /// helper; the legacy helpers stay behind for `GroomOther` /
 /// `MentorCat` / `MateWith` only until their §6.5.2–§6.5.4 ports land.
+#[allow(clippy::too_many_arguments)]
 pub fn resolve_socialize_target(
     registry: &DseRegistry,
     cat: Entity,
     cat_pos: Position,
     cat_positions: &[(Entity, Position)],
     relationships: &Relationships,
+    relations: &crate::ai::faction::FactionRelations,
+    stance_overlays: &dyn Fn(Entity) -> crate::ai::faction::StanceOverlays,
     tick: u64,
     focal_hook: Option<FocalTargetHook<'_>>,
 ) -> Option<Entity> {
@@ -233,6 +240,28 @@ pub fn resolve_socialize_target(
 
     if candidates.is_empty() {
         return None;
+    }
+
+    // §9.3 stance prefilter — drop candidates whose resolved stance
+    // fails the DSE requirement. Socialize candidates are cats by
+    // construction (cat_positions filter), so the species lookup is
+    // a constant `Cat`.
+    if let Some(req) = dse.required_stance() {
+        let species_of = |_: Entity| Some(crate::ai::faction::FactionSpecies::Cat);
+        let (filtered, filtered_pos) = crate::ai::faction::filter_candidates_by_stance(
+            relations,
+            crate::ai::faction::FactionSpecies::Cat,
+            &candidates,
+            &positions,
+            &species_of,
+            stance_overlays,
+            req,
+        );
+        if filtered.is_empty() {
+            return None;
+        }
+        candidates = filtered;
+        positions = filtered_pos;
     }
 
     // Build an entity → position lookup for the target-scoped fetcher.
@@ -623,6 +652,8 @@ mod tests {
             Position::new(0, 0),
             &cat_positions,
             &relationships,
+            &crate::ai::faction::FactionRelations::canonical(),
+            &|_| crate::ai::faction::StanceOverlays::default(),
             0,
             None,
         );
@@ -644,6 +675,8 @@ mod tests {
             Position::new(0, 0),
             &cat_positions,
             &relationships,
+            &crate::ai::faction::FactionRelations::canonical(),
+            &|_| crate::ai::faction::StanceOverlays::default(),
             0,
             None,
         );
@@ -675,6 +708,8 @@ mod tests {
             Position::new(0, 0),
             &cat_positions,
             &relationships,
+            &crate::ai::faction::FactionRelations::canonical(),
+            &|_| crate::ai::faction::StanceOverlays::default(),
             0,
             None,
         );
@@ -695,6 +730,8 @@ mod tests {
             Position::new(0, 0),
             &cat_positions,
             &relationships,
+            &crate::ai::faction::FactionRelations::canonical(),
+            &|_| crate::ai::faction::StanceOverlays::default(),
             0,
             None,
         );
@@ -729,6 +766,8 @@ mod tests {
             Position::new(0, 0),
             &cat_positions,
             &relationships,
+            &crate::ai::faction::FactionRelations::canonical(),
+            &|_| crate::ai::faction::StanceOverlays::default(),
             0,
             None,
         );
@@ -764,5 +803,18 @@ mod tests {
             Intention::Activity { kind, .. } => assert_eq!(kind, ActivityKind::Socialize),
             other => panic!("expected Activity intention, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn socialize_target_stance_requirement_is_same_or_ally() {
+        use crate::ai::faction::FactionStance;
+        let req = socialize_target_dse()
+            .required_stance
+            .expect("§9.3 binding must populate required_stance");
+        assert!(req.accepts(FactionStance::Same));
+        assert!(req.accepts(FactionStance::Ally));
+        assert!(!req.accepts(FactionStance::Enemy));
+        assert!(!req.accepts(FactionStance::Predator));
+        assert!(!req.accepts(FactionStance::Neutral));
     }
 }
