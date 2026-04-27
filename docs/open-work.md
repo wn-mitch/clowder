@@ -15,11 +15,11 @@ _Last generated: 2026-04-27._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 16 |
+| Ready | 19 |
 | Parked | 1 |
 | Blocked | 9 |
 | Done (awaiting archive) | 2 |
-| **Open total** | **32** |
+| **Open total** | **35** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -35,7 +35,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
 - **[027](docs/open-work/tickets/027-mating-cadence-three-bug-cascade.md)** — Mating cadence — three-bug cascade blocking MatingOccurred — _added 2026-04-25_
 
-## Ready (16)
+## Ready (19)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -53,6 +53,9 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[039](docs/open-work/tickets/039-foodcooked-still-silent-post-036.md)** — FoodCooked still silent after 036 — Cook chain execution failure downstream of CraftingHint::Cook — _added 2026-04-26_
 - **[040](docs/open-work/tickets/040-disposition-shift-courtship-grooming-regression.md)** — Disposition shift after 036 collapsed Courtship / Grooming / Mythic-texture continuity — _added 2026-04-26_
 - **[041](docs/open-work/tickets/041-founding-haul-balance-tuning.md)** — Founding wagon-dismantling haul — balance the early-game cost so cats don't starve while hauling — _added 2026-04-26_
+- **[045](docs/open-work/tickets/045-ward-perimeter-coverage.md)** — Ward perimeter is a fiction — 1-day decay × reactive-only placement leaves 0-2 wards alive across the entire map — _added 2026-04-27_
+- **[046](docs/open-work/tickets/046-fight-target-combat-advantage-damage-per-tick.md)** — FightTarget combat-advantage uses skill-points difference, not damage-per-tick exchange — cats engage threats they can't survive — _added 2026-04-27_
+- **[047](docs/open-work/tickets/047-critical-health-interrupt-treadmill.md)** — CriticalHealth interrupt is a treadmill, not a brake — replan picks the same disposition while damage accumulates — _added 2026-04-27_
 
 ## Parked (1)
 
@@ -84,7 +87,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/). Recent months:
 
-- [2026-04](docs/open-work/landed/2026-04.md) — 47 entries
+- [2026-04](docs/open-work/landed/2026-04.md) — 49 entries
 
 ## Conventions
 
