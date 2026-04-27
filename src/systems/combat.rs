@@ -79,6 +79,7 @@ pub fn resolve_combat(
     mut colony_score: Option<ResMut<crate::resources::colony_score::ColonyScore>>,
     mut event_log: Option<ResMut<crate::resources::event_log::EventLog>>,
     registry: Option<Res<TemplateRegistry>>,
+    mut commands: Commands,
 ) {
     let c = &constants.combat;
     // Collect fighting cats and their targets.
@@ -355,6 +356,23 @@ pub fn resolve_combat(
     // inside legend_witness_range receive a secondhand mood + safety boost
     // and a lasting Triumph memory.
     for (target_entity, target_pos, posse) in &pending_banishments {
+        // §9.2 / ticket 049 — cat-on-cat banishment branch. The
+        // shadowfox path that populates `pending_banishments` today is
+        // the only producer; this branch lights up only when a future
+        // system pushes a cat onto the list. Tag the cat with the
+        // `Banished` marker (consumed by §9.3 stance overlay) and
+        // increment the colony's `banishments` counter. Skip the
+        // shadowfox-specific corruption pushback + posse/witness boons
+        // — banishing a clanmate is not a Legend-tier triumph.
+        if cats.get(*target_entity).is_ok() {
+            commands
+                .entity(*target_entity)
+                .insert(crate::components::markers::Banished);
+            if let Some(ref mut score) = colony_score {
+                score.banishments += 1;
+            }
+            continue;
+        }
         activation.record(Feature::ShadowFoxBanished);
         if let Some(ref mut score) = colony_score {
             score.banishments += 1;
@@ -1222,5 +1240,46 @@ mod tests {
         assert!(has_in_combat(&world, fighter));
         assert!(!has_in_combat(&world, hunter));
         assert!(!has_in_combat(&world, idler));
+    }
+
+    // -----------------------------------------------------------------------
+    // §9.2 / ticket 049 cat-on-cat banishment branch tests
+    // -----------------------------------------------------------------------
+
+    /// The `Banished` marker is a ZST with a stable KEY. Inserting it
+    /// onto a cat entity flips `Has<Banished>` true and keeps the
+    /// entity alive (vs the shadowfox path which despawns).
+    #[test]
+    fn banished_marker_persists_on_cat() {
+        let mut world = World::new();
+        let cat = world.spawn(()).id();
+        world
+            .commands()
+            .entity(cat)
+            .insert(crate::components::markers::Banished);
+        world.flush();
+        assert!(world.get::<crate::components::markers::Banished>(cat).is_some());
+        // Marker is sticky — running a no-op schedule does not clear it.
+        let mut schedule = Schedule::default();
+        schedule.run(&mut world);
+        assert!(world.get::<crate::components::markers::Banished>(cat).is_some());
+    }
+
+    /// Resolved stance with the `Banished` overlay set demotes
+    /// `Same → Enemy` for a cat-on-cat observation. This is the
+    /// runtime contract that the §9.3 prefilter exploits to drop a
+    /// banished cat from `socialize_target` candidate sets.
+    #[test]
+    fn banished_overlay_demotes_same_to_enemy() {
+        use crate::ai::faction::{resolve_stance, FactionStance, StanceOverlays};
+        let resolved = resolve_stance(
+            FactionStance::Same,
+            true, // observer is a cat
+            StanceOverlays {
+                banished: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(resolved, FactionStance::Enemy);
     }
 }

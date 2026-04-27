@@ -255,6 +255,37 @@ pub struct BuildingResolverParams<'w, 's> {
 }
 
 /// Bundles resources for resolve_goap_plans.
+/// Bundled marker queries for `evaluate_and_plan`'s snapshot population
+/// pass. Wraps the §4 broad-phase target-existence markers (ticket 014)
+/// and the §9.2 faction overlay markers (ticket 049). Bundled via
+/// SystemParam derive so the parent system stays under Bevy's
+/// 16-param limit.
+#[allow(clippy::type_complexity)]
+#[derive(bevy_ecs::system::SystemParam)]
+pub struct TargetMarkerQueries<'w, 's> {
+    pub target_existence_q: Query<
+        'w,
+        's,
+        (
+            Has<markers::HasThreatNearby>,
+            Has<markers::HasSocialTarget>,
+            Has<markers::HasHerbsNearby>,
+            Has<markers::PreyNearby>,
+            Has<markers::CarcassNearby>,
+        ),
+    >,
+    pub faction_overlay_q: Query<
+        'w,
+        's,
+        (
+            Has<markers::Visitor>,
+            Has<markers::HostileVisitor>,
+            Has<markers::Banished>,
+            Has<markers::BefriendedAlly>,
+        ),
+    >,
+}
+
 #[allow(clippy::type_complexity)]
 #[derive(bevy_ecs::system::SystemParam)]
 pub struct ExecutorContext<'w, 's> {
@@ -803,17 +834,10 @@ pub fn evaluate_and_plan(
         Has<markers::Apprentice>,
         Has<markers::HasMentoringTarget>,
     )>,
-    // Ticket 014 §4 sensing batch — broad-phase target-existence markers
-    // authored by `sensing::update_target_existence_markers`. Populating
-    // the snapshot here is required for the `markers.has(KEY, entity)`
-    // reads in the per-cat ScoringContext below to resolve truthfully.
-    target_existence_q: Query<(
-        Has<markers::HasThreatNearby>,
-        Has<markers::HasSocialTarget>,
-        Has<markers::HasHerbsNearby>,
-        Has<markers::PreyNearby>,
-        Has<markers::CarcassNearby>,
-    )>,
+    // Bundled marker queries (§4 sensing + §9.2 faction overlays).
+    // Bundled via SystemParam derive so `evaluate_and_plan` stays under
+    // Bevy's 16-param limit per CLAUDE.md ECS rules.
+    marker_qs: TargetMarkerQueries,
 ) {
     let sc = &res.constants.scoring;
     let d = &res.constants.disposition;
@@ -1136,12 +1160,27 @@ pub fn evaluate_and_plan(
         }
         // Ticket 014 §4 sensing batch — broad-phase target-existence
         // markers authored by `sensing::update_target_existence_markers`.
-        if let Ok((threat, social, herbs, prey, carcass)) = target_existence_q.get(entity) {
+        if let Ok((threat, social, herbs, prey, carcass)) =
+            marker_qs.target_existence_q.get(entity)
+        {
             markers.set_entity(markers::HasThreatNearby::KEY, entity, threat);
             markers.set_entity(markers::HasSocialTarget::KEY, entity, social);
             markers.set_entity(markers::HasHerbsNearby::KEY, entity, herbs);
             markers.set_entity(markers::PreyNearby::KEY, entity, prey);
             markers.set_entity(markers::CarcassNearby::KEY, entity, carcass);
+        }
+        // Ticket 049 §9.2 — faction overlay markers (Visitor /
+        // HostileVisitor / Banished / BefriendedAlly). The runtime §9.3
+        // prefilter reads these via `ExecutorContext::stance_overlays_of`
+        // (a parallel Has<...> query); the snapshot mirror keeps
+        // `MarkerSnapshot::has(KEY, entity)` consistent for diagnostics.
+        if let Ok((visitor, hostile_visitor, banished, befriended_ally)) =
+            marker_qs.faction_overlay_q.get(entity)
+        {
+            markers.set_entity(markers::Visitor::KEY, entity, visitor);
+            markers.set_entity(markers::HostileVisitor::KEY, entity, hostile_visitor);
+            markers.set_entity(markers::Banished::KEY, entity, banished);
+            markers.set_entity(markers::BefriendedAlly::KEY, entity, befriended_ally);
         }
 
         // Ticket 014 §4 sensing batch — `has_herbs_nearby` /
