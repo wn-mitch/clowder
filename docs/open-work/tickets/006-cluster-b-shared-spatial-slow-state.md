@@ -33,11 +33,49 @@ substrate.
 
 **Current state:** Phase 2B landed the generalized influence-map
 substrate + migrated scent onto it (see Landed: **Phase 2B — Scent
-as influence map**). Corruption, ward, prey-density, and
-social-attraction layers remain one-off or not-yet-built. The B1
-exit-criterion "at least two distinct layers share one abstraction"
-is not yet met — scent is on the substrate, but no second layer has
-been migrated, so the abstraction has no co-tenant yet.
+as influence map**). Ticket 048 added `CarcassScentMap`
+(§5.6.3 #6, substrate-only — consumer cutover deferred). Ticket 045
+added `WardCoverageMap` (§5.6.3 #3 ward-coverage view; full
+ward-strength promotion still deferred). Three live layers now share
+the abstraction, so the original "≥2 layers" exit criterion is met.
+
+**Re-scoped exit criterion (2026-04-27 audit):** all §5.6.3 rows
+landed, deferred to a successor feature with an open ticket, or
+explicitly out-of-scope. The `≥2 layers` bar was a refactor-pre-flight
+proof-of-substrate; the real work is completing the spec catalog so
+DSEs that want spatial inputs aren't silently degraded.
+
+### §5.6.3 absent-map checklist
+
+Eight rows from the §5.6.3 catalog with current status:
+
+- [x] **#6 carcass scent** — *landed substrate* (ticket 048,
+  `CarcassScentMap`). Consumer cutover at `goap.rs:1133–1145` still
+  uses per-pair `observer_smells_at`; balance-affecting follow-on.
+- [~] **#3 ward strength** — *partial* (ticket 045 added
+  `WardCoverageMap` for placement scoring). Full §5.6.3 #3 promotion
+  to a first-class spatial axis in scoring is still deferred per
+  ticket 048's landing log.
+- [~] **#5 prey-species split** — *partial*. `PreyScentMap` lives on
+  the substrate; per-prey-species split (`mouse_scent`,
+  `rabbit_scent`, `bird_scent` separated) deferred per ticket 048's
+  landing log.
+- [ ] **#4 food-location** — *absent*. Wanted by Forage / Eat for
+  stockpile-aware scoring; today proxies via inline iteration.
+- [ ] **#7 herb-location** — *absent*. Wanted by herbcraft DSEs;
+  today proxies via per-pair sensing.
+- [ ] **#8 construction site** — *absent*. Wanted by Build target
+  ranking; today proxies via construction-component iteration.
+- [ ] **#9 garden / crop** — *absent*. Wanted by Tend / Harvest
+  spatial routing.
+- [ ] **#13 kitten-urgency** — *absent*. Wanted by Caretake target
+  ranking; today proxies via per-kitten lookup.
+
+Each row's "wanted by DSE X" column is also gated on ticket 052
+(§L2.10.7 plan-cost feedback) — `SpatialConsideration` is the
+consumer-side substrate that reads these maps. Order: 052 lands the
+consumer surface; this ticket lands the producer maps; per-DSE
+cutover is the join.
 
 **Touch points:**
 - `src/systems/wind.rs` + `sensing.rs` — scent already migrated to
@@ -65,13 +103,18 @@ been migrated, so the abstraction has no co-tenant yet.
 - Nick Mercer Unity reference implementation:
   <https://github.com/NickMercer/InfluenceMap>
 
-**Exit criterion:** at least two distinct layers (scent + corruption,
-or scent + social attraction) share one abstraction; scoring layer
-reads influence-map values as native axis inputs (gated on A1).
+**Exit criterion (re-scoped 2026-04-27):** every §5.6.3 row above is
+either landed, has an open successor ticket, or is marked explicitly
+out-of-scope; scoring layer reads influence-map values as native axis
+inputs through `SpatialConsideration` (ticket 052) where the row's
+DSE consumer wants distance-shaped scoring.
 
-**Dependency:** gated on A1 for clean consumption by scoring; can
-proceed in parallel with cluster C.
+**Dependency:** gated on A1 for clean consumption by scoring (now
+satisfied); can proceed in parallel with cluster C. Landing the
+producer maps before ticket 052's consumer cutover is fine —
+`SpatialConsideration` will read whichever maps exist when it lands.
 
 ## Log
 
 - 2026-04-27: dropped blocked-by 005 — cluster-A umbrella retired; A1 dependency satisfied by landed work. Status flipped blocked → ready.
+- 2026-04-27: re-scoped per substrate-refactor audit. Original "≥2 layers share an abstraction" exit criterion was already met (scent + carcass + ward-coverage), but the spec's §5.6.3 row catalog had 8 absent rows that no ticket enumerated. Promoted the exit criterion to "all §5.6.3 rows landed/deferred-with-ticket/out-of-scope" and added the absent-map checklist above. No status flip; ticket stays `ready`.
