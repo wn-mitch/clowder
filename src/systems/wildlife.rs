@@ -641,12 +641,14 @@ pub fn predator_hunt_prey(
     mut rng: ResMut<SimRng>,
     mut log: ResMut<NarrativeLog>,
     time: Res<TimeState>,
+    time_scale: Res<TimeScale>,
     constants: Res<SimConstants>,
     map: Res<TileMap>,
     mut activation: ResMut<SystemActivation>,
 ) {
     let c = &constants.wildlife;
     let fc = &constants.fox_ecology;
+    let satiation_prey_kill = fc.satiation_after_prey_kill.ticks(&time_scale);
     for (pred_entity, predator, pred_pos, fox_phase) in predators.iter() {
         // Foxes with ecology: only hunt when in HuntingPrey phase.
         if let Some(phase) = fox_phase {
@@ -719,7 +721,7 @@ pub fn predator_hunt_prey(
 
                     // Fox-specific: gain satiation from kill.
                     if let Ok(mut fox_state) = fox_states.get_mut(pred_entity) {
-                        fox_state.satiation_ticks = fc.satiation_after_prey_kill;
+                        fox_state.satiation_ticks = satiation_prey_kill;
                         fox_state.hunger = (fox_state.hunger - 0.3).max(0.0);
                         activation.record(Feature::FoxHuntedPrey);
                     }
@@ -1311,8 +1313,13 @@ pub fn spawn_initial_fox_dens(world: &mut World, colony_center: Position) {
 
 /// Per-tick fox state maintenance: hunger decay, satiation countdown, boldness
 /// update, and age tracking.
-pub fn fox_needs_tick(mut foxes: Query<&mut FoxState>, constants: Res<SimConstants>) {
+pub fn fox_needs_tick(
+    mut foxes: Query<&mut FoxState>,
+    constants: Res<SimConstants>,
+    time_scale: Res<TimeScale>,
+) {
     let fc = &constants.fox_ecology;
+    let hunger_per_tick = fc.hunger_decay_rate.per_tick(&time_scale);
     for mut fox in &mut foxes {
         // Age.
         fox.age_ticks += 1;
@@ -1321,7 +1328,7 @@ pub fn fox_needs_tick(mut foxes: Query<&mut FoxState>, constants: Res<SimConstan
         if fox.satiation_ticks > 0 {
             fox.satiation_ticks -= 1;
         } else {
-            fox.hunger = (fox.hunger + fc.hunger_decay_per_tick).min(1.0);
+            fox.hunger = (fox.hunger + hunger_per_tick).min(1.0);
         }
 
         // Cooldown.
@@ -1344,12 +1351,17 @@ pub fn fox_lifecycle_tick(
     mut dens: Query<(Entity, &mut FoxDen, &Position)>,
     time: Res<TimeState>,
     sim_config: Res<SimConfig>,
+    time_scale: Res<TimeScale>,
     mut rng: ResMut<SimRng>,
     constants: Res<SimConstants>,
     mut log: ResMut<NarrativeLog>,
     mut activation: ResMut<SystemActivation>,
 ) {
     let fc = &constants.fox_ecology;
+    let cub_duration_ticks = fc.cub_duration.ticks(&time_scale);
+    let juvenile_duration_ticks = fc.juvenile_duration.ticks(&time_scale);
+    let max_age_ticks = fc.max_age.ticks(&time_scale);
+    let starvation_death_ticks = fc.starvation_death_duration.ticks(&time_scale);
 
     // Collect fox data to avoid borrow conflicts.
     let fox_snapshot: Vec<(Entity, FoxState, Position)> = foxes
@@ -1360,15 +1372,15 @@ pub fn fox_lifecycle_tick(
     for (entity, fox_state, _fox_pos) in &fox_snapshot {
         // --- Life stage advancement ---
         let new_stage = match fox_state.life_stage {
-            FoxLifeStage::Cub if fox_state.age_ticks >= fc.cub_duration_ticks => {
+            FoxLifeStage::Cub if fox_state.age_ticks >= cub_duration_ticks => {
                 Some(FoxLifeStage::Juvenile)
             }
             FoxLifeStage::Juvenile
-                if fox_state.age_ticks >= fc.cub_duration_ticks + fc.juvenile_duration_ticks =>
+                if fox_state.age_ticks >= cub_duration_ticks + juvenile_duration_ticks =>
             {
                 Some(FoxLifeStage::Adult)
             }
-            FoxLifeStage::Adult if fox_state.age_ticks >= fc.max_age_ticks => {
+            FoxLifeStage::Adult if fox_state.age_ticks >= max_age_ticks => {
                 Some(FoxLifeStage::Elder)
             }
             _ => None,
@@ -1411,7 +1423,7 @@ pub fn fox_lifecycle_tick(
                     fs_live.starvation_ticks = 0;
                 }
                 (
-                    fs_live.starvation_ticks >= fc.starvation_death_ticks,
+                    fs_live.starvation_ticks >= starvation_death_ticks,
                     fs_live.starvation_ticks,
                 )
             } else {
@@ -1548,12 +1560,14 @@ pub fn fox_ai_decision(
     map: Res<TileMap>,
     mut rng: ResMut<SimRng>,
     constants: Res<SimConstants>,
+    time_scale: Res<TimeScale>,
     mut activation: ResMut<SystemActivation>,
     scent_map: Res<FoxScentMap>,
     cat_presence: Res<CatPresenceMap>,
 ) {
     let fc = &constants.fox_ecology;
     let wc = &constants.wildlife;
+    let standoff_max_ticks = fc.standoff_max_duration.ticks(&time_scale);
 
     // Snapshot cat positions for proximity checks.
     let cat_positions: Vec<(Entity, Position, f32)> = cats
@@ -1710,7 +1724,7 @@ pub fn fox_ai_decision(
                     if let Some((cat_e, cat_pos, _)) = threat {
                         *phase = FoxAiPhase::Confronting {
                             target_id: cat_e.to_bits(),
-                            ticks_remaining: fc.standoff_max_ticks,
+                            ticks_remaining: standoff_max_ticks,
                         };
                         *ai_state = WildlifeAiState::Stalking {
                             target_x: cat_pos.x,
@@ -1742,7 +1756,7 @@ pub fn fox_ai_decision(
             if let Some((cat_e, cat_pos, _)) = vulnerable_cat {
                 *phase = FoxAiPhase::Confronting {
                     target_id: cat_e.to_bits(),
-                    ticks_remaining: fc.standoff_max_ticks,
+                    ticks_remaining: standoff_max_ticks,
                 };
                 *ai_state = WildlifeAiState::Stalking {
                     target_x: cat_pos.x,
@@ -2106,10 +2120,12 @@ pub fn fox_confrontation_tick(
     constants: Res<SimConstants>,
     mut log: ResMut<NarrativeLog>,
     time: Res<TimeState>,
+    time_scale: Res<TimeScale>,
     mut activation: ResMut<SystemActivation>,
     map: Res<TileMap>,
 ) {
     let fc = &constants.fox_ecology;
+    let post_action_cooldown_ticks = fc.post_action_cooldown.ticks(&time_scale);
 
     for (_fox_entity, mut fox, mut phase, mut ai_state, pos, mut fox_health) in &mut foxes {
         let (target_id, ticks_remaining) = match &mut *phase {
@@ -2133,7 +2149,7 @@ pub fn fox_confrontation_tick(
                     dx: flee_dx,
                     dy: flee_dy,
                 };
-                fox.post_action_cooldown = fc.post_action_cooldown;
+                fox.post_action_cooldown = post_action_cooldown_ticks;
                 activation.record(Feature::FoxRetreated);
                 log.push(
                     time.tick,
@@ -2145,7 +2161,7 @@ pub fn fox_confrontation_tick(
                 let dx = if rng.rng.random() { 1 } else { -1 };
                 *phase = FoxAiPhase::PatrolTerritory { dx, dy: 0 };
                 *ai_state = WildlifeAiState::Patrolling { dx, dy: 0 };
-                fox.post_action_cooldown = fc.post_action_cooldown;
+                fox.post_action_cooldown = post_action_cooldown_ticks;
                 log.push(
                     time.tick,
                     "The fox stands its ground, hackles raised.".to_string(),
@@ -2216,7 +2232,7 @@ pub fn fox_confrontation_tick(
                 dx: flee_dx,
                 dy: flee_dy,
             };
-            fox.post_action_cooldown = fc.post_action_cooldown;
+            fox.post_action_cooldown = post_action_cooldown_ticks;
         }
     }
 }
@@ -2239,10 +2255,13 @@ pub fn fox_store_raid_tick(
     constants: Res<SimConstants>,
     mut log: ResMut<NarrativeLog>,
     time: Res<TimeState>,
+    time_scale: Res<TimeScale>,
     mut activation: ResMut<SystemActivation>,
     map: Res<TileMap>,
 ) {
     let fc = &constants.fox_ecology;
+    let post_action_cooldown_ticks = fc.post_action_cooldown.ticks(&time_scale);
+    let satiation_after_store_raid = fc.satiation_after_store_raid.ticks(&time_scale);
 
     let cat_positions: Vec<Position> = cats.iter().copied().collect();
 
@@ -2272,7 +2291,7 @@ pub fn fox_store_raid_tick(
                 dx: flee_dx,
                 dy: flee_dy,
             };
-            fox.post_action_cooldown = fc.post_action_cooldown;
+            fox.post_action_cooldown = post_action_cooldown_ticks;
             activation.record(Feature::FoxRetreated);
             continue;
         }
@@ -2281,9 +2300,9 @@ pub fn fox_store_raid_tick(
             // Steal food!
             let stolen = food.withdraw(fc.raid_food_stolen);
             if stolen > 0.0 {
-                fox.satiation_ticks = fc.satiation_after_store_raid;
+                fox.satiation_ticks = satiation_after_store_raid;
                 fox.hunger = (fox.hunger - 0.4).max(0.0);
-                fox.post_action_cooldown = fc.post_action_cooldown;
+                fox.post_action_cooldown = post_action_cooldown_ticks;
                 activation.record(Feature::FoxStoreRaided);
                 log.push(
                     time.tick,

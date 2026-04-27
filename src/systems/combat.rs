@@ -69,6 +69,7 @@ pub fn resolve_combat(
     >,
     time: Res<TimeState>,
     config: Res<crate::resources::time::SimConfig>,
+    time_scale: Res<crate::resources::time::TimeScale>,
     mut log: ResMut<NarrativeLog>,
     mut rng: ResMut<SimRng>,
     constants: Res<SimConstants>,
@@ -340,7 +341,7 @@ pub fn resolve_combat(
 
                 mood.modifiers.push_back(MoodModifier {
                     amount: c.flee_mood_penalty,
-                    ticks_remaining: c.flee_mood_ticks,
+                    ticks_remaining: c.flee_mood_duration.ticks(&time_scale),
                     source: "fled from combat".to_string(),
                 });
             }
@@ -534,7 +535,7 @@ pub fn resolve_combat(
 
             let mut victory_mod = MoodModifier {
                 amount: c.victory_mood_bonus,
-                ticks_remaining: c.victory_mood_ticks,
+                ticks_remaining: c.victory_mood_duration.ticks(&time_scale),
                 source: "won a fight".to_string(),
             };
             crate::systems::mood::patience_extend(
@@ -573,7 +574,7 @@ pub fn resolve_combat(
     for cat_entity in &cats_to_flee {
         if let Ok((_, mut current, _, _, _, _, _, _, _, _)) = cats.get_mut(*cat_entity) {
             current.action = Action::Flee;
-            current.ticks_remaining = c.flee_action_ticks;
+            current.ticks_remaining = c.flee_action_duration.ticks(&time_scale);
             // Keep target_position — will be recalculated next evaluate_actions.
             current.target_entity = None;
         }
@@ -647,11 +648,12 @@ pub(crate) fn apply_injury(
 pub fn heal_duration(
     kind: InjuryKind,
     c: &crate::resources::sim_constants::CombatConstants,
+    time_scale: &crate::resources::time::TimeScale,
 ) -> u64 {
     match kind {
-        InjuryKind::Minor => c.heal_duration_minor,
-        InjuryKind::Moderate => c.heal_duration_moderate,
-        InjuryKind::Severe => c.heal_duration_severe,
+        InjuryKind::Minor => c.heal_minor_duration.ticks(time_scale),
+        InjuryKind::Moderate => c.heal_moderate_duration.ticks(time_scale),
+        InjuryKind::Severe => c.heal_severe_duration.ticks(time_scale),
     }
 }
 
@@ -666,6 +668,7 @@ pub fn heal_injuries(
         Option<&mut crate::components::identity::Appearance>,
     )>,
     time: Res<TimeState>,
+    time_scale: Res<crate::resources::time::TimeScale>,
     constants: Res<SimConstants>,
     mut activation: ResMut<SystemActivation>,
 ) {
@@ -677,7 +680,7 @@ pub fn heal_injuries(
             if injury.healed {
                 continue;
             }
-            let duration = heal_duration(injury.kind, c);
+            let duration = heal_duration(injury.kind, c, &time_scale);
             if time.tick.saturating_sub(injury.tick_received) >= duration {
                 injury.healed = true;
                 activation.record(Feature::InjuryHealed);
@@ -800,8 +803,16 @@ mod tests {
     #[test]
     fn heal_duration_ordering() {
         let c = &SimConstants::default().combat;
-        assert!(heal_duration(InjuryKind::Minor, c) < heal_duration(InjuryKind::Moderate, c));
-        assert!(heal_duration(InjuryKind::Moderate, c) < heal_duration(InjuryKind::Severe, c));
+        let ts = crate::resources::time::TimeScale::from_config(
+            &crate::resources::time::SimConfig::default(),
+            16.6667,
+        );
+        assert!(
+            heal_duration(InjuryKind::Minor, c, &ts) < heal_duration(InjuryKind::Moderate, c, &ts)
+        );
+        assert!(
+            heal_duration(InjuryKind::Moderate, c, &ts) < heal_duration(InjuryKind::Severe, c, &ts)
+        );
     }
 
     #[test]
@@ -816,6 +827,10 @@ mod tests {
         });
         world.insert_resource(SimConstants::default());
         world.insert_resource(SystemActivation::default());
+        world.insert_resource(crate::resources::time::TimeScale::from_config(
+            &crate::resources::time::SimConfig::default(),
+            16.6667,
+        ));
 
         let entity = world
             .spawn(Health {
@@ -926,8 +941,12 @@ mod tests {
             "HP after hit: expected {expected_after_hit}, got {hp_after_hit}",
         );
 
-        // Advance time past heal_duration_moderate and run heal_injuries.
-        let heal_tick = tick_of_injury + c.combat.heal_duration_moderate;
+        // Advance time past heal_moderate_duration and run heal_injuries.
+        let ts = crate::resources::time::TimeScale::from_config(
+            &crate::resources::time::SimConfig::default(),
+            16.6667,
+        );
+        let heal_tick = tick_of_injury + c.combat.heal_moderate_duration.ticks(&ts);
 
         let mut world = World::new();
         world.insert_resource(TimeState {
@@ -937,6 +956,7 @@ mod tests {
         });
         world.insert_resource(c);
         world.insert_resource(SystemActivation::default());
+        world.insert_resource(ts);
 
         let entity = world.spawn(health).id();
 

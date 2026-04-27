@@ -61,6 +61,19 @@ pub fn setup_world_exclusive(world: &mut World) {
         world.insert_resource(crate::resources::ColonyScore::default());
     }
 
+    // Provisional TimeScale so worldgen subsystems that pre-simulate
+    // prey ecology (`seed_prey_ecosystem` → `presimulate_prey`) can
+    // resolve `Res<TimeScale>` parameters on prey/fox systems gained
+    // in ticket 033 Phase 4. Built from `SimConfig::default()`; the
+    // post-build_new_world block at the bottom of this function
+    // re-inserts the canonical TimeScale once the live SimConfig has
+    // landed (defensive for the load_path case where saved SimConfig
+    // may differ from defaults).
+    {
+        let provisional = TimeScale::from_config(&SimConfig::default(), args_wall_seconds_per_game_day);
+        world.insert_resource(provisional);
+    }
+
     if let Some(ref load_path) = args_load_path {
         match persistence::load_from_file(load_path) {
             Ok(save) => {

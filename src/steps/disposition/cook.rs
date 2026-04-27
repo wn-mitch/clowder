@@ -1,5 +1,6 @@
 use crate::components::magic::{Inventory, ItemSlot};
 use crate::resources::sim_constants::DispositionConstants;
+use crate::resources::time::TimeScale;
 use crate::steps::{StepOutcome, StepResult};
 
 /// # GOAP step resolver: `Cook`
@@ -33,8 +34,9 @@ pub fn resolve_cook(
     ticks: u64,
     inventory: &mut Inventory,
     d: &DispositionConstants,
+    time_scale: &TimeScale,
 ) -> StepOutcome<bool> {
-    if ticks < d.cook_ticks {
+    if ticks < d.cook_duration.ticks(time_scale) {
         return StepOutcome::unwitnessed(StepResult::Continue);
     }
     for slot in inventory.slots.iter_mut() {

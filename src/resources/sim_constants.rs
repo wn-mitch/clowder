@@ -280,15 +280,22 @@ pub struct CombatConstants {
     pub morale_loyalty_weight: f32,
     pub morale_flee_threshold: f32,
     pub flee_mood_penalty: f32,
-    pub flee_mood_ticks: u64,
     pub victory_respect_gain: f32,
     pub victory_safety_gain: f32,
     pub victory_mood_bonus: f32,
-    pub victory_mood_ticks: u64,
-    pub flee_action_ticks: u64,
-    pub heal_duration_minor: u64,
-    pub heal_duration_moderate: u64,
-    pub heal_duration_severe: u64,
+    // --- DurationDays durations (ticket 033 Phase 4) ---
+    #[serde(alias = "flee_mood_ticks")]
+    pub flee_mood_duration: DurationDays,
+    #[serde(alias = "victory_mood_ticks")]
+    pub victory_mood_duration: DurationDays,
+    #[serde(alias = "flee_action_ticks")]
+    pub flee_action_duration: DurationDays,
+    #[serde(alias = "heal_duration_minor")]
+    pub heal_minor_duration: DurationDays,
+    #[serde(alias = "heal_duration_moderate")]
+    pub heal_moderate_duration: DurationDays,
+    #[serde(alias = "heal_duration_severe")]
+    pub heal_severe_duration: DurationDays,
 }
 
 impl Default for CombatConstants {
@@ -336,15 +343,17 @@ impl Default for CombatConstants {
             morale_loyalty_weight: 0.2,
             morale_flee_threshold: 0.4,
             flee_mood_penalty: -0.3,
-            flee_mood_ticks: 40,
             victory_respect_gain: 0.1,
             victory_safety_gain: 0.2,
             victory_mood_bonus: 0.3,
-            victory_mood_ticks: 50,
-            flee_action_ticks: 15,
-            heal_duration_minor: 50,
-            heal_duration_moderate: 200,
-            heal_duration_severe: 500,
+            // DurationDays durations (Phase 4) — preserve raw-tick numerics at
+            // the default 1000-ticks/day scale: N ticks → N / 1000 days.
+            flee_mood_duration: DurationDays::new(0.04),
+            victory_mood_duration: DurationDays::new(0.05),
+            flee_action_duration: DurationDays::new(0.015),
+            heal_minor_duration: DurationDays::new(0.05),
+            heal_moderate_duration: DurationDays::new(0.2),
+            heal_severe_duration: DurationDays::new(0.5),
         }
     }
 }
@@ -871,7 +880,10 @@ pub struct PreyConstants {
     pub bird_teleport_max_range: i32,
     pub grazing_wander_chance: f32,
     pub grazing_jitter_chance: f32,
-    pub grazing_max_ticks: u64,
+    /// Maximum duration of a grazing bout before the prey returns to Idle.
+    /// (ticket 033 Phase 4)
+    #[serde(alias = "grazing_max_ticks")]
+    pub grazing_max_duration: DurationDays,
     pub grazing_max_roam_normal: i32,
     pub grazing_max_roam_pressured: i32,
     pub grazing_pressure_roam_threshold: f32,
@@ -900,7 +912,10 @@ pub struct PreyConstants {
     pub den_predation_pressure_decay: f32,
     pub den_stress_high_threshold: f32,
     pub den_stress_low_threshold: f32,
-    pub den_abandon_stress_ticks: u64,
+    /// Sustained stress duration after which a prey den is abandoned and
+    /// despawns (ticket 033 Phase 4).
+    #[serde(alias = "den_abandon_stress_ticks")]
+    pub den_abandon_stress_duration: DurationDays,
     pub den_kill_pressure_increment: f32,
     pub den_kill_pressure_range: i32,
     pub den_raid_pressure_increment: f32,
@@ -971,7 +986,8 @@ impl Default for PreyConstants {
             bird_teleport_max_range: 8,
             grazing_wander_chance: 0.05,
             grazing_jitter_chance: 0.1,
-            grazing_max_ticks: 200,
+            // 200 ticks ÷ 1000 ticks/day = 0.2 days (Phase 4).
+            grazing_max_duration: DurationDays::new(0.2),
             grazing_max_roam_normal: 15,
             grazing_max_roam_pressured: 8,
             grazing_pressure_roam_threshold: 0.5,
@@ -994,7 +1010,8 @@ impl Default for PreyConstants {
             den_predation_pressure_decay: 0.9995,
             den_stress_high_threshold: 0.7,
             den_stress_low_threshold: 0.5,
-            den_abandon_stress_ticks: 3000,
+            // 3000 ticks ÷ 1000 ticks/day = 3 days (Phase 4).
+            den_abandon_stress_duration: DurationDays::new(3.0),
             den_kill_pressure_increment: 0.1,
             den_kill_pressure_range: 15,
             den_raid_pressure_increment: 0.3,
@@ -1874,9 +1891,10 @@ pub struct DispositionConstants {
     /// Applied in `resolve_eat_at_stores` after corruption freshness.
     #[serde(default = "default_cooked_food_multiplier")]
     pub cooked_food_multiplier: f32,
-    /// Ticks a cat spends at a Kitchen to transform a raw food item into cooked.
-    #[serde(default = "default_cook_ticks")]
-    pub cook_ticks: u64,
+    /// Duration a cat spends at a Kitchen to transform a raw food item into
+    /// cooked (ticket 033 Phase 4 — was `cook_ticks: u64`).
+    #[serde(default = "default_cook_duration", alias = "cook_ticks")]
+    pub cook_duration: DurationDays,
     /// Manhattan range within which a cat counts as "at" the Kitchen to cook.
     #[serde(default = "default_kitchen_cook_radius")]
     pub kitchen_cook_radius: i32,
@@ -1931,8 +1949,9 @@ fn default_cooked_food_multiplier() -> f32 {
     1.3
 }
 
-fn default_cook_ticks() -> u64 {
-    40
+fn default_cook_duration() -> DurationDays {
+    // 40 ticks ÷ 1000 ticks/day = 0.04 days at default scale.
+    DurationDays::new(0.04)
 }
 
 fn default_kitchen_cook_radius() -> i32 {
@@ -2293,7 +2312,7 @@ impl Default for DispositionConstants {
             threat_ally_range: 8,
             threat_ally_dampening_per_cat: 0.4,
             cooked_food_multiplier: default_cooked_food_multiplier(),
-            cook_ticks: default_cook_ticks(),
+            cook_duration: default_cook_duration(),
             kitchen_cook_radius: default_kitchen_cook_radius(),
         }
     }
@@ -2445,14 +2464,21 @@ impl Default for WildlifeConstants {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FoxEcologyConstants {
     // --- Needs ---
-    /// Per-tick hunger increase when not satiated (~1 season to starve from full).
-    pub hunger_decay_per_tick: f32,
-    /// Ticks of satiation after killing small prey (~3 days).
-    pub satiation_after_prey_kill: u64,
-    /// Ticks of satiation after raiding colony stores.
-    pub satiation_after_store_raid: u64,
-    /// Ticks of satiation after scavenging carrion/scraps.
-    pub satiation_after_scavenge: u64,
+    /// Hunger increase per in-game day when not satiated (~1 season to
+    /// starve from full at the default 1000 ticks/day scale)
+    /// (ticket 033 Phase 4: was `hunger_decay_per_tick: f32`).
+    #[serde(alias = "hunger_decay_per_tick")]
+    pub hunger_decay_rate: RatePerDay,
+    /// Duration of satiation after killing small prey (~1 day at default)
+    /// (ticket 033 Phase 4).
+    #[serde(alias = "satiation_after_prey_kill")]
+    pub satiation_after_prey_kill: DurationDays,
+    /// Duration of satiation after raiding colony stores (Phase 4).
+    #[serde(alias = "satiation_after_store_raid")]
+    pub satiation_after_store_raid: DurationDays,
+    /// Duration of satiation after scavenging carrion/scraps (Phase 4).
+    #[serde(alias = "satiation_after_scavenge")]
+    pub satiation_after_scavenge: DurationDays,
 
     // --- Risk assessment ---
     /// Distance at which a fox actively avoids a healthy adult cat.
@@ -2467,8 +2493,9 @@ pub struct FoxEcologyConstants {
     pub outnumbered_flee_count: usize,
 
     // --- Confrontation ---
-    /// Maximum ticks a standoff lasts before auto-resolving.
-    pub standoff_max_ticks: u64,
+    /// Maximum duration a standoff lasts before auto-resolving (Phase 4).
+    #[serde(alias = "standoff_max_ticks")]
+    pub standoff_max_duration: DurationDays,
     /// Per-tick chance a standoff escalates to physical contact.
     pub standoff_escalation_chance: f32,
     /// Chance fox retreats when standoff ends without escalation.
@@ -2479,12 +2506,16 @@ pub struct FoxEcologyConstants {
     pub den_defense_escalation_chance: f32,
 
     // --- Lifecycle ---
-    /// Ticks a fox stays in Cub stage (~1 season).
-    pub cub_duration_ticks: u64,
-    /// Ticks a fox stays in Juvenile stage (~2 seasons).
-    pub juvenile_duration_ticks: u64,
-    /// Maximum age in ticks before fox dies of old age (~4 years / 16 seasons).
-    pub max_age_ticks: u64,
+    /// Duration a fox stays in Cub stage (~1 season) (Phase 4).
+    #[serde(alias = "cub_duration_ticks")]
+    pub cub_duration: DurationSeasons,
+    /// Duration a fox stays in Juvenile stage (~2 seasons) (Phase 4).
+    #[serde(alias = "juvenile_duration_ticks")]
+    pub juvenile_duration: DurationSeasons,
+    /// Maximum age before a fox dies of old age (~4 years / 16 seasons)
+    /// (Phase 4).
+    #[serde(alias = "max_age_ticks")]
+    pub max_age: DurationSeasons,
     /// Minimum litter size during breeding.
     pub litter_size_min: u32,
     /// Maximum litter size during breeding.
@@ -2493,8 +2524,9 @@ pub struct FoxEcologyConstants {
     pub juvenile_mortality_per_tick: f32,
     /// Per-tick mortality chance for elder foxes.
     pub elder_mortality_per_tick: f32,
-    /// Ticks of sustained hunger=1.0 before starvation death.
-    pub starvation_death_ticks: u64,
+    /// Sustained hunger=1.0 duration before starvation death (Phase 4).
+    #[serde(alias = "starvation_death_ticks")]
+    pub starvation_death_duration: DurationDays,
 
     // --- Territory ---
     /// Default territory radius from den in tiles.
@@ -2535,8 +2567,9 @@ pub struct FoxEcologyConstants {
     pub cat_presence_avoidance_threshold: f32,
 
     // --- Cooldowns ---
-    /// Ticks of cooldown after any confrontation/raid/hunt action.
-    pub post_action_cooldown: u64,
+    /// Cooldown duration after any confrontation/raid/hunt action
+    /// (ticket 033 Phase 4 — was raw `u64` ticks).
+    pub post_action_cooldown: DurationDays,
 
     // --- Initial spawn ---
     /// Minimum fox dens placed during world gen.
@@ -2550,11 +2583,12 @@ pub struct FoxEcologyConstants {
 impl Default for FoxEcologyConstants {
     fn default() -> Self {
         Self {
-            // Needs — matched to cat hunger_decay (0.0001/tick)
-            hunger_decay_per_tick: 0.0001,
-            satiation_after_prey_kill: 1000,
-            satiation_after_store_raid: 800,
-            satiation_after_scavenge: 500,
+            // Needs — matched to cat hunger_decay (0.0001/tick = 0.1/day)
+            hunger_decay_rate: RatePerDay::new(0.1),
+            // 1000 ticks → 1 day, 800 → 0.8 day, 500 → 0.5 day at default scale.
+            satiation_after_prey_kill: DurationDays::new(1.0),
+            satiation_after_store_raid: DurationDays::new(0.8),
+            satiation_after_scavenge: DurationDays::new(0.5),
 
             // Risk assessment
             cat_avoidance_range: 6,
@@ -2564,21 +2598,23 @@ impl Default for FoxEcologyConstants {
             outnumbered_flee_count: 2,
 
             // Confrontation
-            standoff_max_ticks: 15,
+            // 15 ticks ÷ 1000 = 0.015 days at default scale.
+            standoff_max_duration: DurationDays::new(0.015),
             standoff_escalation_chance: 0.05,
             standoff_fox_retreat_chance: 0.7,
             standoff_damage_on_escalation: 0.05,
             den_defense_escalation_chance: 0.15,
 
-            // Lifecycle
-            cub_duration_ticks: 20_000,
-            juvenile_duration_ticks: 40_000,
-            max_age_ticks: 320_000,
+            // Lifecycle — 20000 ticks/season at default; convert ticks → seasons.
+            cub_duration: DurationSeasons::new(1.0),
+            juvenile_duration: DurationSeasons::new(2.0),
+            max_age: DurationSeasons::new(16.0),
             litter_size_min: 3,
             litter_size_max: 5,
             juvenile_mortality_per_tick: 0.000002,
             elder_mortality_per_tick: 0.000005,
-            starvation_death_ticks: 2000,
+            // 2000 ticks ÷ 1000 = 2 days at default scale.
+            starvation_death_duration: DurationDays::new(2.0),
 
             // Territory
             territory_radius: 18,
@@ -2601,7 +2637,7 @@ impl Default for FoxEcologyConstants {
             // most fox activity; foxes spent the bulk of each day frozen in
             // Resting. Shorter cooldown keeps downstream features (FoxStandoff,
             // FoxAvoidedCat, etc.) firing regularly.
-            post_action_cooldown: 800,
+            post_action_cooldown: DurationDays::new(0.8),
 
             // Initial spawn
             initial_den_count_min: 1,
@@ -3517,8 +3553,8 @@ mod tests {
         // Spot-check a few values across different sub-structs
         assert_eq!(original.needs.hunger_decay, deserialized.needs.hunger_decay);
         assert_eq!(
-            original.combat.flee_mood_ticks,
-            deserialized.combat.flee_mood_ticks
+            original.combat.flee_mood_duration,
+            deserialized.combat.flee_mood_duration
         );
         assert_eq!(
             original.species.rabbit.catch_difficulty,

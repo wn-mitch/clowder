@@ -196,7 +196,7 @@ fn find_cover_direction(
 /// Species-differentiated: movement speed, alertness, flee strategy (Standard,
 /// SeekCover, Teleport, Stationary), and freeze/alert durations all come from
 /// the `PreyConfig` component.
-#[allow(clippy::type_complexity)]
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn prey_ai(
     mut query: Query<
         (&PreyConfig, &mut PreyState, &mut Position),
@@ -208,8 +208,10 @@ pub fn prey_ai(
     map: Res<TileMap>,
     mut rng: ResMut<SimRng>,
     constants: Res<SimConstants>,
+    time_scale: Res<TimeScale>,
 ) {
     let p = &constants.prey;
+    let grazing_max_ticks = p.grazing_max_duration.ticks(&time_scale);
     for (config, mut state, mut pos) in &mut query {
         // O(1) den lookup for predation pressure → vigilance.
         let (pressure, home_den_pos) = state
@@ -358,7 +360,7 @@ pub fn prey_ai(
                     }
                 }
 
-                if new_ticks >= p.grazing_max_ticks {
+                if new_ticks >= grazing_max_ticks {
                     state.ai_state = PreyAiState::Idle;
                 } else {
                     state.ai_state = PreyAiState::Grazing {
@@ -710,16 +712,19 @@ pub fn prey_population(
 /// Also decays predation_pressure on all existing dens each tick.
 /// Decay predation pressure, track stress, and abandon dens under sustained
 /// high pressure. New den formation is handled by `orphan_prey_adopt_or_found`.
+#[allow(clippy::too_many_arguments)]
 pub fn prey_den_lifecycle(
     mut commands: Commands,
     mut existing_dens: Query<(Entity, &mut PreyDen, &Position)>,
     mut log: ResMut<NarrativeLog>,
     time: Res<TimeState>,
+    time_scale: Res<TimeScale>,
     constants: Res<SimConstants>,
     map: Res<TileMap>,
     mut activation: ResMut<SystemActivation>,
 ) {
     let p = &constants.prey;
+    let den_abandon_ticks = p.den_abandon_stress_duration.ticks(&time_scale);
     for (entity, mut den, den_pos) in &mut existing_dens {
         // Decay predation pressure (half-life ~1400 ticks ≈ 1.4 days).
         den.predation_pressure *= p.den_predation_pressure_decay;
@@ -741,7 +746,7 @@ pub fn prey_den_lifecycle(
         }
 
         // Abandon after ~3 days of sustained high pressure.
-        if u64::from(den.stressed_ticks) > p.den_abandon_stress_ticks {
+        if u64::from(den.stressed_ticks) > den_abandon_ticks {
             activation.record(Feature::PreyDenAbandoned);
             let name = den.den_name;
             let kind_name = match den.kind {
@@ -1277,6 +1282,7 @@ mod tests {
         world.insert_resource(SimRng::new(42));
         world.insert_resource(crate::species::build_registry());
         world.insert_resource(SimConstants::default());
+        world.insert_resource(test_time_scale());
         let mut schedule = Schedule::default();
         schedule.add_systems(prey_ai);
         (world, schedule)

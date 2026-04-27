@@ -3946,7 +3946,8 @@ fn dispatch_step_action(
         }
 
         GoapActionKind::Cook => {
-            let outcome = crate::steps::disposition::resolve_cook(ticks, inventory, d);
+            let outcome =
+                crate::steps::disposition::resolve_cook(ticks, inventory, d, &ec.time_scale);
             // Mastery iter 2: Cook fires only when a real raw→cooked
             // flip happens (witness = true). Witnessed Advance is the
             // mastery gate; bare Advance with no witness means no
