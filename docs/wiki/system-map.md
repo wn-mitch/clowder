@@ -21,16 +21,38 @@ graph TD
     end
     subgraph chain2["Chain 2: Needs, Mood & Decision-Making"]
         needs_decay_needs["needs::decay_needs"]
+        incapacitation_update_incapacitation["incapacitation::update_incapacitation"]
+        needs_decay_needs --> incapacitation_update_incapacitation
+        growth_update_life_stage_markers["growth::update_life_stage_markers"]
+        incapacitation_update_incapacitation --> growth_update_life_stage_markers
+        needs_update_injury_marker["needs::update_injury_marker"]
+        growth_update_life_stage_markers --> needs_update_injury_marker
+        items_update_inventory_markers["items::update_inventory_markers"]
+        needs_update_injury_marker --> items_update_inventory_markers
+        coordination_update_directive_markers["coordination::update_directive_markers"]
+        items_update_inventory_markers --> coordination_update_directive_markers
+        combat_update_combat_marker["combat::update_combat_marker"]
+        coordination_update_directive_markers --> combat_update_combat_marker
+        magic_update_corrupted_tile_markers["magic::update_corrupted_tile_markers"]
+        combat_update_combat_marker --> magic_update_corrupted_tile_markers
+        sensing_update_terrain_markers["sensing::update_terrain_markers"]
+        magic_update_corrupted_tile_markers --> sensing_update_terrain_markers
         needs_decay_grooming["needs::decay_grooming"]
-        needs_decay_needs --> needs_decay_grooming
+        sensing_update_terrain_markers --> needs_decay_grooming
         needs_eat_from_inventory["needs::eat_from_inventory"]
         needs_decay_grooming --> needs_eat_from_inventory
         needs_decay_exploration["needs::decay_exploration"]
         needs_eat_from_inventory --> needs_decay_exploration
+        needs_stamp_passive_exploration["needs::stamp_passive_exploration"]
+        needs_decay_exploration --> needs_stamp_passive_exploration
         needs_bond_proximity_social["needs::bond_proximity_social"]
-        needs_decay_exploration --> needs_bond_proximity_social
+        needs_stamp_passive_exploration --> needs_bond_proximity_social
+        fulfillment_decay_fulfillment["fulfillment::decay_fulfillment"]
+        needs_bond_proximity_social --> fulfillment_decay_fulfillment
+        fulfillment_bond_proximity_social_warmth["fulfillment::bond_proximity_social_warmth"]
+        fulfillment_decay_fulfillment --> fulfillment_bond_proximity_social_warmth
         pregnancy_tick_pregnancy["pregnancy::tick_pregnancy"]
-        needs_bond_proximity_social --> pregnancy_tick_pregnancy
+        fulfillment_bond_proximity_social_warmth --> pregnancy_tick_pregnancy
         fertility_handle_post_partum_reinsert["fertility::handle_post_partum_reinsert"]
         pregnancy_tick_pregnancy --> fertility_handle_post_partum_reinsert
         fertility_update_fertility_phase["fertility::update_fertility_phase"]
@@ -118,6 +140,7 @@ graph TD
         time_emit_weather_transitions["time::emit_weather_transitions"]
         magic_corruption_spread["magic::corruption_spread"]
         magic_ward_decay["magic::ward_decay"]
+        magic_update_ward_coverage_map["magic::update_ward_coverage_map"]
         magic_herb_seasonal_check["magic::herb_seasonal_check"]
         magic_advance_herb_growth["magic::advance_herb_growth"]
         magic_advance_flavor_growth["magic::advance_flavor_growth"]
@@ -138,6 +161,7 @@ graph TD
         wildlife_fox_scent_tick["wildlife::fox_scent_tick"]
         wildlife_predator_hunt_prey["wildlife::predator_hunt_prey"]
         wildlife_carcass_decay["wildlife::carcass_decay"]
+        wildlife_carcass_scent_tick["wildlife::carcass_scent_tick"]
         wildlife_predator_stalk_cats["wildlife::predator_stalk_cats"]
         prey_prey_population["prey::prey_population"]
         prey_prey_hunger["prey::prey_hunger"]

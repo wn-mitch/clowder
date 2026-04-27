@@ -2387,6 +2387,19 @@ pub struct WildlifeConstants {
     pub carcass_drop_chance: f32,
     /// Ticks before a carcass crumbles to dust.
     pub carcass_max_age: u64,
+    /// Per-tick scent magnitude an actionable carcass deposits onto
+    /// `CarcassScentMap`. Phase 2C — mirrors `PreyConstants::
+    /// scent_deposit_per_tick`. §5.6.3 row #6.
+    #[serde(default = "default_carcass_scent_deposit_per_tick")]
+    pub carcass_scent_deposit_per_tick: f32,
+    /// Global decay on `CarcassScentMap`, expressed per in-game day.
+    /// Per §5.6.5 #6 ("slow fade"), carcass scent persists longer than
+    /// active prey-scent activity trails — the kill site lingers as
+    /// a draw for scavengers even after the carcass is processed.
+    /// Half the prey-scent decay rate gives ~2 in-game days for a peak
+    /// deposit to fade below the typical detection threshold.
+    #[serde(default = "default_carcass_scent_decay_rate")]
+    pub carcass_scent_decay_rate: RatePerDay,
     /// Probability a shadow fox encircles a ward instead of reversing.
     pub ward_siege_chance: f32,
     /// Extra decay per tick per encircling shadow fox.
@@ -2442,6 +2455,8 @@ impl Default for WildlifeConstants {
             carcass_corruption_rate: 0.002,
             carcass_drop_chance: 0.25,
             carcass_max_age: 500,
+            carcass_scent_deposit_per_tick: default_carcass_scent_deposit_per_tick(),
+            carcass_scent_decay_rate: default_carcass_scent_decay_rate(),
             ward_siege_chance: 0.3,
             ward_siege_decay_bonus: 0.0005,
             ward_siege_corruption_rate: 0.005,
@@ -2454,6 +2469,14 @@ impl Default for WildlifeConstants {
             ambush_witness_safety_drain: 0.08,
         }
     }
+}
+
+fn default_carcass_scent_deposit_per_tick() -> f32 {
+    0.1
+}
+
+fn default_carcass_scent_decay_rate() -> RatePerDay {
+    RatePerDay::new(0.5)
 }
 
 // ---------- FoxEcologyConstants ----------

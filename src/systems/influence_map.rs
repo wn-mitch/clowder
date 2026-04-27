@@ -176,6 +176,23 @@ impl InfluenceMap for crate::resources::PreyScentMap {
     }
 }
 
+impl InfluenceMap for crate::resources::CarcassScentMap {
+    fn metadata(&self) -> MapMetadata {
+        MapMetadata {
+            // §5.6.3 row #6: scent × neutral. Carcasses are not
+            // faction-aligned — both cats (harvest, cleanse) and
+            // wildlife (scavenger draw) read this channel.
+            name: "carcass_scent",
+            channel: ChannelKind::Scent,
+            faction: Faction::Neutral,
+        }
+    }
+
+    fn base_sample(&self, pos: Position) -> f32 {
+        self.get(pos.x, pos.y)
+    }
+}
+
 impl InfluenceMap for crate::resources::CatPresenceMap {
     fn metadata(&self) -> MapMetadata {
         MapMetadata {

@@ -2,7 +2,7 @@
 
 # Components
 
-127 component types derived from `#[derive(Component)]`.
+129 component types derived from `#[derive(Component)]`.
 
 ## `src/components/aspirations.rs`
 
@@ -270,6 +270,16 @@
 | `grid_h` | `usize` |
 | `bucket_size` | `i32` |
 
+## `src/components/fulfillment.rs`
+
+### Fulfillment (struct)
+
+> Per-cat fulfillment register. Architecturally distinct from `Needs` — fulfillment sits *above* Maslow in priority (a cat can be physically comfortable and socially starved) and is morally silent (the framework doesn't label any axis as pathological).  All values are `f32` in `[0.0, 1.0]` where 1.0 = fully satisfied.
+
+| Field | Type |
+|-------|------|
+| `social_warmth` | `f32` |
+
 ## `src/components/goap_plan.rs`
 
 ### GoapPlan (struct)
@@ -352,6 +362,10 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 | `distinguishing_marks` | `Vec<String>` |
 
 ## `src/components/items.rs`
+
+### BuildMaterialItem (struct)
+
+> Marker stamped on ground `Item` entities whose `kind` is a build material (`Wood` / `Stone`). Used to make the planner's mutable build-material query (`BuildingResolverParams::material_items`) statically disjoint from the read-only `items_query` consumed by food/herb resolvers (`eat_at_stores`, `deposit_at_stores`, etc). Without it, both queries overlap on the same `Item` entities and Bevy's borrow checker (B0001) rejects the system.
 
 ### Item (struct)
 
@@ -468,7 +482,7 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 ### Incapacitated (struct)
 
-> Severe unhealed injury — downed. `needs.rs::update_incapacitation`. Used as the eligibility gate that retires the §2.3 incapacitated branch: `Q<_, With<Incapacitated>>` picks the narrow DSE set (Eat, Sleep, Idle); every other DSE uses `Without<Incapacitated>`.
+> Severe unhealed injury — downed. `systems::incapacitation::update_incapacitation`. Used as the eligibility gate that retires the §2.3 incapacitated branch: `Q<_, With<Incapacitated>>` picks the narrow DSE set (Eat, Sleep, Idle); every other DSE uses `Without<Incapacitated>`.
 
 ### Injured (struct)
 
@@ -502,7 +516,7 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 ### HasHerbsInInventory (struct)
 
-> Authoring: `items.rs::update_inventory_markers` (with `Changed<Inventory>` filter for per-tick cost).
+> Authoring: `items.rs::update_inventory_markers`.
 
 ### HasRemedyHerbs (struct)
 

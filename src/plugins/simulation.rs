@@ -183,6 +183,7 @@ impl Plugin for SimulationPlugin {
                         systems::wildlife::fox_scent_tick,
                         systems::wildlife::predator_hunt_prey,
                         systems::wildlife::carcass_decay,
+                        systems::wildlife::carcass_scent_tick,
                         systems::wildlife::predator_stalk_cats,
                     )
                         .chain(),

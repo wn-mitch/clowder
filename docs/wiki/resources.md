@@ -2,7 +2,7 @@
 
 # Resources
 
-33 resource types derived from `#[derive(Resource)]`.
+35 resource types derived from `#[derive(Resource)]`.
 
 ## `src/components/coordination.rs`
 
@@ -21,6 +21,19 @@
 ### AspirationRegistry (struct)
 
 > All aspiration chains available in the simulation, loaded from RON files.
+
+## `src/resources/carcass_scent_map.rs`
+
+### CarcassScentMap (struct)
+
+> Spatial grid tracking carcass scent. Sibling of `PreyScentMap` and `FoxScentMap` introduced in Phase 2C of the AI substrate refactor (§5.6.3 row #6). Actionable carcasses (`!c.cleansed || !c.harvested`) deposit scent on their tile each tick; cats sample the grid to detect rotting prey within scent range without per-pair `observer_smells_at` iteration.  **Decay shape (§5.6.5 #6):** "slow fade" — carcasses persist for days but scent must lose a bit each update so a cleansed-and-harvested carcass's residual scent fades after the entity stops re-depositing. Mirrors `PreyScentMap`'s additive-decay shape; see `WildlifeConstants::carcass_scent_decay_rate` for the per-day knob.  **Substrate-only landing (Phase 2C):** the trace emitter walks this map but the scoring path in `goap.rs:1133–1145` still uses per-pair `observer_smells_at`. Consumer cutover lands separately so the structural change doesn't entangle with the balance shift.
+
+| Field | Type |
+|-------|------|
+| `marks` | `Vec<f32>` |
+| `grid_w` | `usize` |
+| `grid_h` | `usize` |
+| `bucket_size` | `i32` |
 
 ## `src/resources/cat_presence_map.rs`
 
@@ -242,6 +255,7 @@
 | `world_gen` | `WorldGenConstants` |
 | `sensory` | `SensoryConstants` |
 | `fertility` | `FertilityConstants` |
+| `fulfillment` | `FulfillmentConstants` |
 
 ## `src/resources/snapshot_config.rs`
 
@@ -288,16 +302,6 @@
 | `ticks_per_season` | `u64` |
 | `seed` | `u64` |
 
-### TimeState (struct)
-
-> Global simulation clock. Advance `tick` each update; everything else is derived.
-
-| Field | Type |
-|-------|------|
-| `tick` | `u64` |
-| `paused` | `bool` |
-| `speed` | `SimSpeed` |
-
 ## `src/resources/trace_log.rs`
 
 ### FocalTraceTarget (struct)
@@ -319,6 +323,14 @@
 | `capacity` | `usize` |
 | `total_pushed` | `u64` |
 
+### FocalScoreCapture (struct)
+
+> Per-tick focal-cat scoring capture. Populated during `evaluate_and_plan` / `cat_presence_tick` (whichever system's scoring pass runs for a given cat); drained and cleared by `emit_focal_trace`.  The `Mutex` wrapper lets `EvalInputs` carry an immutable reference that nonetheless mutates the capture — Bevy's `Resource` trait requires `Send + Sync`, which rules out `RefCell`. The mutex is uncontended in the single-threaded scoring path (no second writer within a tick); the lock cost is negligible relative to the scoring it guards. Making this a `Resource` means the plugin / main.rs insert it once per run (alongside `FocalTraceTarget` + `TraceLog`) and the capture persists across the system boundary from scoring to emission.
+
+| Field | Type |
+|-------|------|
+| `inner` | `Mutex<FocalScoreCaptureInner>` |
+
 ## `src/resources/unmet_demand.rs`
 
 ### UnmetDemand (struct)
@@ -330,6 +342,19 @@
 | `kitchen` | `f32` |
 | `workshop` | `f32` |
 | `garden` | `f32` |
+
+## `src/resources/ward_coverage_map.rs`
+
+### WardCoverageMap (struct)
+
+> Spatial grid tracking ward repulsion coverage across the map.  Mirrors the bucketed-overlay pattern used by `FoxScentMap` and `CatPresenceMap`. Unlike scent maps (cumulative deposit + global decay), ward coverage is a *current* property — it's recomputed each tick from live `Ward` entities. Each ward stamps a radial falloff `ward.strength * (1 - dist/repel_radius)` into nearby buckets; overlapping wards sum (clamped to 1.0).  Consumers: ward-placement DSEs sample this map to express anti-clustering — high coverage on a candidate tile means a new ward there is redundant. Listed as Absent in §5.6.3 of the AI substrate refactor spec; ticket 045 brings it online.
+
+| Field | Type |
+|-------|------|
+| `marks` | `Vec<f32>` |
+| `grid_w` | `usize` |
+| `grid_h` | `usize` |
+| `bucket_size` | `i32` |
 
 ## `src/resources/weather.rs`
 

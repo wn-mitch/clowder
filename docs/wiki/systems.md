@@ -10,7 +10,7 @@ Status of each design document cross-referenced against `SimulationPlugin::build
 |--------|--------|---------------------|------------|
 | Collective Memory | **[Built]** | `memory::decay_memories`, `colony_knowledge::update_colony_knowledge` | [doc](../systems/collective-memory.md) |
 | Corpse Handling | **[Built]** | `death::check_death`, `death::cleanup_dead` | [doc](../systems/corpse-handling.md) |
-| Magic | **[Built]** | `magic::CorruptionPushback`, `magic::corruption_spread`, `magic::ward_decay`, `magic::herb_seasonal_check`, `magic::advance_herb_growth` (+8 more) | [doc](../systems/magic.md) |
+| Magic | **[Built]** | `magic::CorruptionPushback`, `magic::corruption_spread`, `magic::ward_decay`, `magic::update_ward_coverage_map`, `magic::herb_seasonal_check` (+10 more) | [doc](../systems/magic.md) |
 | Weather — Living Climate System | **[Built]** | `weather::update_weather`, `wind::update_wind` | [doc](../systems/weather.md) |
 
 ## Partial
@@ -23,6 +23,9 @@ Status of each design document cross-referenced against `SimulationPlugin::build
 
 | System | Status | Registered Functions | Design Doc |
 |--------|--------|---------------------|------------|
+| A1.2 §11 focal-cat replay instrumentation — kickoff | *[Aspirational]* | — | [doc](../systems/a1-2-focal-cat-replay-kickoff.md) |
+| A1.4 §13.1 retired-constants cleanup — kickoff | *[Aspirational]* | — | [doc](../systems/a1-4-retired-constants-kickoff.md) |
+| A1 IAUS core — kickoff | *[Aspirational]* | — | [doc](../systems/a1-iaus-core-kickoff.md) |
 | AI Substrate Refactor — Design Specification | *[Aspirational]* | — | [doc](../systems/ai-substrate-refactor.md) |
 | Crafted Items & Recipes | *[Aspirational]* | — | [doc](../systems/crafting.md) |
 | Disease | *[Aspirational]* | — | [doc](../systems/disease.md) |
@@ -32,6 +35,7 @@ Status of each design document cross-referenced against `SimulationPlugin::build
 | Monuments — Civic & Memorial Structures | *[Aspirational]* | — | [doc](../systems/monuments.md) |
 | NamedLandmark Substrate — Event-Anchored Naming | *[Aspirational]* | — | [doc](../systems/naming.md) |
 | Happy Paths (Usage-worn Trails) | *[Aspirational]* | — | [doc](../systems/paths.md) |
+| Phase 6a §7 commitment gate — attempt status | *[Aspirational]* | — | [doc](../systems/phase-6a-commitment-gate-attempt.md) |
 | Project vision | *[Aspirational]* | — | [doc](../systems/project-vision.md) |
 | Organized Raids | *[Aspirational]* | — | [doc](../systems/raids.md) |
 | Recreation & Grooming | *[Aspirational]* | — | [doc](../systems/recreation.md) |
@@ -43,6 +47,7 @@ Status of each design document cross-referenced against `SimulationPlugin::build
 | Strategist coordinator (stub) | *[Aspirational]* | — | [doc](../systems/strategist-coordinator.md) |
 | Substances | *[Aspirational]* | — | [doc](../systems/substances.md) |
 | The Calling | *[Aspirational]* | — | [doc](../systems/the-calling.md) |
+| Time anchor | *[Aspirational]* | — | [doc](../systems/time-anchor.md) |
 | Trade & Visitors | *[Aspirational]* | — | [doc](../systems/trade.md) |
 | Warmth Split — temperature need vs social warmth fulfillment axis | *[Aspirational]* | — | [doc](../systems/warmth-split.md) |
 
@@ -55,12 +60,15 @@ System modules with registered functions but no design doc:
 - **fate**: assign_fated_connections, awaken_fated_connections
 - **fertility**: handle_post_partum_reinsert, update_fertility_phase
 - **fox_goap**: sync_fox_needs, fox_evaluate_and_plan, fox_resolve_goap_plans, feed_cubs_at_dens, resolve_paired_confrontations
+- **fulfillment**: decay_fulfillment, bond_proximity_social_warmth
 - **goap**: check_anxiety_interrupts, evaluate_and_plan, resolve_goap_plans, emit_plan_narrative
-- **growth**: tick_kitten_growth, kitten_mood_aura
+- **growth**: update_life_stage_markers, tick_kitten_growth, kitten_mood_aura
+- **incapacitation**: update_incapacitation
 - **pregnancy**: tick_pregnancy
 - **prey**: prey_population, prey_hunger, prey_ai, prey_scent_tick, prey_den_lifecycle, update_den_pressure, apply_den_raids, orphan_prey_adopt_or_found
+- **sensing**: update_terrain_markers
 - **snapshot**: emit_cat_snapshots, emit_position_traces, emit_spatial_snapshots
 - **task_chains**: resolve_task_chains
 - **trace_emit**: emit_focal_trace
-- **wildlife**: spawn_wildlife, wildlife_ai, fox_movement, fox_needs_tick, fox_ai_decision, fox_scent_tick, predator_hunt_prey, carcass_decay, predator_stalk_cats, detect_threats, fox_lifecycle_tick, fox_confrontation_tick, fox_store_raid_tick, cleanup_wildlife
+- **wildlife**: spawn_wildlife, wildlife_ai, fox_movement, fox_needs_tick, fox_ai_decision, fox_scent_tick, predator_hunt_prey, carcass_decay, carcass_scent_tick, predator_stalk_cats, detect_threats, fox_lifecycle_tick, fox_confrontation_tick, fox_store_raid_tick, cleanup_wildlife
 

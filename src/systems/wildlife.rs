@@ -782,6 +782,44 @@ pub fn carcass_decay(
 }
 
 // ---------------------------------------------------------------------------
+// carcass_scent_tick — Phase 2C §5.6.3 row #6
+// ---------------------------------------------------------------------------
+
+/// Actionable carcasses (`!cleansed || !harvested`) deposit scent onto
+/// `CarcassScentMap` each tick; the whole grid decays globally. Mirrors
+/// `prey_scent_tick` (`src/systems/prey.rs:541+`) — carcass scent
+/// becomes a grid-addressable influence-map read on the substrate
+/// scaffolded in Phase 2A.
+///
+/// **Phase 2C scope:** deposit + decay only. Consumer reads in
+/// `goap.rs:1133–1145` still go through per-pair `observer_smells_at`;
+/// the cutover is a separate balance-affecting follow-on so the
+/// structural landing carries no scoring delta. The map is observable
+/// via the focal-cat trace (registered in `trace_emit.rs:120+`).
+///
+/// The `actionable` filter mirrors `goap.rs:840–846`'s
+/// `carcass_positions` snapshot — fully cleansed AND harvested
+/// carcasses are de facto inert; once the map cuts over to drive
+/// scoring, scoring should not see lingering scent from finished
+/// carcasses.
+pub fn carcass_scent_tick(
+    carcasses: Query<(&crate::components::wildlife::Carcass, &Position)>,
+    mut scent_map: ResMut<crate::resources::CarcassScentMap>,
+    constants: Res<SimConstants>,
+    time_scale: Res<TimeScale>,
+) {
+    let c = &constants.wildlife;
+    // Global decay first — prior-tick deposits fade before this
+    // tick's stamps land, matching `prey_scent_tick` ordering.
+    scent_map.decay_all(c.carcass_scent_decay_rate.per_tick(&time_scale));
+    for (carcass, pos) in &carcasses {
+        if !carcass.cleansed || !carcass.harvested {
+            scent_map.deposit(pos.x, pos.y, c.carcass_scent_deposit_per_tick);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // predator_stalk_cats — foxes actively hunt nearby cats
 // ---------------------------------------------------------------------------
 

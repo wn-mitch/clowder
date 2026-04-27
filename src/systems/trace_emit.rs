@@ -47,6 +47,7 @@ use crate::resources::cat_presence_map::CatPresenceMap;
 use crate::resources::exploration_map::ExplorationMap;
 use crate::resources::fox_scent_map::FoxScentMap;
 use crate::resources::map::TileMap;
+use crate::resources::carcass_scent_map::CarcassScentMap;
 use crate::resources::prey_scent_map::PreyScentMap;
 use crate::resources::ward_coverage_map::WardCoverageMap;
 use crate::resources::sim_constants::SimConstants;
@@ -76,6 +77,7 @@ pub fn emit_focal_trace(
     constants: Res<SimConstants>,
     fox_scent_map: Option<Res<FoxScentMap>>,
     prey_scent_map: Option<Res<PreyScentMap>>,
+    carcass_scent_map: Option<Res<CarcassScentMap>>,
     cat_presence_map: Option<Res<CatPresenceMap>>,
     exploration_map: Option<Res<ExplorationMap>>,
     ward_coverage_map: Option<Res<WardCoverageMap>>,
@@ -117,17 +119,22 @@ pub fn emit_focal_trace(
     let cat_name = name.0.clone();
 
     // -----------------------------------------------------------------
-    // L1 — one record per registered InfluenceMap. Phase 2 walks the
-    // three Partial persistent-grid maps (FoxScentMap, CatPresenceMap,
-    // ExplorationMap) with Phase 2A's attenuation pipeline. Scent-
-    // from-on-demand-detection and corruption-from-TileMap come online
-    // in Phase 2B/2C. Cat is the observer species, hence species-sens
-    // is looked up against `SensorySpecies::Cat` on each channel.
+    // L1 — one record per registered InfluenceMap. The walk now covers
+    // seven maps: FoxScentMap, PreyScentMap, CarcassScentMap (Phase 2C),
+    // CatPresenceMap, ExplorationMap, WardCoverageMap, and the
+    // CorruptionLens borrow adapter for TileMap.corruption. Cat is the
+    // observer species, so species-sens is looked up against
+    // `SensorySpecies::Cat` on each channel via the §5.6.6 attenuation
+    // pipeline. Phase 2D will replace this hardcoded sequence with a
+    // registry walk.
     // -----------------------------------------------------------------
     if let Some(ref m) = fox_scent_map {
         emit_l1_for_map(&mut trace_log, tick, &cat_name, *pos, &**m, &constants);
     }
     if let Some(ref m) = prey_scent_map {
+        emit_l1_for_map(&mut trace_log, tick, &cat_name, *pos, &**m, &constants);
+    }
+    if let Some(ref m) = carcass_scent_map {
         emit_l1_for_map(&mut trace_log, tick, &cat_name, *pos, &**m, &constants);
     }
     if let Some(ref m) = cat_presence_map {

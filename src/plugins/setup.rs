@@ -330,6 +330,10 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     // Insert prey scent map resource (Phase 2B).
     world.insert_resource(crate::resources::PreyScentMap::default());
 
+    // Insert carcass scent map resource (ticket 048 — Phase 2C
+    // §5.6.3 row #6).
+    world.insert_resource(crate::resources::CarcassScentMap::default());
+
     // Insert cat presence map resource.
     world.insert_resource(crate::resources::CatPresenceMap::default());
 
