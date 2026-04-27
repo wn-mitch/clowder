@@ -193,8 +193,18 @@ impl Plugin for SimulationPlugin {
                     systems::prey::prey_scent_tick,
                     systems::prey::prey_den_lifecycle,
                     systems::wildlife::detect_threats,
-                    systems::buildings::apply_building_effects,
-                    systems::buildings::decay_building_condition,
+                    // Building-side sub-chain: passive effects, decay,
+                    // and the §5.6.3 colony-faction influence-map
+                    // writers (ticket 006). Nested to stay under
+                    // Bevy's 20-system tuple limit on the outer chain.
+                    // Map writers run *after* `decay_building_condition`
+                    // so effectiveness gates read post-decay values.
+                    (
+                        systems::buildings::apply_building_effects,
+                        systems::buildings::decay_building_condition,
+                        systems::buildings::update_food_location_map,
+                    )
+                        .chain(),
                     systems::items::decay_items,
                 )
                     .chain(),

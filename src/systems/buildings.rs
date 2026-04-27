@@ -264,6 +264,40 @@ pub fn process_gates(
 }
 
 // ---------------------------------------------------------------------------
+// Influence-map writers (ticket 006 — §5.6.3 producer landings)
+// ---------------------------------------------------------------------------
+
+/// Re-stamp `FoodLocationMap` from live `Stores` and `Kitchen`
+/// `Structure` entities. §5.6.3 row #7 — sight × colony.
+///
+/// Each functional building (effectiveness > 0) paints a linear-falloff
+/// disc of `food_location_sense_range` tiles, centered on the building's
+/// computed center and weighted by effectiveness. Overlapping buildings
+/// sum (clamped to 1.0).
+///
+/// Producer-only at landing — no DSE consumes this map yet (ticket 052
+/// owns the consumer cutover). Behavior-neutral.
+pub fn update_food_location_map(
+    buildings: Query<(&Structure, &Position), Without<ConstructionSite>>,
+    mut map: ResMut<crate::resources::FoodLocationMap>,
+    constants: Res<SimConstants>,
+) {
+    let sense_range = constants.influence_maps.food_location_sense_range;
+    map.clear();
+    for (structure, anchor) in &buildings {
+        if !matches!(structure.kind, StructureType::Stores | StructureType::Kitchen) {
+            continue;
+        }
+        let eff = structure.effectiveness();
+        if eff <= 0.0 {
+            continue;
+        }
+        let center = structure.center(anchor);
+        map.stamp(center.x, center.y, eff, sense_range);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 

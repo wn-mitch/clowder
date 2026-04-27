@@ -41,6 +41,8 @@ pub struct SimConstants {
     pub fertility: FertilityConstants,
     #[serde(default)]
     pub fulfillment: FulfillmentConstants,
+    #[serde(default)]
+    pub influence_maps: InfluenceMapConstants,
 }
 
 // ---------- NeedsConstants ----------
@@ -3493,6 +3495,53 @@ impl Default for FulfillmentConstants {
             social_warmth_bond_proximity_rate: 0.0002,
             social_warmth_bond_proximity_range: 3,
             social_warmth_socialize_per_tick: 0.001,
+        }
+    }
+}
+
+// ---------- InfluenceMapConstants (§5.6.3 producer-side knobs) ----------
+
+/// Per-map sense-range knobs for the colony-faction influence-map
+/// producers landed in ticket 006. Each map stamps a linear-falloff
+/// disc around its source positions; the radius below sets the
+/// falloff distance in world tiles.
+///
+/// **Producer-only at landing.** Consumer cutover (DSE
+/// `SpatialConsideration` integration) is owned by ticket 052 — these
+/// knobs only shape the on-substrate gradient for now. Numeric values
+/// are placeholders chosen to roughly match cat sight range; they
+/// become balance-affecting once a `SpatialConsideration` reads them.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct InfluenceMapConstants {
+    /// Falloff radius (world tiles) for `FoodLocationMap` — §5.6.3 row
+    /// #7. Each functional Stores or Kitchen paints a disc of this
+    /// radius scaled by `Structure::effectiveness()`.
+    pub food_location_sense_range: f32,
+    /// Falloff radius for `GardenLocationMap` — §5.6.3 row #10.
+    pub garden_location_sense_range: f32,
+    /// Falloff radius for `ConstructionSiteMap` — §5.6.3 row #9.
+    /// Stamps both `ConstructionSite` (urgency = `1 - progress`) and
+    /// damaged `Structure` (urgency = `1 - condition` when condition
+    /// falls below `damaged_threshold`).
+    pub construction_site_sense_range: f32,
+    /// Falloff radius for `KittenUrgencyMap` — §5.6.3 row #13. Each
+    /// kitten paints a disc weighted by hunger deficit (`1 - hunger`).
+    pub kitten_urgency_sense_range: f32,
+    /// Hunger threshold below which a damaged `Structure` deposits
+    /// into `ConstructionSiteMap`. Mirrors §4 `HasDamagedBuilding`'s
+    /// `condition < damaged_threshold` predicate so the map view
+    /// agrees with the marker view.
+    pub damaged_threshold: f32,
+}
+
+impl Default for InfluenceMapConstants {
+    fn default() -> Self {
+        Self {
+            food_location_sense_range: 15.0,
+            garden_location_sense_range: 15.0,
+            construction_site_sense_range: 15.0,
+            kitten_urgency_sense_range: 12.0,
+            damaged_threshold: 0.4,
         }
     }
 }
