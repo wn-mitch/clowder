@@ -267,12 +267,21 @@ impl Plugin for SimulationPlugin {
                             // CarcassNearby. Single author owns five
                             // markers to amortize the per-cat sensing scans.
                             systems::sensing::update_target_existence_markers,
-                            // Ticket 014 §4 fox spatial batch — three
-                            // fox markers (StoreVisible/StoreGuarded,
-                            // CatThreateningDen, WardNearbyFox stub).
-                            systems::fox_spatial::update_store_awareness_markers,
-                            systems::fox_spatial::update_den_threat_markers,
-                            systems::fox_spatial::update_ward_detection_markers,
+                            // Ticket 014 §4 fox markers — 7 authors
+                            // grouped into a sub-tuple so the outer
+                            // chain stays under Bevy's 20-system tuple
+                            // limit. Authors are independent of each
+                            // other; chain ordering is informational.
+                            (
+                                systems::fox_spatial::update_store_awareness_markers,
+                                systems::fox_spatial::update_den_threat_markers,
+                                systems::fox_spatial::update_ward_detection_markers,
+                                systems::fox_spatial::update_cub_marker,
+                                systems::fox_spatial::update_cub_hunger_markers,
+                                systems::fox_spatial::update_juvenile_dispersal_markers,
+                                systems::fox_spatial::update_den_marker,
+                            )
+                                .chain(),
                         )
                             .chain(),
                         systems::needs::decay_grooming,

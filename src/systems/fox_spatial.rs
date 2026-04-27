@@ -158,6 +158,116 @@ pub fn update_den_threat_markers(
     }
 }
 
+/// Author `HasCubs` per fox.
+///
+/// **Predicate** — bit-for-bit mirror of
+/// `fox_goap.rs::build_scoring_context::has_cubs`:
+/// `cubs_present > 0` at the fox's home den.
+///
+/// **v1 is per-tick scan**, not event-driven. The marker rustdoc
+/// nominates `CubsBorn` + on-despawn events; those don't exist yet.
+/// Per-tick scan keeps the slice atomic; the event-refactor lands
+/// separately.
+#[allow(clippy::type_complexity)]
+pub fn update_cub_marker(
+    mut commands: Commands,
+    foxes: Query<
+        (Entity, &FoxState, Has<markers::HasCubs>),
+        (With<WildAnimal>, Without<Dead>),
+    >,
+    dens: Query<&FoxDen, Without<FoxState>>,
+) {
+    for (entity, fox_state, has_marker) in foxes.iter() {
+        let cubs_present = fox_state
+            .home_den
+            .and_then(|e| dens.get(e).ok())
+            .map(|d| d.cubs_present)
+            .unwrap_or(0);
+        let want = cubs_present > 0;
+        toggle(&mut commands, entity, want, has_marker, markers::HasCubs);
+    }
+}
+
+/// Author `CubsHungry` per fox.
+///
+/// **Predicate** — bit-for-bit mirror of
+/// `fox_goap.rs::build_scoring_context::cubs_hungry`:
+/// `has_cubs ∧ FoxNeeds.cub_satiation < 0.4`. The 0.4 threshold is
+/// the inline literal at the field site; not migrated to a constant
+/// in this commit.
+#[allow(clippy::type_complexity)]
+pub fn update_cub_hunger_markers(
+    mut commands: Commands,
+    foxes: Query<
+        (
+            Entity,
+            &FoxState,
+            &crate::components::fox_personality::FoxNeeds,
+            Has<markers::CubsHungry>,
+        ),
+        (With<WildAnimal>, Without<Dead>),
+    >,
+    dens: Query<&FoxDen, Without<FoxState>>,
+) {
+    const CUB_HUNGER_THRESHOLD: f32 = 0.4;
+    for (entity, fox_state, needs, has_marker) in foxes.iter() {
+        let has_cubs = fox_state
+            .home_den
+            .and_then(|e| dens.get(e).ok())
+            .map(|d| d.cubs_present > 0)
+            .unwrap_or(false);
+        let want = has_cubs && needs.cub_satiation < CUB_HUNGER_THRESHOLD;
+        toggle(&mut commands, entity, want, has_marker, markers::CubsHungry);
+    }
+}
+
+/// Author `IsDispersingJuvenile` per fox.
+///
+/// **Predicate** — bit-for-bit mirror of
+/// `fox_goap.rs::build_scoring_context::is_dispersing_juvenile`:
+/// `life_stage == Juvenile ∧ home_den.is_none()`.
+#[allow(clippy::type_complexity)]
+pub fn update_juvenile_dispersal_markers(
+    mut commands: Commands,
+    foxes: Query<
+        (Entity, &FoxState, Has<markers::IsDispersingJuvenile>),
+        (With<WildAnimal>, Without<Dead>),
+    >,
+) {
+    use crate::components::wildlife::FoxLifeStage;
+    for (entity, fox_state, has_marker) in foxes.iter() {
+        let want =
+            fox_state.life_stage == FoxLifeStage::Juvenile && fox_state.home_den.is_none();
+        toggle(
+            &mut commands,
+            entity,
+            want,
+            has_marker,
+            markers::IsDispersingJuvenile,
+        );
+    }
+}
+
+/// Author `HasDen` per fox.
+///
+/// **Predicate** — bit-for-bit mirror of
+/// `fox_goap.rs::build_scoring_context::has_den`:
+/// `fox_state.home_den.is_some()`. v1 is per-tick scan; event-driven
+/// (`DenClaimed` / `DenLost`) follow-on deferred.
+#[allow(clippy::type_complexity)]
+pub fn update_den_marker(
+    mut commands: Commands,
+    foxes: Query<
+        (Entity, &FoxState, Has<markers::HasDen>),
+        (With<WildAnimal>, Without<Dead>),
+    >,
+) {
+    for (entity, fox_state, has_marker) in foxes.iter() {
+        let want = fox_state.home_den.is_some();
+        toggle(&mut commands, entity, want, has_marker, markers::HasDen);
+    }
+}
+
 /// Author `WardNearbyFox` per fox.
 ///
 /// **Predicate** — currently hardcoded `false` to mirror today's
@@ -405,5 +515,190 @@ mod tests {
             .id();
         schedule.run(&mut world);
         assert!(!world.entity(fox).contains::<markers::WardNearbyFox>());
+    }
+
+    // -----------------------------------------------------------------------
+    // Fox lifecycle markers — HasCubs / CubsHungry / IsDispersingJuvenile / HasDen
+    // -----------------------------------------------------------------------
+
+    use crate::components::fox_personality::FoxNeeds;
+    use crate::components::wildlife::{FoxLifeStage, FoxSex};
+
+    fn setup_cub_marker() -> (World, Schedule) {
+        let world = World::new();
+        let mut schedule = Schedule::default();
+        schedule.add_systems(update_cub_marker);
+        (world, schedule)
+    }
+
+    #[test]
+    fn fox_no_den_no_has_cubs() {
+        let (mut world, mut schedule) = setup_cub_marker();
+        let fox = spawn_fox(&mut world, 0, 0);
+        schedule.run(&mut world);
+        assert!(!world.entity(fox).contains::<markers::HasCubs>());
+    }
+
+    #[test]
+    fn fox_with_den_zero_cubs_no_marker() {
+        let (mut world, mut schedule) = setup_cub_marker();
+        let den = spawn_den(&mut world, 5, 5, 0);
+        let fox = spawn_fox_with_den(&mut world, 5, 5, den);
+        schedule.run(&mut world);
+        assert!(!world.entity(fox).contains::<markers::HasCubs>());
+    }
+
+    #[test]
+    fn fox_with_cubs_at_den_gets_marker() {
+        let (mut world, mut schedule) = setup_cub_marker();
+        let den = spawn_den(&mut world, 5, 5, 2);
+        let fox = spawn_fox_with_den(&mut world, 5, 5, den);
+        schedule.run(&mut world);
+        assert!(world.entity(fox).contains::<markers::HasCubs>());
+    }
+
+    #[test]
+    fn cubs_lost_clears_marker() {
+        let (mut world, mut schedule) = setup_cub_marker();
+        let den = spawn_den(&mut world, 5, 5, 2);
+        let fox = spawn_fox_with_den(&mut world, 5, 5, den);
+        schedule.run(&mut world);
+        assert!(world.entity(fox).contains::<markers::HasCubs>());
+        world.entity_mut(den).get_mut::<FoxDen>().unwrap().cubs_present = 0;
+        schedule.run(&mut world);
+        assert!(!world.entity(fox).contains::<markers::HasCubs>());
+    }
+
+    fn setup_cub_hunger() -> (World, Schedule) {
+        let world = World::new();
+        let mut schedule = Schedule::default();
+        schedule.add_systems(update_cub_hunger_markers);
+        (world, schedule)
+    }
+
+    fn spawn_fox_with_needs(
+        world: &mut World,
+        fx: i32,
+        fy: i32,
+        den: Entity,
+        cub_satiation: f32,
+    ) -> Entity {
+        let mut needs = FoxNeeds::default();
+        needs.cub_satiation = cub_satiation;
+        world
+            .spawn((
+                WildAnimal::new(WildSpecies::Fox),
+                FoxState::new_adult(FoxSex::Female, Some(den)),
+                Position::new(fx, fy),
+                needs,
+            ))
+            .id()
+    }
+
+    #[test]
+    fn fox_no_cubs_no_cubs_hungry() {
+        let (mut world, mut schedule) = setup_cub_hunger();
+        let den = spawn_den(&mut world, 5, 5, 0);
+        let fox = spawn_fox_with_needs(&mut world, 5, 5, den, 0.0);
+        schedule.run(&mut world);
+        assert!(!world.entity(fox).contains::<markers::CubsHungry>());
+    }
+
+    #[test]
+    fn cubs_well_fed_no_marker() {
+        let (mut world, mut schedule) = setup_cub_hunger();
+        let den = spawn_den(&mut world, 5, 5, 2);
+        let fox = spawn_fox_with_needs(&mut world, 5, 5, den, 0.8); // > 0.4
+        schedule.run(&mut world);
+        assert!(!world.entity(fox).contains::<markers::CubsHungry>());
+    }
+
+    #[test]
+    fn cubs_below_threshold_get_marker() {
+        let (mut world, mut schedule) = setup_cub_hunger();
+        let den = spawn_den(&mut world, 5, 5, 2);
+        let fox = spawn_fox_with_needs(&mut world, 5, 5, den, 0.3); // < 0.4
+        schedule.run(&mut world);
+        assert!(world.entity(fox).contains::<markers::CubsHungry>());
+    }
+
+    fn setup_juvenile_dispersal() -> (World, Schedule) {
+        let world = World::new();
+        let mut schedule = Schedule::default();
+        schedule.add_systems(update_juvenile_dispersal_markers);
+        (world, schedule)
+    }
+
+    fn spawn_juvenile_no_den(world: &mut World) -> Entity {
+        let mut state = FoxState::new_adult(FoxSex::Female, None);
+        state.life_stage = FoxLifeStage::Juvenile;
+        world
+            .spawn((WildAnimal::new(WildSpecies::Fox), state, Position::new(0, 0)))
+            .id()
+    }
+
+    fn spawn_juvenile_with_den(world: &mut World, den: Entity) -> Entity {
+        let mut state = FoxState::new_adult(FoxSex::Female, Some(den));
+        state.life_stage = FoxLifeStage::Juvenile;
+        world
+            .spawn((WildAnimal::new(WildSpecies::Fox), state, Position::new(0, 0)))
+            .id()
+    }
+
+    #[test]
+    fn juvenile_no_den_gets_dispersal_marker() {
+        let (mut world, mut schedule) = setup_juvenile_dispersal();
+        let fox = spawn_juvenile_no_den(&mut world);
+        schedule.run(&mut world);
+        assert!(world
+            .entity(fox)
+            .contains::<markers::IsDispersingJuvenile>());
+    }
+
+    #[test]
+    fn juvenile_with_den_no_dispersal() {
+        let (mut world, mut schedule) = setup_juvenile_dispersal();
+        let den = spawn_den(&mut world, 5, 5, 0);
+        let fox = spawn_juvenile_with_den(&mut world, den);
+        schedule.run(&mut world);
+        assert!(!world
+            .entity(fox)
+            .contains::<markers::IsDispersingJuvenile>());
+    }
+
+    #[test]
+    fn adult_no_den_no_dispersal() {
+        let (mut world, mut schedule) = setup_juvenile_dispersal();
+        let fox = spawn_fox(&mut world, 0, 0);
+        schedule.run(&mut world);
+        // Adults that lose their den don't get the dispersal marker —
+        // it's a juvenile-specific lifecycle stage.
+        assert!(!world
+            .entity(fox)
+            .contains::<markers::IsDispersingJuvenile>());
+    }
+
+    fn setup_has_den() -> (World, Schedule) {
+        let world = World::new();
+        let mut schedule = Schedule::default();
+        schedule.add_systems(update_den_marker);
+        (world, schedule)
+    }
+
+    #[test]
+    fn fox_with_home_den_gets_marker() {
+        let (mut world, mut schedule) = setup_has_den();
+        let den = spawn_den(&mut world, 5, 5, 0);
+        let fox = spawn_fox_with_den(&mut world, 5, 5, den);
+        schedule.run(&mut world);
+        assert!(world.entity(fox).contains::<markers::HasDen>());
+    }
+
+    #[test]
+    fn fox_no_home_den_no_marker() {
+        let (mut world, mut schedule) = setup_has_den();
+        let fox = spawn_fox(&mut world, 0, 0);
+        schedule.run(&mut world);
+        assert!(!world.entity(fox).contains::<markers::HasDen>());
     }
 }

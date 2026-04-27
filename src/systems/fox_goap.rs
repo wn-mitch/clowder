@@ -292,14 +292,18 @@ pub fn fox_evaluate_and_plan(
     dse_registry: Res<DseRegistry>,
     modifier_pipeline: Res<ModifierPipeline>,
     mut event_log: Option<ResMut<EventLog>>,
-    // Ticket 014 §4 fox spatial batch — markers authored by
-    // `fox_spatial::update_*_markers`. Bundled here so `EvalCtx::has_marker`
-    // sees the truthful values once the snapshot is populated below.
+    // Ticket 014 §4 fox markers — authored by `fox_spatial::update_*`.
+    // Bundled so `EvalCtx::has_marker` sees truthful values from the
+    // populated snapshot.
     fox_marker_q: Query<(
         bevy::prelude::Has<crate::components::markers::StoreVisible>,
         bevy::prelude::Has<crate::components::markers::StoreGuarded>,
         bevy::prelude::Has<crate::components::markers::CatThreateningDen>,
         bevy::prelude::Has<crate::components::markers::WardNearbyFox>,
+        bevy::prelude::Has<crate::components::markers::HasCubs>,
+        bevy::prelude::Has<crate::components::markers::CubsHungry>,
+        bevy::prelude::Has<crate::components::markers::IsDispersingJuvenile>,
+        bevy::prelude::Has<crate::components::markers::HasDen>,
     )>,
 ) {
     let cat_positions: Vec<Position> = cats.iter().copied().collect();
@@ -314,29 +318,26 @@ pub fn fox_evaluate_and_plan(
     // to `.require()` filters.
     let mut fox_markers = crate::ai::scoring::MarkerSnapshot::new();
     for (fox_entity, _, _, _, _, _) in &foxes {
-        if let Ok((store_visible, store_guarded, cat_threatening_den, ward_nearby)) =
-            fox_marker_q.get(fox_entity)
+        if let Ok((
+            store_visible,
+            store_guarded,
+            cat_threatening_den,
+            ward_nearby,
+            has_cubs,
+            cubs_hungry,
+            is_dispersing,
+            has_den,
+        )) = fox_marker_q.get(fox_entity)
         {
-            fox_markers.set_entity(
-                crate::components::markers::StoreVisible::KEY,
-                fox_entity,
-                store_visible,
-            );
-            fox_markers.set_entity(
-                crate::components::markers::StoreGuarded::KEY,
-                fox_entity,
-                store_guarded,
-            );
-            fox_markers.set_entity(
-                crate::components::markers::CatThreateningDen::KEY,
-                fox_entity,
-                cat_threatening_den,
-            );
-            fox_markers.set_entity(
-                crate::components::markers::WardNearbyFox::KEY,
-                fox_entity,
-                ward_nearby,
-            );
+            use crate::components::markers as m;
+            fox_markers.set_entity(m::StoreVisible::KEY, fox_entity, store_visible);
+            fox_markers.set_entity(m::StoreGuarded::KEY, fox_entity, store_guarded);
+            fox_markers.set_entity(m::CatThreateningDen::KEY, fox_entity, cat_threatening_den);
+            fox_markers.set_entity(m::WardNearbyFox::KEY, fox_entity, ward_nearby);
+            fox_markers.set_entity(m::HasCubs::KEY, fox_entity, has_cubs);
+            fox_markers.set_entity(m::CubsHungry::KEY, fox_entity, cubs_hungry);
+            fox_markers.set_entity(m::IsDispersingJuvenile::KEY, fox_entity, is_dispersing);
+            fox_markers.set_entity(m::HasDen::KEY, fox_entity, has_den);
         }
     }
 

@@ -405,23 +405,38 @@ impl WardNearbyFox {
     pub const KEY: &str = "WardNearbyFox";
 }
 
-/// Fox has ≥1 cub at its den. Event-driven (`CubsBorn` +
-/// on-despawn cleanup).
+/// Fox has ≥1 cub at its den. Per-tick author scan today
+/// (`fox_spatial.rs::update_cub_marker`); event-driven follow-on
+/// (`CubsBorn` / on-despawn) deferred to a separate ticket.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HasCubs;
+impl HasCubs {
+    pub const KEY: &str = "HasCubs";
+}
 
-/// `cub_satiation < 0.4`. `fox_goap.rs::update_cub_hunger_markers`.
+/// `cub_satiation < 0.4`. `fox_spatial.rs::update_cub_hunger_markers`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct CubsHungry;
+impl CubsHungry {
+    pub const KEY: &str = "CubsHungry";
+}
 
 /// Juvenile fox with no home den (dispersal eligibility).
-/// `fox_goap.rs::update_juvenile_dispersal_markers`.
+/// `fox_spatial.rs::update_juvenile_dispersal_markers`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct IsDispersingJuvenile;
+impl IsDispersingJuvenile {
+    pub const KEY: &str = "IsDispersingJuvenile";
+}
 
-/// Fox has a home den. Event-driven (`DenClaimed` / `DenLost`).
+/// Fox has a home den. Per-tick author scan today
+/// (`fox_spatial.rs::update_den_marker`); event-driven follow-on
+/// (`DenClaimed` / `DenLost`) deferred to a separate ticket.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HasDen;
+impl HasDen {
+    pub const KEY: &str = "HasDen";
+}
 
 // ---------------------------------------------------------------------------
 // §9.2 Faction overlay markers
