@@ -83,7 +83,7 @@ pub struct ContributorRow {
 pub struct ConsiderationContribution {
     pub name: String,
     pub input: f32,
-    /// Textual description of the response curve (e.g. `"Logistic(8,0.75)"`,
+    /// Textual description of the response curve (e.g. `"Logistic(8,0.5)"`,
     /// `"Linear"`). Phase 3 will replace with a typed `Curve` enum.
     pub curve: String,
     pub score: f32,

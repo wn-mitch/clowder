@@ -31,7 +31,7 @@ use super::curves::Curve;
 
 /// One scalar input, one curve. The canonical §1.2 "concrete numbers /
 /// abstract ratings" flavor. Example: `Eat.hunger` = scalar hunger →
-/// `Logistic(8, 0.75)`.
+/// `Logistic(8, 0.5)` (recalibrated ticket 044).
 #[derive(Debug, Clone)]
 pub struct ScalarConsideration {
     pub name: &'static str,
@@ -199,7 +199,8 @@ mod tests {
     #[test]
     fn scalar_matches_curve_output() {
         let c = ScalarConsideration::new("hunger", hangry());
-        assert!((c.score(0.75) - 0.5).abs() < 1e-4);
+        // Hangry midpoint after ticket 044 recalibration is 0.5.
+        assert!((c.score(0.5) - 0.5).abs() < 1e-4);
     }
 
     #[test]

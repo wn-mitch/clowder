@@ -659,7 +659,7 @@ pub fn score_actions(
     // that rode this branch. The `ScoringContext.is_incapacitated`
     // field is retained for non-scoring consumers.
 
-    // --- Eat (§2.3 hangry anchor: Logistic(8, 0.75)) ---
+    // --- Eat (§2.3 hangry anchor: Logistic(8, 0.5), recalibrated ticket 044) ---
     // §4 (Phase 4b.2) retired the outer `ctx.food_available` gate. The
     // Eat DSE's `.require("HasStoredFood")` eligibility filter resolves
     // against `EvalInputs::markers` (populated by the caller from
@@ -2028,11 +2028,21 @@ mod tests {
     }
 
     /// A diligent non-bold cat should prefer Forage over Hunt.
+    ///
+    /// Uses moderate hunger (0.5 → urgency=0.5) so the shared hangry
+    /// axis sits at its midpoint (~0.5) and personality differentiators
+    /// (boldness for Hunt, diligence for Forage) still drive the
+    /// choice. Higher urgency would saturate the hunger axis on both
+    /// DSEs — under `Logistic(8, 0.5)` after ticket 044 recalibration,
+    /// hunger=0.2 puts urgency=0.8 → score ~0.95, drowning the
+    /// personality signal. The test's intent ("diligent → Forage")
+    /// only reads cleanly at hunger levels where personality still
+    /// has comparable weight.
     #[test]
     fn diligent_cat_prefers_forage_over_hunt() {
         let sc = default_scoring();
         let mut needs = Needs::default();
-        needs.hunger = 0.2;
+        needs.hunger = 0.5;
 
         let mut personality = default_personality();
         personality.boldness = 0.2;
@@ -2484,10 +2494,11 @@ mod tests {
         //
         // Scenario: a hungry/tired cat so Eat and Sleep have
         // above-jitter scores under the Logistic curves. The §2.3
-        // hangry anchor Logistic(8, 0.75) returns ~0 at `hunger=1.0`
-        // (sated), which is correct behavior but breaks the
-        // branch-coverage assertion this test makes; the adjustment
-        // preserves intent while accommodating the curve shape.
+        // hangry anchor Logistic(8, 0.5) (recalibrated ticket 044)
+        // returns ~0 at `hunger=1.0` (sated), which is correct
+        // behavior but breaks the branch-coverage assertion this test
+        // makes; the adjustment preserves intent while accommodating
+        // the curve shape.
         let mut needs = Needs::default();
         needs.hunger = 0.4;
         needs.energy = 0.3;

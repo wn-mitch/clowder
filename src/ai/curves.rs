@@ -43,9 +43,9 @@ pub enum Curve {
     },
 
     /// Logistic sigmoid: `1 / (1 + exp(−steepness · (x − midpoint)))`.
-    /// §2.3 anchors: hangry (`Logistic(8, 0.75)`), sleep-dep
-    /// (`Logistic(10, 0.7)`), loneliness (`Logistic(5, 0.6)`),
-    /// flee-or-fight (`Logistic(10, midpoint)`).
+    /// §2.3 anchors: hangry (`Logistic(8, 0.5)` — recalibrated ticket
+    /// 044), sleep-dep (`Logistic(10, 0.7)`), loneliness
+    /// (`Logistic(5, 0.6)`), flee-or-fight (`Logistic(10, midpoint)`).
     Logistic { steepness: f32, midpoint: f32 },
 
     /// Inverse-S: `1 − 1 / (1 + exp(−slope · (x − inflection)))`. Used
@@ -171,13 +171,26 @@ fn piecewise_eval(knots: &[(f32, f32)], x: f32) -> f32 {
 // Named anchors — shared curve shapes from §2.3
 // ---------------------------------------------------------------------------
 
-/// Hangry anchor: `Logistic(8, 0.75)` per §2.3. Reused by
-/// `Hunt.hunger`, `Forage.hunger`, fox `Hunting.hunger`,
-/// fox `Raiding.hunger`.
+/// Hangry anchor: `Logistic(8, 0.5)`. Reused by `Hunt.hunger`,
+/// `Forage.hunger`, fox `Hunting.hunger`, fox `Raiding.hunger`.
+///
+/// **Recalibrated 2026-04-27 (ticket 044) from `Logistic(8, 0.5)` (was 0.75).**
+/// At midpoint 0.75 the curve only crosses 0.5 when hunger has dropped to
+/// ~0.25 ("very hungry"); below that, Eat scored ~0.05 and routinely
+/// lost to Groom/Socialize/Sleep even on cats whose hunger was draining
+/// fast. In a 17-year collapse-probe soak (`logs/collapse-probe-42/`)
+/// the eating window between "Eat starts winning" and "starvation
+/// cliff" was so narrow that any plan-failure during that window left
+/// cats dying with food in stores. Shifting the midpoint to 0.5 means
+/// cats meaningfully consider food at "half-hungry" instead of waiting
+/// for emergency hunger — biologically, real cats nibble continuously,
+/// they don't panic-eat. Steepness stays at 8 so once hunger crosses
+/// the threshold Eat dominates decisively. See
+/// `docs/balance/hangry-recalibration.md`.
 pub fn hangry() -> Curve {
     Curve::Logistic {
         steepness: 8.0,
-        midpoint: 0.75,
+        midpoint: 0.5,
     }
 }
 
@@ -304,20 +317,26 @@ mod tests {
     #[test]
     fn logistic_midpoint_is_half() {
         let c = hangry();
-        assert!(approx(c.evaluate(0.75), 0.5, 1e-4));
+        // Recalibrated to midpoint=0.5 (ticket 044): "half-hungry" pulls
+        // 0.5 score, vs the old midpoint=0.75 where cats waited until
+        // emergency hunger before Eat could win.
+        assert!(approx(c.evaluate(0.5), 0.5, 1e-4));
     }
 
     #[test]
     fn logistic_saturates_high_and_low() {
         let c = hangry();
-        assert!(c.evaluate(0.0) < 0.01);
-        assert!(c.evaluate(1.0) > 0.88);
+        // Sated (urgency=0.1, hunger=0.9): Eat ~0.04, near zero — cat
+        // doesn't fight Sleep/Play for food when full.
+        assert!(c.evaluate(0.1) < 0.05);
+        // Starving (urgency=1.0, hunger=0.0): Eat ~0.98, dominant.
+        assert!(c.evaluate(1.0) > 0.95);
     }
 
     #[test]
     fn logistic_steeper_than_linear_near_midpoint() {
         let c = hangry();
-        let slope = (c.evaluate(0.8) - c.evaluate(0.7)) / 0.1;
+        let slope = (c.evaluate(0.55) - c.evaluate(0.45)) / 0.1;
         // Derivative of logistic at midpoint is steepness/4 = 2.0.
         assert!(
             slope > 1.5,

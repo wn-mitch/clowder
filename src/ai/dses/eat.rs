@@ -9,7 +9,7 @@
 //!
 //! | Axis | Shape | Rationale |
 //! |---|---|---|
-//! | §2.3 `Eat.hunger` | `Logistic(steepness=8, midpoint=0.75)` | Hangry anchor — threshold, not ramp. Every other hunger-axis DSE (Hunt, Forage, fox Hunting/Raiding) reuses this shape. |
+//! | §2.3 `Eat.hunger` | `Logistic(steepness=8, midpoint=0.5)` | Hangry anchor — recalibrated 2026-04-27 (ticket 044) from midpoint 0.75 to 0.5; cats now meaningfully consider food at "half-hungry" instead of waiting for emergency hunger. Every other hunger-axis DSE (Hunt, Forage, fox Hunting/Raiding) reuses this shape. |
 //! | §3.1.1 `Eat` | `CompensatedProduct` | n=1 today; kept CP (not WS) so future axes (`food_available`, `digestion_gate`) compose with gating semantics. |
 //! | §3.3.1 | RtM | Auto-derived from CP. |
 //! | §L2.10.3 Intention | `Goal(hunger < threshold)` | Need-driven. |
@@ -178,10 +178,10 @@ mod tests {
 
     #[test]
     fn eat_dse_uses_hangry_anchor() {
-        // Phase 3b.2 spec row: hunger via Logistic(8, 0.75). At
-        // hunger=0.75 the score should be ~0.5 (logistic midpoint);
-        // at hunger=0.9 it should be >0.85; at hunger=0.1 it should
-        // be <0.01.
+        // Recalibrated 2026-04-27 (ticket 044): hunger via Logistic(8, 0.5).
+        // At urgency=0.5 (half-hungry) the score is ~0.5 (logistic midpoint);
+        // at urgency=0.9 (starving) it should be >0.95; at urgency=0.1
+        // (sated) it should be <0.05.
         let dse = EatDse::new();
         let entity = Entity::from_raw_u32(1).unwrap();
 
@@ -215,13 +215,13 @@ mod tests {
                 .final_score
         };
 
-        // Logistic(8, 0.75):
-        //   x=0.75 → 0.5 (midpoint, exact)
-        //   x=0.9  → 1/(1+e^{-1.2}) ≈ 0.77
-        //   x=0.1  → 1/(1+e^{5.2}) ≈ 0.0055
-        assert!(approx(score(0.75), 0.5, 0.01), "midpoint: {}", score(0.75));
-        assert!(score(0.9) > 0.7, "starving: {}", score(0.9));
-        assert!(score(0.1) < 0.01, "sated: {}", score(0.1));
+        // Logistic(8, 0.5):
+        //   x=0.5  → 0.5 (midpoint, exact)
+        //   x=0.9  → 1/(1+e^{-3.2}) ≈ 0.961
+        //   x=0.1  → 1/(1+e^{3.2})  ≈ 0.039
+        assert!(approx(score(0.5), 0.5, 0.01), "midpoint: {}", score(0.5));
+        assert!(score(0.9) > 0.95, "starving: {}", score(0.9));
+        assert!(score(0.1) < 0.05, "sated: {}", score(0.1));
     }
 
     #[test]

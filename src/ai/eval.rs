@@ -914,8 +914,8 @@ mod tests {
         // half-satisfied).
         let maslow = |tier: u8| if tier == 1 { 0.5 } else { 1.0 };
         let modifiers = ModifierPipeline::new();
-        // Hunger = 0.75 → Logistic(8, 0.75) evaluates to ~0.5.
-        let fetch = |name: &str, _: Entity| if name == "hunger" { 0.75 } else { 0.0 };
+        // Hunger = 0.5 → Logistic(8, 0.5) evaluates to ~0.5 (ticket 044).
+        let fetch = |name: &str, _: Entity| if name == "hunger" { 0.5 } else { 0.0 };
 
         let scored =
             evaluate_single(&dse, entity, &ctx, &maslow, &modifiers, &fetch).expect("eligible");
