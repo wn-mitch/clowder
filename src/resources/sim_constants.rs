@@ -47,103 +47,110 @@ pub struct SimConstants {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct NeedsConstants {
-    pub hunger_decay: f32,
-    pub energy_decay: f32,
-    pub base_temperature_drain: f32,
-    pub weather_temperature_snow: f32,
-    pub weather_temperature_storm: f32,
-    pub weather_temperature_wind: f32,
-    pub weather_temperature_heavy_rain: f32,
-    pub weather_temperature_light_rain: f32,
-    pub season_temperature_winter: f32,
-    pub season_temperature_autumn: f32,
-    /// Health drained per tick while a cat is at `hunger == 0.0` (the
-    /// starvation cliff in `src/systems/needs.rs:95`). At 0.0005, a
-    /// continuously-starving cat dies from this drain in ~2000 ticks
-    /// (~2 in-sim days). Pair with `starvation_safety_drain` and
-    /// `starvation_mood_penalty` for the full cascade. See ticket 032
-    /// for the open work to soften this cliff into a graded
+    // --- RatePerDay rates (ticket 033 Phase 2) ---
+    pub hunger_decay: RatePerDay,
+    pub energy_decay: RatePerDay,
+    pub base_temperature_drain: RatePerDay,
+    pub weather_temperature_snow: RatePerDay,
+    pub weather_temperature_storm: RatePerDay,
+    pub weather_temperature_wind: RatePerDay,
+    pub weather_temperature_heavy_rain: RatePerDay,
+    pub weather_temperature_light_rain: RatePerDay,
+    pub season_temperature_winter: RatePerDay,
+    pub season_temperature_autumn: RatePerDay,
+    /// Health drained per in-game day while a cat is at `hunger == 0.0`
+    /// (the starvation cliff in `src/systems/needs.rs:95`). At
+    /// `RatePerDay::new(0.5)` (0.0005/tick at the default 1000
+    /// ticks/day scale), a continuously-starving cat dies from this
+    /// drain in ~2 in-sim days. Pair with `starvation_safety_drain`
+    /// and `starvation_mood_penalty` for the full cascade. See ticket
+    /// 032 for the open work to soften this cliff into a graded
     /// body-condition axis.
-    pub starvation_health_drain: f32,
-    pub starvation_safety_drain: f32,
+    pub starvation_health_drain: RatePerDay,
+    pub starvation_safety_drain: RatePerDay,
+    pub safety_recovery_rate: RatePerDay,
+    pub social_base_drain: RatePerDay,
+    pub acceptance_base_drain: RatePerDay,
+    pub respect_base_drain: RatePerDay,
+    pub mastery_base_drain: RatePerDay,
+    pub purpose_base_drain: RatePerDay,
+    pub tradition_safety_boost: RatePerDay,
+    pub tradition_safety_drain: RatePerDay,
+    // --- Grooming ---
+    pub grooming_decay: RatePerDay,
+    pub grooming_pride_penalty_scale: RatePerDay,
+    // --- Mating ---
+    pub mating_base_decay: RatePerDay,
+    // --- Bond proximity ---
+    pub bond_proximity_social_rate: RatePerDay,
+    // --- Scalar tuning (non-temporal) ---
     pub starvation_mood_penalty: f32,
-    pub starvation_mood_ticks: u64,
     pub starvation_social_multiplier: f32,
-    pub safety_recovery_rate: f32,
-    pub social_base_drain: f32,
     pub social_sociability_scale: f32,
-    pub acceptance_base_drain: f32,
     pub acceptance_temperature_scale: f32,
-    pub respect_base_drain: f32,
     pub respect_ambition_scale: f32,
     pub respect_low_threshold: f32,
     pub pride_amplifier_scale: f32,
-    pub mastery_base_drain: f32,
     pub mastery_diligence_scale: f32,
-    pub purpose_base_drain: f32,
     pub purpose_curiosity_scale: f32,
     pub purpose_patience_scale: f32,
     pub purpose_independence_scale: f32,
-    pub tradition_familiar_distance: i32,
-    pub tradition_safety_boost: f32,
-    pub tradition_safety_drain: f32,
     pub eat_from_inventory_threshold: f32,
     /// Scales food_value reduction from tile corruption (e.g. 0.5 = half nourishment at full corruption).
     pub corruption_food_penalty: f32,
-    // --- Grooming ---
-    pub grooming_decay: f32,
-    pub grooming_pride_penalty_scale: f32,
-    // --- Mating ---
-    pub mating_base_decay: f32,
     pub mating_temperature_scale: f32,
-    // --- Bond proximity ---
-    pub bond_proximity_social_rate: f32,
+    // --- Counts / distances ---
+    pub starvation_mood_ticks: u64,
+    pub tradition_familiar_distance: i32,
     pub bond_proximity_range: i32,
 }
 
 impl Default for NeedsConstants {
     fn default() -> Self {
         Self {
-            hunger_decay: 0.0001,
-            energy_decay: 0.0001,
-            base_temperature_drain: 0.0001,
-            weather_temperature_snow: 0.0004,
-            weather_temperature_storm: 0.0003,
-            weather_temperature_wind: 0.0002,
-            weather_temperature_heavy_rain: 0.0002,
-            weather_temperature_light_rain: 0.0001,
-            season_temperature_winter: 0.0003,
-            season_temperature_autumn: 0.0001,
-            starvation_health_drain: 0.0005,
-            starvation_safety_drain: 0.0005,
+            // RatePerDay rates (per_day = per_tick * 1000)
+            hunger_decay: RatePerDay::new(0.1),
+            energy_decay: RatePerDay::new(0.1),
+            base_temperature_drain: RatePerDay::new(0.1),
+            weather_temperature_snow: RatePerDay::new(0.4),
+            weather_temperature_storm: RatePerDay::new(0.3),
+            weather_temperature_wind: RatePerDay::new(0.2),
+            weather_temperature_heavy_rain: RatePerDay::new(0.2),
+            weather_temperature_light_rain: RatePerDay::new(0.1),
+            season_temperature_winter: RatePerDay::new(0.3),
+            season_temperature_autumn: RatePerDay::new(0.1),
+            starvation_health_drain: RatePerDay::new(0.5),
+            starvation_safety_drain: RatePerDay::new(0.5),
+            safety_recovery_rate: RatePerDay::new(0.2),
+            social_base_drain: RatePerDay::new(0.1),
+            acceptance_base_drain: RatePerDay::new(0.05),
+            respect_base_drain: RatePerDay::new(0.03),
+            mastery_base_drain: RatePerDay::new(0.02),
+            purpose_base_drain: RatePerDay::new(0.01),
+            tradition_safety_boost: RatePerDay::new(0.2),
+            tradition_safety_drain: RatePerDay::new(0.1),
+            grooming_decay: RatePerDay::new(0.03),
+            grooming_pride_penalty_scale: RatePerDay::new(0.05),
+            mating_base_decay: RatePerDay::new(0.08),
+            bond_proximity_social_rate: RatePerDay::new(0.3),
+            // Scalar tuning
             starvation_mood_penalty: -0.3,
-            starvation_mood_ticks: 5,
             starvation_social_multiplier: 2.0,
-            safety_recovery_rate: 0.0002,
-            social_base_drain: 0.0001,
             social_sociability_scale: 0.5,
-            acceptance_base_drain: 0.00005,
             acceptance_temperature_scale: 0.5,
-            respect_base_drain: 0.00003,
             respect_ambition_scale: 0.5,
             respect_low_threshold: 0.4,
             pride_amplifier_scale: 0.8,
-            mastery_base_drain: 0.00002,
             mastery_diligence_scale: 0.5,
-            purpose_base_drain: 0.00001,
             purpose_curiosity_scale: 0.5,
             purpose_patience_scale: 0.3,
             purpose_independence_scale: 0.4,
-            tradition_familiar_distance: 5,
-            tradition_safety_boost: 0.0002,
-            tradition_safety_drain: 0.0001,
             eat_from_inventory_threshold: 0.4,
             corruption_food_penalty: 0.5,
-            grooming_decay: 0.00003,
-            grooming_pride_penalty_scale: 0.00005,
-            mating_base_decay: 0.00008,
             mating_temperature_scale: 0.5,
-            bond_proximity_social_rate: 0.0003,
+            // Counts / distances
+            starvation_mood_ticks: 5,
+            tradition_familiar_distance: 5,
             bond_proximity_range: 3,
         }
     }
@@ -153,55 +160,61 @@ impl Default for NeedsConstants {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BuildingConstants {
-    pub den_effect_radius: i32,
-    pub den_temperature_bonus: f32,
-    pub den_safety_bonus: f32,
-    pub hearth_effect_radius: i32,
-    pub hearth_social_bonus: f32,
-    pub hearth_temperature_bonus_cold: f32,
+    // --- RatePerDay rates (ticket 033 Phase 2) ---
+    pub den_temperature_bonus: RatePerDay,
+    pub den_safety_bonus: RatePerDay,
+    pub hearth_social_bonus: RatePerDay,
+    pub hearth_temperature_bonus_cold: RatePerDay,
+    pub dirty_temperature_drain: RatePerDay,
+    pub structural_decay_storm: RatePerDay,
+    pub structural_decay_snow: RatePerDay,
+    pub structural_decay_heavy_rain: RatePerDay,
+    pub cleanliness_decay_storm: RatePerDay,
+    pub cleanliness_decay_snow: RatePerDay,
+    pub cleanliness_decay_fog: RatePerDay,
+    pub cleanliness_decay_clear: RatePerDay,
+    pub tidy_cleanliness_rate: RatePerDay,
+    // --- Scalars ---
     pub stores_spoilage_multiplier: f32,
     pub dirty_threshold: f32,
-    pub dirty_discomfort_radius: i32,
-    pub dirty_temperature_drain: f32,
-    pub structural_decay_storm: f32,
-    pub structural_decay_snow: f32,
-    pub structural_decay_heavy_rain: f32,
-    pub cleanliness_decay_storm: f32,
-    pub cleanliness_decay_snow: f32,
-    pub cleanliness_decay_fog: f32,
-    pub cleanliness_decay_clear: f32,
-    pub tidy_radius: i32,
-    pub tidy_cleanliness_rate: f32,
     pub gate_tired_energy_threshold: f32,
     pub gate_tired_diligence_scale: f32,
     pub gate_close_diligence_threshold: f32,
+    // --- Radii ---
+    pub den_effect_radius: i32,
+    pub hearth_effect_radius: i32,
+    pub dirty_discomfort_radius: i32,
+    pub tidy_radius: i32,
 }
 
 impl Default for BuildingConstants {
     fn default() -> Self {
         Self {
-            den_effect_radius: 5,
-            den_temperature_bonus: 0.003,
-            den_safety_bonus: 0.0005,
-            hearth_effect_radius: 6,
-            hearth_social_bonus: 0.001,
-            hearth_temperature_bonus_cold: 0.003,
+            // RatePerDay rates (per_day = per_tick * 1000)
+            den_temperature_bonus: RatePerDay::new(3.0),
+            den_safety_bonus: RatePerDay::new(0.5),
+            hearth_social_bonus: RatePerDay::new(1.0),
+            hearth_temperature_bonus_cold: RatePerDay::new(3.0),
+            dirty_temperature_drain: RatePerDay::new(0.3),
+            structural_decay_storm: RatePerDay::new(0.03),
+            structural_decay_snow: RatePerDay::new(0.02),
+            structural_decay_heavy_rain: RatePerDay::new(0.01),
+            cleanliness_decay_storm: RatePerDay::new(0.2),
+            cleanliness_decay_snow: RatePerDay::new(0.15),
+            cleanliness_decay_fog: RatePerDay::new(0.1),
+            cleanliness_decay_clear: RatePerDay::new(0.08),
+            tidy_cleanliness_rate: RatePerDay::new(0.5),
+            // Scalars
             stores_spoilage_multiplier: 0.5,
             dirty_threshold: 0.3,
-            dirty_discomfort_radius: 3,
-            dirty_temperature_drain: 0.0003,
-            structural_decay_storm: 0.00003,
-            structural_decay_snow: 0.00002,
-            structural_decay_heavy_rain: 0.00001,
-            cleanliness_decay_storm: 0.0002,
-            cleanliness_decay_snow: 0.00015,
-            cleanliness_decay_fog: 0.0001,
-            cleanliness_decay_clear: 0.00008,
-            tidy_radius: 3,
-            tidy_cleanliness_rate: 0.0005,
             gate_tired_energy_threshold: 0.3,
             gate_tired_diligence_scale: 0.6,
             gate_close_diligence_threshold: 0.5,
+            // Radii
+            den_effect_radius: 5,
+            hearth_effect_radius: 6,
+            dirty_discomfort_radius: 3,
+            tidy_radius: 3,
         }
     }
 }
@@ -342,11 +355,11 @@ impl Default for CombatConstants {
 pub struct MagicConstants {
     pub corruption_spread_interval: u64,
     pub corruption_spread_threshold: f32,
-    pub corruption_spread_rate: f32,
+    pub corruption_spread_rate: RatePerDay,
     pub corruption_new_tile_threshold: f32,
     pub ward_post_decay_multiplier: f32,
-    pub healing_poultice_rate: f32,
-    pub energy_tonic_rate: f32,
+    pub healing_poultice_rate: RatePerDay,
+    pub energy_tonic_rate: RatePerDay,
     pub mood_tonic_bonus: f32,
     pub mood_tonic_ticks: u64,
     pub personal_corruption_mood_threshold: f32,
@@ -370,21 +383,23 @@ pub struct MagicConstants {
     pub gratitude_fondness_gain: f32,
     pub herbcraft_apply_skill_growth: f32,
     pub set_ward_ticks: u64,
-    /// Per-tick strength loss for a thornward at the unsieged baseline
+    /// Per-day strength loss for a thornward at the unsieged baseline
     /// (`Ward::strength` starts at 1.0; decay is linear in
-    /// `src/systems/magic.rs:158`). 1 in-sim day = `ticks_per_day_phase
-    /// × 4 = 1000` ticks, so decay 0.0005 = 2-day lifetime, 0.001 =
-    /// 1-day, etc. Under siege, `effective_decay += siege_pressure ×
-    /// ward_siege_decay_bonus` so a sieged ward burns faster than the
-    /// baseline lifetime suggests.
-    pub thornward_decay_rate: f32,
+    /// `src/systems/magic.rs:158`). `RatePerDay::new(1.0)` = 1-day
+    /// lifetime, `RatePerDay::new(0.5)` = 2-day, etc. Under siege,
+    /// `effective_decay += siege_pressure × ward_siege_decay_bonus` so
+    /// a sieged ward burns faster than the baseline lifetime suggests.
+    /// The wrapper converts to per-tick at ward-spawn time
+    /// (`src/steps/magic/set_ward.rs`); the resulting per-tick rate
+    /// is stored on `Ward::decay_rate`.
+    pub thornward_decay_rate: RatePerDay,
     pub herbcraft_ward_skill_growth: f32,
     pub magic_ward_skill_growth: f32,
     pub scry_ticks: u64,
     pub scry_memory_strength: f32,
     pub scry_magic_skill_growth: f32,
-    pub cleanse_corruption_rate: f32,
-    pub cleanse_personal_corruption_rate: f32,
+    pub cleanse_corruption_rate: RatePerDay,
+    pub cleanse_personal_corruption_rate: RatePerDay,
     pub cleanse_magic_skill_growth: f32,
     pub cleanse_done_threshold: f32,
     pub cleanse_max_ticks: u64,
@@ -419,8 +434,9 @@ pub struct MagicConstants {
     pub harvest_corruption_gain: f32,
     /// Corruption above this threshold suppresses herb harvestability.
     pub herb_suppression_threshold: f32,
-    /// Health drain per tick on tiles with corruption > 0.8.
-    pub corruption_health_drain: f32,
+    /// Health drain per in-game day on tiles with corruption > 0.8.
+    /// Per-day = per-tick × 1000 at the default scale.
+    pub corruption_health_drain: RatePerDay,
     /// Corruption threshold above which health drain applies.
     pub corruption_health_drain_threshold: f32,
     /// Rest quality multiplier on corrupted tiles (lower = worse rest).
@@ -438,11 +454,11 @@ impl Default for MagicConstants {
         Self {
             corruption_spread_interval: 10,
             corruption_spread_threshold: 0.3,
-            corruption_spread_rate: 0.0001,
+            corruption_spread_rate: RatePerDay::new(0.1),
             corruption_new_tile_threshold: 0.05,
             ward_post_decay_multiplier: 0.3,
-            healing_poultice_rate: 0.008,
-            energy_tonic_rate: 0.003,
+            healing_poultice_rate: RatePerDay::new(8.0),
+            energy_tonic_rate: RatePerDay::new(3.0),
             mood_tonic_bonus: 0.2,
             mood_tonic_ticks: 500,
             personal_corruption_mood_threshold: 0.3,
@@ -473,14 +489,14 @@ impl Default for MagicConstants {
             gratitude_fondness_gain: 0.1,
             herbcraft_apply_skill_growth: 0.005,
             set_ward_ticks: 8,
-            thornward_decay_rate: 0.001,
+            thornward_decay_rate: RatePerDay::new(1.0),
             herbcraft_ward_skill_growth: 0.01,
             magic_ward_skill_growth: 0.01,
             scry_ticks: 10,
             scry_memory_strength: 0.6,
             scry_magic_skill_growth: 0.01,
-            cleanse_corruption_rate: 0.001,
-            cleanse_personal_corruption_rate: 0.0005,
+            cleanse_corruption_rate: RatePerDay::new(1.0),
+            cleanse_personal_corruption_rate: RatePerDay::new(0.5),
             cleanse_magic_skill_growth: 0.005,
             cleanse_done_threshold: 0.05,
             cleanse_max_ticks: 100,
@@ -510,7 +526,7 @@ impl Default for MagicConstants {
             harvest_carcass_ticks: 15,
             harvest_corruption_gain: 0.05,
             herb_suppression_threshold: 0.5,
-            corruption_health_drain: 0.0005,
+            corruption_health_drain: RatePerDay::new(0.5),
             corruption_health_drain_threshold: 0.8,
             corruption_rest_penalty: 0.5,
             territory_corruption_inner_radius: 15,
@@ -523,9 +539,22 @@ impl Default for MagicConstants {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SocialConstants {
+    // --- RatePerDay rates (ticket 033 Phase 2) ---
+    pub passive_familiarity_rate: RatePerDay,
+    /// Per-day-equivalent of the romantic-attraction step applied at every
+    /// `bond_check_interval` firing. The wrapper preserves the literal
+    /// per-tick numeric so consumer math is unchanged: at the default 1000
+    /// ticks/day scale, `RatePerDay::new(3.5).per_tick(&ts) = 0.0035` —
+    /// the legacy per-check value. Combined with `bond_check_interval = 50`
+    /// (20 checks/day), the actual per-day accumulation is 0.07/day; the
+    /// `RatePerDay` value here does NOT represent that. Treat the wrapper
+    /// as a typing-only retype: the *displayed* per-day number is the
+    /// per-tick × 1000 mechanical scale, not the per-day-accumulated total.
+    pub courtship_romantic_rate: RatePerDay,
+    // --- Counts / radii ---
     pub passive_familiarity_range: i32,
-    pub passive_familiarity_rate: f32,
     pub bond_check_interval: u64,
+    // --- Bond thresholds ---
     pub mates_romantic_threshold: f32,
     pub mates_fondness_threshold: f32,
     pub mates_familiarity_threshold: f32,
@@ -549,7 +578,6 @@ pub struct SocialConstants {
     // a chicken-and-egg: Partners bond requires romantic>0.5, but mating
     // requires Partners bond. Courtship drift breaks the cycle: compatible
     // close-friend pairs develop romantic attraction passively over time.
-    pub courtship_romantic_rate: f32,
     pub courtship_fondness_gate: f32,
     pub courtship_familiarity_gate: f32,
 }
@@ -557,9 +585,23 @@ pub struct SocialConstants {
 impl Default for SocialConstants {
     fn default() -> Self {
         Self {
+            // RatePerDay rates (per_day = per_tick × 1000 — see field doc on
+            // `courtship_romantic_rate` re: per-check vs per-day semantics).
+            passive_familiarity_rate: RatePerDay::new(0.3),
+            // Per bond_check_interval=50: 0.0035 per check × 20 checks/day =
+            // 0.07/day actual accumulation. Reaches Partners threshold (0.5)
+            // in ~7.1 in-game days; Mates (0.7) in ~10. Compatible
+            // close-friend pairs become Partners within their first fertile
+            // Spring, Mates by their second. Bumped 0.0025 → 0.0035 (ticket
+            // 027 Bug 3 partial, 1.4× — inside the ±30% noise band): the
+            // prior rate left late-spawning pairs short of the Partners
+            // threshold by the end of the 900s soak window even when their
+            // fondness / familiarity were already gate-passing.
+            courtship_romantic_rate: RatePerDay::new(3.5),
+            // Counts / radii
             passive_familiarity_range: 2,
-            passive_familiarity_rate: 0.0003,
             bond_check_interval: 50,
+            // Bond thresholds
             mates_romantic_threshold: 0.7,
             mates_fondness_threshold: 0.7,
             mates_familiarity_threshold: 0.6,
@@ -586,18 +628,9 @@ impl Default for SocialConstants {
             fondness_grooming_scale: 0.3,
             romantic_grooming_floor: 0.5,
             romantic_grooming_scale: 0.5,
-            // Per bond_check_interval=50: 0.0035 × 20 checks/day = 0.07/day.
-            // Reaches Partners threshold (0.5) in ~7.1 in-game days; Mates
-            // (0.7) in ~10. Compatible close-friend pairs become Partners
-            // within their first fertile Spring, Mates by their second. The
-            // fondness gate sits at the Friends threshold (0.3) so drift
+            // The fondness gate sits at the Friends threshold (0.3) so drift
             // engages the moment a Friends bond forms — no dead zone between
-            // tiers. Bumped 0.0025 → 0.0035 (ticket 027 Bug 3 partial,
-            // 1.4× — inside the ±30% noise band): the prior rate left
-            // late-spawning pairs short of the Partners threshold by the
-            // end of the 900s soak window even when their fondness /
-            // familiarity were already gate-passing.
-            courtship_romantic_rate: 0.0035,
+            // tiers.
             courtship_fondness_gate: 0.3,
             courtship_familiarity_gate: 0.4,
         }
@@ -752,25 +785,27 @@ pub struct PreyConstants {
     pub grazing_max_roam_pressured: i32,
     pub grazing_pressure_roam_threshold: f32,
     pub flee_stop_distance: i32,
-    pub hunger_base_rate: f32,
+    pub hunger_base_rate: RatePerDay,
     pub overcrowding_threshold: f32,
     pub overcrowding_hunger_extra: f32,
     pub store_raid_chance: f32,
     pub store_raid_range: i32,
     pub store_raid_hunger_relief: f32,
-    pub store_raid_cleanliness_drain: f32,
+    pub store_raid_cleanliness_drain: RatePerDay,
     pub store_raid_narrative_chance: f32,
     pub passive_hunger_relief: f32,
-    /// Per-tick health drain for a *prey animal* (rabbit, etc.) at full
+    /// Per-day health drain for a *prey animal* (rabbit, etc.) at full
     /// hunger — the prey-side analogue of `NeedsConstants::starvation_health_drain`.
     /// Drives prey mortality in lean seasons; combined with
     /// `den_refill_base_chance` this is the prey-population governor.
-    pub starvation_health_drain: f32,
+    /// Per-day = per-tick × 1000 at the default scale.
+    pub starvation_health_drain: RatePerDay,
     pub starvation_threshold: f32,
     pub starvation_narrative_chance: f32,
     pub background_breed_rate_multiplier: f32,
     pub den_refill_base_chance: f32,
     pub den_fear_breeding_suppression: f32,
+    // stays raw f32 — exponential decay, not additive (would need a different wrapper type)
     pub den_predation_pressure_decay: f32,
     pub den_stress_high_threshold: f32,
     pub den_stress_low_threshold: f32,
@@ -850,16 +885,16 @@ impl Default for PreyConstants {
             grazing_max_roam_pressured: 8,
             grazing_pressure_roam_threshold: 0.5,
             flee_stop_distance: 10,
-            hunger_base_rate: 0.0002,
+            hunger_base_rate: RatePerDay::new(0.2),
             overcrowding_threshold: 0.8,
             overcrowding_hunger_extra: 0.0001,
             store_raid_chance: 0.05,
             store_raid_range: 2,
             store_raid_hunger_relief: 0.015,
-            store_raid_cleanliness_drain: 0.001,
+            store_raid_cleanliness_drain: RatePerDay::new(1.0),
             store_raid_narrative_chance: 0.02,
             passive_hunger_relief: 0.0003,
-            starvation_health_drain: 0.001,
+            starvation_health_drain: RatePerDay::new(1.0),
             starvation_threshold: 0.9,
             starvation_narrative_chance: 0.1,
             background_breed_rate_multiplier: 0.5,

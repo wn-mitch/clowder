@@ -8,6 +8,7 @@ use crate::components::skills::{Corruption, MagicAffinity, Skills};
 use crate::resources::event_log::{EventKind, EventLog};
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::sim_constants::{CombatConstants, MagicConstants};
+use crate::resources::time::TimeScale;
 use crate::steps::StepResult;
 
 /// # GOAP step resolver: `SetWard`
@@ -49,6 +50,7 @@ pub fn resolve_set_ward(
     tick: u64,
     m: &MagicConstants,
     combat: &CombatConstants,
+    time_scale: &TimeScale,
 ) -> StepResult {
     if ticks >= m.set_ward_ticks {
         // Consume thornbriar if setting a thornward.
@@ -84,7 +86,7 @@ pub fn resolve_set_ward(
             WardKind::DurableWard => Ward::durable(),
         };
         if kind == WardKind::Thornward {
-            ward.decay_rate = m.thornward_decay_rate;
+            ward.decay_rate = m.thornward_decay_rate.per_tick(time_scale);
         }
         let spawn_strength = ward.strength;
         commands.spawn((ward, Position::new(pos.x, pos.y)));

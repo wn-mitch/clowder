@@ -931,10 +931,14 @@ pub fn prey_hunger(
     mut log: ResMut<NarrativeLog>,
     mut rng: ResMut<SimRng>,
     time: Res<TimeState>,
+    time_scale: Res<TimeScale>,
     registry: Res<SpeciesRegistry>,
     constants: Res<SimConstants>,
 ) {
     let p = &constants.prey;
+    let hunger_base_rate = p.hunger_base_rate.per_tick(&time_scale);
+    let store_raid_cleanliness_drain = p.store_raid_cleanliness_drain.per_tick(&time_scale);
+    let starvation_health_drain = p.starvation_health_drain.per_tick(&time_scale);
     // Count population per species.
     let mut counts: HashMap<PreyKind, usize> = HashMap::new();
     for (_, cfg, _, _, _) in query.iter() {
@@ -957,7 +961,7 @@ pub fn prey_hunger(
         let cap = profile.population_cap();
 
         // Base hunger increase.
-        state.hunger += p.hunger_base_rate;
+        state.hunger += hunger_base_rate;
 
         // Overcrowding penalty above threshold.
         if pop as f32 > cap as f32 * p.overcrowding_threshold {
@@ -984,7 +988,7 @@ pub fn prey_hunger(
                         commands.entity(food_entity).despawn();
                         state.hunger = (state.hunger - p.store_raid_hunger_relief).max(0.0);
                         structure.cleanliness =
-                            (structure.cleanliness - p.store_raid_cleanliness_drain).max(0.0);
+                            (structure.cleanliness - store_raid_cleanliness_drain).max(0.0);
                         ate_from_stores = true;
 
                         if rng.rng.random::<f32>() < p.store_raid_narrative_chance {
@@ -1007,7 +1011,7 @@ pub fn prey_hunger(
 
         // Starvation drains health.
         if state.hunger > p.starvation_threshold {
-            health.current -= p.starvation_health_drain;
+            health.current -= starvation_health_drain;
         }
 
         if health.current <= 0.0 {
@@ -1177,6 +1181,10 @@ mod tests {
     use crate::resources::map::Terrain;
     use bevy_ecs::schedule::Schedule;
 
+    fn test_time_scale() -> TimeScale {
+        TimeScale::from_config(&SimConfig::default(), 16.6667)
+    }
+
     fn setup() -> (World, Schedule) {
         let mut world = World::new();
         let map = TileMap::new(20, 20, Terrain::Grass);
@@ -1189,6 +1197,7 @@ mod tests {
             speed: crate::resources::SimSpeed::Normal,
         });
         world.insert_resource(SimConfig::default());
+        world.insert_resource(test_time_scale());
         world.insert_resource(crate::species::build_registry());
         world.insert_resource(PreyDensity::default());
         world.insert_resource(SimConstants::default());
@@ -1401,6 +1410,7 @@ mod tests {
             speed: crate::resources::SimSpeed::Normal,
         });
         world.insert_resource(SimConfig::default());
+        world.insert_resource(test_time_scale());
         world.insert_resource(crate::species::build_registry());
         world.insert_resource(SimConstants::default());
 

@@ -10,7 +10,7 @@ use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::relationships::{BondType, Relationships};
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::system_activation::{Feature, SystemActivation};
-use crate::resources::time::{SimConfig, TimeState};
+use crate::resources::time::{SimConfig, TimeScale, TimeState};
 
 // ---------------------------------------------------------------------------
 // passive_familiarity system
@@ -23,13 +23,15 @@ pub fn passive_familiarity(
     query: Query<(Entity, &Position), (Without<Dead>, Without<Structure>)>,
     mut relationships: ResMut<Relationships>,
     constants: Res<SimConstants>,
+    time_scale: Res<TimeScale>,
 ) {
     let c = &constants.social;
+    let passive_familiarity_rate = c.passive_familiarity_rate.per_tick(&time_scale);
     let cats: Vec<(Entity, Position)> = query.iter().map(|(e, p)| (e, *p)).collect();
     for i in 0..cats.len() {
         for j in (i + 1)..cats.len() {
             if cats[i].1.manhattan_distance(&cats[j].1) <= c.passive_familiarity_range {
-                relationships.modify_familiarity(cats[i].0, cats[j].0, c.passive_familiarity_rate);
+                relationships.modify_familiarity(cats[i].0, cats[j].0, passive_familiarity_rate);
             }
         }
     }
@@ -61,6 +63,7 @@ struct CourtshipFitness {
 pub fn check_bonds(
     time: Res<TimeState>,
     config: Res<SimConfig>,
+    time_scale: Res<TimeScale>,
     mut relationships: ResMut<Relationships>,
     mut log: ResMut<NarrativeLog>,
     names: Query<&Name>,
@@ -80,6 +83,10 @@ pub fn check_bonds(
     if !time.tick.is_multiple_of(c.bond_check_interval) {
         return;
     }
+    // Per-check semantics: courtship_romantic_rate is the value added each
+    // time the cadence fires. RatePerDay value × ticks_per_day_phase →
+    // that legacy per-tick numeric.
+    let courtship_romantic_rate = c.courtship_romantic_rate.per_tick(&time_scale);
 
     let fitness: HashMap<Entity, CourtshipFitness> = fitness_query
         .iter()
@@ -127,7 +134,7 @@ pub fn check_bonds(
             && rel.fondness > c.courtship_fondness_gate
             && rel.familiarity > c.courtship_familiarity_gate
         {
-            rel.romantic = (rel.romantic + c.courtship_romantic_rate).min(1.0);
+            rel.romantic = (rel.romantic + courtship_romantic_rate).min(1.0);
             activation.record(Feature::CourtshipInteraction);
             if let Some(elog) = event_log.as_mut() {
                 if let (Ok(name_a), Ok(name_b)) = (names.get(a), names.get(b)) {
@@ -299,10 +306,16 @@ mod tests {
     use crate::resources::relationships::Relationships;
     use crate::resources::time::TimeState;
 
+    fn test_time_scale() -> TimeScale {
+        TimeScale::from_config(&SimConfig::default(), 16.6667)
+    }
+
     fn setup_world() -> (World, Schedule) {
         let mut world = World::new();
         world.insert_resource(Relationships::default());
         world.insert_resource(TimeState::default());
+        world.insert_resource(crate::resources::time::SimConfig::default());
+        world.insert_resource(test_time_scale());
         world.insert_resource(NarrativeLog::default());
         world.insert_resource(crate::resources::SimConstants::default());
         world.insert_resource(SystemActivation::default());
@@ -481,6 +494,7 @@ mod tests {
         time.tick = tick;
         world.insert_resource(time);
         world.insert_resource(crate::resources::time::SimConfig::default());
+        world.insert_resource(test_time_scale());
         world.insert_resource(NarrativeLog::default());
         world.insert_resource(crate::resources::SimConstants::default());
         world.insert_resource(SystemActivation::default());
@@ -558,9 +572,11 @@ mod tests {
         schedule.run(&mut world);
 
         let rels = world.resource::<Relationships>();
+        let ts = test_time_scale();
         let rate = crate::resources::SimConstants::default()
             .social
-            .courtship_romantic_rate;
+            .courtship_romantic_rate
+            .per_tick(&ts);
         assert!(
             (rels.get(a, b).unwrap().romantic - rate).abs() < 1e-6,
             "one tick of courtship should add exactly courtship_romantic_rate to romantic"
@@ -637,9 +653,11 @@ mod tests {
         schedule.run(&mut world);
 
         let rels = world.resource::<Relationships>();
+        let ts = test_time_scale();
         let rate = crate::resources::SimConstants::default()
             .social
-            .courtship_romantic_rate;
+            .courtship_romantic_rate
+            .per_tick(&ts);
         assert!(
             rels.get(a, b).unwrap().romantic > 0.0,
             "drift should engage for Friends-tier pair under new fondness gate"
@@ -657,8 +675,10 @@ mod tests {
         // simulate the needed number of checks directly rather than advancing
         // time ticks through a full schedule.
         let c = crate::resources::SimConstants::default().social;
+        let ts = test_time_scale();
+        let courtship_rate_per_tick = c.courtship_romantic_rate.per_tick(&ts);
         let checks_needed =
-            (c.partners_romantic_threshold / c.courtship_romantic_rate).ceil() as u64;
+            (c.partners_romantic_threshold / courtship_rate_per_tick).ceil() as u64;
 
         let adult_tick = 50 + 20_000 * 12;
         let (mut world, mut schedule) = bond_test_world(adult_tick);

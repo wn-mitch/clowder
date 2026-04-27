@@ -6,7 +6,7 @@ use crate::components::physical::{Dead, Needs, Position};
 use crate::resources::food::FoodStores;
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::system_activation::{Feature, SystemActivation};
-use crate::resources::time::{Season, SimConfig, TimeState};
+use crate::resources::time::{Season, SimConfig, TimeScale, TimeState};
 use crate::resources::weather::{Weather, WeatherState};
 
 // ---------------------------------------------------------------------------
@@ -63,16 +63,24 @@ pub fn scan_colony_buildings<'a>(
 ///
 /// Runs after `detect_threats` and before `decay_needs` so that building
 /// bonuses are applied before needs decay subtracts from them.
+#[allow(clippy::too_many_arguments)]
 pub fn apply_building_effects(
     buildings: Query<(&Structure, &Position), Without<ConstructionSite>>,
     mut cats: Query<(&Position, &mut Needs), Without<Dead>>,
     mut food: ResMut<FoodStores>,
     time: Res<TimeState>,
     config: Res<SimConfig>,
+    time_scale: Res<TimeScale>,
     weather: Res<WeatherState>,
     constants: Res<SimConstants>,
 ) {
     let b = &constants.buildings;
+    let den_temperature_bonus = b.den_temperature_bonus.per_tick(&time_scale);
+    let den_safety_bonus = b.den_safety_bonus.per_tick(&time_scale);
+    let hearth_social_bonus = b.hearth_social_bonus.per_tick(&time_scale);
+    let hearth_temperature_bonus_cold = b.hearth_temperature_bonus_cold.per_tick(&time_scale);
+    let dirty_temperature_drain = b.dirty_temperature_drain.per_tick(&time_scale);
+
     let season = time.season(&config);
     let is_winter = season == Season::Winter;
     let is_cold = is_winter
@@ -97,18 +105,18 @@ pub fn apply_building_effects(
                 for (cat_pos, mut needs) in &mut cats {
                     if cat_pos.manhattan_distance(&center) <= b.den_effect_radius {
                         needs.temperature =
-                            (needs.temperature + b.den_temperature_bonus * eff).min(1.0);
-                        needs.safety = (needs.safety + b.den_safety_bonus * eff).min(1.0);
+                            (needs.temperature + den_temperature_bonus * eff).min(1.0);
+                        needs.safety = (needs.safety + den_safety_bonus * eff).min(1.0);
                     }
                 }
             }
             StructureType::Hearth => {
                 for (cat_pos, mut needs) in &mut cats {
                     if cat_pos.manhattan_distance(&center) <= b.hearth_effect_radius {
-                        needs.social = (needs.social + b.hearth_social_bonus * eff).min(1.0);
+                        needs.social = (needs.social + hearth_social_bonus * eff).min(1.0);
                         if is_cold {
                             needs.temperature = (needs.temperature
-                                + b.hearth_temperature_bonus_cold * eff)
+                                + hearth_temperature_bonus_cold * eff)
                                 .min(1.0);
                         }
                     }
@@ -127,7 +135,7 @@ pub fn apply_building_effects(
             for (cat_pos, mut needs) in &mut cats {
                 if cat_pos.manhattan_distance(&center) <= b.dirty_discomfort_radius {
                     needs.temperature = (needs.temperature
-                        - b.dirty_temperature_drain * (1.0 - structure.cleanliness))
+                        - dirty_temperature_drain * (1.0 - structure.cleanliness))
                         .max(0.0);
                 }
             }
@@ -149,22 +157,23 @@ pub fn decay_building_condition(
     mut buildings: Query<&mut Structure>,
     weather: Res<WeatherState>,
     constants: Res<SimConstants>,
+    time_scale: Res<TimeScale>,
 ) {
     let b = &constants.buildings;
     // Structural decay: very slow, only from harsh weather.
     let structural_decay = match weather.current {
-        Weather::Storm => b.structural_decay_storm,
-        Weather::Snow => b.structural_decay_snow,
-        Weather::HeavyRain => b.structural_decay_heavy_rain,
+        Weather::Storm => b.structural_decay_storm.per_tick(&time_scale),
+        Weather::Snow => b.structural_decay_snow.per_tick(&time_scale),
+        Weather::HeavyRain => b.structural_decay_heavy_rain.per_tick(&time_scale),
         _ => 0.0,
     };
 
     // Cleanliness decay: routine, from weather and use.
     let cleanliness_decay = match weather.current {
-        Weather::HeavyRain | Weather::Storm => b.cleanliness_decay_storm,
-        Weather::Snow | Weather::Wind => b.cleanliness_decay_snow,
-        Weather::LightRain | Weather::Fog => b.cleanliness_decay_fog,
-        _ => b.cleanliness_decay_clear,
+        Weather::HeavyRain | Weather::Storm => b.cleanliness_decay_storm.per_tick(&time_scale),
+        Weather::Snow | Weather::Wind => b.cleanliness_decay_snow.per_tick(&time_scale),
+        Weather::LightRain | Weather::Fog => b.cleanliness_decay_fog.per_tick(&time_scale),
+        _ => b.cleanliness_decay_clear.per_tick(&time_scale),
     };
 
     for mut structure in &mut buildings {
@@ -182,9 +191,11 @@ pub fn tidy_buildings(
     cats: Query<(&Position, &crate::ai::CurrentAction), Without<Dead>>,
     mut buildings: Query<(&Position, &mut Structure)>,
     constants: Res<SimConstants>,
+    time_scale: Res<TimeScale>,
     mut activation: ResMut<SystemActivation>,
 ) {
     let b = &constants.buildings;
+    let tidy_cleanliness_rate = b.tidy_cleanliness_rate.per_tick(&time_scale);
     for (cat_pos, action) in &cats {
         if !matches!(
             action.action,
@@ -196,7 +207,7 @@ pub fn tidy_buildings(
             let center = structure.center(building_pos);
             if cat_pos.manhattan_distance(&center) <= b.tidy_radius {
                 activation.record(Feature::BuildingTidied);
-                structure.cleanliness = (structure.cleanliness + b.tidy_cleanliness_rate).min(1.0);
+                structure.cleanliness = (structure.cleanliness + tidy_cleanliness_rate).min(1.0);
             }
         }
     }
@@ -262,6 +273,10 @@ mod tests {
     use crate::components::building::Structure;
     use bevy_ecs::schedule::Schedule;
 
+    fn test_time_scale() -> TimeScale {
+        TimeScale::from_config(&SimConfig::default(), 16.6667)
+    }
+
     fn test_world() -> World {
         let mut world = World::new();
         world.insert_resource(FoodStores::default());
@@ -271,6 +286,7 @@ mod tests {
             speed: crate::resources::SimSpeed::Normal,
         });
         world.insert_resource(SimConfig::default());
+        world.insert_resource(test_time_scale());
         world.insert_resource(WeatherState::default());
         world.insert_resource(crate::resources::SimConstants::default());
         world.insert_resource(SystemActivation::default());
@@ -383,6 +399,7 @@ mod tests {
             ticks_until_change: 50,
         });
         world.insert_resource(crate::resources::SimConstants::default());
+        world.insert_resource(test_time_scale());
 
         let building = world.spawn(Structure::new(StructureType::Den)).id();
 
@@ -409,6 +426,7 @@ mod tests {
             ticks_until_change: 50,
         });
         world.insert_resource(crate::resources::SimConstants::default());
+        world.insert_resource(test_time_scale());
 
         let building = world.spawn(Structure::new(StructureType::Den)).id();
 
@@ -439,6 +457,7 @@ mod tests {
             ticks_until_change: 50,
         });
         world.insert_resource(crate::resources::SimConstants::default());
+        world.insert_resource(test_time_scale());
 
         let building = world
             .spawn(Structure {

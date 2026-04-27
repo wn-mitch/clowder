@@ -8,6 +8,7 @@ use crate::components::skills::{Corruption, MagicAffinity, Skills};
 use crate::resources::map::TileMap;
 use crate::resources::narrative::NarrativeLog;
 use crate::resources::sim_constants::{CombatConstants, MagicConstants};
+use crate::resources::time::TimeScale;
 use crate::steps::StepResult;
 
 /// # GOAP step resolver: `CleanseCorruption`
@@ -45,6 +46,7 @@ pub fn resolve_cleanse_corruption(
     tick: u64,
     m: &MagicConstants,
     combat: &CombatConstants,
+    time_scale: &TimeScale,
 ) -> StepResult {
     if ticks == 1 {
         if let Some(misfire) =
@@ -59,13 +61,16 @@ pub fn resolve_cleanse_corruption(
         }
     }
 
+    let cleanse_corruption_rate = m.cleanse_corruption_rate.per_tick(time_scale);
+    let cleanse_personal_corruption_rate = m.cleanse_personal_corruption_rate.per_tick(time_scale);
+
     // Per-tick: reduce tile corruption.
     if map.in_bounds(pos.x, pos.y) {
         let tile = map.get_mut(pos.x, pos.y);
-        tile.corruption = (tile.corruption - skills.magic * m.cleanse_corruption_rate).max(0.0);
+        tile.corruption = (tile.corruption - skills.magic * cleanse_corruption_rate).max(0.0);
     }
     // Occupational hazard: personal corruption increases.
-    corruption.0 = (corruption.0 + m.cleanse_personal_corruption_rate).min(1.0);
+    corruption.0 = (corruption.0 + cleanse_personal_corruption_rate).min(1.0);
     skills.magic += skills.growth_rate() * m.cleanse_magic_skill_growth;
 
     // Advance when tile is cleansed or after max ticks.

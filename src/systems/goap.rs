@@ -260,6 +260,7 @@ pub struct ExecutorContext<'w, 's> {
     pub map: ResMut<'w, TileMap>,
     pub wind: Res<'w, crate::resources::wind::WindState>,
     pub time: Res<'w, TimeState>,
+    pub time_scale: Res<'w, crate::resources::time::TimeScale>,
     pub constants: Res<'w, SimConstants>,
     pub event_log: Option<ResMut<'w, EventLog>>,
     /// Wildlife entities with positions, for `EngageThreat` target resolution.
@@ -3417,6 +3418,7 @@ fn dispatch_step_action(
                         ec.time.tick,
                         &ec.constants.magic,
                         &ec.constants.combat,
+                        &ec.time_scale,
                     );
                     if matches!(result, crate::steps::StepResult::Advance) {
                         if let Some(ref mut act) = narr.activation {
@@ -3456,6 +3458,7 @@ fn dispatch_step_action(
                     ec.time.tick,
                     &ec.constants.magic,
                     &ec.constants.combat,
+                    &ec.time_scale,
                 );
                 if matches!(result, crate::steps::StepResult::Advance) {
                     if let Some(ref mut act) = narr.activation {
@@ -3631,6 +3634,7 @@ fn dispatch_step_action(
                         ec.time.tick,
                         &ec.constants.magic,
                         &ec.constants.combat,
+                        &ec.time_scale,
                     );
                     if matches!(result, crate::steps::StepResult::Advance) {
                         if let Some(ref mut act) = narr.activation {

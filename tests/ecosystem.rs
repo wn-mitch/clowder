@@ -7,7 +7,7 @@ use clowder::components::wildlife::{WildAnimal, WildSpecies, WildlifeAiState};
 use clowder::resources::map::TileMap;
 use clowder::resources::narrative::NarrativeLog;
 use clowder::resources::rng::SimRng;
-use clowder::resources::time::{SimConfig, TimeState};
+use clowder::resources::time::{SimConfig, TimeScale, TimeState};
 use clowder::species::{self, SpeciesRegistry};
 
 // ---------------------------------------------------------------------------
@@ -22,6 +22,7 @@ fn setup_ecosystem() -> (World, Schedule) {
     world.insert_resource(NarrativeLog::default());
     world.insert_resource(TimeState::default());
     world.insert_resource(SimConfig::default());
+    world.insert_resource(TimeScale::from_config(&SimConfig::default(), 16.6667));
     world.insert_resource(species::build_registry());
     world.insert_resource(clowder::components::prey::PreyDensity::default());
     world.insert_resource(clowder::resources::SimConstants::default());

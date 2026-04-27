@@ -9,7 +9,7 @@ use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::components::pregnancy::Pregnant;
 
 use crate::resources::sim_constants::SimConstants;
-use crate::resources::time::{Season, SimConfig, TimeState};
+use crate::resources::time::{Season, SimConfig, TimeScale, TimeState};
 use crate::resources::weather::{Weather, WeatherState};
 
 // ---------------------------------------------------------------------------
@@ -29,6 +29,7 @@ use crate::resources::weather::{Weather, WeatherState};
 pub fn decay_needs(
     time: Res<TimeState>,
     config: Res<SimConfig>,
+    time_scale: Res<TimeScale>,
     weather: Res<WeatherState>,
     constants: Res<SimConstants>,
     mut query: Query<
@@ -50,25 +51,42 @@ pub fn decay_needs(
     let c = &constants.needs;
     let season = time.season(&config);
 
+    // Hoist per-tick conversions (identical for every cat this sweep).
+    let hunger_decay = c.hunger_decay.per_tick(&time_scale);
+    let energy_decay = c.energy_decay.per_tick(&time_scale);
+    let base_temperature_drain = c.base_temperature_drain.per_tick(&time_scale);
+    let starvation_health_drain = c.starvation_health_drain.per_tick(&time_scale);
+    let starvation_safety_drain = c.starvation_safety_drain.per_tick(&time_scale);
+    let safety_recovery_rate = c.safety_recovery_rate.per_tick(&time_scale);
+    let social_base_drain = c.social_base_drain.per_tick(&time_scale);
+    let acceptance_base_drain = c.acceptance_base_drain.per_tick(&time_scale);
+    let respect_base_drain = c.respect_base_drain.per_tick(&time_scale);
+    let mastery_base_drain = c.mastery_base_drain.per_tick(&time_scale);
+    let purpose_base_drain = c.purpose_base_drain.per_tick(&time_scale);
+    let tradition_safety_boost = c.tradition_safety_boost.per_tick(&time_scale);
+    let tradition_safety_drain = c.tradition_safety_drain.per_tick(&time_scale);
+    let grooming_pride_penalty_scale = c.grooming_pride_penalty_scale.per_tick(&time_scale);
+    let mating_base_decay = c.mating_base_decay.per_tick(&time_scale);
+
     // Additional temperature drain from weather.
     let weather_temperature_drain = match weather.current {
-        Weather::Snow => c.weather_temperature_snow,
-        Weather::Storm => c.weather_temperature_storm,
-        Weather::Wind => c.weather_temperature_wind,
-        Weather::HeavyRain => c.weather_temperature_heavy_rain,
-        Weather::LightRain => c.weather_temperature_light_rain,
+        Weather::Snow => c.weather_temperature_snow.per_tick(&time_scale),
+        Weather::Storm => c.weather_temperature_storm.per_tick(&time_scale),
+        Weather::Wind => c.weather_temperature_wind.per_tick(&time_scale),
+        Weather::HeavyRain => c.weather_temperature_heavy_rain.per_tick(&time_scale),
+        Weather::LightRain => c.weather_temperature_light_rain.per_tick(&time_scale),
         _ => 0.0,
     };
 
     // Additional temperature drain from season.
     let season_temperature_drain = match season {
-        Season::Winter => c.season_temperature_winter,
-        Season::Autumn => c.season_temperature_autumn,
+        Season::Winter => c.season_temperature_winter.per_tick(&time_scale),
+        Season::Autumn => c.season_temperature_autumn.per_tick(&time_scale),
         _ => 0.0,
     };
 
     let temperature_drain =
-        c.base_temperature_drain + weather_temperature_drain + season_temperature_drain;
+        base_temperature_drain + weather_temperature_drain + season_temperature_drain;
 
     for (
         mut needs,
@@ -84,18 +102,18 @@ pub fn decay_needs(
     ) in &mut query
     {
         // --- Level 1: Physiological ---
-        needs.hunger = (needs.hunger - c.hunger_decay).max(0.0);
-        needs.energy = (needs.energy - c.energy_decay).max(0.0);
+        needs.hunger = (needs.hunger - hunger_decay).max(0.0);
+        needs.energy = (needs.energy - energy_decay).max(0.0);
         needs.temperature = (needs.temperature - temperature_drain).max(0.0);
 
         // --- Starvation cascade ---
         let starving = needs.hunger == 0.0;
         if starving {
             // Health drains when starving.
-            health.current = (health.current - c.starvation_health_drain).max(0.0);
+            health.current = (health.current - starvation_health_drain).max(0.0);
 
             // Safety drops from existential anxiety.
-            needs.safety = (needs.safety - c.starvation_safety_drain).max(0.0);
+            needs.safety = (needs.safety - starvation_safety_drain).max(0.0);
 
             // Persistent mood penalty (refresh each tick while starving).
             if !mood.modifiers.iter().any(|m| m.source == "starvation") {
@@ -116,7 +134,7 @@ pub fn decay_needs(
 
         // --- Level 2: Safety — recovers passively (unless starving) ---
         if !starving {
-            needs.safety = (needs.safety + c.safety_recovery_rate).min(1.0);
+            needs.safety = (needs.safety + safety_recovery_rate).min(1.0);
         }
 
         // --- Level 3: Belonging ---
@@ -125,13 +143,13 @@ pub fn decay_needs(
         } else {
             1.0
         };
-        let social_drain = c.social_base_drain
+        let social_drain = social_base_drain
             * (1.0 + personality.sociability * c.social_sociability_scale)
             * social_multiplier;
         needs.social = (needs.social - social_drain).max(0.0);
 
         let acceptance_drain =
-            c.acceptance_base_drain * (1.0 + personality.warmth * c.acceptance_temperature_scale);
+            acceptance_base_drain * (1.0 + personality.warmth * c.acceptance_temperature_scale);
         needs.acceptance = (needs.acceptance - acceptance_drain).max(0.0);
 
         // Mating need: decays across the photoperiodic breeding window for
@@ -147,7 +165,7 @@ pub fn decay_needs(
             && pregnant.is_none();
         let fertility = constants.scoring.season_fertility(season);
         if is_fertile && fertility > 0.0 {
-            let mating_drain = c.mating_base_decay
+            let mating_drain = mating_base_decay
                 * (1.0 + personality.warmth * c.mating_temperature_scale)
                 * fertility;
             needs.mating = (needs.mating - mating_drain).max(0.0);
@@ -162,7 +180,7 @@ pub fn decay_needs(
         } else {
             1.0
         };
-        let respect_drain = c.respect_base_drain
+        let respect_drain = respect_base_drain
             * (1.0 + personality.ambition * c.respect_ambition_scale)
             * pride_amplifier;
         needs.respect = (needs.respect - respect_drain).max(0.0);
@@ -170,17 +188,17 @@ pub fn decay_needs(
         // Grooming penalty: unkempt cats lose additional pride/respect.
         // High-pride cats care more about appearance — amplifies the depression spiral.
         if let Some(g) = grooming {
-            let grooming_penalty = (1.0 - g.0) * personality.pride * c.grooming_pride_penalty_scale;
+            let grooming_penalty = (1.0 - g.0) * personality.pride * grooming_pride_penalty_scale;
             needs.respect = (needs.respect - grooming_penalty).max(0.0);
         }
 
         let mastery_drain =
-            c.mastery_base_drain * (1.0 + personality.diligence * c.mastery_diligence_scale);
+            mastery_base_drain * (1.0 + personality.diligence * c.mastery_diligence_scale);
         needs.mastery = (needs.mastery - mastery_drain).max(0.0);
 
         // --- Level 5: Self-actualisation ---
         // Patience slows purpose drain; independence speeds it up.
-        let purpose_drain = c.purpose_base_drain
+        let purpose_drain = purpose_base_drain
             * (1.0 + personality.curiosity * c.purpose_curiosity_scale)
             * (1.0 - personality.patience * c.purpose_patience_scale)
             * (1.0 + personality.independence * c.purpose_independence_scale);
@@ -193,10 +211,10 @@ pub fn decay_needs(
                 let dist = pos.manhattan_distance(&fam_pos);
                 if dist <= c.tradition_familiar_distance {
                     needs.safety =
-                        (needs.safety + personality.tradition * c.tradition_safety_boost).min(1.0);
+                        (needs.safety + personality.tradition * tradition_safety_boost).min(1.0);
                 } else {
                     needs.safety =
-                        (needs.safety - personality.tradition * c.tradition_safety_drain).max(0.0);
+                        (needs.safety - personality.tradition * tradition_safety_drain).max(0.0);
                 }
             }
         }
@@ -211,9 +229,10 @@ pub fn decay_needs(
 /// (1.0) reaches unkempt territory (~0.3) in about one season.
 pub fn decay_grooming(
     constants: Res<SimConstants>,
+    time_scale: Res<TimeScale>,
     mut query: Query<&mut crate::components::grooming::GroomingCondition, Without<Dead>>,
 ) {
-    let rate = constants.needs.grooming_decay;
+    let rate = constants.needs.grooming_decay.per_tick(&time_scale);
     for mut grooming in &mut query {
         grooming.0 = (grooming.0 - rate).max(0.0);
     }
@@ -253,8 +272,10 @@ pub fn bond_proximity_social(
     mut query: Query<(Entity, &Position, &mut Needs), Without<Dead>>,
     relationships: Res<crate::resources::relationships::Relationships>,
     constants: Res<SimConstants>,
+    time_scale: Res<TimeScale>,
 ) {
     let c = &constants.needs;
+    let bond_proximity_social_rate = c.bond_proximity_social_rate.per_tick(&time_scale);
     // Read pass: snapshot positions.
     let snapshot: Vec<(Entity, Position)> = query.iter().map(|(e, p, _)| (e, *p)).collect();
 
@@ -274,7 +295,7 @@ pub fn bond_proximity_social(
         });
 
         if has_nearby_bond {
-            needs.social = (needs.social + c.bond_proximity_social_rate).min(1.0);
+            needs.social = (needs.social + bond_proximity_social_rate).min(1.0);
         }
     }
 }
@@ -358,10 +379,15 @@ mod tests {
     use crate::resources::sim_constants::SimConstants;
     use bevy_ecs::schedule::Schedule;
 
+    fn test_time_scale() -> TimeScale {
+        TimeScale::from_config(&SimConfig::default(), 16.6667)
+    }
+
     fn setup_world() -> (World, Schedule) {
         let mut world = World::new();
         world.insert_resource(TimeState::default());
         world.insert_resource(SimConfig::default());
+        world.insert_resource(test_time_scale());
         world.insert_resource(WeatherState::default());
         world.insert_resource(SimConstants::default());
         let mut schedule = Schedule::default();
@@ -415,7 +441,8 @@ mod tests {
         schedule.run(&mut world);
         let after = world.get::<Needs>(entity).unwrap().hunger;
 
-        let expected = SimConstants::default().needs.hunger_decay;
+        let ts = test_time_scale();
+        let expected = SimConstants::default().needs.hunger_decay.per_tick(&ts);
         assert!(
             after < before,
             "hunger should decrease; before={before}, after={after}"
@@ -435,7 +462,8 @@ mod tests {
         schedule.run(&mut world);
         let after = world.get::<Needs>(entity).unwrap().energy;
 
-        let expected = SimConstants::default().needs.energy_decay;
+        let ts = test_time_scale();
+        let expected = SimConstants::default().needs.energy_decay.per_tick(&ts);
         assert!(
             after < before,
             "energy should decrease; before={before}, after={after}"
@@ -480,7 +508,11 @@ mod tests {
         schedule.run(&mut world);
         let after = world.get::<Needs>(entity).unwrap().safety;
 
-        let recovery = SimConstants::default().needs.safety_recovery_rate;
+        let ts = test_time_scale();
+        let recovery = SimConstants::default()
+            .needs
+            .safety_recovery_rate
+            .per_tick(&ts);
         assert!(after > 0.5, "safety should recover toward 1.0; got {after}");
         assert!(
             (after - (0.5 + recovery)).abs() < 1e-6,
@@ -564,7 +596,11 @@ mod tests {
             health_after < health_before,
             "starvation should drain health; before={health_before}, after={health_after}"
         );
-        let expected = SimConstants::default().needs.starvation_health_drain;
+        let ts = test_time_scale();
+        let expected = SimConstants::default()
+            .needs
+            .starvation_health_drain
+            .per_tick(&ts);
         assert!(
             (health_before - health_after - expected).abs() < 1e-6,
             "expected {expected} health drain per tick"
@@ -778,9 +814,13 @@ mod tests {
         schedule.run(&mut world);
 
         let safety = world.get::<Needs>(entity).unwrap().safety;
+        let ts = test_time_scale();
         let nc = &SimConstants::default().needs;
         // Safety normally recovers by safety_recovery_rate. With tradition bonus: +tradition_safety_boost extra.
-        let expected_min = 0.8 + nc.safety_recovery_rate + nc.tradition_safety_boost - 1e-6;
+        let expected_min = 0.8
+            + nc.safety_recovery_rate.per_tick(&ts)
+            + nc.tradition_safety_boost.per_tick(&ts)
+            - 1e-6;
         assert!(
             safety > expected_min,
             "traditional cat near familiar territory should get safety boost; got {safety}"
@@ -852,7 +892,8 @@ mod tests {
 
         let after = world.get::<Needs>(entity).unwrap().mating;
         let sc = SimConstants::default();
-        let expected_drain = sc.needs.mating_base_decay
+        let ts = test_time_scale();
+        let expected_drain = sc.needs.mating_base_decay.per_tick(&ts)
             * (1.0 + default_personality().warmth * sc.needs.mating_temperature_scale)
             * sc.scoring.mating_fertility_summer;
         let expected = 1.0 - expected_drain;

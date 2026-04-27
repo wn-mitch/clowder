@@ -18,7 +18,7 @@ use crate::resources::relationships::Relationships;
 use crate::resources::rng::SimRng;
 use crate::resources::sim_constants::{MagicConstants, SimConstants};
 use crate::resources::system_activation::{Feature, SystemActivation};
-use crate::resources::time::{Season, SimConfig, TimeState};
+use crate::resources::time::{Season, SimConfig, TimeScale, TimeState};
 
 // ---------------------------------------------------------------------------
 // §4 colony-scoped ward marker predicate
@@ -58,6 +58,7 @@ pub struct CorruptionPushback {
 pub fn corruption_spread(
     mut map: ResMut<TileMap>,
     time: Res<TimeState>,
+    time_scale: Res<TimeScale>,
     mut log: ResMut<NarrativeLog>,
     constants: Res<SimConstants>,
     mut activation: ResMut<SystemActivation>,
@@ -66,6 +67,7 @@ pub fn corruption_spread(
     if !time.tick.is_multiple_of(m.corruption_spread_interval) {
         return;
     }
+    let corruption_spread_rate = m.corruption_spread_rate.per_tick(&time_scale);
 
     // Snapshot corrupted tiles so we don't double-count within one pass.
     let mut sources: Vec<(i32, i32, f32)> = Vec::new();
@@ -81,7 +83,7 @@ pub fn corruption_spread(
     let mut new_tiles_corrupted = 0u32;
     let deltas: [(i32, i32); 4] = [(0, 1), (0, -1), (1, 0), (-1, 0)];
     for (sx, sy, corruption) in sources {
-        let spread = corruption * m.corruption_spread_rate;
+        let spread = corruption * corruption_spread_rate;
         for (dx, dy) in &deltas {
             let nx = sx + dx;
             let ny = sy + dy;
@@ -200,17 +202,20 @@ pub fn apply_remedy_effects(
     )>,
     mut commands: Commands,
     constants: Res<SimConstants>,
+    time_scale: Res<TimeScale>,
     mut activation: ResMut<SystemActivation>,
 ) {
     let m = &constants.magic;
+    let healing_poultice_rate = m.healing_poultice_rate.per_tick(&time_scale);
+    let energy_tonic_rate = m.energy_tonic_rate.per_tick(&time_scale);
     for (entity, mut remedy, mut health, mut needs, mut mood) in &mut query {
         activation.record(Feature::RemedyApplied);
         match remedy.kind {
             RemedyKind::HealingPoultice => {
-                health.current = (health.current + m.healing_poultice_rate).min(health.max);
+                health.current = (health.current + healing_poultice_rate).min(health.max);
             }
             RemedyKind::EnergyTonic => {
-                needs.energy = (needs.energy + m.energy_tonic_rate).min(1.0);
+                needs.energy = (needs.energy + energy_tonic_rate).min(1.0);
             }
             RemedyKind::MoodTonic => {
                 // Only on the first tick of application.
@@ -283,10 +288,12 @@ pub fn corruption_tile_effects(
     map: Res<TileMap>,
     mut herbs: Query<(Entity, &Position, &mut Herb, Option<&Harvestable>)>,
     constants: Res<SimConstants>,
+    time_scale: Res<TimeScale>,
     mut activation: ResMut<SystemActivation>,
     mut commands: Commands,
 ) {
     let m = &constants.magic;
+    let corruption_health_drain = m.corruption_health_drain.per_tick(&time_scale);
     for (pos, mut mood, mut health) in &mut cats {
         if !map.in_bounds(pos.x, pos.y) {
             continue;
@@ -308,7 +315,7 @@ pub fn corruption_tile_effects(
         }
         // Health drain on heavily corrupted tiles.
         if corruption > m.corruption_health_drain_threshold {
-            health.current = (health.current - m.corruption_health_drain).max(0.0);
+            health.current = (health.current - corruption_health_drain).max(0.0);
             activation.record(Feature::CorruptionHealthDrain);
         }
     }
@@ -658,6 +665,7 @@ pub fn resolve_magic_task_chains(
     mut log: ResMut<NarrativeLog>,
     mut relationships: ResMut<Relationships>,
     time: Res<TimeState>,
+    time_scale: Res<TimeScale>,
     mut commands: Commands,
     constants: Res<SimConstants>,
     mut activation: ResMut<SystemActivation>,
@@ -817,6 +825,7 @@ pub fn resolve_magic_task_chains(
                         time.tick,
                         m,
                         &constants.combat,
+                        &time_scale,
                     ),
                     &mut chain,
                 );
@@ -864,6 +873,7 @@ pub fn resolve_magic_task_chains(
                         time.tick,
                         m,
                         &constants.combat,
+                        &time_scale,
                     ),
                     &mut chain,
                 );
@@ -1059,6 +1069,10 @@ mod tests {
     use crate::resources::time::SimSpeed;
     use bevy_ecs::schedule::Schedule;
 
+    fn test_time_scale() -> TimeScale {
+        TimeScale::from_config(&SimConfig::default(), 16.6667)
+    }
+
     fn test_world() -> World {
         let mut world = World::new();
         world.insert_resource(TimeState {
@@ -1067,6 +1081,7 @@ mod tests {
             speed: SimSpeed::Normal,
         });
         world.insert_resource(SimConfig::default());
+        world.insert_resource(test_time_scale());
         world.insert_resource(TileMap::new(10, 10, Terrain::Grass));
         world.insert_resource(SimRng::new(42));
         world.insert_resource(Relationships::default());

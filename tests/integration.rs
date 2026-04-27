@@ -56,6 +56,9 @@ fn setup_world(seed: u64) -> World {
         paused: false,
         speed: clowder::resources::SimSpeed::Normal,
     });
+    world.insert_resource(clowder::resources::time::TimeScale::from_config(
+        &config, 16.6667,
+    ));
     world.insert_resource(config);
     world.insert_resource(WeatherState::default());
     world.insert_resource(NarrativeLog::default());
