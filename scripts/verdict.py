@@ -35,6 +35,8 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+from _agent_call_log import append_call_history  # noqa: E402
 
 LEGACY_BASELINE = REPO_ROOT / "logs" / "baseline-pre-substrate-refactor" / "events.jsonl"
 BASELINES_DIR = REPO_ROOT / "logs" / "baselines"
@@ -54,6 +56,7 @@ class Verdict:
     baseline: str | None = None
     commit: str | None = None
     next_steps: list[str] = field(default_factory=list)
+    rationale: str | None = None
 
 
 def find_events_log(run_dir: Path) -> Path:
@@ -231,6 +234,11 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--baseline", default=None, help="Override baseline events.jsonl path")
     ap.add_argument("--no-history", action="store_true", help="Don't append to logs/verdict-history.jsonl")
     ap.add_argument("--text", action="store_true", help="Human-readable output (JSON is default)")
+    ap.add_argument("--rationale", default=None,
+                    help="Why this verdict was requested (free text). Appended to "
+                         "logs/agent-call-history.jsonl alongside the verdict; lets "
+                         "future review surface patterns of what callers were trying "
+                         "to figure out. Always pass when invoked by an agent.")
     args = ap.parse_args(argv)
 
     run_dir = Path(args.run_dir)
@@ -241,8 +249,12 @@ def main(argv: list[str]) -> int:
             run=str(run_dir), verdict="fail",
             canaries={"survival": "fail", "continuity": "skip", "detail": "no footer line"},
             next_steps=[f"check that {events_path} contains a `_footer` JSONL line"],
+            rationale=args.rationale,
         )
         _emit(v, args.text)
+        append_call_history(tool="verdict", subtool=None, args=args,
+                            rationale=args.rationale, exit_code=2,
+                            commit=v.commit)
         return 2
 
     surv_status, _ = run_canary_script(REPO_ROOT / "scripts" / "check_canaries.sh", events_path)
@@ -279,6 +291,7 @@ def main(argv: list[str]) -> int:
         footer_drift=drift_rows,
         baseline=str(baseline_path) if baseline_path else None,
         commit=commit if isinstance(commit, str) else None,
+        rationale=args.rationale,
     )
     v.next_steps = derive_next_steps(v, run_dir, footer)
 
@@ -287,7 +300,11 @@ def main(argv: list[str]) -> int:
 
     _emit(v, args.text)
 
-    return {"pass": 0, "concern": 1, "fail": 2}[overall]
+    exit_code = {"pass": 0, "concern": 1, "fail": 2}[overall]
+    append_call_history(tool="verdict", subtool=None, args=args,
+                        rationale=args.rationale, exit_code=exit_code,
+                        commit=v.commit)
+    return exit_code
 
 
 def _emit(v: Verdict, text_mode: bool) -> None:

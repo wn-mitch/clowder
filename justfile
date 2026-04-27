@@ -168,6 +168,19 @@ fingerprint *ARGS:
 explain *ARGS:
     uv run scripts/explain_constant.py {{ARGS}}
 
+# Friction-log breadcrumb. Appends one JSON line to
+# logs/agent-friction.jsonl when an agent (Claude or otherwise) hits a
+# workflow snag — a tool's output didn't match its SKILL.md, two tries
+# both failed, no `just` command served the user's intent. Periodic
+# review of the log surfaces patterns worth encoding into CLAUDE.md or
+# a new SKILL.md. See .claude/skills/agent-feedback/SKILL.md.
+#
+# Examples:
+#   just agent-feedback "q events refused on sweep dir; narrative didn't suggest q deaths"
+#   just agent-feedback "frame-diff column shape changed silently between runs" --severity major --tool frame-diff
+agent-feedback *ARGS:
+    uv run scripts/agent_feedback.py {{ARGS}}
+
 # Promote a soak directory to a named first-class baseline. Writes
 # logs/baselines/<label>.json + (unless --no-current) updates
 # logs/baselines/current.json so `just verdict` auto-reads it as the

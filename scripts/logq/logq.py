@@ -38,6 +38,11 @@ else:
         run_jq, run_jq_count, trace_id,
     )
 
+# Sibling-module import for the agent-call telemetry helper. logq lives
+# in scripts/logq/ but the helper is at scripts/_agent_call_log.py.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from _agent_call_log import append_call_history  # type: ignore[no-redef]  # noqa: E402
+
 
 # ── shared helpers ──────────────────────────────────────────────────────────
 
@@ -1349,6 +1354,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--format", choices=("json", "text"), default="json",
                    help="Output format. Default json (for tool callers). "
                         "Use text for human CLI reading.")
+    p.add_argument("--rationale", default=None,
+                   help="Why this query was issued (free text). Appended to "
+                        "logs/agent-call-history.jsonl alongside the subtool "
+                        "name and args; lets future review surface patterns of "
+                        "what callers were trying to figure out. Always pass "
+                        "when invoked by an agent.")
     sub = p.add_subparsers(dest="subtool", required=True)
 
     s = sub.add_parser("run-summary", help="Header + footer + joinability check.")
@@ -1453,8 +1464,12 @@ def main(argv: list[str] | None = None) -> int:
             results=[], narrative=f"missing file: {e}", next=[],
         )
         emit(msg, fmt=args.format)
+        append_call_history(tool="q", subtool=args.subtool, args=args,
+                            rationale=args.rationale, exit_code=2)
         return 2
     emit(env, fmt=args.format)
+    append_call_history(tool="q", subtool=args.subtool, args=args,
+                        rationale=args.rationale, exit_code=0)
     return 0
 
 

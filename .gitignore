@@ -54,5 +54,12 @@ tools/narrative-editor/dist/
 __pycache__/
 *.pyc
 
-# Claude Code session state
-.claude/
+# Claude Code session state — most is per-machine, but SKILL.md
+# routing files ship with the repo so the agent surface is shared
+# across machines and future collaborators.
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/*/
+.claude/skills/*/*
+!.claude/skills/*/SKILL.md

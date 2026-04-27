@@ -49,6 +49,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # Reuse sweep_stats's stat machinery directly.
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import sweep_stats  # noqa: E402
+from _agent_call_log import append_call_history  # noqa: E402
 
 
 @dataclass
@@ -240,6 +241,10 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--skip-baseline", action="store_true", help="Reuse logs/sweep-baseline-<slug>")
     ap.add_argument("--skip-treatment", action="store_true", help="Reuse logs/sweep-<slug>-treatment")
     ap.add_argument("--text", action="store_true", help="Human-readable output")
+    ap.add_argument("--rationale", default=None,
+                    help="Why this hypothesis run was requested (free text). "
+                         "Appended to logs/agent-call-history.jsonl on completion. "
+                         "Always pass when invoked by an agent.")
     args = ap.parse_args(argv)
 
     spec_path = Path(args.spec)
@@ -314,13 +319,16 @@ def main(argv: list[str]) -> int:
     else:
         sys.stdout.write(json.dumps(envelope, indent=2) + "\n")
 
-    return {
+    exit_code = {
         "concordant": 0,
         "inconclusive": 1,
         "off-magnitude": 1,
         "drift": 1,
         "wrong-direction": 2,
     }.get(conc["verdict"], 1)
+    append_call_history(tool="hypothesize", subtool=None, args=args,
+                        rationale=args.rationale, exit_code=exit_code)
+    return exit_code
 
 
 if __name__ == "__main__":
