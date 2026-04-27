@@ -1,4 +1,5 @@
 use bevy_ecs::prelude::*;
+use bevy_ecs::system::SystemParam;
 use rand::SeedableRng;
 
 use crate::components::building::StructureType;
@@ -171,6 +172,20 @@ pub fn evaluate_coordinators(
 }
 
 // ---------------------------------------------------------------------------
+// WardPlacementSignals — bundles the four spatial inputs the perimeter
+// scoring loop reads. Lives here to keep `assess_colony_needs` under
+// Bevy's 16-param tuple limit per CLAUDE.md guidance.
+// ---------------------------------------------------------------------------
+
+#[derive(SystemParam)]
+pub struct WardPlacementSignals<'w> {
+    pub tile_map: Res<'w, crate::resources::map::TileMap>,
+    pub fox_scent: Res<'w, crate::resources::FoxScentMap>,
+    pub cat_presence: Res<'w, crate::resources::CatPresenceMap>,
+    pub ward_coverage: Res<'w, crate::resources::WardCoverageMap>,
+}
+
+// ---------------------------------------------------------------------------
 // assess_colony_needs
 // ---------------------------------------------------------------------------
 
@@ -197,13 +212,14 @@ pub fn assess_colony_needs(
     herb_query: Query<&crate::components::magic::Herb, With<crate::components::magic::Harvestable>>,
     wildlife: Query<(Entity, &Position, &crate::components::wildlife::WildAnimal)>,
     carcass_query: Query<(Entity, &Position, &crate::components::wildlife::Carcass)>,
-    map: Res<crate::resources::map::TileMap>,
-    fox_scent: Res<crate::resources::FoxScentMap>,
+    placement_signals: WardPlacementSignals,
     event_log: Option<ResMut<crate::resources::event_log::EventLog>>,
     constants: Res<SimConstants>,
     colony_center: Res<crate::resources::ColonyCenter>,
     mut activation: ResMut<SystemActivation>,
 ) {
+    let map = &placement_signals.tile_map;
+    let fox_scent = &placement_signals.fox_scent;
     let cc = &constants.coordination;
     if !time.tick.is_multiple_of(cc.assess_interval) {
         return;
@@ -460,11 +476,18 @@ pub fn assess_colony_needs(
             // Bevy's 16-param tuple limit).
             let seed = time.tick.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ coord_entity.to_bits();
             let mut local_rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+            let placement_maps = PlacementMaps {
+                fox_scent: &placement_signals.fox_scent,
+                cat_presence: &placement_signals.cat_presence,
+                ward_coverage: &placement_signals.ward_coverage,
+                tile_map: &placement_signals.tile_map,
+            };
             let ward_pos = compute_ward_placement(
                 &building_positions,
                 &ward_data,
                 colony_center.0,
                 cc.ward_placement_radius,
+                &placement_maps,
                 &mut local_rng,
             );
             queue.directives.push(Directive {
@@ -1244,29 +1267,55 @@ fn footprints_overlap_with_gap(
 }
 
 // ---------------------------------------------------------------------------
-// Ward placement — find the coverage gap farthest from existing wards
+// Ward placement — sample influence maps to pick the best perimeter tile
 // ---------------------------------------------------------------------------
 
-/// Pick a position for a new ward.
+/// Sampler bundle for ward-placement scoring. Borrowed at the call site
+/// from the `WardPlacementSignals` SystemParam; kept as a thin struct so
+/// the placement algorithm stays a pure function over plain references
+/// (testable without spinning up a Bevy World).
+pub(crate) struct PlacementMaps<'a> {
+    pub fox_scent: &'a crate::resources::FoxScentMap,
+    pub cat_presence: &'a crate::resources::CatPresenceMap,
+    pub ward_coverage: &'a crate::resources::WardCoverageMap,
+    pub tile_map: &'a crate::resources::map::TileMap,
+}
+
+impl<'a> PlacementMaps<'a> {
+    fn corruption_at(&self, x: i32, y: i32) -> f32 {
+        if self.tile_map.in_bounds(x, y) {
+            self.tile_map.get(x, y).corruption
+        } else {
+            0.0
+        }
+    }
+}
+
+/// Pick a position for a new ward by sampling L1 influence maps at
+/// candidate tiles around the placement anchor.
 ///
-/// Prefers positions that cover colony structures (Den/Hearth/Stores/Workshop)
-/// not already protected by existing wards. Falls back to gap-filling around
-/// the colony center when all structures are covered (or none exist).
+/// Per-tile score:
+/// - `unaddressed_threat = max(fox_scent, corruption) - ward_coverage`,
+///   clamped to `[0, 1]`. High = SFs walked here recently or corruption
+///   is creeping, AND existing wards aren't already covering the tile.
+/// - `cat_value = cat_presence` — modest bonus for tiles where cats
+///   actually live (a ward covering nobody is wasted).
+/// - `score = unaddressed_threat + 0.3 × cat_value` plus small per-call
+///   jitter so simultaneous placement decisions don't converge.
 ///
-/// Scoring (per candidate):
-/// - `uncovered_structures`: count of structure positions within `expected_repel_radius`
-///   of the candidate that are NOT already inside an existing ward.
-/// - `min_gap`: distance from nearest existing ward (higher = less redundant).
-/// - Final score = `uncovered_structures * 100.0 + min_gap`
-///   (the big weight ensures uncovered structures always win over pure gap-filling).
+/// Candidates are a coarse grid (every 5 tiles) within `placement_radius`
+/// of the anchor, with hard exclusion of tiles within Manhattan-3 of any
+/// existing ward to skip pointless re-stacking before scoring runs.
 ///
-/// The first ward in an empty colony goes directly onto the structure cluster
-/// centroid so it immediately covers the most valuable cats.
+/// Falls back to the structure-cluster centroid when (a) no wards yet
+/// exist and structures are present (first-ward heuristic, blankets the
+/// core) or (b) every candidate is excluded.
 pub(crate) fn compute_ward_placement(
     building_positions: &[Position],
     ward_positions: &[(Position, f32)],
     colony_center: Position,
     placement_radius: f32,
+    maps: &PlacementMaps<'_>,
     rng: &mut impl rand::Rng,
 ) -> Position {
     let anchor = if building_positions.is_empty() {
@@ -1279,69 +1328,73 @@ pub(crate) fn compute_ward_placement(
         Position::new((sx / n) as i32, (sy / n) as i32)
     };
 
-    // First ward with structures: place directly on the structure cluster
-    // so it blankets the colony core.
+    // First ward with structures: blanket the cluster centroid.
     if ward_positions.is_empty() && !building_positions.is_empty() {
         return anchor;
     }
 
-    // Fallback default for empty colonies.
+    // Fallback default for empty colonies before any structures exist.
     if ward_positions.is_empty() {
         return Position::new(anchor.x, anchor.y - placement_radius as i32);
     }
 
-    // Approximate the radius a new ward will project (conservative estimate
-    // using half of placement_radius — actual repel_radius is data-driven).
-    let expected_repel_radius = placement_radius * 0.5;
-
-    // Build the set of structures that are still uncovered.
-    let uncovered: Vec<Position> = building_positions
-        .iter()
-        .filter(|bp| {
-            !ward_positions
+    // Coarse-grid candidate generation (every 5 tiles, matching the
+    // bucket size of the influence maps). For placement_radius=10 this
+    // yields ~20 candidates; for radius=20, ~80. Cheap enough.
+    const CANDIDATE_STEP: i32 = 5;
+    const HARD_EXCLUDE_MANHATTAN: i32 = 3;
+    let r = placement_radius.ceil() as i32;
+    let mut candidates: Vec<Position> = Vec::new();
+    for dy in (-r..=r).step_by(CANDIDATE_STEP as usize) {
+        for dx in (-r..=r).step_by(CANDIDATE_STEP as usize) {
+            let cx = anchor.x + dx;
+            let cy = anchor.y + dy;
+            if !maps.tile_map.in_bounds(cx, cy) {
+                continue;
+            }
+            // Stay inside the placement-radius disk (the loop walks a
+            // square; clip to the inscribed circle).
+            let euclid_sq = (dx * dx + dy * dy) as f32;
+            if euclid_sq > placement_radius * placement_radius {
+                continue;
+            }
+            let candidate = Position::new(cx, cy);
+            if ward_positions
                 .iter()
-                .any(|(wp, r)| (bp.manhattan_distance(wp) as f32) <= *r)
-        })
-        .copied()
-        .collect();
+                .any(|(wp, _)| candidate.manhattan_distance(wp) <= HARD_EXCLUDE_MANHATTAN)
+            {
+                continue;
+            }
+            candidates.push(candidate);
+        }
+    }
 
-    // Per-call angle offset jitters candidate positions so cats planning
-    // on the same tick don't all land on the same "best" spot. Without this
-    // jitter, simultaneous placement decisions converge to identical
-    // positions and wards visibly stack.
-    let base_angle_offset: f32 = rng.random_range(0.0..std::f32::consts::TAU / 12.0);
-    let mut candidates: Vec<Position> = (0..12)
-        .map(|i| {
-            let angle = base_angle_offset + (i as f32 / 12.0) * std::f32::consts::TAU;
-            let cx = anchor.x + (angle.cos() * placement_radius) as i32;
-            let cy = anchor.y + (angle.sin() * placement_radius) as i32;
-            Position::new(cx, cy)
-        })
-        .collect();
-
-    // Also consider each uncovered structure position directly as a candidate —
-    // placing a ward on top of a cat-activity zone is usually optimal.
-    candidates.extend(uncovered.iter().copied());
+    // Edge case: every candidate excluded (very crowded colony) — fall
+    // back to the anchor so we still emit *something*.
+    if candidates.is_empty() {
+        return anchor;
+    }
 
     let mut best_pos = candidates[0];
     let mut best_score = f32::NEG_INFINITY;
 
-    for candidate in candidates {
-        let covered_count = uncovered
-            .iter()
-            .filter(|bp| (candidate.manhattan_distance(bp) as f32) <= expected_repel_radius)
-            .count() as f32;
+    for candidate in &candidates {
+        let fox_scent = maps.fox_scent.get(candidate.x, candidate.y);
+        let corruption = maps.corruption_at(candidate.x, candidate.y);
+        let coverage = maps.ward_coverage.get(candidate.x, candidate.y);
+        let cat_value = maps.cat_presence.get(candidate.x, candidate.y);
 
-        let min_gap = ward_positions
-            .iter()
-            .map(|(wp, radius)| candidate.manhattan_distance(wp) as f32 - radius)
-            .fold(f32::MAX, f32::min);
+        let threat = fox_scent.max(corruption);
+        let unaddressed_threat = (threat - coverage).clamp(0.0, 1.0);
 
-        let score = covered_count * 100.0 + min_gap;
+        // Small jitter ([0, 0.05)) breaks ties deterministically without
+        // overwhelming the influence-map signal.
+        let jitter = rng.random_range(0.0_f32..0.05);
+        let score = unaddressed_threat + 0.3 * cat_value + jitter;
 
         if score > best_score {
             best_score = score;
-            best_pos = candidate;
+            best_pos = *candidate;
         }
     }
     best_pos
@@ -1420,35 +1473,122 @@ mod tests {
 
     use crate::components::mental::{Memory, MemoryEntry};
 
+    fn empty_placement_maps() -> (
+        crate::resources::FoxScentMap,
+        crate::resources::CatPresenceMap,
+        crate::resources::WardCoverageMap,
+        crate::resources::map::TileMap,
+    ) {
+        (
+            crate::resources::FoxScentMap::default(),
+            crate::resources::CatPresenceMap::default(),
+            crate::resources::WardCoverageMap::default(),
+            crate::resources::map::TileMap::new(120, 90, crate::resources::Terrain::Grass),
+        )
+    }
+
     #[test]
-    fn ward_placement_prefers_uncovered_structure() {
-        // Two structures far apart; no existing wards; placement should land
-        // on the cluster centroid.
+    fn ward_placement_first_ward_lands_on_cluster_centroid() {
+        // Empty wards + structures present → first-ward fallback returns
+        // the structure-cluster centroid. Preserves the "blanket the
+        // colony core" behavior across the influence-map rewrite.
         let structures = vec![Position::new(10, 10), Position::new(14, 10)];
         let wards: Vec<(Position, f32)> = vec![];
+        let (fs, cp, wc, tm) = empty_placement_maps();
+        let maps = PlacementMaps {
+            fox_scent: &fs,
+            cat_presence: &cp,
+            ward_coverage: &wc,
+            tile_map: &tm,
+        };
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
-        let pos = compute_ward_placement(&structures, &wards, Position::new(0, 0), 10.0, &mut rng);
-        // Centroid is (12, 10).
+        let pos = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(0, 0),
+            10.0,
+            &maps,
+            &mut rng,
+        );
         assert_eq!(pos, Position::new(12, 10));
     }
 
     #[test]
-    fn ward_placement_covers_uncovered_structure_when_one_exists() {
-        // One structure already covered by a ward, another 30 tiles away with
-        // no coverage — placement should prefer covering the uncovered one.
-        let covered = Position::new(10, 10);
-        let uncovered = Position::new(40, 10);
-        let structures = vec![covered, uncovered];
-        let wards = vec![(covered, 5.0)];
-        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
-        let pos =
-            compute_ward_placement(&structures, &wards, Position::new(20, 10), 10.0, &mut rng);
-        // The uncovered structure should be within the chosen ward's coverage.
-        let covered_by_new = uncovered.manhattan_distance(&pos) as f32 <= 5.0;
+    fn ward_placement_picks_fox_scent_corridor() {
+        // One existing ward at the colony center; the new ward should
+        // land near a tile saturated with fox-scent rather than back on
+        // the cluster.
+        let structures = vec![Position::new(60, 45)];
+        let wards = vec![(Position::new(60, 45), 6.0)];
+        let (mut fs, cp, wc, tm) = empty_placement_maps();
+        // Saturate fox-scent at a corridor tile within placement_radius
+        // of the cluster centroid.
+        fs.deposit(67, 45, 1.0);
+        let maps = PlacementMaps {
+            fox_scent: &fs,
+            cat_presence: &cp,
+            ward_coverage: &wc,
+            tile_map: &tm,
+        };
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(7);
+        let pos = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(60, 45),
+            10.0,
+            &maps,
+            &mut rng,
+        );
+        // The chosen tile should bucket-hit the fox-scent peak (within
+        // a 5-tile bucket of (67, 45)).
+        let dx = (pos.x - 67).abs();
+        let dy = (pos.y - 45).abs();
         assert!(
-            covered_by_new,
-            "new ward at {:?} does not cover uncovered structure at {:?}",
-            pos, uncovered
+            dx <= 5 && dy <= 5,
+            "expected placement near fox-scent peak (67, 45), got {pos:?}"
+        );
+        // And NOT the cluster center — anti-clustering hard-exclusion at
+        // Manhattan-3 would forbid it anyway.
+        assert!(
+            pos.manhattan_distance(&Position::new(60, 45)) > 3,
+            "placement {pos:?} too close to existing ward",
+        );
+    }
+
+    #[test]
+    fn ward_placement_avoids_already_covered_tiles() {
+        // Fox-scent peak coincides with an already-covered region. The
+        // anti-clustering term should push placement to a different
+        // candidate even if it scores zero on threat — coverage
+        // saturation cancels the fox_scent contribution.
+        let structures = vec![Position::new(60, 45)];
+        let wards = vec![(Position::new(60, 45), 6.0)];
+        let (mut fs, cp, mut wc, tm) = empty_placement_maps();
+        // Threat at (67, 45), but coverage saturates the same area.
+        fs.deposit(67, 45, 1.0);
+        wc.stamp_ward(60, 45, 1.0, 9.0);
+        let maps = PlacementMaps {
+            fox_scent: &fs,
+            cat_presence: &cp,
+            ward_coverage: &wc,
+            tile_map: &tm,
+        };
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(99);
+        let pos = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(60, 45),
+            10.0,
+            &maps,
+            &mut rng,
+        );
+        // Placement is allowed to be anywhere in the disk; but it should
+        // not hard-overlap the existing ward. With unaddressed_threat
+        // pinned to ~0 by coverage, jitter dominates and the choice is
+        // any non-excluded tile.
+        assert!(
+            pos.manhattan_distance(&Position::new(60, 45)) > 3,
+            "placement {pos:?} violates Manhattan-3 hard-exclusion",
         );
     }
 
@@ -1675,6 +1815,8 @@ mod tests {
         world.insert_resource(SystemActivation::default());
         world.insert_resource(crate::resources::ColonyCenter(Position::new(20, 20)));
         world.insert_resource(crate::resources::FoxScentMap::default());
+        world.insert_resource(crate::resources::CatPresenceMap::default());
+        world.insert_resource(crate::resources::WardCoverageMap::default());
         world.insert_resource(crate::resources::map::TileMap::new(
             50,
             50,
@@ -1722,6 +1864,8 @@ mod tests {
         world.insert_resource(SystemActivation::default());
         world.insert_resource(crate::resources::ColonyCenter(Position::new(20, 20)));
         world.insert_resource(crate::resources::FoxScentMap::default());
+        world.insert_resource(crate::resources::CatPresenceMap::default());
+        world.insert_resource(crate::resources::WardCoverageMap::default());
         world.insert_resource(crate::resources::map::TileMap::new(
             50,
             50,

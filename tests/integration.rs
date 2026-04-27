@@ -77,6 +77,7 @@ fn setup_world(seed: u64) -> World {
     world.insert_resource(clowder::resources::FoxScentMap::default());
     world.insert_resource(clowder::resources::PreyScentMap::default());
     world.insert_resource(clowder::resources::CatPresenceMap::default());
+    world.insert_resource(clowder::resources::WardCoverageMap::default());
     world.insert_resource(clowder::resources::ForcedConditions::default());
     world.insert_resource(clowder::resources::ColonyCenter(colony_site));
     world.insert_resource(clowder::resources::ColonyScore::default());

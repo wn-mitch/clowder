@@ -126,6 +126,12 @@ pub struct ChainResources<'w> {
     pub food: Res<'w, FoodStores>,
     pub relationships: Res<'w, Relationships>,
     pub fox_scent_map: Res<'w, FoxScentMap>,
+    /// Cat-presence influence map — sampled by `compute_ward_placement`
+    /// to bias ward placement toward tiles where cats actually live.
+    pub cat_presence_map: Res<'w, crate::resources::CatPresenceMap>,
+    /// Ward-coverage influence map — sampled by `compute_ward_placement`
+    /// for anti-clustering (skip tiles already covered by other wards).
+    pub ward_coverage_map: Res<'w, crate::resources::WardCoverageMap>,
     /// Mutable ledger of frustrated action desires — chain builders record
     /// misses here so the coordinator's BuildPressure can respond.
     pub unmet_demand: ResMut<'w, crate::resources::UnmetDemand>,
@@ -1325,25 +1331,34 @@ pub fn disposition_to_chain(
                 build_building_chain(entity, pos, &building_query, build_target, d, &mut commands)
             }
             DispositionKind::Farming => build_farming_chain(pos, &building_query),
-            DispositionKind::Crafting => build_crafting_chain(
-                pos,
-                personality,
-                needs,
-                skills,
-                magic_aff,
-                inventory,
-                &herb_query,
-                &building_query,
-                &ward_query,
-                &cat_pos_list,
-                &injured_cat_list,
-                apply_remedy_target,
-                &res.map,
-                ward_strength_low,
-                d,
-                &mut rng.rng,
-                disposition.crafting_hint,
-            ),
+            DispositionKind::Crafting => {
+                let placement_maps = crate::systems::coordination::PlacementMaps {
+                    fox_scent: &res.fox_scent_map,
+                    cat_presence: &res.cat_presence_map,
+                    ward_coverage: &res.ward_coverage_map,
+                    tile_map: &res.map,
+                };
+                build_crafting_chain(
+                    pos,
+                    personality,
+                    needs,
+                    skills,
+                    magic_aff,
+                    inventory,
+                    &herb_query,
+                    &building_query,
+                    &ward_query,
+                    &cat_pos_list,
+                    &injured_cat_list,
+                    apply_remedy_target,
+                    &res.map,
+                    &placement_maps,
+                    ward_strength_low,
+                    d,
+                    &mut rng.rng,
+                    disposition.crafting_hint,
+                )
+            }
             DispositionKind::Coordinating => build_coordinating_chain(
                 entity,
                 pos,
@@ -1936,6 +1951,7 @@ fn build_crafting_chain(
     injured_cats: &[(Entity, Position)],
     apply_remedy_target: Option<Entity>,
     map: &TileMap,
+    placement_maps: &crate::systems::coordination::PlacementMaps<'_>,
     ward_strength_low: bool,
     d: &DispositionConstants,
     rng: &mut impl Rng,
@@ -1959,6 +1975,7 @@ fn build_crafting_chain(
             &ward_data,
             center,
             d.crafting_ward_placement_radius,
+            placement_maps,
             rng,
         ))
     } else {
@@ -4136,6 +4153,15 @@ mod tests {
         let mut rng = ChaCha8Rng::seed_from_u64(99);
         let _unmet_demand = crate::resources::UnmetDemand::default();
 
+        let fox_scent_map = crate::resources::FoxScentMap::default();
+        let cat_presence_map = crate::resources::CatPresenceMap::default();
+        let ward_coverage_map = crate::resources::WardCoverageMap::default();
+        let placement_maps = crate::systems::coordination::PlacementMaps {
+            fox_scent: &fox_scent_map,
+            cat_presence: &cat_presence_map,
+            ward_coverage: &ward_coverage_map,
+            tile_map: &map,
+        };
         let result = build_crafting_chain(
             &pos,
             &personality,
@@ -4150,6 +4176,7 @@ mod tests {
             &injured_cats,
             None,
             &map,
+            &placement_maps,
             false,
             &d,
             &mut rng,
