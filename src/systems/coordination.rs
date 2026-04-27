@@ -486,7 +486,6 @@ pub fn assess_colony_needs(
                 &building_positions,
                 &ward_data,
                 colony_center.0,
-                cc.ward_placement_radius,
                 &placement_maps,
                 &mut local_rng,
             );
@@ -1292,7 +1291,7 @@ impl<'a> PlacementMaps<'a> {
 }
 
 /// Pick a position for a new ward by sampling L1 influence maps at
-/// candidate tiles around the placement anchor.
+/// candidate tiles across the whole map.
 ///
 /// Per-tile score:
 /// - `unaddressed_threat = max(fox_scent, corruption) - ward_coverage`,
@@ -1300,12 +1299,18 @@ impl<'a> PlacementMaps<'a> {
 ///   is creeping, AND existing wards aren't already covering the tile.
 /// - `cat_value = cat_presence` — modest bonus for tiles where cats
 ///   actually live (a ward covering nobody is wasted).
-/// - `score = unaddressed_threat + 0.3 × cat_value` plus small per-call
-///   jitter so simultaneous placement decisions don't converge.
+/// - `distance_cost = DIST_PENALTY_PER_TILE × manhattan(anchor, candidate)`
+///   — soft travel-cost term so the priestess doesn't walk to the
+///   opposite map corner for a marginal score gain. At 0.005/tile a
+///   100-tile detour subtracts 0.5 from the score, so a fully-saturated
+///   threat tile far away still beats a half-strength threat nearby
+///   only by a meaningful margin.
+/// - `score = unaddressed_threat + 0.3 × cat_value − distance_cost`
+///   plus small jitter for tie-breaking.
 ///
-/// Candidates are a coarse grid (every 5 tiles) within `placement_radius`
-/// of the anchor, with hard exclusion of tiles within Manhattan-3 of any
-/// existing ward to skip pointless re-stacking before scoring runs.
+/// Candidates are a coarse map-wide grid (every 5 tiles, bucket-aligned
+/// with the influence maps), with hard exclusion of tiles within
+/// Manhattan-3 of any existing ward.
 ///
 /// Falls back to the structure-cluster centroid when (a) no wards yet
 /// exist and structures are present (first-ward heuristic, blankets the
@@ -1314,7 +1319,6 @@ pub(crate) fn compute_ward_placement(
     building_positions: &[Position],
     ward_positions: &[(Position, f32)],
     colony_center: Position,
-    placement_radius: f32,
     maps: &PlacementMaps<'_>,
     rng: &mut impl rand::Rng,
 ) -> Position {
@@ -1335,29 +1339,25 @@ pub(crate) fn compute_ward_placement(
 
     // Fallback default for empty colonies before any structures exist.
     if ward_positions.is_empty() {
-        return Position::new(anchor.x, anchor.y - placement_radius as i32);
+        return anchor;
     }
 
-    // Coarse-grid candidate generation (every 5 tiles, matching the
-    // bucket size of the influence maps). For placement_radius=10 this
-    // yields ~20 candidates; for radius=20, ~80. Cheap enough.
+    // Coarse-grid candidate generation across the whole map (every 5
+    // tiles, matching the bucket size of the influence maps). For the
+    // default 120×90 map this yields ~430 candidates; cheap to score.
     const CANDIDATE_STEP: i32 = 5;
     const HARD_EXCLUDE_MANHATTAN: i32 = 3;
-    let r = placement_radius.ceil() as i32;
+    /// Travel-cost penalty per Manhattan tile from the anchor. Tuned so
+    /// a 100-tile detour costs 0.5 score — a saturated threat far away
+    /// still beats a half-saturated threat nearby, but only by a real
+    /// margin. Picked dimensionlessly against the [0, 1] threat axis;
+    /// no balance constant needed.
+    const DIST_PENALTY_PER_TILE: f32 = 0.005;
+    let map_w = maps.tile_map.width;
+    let map_h = maps.tile_map.height;
     let mut candidates: Vec<Position> = Vec::new();
-    for dy in (-r..=r).step_by(CANDIDATE_STEP as usize) {
-        for dx in (-r..=r).step_by(CANDIDATE_STEP as usize) {
-            let cx = anchor.x + dx;
-            let cy = anchor.y + dy;
-            if !maps.tile_map.in_bounds(cx, cy) {
-                continue;
-            }
-            // Stay inside the placement-radius disk (the loop walks a
-            // square; clip to the inscribed circle).
-            let euclid_sq = (dx * dx + dy * dy) as f32;
-            if euclid_sq > placement_radius * placement_radius {
-                continue;
-            }
+    for cy in (0..map_h).step_by(CANDIDATE_STEP as usize) {
+        for cx in (0..map_w).step_by(CANDIDATE_STEP as usize) {
             let candidate = Position::new(cx, cy);
             if ward_positions
                 .iter()
@@ -1387,10 +1387,13 @@ pub(crate) fn compute_ward_placement(
         let threat = fox_scent.max(corruption);
         let unaddressed_threat = (threat - coverage).clamp(0.0, 1.0);
 
+        let dist = anchor.manhattan_distance(candidate) as f32;
+        let distance_cost = DIST_PENALTY_PER_TILE * dist;
+
         // Small jitter ([0, 0.05)) breaks ties deterministically without
         // overwhelming the influence-map signal.
         let jitter = rng.random_range(0.0_f32..0.05);
-        let score = unaddressed_threat + 0.3 * cat_value + jitter;
+        let score = unaddressed_threat + 0.3 * cat_value - distance_cost + jitter;
 
         if score > best_score {
             best_score = score;
@@ -1506,7 +1509,6 @@ mod tests {
             &structures,
             &wards,
             Position::new(0, 0),
-            10.0,
             &maps,
             &mut rng,
         );
@@ -1517,12 +1519,12 @@ mod tests {
     fn ward_placement_picks_fox_scent_corridor() {
         // One existing ward at the colony center; the new ward should
         // land near a tile saturated with fox-scent rather than back on
-        // the cluster.
+        // the cluster. Anchor at (60, 45); fox-scent peak at (67, 45)
+        // is 7 tiles away — the soft distance penalty (0.005/tile = 0.035)
+        // is dominated by the saturated threat signal (1.0).
         let structures = vec![Position::new(60, 45)];
         let wards = vec![(Position::new(60, 45), 6.0)];
         let (mut fs, cp, wc, tm) = empty_placement_maps();
-        // Saturate fox-scent at a corridor tile within placement_radius
-        // of the cluster centroid.
         fs.deposit(67, 45, 1.0);
         let maps = PlacementMaps {
             fox_scent: &fs,
@@ -1535,20 +1537,17 @@ mod tests {
             &structures,
             &wards,
             Position::new(60, 45),
-            10.0,
             &maps,
             &mut rng,
         );
-        // The chosen tile should bucket-hit the fox-scent peak (within
-        // a 5-tile bucket of (67, 45)).
         let dx = (pos.x - 67).abs();
         let dy = (pos.y - 45).abs();
         assert!(
             dx <= 5 && dy <= 5,
             "expected placement near fox-scent peak (67, 45), got {pos:?}"
         );
-        // And NOT the cluster center — anti-clustering hard-exclusion at
-        // Manhattan-3 would forbid it anyway.
+        // Anti-clustering hard-exclusion (Manhattan-3) keeps the new
+        // ward off the existing one.
         assert!(
             pos.manhattan_distance(&Position::new(60, 45)) > 3,
             "placement {pos:?} too close to existing ward",
@@ -1564,7 +1563,6 @@ mod tests {
         let structures = vec![Position::new(60, 45)];
         let wards = vec![(Position::new(60, 45), 6.0)];
         let (mut fs, cp, mut wc, tm) = empty_placement_maps();
-        // Threat at (67, 45), but coverage saturates the same area.
         fs.deposit(67, 45, 1.0);
         wc.stamp_ward(60, 45, 1.0, 9.0);
         let maps = PlacementMaps {
@@ -1578,17 +1576,45 @@ mod tests {
             &structures,
             &wards,
             Position::new(60, 45),
-            10.0,
             &maps,
             &mut rng,
         );
-        // Placement is allowed to be anywhere in the disk; but it should
-        // not hard-overlap the existing ward. With unaddressed_threat
-        // pinned to ~0 by coverage, jitter dominates and the choice is
-        // any non-excluded tile.
         assert!(
             pos.manhattan_distance(&Position::new(60, 45)) > 3,
             "placement {pos:?} violates Manhattan-3 hard-exclusion",
+        );
+    }
+
+    #[test]
+    fn ward_placement_distance_penalty_prefers_nearby_threat() {
+        // Two equally-saturated fox-scent peaks: one nearby, one far.
+        // Distance penalty should pick the near one — a 60-tile detour
+        // costs 0.30 score, exceeding the noise from jitter (max 0.05).
+        let structures = vec![Position::new(60, 45)];
+        let wards = vec![(Position::new(60, 45), 6.0)];
+        let (mut fs, cp, wc, tm) = empty_placement_maps();
+        fs.deposit(67, 45, 1.0); // 7 tiles from anchor
+        fs.deposit(67, 85, 1.0); // 47 tiles from anchor — much farther
+        let maps = PlacementMaps {
+            fox_scent: &fs,
+            cat_presence: &cp,
+            ward_coverage: &wc,
+            tile_map: &tm,
+        };
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(11);
+        let pos = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(60, 45),
+            &maps,
+            &mut rng,
+        );
+        let dist_near = pos.manhattan_distance(&Position::new(67, 45));
+        let dist_far = pos.manhattan_distance(&Position::new(67, 85));
+        assert!(
+            dist_near < dist_far,
+            "expected placement closer to the nearer peak; got pos={pos:?} \
+             dist_near={dist_near} dist_far={dist_far}",
         );
     }
 

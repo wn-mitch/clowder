@@ -1974,7 +1974,6 @@ fn build_crafting_chain(
             &building_positions,
             &ward_data,
             center,
-            d.crafting_ward_placement_radius,
             placement_maps,
             rng,
         ))
@@ -2063,7 +2062,7 @@ fn try_crafting_sub_mode(
     ward_strength_low: bool,
     ward_placement_pos: Option<Position>,
     d: &DispositionConstants,
-    rng: &mut impl Rng,
+    _rng: &mut impl Rng,
 ) -> Option<(TaskChain, Action)> {
     use crate::components::magic::{HerbKind, RemedyKind, WardKind};
 
@@ -2164,20 +2163,13 @@ fn try_crafting_sub_mode(
                 return None;
             }
 
-            let ward_pos = ward_placement_pos.unwrap_or_else(|| {
-                // Fallback: random angle if no computed position.
-                let center_x = map.width / 2;
-                let center_y = map.height / 2;
-                let angle: f32 = rng.random_range(0.0..std::f32::consts::TAU);
-                let radius = d.crafting_ward_placement_radius;
-                let mut p = Position::new(
-                    center_x + (angle.cos() * radius) as i32,
-                    center_y + (angle.sin() * radius) as i32,
-                );
-                p.x = p.x.clamp(0, map.width - 1);
-                p.y = p.y.clamp(0, map.height - 1);
-                p
-            });
+            // Fallback to map-center anchor on the rare path where
+            // `ward_strength_low` was false at computation time but the
+            // cat still committed to ward (e.g. directive-driven warding
+            // ahead of the colony-side gate). Influence-map scoring is
+            // skipped in that branch; map center is a safe-enough drop.
+            let ward_pos = ward_placement_pos
+                .unwrap_or_else(|| Position::new(map.width / 2, map.height / 2));
 
             let kind = if is_durable {
                 WardKind::DurableWard
