@@ -1,11 +1,11 @@
 ---
 id: 009
 title: World-generation richness (Cluster E)
-status: blocked
+status: ready
 cluster: E
 added: 2026-04-20
 parked: null
-blocked-by: [005]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, refactor-plan.md, fate.md, narrative.md]
 related-balance: []
@@ -146,3 +146,7 @@ canary passes from t=0 forward without relying on live-sim events.
 - Pairs with **C4 (strategist-coordinator)** — leadership patterns
   during fast-forward produce the current coordinator *and* the
   dynastic backstory explaining why they lead.
+
+## Log
+
+- 2026-04-27: dropped blocked-by 005 — cluster-A umbrella retired; A1 dependency satisfied by landed work. Status flipped blocked → ready.

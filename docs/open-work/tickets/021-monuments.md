@@ -5,7 +5,7 @@ status: blocked
 cluster: null
 added: 2026-04-22
 parked: null
-blocked-by: [005, 020]
+blocked-by: [020]
 supersedes: []
 related-systems: [monuments.md]
 related-balance: []
@@ -66,3 +66,7 @@ well — pressure to add kinds over time creeping the launch-5 toward
 **Resume when:** #20 naming substrate has landed, A1 IAUS refactor
 has landed, and the #18 ruin-clearings multi-cat coordination
 pattern is proven.
+
+## Log
+
+- 2026-04-27: dropped blocked-by 005 — cluster-A umbrella retired; A1 IAUS refactor landed. Still blocked on 020 (NamedLandmark substrate); #18's multi-cat coordination pattern is a soft sequencing dependency, not a hard blocker.

@@ -1,11 +1,11 @@
 ---
 id: 006
 title: Shared spatial slow-state (Cluster B)
-status: blocked
+status: ready
 cluster: B
 added: 2026-04-20
 parked: null
-blocked-by: [005]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, refactor-plan.md, scoring-layer-second-order.md]
 related-balance: []
@@ -71,3 +71,7 @@ reads influence-map values as native axis inputs (gated on A1).
 
 **Dependency:** gated on A1 for clean consumption by scoring; can
 proceed in parallel with cluster C.
+
+## Log
+
+- 2026-04-27: dropped blocked-by 005 — cluster-A umbrella retired; A1 dependency satisfied by landed work. Status flipped blocked → ready.

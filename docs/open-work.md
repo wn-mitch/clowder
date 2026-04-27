@@ -14,33 +14,34 @@ _Last generated: 2026-04-27._
 
 | Status | Count |
 |---|---|
-| In progress | 6 |
-| Ready | 18 |
+| In progress | 4 |
+| Ready | 25 |
 | Parked | 1 |
-| Blocked | 9 |
+| Blocked | 6 |
 | Done (awaiting archive) | 2 |
-| **Open total** | **34** |
+| **Open total** | **36** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-index` (regenerate this file).
 
-## In progress (6)
+## In progress (4)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
-- **[005](docs/open-work/tickets/005-cluster-a-scoring-substrate-refactor.md)** — Scoring substrate refactor cluster (Cluster A — Foundational) — _[A] · added 2026-04-20_
 - **[013](docs/open-work/tickets/013-spec-follow-on-debts-from-ai-substrate-refactor.md)** — Spec-follow-on debts from AI substrate refactor — _added 2026-04-21_
-- **[014](docs/open-work/tickets/014-phase-4-follow-ons.md)** — Phase 4 follow-ons — target-taking registration + markers + mate-gender + Mating/PracticeMagic magnitude — _added 2026-04-22_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
 - **[027](docs/open-work/tickets/027-mating-cadence-three-bug-cascade.md)** — Mating cadence — three-bug cascade blocking MatingOccurred — _added 2026-04-25_
 
-## Ready (18)
+## Ready (25)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _added 2026-04-20_
+- **[006](docs/open-work/tickets/006-cluster-b-shared-spatial-slow-state.md)** — Shared spatial slow-state (Cluster B) — _[B] · added 2026-04-20_
+- **[007](docs/open-work/tickets/007-cluster-c-deliberation-layer.md)** — Deliberation-layer (Cluster C) — _[C] · added 2026-04-20_
 - **[008](docs/open-work/tickets/008-cluster-d-formalization-verification.md)** — Formalization and verification (Cluster D) — _[D] · added 2026-04-20_
+- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[E] · added 2026-04-20_
 - **[010](docs/open-work/tickets/010-post-death-biographies-via-claude-api.md)** — Post-death biographies via Claude API (presenter) — _added 2026-04-21_
 - **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** — Crafting — items, recipes, stations — _added 2026-04-22_
 - **[020](docs/open-work/tickets/020-namedlandmark-substrate.md)** — NamedLandmark substrate (cross-consumer naming) — _added 2026-04-22_
@@ -55,21 +56,22 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[041](docs/open-work/tickets/041-founding-haul-balance-tuning.md)** — Founding wagon-dismantling haul — balance the early-game cost so cats don't starve while hauling — _added 2026-04-26_
 - **[046](docs/open-work/tickets/046-fight-target-combat-advantage-damage-per-tick.md)** — FightTarget combat-advantage uses skill-points difference, not damage-per-tick exchange — cats engage threats they can't survive — _added 2026-04-27_
 - **[047](docs/open-work/tickets/047-critical-health-interrupt-treadmill.md)** — CriticalHealth interrupt is a treadmill, not a brake — replan picks the same disposition while damage accumulates — _added 2026-04-27_
+- **[049](docs/open-work/tickets/049-faction-overlay-markers.md)** — §9.2 faction overlay markers — Visitor / HostileVisitor / Banished / BefriendedAlly — _added 2026-04-27_
+- **[050](docs/open-work/tickets/050-marker-predicate-refinements.md)** — §4 marker predicate refinements — species-attenuated threat, ward-near-fox truth, event-driven cubs/den — _added 2026-04-27_
+- **[051](docs/open-work/tickets/051-fox-dse-eligibility-migration.md)** — Fox DSE eligibility migration — `.require()`/`.forbid()` cutover for §4 fox markers — _added 2026-04-27_
+- **[052](docs/open-work/tickets/052-l2-10-7-plan-cost-feedback.md)** — §L2.10.7 plan-cost feedback — `SpatialConsideration` curves on spatially-sensitive DSEs — _added 2026-04-27_
 
 ## Parked (1)
 
 - **[015](docs/open-work/tickets/015-alloparenting-reframe-b.md)** — Alloparenting Reframe B — mama drops kitten at hearth near resting elder — _parked 2026-04-22 · added 2026-04-22_
 
-## Blocked (9)
+## Blocked (6)
 
-- **[006](docs/open-work/tickets/006-cluster-b-shared-spatial-slow-state.md)** — Shared spatial slow-state (Cluster B) — _[B] · blocked-by 005 · added 2026-04-20_
-- **[007](docs/open-work/tickets/007-cluster-c-deliberation-layer.md)** — Deliberation-layer (Cluster C) — _[C] · blocked-by 005 · added 2026-04-20_
-- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[E] · blocked-by 005 · added 2026-04-20_
-- **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _blocked-by 005, 007, 010 · added 2026-04-21_
+- **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _blocked-by 007, 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _blocked-by 016 · added 2026-04-22_
-- **[018](docs/open-work/tickets/018-ruin-clearings.md)** — Ruin clearings (corruption nodes, PMD-flavored) — _blocked-by 005, 016 · added 2026-04-22_
+- **[018](docs/open-work/tickets/018-ruin-clearings.md)** — Ruin clearings (corruption nodes, PMD-flavored) — _blocked-by 016 · added 2026-04-22_
 - **[019](docs/open-work/tickets/019-happy-paths-usage-worn-trails.md)** — Happy paths — usage-worn trails — _blocked-by 020 · added 2026-04-22_
-- **[021](docs/open-work/tickets/021-monuments.md)** — Monuments — civic & memorial structures — _blocked-by 005, 020 · added 2026-04-22_
+- **[021](docs/open-work/tickets/021-monuments.md)** — Monuments — civic & memorial structures — _blocked-by 020 · added 2026-04-22_
 - **[026](docs/open-work/tickets/026-apprenticeship-xp-boost.md)** — Apprenticeship XP-boost on per-skill Skills component — _blocked-by mastery-restoration iteration 2 · added 2026-04-24_
 
 ## Done (awaiting archive) (2)
@@ -86,7 +88,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/). Recent months:
 
-- [2026-04](docs/open-work/landed/2026-04.md) — 50 entries
+- [2026-04](docs/open-work/landed/2026-04.md) — 53 entries
 
 ## Conventions
 

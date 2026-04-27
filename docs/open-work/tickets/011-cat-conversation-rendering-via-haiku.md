@@ -5,7 +5,7 @@ status: blocked
 cluster: null
 added: 2026-04-21
 parked: null
-blocked-by: [005, 007, 010]
+blocked-by: [007, 010]
 supersedes: []
 related-systems: []
 related-balance: []
@@ -46,3 +46,7 @@ infrastructure). Three-deep dependency chain; no rush.
 sim math can diverge — narratively-satisfying LLM prose subtly
 drowning out the math's quieter truths. H=3 priced this in; vigilance
 is the mitigation.
+
+## Log
+
+- 2026-04-27: dropped blocked-by 005 — cluster-A umbrella retired; A1 + A3 dependencies satisfied by landed work. Still blocked on 007 (cluster C / C3 belief modeling) and 010 (post-death biographies presenter).

@@ -5,7 +5,7 @@ status: blocked
 cluster: null
 added: 2026-04-22
 parked: null
-blocked-by: [005, 016]
+blocked-by: [016]
 supersedes: []
 related-systems: [ruin-clearings.md]
 related-balance: []
@@ -50,3 +50,7 @@ mortality cause in `logs/events.jsonl` and a
 
 **Resume when:** A1 lands and #16 Phase 1 ships. Do not pick up
 before both.
+
+## Log
+
+- 2026-04-27: dropped blocked-by 005 — cluster-A umbrella retired; A1 IAUS refactor landed. Still blocked on 016 (crafting items/recipes/stations) for the multi-cat coordination prerequisite.

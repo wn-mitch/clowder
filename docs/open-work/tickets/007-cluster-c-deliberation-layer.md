@@ -1,11 +1,11 @@
 ---
 id: 007
 title: Deliberation-layer (Cluster C)
-status: blocked
+status: ready
 cluster: C
 added: 2026-04-20
 parked: null
-blocked-by: [005]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, refactor-plan.md, scoring-layer-second-order.md, strategist-coordinator.md]
 related-balance: []
@@ -292,3 +292,7 @@ Not duplicated here; see sub-task 3 of #1.
   goal-oriented architectures — free at <http://www.gameaipro.com/>
 - `docs/systems/strategist-coordinator.md` (in-repo) — the existing
   design stub
+
+## Log
+
+- 2026-04-27: dropped blocked-by 005 — cluster-A umbrella retired; A1 dependency satisfied by landed work. Status flipped blocked → ready.
