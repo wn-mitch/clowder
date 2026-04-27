@@ -469,14 +469,13 @@ pub fn evaluate_dispositions(
     let mut markers = crate::ai::scoring::MarkerSnapshot::new();
     markers.set_colony(markers::HasStoredFood::KEY, food_available);
 
-    // Collect positions once.
+    // Collect positions once. Ticket 014 §4 sensing batch retired the
+    // per-cat `prey_positions` consumer (prey_nearby reads via marker
+    // snapshot now); cat_positions stays for relationship-aware
+    // resolvers later in the loop.
     let mut cat_positions: Vec<(Entity, Position)> = Vec::new();
-    let mut prey_positions: Vec<Position> = Vec::new();
-    for (e, p, prey) in all_positions.iter() {
+    for (e, p, _prey) in all_positions.iter() {
         cat_positions.push((e, *p));
-        if prey.is_some() {
-            prey_positions.push(*p);
-        }
     }
 
     let wildlife_positions: Vec<(Entity, Position)> =
@@ -512,8 +511,8 @@ pub fn evaluate_dispositions(
     let has_raw_food_in_stores = cooking.has_raw_food_in_stores();
     markers.set_colony(markers::HasRawFoodInStores::KEY, has_raw_food_in_stores);
 
-    let herb_positions: Vec<(Entity, Position)> =
-        herb_query.iter().map(|(e, _, p)| (e, *p)).collect();
+    // Ticket 014 §4 sensing batch — herb_positions retired here;
+    // has_herbs_nearby is read via the HasHerbsNearby marker.
     // Ticket 014 Magic colony batch: shared helper + colony-scoped
     // marker. Retires the inline `herb_query.iter().any(...)` scan that
     // duplicated identical logic across this file and goap.rs.
@@ -612,30 +611,22 @@ pub fn evaluate_dispositions(
             |a, b| relationships.get(a, b).map(|r| r.fondness),
         );
 
-        // §6.5.1 target-taking DSE: the `has_social_target` bool gate
-        // now reads through the same picker that disposition_to_chain's
-        // `build_socializing_chain` and `goap.rs::SocializeWith`
-        // consume. Retires the divergent fondness-only /
-        // fondness+novelty formulas that used to live in those callers.
-        let has_social_target = crate::ai::dses::socialize_target::resolve_socialize_target(
-            &side_effects.dse_registry,
-            entity,
-            *pos,
-            &cat_positions,
-            &relationships,
-            side_effects.time.tick,
-            // Scorer pre-check; focal capture happens at the
-            // step-resolution site, not here.
-            None,
-        )
-        .is_some();
+        // Ticket 014 §4 sensing batch — `has_social_target` /
+        // `has_threat_nearby` now read from `MarkerSnapshot` after
+        // `sensing::update_target_existence_markers` authors the ZSTs.
+        // The inline `resolve_socialize_target` call here retires.
+        // The disposition path is unregistered in the schedule today,
+        // so the marker assignment below mirrors the live goap path
+        // for forward-compat parity.
 
+        // Allies-fighting still needs the nearest-threat position to
+        // count co-fighting cats; use the same flat-range scan that
+        // the author uses internally.
         let nearest_threat = wildlife_positions
             .iter()
             .filter(|(_, wp)| pos.manhattan_distance(wp) <= d.wildlife_threat_range)
             .min_by_key(|(_, wp)| pos.manhattan_distance(wp));
 
-        let has_threat_nearby = nearest_threat.is_some();
         let allies_fighting_threat = if let Some(&(_, threat_pos)) = nearest_threat {
             action_snapshot
                 .iter()
@@ -723,27 +714,15 @@ pub fn evaluate_dispositions(
             );
         }
 
-        let has_herbs_nearby = herb_positions.iter().any(|(_, hp)| {
-            crate::systems::sensing::observer_sees_at(
-                crate::components::SensorySpecies::Cat,
-                *pos,
-                &constants.sensory.cat,
-                *hp,
-                crate::components::SensorySignature::PREY,
-                d.herb_detection_range as f32,
-            )
-        });
-
-        let prey_nearby = prey_positions.iter().any(|pp| {
-            crate::systems::sensing::observer_sees_at(
-                crate::components::SensorySpecies::Cat,
-                *pos,
-                &constants.sensory.cat,
-                *pp,
-                crate::components::SensorySignature::PREY,
-                d.prey_detection_range as f32,
-            )
-        });
+        // Ticket 014 §4 sensing batch — `has_herbs_nearby` /
+        // `prey_nearby` / `has_threat_nearby` / `has_social_target` /
+        // `carcass_nearby` now read from `MarkerSnapshot` after
+        // `sensing::update_target_existence_markers` authors the ZSTs.
+        let has_herbs_nearby = markers.has(markers::HasHerbsNearby::KEY, entity);
+        let prey_nearby = markers.has(markers::PreyNearby::KEY, entity);
+        let has_threat_nearby = markers.has(markers::HasThreatNearby::KEY, entity);
+        let has_social_target = markers.has(markers::HasSocialTarget::KEY, entity);
+        let carcass_nearby = markers.has(markers::CarcassNearby::KEY, entity);
 
         let (on_corrupted_tile, tile_corruption, on_special_terrain) =
             if map.in_bounds(pos.x, pos.y) {
@@ -812,7 +791,12 @@ pub fn evaluate_dispositions(
                 0.5,
             ),
             fox_scent_level: colony.fox_scent_map.get(pos.x, pos.y),
-            carcass_nearby: false,
+            // Ticket 014 §4 sensing batch — read via marker. Disposition
+            // path doesn't carry a carcass-count snapshot; the marker
+            // is the truthful source. `nearby_carcass_count` stays 0
+            // here because the field is unused on this code path
+            // (no DSE input reads it; goap.rs provides the count).
+            carcass_nearby,
             nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
             // Ticket 014 Magic colony batch — read via marker. Disposition

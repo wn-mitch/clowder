@@ -149,6 +149,9 @@ impl OnSpecialTerrain {
 /// `sensing.rs::update_threat_proximity_markers`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HasThreatNearby;
+impl HasThreatNearby {
+    pub const KEY: &str = "HasThreatNearby";
+}
 
 // ---------------------------------------------------------------------------
 // Capability markers (§4.3 Capability — derived per-tick from parent tags)
@@ -257,16 +260,28 @@ impl ThornbriarAvailable {
 
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HasSocialTarget;
+impl HasSocialTarget {
+    pub const KEY: &str = "HasSocialTarget";
+}
 
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HasHerbsNearby;
+impl HasHerbsNearby {
+    pub const KEY: &str = "HasHerbsNearby";
+}
 
 /// Shared between cats and foxes via `With<Prey>` + distance.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct PreyNearby;
+impl PreyNearby {
+    pub const KEY: &str = "PreyNearby";
+}
 
 #[derive(Component, Debug, Clone, Copy)]
 pub struct CarcassNearby;
+impl CarcassNearby {
+    pub const KEY: &str = "CarcassNearby";
+}
 
 /// `buildings.rs::update_colony_building_markers`.
 #[derive(Component, Debug, Clone, Copy)]

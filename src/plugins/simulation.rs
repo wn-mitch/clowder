@@ -261,6 +261,12 @@ impl Plugin for SimulationPlugin {
                             // parenthood authored from
                             // `KittenDependency` references.
                             systems::growth::update_parent_markers,
+                            // Ticket 014 §4 sensing batch — broad-phase
+                            // target-existence: HasThreatNearby,
+                            // HasSocialTarget, HasHerbsNearby, PreyNearby,
+                            // CarcassNearby. Single author owns five
+                            // markers to amortize the per-cat sensing scans.
+                            systems::sensing::update_target_existence_markers,
                         )
                             .chain(),
                         systems::needs::decay_grooming,

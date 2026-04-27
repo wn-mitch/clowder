@@ -737,6 +737,205 @@ pub fn update_terrain_markers(
 }
 
 // ---------------------------------------------------------------------------
+// update_target_existence_markers (Ticket 014 §4 sensing batch)
+// ---------------------------------------------------------------------------
+
+/// Author the §4.3 broad-phase target-existence ZSTs per cat per tick:
+/// `HasThreatNearby` / `HasSocialTarget` / `HasHerbsNearby` /
+/// `PreyNearby` / `CarcassNearby`. Each predicate is a bit-for-bit
+/// mirror of the inline computation that lives at the top of every
+/// per-cat scoring loop in `disposition.rs::evaluate_dispositions` and
+/// `goap.rs::evaluate_and_plan` — once authored, those callers read
+/// from `MarkerSnapshot` instead of recomputing.
+///
+/// **Predicates:**
+/// - `HasThreatNearby` — any wildlife within `wildlife_threat_range`
+///   Manhattan tiles. Flat-range, NOT species-attenuated yet (the
+///   sensory model's species-aware version is a predicate-refinement
+///   follow-on; the cat-in-combat branch lands on `InCombat` instead).
+/// - `HasSocialTarget` — `resolve_socialize_target` returns Some.
+///   Mirrors the inline `is_some()` checks in both scoring loops.
+/// - `HasHerbsNearby` — any harvestable herb within
+///   `herb_detection_range` via `observer_sees_at` with cat sensory
+///   profile + PREY signature.
+/// - `PreyNearby` — any prey animal within `prey_detection_range`
+///   via `observer_sees_at`. Authored for cats only here; the fox-side
+///   share of this marker is added in the fox-spatial author batch
+///   (Ticket 014 Commit 5).
+/// - `CarcassNearby` — any uncleansed-or-unharvested carcass within
+///   `carcass_detection_range` via `observer_smells_at`. Mirrors the
+///   `goap.rs::nearby_carcass_count > 0` predicate. **Behavior change
+///   for the legacy disposition path:** that path previously
+///   hardcoded `carcass_nearby = false`; the disposition path is
+///   currently unregistered in the schedule, so this is a no-op at
+///   runtime — but documents-as-correct the intent for any future
+///   re-enable of the disposition path.
+///
+/// **Ordering** — Chain 2a, after the per-cat marker authors so any
+/// future predicate refinement (e.g. adding an `Incapacitated` filter
+/// to threat-nearby) reads freshly-authored upstream markers. Runs
+/// before the GOAP / disposition scoring loops so the snapshot
+/// population sees the freshly-authored markers.
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
+pub fn update_target_existence_markers(
+    mut commands: Commands,
+    cats: Query<
+        (
+            Entity,
+            &Position,
+            Has<crate::components::markers::HasThreatNearby>,
+            Has<crate::components::markers::HasSocialTarget>,
+            Has<crate::components::markers::HasHerbsNearby>,
+            Has<crate::components::markers::PreyNearby>,
+            Has<crate::components::markers::CarcassNearby>,
+        ),
+        (With<crate::components::identity::Species>, Without<Dead>),
+    >,
+    cat_positions_q: Query<
+        (Entity, &Position),
+        (With<crate::components::identity::Species>, Without<Dead>),
+    >,
+    wildlife_q: Query<
+        &Position,
+        (With<crate::components::wildlife::WildAnimal>, Without<Dead>),
+    >,
+    herb_q: Query<
+        &Position,
+        (
+            With<crate::components::magic::Herb>,
+            With<crate::components::magic::Harvestable>,
+        ),
+    >,
+    prey_q: Query<&Position, (With<crate::components::prey::PreyAnimal>, Without<Dead>)>,
+    carcass_q: Query<(&crate::components::wildlife::Carcass, &Position), Without<Dead>>,
+    relationships: Res<crate::resources::relationships::Relationships>,
+    dse_registry: Res<crate::ai::eval::DseRegistry>,
+    time: Res<crate::resources::time::TimeState>,
+    constants: Res<crate::resources::sim_constants::SimConstants>,
+) {
+    use crate::components::markers::{
+        CarcassNearby, HasHerbsNearby, HasSocialTarget, HasThreatNearby, PreyNearby,
+    };
+    let d = &constants.disposition;
+    let sc = &constants.scoring;
+    let cat_profile = &constants.sensory.cat;
+
+    let cat_positions: Vec<(Entity, Position)> =
+        cat_positions_q.iter().map(|(e, p)| (e, *p)).collect();
+    let wildlife_positions: Vec<Position> = wildlife_q.iter().copied().collect();
+    let herb_positions: Vec<Position> = herb_q.iter().copied().collect();
+    let prey_positions: Vec<Position> = prey_q.iter().copied().collect();
+    let carcass_positions: Vec<Position> = carcass_q
+        .iter()
+        .filter(|(c, _)| !c.cleansed || !c.harvested)
+        .map(|(_, p)| *p)
+        .collect();
+
+    let threat_range = d.wildlife_threat_range;
+    let herb_range = d.herb_detection_range as f32;
+    let prey_range = d.prey_detection_range as f32;
+    let carcass_range = sc.carcass_detection_range as f32;
+
+    for (entity, pos, cur_threat, cur_social, cur_herbs, cur_prey, cur_carcass) in cats.iter() {
+        let want_threat = wildlife_positions
+            .iter()
+            .any(|wp| pos.manhattan_distance(wp) <= threat_range);
+
+        let want_social = crate::ai::dses::socialize_target::resolve_socialize_target(
+            &dse_registry,
+            entity,
+            *pos,
+            &cat_positions,
+            &relationships,
+            time.tick,
+            None,
+        )
+        .is_some();
+
+        let want_herbs = herb_positions.iter().any(|hp| {
+            observer_sees_at(
+                crate::components::SensorySpecies::Cat,
+                *pos,
+                cat_profile,
+                *hp,
+                crate::components::SensorySignature::PREY,
+                herb_range,
+            )
+        });
+
+        let want_prey = prey_positions.iter().any(|pp| {
+            observer_sees_at(
+                crate::components::SensorySpecies::Cat,
+                *pos,
+                cat_profile,
+                *pp,
+                crate::components::SensorySignature::PREY,
+                prey_range,
+            )
+        });
+
+        let want_carcass = carcass_positions.iter().any(|cp| {
+            observer_smells_at(
+                crate::components::SensorySpecies::Cat,
+                *pos,
+                cat_profile,
+                *cp,
+                crate::components::SensorySignature::CARCASS,
+                carcass_range,
+            )
+        });
+
+        toggle_target_marker(
+            &mut commands,
+            entity,
+            want_threat,
+            cur_threat,
+            HasThreatNearby,
+        );
+        toggle_target_marker(
+            &mut commands,
+            entity,
+            want_social,
+            cur_social,
+            HasSocialTarget,
+        );
+        toggle_target_marker(
+            &mut commands,
+            entity,
+            want_herbs,
+            cur_herbs,
+            HasHerbsNearby,
+        );
+        toggle_target_marker(&mut commands, entity, want_prey, cur_prey, PreyNearby);
+        toggle_target_marker(
+            &mut commands,
+            entity,
+            want_carcass,
+            cur_carcass,
+            CarcassNearby,
+        );
+    }
+}
+
+fn toggle_target_marker<M: Component + Copy>(
+    commands: &mut Commands,
+    entity: Entity,
+    want: bool,
+    has: bool,
+    marker: M,
+) {
+    match (want, has) {
+        (true, false) => {
+            commands.entity(entity).insert(marker);
+        }
+        (false, true) => {
+            commands.entity(entity).remove::<M>();
+        }
+        _ => {}
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1374,5 +1573,278 @@ mod tests {
             has_on_special_terrain(&world, cat),
             "steady-state on special terrain should not flap marker"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // §4 sensing batch — update_target_existence_markers tests
+    // -----------------------------------------------------------------------
+
+    use crate::ai::eval::DseRegistry;
+    use crate::components::identity::Species;
+    use crate::components::magic::{GrowthStage, Harvestable, Herb, HerbKind};
+    use crate::components::physical::DeathCause;
+    use crate::components::wildlife::{Carcass, WildAnimal};
+    use crate::resources::relationships::Relationships;
+    use crate::resources::sim_constants::SimConstants;
+    use crate::resources::time::TimeState;
+
+    fn target_existence_setup() -> (World, Schedule) {
+        let mut world = World::new();
+        world.insert_resource(SimConstants::default());
+        world.insert_resource(TimeState::default());
+        world.insert_resource(Relationships::default());
+        // Bootstrap a DseRegistry containing socialize_target so
+        // resolve_socialize_target finds its DSE. Other registries
+        // come up empty — sensible since the test isolates the
+        // target-existence author.
+        let mut registry = DseRegistry::default();
+        registry
+            .target_taking_dses
+            .push(crate::ai::dses::socialize_target_dse());
+        world.insert_resource(registry);
+
+        let mut schedule = Schedule::default();
+        schedule.add_systems(update_target_existence_markers);
+        (world, schedule)
+    }
+
+    fn spawn_cat(world: &mut World, x: i32, y: i32) -> Entity {
+        world.spawn((Species, Position::new(x, y))).id()
+    }
+
+    fn spawn_wildlife(world: &mut World, x: i32, y: i32) -> Entity {
+        world
+            .spawn((WildAnimal::new(WildSpecies::Fox), Position::new(x, y)))
+            .id()
+    }
+
+    fn spawn_prey(world: &mut World, x: i32, y: i32) -> Entity {
+        world
+            .spawn((crate::components::prey::PreyAnimal, Position::new(x, y)))
+            .id()
+    }
+
+    fn spawn_herb(world: &mut World, x: i32, y: i32) -> Entity {
+        world
+            .spawn((
+                Herb {
+                    kind: HerbKind::HealingMoss,
+                    growth_stage: GrowthStage::Blossom,
+                    magical: false,
+                    twisted: false,
+                },
+                Harvestable,
+                Position::new(x, y),
+            ))
+            .id()
+    }
+
+    fn spawn_carcass(world: &mut World, x: i32, y: i32) -> Entity {
+        world
+            .spawn((
+                Carcass {
+                    prey_kind: PreyKind::Mouse,
+                    age_ticks: 0,
+                    corruption_rate: 0.0,
+                    cleansed: false,
+                    harvested: false,
+                },
+                Position::new(x, y),
+            ))
+            .id()
+    }
+
+    #[test]
+    fn solo_cat_no_target_markers() {
+        let (mut world, mut schedule) = target_existence_setup();
+        let cat = spawn_cat(&mut world, 0, 0);
+        schedule.run(&mut world);
+        assert!(!world.entity(cat).contains::<crate::components::markers::HasThreatNearby>());
+        assert!(!world.entity(cat).contains::<crate::components::markers::HasSocialTarget>());
+        assert!(!world.entity(cat).contains::<crate::components::markers::HasHerbsNearby>());
+        assert!(!world.entity(cat).contains::<crate::components::markers::PreyNearby>());
+        assert!(!world.entity(cat).contains::<crate::components::markers::CarcassNearby>());
+    }
+
+    #[test]
+    fn wildlife_in_threat_range_flags_threat() {
+        let (mut world, mut schedule) = target_existence_setup();
+        let cat = spawn_cat(&mut world, 0, 0);
+        let _fox = spawn_wildlife(&mut world, 5, 0);
+        schedule.run(&mut world);
+        assert!(world
+            .entity(cat)
+            .contains::<crate::components::markers::HasThreatNearby>());
+    }
+
+    #[test]
+    fn wildlife_outside_range_no_threat() {
+        let (mut world, mut schedule) = target_existence_setup();
+        let cat = spawn_cat(&mut world, 0, 0);
+        // Default wildlife_threat_range = 10; place fox at 50 tiles.
+        let _fox = spawn_wildlife(&mut world, 50, 0);
+        schedule.run(&mut world);
+        assert!(!world
+            .entity(cat)
+            .contains::<crate::components::markers::HasThreatNearby>());
+    }
+
+    #[test]
+    fn cat_in_socialize_range_flags_social() {
+        let (mut world, mut schedule) = target_existence_setup();
+        let cat = spawn_cat(&mut world, 0, 0);
+        let _peer = spawn_cat(&mut world, 5, 0);
+        schedule.run(&mut world);
+        assert!(world
+            .entity(cat)
+            .contains::<crate::components::markers::HasSocialTarget>());
+    }
+
+    #[test]
+    fn no_other_cat_no_social() {
+        let (mut world, mut schedule) = target_existence_setup();
+        let cat = spawn_cat(&mut world, 0, 0);
+        schedule.run(&mut world);
+        assert!(!world
+            .entity(cat)
+            .contains::<crate::components::markers::HasSocialTarget>());
+    }
+
+    #[test]
+    fn herb_in_range_flags_herbs_nearby() {
+        let (mut world, mut schedule) = target_existence_setup();
+        let cat = spawn_cat(&mut world, 0, 0);
+        let _herb = spawn_herb(&mut world, 3, 0);
+        schedule.run(&mut world);
+        assert!(world
+            .entity(cat)
+            .contains::<crate::components::markers::HasHerbsNearby>());
+    }
+
+    #[test]
+    fn herb_far_no_marker() {
+        let (mut world, mut schedule) = target_existence_setup();
+        let cat = spawn_cat(&mut world, 0, 0);
+        // Default herb_detection_range = 15.
+        let _herb = spawn_herb(&mut world, 50, 0);
+        schedule.run(&mut world);
+        assert!(!world
+            .entity(cat)
+            .contains::<crate::components::markers::HasHerbsNearby>());
+    }
+
+    #[test]
+    fn prey_in_range_flags_prey_nearby() {
+        let (mut world, mut schedule) = target_existence_setup();
+        let cat = spawn_cat(&mut world, 0, 0);
+        let _prey = spawn_prey(&mut world, 3, 0);
+        schedule.run(&mut world);
+        assert!(world
+            .entity(cat)
+            .contains::<crate::components::markers::PreyNearby>());
+    }
+
+    #[test]
+    fn carcass_in_range_flags_carcass_nearby() {
+        let (mut world, mut schedule) = target_existence_setup();
+        let cat = spawn_cat(&mut world, 0, 0);
+        let _c = spawn_carcass(&mut world, 5, 0);
+        schedule.run(&mut world);
+        assert!(world
+            .entity(cat)
+            .contains::<crate::components::markers::CarcassNearby>());
+    }
+
+    #[test]
+    fn fully_processed_carcass_excluded() {
+        let (mut world, mut schedule) = target_existence_setup();
+        let cat = spawn_cat(&mut world, 0, 0);
+        // Both cleansed and harvested → filtered out.
+        world.spawn((
+            Carcass {
+                prey_kind: PreyKind::Mouse,
+                age_ticks: 0,
+                corruption_rate: 0.0,
+                cleansed: true,
+                harvested: true,
+            },
+            Position::new(5, 0),
+        ));
+        schedule.run(&mut world);
+        assert!(!world
+            .entity(cat)
+            .contains::<crate::components::markers::CarcassNearby>());
+    }
+
+    #[test]
+    fn dead_cat_excluded_from_authoring() {
+        let (mut world, mut schedule) = target_existence_setup();
+        let cat = world
+            .spawn((
+                Species,
+                Position::new(0, 0),
+                Dead {
+                    tick: 0,
+                    cause: DeathCause::Starvation,
+                },
+            ))
+            .id();
+        let _peer = spawn_cat(&mut world, 5, 0);
+        let _fox = spawn_wildlife(&mut world, 5, 0);
+        schedule.run(&mut world);
+        // Dead cats don't get markers authored.
+        assert!(!world.entity(cat).contains::<crate::components::markers::HasThreatNearby>());
+        assert!(!world.entity(cat).contains::<crate::components::markers::HasSocialTarget>());
+    }
+
+    #[test]
+    fn target_existence_markers_idempotent() {
+        let (mut world, mut schedule) = target_existence_setup();
+        let cat = spawn_cat(&mut world, 0, 0);
+        let _peer = spawn_cat(&mut world, 5, 0);
+        schedule.run(&mut world);
+        assert!(world
+            .entity(cat)
+            .contains::<crate::components::markers::HasSocialTarget>());
+        schedule.run(&mut world);
+        assert!(world
+            .entity(cat)
+            .contains::<crate::components::markers::HasSocialTarget>());
+    }
+
+    #[test]
+    fn target_existence_markers_clear_when_target_removed() {
+        let (mut world, mut schedule) = target_existence_setup();
+        let cat = spawn_cat(&mut world, 0, 0);
+        let prey = spawn_prey(&mut world, 3, 0);
+        schedule.run(&mut world);
+        assert!(world
+            .entity(cat)
+            .contains::<crate::components::markers::PreyNearby>());
+        world.entity_mut(prey).despawn();
+        schedule.run(&mut world);
+        assert!(!world
+            .entity(cat)
+            .contains::<crate::components::markers::PreyNearby>());
+    }
+
+    #[test]
+    fn dead_wildlife_excluded() {
+        let (mut world, mut schedule) = target_existence_setup();
+        let cat = spawn_cat(&mut world, 0, 0);
+        // Spawn dead wildlife — it shouldn't trigger HasThreatNearby
+        // because the query filters Without<Dead>.
+        world.spawn((
+            WildAnimal::new(WildSpecies::Fox),
+            Position::new(5, 0),
+            Dead {
+                tick: 0,
+                cause: DeathCause::Starvation,
+            },
+        ));
+        schedule.run(&mut world);
+        assert!(!world
+            .entity(cat)
+            .contains::<crate::components::markers::HasThreatNearby>());
     }
 }

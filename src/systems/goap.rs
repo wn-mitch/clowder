@@ -982,33 +982,21 @@ pub fn evaluate_and_plan(
             |a, b| res.relationships.get(a, b).map(|r| r.fondness),
         );
 
-        // §6.5.1: the `has_social_target` bool gate reads through the
-        // target-taking DSE so the scorer and the downstream
-        // `SocializeWith` step both see the same "is a partner
-        // available?" verdict. Retires divergent range-bound plain
-        // filter gates.
-        let has_social_target = crate::ai::dses::socialize_target::resolve_socialize_target(
-            &res.dse_registry,
-            entity,
-            *pos,
-            &cat_positions,
-            &res.relationships,
-            res.time.tick,
-            // This scorer-side call pre-checks whether a partner
-            // exists for the outer eligibility gate; the L2 record
-            // for `socialize_target` is captured at the step-
-            // resolution site below (goap.rs:~2038) where the cat
-            // actually picks a target. No double-capture here.
-            None,
-        )
-        .is_some();
+        // Ticket 014 §4 sensing batch — `has_social_target` /
+        // `has_threat_nearby` now read from `MarkerSnapshot` after
+        // `sensing::update_target_existence_markers` authors the ZSTs.
+        // The inline `resolve_socialize_target` bool-only call retires;
+        // the L2 step-resolution site at goap.rs:~2038 still calls the
+        // resolver to pick the actual target.
 
+        // Allies-fighting still needs the nearest-threat position to
+        // count co-fighting cats; the same flat-range scan that the
+        // author uses internally.
         let nearest_threat = wildlife_positions
             .iter()
             .filter(|(_, wp)| pos.manhattan_distance(wp) <= d.wildlife_threat_range)
             .min_by_key(|(_, wp)| pos.manhattan_distance(wp));
 
-        let has_threat_nearby = nearest_threat.is_some();
         let allies_fighting_threat = if let Some(&(_, threat_pos)) = nearest_threat {
             action_snapshot
                 .iter()
@@ -1098,27 +1086,17 @@ pub fn evaluate_and_plan(
             );
         }
 
-        let has_herbs_nearby = herb_positions.iter().any(|(_, hp, _)| {
-            crate::systems::sensing::observer_sees_at(
-                crate::components::SensorySpecies::Cat,
-                *pos,
-                &res.constants.sensory.cat,
-                *hp,
-                crate::components::SensorySignature::PREY,
-                d.herb_detection_range as f32,
-            )
-        });
-
-        let prey_nearby = prey_positions.iter().any(|pp| {
-            crate::systems::sensing::observer_sees_at(
-                crate::components::SensorySpecies::Cat,
-                *pos,
-                &res.constants.sensory.cat,
-                *pp,
-                crate::components::SensorySignature::PREY,
-                d.prey_detection_range as f32,
-            )
-        });
+        // Ticket 014 §4 sensing batch — `has_herbs_nearby` /
+        // `prey_nearby` now read from `MarkerSnapshot`. The inline
+        // `observer_sees_at` scans retire here. `nearby_carcass_count`
+        // remains an inline count: the count is consumed by ScoringContext
+        // separately from the boolean `carcass_nearby` marker (used by
+        // magic_harvest siblings as a magnitude axis), so the count
+        // computation stays here while the boolean reads from snapshot.
+        let has_herbs_nearby = markers.has(markers::HasHerbsNearby::KEY, entity);
+        let prey_nearby = markers.has(markers::PreyNearby::KEY, entity);
+        let has_threat_nearby = markers.has(markers::HasThreatNearby::KEY, entity);
+        let has_social_target = markers.has(markers::HasSocialTarget::KEY, entity);
 
         let nearby_carcass_count = carcass_positions
             .iter()
@@ -1222,7 +1200,11 @@ pub fn evaluate_and_plan(
                 0.5,
             ),
             fox_scent_level: colony.fox_scent_map.get(pos.x, pos.y),
-            carcass_nearby: nearby_carcass_count > 0,
+            // Ticket 014 §4 sensing batch — read via marker. The
+            // marker's predicate is "any uncleansed-or-unharvested
+            // carcass within carcass_detection_range" (matches the
+            // `nearby_carcass_count > 0` invariant exactly).
+            carcass_nearby: markers.has(markers::CarcassNearby::KEY, entity),
             nearby_carcass_count,
             territory_max_corruption,
             // Ticket 014 Magic colony batch — read via marker.
