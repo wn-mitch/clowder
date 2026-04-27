@@ -267,6 +267,49 @@ pub fn resolve_stance(
     base
 }
 
+/// §9.3 candidate prefilter — drop candidates whose resolved stance
+/// fails `requirement`. Returns the kept entities and their parallel
+/// positions, preserving input order.
+///
+/// The `target_species_of` closure resolves each candidate to a
+/// [`FactionSpecies`]; returning `None` drops the candidate (the
+/// candidate is unfactionable, e.g. a building entity reaching this
+/// helper by mistake). The `overlays_of` closure reads the four §9.2
+/// overlay markers from the ECS for each candidate.
+///
+/// Caller pre-filtering by distance / role is unchanged — this helper
+/// only enforces the stance band, not target eligibility writ large.
+pub fn filter_candidates_by_stance(
+    relations: &FactionRelations,
+    observer_species: FactionSpecies,
+    candidates: &[Entity],
+    positions: &[crate::components::physical::Position],
+    target_species_of: &dyn Fn(Entity) -> Option<FactionSpecies>,
+    overlays_of: &dyn Fn(Entity) -> StanceOverlays,
+    requirement: &StanceRequirement,
+) -> (Vec<Entity>, Vec<crate::components::physical::Position>) {
+    debug_assert_eq!(
+        candidates.len(),
+        positions.len(),
+        "candidate/position slices must match length"
+    );
+    let observer_is_cat = observer_species.is_cat();
+    let mut kept = Vec::with_capacity(candidates.len());
+    let mut kept_pos = Vec::with_capacity(candidates.len());
+    for (entity, pos) in candidates.iter().zip(positions.iter()) {
+        let Some(target_species) = target_species_of(*entity) else {
+            continue;
+        };
+        let base = relations.stance(observer_species, target_species);
+        let resolved = resolve_stance(base, observer_is_cat, overlays_of(*entity));
+        if requirement.accepts(resolved) {
+            kept.push(*entity);
+            kept_pos.push(*pos);
+        }
+    }
+    (kept, kept_pos)
+}
+
 // ---------------------------------------------------------------------------
 // §9.3 StanceRequirement
 // ---------------------------------------------------------------------------
@@ -661,5 +704,180 @@ mod tests {
         let req = StanceRequirement::hunt();
         assert!(req.accepts(FactionStance::Prey));
         assert!(!req.accepts(FactionStance::Enemy));
+    }
+
+    // --- §9.3 filter_candidates_by_stance ---
+
+    fn entity_n(n: u32) -> Entity {
+        Entity::from_raw_u32(n).unwrap()
+    }
+
+    #[test]
+    fn filter_empty_candidates_returns_empty() {
+        let rel = FactionRelations::canonical();
+        let species_of = |_: Entity| Some(FactionSpecies::Cat);
+        let overlays_of = |_: Entity| StanceOverlays::default();
+        let (kept, kept_pos) = filter_candidates_by_stance(
+            &rel,
+            FactionSpecies::Cat,
+            &[],
+            &[],
+            &species_of,
+            &overlays_of,
+            &StanceRequirement::socialize(),
+        );
+        assert!(kept.is_empty());
+        assert!(kept_pos.is_empty());
+    }
+
+    #[test]
+    fn filter_keeps_all_when_base_stance_satisfies_requirement() {
+        let rel = FactionRelations::canonical();
+        let a = entity_n(10);
+        let b = entity_n(11);
+        let candidates = [a, b];
+        let positions = [
+            crate::components::physical::Position::new(0, 0),
+            crate::components::physical::Position::new(1, 0),
+        ];
+        let species_of = |_: Entity| Some(FactionSpecies::Cat);
+        let overlays_of = |_: Entity| StanceOverlays::default();
+        let (kept, kept_pos) = filter_candidates_by_stance(
+            &rel,
+            FactionSpecies::Cat,
+            &candidates,
+            &positions,
+            &species_of,
+            &overlays_of,
+            &StanceRequirement::socialize(),
+        );
+        assert_eq!(kept, vec![a, b]);
+        assert_eq!(kept_pos.len(), 2);
+    }
+
+    #[test]
+    fn filter_drops_banished_cat_under_socialize() {
+        let rel = FactionRelations::canonical();
+        let normal = entity_n(10);
+        let banished = entity_n(11);
+        let candidates = [normal, banished];
+        let positions = [
+            crate::components::physical::Position::new(0, 0),
+            crate::components::physical::Position::new(1, 0),
+        ];
+        let species_of = |_: Entity| Some(FactionSpecies::Cat);
+        let overlays_of = move |e: Entity| {
+            if e == banished {
+                StanceOverlays {
+                    banished: true,
+                    ..Default::default()
+                }
+            } else {
+                StanceOverlays::default()
+            }
+        };
+        let (kept, _) = filter_candidates_by_stance(
+            &rel,
+            FactionSpecies::Cat,
+            &candidates,
+            &positions,
+            &species_of,
+            &overlays_of,
+            &StanceRequirement::socialize(),
+        );
+        assert_eq!(kept, vec![normal]);
+    }
+
+    #[test]
+    fn filter_befriended_fox_kept_by_socialize_dropped_by_hunt() {
+        let rel = FactionRelations::canonical();
+        let fox = entity_n(20);
+        let candidates = [fox];
+        let positions = [crate::components::physical::Position::new(0, 0)];
+        let species_of = |_: Entity| Some(FactionSpecies::Fox);
+        let overlays_of = |_: Entity| StanceOverlays {
+            befriended_ally: true,
+            ..Default::default()
+        };
+
+        // Cat → Fox base = Predator. BefriendedAlly upgrades to Ally.
+        // Socialize accepts Ally → kept.
+        let (kept_soc, _) = filter_candidates_by_stance(
+            &rel,
+            FactionSpecies::Cat,
+            &candidates,
+            &positions,
+            &species_of,
+            &overlays_of,
+            &StanceRequirement::socialize(),
+        );
+        assert_eq!(kept_soc, vec![fox]);
+
+        // Hunt requires Prey; Ally is not Prey → dropped.
+        let (kept_hunt, _) = filter_candidates_by_stance(
+            &rel,
+            FactionSpecies::Cat,
+            &candidates,
+            &positions,
+            &species_of,
+            &overlays_of,
+            &StanceRequirement::hunt(),
+        );
+        assert!(kept_hunt.is_empty());
+    }
+
+    #[test]
+    fn filter_resolves_per_candidate_species() {
+        // Cat observer with mixed candidates: a fellow cat (Same →
+        // Socialize accepts) and a snake (Predator → Socialize
+        // rejects). The species_of closure must resolve each candidate
+        // independently.
+        let rel = FactionRelations::canonical();
+        let cat = entity_n(30);
+        let snake = entity_n(31);
+        let candidates = [cat, snake];
+        let positions = [
+            crate::components::physical::Position::new(0, 0),
+            crate::components::physical::Position::new(1, 0),
+        ];
+        let species_of = move |e: Entity| {
+            if e == cat {
+                Some(FactionSpecies::Cat)
+            } else {
+                Some(FactionSpecies::Snake)
+            }
+        };
+        let overlays_of = |_: Entity| StanceOverlays::default();
+        let (kept, _) = filter_candidates_by_stance(
+            &rel,
+            FactionSpecies::Cat,
+            &candidates,
+            &positions,
+            &species_of,
+            &overlays_of,
+            &StanceRequirement::socialize(),
+        );
+        assert_eq!(kept, vec![cat]);
+    }
+
+    #[test]
+    fn filter_drops_candidate_when_species_resolver_returns_none() {
+        let rel = FactionRelations::canonical();
+        let candidate = entity_n(40);
+        let candidates = [candidate];
+        let positions = [crate::components::physical::Position::new(0, 0)];
+        let species_of = |_: Entity| None;
+        let overlays_of = |_: Entity| StanceOverlays::default();
+        let (kept, kept_pos) = filter_candidates_by_stance(
+            &rel,
+            FactionSpecies::Cat,
+            &candidates,
+            &positions,
+            &species_of,
+            &overlays_of,
+            &StanceRequirement::socialize(),
+        );
+        assert!(kept.is_empty());
+        assert!(kept_pos.is_empty());
     }
 }
