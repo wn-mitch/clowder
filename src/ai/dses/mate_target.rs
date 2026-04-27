@@ -92,6 +92,7 @@ pub fn mate_target_dse() -> TargetTakingDse {
         composition: Composition::weighted_sum(vec![0.1875, 0.5, 0.3125]),
         aggregation: TargetAggregation::Best,
         intention: mate_intention,
+        required_stance: None,
     }
 }
 

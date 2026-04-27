@@ -93,6 +93,13 @@ pub enum TargetAggregation {
 /// `intention` is a fn pointer that builds the `Intention` carrying the
 /// winning target forward to the GOAP planner. Parameterized on the
 /// target `Entity` so downstream planning has the commitment anchor.
+///
+/// `required_stance` is the §9.3 DSE filter binding — when present, the
+/// resolver pre-filters its candidate set through
+/// [`crate::ai::faction::filter_candidates_by_stance`] before scoring.
+/// `None` means the DSE accepts any candidate stance (e.g.,
+/// `build_target` whose candidates are construction sites, not
+/// factionable entities).
 pub struct TargetTakingDse {
     pub id: DseId,
     pub candidate_query: fn(Entity) -> &'static str,
@@ -100,6 +107,7 @@ pub struct TargetTakingDse {
     pub composition: Composition,
     pub aggregation: TargetAggregation,
     pub intention: fn(Entity) -> Intention,
+    pub required_stance: Option<crate::ai::faction::StanceRequirement>,
 }
 
 impl TargetTakingDse {
@@ -117,6 +125,17 @@ impl TargetTakingDse {
 
     pub fn aggregation(&self) -> TargetAggregation {
         self.aggregation
+    }
+
+    /// §9.3 stance binding. Mirrors `EligibilityFilter::with_stance`
+    /// for target-taking DSEs. Builder form so factories can chain.
+    pub fn with_stance(mut self, stance: crate::ai::faction::StanceRequirement) -> Self {
+        self.required_stance = Some(stance);
+        self
+    }
+
+    pub fn required_stance(&self) -> Option<&crate::ai::faction::StanceRequirement> {
+        self.required_stance.as_ref()
     }
 }
 
@@ -456,6 +475,7 @@ mod tests {
             composition: Composition::compensated_product(vec![1.0]),
             aggregation: TargetAggregation::Best,
             intention: noop_intention,
+            required_stance: None,
         };
         let cat = Entity::from_raw_u32(1).unwrap();
         let ctx = test_ctx(cat);
@@ -479,6 +499,7 @@ mod tests {
             composition: Composition::compensated_product(vec![1.0]),
             aggregation: TargetAggregation::Best,
             intention: noop_intention,
+            required_stance: None,
         };
         let cat = Entity::from_raw_u32(1).unwrap();
         let a = Entity::from_raw_u32(10).unwrap();
@@ -528,6 +549,7 @@ mod tests {
             composition: Composition::compensated_product(vec![1.0]),
             aggregation: TargetAggregation::SumTopN(2),
             intention: noop_intention,
+            required_stance: None,
         };
         let cat = Entity::from_raw_u32(1).unwrap();
         let a = Entity::from_raw_u32(10).unwrap();
@@ -572,6 +594,7 @@ mod tests {
             composition: Composition::compensated_product(vec![1.0]),
             aggregation: TargetAggregation::WeightedAverage,
             intention: noop_intention,
+            required_stance: None,
         };
         let cat = Entity::from_raw_u32(1).unwrap();
         let a = Entity::from_raw_u32(10).unwrap();
@@ -619,6 +642,7 @@ mod tests {
             composition: Composition::compensated_product(vec![1.0]),
             aggregation: TargetAggregation::Best,
             intention: noop_intention,
+            required_stance: None,
         };
         let cat = Entity::from_raw_u32(1).unwrap();
         let a = Entity::from_raw_u32(10).unwrap();

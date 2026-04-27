@@ -121,6 +121,7 @@ pub fn hunt_target_dse() -> TargetTakingDse {
         composition: Composition::weighted_sum(vec![0.357, 0.357, 0.286]),
         aggregation: TargetAggregation::Best,
         intention: hunt_intention,
+        required_stance: None,
     }
 }
 

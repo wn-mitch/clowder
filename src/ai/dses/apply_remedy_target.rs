@@ -117,6 +117,7 @@ pub fn apply_remedy_target_dse() -> TargetTakingDse {
         composition: Composition::weighted_sum(vec![3.0 / 14.0, 8.0 / 14.0, 3.0 / 14.0]),
         aggregation: TargetAggregation::Best,
         intention: apply_remedy_intention,
+        required_stance: None,
     }
 }
 

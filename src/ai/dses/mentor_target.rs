@@ -114,6 +114,7 @@ pub fn mentor_target_dse() -> TargetTakingDse {
         composition: Composition::weighted_sum(vec![0.25, 0.25, 0.5]),
         aggregation: TargetAggregation::Best,
         intention: mentor_intention,
+        required_stance: None,
     }
 }
 

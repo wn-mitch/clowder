@@ -132,6 +132,7 @@ pub fn socialize_target_dse() -> TargetTakingDse {
         composition: Composition::weighted_sum(vec![0.20, 0.28, 0.20, 0.12, 0.20]),
         aggregation: TargetAggregation::Best,
         intention: socialize_intention,
+        required_stance: None,
     }
 }
 

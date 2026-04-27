@@ -149,6 +149,7 @@ pub fn caretake_target_dse() -> TargetTakingDse {
         composition: Composition::weighted_sum(vec![0.20, 0.40, 0.25, 0.15]),
         aggregation: TargetAggregation::Best,
         intention: caretake_intention,
+        required_stance: None,
     }
 }
 

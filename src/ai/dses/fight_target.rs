@@ -157,6 +157,7 @@ pub fn fight_target_dse() -> TargetTakingDse {
         // plans a path to its #1 threat, not to a phantom centroid.
         aggregation: TargetAggregation::SumTopN(3),
         intention: fight_intention,
+        required_stance: None,
     }
 }
 

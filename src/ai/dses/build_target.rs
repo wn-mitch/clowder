@@ -147,6 +147,7 @@ pub fn build_target_dse() -> TargetTakingDse {
         composition: Composition::weighted_sum(vec![0.20, 0.30, 0.30, 0.20]),
         aggregation: TargetAggregation::Best,
         intention: build_intention,
+        required_stance: None,
     }
 }
 

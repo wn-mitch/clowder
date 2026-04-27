@@ -136,6 +136,7 @@ pub fn groom_other_target_dse() -> TargetTakingDse {
         composition: Composition::weighted_sum(vec![0.30, 0.30, 0.30, 0.10]),
         aggregation: TargetAggregation::Best,
         intention: groom_other_intention,
+        required_stance: None,
     }
 }
 

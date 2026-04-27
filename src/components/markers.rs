@@ -444,26 +444,46 @@ impl HasDen {
 
 /// Non-colony cat present on the map (Wandering Loner / Trader /
 /// Scout per `docs/systems/trade.md`). Observer-Cat × target-Cat:
-/// demote `Same` → `Neutral`.
+/// demote `Same` → `Neutral`. Authoritative-on-arrival: the trade
+/// subsystem (Aspirational) inserts on spawn / removes on depart;
+/// no per-tick author system.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Visitor;
+impl Visitor {
+    pub const KEY: &str = "Visitor";
+}
 
 /// Hostile-Loner variant. Observer-Cat × target-Cat: demote
-/// `Same` → `Enemy`.
+/// `Same` → `Enemy`. Same authoritative-on-arrival lifecycle as
+/// `Visitor`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HostileVisitor;
+impl HostileVisitor {
+    pub const KEY: &str = "HostileVisitor";
+}
 
 /// Cat exiled from the colony. Observer-Cat × target-Cat: demote
-/// `Same` → `Enemy`. See §9.2 — today's `combat.rs::pending_banishments`
-/// path is shadowfox-only; extending to cat-on-cat lands in Phase 3d.
+/// `Same` → `Enemy`. Inserted by `combat.rs::resolve_combat` when a
+/// cat appears in the `pending_banishments` list (today's shadowfox
+/// path despawns wildlife; the cat-on-cat branch tags rather than
+/// despawns). The trigger that pushes a cat onto `pending_banishments`
+/// is left to a future ticket.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Banished;
+impl Banished {
+    pub const KEY: &str = "Banished";
+}
 
 /// Fox or prey-species target befriended through repeated non-hostile
 /// contact. Observer-Cat × target-Fox: upgrade `Predator` → `Ally`
-/// (reciprocal on fox: `Prey` → `Ally`). `social.rs::befriend_wildlife`.
+/// (reciprocal on fox: `Prey` → `Ally`). Authored by
+/// `social.rs::befriend_wildlife` from a cat ↔ wildlife familiarity
+/// threshold.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct BefriendedAlly;
+impl BefriendedAlly {
+    pub const KEY: &str = "BefriendedAlly";
+}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -579,5 +599,27 @@ mod tests {
         assert_marker_queryable(HostileVisitor);
         assert_marker_queryable(Banished);
         assert_marker_queryable(BefriendedAlly);
+    }
+
+    #[test]
+    fn faction_overlay_marker_keys_unique() {
+        let keys = [
+            Visitor::KEY,
+            HostileVisitor::KEY,
+            Banished::KEY,
+            BefriendedAlly::KEY,
+        ];
+        for k in keys {
+            assert!(!k.is_empty(), "marker KEY must be non-empty");
+        }
+        for i in 0..keys.len() {
+            for j in (i + 1)..keys.len() {
+                assert_ne!(
+                    keys[i], keys[j],
+                    "§9.2 marker KEYs must be unique — collision between {} and {}",
+                    keys[i], keys[j]
+                );
+            }
+        }
     }
 }
