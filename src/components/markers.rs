@@ -52,11 +52,17 @@ use bevy_ecs::prelude::*;
 /// relationship. Authoring: `aspirations.rs::update_training_markers`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Mentor;
+impl Mentor {
+    pub const KEY: &str = "Mentor";
+}
 
 /// Cat is the apprentice side of a `Training` relationship.
 /// Authoring: as `Mentor`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Apprentice;
+impl Apprentice {
+    pub const KEY: &str = "Apprentice";
+}
 
 // ---------------------------------------------------------------------------
 // LifeStage markers (§4.3 LifeStage — replace Age::stage() hot call)
@@ -274,9 +280,12 @@ impl HasGarden {
 
 /// ≥1 other cat has a skill below 0.3 where this cat has the same
 /// skill above 0.6 (per-cat relative predicate).
-/// `aspirations.rs::update_mentoring_markers`.
+/// `aspirations.rs::update_mentoring_target_markers`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HasMentoringTarget;
+impl HasMentoringTarget {
+    pub const KEY: &str = "HasMentoringTarget";
+}
 
 /// Orientation-compatible partner with Partners+ bond exists.
 /// `mating.rs::update_mate_eligibility_markers`.

@@ -251,6 +251,12 @@ impl Plugin for SimulationPlugin {
                             systems::combat::update_combat_marker,
                             systems::magic::update_corrupted_tile_markers,
                             systems::sensing::update_terrain_markers,
+                            // Ticket 014 Mentoring batch — Mentor /
+                            // Apprentice authored from `Training`;
+                            // HasMentoringTarget from skill-gap
+                            // sensing predicate.
+                            systems::aspirations::update_training_markers,
+                            systems::aspirations::update_mentoring_target_markers,
                         )
                             .chain(),
                         systems::needs::decay_grooming,

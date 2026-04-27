@@ -6,10 +6,12 @@ use crate::components::aspirations::{
     ActiveAspiration, AspirationDomain, Aspirations, AspirationsInitialized, Preference,
     Preferences,
 };
-use crate::components::identity::{Age, LifeStage, Name};
+use crate::components::identity::{Age, LifeStage, Name, Species};
+use crate::components::markers;
 use crate::components::mental::{Memory, MemoryType, MoodModifier};
 use crate::components::personality::Personality;
-use crate::components::physical::{Dead, Needs};
+use crate::components::physical::{Dead, Needs, Position};
+use crate::components::skills::{Skills, Training};
 use crate::components::zodiac::ZodiacSign;
 use crate::resources::aspiration_registry::AspirationRegistry;
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
@@ -627,6 +629,184 @@ pub fn track_milestones(
 }
 
 // ---------------------------------------------------------------------------
+// §4 marker authoring — Mentoring batch
+// ---------------------------------------------------------------------------
+
+/// Insert/remove a ZST marker only when state actually changes,
+/// avoiding unnecessary archetype moves. Mirrors the `toggle` helper
+/// in `capabilities.rs`.
+fn toggle<M: Component + Copy>(
+    commands: &mut Commands,
+    entity: Entity,
+    want: bool,
+    has: bool,
+    marker: M,
+) {
+    match (want, has) {
+        (true, false) => {
+            commands.entity(entity).insert(marker);
+        }
+        (false, true) => {
+            commands.entity(entity).remove::<M>();
+        }
+        _ => {}
+    }
+}
+
+/// Author the `Mentor` and `Apprentice` ZSTs from each cat's `Training`
+/// component. A cat is `Mentor` iff `training.apprentice.is_some()`;
+/// `Apprentice` iff `training.mentor.is_some()`. A cat may be both
+/// simultaneously (mentoring one apprentice while still studying under
+/// a senior cat).
+///
+/// **Predicate** — bit-for-bit mirror of `Training.apprentice` /
+/// `Training.mentor` reads. Cats without a `Training` component are
+/// treated as having neither role; the second query handles cleanup
+/// when a cat loses or never had `Training`.
+///
+/// **Ordering** — Chain 2a, sibling of `update_directive_markers`. The
+/// `Training` component is mutated by `relationships`/skill-progression
+/// systems in Chain 2b (after marker authoring), so the marker reflects
+/// the prior tick's state for the same-tick scoring read. This matches
+/// the `IsCoordinatorWithDirectives` pattern.
+#[allow(clippy::type_complexity)]
+pub fn update_training_markers(
+    mut commands: Commands,
+    with_training: Query<
+        (
+            Entity,
+            &Training,
+            Has<markers::Mentor>,
+            Has<markers::Apprentice>,
+        ),
+        Without<Dead>,
+    >,
+    without_training: Query<
+        (Entity, Has<markers::Mentor>, Has<markers::Apprentice>),
+        (Without<Training>, Without<Dead>),
+    >,
+) {
+    for (entity, training, has_mentor, has_apprentice) in with_training.iter() {
+        toggle(
+            &mut commands,
+            entity,
+            training.apprentice.is_some(),
+            has_mentor,
+            markers::Mentor,
+        );
+        toggle(
+            &mut commands,
+            entity,
+            training.mentor.is_some(),
+            has_apprentice,
+            markers::Apprentice,
+        );
+    }
+    // Clean up stale markers on cats that lost their Training component
+    // (or never had one). Without<Training> guards entry, but a cat that
+    // had a marker before `Training` was removed needs explicit cleanup.
+    for (entity, has_mentor, has_apprentice) in without_training.iter() {
+        if has_mentor {
+            commands.entity(entity).remove::<markers::Mentor>();
+        }
+        if has_apprentice {
+            commands.entity(entity).remove::<markers::Apprentice>();
+        }
+    }
+}
+
+/// Author the `HasMentoringTarget` ZST per the §4.3 per-cat predicate:
+/// the cat has at least one skill above `mentor_skill_threshold_high`
+/// (default 0.6), AND can sense another living cat within
+/// `mentoring_detection_range` whose corresponding skill is below
+/// `mentor_skill_threshold_low` (default 0.3) on the same axis.
+///
+/// **Predicate** — bit-for-bit mirror of the inline `has_mentoring_target_fn`
+/// closures previously living in `disposition.rs::evaluate_dispositions`
+/// and `goap.rs::evaluate_and_plan`. The mirror retires the
+/// silent-divergence between those two scoring loops by routing both
+/// through this single author.
+///
+/// **Ordering** — Chain 2a, after life-stage / injury / inventory so
+/// any future combination (e.g. mentoring requires Adult) reads
+/// freshly-authored upstream markers. Currently no upstream marker
+/// gates apply; the predicate is a pure function of `Position` +
+/// `Skills` + sensory range.
+#[allow(clippy::type_complexity)]
+pub fn update_mentoring_target_markers(
+    mut commands: Commands,
+    cats: Query<
+        (
+            Entity,
+            &Position,
+            &Skills,
+            Has<markers::HasMentoringTarget>,
+        ),
+        (With<Species>, Without<Dead>),
+    >,
+    constants: Res<SimConstants>,
+) {
+    let d = &constants.disposition;
+    let cat_profile = &constants.sensory.cat;
+    let detection_range = d.mentoring_detection_range as f32;
+    let high = d.mentor_skill_threshold_high;
+    let low = d.mentor_skill_threshold_low;
+
+    let snapshot: Vec<(Entity, Position, [f32; 6])> = cats
+        .iter()
+        .map(|(e, p, s, _)| {
+            (
+                e,
+                *p,
+                [
+                    s.hunting,
+                    s.foraging,
+                    s.herbcraft,
+                    s.building,
+                    s.combat,
+                    s.magic,
+                ],
+            )
+        })
+        .collect();
+
+    for (entity, pos, skills, has_marker) in cats.iter() {
+        let mentor_arr = [
+            skills.hunting,
+            skills.foraging,
+            skills.herbcraft,
+            skills.building,
+            skills.combat,
+            skills.magic,
+        ];
+        let qualifies_as_mentor = mentor_arr.iter().any(|&s| s > high);
+        let want = qualifies_as_mentor
+            && snapshot.iter().any(|(other, other_pos, other_arr)| {
+                *other != entity
+                    && crate::systems::sensing::observer_sees_at(
+                        crate::components::SensorySpecies::Cat,
+                        *pos,
+                        cat_profile,
+                        *other_pos,
+                        crate::components::SensorySignature::CAT,
+                        detection_range,
+                    )
+                    && mentor_arr
+                        .iter()
+                        .zip(other_arr.iter())
+                        .any(|(&m, &a)| m > high && a < low)
+            });
+        toggle(
+            &mut commands,
+            entity,
+            want,
+            has_marker,
+            markers::HasMentoringTarget,
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -682,5 +862,308 @@ mod tests {
         assert!(prefs
             .get(Action::Hunt)
             .is_some_and(|p| p == Preference::Like));
+    }
+
+    // -----------------------------------------------------------------------
+    // §4 Mentoring batch — author tests
+    // -----------------------------------------------------------------------
+
+    use crate::components::physical::{DeathCause, Position};
+    use crate::components::skills::{Skills, Training};
+    use bevy_ecs::schedule::Schedule;
+
+    fn setup_training() -> (World, Schedule) {
+        let world = World::new();
+        let mut schedule = Schedule::default();
+        schedule.add_systems(update_training_markers);
+        (world, schedule)
+    }
+
+    fn spawn_cat_with_training(world: &mut World, training: Training) -> Entity {
+        world
+            .spawn((Species, Position::new(0, 0), Skills::default(), training))
+            .id()
+    }
+
+    fn spawn_cat_no_training(world: &mut World) -> Entity {
+        world
+            .spawn((Species, Position::new(0, 0), Skills::default()))
+            .id()
+    }
+
+    #[test]
+    fn cat_without_training_has_neither_mentor_nor_apprentice() {
+        let (mut world, mut schedule) = setup_training();
+        let cat = spawn_cat_no_training(&mut world);
+        schedule.run(&mut world);
+        assert!(!world.entity(cat).contains::<markers::Mentor>());
+        assert!(!world.entity(cat).contains::<markers::Apprentice>());
+    }
+
+    #[test]
+    fn cat_with_apprentice_gets_mentor_marker() {
+        let (mut world, mut schedule) = setup_training();
+        let apprentice = spawn_cat_no_training(&mut world);
+        let cat = spawn_cat_with_training(
+            &mut world,
+            Training {
+                apprentice: Some(apprentice),
+                mentor: None,
+            },
+        );
+        schedule.run(&mut world);
+        assert!(world.entity(cat).contains::<markers::Mentor>());
+        assert!(!world.entity(cat).contains::<markers::Apprentice>());
+    }
+
+    #[test]
+    fn cat_with_mentor_gets_apprentice_marker() {
+        let (mut world, mut schedule) = setup_training();
+        let mentor = spawn_cat_no_training(&mut world);
+        let cat = spawn_cat_with_training(
+            &mut world,
+            Training {
+                apprentice: None,
+                mentor: Some(mentor),
+            },
+        );
+        schedule.run(&mut world);
+        assert!(world.entity(cat).contains::<markers::Apprentice>());
+        assert!(!world.entity(cat).contains::<markers::Mentor>());
+    }
+
+    #[test]
+    fn cat_with_both_roles_gets_both_markers() {
+        let (mut world, mut schedule) = setup_training();
+        let other_a = spawn_cat_no_training(&mut world);
+        let other_b = spawn_cat_no_training(&mut world);
+        let cat = spawn_cat_with_training(
+            &mut world,
+            Training {
+                apprentice: Some(other_a),
+                mentor: Some(other_b),
+            },
+        );
+        schedule.run(&mut world);
+        assert!(world.entity(cat).contains::<markers::Mentor>());
+        assert!(world.entity(cat).contains::<markers::Apprentice>());
+    }
+
+    #[test]
+    fn losing_apprentice_removes_mentor_marker() {
+        let (mut world, mut schedule) = setup_training();
+        let apprentice = spawn_cat_no_training(&mut world);
+        let cat = spawn_cat_with_training(
+            &mut world,
+            Training {
+                apprentice: Some(apprentice),
+                mentor: None,
+            },
+        );
+        schedule.run(&mut world);
+        assert!(world.entity(cat).contains::<markers::Mentor>());
+        // Clear apprentice slot.
+        world.entity_mut(cat).get_mut::<Training>().unwrap().apprentice = None;
+        schedule.run(&mut world);
+        assert!(!world.entity(cat).contains::<markers::Mentor>());
+    }
+
+    #[test]
+    fn removing_training_component_cleans_up_markers() {
+        let (mut world, mut schedule) = setup_training();
+        let apprentice = spawn_cat_no_training(&mut world);
+        let cat = spawn_cat_with_training(
+            &mut world,
+            Training {
+                apprentice: Some(apprentice),
+                mentor: None,
+            },
+        );
+        schedule.run(&mut world);
+        assert!(world.entity(cat).contains::<markers::Mentor>());
+        // Drop the Training component entirely.
+        world.entity_mut(cat).remove::<Training>();
+        schedule.run(&mut world);
+        assert!(!world.entity(cat).contains::<markers::Mentor>());
+    }
+
+    #[test]
+    fn dead_cat_excluded_from_authoring() {
+        let (mut world, mut schedule) = setup_training();
+        let apprentice = spawn_cat_no_training(&mut world);
+        let cat = world
+            .spawn((
+                Species,
+                Position::new(0, 0),
+                Skills::default(),
+                Training {
+                    apprentice: Some(apprentice),
+                    mentor: None,
+                },
+                Dead {
+                    tick: 0,
+                    cause: DeathCause::Starvation,
+                },
+            ))
+            .id();
+        schedule.run(&mut world);
+        assert!(!world.entity(cat).contains::<markers::Mentor>());
+    }
+
+    #[test]
+    fn training_markers_idempotent() {
+        let (mut world, mut schedule) = setup_training();
+        let apprentice = spawn_cat_no_training(&mut world);
+        let cat = spawn_cat_with_training(
+            &mut world,
+            Training {
+                apprentice: Some(apprentice),
+                mentor: None,
+            },
+        );
+        schedule.run(&mut world);
+        assert!(world.entity(cat).contains::<markers::Mentor>());
+        // Second run with same state: no panic, marker still present.
+        schedule.run(&mut world);
+        assert!(world.entity(cat).contains::<markers::Mentor>());
+    }
+
+    // -----------------------------------------------------------------------
+    // update_mentoring_target_markers
+    // -----------------------------------------------------------------------
+
+    fn setup_mentoring_target() -> (World, Schedule) {
+        let mut world = World::new();
+        world.insert_resource(SimConstants::default());
+        let mut schedule = Schedule::default();
+        schedule.add_systems(update_mentoring_target_markers);
+        (world, schedule)
+    }
+
+    fn spawn_cat_with_skills(world: &mut World, x: i32, y: i32, skills: Skills) -> Entity {
+        world.spawn((Species, Position::new(x, y), skills)).id()
+    }
+
+    fn high_hunting_skills() -> Skills {
+        Skills {
+            hunting: 0.7, // > 0.6 high threshold
+            ..Skills::default()
+        }
+    }
+
+    fn low_hunting_skills() -> Skills {
+        Skills {
+            hunting: 0.1, // < 0.3 low threshold
+            ..Skills::default()
+        }
+    }
+
+    #[test]
+    fn solo_cat_no_mentoring_target() {
+        let (mut world, mut schedule) = setup_mentoring_target();
+        let cat = spawn_cat_with_skills(&mut world, 0, 0, high_hunting_skills());
+        schedule.run(&mut world);
+        assert!(!world.entity(cat).contains::<markers::HasMentoringTarget>());
+    }
+
+    #[test]
+    fn high_skill_with_low_skill_peer_in_range_gets_marker() {
+        let (mut world, mut schedule) = setup_mentoring_target();
+        let mentor = spawn_cat_with_skills(&mut world, 0, 0, high_hunting_skills());
+        let _peer = spawn_cat_with_skills(&mut world, 3, 0, low_hunting_skills());
+        schedule.run(&mut world);
+        assert!(world.entity(mentor).contains::<markers::HasMentoringTarget>());
+    }
+
+    #[test]
+    fn no_high_skill_no_marker() {
+        let (mut world, mut schedule) = setup_mentoring_target();
+        let cat = spawn_cat_with_skills(&mut world, 0, 0, Skills::default());
+        let _peer = spawn_cat_with_skills(&mut world, 3, 0, low_hunting_skills());
+        schedule.run(&mut world);
+        assert!(!world.entity(cat).contains::<markers::HasMentoringTarget>());
+    }
+
+    #[test]
+    fn peer_too_far_no_marker() {
+        let (mut world, mut schedule) = setup_mentoring_target();
+        let mentor = spawn_cat_with_skills(&mut world, 0, 0, high_hunting_skills());
+        // Beyond mentoring_detection_range=10 + cat sight max — well outside.
+        let _peer = spawn_cat_with_skills(&mut world, 50, 0, low_hunting_skills());
+        schedule.run(&mut world);
+        assert!(!world.entity(mentor).contains::<markers::HasMentoringTarget>());
+    }
+
+    #[test]
+    fn peer_with_high_skill_no_marker() {
+        let (mut world, mut schedule) = setup_mentoring_target();
+        let mentor = spawn_cat_with_skills(&mut world, 0, 0, high_hunting_skills());
+        // Peer also has high hunting — no skill gap on any axis.
+        let _peer = spawn_cat_with_skills(&mut world, 3, 0, high_hunting_skills());
+        schedule.run(&mut world);
+        assert!(!world.entity(mentor).contains::<markers::HasMentoringTarget>());
+    }
+
+    #[test]
+    fn dead_peer_excluded() {
+        let (mut world, mut schedule) = setup_mentoring_target();
+        let mentor = spawn_cat_with_skills(&mut world, 0, 0, high_hunting_skills());
+        // Spawn a dead cat with the right skill profile.
+        world.spawn((
+            Species,
+            Position::new(3, 0),
+            low_hunting_skills(),
+            Dead {
+                tick: 0,
+                cause: DeathCause::Starvation,
+            },
+        ));
+        schedule.run(&mut world);
+        // Dead cats are filtered out (Without<Dead>), so the only living peer
+        // is the mentor itself — no qualifying gap.
+        assert!(!world.entity(mentor).contains::<markers::HasMentoringTarget>());
+    }
+
+    #[test]
+    fn skill_gap_disappears_when_peer_levels_up() {
+        let (mut world, mut schedule) = setup_mentoring_target();
+        let mentor = spawn_cat_with_skills(&mut world, 0, 0, high_hunting_skills());
+        let peer = spawn_cat_with_skills(&mut world, 3, 0, low_hunting_skills());
+        schedule.run(&mut world);
+        assert!(world.entity(mentor).contains::<markers::HasMentoringTarget>());
+        // Peer learns. Now they're both above 0.3 — no gap > threshold.
+        world.entity_mut(peer).get_mut::<Skills>().unwrap().hunting = 0.5;
+        schedule.run(&mut world);
+        assert!(!world.entity(mentor).contains::<markers::HasMentoringTarget>());
+    }
+
+    #[test]
+    fn mentoring_target_idempotent() {
+        let (mut world, mut schedule) = setup_mentoring_target();
+        let mentor = spawn_cat_with_skills(&mut world, 0, 0, high_hunting_skills());
+        let _peer = spawn_cat_with_skills(&mut world, 3, 0, low_hunting_skills());
+        schedule.run(&mut world);
+        assert!(world.entity(mentor).contains::<markers::HasMentoringTarget>());
+        schedule.run(&mut world);
+        assert!(world.entity(mentor).contains::<markers::HasMentoringTarget>());
+    }
+
+    #[test]
+    fn cross_axis_gap_qualifies() {
+        let (mut world, mut schedule) = setup_mentoring_target();
+        // Mentor specializes in herbcraft.
+        let mentor = spawn_cat_with_skills(
+            &mut world,
+            0,
+            0,
+            Skills {
+                herbcraft: 0.7,
+                ..Skills::default()
+            },
+        );
+        // Peer is a herbcraft-novice (default herbcraft is 0.05 < 0.3).
+        let _peer = spawn_cat_with_skills(&mut world, 3, 0, Skills::default());
+        schedule.run(&mut world);
+        assert!(world.entity(mentor).contains::<markers::HasMentoringTarget>());
     }
 }

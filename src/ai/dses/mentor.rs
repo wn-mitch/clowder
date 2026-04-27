@@ -6,7 +6,11 @@
 //! status/respect, not affection) — a real cat social dynamic."
 //! CP would silence that signal.
 //!
-//! Eligibility: `has_mentoring_target` (outer gate until §4 port).
+//! Eligibility: `.require(HasMentoringTarget::KEY)` (Ticket 014
+//! Mentoring batch). `aspirations::update_mentoring_target_markers`
+//! authors the marker per tick from the same skill-gap predicate that
+//! used to live as the inline `has_mentoring_target_fn` closures in
+//! `disposition.rs` / `goap.rs` (now retired).
 
 use bevy::prelude::*;
 
@@ -46,7 +50,13 @@ impl MentorDse {
             // ambition is the status-seeking secondary driver.
             composition: Composition::weighted_sum(vec![0.4, 0.4, 0.2]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
-            eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
+            // Ticket 014 Mentoring batch: also requires
+            // `HasMentoringTarget` (cat sees a peer with a learnable
+            // skill gap), authored by
+            // `aspirations::update_mentoring_target_markers`.
+            eligibility: EligibilityFilter::new()
+                .forbid(markers::Incapacitated::KEY)
+                .require(markers::HasMentoringTarget::KEY),
         }
     }
 }

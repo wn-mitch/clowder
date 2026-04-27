@@ -196,9 +196,11 @@ pub struct ScoringContext<'a> {
     /// Number of pending directives (0 if not a coordinator).
     pub pending_directive_count: usize,
     // --- Mentoring context ---
-    /// Whether a valid mentoring target exists (cat with skill < 0.3 where
-    /// this cat has the same skill > 0.6).
-    pub has_mentoring_target: bool,
+    // Ticket 014 Mentoring batch: `has_mentoring_target` field retired —
+    // read via the `HasMentoringTarget` marker now. `MentorDse`'s
+    // EligibilityFilter requires the marker via
+    // `aspirations::update_mentoring_target_markers`, so the inline
+    // outer gate at the Mentor scoring site is retired in lockstep.
     /// Whether at least one prey animal is within hunting range.
     pub prey_nearby: bool,
     // --- Personality integration fields ---
@@ -908,9 +910,16 @@ pub fn score_actions(
     }
 
     // --- Mentor (§2.3: WS of warmth + diligence + ambition) ---
-    if ctx.has_mentoring_target {
+    // Ticket 014 Mentoring batch: inline `if ctx.has_mentoring_target`
+    // guard retired. `MentorDse` now carries
+    // `.require(HasMentoringTarget::KEY)` on its EligibilityFilter, so
+    // `score_dse_by_id` returns 0.0 for cats with no mentoring target.
+    // (Mirrors the `mate` retire pattern below.)
+    {
         let score = score_dse_by_id("mentor", ctx, inputs);
-        scores.push((Action::Mentor, score + jitter(rng, s.jitter_range)));
+        if score > 0.0 {
+            scores.push((Action::Mentor, score + jitter(rng, s.jitter_range)));
+        }
     }
 
     // --- Mate (§2.3: CP of mating_deficit + warmth — Logistic(6, 0.6)) ---
@@ -1817,7 +1826,6 @@ mod tests {
             on_special_terrain: false,
             is_coordinator_with_directives: false,
             pending_directive_count: 0,
-            has_mentoring_target: false,
             prey_nearby: true,
             phys_satisfaction: needs.physiological_satisfaction(),
             respect: needs.respect,
@@ -1962,7 +1970,6 @@ mod tests {
             on_special_terrain: false,
             is_coordinator_with_directives: false,
             pending_directive_count: 0,
-            has_mentoring_target: false,
             prey_nearby: true,
             phys_satisfaction: needs.physiological_satisfaction(),
             respect: needs.respect,
@@ -2111,7 +2118,6 @@ mod tests {
             on_special_terrain: false,
             is_coordinator_with_directives: false,
             pending_directive_count: 0,
-            has_mentoring_target: false,
             prey_nearby: true,
             phys_satisfaction: needs.physiological_satisfaction(),
             respect: needs.respect,
@@ -2369,7 +2375,6 @@ mod tests {
             on_special_terrain: false,
             is_coordinator_with_directives: false,
             pending_directive_count: 0,
-            has_mentoring_target: false,
             prey_nearby: true,
             phys_satisfaction: needs.physiological_satisfaction(),
             respect: needs.respect,
@@ -2443,7 +2448,6 @@ mod tests {
             on_special_terrain: false,
             is_coordinator_with_directives: false,
             pending_directive_count: 0,
-            has_mentoring_target: false,
             prey_nearby: true,
             phys_satisfaction: needs.physiological_satisfaction(),
             respect: needs.respect,
@@ -2536,7 +2540,6 @@ mod tests {
             on_special_terrain: false,
             is_coordinator_with_directives: false,
             pending_directive_count: 0,
-            has_mentoring_target: false,
             prey_nearby: true,
             phys_satisfaction: needs.physiological_satisfaction(),
             respect: needs.respect,
@@ -2846,7 +2849,6 @@ mod tests {
             on_special_terrain: false,
             is_coordinator_with_directives: false,
             pending_directive_count: 0,
-            has_mentoring_target: false,
             prey_nearby: true,
             phys_satisfaction: needs.physiological_satisfaction(),
             respect: needs.respect,
@@ -2921,7 +2923,6 @@ mod tests {
             on_special_terrain: false,
             is_coordinator_with_directives: false,
             pending_directive_count: 0,
-            has_mentoring_target: false,
             prey_nearby: true,
             phys_satisfaction: needs.physiological_satisfaction(),
             respect: needs.respect,

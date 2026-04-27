@@ -111,6 +111,19 @@ pub struct MarkerQueries<'w, 's> {
     /// §7.M Bug 3 PairingActivity) can sit alongside without disturbing
     /// the State tuple.
     pub mate_eligibility: Query<'w, 's, Has<markers::HasEligibleMate>>,
+    /// Ticket 014 Mentoring batch — Mentor / Apprentice / HasMentoringTarget.
+    /// Authored by `aspirations::update_training_markers` (Mentor /
+    /// Apprentice) and `aspirations::update_mentoring_target_markers`
+    /// (HasMentoringTarget).
+    pub mentoring: Query<
+        'w,
+        's,
+        (
+            Has<markers::Mentor>,
+            Has<markers::Apprentice>,
+            Has<markers::HasMentoringTarget>,
+        ),
+    >,
 }
 
 use crate::resources::food::FoodStores;
@@ -432,7 +445,8 @@ pub fn evaluate_dispositions(
     ward_query: Query<(&Ward, &Position)>,
     directive_queue_query: Query<(Entity, &DirectiveQueue)>,
     active_directive_query: Query<&ActiveDirective>,
-    skills_query: Query<&Skills, Without<Dead>>,
+    // Ticket 014 Mentoring batch — `skills_query` retired alongside the
+    // `has_mentoring_target_fn` closure that was its only consumer.
     map: Res<TileMap>,
     food: Res<FoodStores>,
     relationships: Res<Relationships>,
@@ -533,46 +547,11 @@ pub fn evaluate_dispositions(
         )
         .collect();
 
-    let has_mentoring_target_fn = |entity: Entity, pos: &Position, skills: &Skills| -> bool {
-        let mentor_skills = [
-            skills.hunting,
-            skills.foraging,
-            skills.herbcraft,
-            skills.building,
-            skills.combat,
-            skills.magic,
-        ];
-        if !mentor_skills
-            .iter()
-            .any(|&s| s > d.mentor_skill_threshold_high)
-        {
-            return false;
-        }
-        cat_positions.iter().any(|(other, other_pos)| {
-            *other != entity
-                && crate::systems::sensing::observer_sees_at(
-                    crate::components::SensorySpecies::Cat,
-                    *pos,
-                    &constants.sensory.cat,
-                    *other_pos,
-                    crate::components::SensorySignature::CAT,
-                    d.mentoring_detection_range as f32,
-                )
-                && skills_query.get(*other).is_ok_and(|other_skills| {
-                    let other_arr = [
-                        other_skills.hunting,
-                        other_skills.foraging,
-                        other_skills.herbcraft,
-                        other_skills.building,
-                        other_skills.combat,
-                        other_skills.magic,
-                    ];
-                    mentor_skills.iter().zip(other_arr.iter()).any(|(&m, &a)| {
-                        m > d.mentor_skill_threshold_high && a < d.mentor_skill_threshold_low
-                    })
-                })
-        })
-    };
+    // Ticket 014 Mentoring batch — `has_mentoring_target_fn` closure
+    // retired. The predicate now lives in
+    // `aspirations::update_mentoring_target_markers`, the snapshot
+    // population below routes the result through `MarkerSnapshot`, and
+    // `MentorDse.eligibility()` requires `HasMentoringTarget::KEY`.
 
     for (
         (entity, _name, needs, personality, pos, memory, skills, health),
@@ -718,6 +697,20 @@ pub fn evaluate_dispositions(
         if let Ok(has_mate) = side_effects.marker_queries.mate_eligibility.get(entity) {
             markers.set_entity(markers::HasEligibleMate::KEY, entity, has_mate);
         }
+        // Ticket 014 Mentoring batch — Mentor / Apprentice authored by
+        // `aspirations::update_training_markers`; HasMentoringTarget by
+        // `aspirations::update_mentoring_target_markers`.
+        if let Ok((is_mentor, is_apprentice, has_mentoring_target)) =
+            side_effects.marker_queries.mentoring.get(entity)
+        {
+            markers.set_entity(markers::Mentor::KEY, entity, is_mentor);
+            markers.set_entity(markers::Apprentice::KEY, entity, is_apprentice);
+            markers.set_entity(
+                markers::HasMentoringTarget::KEY,
+                entity,
+                has_mentoring_target,
+            );
+        }
 
         let has_herbs_nearby = herb_positions.iter().any(|(_, hp)| {
             crate::systems::sensing::observer_sees_at(
@@ -793,7 +786,6 @@ pub fn evaluate_dispositions(
                 entity,
             ),
             pending_directive_count: directive_snapshot.get(&entity).map_or(0, |(len, _)| *len),
-            has_mentoring_target: has_mentoring_target_fn(entity, pos, skills),
             prey_nearby,
             phys_satisfaction: needs.physiological_satisfaction(),
             respect: needs.respect,
