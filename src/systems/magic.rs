@@ -187,6 +187,36 @@ pub fn ward_decay(
 }
 
 // ---------------------------------------------------------------------------
+// update_ward_coverage_map
+// ---------------------------------------------------------------------------
+
+/// Rebuild the `WardCoverageMap` from current `Ward` entities each tick.
+///
+/// Coverage is a derived property of live wards (strength × repel
+/// radius), not a memory like fox-scent — recomputing from scratch is
+/// simpler than maintaining event-driven decay parity with the
+/// continuous `Ward::strength` decay applied above in `ward_decay`.
+/// Cost is bounded: ~10 wards × ~25-bucket stamp area = ~250 writes
+/// per tick. Runs after `ward_decay` so newly-despawned wards drop out
+/// of coverage on the same tick.
+///
+/// Consumed by ward-placement DSEs (ticket 045) for anti-clustering:
+/// candidate tiles with high `ward_coverage` value are already
+/// covered, so a new ward there is redundant.
+pub fn update_ward_coverage_map(
+    wards: Query<(&Ward, &Position)>,
+    mut coverage: ResMut<crate::resources::WardCoverageMap>,
+) {
+    coverage.clear();
+    for (ward, pos) in &wards {
+        if ward.inverted {
+            continue;
+        }
+        coverage.stamp_ward(pos.x, pos.y, ward.strength, ward.repel_radius());
+    }
+}
+
+// ---------------------------------------------------------------------------
 // apply_remedy_effects
 // ---------------------------------------------------------------------------
 

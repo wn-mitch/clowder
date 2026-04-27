@@ -149,7 +149,14 @@ impl Plugin for SimulationPlugin {
                     systems::wind::update_wind,
                     systems::time::emit_weather_transitions,
                     systems::magic::corruption_spread,
-                    systems::magic::ward_decay,
+                    // Ward decay → coverage rebuild: rebuild reads
+                    // post-decay strength so the L1 `ward_coverage`
+                    // map is always one tick fresh.
+                    (
+                        systems::magic::ward_decay,
+                        systems::magic::update_ward_coverage_map,
+                    )
+                        .chain(),
                     // Herb/flavor growth sub-chain: seasonal check resets stage,
                     // then growth advances, then flavors advance.
                     (

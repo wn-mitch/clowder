@@ -48,6 +48,7 @@ use crate::resources::exploration_map::ExplorationMap;
 use crate::resources::fox_scent_map::FoxScentMap;
 use crate::resources::map::TileMap;
 use crate::resources::prey_scent_map::PreyScentMap;
+use crate::resources::ward_coverage_map::WardCoverageMap;
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::time::TimeState;
 use crate::resources::trace_log::{
@@ -77,6 +78,7 @@ pub fn emit_focal_trace(
     prey_scent_map: Option<Res<PreyScentMap>>,
     cat_presence_map: Option<Res<CatPresenceMap>>,
     exploration_map: Option<Res<ExplorationMap>>,
+    ward_coverage_map: Option<Res<WardCoverageMap>>,
     tile_map: Option<Res<TileMap>>,
     mut trace_log: ResMut<TraceLog>,
     focal_capture: Res<FocalScoreCapture>,
@@ -132,6 +134,9 @@ pub fn emit_focal_trace(
         emit_l1_for_map(&mut trace_log, tick, &cat_name, *pos, &**m, &constants);
     }
     if let Some(ref m) = exploration_map {
+        emit_l1_for_map(&mut trace_log, tick, &cat_name, *pos, &**m, &constants);
+    }
+    if let Some(ref m) = ward_coverage_map {
         emit_l1_for_map(&mut trace_log, tick, &cat_name, *pos, &**m, &constants);
     }
     if let Some(ref m) = tile_map {

@@ -333,6 +333,9 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     // Insert cat presence map resource.
     world.insert_resource(crate::resources::CatPresenceMap::default());
 
+    // Insert ward coverage map resource (ticket 045 — substrate-refactor §5.6.3).
+    world.insert_resource(crate::resources::WardCoverageMap::default());
+
     // Insert unmet-demand ledger — tracks frustrated wants (e.g. cats
     // scoring Cook but with no Kitchen) so the coordinator can prioritize
     // the missing infrastructure.

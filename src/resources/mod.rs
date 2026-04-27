@@ -23,6 +23,7 @@ pub mod time;
 pub mod time_units;
 pub mod trace_log;
 pub mod unmet_demand;
+pub mod ward_coverage_map;
 pub mod weather;
 pub mod wind;
 pub mod zodiac;
@@ -54,5 +55,6 @@ pub use trace_log::{
     TraceRecord,
 };
 pub use unmet_demand::UnmetDemand;
+pub use ward_coverage_map::WardCoverageMap;
 pub use weather::{Weather, WeatherState};
 pub use zodiac::ZodiacData;
