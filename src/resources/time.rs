@@ -41,6 +41,14 @@ impl Default for SimConfig {
     }
 }
 
+/// Test-scoped season length. Production uses 20 000 ticks/season; tests
+/// use this 10× smaller value so age-window assertions remain readable
+/// without paying the cost of a full season's tick count. Single source
+/// of truth across `src/components/identity.rs` and
+/// `src/world_gen/colony.rs` (ticket 033 Phase 5 — was duplicated).
+#[cfg(test)]
+pub const TEST_TICKS_PER_SEASON: u64 = 2000;
+
 // ---------------------------------------------------------------------------
 // TimeScale
 // ---------------------------------------------------------------------------

@@ -245,7 +245,7 @@ mod tests {
         assert_eq!(DurationSeasons::new(4.0).ticks(&ts), 80_000);
 
         let mut config = SimConfig::default();
-        config.ticks_per_season = 2000; // Test-scale.
+        config.ticks_per_season = crate::resources::time::TEST_TICKS_PER_SEASON;
         let small = TimeScale::from_config(&config, 16.6667);
         assert_eq!(DurationSeasons::new(0.5).ticks(&small), 1000);
     }

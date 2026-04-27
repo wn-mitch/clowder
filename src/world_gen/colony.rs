@@ -563,8 +563,8 @@ mod tests {
         assert_eq!(pos, Position::new(5, 5));
     }
 
+    use crate::resources::time::TEST_TICKS_PER_SEASON as TICKS_PER_SEASON;
     const START_TICK: u64 = 200_000;
-    const TICKS_PER_SEASON: u64 = 2000;
 
     fn age_consts() -> FounderAgeConstants {
         FounderAgeConstants::default()

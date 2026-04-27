@@ -144,8 +144,7 @@ pub struct Appearance {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    const TICKS_PER_SEASON: u64 = 2000;
+    use crate::resources::time::TEST_TICKS_PER_SEASON as TICKS_PER_SEASON;
 
     fn stage_at_seasons(born_tick: u64, seasons: u64) -> LifeStage {
         let current_tick = born_tick + seasons * TICKS_PER_SEASON;
