@@ -817,4 +817,56 @@ mod tests {
         assert!(!req.accepts(FactionStance::Predator));
         assert!(!req.accepts(FactionStance::Neutral));
     }
+
+    #[test]
+    fn resolver_drops_banished_candidate() {
+        // §9.3 + §9.2: a Banished cat in the candidate set should be
+        // filtered out before evaluate_target_taking. Resolver picks
+        // the non-banished cat even when the banished cat would have
+        // scored higher on every other axis.
+        let mut registry = DseRegistry::new();
+        registry.target_taking_dses.push(socialize_target_dse());
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let banished = Entity::from_raw_u32(2).unwrap();
+        let normal = Entity::from_raw_u32(3).unwrap();
+
+        let mut relationships = Relationships::default();
+        // Banished cat would otherwise win on fondness.
+        relationships.get_or_insert(cat, banished).fondness = 0.9;
+        relationships.get_or_insert(cat, banished).familiarity = 0.5;
+        relationships.get_or_insert(cat, normal).fondness = 0.3;
+        relationships.get_or_insert(cat, normal).familiarity = 0.5;
+
+        let cat_positions = vec![
+            (banished, Position::new(2, 0)),
+            (normal, Position::new(2, 1)),
+        ];
+        let stance_overlays = move |e: Entity| {
+            if e == banished {
+                crate::ai::faction::StanceOverlays {
+                    banished: true,
+                    ..Default::default()
+                }
+            } else {
+                crate::ai::faction::StanceOverlays::default()
+            }
+        };
+
+        let out = resolve_socialize_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &cat_positions,
+            &relationships,
+            &crate::ai::faction::FactionRelations::canonical(),
+            &stance_overlays,
+            0,
+            None,
+        );
+        assert_eq!(
+            out,
+            Some(normal),
+            "banished candidate should be filtered; resolver picks the non-banished cat"
+        );
+    }
 }

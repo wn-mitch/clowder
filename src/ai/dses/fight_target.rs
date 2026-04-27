@@ -661,4 +661,35 @@ mod tests {
         assert!(!req.accepts(FactionStance::Ally));
         assert!(!req.accepts(FactionStance::Predator));
     }
+
+    #[test]
+    fn resolver_drops_predator_candidate_via_stance_prefilter() {
+        // §9.3: Cat→Fox = Predator. fight_target's required_stance is
+        // Enemy|Prey. Without the prefilter, a Fox candidate would be
+        // scored alongside ShadowFox. With the prefilter, Fox is
+        // dropped before evaluate_target_taking and ShadowFox wins.
+        let mut registry = DseRegistry::new();
+        registry.target_taking_dses.push(fight_target_dse());
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let fox = candidate(2, 1, 0, WildSpecies::Fox, 0.15);
+        let shadow = candidate(3, 2, 0, WildSpecies::ShadowFox, 0.18);
+        let out = resolve_fight_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &[fox, shadow],
+            0.5,
+            1.0,
+            &[],
+            &crate::ai::faction::FactionRelations::canonical(),
+            &|_| crate::ai::faction::StanceOverlays::default(),
+            0,
+            None,
+        );
+        assert_eq!(
+            out,
+            Some(shadow.entity),
+            "Predator-stance Fox candidate should be filtered; ShadowFox (Enemy) wins"
+        );
+    }
 }

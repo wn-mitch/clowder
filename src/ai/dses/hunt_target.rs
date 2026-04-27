@@ -548,4 +548,41 @@ mod tests {
         assert!(!req.accepts(FactionStance::Same));
         assert!(!req.accepts(FactionStance::Predator));
     }
+
+    #[test]
+    fn resolver_drops_befriended_prey() {
+        // §9.2 BefriendedAlly upgrades Cat→Prey to Ally. Hunt requires
+        // Prey, so a befriended prey candidate should be filtered out
+        // before evaluate_target_taking.
+        let mut registry = DseRegistry::new();
+        registry.target_taking_dses.push(hunt_target_dse());
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let befriended = candidate(2, 1, 0, PreyKind::Mouse, 0.2);
+        let normal = candidate(3, 0, 1, PreyKind::Mouse, 0.2);
+        let stance_overlays = move |e: Entity| {
+            if e == befriended.entity {
+                crate::ai::faction::StanceOverlays {
+                    befriended_ally: true,
+                    ..Default::default()
+                }
+            } else {
+                crate::ai::faction::StanceOverlays::default()
+            }
+        };
+        let out = resolve_hunt_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &[befriended, normal],
+            &crate::ai::faction::FactionRelations::canonical(),
+            &stance_overlays,
+            0,
+            None,
+        );
+        assert_eq!(
+            out,
+            Some(normal.entity),
+            "befriended prey candidate should be filtered out by §9.3"
+        );
+    }
 }
