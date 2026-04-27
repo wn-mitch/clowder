@@ -257,6 +257,10 @@ impl Plugin for SimulationPlugin {
                             // sensing predicate.
                             systems::aspirations::update_training_markers,
                             systems::aspirations::update_mentoring_target_markers,
+                            // Ticket 014 Parent marker — active
+                            // parenthood authored from
+                            // `KittenDependency` references.
+                            systems::growth::update_parent_markers,
                         )
                             .chain(),
                         systems::needs::decay_grooming,

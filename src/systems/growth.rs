@@ -167,6 +167,66 @@ pub fn update_life_stage_markers(
 }
 
 // ---------------------------------------------------------------------------
+// update_parent_markers (Ticket 014 §4 Reproduction marker)
+// ---------------------------------------------------------------------------
+
+/// Author the `Parent` ZST on every living cat that has at least one
+/// living dependent kitten with `mother == self` or `father == self`.
+///
+/// **Predicate** — `Parent` iff `∃ living KittenDependency d : d.mother == self ∨ d.father == self`.
+/// First authoring of this marker; no inline predicate is being
+/// retired. The marker is staged for future grief / aspiration
+/// consumers — there is no DSE `.require()` cutover today.
+///
+/// **§4.3 ordering hazard.** Grief consumers MUST NOT infer
+/// parent-at-time-of-death status from `With<Parent>` on a survivor
+/// post-death. When a kitten dies, the surviving parent's `Parent`
+/// marker is removed within the same tick (the kitten's
+/// `KittenDependency` stops counting once `With<Dead>` filters it
+/// out, then `cleanup_dead` despawns it). A bereaved-parent grief
+/// emitter that queries `With<Parent>` after the death cleanup
+/// would see a false negative for parents whose only kitten just
+/// died. The canonical parent-at-time-of-death channel is the
+/// future `CatDied.survivors_by_relationship` event payload — see
+/// `docs/systems/ai-substrate-refactor.md` §4.3 prose.
+///
+/// **Ordering** — Chain 2a, before the GOAP / disposition scoring
+/// loops so the snapshot population sees the freshly-authored marker.
+/// Sibling of `update_life_stage_markers` in growth.rs.
+#[allow(clippy::type_complexity)]
+pub fn update_parent_markers(
+    mut commands: Commands,
+    kittens: Query<&KittenDependency, Without<Dead>>,
+    cats: Query<
+        (Entity, Has<markers::Parent>),
+        (With<Species>, Without<Dead>),
+    >,
+) {
+    use std::collections::HashSet;
+    let mut parents: HashSet<Entity> = HashSet::new();
+    for dep in kittens.iter() {
+        if let Some(m) = dep.mother {
+            parents.insert(m);
+        }
+        if let Some(f) = dep.father {
+            parents.insert(f);
+        }
+    }
+    for (entity, has_marker) in cats.iter() {
+        let want = parents.contains(&entity);
+        match (want, has_marker) {
+            (true, false) => {
+                commands.entity(entity).insert(markers::Parent);
+            }
+            (false, true) => {
+                commands.entity(entity).remove::<markers::Parent>();
+            }
+            _ => {}
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -314,5 +374,154 @@ mod tests {
             has_stage(&world, adult_born).2,
             "adult should still be Adult"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // §4 Parent marker — author tests
+    // -----------------------------------------------------------------------
+
+    use crate::components::physical::DeathCause;
+
+    fn setup_parent() -> (World, Schedule) {
+        let world = World::new();
+        let mut schedule = Schedule::default();
+        schedule.add_systems(update_parent_markers);
+        (world, schedule)
+    }
+
+    fn spawn_adult(world: &mut World) -> Entity {
+        world.spawn(Species).id()
+    }
+
+    fn spawn_kitten(world: &mut World, mother: Entity, father: Entity) -> Entity {
+        world
+            .spawn((Species, KittenDependency::new(mother, father)))
+            .id()
+    }
+
+    #[test]
+    fn solo_cat_no_parent() {
+        let (mut world, mut schedule) = setup_parent();
+        let cat = spawn_adult(&mut world);
+        schedule.run(&mut world);
+        assert!(!world.entity(cat).contains::<markers::Parent>());
+    }
+
+    #[test]
+    fn mother_with_living_kitten_gets_parent() {
+        let (mut world, mut schedule) = setup_parent();
+        let mother = spawn_adult(&mut world);
+        let father = spawn_adult(&mut world);
+        let _kitten = spawn_kitten(&mut world, mother, father);
+        schedule.run(&mut world);
+        assert!(world.entity(mother).contains::<markers::Parent>());
+        assert!(world.entity(father).contains::<markers::Parent>());
+    }
+
+    #[test]
+    fn matured_kitten_drops_parent_marker() {
+        let (mut world, mut schedule) = setup_parent();
+        let mother = spawn_adult(&mut world);
+        let father = spawn_adult(&mut world);
+        let kitten = spawn_kitten(&mut world, mother, father);
+        schedule.run(&mut world);
+        assert!(world.entity(mother).contains::<markers::Parent>());
+        // Maturation in `tick_kitten_growth` removes KittenDependency.
+        // Simulate by removing it directly here.
+        world.entity_mut(kitten).remove::<KittenDependency>();
+        schedule.run(&mut world);
+        assert!(!world.entity(mother).contains::<markers::Parent>());
+        assert!(!world.entity(father).contains::<markers::Parent>());
+    }
+
+    #[test]
+    fn dead_kitten_excluded_so_parent_drops() {
+        let (mut world, mut schedule) = setup_parent();
+        let mother = spawn_adult(&mut world);
+        let father = spawn_adult(&mut world);
+        let kitten = spawn_kitten(&mut world, mother, father);
+        schedule.run(&mut world);
+        assert!(world.entity(mother).contains::<markers::Parent>());
+        // Kill the kitten — the §4.3 ordering hazard says the parent's
+        // marker should drop within the same tick (the canonical
+        // parent-at-time-of-death channel is the future
+        // CatDied.survivors_by_relationship event payload).
+        world.entity_mut(kitten).insert(Dead {
+            tick: 0,
+            cause: DeathCause::Starvation,
+        });
+        schedule.run(&mut world);
+        assert!(!world.entity(mother).contains::<markers::Parent>());
+        assert!(!world.entity(father).contains::<markers::Parent>());
+    }
+
+    #[test]
+    fn dead_parent_no_marker_authoring() {
+        let (mut world, mut schedule) = setup_parent();
+        let father = spawn_adult(&mut world);
+        // Mother is dead at the time of the author tick.
+        let mother = world
+            .spawn((
+                Species,
+                Dead {
+                    tick: 0,
+                    cause: DeathCause::Starvation,
+                },
+            ))
+            .id();
+        let _kitten = spawn_kitten(&mut world, mother, father);
+        schedule.run(&mut world);
+        // Father is living and has the kitten → Parent.
+        assert!(world.entity(father).contains::<markers::Parent>());
+        // Dead mother is filtered out of the cats query → no marker.
+        assert!(!world.entity(mother).contains::<markers::Parent>());
+    }
+
+    #[test]
+    fn parent_marker_idempotent() {
+        let (mut world, mut schedule) = setup_parent();
+        let mother = spawn_adult(&mut world);
+        let father = spawn_adult(&mut world);
+        let _kitten = spawn_kitten(&mut world, mother, father);
+        schedule.run(&mut world);
+        assert!(world.entity(mother).contains::<markers::Parent>());
+        schedule.run(&mut world);
+        assert!(world.entity(mother).contains::<markers::Parent>());
+    }
+
+    #[test]
+    fn parent_marker_aggregates_multiple_kittens() {
+        let (mut world, mut schedule) = setup_parent();
+        let mother = spawn_adult(&mut world);
+        let father = spawn_adult(&mut world);
+        let kitten_a = spawn_kitten(&mut world, mother, father);
+        let _kitten_b = spawn_kitten(&mut world, mother, father);
+        schedule.run(&mut world);
+        assert!(world.entity(mother).contains::<markers::Parent>());
+        // Drop one kitten — parent stays because the other is alive.
+        world.entity_mut(kitten_a).remove::<KittenDependency>();
+        schedule.run(&mut world);
+        assert!(world.entity(mother).contains::<markers::Parent>());
+    }
+
+    #[test]
+    fn parent_marker_handles_unknown_father() {
+        // KittenDependency is `Option<Entity>` for both parents — the
+        // father field can be None (e.g. unknown sire). Mother-only
+        // kittens still mark the mother.
+        let (mut world, mut schedule) = setup_parent();
+        let mother = spawn_adult(&mut world);
+        let _kitten = world
+            .spawn((
+                Species,
+                KittenDependency {
+                    mother: Some(mother),
+                    father: None,
+                    maturity: 0.0,
+                },
+            ))
+            .id();
+        schedule.run(&mut world);
+        assert!(world.entity(mother).contains::<markers::Parent>());
     }
 }

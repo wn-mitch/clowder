@@ -343,6 +343,9 @@ pub struct WardsUnderSiege;
 /// in a single tick pass over `Query<&KittenDependency>`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Parent;
+impl Parent {
+    pub const KEY: &str = "Parent";
+}
 
 // Note: `Fertility { phase, … }` is data-bearing (§7.M.7); lands in
 // Phase 3c alongside the MateWithGoal DSE, not here.
