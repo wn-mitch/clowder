@@ -571,10 +571,19 @@ pub fn resolve_combat(
     }
 
     // Make fleeing cats switch to Flee action.
+    //
+    // `ticks_remaining = 0` matches the sibling Flee paths in
+    // `disposition.rs` (ThreatDetected interrupt) and `goap.rs`
+    // (ThreatNearby urgency preempt). A non-zero value here would block
+    // `evaluate_and_plan`'s gate at goap.rs:~975 — and because the
+    // combat system re-fires every tick on persistent wildlife threats,
+    // it refreshed faster than it could decay, locking cats in Flee
+    // until they starved (ticket 043, mirrors ticket 042's pattern for
+    // a different urgency path).
     for cat_entity in &cats_to_flee {
         if let Ok((_, mut current, _, _, _, _, _, _, _, _)) = cats.get_mut(*cat_entity) {
             current.action = Action::Flee;
-            current.ticks_remaining = c.flee_action_duration.ticks(&time_scale);
+            current.ticks_remaining = 0;
             // Keep target_position — will be recalculated next evaluate_actions.
             current.target_entity = None;
         }

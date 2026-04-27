@@ -288,8 +288,6 @@ pub struct CombatConstants {
     pub flee_mood_duration: DurationDays,
     #[serde(alias = "victory_mood_ticks")]
     pub victory_mood_duration: DurationDays,
-    #[serde(alias = "flee_action_ticks")]
-    pub flee_action_duration: DurationDays,
     #[serde(alias = "heal_duration_minor")]
     pub heal_minor_duration: DurationDays,
     #[serde(alias = "heal_duration_moderate")]
@@ -350,7 +348,6 @@ impl Default for CombatConstants {
             // the default 1000-ticks/day scale: N ticks → N / 1000 days.
             flee_mood_duration: DurationDays::new(0.04),
             victory_mood_duration: DurationDays::new(0.05),
-            flee_action_duration: DurationDays::new(0.015),
             heal_minor_duration: DurationDays::new(0.05),
             heal_moderate_duration: DurationDays::new(0.2),
             heal_severe_duration: DurationDays::new(0.5),
