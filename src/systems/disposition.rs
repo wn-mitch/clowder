@@ -838,6 +838,7 @@ pub fn evaluate_dispositions(
             has_functional_kitchen,
             has_raw_food_in_stores,
             social_warmth_deficit: fulfillment.map_or(0.4, |f| f.social_warmth_deficit()),
+            cat_anchors: crate::ai::scoring::CatAnchorPositions::default(),
         };
 
         // §11 trace plumbing — dormant except when running headless
@@ -854,6 +855,9 @@ pub fn evaluate_dispositions(
             dse_registry: &side_effects.dse_registry,
             modifier_pipeline: &side_effects.modifier_pipeline,
             markers: &markers,
+            colony_landmarks: &colony.colony_landmarks,
+            exploration_map: &colony.exploration_map,
+            corruption_landmarks: &colony.corruption_landmarks,
             focal_cat,
             focal_capture,
         };

@@ -41,6 +41,18 @@ pub struct EvalInputs<'a> {
     /// marker support extends the snapshot when per-cat authoring
     /// systems land.
     pub markers: &'a MarkerSnapshot,
+    /// §L2.10.7 colony-wide anchor lookup. Read by the cat-side
+    /// `EvalCtx::anchor_position` closure for `LandmarkAnchor::Nearest{Kitchen,Stores,Garden}`
+    /// — colony-wide single-instance buildings populated by
+    /// `systems::buildings::update_colony_landmarks`.
+    pub colony_landmarks: &'a crate::resources::ColonyLandmarks,
+    /// §L2.10.7 unexplored-frontier centroid cache. Read by Explore
+    /// (B16) via `LandmarkAnchor::UnexploredFrontierCentroid`.
+    pub exploration_map: &'a crate::resources::ExplorationMap,
+    /// §L2.10.7 territory-corruption centroid cache. Read by
+    /// ColonyCleanse (B12) via
+    /// `LandmarkAnchor::TerritoryCorruptionCentroid`.
+    pub corruption_landmarks: &'a crate::resources::CorruptionLandmarks,
     /// §11 focal-cat entity, when active. The caller resolves the
     /// focal name against the live cat roster and populates this once
     /// per tick; `score_dse_by_id` compares it against `cat` to gate
@@ -137,6 +149,46 @@ fn jitter(rng: &mut impl Rng, range: f32) -> f32 {
 // ---------------------------------------------------------------------------
 
 /// Everything the scoring function needs to evaluate available actions.
+/// §L2.10.7 per-cat anchor positions. Populated once per scoring
+/// tick by the cat-side `ScoringContext` builders (`goap.rs::eligible_dispositions`
+/// and `disposition.rs::evaluate_dispositions`); read by the
+/// `EvalCtx::anchor_position` closure in `score_dse_by_id` to resolve
+/// `LandmarkSource::Anchor(LandmarkAnchor::*)` to a concrete tile
+/// position.
+///
+/// Each field is `Option<Position>`; `None` means the anchor has no
+/// resolvable position for this cat this tick (no threat in range,
+/// no corrupted tile nearby, no construction site, etc.) and the
+/// consideration scores 0.0 per the
+/// `LandmarkSource::Anchor` substrate convention.
+///
+/// **Why an owned struct, not a reference.** ScoringContext borrows
+/// shared resources; the anchor positions are computed per-cat per-tick
+/// and don't outlive the builder. Owning them inside ScoringContext
+/// keeps the closure capture trivial (no extra lifetime dance).
+#[derive(Default, Debug, Clone, Copy)]
+pub struct CatAnchorPositions {
+    /// `LandmarkAnchor::NearestConstructionSite` — Build (B6).
+    pub nearest_construction_site: Option<Position>,
+    /// `LandmarkAnchor::NearestForageableCluster` — Forage (B7).
+    pub nearest_forageable_cluster: Option<Position>,
+    /// `LandmarkAnchor::NearestHerbPatch` — HerbcraftGather (B8).
+    pub nearest_herb_patch: Option<Position>,
+    /// `LandmarkAnchor::NearestPerimeterTile` — HerbcraftWard (B9).
+    pub nearest_perimeter_tile: Option<Position>,
+    /// `LandmarkAnchor::CoordinatorPerch` — Coordinate (B14).
+    pub coordinator_perch: Option<Position>,
+    /// `LandmarkAnchor::TerritoryPerimeterAnchor` — Patrol (B13).
+    pub territory_perimeter_anchor: Option<Position>,
+    /// `LandmarkAnchor::OwnSleepingSpot` — Sleep (B2).
+    pub own_sleeping_spot: Option<Position>,
+    /// `LandmarkAnchor::NearestThreat` — Flee (B15).
+    pub nearest_threat: Option<Position>,
+    /// `LandmarkAnchor::NearestCorruptedTile` — Cleanse (B1) +
+    /// DurableWard (B11).
+    pub nearest_corrupted_tile: Option<Position>,
+}
+
 pub struct ScoringContext<'a> {
     pub scoring: &'a ScoringConstants,
     pub needs: &'a Needs,
@@ -272,6 +324,11 @@ pub struct ScoringContext<'a> {
     /// socializing urgency from the Fulfillment register, independent of
     /// the Maslow social need.
     pub social_warmth_deficit: f32,
+    // --- §L2.10.7 anchor positions ---
+    /// Per-cat anchor positions for `LandmarkSource::Anchor` resolution.
+    /// Populated by the ScoringContext builders (`goap.rs`, `disposition.rs`)
+    /// once per scoring tick. See [`CatAnchorPositions`] doc for details.
+    pub cat_anchors: CatAnchorPositions,
 }
 
 // ---------------------------------------------------------------------------
@@ -548,7 +605,36 @@ fn score_dse_by_id(dse_id: &str, ctx: &ScoringContext, inputs: &EvalInputs) -> f
     let markers = inputs.markers;
     let has_marker = |name: &str, entity: Entity| -> bool { markers.has(name, entity) };
     let entity_position = |_: Entity| -> Option<Position> { None };
-    let anchor_position = |_: LandmarkAnchor| -> Option<Position> { None };
+    // §L2.10.7 cat-side anchor resolution. Reads colony-wide anchors
+    // from `EvalInputs` (ColonyLandmarks / ExplorationMap /
+    // CorruptionLandmarks) and per-cat anchors from
+    // `ScoringContext.cat_anchors` (populated once per scoring tick by
+    // the builders in `goap.rs` / `disposition.rs`).
+    let anchor_position = |a: LandmarkAnchor| -> Option<Position> {
+        match a {
+            // Colony-wide single-instance buildings.
+            LandmarkAnchor::NearestKitchen => inputs.colony_landmarks.kitchen,
+            LandmarkAnchor::NearestStores => inputs.colony_landmarks.stores,
+            LandmarkAnchor::NearestGarden => inputs.colony_landmarks.garden,
+            // Per-tick precomputed centroids.
+            LandmarkAnchor::UnexploredFrontierCentroid => {
+                inputs.exploration_map.frontier_centroid()
+            }
+            LandmarkAnchor::TerritoryCorruptionCentroid => inputs.corruption_landmarks.centroid(),
+            // Per-cat anchors populated by the ScoringContext builder.
+            LandmarkAnchor::NearestConstructionSite => ctx.cat_anchors.nearest_construction_site,
+            LandmarkAnchor::NearestForageableCluster => ctx.cat_anchors.nearest_forageable_cluster,
+            LandmarkAnchor::NearestHerbPatch => ctx.cat_anchors.nearest_herb_patch,
+            LandmarkAnchor::NearestPerimeterTile => ctx.cat_anchors.nearest_perimeter_tile,
+            LandmarkAnchor::CoordinatorPerch => ctx.cat_anchors.coordinator_perch,
+            LandmarkAnchor::TerritoryPerimeterAnchor => ctx.cat_anchors.territory_perimeter_anchor,
+            LandmarkAnchor::OwnSleepingSpot => ctx.cat_anchors.own_sleeping_spot,
+            LandmarkAnchor::NearestThreat => ctx.cat_anchors.nearest_threat,
+            LandmarkAnchor::NearestCorruptedTile => ctx.cat_anchors.nearest_corrupted_tile,
+            // Fox-side anchors aren't relevant to cat scoring.
+            _ => None,
+        }
+    };
     let needs_ref = ctx.needs;
     let maslow = |tier: u8| needs_ref.level_suppression(tier);
 
@@ -1758,6 +1844,21 @@ mod tests {
         })
     }
 
+    fn cached_colony_landmarks() -> &'static crate::resources::ColonyLandmarks {
+        static L: OnceLock<crate::resources::ColonyLandmarks> = OnceLock::new();
+        L.get_or_init(crate::resources::ColonyLandmarks::default)
+    }
+
+    fn cached_exploration_map() -> &'static crate::resources::ExplorationMap {
+        static M: OnceLock<crate::resources::ExplorationMap> = OnceLock::new();
+        M.get_or_init(crate::resources::ExplorationMap::default)
+    }
+
+    fn cached_corruption_landmarks() -> &'static crate::resources::CorruptionLandmarks {
+        static C: OnceLock<crate::resources::CorruptionLandmarks> = OnceLock::new();
+        C.get_or_init(crate::resources::CorruptionLandmarks::default)
+    }
+
     fn test_eval_inputs() -> EvalInputs<'static> {
         EvalInputs {
             cat: Entity::from_raw_u32(1).unwrap(),
@@ -1766,6 +1867,9 @@ mod tests {
             dse_registry: cached_registry(),
             modifier_pipeline: cached_modifier_pipeline(),
             markers: cached_test_markers(),
+            colony_landmarks: cached_colony_landmarks(),
+            exploration_map: cached_exploration_map(),
+            corruption_landmarks: cached_corruption_landmarks(),
             focal_cat: None,
             focal_capture: None,
         }
@@ -1853,6 +1957,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
+            cat_anchors: crate::ai::scoring::CatAnchorPositions::default(),
         }
     }
 
@@ -1996,6 +2101,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
+            cat_anchors: crate::ai::scoring::CatAnchorPositions::default(),
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let best = select_best_action(&scores);
@@ -2143,6 +2249,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
+            cat_anchors: crate::ai::scoring::CatAnchorPositions::default(),
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let socialize_score = scores
@@ -2399,6 +2506,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
+            cat_anchors: crate::ai::scoring::CatAnchorPositions::default(),
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let best = select_best_action(&scores);
@@ -2471,6 +2579,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
+            cat_anchors: crate::ai::scoring::CatAnchorPositions::default(),
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let fight_score = scores.iter().find(|(a, _)| *a == Action::Fight).unwrap().1;
@@ -2562,6 +2671,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
+            cat_anchors: crate::ai::scoring::CatAnchorPositions::default(),
         };
         // Build a per-test MarkerSnapshot with Incapacitated set for
         // this cat (the cached shared snapshot only carries colony
@@ -2580,6 +2690,9 @@ mod tests {
         let inputs = EvalInputs {
             cat: cat_entity,
             markers: &markers,
+            colony_landmarks: &Default::default(),
+            exploration_map: &Default::default(),
+            corruption_landmarks: &Default::default(),
             ..base
         };
         let scores = score_actions(&c, &inputs, &mut rng).scores;
@@ -2870,6 +2983,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
+            cat_anchors: crate::ai::scoring::CatAnchorPositions::default(),
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let wander = scores.iter().find(|(a, _)| *a == Action::Wander).unwrap().1;
@@ -2943,6 +3057,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
+            cat_anchors: crate::ai::scoring::CatAnchorPositions::default(),
         };
 
         let scores_full = score_actions(&base, &test_eval_inputs(), &mut rng_full).scores;
@@ -3383,6 +3498,9 @@ mod tests {
             dse_registry: cached_registry(),
             modifier_pipeline: cached_modifier_pipeline(),
             markers: &snap,
+            colony_landmarks: &Default::default(),
+            exploration_map: &Default::default(),
+            corruption_landmarks: &Default::default(),
             focal_cat: None,
             focal_capture: None,
         };

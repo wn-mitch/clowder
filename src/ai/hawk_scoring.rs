@@ -296,6 +296,9 @@ mod tests {
             dse_registry: &registry,
             modifier_pipeline: &modifier,
             markers: &markers,
+            colony_landmarks: &Default::default(),
+            exploration_map: &Default::default(),
+            corruption_landmarks: &Default::default(),
             focal_cat: None,
             focal_capture: None,
         };

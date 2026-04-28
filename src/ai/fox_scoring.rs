@@ -569,6 +569,11 @@ mod tests {
         modifiers: &'a ModifierPipeline,
         markers: &'a crate::ai::scoring::MarkerSnapshot,
     ) -> EvalInputs<'a> {
+        use std::sync::OnceLock;
+        static COLONY_LANDMARKS: OnceLock<crate::resources::ColonyLandmarks> = OnceLock::new();
+        static EXPLORATION_MAP: OnceLock<crate::resources::ExplorationMap> = OnceLock::new();
+        static CORRUPTION_LANDMARKS: OnceLock<crate::resources::CorruptionLandmarks> =
+            OnceLock::new();
         EvalInputs {
             cat: Entity::from_raw_u32(1).unwrap(),
             position: Position::new(0, 0),
@@ -576,6 +581,12 @@ mod tests {
             dse_registry: registry,
             modifier_pipeline: modifiers,
             markers,
+            colony_landmarks: COLONY_LANDMARKS
+                .get_or_init(crate::resources::ColonyLandmarks::default),
+            exploration_map: EXPLORATION_MAP
+                .get_or_init(crate::resources::ExplorationMap::default),
+            corruption_landmarks: CORRUPTION_LANDMARKS
+                .get_or_init(crate::resources::CorruptionLandmarks::default),
             focal_cat: None,
             focal_capture: None,
         }

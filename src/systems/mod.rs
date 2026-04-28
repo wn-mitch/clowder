@@ -9,6 +9,13 @@ pub struct ColonyContext<'w> {
     pub exploration_map: Res<'w, crate::resources::ExplorationMap>,
     pub fox_scent_map: Res<'w, crate::resources::FoxScentMap>,
     pub cat_presence_map: ResMut<'w, crate::resources::CatPresenceMap>,
+    /// §L2.10.7 colony-wide single-instance building positions
+    /// (kitchen, stores, garden). Read by the cat-side
+    /// `EvalCtx::anchor_position` closure for `LandmarkAnchor::Nearest{Kitchen,Stores,Garden}`.
+    pub colony_landmarks: Res<'w, crate::resources::ColonyLandmarks>,
+    /// §L2.10.7 territory-corruption centroid cache. Read by
+    /// ColonyCleanse via `LandmarkAnchor::TerritoryCorruptionCentroid`.
+    pub corruption_landmarks: Res<'w, crate::resources::CorruptionLandmarks>,
 }
 
 pub mod actions;

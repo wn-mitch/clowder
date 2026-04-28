@@ -1310,6 +1310,7 @@ pub fn evaluate_and_plan(
             has_functional_kitchen,
             has_raw_food_in_stores,
             social_warmth_deficit: fulfillment.map_or(0.4, |f| f.social_warmth_deficit()),
+            cat_anchors: crate::ai::scoring::CatAnchorPositions::default(),
         };
 
         let focal_cat = res.focal_target.as_deref().and_then(|t| t.entity);
@@ -1321,6 +1322,9 @@ pub fn evaluate_and_plan(
             dse_registry: &res.dse_registry,
             modifier_pipeline: &res.modifier_pipeline,
             markers: &markers,
+            colony_landmarks: &colony.colony_landmarks,
+            exploration_map: &colony.exploration_map,
+            corruption_landmarks: &colony.corruption_landmarks,
             focal_cat,
             focal_capture,
         };

@@ -507,6 +507,9 @@ pub fn fox_evaluate_and_plan(
             dse_registry: &dse_registry,
             modifier_pipeline: &modifier_pipeline,
             markers: &fox_markers,
+            colony_landmarks: &Default::default(),
+            exploration_map: &Default::default(),
+            corruption_landmarks: &Default::default(),
             // §11 focal-cat tracing keys off cat name; foxes never
             // match, so unconditionally `None` here keeps fox-scoring
             // on the zero-cost path.
