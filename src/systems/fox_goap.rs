@@ -105,6 +105,15 @@ pub fn sync_fox_needs(
 /// Kept intentionally simple for the first pass — spatial belief integration
 /// (FoxHuntingBeliefs, FoxThreatMemory) is stubbed to reasonable defaults so
 /// the system works end-to-end; those integrations slot in later.
+///
+/// **§L2.10.7 anchor positions** — the seven anchor fields populated
+/// here (`den_position`, `cat_cluster_centroid`, `prey_belief_centroid`,
+/// `frontier_centroid`, `nearest_visible_store`, `nearest_map_edge`,
+/// `territory_perimeter_anchor`) feed the `EvalCtx::anchor_position`
+/// closure in `score_fox_dse_by_id` (A3). Each is `None` when the
+/// anchor has no resolvable position; the consideration scores 0.0 in
+/// that case (substrate convention from
+/// `LandmarkSource::Anchor` dispatcher).
 #[allow(clippy::too_many_arguments)]
 fn build_scoring_context<'a>(
     needs: &'a FoxNeeds,
@@ -118,6 +127,8 @@ fn build_scoring_context<'a>(
     store_positions: &[Position],
     prey_positions: &[Position],
     hunting_beliefs: Option<&FoxHuntingBeliefs>,
+    exploration: Option<&crate::components::fox_spatial::FoxExplorationMap>,
+    map_extent: (i32, i32),
     befriended_ally: bool,
     now: u64,
     day_phase: DayPhase,
@@ -156,6 +167,24 @@ fn build_scoring_context<'a>(
 
     let ticks_since_patrol = now.saturating_sub(fox_state.last_patrol_tick);
 
+    // §L2.10.7 anchor centroids — computed once per fox per scoring
+    // tick. Each is `None` when no contributing data is available.
+    let cat_cluster_centroid = mean_position(
+        cat_positions
+            .iter()
+            .filter(|p| p.manhattan_distance(&fox_pos) <= 6)
+            .copied(),
+    );
+    let prey_belief_centroid = hunting_beliefs.and_then(prey_belief_centroid_from);
+    let frontier_centroid = exploration.and_then(exploration_frontier_centroid);
+    let nearest_visible_store = store_positions
+        .iter()
+        .filter(|p| p.manhattan_distance(&fox_pos) <= 12)
+        .min_by_key(|p| fox_pos.manhattan_distance(p))
+        .copied();
+    let nearest_map_edge = nearest_map_edge_for(fox_pos, map_extent);
+    let territory_perimeter_anchor = den_pos.map(|d| Position::new(d.x + 10, d.y + 10));
+
     FoxScoringContext {
         needs,
         personality,
@@ -176,9 +205,101 @@ fn build_scoring_context<'a>(
         ticks_since_patrol,
         day_phase,
         self_position: fox_pos,
+        den_position: den_pos,
+        cat_cluster_centroid,
+        prey_belief_centroid,
+        frontier_centroid,
+        nearest_visible_store,
+        nearest_map_edge,
+        territory_perimeter_anchor,
         scoring,
         jitter_range: 0.05,
     }
+}
+
+/// Mean of an iterator of positions; `None` for empty iterators.
+fn mean_position(iter: impl IntoIterator<Item = Position>) -> Option<Position> {
+    let mut sum_x: i64 = 0;
+    let mut sum_y: i64 = 0;
+    let mut count: i64 = 0;
+    for p in iter {
+        sum_x += p.x as i64;
+        sum_y += p.y as i64;
+        count += 1;
+    }
+    (count > 0).then(|| Position::new((sum_x / count) as i32, (sum_y / count) as i32))
+}
+
+/// Threshold below which a `FoxHuntingBeliefs` cell is ignored when
+/// computing the prey-belief centroid. Matches the
+/// `HUNTING_DEFAULT_PRIOR` so cells at the prior contribute nothing
+/// — only cells the fox has updated meaningfully drive the centroid.
+const PREY_BELIEF_FLOOR: f32 = crate::components::fox_spatial::HUNTING_DEFAULT_PRIOR;
+
+/// Intensity-weighted centroid of belief cells above the floor. Each
+/// cell contributes `(belief - floor) × bucket_center`.
+fn prey_belief_centroid_from(beliefs: &FoxHuntingBeliefs) -> Option<Position> {
+    let mut wx: f64 = 0.0;
+    let mut wy: f64 = 0.0;
+    let mut total: f64 = 0.0;
+    let bs = beliefs.bucket_size as f64;
+    for by in 0..beliefs.grid_h {
+        for bx in 0..beliefs.grid_w {
+            let v = beliefs.beliefs[by * beliefs.grid_w + bx];
+            if v > PREY_BELIEF_FLOOR {
+                let weight = (v - PREY_BELIEF_FLOOR) as f64;
+                let cx = bs * bx as f64 + bs / 2.0;
+                let cy = bs * by as f64 + bs / 2.0;
+                wx += weight * cx;
+                wy += weight * cy;
+                total += weight;
+            }
+        }
+    }
+    (total > 0.0).then(|| Position::new((wx / total).round() as i32, (wy / total).round() as i32))
+}
+
+/// Threshold above which a `FoxExplorationMap` cell is considered
+/// "explored" (and excluded from the frontier centroid).
+const EXPLORATION_THRESHOLD: f32 = 0.5;
+
+/// Centroid of unvisited cells (coverage below threshold) — fox
+/// Dispersing's gradient-following anchor.
+fn exploration_frontier_centroid(
+    exploration: &crate::components::fox_spatial::FoxExplorationMap,
+) -> Option<Position> {
+    let mut wx: f64 = 0.0;
+    let mut wy: f64 = 0.0;
+    let mut total: f64 = 0.0;
+    let bs = exploration.bucket_size as f64;
+    for by in 0..exploration.grid_h {
+        for bx in 0..exploration.grid_w {
+            let v = exploration.coverage[by * exploration.grid_w + bx];
+            if v < EXPLORATION_THRESHOLD {
+                // Weight by 1 - v so deeply unvisited cells dominate.
+                let weight = (1.0 - v) as f64;
+                let cx = bs * bx as f64 + bs / 2.0;
+                let cy = bs * by as f64 + bs / 2.0;
+                wx += weight * cx;
+                wy += weight * cy;
+                total += weight;
+            }
+        }
+    }
+    (total > 0.0).then(|| Position::new((wx / total).round() as i32, (wy / total).round() as i32))
+}
+
+/// Closest map-edge tile to the fox, picking the corner of the
+/// nearer half-plane on each axis. Mirrors the existing
+/// `resolve_zone_position`'s `MapEdge` arm so anchor lookups and zone
+/// resolution agree.
+fn nearest_map_edge_for(pos: Position, (width, height): (i32, i32)) -> Option<Position> {
+    if width <= 0 || height <= 0 {
+        return None;
+    }
+    let edge_x = if pos.x < width / 2 { 0 } else { width - 1 };
+    let edge_y = if pos.y < height / 2 { 0 } else { height - 1 };
+    Some(Position::new(edge_x, edge_y))
 }
 
 /// Build a [`FoxPlannerState`] snapshot for A* search.
@@ -265,10 +386,12 @@ pub fn fox_evaluate_and_plan(
             &FoxNeeds,
             &FoxPersonality,
             Option<&FoxHuntingBeliefs>,
+            Option<&crate::components::fox_spatial::FoxExplorationMap>,
         ),
         (With<WildAnimal>, Without<FoxGoapPlan>, Without<Dead>),
     >,
     dens: Query<(Entity, &FoxDen, &Position), Without<FoxState>>,
+    map: Res<TileMap>,
     cats: Query<
         &Position,
         (
@@ -323,7 +446,7 @@ pub fn fox_evaluate_and_plan(
     // so `EvalCtx::has_marker` resolves truthfully when fox DSEs migrate
     // to `.require()` filters.
     let mut fox_markers = crate::ai::scoring::MarkerSnapshot::new();
-    for (fox_entity, _, _, _, _, _) in &foxes {
+    for (fox_entity, _, _, _, _, _, _) in &foxes {
         if let Ok((
             store_visible,
             store_guarded,
@@ -347,7 +470,9 @@ pub fn fox_evaluate_and_plan(
         }
     }
 
-    for (fox_entity, fox_state, fox_pos, needs, personality, hunting_beliefs) in &foxes {
+    for (fox_entity, fox_state, fox_pos, needs, personality, hunting_beliefs, exploration) in
+        &foxes
+    {
         let den_info = fox_state
             .home_den
             .and_then(|e| dens.get(e).ok())
@@ -368,6 +493,8 @@ pub fn fox_evaluate_and_plan(
             &store_positions,
             &prey_positions,
             hunting_beliefs,
+            exploration,
+            (map.width, map.height),
             befriended_ally,
             time.tick,
             day_phase,

@@ -102,6 +102,39 @@ pub struct FoxScoringContext<'a> {
     /// scalar-only.
     pub self_position: Position,
 
+    // --- §L2.10.7 anchor positions (per-fox centroids; fed to the
+    // `EvalCtx::anchor_position` closure in `score_fox_dse_by_id`).
+    /// Den entity position. Resolved from `FoxState.home_den`. `None`
+    /// when the fox has no home den (juvenile disperser). Read by fox
+    /// Resting / Feeding / DenDefense via [`LandmarkAnchor::OwnDen`].
+    pub den_position: Option<Position>,
+    /// Centroid of cats within `cats_nearby` detection range. `None`
+    /// when no cats are in range. Read by fox Avoiding via
+    /// [`LandmarkAnchor::CatClusterCentroid`].
+    pub cat_cluster_centroid: Option<Position>,
+    /// Intensity-weighted centroid of high-belief cells in the focal
+    /// fox's `FoxHuntingBeliefs` grid. `None` when no cell has belief
+    /// above the floor. Read by fox Hunting via
+    /// [`LandmarkAnchor::PreyBeliefCentroid`].
+    pub prey_belief_centroid: Option<Position>,
+    /// Centroid of low-coverage cells in the focal fox's
+    /// `FoxExplorationMap` grid. `None` when fully explored. Read by
+    /// fox Dispersing via [`LandmarkAnchor::UnexploredFrontierCentroid`].
+    pub frontier_centroid: Option<Position>,
+    /// Nearest visible (un-guarded) colony store tile from the fox's
+    /// position. `None` when no store is in detection range. Read by
+    /// fox Raiding via [`LandmarkAnchor::NearestVisibleStore`].
+    pub nearest_visible_store: Option<Position>,
+    /// Nearest map-edge tile (escape routing). Always `Some` when the
+    /// fox is on a finite map. Read by fox Fleeing via
+    /// [`LandmarkAnchor::NearestMapEdge`].
+    pub nearest_map_edge: Option<Position>,
+    /// Anchor along the fox's territory perimeter (currently
+    /// `home_den` position offset along the patrol arc). `None` when
+    /// the fox has no den. Read by fox Patrolling via
+    /// [`LandmarkAnchor::TerritoryPerimeterAnchor`].
+    pub territory_perimeter_anchor: Option<Position>,
+
     // --- Tuning ---
     pub scoring: &'a ScoringConstants,
     pub jitter_range: f32,
@@ -481,6 +514,13 @@ mod tests {
             ticks_since_patrol: 0,
             day_phase: DayPhase::Night, // hunt-favorable default; tests override
             self_position: Position::new(0, 0),
+            den_position: None,
+            cat_cluster_centroid: None,
+            prey_belief_centroid: None,
+            frontier_centroid: None,
+            nearest_visible_store: None,
+            nearest_map_edge: None,
+            territory_perimeter_anchor: None,
             scoring,
             jitter_range: 0.0, // no jitter in tests
         }
