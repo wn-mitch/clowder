@@ -44,7 +44,7 @@ this file.
 | Phase 2 | §5 InfluenceMap substrate | ✅ landed (substrate); 🔄 catalog rollout | [006](006-cluster-b-shared-spatial-slow-state.md) |
 | Phase 3a–3d | §2–§3 / §4 / §9 L2 substrate | ✅ landed | (retired 005) |
 | Phase 4 | §6 target-taking DSEs | ✅ landed | (retired 014) |
-| Phase 4 follow-ons | §4 / §6.5 residue | 🔄 in flight | [049](049-faction-overlay-markers.md), [050](050-marker-predicate-refinements.md), [051](051-fox-dse-eligibility-migration.md), [052](052-l2-10-7-plan-cost-feedback.md) |
+| Phase 4 follow-ons | §4 / §6.5 residue | 🔄 in flight | [049](049-faction-overlay-markers.md), [050](050-marker-predicate-refinements.md), [051](051-fox-dse-eligibility-migration.md), 052 ✅ landed (acccdc7), [065](065-l2-10-7-self-state-fox-roster-sweep.md) |
 | Phase 5 | scattered sites + silent-advance audit | ✅ landed | (retired 005) |
 | Phase 6a | §7 commitment gate | ✅ landed | (retired 005) |
 | Phase 6b | §7.7 aspiration reconsideration | 🔄 in flight | [053](053-death-event-grief-emission.md), [054](054-fate-event-vocabulary-expansion.md), [055](055-mood-drift-threshold-detection.md), [056](056-aspiration-compatibility-matrix.md), [057](057-coordinator-directive-intention-strategy-row.md), [058](058-tradition-unfiltered-loop-fix.md) |
@@ -76,7 +76,7 @@ substrate's vocabulary and were tracked alongside it:
 | [049](049-faction-overlay-markers.md) | ready | §9.2 | Faction overlay markers (4 ZSTs) |
 | [050](050-marker-predicate-refinements.md) | ready | §4 | Marker predicate refinements (3 promotions) |
 | [051](051-fox-dse-eligibility-migration.md) | ready | §4 / fox | Fox DSE `.require()` / `.forbid()` cutover |
-| [052](052-l2-10-7-plan-cost-feedback.md) | ready | §L2.10.7 | **Plan-cost feedback** (largest remaining structural item) |
+| [065](065-l2-10-7-self-state-fox-roster-sweep.md) | ready | §L2.10.7 | Self-state DSE + fox disposition roster (succeeds 052) |
 | [053](053-death-event-grief-emission.md) | blocked-by 007 | §7.7.b | Death-event grief emission |
 | [054](054-fate-event-vocabulary-expansion.md) | ready | §7.7.c | Fate event vocabulary expansion |
 | [055](055-mood-drift-threshold-detection.md) | blocked-by 056 | §7.7.d | Mood drift detection |
@@ -89,16 +89,25 @@ substrate's vocabulary and were tracked alongside it:
 
 ### Critical path
 
-The structural critical path is **052 → 006 → 059**:
+The structural critical path is **052 ✅ → 065 → 006 → 059**:
 
-1. **052** lands the `SpatialConsideration` consumer surface and
-   per-DSE roster cutover. Unblocks 4 §6.5 axes (`pursuit-cost`,
-   `fertility-window` spatial, `apprentice-receptivity` spatial-
-   pairing, `remedy-match` caretaker-distance).
-2. **006** completes the §5.6.3 absent-map catalog. Producer maps
-   feed 052's consumer surface.
-3. **059** sweeps the residue: deletes `ScoringContext` /
-   `FoxScoringContext` after 052's last consumer is written,
+1. **052** ✅ landed 2026-04-28 (acccdc7). The `SpatialConsideration`
+   substrate is in production with `LandmarkSource::{TargetPosition,
+   Tile, Entity}`; all 9 cat target-taking DSEs cut over to it; the
+   four §6.5 deferred axes (`pursuit-cost`, `fertility-window` spatial,
+   `apprentice-receptivity` spatial-pairing, `remedy-match` caretaker-
+   distance) are unblocked. Cumulative drift across the entire
+   refactor's 6 commits: ~zero on every characteristic metric.
+2. **065** picks up the rest of §L2.10.7's roster — 12 cat self-state
+   DSEs + 9 fox dispositions. First production callers of
+   `LandmarkSource::Entity`; substrate decision needed for aggregate-
+   centroid landmarks (Explore frontier, PracticeMagic corruption
+   cluster, fox Hunting prey-belief centroid).
+3. **006** completes the §5.6.3 absent-map catalog. Producer maps
+   feed 065's centroid resolution paths and the influence-map
+   sampling sites that ScoringContext currently owns.
+4. **059** sweeps the residue: deletes `ScoringContext` /
+   `FoxScoringContext` after 065's last consumer is written,
    reconciles spec-vs-code drift.
 
 Other tickets parallelize off this spine. 027 is mating-specific
@@ -123,9 +132,10 @@ themselves, gated only on the cluster-A landings.
 
 As of 2026-04-27 — substrate is structurally complete through
 Phase 6a. Phase 6b/6c/6d landed via separate ticket threads.
-Phase 7 cleanup is parked pending 052. The user's audit on
-2026-04-27 confirmed every spec section maps to either landed work
-or an open child ticket; founder-age regression (refactor pre-flight
+Phase 7 cleanup is parked pending 065 (which now owns 052's
+remaining substrate consumers). The user's audit on 2026-04-27
+confirmed every spec section maps to either landed work or an
+open child ticket; founder-age regression (refactor pre-flight
 gate 2) was confirmed quietly resolved with no ticket needed.
 
 For the per-section coverage map, see the audit plan at
