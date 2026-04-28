@@ -1846,7 +1846,16 @@ mod tests {
 
     fn cached_colony_landmarks() -> &'static crate::resources::ColonyLandmarks {
         static L: OnceLock<crate::resources::ColonyLandmarks> = OnceLock::new();
-        L.get_or_init(crate::resources::ColonyLandmarks::default)
+        // Place every colony building at (0, 0) so the §L2.10.7
+        // spatial axes evaluate at the closest cost when the test
+        // cat is at the origin (the default `test_eval_inputs()`
+        // position). Tests that exercise distance-based behavior
+        // override these in their own `EvalInputs` literal.
+        L.get_or_init(|| crate::resources::ColonyLandmarks {
+            kitchen: Some(Position::new(0, 0)),
+            stores: Some(Position::new(0, 0)),
+            garden: Some(Position::new(0, 0)),
+        })
     }
 
     fn cached_exploration_map() -> &'static crate::resources::ExplorationMap {
@@ -2690,9 +2699,6 @@ mod tests {
         let inputs = EvalInputs {
             cat: cat_entity,
             markers: &markers,
-            colony_landmarks: &Default::default(),
-            exploration_map: &Default::default(),
-            corruption_landmarks: &Default::default(),
             ..base
         };
         let scores = score_actions(&c, &inputs, &mut rng).scores;
@@ -3498,9 +3504,9 @@ mod tests {
             dse_registry: cached_registry(),
             modifier_pipeline: cached_modifier_pipeline(),
             markers: &snap,
-            colony_landmarks: &Default::default(),
-            exploration_map: &Default::default(),
-            corruption_landmarks: &Default::default(),
+            colony_landmarks: cached_colony_landmarks(),
+            exploration_map: cached_exploration_map(),
+            corruption_landmarks: cached_corruption_landmarks(),
             focal_cat: None,
             focal_capture: None,
         };

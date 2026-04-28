@@ -10,8 +10,10 @@
 use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
-use crate::ai::curves::Curve;
+use crate::ai::considerations::{
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
+use crate::ai::curves::{Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
@@ -19,6 +21,11 @@ use crate::components::markers;
 
 pub const COMPASSION_INPUT: &str = "compassion";
 pub const HERBCRAFT_SKILL_INPUT: &str = "herbcraft_skill";
+
+/// Manhattan range over which the kitchen-distance curve is normalized.
+/// Reuses `cook::COOK_KITCHEN_RANGE` (20 tiles) — same building, same
+/// shape; remedy preparation happens at the same kitchen as cooking.
+pub const HERBCRAFT_PREPARE_KITCHEN_RANGE: f32 = 20.0;
 
 pub struct HerbcraftPrepareDse {
     id: DseId,
@@ -33,13 +40,30 @@ impl HerbcraftPrepareDse {
             slope: 1.0,
             intercept: 0.0,
         };
+        // §L2.10.7 spatial axis: distance to nearest kitchen tile.
+        // Same Composite{Logistic, Invert} shape as Cook — preparation
+        // happens at the kitchen, distant cats discounted but not
+        // gated.
+        let kitchen_distance = Curve::Composite {
+            inner: Box::new(Curve::Logistic {
+                steepness: 8.0,
+                midpoint: 0.5,
+            }),
+            post: PostOp::Invert,
+        };
         Self {
             id: DseId("herbcraft_prepare"),
             considerations: vec![
                 Consideration::Scalar(ScalarConsideration::new(COMPASSION_INPUT, linear.clone())),
                 Consideration::Scalar(ScalarConsideration::new(HERBCRAFT_SKILL_INPUT, linear)),
+                Consideration::Spatial(SpatialConsideration::new(
+                    "herbcraft_prepare_kitchen_distance",
+                    LandmarkSource::Anchor(LandmarkAnchor::NearestKitchen),
+                    HERBCRAFT_PREPARE_KITCHEN_RANGE,
+                    kitchen_distance,
+                )),
             ],
-            composition: Composition::compensated_product(vec![1.0, 1.0]),
+            composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
             eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
         }

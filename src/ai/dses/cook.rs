@@ -21,12 +21,17 @@
 use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
-use crate::ai::curves::{scarcity, Curve};
+use crate::ai::considerations::{Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration};
+use crate::ai::curves::{scarcity, Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
 use crate::components::markers;
+
+/// Manhattan range over which the kitchen-distance curve is normalized
+/// for Cook. Beyond this the curve saturates near zero. 20 tiles ≈ a
+/// long colony walk; cats farther than this rarely commute to Cook.
+pub const COOK_KITCHEN_RANGE: f32 = 20.0;
 
 pub struct CookDse {
     id: DseId,
@@ -37,6 +42,18 @@ pub struct CookDse {
 
 impl CookDse {
     pub fn new() -> Self {
+        // §L2.10.7 Cook spatial axis: `Composite { Logistic(8, 0.5),
+        // Invert }` evaluates `1 - Logistic(cost)` over normalized
+        // cost = manhattan_distance / COOK_KITCHEN_RANGE. Close-enough
+        // plateau: at cost=0 ≈ 0.98, at cost=1 ≈ 0.02. Mirrors
+        // mate_target.rs's pattern for the "commute" curve family.
+        let kitchen_distance = Curve::Composite {
+            inner: Box::new(Curve::Logistic {
+                steepness: 8.0,
+                midpoint: 0.5,
+            }),
+            post: PostOp::Invert,
+        };
         Self {
             id: DseId("cook"),
             considerations: vec![
@@ -58,11 +75,23 @@ impl CookDse {
                         intercept: 0.0,
                     },
                 )),
+                // §L2.10.7 spatial axis: distance to nearest kitchen
+                // tile via the colony-wide ColonyLandmarks resource.
+                // Closer-is-better via Composite{Logistic, Invert}.
+                Consideration::Spatial(SpatialConsideration::new(
+                    "cook_kitchen_distance",
+                    LandmarkSource::Anchor(LandmarkAnchor::NearestKitchen),
+                    COOK_KITCHEN_RANGE,
+                    kitchen_distance,
+                )),
             ],
             // RtEO sum = 1.0. Base rate carries the "always worth
             // doing" floor; scarcity escalates under colony stress;
-            // diligence is the personality weight.
-            composition: Composition::weighted_sum(vec![0.4, 0.3, 0.3]),
+            // diligence is the personality weight; spatial axis at 0.20
+            // mirrors the §6.5 target-taking precedent
+            // (mate_target.rs / hunt_target.rs / etc.). Original three
+            // weights renormalized by ×0.80 to sum 1.0.
+            composition: Composition::weighted_sum(vec![0.32, 0.24, 0.24, 0.20]),
             // §4 batch 2: `.require(CanCook)` gates on Adult ∧ ¬Injured.
             // Colony-scoped kitchen/food markers stay here (not bundled
             // into CanCook) to preserve the `wants_cook_but_no_kitchen`

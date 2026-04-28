@@ -14,8 +14,10 @@
 use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
-use crate::ai::curves::{scarcity, Curve};
+use crate::ai::considerations::{
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
+use crate::ai::curves::{scarcity, Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
@@ -23,6 +25,10 @@ use crate::components::markers;
 
 pub const FOOD_SCARCITY_INPUT: &str = "food_scarcity";
 pub const DILIGENCE_INPUT: &str = "diligence";
+
+/// Manhattan range over which the garden-distance curve is normalized.
+/// Same shape as Cook/Eat: 20 tiles.
+pub const FARM_GARDEN_RANGE: f32 = 20.0;
 
 pub struct FarmDse {
     id: DseId,
@@ -33,6 +39,16 @@ pub struct FarmDse {
 
 impl FarmDse {
     pub fn new() -> Self {
+        // §L2.10.7 spatial axis: distance to garden tile via
+        // ColonyLandmarks. Same Composite{Logistic, Invert} shape as
+        // Cook — close-enough plateau, distant garden discounted.
+        let garden_distance = Curve::Composite {
+            inner: Box::new(Curve::Logistic {
+                steepness: 8.0,
+                midpoint: 0.5,
+            }),
+            post: PostOp::Invert,
+        };
         Self {
             id: DseId("farm"),
             considerations: vec![
@@ -44,8 +60,18 @@ impl FarmDse {
                         intercept: 0.0,
                     },
                 )),
+                // §L2.10.7 spatial axis. Multiplicative under
+                // CompensatedProduct: distant garden discounts the
+                // farm score. Marker eligibility (HasGarden) still
+                // gates the DSE entirely when no garden exists.
+                Consideration::Spatial(SpatialConsideration::new(
+                    "farm_garden_distance",
+                    LandmarkSource::Anchor(LandmarkAnchor::NearestGarden),
+                    FARM_GARDEN_RANGE,
+                    garden_distance,
+                )),
             ],
-            composition: Composition::compensated_product(vec![1.0, 1.0]),
+            composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
             // §4 marker eligibility (Phase 4b.4): Farm only scores if
             // the colony has a functional garden. Retires the inline
             // `if ctx.has_garden` gate at `scoring.rs::score_actions`.

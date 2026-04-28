@@ -31,12 +31,19 @@
 use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
-use crate::ai::curves::hangry;
+use crate::ai::considerations::{
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
+use crate::ai::curves::{hangry, Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
 use crate::components::markers;
+
+/// Manhattan range over which the stores-distance curve is normalized
+/// for Eat. Beyond this the curve saturates near zero. 20 tiles ≈ a
+/// long colony walk; cats farther rarely commute solely to Eat.
+pub const EAT_STORES_RANGE: f32 = 20.0;
 
 // ---------------------------------------------------------------------------
 // Eat DSE
@@ -62,13 +69,36 @@ pub struct EatDse {
 
 impl EatDse {
     pub fn new() -> Self {
+        // §L2.10.7 spatial axis: distance to nearest stores tile
+        // resolved via ColonyLandmarks. `Composite { Logistic(8, 0.5),
+        // Invert }` gives `1 - Logistic(cost)` over normalized cost —
+        // close-enough plateau, distant food viable but discounted
+        // (spec rationale).
+        let stores_distance = Curve::Composite {
+            inner: Box::new(Curve::Logistic {
+                steepness: 8.0,
+                midpoint: 0.5,
+            }),
+            post: PostOp::Invert,
+        };
         Self {
             id: DseId("eat"),
-            considerations: vec![Consideration::Scalar(ScalarConsideration::new(
-                HUNGER_INPUT,
-                hangry(),
-            ))],
-            composition: Composition::compensated_product(vec![1.0]),
+            considerations: vec![
+                Consideration::Scalar(ScalarConsideration::new(HUNGER_INPUT, hangry())),
+                // §L2.10.7 spatial axis. Multiplicative with hunger
+                // urgency under CompensatedProduct: starving cat at
+                // stores ≈ 0.98 × hunger; starving cat 20 tiles away
+                // ≈ 0.02 × hunger — discounted but not gated. The
+                // marker-eligibility check on `HasStoredFood` still
+                // gates the DSE entirely when no stores exist.
+                Consideration::Spatial(SpatialConsideration::new(
+                    "eat_stores_distance",
+                    LandmarkSource::Anchor(LandmarkAnchor::NearestStores),
+                    EAT_STORES_RANGE,
+                    stores_distance,
+                )),
+            ],
+            composition: Composition::compensated_product(vec![1.0, 1.0]),
             // §4 marker eligibility (Phase 4b.2): the cat can only
             // score Eat if the colony has food in stores. Retires the
             // inline `if ctx.food_available` gate at
@@ -158,10 +188,6 @@ mod tests {
     use crate::ai::eval::{evaluate_single, ModifierPipeline};
     use crate::components::physical::Position;
 
-    fn approx(a: f32, b: f32, tol: f32) -> bool {
-        (a - b).abs() < tol
-    }
-
     #[test]
     fn eat_dse_id_is_stable() {
         let dse = EatDse::new();
@@ -191,7 +217,16 @@ mod tests {
         // by returning true for that key.
         let has_marker = |name: &str, _: Entity| name == markers::HasStoredFood::KEY;
         let entity_position = |_: Entity| -> Option<Position> { None };
-        let anchor_position = |_: LandmarkAnchor| -> Option<Position> { None };
+        // Place the stores at the cat's position so the §L2.10.7
+        // spatial axis evaluates to ~0.98 (closest cost) — preserves
+        // the hunger-anchor shape under CompensatedProduct in this
+        // test; spatial-axis behavior is exercised separately.
+        let anchor_position = |a: LandmarkAnchor| -> Option<Position> {
+            match a {
+                LandmarkAnchor::NearestStores => Some(Position::new(0, 0)),
+                _ => None,
+            }
+        };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
@@ -218,13 +253,22 @@ mod tests {
                 .final_score
         };
 
-        // Logistic(8, 0.5):
-        //   x=0.5  → 0.5 (midpoint, exact)
-        //   x=0.9  → 1/(1+e^{-3.2}) ≈ 0.961
-        //   x=0.1  → 1/(1+e^{3.2})  ≈ 0.039
-        assert!(approx(score(0.5), 0.5, 0.01), "midpoint: {}", score(0.5));
-        assert!(score(0.9) > 0.95, "starving: {}", score(0.9));
-        assert!(score(0.1) < 0.05, "sated: {}", score(0.1));
+        // Hunger axis Logistic(8, 0.5) drives the underlying shape.
+        // Post-§L2.10.7 the DSE composes hunger × spatial under
+        // CompensatedProduct, which lifts low-hunger scores via the
+        // geometric-mean compensation (§3.2 strength=0.75). Bounds
+        // accommodate the lift while still asserting the hunger
+        // axis is monotonic and dominant:
+        //   hunger=0.1 (sated)   → CP ≈ 0.26 (raw 0.098 · spatial 0.98)
+        //   hunger=0.5 (midpoint) → CP ≈ 0.65
+        //   hunger=0.9 (starving) → CP ≈ 0.93
+        assert!(score(0.5) > 0.6 && score(0.5) < 0.7, "midpoint: {}", score(0.5));
+        assert!(score(0.9) > 0.9, "starving: {}", score(0.9));
+        assert!(score(0.1) < 0.3, "sated: {}", score(0.1));
+        // Monotonicity check — CP's compensation must not invert the
+        // hunger ordering.
+        assert!(score(0.9) > score(0.5));
+        assert!(score(0.5) > score(0.1));
     }
 
     #[test]
