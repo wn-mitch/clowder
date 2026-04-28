@@ -22,13 +22,20 @@
 //! fertility-window axis deferred until §7.M.7.5's phase→scalar
 //! signal mapping lands (Enumeration Debt). Weights renormalized
 //! from the spec's (0.15/0.40/0.25/0.20) by dropping the 0.20 and
-//! dividing the remaining three by 0.80:
+//! dividing the remaining three by 0.80. The distance axis lands as
+//! a `SpatialConsideration` per the §L2.10.7 plan-cost feedback
+//! design (ticket 052) — Manhattan distance to the candidate tile
+//! flows through `Composite { Logistic(20, 0.5), Invert }` over
+//! `range = MATE_TARGET_RANGE`. Inverted-logistic on normalized cost
+//! is mathematically equivalent to the prior `Logistic(20, 0.5)`
+//! over `1 - dist/range` (logistic is point-symmetric about its
+//! midpoint), so this port is behavior-neutral.
 //!
-//! | # | Consideration | Scalar name       | Curve                            | Spec weight | Renormalized |
-//! |---|---------------|-------------------|----------------------------------|-------------|--------------|
-//! | 1 | distance      | `target_nearness` | `Logistic(20, 0.5)` near-step    | 0.15        | 0.1875       |
-//! | 2 | romantic      | `target_romantic` | `Linear(1, 0)`                   | 0.40        | 0.5000       |
-//! | 3 | fondness      | `target_fondness` | `Linear(1, 0)`                   | 0.25        | 0.3125       |
+//! | # | Consideration | Source              | Curve                                | Spec weight | Renormalized |
+//! |---|---------------|---------------------|--------------------------------------|-------------|--------------|
+//! | 1 | distance      | `Spatial(target)`   | `Logistic(20, 0.5, inverted)` over R | 0.15        | 0.1875       |
+//! | 2 | romantic      | `target_romantic`   | `Linear(1, 0)`                       | 0.40        | 0.5000       |
+//! | 3 | fondness      | `target_fondness`   | `Linear(1, 0)`                       | 0.25        | 0.3125       |
 //!
 //! Candidate filter: nearby cats within `MATE_TARGET_RANGE` tiles
 //! whose bond is `Partners` or `Mates`. The bond filter is a
@@ -39,8 +46,10 @@
 use bevy::prelude::Entity;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
-use crate::ai::curves::Curve;
+use crate::ai::considerations::{
+    Consideration, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
+use crate::ai::curves::{Curve, PostOp};
 use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination};
 use crate::ai::eval::DseRegistry;
 use crate::ai::target_dse::{
@@ -49,7 +58,6 @@ use crate::ai::target_dse::{
 use crate::components::physical::Position;
 use crate::resources::relationships::{BondType, Relationships};
 
-pub const TARGET_NEARNESS_INPUT: &str = "target_nearness";
 pub const TARGET_ROMANTIC_INPUT: &str = "target_romantic";
 pub const TARGET_FONDNESS_INPUT: &str = "target_fondness";
 
@@ -66,21 +74,27 @@ pub fn mate_target_dse() -> TargetTakingDse {
         slope: 1.0,
         intercept: 0.0,
     };
-    // Logistic near-step: sharp drop-off as distance grows; max at
-    // adjacency. `target_nearness = 1 - dist/range`, so nearness=1 at
-    // adjacent, nearness=0.5 at half-range (dist=5). Logistic(20, 0.5)
-    // crosses 0.5 at nearness=0.5, saturating near nearness=1.
-    let nearness_curve = Curve::Logistic {
-        steepness: 20.0,
-        midpoint: 0.5,
+    // §L2.10.7 distance axis: normalized cost (`dist/range`) flows
+    // through an inverted logistic — adjacent cost (~0) saturates near
+    // 1.0; cost beyond the midpoint (range/2 = 5 tiles) drops sharply
+    // toward 0. Steepness 20 matches the spec catalog's "near-step"
+    // anchor for Mate.
+    let nearness_curve = Curve::Composite {
+        inner: Box::new(Curve::Logistic {
+            steepness: 20.0,
+            midpoint: 0.5,
+        }),
+        post: PostOp::Invert,
     };
 
     TargetTakingDse {
         id: DseId("mate_target"),
         candidate_query: mate_candidate_query_doc,
         per_target_considerations: vec![
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_NEARNESS_INPUT,
+            Consideration::Spatial(SpatialConsideration::new(
+                "mate_target_nearness",
+                LandmarkSource::TargetPosition,
+                MATE_TARGET_RANGE,
                 nearness_curve,
             )),
             Consideration::Scalar(ScalarConsideration::new(
@@ -160,23 +174,12 @@ pub fn resolve_mate_target(
         return None;
     }
 
-    let pos_map: std::collections::HashMap<Entity, Position> = candidates
-        .iter()
-        .copied()
-        .zip(positions.iter().copied())
-        .collect();
-
+    // Spatial nearness axis (`mate_target_nearness`) is computed by
+    // the substrate from `EvalCtx::self_position` to each candidate's
+    // tile per §L2.10.7, so no nearness branch lives in `fetch_target`.
     let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     let fetch_target = |name: &str, cat: Entity, target: Entity| -> f32 {
         match name {
-            TARGET_NEARNESS_INPUT => {
-                let target_pos = match pos_map.get(&target) {
-                    Some(p) => *p,
-                    None => return 0.0,
-                };
-                let dist = cat_pos.manhattan_distance(&target_pos) as f32;
-                (1.0 - dist / MATE_TARGET_RANGE).clamp(0.0, 1.0)
-            }
             TARGET_ROMANTIC_INPUT => relationships
                 .get(cat, target)
                 .map(|r| r.romantic)
@@ -353,6 +356,42 @@ mod tests {
         // Romantic weight (0.5) dominates fondness weight (0.3125),
         // so the more-romantic partner wins even with lower fondness.
         assert_eq!(out, Some(romantic_partner));
+    }
+
+    #[test]
+    fn nearness_attenuates_far_partner_smoothly() {
+        // §L2.10.7 elastic-channel verification: across the
+        // inverted-logistic midpoint (range/2 = 5 tiles) the spatial
+        // axis suppresses score sharply. Two same-romantic, same-
+        // fondness partners — the close one wins. Equal romantic +
+        // fondness means the spatial axis is what separates them.
+        let mut registry = DseRegistry::new();
+        registry.target_taking_dses.push(mate_target_dse());
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let close = Entity::from_raw_u32(2).unwrap();
+        let far = Entity::from_raw_u32(3).unwrap();
+        let mut relationships = Relationships::default();
+        relationships.get_or_insert(cat, close).fondness = 0.5;
+        relationships.get_or_insert(cat, close).romantic = 0.5;
+        relationships.get_or_insert(cat, close).bond = Some(BondType::Partners);
+        relationships.get_or_insert(cat, far).fondness = 0.5;
+        relationships.get_or_insert(cat, far).romantic = 0.5;
+        relationships.get_or_insert(cat, far).bond = Some(BondType::Partners);
+
+        let cat_positions = vec![
+            (close, Position::new(1, 0)), // dist 1, well below midpoint
+            (far, Position::new(9, 0)),   // dist 9, well past midpoint
+        ];
+        let out = resolve_mate_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &cat_positions,
+            &relationships,
+            0,
+            None,
+        );
+        assert_eq!(out, Some(close));
     }
 
     #[test]

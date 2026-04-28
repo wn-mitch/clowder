@@ -152,3 +152,49 @@ or surfaces a hypothesis-required shift.
   Successor work: Mate, Mentor, ApplyRemedy axis ports (scope item 3
   remainder); 30-row roster sweep across remaining cat self-state
   DSEs + fox dispositions (scope item 2).
+
+- 2026-04-28: Mate port (scope item 3 §7.M.5 distance-axis half).
+  Mate's `target_nearness` Scalar (`Logistic(20, 0.5)` over `1 - dist/
+  range`) swapped for a `SpatialConsideration` with `LandmarkSource::
+  TargetPosition` + `range = MATE_TARGET_RANGE` + `Composite {
+  Logistic(20, 0.5), Invert }` curve over normalized cost. Inverted
+  logistic on `dist/range` is mathematically identical to logistic on
+  `1 - dist/range` (logistic is point-symmetric about its midpoint),
+  so the port is behavior-neutral by construction. The §7.M.5
+  fertility-window axis remains deferred until §7.M.7.5's
+  phase→scalar mapping lands. All 1501 lib + integration tests pass
+  (added `nearness_attenuates_far_partner_smoothly` exercising the
+  spatial axis across the midpoint).
+
+  Paired-baseline soak (seed 42, 15 min) at `11f57d9` (post-Hunt) vs
+  the Mate-port WIP — **fully behavior-neutral**:
+
+  | Metric                      | post-Hunt | post-Mate | Δ        |
+  |-----------------------------|-----------|-----------|----------|
+  | Injury / Ambush / Starv     | 1/4/1     | 1/4/1     | identical|
+  | grooming                    | 262       | 262       | identical|
+  | play                        | 834       | 834       | identical|
+  | burial / courtship          | 0/0       | 0/0       | identical|
+  | mentoring                   | 0         | 0         | identical|
+  | mythic-texture              | 30        | 30        | identical|
+  | never_fired_expected        | (4)       | (4)       | identical|
+  | Plan-failure top-5 reasons  | —         | —         | 1 row +1 |
+
+  The single delta in the entire footer: `TravelTo(SocialTarget): no
+  reachable zone target` 30 → 31. Consistent with one mate-target
+  argmax in the whole soak resolving to a different partner due to
+  f32 LSB ordering (`1 - Logistic(c)` vs `Logistic(1 - c)` are equal
+  in real arithmetic but emit different LSBs in f32), whose path
+  happened not to be reachable. Smaller behavioral footprint than
+  Hunt's port (which shifted grooming +1.9%, play +1.0%) because
+  Mate's candidate pool is bond-restricted to Partners/Mates — far
+  fewer opportunities for f32 tie-break flips than Hunt's full
+  visible-prey pool.
+
+  Post-Hunt baseline archived at
+  `logs/tuned-42-11f57d9-post-hunt-baseline/`.
+
+  Successor work: Mentor (apprentice-receptivity spatial pairing) and
+  ApplyRemedy (caretaker-distance variant) ports remain in scope
+  item 3; 30-row roster sweep (scope item 2) across remaining cat
+  self-state DSEs + fox dispositions.
