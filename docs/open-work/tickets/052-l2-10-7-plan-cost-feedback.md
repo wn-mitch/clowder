@@ -331,3 +331,79 @@ or surfaces a hypothesis-required shift.
   Successor work: Groom-other, Caretake, Fight, Build remaining
   in scope item 2 (cat self-state DSEs); fox dispositions
   thereafter.
+
+- 2026-04-28: GroomOther + Caretake + Fight + Build ports —
+  bundled cutover of the remaining four cat target-taking DSEs
+  (the user requested these be landed in one commit without
+  intermediate per-port soaks since the per-port behavior pattern
+  was well-established by Hunt/Mate/Mentor/ApplyRemedy/Socialize).
+  This **completes scope item 2 for cat target-taking DSEs** —
+  every spatially-sensitive `TargetTakingDse` now runs through
+  `SpatialConsideration` instead of a hand-rolled scalar. Curve
+  shapes per port:
+  - GroomOther: `Composite{Logistic(15, 0.15), Invert}` — algebra
+    `Logistic(s, m)` over `(1-cost)` ≡ `Composite{Logistic(s,
+    1-m), Invert}` over `cost`. Midpoint flipped 0.85 → 0.15.
+  - Caretake: `Quadratic(exp=1.5, divisor=-1, shift=1)` —
+    `(1-cost)^1.5`, same idiom as ApplyRemedy.
+  - Fight: `Composite{Logistic(10, 0.5), Invert}` — Logistic
+    point-symmetry, 1-m = m at m=0.5 (same as Mate).
+  - Build: `Linear(slope=-1, intercept=1)` — direct expression
+    of the legacy linear `1-cost` shape.
+
+  All 1502 lib + integration tests pass.
+
+  Single bundled paired-baseline soak (seed 42, 15 min) at
+  `6322c9c` (post-Socialize) vs the four-port WIP — **survival-
+  and continuity-canary neutral**, with f32 LSB drift partially
+  *canceling* Socialize's:
+
+  | Metric                      | post-Soc | bundled | Δ          |
+  |-----------------------------|----------|---------|------------|
+  | Injury / Ambush / Starv     | 1/4/1    | 1/4/1   | identical  |
+  | grooming                    | 268      | 262     | -6 (-2.2%) |
+  | play                        | 842      | 834     | -8 (-1.0%) |
+  | burial / courtship          | 0/0      | 0/0     | identical  |
+  | mentoring                   | 0        | 0       | identical  |
+  | mythic-texture              | 30       | 30      | identical  |
+  | never_fired_expected        | (4)      | (4)     | identical  |
+  | Plan-failure total          | 300      | 280     | -20 (-6.7%)|
+
+  Single plan-failure reason changed: `TravelTo(SocialTarget) no
+  reachable` 51 → 31. **Cumulative drift from pre-Socialize**
+  (post-ApplyRemedy = 262/834/284): grooming 262 → 268 → 262
+  (net 0), play 834 → 842 → 834 (net 0), plan-failures 284 →
+  300 → 280 (net -4, -1.4%). The bundled ports' LSB churn ran
+  in the opposite direction of Socialize's so the colony-wide
+  effect of the entire substrate refactor ends up essentially
+  noise-level on every characteristic metric. **No drift exceeds
+  the ±10% balance-methodology threshold; no hypothesis required.**
+
+  Post-Socialize baseline archived at
+  `logs/tuned-42-6322c9c-post-socialize-baseline/`; bundled-port
+  soak archived at `logs/tuned-42-bundled-go-care-fight-build/`.
+
+  ## Scope-item-2 status: cat target-taking DSEs COMPLETE
+
+  All 9 cat target-taking DSEs in `src/ai/dses/*_target.rs` now
+  use `SpatialConsideration` for their distance axis: Hunt, Mate,
+  Mentor, ApplyRemedy, Socialize, GroomOther, Caretake, Fight,
+  Build. Every `TARGET_NEARNESS_INPUT` const removed; every
+  `pos_map` lookup table in resolvers retired; substrate handles
+  per-candidate Manhattan distance via `LandmarkSource::
+  TargetPosition`. The §6.5 row-by-row spec compliance is now
+  achievable directly from the factory-side `Curve` declaration
+  rather than spread across factory + fetcher.
+
+  Successor work: scope item 2's remaining roster — cat *self-
+  state* DSEs (Eat / Sleep / Forage / Explore / Flee / Patrol /
+  Build / Farm / Herbcraft / PracticeMagic / Coordinate / Cook
+  per §L2.10.7 line 5621+) and all 9 fox dispositions
+  (Hunting / Feeding / Patrolling / Raiding / DenDefense /
+  Resting / Dispersing / Fleeing / Avoiding per §L2.10.7 line
+  5648+). These are structurally distinct from target-taking
+  DSEs — they don't pass through `TargetTakingDse` and need
+  their own substrate plumbing decision (which `LandmarkSource`
+  flavor each row binds to). That work is large enough to
+  warrant a successor ticket; the current ticket can close on
+  scope items 1, 3, and the cat target-taking half of item 2.

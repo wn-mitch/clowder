@@ -20,25 +20,31 @@
 //!   Socialize / Mate / Mentor ports, so the legacy helper goes away
 //!   with this port.
 //!
-//! Four per-target considerations per §6.5.4:
+//! Four per-target considerations per §6.5.4. The distance axis lands
+//! as a `SpatialConsideration` per the §L2.10.7 plan-cost feedback
+//! design (ticket 052) — Manhattan distance to the partner flows
+//! through `Composite { Logistic(15, 0.15), Invert }` over normalized
+//! cost. Algebra: `Logistic(s, m)` over `(1 - cost)` is identical to
+//! `1 - Logistic(s, 1-m)` over `cost`, so flipping the midpoint
+//! 0.85 → 1-0.85 = 0.15 and inverting gives the same numerical curve
+//! as the legacy form. Behavior-neutral by construction.
 //!
-//! | # | Consideration       | Scalar name              | Curve                          | Weight |
-//! |---|---------------------|--------------------------|--------------------------------|--------|
-//! | 1 | distance            | `target_nearness`        | `Logistic(15, 0.85)` near-step | 0.30   |
-//! | 2 | fondness            | `target_fondness`        | `Linear(1, 0)`                 | 0.30   |
-//! | 3 | target-need-warmth  | `target_warmth_deficit`  | `Quadratic(exp=2)`             | 0.30   |
-//! | 4 | kinship             | `target_kinship`         | `Piecewise` (kin=1.0 / else=0.5) | 0.10  |
+//! | # | Consideration       | Source                   | Curve                                  | Weight |
+//! |---|---------------------|--------------------------|----------------------------------------|--------|
+//! | 1 | distance            | `Spatial(target)`        | `Composite{Logistic(15, 0.15), Invert}`| 0.30   |
+//! | 2 | fondness            | `target_fondness`        | `Linear(1, 0)`                         | 0.30   |
+//! | 3 | target-need-warmth  | `target_warmth_deficit`  | `Quadratic(exp=2)`                     | 0.30   |
+//! | 4 | kinship             | `target_kinship`         | `Piecewise` (kin=1.0 / else=0.5)       | 0.10   |
 //!
 //! **Distance curve interpretation.** The spec cell reads
-//! `Logistic(steepness=15, midpoint=1), range=1–2`; the midpoint
-//! parameter is reified here onto the normalized distance signal
-//! `1 − dist/GROOM_OTHER_TARGET_RANGE`. With range = 10 (social
-//! candidate pool) the midpoint lands at signal = 0.85, corresponding
-//! to dist ≈ 1.5 — the spec's 1–2 tile design-intent band. The curve
-//! saturates near dist = 0, crosses 0.5 at dist ≈ 1.5, and drops
-//! below 0.1 by dist = 3. Allogrooming requires near-adjacency; the
-//! curve enforces it without a hard candidate-pool cutoff that would
-//! exclude the 2-tile partner the cat is about to walk one step to.
+//! `Logistic(steepness=15, midpoint=1), range=1–2`; reified onto the
+//! normalized cost `dist/GROOM_OTHER_TARGET_RANGE`, the inverted
+//! midpoint at cost = 0.15 corresponds to dist ≈ 1.5 — the spec's
+//! 1–2 tile design-intent band. The curve saturates near dist = 0,
+//! crosses 0.5 at dist ≈ 1.5, and drops below 0.1 by dist = 3.
+//! Allogrooming requires near-adjacency; the curve enforces it
+//! without a hard candidate-pool cutoff that would exclude the
+//! 2-tile partner the cat is about to walk one step to.
 //!
 //! **Warmth signal.** `target.needs.temperature` deficit = `1 −
 //! temperature`. Convex `Quadratic(2)` amplifies desperate need
@@ -57,8 +63,10 @@
 use bevy::prelude::Entity;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
-use crate::ai::curves::Curve;
+use crate::ai::considerations::{
+    Consideration, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
+use crate::ai::curves::{Curve, PostOp};
 use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination};
 use crate::ai::eval::DseRegistry;
 use crate::ai::target_dse::{
@@ -67,7 +75,6 @@ use crate::ai::target_dse::{
 use crate::components::physical::Position;
 use crate::resources::relationships::Relationships;
 
-pub const TARGET_NEARNESS_INPUT: &str = "target_nearness";
 pub const TARGET_FONDNESS_INPUT: &str = "target_fondness";
 pub const TARGET_WARMTH_DEFICIT_INPUT: &str = "target_warmth_deficit";
 pub const TARGET_KINSHIP_INPUT: &str = "target_kinship";
@@ -92,13 +99,18 @@ pub fn groom_other_target_dse() -> TargetTakingDse {
         divisor: 1.0,
         shift: 0.0,
     };
-    // Near-step distance curve. Midpoint 0.85 on the normalized
-    // `1 − dist/range` signal crosses 0.5 at dist ≈ 1.5 with range=10,
-    // within the spec's 1–2 tile range row. Steepness 15 gives a
-    // sharp transition — by dist=3 the score is <0.1.
-    let nearness_curve = Curve::Logistic {
-        steepness: 15.0,
-        midpoint: 0.85,
+    // §L2.10.7 distance axis: logistic on inverted normalized cost.
+    // Algebra: `Logistic(15, 0.85)` over `(1 - cost)` is identical to
+    // `Composite{Logistic(15, 0.15), Invert}` over `cost`. Crosses 0.5
+    // at cost = 0.15 (dist ≈ 1.5 with range=10), saturates near
+    // adjacency, drops <0.1 by dist=3. Behavior-neutral preservation
+    // of the legacy near-step shape.
+    let nearness_curve = Curve::Composite {
+        inner: Box::new(Curve::Logistic {
+            steepness: 15.0,
+            midpoint: 0.15,
+        }),
+        post: PostOp::Invert,
     };
     // Piecewise cliff: kin (signal=1.0) → 1.0; non-kin (signal=0.0) →
     // 0.5. The resolver collapses kin/non-kin to a boolean upstream,
@@ -111,8 +123,10 @@ pub fn groom_other_target_dse() -> TargetTakingDse {
         id: DseId("groom_other_target"),
         candidate_query: groom_other_candidate_query_doc,
         per_target_considerations: vec![
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_NEARNESS_INPUT,
+            Consideration::Spatial(SpatialConsideration::new(
+                "groom_other_target_nearness",
+                LandmarkSource::TargetPosition,
+                GROOM_OTHER_TARGET_RANGE,
                 nearness_curve,
             )),
             Consideration::Scalar(ScalarConsideration::new(
@@ -208,23 +222,12 @@ pub fn resolve_groom_other_target(
         return None;
     }
 
-    let pos_map: std::collections::HashMap<Entity, Position> = candidates
-        .iter()
-        .copied()
-        .zip(positions.iter().copied())
-        .collect();
-
+    // Spatial nearness axis (`groom_other_target_nearness`) is
+    // computed by the substrate from `EvalCtx::self_position` to each
+    // candidate's tile per §L2.10.7.
     let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     let fetch_target = |name: &str, cat: Entity, target: Entity| -> f32 {
         match name {
-            TARGET_NEARNESS_INPUT => {
-                let target_pos = match pos_map.get(&target) {
-                    Some(p) => *p,
-                    None => return 0.0,
-                };
-                let dist = cat_pos.manhattan_distance(&target_pos) as f32;
-                (1.0 - dist / GROOM_OTHER_TARGET_RANGE).clamp(0.0, 1.0)
-            }
             TARGET_FONDNESS_INPUT => relationships
                 .get(cat, target)
                 .map(|r| r.fondness)

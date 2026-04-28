@@ -24,20 +24,20 @@
 //! Four per-target considerations per §6.5.8. All four spec axes
 //! port directly; aggregation is `Best`.
 //!
-//! | # | Consideration         | Scalar name              | Curve                  | Weight |
-//! |---|-----------------------|--------------------------|------------------------|--------|
-//! | 1 | distance              | `target_nearness`        | `Linear(1, 0)`         | 0.20   |
-//! | 2 | site-type             | `target_site_type`       | Piecewise cliff        | 0.30   |
-//! | 3 | progress-urgency      | `target_progress_urgency`| `Quadratic(exp=2)`     | 0.30   |
-//! | 4 | structural-condition  | `target_condition_urgency`| `Linear(1, 0)` on deficit | 0.20 |
+//! | # | Consideration         | Source                    | Curve                       | Weight |
+//! |---|-----------------------|---------------------------|-----------------------------|--------|
+//! | 1 | distance              | `Spatial(target)`         | `Linear(-1, 1)`             | 0.20   |
+//! | 2 | site-type             | `target_site_type`        | Piecewise cliff             | 0.30   |
+//! | 3 | progress-urgency      | `target_progress_urgency` | `Quadratic(exp=2)`          | 0.30   |
+//! | 4 | structural-condition  | `target_condition_urgency`| `Linear(1, 0)` on deficit   | 0.20   |
 //!
 //! **Distance curve reinterpretation.** Spec row #8 says
 //! `Linear(slope=-1/20, intercept=1), range=20` — literally a line
-//! from (dist=0 → 1) to (dist=20 → 0). Mapped to the normalized
-//! `1 − dist/range` signal the DSE substrate uses, this is exactly
-//! `Linear(1, 0)` — pass-through. The resolver computes the
-//! normalization upstream so the curve stays uniform with the other
-//! target DSEs.
+//! from (dist=0 → 1) to (dist=20 → 0). The substrate normalizes
+//! input as `cost = dist/range`, so `Linear(slope=-1, intercept=1)`
+//! over normalized cost evaluates `1 - cost`, the exact same
+//! attenuation. Behavior-neutral preservation of the legacy
+//! pass-through shape.
 //!
 //! **Site-type encoding.** A candidate is either a ConstructionSite
 //! (scalar=1.0) or a needs-repair Structure (scalar=0.6). The
@@ -58,7 +58,9 @@
 use bevy::prelude::Entity;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
+use crate::ai::considerations::{
+    Consideration, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
 use crate::ai::curves::Curve;
 use crate::ai::dse::{CommitmentStrategy, DseId, EvalCtx, GoalState, Intention};
 use crate::ai::eval::DseRegistry;
@@ -67,7 +69,6 @@ use crate::ai::target_dse::{
 };
 use crate::components::physical::Position;
 
-pub const TARGET_NEARNESS_INPUT: &str = "target_nearness";
 pub const TARGET_SITE_TYPE_INPUT: &str = "target_site_type";
 pub const TARGET_PROGRESS_URGENCY_INPUT: &str = "target_progress_urgency";
 pub const TARGET_CONDITION_URGENCY_INPUT: &str = "target_condition_urgency";
@@ -106,6 +107,13 @@ pub fn build_target_dse() -> TargetTakingDse {
         slope: 1.0,
         intercept: 0.0,
     };
+    // §L2.10.7 distance axis: `Linear(slope=-1, intercept=1)` over
+    // normalized cost evaluates `1 - cost`, exactly the legacy linear
+    // attenuation. Substrate-handled, no resolver branch needed.
+    let nearness_curve = Curve::Linear {
+        slope: -1.0,
+        intercept: 1.0,
+    };
     let progress_curve = Curve::Quadratic {
         exponent: 2.0,
         divisor: 1.0,
@@ -127,9 +135,11 @@ pub fn build_target_dse() -> TargetTakingDse {
         id: DseId("build_target"),
         candidate_query: build_candidate_query_doc,
         per_target_considerations: vec![
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_NEARNESS_INPUT,
-                linear.clone(),
+            Consideration::Spatial(SpatialConsideration::new(
+                "build_target_nearness",
+                LandmarkSource::TargetPosition,
+                BUILD_TARGET_RANGE,
+                nearness_curve,
             )),
             Consideration::Scalar(ScalarConsideration::new(
                 TARGET_SITE_TYPE_INPUT,
@@ -212,23 +222,12 @@ pub fn resolve_build_target(
         return None;
     }
 
-    let pos_map: std::collections::HashMap<Entity, Position> = entities
-        .iter()
-        .copied()
-        .zip(positions.iter().copied())
-        .collect();
-
+    // Spatial nearness axis (`build_target_nearness`) is computed by
+    // the substrate from `EvalCtx::self_position` to each candidate's
+    // tile per §L2.10.7.
     let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     let fetch_target = |name: &str, _cat: Entity, target: Entity| -> f32 {
         match name {
-            TARGET_NEARNESS_INPUT => {
-                let target_pos = match pos_map.get(&target) {
-                    Some(p) => *p,
-                    None => return 0.0,
-                };
-                let dist = cat_pos.manhattan_distance(&target_pos) as f32;
-                (1.0 - dist / BUILD_TARGET_RANGE).clamp(0.0, 1.0)
-            }
             TARGET_SITE_TYPE_INPUT => match kind_map.get(&target) {
                 Some(BuildTargetKind::NewBuild) => 1.0,
                 Some(BuildTargetKind::Repair) => 0.6,

@@ -12,14 +12,19 @@
 //! `goap.rs::FeedKitten` populate-sites over to the spec-shape
 //! four-axis bundle. The §6.5.6 axes are:
 //!
-//! | # | Consideration       | Scalar name                | Curve                          | Weight |
-//! |---|---------------------|----------------------------|--------------------------------|--------|
-//! | 1 | distance            | `target_nearness`          | `Quadratic(exp=1.5)` r=12      | 0.20   |
-//! | 2 | kitten-hunger       | `target_kitten_hunger`     | `Quadratic(exp=2)`             | 0.40   |
-//! | 3 | kinship             | `target_kinship`           | `Piecewise([(0, 0.6), (1, 1)])` | 0.25  |
-//! | 4 | kitten-isolation    | `target_kitten_isolation`  | `Linear(1, 0)`                 | 0.15   |
+//! | # | Consideration       | Source                     | Curve                                   | Weight |
+//! |---|---------------------|----------------------------|-----------------------------------------|--------|
+//! | 1 | distance            | `Spatial(target)`          | `Quadratic(exp=1.5, div=-1, shift=1)`   | 0.20   |
+//! | 2 | kitten-hunger       | `target_kitten_hunger`     | `Quadratic(exp=2)`                      | 0.40   |
+//! | 3 | kinship             | `target_kinship`           | `Piecewise([(0, 0.6), (1, 1)])`         | 0.25   |
+//! | 4 | kitten-isolation    | `target_kitten_isolation`  | `Linear(1, 0)`                          | 0.15   |
 //!
-//! Weights sum to 1.0 verbatim — no deferred axes.
+//! Weights sum to 1.0 verbatim — no deferred axes. The distance axis
+//! lands as a `SpatialConsideration` per the §L2.10.7 plan-cost
+//! feedback design (ticket 052) — `Quadratic(exp=1.5, divisor=-1,
+//! shift=1)` over normalized cost evaluates `(1 - cost)^1.5`,
+//! preserving the legacy `nearness^1.5` shape (same explicit-
+//! inversion idiom as ApplyRemedy).
 //!
 //! **Aggregation.** `Best` — §6.6 default. Pre-refactor
 //! `resolve_caretake` picked argmax of a hand-rolled
@@ -70,7 +75,9 @@ use bevy::prelude::Entity;
 
 use crate::ai::caretake_targeting::{CaretakeResolution, KittenState};
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
+use crate::ai::considerations::{
+    Consideration, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
 use crate::ai::curves::Curve;
 use crate::ai::dse::{CommitmentStrategy, DseId, EvalCtx, GoalState, Intention};
 use crate::ai::eval::DseRegistry;
@@ -79,7 +86,6 @@ use crate::ai::target_dse::{
 };
 use crate::components::physical::Position;
 
-pub const TARGET_NEARNESS_INPUT: &str = "target_nearness";
 pub const TARGET_KITTEN_HUNGER_INPUT: &str = "target_kitten_hunger";
 pub const TARGET_KINSHIP_INPUT: &str = "target_kinship";
 pub const TARGET_KITTEN_ISOLATION_INPUT: &str = "target_kitten_isolation";
@@ -103,10 +109,13 @@ pub const ISOLATION_RADIUS: f32 = 3.0;
 
 /// §6.5.6 `Caretake` target-taking DSE factory.
 pub fn caretake_target_dse() -> TargetTakingDse {
+    // §L2.10.7 distance axis: `(1 - cost)^1.5` via `Quadratic(exp=1.5,
+    // divisor=-1, shift=1)`. Same explicit-inversion idiom as
+    // ApplyRemedy / Mentor / Socialize ports.
     let nearness_curve = Curve::Quadratic {
         exponent: 1.5,
-        divisor: 1.0,
-        shift: 0.0,
+        divisor: -1.0,
+        shift: 1.0,
     };
     let hunger_curve = Curve::Quadratic {
         exponent: 2.0,
@@ -129,8 +138,10 @@ pub fn caretake_target_dse() -> TargetTakingDse {
         id: DseId("caretake_target"),
         candidate_query: caretake_candidate_query_doc,
         per_target_considerations: vec![
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_NEARNESS_INPUT,
+            Consideration::Spatial(SpatialConsideration::new(
+                "caretake_target_nearness",
+                LandmarkSource::TargetPosition,
+                CARETAKE_TARGET_RANGE,
                 nearness_curve,
             )),
             Consideration::Scalar(ScalarConsideration::new(
@@ -237,17 +248,12 @@ pub fn resolve_caretake_target(
         kitten_by_entity.insert(k.entity, *k);
     }
 
+    // Spatial nearness axis (`caretake_target_nearness`) is computed
+    // by the substrate from `EvalCtx::self_position` to each
+    // candidate's tile per §L2.10.7.
     let fetch_self = |_name: &str, _adult: Entity| -> f32 { 0.0 };
     let fetch_target = |name: &str, _adult: Entity, target: Entity| -> f32 {
         match name {
-            TARGET_NEARNESS_INPUT => {
-                let k = match kitten_by_entity.get(&target) {
-                    Some(k) => k,
-                    None => return 0.0,
-                };
-                let dist = adult_pos.manhattan_distance(&k.pos) as f32;
-                (1.0 - dist / CARETAKE_TARGET_RANGE).clamp(0.0, 1.0)
-            }
             TARGET_KITTEN_HUNGER_INPUT => kitten_by_entity
                 .get(&target)
                 .map(|k| (1.0 - k.hunger).clamp(0.0, 1.0))

@@ -25,12 +25,18 @@
 //! #1 threat) — the sum is for action-selection pressure, the winner
 //! is for GOAP planning.
 //!
-//! | # | Consideration       | Scalar name              | Curve                    | Weight |
-//! |---|---------------------|--------------------------|--------------------------|--------|
-//! | 1 | distance            | `target_nearness`        | `Logistic(10, 0.5)` step | 0.25   |
-//! | 2 | threat-level        | `target_threat`          | `Quadratic(exp=2)`       | 0.30   |
-//! | 3 | combat-advantage    | `target_combat_adv`      | `Logistic(10, 0.5)`      | 0.25   |
-//! | 4 | ally-proximity      | `ally_proximity`         | `Linear(1, 0)` capped at 3 | 0.20 |
+//! | # | Consideration       | Source                   | Curve                                 | Weight |
+//! |---|---------------------|--------------------------|---------------------------------------|--------|
+//! | 1 | distance            | `Spatial(target)`        | `Composite{Logistic(10, 0.5), Invert}`| 0.25   |
+//! | 2 | threat-level        | `target_threat`          | `Quadratic(exp=2)`                    | 0.30   |
+//! | 3 | combat-advantage    | `target_combat_adv`      | `Logistic(10, 0.5)`                   | 0.25   |
+//! | 4 | ally-proximity      | `ally_proximity`         | `Linear(1, 0)` capped at 3            | 0.20   |
+//!
+//! The distance axis lands as a `SpatialConsideration` per the
+//! §L2.10.7 plan-cost feedback design (ticket 052). Logistic is
+//! point-symmetric about its midpoint (0.5), so `Logistic(10, 0.5)`
+//! over `(1 - cost)` is identical to `Composite{Logistic(10, 0.5),
+//! Invert}` over `cost` (1 - m = m when m = 0.5).
 //!
 //! **Distance curve interpretation.** §6.5.9 specifies
 //! `Logistic(10, 2), range=2-3`; midpoint=2 in tiles. Mapped to the
@@ -63,8 +69,10 @@
 use bevy::prelude::Entity;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
-use crate::ai::curves::Curve;
+use crate::ai::considerations::{
+    Consideration, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
+use crate::ai::curves::{Curve, PostOp};
 use crate::ai::dse::{CommitmentStrategy, DseId, EvalCtx, GoalState, Intention};
 use crate::ai::eval::DseRegistry;
 use crate::ai::faction::StanceRequirement;
@@ -74,7 +82,6 @@ use crate::ai::target_dse::{
 use crate::components::physical::Position;
 use crate::components::wildlife::WildSpecies;
 
-pub const TARGET_NEARNESS_INPUT: &str = "target_nearness";
 pub const TARGET_THREAT_INPUT: &str = "target_threat";
 pub const TARGET_COMBAT_ADV_INPUT: &str = "target_combat_adv";
 pub const ALLY_PROXIMITY_INPUT: &str = "ally_proximity";
@@ -123,9 +130,16 @@ pub fn fight_target_dse() -> TargetTakingDse {
         divisor: 1.0,
         shift: 0.0,
     };
-    let nearness_curve = Curve::Logistic {
-        steepness: 10.0,
-        midpoint: 0.5,
+    // §L2.10.7 distance axis: Logistic is point-symmetric about its
+    // midpoint, so `Logistic(10, 0.5)` over `(1 - cost)` is identical
+    // to `Composite{Logistic(10, 0.5), Invert}` over `cost`. Same
+    // idiom as Mate's port.
+    let nearness_curve = Curve::Composite {
+        inner: Box::new(Curve::Logistic {
+            steepness: 10.0,
+            midpoint: 0.5,
+        }),
+        post: PostOp::Invert,
     };
     // Combat-advantage logistic: midpoint at 0.5 (post-normalization
     // where 0.5 = parity). Steepness 10 matches the spec's `Logistic
@@ -140,8 +154,10 @@ pub fn fight_target_dse() -> TargetTakingDse {
         id: DseId("fight_target"),
         candidate_query: fight_candidate_query_doc,
         per_target_considerations: vec![
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_NEARNESS_INPUT,
+            Consideration::Spatial(SpatialConsideration::new(
+                "fight_target_nearness",
+                LandmarkSource::TargetPosition,
+                FIGHT_TARGET_RANGE,
                 nearness_curve,
             )),
             Consideration::Scalar(ScalarConsideration::new(TARGET_THREAT_INPUT, threat_curve)),
@@ -317,25 +333,14 @@ pub fn resolve_fight_target(
         positions = filtered_pos;
     }
 
-    let pos_map: std::collections::HashMap<Entity, Position> = entities
-        .iter()
-        .copied()
-        .zip(positions.iter().copied())
-        .collect();
-
     let ally_score = ally_proximity_normalized(cat_pos, ally_positions);
 
+    // Spatial nearness axis (`fight_target_nearness`) is computed by
+    // the substrate from `EvalCtx::self_position` to each candidate's
+    // tile per §L2.10.7.
     let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     let fetch_target = |name: &str, _cat: Entity, target: Entity| -> f32 {
         match name {
-            TARGET_NEARNESS_INPUT => {
-                let target_pos = match pos_map.get(&target) {
-                    Some(p) => *p,
-                    None => return 0.0,
-                };
-                let dist = cat_pos.manhattan_distance(&target_pos) as f32;
-                (1.0 - dist / FIGHT_TARGET_RANGE).clamp(0.0, 1.0)
-            }
             TARGET_THREAT_INPUT => threat_map.get(&target).copied().unwrap_or(0.0),
             TARGET_COMBAT_ADV_INPUT => {
                 let target_threat = threat_map.get(&target).copied().unwrap_or(0.0);
