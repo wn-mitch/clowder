@@ -19,6 +19,19 @@ use crate::ai::considerations::{
     Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
 };
 use crate::ai::curves::{Curve, PostOp};
+
+/// §L2.10.7 Cleanse range — Manhattan tiles over which the
+/// nearest-corrupted-tile distance is normalized. Tight (8) because
+/// per-tile cleansing is a "stand on the rot" act; cats not adjacent
+/// to a corrupted tile shouldn't be running Cleanse.
+pub const CLEANSE_TILE_RANGE: f32 = 8.0;
+
+/// §L2.10.7 DurableWard range — Manhattan tiles for the
+/// nearest-corrupted-tile (hotspot) anchor. Wider (16) than Cleanse:
+/// wards are placed *near* corruption, not on it. Matches the legacy
+/// `corruption_smell_range` semantic that the retired
+/// `nearby_corruption_level` scalar used.
+pub const DURABLE_WARD_HOTSPOT_RANGE: f32 = 16.0;
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
@@ -112,22 +125,30 @@ pub struct DurableWardDse {
 
 impl DurableWardDse {
     pub fn new() -> Self {
-        // §2.3 row 6: Logistic(8, 0.1) on `nearby_corruption_level`
-        // collapses the old threshold-gate + linear-scale pair
-        // (`corruption_sensed_response_bonus` modifier) into one
-        // axis-level primitive. The flat additive bonus retires.
-        let nearby_corruption = Curve::Logistic {
-            steepness: 8.0,
-            midpoint: 0.1,
+        // §L2.10.7 row PracticeMagic: Power-Invert curve over
+        // distance to the nearest corrupted tile. Replaces the
+        // retired `nearby_corruption_level` Logistic(8, 0.1) scalar
+        // axis — the per-cat NearestCorruptedTile anchor (populated
+        // by the ScoringContext builder) IS the local corruption
+        // signal: present iff the cat is in scent-range of a
+        // corrupted tile, distance encodes urgency.
+        let hotspot_distance = Curve::Composite {
+            inner: Box::new(Curve::Polynomial {
+                exponent: 2,
+                divisor: 1.0,
+            }),
+            post: PostOp::Invert,
         };
         Self {
             considerations: vec![
                 Consideration::Scalar(ScalarConsideration::new("spirituality", linear())),
                 Consideration::Scalar(ScalarConsideration::new("magic_skill", linear())),
                 Consideration::Scalar(ScalarConsideration::new("ward_deficit", linear())),
-                Consideration::Scalar(ScalarConsideration::new(
-                    "nearby_corruption_level",
-                    nearby_corruption,
+                Consideration::Spatial(SpatialConsideration::new(
+                    "durable_ward_hotspot_distance",
+                    LandmarkSource::Anchor(LandmarkAnchor::NearestCorruptedTile),
+                    DURABLE_WARD_HOTSPOT_RANGE,
+                    hotspot_distance,
                 )),
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0, 1.0, 1.0]),
@@ -197,21 +218,34 @@ pub struct CleanseDse {
 }
 
 impl CleanseDse {
-    pub fn new(scoring: &ScoringConstants) -> Self {
-        // §2.3 row 5: Logistic(8, magic_cleanse_corruption_threshold)
-        // on `tile_corruption`. Threshold-gated cleansing — a
-        // corrupted tile is a "now" problem, not a ramp. Absorbs the
-        // retiring `cleanse_corruption_emergency_bonus` flat additive
-        // bonus into the axis curve itself.
-        let tile_corruption = Curve::Logistic {
-            steepness: 8.0,
-            midpoint: scoring.magic_cleanse_corruption_threshold,
+    pub fn new(_scoring: &ScoringConstants) -> Self {
+        // §L2.10.7 row PracticeMagic: Power-Invert curve over
+        // distance to the nearest corrupted tile. Per-tile
+        // cleansing — sharper falloff than DurableWard's hotspot
+        // axis (range 8 vs 16) because Cleanse acts on a specific
+        // tile, not a region. Replaces the retired `tile_corruption`
+        // Logistic(8, magic_cleanse_corruption_threshold) scalar.
+        // The ScoringContext builder populates
+        // `cat_anchors.nearest_corrupted_tile` with `Some(self_pos)`
+        // when the cat is on a corrupted tile (preserving the legacy
+        // "tile_corruption > threshold" intent).
+        let tile_distance = Curve::Composite {
+            inner: Box::new(Curve::Polynomial {
+                exponent: 2,
+                divisor: 1.0,
+            }),
+            post: PostOp::Invert,
         };
         Self {
             considerations: vec![
                 Consideration::Scalar(ScalarConsideration::new("spirituality", linear())),
                 Consideration::Scalar(ScalarConsideration::new("magic_skill", linear())),
-                Consideration::Scalar(ScalarConsideration::new("tile_corruption", tile_corruption)),
+                Consideration::Spatial(SpatialConsideration::new(
+                    "cleanse_tile_distance",
+                    LandmarkSource::Anchor(LandmarkAnchor::NearestCorruptedTile),
+                    CLEANSE_TILE_RANGE,
+                    tile_distance,
+                )),
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
@@ -499,6 +533,7 @@ mod tests {
         (a - b).abs() < tol
     }
 
+    #[allow(dead_code)]
     fn scalar_curve(dse: &dyn Dse, axis: &str) -> Option<Curve> {
         dse.considerations().iter().find_map(|c| match c {
             Consideration::Scalar(s) if s.name == axis => Some(s.curve.clone()),
@@ -603,79 +638,56 @@ mod tests {
     // -----------------------------------------------------------------
 
     #[test]
-    fn durable_ward_has_nearby_corruption_axis_logistic_8_01() {
-        // §2.3 row 6: Logistic(8, 0.1) on `nearby_corruption_level`
-        // absorbs the retiring `corruption_sensed_response_bonus`
-        // threshold-gate + linear-scale pair into one primitive.
+    fn durable_ward_uses_corruption_hotspot_anchor() {
+        // §L2.10.7 row PracticeMagic: Power-Invert curve over
+        // distance to the nearest corrupted tile (hotspot). Replaces
+        // the retired `nearby_corruption_level` Logistic(8, 0.1)
+        // scalar axis. (1 - cost^2): 0 → 1, 0.5 → 0.75, 1 → 0.
         let dse = DurableWardDse::new();
-        let names: Vec<&str> = dse
+        let spatial = dse
             .considerations()
             .iter()
-            .map(|c| match c {
-                Consideration::Scalar(s) => s.name,
-                _ => "",
+            .find_map(|c| match c {
+                Consideration::Spatial(s) if s.name == "durable_ward_hotspot_distance" => {
+                    Some(s)
+                }
+                _ => None,
             })
-            .collect();
-        assert!(names.contains(&"nearby_corruption_level"));
+            .expect("durable_ward_hotspot_distance axis must exist");
+        assert!(matches!(
+            spatial.landmark,
+            LandmarkSource::Anchor(LandmarkAnchor::NearestCorruptedTile)
+        ));
+        assert!(approx(spatial.curve.evaluate(0.0), 1.0, 1e-4));
+        assert!(approx(spatial.curve.evaluate(0.5), 0.75, 1e-4));
+        assert!(approx(spatial.curve.evaluate(1.0), 0.0, 1e-4));
         assert_eq!(dse.considerations().len(), 4);
-
-        let curve = scalar_curve(&dse, "nearby_corruption_level")
-            .expect("nearby_corruption_level axis must exist");
-        // 0.0 → 0.3100; 0.1 (midpoint) → 0.5; 0.5 → 0.9608;
-        // 1.0 → ≈ 0.9993.
-        assert!(approx(curve.evaluate(0.0), 0.3100, 1e-3));
-        assert!(approx(curve.evaluate(0.1), 0.5, 1e-4));
-        assert!(approx(curve.evaluate(0.2), 0.6900, 1e-3));
-        assert!(approx(curve.evaluate(0.5), 0.9608, 1e-3));
-        assert!(approx(curve.evaluate(1.0), 0.9993, 1e-3));
-        match curve {
-            Curve::Logistic {
-                steepness,
-                midpoint,
-            } => {
-                assert!(approx(steepness, 8.0, 1e-6));
-                assert!(approx(midpoint, 0.1, 1e-6));
-            }
-            other => panic!("expected Logistic(8, 0.1); got {other:?}"),
-        }
     }
 
     #[test]
-    fn cleanse_tile_corruption_axis_is_logistic_at_threshold() {
-        // §2.3 row 5: Logistic(8, magic_cleanse_corruption_threshold).
-        // Default threshold is 0.1 so the shape mirrors the
-        // corruption-emergency midpoint anchor.
+    fn cleanse_uses_nearest_corrupted_tile_anchor() {
+        // §L2.10.7 row PracticeMagic: per-tile cleansing uses the
+        // same NearestCorruptedTile anchor as DurableWard but a
+        // tighter range (8 vs 16) — the act requires standing on
+        // the rot, not just sensing it.
         let sc = ScoringConstants::default();
         let dse = CleanseDse::new(&sc);
-        let curve = scalar_curve(&dse, "tile_corruption").expect("tile_corruption axis must exist");
-        let midpoint = sc.magic_cleanse_corruption_threshold;
-        assert!(approx(curve.evaluate(midpoint), 0.5, 1e-4));
-        // Above the threshold the curve surges sharply.
-        assert!(curve.evaluate(midpoint + 0.1) > 0.6);
-        // Well below the threshold it is small but non-zero.
-        assert!(curve.evaluate(0.0) < 0.5);
-        match curve {
-            Curve::Logistic {
-                steepness,
-                midpoint: m,
-            } => {
-                assert!(approx(steepness, 8.0, 1e-6));
-                assert!(approx(m, midpoint, 1e-6));
-            }
-            other => panic!("expected Logistic(8, ·); got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn cleanse_tile_corruption_uses_runtime_threshold() {
-        // Confirm the factory reads the midpoint from
-        // ScoringConstants rather than hardcoding — tuning the
-        // constant shifts the axis shape.
-        let mut sc = ScoringConstants::default();
-        sc.magic_cleanse_corruption_threshold = 0.4;
-        let dse = CleanseDse::new(&sc);
-        let curve = scalar_curve(&dse, "tile_corruption").unwrap();
-        assert!(approx(curve.evaluate(0.4), 0.5, 1e-4));
+        let spatial = dse
+            .considerations()
+            .iter()
+            .find_map(|c| match c {
+                Consideration::Spatial(s) if s.name == "cleanse_tile_distance" => Some(s),
+                _ => None,
+            })
+            .expect("cleanse_tile_distance axis must exist");
+        assert!(matches!(
+            spatial.landmark,
+            LandmarkSource::Anchor(LandmarkAnchor::NearestCorruptedTile)
+        ));
+        assert!((spatial.range - CLEANSE_TILE_RANGE).abs() < 1e-4);
+        assert!(approx(spatial.curve.evaluate(0.0), 1.0, 1e-4));
+        assert!(approx(spatial.curve.evaluate(1.0), 0.0, 1e-4));
+        assert_eq!(dse.considerations().len(), 3);
     }
 
     #[test]

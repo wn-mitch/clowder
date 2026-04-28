@@ -1224,9 +1224,16 @@ pub fn evaluate_and_plan(
         // "Smell the rot": sample the map within corruption_smell_range tiles
         // and take the max. This lets cats proactively react to corruption
         // before they're standing on it.
-        let nearby_corruption_level = {
+        // §L2.10.7: also track the *position* of the most-corrupted
+        // tile so the §L2.10.7 NearestCorruptedTile anchor (consumed
+        // by Cleanse + DurableWard) can resolve to a concrete
+        // coordinate. None when no tile in the smell radius is above
+        // the corrupted_tile_threshold — the consideration scores 0
+        // and the CP gate suppresses the DSE.
+        let (nearby_corruption_level, nearest_corrupted_tile) = {
             let r = sc.corruption_smell_range;
             let mut max_c: f32 = 0.0;
+            let mut max_pos: Option<crate::components::physical::Position> = None;
             for dy in -r..=r {
                 for dx in -r..=r {
                     if dx.abs() + dy.abs() > r {
@@ -1238,11 +1245,14 @@ pub fn evaluate_and_plan(
                         let c = res.map.get(nx, ny).corruption;
                         if c > max_c {
                             max_c = c;
+                            if c > d.corrupted_tile_threshold {
+                                max_pos = Some(crate::components::physical::Position::new(nx, ny));
+                            }
                         }
                     }
                 }
             }
-            max_c
+            (max_c, max_pos)
         };
 
         // Ticket 027 Bug 2: inline `has_eligible_mate` retired —
@@ -1310,7 +1320,10 @@ pub fn evaluate_and_plan(
             has_functional_kitchen,
             has_raw_food_in_stores,
             social_warmth_deficit: fulfillment.map_or(0.4, |f| f.social_warmth_deficit()),
-            cat_anchors: crate::ai::scoring::CatAnchorPositions::default(),
+            cat_anchors: crate::ai::scoring::CatAnchorPositions {
+                nearest_corrupted_tile,
+                ..Default::default()
+            },
         };
 
         let focal_cat = res.focal_target.as_deref().and_then(|t| t.entity);

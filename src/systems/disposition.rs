@@ -766,6 +766,33 @@ pub fn evaluate_dispositions(
                 (false, 0.0, false)
             };
 
+        // §L2.10.7: scan smell radius for the most-corrupted tile;
+        // its position feeds the NearestCorruptedTile anchor (Cleanse,
+        // DurableWard). Mirrors the goap.rs path that authors the
+        // same anchor.
+        let nearest_corrupted_tile: Option<crate::components::physical::Position> = {
+            let r = sc.corruption_smell_range;
+            let mut max_c: f32 = 0.0;
+            let mut max_pos: Option<crate::components::physical::Position> = None;
+            for dy in -r..=r {
+                for dx in -r..=r {
+                    if dx.abs() + dy.abs() > r {
+                        continue;
+                    }
+                    let nx = pos.x + dx;
+                    let ny = pos.y + dy;
+                    if map.in_bounds(nx, ny) {
+                        let c = map.get(nx, ny).corruption;
+                        if c > max_c && c > d.corrupted_tile_threshold {
+                            max_c = c;
+                            max_pos = Some(crate::components::physical::Position::new(nx, ny));
+                        }
+                    }
+                }
+            }
+            max_pos
+        };
+
         // Ticket 027 Bug 2: inline `has_eligible_mate` retired —
         // `mating::update_mate_eligibility_markers` now authors the
         // `HasEligibleMate` ZST per tick, and `MateDse.eligibility()`
@@ -838,7 +865,10 @@ pub fn evaluate_dispositions(
             has_functional_kitchen,
             has_raw_food_in_stores,
             social_warmth_deficit: fulfillment.map_or(0.4, |f| f.social_warmth_deficit()),
-            cat_anchors: crate::ai::scoring::CatAnchorPositions::default(),
+            cat_anchors: crate::ai::scoring::CatAnchorPositions {
+                nearest_corrupted_tile,
+                ..Default::default()
+            },
         };
 
         // §11 trace plumbing — dormant except when running headless
