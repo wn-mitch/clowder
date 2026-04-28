@@ -457,6 +457,27 @@ pub fn update_corrupted_tile_markers(
 }
 
 // ---------------------------------------------------------------------------
+// update_corruption_landmarks — territory centroid cache for §L2.10.7
+// ---------------------------------------------------------------------------
+
+/// Recompute the per-tick intensity-weighted centroid of corruption
+/// across the colony map. Read by `ColonyCleanseDse` through
+/// [`crate::ai::considerations::LandmarkAnchor::TerritoryCorruptionCentroid`]
+/// — caching avoids re-scanning the 120×90 grid 50× per scoring tick.
+///
+/// Ordering — runs after `corruption_spread` / `corruption_tile_effects`
+/// so the centroid reflects this tick's post-spread state, with at most
+/// one tick of lag for AI consumers reading it next frame.
+pub fn update_corruption_landmarks(
+    map: Res<TileMap>,
+    mut landmarks: ResMut<crate::resources::CorruptionLandmarks>,
+) {
+    let width = map.width;
+    let height = map.height;
+    landmarks.recompute(width, height, |x, y| map.get(x, y).corruption);
+}
+
+// ---------------------------------------------------------------------------
 // herb_seasonal_check
 // ---------------------------------------------------------------------------
 

@@ -187,6 +187,12 @@ impl Plugin for SimulationPlugin {
                         .chain(),
                     systems::magic::corruption_tile_effects,
                     systems::magic::apply_corruption_pushback,
+                    // §L2.10.7 — recompute the territory corruption
+                    // centroid after spread + tile effects so AI
+                    // consumers (ColonyCleanseDse via
+                    // LandmarkAnchor::TerritoryCorruptionCentroid)
+                    // read the post-mutation centroid next frame.
+                    systems::magic::update_corruption_landmarks,
                     systems::magic::spawn_shadow_fox_from_corruption,
                     (
                         systems::wildlife::spawn_wildlife,
