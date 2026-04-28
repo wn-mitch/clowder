@@ -52,9 +52,11 @@ class Verdict:
     verdict: str  # pass | concern | fail
     canaries: dict[str, Any] = field(default_factory=dict)
     constants_drift_vs_baseline: str = "no-baseline"
+    seed_match_vs_baseline: str = "no-baseline"  # match | mismatch | no-baseline
     footer_drift: list[dict[str, Any]] = field(default_factory=list)
     baseline: str | None = None
     commit: str | None = None
+    seed: int | None = None
     next_steps: list[str] = field(default_factory=list)
     rationale: str | None = None
 
@@ -137,6 +139,23 @@ def constants_drift(baseline: Path, observed: Path) -> str:
         capture_output=True, text=True,
     )
     return "clean" if proc.returncode == 0 else "drift"
+
+
+def seed_match(baseline: Path, observed: Path) -> tuple[str, int | None, int | None]:
+    """Compare seeds between baseline and observed `events.jsonl` headers.
+
+    Returns (status, baseline_seed, observed_seed). status ∈ {match, mismatch}.
+    Seed mismatch means the per-metric drift readout is confounded with
+    seed-level variance and the comparison is not a valid regression
+    measurement — the caller should re-run on the baseline's seed.
+    """
+    b_seed = read_header_field(baseline, ".seed")
+    o_seed = read_header_field(observed, ".seed")
+    b_seed = b_seed if isinstance(b_seed, int) else None
+    o_seed = o_seed if isinstance(o_seed, int) else None
+    if b_seed is None or o_seed is None:
+        return ("match", b_seed, o_seed)  # missing field — don't block
+    return (("match" if b_seed == o_seed else "mismatch"), b_seed, o_seed)
 
 
 _NUMERIC_FIELDS = (
@@ -270,15 +289,26 @@ def main(argv: list[str]) -> int:
 
     baseline_path = resolve_baseline(args.baseline)
     constants_status = "no-baseline"
+    seed_status = "no-baseline"
+    baseline_seed: int | None = None
     drift_rows: list[dict[str, Any]] = []
     if baseline_path:
         constants_status = constants_drift(baseline_path, events_path)
+        seed_status, baseline_seed, _ = seed_match(baseline_path, events_path)
         baseline_footer = read_footer(baseline_path)
         if baseline_footer:
             drift_rows = footer_drift(baseline_footer, footer)
 
     overall = derive_overall(surv_status, cont_status, constants_status, drift_rows)
+    # Seed mismatch is a comparability failure: the drift table is bogus
+    # because we're comparing different control worlds. Downgrade the
+    # verdict (but never below the survival/continuity verdict) and let
+    # `derive_next_steps` surface the re-run instruction.
+    if seed_status == "mismatch" and overall == "pass":
+        overall = "concern"
     commit = read_header_field(events_path, ".commit_hash_short")
+    observed_seed = read_header_field(events_path, ".seed")
+    observed_seed = observed_seed if isinstance(observed_seed, int) else None
 
     v = Verdict(
         run=str(run_dir),
@@ -288,12 +318,19 @@ def main(argv: list[str]) -> int:
             "continuity": cont_status if not cont_detail else f"fail:{','.join(cont_detail)}",
         },
         constants_drift_vs_baseline=constants_status,
+        seed_match_vs_baseline=seed_status,
         footer_drift=drift_rows,
         baseline=str(baseline_path) if baseline_path else None,
         commit=commit if isinstance(commit, str) else None,
+        seed=observed_seed,
         rationale=args.rationale,
     )
     v.next_steps = derive_next_steps(v, run_dir, footer)
+    if seed_status == "mismatch" and baseline_seed is not None and observed_seed is not None:
+        v.next_steps.insert(
+            0,
+            f"baseline seed={baseline_seed} but run seed={observed_seed}; re-run with --seed {baseline_seed} or pass an explicit baseline that matches",
+        )
 
     if not args.no_history:
         append_history(v)
@@ -322,6 +359,9 @@ def _text(v: Verdict) -> str:
     lines.append(f"  continuity: {v.canaries.get('continuity', '?')}")
     lines.append(f"  constants: {v.constants_drift_vs_baseline}"
                  + (f"  (baseline={v.baseline})" if v.baseline else ""))
+    if v.seed_match_vs_baseline != "no-baseline":
+        seed_disp = "" if v.seed is None else f"  (seed={v.seed})"
+        lines.append(f"  seed:      {v.seed_match_vs_baseline}{seed_disp}")
     if v.footer_drift:
         lines.append("  footer drift (top):")
         for r in v.footer_drift[:5]:

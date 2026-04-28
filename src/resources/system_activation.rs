@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use bevy_ecs::prelude::*;
 
@@ -29,7 +29,18 @@ pub enum FeatureCategory {
 /// Each variant represents a meaningful event in the simulation — not a Bevy
 /// system running, but actual *work* being done (corruption spreading to a
 /// new tile, a bond forming, a ShadowFox spawning, etc.).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub enum Feature {
     CorruptionSpread,
     CorruptionTileEffect,
@@ -661,7 +672,14 @@ pub fn feature_name(f: Feature) -> &'static str {
 /// Tracks how many times each simulation feature meaningfully fires.
 #[derive(Resource, Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct SystemActivation {
-    pub counts: HashMap<Feature, u64>,
+    /// Per-feature firing counts. Stored as a `BTreeMap` (not `HashMap`) so
+    /// (1) `activation_score_in`'s f64 sum is associative across processes —
+    /// `HashMap` iteration order varies with `RandomState`'s per-process seed,
+    /// and float addition is non-associative, so a `HashMap` here produced
+    /// 1-ULP drift in `positive_activation_score` on otherwise-identical seed-42
+    /// runs; (2) the JSON serialization order in events.jsonl is stable, which
+    /// `just verdict` and the determinism test assume.
+    pub counts: BTreeMap<Feature, u64>,
 }
 
 impl SystemActivation {

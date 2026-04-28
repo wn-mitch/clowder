@@ -58,10 +58,15 @@ def read_trace(path: Path):
 
 def headers_match(a, b):
     """§11.4 joinability invariant — traces are comparable only when
-    their headers agree on commit_hash, sim_config, and constants."""
+    their headers agree on commit_hash, sim_config, constants, and seed.
+
+    Seed is part of the joinability set: same-commit + same-constants +
+    different-seed gives two different control worlds, so per-DSE drift
+    measured across them is confounded with seed-level variance.
+    """
     if a is None or b is None:
         return False, "one or both traces missing header"
-    for key in ("commit_hash", "sim_config", "constants"):
+    for key in ("commit_hash", "sim_config", "constants", "seed"):
         if a.get(key) != b.get(key):
             return False, f"header field mismatch: {key}"
     return True, None

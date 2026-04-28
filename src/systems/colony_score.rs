@@ -228,9 +228,11 @@ pub fn emit_colony_score(
     // so analysis tooling can distinguish "no event yet" from "dead system"
     // without consulting a parallel classification table.
     use crate::resources::system_activation::Feature;
-    let mut positive = std::collections::HashMap::new();
-    let mut negative = std::collections::HashMap::new();
-    let mut neutral = std::collections::HashMap::new();
+    // BTreeMap so the SystemActivation event's JSON key order is stable
+    // across processes (replay determinism — see EventKind::SystemActivation).
+    let mut positive = std::collections::BTreeMap::new();
+    let mut negative = std::collections::BTreeMap::new();
+    let mut neutral = std::collections::BTreeMap::new();
     for feature in Feature::ALL {
         let count = activation.counts.get(feature).copied().unwrap_or(0);
         let bucket = match feature.category() {

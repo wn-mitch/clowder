@@ -400,8 +400,17 @@ atlas-test:
 atlas-coverage:
     python3 tools/audit_sprites.py
 
+# Replay-determinism gate: runs the integration test that proves two
+# same-seed runs of the same binary produce a byte-identical events.jsonl.
+# Release mode because the canonical sim is release; debug-mode determinism
+# is not a gate this project cares about. Fast enough (~10s) to keep in
+# every CI run — failures here mean a new HashMap-iteration or scheduler
+# nondeterminism source has crept in.
+check-determinism:
+    cargo test --release --test integration simulation_is_deterministic
+
 # Run all checks
-ci: check test
+ci: check test check-determinism
 
 # Build optimized release binary
 release-build:

@@ -167,9 +167,14 @@ impl LocationPreferences {
 
     /// The tile position this cat has visited most frequently (across all
     /// actions), or `None` if no data exists.
+    ///
+    /// Backed by `BTreeMap` (not `HashMap`) because `max_by_key` returns the
+    /// last-iterated max on ties, and `HashMap`'s iteration order varies per
+    /// process — same input picked different tiles on different runs, breaking
+    /// same-seed replay.
     pub fn most_frequented(&self) -> Option<(i32, i32)> {
-        let mut totals: std::collections::HashMap<(i32, i32), u32> =
-            std::collections::HashMap::new();
+        let mut totals: std::collections::BTreeMap<(i32, i32), u32> =
+            std::collections::BTreeMap::new();
         for &(x, y, _, count) in &self.entries {
             *totals.entry((x, y)).or_default() += count;
         }

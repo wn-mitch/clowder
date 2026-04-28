@@ -100,6 +100,25 @@ pub struct SimulationPlugin;
 
 impl Plugin for SimulationPlugin {
     fn build(&self, app: &mut App) {
+        // Determinism: pin the simulation schedules to a single-threaded
+        // executor. The standalone systems group below is unordered relative
+        // to itself, and Bevy's MultiThreadedExecutor picks a topological
+        // order that varies across processes when the conflict graph admits
+        // alternatives — that shifts the SimRng-consumption sequence and
+        // breaks same-seed replay (verified: two seed-42 runs of the same
+        // binary diverged at the first SystemActivation tick). Single-
+        // threaded execution forces a stable order; the throughput cost is
+        // negligible for a ~50-cat headless sim. Pinning Startup as well
+        // covers worldgen, even though its current systems are explicitly
+        // chained.
+        use bevy::ecs::schedule::ExecutorKind;
+        app.edit_schedule(Startup, |s| {
+            s.set_executor_kind(ExecutorKind::SingleThreaded);
+        });
+        app.edit_schedule(FixedUpdate, |s| {
+            s.set_executor_kind(ExecutorKind::SingleThreaded);
+        });
+
         // World construction — terrain, cats, all sim resources. Owned
         // by the plugin so any host (windowed App, headless App in
         // ticket 030) gets the simulation populated by adding the

@@ -3,14 +3,32 @@ pub mod core;
 pub mod goals;
 
 use std::cmp::Reverse;
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::{BTreeMap, BinaryHeap, HashMap};
 
 // ---------------------------------------------------------------------------
 // PlannerState — compact, hashable state for A* search
 // ---------------------------------------------------------------------------
 
 /// Abstract zone categories. Resolved to concrete positions at execution time.
-#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+///
+/// `PartialOrd, Ord` exist so `(PlannerZone, PlannerZone)` can key a
+/// `BTreeMap` in `ZoneDistances` — the planner's action list is built by
+/// iterating that map, and we need a stable iteration order for replay
+/// determinism (HashMap order seeded the GOAP A* tiebreak and let same-seed
+/// runs pick `TravelTo(Kitchen)` vs `TravelTo(ForagingGround)` for the same
+/// cat-state).
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Hash,
+    Eq,
+    PartialEq,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub enum PlannerZone {
     Stores,
     HuntingGround,
@@ -274,9 +292,16 @@ pub struct PlannedStep {
 // ---------------------------------------------------------------------------
 
 /// Pre-computed distances between abstract zones, built from ECS spatial queries.
+///
+/// Stored as a `BTreeMap` (not `HashMap`) so `travel_actions` iterates in a
+/// stable, process-independent order. The resulting action list seeds A*'s
+/// open-list insertion order, which is the equal-f-cost tiebreak — so a
+/// `HashMap` here let same-seed runs of the same binary pick different
+/// goal-equivalent plans (e.g. `TravelTo(Kitchen)` vs `TravelTo(ForagingGround)`
+/// for prey-deposit on Mallow at tick 1,203,876).
 #[derive(Debug, Clone, Default)]
 pub struct ZoneDistances {
-    pub distances: HashMap<(PlannerZone, PlannerZone), u32>,
+    pub distances: BTreeMap<(PlannerZone, PlannerZone), u32>,
 }
 
 impl ZoneDistances {

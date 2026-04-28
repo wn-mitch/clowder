@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use bevy_ecs::prelude::*;
 use rand::Rng;
@@ -54,9 +54,16 @@ impl Default for Relationship {
 
 /// Colony-wide relationship graph. Symmetric: `get(a, b)` and `get(b, a)`
 /// always return the same entry.
+///
+/// Stored as a `BTreeMap` (not `HashMap`) so `all_for` and `iter` yield a
+/// stable, process-independent order. Coordinator election sums f32
+/// fondness/familiarity over `all_for(entity)`, and float addition is
+/// non-associative, so a `HashMap` produced 1-ULP drift in `social_weight`
+/// across same-seed runs of the same binary — enough to flip tiebreaks in
+/// downstream sorts.
 #[derive(Resource, Debug, Default)]
 pub struct Relationships {
-    data: HashMap<(Entity, Entity), Relationship>,
+    data: BTreeMap<(Entity, Entity), Relationship>,
 }
 
 /// Normalize a pair so the entity with the smaller index comes first.

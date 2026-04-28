@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::collections::VecDeque;
 
 use bevy_ecs::prelude::Resource;
@@ -332,9 +332,12 @@ pub enum EventKind {
         living_cats: u64,
     },
     SystemActivation {
-        positive: HashMap<String, u64>,
-        negative: HashMap<String, u64>,
-        neutral: HashMap<String, u64>,
+        // BTreeMap (not HashMap) so JSON key order in events.jsonl is stable
+        // across processes — the determinism contract for replay regression
+        // tests (`just verdict` consumes these as strings).
+        positive: BTreeMap<String, u64>,
+        negative: BTreeMap<String, u64>,
+        neutral: BTreeMap<String, u64>,
     },
 
     // ----- Plan lifecycle events -----
@@ -429,21 +432,24 @@ pub struct EventLog {
     pub entries: VecDeque<EventEntry>,
     pub capacity: usize,
     pub total_pushed: u64,
-    pub deaths_by_cause: HashMap<String, u64>,
-    pub plan_failures_by_reason: HashMap<String, u64>,
-    pub interrupts_by_reason: HashMap<String, u64>,
+    // BTreeMap (not HashMap) so the JSON serialization order in the
+    // headless footer is stable across processes — see the determinism
+    // contract notes on `EventKind::SystemActivation::positive`.
+    pub deaths_by_cause: BTreeMap<String, u64>,
+    pub plan_failures_by_reason: BTreeMap<String, u64>,
+    pub interrupts_by_reason: BTreeMap<String, u64>,
     /// Continuity-canary class counters. Six fixed keys: `grooming`,
     /// `play`, `mentoring`, `burial`, `courtship`, `mythic-texture`.
     /// Populated by `push()` from the corresponding canary event
     /// variants and from existing events that map to a canary class
     /// (MatingOccurred → courtship, ShadowFoxBanished → mythic-texture).
     /// Serialized into the headless footer for `just check-continuity`.
-    pub continuity_tallies: HashMap<String, u64>,
+    pub continuity_tallies: BTreeMap<String, u64>,
 }
 
 impl Default for EventLog {
     fn default() -> Self {
-        let mut continuity_tallies = HashMap::new();
+        let mut continuity_tallies = BTreeMap::new();
         // Initialize all six keys to zero so the footer always reports
         // the canary set; a missing key is indistinguishable from zero
         // in JSON but the explicit zero is clearer to readers.
@@ -461,9 +467,9 @@ impl Default for EventLog {
             entries: VecDeque::new(),
             capacity: 500,
             total_pushed: 0,
-            deaths_by_cause: HashMap::new(),
-            plan_failures_by_reason: HashMap::new(),
-            interrupts_by_reason: HashMap::new(),
+            deaths_by_cause: BTreeMap::new(),
+            plan_failures_by_reason: BTreeMap::new(),
+            interrupts_by_reason: BTreeMap::new(),
             continuity_tallies,
         }
     }

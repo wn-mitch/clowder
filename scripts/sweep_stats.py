@@ -59,6 +59,14 @@ class SweepReport:
     runs: list[str] = field(default_factory=list)
     metrics: list[dict[str, Any]] = field(default_factory=list)
     vs_baseline: str | None = None
+    # Seed bookkeeping. Listed sorted; `seed_sets_match` only meaningful
+    # when comparing against a baseline. When False, every per-metric
+    # delta is confounded with seed-level variance and the bands are
+    # inflated — the caller should rebuild the comparison sweep on the
+    # baseline's seed set.
+    seeds: list[int] = field(default_factory=list)
+    baseline_seeds: list[int] | None = None
+    seed_sets_match: bool | None = None
 
 
 # ── reading ─────────────────────────────────────────────────────────────────
@@ -95,6 +103,31 @@ def read_footer(events_path: Path) -> dict[str, Any] | None:
     except OSError:
         return None
     return last
+
+
+def read_header_seed(events_path: Path) -> int | None:
+    """Best-effort seed extraction from line 1's `_header` record."""
+    try:
+        with events_path.open() as f:
+            line = f.readline().strip()
+            if not line:
+                return None
+            obj = json.loads(line)
+            if isinstance(obj, dict) and obj.get("_header"):
+                seed = obj.get("seed")
+                return seed if isinstance(seed, int) else None
+    except (OSError, json.JSONDecodeError):
+        return None
+    return None
+
+
+def collect_seeds(files: list[Path]) -> list[int]:
+    seeds: set[int] = set()
+    for p in files:
+        s = read_header_seed(p)
+        if s is not None:
+            seeds.add(s)
+    return sorted(seeds)
 
 
 # ── flattening ──────────────────────────────────────────────────────────────
@@ -223,8 +256,11 @@ def build_report(sweep_dir: Path, baseline_dir: Path | None) -> SweepReport:
         sys.exit(2)
 
     columns = collect(footers)
+    seeds = collect_seeds(files)
 
     baseline_columns: dict[str, list[float]] | None = None
+    baseline_seeds: list[int] | None = None
+    seed_sets_match: bool | None = None
     if baseline_dir:
         b_files = find_events_files(baseline_dir)
         b_footers = [f for f in (read_footer(p) for p in b_files) if f]
@@ -232,6 +268,15 @@ def build_report(sweep_dir: Path, baseline_dir: Path | None) -> SweepReport:
             sys.stderr.write(f"sweep-stats: no `_footer` records in baseline {baseline_dir}\n")
             sys.exit(2)
         baseline_columns = collect(b_footers)
+        baseline_seeds = collect_seeds(b_files)
+        seed_sets_match = (set(seeds) == set(baseline_seeds)) if (seeds and baseline_seeds) else None
+        if seed_sets_match is False:
+            sys.stderr.write(
+                f"sweep-stats: WARNING — seed sets differ between observed {seeds} and "
+                f"baseline {baseline_seeds}; per-metric deltas are confounded with seed-level "
+                "variance. Re-run the observed sweep on the baseline's seed set for a clean "
+                "comparison.\n"
+            )
 
     rows: list[dict[str, Any]] = []
     for path in sorted(columns):
@@ -262,13 +307,20 @@ def build_report(sweep_dir: Path, baseline_dir: Path | None) -> SweepReport:
         runs=[str(p.relative_to(sweep_dir)) for p in files],
         metrics=rows,
         vs_baseline=str(baseline_dir) if baseline_dir else None,
+        seeds=seeds,
+        baseline_seeds=baseline_seeds,
+        seed_sets_match=seed_sets_match,
     )
 
 
 def render_text(r: SweepReport) -> str:
     lines = [f"sweep: {r.sweep}  (n={r.n})"]
+    if r.seeds:
+        lines.append(f"  seeds: {r.seeds}")
     if r.vs_baseline:
         lines.append(f"  vs baseline: {r.vs_baseline}")
+        if r.seed_sets_match is False:
+            lines.append(f"  ⚠ seed mismatch — baseline={r.baseline_seeds}; deltas are confounded")
     bands: dict[str, list[dict[str, Any]]] = {
         "significant": [], "drift": [], "noise": [], "inconclusive": [],
     }

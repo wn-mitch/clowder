@@ -76,6 +76,11 @@ class Fingerprint:
     rows: list[dict[str, Any]] = field(default_factory=list)
     next_steps: list[str] = field(default_factory=list)
     doc_source: str = str(HEALTHY_COLONY)
+    seed: int | None = None
+    # The healthy-colony bands pool 5 seeds × 3 reps; we don't enforce
+    # seed-equality here (any canonical seed is in-band by construction)
+    # but we do surface the seed so a reader can spot a non-canonical run.
+    seed_in_canonical_set: bool | None = None
 
 
 # ── parsing healthy-colony.md ──────────────────────────────────────────
@@ -142,6 +147,30 @@ def read_footer(events_path: Path) -> dict[str, Any]:
         raise SystemExit(f"fingerprint: jq failed: {proc.stderr.strip()}")
     line = next((l for l in proc.stdout.splitlines() if l.strip()), "")
     return json.loads(line) if line else {}
+
+
+# Canonical seed list — sourced from `healthy-colony.md` (pooled across
+# all 5 seeds × 3 reps for the band derivation). A run on a seed outside
+# this set isn't strictly invalid, but its variance characteristics aren't
+# what the bands measured, so we flag it.
+_CANONICAL_SEEDS: frozenset[int] = frozenset({42, 99, 7, 2025, 314})
+
+
+def read_header_seed(events_path: Path) -> int | None:
+    proc = subprocess.run(
+        ["jq", "-c", "select(._header) | .seed", str(events_path)],
+        capture_output=True, text=True,
+    )
+    if proc.returncode != 0:
+        return None
+    line = next((l for l in proc.stdout.splitlines() if l.strip()), "")
+    if not line or line == "null":
+        return None
+    try:
+        v = json.loads(line)
+        return v if isinstance(v, int) else None
+    except json.JSONDecodeError:
+        return None
 
 
 def lookup_dotted(d: dict[str, Any], dotted: str) -> Any:
@@ -239,15 +268,21 @@ def main(argv: list[str]) -> int:
                                    verdict=verdict, note=note))
 
     overall = derive_overall(rows)
+    seed = read_header_seed(events)
     fp = Fingerprint(
         run=str(run_dir),
         overall=overall,
         rows=[asdict(r) for r in rows],
         next_steps=derive_next_steps(rows, run_dir),
+        seed=seed,
+        seed_in_canonical_set=(seed in _CANONICAL_SEEDS) if seed is not None else None,
     )
 
     if args.text:
         sys.stdout.write(f"fingerprint: {overall.upper()}  ({run_dir})\n")
+        if fp.seed is not None:
+            tag = "canonical" if fp.seed_in_canonical_set else "non-canonical"
+            sys.stdout.write(f"  seed: {fp.seed} ({tag})\n")
         groups: dict[str, list[FingerprintRow]] = {}
         for r in rows:
             groups.setdefault(r.verdict, []).append(r)
