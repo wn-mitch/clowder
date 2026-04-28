@@ -267,6 +267,41 @@ pub fn process_gates(
 // Influence-map writers (ticket 006 — §5.6.3 producer landings)
 // ---------------------------------------------------------------------------
 
+/// Refresh the `ColonyLandmarks` resource from live `Structure`
+/// entities. §L2.10.7 anchor-resolution path: cat self-state DSEs
+/// (Eat / Cook / Farm / HerbcraftPrepare) request a single colony
+/// landmark via `LandmarkAnchor::NearestKitchen` / `NearestStores` /
+/// `NearestGarden`; the closure resolves them by reading this cache.
+///
+/// Picks the first functional instance encountered for each kind —
+/// "single-instance" semantics matching today's solo-colony assumption.
+/// Multi-instance support (nearest-of-many) lands when a colony grows
+/// past one of any building.
+pub fn update_colony_landmarks(
+    buildings: Query<(&Structure, &Position), Without<ConstructionSite>>,
+    mut landmarks: ResMut<crate::resources::ColonyLandmarks>,
+) {
+    *landmarks = crate::resources::ColonyLandmarks::empty();
+    for (structure, anchor) in &buildings {
+        if structure.effectiveness() <= 0.0 {
+            continue;
+        }
+        let center = structure.center(anchor);
+        match structure.kind {
+            StructureType::Kitchen if landmarks.kitchen.is_none() => {
+                landmarks.kitchen = Some(center);
+            }
+            StructureType::Stores if landmarks.stores.is_none() => {
+                landmarks.stores = Some(center);
+            }
+            StructureType::Garden if landmarks.garden.is_none() => {
+                landmarks.garden = Some(center);
+            }
+            _ => {}
+        }
+    }
+}
+
 /// Re-stamp `FoodLocationMap` from live `Stores` and `Kitchen`
 /// `Structure` entities. §5.6.3 row #7 — sight × colony.
 ///

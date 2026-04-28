@@ -146,6 +146,9 @@ pub fn setup_world_exclusive(world: &mut World) {
     if !world.contains_resource::<crate::resources::CorruptionLandmarks>() {
         world.insert_resource(crate::resources::CorruptionLandmarks::default());
     }
+    if !world.contains_resource::<crate::resources::ColonyLandmarks>() {
+        world.insert_resource(crate::resources::ColonyLandmarks::default());
+    }
     if !world.contains_resource::<crate::systems::wildlife::DetectionCooldowns>() {
         world.insert_resource(crate::systems::wildlife::DetectionCooldowns::default());
     }
@@ -251,6 +254,7 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     world.insert_resource(ColonyHuntingMap::default());
     world.insert_resource(crate::resources::ExplorationMap::default());
     world.insert_resource(crate::resources::CorruptionLandmarks::default());
+    world.insert_resource(crate::resources::ColonyLandmarks::default());
     world.insert_resource(FoodStores::default());
     world.insert_resource(crate::systems::wildlife::DetectionCooldowns::default());
     world.insert_resource(crate::resources::SystemActivation::default());
