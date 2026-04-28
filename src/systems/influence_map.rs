@@ -279,6 +279,24 @@ impl InfluenceMap for crate::resources::GardenLocationMap {
     }
 }
 
+impl InfluenceMap for crate::resources::ConstructionSiteMap {
+    fn metadata(&self) -> MapMetadata {
+        MapMetadata {
+            // §5.6.3 row #9: construction / damaged-building — sight
+            // × colony. Producer landed by ticket 006; consumer
+            // cutover (Build / Repair target ranking) lives in
+            // ticket 052.
+            name: "construction_site",
+            channel: ChannelKind::Sight,
+            faction: Faction::Colony,
+        }
+    }
+
+    fn base_sample(&self, pos: Position) -> f32 {
+        self.get(pos.x, pos.y)
+    }
+}
+
 /// Borrow-based adapter that exposes `TileMap`'s per-tile corruption
 /// field as an `InfluenceMap`. Corruption lives alongside terrain on
 /// `Tile` rather than in a dedicated resource; the lens avoids
@@ -598,6 +616,21 @@ mod tests {
         let mut map = GardenLocationMap::default_map();
         let md = map.metadata();
         assert_eq!(md.name, "garden_location");
+        assert_eq!(md.channel, ChannelKind::Sight);
+        assert!(matches!(md.faction, Faction::Colony));
+
+        map.stamp(20, 20, 1.0, 12.0);
+        let sampled = map.base_sample(Position::new(22, 22));
+        assert_eq!(sampled, map.get(22, 22));
+        assert!(sampled > 0.0);
+    }
+
+    #[test]
+    fn construction_site_map_implements_influence_map() {
+        use crate::resources::ConstructionSiteMap;
+        let mut map = ConstructionSiteMap::default_map();
+        let md = map.metadata();
+        assert_eq!(md.name, "construction_site");
         assert_eq!(md.channel, ChannelKind::Sight);
         assert!(matches!(md.faction, Faction::Colony));
 

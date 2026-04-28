@@ -204,6 +204,7 @@ impl Plugin for SimulationPlugin {
                         systems::buildings::decay_building_condition,
                         systems::buildings::update_food_location_map,
                         systems::buildings::update_garden_location_map,
+                        systems::buildings::update_construction_site_map,
                     )
                         .chain(),
                     systems::items::decay_items,

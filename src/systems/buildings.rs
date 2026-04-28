@@ -323,6 +323,44 @@ pub fn update_garden_location_map(
     }
 }
 
+/// Re-stamp `ConstructionSiteMap` from active `ConstructionSite`
+/// entities and damaged `Structure` entities. §5.6.3 row #9 — sight ×
+/// colony. Strength encodes urgency: `1 - progress` for in-progress
+/// sites, `1 - condition` for damaged structures (only when condition
+/// is below `damaged_threshold`, mirroring the §4 `HasDamagedBuilding`
+/// marker predicate).
+///
+/// Producer-only — Build / Repair target ranking via
+/// `SpatialConsideration` is owned by ticket 052.
+pub fn update_construction_site_map(
+    sites: Query<(&ConstructionSite, &Position)>,
+    structures: Query<(&Structure, &Position), Without<ConstructionSite>>,
+    mut map: ResMut<crate::resources::ConstructionSiteMap>,
+    constants: Res<SimConstants>,
+) {
+    let cfg = &constants.influence_maps;
+    let sense_range = cfg.construction_site_sense_range;
+    map.clear();
+    for (site, pos) in &sites {
+        let urgency = (1.0 - site.progress).clamp(0.0, 1.0);
+        if urgency <= 0.0 {
+            continue;
+        }
+        map.stamp(pos.x, pos.y, urgency, sense_range);
+    }
+    for (structure, anchor) in &structures {
+        if structure.condition >= cfg.damaged_threshold {
+            continue;
+        }
+        let urgency = (1.0 - structure.condition).clamp(0.0, 1.0);
+        if urgency <= 0.0 {
+            continue;
+        }
+        let center = structure.center(anchor);
+        map.stamp(center.x, center.y, urgency, sense_range);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
