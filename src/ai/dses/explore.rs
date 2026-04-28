@@ -14,8 +14,10 @@
 use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
-use crate::ai::curves::{explore_saturation, Curve};
+use crate::ai::considerations::{
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
+use crate::ai::curves::Curve;
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
@@ -23,7 +25,12 @@ use crate::components::markers;
 use crate::resources::sim_constants::ScoringConstants;
 
 pub const CURIOSITY_INPUT: &str = "curiosity";
-pub const UNEXPLORED_NEARBY_INPUT: &str = "unexplored_nearby";
+
+/// Manhattan range over which the unexplored-frontier centroid
+/// distance is normalized for Explore. 40 tiles ≈ a long territory
+/// traverse; cats farther than this score the spatial axis at zero
+/// and Explore is suppressed (CP gate).
+pub const EXPLORE_FRONTIER_RANGE: f32 = 40.0;
 
 pub struct ExploreDse {
     id: DseId,
@@ -34,6 +41,19 @@ pub struct ExploreDse {
 
 impl ExploreDse {
     pub fn new(scoring: &ScoringConstants) -> Self {
+        // §L2.10.7 row Explore: Linear over normalized distance to
+        // the unexplored-frontier centroid (closer-is-better via
+        // `Linear(slope=-1, intercept=1)` evaluates `1 - cost`).
+        // "Distance is the incentive gradient" per spec rationale —
+        // the cat that's closer to the frontier scores higher and
+        // drifts toward it. Replaces the retired
+        // `unexplored_nearby` saturation scalar; the
+        // ExplorationMap's per-tick frontier_centroid (A1.1) is the
+        // anchor.
+        let frontier_distance = Curve::Linear {
+            slope: -1.0,
+            intercept: 1.0,
+        };
         Self {
             id: DseId("explore"),
             considerations: vec![
@@ -44,9 +64,11 @@ impl ExploreDse {
                         intercept: 0.0,
                     },
                 )),
-                Consideration::Scalar(ScalarConsideration::new(
-                    UNEXPLORED_NEARBY_INPUT,
-                    explore_saturation(),
+                Consideration::Spatial(SpatialConsideration::new(
+                    "explore_frontier_distance",
+                    LandmarkSource::Anchor(LandmarkAnchor::UnexploredFrontierCentroid),
+                    EXPLORE_FRONTIER_RANGE,
+                    frontier_distance,
                 )),
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0]),
@@ -139,34 +161,31 @@ mod tests {
     }
 
     #[test]
-    fn explore_saturation_suppresses_explored_area() {
+    fn explore_frontier_distance_falls_off_linearly() {
         let dse = ExploreDse::new(&default_scoring());
-        // When unexplored_nearby = 0.1 (90% explored), the Logistic
-        // should output < 0.15 — effectively suppressing Explore.
-        if let Consideration::Scalar(ref c) = dse.considerations()[1] {
-            let output = c.curve.evaluate(0.1);
-            assert!(
-                output < 0.15,
-                "unexplored_nearby=0.1 should suppress; got {output}"
-            );
+        // §L2.10.7 row: Linear over normalized cost. At normalized
+        // cost 0 (cat at centroid) the curve evaluates 1.0; at cost
+        // 0.5 it's 0.5; at cost 1.0 (range edge) it's 0.0. Confirms
+        // the gradient-following shape the spec rationalizes.
+        if let Consideration::Spatial(ref s) = dse.considerations()[1] {
+            assert!((s.curve.evaluate(0.0) - 1.0).abs() < 1e-4);
+            assert!((s.curve.evaluate(0.5) - 0.5).abs() < 1e-4);
+            assert!(s.curve.evaluate(1.0) < 1e-4);
         } else {
-            panic!("second consideration should be Scalar");
+            panic!("second consideration should be Spatial");
         }
     }
 
     #[test]
-    fn explore_score_meaningful_when_fresh() {
+    fn explore_uses_frontier_centroid_anchor() {
         let dse = ExploreDse::new(&default_scoring());
-        // When unexplored_nearby = 1.0 (fresh area), the saturation
-        // curve should be near 1.0.
-        if let Consideration::Scalar(ref c) = dse.considerations()[1] {
-            let output = c.curve.evaluate(1.0);
-            assert!(
-                output > 0.99,
-                "unexplored_nearby=1.0 should be near 1.0; got {output}"
-            );
+        if let Consideration::Spatial(ref s) = dse.considerations()[1] {
+            assert!(matches!(
+                s.landmark,
+                LandmarkSource::Anchor(LandmarkAnchor::UnexploredFrontierCentroid)
+            ));
         } else {
-            panic!("second consideration should be Scalar");
+            panic!("second consideration should be Spatial");
         }
     }
 }

@@ -15,8 +15,10 @@
 use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
-use crate::ai::curves::Curve;
+use crate::ai::considerations::{
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
+use crate::ai::curves::{Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
@@ -268,25 +270,40 @@ pub struct ColonyCleanseDse {
     eligibility: EligibilityFilter,
 }
 
+/// Manhattan range over which the corruption-centroid distance is
+/// normalized for ColonyCleanse. 30 tiles ≈ territory-wide; cats
+/// farther than this rarely commute solely to ColonyCleanse.
+pub const COLONY_CLEANSE_CENTROID_RANGE: f32 = 30.0;
+
 impl ColonyCleanseDse {
     pub fn new() -> Self {
-        // §2.3 row 5 (colony side): Logistic(6, 0.3) on
-        // `territory_max_corruption`. Softer than per-tile cleanse
-        // because territory-wide corruption drives earlier but less
-        // sharp response. Absorbs the retiring
-        // `cleanse_corruption_emergency_bonus` flat additive bonus on
-        // the colony side into the axis curve.
-        let territory_corruption = Curve::Logistic {
-            steepness: 6.0,
-            midpoint: 0.3,
+        // §L2.10.7 row 'PracticeMagic': Power curve over distance to
+        // the territory-wide corruption centroid. `Composite {
+        // Polynomial(exp=2, divisor=1), Invert }` evaluates
+        // `1 - (cost)^2`: at the centroid score=1 (urgent cleanse),
+        // half-distance → 0.75, edge → 0. CorruptionLandmarks (A1.2)
+        // returns None when no tile is above the corruption floor;
+        // the consideration scores 0.0 in that case via the substrate
+        // dispatcher and the CP gate suppresses the DSE entirely.
+        // Replaces the retired `territory_max_corruption` scalar
+        // axis (Logistic(6, 0.3)) — the centroid is the §5.6
+        // scent-like spread's geographic anchor.
+        let centroid_distance = Curve::Composite {
+            inner: Box::new(Curve::Polynomial {
+                exponent: 2,
+                divisor: 1.0,
+            }),
+            post: PostOp::Invert,
         };
         Self {
             considerations: vec![
                 Consideration::Scalar(ScalarConsideration::new("spirituality", linear())),
                 Consideration::Scalar(ScalarConsideration::new("magic_skill", linear())),
-                Consideration::Scalar(ScalarConsideration::new(
-                    "territory_max_corruption",
-                    territory_corruption,
+                Consideration::Spatial(SpatialConsideration::new(
+                    "colony_cleanse_centroid_distance",
+                    LandmarkSource::Anchor(LandmarkAnchor::TerritoryCorruptionCentroid),
+                    COLONY_CLEANSE_CENTROID_RANGE,
+                    centroid_distance,
                 )),
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
@@ -662,46 +679,33 @@ mod tests {
     }
 
     #[test]
-    fn colony_cleanse_territory_axis_is_logistic_6_03() {
-        // §2.3 row 5 (colony side): Logistic(6, 0.3) — softer than
-        // per-tile cleanse (steepness 6 vs 8) with midpoint at
-        // territory saturation of 0.3.
+    fn colony_cleanse_uses_corruption_centroid_anchor() {
+        // §L2.10.7 row PracticeMagic (colony side): Power-Invert
+        // curve (`Composite { Polynomial(exp=2, divisor=1), Invert }`)
+        // over distance to the territory corruption centroid. At
+        // cost=0 (cat at centroid) → 1.0; at cost=1 (range edge) → 0.
+        // Replaces the retired `territory_max_corruption` scalar
+        // axis (formerly Logistic(6, 0.3)).
         let dse = ColonyCleanseDse::new();
-        let curve = scalar_curve(&dse, "territory_max_corruption")
-            .expect("territory_max_corruption axis must exist");
-        // 0.3 (midpoint) → 0.5
-        assert!(approx(curve.evaluate(0.3), 0.5, 1e-4));
-        // 0.0 → 1/(1+exp(1.8)) ≈ 0.1419
-        assert!(approx(curve.evaluate(0.0), 0.1419, 1e-3));
-        // 0.6 → 1/(1+exp(-1.8)) ≈ 0.8581
-        assert!(approx(curve.evaluate(0.6), 0.8581, 1e-3));
-        // 1.0 → 1/(1+exp(-4.2)) ≈ 0.9852
-        assert!(approx(curve.evaluate(1.0), 0.9852, 1e-3));
-        match curve {
-            Curve::Logistic {
-                steepness,
-                midpoint,
-            } => {
-                assert!(approx(steepness, 6.0, 1e-6));
-                assert!(approx(midpoint, 0.3, 1e-6));
-            }
-            other => panic!("expected Logistic(6, 0.3); got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn colony_cleanse_softer_than_cleanse_near_threshold() {
-        // Structural witness: at the same sampled corruption level
-        // below the per-tile threshold, per-tile Cleanse is more
-        // conservative (steeper) than colony-wide ColonyCleanse,
-        // which ramps earlier but less sharply.
-        let sc = ScoringConstants::default();
-        let cleanse = scalar_curve(&CleanseDse::new(&sc), "tile_corruption").unwrap();
-        let colony = scalar_curve(&ColonyCleanseDse::new(), "territory_max_corruption").unwrap();
-        // At x=0.2 (halfway between the two midpoints 0.1 and 0.3),
-        // Cleanse is already surging (>0.6) while ColonyCleanse is
-        // still ramping (<0.5).
-        assert!(cleanse.evaluate(0.2) > 0.6);
-        assert!(colony.evaluate(0.2) < 0.5);
+        let spatial = dse
+            .considerations()
+            .iter()
+            .find_map(|c| match c {
+                Consideration::Spatial(s)
+                    if s.name == "colony_cleanse_centroid_distance" =>
+                {
+                    Some(s)
+                }
+                _ => None,
+            })
+            .expect("colony_cleanse_centroid_distance axis must exist");
+        assert!(matches!(
+            spatial.landmark,
+            LandmarkSource::Anchor(LandmarkAnchor::TerritoryCorruptionCentroid)
+        ));
+        // (1 - cost^2): 0 → 1, 0.5 → 0.75, 1 → 0
+        assert!(approx(spatial.curve.evaluate(0.0), 1.0, 1e-4));
+        assert!(approx(spatial.curve.evaluate(0.5), 0.75, 1e-4));
+        assert!(approx(spatial.curve.evaluate(1.0), 0.0, 1e-4));
     }
 }

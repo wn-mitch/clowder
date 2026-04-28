@@ -2112,7 +2112,26 @@ mod tests {
             social_warmth_deficit: 0.4,
             cat_anchors: crate::ai::scoring::CatAnchorPositions::default(),
         };
-        let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
+        // §L2.10.7: this test sets `food_available: false`,
+        // `has_functional_kitchen: false`, etc. on the context, but
+        // the cached test MarkerSnapshot enables every colony
+        // marker — Cook would now win via its spatial axis on the
+        // (0,0) cached kitchen landmark. Build a marker snapshot
+        // that drops the food-related markers to keep the scenario
+        // honest: no food in stores, no functional kitchen.
+        let mut markers = MarkerSnapshot::new();
+        markers.set_colony(markers::WardStrengthLow::KEY, true);
+        let cat_entity = Entity::from_raw_u32(1).unwrap();
+        markers.set_entity(markers::CanForage::KEY, cat_entity, true);
+        markers.set_entity(markers::CanHunt::KEY, cat_entity, true);
+        markers.set_entity(markers::CanWard::KEY, cat_entity, true);
+        let base = test_eval_inputs();
+        let inputs = EvalInputs {
+            cat: cat_entity,
+            markers: &markers,
+            ..base
+        };
+        let scores = score_actions(&c, &inputs, &mut rng).scores;
         let best = select_best_action(&scores);
 
         assert!(
@@ -3719,37 +3738,49 @@ mod tests {
 
     #[test]
     fn explore_score_drops_with_saturation() {
-        // Ticket 001 Sub-2: Explore's Logistic curve on unexplored_nearby
-        // should produce a meaningful score drop between fresh and familiar
-        // areas. CompensatedProduct softens the product, so the ratio won't
-        // be as dramatic as the raw curve — but the familiar-area score
-        // should be low enough that peers (Hunt, Socialize) can outcompete.
+        // Ticket 001 Sub-2 (post-§L2.10.7): Explore's exploration-axis
+        // saturation moved from a `unexplored_nearby` Logistic scalar
+        // to a `LandmarkAnchor::UnexploredFrontierCentroid` Linear
+        // distance. The shape-level test now lives in
+        // `src/ai/dses/explore.rs::tests::explore_frontier_distance_falls_off_linearly`.
+        //
+        // This higher-level scoring test just verifies the DSE still
+        // produces above-zero scores when an unexplored frontier
+        // exists (the cached test landmarks default to `None` for the
+        // frontier centroid, so the spatial axis returns 0.0 — Explore
+        // scores 0.0 too under CP). With the centroid set near the
+        // cat, the score is positive.
         let sc = default_scoring();
         let needs = Needs::default();
         let mut personality = default_personality();
         personality.curiosity = 0.7;
 
-        let mut ctx_fresh = ctx(&needs, &personality, &sc);
-        ctx_fresh.unexplored_nearby = 1.0;
+        let ctx_fresh = ctx(&needs, &personality, &sc);
 
-        let mut ctx_familiar = ctx(&needs, &personality, &sc);
-        ctx_familiar.unexplored_nearby = 0.1;
-
-        let inputs = test_eval_inputs();
-
-        let score_fresh = score_dse_by_id("explore", &ctx_fresh, &inputs);
-        let score_familiar = score_dse_by_id("explore", &ctx_familiar, &inputs);
-
-        // Fresh should be materially higher than familiar.
-        assert!(
-            score_fresh > score_familiar * 2.5,
-            "fresh ({score_fresh}) should be ≥2.5× familiar ({score_familiar})"
+        let mut exploration_with_frontier = crate::resources::ExplorationMap::default();
+        exploration_with_frontier.recompute_frontier_centroid(
+            crate::resources::exploration_map::FRONTIER_THRESHOLD,
         );
-        // Familiar-area score should be low enough to lose to typical
-        // peer DSEs (Hunt ~0.4, Socialize ~0.3 at moderate need).
+        // Default 120×90 map → centroid at (60, 45). Place the cat
+        // there so the spatial axis evaluates near 1.0 instead of
+        // saturating to zero at the 40-tile range edge.
+        let base = test_eval_inputs();
+        let inputs_fresh = EvalInputs {
+            position: Position::new(60, 45),
+            exploration_map: &exploration_with_frontier,
+            ..base
+        };
+        let score_fresh = score_dse_by_id("explore", &ctx_fresh, &inputs_fresh);
+        // No frontier (default empty map): centroid = None → spatial
+        // axis = 0 → CP gates Explore to 0.
+        let score_no_frontier = score_dse_by_id("explore", &ctx_fresh, &test_eval_inputs());
         assert!(
-            score_familiar < 0.30,
-            "familiar-area explore ({score_familiar}) should be < 0.30"
+            score_fresh > 0.0,
+            "explore should score > 0 with a frontier; got {score_fresh}"
+        );
+        assert!(
+            score_no_frontier <= 0.001,
+            "explore should be gated near 0 without a frontier centroid; got {score_no_frontier}"
         );
     }
 }
