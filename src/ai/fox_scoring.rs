@@ -531,7 +531,12 @@ mod tests {
             ticks_since_patrol: 0,
             day_phase: DayPhase::Night, // hunt-favorable default; tests override
             self_position: Position::new(0, 0),
-            den_position: None,
+            // §L2.10.7 fox-side anchors. Default to a den at the
+            // fox's position so the OwnDen-anchored DSEs (Resting,
+            // Feeding, DenDefense) score near 1 on the spatial axis
+            // — tests that exercise distance-based behavior override
+            // these in their own context literal.
+            den_position: Some(Position::new(0, 0)),
             cat_cluster_centroid: None,
             prey_belief_centroid: None,
             frontier_centroid: None,
@@ -630,6 +635,12 @@ mod tests {
         };
         let ctx = FoxScoringContext {
             prey_nearby: false,
+            // §L2.10.7: fox is on patrol (low territory_scent), away
+            // from den. Push den_position out of OwnDen-anchor range
+            // so Resting's new spatial axis attenuates and Patrolling
+            // stays the winner. Without this, the den-at-position
+            // default lifts Resting above Patrolling.
+            den_position: Some(Position::new(50, 50)),
             ..default_context(&needs, &personality, &SCORING)
         };
         let registry = test_fox_registry(&SCORING);

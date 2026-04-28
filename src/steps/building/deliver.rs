@@ -3,7 +3,6 @@ use bevy_ecs::prelude::*;
 use crate::components::building::ConstructionSite;
 use crate::components::building::CropState;
 use crate::components::building::Structure;
-use crate::components::items::ItemKind;
 use crate::components::magic::{Inventory, ItemSlot};
 use crate::components::physical::Position;
 use crate::components::task_chain::Material;
@@ -144,20 +143,11 @@ pub fn deliver_legacy_chain_adapter(
     }
 }
 
-// Suppress unused-import warning for ItemKind on builds that don't
-// land a code path referencing it directly here. The import is kept
-// because the rustdoc references `ItemKind::material()` and the
-// helper above relies on that bridge through the inventory slots.
-#[allow(dead_code)]
-fn _kind_anchor() -> Option<ItemKind> {
-    None
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::components::building::StructureType;
-    use crate::components::items::ItemModifiers;
+    use crate::components::items::{ItemKind, ItemModifiers};
 
     fn test_world() -> World {
         World::new()

@@ -11,14 +11,21 @@
 use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
-use crate::ai::curves::Curve;
+use crate::ai::considerations::{
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
+use crate::ai::curves::{Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
 
 pub const CUB_SATIATION_DEFICIT_INPUT: &str = "cub_satiation_deficit";
 pub const PROTECTIVENESS_INPUT: &str = "protectiveness";
+
+/// §L2.10.7 fox Feeding range — Manhattan tiles for the
+/// home-den anchor. 12 tiles ≈ a fox's territorial radius (matches
+/// fox Resting). Power curve gives sharp 'return-to-den' pull.
+pub const FOX_FEEDING_DEN_RANGE: f32 = 12.0;
 
 pub struct FoxFeedingDse {
     id: DseId,
@@ -29,6 +36,15 @@ pub struct FoxFeedingDse {
 
 impl FoxFeedingDse {
     pub fn new() -> Self {
+        // §L2.10.7 row Feeding: Power curve over distance to den.
+        // 'Return-to-den is highly localized' per spec line 5649.
+        let den_distance = Curve::Composite {
+            inner: Box::new(Curve::Polynomial {
+                exponent: 2,
+                divisor: 1.0,
+            }),
+            post: PostOp::Invert,
+        };
         Self {
             id: DseId("fox_feeding"),
             considerations: vec![
@@ -46,8 +62,14 @@ impl FoxFeedingDse {
                         intercept: 0.0,
                     },
                 )),
+                Consideration::Spatial(SpatialConsideration::new(
+                    "fox_feeding_den_distance",
+                    LandmarkSource::Anchor(LandmarkAnchor::OwnDen),
+                    FOX_FEEDING_DEN_RANGE,
+                    den_distance,
+                )),
             ],
-            composition: Composition::compensated_product(vec![1.0, 1.0]),
+            composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
             eligibility: EligibilityFilter::new(),
         }
     }

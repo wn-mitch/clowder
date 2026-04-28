@@ -24,14 +24,22 @@
 use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
-use crate::ai::curves::{flee_or_fight, Curve};
+use crate::ai::considerations::{
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
+use crate::ai::curves::{flee_or_fight, Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
 
 pub const CUB_SAFETY_DEFICIT_INPUT: &str = "cub_safety_deficit";
 pub const PROTECTIVENESS_INPUT: &str = "protectiveness";
+
+/// §L2.10.7 fox DenDefense range — Manhattan tiles for the
+/// home-den anchor. 8 tiles ≈ tighter than Resting/Feeding (12)
+/// because DenDefense is an at-the-den action; foxes far from the
+/// den can't defend even if they want to. Sharper Power fall-off.
+pub const FOX_DEN_DEFENSE_DEN_RANGE: f32 = 8.0;
 
 pub struct FoxDenDefenseDse {
     id: DseId,
@@ -42,6 +50,17 @@ pub struct FoxDenDefenseDse {
 
 impl FoxDenDefenseDse {
     pub fn new() -> Self {
+        // §L2.10.7 row DenDefense: Power-Invert curve over distance
+        // to den. Spec line 5652: 'Inverse-distance-from-den; sharper
+        // than Flee because cubs anchor commitment.' Closer-to-den =
+        // higher score, encoding 'stay near the cubs'.
+        let den_distance = Curve::Composite {
+            inner: Box::new(Curve::Polynomial {
+                exponent: 2,
+                divisor: 1.0,
+            }),
+            post: PostOp::Invert,
+        };
         Self {
             id: DseId("fox_den_defense"),
             considerations: vec![
@@ -56,8 +75,14 @@ impl FoxDenDefenseDse {
                         intercept: 0.0,
                     },
                 )),
+                Consideration::Spatial(SpatialConsideration::new(
+                    "fox_den_defense_den_distance",
+                    LandmarkSource::Anchor(LandmarkAnchor::OwnDen),
+                    FOX_DEN_DEFENSE_DEN_RANGE,
+                    den_distance,
+                )),
             ],
-            composition: Composition::compensated_product(vec![1.0, 1.0]),
+            composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
             eligibility: EligibilityFilter::new(),
         }
     }
@@ -113,8 +138,31 @@ mod tests {
     }
 
     #[test]
-    fn fox_den_defense_has_two_axes() {
-        assert_eq!(FoxDenDefenseDse::new().considerations().len(), 2);
+    fn fox_den_defense_has_three_axes() {
+        // §L2.10.7: cub_safety_deficit + protectiveness + den_distance.
+        assert_eq!(FoxDenDefenseDse::new().considerations().len(), 3);
+    }
+
+    #[test]
+    fn fox_den_defense_uses_own_den_anchor() {
+        let dse = FoxDenDefenseDse::new();
+        let spatial = dse
+            .considerations()
+            .iter()
+            .find_map(|c| match c {
+                Consideration::Spatial(sp) if sp.name == "fox_den_defense_den_distance" => {
+                    Some(sp)
+                }
+                _ => None,
+            })
+            .expect("fox_den_defense_den_distance axis must exist");
+        assert!(matches!(
+            spatial.landmark,
+            LandmarkSource::Anchor(LandmarkAnchor::OwnDen)
+        ));
+        // Power-Invert: closer = higher.
+        assert!(spatial.curve.evaluate(0.0) > 0.99);
+        assert!(spatial.curve.evaluate(1.0) < 0.01);
     }
 
     #[test]

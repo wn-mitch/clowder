@@ -26,8 +26,10 @@
 use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
-use crate::ai::curves::{piecewise, Curve};
+use crate::ai::considerations::{
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
+use crate::ai::curves::{piecewise, Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
@@ -43,6 +45,12 @@ pub const DAWN_KNOT: f32 = 0.0;
 pub const DAY_KNOT: f32 = 0.33;
 pub const DUSK_KNOT: f32 = 0.66;
 pub const NIGHT_KNOT: f32 = 1.0;
+
+/// §L2.10.7 fox Resting range — Manhattan tiles for the
+/// home-den anchor. 12 ≈ a fox's territorial radius; foxes farther
+/// from the den than this find resting unattractive (sharp Power
+/// fall-off encodes 'home-base pull').
+pub const FOX_RESTING_DEN_RANGE: f32 = 12.0;
 
 pub struct FoxRestingDse {
     id: DseId,
@@ -63,6 +71,18 @@ impl FoxRestingDse {
             slope: 1.0,
             intercept: 0.0,
         };
+        // §L2.10.7 row Resting: Power curve over distance to the
+        // fox's home-den anchor. `Composite { Polynomial(exp=2,
+        // divisor=1), Invert }` evaluates `1 - cost^2`: at the den
+        // score=1, half-distance → 0.75, range edge → 0. Sharp
+        // 'home-base pull' per spec rationale (line 5653).
+        let den_distance = Curve::Composite {
+            inner: Box::new(Curve::Polynomial {
+                exponent: 2,
+                divisor: 1.0,
+            }),
+            post: PostOp::Invert,
+        };
 
         Self {
             id: DseId("fox_resting"),
@@ -70,13 +90,19 @@ impl FoxRestingDse {
                 Consideration::Scalar(ScalarConsideration::new(HUNGER_INPUT, linear.clone())),
                 Consideration::Scalar(ScalarConsideration::new(HEALTH_FRACTION_INPUT, linear)),
                 Consideration::Scalar(ScalarConsideration::new(DAY_PHASE_INPUT, day_phase_curve)),
+                Consideration::Spatial(SpatialConsideration::new(
+                    "fox_resting_den_distance",
+                    LandmarkSource::Anchor(LandmarkAnchor::OwnDen),
+                    FOX_RESTING_DEN_RANGE,
+                    den_distance,
+                )),
             ],
-            // RtEO sum = 1.0. Day phase dominates — diurnal foxes
-            // rest by day independent of comfort state (§3.1.1 row
-            // 1518 design note). Hunger + health carry the "well-fed
-            // + healthy produces comfort" signal but split the
-            // remaining weight equally.
-            composition: Composition::weighted_sum(vec![0.25, 0.25, 0.5]),
+            // RtEO sum = 1.0. Day phase dominates (diurnal foxes
+            // rest by day independent of comfort state — §3.1.1 row
+            // 1518). Den proximity at 0.20 mirrors the §L2.10.7
+            // Power-curve weight precedent. Original three weights
+            // (0.25/0.25/0.5) renormalized by ×0.80 to keep sum=1.0.
+            composition: Composition::weighted_sum(vec![0.20, 0.20, 0.40, 0.20]),
             eligibility: EligibilityFilter::new(),
         }
     }
@@ -127,9 +153,29 @@ mod tests {
     }
 
     #[test]
-    fn fox_resting_has_three_axes() {
+    fn fox_resting_has_four_axes() {
+        // §L2.10.7: hunger + health + day_phase + den_distance.
         let s = ScoringConstants::default();
-        assert_eq!(FoxRestingDse::new(&s).considerations().len(), 3);
+        assert_eq!(FoxRestingDse::new(&s).considerations().len(), 4);
+    }
+
+    #[test]
+    fn fox_resting_uses_own_den_anchor() {
+        let s = ScoringConstants::default();
+        let dse = FoxRestingDse::new(&s);
+        let spatial = dse
+            .considerations()
+            .iter()
+            .find_map(|c| match c {
+                Consideration::Spatial(sp) if sp.name == "fox_resting_den_distance" => Some(sp),
+                _ => None,
+            })
+            .expect("fox_resting_den_distance axis must exist");
+        assert!(matches!(
+            spatial.landmark,
+            LandmarkSource::Anchor(LandmarkAnchor::OwnDen)
+        ));
+        assert!((spatial.range - FOX_RESTING_DEN_RANGE).abs() < 1e-4);
     }
 
     #[test]
@@ -159,11 +205,18 @@ mod tests {
     fn day_phase_knots_match_fox_rest_constants() {
         let s = ScoringConstants::default();
         let dse = FoxRestingDse::new(&s);
-        let c = match &dse.considerations()[2] {
-            Consideration::Scalar(sc) => &sc.curve,
-            _ => panic!("expected scalar"),
-        };
-        assert!((c.evaluate(DAY_KNOT) - s.fox_rest_day_bonus).abs() < 1e-4);
-        assert!((c.evaluate(NIGHT_KNOT) - s.fox_rest_night_bonus).abs() < 1e-4);
+        // Find day_phase axis by name rather than fixed index — the
+        // §L2.10.7 spatial port adds a 4th consideration after
+        // day_phase.
+        let day_phase_axis = dse
+            .considerations()
+            .iter()
+            .find_map(|c| match c {
+                Consideration::Scalar(sc) if sc.name == DAY_PHASE_INPUT => Some(&sc.curve),
+                _ => None,
+            })
+            .expect("day_phase axis must exist");
+        assert!((day_phase_axis.evaluate(DAY_KNOT) - s.fox_rest_day_bonus).abs() < 1e-4);
+        assert!((day_phase_axis.evaluate(NIGHT_KNOT) - s.fox_rest_night_bonus).abs() < 1e-4);
     }
 }
