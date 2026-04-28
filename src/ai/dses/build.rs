@@ -14,8 +14,10 @@
 use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
-use crate::ai::curves::{piecewise, Curve};
+use crate::ai::considerations::{
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
+use crate::ai::curves::{piecewise, Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
@@ -25,6 +27,11 @@ use crate::resources::sim_constants::ScoringConstants;
 pub const DILIGENCE_INPUT: &str = "diligence";
 pub const SITE_PRESENCE_INPUT: &str = "has_construction_site";
 pub const REPAIR_PRESENCE_INPUT: &str = "has_damaged_building";
+
+/// §L2.10.7 Build range — Manhattan tiles for the
+/// nearest-construction-site anchor. 25 ≈ a long colony walk;
+/// matches Cook/Eat/Farm range cluster.
+pub const BUILD_SITE_RANGE: f32 = 25.0;
 
 pub struct BuildDse {
     id: DseId,

@@ -533,14 +533,6 @@ mod tests {
         (a - b).abs() < tol
     }
 
-    #[allow(dead_code)]
-    fn scalar_curve(dse: &dyn Dse, axis: &str) -> Option<Curve> {
-        dse.considerations().iter().find_map(|c| match c {
-            Consideration::Scalar(s) if s.name == axis => Some(s.curve.clone()),
-            _ => None,
-        })
-    }
-
     #[test]
     fn all_six_practice_magic_ids_stable() {
         let sc = ScoringConstants::default();
