@@ -10,10 +10,15 @@
 //! - `ScalarConsideration` — reads one `f32` from the cat's state and
 //!   passes it through a `Curve`. Covers hunger, boldness, skill,
 //!   satisfaction — anything already bounded or easily normalized.
-//! - `SpatialConsideration` — samples an `InfluenceMap` at a position
-//!   (typically the cat's own position for self-referential axes like
-//!   "threat level here", or a candidate target's position for
-//!   target-taking DSEs) and passes the sample through a `Curve`.
+//! - `SpatialConsideration` — computes the cat's Manhattan distance to
+//!   a specific landmark (target candidate position or fixed tile) and
+//!   passes the distance through a `Curve`. The §L2.10.7 plan-cost
+//!   feedback design: landmark distance enters scoring as a curve
+//!   contribution, so high-cost candidates are suppressed elastically
+//!   without a pathfinder-in-the-loop. Closer-is-better axes use
+//!   `Quadratic` / `Power` (sharp falloff); close-enough axes use
+//!   `Logistic` (sigmoid plateau); incentive-gradient axes use
+//!   `Linear`.
 //! - `MarkerConsideration` — reads one ECS marker as a 0/1 gate. Most
 //!   marker uses are eligibility filters (§4), but *additive* markers
 //!   that contribute to the score (not just gate it) are scored via
@@ -24,6 +29,8 @@
 //! that's the evaluator's job (Phase 3a task #5: EvalCtx + evaluate()).
 
 use super::curves::Curve;
+use crate::components::physical::Position;
+use bevy_ecs::entity::Entity;
 
 // ---------------------------------------------------------------------------
 // Scalar consideration
@@ -52,62 +59,108 @@ impl ScalarConsideration {
 }
 
 // ---------------------------------------------------------------------------
-// Spatial consideration
+// Spatial consideration — §L2.10.7 plan-cost feedback
 // ---------------------------------------------------------------------------
 
-/// One influence-map sample at a position, one curve. §1.2 spatial
-/// flavor — the IAM "personal-interest template" (ch 30) as a
-/// first-class consideration shape rather than a post-hoc lookup.
+/// One landmark distance, one curve. The §L2.10.7 plan-cost feedback
+/// design: the cat's Manhattan distance to a specific landmark
+/// (candidate target, fixed tile) enters scoring as a curve
+/// contribution. High-cost candidates degrade smoothly via the curve
+/// shape without invoking a pathfinder mid-score.
 ///
-/// Two `CenterPolicy` values cover the anchor options:
+/// **Two channels compose** per spec §0.2's elastic-failure rule. The
+/// elastic channel here (curve attenuation) and the GOAP hard-fail
+/// channel (`replan_count ≥ max_replans` in
+/// `crate::components::goap_plan`) are designed to coexist: scoring
+/// degrades smoothly as reachability worsens; only when elasticity
+/// has run out does `replan_count` fire as the last exit.
 ///
-/// - `SelfPosition` — sample at the cat's own position. Example:
-///   `Flee.threat_nearby` samples fox-scent at `self.pos`.
-/// - `TargetPosition` — sample at a candidate target's position.
-///   Example: `Hunt.prey_proximity` under §6's target-taking DSE
-///   samples the prey map at each candidate's tile.
+/// **Curve choice per axis** (§L2.10.7):
+/// - `Quadratic` / `Power` — closer-is-better, sharp falloff (hunt,
+///   defend-territory, urgent-threat).
+/// - `Logistic` — close-enough plateau (routine errands, non-urgent
+///   socializing).
+/// - `Linear` — incentive gradient (exploration).
 ///
-/// The evaluator (Phase 3a task #5) resolves the position given the
-/// consideration's `CenterPolicy` and the current `EvalCtx`.
+/// Numeric tuning (curve parameters) is balance-thread work, not
+/// substrate scope; this struct commits curve *shape*.
 #[derive(Debug, Clone)]
 pub struct SpatialConsideration {
     pub name: &'static str,
-    /// Reference to a registered channel × faction map via a stable
-    /// key. Phase 3a intentionally uses a string key rather than a
-    /// typed enum so Phase 2's `InfluenceMap` registry grows
-    /// open-set (§5.6.9); mis-keyed lookups surface as a debug-level
-    /// warning rather than a compile error.
-    pub map_key: MapKey,
-    pub center: CenterPolicy,
+    /// What the curve measures distance to. Resolved by the evaluator
+    /// against `EvalCtx`.
+    pub landmark: LandmarkSource,
+    /// Tile-range for input normalization. Manhattan distance is
+    /// divided by `range` before being passed to the curve, so curve
+    /// parameters (especially `Logistic.midpoint`) are written in
+    /// `[0, 1]` units regardless of the per-DSE candidate range. A
+    /// closer-is-better axis wraps its curve in
+    /// `Composite { ..., Invert }`; a farther-is-better axis (Flee,
+    /// Avoid) operates directly on the normalized cost.
+    pub range: f32,
     pub curve: Curve,
 }
 
-/// Where the spatial sample is taken. Resolved by the evaluator.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CenterPolicy {
-    SelfPosition,
-    /// Sample at the position of the DSE's current candidate target.
-    /// Only meaningful for target-taking DSEs (§6).
+/// Where to compute distance from `EvalCtx::self_position`. The
+/// evaluator resolves the landmark to a concrete `Position`, takes
+/// the Manhattan distance from the cat's position, and runs that
+/// distance through the curve.
+///
+/// Future variants (per §L2.10.7's "entity, tile coord, or
+/// cat-relative anchor" enumeration): an `Entity(Entity)` variant
+/// for pinned entity references and a cat-relative anchor variant
+/// land when consumers need them. They're omitted here to avoid
+/// introducing dead substrate — the same lesson the prior
+/// influence-map shape taught when every call site stubbed it to
+/// zero.
+#[derive(Debug, Clone, Copy)]
+pub enum LandmarkSource {
+    /// Resolves to `EvalCtx::target_position`. Returns score 0.0 when
+    /// the target position is `None` (target-taking DSE without a
+    /// candidate). The canonical target-taking-DSE shape: each
+    /// candidate's position drives the per-candidate spatial axis.
     TargetPosition,
+    /// Fixed tile coordinate. For globally-known landmarks (a unique
+    /// hearth, a colony center) or per-cat landmarks resolved at
+    /// construction time.
+    Tile(Position),
+    /// Pinned entity reference. The evaluator resolves the entity's
+    /// current `Position` via the `EvalCtx::entity_position` lookup.
+    /// Returns score 0.0 when the entity has no resolvable position
+    /// (despawned, off-grid).
+    Entity(Entity),
 }
 
-/// Stable key identifying an L1 influence map. Matches
-/// `MapMetadata.name` from [`crate::systems::influence_map`].
-pub type MapKey = &'static str;
-
 impl SpatialConsideration {
-    pub fn new(name: &'static str, map_key: MapKey, center: CenterPolicy, curve: Curve) -> Self {
+    pub fn new(name: &'static str, landmark: LandmarkSource, range: f32, curve: Curve) -> Self {
+        debug_assert!(range > 0.0, "SpatialConsideration::range must be positive");
         Self {
             name,
-            map_key,
-            center,
+            landmark,
+            range,
             curve,
         }
     }
 
-    /// Evaluate the curve at the caller-supplied map sample.
-    pub fn score(&self, sample: f32) -> f32 {
-        self.curve.evaluate(sample)
+    /// Evaluate the curve at the normalized cost `distance / range`.
+    /// The evaluator resolves landmark → `Position` → Manhattan
+    /// distance, then calls this. Curves operate on normalized cost
+    /// (`[0, 1+]`) so per-DSE range scales factor out of curve
+    /// parameters.
+    pub fn score(&self, distance: f32) -> f32 {
+        let normalized = distance / self.range;
+        self.curve.evaluate(normalized)
+    }
+
+    /// Stable label for trace emission. Distinguishes landmark
+    /// flavors in §11.3 L2 records without leaking entity ids or
+    /// runtime tile coords (which would balloon the trace).
+    pub fn landmark_label(&self) -> &'static str {
+        match self.landmark {
+            LandmarkSource::TargetPosition => "target_position",
+            LandmarkSource::Tile(_) => "tile",
+            LandmarkSource::Entity(_) => "entity",
+        }
     }
 }
 
@@ -194,7 +247,15 @@ impl Consideration {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ai::curves::hangry;
+    use crate::ai::curves::{Curve, hangry};
+
+    fn quadratic_unit() -> Curve {
+        Curve::Quadratic {
+            exponent: 2.0,
+            divisor: 1.0,
+            shift: 0.0,
+        }
+    }
 
     #[test]
     fn scalar_matches_curve_output() {
@@ -204,15 +265,59 @@ mod tests {
     }
 
     #[test]
-    fn spatial_center_policy_is_data() {
-        let c = SpatialConsideration::new(
-            "fox_scent",
-            "fox_scent",
-            CenterPolicy::SelfPosition,
-            hangry(),
+    fn spatial_landmark_label_dispatches_per_variant() {
+        let target = SpatialConsideration::new(
+            "hunt",
+            LandmarkSource::TargetPosition,
+            10.0,
+            quadratic_unit(),
         );
-        assert_eq!(c.center, CenterPolicy::SelfPosition);
-        assert!(c.score(0.75) > 0.0);
+        let tile = SpatialConsideration::new(
+            "hearth",
+            LandmarkSource::Tile(Position::new(0, 0)),
+            10.0,
+            quadratic_unit(),
+        );
+        let entity = SpatialConsideration::new(
+            "den",
+            LandmarkSource::Entity(Entity::from_raw_u32(1).unwrap()),
+            10.0,
+            quadratic_unit(),
+        );
+        assert_eq!(target.landmark_label(), "target_position");
+        assert_eq!(tile.landmark_label(), "tile");
+        assert_eq!(entity.landmark_label(), "entity");
+    }
+
+    #[test]
+    fn spatial_normalizes_distance_by_range() {
+        // Quadratic(exp=2, div=1, shift=0) evaluates `d/R` → `(d/R)^2`.
+        let c = SpatialConsideration::new(
+            "test",
+            LandmarkSource::TargetPosition,
+            10.0,
+            quadratic_unit(),
+        );
+        assert!((c.score(0.0) - 0.0).abs() < 1e-4);
+        assert!((c.score(5.0) - 0.25).abs() < 1e-4); // half-range → 0.5² = 0.25
+        assert!((c.score(10.0) - 1.0).abs() < 1e-4); // full range → 1² = 1
+    }
+
+    #[test]
+    fn spatial_curve_invert_makes_closer_better() {
+        // Composite { Quadratic(2), Invert } evaluates 1 - (d/R)².
+        let c = SpatialConsideration::new(
+            "closer_is_better",
+            LandmarkSource::TargetPosition,
+            10.0,
+            Curve::Composite {
+                inner: Box::new(quadratic_unit()),
+                post: super::super::curves::PostOp::Invert,
+            },
+        );
+        assert!((c.score(0.0) - 1.0).abs() < 1e-4); // adjacent → 1
+        assert!((c.score(5.0) - 0.75).abs() < 1e-4); // half-range → 1 - 0.25 = 0.75
+        assert!((c.score(10.0) - 0.0).abs() < 1e-4); // boundary → 0
     }
 
     #[test]

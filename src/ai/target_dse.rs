@@ -33,7 +33,7 @@
 use bevy::prelude::Entity;
 
 use super::composition::Composition;
-use super::considerations::{CenterPolicy, Consideration};
+use super::considerations::{Consideration, LandmarkSource};
 use super::dse::{DseId, EvalCtx, Intention};
 
 // ---------------------------------------------------------------------------
@@ -79,9 +79,10 @@ pub enum TargetAggregation {
 ///
 /// `per_target_considerations` is a list of the same `Consideration`
 /// enum regular `Dse`s consume — the difference is interpretation:
-/// `Spatial` considerations with `CenterPolicy::TargetPosition` sample
-/// the *candidate's* position, not `self.pos`. The evaluator switches
-/// the per-target `EvalCtx.target_position` as it iterates candidates.
+/// `Spatial` considerations with `LandmarkSource::TargetPosition`
+/// measure distance to the *candidate's* tile, not to a fixed
+/// landmark. The evaluator switches the per-target
+/// `EvalCtx.target_position` as it iterates candidates.
 ///
 /// `composition` reduces per-target considerations to one per-candidate
 /// score — typically `CompensatedProduct` (§3.1), matching the regular
@@ -330,9 +331,9 @@ pub fn evaluate_target_taking(
 
 /// Score one per-target consideration against a specific candidate.
 /// Matches `score_consideration` in [`super::eval`] but with `target`
-/// + `target_pos` threaded in so `CenterPolicy::TargetPosition` resolves
-///   against the candidate, and scalar-by-name considerations get the
-///   target-scoped fetcher.
+/// + `target_pos` threaded in so `LandmarkSource::TargetPosition`
+///   resolves against the candidate, and scalar-by-name considerations
+///   get the target-scoped fetcher.
 fn score_target_consideration(
     consideration: &Consideration,
     cat: Entity,
@@ -355,11 +356,16 @@ fn score_target_consideration(
             }
         }
         Consideration::Spatial(s) => {
-            let pos = match s.center {
-                CenterPolicy::SelfPosition => ctx.self_position,
-                CenterPolicy::TargetPosition => target_pos,
+            let landmark_pos = match s.landmark {
+                LandmarkSource::TargetPosition => target_pos,
+                LandmarkSource::Tile(p) => p,
+                LandmarkSource::Entity(e) => match (ctx.entity_position)(e) {
+                    Some(p) => p,
+                    None => return 0.0,
+                },
             };
-            s.score((ctx.sample_map)(s.map_key, pos))
+            let distance = ctx.self_position.manhattan_distance(&landmark_pos) as f32;
+            s.score(distance)
         }
         Consideration::Marker(m) => {
             // Marker considerations on the target test the target's
@@ -425,7 +431,7 @@ fn aggregate(per_target: &[(Entity, f32)], rule: TargetAggregation) -> (f32, Opt
 mod tests {
     use super::*;
     use crate::ai::composition::Composition;
-    use crate::ai::considerations::{CenterPolicy, ScalarConsideration, SpatialConsideration};
+    use crate::ai::considerations::{LandmarkSource, ScalarConsideration, SpatialConsideration};
     use crate::ai::curves::Curve;
     use crate::ai::dse::{ActivityKind, CommitmentStrategy, Termination};
     use crate::components::physical::Position;
@@ -451,11 +457,11 @@ mod tests {
 
     fn test_ctx(entity: Entity) -> EvalCtx<'static> {
         static MARKER: fn(&str, Entity) -> bool = |_, _| false;
-        static SAMPLE: fn(&str, Position) -> f32 = |_, _| 0.0;
+        static NO_ENTITY_POS: fn(Entity) -> Option<Position> = |_| None;
         EvalCtx {
             cat: entity,
             tick: 0,
-            sample_map: &SAMPLE,
+            entity_position: &NO_ENTITY_POS,
             has_marker: &MARKER,
             self_position: Position::new(0, 0),
             target: None,
@@ -628,15 +634,19 @@ mod tests {
 
     #[test]
     fn spatial_consideration_uses_candidate_position() {
-        // Spatial consideration with `TargetPosition` center must sample
-        // at each candidate's tile, not the scoring cat's position.
+        // Spatial consideration with `LandmarkSource::TargetPosition`
+        // must measure distance from the scoring cat to each candidate's
+        // tile, not from cat-to-itself. With `Linear { slope: 1, ... }`
+        // and `range = 10`, the score equals `distance / 10` clamped —
+        // so candidate `a` at distance 5 scores 0.5 and `b` at distance
+        // 10 scores 1.0 (saturating linear).
         let dse = TargetTakingDse {
             id: DseId("hunt"),
             candidate_query: noop_candidate_query,
             per_target_considerations: vec![Consideration::Spatial(SpatialConsideration::new(
-                "prey_map",
-                "prey_map",
-                CenterPolicy::TargetPosition,
+                "candidate_distance",
+                LandmarkSource::TargetPosition,
+                10.0,
                 linear_identity(),
             ))],
             composition: Composition::compensated_product(vec![1.0]),
@@ -649,25 +659,7 @@ mod tests {
         let b = Entity::from_raw_u32(11).unwrap();
         let pos_a = Position::new(5, 0);
         let pos_b = Position::new(10, 0);
-        let sample = move |key: &str, pos: Position| -> f32 {
-            if key == "prey_map" {
-                // Return a value that depends on position to verify
-                // per-candidate sampling.
-                pos.x as f32 / 10.0
-            } else {
-                0.0
-            }
-        };
-        let has_marker = |_: &str, _: Entity| false;
-        let ctx = EvalCtx {
-            cat,
-            tick: 0,
-            sample_map: &sample,
-            has_marker: &has_marker,
-            self_position: Position::new(0, 0),
-            target: None,
-            target_position: None,
-        };
+        let ctx = test_ctx(cat);
         let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = |_: &str, _: Entity, _: Entity| 0.0;
         let out = evaluate_target_taking(
@@ -679,7 +671,8 @@ mod tests {
             &fetch_self,
             &fetch_target,
         );
-        // b at x=10 → 1.0, a at x=5 → 0.5. Winner = b.
+        // Cat at (0,0); a at (5,0) → distance 5 → score 0.5;
+        // b at (10,0) → distance 10 → score 1.0. Winner = b.
         assert_eq!(out.winning_target, Some(b));
         assert!((out.aggregated_score - 1.0).abs() < 1e-5);
     }

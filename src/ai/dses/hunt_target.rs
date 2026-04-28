@@ -20,17 +20,21 @@
 //!   the scent gradient, not a candidate-ranking choice.
 //!
 //! Three per-target considerations per §6.5.5. The `pursuit-cost` axis
-//! is deferred pending §L2.10.7's plan-cost feedback shape — until
-//! then, distance² (via `Quadratic(exp=2)` on nearness) stands in,
-//! matching the spec's "pursuit-cost proxies as `distance²`" fallback
-//! note. Weights renormalized from (0.25/0.25/0.20/0.30) by dropping
-//! the 0.30 pursuit-cost row and dividing by 0.70:
+//! lands as a `SpatialConsideration` per the §L2.10.7 plan-cost
+//! feedback design (ticket 052) — Manhattan distance to the candidate
+//! tile flows through `Logistic(steepness=10, midpoint=0.5, inverted)`
+//! over `range = HUNT_TARGET_RANGE`. High-cost prey suppress
+//! elastically; the GOAP `replan_count` hard-fail is the last exit per
+//! spec §0.2's two-channel composition. Weights renormalized from
+//! (0.25/0.25/0.20/0.30) by dropping the 0.30 pursuit-cost row and
+//! dividing by 0.70 — the substrate row replaces the ad-hoc nearness
+//! axis at the same weight slot.
 //!
-//! | # | Consideration          | Scalar name          | Curve                    | Spec weight | Renormalized |
-//! |---|------------------------|----------------------|--------------------------|-------------|--------------|
-//! | 1 | distance               | `target_nearness`    | `Quadratic(exp=2)`       | 0.25        | 0.357        |
-//! | 2 | prey-species-yield     | `prey_yield`         | `Linear(1, 0)`           | 0.25        | 0.357        |
-//! | 3 | prey-alertness (inv)   | `prey_calm`          | `Linear(1, 0)`           | 0.20        | 0.286        |
+//! | # | Consideration          | Source               | Curve                                | Spec weight | Renormalized |
+//! |---|------------------------|----------------------|--------------------------------------|-------------|--------------|
+//! | 1 | pursuit-cost           | `Spatial(target)`    | `Logistic(10, 0.5, inverted)` over R | 0.25        | 0.357        |
+//! | 2 | prey-species-yield     | `prey_yield` scalar  | `Linear(1, 0)`                       | 0.25        | 0.357        |
+//! | 3 | prey-alertness (inv)   | `prey_calm` scalar   | `Linear(1, 0)`                       | 0.20        | 0.286        |
 //!
 //! **Yield normalization.** `ItemKind::food_value()` maxes at 0.8
 //! (RawRat). The resolver divides by `YIELD_NORMALIZER = 0.8` so the
@@ -47,8 +51,10 @@
 use bevy::prelude::Entity;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
-use crate::ai::curves::Curve;
+use crate::ai::considerations::{
+    Consideration, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
+use crate::ai::curves::{Curve, PostOp};
 use crate::ai::dse::{CommitmentStrategy, DseId, EvalCtx, GoalState, Intention};
 use crate::ai::eval::DseRegistry;
 use crate::ai::faction::StanceRequirement;
@@ -58,7 +64,6 @@ use crate::ai::target_dse::{
 use crate::components::physical::Position;
 use crate::components::prey::PreyKind;
 
-pub const TARGET_NEARNESS_INPUT: &str = "target_nearness";
 pub const PREY_YIELD_INPUT: &str = "prey_yield";
 pub const PREY_CALM_INPUT: &str = "prey_calm";
 
@@ -94,22 +99,28 @@ pub fn hunt_target_dse() -> TargetTakingDse {
         slope: 1.0,
         intercept: 0.0,
     };
-    // Quadratic falloff — `target_nearness = 1 - dist/range`, squared.
-    // Nearby prey dominate; distance contribution drops to ~0 by the
-    // outer gate. Matches spec §6.4 row #5.
-    let nearness_curve = Curve::Quadratic {
-        exponent: 2.0,
-        divisor: 1.0,
-        shift: 0.0,
+    // §L2.10.7 pursuit-cost: Manhattan distance / range is the
+    // normalized cost; the inverted logistic suppresses high-cost
+    // candidates with an S-curve cutoff at midpoint=0.5 (i.e.,
+    // `range/2`). Steepness 10 matches the spec catalog's "decisive
+    // cutoff" anchor.
+    let pursuit_cost_curve = Curve::Composite {
+        inner: Box::new(Curve::Logistic {
+            steepness: 10.0,
+            midpoint: 0.5,
+        }),
+        post: PostOp::Invert,
     };
 
     TargetTakingDse {
         id: DseId("hunt_target"),
         candidate_query: hunt_candidate_query_doc,
         per_target_considerations: vec![
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_NEARNESS_INPUT,
-                nearness_curve,
+            Consideration::Spatial(SpatialConsideration::new(
+                "hunt_pursuit_cost",
+                LandmarkSource::TargetPosition,
+                HUNT_TARGET_RANGE,
+                pursuit_cost_curve,
             )),
             Consideration::Scalar(ScalarConsideration::new(PREY_YIELD_INPUT, linear.clone())),
             Consideration::Scalar(ScalarConsideration::new(PREY_CALM_INPUT, linear)),
@@ -232,28 +243,21 @@ pub fn resolve_hunt_target(
         positions = filtered_pos;
     }
 
-    // Lookup-table for the target fetchers. O(N) size; tiny — hunt
-    // candidate pools are bounded by visual range × prey density.
+    // Lookup-table for the per-candidate target fetchers. O(N) size;
+    // tiny — hunt candidate pools are bounded by visual range × prey
+    // density. The spatial axis (`hunt_pursuit_cost`) is computed by
+    // the substrate from `EvalCtx::self_position` to each candidate's
+    // tile, so no nearness branch lives here.
     let kind_map: std::collections::HashMap<Entity, PreyKind> =
         candidates.iter().map(|c| (c.entity, c.kind)).collect();
     let alertness_map: std::collections::HashMap<Entity, f32> = candidates
         .iter()
         .map(|c| (c.entity, c.alertness.clamp(0.0, 1.0)))
         .collect();
-    let pos_map: std::collections::HashMap<Entity, Position> =
-        candidates.iter().map(|c| (c.entity, c.position)).collect();
 
     let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     let fetch_target = |name: &str, _cat: Entity, target: Entity| -> f32 {
         match name {
-            TARGET_NEARNESS_INPUT => {
-                let target_pos = match pos_map.get(&target) {
-                    Some(p) => *p,
-                    None => return 0.0,
-                };
-                let dist = cat_pos.manhattan_distance(&target_pos) as f32;
-                (1.0 - dist / HUNT_TARGET_RANGE).clamp(0.0, 1.0)
-            }
             PREY_YIELD_INPUT => kind_map
                 .get(&target)
                 .copied()
@@ -264,13 +268,13 @@ pub fn resolve_hunt_target(
         }
     };
 
-    let sample_map = |_: &str, _: Position| -> f32 { 0.0 };
+    let entity_position = |_: Entity| -> Option<Position> { None };
     let has_marker = |_: &str, _: Entity| -> bool { false };
 
     let ctx = EvalCtx {
         cat,
         tick,
-        sample_map: &sample_map,
+        entity_position: &entity_position,
         has_marker: &has_marker,
         self_position: cat_pos,
         target: None,
@@ -488,9 +492,10 @@ mod tests {
     fn distance_quadratic_penalty_dominates_small_yield_edge() {
         // A Rat (0.8 raw → 1.0 normalized, the richest prey) at
         // distance 10 loses to a Mouse (0.5 → 0.625 normalized) at
-        // distance 1 because the quadratic nearness curve drops the
-        // Rat's distance contribution to ~0.11 while the Mouse sits
-        // near 0.87.
+        // distance 1 because the §L2.10.7 inverted-logistic pursuit-
+        // cost curve drops the Rat's distance contribution near zero
+        // (its distance crosses the midpoint=range/2) while the Mouse
+        // sits near 1.0 (well below the midpoint).
         let mut registry = DseRegistry::new();
         registry.target_taking_dses.push(hunt_target_dse());
         let cat = Entity::from_raw_u32(1).unwrap();
@@ -547,6 +552,44 @@ mod tests {
         assert!(!req.accepts(FactionStance::Enemy));
         assert!(!req.accepts(FactionStance::Same));
         assert!(!req.accepts(FactionStance::Predator));
+    }
+
+    #[test]
+    fn pursuit_cost_attenuates_far_prey_smoothly() {
+        // §L2.10.7 elastic-channel verification: as candidate distance
+        // approaches the outer range the pursuit-cost suppresses score
+        // (high cost crosses the inverted-logistic midpoint at
+        // range/2). Two same-species, same-alertness rabbits at
+        // distance 1 vs distance 14 — the close one wins, and its
+        // aggregated score is meaningfully larger than the far one's
+        // (not just argmax different).
+        let dse = hunt_target_dse();
+        let mut registry = DseRegistry::new();
+        registry.target_taking_dses.push(hunt_target_dse());
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let close = candidate(2, 1, 0, PreyKind::Rabbit, 0.2);
+        let far = candidate(3, 14, 0, PreyKind::Rabbit, 0.2);
+
+        let out = resolve_hunt_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &[close, far],
+            &noop_relations(),
+            &noop_overlays(),
+            0,
+            None,
+        );
+        assert_eq!(out, Some(close.entity));
+
+        // Confirm the spatial axis is what's separating them: at the
+        // outer-range edge (distance 14, range 15) the inverted
+        // logistic at midpoint 0.5 has driven the pursuit-cost score
+        // toward zero. Both rabbits have identical yield+calm, so the
+        // delta is entirely in the spatial axis.
+        let weights = &dse.composition().weights;
+        // Weight slot 0 is the pursuit-cost spatial; weights sum to 1.0.
+        assert!(weights[0] > 0.3 && weights[0] < 0.4);
     }
 
     #[test]

@@ -173,11 +173,11 @@ mod tests {
             n if n == markers::HasRawFoodInStores::KEY => has_raw_food,
             _ => false,
         };
-        let sample = |_: &str, _: Position| 0.0;
+        let entity_position = |_: Entity| -> Option<Position> { None };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
-            sample_map: &sample,
+            entity_position: &entity_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,

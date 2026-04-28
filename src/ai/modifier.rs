@@ -675,12 +675,12 @@ mod tests {
         // Static closures satisfy `EvalCtx<'ctx>` lifetime where we don't
         // need real per-tick access.
         static MARKER: fn(&str, Entity) -> bool = |_, _| false;
-        static SAMPLE: fn(&str, Position) -> f32 = |_, _| 0.0;
+        static NO_ENTITY_POS: fn(Entity) -> Option<Position> = |_| None;
         let entity = Entity::from_raw_u32(1).unwrap();
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
-            sample_map: &SAMPLE,
+            entity_position: &NO_ENTITY_POS,
             has_marker: &MARKER,
             self_position: Position::new(0, 0),
             target: None,

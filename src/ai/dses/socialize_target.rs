@@ -306,15 +306,16 @@ pub fn resolve_socialize_target(
         }
     };
 
-    // `sample_map` / `has_marker` are unused by Socialize's four scalar
-    // considerations but required by `EvalCtx`. Stub with no-op closures.
-    let sample_map = |_: &str, _: Position| -> f32 { 0.0 };
+    // `entity_position` / `has_marker` are unused by Socialize's four
+    // scalar considerations but required by `EvalCtx`. Stub with no-op
+    // closures.
+    let entity_position = |_: Entity| -> Option<Position> { None };
     let has_marker = |_: &str, _: Entity| -> bool { false };
 
     let ctx = EvalCtx {
         cat,
         tick,
-        sample_map: &sample_map,
+        entity_position: &entity_position,
         has_marker: &has_marker,
         self_position: cat_pos,
         target: None,
@@ -358,11 +359,11 @@ mod tests {
 
     fn test_ctx(entity: Entity) -> EvalCtx<'static> {
         static MARKER: fn(&str, Entity) -> bool = |_, _| false;
-        static SAMPLE: fn(&str, Position) -> f32 = |_, _| 0.0;
+        static NO_ENTITY_POS: fn(Entity) -> Option<Position> = |_| None;
         EvalCtx {
             cat: entity,
             tick: 0,
-            sample_map: &SAMPLE,
+            entity_position: &NO_ENTITY_POS,
             has_marker: &MARKER,
             self_position: Position::new(0, 0),
             target: None,

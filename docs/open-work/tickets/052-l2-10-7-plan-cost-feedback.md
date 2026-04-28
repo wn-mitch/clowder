@@ -1,7 +1,7 @@
 ---
 id: 052
 title: §L2.10.7 plan-cost feedback — `SpatialConsideration` curves on spatially-sensitive DSEs
-status: ready
+status: in-progress
 cluster: null
 added: 2026-04-27
 parked: null
@@ -117,3 +117,38 @@ or surfaces a hypothesis-required shift.
 - 2026-04-27: opened from ticket 005 retirement (cluster-A umbrella
   decomposition). §L2.10.7 was the single remaining structural item
   inside 005's body without a successor ticket.
+- 2026-04-28: substrate landed + Hunt port (scope items 1, partial 3).
+  `SpatialConsideration` swapped in place — old influence-map sampling
+  shape (zero production callers, every `sample_map` closure stubbed
+  to 0.0) replaced by landmark-distance design with
+  `LandmarkSource::{TargetPosition, Tile, Entity}`. `EvalCtx::sample_map`
+  removed; `EvalCtx::entity_position` added for landmark-entity
+  resolution. Hunt's `pursuit-cost` axis now uses the §L2.10.7-spec'd
+  `Logistic(steepness=10, midpoint=0.5, inverted)` over
+  `range = HUNT_TARGET_RANGE`, retiring the `distance²` proxy.
+  All 1500 lib + integration tests pass.
+
+  Paired-baseline soak (seed 42, 15 min) at `1abaf49` (pre-052) vs
+  `afb3841` (post-052) — Hunt port is **behavior-neutral** within
+  noise:
+
+  | Metric                 | pre-052 | post-052 | Δ        |
+  |------------------------|---------|----------|----------|
+  | Injury / Ambush / Starv| 1/4/1   | 1/4/1    | identical|
+  | burial / courtship     | 0/0     | 0/0      | identical|
+  | mentoring              | 0       | 0        | identical|
+  | mythic-texture         | 30      | 30       | identical|
+  | grooming               | 264     | 269      | +1.9%    |
+  | play                   | 834     | 842      | +1.0%    |
+
+  Verdict gates that fail (Starvation > 0; courtship/mentoring/burial
+  collapsed) are pre-existing — Starvation was 2 in the canonical
+  baseline (a879f43), and the continuity collapse is tracked in
+  ticket 040 (post-036 disposition shift), 035 (burial not
+  implemented), 003 (mentor score magnitude).
+
+  Pre-052 soak archived at `logs/tuned-42-1abaf49-pre-052-baseline/`.
+
+  Successor work: Mate, Mentor, ApplyRemedy axis ports (scope item 3
+  remainder); 30-row roster sweep across remaining cat self-state
+  DSEs + fox dispositions (scope item 2).

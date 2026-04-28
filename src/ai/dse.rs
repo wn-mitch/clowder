@@ -236,8 +236,7 @@ impl Intention {
 /// Marker keys are `&'static str` per the open-set contract; the
 /// evaluator resolves each key against a marker-query registry
 /// (Phase 3a task #8). Keys that never resolve are a debug-level
-/// warning, not a compile error — this is the same trade-off the
-/// `SpatialConsideration::map_key` lookup makes.
+/// warning, not a compile error.
 #[derive(Debug, Clone, Default)]
 pub struct EligibilityFilter {
     pub required: Vec<MarkerKey>,
@@ -281,11 +280,14 @@ impl EligibilityFilter {
 ///   inventory aggregates. Pulled through the ECS queries the
 ///   evaluator-system owns; the context references borrow from
 ///   there.
-/// - **Influence-map sampler** — [`InfluenceMapSampler`] closure
-///   type; resolves `(map_key, position) → f32`.
 /// - **ECS world access for marker queries** — via the
 ///   [`MarkerQuery`] closure type; resolves `(marker_key, entity) →
 ///   bool`.
+/// - **Entity position resolution** — for `SpatialConsideration`
+///   with `LandmarkSource::Entity(_)`, the evaluator looks up the
+///   landmark entity's current `Position` via this closure. Returns
+///   `None` for despawned or off-grid entities — the consideration
+///   then scores zero rather than sampling a stale tile.
 ///
 /// Phase 3a commits the shape; Phase 3b populates all three fields
 /// from the evaluator system. The concrete signature stays flexible
@@ -294,12 +296,14 @@ impl EligibilityFilter {
 pub struct EvalCtx<'ctx> {
     pub cat: Entity,
     pub tick: u64,
-    /// Closure for influence-map sampling.
-    pub sample_map: &'ctx dyn Fn(&str, crate::components::physical::Position) -> f32,
     /// Closure for per-cat marker queries.
     pub has_marker: &'ctx dyn Fn(&str, Entity) -> bool,
-    /// Closure for self-position fetch (used by
-    /// `SpatialConsideration` with `CenterPolicy::SelfPosition`).
+    /// Closure for landmark entity position lookup (used by
+    /// `SpatialConsideration` with `LandmarkSource::Entity`).
+    pub entity_position:
+        &'ctx dyn Fn(Entity) -> Option<crate::components::physical::Position>,
+    /// Cat's own position. Used as the origin for
+    /// `SpatialConsideration` distance calculations.
     pub self_position: crate::components::physical::Position,
     /// Optional target entity (set only when the DSE is target-taking
     /// and the evaluator is scoring against a specific candidate).

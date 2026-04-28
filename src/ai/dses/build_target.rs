@@ -257,13 +257,13 @@ pub fn resolve_build_target(
         }
     };
 
-    let sample_map = |_: &str, _: Position| -> f32 { 0.0 };
+    let entity_position = |_: Entity| -> Option<Position> { None };
     let has_marker = |_: &str, _: Entity| -> bool { false };
 
     let ctx = EvalCtx {
         cat,
         tick,
-        sample_map: &sample_map,
+        entity_position: &entity_position,
         has_marker: &has_marker,
         self_position: cat_pos,
         target: None,

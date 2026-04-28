@@ -132,14 +132,14 @@ pub fn score_hawk_dse_by_id(dse_id: &str, ctx: &HawkScoringContext, inputs: &Eva
     let scalars = hawk_ctx_scalars(ctx);
     let fetch_scalar = |name: &str, _: Entity| -> f32 { scalars.get(name).copied().unwrap_or(0.0) };
     let has_marker = |_: &str, _: Entity| false;
-    let sample_map = |_: &str, _: Position| 0.0_f32;
+    let entity_position = |_: Entity| -> Option<Position> { None };
     let needs_ref = ctx.needs;
     let maslow = |tier: u8| needs_ref.level_suppression(tier);
 
     let eval_ctx = EvalCtx {
         cat: inputs.cat,
         tick: inputs.tick,
-        sample_map: &sample_map,
+        entity_position: &entity_position,
         has_marker: &has_marker,
         self_position: inputs.position,
         target: None,

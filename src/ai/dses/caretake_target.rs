@@ -278,13 +278,13 @@ pub fn resolve_caretake_target(
         }
     };
 
-    let sample_map = |_: &str, _: Position| -> f32 { 0.0 };
+    let entity_position = |_: Entity| -> Option<Position> { None };
     let has_marker = |_: &str, _: Entity| -> bool { false };
 
     let ctx = EvalCtx {
         cat: adult,
         tick,
-        sample_map: &sample_map,
+        entity_position: &entity_position,
         has_marker: &has_marker,
         self_position: adult_pos,
         target: None,

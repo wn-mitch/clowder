@@ -32,7 +32,7 @@
 
 use bevy::prelude::*;
 
-use super::considerations::{CenterPolicy, Consideration};
+use super::considerations::{Consideration, LandmarkSource};
 use super::dse::{CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, Intention};
 
 // ---------------------------------------------------------------------------
@@ -338,7 +338,11 @@ pub struct ModifierDelta {
 /// name, the input that fed its curve, a human-readable curve label, the
 /// post-curve score, and the composition weight this consideration was
 /// assigned. `spatial_map_key` is populated iff this is a
-/// `Consideration::Spatial` — downstream L1-to-L2 joinability keys off it.
+/// `Consideration::Spatial` and carries a stable landmark identifier
+/// (`"target_position"` / `"tile"` / `"entity"`) per
+/// [`SpatialConsideration::landmark_label`]. JSON field name preserved
+/// for trace-consumer compat (`scripts/replay_frame.py`,
+/// `docs/diagnostics/log-queries.md`).
 #[derive(Debug, Clone)]
 pub struct ConsiderationTraceRow {
     pub name: &'static str,
@@ -552,16 +556,16 @@ fn composition_mode_label(c: &super::composition::Composition) -> &'static str {
 
 /// Score one consideration by dispatching on its flavor. Scalar
 /// considerations pull from `fetch_scalar`; spatial considerations
-/// resolve a position + `ctx.sample_map`; marker considerations
-/// consult `ctx.has_marker`. Returns a tuple `(score, trace_row)`
-/// where `trace_row` is populated when `capture` is true; callers that
-/// don't need the trace pass `false` and discard the second element.
+/// resolve a landmark `Position` and compute Manhattan distance from
+/// `ctx.self_position`; marker considerations consult `ctx.has_marker`.
+/// Returns a tuple `(score, trace_row)` where `trace_row` is populated
+/// when `capture` is true; callers that don't need the trace pass
+/// `false` and discard the second element.
 ///
 /// `trace_row` carries the input fed to the curve, a human-readable
-/// curve label, the consideration kind, and (for `Spatial`) the map
-/// key so §11.3 L1-to-L2 joinability has a stable link. When `capture`
-/// is false the second slot is always `None` — the branch-predictor
-/// resolves the cost to a single conditional per call.
+/// curve label, the consideration kind, and (for `Spatial`) a stable
+/// `landmark_label` so §11.3 trace consumers can distinguish landmark
+/// flavors. When `capture` is false the second slot is always `None`.
 #[allow(clippy::type_complexity)]
 fn score_consideration_with_trace(
     consideration: &Consideration,
@@ -588,34 +592,48 @@ fn score_consideration_with_trace(
             (score, row)
         }
         Consideration::Spatial(s) => {
-            let pos = match s.center {
-                CenterPolicy::SelfPosition => ctx.self_position,
-                CenterPolicy::TargetPosition => match ctx.target_position {
+            let landmark_pos = match s.landmark {
+                LandmarkSource::TargetPosition => match ctx.target_position {
                     Some(p) => p,
                     // Target-taking DSE scored without a target: zero.
-                    // The target-taking evaluator (§6, Phase 4) must
-                    // populate `ctx.target_position` before calling in.
+                    // The target-taking evaluator (§6) must populate
+                    // `ctx.target_position` before calling in.
                     None => {
                         let row = capture.then(|| {
                             (
                                 0.0,
                                 format!("{:?}", s.curve),
                                 ConsiderationKind::Spatial,
-                                Some(s.map_key),
+                                Some(s.landmark_label()),
+                            )
+                        });
+                        return (0.0, row);
+                    }
+                },
+                LandmarkSource::Tile(p) => p,
+                LandmarkSource::Entity(e) => match (ctx.entity_position)(e) {
+                    Some(p) => p,
+                    None => {
+                        let row = capture.then(|| {
+                            (
+                                0.0,
+                                format!("{:?}", s.curve),
+                                ConsiderationKind::Spatial,
+                                Some(s.landmark_label()),
                             )
                         });
                         return (0.0, row);
                     }
                 },
             };
-            let input = (ctx.sample_map)(s.map_key, pos);
-            let score = s.score(input);
+            let distance = ctx.self_position.manhattan_distance(&landmark_pos) as f32;
+            let score = s.score(distance);
             let row = capture.then(|| {
                 (
-                    input,
+                    distance,
                     format!("{:?}", s.curve),
                     ConsiderationKind::Spatial,
-                    Some(s.map_key),
+                    Some(s.landmark_label()),
                 )
             });
             (score, row)
@@ -811,11 +829,11 @@ mod tests {
 
         // Missing required → fail.
         let has_marker = |_: &str, _: Entity| false;
-        let sample = |_: &str, _: Position| 0.0;
+        let entity_position = |_: Entity| -> Option<Position> { None };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
-            sample_map: &sample,
+            entity_position: &entity_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,
@@ -828,7 +846,7 @@ mod tests {
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
-            sample_map: &sample,
+            entity_position: &entity_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,
@@ -841,13 +859,13 @@ mod tests {
     fn eligibility_forbidden_marker() {
         let filter = EligibilityFilter::new().forbid(markers::Incapacitated::KEY);
         let entity = Entity::from_raw_u32(1).unwrap();
-        let sample = |_: &str, _: Position| 0.0;
+        let entity_position = |_: Entity| -> Option<Position> { None };
 
         let has_incap = |m: &str, _: Entity| m == markers::Incapacitated::KEY;
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
-            sample_map: &sample,
+            entity_position: &entity_position,
             has_marker: &has_incap,
             self_position: Position::new(0, 0),
             target: None,
@@ -859,7 +877,7 @@ mod tests {
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
-            sample_map: &sample,
+            entity_position: &entity_position,
             has_marker: &none,
             self_position: Position::new(0, 0),
             target: None,
@@ -875,11 +893,11 @@ mod tests {
         let entity = Entity::from_raw_u32(1).unwrap();
 
         let has_marker = |_: &str, _: Entity| false;
-        let sample = |_: &str, _: Position| 0.0;
+        let entity_position = |_: Entity| -> Option<Position> { None };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
-            sample_map: &sample,
+            entity_position: &entity_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,
@@ -899,11 +917,11 @@ mod tests {
         let entity = Entity::from_raw_u32(1).unwrap();
 
         let has_marker = |_: &str, _: Entity| false;
-        let sample = |_: &str, _: Position| 0.0;
+        let entity_position = |_: Entity| -> Option<Position> { None };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
-            sample_map: &sample,
+            entity_position: &entity_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,
@@ -940,11 +958,11 @@ mod tests {
         let entity = Entity::from_raw_u32(1).unwrap();
 
         let has_marker = |_: &str, _: Entity| false;
-        let sample = |_: &str, _: Position| 0.0;
+        let entity_position = |_: Entity| -> Option<Position> { None };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
-            sample_map: &sample,
+            entity_position: &entity_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,
@@ -1000,11 +1018,11 @@ mod tests {
 
         let entity = Entity::from_raw_u32(1).unwrap();
         let has_marker = |_: &str, _: Entity| false;
-        let sample = |_: &str, _: Position| 0.0;
+        let entity_position = |_: Entity| -> Option<Position> { None };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
-            sample_map: &sample,
+            entity_position: &entity_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,
@@ -1026,11 +1044,11 @@ mod tests {
 
         let entity = Entity::from_raw_u32(1).unwrap();
         let has_marker = |_: &str, _: Entity| false;
-        let sample = |_: &str, _: Position| 0.0;
+        let entity_position = |_: Entity| -> Option<Position> { None };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
-            sample_map: &sample,
+            entity_position: &entity_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,
@@ -1147,11 +1165,11 @@ mod tests {
         let dse = test_dse("eat", "hunger");
         let entity = Entity::from_raw_u32(1).unwrap();
         let has_marker = |_: &str, _: Entity| false;
-        let sample = |_: &str, _: Position| 0.0;
+        let entity_position = |_: Entity| -> Option<Position> { None };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
-            sample_map: &sample,
+            entity_position: &entity_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,
@@ -1201,11 +1219,11 @@ mod tests {
         let dse = test_dse("eat", "hunger");
         let entity = Entity::from_raw_u32(1).unwrap();
         let has_marker = |_: &str, _: Entity| false;
-        let sample = |_: &str, _: Position| 0.0;
+        let entity_position = |_: Entity| -> Option<Position> { None };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
-            sample_map: &sample,
+            entity_position: &entity_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,
@@ -1277,11 +1295,11 @@ mod tests {
 
         let entity = Entity::from_raw_u32(1).unwrap();
         let has_marker = |_: &str, _: Entity| false;
-        let sample = |_: &str, _: Position| 0.0;
+        let entity_position = |_: Entity| -> Option<Position> { None };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
-            sample_map: &sample,
+            entity_position: &entity_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,

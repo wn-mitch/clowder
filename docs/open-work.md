@@ -14,8 +14,8 @@ _Last generated: 2026-04-28._
 
 | Status | Count |
 |---|---|
-| In progress | 4 |
-| Ready | 30 |
+| In progress | 5 |
+| Ready | 29 |
 | Parked | 2 |
 | Blocked | 9 |
 | Done (awaiting archive) | 2 |
@@ -26,14 +26,15 @@ Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-index` (regenerate this file).
 
-## In progress (4)
+## In progress (5)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
 - **[027](docs/open-work/tickets/027-mating-cadence-three-bug-cascade.md)** — Mating cadence — three-bug cascade blocking MatingOccurred — _added 2026-04-25_
+- **[052](docs/open-work/tickets/052-l2-10-7-plan-cost-feedback.md)** — §L2.10.7 plan-cost feedback — `SpatialConsideration` curves on spatially-sensitive DSEs — _added 2026-04-27_
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _added 2026-04-27_
 
-## Ready (30)
+## Ready (29)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -57,7 +58,6 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[047](docs/open-work/tickets/047-critical-health-interrupt-treadmill.md)** — CriticalHealth interrupt is a treadmill, not a brake — replan picks the same disposition while damage accumulates — _added 2026-04-27_
 - **[050](docs/open-work/tickets/050-marker-predicate-refinements.md)** — §4 marker predicate refinements — species-attenuated threat, ward-near-fox truth, event-driven cubs/den — _added 2026-04-27_
 - **[051](docs/open-work/tickets/051-fox-dse-eligibility-migration.md)** — Fox DSE eligibility migration — `.require()`/`.forbid()` cutover for §4 fox markers — _added 2026-04-27_
-- **[052](docs/open-work/tickets/052-l2-10-7-plan-cost-feedback.md)** — §L2.10.7 plan-cost feedback — `SpatialConsideration` curves on spatially-sensitive DSEs — _added 2026-04-27_
 - **[054](docs/open-work/tickets/054-fate-event-vocabulary-expansion.md)** — §7.7.c Fate event-vocabulary expansion — Calling, destiny, fated-pair convergence — _added 2026-04-27_
 - **[056](docs/open-work/tickets/056-aspiration-compatibility-matrix.md)** — §7.7.1 aspiration compatibility matrix — hard/soft conflict enumeration — _added 2026-04-27_
 - **[058](docs/open-work/tickets/058-tradition-unfiltered-loop-fix.md)** — §3.5.3 item 1 Tradition modifier — fix unfiltered-loop port — _added 2026-04-27_

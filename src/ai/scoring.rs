@@ -546,14 +546,14 @@ fn score_dse_by_id(dse_id: &str, ctx: &ScoringContext, inputs: &EvalInputs) -> f
     // against a per-cat marker; colony-scoped markers ignore it.
     let markers = inputs.markers;
     let has_marker = |name: &str, entity: Entity| -> bool { markers.has(name, entity) };
-    let sample_map = |_name: &str, _pos: Position| 0.0_f32;
+    let entity_position = |_: Entity| -> Option<Position> { None };
     let needs_ref = ctx.needs;
     let maslow = |tier: u8| needs_ref.level_suppression(tier);
 
     let eval_ctx = EvalCtx {
         cat: inputs.cat,
         tick: inputs.tick,
-        sample_map: &sample_map,
+        entity_position: &entity_position,
         has_marker: &has_marker,
         self_position: inputs.position,
         target: None,

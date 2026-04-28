@@ -189,11 +189,11 @@ mod tests {
         // closure stands in for the `MarkerSnapshot.has()` lookup
         // by returning true for that key.
         let has_marker = |name: &str, _: Entity| name == markers::HasStoredFood::KEY;
-        let sample = |_: &str, _: Position| 0.0;
+        let entity_position = |_: Entity| -> Option<Position> { None };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
-            sample_map: &sample,
+            entity_position: &entity_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,
@@ -235,11 +235,11 @@ mod tests {
         let dse = EatDse::new();
         let entity = Entity::from_raw_u32(1).unwrap();
         let has_marker = |_: &str, _: Entity| false;
-        let sample = |_: &str, _: Position| 0.0;
+        let entity_position = |_: Entity| -> Option<Position> { None };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
-            sample_map: &sample,
+            entity_position: &entity_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,
@@ -300,11 +300,11 @@ mod tests {
         let dse = EatDse::new();
         let entity = Entity::from_raw_u32(1).unwrap();
         let has_marker = |_: &str, _: Entity| false;
-        let sample = |_: &str, _: Position| 0.0;
+        let entity_position = |_: Entity| -> Option<Position> { None };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
-            sample_map: &sample,
+            entity_position: &entity_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,
