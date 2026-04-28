@@ -29,8 +29,10 @@
 use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
-use crate::ai::curves::{hangry, Curve};
+use crate::ai::considerations::{
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
+use crate::ai::curves::{hangry, Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
@@ -38,6 +40,12 @@ use crate::ai::faction::StanceRequirement;
 
 pub const HUNGER_INPUT: &str = "hunger_urgency";
 pub const CUNNING_INPUT: &str = "cunning";
+
+/// §L2.10.7 fox Raiding range — Manhattan tiles for the
+/// nearest-visible-store anchor. 12 mirrors the fox_goap.rs
+/// store-visibility radius (`store_visible` ≤ 12 tiles); foxes
+/// outside this radius fail the visibility predicate entirely.
+pub const FOX_RAIDING_STORE_RANGE: f32 = 12.0;
 
 pub struct FoxRaidingDse {
     id: DseId,
@@ -48,6 +56,18 @@ pub struct FoxRaidingDse {
 
 impl FoxRaidingDse {
     pub fn new() -> Self {
+        // §L2.10.7 row Raiding: Composite{Logistic(8, 0.5), Invert}
+        // over distance to nearest visible store. Spec line 5651:
+        // 'Commute-to-target with guard-deterrent handled as a
+        // separate scalar.' None when no store in range — CP gates
+        // the DSE to 0.
+        let store_distance = Curve::Composite {
+            inner: Box::new(Curve::Logistic {
+                steepness: 8.0,
+                midpoint: 0.5,
+            }),
+            post: PostOp::Invert,
+        };
         Self {
             id: DseId("fox_raiding"),
             considerations: vec![
@@ -59,12 +79,18 @@ impl FoxRaidingDse {
                         intercept: 0.0,
                     },
                 )),
+                Consideration::Spatial(SpatialConsideration::new(
+                    "fox_raiding_store_distance",
+                    LandmarkSource::Anchor(LandmarkAnchor::NearestVisibleStore),
+                    FOX_RAIDING_STORE_RANGE,
+                    store_distance,
+                )),
             ],
-            // RtM weights: both axes at their natural ceiling. Hunger
-            // saturates via hangry() (asymptote ≈ 0.88); cunning is a
-            // `[0, 1]` personality coefficient. Both=1.0 means CP's
-            // per-axis ceilings apply unscaled.
-            composition: Composition::compensated_product(vec![1.0, 1.0]),
+            // RtM weights: hunger via hangry() (≈0.88), cunning via
+            // Linear identity, store distance via Logistic-Invert
+            // (≈0.98 at zero distance). All three at 1.0 lets CP's
+            // natural per-axis ceilings dominate.
+            composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
             // §9.3 DSE filter binding — FoxRaid treats colony stores /
             // cats as `Prey` per the fox→cat row (`StoreVisible` marker
             // refinement remains an outer gate — §4 port is Phase 3d).
@@ -123,8 +149,26 @@ mod tests {
     }
 
     #[test]
-    fn fox_raiding_has_two_axes() {
-        assert_eq!(FoxRaidingDse::new().considerations().len(), 2);
+    fn fox_raiding_has_three_axes() {
+        // §L2.10.7: hunger + cunning + store_distance.
+        assert_eq!(FoxRaidingDse::new().considerations().len(), 3);
+    }
+
+    #[test]
+    fn fox_raiding_uses_visible_store_anchor() {
+        let dse = FoxRaidingDse::new();
+        let spatial = dse
+            .considerations()
+            .iter()
+            .find_map(|c| match c {
+                Consideration::Spatial(sp) if sp.name == "fox_raiding_store_distance" => Some(sp),
+                _ => None,
+            })
+            .expect("fox_raiding_store_distance axis must exist");
+        assert!(matches!(
+            spatial.landmark,
+            LandmarkSource::Anchor(LandmarkAnchor::NearestVisibleStore)
+        ));
     }
 
     #[test]

@@ -15,7 +15,9 @@
 use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
+use crate::ai::considerations::{
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
 use crate::ai::curves::{piecewise, Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
@@ -26,6 +28,11 @@ pub const TERRITORY_SCENT_DEFICIT_INPUT: &str = "territory_scent_deficit";
 pub const TICKS_SINCE_PATROL_INPUT: &str = "ticks_since_patrol";
 pub const DAY_PHASE_INPUT: &str = "day_phase";
 pub const TERRITORIALITY_INPUT: &str = "territoriality";
+
+/// §L2.10.7 fox Patrolling range — Manhattan tiles for the
+/// territory perimeter anchor (den + offset). 18 matches the
+/// existing `FoxZone::TerritoryEdge` radius in fox_goap.rs.
+pub const FOX_PATROLLING_PERIMETER_RANGE: f32 = 18.0;
 
 // Shared knot-x encoding across species — see `dses::fox_hunting` +
 // `dses::sleep` + `dses::fox_resting`.
@@ -66,6 +73,15 @@ impl FoxPatrollingDse {
             intercept: 0.0,
         };
 
+        // §L2.10.7 row Patrolling: Linear over normalized distance to
+        // the territory perimeter anchor. Spec line 5650:
+        // 'Even spacing along scent perimeter.' Linear(slope=-1,
+        // intercept=1) → closer-to-perimeter scores higher; the
+        // gradient draws the fox along the boundary.
+        let perimeter_distance = Curve::Linear {
+            slope: -1.0,
+            intercept: 1.0,
+        };
         Self {
             id: DseId("fox_patrolling"),
             considerations: vec![
@@ -82,11 +98,19 @@ impl FoxPatrollingDse {
                 )),
                 Consideration::Scalar(ScalarConsideration::new(DAY_PHASE_INPUT, day_phase_curve)),
                 Consideration::Scalar(ScalarConsideration::new(TERRITORIALITY_INPUT, linear)),
+                Consideration::Spatial(SpatialConsideration::new(
+                    "fox_patrolling_perimeter_distance",
+                    LandmarkSource::Anchor(LandmarkAnchor::TerritoryPerimeterAnchor),
+                    FOX_PATROLLING_PERIMETER_RANGE,
+                    perimeter_distance,
+                )),
             ],
             // RtEO sum = 1.0. Scent deficit + time-since co-drive;
             // day_phase is the circadian rhythm; territoriality is
-            // the personality modulator.
-            composition: Composition::weighted_sum(vec![0.3, 0.25, 0.2, 0.25]),
+            // the personality modulator; perimeter distance pulls
+            // toward the patrol arc. Original four weights renormalized
+            // by ×0.80 to make room for the spatial axis at 0.20.
+            composition: Composition::weighted_sum(vec![0.24, 0.20, 0.16, 0.20, 0.20]),
             eligibility: EligibilityFilter::new(),
         }
     }
@@ -147,13 +171,39 @@ mod tests {
     fn time_since_curve_saturates_at_2000() {
         let s = ScoringConstants::default();
         let dse = FoxPatrollingDse::new(&s);
-        let c = match &dse.considerations()[1] {
-            Consideration::Scalar(sc) => &sc.curve,
-            _ => panic!("expected scalar"),
-        };
+        // Find by name rather than fixed index — §L2.10.7 added a
+        // 5th consideration (perimeter distance) at the end.
+        let c = dse
+            .considerations()
+            .iter()
+            .find_map(|c| match c {
+                Consideration::Scalar(sc) if sc.name == TICKS_SINCE_PATROL_INPUT => Some(&sc.curve),
+                _ => None,
+            })
+            .expect("ticks_since_patrol axis must exist");
         assert!((c.evaluate(0.0) - 0.0).abs() < 1e-4);
         assert!((c.evaluate(1000.0) - 0.5).abs() < 1e-4);
         assert!((c.evaluate(2000.0) - 1.0).abs() < 1e-4);
         assert!((c.evaluate(5000.0) - 1.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn fox_patrolling_uses_territory_perimeter_anchor() {
+        let s = ScoringConstants::default();
+        let dse = FoxPatrollingDse::new(&s);
+        let spatial = dse
+            .considerations()
+            .iter()
+            .find_map(|c| match c {
+                Consideration::Spatial(sp) if sp.name == "fox_patrolling_perimeter_distance" => {
+                    Some(sp)
+                }
+                _ => None,
+            })
+            .expect("fox_patrolling_perimeter_distance axis must exist");
+        assert!(matches!(
+            spatial.landmark,
+            LandmarkSource::Anchor(LandmarkAnchor::TerritoryPerimeterAnchor)
+        ));
     }
 }

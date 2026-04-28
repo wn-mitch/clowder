@@ -41,7 +41,9 @@
 use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
+use crate::ai::considerations::{
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
 use crate::ai::curves::{hangry, piecewise, Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
@@ -51,9 +53,13 @@ use crate::resources::sim_constants::ScoringConstants;
 /// Scalar-input keys (must match `fox_ctx_scalars`).
 pub const HUNGER_INPUT: &str = "hunger_urgency";
 pub const PREY_NEARBY_INPUT: &str = "prey_nearby";
-pub const PREY_BELIEF_INPUT: &str = "prey_belief";
 pub const DAY_PHASE_INPUT: &str = "day_phase";
 pub const BOLDNESS_INPUT: &str = "boldness";
+
+/// §L2.10.7 fox Hunting range — Manhattan tiles for the
+/// prey-belief centroid anchor. 25 ≈ a long crepuscular hunt
+/// across the fox's belief grid.
+pub const FOX_HUNTING_BELIEF_RANGE: f32 = 25.0;
 
 /// Phase-to-knot encoding for the `day_phase` Piecewise curve. Must
 /// match the encoding in `fox_ctx_scalars`.
@@ -84,9 +90,20 @@ impl FoxHuntingDse {
             }),
             post: PostOp::ClampMin(0.3),
         };
-        let prey_belief_curve = Curve::Linear {
-            slope: 0.2,
-            intercept: 0.0,
+        // §L2.10.7 row Hunting: Quadratic over distance to the
+        // prey-belief cluster centroid. Spec line 5648:
+        // 'Belief-grid provides soft location; same ch14 shape as
+        // cat Hunt.' `Composite { Quadratic(exp=2, divisor=1, shift=0),
+        // Invert }` evaluates `1 - cost^2`: at the centroid → 1,
+        // half-distance → 0.75, range edge → 0. Replaces the retired
+        // `prey_belief` Linear scalar axis.
+        let belief_distance = Curve::Composite {
+            inner: Box::new(Curve::Quadratic {
+                exponent: 2.0,
+                divisor: 1.0,
+                shift: 0.0,
+            }),
+            post: PostOp::Invert,
         };
 
         Self {
@@ -100,13 +117,19 @@ impl FoxHuntingDse {
                         intercept: 0.0,
                     },
                 )),
-                Consideration::Scalar(ScalarConsideration::new(
-                    PREY_BELIEF_INPUT,
-                    prey_belief_curve,
+                Consideration::Spatial(SpatialConsideration::new(
+                    "fox_hunting_belief_distance",
+                    LandmarkSource::Anchor(LandmarkAnchor::PreyBeliefCentroid),
+                    FOX_HUNTING_BELIEF_RANGE,
+                    belief_distance,
                 )),
                 Consideration::Scalar(ScalarConsideration::new(DAY_PHASE_INPUT, day_phase_curve)),
                 Consideration::Scalar(ScalarConsideration::new(BOLDNESS_INPUT, boldness_floor)),
             ],
+            // RtEO sum = 1.0. Same layout as the pre-port shape with
+            // the prey_belief scalar replaced by the spatial axis;
+            // weights unchanged because the new axis carries the same
+            // 'where is the prey' signal as the retired scalar.
             composition: Composition::weighted_sum(vec![0.45, 0.10, 0.10, 0.10, 0.25]),
             eligibility: EligibilityFilter::new(),
         }
@@ -186,6 +209,16 @@ mod tests {
         assert_eq!(FoxHuntingDse::new(&s).maslow_tier(), 1);
     }
 
+    fn scalar_curve<'a>(dse: &'a FoxHuntingDse, name: &str) -> &'a Curve {
+        dse.considerations()
+            .iter()
+            .find_map(|c| match c {
+                Consideration::Scalar(sc) if sc.name == name => Some(&sc.curve),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("scalar axis {name} must exist"))
+    }
+
     #[test]
     fn boldness_floor_prevents_zero_contribution() {
         // ClampMin(0.3): even a fox with boldness=0.0 contributes 0.3
@@ -193,10 +226,7 @@ mod tests {
         // hunts when starving" anchor.
         let s = ScoringConstants::default();
         let dse = FoxHuntingDse::new(&s);
-        let boldness_curve = match &dse.considerations()[4] {
-            Consideration::Scalar(sc) => &sc.curve,
-            _ => panic!("expected scalar at boldness axis"),
-        };
+        let boldness_curve = scalar_curve(&dse, BOLDNESS_INPUT);
         assert!((boldness_curve.evaluate(0.0) - 0.3).abs() < 1e-4);
         assert!((boldness_curve.evaluate(0.5) - 0.5).abs() < 1e-4);
         assert!((boldness_curve.evaluate(1.0) - 1.0).abs() < 1e-4);
@@ -209,14 +239,33 @@ mod tests {
         // matches `fox_ctx_scalars`.
         let s = ScoringConstants::default();
         let dse = FoxHuntingDse::new(&s);
-        let curve = match &dse.considerations()[3] {
-            Consideration::Scalar(sc) => &sc.curve,
-            _ => panic!("expected scalar at day_phase axis"),
-        };
+        let curve = scalar_curve(&dse, DAY_PHASE_INPUT);
         assert!((curve.evaluate(DAWN_KNOT) - s.fox_hunt_dawn_bonus).abs() < 1e-4);
         assert!((curve.evaluate(DAY_KNOT) - s.fox_hunt_day_bonus).abs() < 1e-4);
         assert!((curve.evaluate(DUSK_KNOT) - s.fox_hunt_dusk_bonus).abs() < 1e-4);
         assert!((curve.evaluate(NIGHT_KNOT) - s.fox_hunt_night_bonus).abs() < 1e-4);
+    }
+
+    #[test]
+    fn fox_hunting_uses_prey_belief_centroid_anchor() {
+        let s = ScoringConstants::default();
+        let dse = FoxHuntingDse::new(&s);
+        let spatial = dse
+            .considerations()
+            .iter()
+            .find_map(|c| match c {
+                Consideration::Spatial(sp) if sp.name == "fox_hunting_belief_distance" => Some(sp),
+                _ => None,
+            })
+            .expect("fox_hunting_belief_distance axis must exist");
+        assert!(matches!(
+            spatial.landmark,
+            LandmarkSource::Anchor(LandmarkAnchor::PreyBeliefCentroid)
+        ));
+        // Quadratic-Invert: closer = higher.
+        assert!((spatial.curve.evaluate(0.0) - 1.0).abs() < 1e-4);
+        assert!((spatial.curve.evaluate(0.5) - 0.75).abs() < 1e-4);
+        assert!(spatial.curve.evaluate(1.0) < 1e-4);
     }
 
     #[test]

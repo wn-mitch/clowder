@@ -531,18 +531,20 @@ mod tests {
             ticks_since_patrol: 0,
             day_phase: DayPhase::Night, // hunt-favorable default; tests override
             self_position: Position::new(0, 0),
-            // §L2.10.7 fox-side anchors. Default to a den at the
-            // fox's position so the OwnDen-anchored DSEs (Resting,
-            // Feeding, DenDefense) score near 1 on the spatial axis
-            // — tests that exercise distance-based behavior override
-            // these in their own context literal.
+            // §L2.10.7 fox-side anchors. Default to anchors at the
+            // fox's position (or near-by) so spatial axes evaluate
+            // near 1 — tests that exercise distance-based behavior
+            // override these in their own context literal. None
+            // values cause the substrate to score the spatial axis
+            // 0 and CP-gate the DSE entirely; tests checking the
+            // *presence* of a disposition need anchors populated.
             den_position: Some(Position::new(0, 0)),
             cat_cluster_centroid: None,
-            prey_belief_centroid: None,
-            frontier_centroid: None,
-            nearest_visible_store: None,
-            nearest_map_edge: None,
-            territory_perimeter_anchor: None,
+            prey_belief_centroid: Some(Position::new(0, 0)),
+            frontier_centroid: Some(Position::new(0, 0)),
+            nearest_visible_store: Some(Position::new(0, 0)),
+            nearest_map_edge: Some(Position::new(0, 0)),
+            territory_perimeter_anchor: Some(Position::new(0, 0)),
             scoring,
             jitter_range: 0.0, // no jitter in tests
         }
