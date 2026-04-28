@@ -884,6 +884,22 @@ pub fn evaluate_dispositions(
                     d.forage_terrain_search_radius,
                     |t| t.foraging_yield() > 0.0,
                 ),
+                // §L2.10.7 HerbcraftGather anchor: Manhattan-nearest
+                // harvestable herb position.
+                nearest_herb_patch: herb_query
+                    .iter()
+                    .map(|(_, _, p)| *p)
+                    .min_by_key(|p| pos.manhattan_distance(p)),
+                // §L2.10.7 Patrol / HerbcraftWard anchor — single
+                // perimeter point offset from colony center.
+                nearest_perimeter_tile: Some(crate::components::physical::Position::new(
+                    colony.colony_center.0.x + d.patrol_perimeter_offset,
+                    colony.colony_center.0.y,
+                )),
+                territory_perimeter_anchor: Some(crate::components::physical::Position::new(
+                    colony.colony_center.0.x + d.patrol_perimeter_offset,
+                    colony.colony_center.0.y,
+                )),
                 ..Default::default()
             },
         };

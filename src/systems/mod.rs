@@ -16,6 +16,11 @@ pub struct ColonyContext<'w> {
     /// §L2.10.7 territory-corruption centroid cache. Read by
     /// ColonyCleanse via `LandmarkAnchor::TerritoryCorruptionCentroid`.
     pub corruption_landmarks: Res<'w, crate::resources::CorruptionLandmarks>,
+    /// §L2.10.7 colony-center position. Anchors the cat-side
+    /// `LandmarkAnchor::TerritoryPerimeterAnchor` and
+    /// `NearestPerimeterTile` lookups (perimeter is offset from
+    /// colony center).
+    pub colony_center: Res<'w, crate::resources::ColonyCenter>,
 }
 
 pub mod actions;

@@ -1616,6 +1616,12 @@ pub struct DispositionConstants {
     pub sleep_duration_base: u64,
     pub guard_threat_detection_range: i32,
     pub guard_patrol_radius: f32,
+    /// §L2.10.7 perimeter offset (tiles) from colony center used as the
+    /// anchor for cat Patrol and HerbcraftWard spatial axes. Single
+    /// representative point along the outer ring; the cat orbits
+    /// toward it. 12 ≈ inner colony walk; further refinements could
+    /// pick a per-cat angle for spread.
+    pub patrol_perimeter_offset: i32,
     pub social_chain_target_range: i32,
     pub mentor_temperature_threshold: f32,
     pub groom_temperature_threshold: f32,
@@ -2169,6 +2175,7 @@ impl Default for DispositionConstants {
             sleep_duration_base: 75,
             guard_threat_detection_range: 10,
             guard_patrol_radius: 10.0,
+            patrol_perimeter_offset: 12,
             social_chain_target_range: 15,
             mentor_temperature_threshold: 0.5,
             groom_temperature_threshold: 0.7,

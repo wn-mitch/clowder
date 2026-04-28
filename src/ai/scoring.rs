@@ -1966,7 +1966,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
-            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), ..Default::default() },
+            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), ..Default::default() },
         }
     }
 
@@ -2110,7 +2110,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
-            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), ..Default::default() },
+            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), ..Default::default() },
         };
         // §L2.10.7: this test sets `food_available: false`,
         // `has_functional_kitchen: false`, etc. on the context, but
@@ -2277,7 +2277,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
-            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), ..Default::default() },
+            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), ..Default::default() },
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let socialize_score = scores
@@ -2534,7 +2534,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
-            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), ..Default::default() },
+            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), ..Default::default() },
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let best = select_best_action(&scores);
@@ -2607,7 +2607,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
-            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), ..Default::default() },
+            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), ..Default::default() },
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let fight_score = scores.iter().find(|(a, _)| *a == Action::Fight).unwrap().1;
@@ -2699,7 +2699,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
-            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), ..Default::default() },
+            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), ..Default::default() },
         };
         // Build a per-test MarkerSnapshot with Incapacitated set for
         // this cat (the cached shared snapshot only carries colony
@@ -3008,7 +3008,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
-            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), ..Default::default() },
+            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), ..Default::default() },
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let wander = scores.iter().find(|(a, _)| *a == Action::Wander).unwrap().1;
@@ -3082,7 +3082,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
-            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), ..Default::default() },
+            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), ..Default::default() },
         };
 
         let scores_full = score_actions(&base, &test_eval_inputs(), &mut rng_full).scores;
@@ -3570,70 +3570,19 @@ mod tests {
 
     #[test]
     fn ward_score_rises_with_territory_corruption() {
-        // §13.1 rewritten: the `ward_corruption_emergency_bonus` flat
-        // additive retired in favor of a Logistic(8, 0.1) axis on
-        // `territory_max_corruption` in both `herbcraft_ward` and
-        // `herbcraft_gather`. Absolute-threshold assertions no longer
-        // apply (the modifier additive on top of a [0,1] CP is gone);
-        // the ecological relationship "more corruption ⇒ stronger
-        // ward pull" must still hold through the axis curve.
-        let sc = default_scoring();
-        let needs = Needs::default(); // all needs satisfied
-        let mut personality = default_personality();
-        personality.spirituality = 0.6;
-
-        let ward_score_with_corruption = {
-            let mut rng = seeded_rng(100);
-            let mut c = ctx(&needs, &personality, &sc);
-
-            c.ward_strength_low = true;
-            c.herbcraft_skill = 0.6;
-            c.territory_max_corruption = 0.5;
-            let result = score_actions(&c, &test_eval_inputs(), &mut rng);
-            result
-                .scores
-                .iter()
-                .find(|(a, _)| matches!(a, Action::Herbcraft))
-                .map(|(_, s)| *s)
-                .unwrap_or(0.0)
-        };
-
-        let ward_score_without_corruption = {
-            let mut rng = seeded_rng(100);
-            let mut c = ctx(&needs, &personality, &sc);
-
-            c.ward_strength_low = true;
-            c.herbcraft_skill = 0.6;
-            c.territory_max_corruption = 0.0;
-            let result = score_actions(&c, &test_eval_inputs(), &mut rng);
-            result
-                .scores
-                .iter()
-                .find(|(a, _)| matches!(a, Action::Herbcraft))
-                .map(|(_, s)| *s)
-                .unwrap_or(0.0)
-        };
-
-        // Logistic(8, 0.1) on `territory_max_corruption` evaluates to
-        // ~0.31 at 0.0 and ~0.96 at 0.5 — a 3× axis-output gain. The
-        // CP composition blends that with the other axes, so the
-        // aggregate ward_score must rise meaningfully but not
-        // necessarily 3×. Assert strict monotone growth.
-        assert!(
-            ward_score_with_corruption > ward_score_without_corruption,
-            "ward with corruption ({ward_score_with_corruption:.3}) must beat \
-             ward without corruption ({ward_score_without_corruption:.3})"
-        );
-        // Magnitude witness: at corruption 0.5 the axis saturates past
-        // its 0.1 midpoint, so the CP-composed score should pick up a
-        // clearly-above-baseline boost. 1.25× is the conservative
-        // lower bound that matches the axis shape without over-
-        // constraining the compensation math.
-        assert!(
-            ward_score_with_corruption > 1.25 * ward_score_without_corruption,
-            "axis surge should lift ward score ≥ 1.25× baseline; \
-             got {ward_score_with_corruption:.3} vs {ward_score_without_corruption:.3}"
-        );
+        // §L2.10.7 retired: HerbcraftWard's `territory_max_corruption`
+        // Logistic axis was replaced with a NearestPerimeterTile spatial
+        // axis. Corruption-sensing for the magic system flows through
+        // DurableWardDse (NearestCorruptedTile anchor) and
+        // ColonyCleanseDse (TerritoryCorruptionCentroid anchor) — both
+        // ported in B11/B12. HerbcraftWard scores are now driven by
+        // skill + spirituality + perimeter proximity, independent of
+        // corruption.
+        //
+        // This test's premise (corruption → stronger ward pull) no
+        // longer matches the spec; the equivalent invariant now lives
+        // on DurableWard's hotspot axis (assertion in
+        // dses/practice_magic.rs::durable_ward_uses_corruption_hotspot_anchor).
     }
 
     // -------------------------------------------------------------------

@@ -1348,6 +1348,28 @@ pub fn evaluate_and_plan(
                     d.forage_terrain_search_radius,
                     |t| t.foraging_yield() > 0.0,
                 ),
+                // §L2.10.7 HerbcraftGather anchor: Manhattan-nearest
+                // harvestable herb position from world_state.herb_query.
+                // None when no herbs in the world — HasHerbsNearby
+                // marker (eligibility) gates the DSE entirely.
+                nearest_herb_patch: world_state
+                    .herb_query
+                    .iter()
+                    .map(|(_, _, p)| *p)
+                    .min_by_key(|p| pos.manhattan_distance(p)),
+                // §L2.10.7 Patrol / HerbcraftWard anchor: a perimeter
+                // anchor offset from the colony center. Single-point
+                // approximation — the cat patrols toward this anchor
+                // along the colony's outer ring. Future refinement:
+                // multi-point perimeter sampling.
+                nearest_perimeter_tile: Some(crate::components::physical::Position::new(
+                    res.colony_center.0.x + d.patrol_perimeter_offset,
+                    res.colony_center.0.y,
+                )),
+                territory_perimeter_anchor: Some(crate::components::physical::Position::new(
+                    res.colony_center.0.x + d.patrol_perimeter_offset,
+                    res.colony_center.0.y,
+                )),
                 ..Default::default()
             },
         };

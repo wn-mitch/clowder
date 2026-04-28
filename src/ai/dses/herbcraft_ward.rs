@@ -21,8 +21,10 @@
 use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
-use crate::ai::curves::Curve;
+use crate::ai::considerations::{
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
+use crate::ai::curves::{Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
@@ -30,7 +32,11 @@ use crate::components::markers;
 
 pub const SPIRITUALITY_INPUT: &str = "spirituality";
 pub const HERBCRAFT_SKILL_INPUT: &str = "herbcraft_skill";
-pub const TERRITORY_MAX_CORRUPTION_INPUT: &str = "territory_max_corruption";
+
+/// §L2.10.7 HerbcraftWard range — Manhattan tiles for the
+/// nearest-perimeter-tile anchor. 25 ≈ a colony-perimeter walk;
+/// wards placed along the territory boundary.
+pub const HERBCRAFT_WARD_PERIMETER_RANGE: f32 = 25.0;
 
 pub struct HerbcraftWardDse {
     id: DseId,
@@ -45,21 +51,30 @@ impl HerbcraftWardDse {
             slope: 1.0,
             intercept: 0.0,
         };
-        // §2.3 Logistic(8, 0.1) — retires
-        // `ward_corruption_emergency_bonus`'s flat additive bonus by
-        // absorbing the emergency surge at the axis level.
-        let territory_corruption = Curve::Logistic {
-            steepness: 8.0,
-            midpoint: 0.1,
+        // §L2.10.7 row Herbcraft (Ward): Composite{Logistic(8, 0.5),
+        // Invert} over distance to nearest territory perimeter tile.
+        // Spec line 5635: 'Herb commute; emergency-corruption boost
+        // handled by scalar, not spatial.' Replaces the retired
+        // territory_max_corruption Logistic(8, 0.1) scalar — the
+        // anchor IS the placement target (perimeter), not a corruption
+        // signal. WardStrengthLow marker still gates eligibility.
+        let perimeter_distance = Curve::Composite {
+            inner: Box::new(Curve::Logistic {
+                steepness: 8.0,
+                midpoint: 0.5,
+            }),
+            post: PostOp::Invert,
         };
         Self {
             id: DseId("herbcraft_ward"),
             considerations: vec![
                 Consideration::Scalar(ScalarConsideration::new(SPIRITUALITY_INPUT, linear.clone())),
                 Consideration::Scalar(ScalarConsideration::new(HERBCRAFT_SKILL_INPUT, linear)),
-                Consideration::Scalar(ScalarConsideration::new(
-                    TERRITORY_MAX_CORRUPTION_INPUT,
-                    territory_corruption,
+                Consideration::Spatial(SpatialConsideration::new(
+                    "herbcraft_ward_perimeter_distance",
+                    LandmarkSource::Anchor(LandmarkAnchor::NearestPerimeterTile),
+                    HERBCRAFT_WARD_PERIMETER_RANGE,
+                    perimeter_distance,
                 )),
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
@@ -133,56 +148,34 @@ mod tests {
     }
 
     #[test]
-    fn herbcraft_ward_has_territory_corruption_axis() {
+    fn herbcraft_ward_has_three_axes() {
+        // §L2.10.7: spirituality + herbcraft_skill + perimeter_distance.
         let dse = HerbcraftWardDse::new();
-        let names: Vec<&str> = dse
-            .considerations()
-            .iter()
-            .map(|c| match c {
-                Consideration::Scalar(s) => s.name,
-                _ => "",
-            })
-            .collect();
-        assert!(names.contains(&TERRITORY_MAX_CORRUPTION_INPUT));
         assert_eq!(dse.considerations().len(), 3);
     }
 
     #[test]
-    fn territory_corruption_axis_is_logistic_8_01() {
-        // §2.3 retired-constants row 4: Logistic(8, 0.1) absorbs the
-        // retiring `ward_corruption_emergency_bonus`. Sample analytical
-        // values to pin the curve shape.
+    fn herbcraft_ward_uses_perimeter_anchor() {
         let dse = HerbcraftWardDse::new();
-        let curve = dse
+        let spatial = dse
             .considerations()
             .iter()
             .find_map(|c| match c {
-                Consideration::Scalar(s) if s.name == TERRITORY_MAX_CORRUPTION_INPUT => {
-                    Some(s.curve.clone())
+                Consideration::Spatial(s) if s.name == "herbcraft_ward_perimeter_distance" => {
+                    Some(s)
                 }
                 _ => None,
             })
-            .expect("territory_max_corruption axis must exist");
-        // 0.0 → 1/(1+exp(0.8)) ≈ 0.3100
-        assert!(approx(curve.evaluate(0.0), 0.3100, 1e-3));
-        // 0.1 (midpoint) → 0.5
-        assert!(approx(curve.evaluate(0.1), 0.5, 1e-4));
-        // 0.2 → 1/(1+exp(-0.8)) ≈ 0.6900
-        assert!(approx(curve.evaluate(0.2), 0.6900, 1e-3));
-        // 0.5 → 1/(1+exp(-3.2)) ≈ 0.9608
-        assert!(approx(curve.evaluate(0.5), 0.9608, 1e-3));
-        // 1.0 → 1/(1+exp(-7.2)) ≈ 0.99925
-        assert!(approx(curve.evaluate(1.0), 0.9993, 1e-3));
-        match curve {
-            Curve::Logistic {
-                steepness,
-                midpoint,
-            } => {
-                assert!(approx(steepness, 8.0, 1e-6));
-                assert!(approx(midpoint, 0.1, 1e-6));
-            }
-            other => panic!("expected Logistic(8, 0.1); got {other:?}"),
-        }
+            .expect("herbcraft_ward_perimeter_distance axis must exist");
+        assert!(matches!(
+            spatial.landmark,
+            LandmarkSource::Anchor(LandmarkAnchor::NearestPerimeterTile)
+        ));
+        // Composite{Logistic(8, 0.5), Invert}: at cost 0 ≈ 0.98,
+        // midpoint 0.5 ≈ 0.5, edge 1.0 ≈ 0.02.
+        assert!(approx(spatial.curve.evaluate(0.0), 0.982, 1e-2));
+        assert!(approx(spatial.curve.evaluate(0.5), 0.5, 1e-2));
+        assert!(approx(spatial.curve.evaluate(1.0), 0.018, 1e-2));
     }
 
     #[test]
