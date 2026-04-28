@@ -14,25 +14,24 @@ _Last generated: 2026-04-28._
 
 | Status | Count |
 |---|---|
-| In progress | 5 |
+| In progress | 4 |
 | Ready | 29 |
 | Parked | 2 |
 | Blocked | 9 |
 | Done (awaiting archive) | 2 |
-| **Open total** | **45** |
+| **Open total** | **44** |
 | Pre-existing | 1 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-index` (regenerate this file).
 
-## In progress (5)
+## In progress (4)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
 - **[027](docs/open-work/tickets/027-mating-cadence-three-bug-cascade.md)** — Mating cadence — three-bug cascade blocking MatingOccurred — _added 2026-04-25_
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _added 2026-04-27_
-- **[065](docs/open-work/tickets/065-l2-10-7-self-state-fox-roster-sweep.md)** — §L2.10.7 SpatialConsideration roster — cat self-state DSEs + fox dispositions — _added 2026-04-28_
 
 ## Ready (29)
 
@@ -96,7 +95,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/). Recent months:
 
-- [2026-04](docs/open-work/landed/2026-04.md) — 58 entries
+- [2026-04](docs/open-work/landed/2026-04.md) — 59 entries
 
 ## Conventions
 
