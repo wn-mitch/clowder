@@ -31,7 +31,9 @@
 use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
+use crate::ai::considerations::{
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
 use crate::ai::curves::{Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
@@ -39,6 +41,13 @@ use crate::ai::dse::{
 
 pub const CATS_NEARBY_INPUT: &str = "cats_nearby";
 pub const BOLDNESS_INPUT: &str = "boldness";
+
+/// §L2.10.7 fox Avoiding range — Manhattan tiles for the
+/// cat-cluster centroid anchor. 8 mirrors the fox_goap.rs cats-
+/// nearby radius (≤6 + 2 buffer). Sharper Power fall-off than
+/// Fleeing because Avoiding is pre-threat (fox responding to
+/// presence, not damage).
+pub const FOX_AVOIDING_CLUSTER_RANGE: f32 = 8.0;
 
 pub struct FoxAvoidingDse {
     id: DseId,
@@ -64,13 +73,33 @@ impl FoxAvoidingDse {
             post: PostOp::Invert,
         };
 
+        // §L2.10.7 row Avoiding: Power-Invert curve over distance to
+        // cat-cluster centroid. Spec line 5656: 'Inverse-distance-
+        // from-cats; sharper than Flee because Avoiding is
+        // pre-threat.' At cluster (cost=0) → 1, range edge → 0.
+        // Cats clustered nearby = strong avoiding pull; cats far = no
+        // pull. Reuses the cats_nearby scalar saturation as the
+        // intensity axis; the spatial anchor adds direction info.
+        let cluster_distance = Curve::Composite {
+            inner: Box::new(Curve::Polynomial {
+                exponent: 2,
+                divisor: 1.0,
+            }),
+            post: PostOp::Invert,
+        };
         Self {
             id: DseId("fox_avoiding"),
             considerations: vec![
                 Consideration::Scalar(ScalarConsideration::new(CATS_NEARBY_INPUT, cats_curve)),
                 Consideration::Scalar(ScalarConsideration::new(BOLDNESS_INPUT, boldness_curve)),
+                Consideration::Spatial(SpatialConsideration::new(
+                    "fox_avoiding_cluster_distance",
+                    LandmarkSource::Anchor(LandmarkAnchor::CatClusterCentroid),
+                    FOX_AVOIDING_CLUSTER_RANGE,
+                    cluster_distance,
+                )),
             ],
-            composition: Composition::compensated_product(vec![1.0, 1.0]),
+            composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
             eligibility: EligibilityFilter::new(),
         }
     }

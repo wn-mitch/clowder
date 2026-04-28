@@ -18,7 +18,9 @@
 use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
+use crate::ai::considerations::{
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
 use crate::ai::curves::{piecewise, Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
@@ -27,6 +29,12 @@ use crate::ai::dse::{
 pub const HEALTH_DEFICIT_INPUT: &str = "health_deficit";
 pub const CATS_NEARBY_INPUT: &str = "cats_nearby";
 pub const BOLDNESS_INPUT: &str = "boldness";
+
+/// §L2.10.7 fox Fleeing range — Manhattan tiles for the
+/// nearest-map-edge anchor. 30 ≈ map half-extent (120/2 ≈ 60, but
+/// any fox is within ~30 of an edge on a 120×90 map). Power-Invert
+/// gives 'fox near edge ≈ already escaping → strong Fleeing pull.'
+pub const FOX_FLEEING_EDGE_RANGE: f32 = 30.0;
 
 pub struct FoxFleeingDse {
     id: DseId,
@@ -58,17 +66,37 @@ impl FoxFleeingDse {
             post: PostOp::Invert,
         };
 
+        // §L2.10.7 row Fleeing: Power-Invert curve over distance to
+        // nearest map edge. Spec line 5655: 'Same inverse-distance-
+        // from-threat shape as cat Flee.' Anchor is map edge: closer
+        // to edge = higher score = stronger Fleeing pull (the fox is
+        // already escaping; the curve rewards completing the escape).
+        let edge_distance = Curve::Composite {
+            inner: Box::new(Curve::Polynomial {
+                exponent: 2,
+                divisor: 1.0,
+            }),
+            post: PostOp::Invert,
+        };
         Self {
             id: DseId("fox_fleeing"),
             considerations: vec![
                 Consideration::Scalar(ScalarConsideration::new(HEALTH_DEFICIT_INPUT, health_curve)),
                 Consideration::Scalar(ScalarConsideration::new(CATS_NEARBY_INPUT, cats_curve)),
                 Consideration::Scalar(ScalarConsideration::new(BOLDNESS_INPUT, boldness_curve)),
+                Consideration::Spatial(SpatialConsideration::new(
+                    "fox_fleeing_edge_distance",
+                    LandmarkSource::Anchor(LandmarkAnchor::NearestMapEdge),
+                    FOX_FLEEING_EDGE_RANGE,
+                    edge_distance,
+                )),
             ],
-            // RtEO sum = 1.0. Health deficit dominates (panic when
-            // injured). Cats-nearby is an escalation bonus. Boldness
-            // damped-invert is personality modulation.
-            composition: Composition::weighted_sum(vec![0.45, 0.25, 0.30]),
+            // RtEO sum = 1.0. Health deficit still dominates (panic
+            // when injured); cats-nearby escalates; boldness modulates.
+            // Edge-distance at 0.20 mirrors the §L2.10.7 spatial-axis
+            // weight precedent. Original three weights renormalized
+            // by ×0.80 to make room.
+            composition: Composition::weighted_sum(vec![0.36, 0.20, 0.24, 0.20]),
             eligibility: EligibilityFilter::new(),
         }
     }
@@ -124,8 +152,29 @@ mod tests {
     }
 
     #[test]
-    fn fox_fleeing_has_three_axes() {
-        assert_eq!(FoxFleeingDse::new().considerations().len(), 3);
+    fn fox_fleeing_has_four_axes() {
+        // §L2.10.7: health + cats_nearby + boldness + edge_distance.
+        assert_eq!(FoxFleeingDse::new().considerations().len(), 4);
+    }
+
+    #[test]
+    fn fox_fleeing_uses_nearest_map_edge_anchor() {
+        let dse = FoxFleeingDse::new();
+        let spatial = dse
+            .considerations()
+            .iter()
+            .find_map(|c| match c {
+                Consideration::Spatial(sp) if sp.name == "fox_fleeing_edge_distance" => Some(sp),
+                _ => None,
+            })
+            .expect("fox_fleeing_edge_distance axis must exist");
+        assert!(matches!(
+            spatial.landmark,
+            LandmarkSource::Anchor(LandmarkAnchor::NearestMapEdge)
+        ));
+        // Power-Invert: closer = higher.
+        assert!((spatial.curve.evaluate(0.0) - 1.0).abs() < 1e-4);
+        assert!(spatial.curve.evaluate(1.0) < 1e-4);
     }
 
     #[test]
