@@ -41,15 +41,19 @@ impl HerbcraftPrepareDse {
             intercept: 0.0,
         };
         // §L2.10.7 spatial axis: distance to nearest kitchen tile.
-        // Same Composite{Logistic, Invert} shape as Cook — preparation
-        // happens at the kitchen, distant cats discounted but not
-        // gated.
+        // Same Composite{Logistic, Invert, ClampMin(0.1)} shape as
+        // Cook — preparation happens at the kitchen, distant cats
+        // discounted but not gated. The ClampMin floor preserves
+        // build-pressure feedback when no kitchen exists yet.
         let kitchen_distance = Curve::Composite {
-            inner: Box::new(Curve::Logistic {
-                steepness: 8.0,
-                midpoint: 0.5,
+            inner: Box::new(Curve::Composite {
+                inner: Box::new(Curve::Logistic {
+                    steepness: 8.0,
+                    midpoint: 0.5,
+                }),
+                post: PostOp::Invert,
             }),
-            post: PostOp::Invert,
+            post: PostOp::ClampMin(0.1),
         };
         Self {
             id: DseId("herbcraft_prepare"),

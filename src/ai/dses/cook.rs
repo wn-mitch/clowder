@@ -45,14 +45,21 @@ impl CookDse {
         // §L2.10.7 Cook spatial axis: `Composite { Logistic(8, 0.5),
         // Invert }` evaluates `1 - Logistic(cost)` over normalized
         // cost = manhattan_distance / COOK_KITCHEN_RANGE. Close-enough
-        // plateau: at cost=0 ≈ 0.98, at cost=1 ≈ 0.02. Mirrors
-        // mate_target.rs's pattern for the "commute" curve family.
+        // plateau: at cost=0 ≈ 0.98, at cost=1 ≈ 0.02. Outer
+        // ClampMin(0.1) floor so distant cats still score non-zero —
+        // the WS composition (vs CP) makes Cook robust either way,
+        // but the floor preserves the build-pressure 'wants Cook
+        // but no kitchen' pathway (scoring.rs:1056) when the kitchen
+        // landmark is None (no kitchen built yet).
         let kitchen_distance = Curve::Composite {
-            inner: Box::new(Curve::Logistic {
-                steepness: 8.0,
-                midpoint: 0.5,
+            inner: Box::new(Curve::Composite {
+                inner: Box::new(Curve::Logistic {
+                    steepness: 8.0,
+                    midpoint: 0.5,
+                }),
+                post: PostOp::Invert,
             }),
-            post: PostOp::Invert,
+            post: PostOp::ClampMin(0.1),
         };
         Self {
             id: DseId("cook"),

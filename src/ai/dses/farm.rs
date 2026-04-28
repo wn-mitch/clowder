@@ -40,14 +40,26 @@ pub struct FarmDse {
 impl FarmDse {
     pub fn new() -> Self {
         // §L2.10.7 spatial axis: distance to garden tile via
-        // ColonyLandmarks. Same Composite{Logistic, Invert} shape as
-        // Cook — close-enough plateau, distant garden discounted.
+        // ColonyLandmarks. Composite{Logistic, Invert} shape for the
+        // close-enough plateau; ClampMin(0.1) outer floor so distant
+        // cats still score non-zero. Without the floor, CP gates
+        // Farm to 0 for any cat outside ~12 tiles, which broke the
+        // build-pressure → garden-built feedback loop in the
+        // closeout soak (CropTended/CropHarvested stopped firing).
+        // The spec's 'high-cost candidates degrade smoothly' wording
+        // (considerations.rs:73) reads "discount, not gate" — the
+        // CanForage / HasGarden / HasFunctionalKitchen marker
+        // eligibility filters still gate DSEs entirely when the
+        // landmark doesn't exist.
         let garden_distance = Curve::Composite {
-            inner: Box::new(Curve::Logistic {
-                steepness: 8.0,
-                midpoint: 0.5,
+            inner: Box::new(Curve::Composite {
+                inner: Box::new(Curve::Logistic {
+                    steepness: 8.0,
+                    midpoint: 0.5,
+                }),
+                post: PostOp::Invert,
             }),
-            post: PostOp::Invert,
+            post: PostOp::ClampMin(0.1),
         };
         Self {
             id: DseId("farm"),

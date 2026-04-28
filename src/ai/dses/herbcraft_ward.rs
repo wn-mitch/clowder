@@ -59,11 +59,14 @@ impl HerbcraftWardDse {
         // anchor IS the placement target (perimeter), not a corruption
         // signal. WardStrengthLow marker still gates eligibility.
         let perimeter_distance = Curve::Composite {
-            inner: Box::new(Curve::Logistic {
-                steepness: 8.0,
-                midpoint: 0.5,
+            inner: Box::new(Curve::Composite {
+                inner: Box::new(Curve::Logistic {
+                    steepness: 8.0,
+                    midpoint: 0.5,
+                }),
+                post: PostOp::Invert,
             }),
-            post: PostOp::Invert,
+            post: PostOp::ClampMin(0.1),
         };
         Self {
             id: DseId("herbcraft_ward"),
@@ -171,11 +174,11 @@ mod tests {
             spatial.landmark,
             LandmarkSource::Anchor(LandmarkAnchor::NearestPerimeterTile)
         ));
-        // Composite{Logistic(8, 0.5), Invert}: at cost 0 ≈ 0.98,
-        // midpoint 0.5 ≈ 0.5, edge 1.0 ≈ 0.02.
+        // Composite{Composite{Logistic(8, 0.5), Invert}, ClampMin(0.1)}:
+        // at cost 0 ≈ 0.98, midpoint 0.5 ≈ 0.5, edge 1.0 floored at 0.1.
         assert!(approx(spatial.curve.evaluate(0.0), 0.982, 1e-2));
         assert!(approx(spatial.curve.evaluate(0.5), 0.5, 1e-2));
-        assert!(approx(spatial.curve.evaluate(1.0), 0.018, 1e-2));
+        assert!(approx(spatial.curve.evaluate(1.0), 0.1, 1e-2));
     }
 
     #[test]

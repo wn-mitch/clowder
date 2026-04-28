@@ -73,13 +73,19 @@ impl EatDse {
         // resolved via ColonyLandmarks. `Composite { Logistic(8, 0.5),
         // Invert }` gives `1 - Logistic(cost)` over normalized cost —
         // close-enough plateau, distant food viable but discounted
-        // (spec rationale).
+        // (spec rationale at considerations.rs:73). Outer
+        // ClampMin(0.1) floor so distant cats still score non-zero
+        // under CP composition; HasStoredFood marker still gates
+        // entirely when the colony has no food.
         let stores_distance = Curve::Composite {
-            inner: Box::new(Curve::Logistic {
-                steepness: 8.0,
-                midpoint: 0.5,
+            inner: Box::new(Curve::Composite {
+                inner: Box::new(Curve::Logistic {
+                    steepness: 8.0,
+                    midpoint: 0.5,
+                }),
+                post: PostOp::Invert,
             }),
-            post: PostOp::Invert,
+            post: PostOp::ClampMin(0.1),
         };
         Self {
             id: DseId("eat"),

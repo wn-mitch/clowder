@@ -56,17 +56,23 @@ pub struct FoxRaidingDse {
 
 impl FoxRaidingDse {
     pub fn new() -> Self {
-        // §L2.10.7 row Raiding: Composite{Logistic(8, 0.5), Invert}
-        // over distance to nearest visible store. Spec line 5651:
-        // 'Commute-to-target with guard-deterrent handled as a
-        // separate scalar.' None when no store in range — CP gates
-        // the DSE to 0.
+        // §L2.10.7 row Raiding: Composite{Logistic(8, 0.5), Invert,
+        // ClampMin(0.1)} over distance to nearest visible store. Spec
+        // line 5651: 'Commute-to-target with guard-deterrent handled
+        // as a separate scalar.' Floor matches the cat-side colony-
+        // anchor pattern (Cook/Eat/Farm). The store-visibility outer
+        // gate at fox_scoring.rs:289 handles the 'no store in range'
+        // case explicitly — anchor None there means no Raiding DSE
+        // entry at all.
         let store_distance = Curve::Composite {
-            inner: Box::new(Curve::Logistic {
-                steepness: 8.0,
-                midpoint: 0.5,
+            inner: Box::new(Curve::Composite {
+                inner: Box::new(Curve::Logistic {
+                    steepness: 8.0,
+                    midpoint: 0.5,
+                }),
+                post: PostOp::Invert,
             }),
-            post: PostOp::Invert,
+            post: PostOp::ClampMin(0.1),
         };
         Self {
             id: DseId("fox_raiding"),
