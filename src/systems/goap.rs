@@ -1370,7 +1370,12 @@ pub fn evaluate_and_plan(
                     res.colony_center.0.x + d.patrol_perimeter_offset,
                     res.colony_center.0.y,
                 )),
-                ..Default::default()
+                // §L2.10.7 Flee anchor: position of the nearest
+                // wildlife threat already scanned for allies_fighting.
+                nearest_threat: nearest_threat.map(|&(_, p)| p),
+                // §L2.10.7 Coordinate anchor: colony center as the
+                // coordinator's perch (single-perch model).
+                coordinator_perch: Some(res.colony_center.0),
             },
         };
 

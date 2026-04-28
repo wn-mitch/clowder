@@ -19,7 +19,9 @@
 use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
+use crate::ai::considerations::{
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
 use crate::ai::curves::{Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
@@ -30,6 +32,11 @@ use crate::resources::sim_constants::ScoringConstants;
 pub const SAFETY_DEFICIT_INPUT: &str = "safety_deficit";
 pub const BOLDNESS_INPUT: &str = "boldness";
 pub const SAFETY_UPPER_BOUND_INPUT: &str = "safety";
+
+/// §L2.10.7 Patrol range — Manhattan tiles for the territory
+/// perimeter anchor. 25 ≈ same scale as HerbcraftWard's perimeter
+/// range (both target the colony perimeter).
+pub const PATROL_PERIMETER_RANGE: f32 = 25.0;
 
 pub struct PatrolDse {
     id: DseId,
@@ -73,8 +80,22 @@ impl PatrolDse {
                         post: PostOp::Invert,
                     },
                 )),
+                // §L2.10.7 row Patrol: Linear over normalized distance
+                // to the territory perimeter anchor. Spec line 5632:
+                // 'Walking-the-beat pattern; even spacing along
+                // perimeter.' Linear gradient pulls the cat along the
+                // patrol arc.
+                Consideration::Spatial(SpatialConsideration::new(
+                    "patrol_perimeter_distance",
+                    LandmarkSource::Anchor(LandmarkAnchor::TerritoryPerimeterAnchor),
+                    PATROL_PERIMETER_RANGE,
+                    Curve::Linear {
+                        slope: -1.0,
+                        intercept: 1.0,
+                    },
+                )),
             ],
-            composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
+            composition: Composition::compensated_product(vec![1.0, 1.0, 1.0, 1.0]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
             eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
         }
@@ -138,17 +159,33 @@ mod tests {
     }
 
     #[test]
-    fn patrol_has_three_considerations() {
-        // Adding the safety_upper_bound axis (iter 2) brings Patrol
-        // to three considerations. Sibling-DSE sanity check — Flee
-        // still has two; the extra axis is specific to Patrol's
-        // upper-bound gate.
+    fn patrol_has_four_considerations() {
+        // §L2.10.7: deficit + boldness + safety_upper_bound +
+        // perimeter_distance.
         let s = ScoringConstants::default();
-        assert_eq!(PatrolDse::new(&s).considerations().len(), 3);
+        assert_eq!(PatrolDse::new(&s).considerations().len(), 4);
+    }
+
+    #[test]
+    fn patrol_uses_territory_perimeter_anchor() {
+        let s = ScoringConstants::default();
+        let dse = PatrolDse::new(&s);
+        let spatial = dse
+            .considerations()
+            .iter()
+            .find_map(|c| match c {
+                Consideration::Spatial(sp) if sp.name == "patrol_perimeter_distance" => Some(sp),
+                _ => None,
+            })
+            .expect("patrol_perimeter_distance axis must exist");
+        assert!(matches!(
+            spatial.landmark,
+            LandmarkSource::Anchor(LandmarkAnchor::TerritoryPerimeterAnchor)
+        ));
     }
 
     /// Helper: pull the scalar curve from a Consideration enum variant.
-    /// Test-local — Patrol's three considerations are all scalars.
+    /// Test-local — Patrol's first three considerations are scalars.
     fn scalar_curve(c: &Consideration) -> &Curve {
         match c {
             Consideration::Scalar(s) => &s.curve,

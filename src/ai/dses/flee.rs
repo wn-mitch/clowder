@@ -24,7 +24,9 @@
 use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
+use crate::ai::considerations::{
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
 use crate::ai::curves::{flee_or_fight, Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
@@ -35,6 +37,11 @@ use crate::resources::sim_constants::ScoringConstants;
 
 pub const SAFETY_DEFICIT_INPUT: &str = "safety_deficit";
 pub const BOLDNESS_INPUT: &str = "boldness";
+
+/// §L2.10.7 Flee range — Manhattan tiles for the nearest-threat
+/// anchor. 12 ≈ a wildlife detection radius; outside this the
+/// threat-distance signal is meaningless.
+pub const FLEE_THREAT_RANGE: f32 = 12.0;
 
 pub struct FleeDse {
     id: DseId,
@@ -60,13 +67,32 @@ impl FleeDse {
             post: PostOp::Invert,
         };
 
+        // §L2.10.7 row Flee: Power-Invert curve over distance to
+        // nearest threat. Spec line 5630: 'Inverse-distance-from-
+        // threat; closer threat is sharply more urgent.' At distance
+        // 0 (cat on threat) → 1, half-range → 0.75, edge → 0. The
+        // anchor is the threat *position* (NearestThreat), so closer
+        // ↔ the cat is in immediate danger ↔ Flee fires hardest.
+        let threat_distance = Curve::Composite {
+            inner: Box::new(Curve::Polynomial {
+                exponent: 2,
+                divisor: 1.0,
+            }),
+            post: PostOp::Invert,
+        };
         Self {
             id: DseId("flee"),
             considerations: vec![
                 Consideration::Scalar(ScalarConsideration::new(SAFETY_DEFICIT_INPUT, safety_curve)),
                 Consideration::Scalar(ScalarConsideration::new(BOLDNESS_INPUT, boldness_invert)),
+                Consideration::Spatial(SpatialConsideration::new(
+                    "flee_threat_distance",
+                    LandmarkSource::Anchor(LandmarkAnchor::NearestThreat),
+                    FLEE_THREAT_RANGE,
+                    threat_distance,
+                )),
             ],
-            composition: Composition::compensated_product(vec![1.0, 1.0]),
+            composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
             // §9.3 DSE filter binding — Flee triggers on `Predator` stance.
             // §13.1: `.forbid(markers::Incapacitated::KEY)` blocks downed cats — a
             // cat with an unhealed Severe injury can't flee, matching
@@ -162,14 +188,39 @@ mod tests {
     fn boldness_curve_inverts_input() {
         let s = ScoringConstants::default();
         let dse = FleeDse::new(&s);
-        let c = match &dse.considerations()[1] {
-            Consideration::Scalar(sc) => &sc.curve,
-            _ => panic!("expected scalar"),
-        };
+        let c = dse
+            .considerations()
+            .iter()
+            .find_map(|c| match c {
+                Consideration::Scalar(sc) if sc.name == BOLDNESS_INPUT => Some(&sc.curve),
+                _ => None,
+            })
+            .expect("boldness axis must exist");
         // Invert: (1 - x), clamped.
         assert!((c.evaluate(0.0) - 1.0).abs() < 1e-4);
         assert!((c.evaluate(1.0) - 0.0).abs() < 1e-4);
         assert!((c.evaluate(0.5) - 0.5).abs() < 1e-4);
+    }
+
+    #[test]
+    fn flee_uses_nearest_threat_anchor() {
+        let s = ScoringConstants::default();
+        let dse = FleeDse::new(&s);
+        let spatial = dse
+            .considerations()
+            .iter()
+            .find_map(|c| match c {
+                Consideration::Spatial(sp) if sp.name == "flee_threat_distance" => Some(sp),
+                _ => None,
+            })
+            .expect("flee_threat_distance axis must exist");
+        assert!(matches!(
+            spatial.landmark,
+            LandmarkSource::Anchor(LandmarkAnchor::NearestThreat)
+        ));
+        // Power-Invert: closer-threat = higher.
+        assert!(spatial.curve.evaluate(0.0) > 0.99);
+        assert!(spatial.curve.evaluate(1.0) < 0.01);
     }
 
     #[test]
@@ -181,7 +232,16 @@ mod tests {
         let entity = Entity::from_raw_u32(1).unwrap();
         let has_marker = |_: &str, _: Entity| false;
         let entity_position = |_: Entity| -> Option<Position> { None };
-        let anchor_position = |_: LandmarkAnchor| -> Option<Position> { None };
+        // §L2.10.7: place a threat at the cat's position so the
+        // spatial axis evaluates to ~1.0. Without the threat anchor,
+        // CP would gate the spatial axis to 0 and short-circuit the
+        // boldness check this test cares about.
+        let anchor_position = |a: LandmarkAnchor| -> Option<Position> {
+            match a {
+                LandmarkAnchor::NearestThreat => Some(Position::new(0, 0)),
+                _ => None,
+            }
+        };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,

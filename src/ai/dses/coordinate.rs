@@ -14,7 +14,9 @@
 use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
+use crate::ai::considerations::{
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
 use crate::ai::curves::{Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
@@ -25,6 +27,10 @@ use crate::resources::sim_constants::ScoringConstants;
 pub const DILIGENCE_INPUT: &str = "diligence";
 pub const DIRECTIVE_COUNT_INPUT: &str = "pending_directive_count";
 pub const AMBITION_INPUT: &str = "ambition";
+
+/// §L2.10.7 Coordinate range — Manhattan tiles for the coordinator-
+/// perch anchor. 18 ≈ inner-colony walking distance.
+pub const COORDINATE_PERCH_RANGE: f32 = 18.0;
 
 pub struct CoordinateDse {
     id: DseId,
@@ -46,6 +52,18 @@ impl CoordinateDse {
             slope: 1.0,
             intercept: 0.0,
         };
+        // §L2.10.7 row Coordinate: Composite{Logistic(8, 0.5), Invert}
+        // over distance to the coordinator's perch. Spec line 5637:
+        // 'Weakly spatial — coordinator works from location; distant
+        // cats discounted for participation.' Logistic for routine-
+        // commute plateau.
+        let perch_distance = Curve::Composite {
+            inner: Box::new(Curve::Logistic {
+                steepness: 8.0,
+                midpoint: 0.5,
+            }),
+            post: PostOp::Invert,
+        };
         Self {
             id: DseId("coordinate"),
             considerations: vec![
@@ -55,10 +73,18 @@ impl CoordinateDse {
                     directive_curve,
                 )),
                 Consideration::Scalar(ScalarConsideration::new(AMBITION_INPUT, linear)),
+                Consideration::Spatial(SpatialConsideration::new(
+                    "coordinate_perch_distance",
+                    LandmarkSource::Anchor(LandmarkAnchor::CoordinatorPerch),
+                    COORDINATE_PERCH_RANGE,
+                    perch_distance,
+                )),
             ],
-            // RtEO sum = 1.0. Directive count is the drive; diligence
-            // + ambition modulate.
-            composition: Composition::weighted_sum(vec![0.3, 0.4, 0.3]),
+            // RtEO sum = 1.0. Directive count drives, diligence +
+            // ambition modulate, perch proximity pulls toward the
+            // coordination location. Original three weights renormalized
+            // ×0.80 to make room for the spatial axis at 0.20.
+            composition: Composition::weighted_sum(vec![0.24, 0.32, 0.24, 0.20]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
             // §4: only coordinators with pending directives are eligible.
             eligibility: EligibilityFilter::new()

@@ -900,7 +900,14 @@ pub fn evaluate_dispositions(
                     colony.colony_center.0.x + d.patrol_perimeter_offset,
                     colony.colony_center.0.y,
                 )),
-                ..Default::default()
+                // §L2.10.7 Flee anchor: position of the nearest
+                // wildlife threat already scanned for allies_fighting.
+                nearest_threat: nearest_threat.map(|(_, p)| *p),
+                // §L2.10.7 Coordinate anchor: colony center. The
+                // coordinator's perch is approximated as the colony
+                // origin tile — single-perch model. Future refinement
+                // could store a per-coordinator perch component.
+                coordinator_perch: Some(colony.colony_center.0),
             },
         };
 
