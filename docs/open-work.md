@@ -14,30 +14,30 @@ _Last generated: 2026-04-27._
 
 | Status | Count |
 |---|---|
-| In progress | 3 |
-| Ready | 31 |
-| Parked | 1 |
+| In progress | 4 |
+| Ready | 30 |
+| Parked | 2 |
 | Blocked | 9 |
 | Done (awaiting archive) | 2 |
-| **Open total** | **44** |
+| **Open total** | **45** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-index` (regenerate this file).
 
-## In progress (3)
+## In progress (4)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
 - **[027](docs/open-work/tickets/027-mating-cadence-three-bug-cascade.md)** — Mating cadence — three-bug cascade blocking MatingOccurred — _added 2026-04-25_
+- **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _added 2026-04-27_
 
-## Ready (31)
+## Ready (30)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _added 2026-04-20_
-- **[006](docs/open-work/tickets/006-cluster-b-shared-spatial-slow-state.md)** — Shared spatial slow-state (Cluster B) — _[B] · added 2026-04-20_
 - **[007](docs/open-work/tickets/007-cluster-c-deliberation-layer.md)** — Deliberation-layer (Cluster C) — _[C] · added 2026-04-20_
 - **[008](docs/open-work/tickets/008-cluster-d-formalization-verification.md)** — Formalization and verification (Cluster D) — _[D] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[E] · added 2026-04-20_
@@ -66,9 +66,10 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[063](docs/open-work/tickets/063-ward-strength-promotion.md)** — Ward-strength promotion — first-class spatial axis (§5.6.3 row #3) — _added 2026-04-27_
 - **[064](docs/open-work/tickets/064-carcass-scent-consumer-cutover.md)** — Carcass-scent consumer cutover — replace observer_smells_at (§5.6.3 row #6) — _added 2026-04-27_
 
-## Parked (1)
+## Parked (2)
 
 - **[015](docs/open-work/tickets/015-alloparenting-reframe-b.md)** — Alloparenting Reframe B — mama drops kitten at hearth near resting elder — _parked 2026-04-22 · added 2026-04-22_
+- **[059](docs/open-work/tickets/059-phase-7-substrate-cleanup.md)** — Phase 7 substrate cleanup — `ScoringContext` removal, §10 unblock map sweep, spec drift reconcile — _parked 2026-04-27 · added 2026-04-27_
 
 ## Blocked (9)
 
@@ -96,7 +97,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/). Recent months:
 
-- [2026-04](docs/open-work/landed/2026-04.md) — 55 entries
+- [2026-04](docs/open-work/landed/2026-04.md) — 56 entries
 
 ## Conventions
 
