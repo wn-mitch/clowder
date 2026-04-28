@@ -297,6 +297,32 @@ pub fn update_food_location_map(
     }
 }
 
+/// Re-stamp `GardenLocationMap` from live `Garden` `Structure`
+/// entities. §5.6.3 row #10 — sight × colony.
+///
+/// Each functional garden paints a linear-falloff disc of
+/// `garden_location_sense_range` tiles weighted by effectiveness.
+/// Producer-only — no DSE consumes this map yet.
+pub fn update_garden_location_map(
+    buildings: Query<(&Structure, &Position), Without<ConstructionSite>>,
+    mut map: ResMut<crate::resources::GardenLocationMap>,
+    constants: Res<SimConstants>,
+) {
+    let sense_range = constants.influence_maps.garden_location_sense_range;
+    map.clear();
+    for (structure, anchor) in &buildings {
+        if structure.kind != StructureType::Garden {
+            continue;
+        }
+        let eff = structure.effectiveness();
+        if eff <= 0.0 {
+            continue;
+        }
+        let center = structure.center(anchor);
+        map.stamp(center.x, center.y, eff, sense_range);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

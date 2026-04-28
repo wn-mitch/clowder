@@ -343,6 +343,9 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     // Insert food-location map resource (ticket 006 — §5.6.3 row #7).
     world.insert_resource(crate::resources::FoodLocationMap::default());
 
+    // Insert garden-location map resource (ticket 006 — §5.6.3 row #10).
+    world.insert_resource(crate::resources::GardenLocationMap::default());
+
     // Insert unmet-demand ledger — tracks frustrated wants (e.g. cats
     // scoring Cook but with no Kitchen) so the coordinator can prioritize
     // the missing infrastructure.

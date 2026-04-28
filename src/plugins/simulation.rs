@@ -203,6 +203,7 @@ impl Plugin for SimulationPlugin {
                         systems::buildings::apply_building_effects,
                         systems::buildings::decay_building_condition,
                         systems::buildings::update_food_location_map,
+                        systems::buildings::update_garden_location_map,
                     )
                         .chain(),
                     systems::items::decay_items,
