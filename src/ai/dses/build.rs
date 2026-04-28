@@ -1,9 +1,12 @@
 //! `Build` — Work-urgency peer (§3.3.2 anchor = 1.0).
 //!
-//! Per §2.3 + §3.1.1 row 1493: `WeightedSum` of 3 axes — diligence
-//! (Linear), site_presence (Piecewise `(0, 0), (1, build_site_bonus)`),
-//! repair_presence (Piecewise `(0, 0), (1, build_repair_bonus)`).
-//! RtEO: site presence drives even low-diligence cats ("there's
+//! Per §2.3 + §3.1.1 row 1493 (post-§L2.10.7): `WeightedSum` of 3
+//! axes — diligence (Linear), site_distance
+//! (`Composite{Logistic(8, 0.5), Invert}` over distance to nearest
+//! construction site, replacing the retired binary `has_construction_site`
+//! Piecewise axis), repair_presence (Piecewise `(0, 0),
+//! (1, build_repair_bonus)`).
+//! RtEO: site proximity drives even low-diligence cats ("there's
 //! literally a half-built wall here"); repair need drives build
 //! independently.
 //!
@@ -42,6 +45,20 @@ pub struct BuildDse {
 
 impl BuildDse {
     pub fn new(scoring: &ScoringConstants) -> Self {
+        // §L2.10.7 row Build: Composite{Logistic(8, 0.5), Invert} over
+        // distance to the nearest construction site. Replaces the
+        // binary `has_construction_site` Piecewise axis — distance to
+        // the work IS the presence signal (None when no site nearby
+        // → CP/WS gate suppresses the build score). The `build_site_bonus`
+        // tunable retires; the curve's plateau gives the same "literally
+        // a half-built wall here" pull at close range.
+        let site_distance = Curve::Composite {
+            inner: Box::new(Curve::Logistic {
+                steepness: 8.0,
+                midpoint: 0.5,
+            }),
+            post: PostOp::Invert,
+        };
         Self {
             id: DseId("build"),
             considerations: vec![
@@ -52,17 +69,26 @@ impl BuildDse {
                         intercept: 0.0,
                     },
                 )),
-                Consideration::Scalar(ScalarConsideration::new(
-                    SITE_PRESENCE_INPUT,
-                    piecewise(vec![(0.0, 0.0), (1.0, scoring.build_site_bonus)]),
+                Consideration::Spatial(SpatialConsideration::new(
+                    "build_site_distance",
+                    LandmarkSource::Anchor(LandmarkAnchor::NearestConstructionSite),
+                    BUILD_SITE_RANGE,
+                    site_distance,
                 )),
+                // `has_damaged_building` retains its binary Piecewise
+                // shape today: §L2.10.7's roster commits one landmark
+                // per row (Site position), and damaged-building repair
+                // is a distinct repair-pull signal that isn't named
+                // separately in the spec. Future audit may split this
+                // into a NearestDamagedBuilding anchor.
                 Consideration::Scalar(ScalarConsideration::new(
                     REPAIR_PRESENCE_INPUT,
                     piecewise(vec![(0.0, 0.0), (1.0, scoring.build_repair_bonus)]),
                 )),
             ],
-            // RtEO sum = 1.0. Diligence is primary; site + repair are
-            // binary presence bonuses.
+            // RtEO sum = 1.0. Diligence is primary; spatial axis pulls
+            // toward the site; repair-presence is the auxiliary repair
+            // bonus.
             composition: Composition::weighted_sum(vec![0.5, 0.25, 0.25]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
             eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),

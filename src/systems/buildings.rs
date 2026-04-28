@@ -55,6 +55,28 @@ pub fn scan_colony_buildings<'a>(
     state
 }
 
+/// Manhattan-nearest active construction site to `cat_pos`. `None`
+/// when no site exists. Read by the §L2.10.7 Build spatial axis via
+/// [`crate::ai::considerations::LandmarkAnchor::NearestConstructionSite`].
+/// Run per-cat in the scoring builder.
+pub fn nearest_construction_site<'a>(
+    buildings: impl Iterator<Item = (&'a Structure, &'a Position, Option<&'a ConstructionSite>)>,
+    cat_pos: Position,
+) -> Option<Position> {
+    let mut best: Option<(Position, i32)> = None;
+    for (structure, anchor, site) in buildings {
+        if site.is_none() {
+            continue;
+        }
+        let center = structure.center(anchor);
+        let d = cat_pos.manhattan_distance(&center);
+        if best.is_none_or(|(_, cur)| d < cur) {
+            best = Some((center, d));
+        }
+    }
+    best.map(|(pos, _)| pos)
+}
+
 // ---------------------------------------------------------------------------
 // apply_building_effects
 // ---------------------------------------------------------------------------

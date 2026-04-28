@@ -1322,6 +1322,14 @@ pub fn evaluate_and_plan(
             social_warmth_deficit: fulfillment.map_or(0.4, |f| f.social_warmth_deficit()),
             cat_anchors: crate::ai::scoring::CatAnchorPositions {
                 nearest_corrupted_tile,
+                nearest_construction_site:
+                    crate::systems::buildings::nearest_construction_site(
+                        world_state
+                            .building_query
+                            .iter()
+                            .map(|(_, s, p, site, _)| (s, p, site)),
+                        *pos,
+                    ),
                 ..Default::default()
             },
         };

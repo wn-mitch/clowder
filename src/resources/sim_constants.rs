@@ -1290,7 +1290,6 @@ pub struct ScoringConstants {
     #[serde(default = "default_patrol_exit_threshold")]
     pub patrol_exit_threshold: f32,
     pub build_diligence_scale: f32,
-    pub build_site_bonus: f32,
     pub build_repair_bonus: f32,
     pub farm_diligence_scale: f32,
     pub herbcraft_gather_spirituality_scale: f32,
@@ -1469,7 +1468,6 @@ impl Default for ScoringConstants {
             patrol_exit_threshold: default_patrol_exit_threshold(),
             patrol_boldness_scale: 1.5,
             build_diligence_scale: 1.5,
-            build_site_bonus: 2.0,
             build_repair_bonus: 0.35,
             farm_diligence_scale: 1.2,
             herbcraft_gather_spirituality_scale: 0.5,

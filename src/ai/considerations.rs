@@ -247,10 +247,10 @@ impl SpatialConsideration {
 /// presence contributes additively (or gates via composition) rather
 /// than via a curve. Most markers are eligibility filters (§4); this
 /// flavor is for the rare cases where a marker's *presence* should
-/// contribute a scalar bonus (e.g. `Build.site_bonus` as
-/// `Piecewise([(0, 0), (1, build_site_bonus)])` today — but see
-/// §2.3 which rewrites those as Piecewise curves on a 0/1 marker-
-/// presence input).
+/// contribute a scalar bonus (e.g. `Build.repair_presence` as
+/// `Piecewise([(0, 0), (1, build_repair_bonus)])` — see §2.3
+/// which rewrites bonus markers as Piecewise curves on a 0/1
+/// marker-presence input).
 ///
 /// Kept as a separate flavor from `ScalarConsideration` because the
 /// input source is different: the evaluator reads a `Query<With<M>>`
