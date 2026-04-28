@@ -1,7 +1,7 @@
 ---
 id: 065
 title: §L2.10.7 SpatialConsideration roster — cat self-state DSEs + fox dispositions
-status: ready
+status: in-progress
 cluster: null
 added: 2026-04-28
 parked: null
@@ -176,3 +176,20 @@ then a fox row to validate the substrate parallel for fox-scoring
   `TargetPosition`); this ticket is purely a per-row port sweep
   with one substrate decision (aggregate-centroid landmarks)
   surfacing on Explore / PracticeMagic / fox Hunting.
+- 2026-04-28: in-progress. Investigation surfaced two more
+  substrate gaps not visible in the audit: (1) cat-side
+  `entity_position` closure was stubbed `|_| None` at
+  `src/ai/scoring.rs:549` — `LandmarkSource::Entity` had zero
+  production callers on either side, not just fox. (2) Self-state
+  DSEs build their `Consideration` list at registration time, so
+  per-cat dynamic landmarks (nearest kitchen, own den, frontier
+  centroid) can't ride `LandmarkSource::Entity(Entity)` cleanly —
+  Entity refs aren't known at registry-population time. Resolved
+  by landing a `LandmarkSource::Anchor(LandmarkAnchor)` variant
+  + `EvalCtx::anchor_position` closure (the substrate's deferred
+  "cat-relative anchor" enumeration per
+  `considerations.rs:111`'s comment). 19-variant `LandmarkAnchor`
+  enum covers all 25 spec-row landmarks. Closures stub to
+  `|_| None` until A2/A3 wires real resolution. Soaks deferred
+  to ticket close per user direction; per-port verification is
+  `just check` + targeted `cargo test` only.

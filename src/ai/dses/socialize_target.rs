@@ -55,8 +55,7 @@ use bevy::prelude::Entity;
 
 use crate::ai::composition::Composition;
 use crate::ai::considerations::{
-    Consideration, LandmarkSource, ScalarConsideration, SpatialConsideration,
-};
+    Consideration, LandmarkSource, ScalarConsideration, SpatialConsideration, LandmarkAnchor};
 use crate::ai::curves::Curve;
 use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination};
 use crate::ai::eval::DseRegistry;
@@ -296,12 +295,14 @@ pub fn resolve_socialize_target(
     // scalar considerations but required by `EvalCtx`. Stub with no-op
     // closures.
     let entity_position = |_: Entity| -> Option<Position> { None };
+    let anchor_position = |_: LandmarkAnchor| -> Option<Position> { None };
     let has_marker = |_: &str, _: Entity| -> bool { false };
 
     let ctx = EvalCtx {
         cat,
         tick,
         entity_position: &entity_position,
+        anchor_position: &anchor_position,
         has_marker: &has_marker,
         self_position: cat_pos,
         target: None,
@@ -346,10 +347,12 @@ mod tests {
     fn test_ctx(entity: Entity) -> EvalCtx<'static> {
         static MARKER: fn(&str, Entity) -> bool = |_, _| false;
         static NO_ENTITY_POS: fn(Entity) -> Option<Position> = |_| None;
+        static NO_ANCHOR_POS: fn(LandmarkAnchor) -> Option<Position> = |_| None;
         EvalCtx {
             cat: entity,
             tick: 0,
             entity_position: &NO_ENTITY_POS,
+            anchor_position: &NO_ANCHOR_POS,
             has_marker: &MARKER,
             self_position: Position::new(0, 0),
             target: None,

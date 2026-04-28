@@ -302,6 +302,18 @@ pub struct EvalCtx<'ctx> {
     /// `SpatialConsideration` with `LandmarkSource::Entity`).
     pub entity_position:
         &'ctx dyn Fn(Entity) -> Option<crate::components::physical::Position>,
+    /// Closure for cat-relative anchor position lookup (used by
+    /// `SpatialConsideration` with `LandmarkSource::Anchor`). The
+    /// canonical self-state-DSE resolution path: per-cat-per-tick,
+    /// the closure dispatches per-`LandmarkAnchor` against
+    /// `ColonyLandmarks` resource positions, per-tick centroid
+    /// snapshots, and per-cat queries (own-den, nearest-threat).
+    /// Returns `None` when the anchor has no resolvable position
+    /// (no kitchen built, no threat in range, empty frontier);
+    /// the consideration scores zero in that case.
+    pub anchor_position: &'ctx dyn Fn(
+        super::considerations::LandmarkAnchor,
+    ) -> Option<crate::components::physical::Position>,
     /// Cat's own position. Used as the origin for
     /// `SpatialConsideration` distance calculations.
     pub self_position: crate::components::physical::Position,

@@ -76,8 +76,7 @@ use bevy::prelude::Entity;
 use crate::ai::caretake_targeting::{CaretakeResolution, KittenState};
 use crate::ai::composition::Composition;
 use crate::ai::considerations::{
-    Consideration, LandmarkSource, ScalarConsideration, SpatialConsideration,
-};
+    Consideration, LandmarkSource, ScalarConsideration, SpatialConsideration, LandmarkAnchor};
 use crate::ai::curves::Curve;
 use crate::ai::dse::{CommitmentStrategy, DseId, EvalCtx, GoalState, Intention};
 use crate::ai::eval::DseRegistry;
@@ -285,12 +284,15 @@ pub fn resolve_caretake_target(
     };
 
     let entity_position = |_: Entity| -> Option<Position> { None };
+
+    let anchor_position = |_: LandmarkAnchor| -> Option<Position> { None };
     let has_marker = |_: &str, _: Entity| -> bool { false };
 
     let ctx = EvalCtx {
         cat: adult,
         tick,
         entity_position: &entity_position,
+        anchor_position: &anchor_position,
         has_marker: &has_marker,
         self_position: adult_pos,
         target: None,

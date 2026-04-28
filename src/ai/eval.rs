@@ -625,6 +625,20 @@ fn score_consideration_with_trace(
                         return (0.0, row);
                     }
                 },
+                LandmarkSource::Anchor(a) => match (ctx.anchor_position)(a) {
+                    Some(p) => p,
+                    None => {
+                        let row = capture.then(|| {
+                            (
+                                0.0,
+                                format!("{:?}", s.curve),
+                                ConsiderationKind::Spatial,
+                                Some(s.landmark_label()),
+                            )
+                        });
+                        return (0.0, row);
+                    }
+                },
             };
             let distance = ctx.self_position.manhattan_distance(&landmark_pos) as f32;
             let score = s.score(distance);
@@ -753,6 +767,7 @@ pub fn default_strategy_for_intention(is_goal: bool) -> CommitmentStrategy {
 
 #[cfg(test)]
 mod tests {
+    use crate::ai::considerations::LandmarkAnchor;
     use super::*;
     use crate::ai::composition::Composition;
     use crate::ai::considerations::{Consideration, ScalarConsideration};
@@ -830,10 +845,12 @@ mod tests {
         // Missing required → fail.
         let has_marker = |_: &str, _: Entity| false;
         let entity_position = |_: Entity| -> Option<Position> { None };
+        let anchor_position = |_: LandmarkAnchor| -> Option<Position> { None };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
             entity_position: &entity_position,
+            anchor_position: &anchor_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,
@@ -847,6 +864,7 @@ mod tests {
             cat: entity,
             tick: 0,
             entity_position: &entity_position,
+            anchor_position: &anchor_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,
@@ -860,12 +878,13 @@ mod tests {
         let filter = EligibilityFilter::new().forbid(markers::Incapacitated::KEY);
         let entity = Entity::from_raw_u32(1).unwrap();
         let entity_position = |_: Entity| -> Option<Position> { None };
-
+        let anchor_position = |_: LandmarkAnchor| -> Option<Position> { None };
         let has_incap = |m: &str, _: Entity| m == markers::Incapacitated::KEY;
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
             entity_position: &entity_position,
+            anchor_position: &anchor_position,
             has_marker: &has_incap,
             self_position: Position::new(0, 0),
             target: None,
@@ -878,6 +897,7 @@ mod tests {
             cat: entity,
             tick: 0,
             entity_position: &entity_position,
+            anchor_position: &anchor_position,
             has_marker: &none,
             self_position: Position::new(0, 0),
             target: None,
@@ -894,10 +914,12 @@ mod tests {
 
         let has_marker = |_: &str, _: Entity| false;
         let entity_position = |_: Entity| -> Option<Position> { None };
+        let anchor_position = |_: LandmarkAnchor| -> Option<Position> { None };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
             entity_position: &entity_position,
+            anchor_position: &anchor_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,
@@ -918,10 +940,12 @@ mod tests {
 
         let has_marker = |_: &str, _: Entity| false;
         let entity_position = |_: Entity| -> Option<Position> { None };
+        let anchor_position = |_: LandmarkAnchor| -> Option<Position> { None };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
             entity_position: &entity_position,
+            anchor_position: &anchor_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,
@@ -959,10 +983,12 @@ mod tests {
 
         let has_marker = |_: &str, _: Entity| false;
         let entity_position = |_: Entity| -> Option<Position> { None };
+        let anchor_position = |_: LandmarkAnchor| -> Option<Position> { None };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
             entity_position: &entity_position,
+            anchor_position: &anchor_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,
@@ -1019,10 +1045,12 @@ mod tests {
         let entity = Entity::from_raw_u32(1).unwrap();
         let has_marker = |_: &str, _: Entity| false;
         let entity_position = |_: Entity| -> Option<Position> { None };
+        let anchor_position = |_: LandmarkAnchor| -> Option<Position> { None };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
             entity_position: &entity_position,
+            anchor_position: &anchor_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,
@@ -1045,10 +1073,12 @@ mod tests {
         let entity = Entity::from_raw_u32(1).unwrap();
         let has_marker = |_: &str, _: Entity| false;
         let entity_position = |_: Entity| -> Option<Position> { None };
+        let anchor_position = |_: LandmarkAnchor| -> Option<Position> { None };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
             entity_position: &entity_position,
+            anchor_position: &anchor_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,
@@ -1166,10 +1196,12 @@ mod tests {
         let entity = Entity::from_raw_u32(1).unwrap();
         let has_marker = |_: &str, _: Entity| false;
         let entity_position = |_: Entity| -> Option<Position> { None };
+        let anchor_position = |_: LandmarkAnchor| -> Option<Position> { None };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
             entity_position: &entity_position,
+            anchor_position: &anchor_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,
@@ -1220,10 +1252,12 @@ mod tests {
         let entity = Entity::from_raw_u32(1).unwrap();
         let has_marker = |_: &str, _: Entity| false;
         let entity_position = |_: Entity| -> Option<Position> { None };
+        let anchor_position = |_: LandmarkAnchor| -> Option<Position> { None };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
             entity_position: &entity_position,
+            anchor_position: &anchor_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,
@@ -1296,10 +1330,12 @@ mod tests {
         let entity = Entity::from_raw_u32(1).unwrap();
         let has_marker = |_: &str, _: Entity| false;
         let entity_position = |_: Entity| -> Option<Position> { None };
+        let anchor_position = |_: LandmarkAnchor| -> Option<Position> { None };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
             entity_position: &entity_position,
+            anchor_position: &anchor_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,

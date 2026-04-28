@@ -473,6 +473,7 @@ pub fn commune_dse() -> Box<dyn Dse> {
 
 #[cfg(test)]
 mod tests {
+    use crate::ai::considerations::LandmarkAnchor;
     use super::*;
     use crate::ai::eval::{evaluate_single, ModifierPipeline};
     use crate::components::physical::Position;
@@ -563,10 +564,12 @@ mod tests {
         let entity = Entity::from_raw_u32(1).unwrap();
         let has_marker = |_: &str, _: Entity| false;
         let entity_position = |_: Entity| -> Option<Position> { None };
+        let anchor_position = |_: LandmarkAnchor| -> Option<Position> { None };
         let ctx = EvalCtx {
             cat: entity,
             tick: 0,
             entity_position: &entity_position,
+            anchor_position: &anchor_position,
             has_marker: &has_marker,
             self_position: Position::new(0, 0),
             target: None,

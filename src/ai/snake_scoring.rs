@@ -10,6 +10,7 @@ use bevy_ecs::prelude::Entity;
 use rand::Rng;
 
 use crate::ai::dse::EvalCtx;
+use crate::ai::considerations::LandmarkAnchor;
 use crate::ai::eval::evaluate_single;
 use crate::ai::scoring::EvalInputs;
 use crate::ai::snake_planner::SnakeDispositionKind;
@@ -152,6 +153,7 @@ pub fn score_snake_dse_by_id(dse_id: &str, ctx: &SnakeScoringContext, inputs: &E
     let fetch_scalar = |name: &str, _: Entity| -> f32 { scalars.get(name).copied().unwrap_or(0.0) };
     let has_marker = |_: &str, _: Entity| false;
     let entity_position = |_: Entity| -> Option<Position> { None };
+    let anchor_position = |_: LandmarkAnchor| -> Option<Position> { None };
     let needs_ref = ctx.needs;
     let maslow = |tier: u8| needs_ref.level_suppression(tier);
 
@@ -159,6 +161,7 @@ pub fn score_snake_dse_by_id(dse_id: &str, ctx: &SnakeScoringContext, inputs: &E
         cat: inputs.cat,
         tick: inputs.tick,
         entity_position: &entity_position,
+        anchor_position: &anchor_position,
         has_marker: &has_marker,
         self_position: inputs.position,
         target: None,

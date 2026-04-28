@@ -14,8 +14,8 @@ _Last generated: 2026-04-28._
 
 | Status | Count |
 |---|---|
-| In progress | 4 |
-| Ready | 30 |
+| In progress | 5 |
+| Ready | 29 |
 | Parked | 2 |
 | Blocked | 9 |
 | Done (awaiting archive) | 2 |
@@ -26,14 +26,15 @@ Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-index` (regenerate this file).
 
-## In progress (4)
+## In progress (5)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
 - **[027](docs/open-work/tickets/027-mating-cadence-three-bug-cascade.md)** — Mating cadence — three-bug cascade blocking MatingOccurred — _added 2026-04-25_
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _added 2026-04-27_
+- **[065](docs/open-work/tickets/065-l2-10-7-self-state-fox-roster-sweep.md)** — §L2.10.7 SpatialConsideration roster — cat self-state DSEs + fox dispositions — _added 2026-04-28_
 
-## Ready (30)
+## Ready (29)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -64,7 +65,6 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[062](docs/open-work/tickets/062-prey-species-split-maps.md)** — Prey-species split — per-species scent maps (§5.6.3 row #5) — _added 2026-04-27_
 - **[063](docs/open-work/tickets/063-ward-strength-promotion.md)** — Ward-strength promotion — first-class spatial axis (§5.6.3 row #3) — _added 2026-04-27_
 - **[064](docs/open-work/tickets/064-carcass-scent-consumer-cutover.md)** — Carcass-scent consumer cutover — replace observer_smells_at (§5.6.3 row #6) — _added 2026-04-27_
-- **[065](docs/open-work/tickets/065-l2-10-7-self-state-fox-roster-sweep.md)** — §L2.10.7 SpatialConsideration roster — cat self-state DSEs + fox dispositions — _added 2026-04-28_
 
 ## Parked (2)
 

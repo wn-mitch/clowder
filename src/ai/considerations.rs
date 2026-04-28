@@ -105,14 +105,6 @@ pub struct SpatialConsideration {
 /// evaluator resolves the landmark to a concrete `Position`, takes
 /// the Manhattan distance from the cat's position, and runs that
 /// distance through the curve.
-///
-/// Future variants (per §L2.10.7's "entity, tile coord, or
-/// cat-relative anchor" enumeration): an `Entity(Entity)` variant
-/// for pinned entity references and a cat-relative anchor variant
-/// land when consumers need them. They're omitted here to avoid
-/// introducing dead substrate — the same lesson the prior
-/// influence-map shape taught when every call site stubbed it to
-/// zero.
 #[derive(Debug, Clone, Copy)]
 pub enum LandmarkSource {
     /// Resolves to `EvalCtx::target_position`. Returns score 0.0 when
@@ -129,6 +121,88 @@ pub enum LandmarkSource {
     /// Returns score 0.0 when the entity has no resolvable position
     /// (despawned, off-grid).
     Entity(Entity),
+    /// Cat-relative anchor — a per-cat-per-tick landmark resolved by
+    /// the evaluator via the `EvalCtx::anchor_position` closure. The
+    /// canonical self-state-DSE shape: the DSE registers *which kind*
+    /// of landmark it wants (e.g. nearest kitchen, own den, prey
+    /// belief centroid) and the evaluator resolves the concrete
+    /// position from per-cat queries / colony resources / per-tick
+    /// snapshots. Returns score 0.0 when the anchor has no resolvable
+    /// position (no kitchen built, no threat in range, empty
+    /// frontier).
+    Anchor(LandmarkAnchor),
+}
+
+/// Cat- or fox-relative anchor kind. Identifies *which* landmark the
+/// `LandmarkSource::Anchor` variant resolves to; the evaluator's
+/// `anchor_position` closure dispatches per-variant against per-tick
+/// snapshots, colony resources (e.g. `ColonyLandmarks`), and per-cat
+/// component lookups.
+///
+/// **Design note — unit variants only.** `LandmarkSource` derives
+/// `Copy`, so `LandmarkAnchor` must also be `Copy`. Anchor *kind* is
+/// the identity; resolution is the closure's job. Adding payload (e.g.
+/// `Nearest(TileTag)`) would push the lookup logic up into the DSE
+/// definition; keeping it unit-only keeps DSEs declarative and the
+/// closure-side dispatch a flat match table.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LandmarkAnchor {
+    // ---- Cat-side colony-resource landmarks (resolved via
+    // `ColonyLandmarks` resource — populated at world-gen / on
+    // construction events).
+    /// Nearest food-stores tile. Eat.
+    NearestStores,
+    /// Nearest functional kitchen tile. Cook + HerbcraftPrepare.
+    NearestKitchen,
+    /// Nearest garden tile. Farm.
+    NearestGarden,
+    /// Nearest forageable-tile cluster (territory boundary). Forage.
+    NearestForageableCluster,
+    /// Nearest active construction site. Build self-state.
+    NearestConstructionSite,
+    /// Nearest herb patch (gather source). HerbcraftGather.
+    NearestHerbPatch,
+    /// Nearest territory perimeter tile (ward placement). HerbcraftWard.
+    NearestPerimeterTile,
+    /// Coordinator's perch / colony meeting tile. Coordinate.
+    CoordinatorPerch,
+    /// Anchor for the cat's territory perimeter walk. Patrol.
+    TerritoryPerimeterAnchor,
+
+    // ---- Cat-side dynamic landmarks (per-cat queries / per-tick
+    // computations).
+    /// Cat's preferred sleeping spot — nearest acceptable sleeping
+    /// tile. Sleep.
+    OwnSleepingSpot,
+    /// Nearest threat entity (Manhattan-nearest hostile within
+    /// detection range). Flee.
+    NearestThreat,
+    /// Nearest corrupted tile. Cleanse + DurableWard.
+    NearestCorruptedTile,
+
+    // ---- Centroids (per-tick precomputed snapshots).
+    /// Centroid of the unexplored-territory frontier. Explore + fox
+    /// Dispersing.
+    UnexploredFrontierCentroid,
+    /// Centroid of high-corruption tiles across the territory.
+    /// ColonyCleanse.
+    TerritoryCorruptionCentroid,
+    /// Centroid of high-prey-belief cells in the focal fox's belief
+    /// grid. Fox Hunting.
+    PreyBeliefCentroid,
+    /// Centroid of nearby cat positions (≤ detection range).
+    /// Fox Avoiding.
+    CatClusterCentroid,
+
+    // ---- Fox-side specific landmarks.
+    /// Focal fox's home den entity position. Fox Resting / Feeding /
+    /// DenDefense.
+    OwnDen,
+    /// Nearest visible (un-guarded) colony store tile from fox POV.
+    /// Fox Raiding.
+    NearestVisibleStore,
+    /// Nearest map-edge tile (escape routing). Fox Fleeing.
+    NearestMapEdge,
 }
 
 impl SpatialConsideration {
@@ -160,6 +234,7 @@ impl SpatialConsideration {
             LandmarkSource::TargetPosition => "target_position",
             LandmarkSource::Tile(_) => "tile",
             LandmarkSource::Entity(_) => "entity",
+            LandmarkSource::Anchor(_) => "anchor",
         }
     }
 }
@@ -284,9 +359,16 @@ mod tests {
             10.0,
             quadratic_unit(),
         );
+        let anchor = SpatialConsideration::new(
+            "kitchen",
+            LandmarkSource::Anchor(LandmarkAnchor::NearestKitchen),
+            10.0,
+            quadratic_unit(),
+        );
         assert_eq!(target.landmark_label(), "target_position");
         assert_eq!(tile.landmark_label(), "tile");
         assert_eq!(entity.landmark_label(), "entity");
+        assert_eq!(anchor.landmark_label(), "anchor");
     }
 
     #[test]

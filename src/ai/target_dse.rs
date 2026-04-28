@@ -363,6 +363,10 @@ fn score_target_consideration(
                     Some(p) => p,
                     None => return 0.0,
                 },
+                LandmarkSource::Anchor(a) => match (ctx.anchor_position)(a) {
+                    Some(p) => p,
+                    None => return 0.0,
+                },
             };
             let distance = ctx.self_position.manhattan_distance(&landmark_pos) as f32;
             s.score(distance)
@@ -429,6 +433,7 @@ fn aggregate(per_target: &[(Entity, f32)], rule: TargetAggregation) -> (f32, Opt
 
 #[cfg(test)]
 mod tests {
+    use crate::ai::considerations::LandmarkAnchor;
     use super::*;
     use crate::ai::composition::Composition;
     use crate::ai::considerations::{LandmarkSource, ScalarConsideration, SpatialConsideration};
@@ -458,10 +463,12 @@ mod tests {
     fn test_ctx(entity: Entity) -> EvalCtx<'static> {
         static MARKER: fn(&str, Entity) -> bool = |_, _| false;
         static NO_ENTITY_POS: fn(Entity) -> Option<Position> = |_| None;
+        static NO_ANCHOR_POS: fn(LandmarkAnchor) -> Option<Position> = |_| None;
         EvalCtx {
             cat: entity,
             tick: 0,
             entity_position: &NO_ENTITY_POS,
+            anchor_position: &NO_ANCHOR_POS,
             has_marker: &MARKER,
             self_position: Position::new(0, 0),
             target: None,

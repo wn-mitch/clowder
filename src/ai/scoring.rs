@@ -4,6 +4,7 @@ use bevy::prelude::Entity;
 use rand::Rng;
 
 use crate::ai::dse::EvalCtx;
+use crate::ai::considerations::LandmarkAnchor;
 use crate::ai::eval::{evaluate_single, DseRegistry, ModifierPipeline};
 use crate::ai::Action;
 use crate::components::disposition::CraftingHint;
@@ -547,6 +548,7 @@ fn score_dse_by_id(dse_id: &str, ctx: &ScoringContext, inputs: &EvalInputs) -> f
     let markers = inputs.markers;
     let has_marker = |name: &str, entity: Entity| -> bool { markers.has(name, entity) };
     let entity_position = |_: Entity| -> Option<Position> { None };
+    let anchor_position = |_: LandmarkAnchor| -> Option<Position> { None };
     let needs_ref = ctx.needs;
     let maslow = |tier: u8| needs_ref.level_suppression(tier);
 
@@ -554,6 +556,7 @@ fn score_dse_by_id(dse_id: &str, ctx: &ScoringContext, inputs: &EvalInputs) -> f
         cat: inputs.cat,
         tick: inputs.tick,
         entity_position: &entity_position,
+        anchor_position: &anchor_position,
         has_marker: &has_marker,
         self_position: inputs.position,
         target: None,
