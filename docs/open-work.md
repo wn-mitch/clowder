@@ -8,7 +8,7 @@
 > fresh. See `CLAUDE.md` §"Long-horizon coordination" for the request-time
 > checklist and maintenance rules.
 
-_Last generated: 2026-04-27._
+_Last generated: 2026-04-28._
 
 ## Summary
 
@@ -20,7 +20,7 @@ _Last generated: 2026-04-27._
 | Blocked | 9 |
 | Done (awaiting archive) | 2 |
 | **Open total** | **45** |
-| Pre-existing | 2 |
+| Pre-existing | 1 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
@@ -88,16 +88,15 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[012](docs/open-work/tickets/012-warmth-split.md)** — Warmth split — temperature need vs social-warmth fulfillment axis — _added 2026-04-21_
 - **[024](docs/open-work/tickets/024-fulfillment-register.md)** — §7.W Fulfillment register — MVP container + social_warmth axis — _[C] · added 2026-04-24_
 
-## Pre-existing (2)
+## Pre-existing (1)
 
-- **[PE-001](docs/open-work/pre-existing/test-harness-drift.md)** — Test harness drift
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 
 ## Landed archive
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/). Recent months:
 
-- [2026-04](docs/open-work/landed/2026-04.md) — 56 entries
+- [2026-04](docs/open-work/landed/2026-04.md) — 57 entries
 
 ## Conventions
 
