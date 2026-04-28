@@ -327,6 +327,7 @@ impl Plugin for SimulationPlugin {
                         systems::needs::eat_from_inventory,
                         systems::needs::decay_exploration,
                         systems::needs::stamp_passive_exploration,
+                        systems::needs::update_exploration_centroid,
                         systems::needs::bond_proximity_social,
                         systems::fulfillment::decay_fulfillment,
                         systems::fulfillment::bond_proximity_social_warmth,

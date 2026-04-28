@@ -335,6 +335,23 @@ pub fn stamp_passive_exploration(
     }
 }
 
+/// Recompute the unexplored-frontier centroid cache once per tick after
+/// passive perception has stamped this frame's discoveries. Read by the
+/// `Explore` self-state DSE through
+/// `LandmarkAnchor::UnexploredFrontierCentroid` and by fox `Dispersing`
+/// through the same anchor — caching avoids rescanning a 120×90 grid
+/// 50× per scoring tick.
+///
+/// Ordering — runs after `stamp_passive_exploration` (Chain 2a) so the
+/// centroid reflects this tick's exploration state, with at most one
+/// tick of lag for the AI consumer that reads it next frame.
+pub fn update_exploration_centroid(
+    mut exploration_map: ResMut<crate::resources::ExplorationMap>,
+) {
+    exploration_map
+        .recompute_frontier_centroid(crate::resources::exploration_map::FRONTIER_THRESHOLD);
+}
+
 // ---------------------------------------------------------------------------
 // §4 per-cat Injured marker author
 // ---------------------------------------------------------------------------

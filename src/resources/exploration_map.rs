@@ -1,14 +1,30 @@
 use bevy_ecs::prelude::*;
 
+use crate::components::physical::Position;
+
+/// Threshold below which a tile is considered "unexplored" for the
+/// frontier-centroid computation. Matches the threshold the
+/// `unexplored_fraction_nearby` callers in `Explore` DSE scoring already
+/// use, so the centroid is consistent with the gating signal.
+pub const FRONTIER_THRESHOLD: f32 = 0.5;
+
 /// Colony-wide fog-of-war exploration map. Tracks which tiles have been
 /// discovered by any cat. Tiles start at 0.0 (unknown) and are set to 1.0
 /// when explored. They decay slowly over time so distant/old discoveries
 /// become worth re-visiting.
+///
+/// `frontier_centroid` caches the centroid of unexplored cells (those
+/// below `FRONTIER_THRESHOLD`) — populated once per tick by
+/// `update_exploration_centroid` in `systems/needs.rs`. Read by the
+/// `Explore` self-state DSE through `LandmarkAnchor::UnexploredFrontierCentroid`
+/// and by fox `Dispersing` through the same anchor; the cache avoids
+/// rescanning a 120×90 grid 50× per scoring tick.
 #[derive(Resource, Debug, Clone)]
 pub struct ExplorationMap {
     pub width: usize,
     pub height: usize,
     tiles: Vec<f32>,
+    frontier_centroid: Option<Position>,
 }
 
 impl ExplorationMap {
@@ -17,6 +33,7 @@ impl ExplorationMap {
             width,
             height,
             tiles: vec![0.0; width * height],
+            frontier_centroid: None,
         }
     }
 
@@ -103,6 +120,40 @@ impl ExplorationMap {
     pub fn explored_fraction(&self, threshold: f32) -> f32 {
         let explored = self.tiles.iter().filter(|&&v| v >= threshold).count();
         explored as f32 / self.tiles.len() as f32
+    }
+
+    /// Recompute the cached frontier centroid — the mean tile
+    /// position of cells whose exploration value is strictly below
+    /// `threshold`. Returns `None` when every tile is at or above the
+    /// threshold (fully explored colony). Called once per tick by
+    /// `systems/needs.rs::update_exploration_centroid` so per-cat
+    /// scoring reads a stable, lag-1-tick cache.
+    pub fn recompute_frontier_centroid(&mut self, threshold: f32) {
+        let mut sum_x: i64 = 0;
+        let mut sum_y: i64 = 0;
+        let mut count: u32 = 0;
+        for (idx, v) in self.tiles.iter().enumerate() {
+            if *v < threshold {
+                let x = (idx % self.width) as i64;
+                let y = (idx / self.width) as i64;
+                sum_x += x;
+                sum_y += y;
+                count += 1;
+            }
+        }
+        self.frontier_centroid = (count > 0).then(|| {
+            Position::new(
+                (sum_x / count as i64) as i32,
+                (sum_y / count as i64) as i32,
+            )
+        });
+    }
+
+    /// Cached centroid of unexplored cells. Populated by
+    /// [`Self::recompute_frontier_centroid`]. `None` until the first
+    /// recompute pass, or when the colony is fully explored.
+    pub fn frontier_centroid(&self) -> Option<Position> {
+        self.frontier_centroid
     }
 }
 
@@ -212,5 +263,50 @@ mod tests {
             (discovery - 0.4).abs() < 1e-5,
             "expected mean discovery ~0.4; got {discovery}"
         );
+    }
+
+    #[test]
+    fn frontier_centroid_starts_none_until_recomputed() {
+        let map = ExplorationMap::new(10, 10);
+        assert!(map.frontier_centroid().is_none());
+    }
+
+    #[test]
+    fn frontier_centroid_is_geometric_center_when_all_unexplored() {
+        let mut map = ExplorationMap::new(10, 10);
+        map.recompute_frontier_centroid(FRONTIER_THRESHOLD);
+        let centroid = map.frontier_centroid().expect("all tiles unexplored");
+        // 10×10 grid, all unexplored — mean of 0..=9 in each axis = 4.5,
+        // floored to 4 (integer position).
+        assert_eq!(centroid, Position::new(4, 4));
+    }
+
+    #[test]
+    fn frontier_centroid_is_none_when_all_explored() {
+        let mut map = ExplorationMap::new(5, 5);
+        for y in 0..5 {
+            for x in 0..5 {
+                map.explore_tile(x, y);
+            }
+        }
+        map.recompute_frontier_centroid(FRONTIER_THRESHOLD);
+        assert!(map.frontier_centroid().is_none());
+    }
+
+    #[test]
+    fn frontier_centroid_shifts_toward_unexplored_region() {
+        // 10×10 grid. Explore the left half (x=0..5); centroid of the
+        // unexplored right half should be around x=7, y=4.5.
+        let mut map = ExplorationMap::new(10, 10);
+        for y in 0..10 {
+            for x in 0..5 {
+                map.explore_tile(x, y);
+            }
+        }
+        map.recompute_frontier_centroid(FRONTIER_THRESHOLD);
+        let centroid = map.frontier_centroid().expect("right half unexplored");
+        // Right half is x=5..=9, mean = 7.0; integer floor = 7.
+        // y range = 0..=9, mean = 4.5, floor = 4.
+        assert_eq!(centroid, Position::new(7, 4));
     }
 }
