@@ -19,23 +19,20 @@
 //!   scoring substrate's other §6 ports stabilize.
 //!
 //! Five per-target considerations (§6.5.1 + ticket 027 Bug 3 partner-bond
-//! bias):
+//! bias). The distance axis lands as a `SpatialConsideration` per the
+//! §L2.10.7 plan-cost feedback design (ticket 052) — Manhattan
+//! distance to the partner flows through `Quadratic(exp=2,
+//! divisor=-1, shift=1)` over normalized cost, evaluating
+//! `(1 - cost)²` and exactly preserving the legacy `nearness²` shape
+//! (same explicit-inversion idiom as Mentor and ApplyRemedy ports):
 //!
-//! | # | Consideration          | Scalar name             | Curve                           | Weight |
-//! |---|------------------------|-------------------------|---------------------------------|--------|
-//! | 1 | distance               | `target_nearness`       | `Quadratic(exp=2)` over range=8 | 0.20   |
-//! | 2 | fondness               | `target_fondness`       | `Linear(1, 0)`                  | 0.28   |
-//! | 3 | novelty (1-familiarity)| `target_novelty`        | `Linear(1, 0)`                  | 0.20   |
-//! | 4 | species-compat         | `target_species_compat` | `Cliff(threshold=0.5)`          | 0.12   |
-//! | 5 | partner bond           | `target_partner_bond`   | `Linear(1, 0)`                  | 0.20   |
-//!
-//! Distance is encoded as a target-scoped scalar rather than a
-//! `Spatial` consideration because no influence map represents
-//! "distance from scoring cat to this specific candidate" — that's
-//! point-to-point geometry, not a grid sample. The target-scoped
-//! fetcher (`fetch_target_scalar(name, cat, target)`) has access to
-//! both entities and can resolve the geometry via a captured position
-//! snapshot.
+//! | # | Consideration          | Source                  | Curve                                | Weight |
+//! |---|------------------------|-------------------------|--------------------------------------|--------|
+//! | 1 | distance               | `Spatial(target)`       | `Quadratic(exp=2, div=-1, shift=1)`  | 0.20   |
+//! | 2 | fondness               | `target_fondness`       | `Linear(1, 0)`                       | 0.28   |
+//! | 3 | novelty (1-familiarity)| `target_novelty`        | `Linear(1, 0)`                       | 0.20   |
+//! | 4 | species-compat         | `target_species_compat` | `Cliff(threshold=0.5)`               | 0.12   |
+//! | 5 | partner bond           | `target_partner_bond`   | `Linear(1, 0)`                       | 0.20   |
 //!
 //! Novelty is stored pre-inverted (`1 - familiarity`) rather than via
 //! a `Linear(-1, 1)` curve so the fetcher is the single source of
@@ -57,7 +54,9 @@
 use bevy::prelude::Entity;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
+use crate::ai::considerations::{
+    Consideration, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
 use crate::ai::curves::Curve;
 use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination};
 use crate::ai::eval::DseRegistry;
@@ -68,7 +67,6 @@ use crate::ai::target_dse::{
 use crate::components::physical::Position;
 use crate::resources::relationships::{BondType, Relationships};
 
-pub const TARGET_NEARNESS_INPUT: &str = "target_nearness";
 pub const TARGET_FONDNESS_INPUT: &str = "target_fondness";
 pub const TARGET_NOVELTY_INPUT: &str = "target_novelty";
 pub const TARGET_SPECIES_COMPAT_INPUT: &str = "target_species_compat";
@@ -83,10 +81,14 @@ pub const SOCIALIZE_TARGET_RANGE: f32 = 10.0;
 /// §6.5.1 `Socialize` target-taking DSE factory. Produces a
 /// [`TargetTakingDse`] consumable by `add_target_taking_dse`.
 pub fn socialize_target_dse() -> TargetTakingDse {
+    // §L2.10.7 distance axis: `Quadratic(exp=2, divisor=-1, shift=1)`
+    // evaluates `(1 - cost)²`, preserving the legacy `nearness²`
+    // shape — same explicit-inversion idiom as Mentor and ApplyRemedy
+    // ports. Sharp falloff near the cat: at half-range score = 0.25.
     let nearness_curve = Curve::Quadratic {
         exponent: 2.0,
-        divisor: 1.0,
-        shift: 0.0,
+        divisor: -1.0,
+        shift: 1.0,
     };
     let linear = Curve::Linear {
         slope: 1.0,
@@ -105,8 +107,10 @@ pub fn socialize_target_dse() -> TargetTakingDse {
         id: DseId("socialize_target"),
         candidate_query: socialize_candidate_query_doc,
         per_target_considerations: vec![
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_NEARNESS_INPUT,
+            Consideration::Spatial(SpatialConsideration::new(
+                "socialize_target_nearness",
+                LandmarkSource::TargetPosition,
+                SOCIALIZE_TARGET_RANGE,
                 nearness_curve,
             )),
             Consideration::Scalar(ScalarConsideration::new(
@@ -224,7 +228,8 @@ pub fn resolve_socialize_target(
     // peers. `SOCIALIZE_TARGET_RANGE` matches today's
     // `DispositionConstants::social_target_range` (10) to preserve
     // outer-gate semantics; per-target distance attenuation happens
-    // inside the DSE via the `target_nearness` Quadratic.
+    // inside the DSE via the `socialize_target_nearness`
+    // SpatialConsideration (§L2.10.7).
     let mut candidates: Vec<Entity> = Vec::new();
     let mut positions: Vec<Position> = Vec::new();
     for (other, other_pos) in cat_positions {
@@ -264,28 +269,9 @@ pub fn resolve_socialize_target(
         positions = filtered_pos;
     }
 
-    // Build an entity → position lookup for the target-scoped fetcher.
-    // Parallel-vec lookup would be O(N) per consideration; the map is
-    // O(1) per lookup at the cost of one small allocation per call.
-    // Candidate pools are small (dozens at most within social range)
-    // so allocation overhead is negligible.
-    let pos_map: std::collections::HashMap<Entity, Position> = candidates
-        .iter()
-        .copied()
-        .zip(positions.iter().copied())
-        .collect();
-
     let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     let fetch_target = |name: &str, cat: Entity, target: Entity| -> f32 {
         match name {
-            TARGET_NEARNESS_INPUT => {
-                let target_pos = match pos_map.get(&target) {
-                    Some(p) => *p,
-                    None => return 0.0,
-                };
-                let dist = cat_pos.manhattan_distance(&target_pos) as f32;
-                (1.0 - dist / SOCIALIZE_TARGET_RANGE).clamp(0.0, 1.0)
-            }
             TARGET_FONDNESS_INPUT => relationships
                 .get(cat, target)
                 .map(|r| r.fondness)
@@ -407,7 +393,6 @@ mod tests {
         let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = move |name: &str, _: Entity, target: Entity| -> f32 {
             match name {
-                TARGET_NEARNESS_INPUT => 1.0,
                 TARGET_FONDNESS_INPUT => {
                     if target == friend {
                         0.9
@@ -447,7 +432,6 @@ mod tests {
         let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = move |name: &str, _: Entity, target: Entity| -> f32 {
             match name {
-                TARGET_NEARNESS_INPUT => 1.0,
                 TARGET_FONDNESS_INPUT => 0.5, // tied
                 TARGET_NOVELTY_INPUT => {
                     if target == novel_stranger {
@@ -506,7 +490,6 @@ mod tests {
         let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = move |name: &str, _: Entity, target: Entity| -> f32 {
             match name {
-                TARGET_NEARNESS_INPUT => 1.0,
                 TARGET_FONDNESS_INPUT => {
                     if target == friend {
                         0.4
@@ -552,7 +535,6 @@ mod tests {
         let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = move |name: &str, _: Entity, target: Entity| -> f32 {
             match name {
-                TARGET_NEARNESS_INPUT => 1.0,
                 TARGET_FONDNESS_INPUT => 0.5,
                 TARGET_NOVELTY_INPUT => 0.5,
                 TARGET_SPECIES_COMPAT_INPUT => 1.0,
@@ -594,7 +576,6 @@ mod tests {
         let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = move |name: &str, _: Entity, target: Entity| -> f32 {
             match name {
-                TARGET_NEARNESS_INPUT => 1.0,
                 TARGET_FONDNESS_INPUT => {
                     if target == friend {
                         0.3
@@ -784,8 +765,7 @@ mod tests {
         let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = |name: &str, _: Entity, _: Entity| -> f32 {
             match name {
-                TARGET_NEARNESS_INPUT
-                | TARGET_FONDNESS_INPUT
+                TARGET_FONDNESS_INPUT
                 | TARGET_NOVELTY_INPUT
                 | TARGET_SPECIES_COMPAT_INPUT => 1.0,
                 _ => 0.0,

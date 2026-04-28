@@ -287,3 +287,47 @@ or surfaces a hypothesis-required shift.
   divisor=-1, shift=1)` for closer-is-better; future ports can
   follow that pattern (Groom-other, Caretake, Fight, fox Hunting)
   or pick `Composite{Logistic, Invert}` per their per-DSE rationale.
+
+- 2026-04-28: Socialize port (scope item 2 row #1, the highest-
+  frequency target-taking DSE — every cat scores Socialize
+  candidates every tick). Same `Quadratic(exp=2, divisor=-1,
+  shift=1)` shape as Mentor's. Removed five test-mock branches
+  (`TARGET_NEARNESS_INPUT => 1.0`) since the substrate now drives
+  the spatial axis directly.
+
+  Paired-baseline soak (seed 42, 15 min) at `40a55b5` (post-
+  ApplyRemedy) vs the Socialize-port WIP — **survival- and
+  continuity-canary neutral, with measurable but sub-threshold
+  drift**:
+
+  | Metric                      | post-AR | post-Soc | Δ          |
+  |-----------------------------|---------|----------|------------|
+  | Injury / Ambush / Starv     | 1/4/1   | 1/4/1    | identical  |
+  | grooming                    | 262     | 268      | +6 (+2.3%) |
+  | play                        | 834     | 842      | +8 (+1.0%) |
+  | burial / courtship          | 0/0     | 0/0      | identical  |
+  | mentoring                   | 0       | 0        | identical  |
+  | mythic-texture              | 30      | 30       | identical  |
+  | never_fired_expected        | (4)     | (4)      | identical  |
+  | Plan-failure total          | 284     | 300      | +16 (+5.6%)|
+
+  Single plan-failure reason changed: `TravelTo(SocialTarget) no
+  reachable` 35 → 51 (+16). Largest per-port drift seen so far,
+  but every metric stays under the ±10% characteristic-metric
+  threshold (grooming +2.3%, play +1.0%, plan-failures +5.6%).
+  Mechanism: Socialize is by far the most-frequently-evaluated
+  target-taking DSE (every cat × every tick × every social
+  partner in range), so f32 LSB churn from the explicit-inverted
+  `Quadratic(exp=2, divisor=-1, shift=1)` evaluation pipeline
+  (which is mathematically identical but numerically distinct
+  from the legacy `(1 - dist/range).clamp(0,1)` then `.powf(2)`
+  in the curve evaluator) accumulates proportionally more argmax
+  flips. Same pattern as Hunt's port (which moved grooming +1.9%,
+  play +1.0% on the much-rarer Hunt evaluation).
+
+  Post-ApplyRemedy baseline archived at
+  `logs/tuned-42-40a55b5-post-applyremedy-baseline/`.
+
+  Successor work: Groom-other, Caretake, Fight, Build remaining
+  in scope item 2 (cat self-state DSEs); fox dispositions
+  thereafter.
