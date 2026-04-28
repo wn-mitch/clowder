@@ -14,26 +14,25 @@ _Last generated: 2026-04-27._
 
 | Status | Count |
 |---|---|
-| In progress | 4 |
-| Ready | 27 |
-| Parked | 2 |
+| In progress | 3 |
+| Ready | 31 |
+| Parked | 1 |
 | Blocked | 9 |
 | Done (awaiting archive) | 2 |
-| **Open total** | **42** |
+| **Open total** | **44** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-index` (regenerate this file).
 
-## In progress (4)
+## In progress (3)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
 - **[027](docs/open-work/tickets/027-mating-cadence-three-bug-cascade.md)** — Mating cadence — three-bug cascade blocking MatingOccurred — _added 2026-04-25_
-- **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _added 2026-04-27_
 
-## Ready (27)
+## Ready (31)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -62,11 +61,14 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[054](docs/open-work/tickets/054-fate-event-vocabulary-expansion.md)** — §7.7.c Fate event-vocabulary expansion — Calling, destiny, fated-pair convergence — _added 2026-04-27_
 - **[056](docs/open-work/tickets/056-aspiration-compatibility-matrix.md)** — §7.7.1 aspiration compatibility matrix — hard/soft conflict enumeration — _added 2026-04-27_
 - **[058](docs/open-work/tickets/058-tradition-unfiltered-loop-fix.md)** — §3.5.3 item 1 Tradition modifier — fix unfiltered-loop port — _added 2026-04-27_
+- **[061](docs/open-work/tickets/061-herb-location-influence-map.md)** — Herb-location influence map (§5.6.3 row #8) — _added 2026-04-27_
+- **[062](docs/open-work/tickets/062-prey-species-split-maps.md)** — Prey-species split — per-species scent maps (§5.6.3 row #5) — _added 2026-04-27_
+- **[063](docs/open-work/tickets/063-ward-strength-promotion.md)** — Ward-strength promotion — first-class spatial axis (§5.6.3 row #3) — _added 2026-04-27_
+- **[064](docs/open-work/tickets/064-carcass-scent-consumer-cutover.md)** — Carcass-scent consumer cutover — replace observer_smells_at (§5.6.3 row #6) — _added 2026-04-27_
 
-## Parked (2)
+## Parked (1)
 
 - **[015](docs/open-work/tickets/015-alloparenting-reframe-b.md)** — Alloparenting Reframe B — mama drops kitten at hearth near resting elder — _parked 2026-04-22 · added 2026-04-22_
-- **[059](docs/open-work/tickets/059-phase-7-substrate-cleanup.md)** — Phase 7 substrate cleanup — `ScoringContext` removal, §10 unblock map sweep, spec drift reconcile — _parked 2026-04-27 · added 2026-04-27_
 
 ## Blocked (9)
 
