@@ -23,17 +23,23 @@
 //! renormalized from the spec's (0.15/0.40/0.30/0.15) by dropping
 //! the 0.30 remedy-match row and dividing by 0.70:
 //!
-//! | # | Consideration      | Scalar name           | Curve                    | Spec weight | Renormalized |
-//! |---|--------------------|-----------------------|--------------------------|-------------|--------------|
-//! | 1 | distance           | `target_nearness`     | `Quadratic(exp=1.5)`     | 0.15        | 0.214        |
-//! | 2 | injury-severity    | `target_injury`       | `Quadratic(exp=2)`       | 0.40        | 0.571        |
-//! | 3 | kinship            | `target_kinship`      | `Linear(0.5, 0.5)`       | 0.15        | 0.214        |
+//! | # | Consideration      | Source                | Curve                                 | Spec weight | Renormalized |
+//! |---|--------------------|-----------------------|---------------------------------------|-------------|--------------|
+//! | 1 | distance           | `Spatial(target)`     | `Quadratic(exp=1.5, div=-1, shift=1)` | 0.15        | 0.214        |
+//! | 2 | injury-severity    | `target_injury`       | `Quadratic(exp=2)`                    | 0.40        | 0.571        |
+//! | 3 | kinship            | `target_kinship`      | `Linear(0.5, 0.5)`                    | 0.15        | 0.214        |
 //!
 //! **Distance curve.** Spec §6.4 row #7 specifies `Quadratic(exp=1.5),
 //! range=15`. The 1.5 exponent sits between linear falloff and the
 //! stronger Quadratic(2) used for adjacency-sensitive DSEs —
 //! healers cross the colony, but a patient at range 15 still
-//! deserves less attention than one at range 3.
+//! deserves less attention than one at range 3. The distance axis
+//! lands as a `SpatialConsideration` per the §L2.10.7 plan-cost
+//! feedback design (ticket 052) — Manhattan distance to the patient
+//! flows through `Quadratic(exp=1.5, divisor=-1, shift=1)` over
+//! normalized cost, which evaluates `(1 - cost)^1.5` and exactly
+//! preserves the legacy scalar `Quadratic(exp=1.5)` over `1 - dist/
+//! range` shape.
 //!
 //! **Injury severity.** `1 − health.current / health.max` — the
 //! standard deficit axis. Convex Quadratic amplifies desperate
@@ -49,7 +55,9 @@
 use bevy::prelude::Entity;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
+use crate::ai::considerations::{
+    Consideration, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
 use crate::ai::curves::Curve;
 use crate::ai::dse::{CommitmentStrategy, DseId, EvalCtx, GoalState, Intention};
 use crate::ai::eval::DseRegistry;
@@ -58,7 +66,6 @@ use crate::ai::target_dse::{
 };
 use crate::components::physical::Position;
 
-pub const TARGET_NEARNESS_INPUT: &str = "target_nearness";
 pub const TARGET_INJURY_INPUT: &str = "target_injury";
 pub const TARGET_KINSHIP_INPUT: &str = "target_kinship";
 
@@ -79,10 +86,16 @@ pub struct PatientCandidate {
 
 /// §6.5.7 `ApplyRemedy` target-taking DSE factory.
 pub fn apply_remedy_target_dse() -> TargetTakingDse {
+    // §L2.10.7 distance axis: `Quadratic(exp=1.5, divisor=-1, shift=1)`
+    // evaluates `((cost - 1) / -1).max(0).powf(1.5) = (1 - cost)^1.5`,
+    // exactly preserving the legacy `nearness^1.5` shape — same
+    // explicit-inversion idiom as Mentor's port (Quadratic isn't
+    // point-symmetric, so `Composite{Quadratic, Invert}` would give
+    // a different shape).
     let nearness_curve = Curve::Quadratic {
         exponent: 1.5,
-        divisor: 1.0,
-        shift: 0.0,
+        divisor: -1.0,
+        shift: 1.0,
     };
     let injury_curve = Curve::Quadratic {
         exponent: 2.0,
@@ -100,8 +113,10 @@ pub fn apply_remedy_target_dse() -> TargetTakingDse {
         id: DseId("apply_remedy_target"),
         candidate_query: apply_remedy_candidate_query_doc,
         per_target_considerations: vec![
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_NEARNESS_INPUT,
+            Consideration::Spatial(SpatialConsideration::new(
+                "apply_remedy_target_nearness",
+                LandmarkSource::TargetPosition,
+                APPLY_REMEDY_TARGET_RANGE,
                 nearness_curve,
             )),
             Consideration::Scalar(ScalarConsideration::new(TARGET_INJURY_INPUT, injury_curve)),
@@ -181,23 +196,12 @@ pub fn resolve_apply_remedy_target(
         return None;
     }
 
-    let pos_map: std::collections::HashMap<Entity, Position> = entities
-        .iter()
-        .copied()
-        .zip(positions.iter().copied())
-        .collect();
-
+    // Spatial nearness axis (`apply_remedy_target_nearness`) is
+    // computed by the substrate from `EvalCtx::self_position` to each
+    // candidate's tile per §L2.10.7.
     let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     let fetch_target = |name: &str, cat: Entity, target: Entity| -> f32 {
         match name {
-            TARGET_NEARNESS_INPUT => {
-                let target_pos = match pos_map.get(&target) {
-                    Some(p) => *p,
-                    None => return 0.0,
-                };
-                let dist = cat_pos.manhattan_distance(&target_pos) as f32;
-                (1.0 - dist / APPLY_REMEDY_TARGET_RANGE).clamp(0.0, 1.0)
-            }
             TARGET_INJURY_INPUT => injury_map.get(&target).copied().unwrap_or(0.0),
             TARGET_KINSHIP_INPUT => {
                 if is_kin(cat, target) {

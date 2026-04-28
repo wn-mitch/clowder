@@ -242,3 +242,48 @@ or surfaces a hypothesis-required shift.
   Successor work: ApplyRemedy (caretaker-distance variant) port
   remains in scope item 3; 30-row roster sweep (scope item 2)
   across remaining cat self-state DSEs + fox dispositions.
+
+- 2026-04-28: ApplyRemedy port (scope item 3 caretaker-distance
+  variant). ApplyRemedy's `target_nearness` Scalar (`Quadratic(exp=1.5)`
+  over `1 - dist/range`) swapped for a `SpatialConsideration` with
+  `LandmarkSource::TargetPosition` + `range = APPLY_REMEDY_TARGET_RANGE`
+  + `Quadratic(exp=1.5, divisor=-1, shift=1)` over normalized cost,
+  which evaluates `(1 - cost)^1.5` (same `divisor=-1, shift=1` idiom
+  Mentor used). Behavior-neutral by construction. The §6.5.7
+  remedy-match axis remains deferred until per-candidate remedy-
+  kind selection lands.
+
+  Paired-baseline soak (seed 42, 15 min) at `dbcb283` (post-Mentor)
+  vs the ApplyRemedy-port WIP — **survival- and continuity-neutral**:
+
+  | Metric                      | post-Mentor | post-ApplyRemedy | Δ        |
+  |-----------------------------|-------------|------------------|----------|
+  | Injury / Ambush / Starv     | 1/4/1       | 1/4/1            | identical|
+  | grooming / play             | 262/834     | 262/834          | identical|
+  | burial / courtship          | 0/0         | 0/0              | identical|
+  | mentoring / mythic-texture  | 0/30        | 0/30             | identical|
+  | never_fired_expected        | (4)         | (4)              | identical|
+  | Plan-failure total          | 279         | 284              | +5 (+1.8%)|
+
+  Only one plan-failure reason changed: `TravelTo(SocialTarget) no
+  reachable` 30 → 35. Same f32-LSB butterfly mechanism as Mate/
+  Mentor (now amplified slightly because Quadratic(1.5) is a non-
+  integer power with more LSB churn than the Logistic ports). The
+  shift propagates non-locally through shared-RNG ordering: an
+  apply-remedy argmax flips, the healer arrives at a slightly
+  different tile, and a different cat's social-target path-check
+  fails downstream. All survival canaries and continuity tallies
+  are identical, so no characteristic-metric drift > ±10% — the
+  shift is well within the per-port noise envelope established by
+  Mate (+1) and Mentor (-1).
+
+  Post-Mentor baseline archived at
+  `logs/tuned-42-dbcb283-post-mentor-baseline/`.
+
+  Successor work: 30-row roster sweep (scope item 2) across
+  remaining cat self-state DSEs + fox dispositions. The
+  Quadratic-family ports (Hunt, Mate, Mentor, ApplyRemedy)
+  established the explicit-inversion idiom `Quadratic(exp=N,
+  divisor=-1, shift=1)` for closer-is-better; future ports can
+  follow that pattern (Groom-other, Caretake, Fight, fox Hunting)
+  or pick `Composite{Logistic, Invert}` per their per-DSE rationale.
