@@ -874,6 +874,16 @@ pub fn evaluate_dispositions(
                             .map(|(_, s, p, site, _)| (s, p, site)),
                         *pos,
                     ),
+                // §L2.10.7 Sleep anchor: cats sleep where they are
+                // (no per-cat sleeping-spot component yet).
+                own_sleeping_spot: Some(*pos),
+                // §L2.10.7 Forage anchor: nearest forageable terrain.
+                nearest_forageable_cluster: crate::ai::capabilities::nearest_matching_tile(
+                    pos,
+                    &map,
+                    d.forage_terrain_search_radius,
+                    |t| t.foraging_yield() > 0.0,
+                ),
                 ..Default::default()
             },
         };

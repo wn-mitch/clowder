@@ -147,6 +147,38 @@ fn has_nearby_tile(
     false
 }
 
+/// Manhattan-nearest tile in `radius` matching `predicate`. Used by
+/// the §L2.10.7 cat-side ScoringContext builder to populate the
+/// `LandmarkAnchor::NearestForageableCluster` anchor (Forage spatial
+/// axis). Single linear scan; `radius²` work but capped at the
+/// `forage_terrain_search_radius` constant.
+pub fn nearest_matching_tile(
+    from: &Position,
+    map: &TileMap,
+    radius: i32,
+    mut predicate: impl FnMut(Terrain) -> bool,
+) -> Option<Position> {
+    let mut best: Option<(Position, i32)> = None;
+    for dy in -radius..=radius {
+        for dx in -radius..=radius {
+            let x = from.x + dx;
+            let y = from.y + dy;
+            if !map.in_bounds(x, y) {
+                continue;
+            }
+            if !predicate(map.get(x, y).terrain) {
+                continue;
+            }
+            let pos = Position::new(x, y);
+            let d = from.manhattan_distance(&pos);
+            if best.is_none_or(|(_, cur)| d < cur) {
+                best = Some((pos, d));
+            }
+        }
+    }
+    best.map(|(p, _)| p)
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

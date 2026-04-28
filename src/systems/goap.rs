@@ -1330,6 +1330,24 @@ pub fn evaluate_and_plan(
                             .map(|(_, s, p, site, _)| (s, p, site)),
                         *pos,
                     ),
+                // §L2.10.7 Sleep anchor: cats sleep where they are
+                // (no per-cat assigned sleeping spot exists today —
+                // future component could replace this fallback). The
+                // spatial axis evaluates to ~1.0 and Sleep's other
+                // axes (energy_deficit, day_phase, injury_rest) drive
+                // selection.
+                own_sleeping_spot: Some(*pos),
+                // §L2.10.7 Forage anchor: nearest forageable terrain
+                // tile within forage_terrain_search_radius. None when
+                // no forageable terrain in range — CanForage marker
+                // gates the DSE entirely so this scan is wasted only
+                // when the marker is true.
+                nearest_forageable_cluster: crate::ai::capabilities::nearest_matching_tile(
+                    pos,
+                    &res.map,
+                    d.forage_terrain_search_radius,
+                    |t| t.foraging_yield() > 0.0,
+                ),
                 ..Default::default()
             },
         };

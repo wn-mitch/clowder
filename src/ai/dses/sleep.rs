@@ -23,8 +23,10 @@
 use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
-use crate::ai::curves::{piecewise, sleep_dep, Curve};
+use crate::ai::considerations::{
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
+use crate::ai::curves::{piecewise, sleep_dep, Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
@@ -33,6 +35,13 @@ use crate::resources::sim_constants::ScoringConstants;
 pub const ENERGY_DEFICIT_INPUT: &str = "energy_deficit";
 pub const DAY_PHASE_INPUT: &str = "day_phase";
 pub const HEALTH_DEFICIT_INPUT: &str = "health_deficit";
+
+/// §L2.10.7 Sleep range — Manhattan tiles for the
+/// own-sleeping-spot anchor. 15 ≈ a few-room radius; cats farther
+/// from a sleeping spot find sleeping unattractive (sharp Power
+/// fall-off — 'Strong preference for own den; sharp fall-off',
+/// spec line 5622).
+pub const SLEEP_SPOT_RANGE: f32 = 15.0;
 
 // Phase-to-knot encoding; must match `fox_hunting` + the scoring-layer
 // `day_phase_scalar` encoder.
@@ -64,17 +73,37 @@ impl SleepDse {
             intercept: 0.0,
         };
 
+        // §L2.10.7 row Sleep: Power-Invert curve over distance to
+        // the cat's own sleeping spot. Spec line 5622: 'Strong
+        // preference for own den; sharp fall-off from it.' Power
+        // gives that sharper fall-off than Logistic (faster decay
+        // beyond the bucket midpoint).
+        let spot_distance = Curve::Composite {
+            inner: Box::new(Curve::Polynomial {
+                exponent: 2,
+                divisor: 1.0,
+            }),
+            post: PostOp::Invert,
+        };
         Self {
             id: DseId("sleep"),
             considerations: vec![
                 Consideration::Scalar(ScalarConsideration::new(ENERGY_DEFICIT_INPUT, sleep_dep())),
                 Consideration::Scalar(ScalarConsideration::new(DAY_PHASE_INPUT, day_phase_curve)),
                 Consideration::Scalar(ScalarConsideration::new(HEALTH_DEFICIT_INPUT, injury_curve)),
+                Consideration::Spatial(SpatialConsideration::new(
+                    "sleep_spot_distance",
+                    LandmarkSource::Anchor(LandmarkAnchor::OwnSleepingSpot),
+                    SLEEP_SPOT_RANGE,
+                    spot_distance,
+                )),
             ],
-            // RtEO sum = 1.0. Energy deficit dominates (the core
-            // driver); day_phase carries the circadian rhythm;
-            // injury_rest is a recovery modulator.
-            composition: Composition::weighted_sum(vec![0.5, 0.3, 0.2]),
+            // RtEO sum = 1.0. Energy deficit still dominates; day_phase
+            // carries the circadian rhythm; injury_rest is a recovery
+            // modulator; spot_distance pulls toward a sleeping place.
+            // Original three weights renormalized ×0.80 to make room
+            // for the spatial axis at 0.20.
+            composition: Composition::weighted_sum(vec![0.40, 0.24, 0.16, 0.20]),
             eligibility: EligibilityFilter::new(),
         }
     }
@@ -128,9 +157,28 @@ mod tests {
     }
 
     #[test]
-    fn sleep_has_three_axes() {
+    fn sleep_has_four_axes() {
+        // §L2.10.7: energy + day_phase + injury_rest + spot_distance.
         let s = ScoringConstants::default();
-        assert_eq!(SleepDse::new(&s).considerations().len(), 3);
+        assert_eq!(SleepDse::new(&s).considerations().len(), 4);
+    }
+
+    #[test]
+    fn sleep_uses_own_sleeping_spot_anchor() {
+        let s = ScoringConstants::default();
+        let dse = SleepDse::new(&s);
+        let spatial = dse
+            .considerations()
+            .iter()
+            .find_map(|c| match c {
+                Consideration::Spatial(sp) if sp.name == "sleep_spot_distance" => Some(sp),
+                _ => None,
+            })
+            .expect("sleep_spot_distance axis must exist");
+        assert!(matches!(
+            spatial.landmark,
+            LandmarkSource::Anchor(LandmarkAnchor::OwnSleepingSpot)
+        ));
     }
 
     #[test]
@@ -156,14 +204,21 @@ mod tests {
         assert_eq!(SleepDse::new(&s).maslow_tier(), 1);
     }
 
+    fn scalar_axis<'a>(dse: &'a SleepDse, name: &str) -> &'a Curve {
+        dse.considerations()
+            .iter()
+            .find_map(|c| match c {
+                Consideration::Scalar(sc) if sc.name == name => Some(&sc.curve),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("scalar axis {name} must exist"))
+    }
+
     #[test]
     fn injury_curve_zero_at_full_health() {
         let s = ScoringConstants::default();
         let dse = SleepDse::new(&s);
-        let c = match &dse.considerations()[2] {
-            Consideration::Scalar(sc) => &sc.curve,
-            _ => panic!("expected scalar"),
-        };
+        let c = scalar_axis(&dse, HEALTH_DEFICIT_INPUT);
         // health_deficit = 0 (full health) → Linear output = 0.
         assert!((c.evaluate(0.0) - 0.0).abs() < 1e-4);
     }
@@ -172,10 +227,7 @@ mod tests {
     fn day_phase_knots_match_scoring_constants() {
         let s = ScoringConstants::default();
         let dse = SleepDse::new(&s);
-        let c = match &dse.considerations()[1] {
-            Consideration::Scalar(sc) => &sc.curve,
-            _ => panic!("expected scalar"),
-        };
+        let c = scalar_axis(&dse, DAY_PHASE_INPUT);
         assert!((c.evaluate(DAWN_KNOT) - s.sleep_dawn_bonus).abs() < 1e-4);
         assert!((c.evaluate(NIGHT_KNOT) - s.sleep_night_bonus).abs() < 1e-4);
     }

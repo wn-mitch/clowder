@@ -10,12 +10,19 @@
 use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
-use crate::ai::curves::{hangry, scarcity, Curve};
+use crate::ai::considerations::{
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
+use crate::ai::curves::{hangry, scarcity, Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
 use crate::components::markers;
+
+/// §L2.10.7 Forage range — Manhattan tiles for the
+/// nearest-forageable-cluster anchor. 25 ≈ a routine errand walk;
+/// matches Cook/Eat/Build commute scale.
+pub const FORAGE_CLUSTER_RANGE: f32 = 25.0;
 
 pub struct ForageDse {
     id: DseId,
@@ -26,6 +33,18 @@ pub struct ForageDse {
 
 impl ForageDse {
     pub fn new() -> Self {
+        // §L2.10.7 row Forage: Composite{Logistic(8, 0.5), Invert} over
+        // distance to nearest forageable-tile cluster. Spec line 5624:
+        // 'Routine errand; sharp fall-off outside a reasonable
+        // radius.' None when no forageable terrain in range — the
+        // CanForage marker (eligibility) gates the DSE entirely.
+        let cluster_distance = Curve::Composite {
+            inner: Box::new(Curve::Logistic {
+                steepness: 8.0,
+                midpoint: 0.5,
+            }),
+            post: PostOp::Invert,
+        };
         Self {
             id: DseId("forage"),
             considerations: vec![
@@ -38,13 +57,19 @@ impl ForageDse {
                         intercept: 0.0,
                     },
                 )),
+                Consideration::Spatial(SpatialConsideration::new(
+                    "forage_cluster_distance",
+                    LandmarkSource::Anchor(LandmarkAnchor::NearestForageableCluster),
+                    FORAGE_CLUSTER_RANGE,
+                    cluster_distance,
+                )),
             ],
-            // RtEO weights: diligence dominates — the point of Forage
-            // vs. Hunt is that diligent non-bold cats choose it.
-            // Hunger and scarcity still contribute, but personality
-            // differentiation is what distinguishes the two
-            // food-acquisition DSEs. Sum = 1.0.
-            composition: Composition::weighted_sum(vec![0.3, 0.25, 0.45]),
+            // RtEO weights: diligence still dominates — the point of
+            // Forage vs. Hunt is diligent non-bold cats choose it.
+            // Spatial axis pulls toward forageable terrain; original
+            // three weights renormalized ×0.80 so spatial axis lands
+            // at 0.20.
+            composition: Composition::weighted_sum(vec![0.24, 0.20, 0.36, 0.20]),
             // §4 batch 2: `.require(CanForage)` gates on ¬Kitten ∧
             // ¬Injured ∧ forageable terrain nearby. Retires the
             // inline `ctx.can_forage` guard in `scoring.rs`.
