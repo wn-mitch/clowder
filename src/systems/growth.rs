@@ -4,7 +4,8 @@ use crate::components::identity::{Age, LifeStage, Species};
 use crate::components::kitten::KittenDependency;
 use crate::components::markers;
 use crate::components::mental::{Mood, MoodModifier};
-use crate::components::physical::{Dead, Position};
+use crate::components::physical::{Dead, Needs, Position};
+use crate::resources::sim_constants::SimConstants;
 use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::resources::time::{SimConfig, TimeState};
 
@@ -99,6 +100,39 @@ pub fn kitten_mood_aura(
                 source: "kitten_aura".to_string(),
             });
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// update_kitten_urgency_map (ticket 006 — §5.6.3 row #13)
+// ---------------------------------------------------------------------------
+
+/// Re-stamp `KittenUrgencyMap` from live kittens, weighted by hunger
+/// deficit. §5.6.3 row #13 — sight × colony.
+///
+/// Each `KittenDependency` cat paints a linear-falloff disc of
+/// `kitten_urgency_sense_range` tiles weighted by `(1 - hunger)`.
+/// Adults near multiple hungry kittens see the contributions sum
+/// (clamped to 1.0). Re-stamped per tick rather than decayed because
+/// kittens move and need-state changes fast.
+///
+/// Producer-only at landing — Caretake target ranking continues to use
+/// the existing per-kitten lookup at `caretake_target.rs` until ticket
+/// 052's `SpatialConsideration` cutover.
+#[allow(clippy::type_complexity)]
+pub fn update_kitten_urgency_map(
+    kittens: Query<(&Position, &Needs), (With<KittenDependency>, Without<Dead>)>,
+    mut map: ResMut<crate::resources::KittenUrgencyMap>,
+    constants: Res<SimConstants>,
+) {
+    let sense_range = constants.influence_maps.kitten_urgency_sense_range;
+    map.clear();
+    for (pos, needs) in &kittens {
+        let urgency = (1.0 - needs.hunger).clamp(0.0, 1.0);
+        if urgency <= 0.0 {
+            continue;
+        }
+        map.stamp(pos.x, pos.y, urgency, sense_range);
     }
 }
 

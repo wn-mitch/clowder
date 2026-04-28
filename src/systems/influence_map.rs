@@ -297,6 +297,23 @@ impl InfluenceMap for crate::resources::ConstructionSiteMap {
     }
 }
 
+impl InfluenceMap for crate::resources::KittenUrgencyMap {
+    fn metadata(&self) -> MapMetadata {
+        MapMetadata {
+            // §5.6.3 row #13: kitten-urgency — sight × colony.
+            // Producer landed by ticket 006; consumer cutover
+            // (Caretake target ranking) lives in ticket 052.
+            name: "kitten_urgency",
+            channel: ChannelKind::Sight,
+            faction: Faction::Colony,
+        }
+    }
+
+    fn base_sample(&self, pos: Position) -> f32 {
+        self.get(pos.x, pos.y)
+    }
+}
+
 /// Borrow-based adapter that exposes `TileMap`'s per-tile corruption
 /// field as an `InfluenceMap`. Corruption lives alongside terrain on
 /// `Tile` rather than in a dedicated resource; the lens avoids
@@ -635,6 +652,21 @@ mod tests {
         assert!(matches!(md.faction, Faction::Colony));
 
         map.stamp(20, 20, 1.0, 12.0);
+        let sampled = map.base_sample(Position::new(22, 22));
+        assert_eq!(sampled, map.get(22, 22));
+        assert!(sampled > 0.0);
+    }
+
+    #[test]
+    fn kitten_urgency_map_implements_influence_map() {
+        use crate::resources::KittenUrgencyMap;
+        let mut map = KittenUrgencyMap::default_map();
+        let md = map.metadata();
+        assert_eq!(md.name, "kitten_urgency");
+        assert_eq!(md.channel, ChannelKind::Sight);
+        assert!(matches!(md.faction, Faction::Colony));
+
+        map.stamp(20, 20, 1.0, 10.0);
         let sampled = map.base_sample(Position::new(22, 22));
         assert_eq!(sampled, map.get(22, 22));
         assert!(sampled > 0.0);
