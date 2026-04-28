@@ -232,7 +232,24 @@ pub fn score_fox_dse_by_id(dse_id: &str, ctx: &FoxScoringContext, inputs: &EvalI
     let fetch_scalar = |name: &str, _: Entity| -> f32 { scalars.get(name).copied().unwrap_or(0.0) };
     let has_marker = |_: &str, _: Entity| false;
     let entity_position = |_: Entity| -> Option<Position> { None };
-    let anchor_position = |_: LandmarkAnchor| -> Option<Position> { None };
+    // §L2.10.7 fox-side anchor resolution. Reads the seven anchor
+    // positions populated by `fox_goap.rs::build_scoring_context` once
+    // per scoring tick. Variants not relevant to fox dispositions
+    // (cat-side anchors like NearestKitchen) return None — the
+    // consideration scores 0.0 per substrate convention.
+    let anchor_position = |a: LandmarkAnchor| -> Option<Position> {
+        match a {
+            LandmarkAnchor::OwnDen => ctx.den_position,
+            LandmarkAnchor::CatClusterCentroid => ctx.cat_cluster_centroid,
+            LandmarkAnchor::PreyBeliefCentroid => ctx.prey_belief_centroid,
+            LandmarkAnchor::UnexploredFrontierCentroid => ctx.frontier_centroid,
+            LandmarkAnchor::NearestVisibleStore => ctx.nearest_visible_store,
+            LandmarkAnchor::NearestMapEdge => ctx.nearest_map_edge,
+            LandmarkAnchor::TerritoryPerimeterAnchor => ctx.territory_perimeter_anchor,
+            // Cat-side anchors aren't relevant to fox scoring.
+            _ => None,
+        }
+    };
     let needs_ref = ctx.needs;
     let maslow = |tier: u8| needs_ref.level_suppression(tier);
 
