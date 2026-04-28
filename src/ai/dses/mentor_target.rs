@@ -22,13 +22,22 @@
 //! marker author system lands (open-work #14 marker-roster second
 //! bullet). Weights renormalized from the spec's
 //! (0.20/0.20/0.40/0.20) by dropping the 0.20 and dividing the
-//! remaining three by 0.80:
+//! remaining three by 0.80. The distance axis lands as a
+//! `SpatialConsideration` per the §L2.10.7 plan-cost feedback design
+//! (ticket 052) — Manhattan distance to the apprentice flows through
+//! `Quadratic(exponent=2, divisor=-1, shift=1)` over normalized cost,
+//! which evaluates `(1 - cost)²`. The §L2.10.7 row at line 5638
+//! commits `Quadratic` family with rationale "Requires sustained
+//! proximity; sharp fall-off" — the `(1-cost)²` shape (sharp drop
+//! near the cat, fully zero by `range`) matches that rationale and
+//! preserves the legacy scalar `Quadratic(exp=2)` over `nearness =
+//! 1 - dist/range`, so the port is behavior-neutral.
 //!
-//! | # | Consideration       | Scalar name          | Curve                   | Spec weight | Renormalized |
-//! |---|---------------------|----------------------|-------------------------|-------------|--------------|
-//! | 1 | distance            | `target_nearness`    | `Quadratic(exp=2)` r=8  | 0.20        | 0.25         |
-//! | 2 | fondness            | `target_fondness`    | `Linear(1, 0)`          | 0.20        | 0.25         |
-//! | 3 | skill-gap-magnitude | `target_skill_gap`   | `Logistic(8, 0.4)`      | 0.40        | 0.50         |
+//! | # | Consideration       | Source              | Curve                                | Spec weight | Renormalized |
+//! |---|---------------------|---------------------|--------------------------------------|-------------|--------------|
+//! | 1 | distance            | `Spatial(target)`   | `Quadratic(exp=2, div=-1, shift=1)`  | 0.20        | 0.25         |
+//! | 2 | fondness            | `target_fondness`   | `Linear(1, 0)`                       | 0.20        | 0.25         |
+//! | 3 | skill-gap-magnitude | `target_skill_gap`  | `Logistic(8, 0.4)`                   | 0.40        | 0.50         |
 //!
 //! No bond-tier eligibility filter — mentoring relationships grow *out
 //! of* the act of mentoring, so bond is an output not an input
@@ -45,7 +54,9 @@
 use bevy::prelude::Entity;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
+use crate::ai::considerations::{
+    Consideration, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
 use crate::ai::curves::Curve;
 use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination};
 use crate::ai::eval::DseRegistry;
@@ -56,7 +67,6 @@ use crate::components::physical::Position;
 use crate::components::skills::Skills;
 use crate::resources::relationships::Relationships;
 
-pub const TARGET_NEARNESS_INPUT: &str = "target_nearness";
 pub const TARGET_FONDNESS_INPUT: &str = "target_fondness";
 pub const TARGET_SKILL_GAP_INPUT: &str = "target_skill_gap";
 
@@ -69,10 +79,16 @@ pub const MENTOR_TARGET_RANGE: f32 = 10.0;
 
 /// §6.5.3 `Mentor` target-taking DSE factory.
 pub fn mentor_target_dse() -> TargetTakingDse {
+    // §L2.10.7 distance axis: `Quadratic(exp=2, divisor=-1, shift=1)`
+    // evaluates `((cost - 1) / -1).max(0).powf(2) = (1 - cost)²`,
+    // exactly preserving the legacy `nearness² = (1 - dist/range)²`
+    // shape. Sharp fall-off near the cat: at half-range the score is
+    // already 0.25, fully zero at `range`. Matches §L2.10.7's
+    // "Requires sustained proximity" rationale.
     let nearness_curve = Curve::Quadratic {
         exponent: 2.0,
-        divisor: 1.0,
-        shift: 0.0,
+        divisor: -1.0,
+        shift: 1.0,
     };
     let linear = Curve::Linear {
         slope: 1.0,
@@ -92,8 +108,10 @@ pub fn mentor_target_dse() -> TargetTakingDse {
         id: DseId("mentor_target"),
         candidate_query: mentor_candidate_query_doc,
         per_target_considerations: vec![
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_NEARNESS_INPUT,
+            Consideration::Spatial(SpatialConsideration::new(
+                "mentor_target_nearness",
+                LandmarkSource::TargetPosition,
+                MENTOR_TARGET_RANGE,
                 nearness_curve,
             )),
             Consideration::Scalar(ScalarConsideration::new(
@@ -208,23 +226,12 @@ pub fn resolve_mentor_target(
         return None;
     }
 
-    let pos_map: std::collections::HashMap<Entity, Position> = candidates
-        .iter()
-        .copied()
-        .zip(positions.iter().copied())
-        .collect();
-
+    // Spatial nearness axis (`mentor_target_nearness`) is computed by
+    // the substrate from `EvalCtx::self_position` to each candidate's
+    // tile per §L2.10.7, so no nearness branch lives in `fetch_target`.
     let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     let fetch_target = |name: &str, cat: Entity, target: Entity| -> f32 {
         match name {
-            TARGET_NEARNESS_INPUT => {
-                let target_pos = match pos_map.get(&target) {
-                    Some(p) => *p,
-                    None => return 0.0,
-                };
-                let dist = cat_pos.manhattan_distance(&target_pos) as f32;
-                (1.0 - dist / MENTOR_TARGET_RANGE).clamp(0.0, 1.0)
-            }
             TARGET_FONDNESS_INPUT => relationships
                 .get(cat, target)
                 .map(|r| r.fondness)
@@ -533,6 +540,54 @@ mod tests {
             None,
         );
         assert_eq!(out, Some(novice));
+    }
+
+    #[test]
+    fn nearness_attenuates_far_apprentice_smoothly() {
+        // §L2.10.7 elastic-channel verification: the `(1 - cost)²`
+        // shape should drop sharply across the inner half of the
+        // range. Two candidates with the *same* skill-gap and
+        // fondness — the closer one wins because the spatial axis
+        // separates them.
+        let mut registry = DseRegistry::new();
+        registry.target_taking_dses.push(mentor_target_dse());
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let close = Entity::from_raw_u32(2).unwrap();
+        let far = Entity::from_raw_u32(3).unwrap();
+        let mut relationships = Relationships::default();
+        relationships.get_or_insert(cat, close).fondness = 0.5;
+        relationships.get_or_insert(cat, far).fondness = 0.5;
+
+        let self_skills = skills_with(0.9, 0.2);
+        let novice_skills = skills_with(0.1, 0.1);
+        let close_skills = novice_skills.clone();
+        let far_skills = novice_skills.clone();
+        let skills_lookup = move |e: Entity| -> Option<Skills> {
+            if e == close {
+                Some(close_skills.clone())
+            } else if e == far {
+                Some(far_skills.clone())
+            } else {
+                None
+            }
+        };
+
+        let cat_positions = vec![
+            (close, Position::new(1, 0)), // dist 1, well below midpoint
+            (far, Position::new(9, 0)),   // dist 9, well past midpoint
+        ];
+        let out = resolve_mentor_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &cat_positions,
+            &self_skills,
+            &skills_lookup,
+            &relationships,
+            0,
+            None,
+        );
+        assert_eq!(out, Some(close));
     }
 
     #[test]

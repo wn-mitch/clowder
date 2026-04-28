@@ -198,3 +198,47 @@ or surfaces a hypothesis-required shift.
   ApplyRemedy (caretaker-distance variant) ports remain in scope
   item 3; 30-row roster sweep (scope item 2) across remaining cat
   self-state DSEs + fox dispositions.
+
+- 2026-04-28: Mentor port (scope item 2 row #18). Mentor's
+  `target_nearness` Scalar (`Quadratic(exp=2)` over `1 - dist/range`)
+  swapped for a `SpatialConsideration` with `LandmarkSource::
+  TargetPosition` + `range = MENTOR_TARGET_RANGE` + `Quadratic(exp=2,
+  divisor=-1, shift=1)` over normalized cost. The
+  `divisor=-1, shift=1` form evaluates `((cost - 1) / -1)² =
+  (1 - cost)²`, exactly preserving the legacy shape (sharp falloff
+  near the cat: half-range = 0.25, zero at `range`). Quadratic isn't
+  point-symmetric like Logistic, so this explicit form is the way
+  to keep behavior-neutrality; the alternative `Composite{Quadratic,
+  Invert}` would give `1 - cost²` (gentle near, cliff at edge),
+  which doesn't match §L2.10.7's "Requires sustained proximity"
+  rationale. All 1502 lib + integration tests pass (added
+  `nearness_attenuates_far_apprentice_smoothly` exercising the
+  spatial axis across the midpoint).
+
+  Paired-baseline soak (seed 42, 15 min) at `1e5efe7` (post-Mate)
+  vs the Mentor-port WIP — **fully behavior-neutral**:
+
+  | Metric                      | post-Mate | post-Mentor | Δ        |
+  |-----------------------------|-----------|-------------|----------|
+  | Injury / Ambush / Starv     | 1/4/1     | 1/4/1       | identical|
+  | grooming                    | 262       | 262         | identical|
+  | play                        | 834       | 834         | identical|
+  | burial / courtship          | 0/0       | 0/0         | identical|
+  | mentoring                   | 0         | 0           | identical|
+  | mythic-texture              | 30        | 30          | identical|
+  | never_fired_expected        | (4)       | (4)         | identical|
+  | Plan-failure top-5 reasons  | —         | —           | 1 row -1 |
+
+  The single delta: `TravelTo(SocialTarget) no reachable` 31 → 30,
+  the *reverse* of Mate's +1 (so the cumulative shift across both
+  ports is 0). Symmetric f32 LSB ordering — same mechanism as
+  Mate's port. Mentoring tally remained 0 (pre-existing canary
+  collapse tracked in ticket 003); the substrate change preserves
+  status quo on that metric, which is the substrate-refactor goal.
+
+  Post-Mate baseline archived at
+  `logs/tuned-42-1e5efe7-post-mate-baseline/`.
+
+  Successor work: ApplyRemedy (caretaker-distance variant) port
+  remains in scope item 3; 30-row roster sweep (scope item 2)
+  across remaining cat self-state DSEs + fox dispositions.
