@@ -248,7 +248,7 @@ fn try_preempt_threat_without_position_still_resets_ticks_remaining() {
 
 #[test]
 fn carry_target_forward_matches_inline_body_when_unset() {
-    let validity = target::TargetValidityQuery;
+    let validity = target::InMemoryValidity::new();
 
     // Build two parallel step_state arrays.
     let mut new_steps = [
@@ -284,7 +284,7 @@ fn carry_target_forward_matches_inline_body_when_unset() {
 
 #[test]
 fn carry_target_forward_preserves_existing_target() {
-    let validity = target::TargetValidityQuery;
+    let validity = target::InMemoryValidity::new();
     let prior = Entity::from_raw_u32(1).unwrap();
     let already = Entity::from_raw_u32(99).unwrap();
 
@@ -304,7 +304,7 @@ fn carry_target_forward_preserves_existing_target() {
 
 #[test]
 fn carry_target_forward_at_step_zero_is_noop() {
-    let validity = target::TargetValidityQuery;
+    let validity = target::InMemoryValidity::new();
     let mut steps = [StepExecutionState::default()];
 
     let result = carry_target_forward(&mut steps, 0, &validity, None);
@@ -314,26 +314,97 @@ fn carry_target_forward_at_step_zero_is_noop() {
 }
 
 // ---------------------------------------------------------------------------
-// validate_target — stub (074 implements)
+// validate_target — 074 implementation
 // ---------------------------------------------------------------------------
 
 #[test]
-fn validate_target_stub_always_ok() {
-    let validity = target::TargetValidityQuery;
+fn validate_target_alive_returns_ok() {
+    let validity = target::InMemoryValidity::new();
     let result = validate_target(Entity::from_raw_u32(1).unwrap(), &validity);
     assert!(result.is_ok());
 }
 
+#[test]
+fn validate_target_returns_dead_for_dead_entity() {
+    let mut validity = target::InMemoryValidity::new();
+    let e = Entity::from_raw_u32(1).unwrap();
+    validity.mark(e, target::TargetInvalidReason::Dead);
+    assert_eq!(
+        validate_target(e, &validity),
+        Err(target::TargetInvalidReason::Dead)
+    );
+}
+
+#[test]
+fn validate_target_returns_banished_for_banished_entity() {
+    let mut validity = target::InMemoryValidity::new();
+    let e = Entity::from_raw_u32(2).unwrap();
+    validity.mark(e, target::TargetInvalidReason::Banished);
+    assert_eq!(
+        validate_target(e, &validity),
+        Err(target::TargetInvalidReason::Banished)
+    );
+}
+
+#[test]
+fn validate_target_returns_incapacitated_for_incapacitated_entity() {
+    let mut validity = target::InMemoryValidity::new();
+    let e = Entity::from_raw_u32(3).unwrap();
+    validity.mark(e, target::TargetInvalidReason::Incapacitated);
+    assert_eq!(
+        validate_target(e, &validity),
+        Err(target::TargetInvalidReason::Incapacitated)
+    );
+}
+
+#[test]
+fn validate_target_returns_despawned_for_absent_entity() {
+    let mut validity = target::InMemoryValidity::new();
+    validity.absent_means_despawned = true;
+    let e = Entity::from_raw_u32(4).unwrap();
+    assert_eq!(
+        validate_target(e, &validity),
+        Err(target::TargetInvalidReason::Despawned)
+    );
+}
+
+#[test]
+fn carry_target_forward_drops_dead_prior_target() {
+    // 074 — when the prior step's target is invalid, the carryover
+    // copy is suppressed and the caller's failure path picks up the
+    // `None` for replan.
+    let mut validity = target::InMemoryValidity::new();
+    let dead_target = Entity::from_raw_u32(7).unwrap();
+    validity.mark(dead_target, target::TargetInvalidReason::Dead);
+
+    let mut steps = [
+        StepExecutionState::default(),
+        StepExecutionState::default(),
+    ];
+    steps[0].target_entity = Some(dead_target);
+
+    let result = carry_target_forward(&mut steps, 1, &validity, None);
+    assert_eq!(
+        result, None,
+        "dead prior target must not propagate; caller replans"
+    );
+    assert_eq!(steps[1].target_entity, None);
+}
+
 // ---------------------------------------------------------------------------
-// require_alive_filter — stub (074 implements)
+// require_alive_filter — 074 implementation
 // ---------------------------------------------------------------------------
 
 #[test]
-fn require_alive_filter_stub_is_empty() {
+fn require_alive_filter_sets_require_target_alive() {
     let filter = require_alive_filter();
     assert!(filter.required.is_empty());
     assert!(filter.forbidden.is_empty());
     assert!(filter.required_stance.is_none());
+    assert!(
+        filter.require_target_alive,
+        "074 — require_alive_filter() must set require_target_alive"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -522,6 +593,7 @@ fn require_unreserved_filter_gates_non_owner_to_zero() {
         self_position: Position::new(0, 0),
         target: None,
         target_position: None,
+        target_alive: None,
     };
     let fetch_self = |_: &str, _: Entity| 0.0;
     // owner_target rates higher quality; without the gate it would win.
@@ -621,6 +693,7 @@ fn require_unreserved_filter_passes_owner() {
         self_position: Position::new(0, 0),
         target: None,
         target_position: None,
+        target_alive: None,
     };
     let fetch_self = |_: &str, _: Entity| 0.0;
     let fetch_target = |_: &str, _: Entity, _: Entity| 0.7;
@@ -704,6 +777,7 @@ fn require_unreserved_filter_inactive_when_dse_opts_out() {
         self_position: Position::new(0, 0),
         target: None,
         target_position: None,
+        target_alive: None,
     };
     let fetch_self = |_: &str, _: Entity| 0.0;
     let fetch_target = |_: &str, _: Entity, _: Entity| 0.7;
@@ -827,6 +901,7 @@ fn require_unreserved_fires_contention_hook() {
         self_position: Position::new(0, 0),
         target: None,
         target_position: None,
+        target_alive: None,
     };
     let fetch_self = |_: &str, _: Entity| 0.0;
     let fetch_target = |_: &str, _: Entity, _: Entity| 0.5;

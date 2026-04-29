@@ -58,7 +58,7 @@ use crate::ai::composition::Composition;
 use crate::ai::considerations::{
     Consideration, LandmarkSource, ScalarConsideration, SpatialConsideration, LandmarkAnchor};
 use crate::ai::curves::Curve;
-use crate::ai::dse::{CommitmentStrategy, DseId, EvalCtx, GoalState, Intention};
+use crate::ai::dse::{CommitmentStrategy, DseId, EligibilityFilter, EvalCtx, GoalState, Intention};
 use crate::ai::eval::DseRegistry;
 use crate::ai::target_dse::{
     evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,
@@ -132,8 +132,10 @@ pub fn apply_remedy_target_dse() -> TargetTakingDse {
         aggregation: TargetAggregation::Best,
         intention: apply_remedy_intention,
         required_stance: None,
-        // Ticket 080 — apply-remedy is contention-tolerant.
-        eligibility: Default::default(),
+        // Tickets 074 + 080 — gate dead/banished/incapacitated
+        // candidates AND candidates already reserved by another
+        // cat. Combined filter applied at the IAUS scoring layer.
+        eligibility: crate::systems::plan_substrate::require_alive_and_unreserved_filter(),
     }
 }
 
@@ -229,6 +231,7 @@ pub fn resolve_apply_remedy_target(
         self_position: cat_pos,
         target: None,
         target_position: None,
+        target_alive: None,
     };
 
     let scored = evaluate_target_taking(

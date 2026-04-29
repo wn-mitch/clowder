@@ -262,6 +262,7 @@ pub fn score_fox_dse_by_id(dse_id: &str, ctx: &FoxScoringContext, inputs: &EvalI
         self_position: inputs.position,
         target: None,
         target_position: None,
+        target_alive: None,
     };
 
     evaluate_single(

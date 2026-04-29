@@ -106,12 +106,10 @@ pub fn mate_target_dse() -> TargetTakingDse {
         aggregation: TargetAggregation::Best,
         intention: mate_intention,
         required_stance: None,
-        // Ticket 080 — partner reservation: when one cat commits to a
-        // mate, no other cat should pick the same partner concurrently.
-        // (Bond filter only restricts to Partners/Mates, which doesn't
-        // prevent two cats with the same Partners-bonded peer from both
-        // targeting them.)
-        eligibility: crate::systems::plan_substrate::require_unreserved_filter(),
+        // Tickets 074 + 080 — gate dead/banished/incapacitated
+        // candidates AND candidates already reserved by another
+        // cat. Combined filter applied at the IAUS scoring layer.
+        eligibility: crate::systems::plan_substrate::require_alive_and_unreserved_filter(),
     }
 }
 
@@ -211,6 +209,7 @@ pub fn resolve_mate_target(
         self_position: cat_pos,
         target: None,
         target_position: None,
+        target_alive: None,
     };
 
     let scored = evaluate_target_taking(

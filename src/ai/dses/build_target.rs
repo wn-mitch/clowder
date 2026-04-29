@@ -61,7 +61,7 @@ use crate::ai::composition::Composition;
 use crate::ai::considerations::{
     Consideration, LandmarkSource, ScalarConsideration, SpatialConsideration, LandmarkAnchor};
 use crate::ai::curves::Curve;
-use crate::ai::dse::{CommitmentStrategy, DseId, EvalCtx, GoalState, Intention};
+use crate::ai::dse::{CommitmentStrategy, DseId, EligibilityFilter, EvalCtx, GoalState, Intention};
 use crate::ai::eval::DseRegistry;
 use crate::ai::target_dse::{
     evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,
@@ -157,12 +157,10 @@ pub fn build_target_dse() -> TargetTakingDse {
         aggregation: TargetAggregation::Best,
         intention: build_intention,
         required_stance: None,
-        // Ticket 080 — build-site reservation is desirable but the
-        // construction pipeline already coordinates via materials
-        // delivery; deferring activation to a follow-on per ticket 080
-        // out-of-scope (the audit gap names carcass / herb / mate as
-        // the high-value contention sites).
-        eligibility: Default::default(),
+        // Tickets 074 + 080 — gate dead/banished/incapacitated
+        // candidates AND candidates already reserved by another
+        // cat. Combined filter applied at the IAUS scoring layer.
+        eligibility: crate::systems::plan_substrate::require_alive_and_unreserved_filter(),
     }
 }
 
@@ -275,6 +273,7 @@ pub fn resolve_build_target(
         self_position: cat_pos,
         target: None,
         target_position: None,
+        target_alive: None,
     };
 
     let scored = evaluate_target_taking(

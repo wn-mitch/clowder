@@ -254,6 +254,14 @@ pub struct EligibilityFilter {
     /// (`evaluate_target_taking` consults
     /// `EvalCtx::is_reserved_by_other` per candidate).
     pub require_unreserved: bool,
+    /// Ticket 074 — when true, target-taking DSE evaluation scores 0.0
+    /// for any candidate failing the `EvalCtx::target_alive` predicate
+    /// (Dead / Banished / Incapacitated / despawned). Closes audit gap
+    /// #3 — the "stale-target-still-scored" hole that let dispositions
+    /// re-pick a dead cat tick after tick. The validity facts already
+    /// live in the per-cat snapshot the resolvers read, so this avoids
+    /// a parallel marker table.
+    pub require_target_alive: bool,
 }
 
 impl EligibilityFilter {
@@ -282,6 +290,15 @@ impl EligibilityFilter {
     /// window.
     pub fn require_unreserved(mut self) -> Self {
         self.require_unreserved = true;
+        self
+    }
+
+    /// Ticket 074 — gate the DSE on target-alive validity. The
+    /// evaluator (`evaluate_target_taking`) consults
+    /// `EvalCtx::target_alive` for each candidate and replaces the
+    /// per-target score with 0.0 when the candidate is invalid.
+    pub fn require_alive(mut self) -> Self {
+        self.require_target_alive = true;
         self
     }
 }
@@ -339,6 +356,16 @@ pub struct EvalCtx<'ctx> {
     pub target: Option<Entity>,
     /// Optional target position (same condition as `target`).
     pub target_position: Option<crate::components::physical::Position>,
+    /// Ticket 074 — per-candidate alive predicate consumed by
+    /// `EligibilityFilter::require_target_alive`. Returns `true` iff
+    /// the entity is a valid target (alive, not banished, not
+    /// incapacitated, not despawned). `None` means callers haven't
+    /// supplied a validity surface; in that case the evaluator treats
+    /// every candidate as alive (no-op gate). When the DSE sets
+    /// `require_target_alive = true` AND a closure is supplied, the
+    /// per-target score is forced to 0.0 for any entity returning
+    /// `false`.
+    pub target_alive: Option<&'ctx dyn Fn(Entity) -> bool>,
 }
 
 // ---------------------------------------------------------------------------

@@ -34,7 +34,7 @@ use bevy::prelude::Entity;
 
 use super::composition::Composition;
 use super::considerations::{Consideration, LandmarkSource};
-use super::dse::{DseId, EvalCtx, Intention};
+use super::dse::{DseId, EligibilityFilter, EvalCtx, Intention};
 
 // ---------------------------------------------------------------------------
 // TargetAggregation
@@ -109,12 +109,14 @@ pub struct TargetTakingDse {
     pub aggregation: TargetAggregation,
     pub intention: fn(Entity) -> Intention,
     pub required_stance: Option<crate::ai::faction::StanceRequirement>,
-    /// Ticket 080 — `EligibilityFilter` carrying flags that apply per
-    /// candidate (today: `require_unreserved`). Cat-side marker
-    /// requirements live upstream of the target-taking DSE on its
-    /// paired self-state DSE; this filter is consulted by
+    /// Tickets 074 + 080 — `EligibilityFilter` carrying per-candidate
+    /// flags. 074 added `require_target_alive` (Dead/Banished/
+    /// Incapacitated/despawned reject the candidate); 080 added
+    /// `require_unreserved` (the resource-reservation gate). Cat-side
+    /// marker requirements live upstream of the target-taking DSE on
+    /// its paired self-state DSE; this filter is consulted by
     /// `evaluate_target_taking`'s candidate prefilter.
-    pub eligibility: super::dse::EligibilityFilter,
+    pub eligibility: EligibilityFilter,
 }
 
 impl TargetTakingDse {
@@ -145,15 +147,21 @@ impl TargetTakingDse {
         self.required_stance.as_ref()
     }
 
-    /// Ticket 080 — register the resource-reservation gate for this
-    /// DSE. Builder form so factories can chain
-    /// `.with_eligibility(plan_substrate::require_unreserved_filter())`.
-    pub fn with_eligibility(mut self, filter: super::dse::EligibilityFilter) -> Self {
+    /// Tickets 074 + 080 — attach an [`EligibilityFilter`] carrying
+    /// per-candidate flags (`require_target_alive` / `require_unreserved`).
+    /// Builder form parallels `with_stance`; chained on target-DSE
+    /// factories. Use
+    /// [`crate::systems::plan_substrate::require_alive_filter`] for
+    /// alive-only, [`crate::systems::plan_substrate::require_unreserved_filter`]
+    /// for reservation-only, or
+    /// [`crate::systems::plan_substrate::require_alive_and_unreserved_filter`]
+    /// for both.
+    pub fn with_eligibility(mut self, filter: EligibilityFilter) -> Self {
         self.eligibility = filter;
         self
     }
 
-    pub fn eligibility(&self) -> &super::dse::EligibilityFilter {
+    pub fn eligibility(&self) -> &EligibilityFilter {
         &self.eligibility
     }
 }
@@ -354,6 +362,18 @@ pub fn evaluate_target_taking_with_reservations(
     let unreserved_gate_active =
         dse.eligibility.require_unreserved && is_reserved_by_other.is_some();
 
+    // Ticket 074 — `EligibilityFilter::require_target_alive` short-
+    // circuits the per-candidate score to 0.0 when the target fails
+    // the `EvalCtx::target_alive` predicate. Closes the audit-#3 hole
+    // where a Dead/Banished/Incapacitated/despawned candidate could
+    // still win selection because the DSE scored it on stale state.
+    // The flag-and-closure pair is a no-op when either is unset:
+    // `require_target_alive == false` (default) skips the check;
+    // `target_alive == None` (caller didn't supply validity surface)
+    // treats every candidate as alive — preserving pre-074 behavior
+    // for callers that haven't migrated yet.
+    let enforce_alive = dse.eligibility.require_target_alive;
+
     // Score each candidate through the per-target consideration bundle.
     // Reservation-gated candidates (ticket 080) take 0.0 and skip the
     // consideration-scoring entirely — the gate is a hard pass-through,
@@ -361,12 +381,24 @@ pub fn evaluate_target_taking_with_reservations(
     // cost on candidates that can't win" principle.
     let mut per_target: Vec<(Entity, f32)> = Vec::with_capacity(candidates.len());
     for (target, target_pos) in candidates.iter().zip(candidate_positions.iter()) {
+        // Ticket 080 — reservation gate (drop candidates already
+        // claimed by another cat).
         if unreserved_gate_active {
             if let Some(check) = is_reserved_by_other {
                 if check(*target) {
                     if let Some(ref mut hook) = on_contention {
                         hook(*target);
                     }
+                    per_target.push((*target, 0.0));
+                    continue;
+                }
+            }
+        }
+        // Ticket 074 — alive gate (drop dead/banished/incapacitated/
+        // despawned candidates).
+        if enforce_alive {
+            if let Some(alive) = ctx.target_alive {
+                if !alive(*target) {
                     per_target.push((*target, 0.0));
                     continue;
                 }
@@ -548,6 +580,7 @@ mod tests {
             self_position: Position::new(0, 0),
             target: None,
             target_position: None,
+            target_alive: None,
         }
     }
 

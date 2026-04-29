@@ -132,8 +132,10 @@ pub fn mentor_target_dse() -> TargetTakingDse {
         aggregation: TargetAggregation::Best,
         intention: mentor_intention,
         required_stance: None,
-        // Ticket 080 — mentoring is contention-tolerant.
-        eligibility: Default::default(),
+        // Tickets 074 + 080 — gate dead/banished/incapacitated
+        // candidates AND candidates already reserved by another
+        // cat. Combined filter applied at the IAUS scoring layer.
+        eligibility: crate::systems::plan_substrate::require_alive_and_unreserved_filter(),
     }
 }
 
@@ -259,6 +261,7 @@ pub fn resolve_mentor_target(
         self_position: cat_pos,
         target: None,
         target_position: None,
+        target_alive: None,
     };
 
     let scored = evaluate_target_taking(

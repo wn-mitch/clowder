@@ -49,8 +49,9 @@ pub use lifecycle::{
     abandon_plan, record_step_failure, try_preempt, PreemptKind, PreemptOutcome,
 };
 pub use target::{
-    carry_target_forward, expire_reservations, release_target, require_alive_filter,
-    require_unreserved_filter, reserve_target, validate_target, TargetInvalidReason,
+    carry_target_forward, expire_reservations, release_target, require_alive_and_unreserved_filter,
+    require_alive_filter, require_unreserved_filter, reserve_target, validate_target,
+    TargetInvalidReason,
 };
 
 // ---------------------------------------------------------------------------

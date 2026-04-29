@@ -177,9 +177,10 @@ pub fn fight_target_dse() -> TargetTakingDse {
         // the cat-action FightDse — candidate-prefilter happens here
         // before evaluate_target_taking.
         required_stance: Some(StanceRequirement::attack()),
-        // Ticket 080 — Fight is contention-tolerant by design (multiple
-        // cats engaging the same threat is a feature, not a bug).
-        eligibility: Default::default(),
+        // Tickets 074 + 080 — gate dead/banished/incapacitated
+        // candidates AND candidates already reserved by another
+        // cat. Combined filter applied at the IAUS scoring layer.
+        eligibility: crate::systems::plan_substrate::require_alive_and_unreserved_filter(),
     }
 }
 
@@ -370,6 +371,7 @@ pub fn resolve_fight_target(
         self_position: cat_pos,
         target: None,
         target_position: None,
+        target_alive: None,
     };
 
     let scored = evaluate_target_taking(

@@ -150,10 +150,10 @@ pub fn groom_other_target_dse() -> TargetTakingDse {
         aggregation: TargetAggregation::Best,
         intention: groom_other_intention,
         required_stance: None,
-        // Ticket 080 — groom-other is contention-tolerant per ticket 080
-        // out-of-scope (multiple cats may groom the same partner over
-        // time; the existing target-cooldown handles disambiguation).
-        eligibility: Default::default(),
+        // Ticket 074 — gate dead/banished/incapacitated candidates.
+        // 080's reservation gate is intentionally not applied here:
+        // multiple cats can socialize at the same partner.
+        eligibility: crate::systems::plan_substrate::require_alive_filter(),
     }
 }
 
@@ -264,6 +264,7 @@ pub fn resolve_groom_other_target(
         self_position: cat_pos,
         target: None,
         target_position: None,
+        target_alive: None,
     };
 
     let scored = evaluate_target_taking(

@@ -48,7 +48,7 @@ use crate::ai::considerations::{
     Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
 };
 use crate::ai::curves::Curve;
-use crate::ai::dse::{CommitmentStrategy, DseId, EvalCtx, GoalState, Intention};
+use crate::ai::dse::{CommitmentStrategy, DseId, EligibilityFilter, EvalCtx, GoalState, Intention};
 use crate::ai::eval::DseRegistry;
 use crate::ai::target_dse::{
     evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,
@@ -112,11 +112,10 @@ pub fn herbcraft_target_dse() -> TargetTakingDse {
         aggregation: TargetAggregation::Best,
         intention: herbcraft_intention,
         required_stance: None,
-        // Ticket 080 — herb tiles are point resources: harvesting
-        // depletes them. Two cats walking to the same tile waste plan
-        // cycles. The reservation gate routes the second cat to a
-        // different patch.
-        eligibility: crate::systems::plan_substrate::require_unreserved_filter(),
+        // Tickets 074 + 080 — gate dead/banished/incapacitated
+        // candidates AND candidates already reserved by another
+        // cat. Combined filter applied at the IAUS scoring layer.
+        eligibility: crate::systems::plan_substrate::require_alive_and_unreserved_filter(),
     }
 }
 
@@ -202,6 +201,7 @@ pub fn resolve_herbcraft_target(
         self_position: cat_pos,
         target: None,
         target_position: None,
+        target_alive: None,
     };
 
     let scored = evaluate_target_taking(

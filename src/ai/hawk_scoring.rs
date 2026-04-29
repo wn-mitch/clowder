@@ -147,6 +147,7 @@ pub fn score_hawk_dse_by_id(dse_id: &str, ctx: &HawkScoringContext, inputs: &Eva
         self_position: inputs.position,
         target: None,
         target_position: None,
+        target_alive: None,
     };
 
     evaluate_single(

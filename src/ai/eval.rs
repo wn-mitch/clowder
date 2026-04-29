@@ -855,6 +855,7 @@ mod tests {
             self_position: Position::new(0, 0),
             target: None,
             target_position: None,
+            target_alive: None,
         };
         assert!(!passes_eligibility(&filter, entity, &ctx));
 
@@ -869,6 +870,7 @@ mod tests {
             self_position: Position::new(0, 0),
             target: None,
             target_position: None,
+            target_alive: None,
         };
         assert!(passes_eligibility(&filter, entity, &ctx));
     }
@@ -889,6 +891,7 @@ mod tests {
             self_position: Position::new(0, 0),
             target: None,
             target_position: None,
+            target_alive: None,
         };
         assert!(!passes_eligibility(&filter, entity, &ctx));
 
@@ -902,6 +905,7 @@ mod tests {
             self_position: Position::new(0, 0),
             target: None,
             target_position: None,
+            target_alive: None,
         };
         assert!(passes_eligibility(&filter, entity, &ctx));
     }
@@ -924,6 +928,7 @@ mod tests {
             self_position: Position::new(0, 0),
             target: None,
             target_position: None,
+            target_alive: None,
         };
         let maslow = |_: u8| 1.0;
         let modifiers = ModifierPipeline::new();
@@ -950,6 +955,7 @@ mod tests {
             self_position: Position::new(0, 0),
             target: None,
             target_position: None,
+            target_alive: None,
         };
 
         // Maslow pre-gate: tier 1 suppression = 0.5 (simulating phys
@@ -993,6 +999,7 @@ mod tests {
             self_position: Position::new(0, 0),
             target: None,
             target_position: None,
+            target_alive: None,
         };
         // Maslow returns 0 for tier MAX, but the evaluator should
         // skip the gate entirely.
@@ -1055,6 +1062,7 @@ mod tests {
             self_position: Position::new(0, 0),
             target: None,
             target_position: None,
+            target_alive: None,
         };
         let fetch = |_: &str, _: Entity| 0.0;
         // 0.5 → 0.6 → 1.2
@@ -1083,6 +1091,7 @@ mod tests {
             self_position: Position::new(0, 0),
             target: None,
             target_position: None,
+            target_alive: None,
         };
         let maslow = |_: u8| 1.0;
         let modifiers = ModifierPipeline::new();
@@ -1206,6 +1215,7 @@ mod tests {
             self_position: Position::new(0, 0),
             target: None,
             target_position: None,
+            target_alive: None,
         };
         let maslow = |_: u8| 1.0;
         let modifiers = ModifierPipeline::new();
@@ -1262,6 +1272,7 @@ mod tests {
             self_position: Position::new(0, 0),
             target: None,
             target_position: None,
+            target_alive: None,
         };
         let maslow = |_: u8| 1.0;
         let modifiers = ModifierPipeline::new();
@@ -1340,6 +1351,7 @@ mod tests {
             self_position: Position::new(0, 0),
             target: None,
             target_position: None,
+            target_alive: None,
         };
         let fetch = |_: &str, _: Entity| 0.0;
 

@@ -391,6 +391,14 @@ pub struct ExecutorContext<'w, 's> {
         &'static crate::components::PairingActivity,
         Without<Dead>,
     >,
+    /// Ticket 074 — read-only target-validity surface (Dead /
+    /// Banished / Incapacitated / despawned). Bundled here so step
+    /// resolvers reach `validate_target` through the same context they
+    /// already hold; nothing else changes about the ExecutorContext
+    /// borrow shape (the query is read-only, disjoint from the
+    /// mutable `cats` query because cats are filtered `Without<Dead>`
+    /// and we read `Has<Dead>` rather than `&Dead`).
+    pub target_validity: crate::systems::plan_substrate::target::TargetValidityQuery<'w, 's>,
 }
 
 impl<'w, 's> ExecutorContext<'w, 's> {
@@ -2782,6 +2790,32 @@ fn dispatch_step_action(
 ) -> crate::steps::StepResult {
     let d = &ec.constants.disposition;
 
+    // Ticket 074 — runtime guard for audit gap #4. Validate the
+    // step's `target_entity` at entry so a plan that committed to a
+    // since-dead/banished/incapacitated/despawned entity fails fast
+    // (rather than the resolver's `if let Some(target)` block silently
+    // running on a stale ID, or `TravelTo(target)` re-pathfinding to
+    // empty space tick after tick). The IAUS-time
+    // `EligibilityFilter::require_alive` gate catches the *new-plan*
+    // case (cat picking a stale target); this catches the *mid-plan*
+    // case (target died after the plan committed). Belt-and-suspenders.
+    //
+    // Resolver bodies remain unchanged — the contract is "step
+    // resolvers run only with valid targets"; the gate enforces it.
+    if let Some(target) = plan.step_state[step_idx].target_entity {
+        if let Err(reason) = crate::systems::plan_substrate::validate_target(
+            target,
+            &ec.target_validity,
+        ) {
+            // Failure name encodes the invalidity flavor for the
+            // narrative trace; the existing `PlanFailureReason::TargetDespawned`
+            // path consumes the failure regardless of subkind.
+            return crate::steps::StepResult::Fail(format!(
+                "target invalid at step entry: {reason:?}"
+            ));
+        }
+    }
+
     match action_kind {
         GoapActionKind::TravelTo(zone) => resolve_travel_to(
             zone,
@@ -2835,13 +2869,15 @@ fn dispatch_step_action(
             // Get prey target from previous SearchPrey step's state, or from
             // our own state (set during replan).
             // Ticket 072: routed through `plan_substrate::carry_target_forward`.
-            // 074 will add a dead-entity check before the copy; today the
-            // body is the verbatim "if None and step_idx > 0, copy from
-            // prior step" lifted from the inline site.
+            // Ticket 074: the validity check inside `carry_target_forward`
+            // now drops dead/banished/incapacitated/despawned prior
+            // targets so the EngagePrey step doesn't engage a stale
+            // entity reference. The substrate's `None` return surfaces
+            // through the caller's existing `PlanStepFailed` path.
             let _carried = crate::systems::plan_substrate::carry_target_forward(
                 &mut plan.step_state,
                 step_idx,
-                &crate::systems::plan_substrate::target::TargetValidityQuery,
+                &ec.target_validity,
                 None, // RecentTargetFailures lands in 073
             );
             resolve_engage_prey(

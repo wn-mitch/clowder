@@ -141,9 +141,10 @@ pub fn socialize_target_dse() -> TargetTakingDse {
         // cat-action SocializeDse (where it was metadata-only) — the
         // candidate-prefilter happens here before evaluate_target_taking.
         required_stance: Some(StanceRequirement::socialize()),
-        // Ticket 080 — socialize is contention-tolerant by design
-        // (multiple cats can socialize at the same partner over time).
-        eligibility: Default::default(),
+        // Ticket 074 — gate dead/banished/incapacitated candidates.
+        // 080's reservation gate is intentionally not applied here:
+        // multiple cats can socialize at the same partner.
+        eligibility: crate::systems::plan_substrate::require_alive_filter(),
     }
 }
 
@@ -353,6 +354,7 @@ pub fn resolve_socialize_target(
         self_position: cat_pos,
         target: None,
         target_position: None,
+        target_alive: None,
     };
 
     let scored = evaluate_target_taking(
@@ -416,6 +418,7 @@ mod tests {
             self_position: Position::new(0, 0),
             target: None,
             target_position: None,
+            target_alive: None,
         }
     }
 

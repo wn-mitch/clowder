@@ -1,80 +1,187 @@
 //! Target-handling operations: validity, carryover across step
 //! boundaries, alive-eligibility filter, resource reservation. 072
-//! stubbed `validate_target` / `require_alive_filter`; 074 fills those
-//! bodies. Ticket 080 adds the resource-reservation API
-//! (`reserve_target` / `release_target` / `require_unreserved_filter`).
+//! stubbed `validate_target` / `require_alive_filter`; 074 fleshes out
+//! `EligibilityFilter::require_alive` + step-resolver `validate_target`
+//! (dead targets rejected at scoring time AND at step entry). Ticket
+//! 080 adds the resource-reservation API (`reserve_target` /
+//! `release_target` / `require_unreserved_filter`).
 
 use bevy_ecs::prelude::*;
+use bevy_ecs::system::SystemParam;
 
 use crate::ai::dse::EligibilityFilter;
 use crate::components::goap_plan::StepExecutionState;
 use crate::components::reserved::Reserved;
+use crate::components::markers::{Banished, Incapacitated};
+use crate::components::physical::Dead;
 use crate::components::RecentTargetFailures;
 
 // ---------------------------------------------------------------------------
 // Target validity (074)
 // ---------------------------------------------------------------------------
 
-/// Why a target entity is invalid. Currently only one variant
-/// (`Despawned`); 074 may add `Reserved` when ticket 080 lands the
-/// resource-reservation eligibility check. 072 ships the enum so
-/// callers (step resolvers) can branch on it without each ticket
-/// re-introducing the type.
+/// Why a target entity is invalid. The four variants mirror the
+/// canonical "partner_invalid" predicate used elsewhere in the
+/// substrate (`ai::pairing::evaluate_drop`) — keeping the cross-
+/// site vocabulary consistent.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TargetInvalidReason {
     /// Entity has been despawned since the plan committed to it.
+    /// Detected when the validity query fails to resolve the entity
+    /// (`Query::get(_) == Err(_)`).
     Despawned,
+    /// Entity carries the `Dead` component. Cats remain in-world for a
+    /// grace period after death (narrative reactions); during that
+    /// window they are still queriable but no longer valid targets.
+    Dead,
+    /// Entity carries the `Banished` faction-overlay marker.
+    Banished,
+    /// Entity carries the `Incapacitated` state marker (severe
+    /// unhealed injury — downed and unable to act).
+    Incapacitated,
 }
 
-/// Placeholder query type for target validity. 074 expands this into
-/// a `SystemParam` bundling the queries needed to check despawn /
-/// reservation. 072 is opaque — the stub doesn't read it, so the
-/// type is a unit struct callers can construct freely.
-#[derive(Debug, Default)]
-pub struct TargetValidityQuery;
+/// Trait abstracting the validity check so the runtime SystemParam
+/// path and the test path share the same `validate_target` /
+/// `carry_target_forward` entry points. The runtime impl wraps a
+/// `Query<(Has<Dead>, Has<Banished>, Has<Incapacitated>)>`; tests can
+/// construct an `InMemoryValidity` from a known-invalid set without
+/// spinning up a `World`.
+pub trait TargetValidity {
+    fn check(&self, target: Entity) -> Result<(), TargetInvalidReason>;
+
+    fn is_alive(&self, target: Entity) -> bool {
+        self.check(target).is_ok()
+    }
+}
+
+/// SystemParam bundling the queries needed to check target validity.
+/// Read-only; safe to share across systems. Same shape as the
+/// `Query<(Has<Dead>, Has<Banished>, Has<Incapacitated>)>` used in
+/// `ai::pairing::evaluate_drop` — keeps the validity surface unified.
+///
+/// 072 shipped a unit struct stub; 074 promotes it to a SystemParam.
+/// Callers that already hold the Bevy 16-param budget bundle this in
+/// alongside their other queries via `#[derive(SystemParam)]`.
+#[derive(SystemParam)]
+pub struct TargetValidityQuery<'w, 's> {
+    pub query: Query<'w, 's, (Has<Dead>, Has<Banished>, Has<Incapacitated>)>,
+}
+
+impl<'w, 's> TargetValidity for TargetValidityQuery<'w, 's> {
+    fn check(&self, target: Entity) -> Result<(), TargetInvalidReason> {
+        match self.query.get(target) {
+            // Despawned — query lookup fails entirely.
+            Err(_) => Err(TargetInvalidReason::Despawned),
+            Ok((dead, _, _)) if dead => Err(TargetInvalidReason::Dead),
+            Ok((_, banished, _)) if banished => Err(TargetInvalidReason::Banished),
+            Ok((_, _, incapacitated)) if incapacitated => Err(TargetInvalidReason::Incapacitated),
+            Ok(_) => Ok(()),
+        }
+    }
+}
+
+/// In-memory validity predicate for unit tests. Stores the explicit
+/// invalidity for known entities; defaults to `Ok(())` for unknown
+/// entities. Tests construct this directly without a `World` round-
+/// trip.
+#[derive(Default)]
+pub struct InMemoryValidity {
+    pub invalid: std::collections::HashMap<Entity, TargetInvalidReason>,
+    /// When `true`, entities not present in `invalid` are reported
+    /// `Despawned` — useful for testing the despawn branch.
+    pub absent_means_despawned: bool,
+}
+
+impl InMemoryValidity {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn mark(&mut self, e: Entity, reason: TargetInvalidReason) {
+        self.invalid.insert(e, reason);
+    }
+}
+
+impl TargetValidity for InMemoryValidity {
+    fn check(&self, target: Entity) -> Result<(), TargetInvalidReason> {
+        match self.invalid.get(&target) {
+            Some(reason) => Err(*reason),
+            None if self.absent_means_despawned => Err(TargetInvalidReason::Despawned),
+            None => Ok(()),
+        }
+    }
+}
 
 /// Validate that `target` is still a usable entity for the calling
-/// step. **072 stub — always returns `Ok(())`.** 074 implements the
-/// dead-entity check (`World::contains_entity` or similar) and the
-/// `Reserved` check from ticket 080.
+/// step. Returns `Ok(())` for an alive, non-banished, non-incapacitated
+/// entity that still resides in the World. Maps each invalid flavor to
+/// a specific [`TargetInvalidReason`] so callers can branch on the
+/// cause (e.g., the existing `PlanFailureReason::TargetDespawned` path
+/// records the failure category for replanning).
 ///
 /// Step resolvers in `src/steps/disposition/*.rs` and
-/// `src/steps/building/*.rs` will call this at entry once 074 lands.
-/// 072 lifts the call signature; the bodies of those resolvers don't
-/// change behavior because the stub is unconditionally `Ok`.
-pub fn validate_target(
-    _target: Entity,
-    _validity: &TargetValidityQuery,
+/// `src/steps/building/*.rs` reach this through their dispatchers in
+/// `goap.rs` — the runtime guard that catches mid-step despawn that
+/// the IAUS-time `EligibilityFilter::require_alive` couldn't have
+/// known about. Belt-and-suspenders: the same predicate runs at both
+/// the scoring layer and the execution layer.
+pub fn validate_target<V: TargetValidity + ?Sized>(
+    target: Entity,
+    validity: &V,
 ) -> Result<(), TargetInvalidReason> {
-    Ok(())
+    validity.check(target)
 }
 
 // ---------------------------------------------------------------------------
 // carry_target_forward
 // ---------------------------------------------------------------------------
 
-/// Carry a step's `target_entity` forward from the prior step when
-/// the current step's `target_entity` is `None`. Lifted verbatim from
-/// `goap.rs:2817–2820` — the `EngagePrey` carryover that copies
-/// `step_state[step_idx - 1].target_entity` into
-/// `step_state[step_idx].target_entity` when the latter is `None`.
-///
-/// 072 preserves the existing unconditional copy. 074 will add a
-/// `validate_target` check before the copy so dead targets are
-/// rejected (and 073's `RecentTargetFailures` notes the dead target).
+/// Carry a step's `target_entity` forward from the prior step when the
+/// current step's `target_entity` is `None`. Lifted from
+/// `goap.rs:2817–2820`'s `EngagePrey` carryover; 074 wraps the copy
+/// in a [`validate_target`] check so dead/banished/incapacitated
+/// candidates do **not** propagate across step boundaries.
 ///
 /// **Real-world effect** — when `step_state[step_idx].target_entity`
-/// is `None` and `step_idx > 0`, copies the prior step's
-/// `target_entity` into the current step. Returns the resulting
-/// target entity (or `None` if neither slot held one).
-pub fn carry_target_forward(
+/// is `None` and `step_idx > 0`, validates the prior step's target and
+/// (on success) copies it into the current step. If the prior target
+/// is invalid (Dead/Banished/Incapacitated/despawned), this function
+/// records the failure into `recent` (when 073's
+/// `RecentTargetFailures` is wired) and returns `None`, surfacing the
+/// stale target to the caller's existing `PlanStepFailed` path with
+/// reason `TargetDespawned`.
+///
+/// Returns the resulting target entity (or `None` if neither slot
+/// held one, or if validation rejected the carryover).
+pub fn carry_target_forward<V: TargetValidity + ?Sized>(
     step_state: &mut [StepExecutionState],
     step_idx: usize,
-    _validity: &TargetValidityQuery,
-    _recent: Option<&mut RecentTargetFailures>,
+    validity: &V,
+    recent: Option<&mut RecentTargetFailures>,
 ) -> Option<Entity> {
     if step_state[step_idx].target_entity.is_none() && step_idx > 0 {
-        step_state[step_idx].target_entity = step_state[step_idx - 1].target_entity;
+        if let Some(prior) = step_state[step_idx - 1].target_entity {
+            // 074 — gate the copy on validity. A despawned/dead/banished
+            // prior target must NOT propagate; the caller's existing
+            // `PlanStepFailed` path picks up the `None` and fails the
+            // step with reason `TargetDespawned`.
+            match validity.check(prior) {
+                Ok(()) => {
+                    step_state[step_idx].target_entity = Some(prior);
+                }
+                Err(_) => {
+                    // 073's `RecentTargetFailures` will accept the dead
+                    // target into the cooldown map when wired. Today
+                    // (073 not yet landed in this worktree) the slot is
+                    // reserved — we don't write because the component
+                    // model isn't yet committed by 073's parallel work;
+                    // the `None` return alone is enough to trigger
+                    // replan via the caller's failure path.
+                    let _ = recent;
+                }
+            }
+        }
     }
     step_state[step_idx].target_entity
 }
@@ -83,17 +190,18 @@ pub fn carry_target_forward(
 // require_alive_filter (074 — IAUS engine extension)
 // ---------------------------------------------------------------------------
 
-/// Build an `EligibilityFilter` that requires the candidate target's
-/// alive marker. **072 stub — returns `EligibilityFilter::new()`** (an
-/// always-pass filter), so today this is identical to "no filter at
-/// all". 074 implements the real version: a marker key the
-/// target-DSE registration adds via `EligibilityFilter::require(...)`.
+/// Build an [`EligibilityFilter`] that requires the candidate target
+/// to be alive (not Dead / Banished / Incapacitated / despawned).
+/// Consumed by the six target-DSE factories via
+/// `.eligibility(plan_substrate::require_alive_filter())`.
 ///
-/// Exposed here so 074 doesn't have to introduce a new public symbol;
-/// the call sites can land their `require_alive_filter()` calls today
-/// (no behavior change) and 074 fills in the body.
+/// The flag is a structural gate distinct from the §4 marker
+/// mechanism — the validity facts already live in the per-cat snapshot
+/// the resolvers read, so this avoids a parallel marker table and
+/// keeps the `EligibilityFilter::require_*` builder convention
+/// readable at registration sites.
 pub fn require_alive_filter() -> EligibilityFilter {
-    EligibilityFilter::new()
+    EligibilityFilter::new().require_alive()
 }
 
 // ---------------------------------------------------------------------------
@@ -114,6 +222,16 @@ pub fn require_alive_filter() -> EligibilityFilter {
 /// gate from a frame-local `Reserved` query.
 pub fn require_unreserved_filter() -> EligibilityFilter {
     EligibilityFilter::new().require_unreserved()
+}
+
+/// Combined alive + unreserved gate. Most target DSEs in tickets 074
+/// + 080 want both: only score live, unclaimed candidates. Builders
+/// chain `eligibility: require_alive_and_unreserved_filter()` rather
+/// than wiring two separate filters.
+pub fn require_alive_and_unreserved_filter() -> EligibilityFilter {
+    EligibilityFilter::new()
+        .require_alive()
+        .require_unreserved()
 }
 
 /// Write a `Reserved { owner, expires_tick = tick + ttl_ticks }`

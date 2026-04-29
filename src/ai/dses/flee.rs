@@ -251,6 +251,7 @@ mod tests {
             self_position: Position::new(0, 0),
             target: None,
             target_position: None,
+            target_alive: None,
         };
         let maslow = |_: u8| 1.0;
         let modifiers = ModifierPipeline::new();

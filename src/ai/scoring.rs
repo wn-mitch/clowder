@@ -721,6 +721,7 @@ fn score_dse_by_id(dse_id: &str, ctx: &ScoringContext, inputs: &EvalInputs) -> f
         self_position: inputs.position,
         target: None,
         target_position: None,
+        target_alive: None,
     };
 
     let focal_active = inputs.focal_capture.is_some() && inputs.focal_cat == Some(inputs.cat);
