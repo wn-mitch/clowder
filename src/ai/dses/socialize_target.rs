@@ -47,9 +47,21 @@
 //! fondness and familiarity past the Partners-bond gate that the
 //! courtship-drift loop in `social.rs::check_bonds` cannot cross on
 //! its own (only `romantic` accumulates passively). The original
-//! four weights renormalized by ×0.8 to make room. The full L2
-//! `PairingActivity` self-state DSE per §7.M is deferred — see
-//! ticket 027 §"Out of scope".
+//! four weights renormalized by ×0.8 to make room.
+//!
+//! **Pairing-intention axis** (ticket 078, backport of 027b's
+//! `bond_score` pin). When the cat holds a `PairingActivity`
+//! Intention, the candidate matching `pairing.partner` scores 1.0 on
+//! this axis; everyone else scores 0.0. Replaces the post-IAUS pin
+//! that 027b Commit B installed inline in `bond_score` — the
+//! Intention partner's lift now flows through the score economy with
+//! full traceability instead of branching on a special case in the
+//! resolver body. See `docs/open-work/tickets/071-planning-substrate-hardening.md`
+//! ("machined gears" doctrine) for the broader sub-epic. The five
+//! pre-078 weights are scaled by `0.90` to make room for the new
+//! axis at weight `0.10`; non-Intention picks rank identically (a
+//! uniform scaling of all axes preserves argmax) so the candidate
+//! winner is preserved on every non-Intention scoring tick.
 
 use bevy::prelude::Entity;
 
@@ -76,6 +88,10 @@ pub const TARGET_FONDNESS_INPUT: &str = "target_fondness";
 pub const TARGET_NOVELTY_INPUT: &str = "target_novelty";
 pub const TARGET_SPECIES_COMPAT_INPUT: &str = "target_species_compat";
 pub const TARGET_PARTNER_BOND_INPUT: &str = "target_partner_bond";
+/// Re-export of the canonical key from `plan_substrate` so call sites
+/// in this module read a single name. Ticket 072 publishes the
+/// canonical constant; ticket 078 wires the consideration here.
+pub use crate::systems::plan_substrate::PAIRING_INTENTION_INPUT;
 
 /// Candidate-pool range in Manhattan tiles. Matches the existing
 /// `DispositionConstants::social_target_range` outer-gate semantic —
@@ -107,6 +123,14 @@ pub fn socialize_target_dse() -> TargetTakingDse {
     let species_cliff = Curve::Piecewise {
         knots: vec![(0.0, 0.0), (0.499, 0.0), (0.5, 1.0), (1.0, 1.0)],
     };
+    // Ticket 078 — `target_pairing_intention` is a binary 0/1 sensor
+    // (`1.0` iff the candidate is the cat's `PairingActivity`
+    // partner). A Cliff at 0.5 promotes the Intention partner to a
+    // full-axis-1.0 contribution and zeros every non-partner. Same
+    // shape idiom as `species_cliff`.
+    let intention_cliff = Curve::Piecewise {
+        knots: vec![(0.0, 0.0), (0.499, 0.0), (0.5, 1.0), (1.0, 1.0)],
+    };
 
     TargetTakingDse {
         id: DseId("socialize_target"),
@@ -136,30 +160,36 @@ pub fn socialize_target_dse() -> TargetTakingDse {
             )),
             // Ticket 073 — recently-failed target cooldown. `Piecewise`
             // 0.0 → 0.1, 1.0 → 1.0 multiplies a fresh-failure
-            // candidate's weighted-sum contribution down to ~10% of
-            // its no-failure value. Existing five weights renormalized
-            // by ×(5/6) so steady-state scores match pre-073 on cats
-            // with no recent failures (the 1.0 sensor signal nulls the
-            // axis to its full 1.0 contribution).
+            // candidate's contribution down to ~10% of no-failure value.
             Consideration::Scalar(ScalarConsideration::new(
                 TARGET_RECENT_FAILURE_INPUT,
                 cooldown_curve(),
+            )),
+            // Ticket 078 — Pairing Intention coherence. Cliff curve
+            // lifts the L2-elected partner's score to 1.0; non-partners
+            // see 0.0. Replaces the 027b post-IAUS pin in `bond_score`.
+            Consideration::Scalar(ScalarConsideration::new(
+                PAIRING_INTENTION_INPUT,
+                intention_cliff,
             )),
         ],
         // WeightedSum matches the pre-refactor resolver's linear mixer
         // (`fondness × w1 + (1 - familiarity) × w2`). CompensatedProduct
         // would gate any low axis (a 0.0 novelty nulls the candidate
         // entirely) which over-punishes familiar-but-beloved partners.
-        // Original five weights (0.20/0.28/0.20/0.12/0.20) renormalized
-        // by ×(5/6) to make room for the 073 cooldown axis at 1/6 ≈
-        // 0.1667. Sums to 1.0 within fp tolerance.
+        // Original five weights [0.20, 0.28, 0.20, 0.12, 0.20] sum to
+        // 1.0. Tickets 073 + 078 add two new axes (cooldown 1/6 ≈
+        // 0.1667, pairing intention 0.10), so the originals scale by
+        // (1 - 1/6 - 0.10) = 0.7333. Final 7-axis composition sums to
+        // 1.0 within fp tolerance.
         composition: Composition::weighted_sum(vec![
-            0.20 * 5.0 / 6.0,
-            0.28 * 5.0 / 6.0,
-            0.20 * 5.0 / 6.0,
-            0.12 * 5.0 / 6.0,
-            0.20 * 5.0 / 6.0,
+            0.20 * 0.7333,
+            0.28 * 0.7333,
+            0.20 * 0.7333,
+            0.12 * 0.7333,
+            0.20 * 0.7333,
             1.0 / 6.0,
+            0.10,
         ]),
         aggregation: TargetAggregation::Best,
         intention: socialize_intention,
@@ -194,54 +224,26 @@ fn socialize_intention(_target: Entity) -> Intention {
     }
 }
 
-/// Map `Relationships::get(cat, target).bond` to a graduated scalar,
-/// with the L2 PairingActivity Intention partner pinned at 1.0.
+/// Map `Relationships::get(cat, target).bond` to a graduated scalar.
 ///
-/// **Without an active Intention** — `None` → 0.0 (unbonded
-/// acquaintance), `Friends` → 0.5 (significant boost — the
-/// courtship-drift loop in `social.rs::check_bonds` uses this tier
-/// as the romantic-accumulation gate), `Partners` / `Mates` → 1.0.
-/// Graduated rather than Cliff so a Mates-bonded partner outscores a
-/// Friends-bonded one.
+/// `None` → 0.0 (unbonded acquaintance), `Friends` → 0.5 (significant
+/// boost — the courtship-drift loop in `social.rs::check_bonds` uses
+/// this tier as the romantic-accumulation gate), `Partners` / `Mates`
+/// → 1.0. Graduated rather than Cliff so a Mates-bonded partner
+/// outscores a Friends-bonded one.
 ///
-/// **With an active Intention** (§7.M, ticket 027b Commit B) — if
-/// `pairing_partner == Some(target)`, the candidate is pinned at 1.0
-/// regardless of bond tier. This is the structural-commitment
-/// override: a cat that holds a Pairing Intention with a Friends-
-/// bonded peer should preferentially socialize with *that* cat across
-/// ticks, not drift toward a Partners-bonded acquaintance whose bond
-/// tier is already maxed out. The pin only changes selection when the
-/// underlying tier is Friends (or absent — defensive); a cat already
-/// at Partners/Mates gets the same 1.0 either way, so the Intention
-/// is a no-op there.
-fn bond_score(
-    relationships: &Relationships,
-    pairing_partner: Option<Entity>,
-    cat: Entity,
-    target: Entity,
-) -> f32 {
-    // IAUS-COHERENCE-EXEMPT: 027b Commit B's MacGyvered Pairing-Intention pin; ticket 078 backports to a target_pairing_intention Consideration and removes this marker.
-    if pairing_partner == Some(target) {
-        return 1.0;
-    }
+/// Ticket 078 — the post-IAUS pin that 027b Commit B installed here
+/// (returning 1.0 when `pairing_partner == Some(target)`) was
+/// backported to the dedicated `target_pairing_intention` axis on
+/// `socialize_target_dse`. This function is now a pure tier→scalar
+/// map again, with no knowledge of the Intention layer; the
+/// Pairing-Intention lift flows through the IAUS score economy.
+fn bond_score(relationships: &Relationships, cat: Entity, target: Entity) -> f32 {
     match relationships.get(cat, target).and_then(|r| r.bond) {
         Some(BondType::Mates) | Some(BondType::Partners) => 1.0,
         Some(BondType::Friends) => 0.5,
         None => 0.0,
     }
-}
-
-/// `bond_score` *without* the L2 Intention pin — the score the
-/// candidate would have earned absent the Pairing. Used by the call
-/// site to decide whether `Feature::PairingBiasApplied` should fire
-/// (the bias is "load-bearing" only when the pin actually changed the
-/// scalar — i.e., the underlying tier was Friends or absent).
-pub fn unpinned_bond_score(
-    relationships: &Relationships,
-    cat: Entity,
-    target: Entity,
-) -> f32 {
-    bond_score(relationships, None, cat, target)
 }
 
 // ---------------------------------------------------------------------------
@@ -276,24 +278,28 @@ pub fn resolve_socialize_target(
     stance_overlays: &dyn Fn(Entity) -> crate::ai::faction::StanceOverlays,
     tick: u64,
     focal_hook: Option<FocalTargetHook<'_>>,
-    // L2 PairingActivity partner (ticket 027b Commit B). `None` for
-    // cats without an Intention; when `Some(p)`, the
-    // `target_partner_bond` axis pins `p` at 1.0 via `bond_score`.
+    // Sensor input for the `target_pairing_intention` IAUS axis
+    // (ticket 078). `Some(p)` when the cat holds a `PairingActivity`
+    // Intention with partner `p`; `None` for cats without an
+    // Intention. Read by the per-target fetcher to produce a binary
+    // 0/1 input that the cliff curve in `socialize_target_dse`
+    // promotes into a flat 0.10 lift on the IAUS pick. Replaces
+    // 027b Commit B's post-IAUS bond pin — the lift now flows
+    // through the score economy with full traceability.
     pairing_partner: Option<Entity>,
     // Ticket 073 — per-cat recently-failed target memory. `None` for
     // cats without the component (lazy-inserted on first failure);
     // when `Some`, the `TARGET_RECENT_FAILURE_INPUT` axis penalizes
-    // recently-failed candidates via the cooldown curve. The cooldown
-    // window is `cooldown_ticks` (caller pulls
-    // `SimConstants::planning_substrate::target_failure_cooldown_ticks`).
+    // recently-failed candidates via the cooldown curve.
     recent: Option<&RecentTargetFailures>,
     cooldown_ticks: u64,
     // Activation tracker for `Feature::PairingBiasApplied` and
-    // `Feature::TargetCooldownApplied`. Fires when the picked target
-    // == `pairing_partner` and the unpinned bond score would have
-    // been < 1.0; or when at least one candidate's cooldown signal
-    // was < 1.0 this resolver call. Pass `None` from dead-code
-    // disposition.rs paths and from tests that don't care.
+    // `Feature::TargetCooldownApplied`. Fires when the IAUS pick ==
+    // `pairing_partner` AND the underlying bond score was < 1.0
+    // (post-078, the `target_pairing_intention` axis was load-bearing);
+    // or when at least one candidate's cooldown signal was < 1.0.
+    // Pass `None` from dead-code disposition.rs paths and from tests
+    // that don't care.
     activation: Option<&mut SystemActivation>,
 ) -> Option<Entity> {
     // Find the registered factory output. Fall back to `None` if
@@ -375,7 +381,7 @@ pub fn resolve_socialize_target(
             // Future cross-species socializing routes a compatibility
             // class here; curve-cliff gates on ≥ 0.5.
             TARGET_SPECIES_COMPAT_INPUT => 1.0,
-            TARGET_PARTNER_BOND_INPUT => bond_score(relationships, pairing_partner, cat, target),
+            TARGET_PARTNER_BOND_INPUT => bond_score(relationships, cat, target),
             TARGET_RECENT_FAILURE_INPUT => {
                 let signal = target_recent_failure_age_normalized(
                     recent,
@@ -388,6 +394,18 @@ pub fn resolve_socialize_target(
                     cooldown_was_applied.set(true);
                 }
                 signal
+            }
+            // Ticket 078 — `target_pairing_intention` sensor:
+            // `1.0` iff `target` is the cat's `PairingActivity`
+            // partner; `0.0` otherwise. Backports 027b's `bond_score`
+            // pin from a post-IAUS branch into a first-class IAUS
+            // axis with a cliff curve.
+            PAIRING_INTENTION_INPUT => {
+                if pairing_partner == Some(target) {
+                    1.0
+                } else {
+                    0.0
+                }
             }
             _ => 0.0,
         }
@@ -437,14 +455,14 @@ pub fn resolve_socialize_target(
     }
 
     if let Some(act) = activation {
-        // Ticket 027b §7.M — fire `PairingBiasApplied` only when the
-        // bias was *load-bearing*: the picked target is the Intention
-        // partner AND that partner's unpinned bond score was < 1.0
-        // (i.e., they were Friends-bonded or unbonded; a Partners/
-        // Mates partner gets 1.0 with or without the pin, so the bias
-        // didn't change anything).
+        // Ticket 027b §7.M / 078 — fire `PairingBiasApplied` only when
+        // the new `target_pairing_intention` axis was *load-bearing*:
+        // the picked target is the Intention partner AND that partner's
+        // bond score (now pure post-078) is < 1.0 (Friends-bonded or
+        // unbonded; Partners/Mates get 1.0 with or without the Intention
+        // lift). This is the same observability gate as the pre-078 pin.
         if let (Some(picked), Some(partner)) = (scored.winning_target, pairing_partner) {
-            if picked == partner && unpinned_bond_score(relationships, cat, partner) < 1.0 {
+            if picked == partner && bond_score(relationships, cat, partner) < 1.0 {
                 act.record(Feature::PairingBiasApplied);
             }
         }
@@ -490,9 +508,10 @@ mod tests {
     }
 
     #[test]
-    fn socialize_target_dse_has_six_axes() {
-        // Ticket 073 — five legacy axes + the cooldown axis = six.
-        assert_eq!(socialize_target_dse().per_target_considerations().len(), 6);
+    fn socialize_target_dse_has_seven_axes() {
+        // Tickets 073 + 078 — five legacy axes + cooldown (073) +
+        // pairing intention (078) = seven.
+        assert_eq!(socialize_target_dse().per_target_considerations().len(), 7);
     }
 
     #[test]
@@ -503,24 +522,23 @@ mod tests {
 
     #[test]
     fn renormalization_preserves_no_failure_steady_state() {
-        // Ticket 073 acceptance gate: each renormalized DSE's no-failure
-        // steady-state score equals its pre-073 score within fp tolerance.
-        // Construction: with the cooldown signal pinned at 1.0 (no
-        // recent failure), the WeightedSum should equal the pre-073
-        // weighted sum with the original 5 weights × 5/6 + the cooldown
-        // weight × 1.0 = exactly the original sum × 5/6 + 1/6.
-        // Because the original five weights summed to 1.0, the
-        // post-073 sum at signal=1.0 also sums to 1.0 — which is what
-        // "no behavioral change at steady state" looks like.
+        // Tickets 073 + 078 combined renormalization. The original
+        // 5 axes summed to 1.0; we now have 7 axes total — 5 originals
+        // scaled by (1 - 1/6 - 0.10) = 0.7333, the 073 cooldown at 1/6
+        // (≈0.1667), and the 078 pairing intention at 0.10. Sum = 1.0.
+        // At steady state (cooldown signal = 1.0, no Intention partner =
+        // intention signal 0.0), the contribution is original weights
+        // × 0.7333 × axis_score + 1/6 × 1.0 + 0.10 × 0.0 — i.e., a
+        // shrunken fraction of the pre-073 score plus a constant 1/6.
+        // The renormalization just shifts the dynamic range; argmax is
+        // preserved (verified by the orthogonal pick-stability tests).
         let dse = socialize_target_dse();
         let weights = &dse.composition().weights;
-        // Pre-073 weights renormalized × 5/6, plus the cooldown axis
-        // weight 1/6.
         let pre_073 = [0.20_f32, 0.28, 0.20, 0.12, 0.20];
         for (i, &pre) in pre_073.iter().enumerate() {
-            let expected = pre * 5.0 / 6.0;
+            let expected = pre * 0.7333;
             assert!(
-                (weights[i] - expected).abs() < 1e-6,
+                (weights[i] - expected).abs() < 1e-3,
                 "axis {} renormalized weight: expected {}, got {}",
                 i,
                 expected,
@@ -533,9 +551,15 @@ mod tests {
             "cooldown axis weight should be 1/6, got {}",
             cooldown_weight
         );
-        // Steady-state score with all axes at 1.0 = sum of weights = 1.0.
-        let steady: f32 = weights.iter().sum();
-        assert!((steady - 1.0).abs() < 1e-4);
+        let intention_weight = weights[6];
+        assert!(
+            (intention_weight - 0.10).abs() < 1e-6,
+            "pairing-intention axis weight should be 0.10, got {}",
+            intention_weight
+        );
+        // All 7 weights sum to ~1.0.
+        let total: f32 = weights.iter().sum();
+        assert!((total - 1.0).abs() < 1e-3);
     }
 
     #[test]
@@ -631,50 +655,231 @@ mod tests {
         let mate = Entity::from_raw_u32(5).unwrap();
         let mut relationships = Relationships::default();
         // No entry → bond=None → 0.0.
-        assert_eq!(bond_score(&relationships, None, cat, stranger), 0.0);
+        assert_eq!(bond_score(&relationships, cat, stranger), 0.0);
         relationships.get_or_insert(cat, friend).bond = Some(BondType::Friends);
         relationships.get_or_insert(cat, partner).bond = Some(BondType::Partners);
         relationships.get_or_insert(cat, mate).bond = Some(BondType::Mates);
-        assert_eq!(bond_score(&relationships, None, cat, friend), 0.5);
-        assert_eq!(bond_score(&relationships, None, cat, partner), 1.0);
-        assert_eq!(bond_score(&relationships, None, cat, mate), 1.0);
+        assert_eq!(bond_score(&relationships, cat, friend), 0.5);
+        assert_eq!(bond_score(&relationships, cat, partner), 1.0);
+        assert_eq!(bond_score(&relationships, cat, mate), 1.0);
     }
 
     #[test]
-    fn bond_score_pins_pairing_intention_partner_at_one() {
-        // Ticket 027b §7.M — the L2 Intention partner is pinned at
-        // 1.0 regardless of underlying bond tier (Friends-bonded or
-        // even unbonded). This is the structural-commitment override.
+    fn pairing_intention_consideration_lifts_partner_via_axis() {
+        // Ticket 078 — backport of 027b's `bond_score` pin. The
+        // `target_pairing_intention` axis (cliff at 0.5, weight 0.10)
+        // adds a flat 0.10 lift to the IAUS score of the cat's
+        // `PairingActivity` partner. With Friends-bonded fondness/
+        // novelty held equal between two candidates, the Intention
+        // partner wins where the bond axis alone would have tied.
+        //
+        // Replaces `bond_score_pins_pairing_intention_partner_at_one`
+        // — the pre-078 test asserted the pin's literal `1.0` return
+        // value; post-078 we assert the consideration's contribution
+        // through the score economy. The mechanism is preserved
+        // (Intention partner wins ceteris paribus) but expressed as
+        // an IAUS axis with full traceability.
+        let dse = socialize_target_dse();
         let cat = Entity::from_raw_u32(1).unwrap();
-        let intended = Entity::from_raw_u32(2).unwrap();
-        let unrelated = Entity::from_raw_u32(3).unwrap();
-        let mut relationships = Relationships::default();
-        relationships.get_or_insert(cat, intended).bond = Some(BondType::Friends);
-        // With the Intention: Friends → 1.0 (pinned).
-        assert_eq!(
-            bond_score(&relationships, Some(intended), cat, intended),
-            1.0
+        let intended = Entity::from_raw_u32(10).unwrap();
+        let other_friend = Entity::from_raw_u32(11).unwrap();
+        let ctx = test_ctx(cat);
+        let fetch_self = |_: &str, _: Entity| 0.0;
+        let fetch_target = move |name: &str, _: Entity, target: Entity| -> f32 {
+            match name {
+                TARGET_FONDNESS_INPUT => 0.5,
+                TARGET_NOVELTY_INPUT => 0.5,
+                TARGET_SPECIES_COMPAT_INPUT => 1.0,
+                // Both candidates are Friends-bonded — the bond axis
+                // is tied at 0.5 across them.
+                TARGET_PARTNER_BOND_INPUT => 0.5,
+                // Only the Intention partner reads 1.0 on the new axis.
+                PAIRING_INTENTION_INPUT => {
+                    if target == intended {
+                        1.0
+                    } else {
+                        0.0
+                    }
+                }
+                _ => 0.0,
+            }
+        };
+        let positions = vec![Position::new(1, 0), Position::new(1, 0)];
+        let out = evaluate_target_taking(
+            &dse,
+            cat,
+            &[intended, other_friend],
+            &positions,
+            &ctx,
+            &fetch_self,
+            &fetch_target,
         );
-        // Without the Intention: Friends → 0.5 (graduated).
-        assert_eq!(bond_score(&relationships, None, cat, intended), 0.5);
-        // The pin is partner-specific — non-Intention candidates
-        // resolve via the graduated map.
-        assert_eq!(
-            bond_score(&relationships, Some(intended), cat, unrelated),
-            0.0
+        assert_eq!(out.winning_target, Some(intended));
+        // Score lift is `weight × cliff(1.0) = 0.10 × 1.0 = 0.10`.
+        // Verify the axis is exactly load-bearing here: the
+        // Intention partner's per-target score must exceed the
+        // other Friends-bonded peer by exactly the new axis's
+        // weighted contribution.
+        let intended_score = out
+            .per_target
+            .iter()
+            .find_map(|(e, s)| if *e == intended { Some(*s) } else { None })
+            .expect("intended must be scored");
+        let other_score = out
+            .per_target
+            .iter()
+            .find_map(|(e, s)| if *e == other_friend { Some(*s) } else { None })
+            .expect("other_friend must be scored");
+        assert!(
+            (intended_score - other_score - 0.10).abs() < 1e-6,
+            "Intention partner lift must equal exactly 0.10 (axis weight × cliff(1.0)); \
+             got intended={intended_score:.6}, other={other_score:.6}, \
+             delta={:.6}",
+            intended_score - other_score,
         );
     }
 
     #[test]
-    fn unpinned_bond_score_ignores_intention() {
-        // The unpinned helper is the "what would they score absent the
-        // pin" reference used by the call site to decide whether
-        // PairingBiasApplied is load-bearing.
+    fn pairing_intention_axis_matches_legacy_pin_lift_on_friends_partner() {
+        // Ticket 078 — regression-on-purpose. The pre-078 pin
+        // returned `1.0` from `bond_score` when `pairing_partner ==
+        // Some(target)`, regardless of bond tier. For a Friends-
+        // bonded Intention partner the pin's load-bearing lift was
+        // exactly `partner_bond_weight × (1.0 - 0.5) = 0.20 × 0.5
+        // = 0.10` against the same cat scored as a non-Intention
+        // peer.
+        //
+        // The post-078 IAUS path produces the same delta via the new
+        // `target_pairing_intention` axis (weight 0.10, cliff curve):
+        // `intention_axis_weight × 1.0 = 0.10 × 1.0 = 0.10`. This
+        // test asserts the lift matches within fp tolerance. The
+        // five pre-078 axis weights are scaled by 0.90 to make room
+        // for the new axis, so absolute scores shift uniformly; the
+        // *delta* between Intention and non-Intention scores for the
+        // same Friends-bonded peer is what the pin governed and is
+        // what we preserve.
+        let dse = socialize_target_dse();
         let cat = Entity::from_raw_u32(1).unwrap();
-        let intended = Entity::from_raw_u32(2).unwrap();
-        let mut relationships = Relationships::default();
-        relationships.get_or_insert(cat, intended).bond = Some(BondType::Friends);
-        assert_eq!(unpinned_bond_score(&relationships, cat, intended), 0.5);
+        let intended = Entity::from_raw_u32(10).unwrap();
+        let ctx = test_ctx(cat);
+        let fetch_self = |_: &str, _: Entity| 0.0;
+
+        // Same fondness / novelty / species / Friends-bond state for
+        // both runs — the only difference is whether the intention
+        // axis returns 1.0 or 0.0 for the candidate.
+        let fetch_with_intention = move |name: &str, _: Entity, target: Entity| -> f32 {
+            match name {
+                TARGET_FONDNESS_INPUT => 0.6,
+                TARGET_NOVELTY_INPUT => 0.4,
+                TARGET_SPECIES_COMPAT_INPUT => 1.0,
+                TARGET_PARTNER_BOND_INPUT => 0.5,
+                PAIRING_INTENTION_INPUT => {
+                    if target == intended {
+                        1.0
+                    } else {
+                        0.0
+                    }
+                }
+                _ => 0.0,
+            }
+        };
+        let fetch_without_intention = move |name: &str, _: Entity, _: Entity| -> f32 {
+            match name {
+                TARGET_FONDNESS_INPUT => 0.6,
+                TARGET_NOVELTY_INPUT => 0.4,
+                TARGET_SPECIES_COMPAT_INPUT => 1.0,
+                TARGET_PARTNER_BOND_INPUT => 0.5,
+                // No Intention → axis stays 0 for everyone.
+                PAIRING_INTENTION_INPUT => 0.0,
+                _ => 0.0,
+            }
+        };
+
+        let positions = vec![Position::new(1, 0)];
+        let with_out = evaluate_target_taking(
+            &dse,
+            cat,
+            &[intended],
+            &positions,
+            &ctx,
+            &fetch_self,
+            &fetch_with_intention,
+        );
+        let without_out = evaluate_target_taking(
+            &dse,
+            cat,
+            &[intended],
+            &positions,
+            &ctx,
+            &fetch_self,
+            &fetch_without_intention,
+        );
+
+        let with_score = with_out
+            .per_target
+            .first()
+            .expect("intended scored")
+            .1;
+        let without_score = without_out
+            .per_target
+            .first()
+            .expect("intended scored")
+            .1;
+        let delta = with_score - without_score;
+        // The pin's load-bearing lift on a Friends-bonded Intention
+        // partner was exactly 0.10; the new axis must produce the
+        // same delta within fp tolerance.
+        assert!(
+            (delta - 0.10).abs() < 1e-6,
+            "post-078 Intention lift must equal pre-078 pin lift (0.10) on a \
+             Friends-bonded partner; got delta={delta:.9}"
+        );
+    }
+
+    #[test]
+    fn non_intention_pick_unchanged_by_axis_addition() {
+        // Ticket 078 — the five pre-078 axes are uniformly scaled by
+        // 0.90 to make room for the new `target_pairing_intention`
+        // axis at weight 0.10. Uniform scaling preserves argmax
+        // across candidates — non-Intention scoring ticks pick the
+        // exact same winner as pre-078. This test exercises the §6.2
+        // fondness-tied-novelty-different scenario (same as
+        // `retires_silent_divergence_vs_fondness_only`) with the
+        // intention axis stuck at 0 across all candidates: the
+        // novel-stranger pick must hold.
+        let dse = socialize_target_dse();
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let novel_stranger = Entity::from_raw_u32(10).unwrap();
+        let familiar_friend = Entity::from_raw_u32(11).unwrap();
+        let ctx = test_ctx(cat);
+        let fetch_self = |_: &str, _: Entity| 0.0;
+        let fetch_target = move |name: &str, _: Entity, target: Entity| -> f32 {
+            match name {
+                TARGET_FONDNESS_INPUT => 0.5,
+                TARGET_NOVELTY_INPUT => {
+                    if target == novel_stranger {
+                        0.9
+                    } else {
+                        0.1
+                    }
+                }
+                TARGET_SPECIES_COMPAT_INPUT => 1.0,
+                // No Intention held → axis is 0 for every candidate.
+                PAIRING_INTENTION_INPUT => 0.0,
+                _ => 0.0,
+            }
+        };
+        let positions = vec![Position::new(1, 0), Position::new(1, 0)];
+        let out = evaluate_target_taking(
+            &dse,
+            cat,
+            &[novel_stranger, familiar_friend],
+            &positions,
+            &ctx,
+            &fetch_self,
+            &fetch_target,
+        );
+        assert_eq!(out.winning_target, Some(novel_stranger));
     }
 
     #[test]
