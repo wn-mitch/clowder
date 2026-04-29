@@ -191,6 +191,13 @@ pub struct CatAnchorPositions {
 
 pub struct ScoringContext<'a> {
     pub scoring: &'a ScoringConstants,
+    /// §075 — disposition-tier tunables consulted by the
+    /// `commitment_tenure_progress` scalar producer
+    /// (`min_disposition_tenure_ticks`). Borrowed alongside `scoring`
+    /// because `ScoringConstants` does not carry the tenure-window
+    /// knob; `ctx_scalars` reads it through this field rather than
+    /// each scoring site re-deriving the progress value.
+    pub disposition_constants: &'a crate::resources::sim_constants::DispositionConstants,
     pub needs: &'a Needs,
     pub personality: &'a Personality,
     pub food_available: bool,
@@ -270,6 +277,19 @@ pub struct ScoringContext<'a> {
     pub has_active_disposition: bool,
     /// The current disposition kind, if any (for patience commitment bonus).
     pub active_disposition: Option<crate::components::disposition::DispositionKind>,
+    /// Tick when the cat's current disposition was last switched into.
+    /// Source: `Disposition::disposition_started_tick`, written by
+    /// `plan_substrate::record_disposition_switch` (072). Consumed by
+    /// the §3.5.1 `CommitmentTenure` Modifier (075) through the
+    /// `commitment_tenure_progress` scalar — the modifier applies an
+    /// additive lift to the cat's incumbent disposition's constituent
+    /// DSEs while `tick - disposition_started_tick <
+    /// min_disposition_tenure_ticks`. Defaults to 0 at every
+    /// `ScoringContext` construction site that doesn't have an active
+    /// Disposition component to read; combined with
+    /// `has_active_disposition = false`, the modifier short-circuits
+    /// and applies no lift.
+    pub disposition_started_tick: u64,
     /// Pre-computed tradition location bonus for the cat's current tile.
     /// Set to `tradition * 0.1` by the caller if the cat's current action
     /// matches a previously successful action at this tile, else 0.0.
@@ -364,7 +384,7 @@ pub struct ScoringResult {
 /// full) maps to `"hunger_urgency" = 0.9`. The inversion lives here
 /// rather than in each DSE's fetch_scalar so future ports share one
 /// source of truth.
-fn ctx_scalars(ctx: &ScoringContext) -> HashMap<&'static str, f32> {
+fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static str, f32> {
     let mut m = HashMap::new();
     // Needs-as-urgency (deficit form).
     m.insert("hunger_urgency", (1.0 - ctx.needs.hunger).clamp(0.0, 1.0));
@@ -527,6 +547,27 @@ fn ctx_scalars(ctx: &ScoringContext) -> HashMap<&'static str, f32> {
         "active_disposition_ordinal",
         active_disposition_ordinal(ctx.active_disposition),
     );
+    // §075 commitment-tenure progress — the `CommitmentTenure`
+    // Modifier consumes this to gate its additive lift on the cat's
+    // incumbent disposition's constituent DSEs. Shape: 0.0 at
+    // `tick == disposition_started_tick`, climbs linearly to 1.0
+    // at the tenure-window edge, saturates at 1.0 thereafter.
+    // The modifier applies its lift while progress < 1.0; outside
+    // the window it returns the score unchanged.
+    //
+    // When the cat has no active disposition, progress is reported
+    // as 1.0 (window already elapsed) so the modifier's outside-
+    // window short-circuit fires — no lift is applied without an
+    // incumbent disposition to lift.
+    m.insert(
+        crate::systems::plan_substrate::COMMITMENT_TENURE_INPUT,
+        commitment_tenure_progress(
+            ctx.has_active_disposition,
+            ctx.disposition_started_tick,
+            inputs.tick,
+            ctx.disposition_constants.min_disposition_tenure_ticks,
+        ),
+    );
     // Dummy "one" input for DSEs with base-rate axes (Cook, Idle,
     // Wander). Carried as a scalar so the curve's weight slot is
     // uniform with the other axes.
@@ -567,6 +608,39 @@ fn active_disposition_ordinal(
     }
 }
 
+/// §075 — `CommitmentTenure` Modifier scalar producer. Returns the
+/// fraction of the cat's disposition-tenure window that has elapsed:
+/// `0.0` immediately after a switch, climbing linearly toward `1.0`
+/// at the window edge, saturating at `1.0` thereafter. The
+/// `CommitmentTenure` modifier (`src/ai/modifier.rs`) lifts the
+/// incumbent disposition's constituent DSE scores while progress is
+/// strictly less than `1.0`; outside the window the modifier returns
+/// each score unchanged.
+///
+/// Cats with no active disposition report `1.0` (window already
+/// elapsed) so the modifier's outside-window short-circuit fires —
+/// no lift is applied without an incumbent to lift.
+///
+/// Defensive against `tick < disposition_started_tick` (clock-rewind
+/// edge case during save/load): saturating subtraction floors the
+/// elapsed window at 0, so progress is `0.0` rather than wrapping.
+/// Defensive against `min_tenure_ticks == 0` (knob set to zero
+/// effectively disables the modifier): returns `1.0` so the modifier
+/// short-circuits.
+fn commitment_tenure_progress(
+    has_active_disposition: bool,
+    disposition_started_tick: u64,
+    tick: u64,
+    min_tenure_ticks: u64,
+) -> f32 {
+    if !has_active_disposition || min_tenure_ticks == 0 {
+        return 1.0;
+    }
+    let elapsed = tick.saturating_sub(disposition_started_tick);
+    let clamped = elapsed.min(min_tenure_ticks);
+    clamped as f32 / min_tenure_ticks as f32
+}
+
 /// Day-phase scalar knots, keyed to the Piecewise curve in Sleep /
 /// fox_hunting / fox_resting. Must match
 /// `dses::sleep::{DAWN_KNOT, …}` and
@@ -596,7 +670,7 @@ fn score_dse_by_id(dse_id: &str, ctx: &ScoringContext, inputs: &EvalInputs) -> f
     let Some(dse) = inputs.dse_registry.cat_dse(dse_id) else {
         return 0.0;
     };
-    let scalars = ctx_scalars(ctx);
+    let scalars = ctx_scalars(ctx, inputs);
     let fetch_scalar =
         |name: &str, _entity: Entity| -> f32 { scalars.get(name).copied().unwrap_or(0.0) };
     // §4 marker lookup — consumes `EvalInputs::markers` populated by
@@ -1813,8 +1887,9 @@ mod tests {
             // modifiers retired in §13.1; their contribution now lives
             // in the axis-level Logistic curves on the corresponding
             // sibling DSEs.
-            let scoring = crate::resources::sim_constants::ScoringConstants::default();
-            crate::ai::modifier::default_modifier_pipeline(&scoring)
+            // §075 — `default_modifier_pipeline` now takes `&SimConstants`.
+            let constants = crate::resources::sim_constants::SimConstants::default();
+            crate::ai::modifier::default_modifier_pipeline(&constants)
         })
     }
 
@@ -1911,6 +1986,18 @@ mod tests {
         ScoringConstants::default()
     }
 
+    /// §075: leak a singleton `DispositionConstants` so the test
+    /// `ctx()` helper can borrow it immutably for the lifetime of
+    /// each test without forcing every caller to construct one.
+    /// Tests don't tune the disposition constants, so a single static
+    /// default suffices for every per-test `ScoringContext`.
+    fn default_disposition_constants() -> &'static crate::resources::sim_constants::DispositionConstants {
+        use std::sync::OnceLock;
+        static DC: OnceLock<crate::resources::sim_constants::DispositionConstants> =
+            OnceLock::new();
+        DC.get_or_init(crate::resources::sim_constants::DispositionConstants::default)
+    }
+
     fn ctx<'a>(
         needs: &'a Needs,
         personality: &'a Personality,
@@ -1918,6 +2005,7 @@ mod tests {
     ) -> ScoringContext<'a> {
         ScoringContext {
             scoring,
+            disposition_constants: default_disposition_constants(),
             needs,
             personality,
             food_available: true,
@@ -1951,6 +2039,7 @@ mod tests {
             respect: needs.respect,
             has_active_disposition: false,
             active_disposition: None,
+            disposition_started_tick: 0,
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
@@ -2062,6 +2151,7 @@ mod tests {
         // No food, no hunt/forage targets — only Wander/Idle/Sleep/Groom/Explore available
         let c = ScoringContext {
             scoring: &sc,
+            disposition_constants: default_disposition_constants(),
             needs: &needs,
             personality: &personality,
             food_available: false,
@@ -2095,6 +2185,7 @@ mod tests {
             respect: needs.respect,
             has_active_disposition: false,
             active_disposition: None,
+            disposition_started_tick: 0,
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
@@ -2229,6 +2320,7 @@ mod tests {
 
         let c = ScoringContext {
             scoring: &sc,
+            disposition_constants: default_disposition_constants(),
             needs: &needs,
             personality: &personality,
             food_available: true,
@@ -2262,6 +2354,7 @@ mod tests {
             respect: needs.respect,
             has_active_disposition: false,
             active_disposition: None,
+            disposition_started_tick: 0,
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
@@ -2486,6 +2579,7 @@ mod tests {
 
         let c = ScoringContext {
             scoring: &sc,
+            disposition_constants: default_disposition_constants(),
             needs: &needs,
             personality: &personality,
             food_available: true,
@@ -2519,6 +2613,7 @@ mod tests {
             respect: needs.respect,
             has_active_disposition: false,
             active_disposition: None,
+            disposition_started_tick: 0,
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
@@ -2559,6 +2654,7 @@ mod tests {
 
         let c = ScoringContext {
             scoring: &sc,
+            disposition_constants: default_disposition_constants(),
             needs: &needs,
             personality: &personality,
             food_available: true,
@@ -2592,6 +2688,7 @@ mod tests {
             respect: needs.respect,
             has_active_disposition: false,
             active_disposition: None,
+            disposition_started_tick: 0,
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
@@ -2651,6 +2748,7 @@ mod tests {
 
         let c = ScoringContext {
             scoring: &sc,
+            disposition_constants: default_disposition_constants(),
             needs: &needs,
             personality: &personality,
             food_available: true,
@@ -2684,6 +2782,7 @@ mod tests {
             respect: needs.respect,
             has_active_disposition: false,
             active_disposition: None,
+            disposition_started_tick: 0,
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
@@ -2960,6 +3059,7 @@ mod tests {
 
         let c = ScoringContext {
             scoring: &sc,
+            disposition_constants: default_disposition_constants(),
             needs: &needs,
             personality: &personality,
             food_available: false,
@@ -2993,6 +3093,7 @@ mod tests {
             respect: needs.respect,
             has_active_disposition: false,
             active_disposition: None,
+            disposition_started_tick: 0,
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
@@ -3035,6 +3136,7 @@ mod tests {
 
         let base = ScoringContext {
             scoring: &sc,
+            disposition_constants: default_disposition_constants(),
             needs: &needs,
             personality: &personality,
             food_available: true,
@@ -3067,6 +3169,7 @@ mod tests {
             respect: needs.respect,
             has_active_disposition: false,
             active_disposition: None,
+            disposition_started_tick: 0,
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
@@ -3731,5 +3834,59 @@ mod tests {
             score_no_frontier <= 0.001,
             "explore should be gated near 0 without a frontier centroid; got {score_no_frontier}"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // §075 commitment-tenure progress producer
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn commitment_tenure_progress_zero_at_switch_tick() {
+        // Cat just switched: tick == disposition_started_tick →
+        // progress = 0.0 (full lift window remains).
+        let p = commitment_tenure_progress(true, 100, 100, 200);
+        assert!((p - 0.0).abs() < 1e-6, "got {p}");
+    }
+
+    #[test]
+    fn commitment_tenure_progress_climbs_linearly_through_window() {
+        // Halfway through a 200-tick window → progress = 0.5.
+        let p = commitment_tenure_progress(true, 100, 200, 200);
+        assert!((p - 0.5).abs() < 1e-6, "got {p}");
+    }
+
+    #[test]
+    fn commitment_tenure_progress_saturates_at_one() {
+        // Past the window edge → progress saturates at 1.0
+        // (modifier short-circuits, no lift).
+        let p = commitment_tenure_progress(true, 100, 5_000, 200);
+        assert!((p - 1.0).abs() < 1e-6, "got {p}");
+    }
+
+    #[test]
+    fn commitment_tenure_progress_one_when_no_active_disposition() {
+        // No incumbent ⇒ producer reports 1.0 so the modifier's
+        // outside-window short-circuit fires (no lift to apply).
+        let p = commitment_tenure_progress(false, 100, 150, 200);
+        assert!((p - 1.0).abs() < 1e-6, "got {p}");
+    }
+
+    #[test]
+    fn commitment_tenure_progress_one_when_min_tenure_zero() {
+        // Defensive: knob set to 0 effectively disables the modifier.
+        // Returns 1.0 so the modifier short-circuits — and avoids the
+        // divide-by-zero that would otherwise hit the elapsed/min calc.
+        let p = commitment_tenure_progress(true, 100, 150, 0);
+        assert!((p - 1.0).abs() < 1e-6, "got {p}");
+    }
+
+    #[test]
+    fn commitment_tenure_progress_clock_rewind_floors_at_zero() {
+        // Defensive: tick < disposition_started_tick (e.g., a save-load
+        // restore that snapshots the started_tick from a later world
+        // state). Saturating subtraction keeps progress at 0.0 rather
+        // than wrapping into a huge u64 → 1.0 saturation mid-window.
+        let p = commitment_tenure_progress(true, 500, 100, 200);
+        assert!((p - 0.0).abs() < 1e-6, "got {p}");
     }
 }

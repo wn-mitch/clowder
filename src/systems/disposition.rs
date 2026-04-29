@@ -800,6 +800,7 @@ pub fn evaluate_dispositions(
 
         let ctx = ScoringContext {
             scoring: sc,
+            disposition_constants: d,
             needs,
             personality,
             food_available,
@@ -837,6 +838,7 @@ pub fn evaluate_dispositions(
             respect: needs.respect,
             has_active_disposition: false,
             active_disposition: None,
+            disposition_started_tick: 0,
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: caretake_resolution.urgency,
             is_parent_of_hungry_kitten: caretake_resolution.is_parent,

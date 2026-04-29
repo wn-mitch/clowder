@@ -85,7 +85,10 @@ pub fn register_dses_at_startup(
 ) {
     let scoring = &constants.scoring;
     populate_dse_registry(&mut registry, scoring);
-    commands.insert_resource(default_modifier_pipeline(scoring));
+    // §075 — `default_modifier_pipeline` takes `&SimConstants` so the
+    // `CommitmentTenure` modifier can reach `DispositionConstants`
+    // (`oscillation_score_lift`).
+    commands.insert_resource(default_modifier_pipeline(&constants));
 }
 
 /// Registers all simulation systems on `FixedUpdate` in the same order as the

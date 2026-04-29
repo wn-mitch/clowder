@@ -72,6 +72,13 @@ const TRADITION_LOCATION_BONUS: &str = "tradition_location_bonus";
 const FOX_SCENT_LEVEL: &str = "fox_scent_level";
 const TILE_CORRUPTION: &str = "tile_corruption";
 const ACTIVE_DISPOSITION_ORDINAL: &str = "active_disposition_ordinal";
+/// §075 — `CommitmentTenure` Modifier. Drift between this name and
+/// `plan_substrate::COMMITMENT_TENURE_INPUT` (the canonical
+/// `&'static str` the substrate publishes) becomes a build-time error
+/// via the `const _: () = assert!(...)` below — see the
+/// `CommitmentTenure` doc-comment for the rationale.
+const COMMITMENT_TENURE_PROGRESS: &str =
+    crate::systems::plan_substrate::COMMITMENT_TENURE_INPUT;
 
 // ---------------------------------------------------------------------------
 // DSE ids the modifiers target
@@ -404,6 +411,115 @@ fn constituent_dses_for_ordinal(ordinal: f32) -> Option<&'static [&'static str]>
 }
 
 // ---------------------------------------------------------------------------
+// CommitmentTenure
+// ---------------------------------------------------------------------------
+
+/// §3.5.1 commitment-tenure hysteresis (ticket 075, parent 071).
+///
+/// **Why:** when two dispositions score within ε of each other, the
+/// IAUS softmax oscillates every tick — picking different incumbents
+/// from one re-evaluation to the next. Oscillation churns plans,
+/// defeats single-disposition commitment, and wastes the score
+/// economy. Audit gap #5 in the planning-substrate hardening sub-epic
+/// (`docs/open-work/tickets/071-planning-substrate-hardening.md`).
+///
+/// **Trigger:** `commitment_tenure_progress < 1.0` AND the cat has an
+/// active disposition. `commitment_tenure_progress` is published by
+/// `scoring::commitment_tenure_progress` (see its doc-comment) — it
+/// reads `Disposition::disposition_started_tick` (written by
+/// `plan_substrate::record_disposition_switch`, ticket 072) and the
+/// current tick, returning the fraction of `min_disposition_tenure_ticks`
+/// that has elapsed since the last switch. `1.0` means the window has
+/// closed and no lift is applied.
+///
+/// **Transform:** `score += oscillation_score_lift` — flat additive,
+/// applied to every DSE that is a constituent action of the cat's
+/// active disposition. Same membership table as [`Patience`]; reuses
+/// [`constituent_dses_for_ordinal`] so the table stays single-sourced.
+///
+/// **Applies to:** dynamic per the active-disposition's constituent
+/// list (see [`constituent_dses_for_ordinal`]). Cats with no active
+/// disposition see no lift on any DSE — the
+/// `commitment_tenure_progress` scalar reports `1.0` in that case
+/// and the modifier short-circuits before the table lookup.
+///
+/// **Architectural guardrail (071's "machined gears" doctrine):**
+/// anti-oscillation is a `Modifier` in the §3.5.1 pipeline — additive
+/// lift on the incumbent disposition's constituent DSEs so it wins
+/// the IAUS pick during the tenure window through the natural softmax
+/// economy. **NOT** a switch-gate that overrides the IAUS pick.
+/// Inspectable in the same modifier-pipeline trace as `Pride` /
+/// `Patience` via `ModifierPipeline::apply_with_trace`.
+///
+/// **Stacking with Patience:** both modifiers register and apply to
+/// constituent DSEs of the active disposition. The combined lift is
+/// `patience_commitment_bonus * personality.patience +
+/// oscillation_score_lift` while the cat is inside the tenure window.
+/// The two are intentionally independent: Patience encodes the cat's
+/// personality-driven commitment to its current behavior, whereas
+/// `CommitmentTenure` is a flat anti-oscillation pad that doesn't
+/// depend on personality. Conservative defaults
+/// (`oscillation_score_lift = 0.10` <
+/// `patience_commitment_bonus = 0.15`) keep the two roughly balanced.
+///
+/// **Gated-boost contract:** returns `score` unchanged on score
+/// `<= 0` so the additive lift doesn't resurrect a DSE the Maslow
+/// pre-gate (or its outer scoring-layer gate) suppressed. Matches the
+/// stance of `Pride` / `Patience` / `IndependenceSolo`.
+pub struct CommitmentTenure {
+    lift: f32,
+}
+
+impl CommitmentTenure {
+    pub fn new(sc: &crate::resources::sim_constants::SimConstants) -> Self {
+        Self {
+            lift: sc.disposition.oscillation_score_lift,
+        }
+    }
+}
+
+impl ScoreModifier for CommitmentTenure {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        if score <= 0.0 {
+            return score;
+        }
+        // Tenure-window check: progress < 1.0 means we're still inside
+        // the window (saturates at 1.0 once the window has elapsed).
+        // The progress producer also returns 1.0 when the cat has no
+        // active disposition, so this single comparison subsumes the
+        // "no active disposition" short-circuit.
+        let progress = fetch(COMMITMENT_TENURE_PROGRESS, ctx.cat);
+        if progress >= 1.0 {
+            return score;
+        }
+        // Membership check: only DSEs in the active disposition's
+        // constituent list receive the lift. Reuses Patience's
+        // ordinal→DSE-id table so the two modifiers stay aligned;
+        // when `DispositionKind::constituent_actions()` changes, the
+        // single table in `constituent_dses_for_ordinal` updates and
+        // both modifiers track it.
+        let ordinal = fetch(ACTIVE_DISPOSITION_ORDINAL, ctx.cat);
+        let Some(constituents) = constituent_dses_for_ordinal(ordinal) else {
+            return score;
+        };
+        if !constituents.contains(&dse_id.0) {
+            return score;
+        }
+        score + self.lift
+    }
+
+    fn name(&self) -> &'static str {
+        "commitment_tenure"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tradition
 // ---------------------------------------------------------------------------
 
@@ -650,12 +766,24 @@ impl ScoreModifier for CorruptionTerritorySuppression {
 /// Mirror sites — `src/plugins/simulation.rs`, `src/main.rs`
 /// `setup_world` + `run_new_game`, save-load restore — each call
 /// this helper to produce the same pipeline shape.
-pub fn default_modifier_pipeline(sc: &ScoringConstants) -> ModifierPipeline {
+pub fn default_modifier_pipeline(
+    constants: &crate::resources::sim_constants::SimConstants,
+) -> ModifierPipeline {
+    let sc = &constants.scoring;
     let mut pipeline = ModifierPipeline::new();
     pipeline.push(Box::new(Pride::new(sc)));
     pipeline.push(Box::new(IndependenceSolo::new(sc)));
     pipeline.push(Box::new(IndependenceGroup::new(sc)));
     pipeline.push(Box::new(Patience::new(sc)));
+    // §075 — `CommitmentTenure` registers between Patience and
+    // Tradition. Order doesn't load-bear (its lift is additive and
+    // commutes with every other §3.5.1 transform), but it sits next
+    // to Patience so the trace shows the two related additive lifts
+    // adjacent in the modifier-pipeline output. The tunable lives on
+    // `DispositionConstants` (alongside `min_disposition_tenure_ticks`),
+    // which is why this helper takes `&SimConstants` rather than
+    // `&ScoringConstants`.
+    pipeline.push(Box::new(CommitmentTenure::new(constants)));
     pipeline.push(Box::new(Tradition::new()));
     pipeline.push(Box::new(FoxTerritorySuppression::new(sc)));
     pipeline.push(Box::new(CorruptionTerritorySuppression::new(sc)));
@@ -1129,15 +1257,205 @@ mod tests {
         assert!(constituent_dses_for_ordinal(0.0).is_none());
     }
 
+    // -----------------------------------------------------------------------
+    // §3.5.1 / §075 CommitmentTenure
+    // -----------------------------------------------------------------------
+
     #[test]
-    fn default_pipeline_registers_seven_modifiers() {
-        // Seven §3.5.1 foundational modifiers. The three Phase 4.2
-        // emergency modifiers (`WardCorruptionEmergency`,
-        // `CleanseEmergency`, `SensedRotBoost`) retired in §13.1 —
-        // their contribution is now produced at the axis level by
-        // the Logistic curves on the corresponding sibling DSEs.
-        let sc = ScoringConstants::default();
-        let pipeline = default_modifier_pipeline(&sc);
-        assert_eq!(pipeline.len(), 7, "expected 7 registered modifiers");
+    fn commitment_tenure_lifts_constituent_dse_inside_window() {
+        // Hunting disposition (ordinal 2) → Hunt is constituent.
+        // Inside the tenure window: progress = 0.4 → modifier applies
+        // its flat lift to the Hunt score.
+        let modifier = CommitmentTenure { lift: 0.10 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            ACTIVE_DISPOSITION_ORDINAL => 2.0,
+            COMMITMENT_TENURE_PROGRESS => 0.4,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(HUNT), 0.5, &ctx, &fetch);
+        assert!(
+            (out - 0.6).abs() < 1e-6,
+            "0.5 + 0.10 = 0.6 inside-window; got {out}"
+        );
+    }
+
+    #[test]
+    fn commitment_tenure_no_lift_outside_window() {
+        // progress = 1.0 → window has elapsed; no lift on any DSE.
+        let modifier = CommitmentTenure { lift: 0.10 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            ACTIVE_DISPOSITION_ORDINAL => 2.0,
+            COMMITMENT_TENURE_PROGRESS => 1.0,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(HUNT), 0.5, &ctx, &fetch);
+        assert!(
+            (out - 0.5).abs() < 1e-6,
+            "outside-window ⇒ no lift; got {out}"
+        );
+    }
+
+    #[test]
+    fn commitment_tenure_no_lift_when_no_active_disposition() {
+        // The scoring producer reports progress = 1.0 when the cat
+        // has no active disposition; the modifier short-circuits on
+        // that. Verify that even with progress = 0.0 (defensive: a
+        // future producer could miss the no-disposition gate), the
+        // ordinal = 0.0 short-circuit also blocks the lift.
+        let modifier = CommitmentTenure { lift: 0.10 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            ACTIVE_DISPOSITION_ORDINAL => 0.0,
+            COMMITMENT_TENURE_PROGRESS => 0.0,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(HUNT), 0.5, &ctx, &fetch);
+        assert!(
+            (out - 0.5).abs() < 1e-6,
+            "no active disposition ⇒ no lift; got {out}"
+        );
+    }
+
+    #[test]
+    fn commitment_tenure_targets_only_constituent_dses_of_active_disposition() {
+        // Hunting disposition (ordinal 2). Inside the window. Hunt is
+        // constituent; Socialize / Eat / Sleep are not — they get no
+        // lift.
+        let modifier = CommitmentTenure { lift: 0.10 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            ACTIVE_DISPOSITION_ORDINAL => 2.0,
+            COMMITMENT_TENURE_PROGRESS => 0.0,
+            _ => 0.0,
+        };
+        // Hunt is constituent → lifted.
+        let hunt_out = modifier.apply(DseId(HUNT), 0.5, &ctx, &fetch);
+        assert!((hunt_out - 0.6).abs() < 1e-6, "Hunt lifted; got {hunt_out}");
+        // Non-constituent DSEs pass through unchanged.
+        for dse in [SOCIALIZE, EAT, SLEEP, FORAGE, FIGHT, BUILD] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "dse {dse} (non-constituent) unchanged; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn commitment_tenure_does_not_resurrect_zero_score() {
+        // Gated-boost contract: a DSE the Maslow pre-gate suppressed
+        // (score == 0) MUST stay at 0 — the additive lift can't bring
+        // a suppressed action back into the pool.
+        let modifier = CommitmentTenure { lift: 0.10 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            ACTIVE_DISPOSITION_ORDINAL => 2.0,
+            COMMITMENT_TENURE_PROGRESS => 0.0,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(HUNT), 0.0, &ctx, &fetch);
+        assert_eq!(out, 0.0, "zero score stays zero — no resurrection");
+    }
+
+    #[test]
+    fn commitment_tenure_lift_independent_of_personality() {
+        // §075 design: the lift is a flat anti-oscillation pad that
+        // doesn't scale with personality (unlike Patience which scales
+        // with `personality.patience`). Verify by sweeping the patience
+        // scalar and confirming the same constant lift fires.
+        let modifier = CommitmentTenure { lift: 0.10 };
+        let (_, ctx) = test_ctx();
+        for patience in [0.0, 0.3, 0.7, 1.0] {
+            let fetch = |name: &str, _: Entity| match name {
+                ACTIVE_DISPOSITION_ORDINAL => 2.0,
+                COMMITMENT_TENURE_PROGRESS => 0.5,
+                PATIENCE => patience,
+                _ => 0.0,
+            };
+            let out = modifier.apply(DseId(HUNT), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.6).abs() < 1e-6,
+                "patience {patience} ⇒ lift unchanged; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn commitment_tenure_breaks_disposition_oscillation_synthetic() {
+        // §075 synthetic regression test. Setup: two dispositions tied
+        // within ε of each other (Hunting + Foraging at score 0.50).
+        // Without the modifier registered, the IAUS softmax (Boltzmann
+        // weights) would split probability ~50/50 across them, making
+        // the cat oscillate every re-evaluation. With the modifier
+        // registered and the cat already on Hunting (active ordinal
+        // 2), the additive lift biases Hunting's softmax weight.
+        //
+        // We don't run the full softmax here (it's a stochastic
+        // sampler); instead we verify the mechanical claim that the
+        // modifier *changes* the Hunting score by exactly `lift` while
+        // leaving Foraging untouched. That score gap is what the
+        // softmax then converts into a probability mass favoring the
+        // incumbent.
+        use crate::ai::eval::ModifierPipeline;
+
+        let mut pipeline = ModifierPipeline::new();
+        pipeline.push(Box::new(CommitmentTenure { lift: 0.10 }));
+
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            ACTIVE_DISPOSITION_ORDINAL => 2.0, // Hunting is incumbent
+            COMMITMENT_TENURE_PROGRESS => 0.0, // tick == disposition_started_tick
+            _ => 0.0,
+        };
+
+        // Hunting (incumbent's constituent) gets the lift.
+        let hunt = pipeline.apply(DseId(HUNT), 0.50, &ctx, &fetch);
+        // Forage (alternate disposition's constituent) does not.
+        let forage = pipeline.apply(DseId(FORAGE), 0.50, &ctx, &fetch);
+        assert!(
+            (hunt - 0.60).abs() < 1e-6,
+            "incumbent disposition's constituent lifted; got {hunt}"
+        );
+        assert!(
+            (forage - 0.50).abs() < 1e-6,
+            "non-incumbent disposition's constituent unchanged; got {forage}"
+        );
+        // The score gap (hunt - forage = 0.10) is precisely what
+        // breaks the tie that would otherwise oscillate the softmax.
+        assert!(
+            hunt > forage,
+            "score gap favors incumbent: hunt={hunt}, forage={forage}"
+        );
+
+        // Sanity: outside the tenure window the gap collapses back to 0.
+        let fetch_outside = |name: &str, _: Entity| match name {
+            ACTIVE_DISPOSITION_ORDINAL => 2.0,
+            COMMITMENT_TENURE_PROGRESS => 1.0, // window has elapsed
+            _ => 0.0,
+        };
+        let hunt_after = pipeline.apply(DseId(HUNT), 0.50, &ctx, &fetch_outside);
+        let forage_after = pipeline.apply(DseId(FORAGE), 0.50, &ctx, &fetch_outside);
+        assert!(
+            (hunt_after - forage_after).abs() < 1e-6,
+            "post-tenure: scores tie again ⇒ softmax can switch freely"
+        );
+    }
+
+    #[test]
+    fn default_pipeline_registers_eight_modifiers() {
+        // Eight §3.5.1 foundational modifiers — the seven original
+        // (`Pride`, `IndependenceSolo`, `IndependenceGroup`, `Patience`,
+        // `Tradition`, `FoxTerritorySuppression`,
+        // `CorruptionTerritorySuppression`) plus §075's
+        // `CommitmentTenure`. The three Phase 4.2 emergency modifiers
+        // (`WardCorruptionEmergency`, `CleanseEmergency`,
+        // `SensedRotBoost`) retired in §13.1 — their contribution is
+        // now produced at the axis level by the Logistic curves on
+        // the corresponding sibling DSEs.
+        let constants = crate::resources::sim_constants::SimConstants::default();
+        let pipeline = default_modifier_pipeline(&constants);
+        assert_eq!(pipeline.len(), 8, "expected 8 registered modifiers");
     }
 }

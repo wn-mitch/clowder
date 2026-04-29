@@ -1919,6 +1919,25 @@ pub struct DispositionConstants {
     /// Manhattan range within which a cat counts as "at" the Kitchen to cook.
     #[serde(default = "default_kitchen_cook_radius")]
     pub kitchen_cook_radius: i32,
+    /// Ticket 075 — `CommitmentTenure` Modifier tenure window. Once a
+    /// cat adopts a disposition, the modifier lifts that disposition's
+    /// constituent DSE scores by `oscillation_score_lift` for this many
+    /// ticks. Default ~200 (≈ 30 sim-minutes) is a conservative anti-
+    /// oscillation pad: enough to break the score-tied-every-tick churn
+    /// pattern, short enough not to lock cats into a stale disposition
+    /// when needs genuinely shift. Tune via post-landing sensitivity
+    /// sweep per the §071 sub-epic doctrine.
+    #[serde(default = "default_min_disposition_tenure_ticks")]
+    pub min_disposition_tenure_ticks: u64,
+    /// Ticket 075 — additive lift `CommitmentTenure` applies to each
+    /// constituent DSE of the cat's currently-adopted disposition while
+    /// `tick - disposition_started_tick < min_disposition_tenure_ticks`.
+    /// Default 0.10 — matches `befriend_familiarity_hysteresis` (only
+    /// other persisted hysteresis knob in the codebase) and sits below
+    /// `patience_commitment_bonus` (0.15) so the two additive bonuses
+    /// stack rather than dominate.
+    #[serde(default = "default_oscillation_score_lift")]
+    pub oscillation_score_lift: f32,
 }
 
 fn default_true() -> bool {
@@ -1977,6 +1996,18 @@ fn default_cook_duration() -> DurationDays {
 
 fn default_kitchen_cook_radius() -> i32 {
     1
+}
+
+/// Ticket 075 — `CommitmentTenure` Modifier tenure window. ~30
+/// sim-minutes at the default 7-tick-per-second cadence.
+fn default_min_disposition_tenure_ticks() -> u64 {
+    200
+}
+
+/// Ticket 075 — additive lift on the cat's incumbent disposition's
+/// constituent DSEs during the tenure window.
+fn default_oscillation_score_lift() -> f32 {
+    0.10
 }
 
 fn default_cook_base_score() -> f32 {
@@ -2335,6 +2366,8 @@ impl Default for DispositionConstants {
             cooked_food_multiplier: default_cooked_food_multiplier(),
             cook_duration: default_cook_duration(),
             kitchen_cook_radius: default_kitchen_cook_radius(),
+            min_disposition_tenure_ticks: default_min_disposition_tenure_ticks(),
+            oscillation_score_lift: default_oscillation_score_lift(),
         }
     }
 }
