@@ -190,6 +190,7 @@ fn bond_score(
     cat: Entity,
     target: Entity,
 ) -> f32 {
+    // IAUS-COHERENCE-EXEMPT: 027b Commit B's MacGyvered Pairing-Intention pin; ticket 078 backports to a target_pairing_intention Consideration and removes this marker.
     if pairing_partner == Some(target) {
         return 1.0;
     }

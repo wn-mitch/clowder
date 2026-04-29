@@ -15,11 +15,11 @@ _Last generated: 2026-04-29._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 29 |
+| Ready | 28 |
 | Parked | 2 |
 | Blocked | 18 |
 | Done (awaiting archive) | 2 |
-| **Open total** | **54** |
+| **Open total** | **53** |
 | Pre-existing | 1 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -34,7 +34,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _added 2026-04-27_
 - **[071](docs/open-work/tickets/071-planning-substrate-hardening.md)** — Planning-substrate hardening — gird against the stuck-cat bug class (sub-epic) — _[planning-substrate] · added 2026-04-29_
 
-## Ready (29)
+## Ready (28)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -64,7 +64,6 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[062](docs/open-work/tickets/062-prey-species-split-maps.md)** — Prey-species split — per-species scent maps (§5.6.3 row #5) — _added 2026-04-27_
 - **[063](docs/open-work/tickets/063-ward-strength-promotion.md)** — Ward-strength promotion — first-class spatial axis (§5.6.3 row #3) — _added 2026-04-27_
 - **[064](docs/open-work/tickets/064-carcass-scent-consumer-cutover.md)** — Carcass-scent consumer cutover — replace observer_smells_at (§5.6.3 row #6) — _added 2026-04-27_
-- **[079](docs/open-work/tickets/079-iaus-coherence-check-script.md)** — check_iaus_coherence.sh — process gate against MacGyvered pins — _[planning-substrate] · added 2026-04-29_
 
 ## Parked (2)
 
@@ -105,7 +104,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/). Recent months:
 
-- [2026-04](docs/open-work/landed/2026-04.md) — 63 entries
+- [2026-04](docs/open-work/landed/2026-04.md) — 64 entries
 
 ## Conventions
 
