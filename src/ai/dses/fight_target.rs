@@ -75,11 +75,17 @@ use crate::ai::curves::{Curve, PostOp};
 use crate::ai::dse::{CommitmentStrategy, DseId, EvalCtx, GoalState, Intention};
 use crate::ai::eval::DseRegistry;
 use crate::ai::faction::StanceRequirement;
+use crate::ai::planner::GoapActionKind;
 use crate::ai::target_dse::{
     evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,
 };
 use crate::components::physical::Position;
 use crate::components::wildlife::WildSpecies;
+use crate::components::RecentTargetFailures;
+use crate::resources::system_activation::{Feature, SystemActivation};
+use crate::systems::plan_substrate::{
+    cooldown_curve, target_recent_failure_age_normalized, TARGET_RECENT_FAILURE_INPUT,
+};
 
 pub const TARGET_THREAT_INPUT: &str = "target_threat";
 pub const TARGET_COMBAT_ADV_INPUT: &str = "target_combat_adv";
@@ -165,8 +171,24 @@ pub fn fight_target_dse() -> TargetTakingDse {
                 combat_adv_curve,
             )),
             Consideration::Scalar(ScalarConsideration::new(ALLY_PROXIMITY_INPUT, linear)),
+            // Ticket 073 — recently-failed target cooldown (audit gap #2).
+            // Critical for the engage-threat stuck-loop pattern:
+            // Lark's 91× `EngageThreat` failures came from re-picking
+            // the same blocker. The cooldown axis breaks the loop.
+            Consideration::Scalar(ScalarConsideration::new(
+                TARGET_RECENT_FAILURE_INPUT,
+                cooldown_curve(),
+            )),
         ],
-        composition: Composition::weighted_sum(vec![0.25, 0.30, 0.25, 0.20]),
+        // Original four weights (0.25/0.30/0.25/0.20) renormalized
+        // ×(4/5) to make room for the cooldown axis at 1/5. Sums to 1.0.
+        composition: Composition::weighted_sum(vec![
+            0.25 * 4.0 / 5.0,
+            0.30 * 4.0 / 5.0,
+            0.25 * 4.0 / 5.0,
+            0.20 * 4.0 / 5.0,
+            1.0 / 5.0,
+        ]),
         // SumTopN(3) per §6.5.9: surrounded cat's action score sums
         // the top-3 threats, encoding "multiple hostiles mean higher
         // engagement urgency." Winner stays the argmax — the cat
@@ -272,6 +294,10 @@ pub fn resolve_fight_target(
     stance_overlays: &dyn Fn(Entity) -> crate::ai::faction::StanceOverlays,
     tick: u64,
     focal_hook: Option<FocalTargetHook<'_>>,
+    // Ticket 073 — per-cat recently-failed target memory.
+    recent: Option<&RecentTargetFailures>,
+    cooldown_ticks: u64,
+    activation: Option<&mut SystemActivation>,
 ) -> Option<Entity> {
     let dse = registry
         .target_taking_dses
@@ -341,6 +367,7 @@ pub fn resolve_fight_target(
     // Spatial nearness axis (`fight_target_nearness`) is computed by
     // the substrate from `EvalCtx::self_position` to each candidate's
     // tile per §L2.10.7.
+    let cooldown_was_applied = std::cell::Cell::new(false);
     let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     let fetch_target = |name: &str, _cat: Entity, target: Entity| -> f32 {
         match name {
@@ -353,6 +380,19 @@ pub fn resolve_fight_target(
             // `target_`-absent convention — the target-scoped fetcher
             // receives it regardless and returns the precomputed scalar.
             ALLY_PROXIMITY_INPUT => ally_score,
+            TARGET_RECENT_FAILURE_INPUT => {
+                let signal = target_recent_failure_age_normalized(
+                    recent,
+                    GoapActionKind::EngageThreat,
+                    target,
+                    tick,
+                    cooldown_ticks,
+                );
+                if signal < 1.0 {
+                    cooldown_was_applied.set(true);
+                }
+                signal
+            }
             _ => 0.0,
         }
     };
@@ -398,6 +438,13 @@ pub fn resolve_fight_target(
         }
     }
 
+    // Ticket 073 — record cooldown application once per resolver call.
+    if let Some(act) = activation {
+        if cooldown_was_applied.get() {
+            act.record(Feature::TargetCooldownApplied);
+        }
+    }
+
     scored.winning_target
 }
 
@@ -426,8 +473,9 @@ mod tests {
     }
 
     #[test]
-    fn fight_target_has_four_axes() {
-        assert_eq!(fight_target_dse().per_target_considerations().len(), 4);
+    fn fight_target_has_five_axes() {
+        // Ticket 073 — four legacy axes + the cooldown axis = five.
+        assert_eq!(fight_target_dse().per_target_considerations().len(), 5);
     }
 
     #[test]
@@ -530,6 +578,9 @@ mod tests {
             &|_| crate::ai::faction::StanceOverlays::default(),
             0,
             None,
+            None,
+            8000,
+            None,
         );
         assert!(out.is_none());
     }
@@ -550,6 +601,9 @@ mod tests {
             &crate::ai::faction::FactionRelations::canonical(),
             &|_| crate::ai::faction::StanceOverlays::default(),
             0,
+            None,
+            None,
+            8000,
             None,
         );
         assert!(out.is_none());
@@ -572,6 +626,9 @@ mod tests {
             &crate::ai::faction::FactionRelations::canonical(),
             &|_| crate::ai::faction::StanceOverlays::default(),
             0,
+            None,
+            None,
+            8000,
             None,
         );
         assert!(out.is_none());
@@ -596,6 +653,9 @@ mod tests {
             &crate::ai::faction::FactionRelations::canonical(),
             &|_| crate::ai::faction::StanceOverlays::default(),
             0,
+            None,
+            None,
+            8000,
             None,
         );
         assert_eq!(out, Some(shadow.entity));
@@ -631,6 +691,9 @@ mod tests {
             &|_| crate::ai::faction::StanceOverlays::default(),
             0,
             None,
+            None,
+            8000,
+            None,
         );
         assert!(out.is_some());
     }
@@ -656,6 +719,9 @@ mod tests {
             &crate::ai::faction::FactionRelations::canonical(),
             &|_| crate::ai::faction::StanceOverlays::default(),
             0,
+            None,
+            None,
+            8000,
             None,
         );
         assert_eq!(out, Some(close.entity));
@@ -696,6 +762,9 @@ mod tests {
             &crate::ai::faction::FactionRelations::canonical(),
             &|_| crate::ai::faction::StanceOverlays::default(),
             0,
+            None,
+            None,
+            8000,
             None,
         );
         assert_eq!(

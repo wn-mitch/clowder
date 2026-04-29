@@ -3718,32 +3718,31 @@ impl Default for PairingConstants {
     }
 }
 
-// ---------- PlanningSubstrateConstants (ticket 071 sub-epic) ----------
+// ---------- PlanningSubstrateConstants (sub-epic 071) ----------
 
-/// Knobs for the planning-substrate hardening sub-epic (parent ticket
-/// 071). Read by `crate::systems::plan_substrate` and the ECS systems
-/// it composes.
-///
-/// Children that contribute knobs here:
-/// - **080** — `reservation_ttl_ticks`: how long a `Reserved` marker
-///   on a target lives before `expire_reservations` clears it.
-/// - **073** *(parallel)* — `target_failure_cooldown_ticks` (when 073
-///   lands; this struct is forward-compatible).
+/// Knobs for the unified `plan_substrate` API (sub-epic 071). Lifts
+/// cross-tick defenses (memory-of-failure / reservation gating /
+/// fallback) out of inline call sites and into the IAUS engine.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PlanningSubstrateConstants {
     /// Ticket 080 — TTL for `Reserved` markers on contended resource
-    /// targets (carcass, herb tile, prey, mate). Long enough for the
-    /// owner cat to traverse + execute under normal sim cadence; short
-    /// enough that abandoned reservations clear without manual release.
-    /// Default 600 ticks ≈ 1 in-sim hour at the canonical 1000-ticks-
-    /// per-day scale; tuneable post-soak per ticket Out-of-scope.
+    /// targets (carcass, herb tile, prey, mate). Default 600 ticks
+    /// ≈ 1 in-sim hour at the 1000-ticks-per-day scale; tuneable
+    /// post-soak per ticket Out-of-scope.
     pub reservation_ttl_ticks: u64,
+    /// Ticket 073 — how long an `(action, target)` failure penalty
+    /// persists on a cat's `RecentTargetFailures` map. Default `8000`
+    /// ≈ 2 sim-hours at the 1000-ticks-per-day scale; conservative
+    /// per ticket 073's Out-of-scope note. Quarterly
+    /// `just rebuild-sensitivity-map` will re-tune.
+    pub target_failure_cooldown_ticks: u64,
 }
 
 impl Default for PlanningSubstrateConstants {
     fn default() -> Self {
         Self {
             reservation_ttl_ticks: 600,
+            target_failure_cooldown_ticks: 8000,
         }
     }
 }

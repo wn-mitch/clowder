@@ -258,6 +258,15 @@ pub enum Feature {
     /// producers, no `Reserved` is ever written, so the gate cannot
     /// activate.
     ReservationContended,
+    /// Ticket 073 — the `target_recent_failure` Consideration scored
+    /// below 1.0 for a candidate (i.e., the cooldown penalty was
+    /// load-bearing for at least one (cat, action, target) tuple this
+    /// tick). Neutral — recently-failed candidates being penalized is
+    /// normal substrate behavior; the count is a soft soak-delta
+    /// sentinel for "is the cooldown actually getting applied?".
+    /// Stays `expected_to_fire_per_soak() => false` until soak data
+    /// confirms a healthy seed-42 run sees ≥1 cooldown penalty fire.
+    TargetCooldownApplied,
 }
 
 impl Feature {
@@ -360,8 +369,9 @@ impl Feature {
         Feature::PairingIntentionEmitted,
         Feature::PairingDropped,
         Feature::PairingBiasApplied,
-        // Ticket 080 resource-reservation substrate
+        // §sub-epic 071 — planning-substrate hardening
         Feature::ReservationContended,
+        Feature::TargetCooldownApplied,
     ];
 
     /// The valence of this feature.
@@ -480,6 +490,10 @@ impl Feature {
             // Ticket 080 — reservation contention is observability
             // signal, not adverse.
             Feature::ReservationContended => Neutral,
+            // Ticket 073 — recently-failed-target cooldown penalty fired
+            // for at least one candidate. State-tracking signal, not
+            // adverse.
+            Feature::TargetCooldownApplied => Neutral,
         }
     }
 
@@ -622,11 +636,11 @@ impl Feature {
             Feature::PairingIntentionEmitted => false,
             Feature::PairingBiasApplied => false,
             // Ticket 080 — `ReservationContended` is exempt until the
-            // producer side (`record_target_picked` writes) ships in a
-            // follow-on. The substrate (filter, expire system,
-            // component) lands first; without producers writing
-            // `Reserved`, the gate never activates.
+            // producer side (`record_target_picked` writes) ships.
             Feature::ReservationContended => false,
+            // Ticket 073 — Neutral feature; promotion to canary waits
+            // for empirical baseline data.
+            Feature::TargetCooldownApplied => false,
             // Every other feature is expected to fire per soak.
             _ => true,
         }
@@ -737,6 +751,7 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::PairingDropped => "PairingDropped",
         Feature::PairingBiasApplied => "PairingBiasApplied",
         Feature::ReservationContended => "ReservationContended",
+        Feature::TargetCooldownApplied => "TargetCooldownApplied",
     }
 }
 
@@ -956,10 +971,11 @@ mod tests {
         // (PairingIntentionEmitted, PairingBiasApplied) + 1 Neutral
         // (PairingDropped) for the §7.M L2 PairingActivity layer.
         // Ticket 080 added 1 Neutral (ReservationContended) for the
-        // resource-reservation substrate.
+        // resource-reservation substrate. Ticket 073 added 1 Neutral
+        // (TargetCooldownApplied) for the RecentTargetFailures cooldown.
         assert_eq!(positive, 47);
         assert_eq!(negative, 20);
-        assert_eq!(neutral, 27);
+        assert_eq!(neutral, 28);
     }
 
     #[test]
@@ -1033,7 +1049,7 @@ mod tests {
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Neutral),
-            27
+            28
         );
     }
 

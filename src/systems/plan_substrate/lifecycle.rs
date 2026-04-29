@@ -1,6 +1,8 @@
 //! Plan-lifecycle operations: step-failure recording, abandonment,
 //! preempt-cleanup. Bodies are lifted verbatim from `goap.rs` per the
-//! ticket-072 mechanical-refactor contract.
+//! ticket-072 mechanical-refactor contract; ticket 073 fleshes out the
+//! `RecentTargetFailures` writes (audit gap #1 — cross-plan target
+//! memory) at the same call sites.
 
 use bevy_ecs::prelude::*;
 
@@ -16,22 +18,37 @@ use crate::components::{
 // ---------------------------------------------------------------------------
 
 /// Record a step's failure on the plan so replanning can exclude the
-/// failing action. Lifted from `goap.rs:2451–2455`. **072 stub:** the
-/// `_reason`, `_target`, `_recent` parameters are reserved for ticket
-/// 073 (per-target failure memory); today the body only mirrors the
-/// existing `plan.failed_actions.insert(action)` behavior.
+/// failing action. Lifted from `goap.rs:2451–2455` (072 mechanical
+/// refactor); ticket 073 extends the body to also write into the
+/// per-cat `RecentTargetFailures` map when the failed step has a
+/// known `target_entity`.
 ///
-/// **Real-world effect** — inserts `action` into `plan.failed_actions`,
-/// which is consulted by the next replan call to exclude impossible
-/// actions.
+/// **Real-world effect** — inserts `action` into `plan.failed_actions`
+/// (consulted by the next replan call to exclude impossible actions).
+/// When `target.is_some()` and `recent.is_some()`, also records the
+/// `(action, target)` pair on `RecentTargetFailures` with the current
+/// tick — this is the cross-plan memory that the
+/// `target_recent_failure` Consideration consults on the six target-
+/// taking DSEs.
+///
+/// `tick` is the current sim tick (caller-supplied to keep this
+/// function pure).
+///
+/// `_reason` is unused today; ticket 075's `CommitmentTenure` Modifier
+/// will branch on it (e.g., demote disposition tenure on
+/// `PlanFailureReason::Resource` failures).
 pub fn record_step_failure(
     plan: &mut GoapPlan,
     action: GoapActionKind,
     _reason: PlanFailureReason,
-    _target: Option<Entity>,
-    _recent: Option<&mut RecentTargetFailures>,
+    target: Option<Entity>,
+    recent: Option<&mut RecentTargetFailures>,
+    tick: u64,
 ) {
     plan.failed_actions.insert(action);
+    if let (Some(target), Some(recent)) = (target, recent) {
+        recent.record(action, target, tick);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -41,8 +58,7 @@ pub fn record_step_failure(
 /// Abandon a plan: reset the `CurrentAction` gate so next tick's
 /// `evaluate_and_plan` re-evaluates, and signal the caller to remove
 /// the `GoapPlan` component from the entity. Returns an
-/// `AbandonedPlanState` snapshot; today (072) the snapshot is empty,
-/// 073 extends it with cross-plan target memory.
+/// `AbandonedPlanState` snapshot.
 ///
 /// Lifted from the two abandonment sites at `goap.rs:2574` and
 /// `goap.rs:2593` — both inline bodies do `current.ticks_remaining = 0`
@@ -53,15 +69,32 @@ pub fn record_step_failure(
 ///
 /// **Real-world effect** — writes `current.ticks_remaining = 0`. The
 /// caller is expected to push `cat_entity` onto its
-/// `plans_to_remove` collection (the substrate doesn't own that
-/// list — it lives in `resolve_goap_plans`'s loop locals).
+/// `plans_to_remove` collection.
+///
+/// **Ticket 073 extension** — when `action.is_some()`,
+/// `target.is_some()` and `recent.is_some()`, also records the
+/// `(action, target)` pair on `RecentTargetFailures`. This is the
+/// cross-plan memory bridge that closes audit gap #1: a replan-cap or
+/// no-plan-possible abandonment destroys the plan's `failed_actions`
+/// set, but the failure memory survives on the cat for the cooldown
+/// window so the next plan's target-picker penalizes the same blocker.
+///
+/// `action` is the planner action whose target is being recorded —
+/// callers pass the current step's `action.kind`. `tick` is the
+/// current sim tick.
 pub fn abandon_plan(
     current: &mut CurrentAction,
     _plan: &mut GoapPlan,
     _reason: AbandonReason,
-    _recent: Option<&mut RecentTargetFailures>,
+    action: Option<GoapActionKind>,
+    target: Option<Entity>,
+    recent: Option<&mut RecentTargetFailures>,
+    tick: u64,
 ) -> AbandonedPlanState {
     current.ticks_remaining = 0;
+    if let (Some(action), Some(target), Some(recent)) = (action, target, recent) {
+        recent.record(action, target, tick);
+    }
     AbandonedPlanState
 }
 
@@ -122,6 +155,11 @@ pub enum PreemptOutcome {
 /// `current.ticks_remaining = 0`. For `ThreatFlee`, additionally
 /// writes `current.action = Action::Flee`, `current.target_position`,
 /// `current.target_entity = None`.
+///
+/// `_recent` is reserved for future hardening tickets. Ticket 073
+/// doesn't write here because preempts are caused by the cat's own
+/// state (urgency, hunger, threat), not by the held target's failure
+/// to cooperate — there's no specific candidate to penalize.
 pub fn try_preempt(
     plan: &mut GoapPlan,
     current: &mut CurrentAction,
@@ -155,4 +193,129 @@ pub fn try_preempt(
     current.ticks_remaining = 0;
 
     PreemptOutcome::Preempted
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::components::{AbandonReason, DispositionKind, Personality};
+    use crate::ai::planner::PlannedStep;
+
+    fn entity(id: u32) -> Entity {
+        Entity::from_raw_u32(id).unwrap()
+    }
+
+    fn test_personality() -> Personality {
+        Personality {
+            boldness: 0.5,
+            sociability: 0.5,
+            curiosity: 0.5,
+            diligence: 0.5,
+            warmth: 0.5,
+            spirituality: 0.5,
+            ambition: 0.5,
+            patience: 0.5,
+            anxiety: 0.5,
+            optimism: 0.5,
+            temper: 0.5,
+            stubbornness: 0.5,
+            playfulness: 0.5,
+            loyalty: 0.5,
+            tradition: 0.5,
+            compassion: 0.5,
+            pride: 0.5,
+            independence: 0.5,
+        }
+    }
+
+    fn fresh_plan() -> GoapPlan {
+        GoapPlan::new(
+            DispositionKind::Socializing,
+            0,
+            &test_personality(),
+            vec![PlannedStep {
+                action: GoapActionKind::SocializeWith,
+                cost: 1,
+            }],
+            None,
+        )
+    }
+
+    #[test]
+    fn record_step_failure_writes_recent_when_target_known() {
+        let mut plan = fresh_plan();
+        let mut recent = RecentTargetFailures::default();
+        let target = entity(10);
+        record_step_failure(
+            &mut plan,
+            GoapActionKind::SocializeWith,
+            PlanFailureReason::Other,
+            Some(target),
+            Some(&mut recent),
+            500,
+        );
+        assert!(plan.failed_actions.contains(&GoapActionKind::SocializeWith));
+        assert_eq!(
+            recent.last_failure_tick(GoapActionKind::SocializeWith, target),
+            Some(500)
+        );
+    }
+
+    #[test]
+    fn record_step_failure_skips_recent_when_no_target() {
+        let mut plan = fresh_plan();
+        let mut recent = RecentTargetFailures::default();
+        record_step_failure(
+            &mut plan,
+            GoapActionKind::TravelTo(crate::ai::planner::PlannerZone::Stores),
+            PlanFailureReason::Other,
+            None,
+            Some(&mut recent),
+            500,
+        );
+        assert!(plan.failed_actions.contains(&GoapActionKind::TravelTo(
+            crate::ai::planner::PlannerZone::Stores
+        )));
+        assert!(recent.is_empty());
+    }
+
+    #[test]
+    fn abandon_plan_writes_recent_when_action_and_target_known() {
+        let mut current = CurrentAction::default();
+        current.ticks_remaining = u64::MAX;
+        let mut plan = fresh_plan();
+        let mut recent = RecentTargetFailures::default();
+        let target = entity(10);
+        let _ = abandon_plan(
+            &mut current,
+            &mut plan,
+            AbandonReason::ReplanCap,
+            Some(GoapActionKind::SocializeWith),
+            Some(target),
+            Some(&mut recent),
+            900,
+        );
+        assert_eq!(current.ticks_remaining, 0);
+        assert_eq!(
+            recent.last_failure_tick(GoapActionKind::SocializeWith, target),
+            Some(900)
+        );
+    }
+
+    #[test]
+    fn abandon_plan_resets_ticks_even_without_recent() {
+        let mut current = CurrentAction::default();
+        current.ticks_remaining = u64::MAX;
+        let mut plan = fresh_plan();
+        let _ = abandon_plan(
+            &mut current,
+            &mut plan,
+            AbandonReason::NoPlanPossible,
+            None,
+            None,
+            None,
+            0,
+        );
+        assert_eq!(current.ticks_remaining, 0);
+    }
 }

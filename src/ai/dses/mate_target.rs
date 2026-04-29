@@ -51,11 +51,17 @@ use crate::ai::considerations::{
 use crate::ai::curves::{Curve, PostOp};
 use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination};
 use crate::ai::eval::DseRegistry;
+use crate::ai::planner::GoapActionKind;
 use crate::ai::target_dse::{
     evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,
 };
 use crate::components::physical::Position;
+use crate::components::RecentTargetFailures;
 use crate::resources::relationships::{BondType, Relationships};
+use crate::resources::system_activation::{Feature, SystemActivation};
+use crate::systems::plan_substrate::{
+    cooldown_curve, target_recent_failure_age_normalized, TARGET_RECENT_FAILURE_INPUT,
+};
 
 pub const TARGET_ROMANTIC_INPUT: &str = "target_romantic";
 pub const TARGET_FONDNESS_INPUT: &str = "target_fondness";
@@ -101,8 +107,20 @@ pub fn mate_target_dse() -> TargetTakingDse {
                 linear.clone(),
             )),
             Consideration::Scalar(ScalarConsideration::new(TARGET_FONDNESS_INPUT, linear)),
+            // Ticket 073 — recently-failed target cooldown (audit gap #2).
+            Consideration::Scalar(ScalarConsideration::new(
+                TARGET_RECENT_FAILURE_INPUT,
+                cooldown_curve(),
+            )),
         ],
-        composition: Composition::weighted_sum(vec![0.1875, 0.5, 0.3125]),
+        // Original three weights (0.1875/0.5/0.3125) renormalized
+        // ×(3/4) to make room for the cooldown axis at 1/4. Sums to 1.0.
+        composition: Composition::weighted_sum(vec![
+            0.1875 * 3.0 / 4.0,
+            0.5 * 3.0 / 4.0,
+            0.3125 * 3.0 / 4.0,
+            1.0 / 4.0,
+        ]),
         aggregation: TargetAggregation::Best,
         intention: mate_intention,
         required_stance: None,
@@ -138,6 +156,7 @@ fn mate_intention(_target: Entity) -> Intention {
 /// the gap where `goap.rs::find_social_target` picked targets
 /// without a bond check, letting the MateWith step target non-mates
 /// once the Mate disposition won selection.
+#[allow(clippy::too_many_arguments)]
 pub fn resolve_mate_target(
     registry: &DseRegistry,
     cat: Entity,
@@ -146,6 +165,11 @@ pub fn resolve_mate_target(
     relationships: &Relationships,
     tick: u64,
     focal_hook: Option<FocalTargetHook<'_>>,
+    // Ticket 073 — per-cat recently-failed target memory.
+    recent: Option<&RecentTargetFailures>,
+    cooldown_ticks: u64,
+    // Activation tracker for `Feature::TargetCooldownApplied`.
+    activation: Option<&mut SystemActivation>,
 ) -> Option<Entity> {
     let dse = registry
         .target_taking_dses
@@ -180,6 +204,7 @@ pub fn resolve_mate_target(
     // Spatial nearness axis (`mate_target_nearness`) is computed by
     // the substrate from `EvalCtx::self_position` to each candidate's
     // tile per §L2.10.7, so no nearness branch lives in `fetch_target`.
+    let cooldown_was_applied = std::cell::Cell::new(false);
     let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     let fetch_target = |name: &str, cat: Entity, target: Entity| -> f32 {
         match name {
@@ -191,6 +216,19 @@ pub fn resolve_mate_target(
                 .get(cat, target)
                 .map(|r| r.fondness)
                 .unwrap_or(0.0),
+            TARGET_RECENT_FAILURE_INPUT => {
+                let signal = target_recent_failure_age_normalized(
+                    recent,
+                    GoapActionKind::MateWith,
+                    target,
+                    tick,
+                    cooldown_ticks,
+                );
+                if signal < 1.0 {
+                    cooldown_was_applied.set(true);
+                }
+                signal
+            }
             _ => 0.0,
         }
     };
@@ -236,6 +274,13 @@ pub fn resolve_mate_target(
         }
     }
 
+    // Ticket 073 — record cooldown application once per resolver call.
+    if let Some(act) = activation {
+        if cooldown_was_applied.get() {
+            act.record(Feature::TargetCooldownApplied);
+        }
+    }
+
     scored.winning_target
 }
 
@@ -250,8 +295,9 @@ mod tests {
     }
 
     #[test]
-    fn mate_target_has_three_axes() {
-        assert_eq!(mate_target_dse().per_target_considerations().len(), 3);
+    fn mate_target_has_four_axes() {
+        // Ticket 073 — three legacy axes + the cooldown axis = four.
+        assert_eq!(mate_target_dse().per_target_considerations().len(), 4);
     }
 
     #[test]
@@ -272,6 +318,9 @@ mod tests {
             &[],
             &relationships,
             0,
+            None,
+            None,
+            8000,
             None,
         );
         assert!(out.is_none());
@@ -301,6 +350,9 @@ mod tests {
             &relationships,
             0,
             None,
+            None,
+            8000,
+            None,
         );
         // Friends bond doesn't pass the filter — even with romantic=0.9,
         // the resolver returns None. This is the bond-filter fix
@@ -327,6 +379,9 @@ mod tests {
             &cat_positions,
             &relationships,
             0,
+            None,
+            None,
+            8000,
             None,
         );
         assert_eq!(out, Some(partner));
@@ -358,6 +413,9 @@ mod tests {
             &cat_positions,
             &relationships,
             0,
+            None,
+            None,
+            8000,
             None,
         );
         // Romantic weight (0.5) dominates fondness weight (0.3125),
@@ -397,6 +455,9 @@ mod tests {
             &relationships,
             0,
             None,
+            None,
+            8000,
+            None,
         );
         assert_eq!(out, Some(close));
     }
@@ -420,6 +481,9 @@ mod tests {
             &cat_positions,
             &relationships,
             0,
+            None,
+            None,
+            8000,
             None,
         );
         assert_eq!(winner, Some(partner));

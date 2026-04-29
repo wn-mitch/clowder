@@ -381,15 +381,12 @@ impl Plugin for SimulationPlugin {
                             .chain(),
                         systems::needs::decay_grooming,
                         // Ticket 080 — clear `Reserved` markers whose
-                        // `expires_tick` has lapsed. Bounds the
-                        // world-size of the marker so abandoned
-                        // reservations (cats that crashed mid-plan,
-                        // plans that weren't released cleanly) don't
-                        // accumulate. Slots into the decay batch
-                        // alongside `decay_grooming` /
-                        // `decay_exploration` per the ticket's
-                        // chain 2a placement.
+                        // `expires_tick` has lapsed.
                         crate::systems::plan_substrate::expire_reservations,
+                        // Ticket 073 — bound per-cat `RecentTargetFailures`
+                        // map size by expiring entries older than
+                        // `target_failure_cooldown_ticks`.
+                        systems::plan_substrate::sensors::prune_recent_target_failures,
                         systems::needs::eat_from_inventory,
                         systems::needs::decay_exploration,
                         systems::needs::stamp_passive_exploration,

@@ -97,7 +97,14 @@ fn record_step_failure_matches_inline_body() {
     old_plan.failed_actions.insert(action);
 
     // New API:
-    record_step_failure(&mut new_plan, action, PlanFailureReason::Other, None, None);
+    record_step_failure(
+        &mut new_plan,
+        action,
+        PlanFailureReason::Other,
+        None,
+        None,
+        0,
+    );
 
     assert_eq!(new_plan.failed_actions, old_plan.failed_actions);
     let mut expected = HashSet::new();
@@ -116,6 +123,7 @@ fn record_step_failure_preserves_existing_entries() {
         PlanFailureReason::Other,
         None,
         None,
+        0,
     );
 
     assert!(plan.failed_actions.contains(&GoapActionKind::ForageItem));
@@ -143,6 +151,9 @@ fn abandon_plan_matches_inline_body() {
         &mut new_plan,
         AbandonReason::ReplanCap,
         None,
+        None,
+        None,
+        0,
     );
 
     assert_eq!(new_current.ticks_remaining, old_current.ticks_remaining);

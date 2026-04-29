@@ -1832,6 +1832,11 @@ pub fn resolve_goap_plans(
                 &mut Memory,
                 &mut PendingUrgencies,
                 Option<&mut crate::components::fulfillment::Fulfillment>,
+                // Ticket 073 — per-cat recently-failed target memory.
+                // Optional because the component is lazy-inserted on
+                // first failure (cats that never fail a target don't
+                // pay for the HashMap allocation).
+                Option<&mut crate::components::RecentTargetFailures>,
             ),
         ),
         (
@@ -1958,7 +1963,7 @@ pub fn resolve_goap_plans(
         grooming: cats
             .iter()
             .map(
-                |((e, _, _, _, _, _, _, _, _), (_, _, _, g, _, _, _, _, _, _, _))| {
+                |((e, _, _, _, _, _, _, _, _), (_, _, _, g, _, _, _, _, _, _, _, _))| {
                     (e, g.as_ref().map_or(0.8, |g| g.0))
                 },
             )
@@ -1968,7 +1973,7 @@ pub fn resolve_goap_plans(
         // double-borrowing the mutable `cats` query.
         gender: cats
             .iter()
-            .map(|((e, _, _, _, _, _, _, _, _), (g, _, _, _, _, _, _, _, _, _, _))| (e, *g))
+            .map(|((e, _, _, _, _, _, _, _, _), (g, _, _, _, _, _, _, _, _, _, _, _))| (e, *g))
             .collect(),
         cat_tile_counts: {
             let mut counts = HashMap::new();
@@ -2003,7 +2008,7 @@ pub fn resolve_goap_plans(
             .collect(),
         injured_cat_positions: cats
             .iter()
-            .filter(|(_, (_, _, _, _, _, health, _, _, _, _, _))| health.current < health.max)
+            .filter(|(_, (_, _, _, _, _, health, _, _, _, _, _, _))| health.current < health.max)
             .map(|((e, _, _, pos, _, _, _, _, _), _)| (e, *pos))
             .collect(),
         // §6.5.3 mentor-target DSE snapshot: candidate-side Skills lookup
@@ -2075,6 +2080,7 @@ pub fn resolve_goap_plans(
             mut memory,
             mut urgencies,
             mut fulfillment_opt,
+            mut recent_failures,
         ),
     ) in &mut cats
     {
@@ -2295,6 +2301,7 @@ pub fn resolve_goap_plans(
             &mut magic_params,
             &snaps,
             &mut accum,
+            recent_failures.as_deref(),
         );
 
         // Re-derive `d` after the dispatch call so the immutable borrow
@@ -2458,12 +2465,26 @@ pub fn resolve_goap_plans(
                     .current_state()
                     .and_then(|s| s.target_entity);
                 if let Some(action) = failed_action {
+                    // Ticket 073 — lazy-insert `RecentTargetFailures` on
+                    // first failure for save-loaded cats that pre-date
+                    // the component (the live-spawn bundle adds it for
+                    // every new cat). The mutation lands next tick
+                    // because Commands buffer until apply; that's
+                    // acceptable since the cooldown signal degrades
+                    // gracefully (single-tick miss vs the 8000-tick
+                    // cooldown window).
+                    if recent_failures.is_none() && failed_target.is_some() {
+                        commands.entity(cat_entity).insert(
+                            crate::components::RecentTargetFailures::default(),
+                        );
+                    }
                     crate::systems::plan_substrate::record_step_failure(
                         &mut plan,
                         action,
                         crate::components::PlanFailureReason::Other,
                         failed_target,
-                        None, // RecentTargetFailures lands in 073
+                        recent_failures.as_deref_mut(),
+                        ec.time.tick,
                     );
                 }
 
@@ -2588,11 +2609,24 @@ pub fn resolve_goap_plans(
                         // The function owns `current.ticks_remaining = 0`; the
                         // caller still pushes onto `plans_to_remove` because that
                         // collection is loop-local and substrate doesn't own it.
+                        // Ticket 073 — pass the failed action+target so the
+                        // substrate writes them onto `RecentTargetFailures`
+                        // before the plan's `failed_actions` set is destroyed.
+                        let abandon_action = failed_action;
+                        let abandon_target = failed_target;
+                        if recent_failures.is_none() && abandon_target.is_some() {
+                            commands.entity(cat_entity).insert(
+                                crate::components::RecentTargetFailures::default(),
+                            );
+                        }
                         let _abandoned = crate::systems::plan_substrate::abandon_plan(
                             &mut current,
                             &mut plan,
                             crate::components::AbandonReason::ReplanCap,
-                            None, // RecentTargetFailures lands in 073
+                            abandon_action,
+                            abandon_target,
+                            recent_failures.as_deref_mut(),
+                            ec.time.tick,
                         );
                         plans_to_remove.push(cat_entity);
                     }
@@ -2613,11 +2647,22 @@ pub fn resolve_goap_plans(
                         });
                     }
                     // Ticket 072: routed through `plan_substrate::abandon_plan`.
+                    // Ticket 073 — same memory-bridge as the ReplanCap branch.
+                    let abandon_action = failed_action;
+                    let abandon_target = failed_target;
+                    if recent_failures.is_none() && abandon_target.is_some() {
+                        commands.entity(cat_entity).insert(
+                            crate::components::RecentTargetFailures::default(),
+                        );
+                    }
                     let _abandoned = crate::systems::plan_substrate::abandon_plan(
                         &mut current,
                         &mut plan,
                         crate::components::AbandonReason::NoPlanPossible,
-                        None, // RecentTargetFailures lands in 073
+                        abandon_action,
+                        abandon_target,
+                        recent_failures.as_deref_mut(),
+                        ec.time.tick,
                     );
                     plans_to_remove.push(cat_entity);
                 }
@@ -2635,7 +2680,7 @@ pub fn resolve_goap_plans(
     // Deferred grooming restorations — apply grooming condition delta and
     // §7.W social_warmth delta to the groomed target.
     for groom in accum.grooming_restorations {
-        if let Ok((_, (_, _, _, grooming, _, _, _, _, _, _, fulfillment))) =
+        if let Ok((_, (_, _, _, grooming, _, _, _, _, _, _, fulfillment, _))) =
             cats.get_mut(groom.target)
         {
             if let Some(mut g) = grooming {
@@ -2787,6 +2832,10 @@ fn dispatch_step_action(
     magic_params: &mut MagicResolverParams,
     snaps: &StepSnapshots,
     accum: &mut StepAccumulators,
+    // Ticket 073 — per-cat recently-failed target memory. Threaded
+    // through `dispatch_step_action` so the six target-DSE branches
+    // can pass the cooldown sensor input into their resolvers.
+    recent_failures: Option<&crate::components::RecentTargetFailures>,
 ) -> crate::steps::StepResult {
     let d = &ec.constants.disposition;
 
@@ -2863,6 +2912,10 @@ fn dispatch_step_action(
             &|e: Entity| ec.stance_overlays_of(e),
             ec_is_focal(ec, cat_entity),
             ec.focal_capture.as_deref(),
+            recent_failures,
+            ec.constants
+                .planning_substrate
+                .target_failure_cooldown_ticks,
         ),
 
         GoapActionKind::EngagePrey => {
@@ -3067,6 +3120,10 @@ fn dispatch_step_action(
                         ec.time.tick,
                         focal_hook,
                         pairing_partner,
+                        recent_failures,
+                        ec.constants
+                            .planning_substrate
+                            .target_failure_cooldown_ticks,
                         narr.activation.as_deref_mut(),
                     );
             }
@@ -3144,6 +3201,11 @@ fn dispatch_step_action(
                         relationships,
                         ec.time.tick,
                         focal_hook,
+                        recent_failures,
+                        ec.constants
+                            .planning_substrate
+                            .target_failure_cooldown_ticks,
+                        narr.activation.as_deref_mut(),
                     );
             }
             // §7.W: construct a temporary Fulfillment for cats without the
@@ -3219,6 +3281,11 @@ fn dispatch_step_action(
                         relationships,
                         ec.time.tick,
                         focal_hook,
+                        recent_failures,
+                        ec.constants
+                            .planning_substrate
+                            .target_failure_cooldown_ticks,
+                        narr.activation.as_deref_mut(),
                     );
             }
             let outcome = crate::steps::disposition::resolve_mentor_cat(
@@ -3337,6 +3404,11 @@ fn dispatch_step_action(
                     &stance_overlays,
                     ec.time.tick,
                     focal_hook,
+                    recent_failures,
+                    ec.constants
+                        .planning_substrate
+                        .target_failure_cooldown_ticks,
+                    narr.activation.as_deref_mut(),
                 );
                 plan.step_state[step_idx].target_entity = picked;
                 current.target_entity = picked;
@@ -3431,6 +3503,11 @@ fn dispatch_step_action(
                         relationships,
                         ec.time.tick,
                         focal_hook,
+                        recent_failures,
+                        ec.constants
+                            .planning_substrate
+                            .target_failure_cooldown_ticks,
+                        narr.activation.as_deref_mut(),
                     );
             }
             let target = plan.step_state[step_idx].target_entity;
@@ -4460,6 +4537,12 @@ fn resolve_search_prey(
     // `FocalTargetHook` locally without threading the ExecutorContext.
     is_focal: bool,
     focal_capture: Option<&crate::resources::FocalScoreCapture>,
+    // Ticket 073 — per-cat recently-failed target memory (cooldown
+    // sensor input) and the cooldown window in ticks. Caller pulls
+    // `recent_failures.as_deref()` from the cats query and the cooldown
+    // ticks from `SimConstants::planning_substrate`.
+    recent_failures: Option<&crate::components::RecentTargetFailures>,
+    cooldown_ticks: u64,
 ) -> crate::steps::StepResult {
     use crate::components::magic::ItemSlot;
 
@@ -4622,6 +4705,15 @@ fn resolve_search_prey(
             stance_overlays,
             time.tick,
             focal_hook,
+            recent_failures,
+            cooldown_ticks,
+            // No activation tracker threaded through this helper today;
+            // the cooldown application still applies via the IAUS axis,
+            // just no `Feature::TargetCooldownApplied` count from the
+            // SearchPrey path. The other 5 target DSEs cover the soak
+            // canary; revisit if hunt-cooldown observability becomes a
+            // live diagnostic question.
+            None,
         );
         if let Some(prey_entity) = picked {
             state.target_entity = Some(prey_entity);

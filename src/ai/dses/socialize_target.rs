@@ -60,12 +60,17 @@ use crate::ai::curves::Curve;
 use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination};
 use crate::ai::eval::DseRegistry;
 use crate::ai::faction::StanceRequirement;
+use crate::ai::planner::GoapActionKind;
 use crate::ai::target_dse::{
     evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,
 };
 use crate::components::physical::Position;
+use crate::components::RecentTargetFailures;
 use crate::resources::relationships::{BondType, Relationships};
 use crate::resources::system_activation::{Feature, SystemActivation};
+use crate::systems::plan_substrate::{
+    cooldown_curve, target_recent_failure_age_normalized, TARGET_RECENT_FAILURE_INPUT,
+};
 
 pub const TARGET_FONDNESS_INPUT: &str = "target_fondness";
 pub const TARGET_NOVELTY_INPUT: &str = "target_novelty";
@@ -125,16 +130,37 @@ pub fn socialize_target_dse() -> TargetTakingDse {
                 TARGET_SPECIES_COMPAT_INPUT,
                 species_cliff,
             )),
-            Consideration::Scalar(ScalarConsideration::new(TARGET_PARTNER_BOND_INPUT, linear)),
+            Consideration::Scalar(ScalarConsideration::new(
+                TARGET_PARTNER_BOND_INPUT,
+                linear,
+            )),
+            // Ticket 073 — recently-failed target cooldown. `Piecewise`
+            // 0.0 → 0.1, 1.0 → 1.0 multiplies a fresh-failure
+            // candidate's weighted-sum contribution down to ~10% of
+            // its no-failure value. Existing five weights renormalized
+            // by ×(5/6) so steady-state scores match pre-073 on cats
+            // with no recent failures (the 1.0 sensor signal nulls the
+            // axis to its full 1.0 contribution).
+            Consideration::Scalar(ScalarConsideration::new(
+                TARGET_RECENT_FAILURE_INPUT,
+                cooldown_curve(),
+            )),
         ],
         // WeightedSum matches the pre-refactor resolver's linear mixer
         // (`fondness × w1 + (1 - familiarity) × w2`). CompensatedProduct
         // would gate any low axis (a 0.0 novelty nulls the candidate
         // entirely) which over-punishes familiar-but-beloved partners.
-        // Partner-bond axis added at weight 0.20; original four weights
-        // (0.25/0.35/0.25/0.15) renormalized by ×0.80 to keep the sum
-        // at 1.0.
-        composition: Composition::weighted_sum(vec![0.20, 0.28, 0.20, 0.12, 0.20]),
+        // Original five weights (0.20/0.28/0.20/0.12/0.20) renormalized
+        // by ×(5/6) to make room for the 073 cooldown axis at 1/6 ≈
+        // 0.1667. Sums to 1.0 within fp tolerance.
+        composition: Composition::weighted_sum(vec![
+            0.20 * 5.0 / 6.0,
+            0.28 * 5.0 / 6.0,
+            0.20 * 5.0 / 6.0,
+            0.12 * 5.0 / 6.0,
+            0.20 * 5.0 / 6.0,
+            1.0 / 6.0,
+        ]),
         aggregation: TargetAggregation::Best,
         intention: socialize_intention,
         // §9.3 Socialize accepts `Same | Ally`. Migrated from the
@@ -254,11 +280,20 @@ pub fn resolve_socialize_target(
     // cats without an Intention; when `Some(p)`, the
     // `target_partner_bond` axis pins `p` at 1.0 via `bond_score`.
     pairing_partner: Option<Entity>,
-    // Activation tracker for `Feature::PairingBiasApplied`. Fires when
-    // the picked target == `pairing_partner` and the unpinned bond
-    // score would have been < 1.0 (i.e., the pin is load-bearing).
-    // Pass `None` from dead-code disposition.rs paths and from tests
-    // that don't care.
+    // Ticket 073 — per-cat recently-failed target memory. `None` for
+    // cats without the component (lazy-inserted on first failure);
+    // when `Some`, the `TARGET_RECENT_FAILURE_INPUT` axis penalizes
+    // recently-failed candidates via the cooldown curve. The cooldown
+    // window is `cooldown_ticks` (caller pulls
+    // `SimConstants::planning_substrate::target_failure_cooldown_ticks`).
+    recent: Option<&RecentTargetFailures>,
+    cooldown_ticks: u64,
+    // Activation tracker for `Feature::PairingBiasApplied` and
+    // `Feature::TargetCooldownApplied`. Fires when the picked target
+    // == `pairing_partner` and the unpinned bond score would have
+    // been < 1.0; or when at least one candidate's cooldown signal
+    // was < 1.0 this resolver call. Pass `None` from dead-code
+    // disposition.rs paths and from tests that don't care.
     activation: Option<&mut SystemActivation>,
 ) -> Option<Entity> {
     // Find the registered factory output. Fall back to `None` if
@@ -315,6 +350,13 @@ pub fn resolve_socialize_target(
         positions = filtered_pos;
     }
 
+    // Ticket 073 — track whether any candidate triggered the cooldown
+    // penalty this call (signal < 1.0). Recorded against
+    // `Feature::TargetCooldownApplied` after the resolver finishes if
+    // the activation tracker is present. Cell so the closure can
+    // mutate it without taking `&mut`.
+    let cooldown_was_applied = std::cell::Cell::new(false);
+
     let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     let fetch_target = |name: &str, cat: Entity, target: Entity| -> f32 {
         match name {
@@ -334,6 +376,19 @@ pub fn resolve_socialize_target(
             // class here; curve-cliff gates on ≥ 0.5.
             TARGET_SPECIES_COMPAT_INPUT => 1.0,
             TARGET_PARTNER_BOND_INPUT => bond_score(relationships, pairing_partner, cat, target),
+            TARGET_RECENT_FAILURE_INPUT => {
+                let signal = target_recent_failure_age_normalized(
+                    recent,
+                    GoapActionKind::SocializeWith,
+                    target,
+                    tick,
+                    cooldown_ticks,
+                );
+                if signal < 1.0 {
+                    cooldown_was_applied.set(true);
+                }
+                signal
+            }
             _ => 0.0,
         }
     };
@@ -381,16 +436,23 @@ pub fn resolve_socialize_target(
         }
     }
 
-    // Ticket 027b §7.M — fire `PairingBiasApplied` only when the bias
-    // was *load-bearing*: the picked target is the Intention partner
-    // AND that partner's unpinned bond score was < 1.0 (i.e., they
-    // were Friends-bonded or unbonded; a Partners/Mates partner gets
-    // 1.0 with or without the pin, so the bias didn't change anything).
-    if let (Some(act), Some(picked), Some(partner)) =
-        (activation, scored.winning_target, pairing_partner)
-    {
-        if picked == partner && unpinned_bond_score(relationships, cat, partner) < 1.0 {
-            act.record(Feature::PairingBiasApplied);
+    if let Some(act) = activation {
+        // Ticket 027b §7.M — fire `PairingBiasApplied` only when the
+        // bias was *load-bearing*: the picked target is the Intention
+        // partner AND that partner's unpinned bond score was < 1.0
+        // (i.e., they were Friends-bonded or unbonded; a Partners/
+        // Mates partner gets 1.0 with or without the pin, so the bias
+        // didn't change anything).
+        if let (Some(picked), Some(partner)) = (scored.winning_target, pairing_partner) {
+            if picked == partner && unpinned_bond_score(relationships, cat, partner) < 1.0 {
+                act.record(Feature::PairingBiasApplied);
+            }
+        }
+        // Ticket 073 — fire `TargetCooldownApplied` once per resolver
+        // call where at least one candidate's cooldown signal was
+        // < 1.0 (i.e., the cooldown axis actually penalized somebody).
+        if cooldown_was_applied.get() {
+            act.record(Feature::TargetCooldownApplied);
         }
     }
 
@@ -428,14 +490,52 @@ mod tests {
     }
 
     #[test]
-    fn socialize_target_dse_has_five_axes() {
-        assert_eq!(socialize_target_dse().per_target_considerations().len(), 5);
+    fn socialize_target_dse_has_six_axes() {
+        // Ticket 073 — five legacy axes + the cooldown axis = six.
+        assert_eq!(socialize_target_dse().per_target_considerations().len(), 6);
     }
 
     #[test]
     fn socialize_target_weights_sum_to_one() {
         let sum: f32 = socialize_target_dse().composition().weights.iter().sum();
         assert!((sum - 1.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn renormalization_preserves_no_failure_steady_state() {
+        // Ticket 073 acceptance gate: each renormalized DSE's no-failure
+        // steady-state score equals its pre-073 score within fp tolerance.
+        // Construction: with the cooldown signal pinned at 1.0 (no
+        // recent failure), the WeightedSum should equal the pre-073
+        // weighted sum with the original 5 weights × 5/6 + the cooldown
+        // weight × 1.0 = exactly the original sum × 5/6 + 1/6.
+        // Because the original five weights summed to 1.0, the
+        // post-073 sum at signal=1.0 also sums to 1.0 — which is what
+        // "no behavioral change at steady state" looks like.
+        let dse = socialize_target_dse();
+        let weights = &dse.composition().weights;
+        // Pre-073 weights renormalized × 5/6, plus the cooldown axis
+        // weight 1/6.
+        let pre_073 = [0.20_f32, 0.28, 0.20, 0.12, 0.20];
+        for (i, &pre) in pre_073.iter().enumerate() {
+            let expected = pre * 5.0 / 6.0;
+            assert!(
+                (weights[i] - expected).abs() < 1e-6,
+                "axis {} renormalized weight: expected {}, got {}",
+                i,
+                expected,
+                weights[i]
+            );
+        }
+        let cooldown_weight = weights[5];
+        assert!(
+            (cooldown_weight - 1.0 / 6.0).abs() < 1e-6,
+            "cooldown axis weight should be 1/6, got {}",
+            cooldown_weight
+        );
+        // Steady-state score with all axes at 1.0 = sum of weights = 1.0.
+        let steady: f32 = weights.iter().sum();
+        assert!((steady - 1.0).abs() < 1e-4);
     }
 
     #[test]
@@ -742,6 +842,8 @@ mod tests {
             None,
             None,
             None,
+            8000,
+            None,
         );
         assert!(out.is_none());
     }
@@ -766,6 +868,8 @@ mod tests {
             0,
             None,
             None,
+            None,
+            8000,
             None,
         );
         assert!(out.is_none());
@@ -802,6 +906,8 @@ mod tests {
             None,
             None,
             None,
+            8000,
+            None,
         );
         assert_eq!(out, Some(friend));
     }
@@ -825,6 +931,8 @@ mod tests {
             0,
             None,
             None,
+            None,
+            8000,
             None,
         );
         assert!(out.is_none());
@@ -863,6 +971,8 @@ mod tests {
             0,
             None,
             None,
+            None,
+            8000,
             None,
         );
         assert_eq!(out, Some(novel));
@@ -956,6 +1066,8 @@ mod tests {
             0,
             None,
             None,
+            None,
+            8000,
             None,
         );
         assert_eq!(

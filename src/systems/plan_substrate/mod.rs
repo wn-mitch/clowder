@@ -42,12 +42,14 @@
 
 pub mod disposition;
 pub mod lifecycle;
+pub mod sensors;
 pub mod target;
 
 pub use disposition::record_disposition_switch;
 pub use lifecycle::{
     abandon_plan, record_step_failure, try_preempt, PreemptKind, PreemptOutcome,
 };
+pub use sensors::{cooldown_curve, prune_recent_target_failures, target_recent_failure_age_normalized};
 pub use target::{
     carry_target_forward, expire_reservations, release_target, require_alive_and_unreserved_filter,
     require_alive_filter, require_unreserved_filter, reserve_target, validate_target,

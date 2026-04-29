@@ -150,6 +150,8 @@ pub fn tick_pregnancy(
                         KittenDependency::new(birth.mother, birth.partner.unwrap_or(birth.mother)),
                         crate::components::SensorySpecies::Cat,
                         crate::components::SensorySignature::CAT,
+                        // Ticket 073 — per-cat recently-failed target memory.
+                        crate::components::RecentTargetFailures::default(),
                     ),
                 ))
                 .id();

@@ -57,11 +57,17 @@ use crate::ai::curves::{Curve, PostOp};
 use crate::ai::dse::{CommitmentStrategy, DseId, EvalCtx, GoalState, Intention};
 use crate::ai::eval::DseRegistry;
 use crate::ai::faction::StanceRequirement;
+use crate::ai::planner::GoapActionKind;
 use crate::ai::target_dse::{
     evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,
 };
 use crate::components::physical::Position;
 use crate::components::prey::PreyKind;
+use crate::components::RecentTargetFailures;
+use crate::resources::system_activation::{Feature, SystemActivation};
+use crate::systems::plan_substrate::{
+    cooldown_curve, target_recent_failure_age_normalized, TARGET_RECENT_FAILURE_INPUT,
+};
 
 pub const PREY_YIELD_INPUT: &str = "prey_yield";
 pub const PREY_CALM_INPUT: &str = "prey_calm";
@@ -123,13 +129,29 @@ pub fn hunt_target_dse() -> TargetTakingDse {
             )),
             Consideration::Scalar(ScalarConsideration::new(PREY_YIELD_INPUT, linear.clone())),
             Consideration::Scalar(ScalarConsideration::new(PREY_CALM_INPUT, linear)),
+            // Ticket 073 — recently-failed target cooldown (audit gap #2).
+            // Hunting amplification: Mocha's 109× `HarvestCarcass` failure
+            // pattern came from a stuck loop where the dead-or-blocked
+            // carcass kept winning the candidate set. The cooldown breaks
+            // the loop by penalizing the same-target re-pick.
+            Consideration::Scalar(ScalarConsideration::new(
+                TARGET_RECENT_FAILURE_INPUT,
+                cooldown_curve(),
+            )),
         ],
         // WeightedSum — matches the §6.1-Critical spec decision that
         // no axis should null a candidate (a loud rabbit is still
         // huntable). CompensatedProduct would gate alertness at 1.0,
         // and the spec explicitly wants alertness as a linear bias,
         // not a multiplicative lock-out.
-        composition: Composition::weighted_sum(vec![0.357, 0.357, 0.286]),
+        // Original three weights (0.357/0.357/0.286) renormalized
+        // ×(3/4) to make room for the cooldown axis at 1/4. Sums to ~1.0.
+        composition: Composition::weighted_sum(vec![
+            0.357 * 3.0 / 4.0,
+            0.357 * 3.0 / 4.0,
+            0.286 * 3.0 / 4.0,
+            1.0 / 4.0,
+        ]),
         aggregation: TargetAggregation::Best,
         intention: hunt_intention,
         // §9.3 Hunt accepts `Prey` only. Migrated from the cat-action
@@ -197,6 +219,10 @@ pub fn resolve_hunt_target(
     stance_overlays: &dyn Fn(Entity) -> crate::ai::faction::StanceOverlays,
     tick: u64,
     focal_hook: Option<FocalTargetHook<'_>>,
+    // Ticket 073 — per-cat recently-failed target memory.
+    recent: Option<&RecentTargetFailures>,
+    cooldown_ticks: u64,
+    activation: Option<&mut SystemActivation>,
 ) -> Option<Entity> {
     let dse = registry
         .target_taking_dses
@@ -258,6 +284,7 @@ pub fn resolve_hunt_target(
         .map(|c| (c.entity, c.alertness.clamp(0.0, 1.0)))
         .collect();
 
+    let cooldown_was_applied = std::cell::Cell::new(false);
     let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     let fetch_target = |name: &str, _cat: Entity, target: Entity| -> f32 {
         match name {
@@ -267,6 +294,19 @@ pub fn resolve_hunt_target(
                 .map(prey_yield_normalized)
                 .unwrap_or(0.0),
             PREY_CALM_INPUT => alertness_map.get(&target).map(|a| 1.0 - a).unwrap_or(0.5),
+            TARGET_RECENT_FAILURE_INPUT => {
+                let signal = target_recent_failure_age_normalized(
+                    recent,
+                    GoapActionKind::EngagePrey,
+                    target,
+                    tick,
+                    cooldown_ticks,
+                );
+                if signal < 1.0 {
+                    cooldown_was_applied.set(true);
+                }
+                signal
+            }
             _ => 0.0,
         }
     };
@@ -312,6 +352,13 @@ pub fn resolve_hunt_target(
         }
     }
 
+    // Ticket 073 — record cooldown application once per resolver call.
+    if let Some(act) = activation {
+        if cooldown_was_applied.get() {
+            act.record(Feature::TargetCooldownApplied);
+        }
+    }
+
     scored.winning_target
 }
 
@@ -334,8 +381,9 @@ mod tests {
     }
 
     #[test]
-    fn hunt_target_has_three_axes() {
-        assert_eq!(hunt_target_dse().per_target_considerations().len(), 3);
+    fn hunt_target_has_four_axes() {
+        // Ticket 073 — three legacy axes + the cooldown axis = four.
+        assert_eq!(hunt_target_dse().per_target_considerations().len(), 4);
     }
 
     #[test]
@@ -402,6 +450,9 @@ mod tests {
             &noop_overlays(),
             0,
             None,
+            None,
+            8000,
+            None,
         );
         assert!(out.is_none());
     }
@@ -419,6 +470,9 @@ mod tests {
             &noop_relations(),
             &noop_overlays(),
             0,
+            None,
+            None,
+            8000,
             None,
         );
         assert!(out.is_none());
@@ -442,6 +496,9 @@ mod tests {
             &noop_relations(),
             &noop_overlays(),
             0,
+            None,
+            None,
+            8000,
             None,
         );
         assert_eq!(out, Some(rabbit.entity));
@@ -470,6 +527,9 @@ mod tests {
             &noop_overlays(),
             0,
             None,
+            None,
+            8000,
+            None,
         );
         assert_eq!(out, Some(relaxed_mouse.entity));
     }
@@ -490,6 +550,9 @@ mod tests {
             &noop_relations(),
             &noop_overlays(),
             0,
+            None,
+            None,
+            8000,
             None,
         );
         assert_eq!(out, Some(close.entity));
@@ -518,6 +581,9 @@ mod tests {
             &noop_overlays(),
             0,
             None,
+            None,
+            8000,
+            None,
         );
         assert_eq!(out, Some(near_mouse.entity));
     }
@@ -544,6 +610,9 @@ mod tests {
             &noop_relations(),
             &noop_overlays(),
             0,
+            None,
+            None,
+            8000,
             None,
         );
         assert_eq!(out, Some(near.entity));
@@ -586,6 +655,9 @@ mod tests {
             &noop_overlays(),
             0,
             None,
+            None,
+            8000,
+            None,
         );
         assert_eq!(out, Some(close.entity));
 
@@ -595,8 +667,9 @@ mod tests {
         // toward zero. Both rabbits have identical yield+calm, so the
         // delta is entirely in the spatial axis.
         let weights = &dse.composition().weights;
-        // Weight slot 0 is the pursuit-cost spatial; weights sum to 1.0.
-        assert!(weights[0] > 0.3 && weights[0] < 0.4);
+        // Weight slot 0 is the pursuit-cost spatial; renormalized to 0.357 × 3/4
+        // after ticket 073 added the cooldown axis at slot 3.
+        assert!(weights[0] > 0.25 && weights[0] < 0.30);
     }
 
     #[test]
@@ -627,6 +700,9 @@ mod tests {
             &crate::ai::faction::FactionRelations::canonical(),
             &stance_overlays,
             0,
+            None,
+            None,
+            8000,
             None,
         );
         assert_eq!(

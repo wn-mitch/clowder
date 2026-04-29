@@ -1294,6 +1294,10 @@ pub fn disposition_to_chain(
             // branch where the live wiring is. Pass `None` here
             // until/unless this path is revived.
             None,
+            // Ticket 073 — same dead-code path; cooldown lookup happens
+            // at the GOAP step-resolver site, not here.
+            None,
+            0,
             None,
         );
         let mate_target = crate::ai::dses::mate_target::resolve_mate_target(
@@ -1305,6 +1309,9 @@ pub fn disposition_to_chain(
             res.time.tick,
             // Chain-building side; the focal capture happens at the
             // GOAP step-resolver site (goap.rs: MateWith step).
+            None,
+            None,
+            0,
             None,
         );
         // §6.5.3: resolve the mentor target-taking DSE. Skill-gap is the
@@ -1326,6 +1333,9 @@ pub fn disposition_to_chain(
             res.time.tick,
             // Chain-building side; the focal capture happens at the
             // GOAP step-resolver site (goap.rs: MentorWith step).
+            None,
+            None,
+            0,
             None,
         );
         // §6.5.4: resolve the groom-other target-taking DSE. Adds
@@ -1350,6 +1360,9 @@ pub fn disposition_to_chain(
             res.time.tick,
             // Chain-building side; the focal capture happens at
             // the GOAP step-resolver site (goap.rs: GroomOther step).
+            None,
+            None,
+            0,
             None,
         );
         // §6.5.7: resolve patient for ApplyRemedy. Replaces the

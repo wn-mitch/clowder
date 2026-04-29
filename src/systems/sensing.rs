@@ -865,6 +865,14 @@ pub fn update_target_existence_markers(
             // does the L2 Intention pin. Pass `None` here so this
             // marker-author doesn't double-fire `PairingBiasApplied`.
             None,
+            // Ticket 073 — existence-check skips cooldown to avoid
+            // `HasSocialTarget` flickering when the only candidate is
+            // recently-failed. The marker should reflect "is there
+            // anyone in range?" not "is there an unpenalized partner?";
+            // the GOAP-side resolver call applies the cooldown when it
+            // matters.
+            None,
+            0,
             None,
         )
         .is_some();

@@ -68,11 +68,17 @@ use crate::ai::considerations::{
 use crate::ai::curves::{Curve, PostOp};
 use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination};
 use crate::ai::eval::DseRegistry;
+use crate::ai::planner::GoapActionKind;
 use crate::ai::target_dse::{
     evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,
 };
 use crate::components::physical::Position;
+use crate::components::RecentTargetFailures;
 use crate::resources::relationships::Relationships;
+use crate::resources::system_activation::{Feature, SystemActivation};
+use crate::systems::plan_substrate::{
+    cooldown_curve, target_recent_failure_age_normalized, TARGET_RECENT_FAILURE_INPUT,
+};
 
 pub const TARGET_FONDNESS_INPUT: &str = "target_fondness";
 pub const TARGET_WARMTH_DEFICIT_INPUT: &str = "target_warmth_deficit";
@@ -140,13 +146,26 @@ pub fn groom_other_target_dse() -> TargetTakingDse {
                 TARGET_KINSHIP_INPUT,
                 kinship_curve,
             )),
+            // Ticket 073 — recently-failed target cooldown (audit gap #2).
+            Consideration::Scalar(ScalarConsideration::new(
+                TARGET_RECENT_FAILURE_INPUT,
+                cooldown_curve(),
+            )),
         ],
         // WeightedSum matches the social-family (Socialize / Mate /
         // Mentor) convention. CompensatedProduct would null a
         // non-kin-but-beloved target via the 0.5 kinship signal
         // passing through multiplicative gating — the spec intent is
         // a small additive bias, not a gate.
-        composition: Composition::weighted_sum(vec![0.30, 0.30, 0.30, 0.10]),
+        // Original four weights (0.30/0.30/0.30/0.10) renormalized
+        // ×(4/5) to make room for the cooldown axis at 1/5.
+        composition: Composition::weighted_sum(vec![
+            0.30 * 4.0 / 5.0,
+            0.30 * 4.0 / 5.0,
+            0.30 * 4.0 / 5.0,
+            0.10 * 4.0 / 5.0,
+            1.0 / 5.0,
+        ]),
         aggregation: TargetAggregation::Best,
         intention: groom_other_intention,
         required_stance: None,
@@ -196,6 +215,10 @@ pub fn resolve_groom_other_target(
     relationships: &Relationships,
     tick: u64,
     focal_hook: Option<FocalTargetHook<'_>>,
+    // Ticket 073 — per-cat recently-failed target memory.
+    recent: Option<&RecentTargetFailures>,
+    cooldown_ticks: u64,
+    activation: Option<&mut SystemActivation>,
 ) -> Option<Entity> {
     let dse = registry
         .target_taking_dses
@@ -228,6 +251,7 @@ pub fn resolve_groom_other_target(
     // Spatial nearness axis (`groom_other_target_nearness`) is
     // computed by the substrate from `EvalCtx::self_position` to each
     // candidate's tile per §L2.10.7.
+    let cooldown_was_applied = std::cell::Cell::new(false);
     let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     let fetch_target = |name: &str, cat: Entity, target: Entity| -> f32 {
         match name {
@@ -245,6 +269,19 @@ pub fn resolve_groom_other_target(
                 } else {
                     0.0
                 }
+            }
+            TARGET_RECENT_FAILURE_INPUT => {
+                let signal = target_recent_failure_age_normalized(
+                    recent,
+                    GoapActionKind::GroomOther,
+                    target,
+                    tick,
+                    cooldown_ticks,
+                );
+                if signal < 1.0 {
+                    cooldown_was_applied.set(true);
+                }
+                signal
             }
             _ => 0.0,
         }
@@ -291,6 +328,13 @@ pub fn resolve_groom_other_target(
         }
     }
 
+    // Ticket 073 — record cooldown application once per resolver call.
+    if let Some(act) = activation {
+        if cooldown_was_applied.get() {
+            act.record(Feature::TargetCooldownApplied);
+        }
+    }
+
     scored.winning_target
 }
 
@@ -304,10 +348,11 @@ mod tests {
     }
 
     #[test]
-    fn groom_other_target_has_four_axes() {
+    fn groom_other_target_has_five_axes() {
+        // Ticket 073 — four legacy axes + the cooldown axis = five.
         assert_eq!(
             groom_other_target_dse().per_target_considerations().len(),
-            4
+            5
         );
     }
 
@@ -353,6 +398,9 @@ mod tests {
             &relationships,
             0,
             None,
+            None,
+            8000,
+            None,
         );
         assert!(out.is_none());
     }
@@ -377,6 +425,9 @@ mod tests {
             &relationships,
             0,
             None,
+            None,
+            8000,
+            None,
         );
         assert!(out.is_none());
     }
@@ -399,6 +450,9 @@ mod tests {
             &is_kin,
             &relationships,
             0,
+            None,
+            None,
+            8000,
             None,
         );
         assert!(out.is_none());
@@ -426,6 +480,9 @@ mod tests {
             &is_kin,
             &relationships,
             0,
+            None,
+            None,
+            8000,
             None,
         );
         assert!(out.is_none());
@@ -468,6 +525,9 @@ mod tests {
             &relationships,
             0,
             None,
+            None,
+            8000,
+            None,
         );
         assert_eq!(out, Some(cold));
     }
@@ -498,6 +558,9 @@ mod tests {
             &is_kin,
             &relationships,
             0,
+            None,
+            None,
+            8000,
             None,
         );
         assert_eq!(out, Some(kin));
@@ -536,6 +599,9 @@ mod tests {
             &relationships,
             0,
             None,
+            None,
+            8000,
+            None,
         );
         assert_eq!(out, Some(near_acquaintance));
     }
@@ -567,6 +633,9 @@ mod tests {
             &is_kin,
             &relationships,
             0,
+            None,
+            None,
+            8000,
             None,
         );
         assert_eq!(out, Some(friend));
@@ -614,6 +683,9 @@ mod tests {
             &relationships,
             0,
             None,
+            None,
+            8000,
+            None,
         );
         assert_eq!(out, Some(freezing));
     }
@@ -651,6 +723,9 @@ mod tests {
             &is_kin,
             &relationships,
             0,
+            None,
+            None,
+            8000,
             None,
         );
         assert_eq!(out, Some(adjacent));

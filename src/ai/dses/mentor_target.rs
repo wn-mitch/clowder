@@ -59,12 +59,18 @@ use crate::ai::considerations::{
 use crate::ai::curves::Curve;
 use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination};
 use crate::ai::eval::DseRegistry;
+use crate::ai::planner::GoapActionKind;
 use crate::ai::target_dse::{
     evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,
 };
 use crate::components::physical::Position;
 use crate::components::skills::Skills;
+use crate::components::RecentTargetFailures;
 use crate::resources::relationships::Relationships;
+use crate::resources::system_activation::{Feature, SystemActivation};
+use crate::systems::plan_substrate::{
+    cooldown_curve, target_recent_failure_age_normalized, TARGET_RECENT_FAILURE_INPUT,
+};
 
 pub const TARGET_FONDNESS_INPUT: &str = "target_fondness";
 pub const TARGET_SKILL_GAP_INPUT: &str = "target_skill_gap";
@@ -121,6 +127,11 @@ pub fn mentor_target_dse() -> TargetTakingDse {
                 TARGET_SKILL_GAP_INPUT,
                 skill_gap_curve,
             )),
+            // Ticket 073 — recently-failed target cooldown (audit gap #2).
+            Consideration::Scalar(ScalarConsideration::new(
+                TARGET_RECENT_FAILURE_INPUT,
+                cooldown_curve(),
+            )),
         ],
         // WeightedSum matches the social-family pattern (Socialize /
         // Mate). CompensatedProduct would gate any low axis — a
@@ -128,7 +139,14 @@ pub fn mentor_target_dse() -> TargetTakingDse {
         // which over-punishes mentorship of strangers. The skill-gap
         // axis's weight (0.5) is dominant by design: gap is the
         // defining mentorship signal per §6.5.3.
-        composition: Composition::weighted_sum(vec![0.25, 0.25, 0.5]),
+        // Original three weights (0.25/0.25/0.5) renormalized ×(3/4)
+        // to make room for the cooldown axis at 1/4. Sums to 1.0.
+        composition: Composition::weighted_sum(vec![
+            0.25 * 3.0 / 4.0,
+            0.25 * 3.0 / 4.0,
+            0.5 * 3.0 / 4.0,
+            1.0 / 4.0,
+        ]),
         aggregation: TargetAggregation::Best,
         intention: mentor_intention,
         required_stance: None,
@@ -199,6 +217,10 @@ pub fn resolve_mentor_target(
     relationships: &Relationships,
     tick: u64,
     focal_hook: Option<FocalTargetHook<'_>>,
+    // Ticket 073 — per-cat recently-failed target memory.
+    recent: Option<&RecentTargetFailures>,
+    cooldown_ticks: u64,
+    activation: Option<&mut SystemActivation>,
 ) -> Option<Entity> {
     let dse = registry
         .target_taking_dses
@@ -232,6 +254,7 @@ pub fn resolve_mentor_target(
     // Spatial nearness axis (`mentor_target_nearness`) is computed by
     // the substrate from `EvalCtx::self_position` to each candidate's
     // tile per §L2.10.7, so no nearness branch lives in `fetch_target`.
+    let cooldown_was_applied = std::cell::Cell::new(false);
     let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     let fetch_target = |name: &str, cat: Entity, target: Entity| -> f32 {
         match name {
@@ -243,6 +266,19 @@ pub fn resolve_mentor_target(
                 .get(&target)
                 .map(|other| max_skill_gap(self_skills, other))
                 .unwrap_or(0.0),
+            TARGET_RECENT_FAILURE_INPUT => {
+                let signal = target_recent_failure_age_normalized(
+                    recent,
+                    GoapActionKind::MentorCat,
+                    target,
+                    tick,
+                    cooldown_ticks,
+                );
+                if signal < 1.0 {
+                    cooldown_was_applied.set(true);
+                }
+                signal
+            }
             _ => 0.0,
         }
     };
@@ -288,6 +324,13 @@ pub fn resolve_mentor_target(
         }
     }
 
+    // Ticket 073 — record cooldown application once per resolver call.
+    if let Some(act) = activation {
+        if cooldown_was_applied.get() {
+            act.record(Feature::TargetCooldownApplied);
+        }
+    }
+
     scored.winning_target
 }
 
@@ -312,8 +355,9 @@ mod tests {
     }
 
     #[test]
-    fn mentor_target_has_three_axes() {
-        assert_eq!(mentor_target_dse().per_target_considerations().len(), 3);
+    fn mentor_target_has_four_axes() {
+        // Ticket 073 — three legacy axes + the cooldown axis = four.
+        assert_eq!(mentor_target_dse().per_target_considerations().len(), 4);
     }
 
     #[test]
@@ -373,6 +417,9 @@ mod tests {
             &relationships,
             0,
             None,
+            None,
+            8000,
+            None,
         );
         assert!(out.is_none());
     }
@@ -404,6 +451,9 @@ mod tests {
             &relationships,
             0,
             None,
+            None,
+            8000,
+            None,
         );
         assert!(out.is_none());
     }
@@ -426,6 +476,9 @@ mod tests {
             &skills_lookup,
             &relationships,
             0,
+            None,
+            None,
+            8000,
             None,
         );
         assert!(out.is_none());
@@ -450,6 +503,9 @@ mod tests {
             &skills_lookup,
             &relationships,
             0,
+            None,
+            None,
+            8000,
             None,
         );
         assert!(out.is_none());
@@ -498,6 +554,9 @@ mod tests {
             &relationships,
             0,
             None,
+            None,
+            8000,
+            None,
         );
         assert_eq!(out, Some(novice));
     }
@@ -544,6 +603,9 @@ mod tests {
             &skills_lookup,
             &relationships,
             0,
+            None,
+            None,
+            8000,
             None,
         );
         assert_eq!(out, Some(novice));
@@ -592,6 +654,9 @@ mod tests {
             &skills_lookup,
             &relationships,
             0,
+            None,
+            None,
+            8000,
             None,
         );
         assert_eq!(out, Some(close));
