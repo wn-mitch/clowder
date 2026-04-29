@@ -224,10 +224,10 @@ pub fn require_unreserved_filter() -> EligibilityFilter {
     EligibilityFilter::new().require_unreserved()
 }
 
-/// Combined alive + unreserved gate. Most target DSEs in tickets 074
-/// + 080 want both: only score live, unclaimed candidates. Builders
-/// chain `eligibility: require_alive_and_unreserved_filter()` rather
-/// than wiring two separate filters.
+/// Combined alive + unreserved gate. Most target DSEs in tickets
+/// 074 and 080 want both: only score live, unclaimed candidates.
+/// Builders chain `eligibility: require_alive_and_unreserved_filter()`
+/// rather than wiring two separate filters.
 pub fn require_alive_and_unreserved_filter() -> EligibilityFilter {
     EligibilityFilter::new()
         .require_alive()

@@ -48,7 +48,7 @@ use crate::ai::considerations::{
     Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
 };
 use crate::ai::curves::Curve;
-use crate::ai::dse::{CommitmentStrategy, DseId, EligibilityFilter, EvalCtx, GoalState, Intention};
+use crate::ai::dse::{CommitmentStrategy, DseId, EvalCtx, GoalState, Intention};
 use crate::ai::eval::DseRegistry;
 use crate::ai::target_dse::{
     evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,

@@ -17,9 +17,9 @@ _Last generated: 2026-04-29._
 | In progress | 5 |
 | Ready | 28 |
 | Parked | 2 |
-| Blocked | 18 |
+| Blocked | 13 |
 | Done (awaiting archive) | 2 |
-| **Open total** | **53** |
+| **Open total** | **48** |
 | Pre-existing | 1 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -70,7 +70,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[015](docs/open-work/tickets/015-alloparenting-reframe-b.md)** — Alloparenting Reframe B — mama drops kitten at hearth near resting elder — _parked 2026-04-22 · added 2026-04-22_
 - **[059](docs/open-work/tickets/059-phase-7-substrate-cleanup.md)** — Phase 7 substrate cleanup — `ScoringContext` removal, §10 unblock map sweep, spec drift reconcile — _parked 2026-04-27 · added 2026-04-27_
 
-## Blocked (18)
+## Blocked (13)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _blocked-by 007, 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _blocked-by 016 · added 2026-04-22_
@@ -81,12 +81,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[053](docs/open-work/tickets/053-death-event-grief-emission.md)** — §7.7.b death-event grief emission — relationship-classified survivors payload — _blocked-by 007 · added 2026-04-27_
 - **[055](docs/open-work/tickets/055-mood-drift-threshold-detection.md)** — §7.7.d mood drift-threshold detection — sustain-duration + arc-misalignment trigger — _blocked-by 056 · added 2026-04-27_
 - **[057](docs/open-work/tickets/057-coordinator-directive-intention-strategy-row.md)** — §7.3 coordinator-directive Intention strategy row — `SingleMinded` with override — _blocked-by 007 · added 2026-04-27_
-- **[073](docs/open-work/tickets/073-recent-target-failures-cooldown-consideration.md)** — RecentTargetFailures component + target_recent_failure Consideration — _[planning-substrate] · blocked-by 072 · added 2026-04-29_
-- **[074](docs/open-work/tickets/074-eligibility-require-alive-and-step-validate.md)** — EligibilityFilter::require_alive + step-resolver validate_target — _[planning-substrate] · blocked-by 072 · added 2026-04-29_
-- **[075](docs/open-work/tickets/075-commitment-tenure-modifier.md)** — CommitmentTenure Modifier (anti-oscillation hysteresis on disposition switching) — _[planning-substrate] · blocked-by 072 · added 2026-04-29_
 - **[076](docs/open-work/tickets/076-last-resort-promotion-modifier.md)** — LastResortPromotion Modifier + no-target step resolvers (spiral-of-failure escalation) — _[planning-substrate] · blocked-by 072, 073 · added 2026-04-29_
-- **[078](docs/open-work/tickets/078-pairing-intention-consideration.md)** — Backport bond_score's Intention pin to a target_pairing_intention Consideration — _[planning-substrate] · blocked-by 072 · added 2026-04-29_
-- **[080](docs/open-work/tickets/080-resource-reservation-eligibility.md)** — Resource reservation — Reserved component + EligibilityFilter::require_unreserved — _[planning-substrate] · blocked-by 072 · added 2026-04-29_
 - **[081](docs/open-work/tickets/081-coordination-directive-failure-demotion.md)** — Coordination directive-failure demotion (colony-side stuck-loop guard) — _[planning-substrate] · blocked-by 072, 073 · added 2026-04-29_
 - **[082](docs/open-work/tickets/082-027b-reactivation.md)** — 027b L2 PairingActivity reactivation on the hardened substrate — _[planning-substrate] · blocked-by 072, 073, 074 · added 2026-04-29_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _blocked-by 071 · added 2026-04-28_
@@ -104,7 +99,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/). Recent months:
 
-- [2026-04](docs/open-work/landed/2026-04.md) — 64 entries
+- [2026-04](docs/open-work/landed/2026-04.md) — 65 entries
 
 ## Conventions
 
