@@ -1072,6 +1072,16 @@ pub fn evaluate_dispositions(
         };
         let mut disp = Disposition::new(chosen, 0, personality);
         disp.crafting_hint = crafting_hint;
+        // Ticket 072: route the disposition switch through
+        // `plan_substrate::record_disposition_switch` so the new
+        // `disposition_started_tick` field is consistently written
+        // here (and at any future switch site). The pre-072 inline
+        // body wrote `adopted_tick = 0` via `Disposition::new` and
+        // had no `disposition_started_tick` to write — this call
+        // writes `disposition_started_tick = 0` to match, preserving
+        // the no-behavior-change invariant. 075 (`CommitmentTenure`)
+        // is the first reader.
+        crate::systems::plan_substrate::record_disposition_switch(&mut disp, chosen, 0);
         commands.entity(entity).insert(disp);
 
         // Keep ticks_remaining = 0 so disposition_to_chain picks it up this tick.
@@ -1274,6 +1284,14 @@ pub fn disposition_to_chain(
             res.time.tick,
             // Chain-building side; the focal capture happens at the
             // GOAP step-resolver site (goap.rs: SocializeWith step).
+            None,
+            // Ticket 027b — `disposition_to_chain` is dead code
+            // (`evaluate_dispositions` not scheduled today; chain-
+            // building runs through GOAP). The L2 Intention lookup
+            // lives in goap.rs's `resolve_goap_plans` SocializeWith
+            // branch where the live wiring is. Pass `None` here
+            // until/unless this path is revived.
+            None,
             None,
         );
         let mate_target = crate::ai::dses::mate_target::resolve_mate_target(
@@ -4019,6 +4037,7 @@ mod tests {
         Disposition {
             kind,
             adopted_tick: 0,
+            disposition_started_tick: 0,
             completions: 0,
             target_completions: 3,
             crafting_hint: None,

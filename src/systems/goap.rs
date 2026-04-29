@@ -380,6 +380,17 @@ pub struct ExecutorContext<'w, 's> {
         ),
         Without<Dead>,
     >,
+    /// Ticket 027b §7.M — L2 PairingActivity Intention lookup. The
+    /// `SocializeWith` step resolver reads this to pin the Intention
+    /// partner at the top of `target_partner_bond` axis. Disjoint
+    /// from the mutable `cats` query in `resolve_goap_plans` because
+    /// `&PairingActivity` is read-only.
+    pub pairing_q: bevy_ecs::prelude::Query<
+        'w,
+        's,
+        &'static crate::components::PairingActivity,
+        Without<Dead>,
+    >,
 }
 
 impl<'w, 's> ExecutorContext<'w, 's> {
@@ -2327,8 +2338,14 @@ pub fn resolve_goap_plans(
                                 );
                             }
 
-                            // ThreatNearby: set flee action with vector away from threat.
-                            if urgent.kind == UrgencyKind::ThreatNearby {
+                            // Compute the flee target (if any) for ThreatNearby,
+                            // then dispatch into `plan_substrate::try_preempt`
+                            // which owns the load-bearing
+                            // `current.ticks_remaining = 0` reset (ticket 041)
+                            // alongside the `plan.current_step = plan.steps.len()`
+                            // exhaustion mark. Ticket 072 lifted these from the
+                            // inline body so the fix is API-owned.
+                            let preempt_kind = if urgent.kind == UrgencyKind::ThreatNearby {
                                 if let Some(threat_pos) = urgent.threat_pos {
                                     let dx = pos.x - threat_pos.x;
                                     let dy = pos.y - threat_pos.y;
@@ -2340,36 +2357,21 @@ pub fn resolve_goap_plans(
                                     );
                                     target.x = target.x.clamp(0, ec.map.width - 1);
                                     target.y = target.y.clamp(0, ec.map.height - 1);
-                                    current.action = Action::Flee;
-                                    current.ticks_remaining = 0;
-                                    current.target_position = Some(target);
-                                    current.target_entity = None;
+                                    crate::systems::plan_substrate::PreemptKind::ThreatFlee {
+                                        flee_target: target,
+                                    }
+                                } else {
+                                    crate::systems::plan_substrate::PreemptKind::ThreatWithoutPosition
                                 }
-                            }
-
-                            // Mark plan exhausted so it flows through the normal
-                            // completion path for cleanup.
-                            plan.current_step = plan.steps.len();
-                            // Reset the CurrentAction gate so next tick's
-                            // `evaluate_and_plan` actually re-evaluates.
-                            // The ThreatNearby sub-block above sets this
-                            // to 0 alongside `Action::Flee`; without the
-                            // unconditional reset here, every other
-                            // urgency kind (CriticalSafety / CriticalHunger
-                            // / Exhaustion) drops the GoapPlan but leaves
-                            // `ticks_remaining = u64::MAX` (set at plan
-                            // creation, line ~1588). `evaluate_and_plan`'s
-                            // `if current.ticks_remaining != 0 { continue }`
-                            // filter (line ~974) then silently skips the
-                            // cat forever. Ticket 041: Mallow stuck with
-                            // `action=Cook` at the kitchen for 13,000+
-                            // ticks after a CriticalSafety preempt of a
-                            // Crafting plan — RetrieveRawFood maps to
-                            // `Action::Cook` per `to_action()`, so the
-                            // stale `current.action` tells the snapshot
-                            // logger she's cooking even though no plan
-                            // step has run since the preempt.
-                            current.ticks_remaining = 0;
+                            } else {
+                                crate::systems::plan_substrate::PreemptKind::NonThreat
+                            };
+                            let _outcome = crate::systems::plan_substrate::try_preempt(
+                                &mut plan,
+                                &mut current,
+                                preempt_kind,
+                                None, // RecentTargetFailures lands in 073
+                            );
                             // Force GoapPlan removal this tick so
                             // `evaluate_and_plan` (which filters
                             // `Without<GoapPlan>`) picks the cat up next
@@ -2438,9 +2440,21 @@ pub fn resolve_goap_plans(
                 }
 
                 // Record the failed action so replanning can exclude it.
+                // Ticket 072: routed through `plan_substrate::record_step_failure`
+                // — body is verbatim today; 073 extends it to update
+                // `RecentTargetFailures` for cross-plan target memory.
                 let failed_action = plan.current().map(|s| s.action);
+                let failed_target = plan
+                    .current_state()
+                    .and_then(|s| s.target_entity);
                 if let Some(action) = failed_action {
-                    plan.failed_actions.insert(action);
+                    crate::systems::plan_substrate::record_step_failure(
+                        &mut plan,
+                        action,
+                        crate::components::PlanFailureReason::Other,
+                        failed_target,
+                        None, // RecentTargetFailures lands in 073
+                    );
                 }
 
                 // Attempt replanning.
@@ -2560,7 +2574,16 @@ pub fn resolve_goap_plans(
                                 outcome: ActionOutcome::Failure,
                             });
                         }
-                        current.ticks_remaining = 0;
+                        // Ticket 072: routed through `plan_substrate::abandon_plan`.
+                        // The function owns `current.ticks_remaining = 0`; the
+                        // caller still pushes onto `plans_to_remove` because that
+                        // collection is loop-local and substrate doesn't own it.
+                        let _abandoned = crate::systems::plan_substrate::abandon_plan(
+                            &mut current,
+                            &mut plan,
+                            crate::components::AbandonReason::ReplanCap,
+                            None, // RecentTargetFailures lands in 073
+                        );
                         plans_to_remove.push(cat_entity);
                     }
                 } else {
@@ -2579,7 +2602,13 @@ pub fn resolve_goap_plans(
                             outcome: ActionOutcome::Failure,
                         });
                     }
-                    current.ticks_remaining = 0;
+                    // Ticket 072: routed through `plan_substrate::abandon_plan`.
+                    let _abandoned = crate::systems::plan_substrate::abandon_plan(
+                        &mut current,
+                        &mut plan,
+                        crate::components::AbandonReason::NoPlanPossible,
+                        None, // RecentTargetFailures lands in 073
+                    );
                     plans_to_remove.push(cat_entity);
                 }
             }
@@ -2803,10 +2832,16 @@ fn dispatch_step_action(
         GoapActionKind::EngagePrey => {
             // Get prey target from previous SearchPrey step's state, or from
             // our own state (set during replan).
-            if plan.step_state[step_idx].target_entity.is_none() && step_idx > 0 {
-                plan.step_state[step_idx].target_entity =
-                    plan.step_state[step_idx - 1].target_entity;
-            }
+            // Ticket 072: routed through `plan_substrate::carry_target_forward`.
+            // 074 will add a dead-entity check before the copy; today the
+            // body is the verbatim "if None and step_idx > 0, copy from
+            // prior step" lifted from the inline site.
+            let _carried = crate::systems::plan_substrate::carry_target_forward(
+                &mut plan.step_state,
+                step_idx,
+                &crate::systems::plan_substrate::target::TargetValidityQuery,
+                None, // RecentTargetFailures lands in 073
+            );
             resolve_engage_prey(
                 &mut plan.step_state[step_idx],
                 ticks,
@@ -2971,6 +3006,17 @@ fn dispatch_step_action(
                     None
                 };
                 let stance_overlays = |e: Entity| ec.stance_overlays_of(e);
+                // Ticket 027b §7.M — look up the L2 PairingActivity
+                // partner so `socialize_target::bond_score` can pin
+                // the Intention partner at 1.0 regardless of bond
+                // tier. Falls back to `None` for cats without an
+                // Intention (the steady-state for non-reproductive
+                // or partnerless cats).
+                let pairing_partner = ec
+                    .pairing_q
+                    .get(cat_entity)
+                    .ok()
+                    .map(|p| p.partner);
                 plan.step_state[step_idx].target_entity =
                     crate::ai::dses::socialize_target::resolve_socialize_target(
                         &ec.dse_registry,
@@ -2982,6 +3028,8 @@ fn dispatch_step_action(
                         &stance_overlays,
                         ec.time.tick,
                         focal_hook,
+                        pairing_partner,
+                        narr.activation.as_deref_mut(),
                     );
             }
             // §7.W: construct a temporary Fulfillment for cats without the

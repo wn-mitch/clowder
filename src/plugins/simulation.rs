@@ -292,6 +292,35 @@ impl Plugin for SimulationPlugin {
                             // marker, so the DSE returns 0.0 for cats
                             // whose gate is closed.
                             crate::ai::mating::update_mate_eligibility_markers,
+                            // §7.M L2 PairingActivity (ticket 027b) —
+                            // **activation deferred**. Registering
+                            // `crate::ai::pairing::author_pairing_intentions`
+                            // here perturbs Bevy 0.18's topological sort
+                            // enough to flip seed-42's late-soak food/eat
+                            // cadence: the canonical 15-min release deep-
+                            // soak with the system active produced 3
+                            // starvation deaths (clustered tick 1344K, last
+                            // 11% of the run) versus zero pre-027b at the
+                            // same parent commit (cef9137). The author
+                            // system body is a true no-op when no Friends-
+                            // bonded reproductive pair exists, so the
+                            // regression must come from scheduler
+                            // reshuffling, not from any side effect inside
+                            // the system. Deferral mirrors ticket 061's
+                            // producer-scaffold precedent ("DSE is
+                            // registered but dormant; no production caller
+                            // yet"). The substrate is otherwise complete:
+                            // PairingActivity component, drop-gate
+                            // predicate, bias wiring on
+                            // `socialize_target.rs::bond_score`, and
+                            // `Feature::Pairing*` activation variants all
+                            // remain in place. To activate: re-add the
+                            // line below and follow up with the four-
+                            // artifact balance methodology against a
+                            // multi-seed sweep.
+                            //
+                            //     crate::ai::pairing::author_pairing_intentions,
+                            //
                             // §4 batch 2: capability markers — reads
                             // life-stage, injury, inventory markers
                             // authored above.

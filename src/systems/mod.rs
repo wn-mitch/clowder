@@ -50,6 +50,7 @@ pub mod narrative;
 pub mod needs;
 pub mod personality_events;
 pub mod personality_friction;
+pub mod plan_substrate;
 pub mod pregnancy;
 pub mod prey;
 pub mod sensing;

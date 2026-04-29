@@ -14,6 +14,7 @@ pub mod hawk_planner;
 pub mod hawk_scoring;
 pub mod mating;
 pub mod modifier;
+pub mod pairing;
 pub mod pathfinding;
 pub mod planner;
 pub mod scoring;

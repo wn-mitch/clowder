@@ -17,10 +17,12 @@ pub mod kitten;
 pub mod magic;
 pub mod markers;
 pub mod mental;
+pub mod pairing;
 pub mod personality;
 pub mod physical;
 pub mod pregnancy;
 pub mod prey;
+pub mod recent_target_failures;
 pub mod sensing;
 pub mod skills;
 pub mod task_chain;
@@ -41,7 +43,10 @@ pub use disposition::{ActionHistory, ActionOutcome, ActionRecord, Disposition, D
 pub use fate::{FateAssigned, FatedLove, FatedRival};
 pub use fertility::{Fertility, FertilityPhase};
 pub use fulfillment::Fulfillment;
-pub use goap_plan::{GoapPlan, PlanEvent, PlanNarrative, StepPhase};
+pub use goap_plan::{
+    AbandonReason, AbandonedPlanState, GoapPlan, PlanEvent, PlanFailureReason, PlanNarrative,
+    StepPhase,
+};
 pub use grooming::GroomingCondition;
 pub use identity::{Age, Appearance, Gender, LifeStage, Name, Orientation, Species};
 pub use items::{Item, ItemKind, ItemLocation};
@@ -51,6 +56,7 @@ pub use magic::{
     MisfireEffect, RemedyEffect, RemedyKind, Seasonal, Ward, WardKind,
 };
 pub use mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier};
+pub use pairing::{PairingActivity, PairingDropBranch, PairingDropConfig, PairingProxies};
 pub use personality::Personality;
 pub use physical::{
     Dead, Health, Injury, InjuryKind, InjurySource, Needs, Position, PreviousPosition,
@@ -60,6 +66,7 @@ pub use prey::{
     DenRaided, FleeStrategy, PreyAiState, PreyAnimal, PreyConfig, PreyDen, PreyDensity, PreyKilled,
     PreyKind, PreyState,
 };
+pub use recent_target_failures::RecentTargetFailures;
 pub use sensing::{SensoryModifier, SensorySignature, SensorySpecies};
 pub use skills::{Corruption, MagicAffinity, Skills, Training};
 pub use task_chain::{FailurePolicy, Material, StepKind, StepStatus, TaskChain, TaskStep};

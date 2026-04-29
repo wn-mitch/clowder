@@ -43,6 +43,8 @@ pub struct SimConstants {
     pub fulfillment: FulfillmentConstants,
     #[serde(default)]
     pub influence_maps: InfluenceMapConstants,
+    #[serde(default)]
+    pub pairing: PairingConstants,
 }
 
 // ---------- NeedsConstants ----------
@@ -3630,6 +3632,53 @@ fn deep_merge(target: &mut serde_json::Value, patch: &serde_json::Value) {
         }
         (slot, other) => {
             *slot = other.clone();
+        }
+    }
+}
+
+// ---------- PairingConstants (§7.M L2 PairingActivity) ----------
+
+/// Knobs for the §7.M L2 PairingActivity Intention layer. Read by
+/// `crate::ai::pairing::author_pairing_intentions` (Commit A) and by
+/// the bias readers in `socialize_target` / `groom_other_target` /
+/// `scoring` (Commit B). Calibrated against the seed-42 noise band
+/// observed in `logs/baseline-2026-04-25/`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PairingConstants {
+    /// Manhattan-distance candidate filter when scanning for an
+    /// emission target. Wider than `MATE_TARGET_RANGE = 10` because
+    /// L2 is multi-season — a cat may pursue a partner across the
+    /// colony, not require adjacency every tick.
+    pub candidate_range: i32,
+    /// Minimum pairing-quality score for a Friends-bonded peer to
+    /// trigger emission. Calibrated so a fresh-Friends peer at
+    /// `fondness ≈ 0.5, romantic ≈ 0.0`, `bond_score = 0.5` clears
+    /// (`0.40·0.5 + 0.40·0.0 + 0.20·0.5 = 0.30 ≥ 0.25`).
+    pub emission_threshold: f32,
+    /// Drop-gate `DesireDrift` floor on the romantic axis. Both this
+    /// and `fondness_floor` must be breached simultaneously for the
+    /// branch to fire — Mates-bonded post-conception cooldown should
+    /// not drop on romantic alone.
+    pub romantic_floor: f32,
+    /// Drop-gate `DesireDrift` floor on the fondness axis (see
+    /// `romantic_floor`).
+    pub fondness_floor: f32,
+    /// Per-axis weights of the pairing-quality scalar. Sum to 1.0.
+    pub quality_fondness_weight: f32,
+    pub quality_romantic_weight: f32,
+    pub quality_bond_weight: f32,
+}
+
+impl Default for PairingConstants {
+    fn default() -> Self {
+        Self {
+            candidate_range: 25,
+            emission_threshold: 0.25,
+            romantic_floor: 0.05,
+            fondness_floor: 0.30,
+            quality_fondness_weight: 0.40,
+            quality_romantic_weight: 0.40,
+            quality_bond_weight: 0.20,
         }
     }
 }

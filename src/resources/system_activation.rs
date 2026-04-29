@@ -223,6 +223,32 @@ pub enum Feature {
     /// as a distinct Feature lets canaries catch planner collapse
     /// separately from legitimate completion.
     CommitmentDropReplanCap,
+    /// Ticket 027b §7.M — `crate::ai::pairing::author_pairing_intentions`
+    /// inserted a [`crate::components::PairingActivity`] Intention on
+    /// a cat with a Friends-or-better orientation-compatible peer in
+    /// range. Positive — every PairingIntentionEmitted is a step
+    /// toward closing the structural Friends → Partners gap that
+    /// stalled mating cadence in the seed-42 baseline. Stays
+    /// `expected_to_fire_per_soak() => false` in Commit A because no
+    /// reader yet uses the Intention; Commit B promotes when the bias
+    /// readers ship.
+    PairingIntentionEmitted,
+    /// Ticket 027b §7.M — the L2 drop gate fired on a held Intention
+    /// (partner died/banished/incapacitated, bond lost, life-stage
+    /// transitioned, season cycled out, or both relationship axes
+    /// collapsed below their floors). Neutral — drops are normal
+    /// state transitions, not an adverse signal. Stays
+    /// `expected_to_fire_per_soak() => false` because drops are
+    /// bursty (a healthy 15-min soak may have zero drops).
+    PairingDropped,
+    /// Ticket 027b §7.M — a target-picker resolver picked the L2
+    /// Intention partner *and* would not have picked them without the
+    /// Intention's hard-1.0 pin (pre-pin bond_score < 1.0). Isolates
+    /// "L2 actually changed target selection" from "Pairing was held
+    /// but the cat would've picked them anyway". Wired in Commit B;
+    /// activation stays unfired (and `expected_to_fire_per_soak() =>
+    /// false`) until then.
+    PairingBiasApplied,
 }
 
 impl Feature {
@@ -321,6 +347,10 @@ impl Feature {
         Feature::CommitmentDropSingleMinded,
         Feature::CommitmentDropOpenMinded,
         Feature::CommitmentDropReplanCap,
+        // §7.M L2 PairingActivity (ticket 027b)
+        Feature::PairingIntentionEmitted,
+        Feature::PairingDropped,
+        Feature::PairingBiasApplied,
     ];
 
     /// The valence of this feature.
@@ -381,6 +411,9 @@ impl Feature {
             Feature::MaterialPickedUp => Positive,
             Feature::BuildingRepaired => Positive,
             Feature::CourtshipInteraction => Positive,
+            // §7.M L2 PairingActivity (ticket 027b)
+            Feature::PairingIntentionEmitted => Positive,
+            Feature::PairingBiasApplied => Positive,
 
             // --- Negative: adverse events, colony loss signals ---
             Feature::DeathStarvation => Negative,
@@ -430,6 +463,9 @@ impl Feature {
             Feature::CommitmentDropSingleMinded => Neutral,
             Feature::CommitmentDropOpenMinded => Neutral,
             Feature::CommitmentDropReplanCap => Neutral,
+            // §7.M L2 PairingActivity drop is a state transition,
+            // not an adverse event.
+            Feature::PairingDropped => Neutral,
         }
     }
 
@@ -556,6 +592,21 @@ impl Feature {
             Feature::KittenBorn => false,
             Feature::KittenFed => false,
             Feature::ItemRetrieved => false,
+            // Ticket 027b §7.M L2 PairingActivity — **activation
+            // deferred**. The author system at
+            // `crate::ai::pairing::author_pairing_intentions` is built,
+            // tested, and ready, but its schedule edge in
+            // `plugins/simulation.rs` is commented out because
+            // registering it in chain 2a perturbs Bevy 0.18's
+            // topological sort enough to drop seed-42 from
+            // Starvation=0 to Starvation=3 (scheduler-shift hazard
+            // also documented on ticket 061). Both Pairing Positive
+            // features therefore cannot fire and must be exempt
+            // from the never-fired canary until activation lands.
+            // When the schedule edge is uncommented, remove these
+            // two false-arms so the canary can validate them.
+            Feature::PairingIntentionEmitted => false,
+            Feature::PairingBiasApplied => false,
             // Every other feature is expected to fire per soak.
             _ => true,
         }
@@ -662,6 +713,9 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::CommitmentDropSingleMinded => "CommitmentDropSingleMinded",
         Feature::CommitmentDropOpenMinded => "CommitmentDropOpenMinded",
         Feature::CommitmentDropReplanCap => "CommitmentDropReplanCap",
+        Feature::PairingIntentionEmitted => "PairingIntentionEmitted",
+        Feature::PairingDropped => "PairingDropped",
+        Feature::PairingBiasApplied => "PairingBiasApplied",
     }
 }
 
@@ -877,10 +931,12 @@ mod tests {
         // OpenMinded / ReplanCap) for the §7.2 commitment-gate
         // tracing split. Ticket 038 added 1 Positive
         // (MaterialPickedUp, paired with the resurrected
-        // MaterialsDelivered).
-        assert_eq!(positive, 45);
+        // MaterialsDelivered). Ticket 027b added 2 Positive
+        // (PairingIntentionEmitted, PairingBiasApplied) + 1 Neutral
+        // (PairingDropped) for the §7.M L2 PairingActivity layer.
+        assert_eq!(positive, 47);
         assert_eq!(negative, 20);
-        assert_eq!(neutral, 25);
+        assert_eq!(neutral, 26);
     }
 
     #[test]
@@ -946,7 +1002,7 @@ mod tests {
     fn features_total_in_matches_category_counts() {
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            45
+            47
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),
@@ -954,7 +1010,7 @@ mod tests {
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Neutral),
-            25
+            26
         );
     }
 

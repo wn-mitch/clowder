@@ -65,6 +65,7 @@ use crate::ai::target_dse::{
 };
 use crate::components::physical::Position;
 use crate::resources::relationships::{BondType, Relationships};
+use crate::resources::system_activation::{Feature, SystemActivation};
 
 pub const TARGET_FONDNESS_INPUT: &str = "target_fondness";
 pub const TARGET_NOVELTY_INPUT: &str = "target_novelty";
@@ -163,22 +164,53 @@ fn socialize_intention(_target: Entity) -> Intention {
     }
 }
 
-/// Map `Relationships::get(cat, target).bond` to a graduated scalar.
+/// Map `Relationships::get(cat, target).bond` to a graduated scalar,
+/// with the L2 PairingActivity Intention partner pinned at 1.0.
 ///
-/// `None` → 0.0 (unbonded acquaintance), `Friends` → 0.5 (significant
-/// boost — the courtship-drift loop in `social.rs::check_bonds` uses
-/// this tier as the romantic-accumulation gate), `Partners` /
-/// `Mates` → 1.0 (already at or past mating-eligibility; keep the
-/// bias maxed so the cat doesn't drift away mid-pairing). The
-/// graduated shape (rather than a Cliff at any-bond) means a
-/// Mates-bonded partner outscores a Friends-bonded one, so a cat
-/// with both in range stays oriented toward the deeper bond.
-fn bond_score(relationships: &Relationships, cat: Entity, target: Entity) -> f32 {
+/// **Without an active Intention** — `None` → 0.0 (unbonded
+/// acquaintance), `Friends` → 0.5 (significant boost — the
+/// courtship-drift loop in `social.rs::check_bonds` uses this tier
+/// as the romantic-accumulation gate), `Partners` / `Mates` → 1.0.
+/// Graduated rather than Cliff so a Mates-bonded partner outscores a
+/// Friends-bonded one.
+///
+/// **With an active Intention** (§7.M, ticket 027b Commit B) — if
+/// `pairing_partner == Some(target)`, the candidate is pinned at 1.0
+/// regardless of bond tier. This is the structural-commitment
+/// override: a cat that holds a Pairing Intention with a Friends-
+/// bonded peer should preferentially socialize with *that* cat across
+/// ticks, not drift toward a Partners-bonded acquaintance whose bond
+/// tier is already maxed out. The pin only changes selection when the
+/// underlying tier is Friends (or absent — defensive); a cat already
+/// at Partners/Mates gets the same 1.0 either way, so the Intention
+/// is a no-op there.
+fn bond_score(
+    relationships: &Relationships,
+    pairing_partner: Option<Entity>,
+    cat: Entity,
+    target: Entity,
+) -> f32 {
+    if pairing_partner == Some(target) {
+        return 1.0;
+    }
     match relationships.get(cat, target).and_then(|r| r.bond) {
         Some(BondType::Mates) | Some(BondType::Partners) => 1.0,
         Some(BondType::Friends) => 0.5,
         None => 0.0,
     }
+}
+
+/// `bond_score` *without* the L2 Intention pin — the score the
+/// candidate would have earned absent the Pairing. Used by the call
+/// site to decide whether `Feature::PairingBiasApplied` should fire
+/// (the bias is "load-bearing" only when the pin actually changed the
+/// scalar — i.e., the underlying tier was Friends or absent).
+pub fn unpinned_bond_score(
+    relationships: &Relationships,
+    cat: Entity,
+    target: Entity,
+) -> f32 {
+    bond_score(relationships, None, cat, target)
 }
 
 // ---------------------------------------------------------------------------
@@ -213,6 +245,16 @@ pub fn resolve_socialize_target(
     stance_overlays: &dyn Fn(Entity) -> crate::ai::faction::StanceOverlays,
     tick: u64,
     focal_hook: Option<FocalTargetHook<'_>>,
+    // L2 PairingActivity partner (ticket 027b Commit B). `None` for
+    // cats without an Intention; when `Some(p)`, the
+    // `target_partner_bond` axis pins `p` at 1.0 via `bond_score`.
+    pairing_partner: Option<Entity>,
+    // Activation tracker for `Feature::PairingBiasApplied`. Fires when
+    // the picked target == `pairing_partner` and the unpinned bond
+    // score would have been < 1.0 (i.e., the pin is load-bearing).
+    // Pass `None` from dead-code disposition.rs paths and from tests
+    // that don't care.
+    activation: Option<&mut SystemActivation>,
 ) -> Option<Entity> {
     // Find the registered factory output. Fall back to `None` if
     // registration was skipped (tests / partial bootstraps) — callers
@@ -286,7 +328,7 @@ pub fn resolve_socialize_target(
             // Future cross-species socializing routes a compatibility
             // class here; curve-cliff gates on ≥ 0.5.
             TARGET_SPECIES_COMPAT_INPUT => 1.0,
-            TARGET_PARTNER_BOND_INPUT => bond_score(relationships, cat, target),
+            TARGET_PARTNER_BOND_INPUT => bond_score(relationships, pairing_partner, cat, target),
             _ => 0.0,
         }
     };
@@ -330,6 +372,19 @@ pub fn resolve_socialize_target(
         ) {
             hook.capture
                 .set_target_ranking("socialize_target", ranking, tick);
+        }
+    }
+
+    // Ticket 027b §7.M — fire `PairingBiasApplied` only when the bias
+    // was *load-bearing*: the picked target is the Intention partner
+    // AND that partner's unpinned bond score was < 1.0 (i.e., they
+    // were Friends-bonded or unbonded; a Partners/Mates partner gets
+    // 1.0 with or without the pin, so the bias didn't change anything).
+    if let (Some(act), Some(picked), Some(partner)) =
+        (activation, scored.winning_target, pairing_partner)
+    {
+        if picked == partner && unpinned_bond_score(relationships, cat, partner) < 1.0 {
+            act.record(Feature::PairingBiasApplied);
         }
     }
 
@@ -469,13 +524,50 @@ mod tests {
         let mate = Entity::from_raw_u32(5).unwrap();
         let mut relationships = Relationships::default();
         // No entry → bond=None → 0.0.
-        assert_eq!(bond_score(&relationships, cat, stranger), 0.0);
+        assert_eq!(bond_score(&relationships, None, cat, stranger), 0.0);
         relationships.get_or_insert(cat, friend).bond = Some(BondType::Friends);
         relationships.get_or_insert(cat, partner).bond = Some(BondType::Partners);
         relationships.get_or_insert(cat, mate).bond = Some(BondType::Mates);
-        assert_eq!(bond_score(&relationships, cat, friend), 0.5);
-        assert_eq!(bond_score(&relationships, cat, partner), 1.0);
-        assert_eq!(bond_score(&relationships, cat, mate), 1.0);
+        assert_eq!(bond_score(&relationships, None, cat, friend), 0.5);
+        assert_eq!(bond_score(&relationships, None, cat, partner), 1.0);
+        assert_eq!(bond_score(&relationships, None, cat, mate), 1.0);
+    }
+
+    #[test]
+    fn bond_score_pins_pairing_intention_partner_at_one() {
+        // Ticket 027b §7.M — the L2 Intention partner is pinned at
+        // 1.0 regardless of underlying bond tier (Friends-bonded or
+        // even unbonded). This is the structural-commitment override.
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let intended = Entity::from_raw_u32(2).unwrap();
+        let unrelated = Entity::from_raw_u32(3).unwrap();
+        let mut relationships = Relationships::default();
+        relationships.get_or_insert(cat, intended).bond = Some(BondType::Friends);
+        // With the Intention: Friends → 1.0 (pinned).
+        assert_eq!(
+            bond_score(&relationships, Some(intended), cat, intended),
+            1.0
+        );
+        // Without the Intention: Friends → 0.5 (graduated).
+        assert_eq!(bond_score(&relationships, None, cat, intended), 0.5);
+        // The pin is partner-specific — non-Intention candidates
+        // resolve via the graduated map.
+        assert_eq!(
+            bond_score(&relationships, Some(intended), cat, unrelated),
+            0.0
+        );
+    }
+
+    #[test]
+    fn unpinned_bond_score_ignores_intention() {
+        // The unpinned helper is the "what would they score absent the
+        // pin" reference used by the call site to decide whether
+        // PairingBiasApplied is load-bearing.
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let intended = Entity::from_raw_u32(2).unwrap();
+        let mut relationships = Relationships::default();
+        relationships.get_or_insert(cat, intended).bond = Some(BondType::Friends);
+        assert_eq!(unpinned_bond_score(&relationships, cat, intended), 0.5);
     }
 
     #[test]
@@ -641,6 +733,8 @@ mod tests {
             &|_| crate::ai::faction::StanceOverlays::default(),
             0,
             None,
+            None,
+            None,
         );
         assert!(out.is_none());
     }
@@ -663,6 +757,8 @@ mod tests {
             &crate::ai::faction::FactionRelations::canonical(),
             &|_| crate::ai::faction::StanceOverlays::default(),
             0,
+            None,
+            None,
             None,
         );
         assert!(out.is_none());
@@ -697,6 +793,8 @@ mod tests {
             &|_| crate::ai::faction::StanceOverlays::default(),
             0,
             None,
+            None,
+            None,
         );
         assert_eq!(out, Some(friend));
     }
@@ -718,6 +816,8 @@ mod tests {
             &crate::ai::faction::FactionRelations::canonical(),
             &|_| crate::ai::faction::StanceOverlays::default(),
             0,
+            None,
+            None,
             None,
         );
         assert!(out.is_none());
@@ -754,6 +854,8 @@ mod tests {
             &crate::ai::faction::FactionRelations::canonical(),
             &|_| crate::ai::faction::StanceOverlays::default(),
             0,
+            None,
+            None,
             None,
         );
         assert_eq!(out, Some(novel));
@@ -845,6 +947,8 @@ mod tests {
             &crate::ai::faction::FactionRelations::canonical(),
             &stance_overlays,
             0,
+            None,
+            None,
             None,
         );
         assert_eq!(

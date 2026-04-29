@@ -1,0 +1,63 @@
+---
+id: 076
+title: LastResortPromotion Modifier + no-target step resolvers (spiral-of-failure escalation)
+status: blocked
+cluster: planning-substrate
+added: 2026-04-29
+parked: null
+blocked-by: [072, 073]
+supersedes: []
+related-systems: [ai-substrate-refactor.md]
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+Audit gap #6 (important severity). When `AnxietyInterrupt` fires (critical hunger / energy / health) the cat's recovery disposition is `Resting` or `Eating`. Today **no escalation path exists if recovery itself fails repeatedly** — no resting site, no food in inventory, no healer, blocked navigation, etc. The cat cycles through failing recovery dispositions until hunger kills it.
+
+Mocha / Nettle / Lark in the failed seed-42 run hit exactly this pattern: anxiety dropped 70% (24,874 → 7,469) because plan-replan churn drowned out anxiety windows, and the cats had no last-resort fallback when their recovery actions kept failing.
+
+Lands as a Modifier promoting no-target last-resort actions (RestInPlace, EatInventoryUnconditional) when recovery has failed N times. Stays inside the IAUS score economy: when the trigger clears (cat actually rests / eats), the modifier deactivates and normal scoring resumes. **No out-of-band side channel; no override of the IAUS pick.**
+
+Parent: ticket 071. Blocked by 072 (`plan_substrate` API) and 073 (`RecentTargetFailures` sensor).
+
+## Scope
+
+- New step resolver `src/steps/disposition/rest_in_place.rs` — no-target Sleep that consumes the cat's current tile, ignoring quality / shelter preferences. Follows the §5 step-resolver contract (5 rustdoc headings, `record_if_witnessed` shape).
+- New step resolver `src/steps/disposition/eat_inventory_unconditional.rs` — eats from inventory ignoring food-type preferences. Follows the same contract.
+- New `LastResortPromotion` modifier in `src/ai/modifier.rs`.
+- Trigger: sensor `RecentTargetFailures.count((Resting | Eating, _)) >= last_resort_failure_threshold` via `plan_substrate::RECOVERY_FAILURE_COUNT_INPUT`.
+- Effect: additive lift `last_resort_score_lift` on `RestInPlace` / `EatInventoryUnconditional` action scores — promotes them above target-requiring recovery actions.
+- New `PlanningSubstrateConstants` knobs: `last_resort_failure_threshold: u32` (default 3), `last_resort_score_lift: f32` (default sized to overcome standard Resting/Eating scores).
+
+## Out of scope
+
+- Replacing the `AnxietyInterrupt` hard-preempt path — that stays as-is. This ticket adds a *score-economy* escalation, not a new preempt.
+- Last-resort actions for non-Maslow-physiological needs (no last-resort socializing, mating, etc.). Only physiological recovery has a survival imperative.
+- Tuning the threshold or lift size — pick conservative defaults; tune via post-landing soak.
+
+## Approach
+
+Files:
+
+- `src/steps/disposition/rest_in_place.rs` — new. Model after `src/steps/disposition/sleep.rs` (or whichever existing rest step is closest). Real-world effect: increment energy on the cat's current tile, ignoring shelter / quality. The five required rustdoc headings from CLAUDE.md §"GOAP Step Resolver Contract" (Real-world effect / Plan-level preconditions / Runtime preconditions / Witness / Feature emission).
+- `src/steps/disposition/eat_inventory_unconditional.rs` — new. Model after the existing `eat` step. Real-world effect: consume any food in inventory, restoring hunger. Bypasses food-type preference checks the normal `eat` resolver enforces.
+- `src/ai/modifier.rs` — add `LastResortPromotion` modifier struct + `new(sc)` constructor. Reads `RECOVERY_FAILURE_COUNT_INPUT` sensor; applies additive lift to the two new actions when the trigger fires.
+- `src/ai/scoring.rs::EvalInputs` — publish the `recovery_failure_count` sensor: counts entries in `RecentTargetFailures` matching `(Resting | Eating, _)` whose tick-age is within `target_failure_cooldown_ticks`.
+- `src/resources/sim_constants.rs::PlanningSubstrateConstants` — add `last_resort_failure_threshold: u32` and `last_resort_score_lift: f32`.
+- Modifier registration site — register `LastResortPromotion::new(sc)` alongside `CommitmentTenure::new(sc)` (ticket 075) and the existing modifiers.
+- New `Feature::*` variants for the two no-target actions (mirror existing eat / sleep features). Exempt from `expected_to_fire_per_soak()` until soak data confirms.
+
+## Verification
+
+- `just check && just test` green.
+- Unit test: `LastResortPromotion::compute` returns the configured lift when `recovery_failure_count >= threshold`, 0.0 otherwise.
+- Unit test on each new step resolver: real-world effect observed (energy / hunger increment); witness recorded; feature fires only on success.
+- Synthetic-world integration test: a cat that fails Resting 3 times then has anxiety fire → next plan picks `RestInPlace` over targeted Resting. Without the modifier, the same setup loops Resting failures until starvation (regression-test framing).
+- `just soak 42 && just verdict logs/tuned-42-076` — hard gates pass. Expect `Feature::TargetCooldownApplied` and the new last-resort features to fire non-zero counts on the seed-42 stuck-pattern recovery.
+
+## Log
+
+- 2026-04-29: Opened under sub-epic 071.

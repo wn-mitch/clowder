@@ -861,6 +861,11 @@ pub fn update_target_existence_markers(
             &stance_overlays_noop,
             time.tick,
             None,
+            // Existence-check probe — the actual GOAP resolver call
+            // does the L2 Intention pin. Pass `None` here so this
+            // marker-author doesn't double-fire `PairingBiasApplied`.
+            None,
+            None,
         )
         .is_some();
 

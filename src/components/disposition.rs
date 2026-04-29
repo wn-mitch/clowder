@@ -205,6 +205,14 @@ pub struct Disposition {
     pub kind: DispositionKind,
     /// Tick when this disposition was adopted.
     pub adopted_tick: u64,
+    /// Tick when this disposition was last switched into.
+    /// Written by `plan_substrate::record_disposition_switch` (ticket
+    /// 072). Initialized to 0 by `Disposition::new`; the existing
+    /// switch site in `evaluate_dispositions` calls
+    /// `record_disposition_switch` to set the current tick. Consumed
+    /// by ticket 075 (`CommitmentTenure` Modifier) — 072 only writes.
+    #[serde(default)]
+    pub disposition_started_tick: u64,
     /// Completed sub-outcomes (e.g., deposit trips for Hunting).
     pub completions: u32,
     /// Disposition clears when completions >= target.
@@ -219,6 +227,7 @@ impl Disposition {
         Self {
             kind,
             adopted_tick: tick,
+            disposition_started_tick: 0,
             completions: 0,
             target_completions: kind.target_completions(personality),
             crafting_hint: None,

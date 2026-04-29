@@ -45,6 +45,33 @@ pub struct GoapPlan {
     pub failed_actions: HashSet<GoapActionKind>,
 }
 
+// ---------------------------------------------------------------------------
+// AbandonReason / AbandonedPlanState — `plan_substrate::abandon_plan` shapes
+// ---------------------------------------------------------------------------
+
+/// Why a plan is being abandoned. Used by `plan_substrate::abandon_plan`
+/// (072) to classify the abandonment for §7.2 commitment-drop branches
+/// and downstream `RecentTargetFailures` accounting (073).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AbandonReason {
+    /// `replan_count` exceeded `max_replans` after a step failure.
+    ReplanCap,
+    /// Replanning produced no plan (planner returned `None`).
+    NoPlanPossible,
+    /// Caller-driven abandonment (e.g., preempt cleanup); 072 does not
+    /// route through this variant today but the API accepts it for
+    /// future use by 075/076.
+    External,
+}
+
+/// Snapshot of cross-plan memory the caller may want to preserve after
+/// `plan_substrate::abandon_plan` consumes the abandoning plan. 072
+/// returns an empty struct (the inline call sites carry no cross-plan
+/// state forward); 073 extends this with the `failed_actions` set so
+/// per-cat target-failure memory persists across replans.
+#[derive(Debug, Clone, Default)]
+pub struct AbandonedPlanState;
+
 impl GoapPlan {
     /// Maximum replans allowed before a plan is abandoned.
     pub const DEFAULT_MAX_REPLANS: u32 = 3;
@@ -111,6 +138,30 @@ impl GoapPlan {
         self.replan_count += 1;
         true
     }
+}
+
+// ---------------------------------------------------------------------------
+// PlanFailureReason — categorized reason a plan step failed
+// ---------------------------------------------------------------------------
+
+/// Categorical reason a plan step failed. Used by the `plan_substrate`
+/// API (`record_step_failure`, `abandon_plan`) to classify failures so
+/// downstream tickets (073 — `RecentTargetFailures`, 074 —
+/// `EligibilityFilter::require_alive`) can react differently per kind.
+///
+/// 072 introduces the enum; only `TargetDespawned` is referenced by
+/// downstream tickets today (074 uses it for dead-target failures).
+/// `Other` is the catch-all the existing inline call sites map to,
+/// preserving behavior in 072.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlanFailureReason {
+    /// The step's target entity has been despawned. Used by 074 when
+    /// `validate_target` rejects a dead entity at step entry.
+    TargetDespawned,
+    /// Catch-all for non-target-related step failures (timeout,
+    /// engagement-loss, etc.). 072 routes every existing inline failure
+    /// site through this variant — finer classification lands later.
+    Other,
 }
 
 // ---------------------------------------------------------------------------
