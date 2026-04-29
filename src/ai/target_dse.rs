@@ -109,6 +109,12 @@ pub struct TargetTakingDse {
     pub aggregation: TargetAggregation,
     pub intention: fn(Entity) -> Intention,
     pub required_stance: Option<crate::ai::faction::StanceRequirement>,
+    /// Ticket 080 — `EligibilityFilter` carrying flags that apply per
+    /// candidate (today: `require_unreserved`). Cat-side marker
+    /// requirements live upstream of the target-taking DSE on its
+    /// paired self-state DSE; this filter is consulted by
+    /// `evaluate_target_taking`'s candidate prefilter.
+    pub eligibility: super::dse::EligibilityFilter,
 }
 
 impl TargetTakingDse {
@@ -137,6 +143,18 @@ impl TargetTakingDse {
 
     pub fn required_stance(&self) -> Option<&crate::ai::faction::StanceRequirement> {
         self.required_stance.as_ref()
+    }
+
+    /// Ticket 080 — register the resource-reservation gate for this
+    /// DSE. Builder form so factories can chain
+    /// `.with_eligibility(plan_substrate::require_unreserved_filter())`.
+    pub fn with_eligibility(mut self, filter: super::dse::EligibilityFilter) -> Self {
+        self.eligibility = filter;
+        self
+    }
+
+    pub fn eligibility(&self) -> &super::dse::EligibilityFilter {
+        &self.eligibility
     }
 }
 
@@ -275,6 +293,46 @@ pub fn evaluate_target_taking(
     fetch_self_scalar: &dyn Fn(&str, Entity) -> f32,
     fetch_target_scalar: &dyn Fn(&str, Entity, Entity) -> f32,
 ) -> ScoredTargetTakingDse {
+    evaluate_target_taking_with_reservations(
+        dse,
+        cat,
+        candidates,
+        candidate_positions,
+        ctx,
+        fetch_self_scalar,
+        fetch_target_scalar,
+        None,
+        None,
+    )
+}
+
+/// Reservation-aware target-taking evaluator (ticket 080). Accepts
+/// optional closures the caller threads in:
+///
+/// - `is_reserved_by_other` — `(target) -> bool`. When the DSE has
+///   `require_unreserved` set on its `EligibilityFilter`, candidates
+///   for which this returns `true` are scored 0.0 and dropped from
+///   selection (they can't win argmax).
+/// - `on_contention` — fired once per gated candidate so the caller
+///   can record `Feature::ReservationContended` without scattering
+///   the activation hook across every resolver.
+///
+/// Both `None` reduces to the legacy `evaluate_target_taking` path —
+/// that's the migration shape the existing call sites use. Resolvers
+/// that opt into reservation-gating pass the closures from a frame-
+/// local `Reserved` snapshot they've already built.
+#[allow(clippy::too_many_arguments)]
+pub fn evaluate_target_taking_with_reservations(
+    dse: &TargetTakingDse,
+    cat: Entity,
+    candidates: &[Entity],
+    candidate_positions: &[crate::components::physical::Position],
+    ctx: &EvalCtx,
+    fetch_self_scalar: &dyn Fn(&str, Entity) -> f32,
+    fetch_target_scalar: &dyn Fn(&str, Entity, Entity) -> f32,
+    is_reserved_by_other: Option<&dyn Fn(Entity) -> bool>,
+    mut on_contention: Option<&mut dyn FnMut(Entity)>,
+) -> ScoredTargetTakingDse {
     debug_assert_eq!(
         candidates.len(),
         candidate_positions.len(),
@@ -293,10 +351,27 @@ pub fn evaluate_target_taking(
 
     let considerations = dse.per_target_considerations();
     let composition = dse.composition();
+    let unreserved_gate_active =
+        dse.eligibility.require_unreserved && is_reserved_by_other.is_some();
 
     // Score each candidate through the per-target consideration bundle.
+    // Reservation-gated candidates (ticket 080) take 0.0 and skip the
+    // consideration-scoring entirely — the gate is a hard pass-through,
+    // not a multiplicative penalty, matching the spec's "no scoring
+    // cost on candidates that can't win" principle.
     let mut per_target: Vec<(Entity, f32)> = Vec::with_capacity(candidates.len());
     for (target, target_pos) in candidates.iter().zip(candidate_positions.iter()) {
+        if unreserved_gate_active {
+            if let Some(check) = is_reserved_by_other {
+                if check(*target) {
+                    if let Some(ref mut hook) = on_contention {
+                        hook(*target);
+                    }
+                    per_target.push((*target, 0.0));
+                    continue;
+                }
+            }
+        }
         let scores: Vec<f32> = considerations
             .iter()
             .map(|c| {
@@ -489,6 +564,7 @@ mod tests {
             aggregation: TargetAggregation::Best,
             intention: noop_intention,
             required_stance: None,
+            eligibility: Default::default(),
         };
         let cat = Entity::from_raw_u32(1).unwrap();
         let ctx = test_ctx(cat);
@@ -513,6 +589,7 @@ mod tests {
             aggregation: TargetAggregation::Best,
             intention: noop_intention,
             required_stance: None,
+            eligibility: Default::default(),
         };
         let cat = Entity::from_raw_u32(1).unwrap();
         let a = Entity::from_raw_u32(10).unwrap();
@@ -563,6 +640,7 @@ mod tests {
             aggregation: TargetAggregation::SumTopN(2),
             intention: noop_intention,
             required_stance: None,
+            eligibility: Default::default(),
         };
         let cat = Entity::from_raw_u32(1).unwrap();
         let a = Entity::from_raw_u32(10).unwrap();
@@ -608,6 +686,7 @@ mod tests {
             aggregation: TargetAggregation::WeightedAverage,
             intention: noop_intention,
             required_stance: None,
+            eligibility: Default::default(),
         };
         let cat = Entity::from_raw_u32(1).unwrap();
         let a = Entity::from_raw_u32(10).unwrap();
@@ -660,6 +739,7 @@ mod tests {
             aggregation: TargetAggregation::Best,
             intention: noop_intention,
             required_stance: None,
+            eligibility: Default::default(),
         };
         let cat = Entity::from_raw_u32(1).unwrap();
         let a = Entity::from_raw_u32(10).unwrap();

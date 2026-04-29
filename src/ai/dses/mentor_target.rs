@@ -132,6 +132,8 @@ pub fn mentor_target_dse() -> TargetTakingDse {
         aggregation: TargetAggregation::Best,
         intention: mentor_intention,
         required_stance: None,
+        // Ticket 080 — mentoring is contention-tolerant.
+        eligibility: Default::default(),
     }
 }
 

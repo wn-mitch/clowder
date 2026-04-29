@@ -160,6 +160,8 @@ pub fn caretake_target_dse() -> TargetTakingDse {
         aggregation: TargetAggregation::Best,
         intention: caretake_intention,
         required_stance: None,
+        // Ticket 080 — caretake (kitten feeding) is contention-tolerant.
+        eligibility: Default::default(),
     }
 }
 

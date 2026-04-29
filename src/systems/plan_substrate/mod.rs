@@ -48,7 +48,10 @@ pub use disposition::record_disposition_switch;
 pub use lifecycle::{
     abandon_plan, record_step_failure, try_preempt, PreemptKind, PreemptOutcome,
 };
-pub use target::{carry_target_forward, require_alive_filter, validate_target, TargetInvalidReason};
+pub use target::{
+    carry_target_forward, expire_reservations, release_target, require_alive_filter,
+    require_unreserved_filter, reserve_target, validate_target, TargetInvalidReason,
+};
 
 // ---------------------------------------------------------------------------
 // IAUS Consideration input keys

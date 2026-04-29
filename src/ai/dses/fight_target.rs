@@ -177,6 +177,9 @@ pub fn fight_target_dse() -> TargetTakingDse {
         // the cat-action FightDse — candidate-prefilter happens here
         // before evaluate_target_taking.
         required_stance: Some(StanceRequirement::attack()),
+        // Ticket 080 — Fight is contention-tolerant by design (multiple
+        // cats engaging the same threat is a feature, not a bug).
+        eligibility: Default::default(),
     }
 }
 

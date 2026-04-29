@@ -358,3 +358,493 @@ fn record_disposition_switch_overwrites_prior_tick() {
     record_disposition_switch(&mut disp, DispositionKind::Foraging, 250);
     assert_eq!(disp.disposition_started_tick, 250);
 }
+
+// ---------------------------------------------------------------------------
+// Resource reservation — ticket 080
+// ---------------------------------------------------------------------------
+
+#[test]
+fn require_unreserved_filter_sets_flag() {
+    let filter = super::require_unreserved_filter();
+    assert!(filter.require_unreserved);
+    // The filter sets only the unreserved flag — no marker requirements
+    // ride alongside (the gate is candidate-target-side, not cat-side).
+    assert!(filter.required.is_empty());
+    assert!(filter.forbidden.is_empty());
+    assert!(filter.required_stance.is_none());
+}
+
+#[test]
+fn reserved_component_records_owner_and_expiry() {
+    use crate::components::reserved::Reserved;
+    let owner = Entity::from_raw_u32(7).unwrap();
+    let r = Reserved::new(owner, 1000, 600);
+    assert_eq!(r.owner, owner);
+    assert_eq!(r.expires_tick, 1600);
+    assert!(!r.is_expired(1599));
+    assert!(r.is_expired(1600));
+    assert!(r.is_expired(2000));
+    assert!(r.is_owned_by(owner));
+    assert!(!r.is_owned_by(Entity::from_raw_u32(8).unwrap()));
+}
+
+#[test]
+fn reserved_saturates_at_u64_max() {
+    // Sanity: a u64::MAX tick + ttl shouldn't panic; saturating_add
+    // pins the expiry at u64::MAX, which `is_expired` evaluates as
+    // false until the world-clock crosses it (effectively never).
+    use crate::components::reserved::Reserved;
+    let owner = Entity::from_raw_u32(1).unwrap();
+    let r = Reserved::new(owner, u64::MAX, 600);
+    assert_eq!(r.expires_tick, u64::MAX);
+    assert!(!r.is_expired(u64::MAX - 1));
+}
+
+#[test]
+fn reserve_target_writes_component() {
+    let mut world = World::new();
+    let target = world.spawn_empty().id();
+    let owner = world.spawn_empty().id();
+
+    let mut commands_queue = bevy_ecs::world::CommandQueue::default();
+    {
+        let mut commands = Commands::new(&mut commands_queue, &world);
+        super::reserve_target(&mut commands, target, owner, 100, 600);
+    }
+    commands_queue.apply(&mut world);
+
+    let r = world
+        .entity(target)
+        .get::<crate::components::reserved::Reserved>()
+        .expect("Reserved should be inserted");
+    assert_eq!(r.owner, owner);
+    assert_eq!(r.expires_tick, 700);
+}
+
+#[test]
+fn release_target_removes_component() {
+    let mut world = World::new();
+    let owner = world.spawn_empty().id();
+    let target = world
+        .spawn(crate::components::reserved::Reserved::new(owner, 100, 600))
+        .id();
+    assert!(world
+        .entity(target)
+        .contains::<crate::components::reserved::Reserved>());
+
+    let mut commands_queue = bevy_ecs::world::CommandQueue::default();
+    {
+        let mut commands = Commands::new(&mut commands_queue, &world);
+        super::release_target(&mut commands, target);
+    }
+    commands_queue.apply(&mut world);
+
+    assert!(!world
+        .entity(target)
+        .contains::<crate::components::reserved::Reserved>());
+}
+
+#[test]
+fn release_target_idempotent_on_unreserved_entity() {
+    // Releasing a never-reserved entity must not panic. `Commands::remove`
+    // on a missing component is documented as a no-op.
+    let mut world = World::new();
+    let target = world.spawn_empty().id();
+
+    let mut commands_queue = bevy_ecs::world::CommandQueue::default();
+    {
+        let mut commands = Commands::new(&mut commands_queue, &world);
+        super::release_target(&mut commands, target);
+    }
+    commands_queue.apply(&mut world);
+    assert!(!world
+        .entity(target)
+        .contains::<crate::components::reserved::Reserved>());
+}
+
+#[test]
+fn require_unreserved_filter_gates_non_owner_to_zero() {
+    // Per-candidate gate semantics: with `require_unreserved`, an
+    // `is_reserved_by_other` closure that returns true for a candidate
+    // drops it to score 0.0; the filter is a hard pass-through.
+    use crate::ai::composition::Composition;
+    use crate::ai::considerations::{Consideration, ScalarConsideration};
+    use crate::ai::curves::Curve;
+    use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination};
+    use crate::ai::target_dse::{
+        evaluate_target_taking_with_reservations, TargetAggregation, TargetTakingDse,
+    };
+    use crate::components::physical::Position;
+
+    fn noop_intention(_: Entity) -> Intention {
+        Intention::Activity {
+            kind: ActivityKind::Idle,
+            termination: Termination::UntilInterrupt,
+            strategy: CommitmentStrategy::OpenMinded,
+        }
+    }
+
+    fn noop_query(_: Entity) -> &'static str {
+        "doc"
+    }
+
+    let dse = TargetTakingDse {
+        id: DseId("test_unreserved"),
+        candidate_query: noop_query,
+        per_target_considerations: vec![Consideration::Scalar(ScalarConsideration::new(
+            "target_quality",
+            Curve::Linear {
+                slope: 1.0,
+                intercept: 0.0,
+            },
+        ))],
+        composition: Composition::weighted_sum(vec![1.0]),
+        aggregation: TargetAggregation::Best,
+        intention: noop_intention,
+        required_stance: None,
+        eligibility: super::require_unreserved_filter(),
+    };
+
+    let cat = Entity::from_raw_u32(1).unwrap();
+    let owner_target = Entity::from_raw_u32(10).unwrap();
+    let stranger_target = Entity::from_raw_u32(11).unwrap();
+
+    let has_marker = |_: &str, _: Entity| false;
+    let entity_pos = |_: Entity| -> Option<Position> { None };
+    let anchor_pos =
+        |_: crate::ai::considerations::LandmarkAnchor| -> Option<Position> { None };
+    let ctx = EvalCtx {
+        cat,
+        tick: 0,
+        entity_position: &entity_pos,
+        anchor_position: &anchor_pos,
+        has_marker: &has_marker,
+        self_position: Position::new(0, 0),
+        target: None,
+        target_position: None,
+    };
+    let fetch_self = |_: &str, _: Entity| 0.0;
+    // owner_target rates higher quality; without the gate it would win.
+    let fetch_target = |_: &str, _: Entity, t: Entity| -> f32 {
+        if t == owner_target {
+            0.9
+        } else {
+            0.4
+        }
+    };
+    // owner_target is reserved by someone other than `cat`; the gate
+    // must drop it to 0.0 so stranger_target wins.
+    let is_reserved_by_other = |target: Entity| -> bool { target == owner_target };
+
+    let scored = evaluate_target_taking_with_reservations(
+        &dse,
+        cat,
+        &[owner_target, stranger_target],
+        &[Position::new(1, 0), Position::new(2, 0)],
+        &ctx,
+        &fetch_self,
+        &fetch_target,
+        Some(&is_reserved_by_other),
+        None,
+    );
+    assert_eq!(
+        scored.winning_target,
+        Some(stranger_target),
+        "reservation gate must drop owner_target so stranger wins"
+    );
+    // owner_target row is preserved at score 0.0 (gate writes 0.0,
+    // doesn't drop the row).
+    let owner_score = scored
+        .per_target
+        .iter()
+        .find(|(e, _)| *e == owner_target)
+        .map(|(_, s)| *s)
+        .unwrap();
+    assert_eq!(owner_score, 0.0, "gated candidate must score 0.0");
+}
+
+#[test]
+fn require_unreserved_filter_passes_owner() {
+    // Per-candidate gate semantics, owner case: when the scoring cat
+    // *is* the owner of the reservation, the gate must NOT fire — the
+    // owner continues to score the candidate normally.
+    use crate::ai::composition::Composition;
+    use crate::ai::considerations::{Consideration, ScalarConsideration};
+    use crate::ai::curves::Curve;
+    use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination};
+    use crate::ai::target_dse::{
+        evaluate_target_taking_with_reservations, TargetAggregation, TargetTakingDse,
+    };
+    use crate::components::physical::Position;
+
+    fn noop_intention(_: Entity) -> Intention {
+        Intention::Activity {
+            kind: ActivityKind::Idle,
+            termination: Termination::UntilInterrupt,
+            strategy: CommitmentStrategy::OpenMinded,
+        }
+    }
+    fn noop_query(_: Entity) -> &'static str {
+        "doc"
+    }
+
+    let dse = TargetTakingDse {
+        id: DseId("test_unreserved_owner"),
+        candidate_query: noop_query,
+        per_target_considerations: vec![Consideration::Scalar(ScalarConsideration::new(
+            "target_quality",
+            Curve::Linear {
+                slope: 1.0,
+                intercept: 0.0,
+            },
+        ))],
+        composition: Composition::weighted_sum(vec![1.0]),
+        aggregation: TargetAggregation::Best,
+        intention: noop_intention,
+        required_stance: None,
+        eligibility: super::require_unreserved_filter(),
+    };
+
+    let cat = Entity::from_raw_u32(1).unwrap();
+    let target = Entity::from_raw_u32(10).unwrap();
+
+    let has_marker = |_: &str, _: Entity| false;
+    let entity_pos = |_: Entity| -> Option<Position> { None };
+    let anchor_pos =
+        |_: crate::ai::considerations::LandmarkAnchor| -> Option<Position> { None };
+    let ctx = EvalCtx {
+        cat,
+        tick: 0,
+        entity_position: &entity_pos,
+        anchor_position: &anchor_pos,
+        has_marker: &has_marker,
+        self_position: Position::new(0, 0),
+        target: None,
+        target_position: None,
+    };
+    let fetch_self = |_: &str, _: Entity| 0.0;
+    let fetch_target = |_: &str, _: Entity, _: Entity| 0.7;
+    // Owner case — `is_reserved_by_other` returns false because the
+    // caller resolves the (cat, target) pair against the snapshot and
+    // `Reserved.owner == cat`.
+    let is_reserved_by_other = |_target: Entity| -> bool { false };
+
+    let scored = evaluate_target_taking_with_reservations(
+        &dse,
+        cat,
+        &[target],
+        &[Position::new(1, 0)],
+        &ctx,
+        &fetch_self,
+        &fetch_target,
+        Some(&is_reserved_by_other),
+        None,
+    );
+    assert_eq!(scored.winning_target, Some(target));
+    assert!((scored.aggregated_score - 0.7).abs() < 1e-5);
+}
+
+#[test]
+fn require_unreserved_filter_inactive_when_dse_opts_out() {
+    // DSEs without `require_unreserved` (`socialize_target`,
+    // `groom_other_target`, etc.) must NOT consult the closure even
+    // when the caller passes one — contention is OK by design for those
+    // DSEs.
+    use crate::ai::composition::Composition;
+    use crate::ai::considerations::{Consideration, ScalarConsideration};
+    use crate::ai::curves::Curve;
+    use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination};
+    use crate::ai::target_dse::{
+        evaluate_target_taking_with_reservations, TargetAggregation, TargetTakingDse,
+    };
+    use crate::components::physical::Position;
+
+    fn noop_intention(_: Entity) -> Intention {
+        Intention::Activity {
+            kind: ActivityKind::Idle,
+            termination: Termination::UntilInterrupt,
+            strategy: CommitmentStrategy::OpenMinded,
+        }
+    }
+    fn noop_query(_: Entity) -> &'static str {
+        "doc"
+    }
+
+    // Note `eligibility: Default::default()` — no require_unreserved.
+    let dse = TargetTakingDse {
+        id: DseId("test_no_unreserved"),
+        candidate_query: noop_query,
+        per_target_considerations: vec![Consideration::Scalar(ScalarConsideration::new(
+            "target_quality",
+            Curve::Linear {
+                slope: 1.0,
+                intercept: 0.0,
+            },
+        ))],
+        composition: Composition::weighted_sum(vec![1.0]),
+        aggregation: TargetAggregation::Best,
+        intention: noop_intention,
+        required_stance: None,
+        eligibility: Default::default(),
+    };
+
+    let cat = Entity::from_raw_u32(1).unwrap();
+    let target = Entity::from_raw_u32(10).unwrap();
+
+    let has_marker = |_: &str, _: Entity| false;
+    let entity_pos = |_: Entity| -> Option<Position> { None };
+    let anchor_pos =
+        |_: crate::ai::considerations::LandmarkAnchor| -> Option<Position> { None };
+    let ctx = EvalCtx {
+        cat,
+        tick: 0,
+        entity_position: &entity_pos,
+        anchor_position: &anchor_pos,
+        has_marker: &has_marker,
+        self_position: Position::new(0, 0),
+        target: None,
+        target_position: None,
+    };
+    let fetch_self = |_: &str, _: Entity| 0.0;
+    let fetch_target = |_: &str, _: Entity, _: Entity| 0.7;
+    // Closure says target is reserved — but the DSE doesn't opt in,
+    // so the gate stays inactive. Score must reflect the underlying
+    // consideration value.
+    let is_reserved_by_other = |_target: Entity| -> bool { true };
+
+    let scored = evaluate_target_taking_with_reservations(
+        &dse,
+        cat,
+        &[target],
+        &[Position::new(1, 0)],
+        &ctx,
+        &fetch_self,
+        &fetch_target,
+        Some(&is_reserved_by_other),
+        None,
+    );
+    assert_eq!(scored.winning_target, Some(target));
+    assert!((scored.aggregated_score - 0.7).abs() < 1e-5);
+}
+
+#[test]
+fn expire_reservations_clears_past_due_markers() {
+    // End-to-end: insert two `Reserved` markers — one with an
+    // expires_tick in the past, one in the future. Run the
+    // maintenance system; the past-due marker is removed, the
+    // future-due marker survives.
+    use bevy::prelude::*;
+    use crate::components::reserved::Reserved;
+    use crate::resources::time::TimeState;
+
+    let mut app = App::new();
+    app.insert_resource(TimeState {
+        tick: 1000,
+        ..Default::default()
+    });
+    let owner = app.world_mut().spawn_empty().id();
+    let stale_target = app
+        .world_mut()
+        .spawn(Reserved::new(owner, 0, 100)) // expires_tick = 100
+        .id();
+    let fresh_target = app
+        .world_mut()
+        .spawn(Reserved::new(owner, 1000, 600)) // expires_tick = 1600
+        .id();
+    app.add_systems(Update, super::expire_reservations);
+    app.update();
+
+    assert!(
+        !app.world()
+            .entity(stale_target)
+            .contains::<Reserved>(),
+        "stale reservation must be cleared"
+    );
+    assert!(
+        app.world()
+            .entity(fresh_target)
+            .contains::<Reserved>(),
+        "future reservation must survive"
+    );
+}
+
+#[test]
+fn require_unreserved_fires_contention_hook() {
+    // The `on_contention` hook must fire once per gated candidate so
+    // resolvers can record `Feature::ReservationContended` without
+    // scattering activation calls across every DSE.
+    use crate::ai::composition::Composition;
+    use crate::ai::considerations::{Consideration, ScalarConsideration};
+    use crate::ai::curves::Curve;
+    use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination};
+    use crate::ai::target_dse::{
+        evaluate_target_taking_with_reservations, TargetAggregation, TargetTakingDse,
+    };
+    use crate::components::physical::Position;
+
+    fn noop_intention(_: Entity) -> Intention {
+        Intention::Activity {
+            kind: ActivityKind::Idle,
+            termination: Termination::UntilInterrupt,
+            strategy: CommitmentStrategy::OpenMinded,
+        }
+    }
+    fn noop_query(_: Entity) -> &'static str {
+        "doc"
+    }
+
+    let dse = TargetTakingDse {
+        id: DseId("test_unreserved_hook"),
+        candidate_query: noop_query,
+        per_target_considerations: vec![Consideration::Scalar(ScalarConsideration::new(
+            "target_quality",
+            Curve::Linear {
+                slope: 1.0,
+                intercept: 0.0,
+            },
+        ))],
+        composition: Composition::weighted_sum(vec![1.0]),
+        aggregation: TargetAggregation::Best,
+        intention: noop_intention,
+        required_stance: None,
+        eligibility: super::require_unreserved_filter(),
+    };
+
+    let cat = Entity::from_raw_u32(1).unwrap();
+    let a = Entity::from_raw_u32(10).unwrap();
+    let b = Entity::from_raw_u32(11).unwrap();
+
+    let has_marker = |_: &str, _: Entity| false;
+    let entity_pos = |_: Entity| -> Option<Position> { None };
+    let anchor_pos =
+        |_: crate::ai::considerations::LandmarkAnchor| -> Option<Position> { None };
+    let ctx = EvalCtx {
+        cat,
+        tick: 0,
+        entity_position: &entity_pos,
+        anchor_position: &anchor_pos,
+        has_marker: &has_marker,
+        self_position: Position::new(0, 0),
+        target: None,
+        target_position: None,
+    };
+    let fetch_self = |_: &str, _: Entity| 0.0;
+    let fetch_target = |_: &str, _: Entity, _: Entity| 0.5;
+    let is_reserved_by_other = |target: Entity| target == a; // only `a` is gated.
+
+    let mut contended: Vec<Entity> = Vec::new();
+    let mut on_contention =
+        |target: Entity| contended.push(target);
+    let _ = evaluate_target_taking_with_reservations(
+        &dse,
+        cat,
+        &[a, b],
+        &[Position::new(1, 0), Position::new(2, 0)],
+        &ctx,
+        &fetch_self,
+        &fetch_target,
+        Some(&is_reserved_by_other),
+        Some(&mut on_contention),
+    );
+    assert_eq!(contended, vec![a]);
+}

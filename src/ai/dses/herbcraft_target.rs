@@ -112,6 +112,11 @@ pub fn herbcraft_target_dse() -> TargetTakingDse {
         aggregation: TargetAggregation::Best,
         intention: herbcraft_intention,
         required_stance: None,
+        // Ticket 080 — herb tiles are point resources: harvesting
+        // depletes them. Two cats walking to the same tile waste plan
+        // cycles. The reservation gate routes the second cat to a
+        // different patch.
+        eligibility: crate::systems::plan_substrate::require_unreserved_filter(),
     }
 }
 

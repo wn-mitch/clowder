@@ -150,6 +150,10 @@ pub fn groom_other_target_dse() -> TargetTakingDse {
         aggregation: TargetAggregation::Best,
         intention: groom_other_intention,
         required_stance: None,
+        // Ticket 080 — groom-other is contention-tolerant per ticket 080
+        // out-of-scope (multiple cats may groom the same partner over
+        // time; the existing target-cooldown handles disambiguation).
+        eligibility: Default::default(),
     }
 }
 

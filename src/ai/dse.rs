@@ -246,6 +246,14 @@ pub struct EligibilityFilter {
     /// (SocializeDse → {Same, Ally}, AttackDse → {Enemy, Prey}, etc.).
     /// `None` means no stance filter.
     pub required_stance: Option<crate::ai::faction::StanceRequirement>,
+    /// Ticket 080 — when true, the DSE rejects any candidate target
+    /// whose `Reserved` marker names a non-self owner during the
+    /// reservation window. Per-cat (cat-side) eligibility evaluators
+    /// ignore this flag because it has no candidate to consult; the
+    /// flag is meaningful for target-taking DSE candidate prefiltering
+    /// (`evaluate_target_taking` consults
+    /// `EvalCtx::is_reserved_by_other` per candidate).
+    pub require_unreserved: bool,
 }
 
 impl EligibilityFilter {
@@ -265,6 +273,15 @@ impl EligibilityFilter {
 
     pub fn with_stance(mut self, stance: crate::ai::faction::StanceRequirement) -> Self {
         self.required_stance = Some(stance);
+        self
+    }
+
+    /// Ticket 080 — opt this DSE into the resource-reservation gate.
+    /// Target-taking DSE candidate prefilter drops candidates whose
+    /// `Reserved` marker names a non-self owner during the reservation
+    /// window.
+    pub fn require_unreserved(mut self) -> Self {
+        self.require_unreserved = true;
         self
     }
 }

@@ -45,6 +45,8 @@ pub struct SimConstants {
     pub influence_maps: InfluenceMapConstants,
     #[serde(default)]
     pub pairing: PairingConstants,
+    #[serde(default)]
+    pub planning_substrate: PlanningSubstrateConstants,
 }
 
 // ---------- NeedsConstants ----------
@@ -3712,6 +3714,36 @@ impl Default for PairingConstants {
             quality_fondness_weight: 0.40,
             quality_romantic_weight: 0.40,
             quality_bond_weight: 0.20,
+        }
+    }
+}
+
+// ---------- PlanningSubstrateConstants (ticket 071 sub-epic) ----------
+
+/// Knobs for the planning-substrate hardening sub-epic (parent ticket
+/// 071). Read by `crate::systems::plan_substrate` and the ECS systems
+/// it composes.
+///
+/// Children that contribute knobs here:
+/// - **080** — `reservation_ttl_ticks`: how long a `Reserved` marker
+///   on a target lives before `expire_reservations` clears it.
+/// - **073** *(parallel)* — `target_failure_cooldown_ticks` (when 073
+///   lands; this struct is forward-compatible).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PlanningSubstrateConstants {
+    /// Ticket 080 — TTL for `Reserved` markers on contended resource
+    /// targets (carcass, herb tile, prey, mate). Long enough for the
+    /// owner cat to traverse + execute under normal sim cadence; short
+    /// enough that abandoned reservations clear without manual release.
+    /// Default 600 ticks ≈ 1 in-sim hour at the canonical 1000-ticks-
+    /// per-day scale; tuneable post-soak per ticket Out-of-scope.
+    pub reservation_ttl_ticks: u64,
+}
+
+impl Default for PlanningSubstrateConstants {
+    fn default() -> Self {
+        Self {
+            reservation_ttl_ticks: 600,
         }
     }
 }

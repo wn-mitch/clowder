@@ -106,6 +106,12 @@ pub fn mate_target_dse() -> TargetTakingDse {
         aggregation: TargetAggregation::Best,
         intention: mate_intention,
         required_stance: None,
+        // Ticket 080 — partner reservation: when one cat commits to a
+        // mate, no other cat should pick the same partner concurrently.
+        // (Bond filter only restricts to Partners/Mates, which doesn't
+        // prevent two cats with the same Partners-bonded peer from both
+        // targeting them.)
+        eligibility: crate::systems::plan_substrate::require_unreserved_filter(),
     }
 }
 

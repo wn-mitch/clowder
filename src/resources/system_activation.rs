@@ -249,6 +249,15 @@ pub enum Feature {
     /// activation stays unfired (and `expected_to_fire_per_soak() =>
     /// false`) until then.
     PairingBiasApplied,
+    /// Ticket 080 — `evaluate_target_taking` gated a candidate to 0.0
+    /// because its `Reserved.owner` named a cat other than the scoring
+    /// cat. Neutral — observability of the resource-reservation
+    /// substrate; firing means the gate is doing real work.
+    /// `expected_to_fire_per_soak() => false` until the producer side
+    /// (`record_target_picked` writes) ships in a follow-on; without
+    /// producers, no `Reserved` is ever written, so the gate cannot
+    /// activate.
+    ReservationContended,
 }
 
 impl Feature {
@@ -351,6 +360,8 @@ impl Feature {
         Feature::PairingIntentionEmitted,
         Feature::PairingDropped,
         Feature::PairingBiasApplied,
+        // Ticket 080 resource-reservation substrate
+        Feature::ReservationContended,
     ];
 
     /// The valence of this feature.
@@ -466,6 +477,9 @@ impl Feature {
             // §7.M L2 PairingActivity drop is a state transition,
             // not an adverse event.
             Feature::PairingDropped => Neutral,
+            // Ticket 080 — reservation contention is observability
+            // signal, not adverse.
+            Feature::ReservationContended => Neutral,
         }
     }
 
@@ -607,6 +621,12 @@ impl Feature {
             // two false-arms so the canary can validate them.
             Feature::PairingIntentionEmitted => false,
             Feature::PairingBiasApplied => false,
+            // Ticket 080 — `ReservationContended` is exempt until the
+            // producer side (`record_target_picked` writes) ships in a
+            // follow-on. The substrate (filter, expire system,
+            // component) lands first; without producers writing
+            // `Reserved`, the gate never activates.
+            Feature::ReservationContended => false,
             // Every other feature is expected to fire per soak.
             _ => true,
         }
@@ -716,6 +736,7 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::PairingIntentionEmitted => "PairingIntentionEmitted",
         Feature::PairingDropped => "PairingDropped",
         Feature::PairingBiasApplied => "PairingBiasApplied",
+        Feature::ReservationContended => "ReservationContended",
     }
 }
 
@@ -934,9 +955,11 @@ mod tests {
         // MaterialsDelivered). Ticket 027b added 2 Positive
         // (PairingIntentionEmitted, PairingBiasApplied) + 1 Neutral
         // (PairingDropped) for the §7.M L2 PairingActivity layer.
+        // Ticket 080 added 1 Neutral (ReservationContended) for the
+        // resource-reservation substrate.
         assert_eq!(positive, 47);
         assert_eq!(negative, 20);
-        assert_eq!(neutral, 26);
+        assert_eq!(neutral, 27);
     }
 
     #[test]
@@ -1010,7 +1033,7 @@ mod tests {
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Neutral),
-            26
+            27
         );
     }
 

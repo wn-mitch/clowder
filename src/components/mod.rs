@@ -23,6 +23,7 @@ pub mod physical;
 pub mod pregnancy;
 pub mod prey;
 pub mod recent_target_failures;
+pub mod reserved;
 pub mod sensing;
 pub mod skills;
 pub mod task_chain;
@@ -67,6 +68,7 @@ pub use prey::{
     PreyKind, PreyState,
 };
 pub use recent_target_failures::RecentTargetFailures;
+pub use reserved::Reserved;
 pub use sensing::{SensoryModifier, SensorySignature, SensorySpecies};
 pub use skills::{Corruption, MagicAffinity, Skills, Training};
 pub use task_chain::{FailurePolicy, Material, StepKind, StepStatus, TaskChain, TaskStep};

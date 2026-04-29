@@ -1,13 +1,14 @@
 //! Target-handling operations: validity, carryover across step
-//! boundaries, alive-eligibility filter. **072 stubs — bodies land in
-//! 074** (`EligibilityFilter::require_alive` + step-resolver
-//! `validate_target`). Today every function here returns the same
-//! result the inline call site currently produces.
+//! boundaries, alive-eligibility filter, resource reservation. 072
+//! stubbed `validate_target` / `require_alive_filter`; 074 fills those
+//! bodies. Ticket 080 adds the resource-reservation API
+//! (`reserve_target` / `release_target` / `require_unreserved_filter`).
 
 use bevy_ecs::prelude::*;
 
 use crate::ai::dse::EligibilityFilter;
 use crate::components::goap_plan::StepExecutionState;
+use crate::components::reserved::Reserved;
 use crate::components::RecentTargetFailures;
 
 // ---------------------------------------------------------------------------
@@ -93,4 +94,78 @@ pub fn carry_target_forward(
 /// (no behavior change) and 074 fills in the body.
 pub fn require_alive_filter() -> EligibilityFilter {
     EligibilityFilter::new()
+}
+
+// ---------------------------------------------------------------------------
+// Resource reservation (ticket 080)
+// ---------------------------------------------------------------------------
+
+/// Build an `EligibilityFilter` whose `require_unreserved` flag tells
+/// `evaluate_target_taking` to gate candidates whose `Reserved.owner`
+/// is some other cat during the reservation window. Cats that hold the
+/// reservation continue to score the candidate normally; non-owners
+/// see 0.0.
+///
+/// Wired via `TargetTakingDse::with_eligibility(...)` (or set on the
+/// `eligibility` field at construction). The reservation snapshot the
+/// resolver consults to populate `is_reserved_by_other` is the
+/// caller's responsibility — the substrate ships the filter shape and
+/// the per-candidate predicate; the resolver builds the (cat, target)
+/// gate from a frame-local `Reserved` query.
+pub fn require_unreserved_filter() -> EligibilityFilter {
+    EligibilityFilter::new().require_unreserved()
+}
+
+/// Write a `Reserved { owner, expires_tick = tick + ttl_ticks }`
+/// component to `target`. Idempotent: a fresh `Reserved` overwrites any
+/// prior reservation on the same entity (Bevy `Commands::insert`
+/// semantics). Callers responsible for invoking after a target picker
+/// resolves a winning target.
+///
+/// **Real-world effect** — schedules an ECS write of `Reserved` on
+/// `target`. The write is deferred to the next `Commands` flush per
+/// Bevy's normal command-buffer semantics; downstream readers in the
+/// same tick will see the prior reservation (if any) until the flush
+/// runs.
+pub fn reserve_target(
+    commands: &mut Commands,
+    target: Entity,
+    owner: Entity,
+    tick: u64,
+    ttl_ticks: u64,
+) {
+    commands
+        .entity(target)
+        .insert(Reserved::new(owner, tick, ttl_ticks));
+}
+
+/// Remove the `Reserved` component from `target`. Idempotent: if no
+/// reservation exists, the operation is a no-op.
+///
+/// **Real-world effect** — schedules an ECS removal of `Reserved` on
+/// `target`. Used by `plan_substrate::lifecycle::abandon_plan` and
+/// terminal step-failure paths to release the cat's hold on the
+/// resource so peers can re-pick it next tick.
+pub fn release_target(commands: &mut Commands, target: Entity) {
+    commands.entity(target).remove::<Reserved>();
+}
+
+/// Maintenance system: remove `Reserved` whose `expires_tick` is in
+/// the past relative to the current sim tick. Bounds the world-size of
+/// the marker so abandoned reservations (cats that crashed, plans that
+/// weren't released cleanly, etc.) don't accumulate.
+///
+/// Registered in chain 2a's decay batch alongside `decay_grooming` and
+/// friends — see `src/plugins/simulation.rs`.
+pub fn expire_reservations(
+    mut commands: Commands,
+    time: Res<crate::resources::time::TimeState>,
+    reserved: Query<(Entity, &Reserved)>,
+) {
+    let now = time.tick;
+    for (entity, r) in reserved.iter() {
+        if r.is_expired(now) {
+            commands.entity(entity).remove::<Reserved>();
+        }
+    }
 }

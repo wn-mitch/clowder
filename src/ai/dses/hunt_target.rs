@@ -136,6 +136,11 @@ pub fn hunt_target_dse() -> TargetTakingDse {
         // HuntDse — candidate-prefilter happens here before
         // evaluate_target_taking.
         required_stance: Some(StanceRequirement::hunt()),
+        // Ticket 080 — prey is a contended resource: two cats both
+        // chasing the same rabbit waste plan cycles. The reservation
+        // gate drops a prey candidate from the pool while another cat
+        // holds it; the DSE re-picks the second-best alternative.
+        eligibility: crate::systems::plan_substrate::require_unreserved_filter(),
     }
 }
 

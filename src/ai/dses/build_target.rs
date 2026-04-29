@@ -157,6 +157,12 @@ pub fn build_target_dse() -> TargetTakingDse {
         aggregation: TargetAggregation::Best,
         intention: build_intention,
         required_stance: None,
+        // Ticket 080 — build-site reservation is desirable but the
+        // construction pipeline already coordinates via materials
+        // delivery; deferring activation to a follow-on per ticket 080
+        // out-of-scope (the audit gap names carcass / herb / mate as
+        // the high-value contention sites).
+        eligibility: Default::default(),
     }
 }
 

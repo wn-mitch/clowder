@@ -132,6 +132,8 @@ pub fn apply_remedy_target_dse() -> TargetTakingDse {
         aggregation: TargetAggregation::Best,
         intention: apply_remedy_intention,
         required_stance: None,
+        // Ticket 080 — apply-remedy is contention-tolerant.
+        eligibility: Default::default(),
     }
 }
 
