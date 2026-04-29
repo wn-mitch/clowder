@@ -864,6 +864,15 @@ pub fn update_target_existence_markers(
         )
         .is_some();
 
+        // §5.6.3 row #8 cutover deferred — see ticket 061 Log.
+        // The per-pair `observer_sees_at` scan stays here. Activating
+        // either the producer-side `update_herb_location_map` writer
+        // OR projecting this marker through `HerbLocationMap.total`
+        // shifts Bevy's topological sort enough to collapse Hunting
+        // and Foraging dispositions to zero on the seed-42 soak. The
+        // producer + DSE infrastructure landed dormant; activation +
+        // marker cutover are deferred to a follow-on that absorbs the
+        // scheduling shift via wider verification.
         let want_herbs = herb_positions.iter().any(|hp| {
             observer_sees_at(
                 crate::components::SensorySpecies::Cat,

@@ -50,6 +50,9 @@ pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConsta
     registry.cat_dses.push(dses::explore_dse(scoring));
     registry.cat_dses.push(dses::wander_dse(scoring));
     registry.cat_dses.push(dses::herbcraft_gather_dse());
+    registry
+        .target_taking_dses
+        .push(dses::herbcraft_target_dse());
     registry.cat_dses.push(dses::herbcraft_prepare_dse());
     registry
         .target_taking_dses
@@ -178,6 +181,20 @@ impl Plugin for SimulationPlugin {
                         .chain(),
                     // Herb/flavor growth sub-chain: seasonal check resets stage,
                     // then growth advances, then flavors advance.
+                    //
+                    // Ticket 061 note — `update_herb_location_map`
+                    // (defined in `magic.rs`) is intentionally NOT
+                    // scheduled here. Adding it shifts Bevy's
+                    // topological sort enough to collapse Hunting and
+                    // Foraging dispositions to zero on a seed-42 soak,
+                    // matching the `reconsider_held_intentions`
+                    // precedent documented at `simulation.rs:425-433`.
+                    // The producer is registered separately (along
+                    // with the marker cutover and the
+                    // `herbcraft_target_dse` consumer wiring) in a
+                    // follow-on that absorbs the scheduling shift via
+                    // wider verification (likely ticket 052's
+                    // spatial-consideration sweep).
                     (
                         systems::magic::herb_seasonal_check,
                         systems::magic::advance_herb_growth,

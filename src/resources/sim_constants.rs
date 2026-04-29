@@ -3532,6 +3532,14 @@ pub struct InfluenceMapConstants {
     /// Falloff radius for `KittenUrgencyMap` — §5.6.3 row #13. Each
     /// kitten paints a disc weighted by hunger deficit (`1 - hunger`).
     pub kitten_urgency_sense_range: f32,
+    /// Falloff radius for `HerbLocationMap` — §5.6.3 row #8. Each
+    /// `Harvestable` herb paints a per-kind disc scaled by growth
+    /// stage (`Sprout=0.25` → `Blossom=1.0`). Default mirrors
+    /// `disposition.herb_detection_range` (15) so the
+    /// `HasHerbsNearby` marker projection (`map.total(pos) > 0`)
+    /// agrees with the legacy per-pair `observer_sees_at` predicate
+    /// at the in-range threshold.
+    pub herb_location_sense_range: f32,
     /// Hunger threshold below which a damaged `Structure` deposits
     /// into `ConstructionSiteMap`. Mirrors §4 `HasDamagedBuilding`'s
     /// `condition < damaged_threshold` predicate so the map view
@@ -3546,6 +3554,7 @@ impl Default for InfluenceMapConstants {
             garden_location_sense_range: 15.0,
             construction_site_sense_range: 15.0,
             kitten_urgency_sense_range: 12.0,
+            herb_location_sense_range: 15.0,
             damaged_threshold: 0.4,
         }
     }

@@ -538,6 +538,40 @@ pub fn advance_herb_growth(
 }
 
 // ---------------------------------------------------------------------------
+// update_herb_location_map
+// ---------------------------------------------------------------------------
+
+/// Re-stamp the [`HerbLocationMap`](crate::resources::HerbLocationMap)
+/// from live `Harvestable` herb entities.
+///
+/// §5.6.3 row #8 — sight × neutral. Each plant paints a per-kind
+/// linear-falloff disc of radius
+/// `constants.influence_maps.herb_location_sense_range` weighted by
+/// growth stage (`Sprout=0.25` → `Blossom=1.0`). Twisted herbs are
+/// skipped — they aren't valid harvest targets and their spatial
+/// signature shouldn't pull cats in.
+///
+/// Re-stamped every tick (matches the four ticket-006 colony-faction
+/// maps). The "event-driven on harvest" propagation called for in
+/// §5.6.3 falls out for free: `gather_herb` despawns the herb entity
+/// and the next tick's re-stamp picks up the absence.
+pub fn update_herb_location_map(
+    herbs: Query<(&Herb, &Position), With<Harvestable>>,
+    mut map: ResMut<crate::resources::HerbLocationMap>,
+    constants: Res<SimConstants>,
+) {
+    let sense_range = constants.influence_maps.herb_location_sense_range;
+    map.clear();
+    for (herb, pos) in &herbs {
+        if herb.twisted {
+            continue;
+        }
+        let strength = crate::resources::growth_stage_strength(herb.growth_stage);
+        map.stamp(herb.kind, pos.x, pos.y, strength, sense_range);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // advance_flavor_growth
 // ---------------------------------------------------------------------------
 

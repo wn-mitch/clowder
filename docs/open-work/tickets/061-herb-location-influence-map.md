@@ -88,3 +88,28 @@ has no consumer.
   ticket 006 landed, *and* because `HerbcraftGather` lacks a
   target-taking variant — herb-location wants a consumer that
   doesn't exist yet.
+- 2026-04-28: producer scaffolding (`HerbLocationMap` resource,
+  `kind_index` + `growth_stage_strength` helpers, `InfluenceMap`
+  impl, `herb_location_sense_range` knob in `InfluenceMapConstants`,
+  resource insertion in `setup.rs`) + consumer
+  (`herbcraft_target_dse` registered in `populate_dse_registry`)
+  landed. Lib tests cover map shape, per-kind isolation, total
+  clamping, growth-stage strength monotonicity, and the new DSE's
+  axis weights / aggregation / distance + density + maturity
+  ranking semantics. **Activation deferred:** registering the
+  `update_herb_location_map` writer in `simulation.rs` collapsed
+  Hunting/Foraging dispositions to zero on the seed-42 soak (final
+  tick: 1334291 vs clean baseline 1318856; courtship 408→0; play
+  417→190; 3 new never-fired features). Bisected to the writer
+  registration alone — disabling it returned the soak bit-identical
+  to `cef9137` baseline. Matches the `reconsider_held_intentions`
+  precedent at `simulation.rs:425-433`: adding a system to the
+  schedule reshuffles topological order enough to break unrelated
+  cat behaviors. The marker cutover (originally scoped here) was
+  also reverted for the same reason. **Follow-on work:** activate
+  the writer + cutover alongside ticket 052's broader
+  spatial-consideration sweep so the four-artifact balance
+  methodology can absorb the scheduling shift in one pass. Writer
+  function lives in `magic.rs` ready to register; DSE is registered
+  but dormant (no production caller invokes
+  `resolve_herbcraft_target` yet — that wiring is also follow-on).

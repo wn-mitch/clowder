@@ -314,6 +314,26 @@ impl InfluenceMap for crate::resources::KittenUrgencyMap {
     }
 }
 
+impl InfluenceMap for crate::resources::HerbLocationMap {
+    fn metadata(&self) -> MapMetadata {
+        MapMetadata {
+            // §5.6.3 row #8: herb-location — sight × neutral. Producer
+            // + initial consumer (HerbcraftTarget DSE) landed by
+            // ticket 061. `base_sample` returns the per-kind sum so
+            // the trait projection answers "any-herb density"; per-
+            // kind queries (e.g., Thornbriar density for ward placement)
+            // go through `HerbLocationMap::get` directly.
+            name: "herb_location",
+            channel: ChannelKind::Sight,
+            faction: Faction::Neutral,
+        }
+    }
+
+    fn base_sample(&self, pos: Position) -> f32 {
+        self.total(pos.x, pos.y)
+    }
+}
+
 /// Borrow-based adapter that exposes `TileMap`'s per-tile corruption
 /// field as an `InfluenceMap`. Corruption lives alongside terrain on
 /// `Tile` rather than in a dedicated resource; the lens avoids
