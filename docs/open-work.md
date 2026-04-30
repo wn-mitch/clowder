@@ -14,25 +14,26 @@ _Last generated: 2026-04-30._
 
 | Status | Count |
 |---|---|
-| In progress | 5 |
+| In progress | 6 |
 | Ready | 29 |
 | Parked | 5 |
-| Blocked | 10 |
+| Blocked | 13 |
 | Done (awaiting archive) | 2 |
-| **Open total** | **49** |
+| **Open total** | **53** |
 | Pre-existing | 1 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-index` (regenerate this file).
 
-## In progress (5)
+## In progress (6)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
 - **[027](docs/open-work/tickets/027-mating-cadence-three-bug-cascade.md)** — Mating cadence — three-bug cascade blocking MatingOccurred — _added 2026-04-25_
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _added 2026-04-27_
 - **[071](docs/open-work/tickets/071-planning-substrate-hardening.md)** — Planning-substrate hardening — gird against the stuck-cat bug class (sub-epic) — _[planning-substrate] · added 2026-04-29_
+- **[087](docs/open-work/tickets/087-interoceptive-perception.md)** — Interoceptive perception — agents need a structured self-snapshot, not raw component reads — _[ai-substrate] · added 2026-04-30_
 
 ## Ready (29)
 
@@ -74,7 +75,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[081](docs/open-work/tickets/081-coordination-directive-failure-demotion.md)** — Coordination directive-failure demotion (colony-side stuck-loop guard) — _[planning-substrate] · parked 2026-04-29 · added 2026-04-29_
 - **[084](docs/open-work/tickets/084-farm-herb-ward-demand-axis.md)** — Farm DSE — tie scoring to herb/ward stockpile demand so gardens stay productive under abundant food — _[balance] · parked 2026-04-30 · blocked-by 086 · added 2026-04-29_
 
-## Blocked (10)
+## Blocked (13)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _blocked-by 007, 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _blocked-by 016 · added 2026-04-22_
@@ -85,6 +86,9 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[053](docs/open-work/tickets/053-death-event-grief-emission.md)** — §7.7.b death-event grief emission — relationship-classified survivors payload — _blocked-by 007 · added 2026-04-27_
 - **[055](docs/open-work/tickets/055-mood-drift-threshold-detection.md)** — §7.7.d mood drift-threshold detection — sustain-duration + arc-misalignment trigger — _blocked-by 056 · added 2026-04-27_
 - **[057](docs/open-work/tickets/057-coordinator-directive-intention-strategy-row.md)** — §7.3 coordinator-directive Intention strategy row — `SingleMinded` with override — _blocked-by 007 · added 2026-04-27_
+- **[088](docs/open-work/tickets/088-body-distress-modifier.md)** — Body-distress Modifier — uniform self-care promotion under §L2.10 Modifier substrate — _[ai-substrate] · blocked-by 087 · added 2026-04-30_
+- **[089](docs/open-work/tickets/089-interoceptive-self-anchors.md)** — Interoceptive self-anchors — spatial self-perception (OwnInjurySite, OwnSafeRestSpot) — _[ai-substrate] · blocked-by 087 · added 2026-04-30_
+- **[090](docs/open-work/tickets/090-self-perception-l4-l5.md)** — L4/L5 self-perception — mastery-confidence, purpose-clarity, esteem-distress — _[ai-substrate] · blocked-by 087 · added 2026-04-30_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _blocked-by 071 · added 2026-04-28_
 
 ## Done (awaiting archive) (2)
