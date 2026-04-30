@@ -43,6 +43,18 @@ read at evaluation time by existing target-pickers and self-state
 scoring. No new `DispositionKind`, no new self-state DSE, no new GOAP
 step resolver.
 
+## Substrate-over-override pattern
+
+Part of the substrate-over-override thread (see [093](093-substrate-over-override-epic.md)). This ticket *is* the L2 substrate layer that retires [027](027-mating-cadence-three-bug-cascade.md) Bug 3's bias-pin hack.
+
+**Hack shape**: the `if pairing_partner == Some(target) { return 1.0 }` post-IAUS pin at `socialize_target.rs:193` (027 Bug 3 bias-only intervention) bypasses the partner-bond consideration's curve. It's a band-aid for the missing L2 commitment layer.
+
+**IAUS lever**: `PairingActivity` ECS component as the structural commitment layer (orthogonal to `GoapPlan`); substrate readers in `socialize_target.rs::bond_score` and `groom_other_target.rs` consume `Option<&PairingActivity>` directly. Ticket 078 (under [071](071-planning-substrate-hardening.md)) is the related `target_pairing_intention` Consideration that turns the bias-pin into a curve-tunable axis.
+
+**Sequencing**: substrate landed (Commit A + B), activation deferred per ticket 082 due to planning-substrate fragility — 071's children land first to harden the substrate against schedule-perturbation cascades. The 027b activation is itself a substrate-over-override sequencing case: the substrate must be *robust* enough to survive activation, not just expressive enough.
+
+**Canonical exemplar**: 087 (CriticalHealth interrupt → `pain_level` + `body_distress_composite` axes, landed at fc4e1ab).
+
 ## Scope
 
 Three commits, atomic and verifiable.

@@ -1336,7 +1336,6 @@ pub struct ScoringConstants {
     pub preference_dislike_penalty: f32,
     pub fated_love_social_bonus: f32,
     pub fated_rival_competition_bonus: f32,
-    pub survival_floor_phys_threshold: f32,
     pub action_softmax_temperature: f32,
     pub disposition_softmax_temperature: f32,
     /// Softmax temperature for fox disposition selection. Matches
@@ -1514,7 +1513,6 @@ impl Default for ScoringConstants {
             preference_dislike_penalty: 0.08,
             fated_love_social_bonus: 0.15,
             fated_rival_competition_bonus: 0.1,
-            survival_floor_phys_threshold: 0.5,
             action_softmax_temperature: 0.15,
             disposition_softmax_temperature: 0.15,
             fox_softmax_temperature: default_fox_softmax_temperature(),

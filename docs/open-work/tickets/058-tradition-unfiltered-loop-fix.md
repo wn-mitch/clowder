@@ -25,6 +25,18 @@ Today this is a no-op in production: the caller at `goap.rs:900` sets
 anything visible. But shipping non-zero Tradition would expose the
 bug.
 
+## Substrate-over-override pattern
+
+Part of the substrate-over-override thread (see [093](093-substrate-over-override-epic.md)).
+
+**Hack shape**: modifier applies a coefficient uniformly across DSEs when it should be action-matched. Tradition boosts Hunt/Patrol/Explore equally on a tile where the cat only ever Foraged — over-broad modifier semantics, currently dormant only because the caller-side bonus is 0.0.
+
+**IAUS lever**: per-action-keyed history axis (option (a)) — `HashMap<Action, f32>` per tile, modifier reads per-DSE-id and adds only on action match. Or redeclare as flat tile-familiarity bonus (option (b)) — formalize Tradition as a location-affinity axis independent of action. Either way, the lever is **history-of-place as a first-class IAUS signal**.
+
+**Sequencing**: no substrate prerequisite (this ticket *is* the substrate fix). Behavior-neutral landing while bonus = 0.0; balance ticket downstream sets the non-zero bonus per the four-artifact methodology.
+
+**Canonical exemplar**: 087 (CriticalHealth interrupt → `pain_level` + `body_distress_composite` axes, landed at fc4e1ab).
+
 ## Scope
 
 Spec §3.5.3 item 1 names two candidate fixes:

@@ -14,27 +14,28 @@ _Last generated: 2026-04-30._
 
 | Status | Count |
 |---|---|
-| In progress | 5 |
-| Ready | 33 |
+| In progress | 6 |
+| Ready | 37 |
 | Parked | 5 |
 | Blocked | 10 |
-| Done (awaiting archive) | 2 |
-| **Open total** | **53** |
+| Done (awaiting archive) | 3 |
+| **Open total** | **58** |
 | Pre-existing | 1 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-index` (regenerate this file).
 
-## In progress (5)
+## In progress (6)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
 - **[027](docs/open-work/tickets/027-mating-cadence-three-bug-cascade.md)** — Mating cadence — three-bug cascade blocking MatingOccurred — _added 2026-04-25_
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _added 2026-04-27_
 - **[071](docs/open-work/tickets/071-planning-substrate-hardening.md)** — Planning-substrate hardening — gird against the stuck-cat bug class (sub-epic) — _[planning-substrate] · added 2026-04-29_
+- **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** — Substrate-over-override — retire control-yanking hacks in favor of IAUS levers — _[substrate-over-override] · added 2026-04-30_
 
-## Ready (33)
+## Ready (37)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -68,7 +69,11 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[088](docs/open-work/tickets/088-body-distress-modifier.md)** — Body-distress Modifier — uniform self-care promotion under §L2.10 Modifier substrate — _[ai-substrate] · blocked-by 014 · added 2026-04-30_
 - **[089](docs/open-work/tickets/089-interoceptive-self-anchors.md)** — Interoceptive self-anchors — spatial self-perception (OwnInjurySite, OwnSafeRestSpot) — _[ai-substrate] · added 2026-04-30_
 - **[090](docs/open-work/tickets/090-self-perception-l4-l5.md)** — L4/L5 self-perception — mastery-confidence, purpose-clarity, esteem-distress — _[ai-substrate] · added 2026-04-30_
-- **[091](docs/open-work/tickets/091-post-087-action-collapse.md)** — Post-087 seed-42 plan-execution collapse — Eat picks 62% but FoodEaten never witnesses; no Forage/Hunt; founder starvation cascade — _added 2026-04-30_
+- **[094](docs/open-work/tickets/094-eat-vs-forage-imbalance.md)** — Eat-vs-Forage IAUS imbalance — colony hauls food but doesn't consume it — _[substrate-over-override] · blocked-by 091 · added 2026-04-30_
+- **[095](docs/open-work/tickets/095-body-zones-epic.md)** — Body zones — anatomical injury model for all animal species — _added 2026-05-01_
+- **[096](docs/open-work/tickets/096-materials-available-substrate-split.md)** — Split `PlannerState.materials_available` into marker-backed entry + per-plan search field — _[ai-substrate] · blocked-by 092 · added 2026-04-30_
+- **[097](docs/open-work/tickets/097-non-cat-planner-substrate-audit.md)** — Audit fox / hawk / snake planners for the parallel-feasibility-language smell 092 retired for cats — _[ai-substrate] · added 2026-04-30_
+- **[098](docs/open-work/tickets/098-search-state-vs-substrate-doctrine.md)** — Document the substrate-vs-search-state boundary in `docs/systems/ai-substrate-refactor.md` — _[docs] · added 2026-04-30_
 
 ## Parked (5)
 
@@ -91,10 +96,11 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[057](docs/open-work/tickets/057-coordinator-directive-intention-strategy-row.md)** — §7.3 coordinator-directive Intention strategy row — `SingleMinded` with override — _blocked-by 007 · added 2026-04-27_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _blocked-by 071 · added 2026-04-28_
 
-## Done (awaiting archive) (2)
+## Done (awaiting archive) (3)
 
 - **[012](docs/open-work/tickets/012-warmth-split.md)** — Warmth split — temperature need vs social-warmth fulfillment axis — _added 2026-04-21_
 - **[024](docs/open-work/tickets/024-fulfillment-register.md)** — §7.W Fulfillment register — MVP container + social_warmth axis — _[C] · added 2026-04-24_
+- **[091](docs/open-work/tickets/091-post-087-action-collapse.md)** — Post-087 seed-42 plan-execution collapse — Eat picks 62% but FoodEaten never witnesses; no Forage/Hunt; founder starvation cascade — _[substrate-over-override] · added 2026-04-30_
 
 ## Pre-existing (1)
 
@@ -104,7 +110,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/). Recent months:
 
-- [2026-04](docs/open-work/landed/2026-04.md) — 69 entries
+- [2026-04](docs/open-work/landed/2026-04.md) — 70 entries
 
 ## Conventions
 

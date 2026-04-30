@@ -404,6 +404,23 @@ pub enum EventKind {
         energy: f32,
         temperature: f32,
     },
+
+    /// Ticket 091: the planner returned `None` for a chosen disposition —
+    /// the cat had no executable plan and silently idled. Pre-091 this path
+    /// emitted nothing, hiding producer-side starvation cascades from every
+    /// canary. The `reason` field starts as `"no_plan_found"`; future
+    /// variants can disambiguate between unreachable goals, missing
+    /// preconditions, A* depth/iteration exhaustion, etc.
+    PlanningFailed {
+        cat: String,
+        disposition: String,
+        reason: String,
+        hunger: f32,
+        energy: f32,
+        temperature: f32,
+        food_available: bool,
+        has_stored_food: bool,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -437,6 +454,12 @@ pub struct EventLog {
     // contract notes on `EventKind::SystemActivation::positive`.
     pub deaths_by_cause: BTreeMap<String, u64>,
     pub plan_failures_by_reason: BTreeMap<String, u64>,
+    /// Ticket 091: per-disposition tally of `make_plan → None` outcomes.
+    /// Distinguishes "the planner can't find a plan for X" from runtime
+    /// step failures (`plan_failures_by_reason`). A high entry here means
+    /// the IAUS layer is electing X but the GOAP layer can't satisfy it —
+    /// the producer-side starvation pattern 091 was opened to fix.
+    pub planning_failures_by_disposition: BTreeMap<String, u64>,
     pub interrupts_by_reason: BTreeMap<String, u64>,
     /// Continuity-canary class counters. Six fixed keys: `grooming`,
     /// `play`, `mentoring`, `burial`, `courtship`, `mythic-texture`.
@@ -469,6 +492,7 @@ impl Default for EventLog {
             total_pushed: 0,
             deaths_by_cause: BTreeMap::new(),
             plan_failures_by_reason: BTreeMap::new(),
+            planning_failures_by_disposition: BTreeMap::new(),
             interrupts_by_reason: BTreeMap::new(),
             continuity_tallies,
         }
@@ -551,6 +575,12 @@ impl EventLog {
             EventKind::PlanInterrupted { reason, .. } => {
                 *self.interrupts_by_reason.entry(reason.clone()).or_insert(0) += 1;
             }
+            EventKind::PlanningFailed { disposition, .. } => {
+                *self
+                    .planning_failures_by_disposition
+                    .entry(disposition.clone())
+                    .or_insert(0) += 1;
+            }
             _ => {}
         }
         self.entries.push_back(EventEntry { tick, kind });
@@ -626,6 +656,66 @@ mod tests {
             },
         );
         assert_eq!(log.continuity_tallies.get("courtship").copied(), Some(2));
+    }
+
+    #[test]
+    fn planning_failed_increments_per_disposition_tally() {
+        // Ticket 091: silent `make_plan → None` path now witnessed via
+        // `EventKind::PlanningFailed`. The footer reads
+        // `planning_failures_by_disposition`, keyed on the disposition that
+        // failed to plan, so an investigator can answer "which DSE is
+        // winning the IAUS contest but losing the planner contest" without
+        // a focal trace.
+        let mut log = EventLog::default();
+        log.push(
+            100,
+            EventKind::PlanningFailed {
+                cat: "Nettle".into(),
+                disposition: "Foraging".into(),
+                reason: "no_plan_found".into(),
+                hunger: 0.9,
+                energy: 0.4,
+                temperature: 0.3,
+                food_available: false,
+                has_stored_food: false,
+            },
+        );
+        log.push(
+            101,
+            EventKind::PlanningFailed {
+                cat: "Nettle".into(),
+                disposition: "Foraging".into(),
+                reason: "no_plan_found".into(),
+                hunger: 0.9,
+                energy: 0.4,
+                temperature: 0.3,
+                food_available: false,
+                has_stored_food: false,
+            },
+        );
+        log.push(
+            102,
+            EventKind::PlanningFailed {
+                cat: "Mocha".into(),
+                disposition: "Hunting".into(),
+                reason: "no_plan_found".into(),
+                hunger: 0.95,
+                energy: 0.5,
+                temperature: 0.3,
+                food_available: false,
+                has_stored_food: false,
+            },
+        );
+        assert_eq!(
+            log.planning_failures_by_disposition
+                .get("Foraging")
+                .copied(),
+            Some(2)
+        );
+        assert_eq!(
+            log.planning_failures_by_disposition.get("Hunting").copied(),
+            Some(1)
+        );
     }
 
     #[test]

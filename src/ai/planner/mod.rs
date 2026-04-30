@@ -5,6 +5,24 @@ pub mod goals;
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BinaryHeap, HashMap};
 
+use bevy::prelude::Entity;
+
+use crate::ai::scoring::MarkerSnapshot;
+
+/// Read-only context threaded through `make_plan`'s A* loop alongside
+/// `PlannerState`. Carries the `MarkerSnapshot` (the IAUS substrate's
+/// authored facts) and the entity being planned for, so
+/// `StatePredicate::HasMarker(...)` evaluates against the same source of
+/// truth that DSE `EligibilityFilter` consults — collapsing the parallel
+/// feasibility languages 092 retired.
+///
+/// Lives outside `PlannerState` so the search node stays `Hash + Eq`;
+/// the snapshot is immutable across the search and is passed by reference.
+pub struct PlanContext<'a> {
+    pub markers: &'a MarkerSnapshot,
+    pub entity: Entity,
+}
+
 // ---------------------------------------------------------------------------
 // PlannerState — compact, hashable state for A* search
 // ---------------------------------------------------------------------------
@@ -76,12 +94,18 @@ pub struct PlannerState {
     pub construction_done: bool,
     pub prey_found: bool,
     pub farm_tended: bool,
-    pub thornbriar_available: bool,
     /// True iff at least one reachable `ConstructionSite` has
     /// `materials_complete() == true`. Construct gates on this; founding
     /// builds only flip true after enough Pickup→Deliver cycles fill the
     /// site's materials ledger. Coarse for the founding-only scope (one
     /// site at a time); per-site tracking is the open follow-on.
+    ///
+    /// Hybrid (ticket 092 §Out of scope): mirrors a world fact at plan
+    /// entry but is also mutated by `SetMaterialsAvailable(true)` in the
+    /// `DeliverMaterials` action, so it can't migrate to a pure
+    /// `HasMarker` query without splitting into entry-marker + per-plan
+    /// search field. Tracked by the materials-available-substrate-split
+    /// follow-up.
     pub materials_available: bool,
 }
 
@@ -150,8 +174,14 @@ pub enum GoapActionKind {
 // Predicates and effects — data-driven, not function pointers
 // ---------------------------------------------------------------------------
 
-/// A condition over `PlannerState` that must hold for an action to be applicable,
-/// or that defines a goal.
+/// A condition over `PlannerState` (or marker substrate via `PlanContext`)
+/// that must hold for an action to be applicable, or that defines a goal.
+///
+/// `HasMarker(name)` consults the IAUS `MarkerSnapshot` directly via
+/// `PlanContext` — same lookup the `EligibilityFilter` uses for DSE gating,
+/// so L2 and L3 cannot disagree on whether a marker-authored fact holds
+/// (ticket 092). Use the `KEY` const on the marker type
+/// (`markers::HasStoredFood::KEY`) rather than a literal string.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StatePredicate {
     ZoneIs(PlannerZone),
@@ -165,13 +195,13 @@ pub enum StatePredicate {
     InteractionDone(bool),
     ConstructionDone(bool),
     FarmTended(bool),
-    ThornbriarAvailable(bool),
     TripsAtLeast(u32),
     MaterialsAvailable(bool),
+    HasMarker(&'static str),
 }
 
 impl StatePredicate {
-    pub fn evaluate(&self, state: &PlannerState) -> bool {
+    pub fn evaluate(&self, state: &PlannerState, ctx: &PlanContext<'_>) -> bool {
         match self {
             Self::ZoneIs(z) => state.zone == *z,
             Self::ZoneIsNot(z) => state.zone != *z,
@@ -184,9 +214,9 @@ impl StatePredicate {
             Self::InteractionDone(v) => state.interaction_done == *v,
             Self::ConstructionDone(v) => state.construction_done == *v,
             Self::FarmTended(v) => state.farm_tended == *v,
-            Self::ThornbriarAvailable(v) => state.thornbriar_available == *v,
             Self::TripsAtLeast(n) => state.trips_done >= *n,
             Self::MaterialsAvailable(v) => state.materials_available == *v,
+            Self::HasMarker(name) => ctx.markers.has(name, ctx.entity),
         }
     }
 }
@@ -239,8 +269,8 @@ pub struct GoapActionDef {
 }
 
 impl GoapActionDef {
-    pub fn is_applicable(&self, state: &PlannerState) -> bool {
-        self.preconditions.iter().all(|p| p.evaluate(state))
+    pub fn is_applicable(&self, state: &PlannerState, ctx: &PlanContext<'_>) -> bool {
+        self.preconditions.iter().all(|p| p.evaluate(state, ctx))
     }
 
     pub fn apply(&self, state: &PlannerState) -> PlannerState {
@@ -263,15 +293,15 @@ pub struct GoalState {
 }
 
 impl GoalState {
-    pub fn is_satisfied(&self, state: &PlannerState) -> bool {
-        self.predicates.iter().all(|p| p.evaluate(state))
+    pub fn is_satisfied(&self, state: &PlannerState, ctx: &PlanContext<'_>) -> bool {
+        self.predicates.iter().all(|p| p.evaluate(state, ctx))
     }
 
     /// Admissible heuristic: count of unsatisfied goal predicates.
-    pub fn heuristic(&self, state: &PlannerState) -> u32 {
+    pub fn heuristic(&self, state: &PlannerState, ctx: &PlanContext<'_>) -> u32 {
         self.predicates
             .iter()
-            .filter(|p| !p.evaluate(state))
+            .filter(|p| !p.evaluate(state, ctx))
             .count() as u32
     }
 }
@@ -338,9 +368,10 @@ pub fn make_plan(
     goal: &GoalState,
     max_depth: usize,
     max_nodes: usize,
+    ctx: &PlanContext<'_>,
 ) -> Option<Vec<PlannedStep>> {
     // Early exit: already at goal.
-    if goal.is_satisfied(&start) {
+    if goal.is_satisfied(&start, ctx) {
         return Some(Vec::new());
     }
 
@@ -354,7 +385,7 @@ pub fn make_plan(
     let mut best_g: HashMap<PlannerState, u32> = HashMap::new();
 
     // Seed with start state.
-    let h = goal.heuristic(&start);
+    let h = goal.heuristic(&start, ctx);
     arena.push(SearchNode {
         state: start.clone(),
         g_cost: 0,
@@ -384,7 +415,7 @@ pub fn make_plan(
 
         // Goal check at dequeue — this node has the lowest f-cost among
         // unvisited nodes, so if it satisfies the goal it's optimal.
-        if goal.is_satisfied(&arena[node_idx].state) {
+        if goal.is_satisfied(&arena[node_idx].state, ctx) {
             return Some(reconstruct_path(&arena, node_idx));
         }
 
@@ -393,7 +424,7 @@ pub fn make_plan(
         }
 
         for action in actions {
-            if !action.is_applicable(&arena[node_idx].state) {
+            if !action.is_applicable(&arena[node_idx].state, ctx) {
                 continue;
             }
 
@@ -406,7 +437,7 @@ pub fn make_plan(
             }
             best_g.insert(next_state.clone(), tentative_g);
 
-            let h = goal.heuristic(&next_state);
+            let h = goal.heuristic(&next_state, ctx);
             let f = tentative_g.saturating_add(h);
 
             arena.push(SearchNode {
@@ -441,27 +472,11 @@ fn reconstruct_path(arena: &[SearchNode], goal_idx: usize) -> Vec<PlannedStep> {
     steps
 }
 
-// ---------------------------------------------------------------------------
-// CatDomain — implements GoapDomain for the cat planner
-// ---------------------------------------------------------------------------
-
-/// Marker type binding the cat-specific planner types to the generic core.
-pub struct CatDomain;
-
-impl core::GoapDomain for CatDomain {
-    type State = PlannerState;
-    type ActionKind = GoapActionKind;
-    type Predicate = StatePredicate;
-    type Effect = StateEffect;
-
-    fn evaluate(pred: &StatePredicate, state: &PlannerState) -> bool {
-        pred.evaluate(state)
-    }
-
-    fn apply(effect: &StateEffect, state: &mut PlannerState) {
-        effect.apply(state);
-    }
-}
+// Note: cat planner uses the concrete `make_plan` above (with `PlanContext`)
+// rather than the generic `core::make_plan`. Non-cat species (fox / hawk /
+// snake) implement `core::GoapDomain` for their state types — auditing
+// those for the same parallel-feasibility-language smell is tracked as a
+// 092 follow-up.
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -483,9 +498,31 @@ mod tests {
             construction_done: false,
             prey_found: false,
             farm_tended: false,
-            thornbriar_available: false,
             materials_available: false,
         }
+    }
+
+    /// Empty `MarkerSnapshot` + a synthetic test entity. Tests that need
+    /// to gate on `HasMarker(...)` build their own snapshot and pass a
+    /// custom `PlanContext` instead.
+    fn test_ctx() -> (MarkerSnapshot, Entity) {
+        (
+            MarkerSnapshot::new(),
+            Entity::from_raw_u32(1).expect("nonzero raw entity id"),
+        )
+    }
+
+    /// Run `make_plan` with an empty marker snapshot. Use when the test
+    /// doesn't depend on any marker-gated predicates.
+    macro_rules! plan {
+        ($start:expr, $actions:expr, $goal:expr, $depth:expr, $nodes:expr) => {{
+            let (markers, entity) = test_ctx();
+            let ctx = PlanContext {
+                markers: &markers,
+                entity,
+            };
+            make_plan($start, $actions, $goal, $depth, $nodes, &ctx)
+        }};
     }
 
     fn hunting_actions_with_travel() -> Vec<GoapActionDef> {
@@ -548,7 +585,7 @@ mod tests {
         };
         let actions = hunting_actions_with_travel();
 
-        let plan = make_plan(start, &actions, &goal, 12, 1000).expect("should find plan");
+        let plan = plan!(start, &actions, &goal, 12, 1000).expect("should find plan");
 
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
         assert_eq!(
@@ -574,7 +611,7 @@ mod tests {
         };
         let actions = hunting_actions_with_travel();
 
-        let plan = make_plan(start, &actions, &goal, 12, 1000).expect("should find plan");
+        let plan = plan!(start, &actions, &goal, 12, 1000).expect("should find plan");
 
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
         assert_eq!(
@@ -637,7 +674,7 @@ mod tests {
             },
         ];
 
-        let plan = make_plan(start, &actions, &goal, 12, 1000).expect("should find plan");
+        let plan = plan!(start, &actions, &goal, 12, 1000).expect("should find plan");
 
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
         // Should go to stores, eat, then done (energy and warmth already ok).
@@ -699,7 +736,7 @@ mod tests {
             },
         ];
 
-        let plan = make_plan(start, &actions, &goal, 12, 1000).expect("should find plan");
+        let plan = plan!(start, &actions, &goal, 12, 1000).expect("should find plan");
 
         // All three needs addressed. SelfGroom is cheapest and has no preconditions,
         // so the planner may weave it in wherever it's cheapest.
@@ -727,7 +764,7 @@ mod tests {
             effects: vec![StateEffect::SetTemperatureOk(true)],
         }];
 
-        let plan = make_plan(start, &actions, &goal, 12, 1000);
+        let plan = plan!(start, &actions, &goal, 12, 1000);
         assert!(plan.is_none());
     }
 
@@ -735,23 +772,19 @@ mod tests {
     fn empty_plan_when_goal_already_satisfied() {
         let start = PlannerState {
             zone: PlannerZone::Stores,
-            carrying: Carrying::Nothing,
             trips_done: 3,
-            hunger_ok: true,
-            energy_ok: true,
-            temperature_ok: true,
-            interaction_done: false,
-            construction_done: false,
-            prey_found: false,
-            farm_tended: false,
-            thornbriar_available: false,
-            materials_available: false,
+            ..default_state()
         };
         let goal = GoalState {
             predicates: vec![StatePredicate::TripsAtLeast(3)],
         };
 
-        let plan = make_plan(start, &[], &goal, 12, 1000).expect("should find plan");
+        let (markers, entity) = test_ctx();
+        let ctx = PlanContext {
+            markers: &markers,
+            entity,
+        };
+        let plan = make_plan(start, &[], &goal, 12, 1000, &ctx).expect("should find plan");
         assert!(plan.is_empty());
     }
 
@@ -770,7 +803,7 @@ mod tests {
         }];
 
         // Max nodes = 10, but reaching trips=100 requires 100 expansions.
-        let plan = make_plan(start, &actions, &goal, 200, 10);
+        let plan = plan!(start, &actions, &goal, 200, 10);
         assert!(plan.is_none());
     }
 
@@ -788,7 +821,7 @@ mod tests {
         }];
 
         // Max depth = 3, but reaching trips=5 requires 5 steps.
-        let plan = make_plan(start, &actions, &goal, 3, 1000);
+        let plan = plan!(start, &actions, &goal, 3, 1000);
         assert!(plan.is_none());
     }
 
@@ -832,7 +865,7 @@ mod tests {
             },
         ];
 
-        let plan = make_plan(start, &actions, &goal, 12, 1000).expect("should find plan");
+        let plan = plan!(start, &actions, &goal, 12, 1000).expect("should find plan");
         let total_cost: u32 = plan.iter().map(|s| s.cost).sum();
         // Cheap route: Stores(1) + SocialTarget(1) + Socialize(2) = 4
         // Expensive route: SocialTarget(10) + Socialize(2) = 12
@@ -884,7 +917,7 @@ mod tests {
             },
         ];
 
-        let plan = make_plan(start, &actions, &goal, 12, 1000).expect("should find plan");
+        let plan = plan!(start, &actions, &goal, 12, 1000).expect("should find plan");
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
         assert_eq!(
             kinds,
@@ -921,7 +954,7 @@ mod tests {
             },
         ];
 
-        let plan = make_plan(start, &actions, &goal, 12, 1000).expect("should find plan");
+        let plan = plan!(start, &actions, &goal, 12, 1000).expect("should find plan");
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
         assert_eq!(
             kinds,

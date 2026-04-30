@@ -21,6 +21,18 @@ DSE-level use cases this unblocks:
 - `Rest` DSE gains a `SpatialConsideration` over `LandmarkAnchor::OwnSafeRestSpot` (analog of `Sleep`'s `OwnSleepingSpot`) so resting near a kitchen / hearth scores higher than resting next to a den entrance, all else equal.
 - A future `TendInjury` DSE (separate ticket) needs `OwnInjurySite` to know where on its own body the injury locus is, so navigation to a healer / herb cache makes sense.
 
+## Substrate-over-override pattern
+
+Part of the substrate-over-override thread (see [093](093-substrate-over-override-epic.md)) — extends 087's substrate to spatial self-perception, on-thread but not directly retiring an override.
+
+**Hack shape**: not a hack-retirement directly — this ticket is *substrate expansion*. It completes the architectural symmetry 087 left incomplete (scalar interoception only). Without spatial self-anchors, future TendInjury / Rest-near-safety DSEs would have to use override-shaped target-resolvers to reach body-state-appropriate locations.
+
+**IAUS lever**: `LandmarkAnchor::OwnInjurySite`, `LandmarkAnchor::OwnSafeRestSpot`, possibly `OwnTerritoryCenter` — first-class spatial-self-perception axes consumed via `SpatialConsideration` in self-care DSEs. Mirrors external perception's `LandmarkAnchor::NearestThreat` etc.
+
+**Sequencing**: blocked-by 087 (landed). No prerequisite for 047 specifically, but lands on the same substrate-expansion thread.
+
+**Canonical exemplar**: 087 (CriticalHealth interrupt → `pain_level` + `body_distress_composite` axes, landed at fc4e1ab).
+
 ## Scope
 
 - Extend `LandmarkAnchor` enum (`src/ai/considerations.rs`) with `OwnInjurySite`, `OwnSafeRestSpot`, possibly `OwnTerritoryCenter`.

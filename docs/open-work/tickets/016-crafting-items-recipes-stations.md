@@ -43,17 +43,25 @@ substrate); Phase 5 is gated on aspirations-mastery arcs and is
 long-horizon.
 
 **Design constraints (load-bearing — drift re-triggers ranking):**
-- §5-first catalog. No combat gear in the catalog. If a combat-gear
-  recipe is ever proposed, re-rank the stub — F and H both drop.
-- `CraftedItem` type carries narrative/identity fields only. No
-  numeric capability modifiers on items themselves; action
-  resolvers own the gameplay effect of using an item.
+- §5-first catalog. Combat gear (spears, bracers, blades, slings)
+  is included as a Phase 2b recipe cluster; F and H hold because
+  items carry no generic modifier fields — the OSRS gravity well
+  is avoided by construction. No stat-stick items.
+- `CraftedItem` type carries narrative/identity fields (name,
+  origin, creator, material, weapon class) and no generic numeric
+  modifier fields. Items have real mechanical effects but those
+  effects live on action resolvers keyed to item identity, not on
+  `attack_bonus` / `armor_rating` floats. Items are a
+  characterization system, not a number ladder.
 - **Decorations are place-anchored, not cat-anchored** (Phase 4+).
   A rug warms the hearth tile; a lamp illuminates a room. The cat
   who placed the decoration gets no personal bonus.
-- Cat-native palette. Reed, bone, fur, feather, shell, rendered
-  fat, berry/clay pigment. No metalwork / milled lumber /
-  human-import materials.
+- Cat-native palette: reed, bone, fur, feather, shell, rendered
+  fat, berry/clay/ash pigment, raw hide, sinew, flint, fieldstone.
+  Cats do not smelt or forge. Metal enters as `ScavengedMetal`
+  (from ruins) or `TradedMetal` (from forge-culture neighbors) —
+  precious, provenance-tagged, never produced by a cat discipline.
+  Adornment & Setting works with found metal; it does not make it.
 - **Not-DF guardrail for Phase 5.** Phase 5 is collective (multi-cat)
   or cumulative (multi-season), never individual-rare-strike.
   `the-calling.md` owns individual mood-strike craft.
@@ -65,9 +73,9 @@ long-horizon.
 2. Material-scarcity (deep exploration / cleared ruins / cross-
    season storage inputs).
 3. Skill-via-aspirations — new mastery arcs (`WeavingMastery`,
-   `BoneShapingMastery`, `PigmentMastery`, `CairnMastery`) defined
-   in `aspirations.rs`; at least one cat advanced on a relevant arc
-   enables the recipe for the whole colony.
+   `BoneShapingMastery`, `HideworkMastery`, `PigmentMastery`,
+   `CairnMastery`) defined in `aspirations.rs`; at least one cat
+   advanced on a relevant arc enables the recipe for the whole colony.
 
 **Dependencies:** benefits from but does not hard-block on the A1
 IAUS refactor. Phase 1 is independent. Phase 3 soft-depends on #17

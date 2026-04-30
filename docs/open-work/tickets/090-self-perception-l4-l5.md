@@ -21,6 +21,18 @@ Closing the catalog gap requires both perception (knowing the cat's L4/L5 state)
 
 This is *not* "balance tuning on refactor-affected metrics" (deferred per CLAUDE.md). It's substrate plumbing — perception coverage of needs that already exist in the data model.
 
+## Substrate-over-override pattern
+
+Part of the substrate-over-override thread (see [093](093-substrate-over-override-epic.md)) — extends 087's substrate to higher Maslow tiers, on-thread but not directly retiring an override.
+
+**Hack shape**: similar to [089](089-interoceptive-self-anchors.md), this is substrate-expansion not hack-retirement. The current state — needs decay (respect/mastery/purpose) with no DSE pulling them — is *implicitly* a hack: silently dropping signals because no perception layer publishes them. The cat has no agentic awareness of L4/L5 distress.
+
+**IAUS lever**: `mastery_confidence`, `purpose_clarity`, `esteem_distress` scalars + `LowMastery`, `LackingPurpose`, `EsteemDistressed` ZST markers — perception coverage of Maslow tiers that already exist in the data model. Future L4/L5 DSEs (separate tickets) consume these without overrides.
+
+**Sequencing**: blocked-by 087 (landed). Perception-only ticket; downstream DSE catalog work depends on it but is out-of-scope here.
+
+**Canonical exemplar**: 087 (CriticalHealth interrupt → `pain_level` + `body_distress_composite` axes, landed at fc4e1ab).
+
 ## Scope
 
 - Extend interoceptive perception module (087) with new scalars: `mastery_confidence` (derived from skill levels — high skills → high confidence), `purpose_clarity` (derived from `Aspiration` state if present, else 0), `esteem_distress` (derived from low respect/mastery).

@@ -66,6 +66,18 @@ The interrupt's intent was to break commitments when the cat is in trouble — e
 
 All three are "interrupt fires faster than the underlying state can clear." Worth a doc note in `docs/systems/` codifying the invariant: **an interrupt that fires every tick must produce a state change that prevents it firing next tick** — otherwise it's a no-op cycle while real damage accumulates.
 
+## Substrate-over-override pattern
+
+Part of the substrate-over-override thread (see [093](093-substrate-over-override-epic.md)) — this ticket is the **prototypical case**.
+
+**Hack shape**: per-tick interrupt that yanks control whenever `health < critical_health_threshold`. Binary gate, no debounce, fires regardless of whether replan changes the answer. Cats die in the replan-churn loop. The per-disposition exemption lists at `disposition.rs:305-342` are the same pattern in special-case clothing.
+
+**IAUS lever**: continuous health/safety/hunger/energy deficits as DSE axes + jerk curves on Sleep/Eat/Flee CP composition. Mirror the 087 prototype exactly — `body_distress_composite` is the model; extend to `hunger_distress`, `exhaustion_distress`, `threat_proximity`. The per-disposition exemption lists get replaced by the Rao-Georgeff §7.2 commitment/momentum modifier in the same pass.
+
+**Sequencing**: [088](088-body-distress-modifier.md) (Body-distress Modifier) must land first to provide the substrate axis with sufficient magnitude to replace each interrupt branch. Land axes one-at-a-time, soak-verify magnitude, *then* retire the corresponding interrupt branch. Removing interrupts before substrate is expressive enough caused 091's collapse.
+
+**Canonical exemplar**: 087 (CriticalHealth interrupt → `pain_level` + `body_distress_composite` axes, landed at fc4e1ab).
+
 ## Fix candidates
 
 **(A) Force-Flee on CriticalHealth.** Most aggressive: when CriticalHealth fires, override the disposition picker for N ticks and force `Action::Flee` away from the nearest threat. Mirrors `disposition.rs:217-232`'s `ThreatDetected` handler which already does exactly this. The current `_ =>` branch at line 233 (catch-all for non-threat interrupt reasons) just resets `ticks_remaining`; CriticalHealth deserves the same Flee treatment when there's a nearby threat.

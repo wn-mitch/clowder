@@ -494,6 +494,7 @@ fn print_headless_summary(footer: &str) {
     for key in [
         "deaths_by_cause",
         "plan_failures_by_reason",
+        "planning_failures_by_disposition",
         "interrupts_by_reason",
         "continuity_tallies",
     ] {

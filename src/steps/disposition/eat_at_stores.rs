@@ -22,8 +22,14 @@ use crate::steps::{StepOutcome, StepResult};
 /// (Continue until then). Requires `target_entity` to be `Some` and
 /// resolve to a `StoredItems` component, and for at least one stored
 /// item to return `kind.is_food()`. All three misses cause
-/// `unwitnessed(Advance)`: the chain moves on so the cat can re-plan
-/// next tick rather than starving in place.
+/// `StepResult::Fail` with a reason (was `unwitnessed(Advance)` pre-091,
+/// which silently no-op'd against empty stores and let cats lock-loop
+/// in Resting/EatAtStores indefinitely; the `Fail` triggers replan and
+/// surfaces a `PlanStepFailed` event so the canary can see the gap).
+/// Ticket 091 also added `StatePredicate::HasStoredFood(true)` to the
+/// `EatAtStores` GOAP precondition, so this Fail branch should now be
+/// reached only when world state drifts between planning and execution
+/// (e.g., food spoiled or another cat consumed the last item this tick).
 ///
 /// **Witness** — `StepOutcome<bool>`. `true` iff food was consumed
 /// *and* hunger restoration was applied this call.
@@ -49,10 +55,14 @@ pub fn resolve_eat_at_stores(
     }
 
     let Some(store_entity) = target_entity else {
-        return StepOutcome::unwitnessed(StepResult::Advance);
+        return StepOutcome::unwitnessed(StepResult::Fail(
+            "eat_at_stores: no target Stores entity".into(),
+        ));
     };
     let Ok(mut stored) = stores_query.get_mut(store_entity) else {
-        return StepOutcome::unwitnessed(StepResult::Advance);
+        return StepOutcome::unwitnessed(StepResult::Fail(
+            "eat_at_stores: target lacks StoredItems component".into(),
+        ));
     };
 
     let Some(item_entity) = stored.items.iter().copied().find(|&item_e| {
@@ -60,7 +70,9 @@ pub fn resolve_eat_at_stores(
             .get(item_e)
             .is_ok_and(|item| item.kind.is_food())
     }) else {
-        return StepOutcome::unwitnessed(StepResult::Advance);
+        return StepOutcome::unwitnessed(StepResult::Fail(
+            "eat_at_stores: no food item in stores".into(),
+        ));
     };
 
     if let Ok(item) = items_query.get(item_entity) {

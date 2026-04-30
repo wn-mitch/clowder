@@ -7,7 +7,7 @@ use crate::ai::pathfinding::{find_free_adjacent, step_toward};
 use crate::ai::scoring::{
     apply_aspiration_bonuses, apply_cascading_bonuses, apply_colony_knowledge_bonuses,
     apply_directive_bonus, apply_fated_bonuses, apply_memory_bonuses, apply_preference_bonuses,
-    apply_priority_bonus, enforce_survival_floor, score_actions, ScoringContext,
+    apply_priority_bonus, score_actions, ScoringContext,
 };
 use crate::ai::{Action, CurrentAction};
 use crate::components::building::{
@@ -1009,7 +1009,6 @@ pub fn evaluate_dispositions(
                 * (1.0 - personality.stubbornness * d.directive_stubbornness_penalty);
             apply_directive_bonus(&mut scores, directive.kind.to_action(), bonus);
         }
-        enforce_survival_floor(&mut scores, needs, sc);
 
         // Determine Groom routing.
         let self_groom_score = (1.0 - needs.temperature)

@@ -12,7 +12,7 @@ use crate::ai::planner::{
 use crate::ai::scoring::{
     apply_aspiration_bonuses, apply_cascading_bonuses, apply_colony_knowledge_bonuses,
     apply_directive_bonus, apply_fated_bonuses, apply_memory_bonuses, apply_preference_bonuses,
-    apply_priority_bonus, enforce_survival_floor, score_actions, ScoringContext,
+    apply_priority_bonus, score_actions, ScoringContext,
 };
 use crate::ai::{Action, CurrentAction};
 use crate::components::building::{
@@ -1498,7 +1498,6 @@ pub fn evaluate_and_plan(
                 * (1.0 - personality.stubbornness * d.directive_stubbornness_penalty);
             apply_directive_bonus(&mut scores, directive.kind.to_action(), bonus);
         }
-        enforce_survival_floor(&mut scores, needs, sc);
 
         // Groom routing.
         let self_groom_score = (1.0 - needs.temperature)
@@ -1680,9 +1679,20 @@ pub fn evaluate_and_plan(
         } else {
             None
         };
-        let goal = goal_for_disposition(chosen, 0);
+        // 092 substrate handoff: the planner reads the same
+        // `MarkerSnapshot` the IAUS scoring layer just built (line 874+),
+        // so `HasMarker(...)` predicates on `EatAtStores`, `SetWard`, and
+        // the Resting partial-goal branch all consult one source of truth.
+        let plan_ctx = crate::ai::planner::PlanContext {
+            markers: &markers,
+            entity,
+        };
+        // Read for the PlanningFailed event below — markers are the
+        // authoritative source of `HasStoredFood` (093 substrate doctrine).
+        let planner_has_stored_food = markers.has(markers::HasStoredFood::KEY, entity);
+        let goal = goal_for_disposition(chosen, 0, &plan_ctx);
 
-        if let Some(steps) = make_plan(planner_state, &actions, &goal, 12, 1000) {
+        if let Some(steps) = make_plan(planner_state, &actions, &goal, 12, 1000, &plan_ctx) {
             let mut plan = GoapPlan::new(chosen, res.time.tick, personality, steps, crafting_hint);
             if chosen == DispositionKind::Resting {
                 plan.max_replans = d.resting_max_replans;
@@ -1755,8 +1765,30 @@ pub fn evaluate_and_plan(
 
             current.ticks_remaining = u64::MAX;
             commands.entity(entity).insert(plan);
+        } else if let Some(ref mut log) = event_log {
+            // Ticket 091: surface the silent `make_plan → None` path.
+            // Pre-091 this branch emitted nothing — the cat just idled
+            // with `ticks_remaining = 0` and replanned next tick. When
+            // IAUS elects a disposition (e.g., Foraging) but the GOAP
+            // planner can't satisfy it (e.g., no reachable foraging
+            // zone, or `Carrying` vetoes ForageItem), the producer side
+            // collapses with no canary-visible signal. The footer field
+            // `planning_failures_by_disposition` is the cheap pre-trace
+            // disambiguator for that pattern.
+            log.push(
+                res.time.tick,
+                EventKind::PlanningFailed {
+                    cat: name.0.clone(),
+                    disposition: format!("{:?}", chosen),
+                    reason: "no_plan_found".into(),
+                    hunger: needs.hunger,
+                    energy: needs.energy,
+                    temperature: needs.temperature,
+                    food_available,
+                    has_stored_food: planner_has_stored_food,
+                },
+            );
         }
-        // If no plan found, cat stays idle (ticks_remaining = 0).
     }
 }
 
@@ -1795,6 +1827,14 @@ struct StepSnapshots {
     /// tick from a `Without<GoapPlan>` items query so the planner's
     /// `PlannerZone::MaterialPile` resolves to the nearest haulable pile.
     material_pile_positions: Vec<(Entity, Position, ItemKind)>,
+    /// Ticket 092: per-tick `MarkerSnapshot` for the colony markers the
+    /// planner consults via `StatePredicate::HasMarker(...)` —
+    /// `HasStoredFood`, `ThornbriarAvailable`. Authored once per tick
+    /// from the same world state the IAUS substrate uses, so L2 (DSE
+    /// eligibility) and L3 (planner preconditions) cannot disagree on a
+    /// marker-authored fact during this tick's replans. Replaces the
+    /// 091-era `has_stored_food: bool` mirror.
+    planner_markers: crate::ai::scoring::MarkerSnapshot,
     workshop_bonus: f32,
     season_mod: f32,
     builders_per_site: HashMap<Entity, usize>,
@@ -1895,6 +1935,40 @@ pub fn resolve_goap_plans(
         .filter(|(_, kind, _, _, _)| *kind == StructureType::Stores)
         .map(|(e, _, p, _, _)| (*e, *p))
         .collect();
+
+    // Ticket 091: source the planner's `HasStoredFood` from `StoredItems`
+    // directly (not the `FoodStores` resource cache, which `sync_food_stores`
+    // refreshes once per tick and can lag a step behind a withdraw within
+    // the same tick). Mirrors the IAUS-substrate authoring at goap.rs:919.
+    let has_stored_food = stores_entities.iter().any(|(e, _)| {
+        stores_query.get(*e).is_ok_and(|stored| {
+            stored
+                .items
+                .iter()
+                .copied()
+                .any(|ie| items_query.get(ie).is_ok_and(|it| it.kind.is_food()))
+        })
+    });
+
+    // Ticket 092: build the per-tick planner-facing `MarkerSnapshot`
+    // alongside `has_stored_food`. Carries the colony-scoped markers the
+    // planner gates on via `HasMarker(...)`. `evaluate_and_plan` builds
+    // its own snapshot from the full `world_state` query set; this
+    // replan-side snapshot covers the subset the planner actually
+    // consults at replan time (HasStoredFood, ThornbriarAvailable).
+    let planner_markers = {
+        let mut m = crate::ai::scoring::MarkerSnapshot::new();
+        if has_stored_food {
+            m.set_colony(markers::HasStoredFood::KEY, true);
+        }
+        let thornbriar_available = crate::systems::magic::is_thornbriar_available(
+            magic_params.herb_query.iter().map(|(_, h, _)| h),
+        );
+        if thornbriar_available {
+            m.set_colony(markers::ThornbriarAvailable::KEY, true);
+        }
+        m
+    };
 
     // Only completed kitchens count — a construction site can't be cooked at.
     let kitchen_entities: Vec<(Entity, Position)> = building_snapshot
@@ -2000,6 +2074,7 @@ pub fn resolve_goap_plans(
         farm_positions,
         herb_positions,
         material_pile_positions,
+        planner_markers,
         workshop_bonus: if building_snapshot
             .iter()
             .any(|(_, kind, _, _, _)| *kind == StructureType::Workshop)
@@ -2241,9 +2316,15 @@ pub fn resolve_goap_plans(
                 );
                 let actions =
                     actions_for_disposition(plan.kind, plan.crafting_hint, &zone_distances);
-                let goal = goal_for_disposition(plan.kind, plan.trips_done);
+                let plan_ctx = crate::ai::planner::PlanContext {
+                    markers: &snaps.planner_markers,
+                    entity: cat_entity,
+                };
+                let goal = goal_for_disposition(plan.kind, plan.trips_done, &plan_ctx);
 
-                if let Some(new_steps) = make_plan(planner_state, &actions, &goal, 12, 1000) {
+                if let Some(new_steps) =
+                    make_plan(planner_state, &actions, &goal, 12, 1000, &plan_ctx)
+                {
                     plan.replan(new_steps);
                 } else {
                     // Can't plan next trip — complete anyway.
@@ -2529,9 +2610,15 @@ pub fn resolve_goap_plans(
                 let mut actions =
                     actions_for_disposition(plan.kind, plan.crafting_hint, &zone_distances);
                 actions.retain(|a| !plan.failed_actions.contains(&a.kind));
-                let goal = goal_for_disposition(plan.kind, plan.trips_done);
+                let plan_ctx = crate::ai::planner::PlanContext {
+                    markers: &snaps.planner_markers,
+                    entity: cat_entity,
+                };
+                let goal = goal_for_disposition(plan.kind, plan.trips_done, &plan_ctx);
 
-                if let Some(new_steps) = make_plan(planner_state, &actions, &goal, 12, 1000) {
+                if let Some(new_steps) =
+                    make_plan(planner_state, &actions, &goal, 12, 1000, &plan_ctx)
+                {
                     if plan.replan(new_steps) {
                         if let Some(ref mut log) = ec.event_log {
                             log.push(
@@ -5562,6 +5649,13 @@ fn build_planner_state(
         Carrying::Nothing
     };
 
+    // `herb_positions` is still consumed above by `classify_zone` for
+    // `PlannerZone::HerbPatch` mapping. The prior `thornbriar_available`
+    // mirror (consumed by Crafting/SetWard preconditions) was retired in
+    // 092 — that precondition now consults the
+    // `markers::ThornbriarAvailable` colony marker via
+    // `StatePredicate::HasMarker(...)`, which the substrate authors at
+    // `evaluate_and_plan` line 941 (and `resolve_goap_plans` per-tick).
     PlannerState {
         zone,
         carrying,
@@ -5573,9 +5667,6 @@ fn build_planner_state(
         construction_done: false,
         prey_found: false,
         farm_tended: false,
-        thornbriar_available: herb_positions
-            .iter()
-            .any(|(_, _, kind)| *kind == HerbKind::Thornbriar),
         materials_available,
     }
 }

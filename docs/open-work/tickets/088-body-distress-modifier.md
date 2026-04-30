@@ -21,6 +21,18 @@ Reframes 076 (last-resort-promotion-modifier, parked). 076 frames promotion as *
 
 Blocked-by 087 (the perception module that publishes the signal) and the §L2.10 Modifier substrate work which is in flight under ticket 014 / 060 epic.
 
+## Substrate-over-override pattern
+
+Part of the substrate-over-override thread (see [093](093-substrate-over-override-epic.md)). **This ticket is the substrate prerequisite for [047](047-critical-health-interrupt-treadmill.md)** — without it, 047's interrupt-retirement is unsafe.
+
+**Hack shape**: this ticket *is* the substrate fix — there is no override to retire here. It's the next layer of the 087 perception substrate, providing a Modifier that lifts the self-care DSE class as a unit when body-distress is high.
+
+**IAUS lever**: `BodyDistressPromotion` Modifier in §L2.10's pipeline, reading `body_distress_composite` from 087's interoceptive perception. Lifts Flee/Rest/Sleep/Eat/Hunt/Forage/GroomSelf as a class — exactly the substrate layer that lets 047 retire its `CriticalHealth` interrupt without colony collapse.
+
+**Sequencing**: blocked-by 087 (landed) + 014 (§L2.10 Modifier substrate). **Promote priority — 047 cannot safely retire `CriticalHealth` interrupt branches until 088's axes are in place with sufficient magnitude.** Verify post-landing via `just soak 42` + focal trace on a near-starving cat: body-distress axis should fire with magnitude that would suppress non-self-care DSEs without the interrupt.
+
+**Canonical exemplar**: 087 (CriticalHealth interrupt → `pain_level` + `body_distress_composite` axes, landed at fc4e1ab).
+
 ## Scope
 
 - New `BodyDistressPromotion` Modifier in `src/ai/modifier.rs` (or wherever §L2.10 Modifier substrate lands by then).

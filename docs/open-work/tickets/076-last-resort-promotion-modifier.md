@@ -23,6 +23,18 @@ Lands as a Modifier promoting no-target last-resort actions (RestInPlace, EatInv
 
 Parent: ticket 071. Blocked by 072 (`plan_substrate` API) and 073 (`RecentTargetFailures` sensor).
 
+## Substrate-over-override pattern
+
+Part of the substrate-over-override thread (see [093](093-substrate-over-override-epic.md)). **Re-evaluate this ticket with the substrate-over-override lens before unparking.**
+
+**Hack shape**: this ticket proposes adding a modifier that promotes no-target last-resort actions (RestInPlace, EatInventoryUnconditional) when recovery actions fail N times. The original framing is sound (post-failure escalation), but the lens raises a question: is `LastResortPromotion` the right *shape* of substrate fix, or a wrong-shape hack of its own?
+
+**IAUS lever — alternative framing**: what 076 wants might be **fallback DSEs that are always eligible at low score** (so they win when nothing else can plan), not a special-case modifier that lifts them only post-failure. The existing modifier framing reads as "compensate for the recovery DSEs failing"; the alternative reads as "give cats a substrate-native ground state when all other DSEs fail eligibility." [088](088-body-distress-modifier.md) (Body-distress Modifier) is *proactive* (lifts on distress) and is a clearer substrate primitive; 076's *reactive* (lifts on failure-count) framing is more override-shaped.
+
+**Sequencing**: parked pending 027b reactivation soak (ticket 082). If 082 shows recovery-loop pathology, reconsider — but reframe with the lens first. Possibly close-and-replace with a "fallback DSE substrate" ticket. 088 is the substrate twin and is the cleaner primitive.
+
+**Canonical exemplar**: 087 (CriticalHealth interrupt → `pain_level` + `body_distress_composite` axes, landed at fc4e1ab).
+
 ## Scope
 
 - New step resolver `src/steps/disposition/rest_in_place.rs` — no-target Sleep that consumes the cat's current tile, ignoring quality / shelter preferences. Follows the §5 step-resolver contract (5 rustdoc headings, `record_if_witnessed` shape).

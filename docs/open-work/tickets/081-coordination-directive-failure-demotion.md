@@ -21,6 +21,18 @@ The per-cat 073 cooldown handles the cat side (the cat won't re-target the same 
 
 Parent: ticket 071. Blocked by 072 (`plan_substrate::lifecycle::record_step_failure`) and 073 (`RecentTargetFailures` aggregate readable as a sensor).
 
+## Substrate-over-override pattern
+
+Part of the substrate-over-override thread (see [093](093-substrate-over-override-epic.md)).
+
+**Hack shape**: coordinator re-issues the same directive every tick even after repeated cross-cat failures (Build → fail → reassign → Build → fail). No colony-side memory of cross-cat failure means the coordinator perpetually mis-assigns labor. Currently *no* override exists in code — but adding one (this ticket's demotion logic) without substrate framing would just be a coordinator-side hack patched on top of a substrate-side bug.
+
+**IAUS lever**: this ticket *is* the substrate-side fix. `DirectiveFailureLedger` is **colony-level failure memory as a first-class IAUS axis**, expressed as a Modifier in §3.5.1's pipeline that demotes via `RecentTargetFailures` aggregate. No out-of-band override; the coordinator's score economy reads the ledger like any other consideration.
+
+**Sequencing**: blocked-by 072 (`plan_substrate::lifecycle::record_step_failure`) and 073 (`RecentTargetFailures` aggregate readable as a sensor). Cleanest unpark when the colony-side directive-loop pattern is observed in soak after the rest of [071](071-planning-substrate-hardening.md) lands.
+
+**Canonical exemplar**: 087 (CriticalHealth interrupt → `pain_level` + `body_distress_composite` axes, landed at fc4e1ab).
+
 ## Scope
 
 - Read aggregate `RecentTargetFailures` per directive in `coordination::accumulate_build_pressure` (`src/systems/coordination.rs:788–862`) and the dispatch site at `dispatch_urgent_directives` (line ~862). Compute the cross-cat failure count for the directive's action+target pair.

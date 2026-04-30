@@ -32,6 +32,24 @@ Mating-cadence is upstream of generational continuity, mentorship
 transmission to non-founders, KittenMatured firings, and any
 multi-generational balance work.
 
+## Substrate-over-override pattern
+
+Part of the substrate-over-override thread (see [093](093-substrate-over-override-epic.md)). This ticket tracks three mating-cadence bugs that each fit the pattern.
+
+**Hack shape**:
+- **Bug 1** — observability hack: `Feature::CourtshipInteraction` emitted only inside MateWith, masking passive-drift courtship. Continuity canary lies.
+- **Bug 2** — lifted-condition outer gate at `scoring.rs:916` (`if ctx.has_eligible_mate { … }`) bypasses the substrate's marker-based eligibility.
+- **Bug 3** — missing L2 substrate layer (PairingActivity); compensated for via post-IAUS bias-pin at `socialize_target.rs:193`.
+
+**IAUS lever**:
+- Bug 1: emit the feature inside `check_bonds` (substrate-side observability).
+- Bug 2: retire the wrapper, author `HasEligibleMate` marker, gate via `EligibilityFilter::require()`.
+- Bug 3: implement L2 PairingActivity as a parallel persistent commitment layer (see [027b](027b-l2-pairing-activity.md)) — multi-layer choreography expressed natively in the substrate per spec §7.M.
+
+**Sequencing**: Bugs 1 and 2 are landed. Bug 3 is parked under 027b, blocked-by [071](071-planning-substrate-hardening.md) (planning-substrate hardening). The bias-pin at `socialize_target.rs:193` is itself a hack — ticket 078 (under 071) is the substrate-side replacement (a `target_pairing_intention` Consideration that turns the pin into a curve-tunable axis).
+
+**Canonical exemplar**: 087 (CriticalHealth interrupt → `pain_level` + `body_distress_composite` axes, landed at fc4e1ab).
+
 ## Scope
 
 Three sequenced fixes, each with its own commit. Fix order chosen so
