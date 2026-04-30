@@ -3,10 +3,17 @@
 //! Farm must fire ≥ 1× on seed 42 to prove substrate dormancy (not
 //! missing system) was the cause of its 0-fire baseline.
 //!
-//! Per §2.3 + §3.1.1 row 1494: `CompensatedProduct` of 2 axes —
-//! `food_scarcity` via `scarcity()` (Quadratic(exp=2)) and
-//! `diligence` via Linear. Both gate: no scarcity ⇒ no reason to
-//! farm; no diligence ⇒ cat won't bother.
+//! Per §2.3 + §3.1.1 row 1494: `CompensatedProduct` of four axes —
+//! `food_scarcity` via `scarcity()` (Quadratic(exp=2)), `diligence`
+//! via Linear, `farm_garden_distance` spatial, and (ticket 084)
+//! `farm_herb_pressure` via Linear identity over a 0/1 scalar that
+//! mirrors the `ward_strength_low && !thornbriar_available`
+//! condition the coordinator uses to repurpose a FoodCrops garden
+//! into a Thornbriar plot. The herb-pressure axis is the demand
+//! signal that lets a Thornbriar plot draw a farmer when food
+//! stockpiles are full but ward stockpile is empty — without it,
+//! Farm scored to ~0 via `food_scarcity` and the repurposed plot
+//! sat at growth = 0.
 //!
 //! Eligibility: `.require("HasGarden")` per §4 port (Phase 4b.4).
 //! Maslow tier 2.
@@ -25,6 +32,12 @@ use crate::components::markers;
 
 pub const FOOD_SCARCITY_INPUT: &str = "food_scarcity";
 pub const DILIGENCE_INPUT: &str = "diligence";
+/// Ticket 084 — herb/ward demand axis. Scalar is 1.0 when
+/// `ward_strength_low && !thornbriar_available` (the same condition
+/// `coordination.rs::evaluate_coordinators` uses to repurpose a
+/// FoodCrops garden to Thornbriar), 0.0 otherwise. Sourced from
+/// `ctx_scalars` in `scoring.rs`.
+pub const FARM_HERB_PRESSURE_INPUT: &str = "farm_herb_pressure";
 
 /// Manhattan range over which the garden-distance curve is normalized.
 /// Same shape as Cook/Eat: 20 tiles.
@@ -82,8 +95,22 @@ impl FarmDse {
                     FARM_GARDEN_RANGE,
                     garden_distance,
                 )),
+                // Ticket 084 — herb/ward demand axis. Linear identity
+                // over a 0/1 scalar; CP compensation lifts Farm above
+                // zero when this axis fires (1.0) even if
+                // `food_scarcity` is 0 (food stockpile full). Pairs
+                // the DSE's motivation with the coordinator's garden-
+                // repurposing decision so a Thornbriar plot draws a
+                // farmer instead of sitting at growth = 0.
+                Consideration::Scalar(ScalarConsideration::new(
+                    FARM_HERB_PRESSURE_INPUT,
+                    Curve::Linear {
+                        slope: 1.0,
+                        intercept: 0.0,
+                    },
+                )),
             ],
-            composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
+            composition: Composition::compensated_product(vec![1.0, 1.0, 1.0, 1.0]),
             // §4 marker eligibility (Phase 4b.4): Farm only scores if
             // the colony has a functional garden. Retires the inline
             // `if ctx.has_garden` gate at `scoring.rs::score_actions`.
@@ -151,5 +178,27 @@ mod tests {
             FarmDse::new().composition().mode,
             CompositionMode::CompensatedProduct
         );
+    }
+
+    #[test]
+    fn farm_dse_has_herb_pressure_axis() {
+        // Ticket 084 — Farm carries a fourth axis tied to ward/herb
+        // demand so a Thornbriar-repurposed garden draws a farmer
+        // even with food stockpiles full.
+        let dse = FarmDse::new();
+        let inputs: Vec<&str> = dse
+            .considerations()
+            .iter()
+            .filter_map(|c| match c {
+                Consideration::Scalar(s) => Some(s.name),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            inputs.contains(&FARM_HERB_PRESSURE_INPUT),
+            "FarmDse must read `farm_herb_pressure`; found scalar inputs: {inputs:?}"
+        );
+        // Composition must carry one weight per consideration.
+        assert_eq!(dse.composition().weights.len(), dse.considerations().len());
     }
 }

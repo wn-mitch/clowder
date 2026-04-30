@@ -295,37 +295,24 @@ impl Plugin for SimulationPlugin {
                             // marker, so the DSE returns 0.0 for cats
                             // whose gate is closed.
                             crate::ai::mating::update_mate_eligibility_markers,
-                            // §7.M L2 PairingActivity (ticket 027b /
-                            // 082) — **activation deferred (round 2)**.
-                            // Sub-epic 071's substrate hardening (Wave
-                            // 1: 072 refactor + Wave 2: 073/074/075/
-                            // 078/079/080) successfully prevents the
-                            // ORIGINATING starvation cascade (seed-42
-                            // soak with this line uncommented produces
-                            // Starvation = 0, vs Starvation = 3 in
-                            // 027b-active-failed). However, registering
-                            // `author_pairing_intentions` here STILL
-                            // perturbs Bevy 0.18's topological sort
-                            // enough to collapse the Farming disposition
-                            // entirely — Farming plans drop from 448
-                            // (post-072) to 0 (post-082), and the
-                            // CropTended (5070→0) and CropHarvested
-                            // (176→0) features stop firing. The
-                            // substrate hardening absorbed the starvation
-                            // pathway but not the scheduler-shift effect
-                            // on farming. Activation requires a follow-on
-                            // ticket investigating either (a) the
-                            // ordering of `author_pairing_intentions`
-                            // within chain 2a's marker batch, or (b)
-                            // explicit `.before/.after` constraints
-                            // pinning Farming-relevant systems away
-                            // from the Pairing system. To activate:
-                            // re-add the line below and follow up with
-                            // the four-artifact balance methodology
-                            // against a multi-seed sweep.
-                            //
-                            //     crate::ai::pairing::author_pairing_intentions,
-                            //
+                            // §7.M L2 PairingActivity author (tickets
+                            // 027b / 082 / 083). Activated post-Wave-2
+                            // substrate hardening: starvation cascade
+                            // gone (Starvation = 0 on seed-42 soak).
+                            // The earlier "Bevy topological-sort
+                            // reshuffle" framing was wrong — chain 2a
+                            // is `.chain()`-wrapped, source order is
+                            // enforced. Adding the system shifts the
+                            // food economy slightly (pair-socializing
+                            // bias lifts cooperation, more efficient
+                            // hunts) which raises median food_fraction
+                            // and correctly silences Farm via its
+                            // CompensatedProduct gate. Farm dormancy
+                            // under abundant food is intended; ticket
+                            // 084 tracks tying Farm to herb/ward
+                            // demand so gardens stay productive when
+                            // food is full but Thornbriar is short.
+                            crate::ai::pairing::author_pairing_intentions,
                             // §4 batch 2: capability markers — reads
                             // life-stage, injury, inventory markers
                             // authored above.

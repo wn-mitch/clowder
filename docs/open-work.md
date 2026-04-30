@@ -8,7 +8,7 @@
 > fresh. See `CLAUDE.md` §"Long-horizon coordination" for the request-time
 > checklist and maintenance rules.
 
-_Last generated: 2026-04-29._
+_Last generated: 2026-04-30._
 
 ## Summary
 
@@ -64,7 +64,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[062](docs/open-work/tickets/062-prey-species-split-maps.md)** — Prey-species split — per-species scent maps (§5.6.3 row #5) — _added 2026-04-27_
 - **[063](docs/open-work/tickets/063-ward-strength-promotion.md)** — Ward-strength promotion — first-class spatial axis (§5.6.3 row #3) — _added 2026-04-27_
 - **[064](docs/open-work/tickets/064-carcass-scent-consumer-cutover.md)** — Carcass-scent consumer cutover — replace observer_smells_at (§5.6.3 row #6) — _added 2026-04-27_
-- **[083](docs/open-work/tickets/083-l2-pairing-farming-scheduler-regression.md)** — L2 PairingActivity activation collapses Farming via Bevy 0.18 schedule shift — _[planning-substrate] · added 2026-04-29_
+- **[086](docs/open-work/tickets/086-farm-canary-triggering-scenario.md)** — Find a triggering scenario for Farm DSE canary (CropTended / CropHarvested) — _[balance] · added 2026-04-30_
 
 ## Parked (5)
 
@@ -72,7 +72,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[059](docs/open-work/tickets/059-phase-7-substrate-cleanup.md)** — Phase 7 substrate cleanup — `ScoringContext` removal, §10 unblock map sweep, spec drift reconcile — _parked 2026-04-27 · added 2026-04-27_
 - **[076](docs/open-work/tickets/076-last-resort-promotion-modifier.md)** — LastResortPromotion Modifier + no-target step resolvers (spiral-of-failure escalation) — _[planning-substrate] · parked 2026-04-29 · added 2026-04-29_
 - **[081](docs/open-work/tickets/081-coordination-directive-failure-demotion.md)** — Coordination directive-failure demotion (colony-side stuck-loop guard) — _[planning-substrate] · parked 2026-04-29 · added 2026-04-29_
-- **[082](docs/open-work/tickets/082-027b-reactivation.md)** — 027b L2 PairingActivity reactivation on the hardened substrate — _[planning-substrate] · parked 2026-04-29 · blocked-by 083 · added 2026-04-29_
+- **[084](docs/open-work/tickets/084-farm-herb-ward-demand-axis.md)** — Farm DSE — tie scoring to herb/ward stockpile demand so gardens stay productive under abundant food — _[balance] · parked 2026-04-30 · blocked-by 086 · added 2026-04-29_
 
 ## Blocked (10)
 
@@ -100,7 +100,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/). Recent months:
 
-- [2026-04](docs/open-work/landed/2026-04.md) — 65 entries
+- [2026-04](docs/open-work/landed/2026-04.md) — 68 entries
 
 ## Conventions
 

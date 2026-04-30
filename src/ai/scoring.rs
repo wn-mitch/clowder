@@ -479,6 +479,29 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
         "ward_deficit",
         if ctx.ward_strength_low { 1.0 } else { 0.0 },
     );
+    // Ticket 084 — Farm DSE herb-pressure axis. Mirrors the exact
+    // condition `coordination.rs::evaluate_coordinators` uses to
+    // repurpose a FoodCrops garden into a Thornbriar plot
+    // (`ward_strength_low && !thornbriar_available`). When the
+    // coordinator decides "the colony needs thornbriar," this scalar
+    // signals the same demand to FarmDse, so a cat actually tends the
+    // repurposed plot even with food stockpiles full. Colony-scoped
+    // marker is authored before scoring at `goap.rs:941`; the
+    // `markers.has` lookup ignores the entity parameter for
+    // colony-scoped keys.
+    m.insert(
+        "farm_herb_pressure",
+        if ctx.ward_strength_low
+            && !inputs.markers.has(
+                crate::components::markers::ThornbriarAvailable::KEY,
+                inputs.cat,
+            )
+        {
+            1.0
+        } else {
+            0.0
+        },
+    );
     m.insert(
         "territory_max_corruption",
         ctx.territory_max_corruption.clamp(0.0, 1.0),

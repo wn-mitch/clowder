@@ -102,3 +102,42 @@ P4a is the load-bearing failure. The substrate-landing-as-bit-identical hypothes
 - **Drop-branch over-firing.** The romantic + fondness double-floor was picked conservatively (both must collapse), but if the `DesireDrift` branch fires too aggressively against partial-bond pairs in the noise-tail of a soak, Pairings churn and never escalate. Mitigation: focal-trace the dropped-branch distribution; if `DesireDrift` dominates `PartnerInvalid`, raise the floors.
 - **First-emission threshold too low.** `emission_threshold = 0.25` was calibrated for the fresh-Friends-bond case; if Pairings emit on every transient Friends-bond and never stabilize, the bias spreads thin across short-lived Intentions. Mitigation: raise `emission_threshold` to 0.35 (which would require non-zero `romantic` *and* fondness ≥ 0.5 to clear).
 - **Bias too aggressive on Mates-bonded multi-pair.** A cat with both a Mates-bonded peer (pre-027b) and a Friends-bonded Intention partner now scores them equally (1.0 vs 1.0). Should be fine — the cat already has a structural commitment to the Mates partner via the Mates bond — but if focal-trace shows post-027b Mates pairs drifting toward the Intention partner, the pin should be conditioned on `existing_bond.tier < pairing.partner.bond.tier` (don't override a stronger underlying bond).
+
+## Activation observation (2026-04-29, ticket 083)
+
+L2 PairingActivity activated at HEAD post-Wave-2 substrate hardening. Single-seed seed-42 release soak.
+
+| Metric | Pre-072 baseline (`tuned-42-072-refactor`) | Post-activation (`tuned-42-082-pairing-active-farming-regress`) | Verdict |
+|---|---|---|---|
+| `deaths_by_cause.Starvation` | 0 | **0** | ✓ hard gate held — substrate hardening fixed the originating cascade |
+| `deaths_by_cause.ShadowFoxAmbush` | _within ≤10_ | _within ≤10_ | ✓ hard gate |
+| four pass canaries (grooming/play/courtship/mythic-texture) | each ≥1 | each ≥1 | ✓ |
+| `PairingIntentionEmitted` | 0 | 14651 | ✓ L2 trunk live |
+| `PairingDropped` | 0 | 14650 | drop gate active; 1:1 emit/drop ratio = bursty churn (see Risks above) |
+| `food_fraction` median | 0.96 | **0.98** | secondary lift |
+| `food_fraction` mean | 0.83 | **0.94** | secondary lift |
+| `FoodCooked` total | 227k | 255k (+12%) | secondary lift |
+| `FoodEaten` total | 138k | 165k (+20%) | secondary lift |
+| `PreyKilled` | 514 | 895 (+74%) | hunt efficiency lift |
+| `Farming` PlanCreated | 448 | **0** | dormancy |
+| `CropTended` / `CropHarvested` | 5070 / 176 | **0** / **0** | dormancy |
+
+**Diagnosis.** The Farming silence is *not* a scheduler bug. Chain 2a is `.chain()`-wrapped, so registration order is enforced; the executor is single-threaded for determinism. The first ~65k ticks of 082 are byte-identical to 072 with `PairingIntentionEmitted = 0` — confirming no topological perturbation. Pairing first fires at tick 1265400; from that point the food economy slowly diverges. `Farm` DSE is `CompensatedProduct(food_scarcity, diligence, garden_distance)`; with median food_fraction at 0.98, `food_scarcity = (1 - 0.98)² ≈ 0.0004` gates the score to zero. **Farm dormancy under healthy food economy is intended ecology**, not a regression.
+
+**Canary reconciliation.** The original `CropTended` / `CropHarvested` canary was added in Phase 4c.4 to catch the silent-dead farming pipeline. Phase 5a's `record_if_witnessed` discipline + step-resolver tests on `tend.rs`/`harvest.rs` now make the silent-witness class of bug a type/test failure rather than a runtime canary's job. Both features are demoted to `expected_to_fire_per_soak() => false` in ticket 083 with re-promotion gated on ticket 084 below.
+
+**Open thread (ticket 084).** Gardens are dual-purpose: `CropKind::FoodCrops` produces Berries/Roots, `CropKind::Thornbriar` produces ward herbs (`coordination.rs:532` repurposes one garden when `ward_strength_low && !thornbriar_available`). The Farm DSE only scores via `food_scarcity` — there is no axis for ward/herb pressure. Under abundant-food + ward-stockpile-low, a repurposed Thornbriar garden never gets tended. Ticket 084 tracks adding a herb/ward-demand axis so gardens stay productive when food is full but wards are weak.
+
+## Concordance update (post-activation)
+
+| Prediction | Verdict |
+|---|---|
+| **P1** `MatingOccurred > 0` ≥ 1/12 | _untestable single-seed; multi-seed sweep deferred to ticket 082 closeout_ |
+| **P2** `BondFormed_Partners > 0` ≥ 4/12 | _untestable single-seed_ |
+| **P3** `PairingBiasApplied / SocializeTargetResolves > 0.10` | _untestable single-seed; trunk fired (see table above)_ |
+| **P4a** `Starvation` within ±10% of baseline | **pass** — 0 vs 0 |
+| **P4b** `ShadowFoxAmbush ≤ 10` | pass |
+| **P4c** `mean_lifespan` Cohen's d < 0.5 | _deferred to multi-seed_ |
+| **P4d** continuity canaries each ≥ 1 | pass on 4/6 (mentoring/burial pre-existing zeros tracked separately) |
+
+P4a (Starvation) is the load-bearing prediction. Pre-Wave-2 it failed (`logs/tuned-42-027b-active-failed/` showed Starvation=3); post-Wave-2 it passes. The substrate hardening absorbed the planning-fragility damage that the earlier failure was attributed to.

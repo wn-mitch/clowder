@@ -779,6 +779,21 @@ pub fn expire_directives(
 // accumulate_build_pressure
 // ---------------------------------------------------------------------------
 
+/// Whether `pressure.farming` should accumulate this tick.
+///
+/// Gardens are multiuse — they grow food crops *and* thornbriar (for wards).
+/// The gate fires when the colony lacks a garden AND at least one demand axis
+/// wants one: low food stockpile *or* weak wards with no thornbriar supply.
+/// Once a garden exists, this returns `false` and the post-construction
+/// repurposing path (`assess_colony_needs:530`) handles food↔herb specialization.
+pub(crate) fn should_accumulate_farming_pressure(
+    has_garden: bool,
+    food_demand: bool,
+    herb_demand: bool,
+) -> bool {
+    !has_garden && (food_demand || herb_demand)
+}
+
 /// Evaluate colony infrastructure gaps and accumulate build pressure on each
 /// coordinator. When pressure exceeds the coordinator's action threshold
 /// (derived from attentiveness), issue a Build directive for new construction.
@@ -811,6 +826,12 @@ pub fn accumulate_build_pressure(
         &crate::components::items::Item,
         bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
     >,
+    wards: Query<&crate::components::magic::Ward>,
+    herbs: Query<
+        &crate::components::magic::Herb,
+        With<crate::components::magic::Harvestable>,
+    >,
+    cat_inventories: Query<&crate::components::magic::Inventory, Without<Dead>>,
     mut unmet_demand: ResMut<crate::resources::UnmetDemand>,
     mut log: ResMut<NarrativeLog>,
     constants: Res<SimConstants>,
@@ -846,6 +867,26 @@ pub fn accumulate_build_pressure(
     let has_workshop = has_structure(StructureType::Workshop);
     let has_watchtower = has_structure(StructureType::Watchtower);
     let has_kitchen = has_structure(StructureType::Kitchen);
+
+    // Garden demand splits into two axes — gardens are multiuse:
+    //   • food-side  — colony's stockpile is running low.
+    //   • herb-side  — wards are weak AND the colony has no thornbriar
+    //                  in any reachable form (no wild patches AND no cat
+    //                  carrying any). Stockpile-aware (vs. world-only)
+    //                  so the build commitment is not coupled to wild
+    //                  patch respawn flicker. Mirrors
+    //                  `assess_colony_needs:530` repurposing logic but
+    //                  applies a stricter supply check, since building
+    //                  is irreversible while repurposing is cheap.
+    let ward_strength_low = crate::systems::magic::is_ward_strength_low(
+        wards.iter(),
+        cc.ward_avg_strength_low_threshold,
+    );
+    let wild_thornbriar_available =
+        crate::systems::magic::is_thornbriar_available(herbs.iter());
+    let any_cat_carrying_thornbriar = cat_inventories
+        .iter()
+        .any(|inv| inv.has_herb(crate::components::magic::HerbKind::Thornbriar));
     let has_hearth = has_structure(StructureType::Hearth);
     // ConstructionSite entities only exist while the build is incomplete —
     // they're despawned on completion. So any non-empty iter means there's
@@ -980,8 +1021,13 @@ pub fn accumulate_build_pressure(
             }
         }
 
-        // Farming pressure.
-        if !has_garden && food_fraction < cc.build_pressure_farming_food_threshold {
+        // Farming pressure — gardens are multiuse (food crops + thornbriar
+        // for wards), so accumulate when *either* demand axis fires. See
+        // `should_accumulate_farming_pressure` for the truth-table contract.
+        let food_demand = food_fraction < cc.build_pressure_farming_food_threshold;
+        let herb_demand =
+            ward_strength_low && !wild_thornbriar_available && !any_cat_carrying_thornbriar;
+        if should_accumulate_farming_pressure(has_garden, food_demand, herb_demand) {
             pressure.farming += rate;
         } else {
             pressure.farming *= BuildPressure::DECAY;
@@ -2039,6 +2085,27 @@ mod tests {
             Some(StructureType::Den),
             "shelter (0.9) is highest above threshold"
         );
+    }
+
+    #[test]
+    fn farming_gate_truth_table() {
+        use super::should_accumulate_farming_pressure as gate;
+
+        // No garden + at least one demand axis → accumulate.
+        assert!(gate(false, true, false), "food demand alone fires the gate");
+        assert!(gate(false, false, true), "herb demand alone fires the gate");
+        assert!(gate(false, true, true), "both demands also fire");
+
+        // No garden + no demand → don't accumulate.
+        assert!(!gate(false, false, false), "no demand → no pressure");
+
+        // Garden already exists → never accumulate, regardless of demand.
+        // (Repurposing logic at assess_colony_needs:530 handles food↔herb
+        // specialization on the existing garden.)
+        assert!(!gate(true, true, true), "has_garden short-circuits");
+        assert!(!gate(true, true, false), "has_garden short-circuits");
+        assert!(!gate(true, false, true), "has_garden short-circuits");
+        assert!(!gate(true, false, false), "has_garden short-circuits");
     }
 
     fn default_personality() -> Personality {

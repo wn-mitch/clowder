@@ -228,10 +228,10 @@ pub enum Feature {
     /// a cat with a Friends-or-better orientation-compatible peer in
     /// range. Positive — every PairingIntentionEmitted is a step
     /// toward closing the structural Friends → Partners gap that
-    /// stalled mating cadence in the seed-42 baseline. Stays
-    /// `expected_to_fire_per_soak() => false` in Commit A because no
-    /// reader yet uses the Intention; Commit B promotes when the bias
-    /// readers ship.
+    /// stalled mating cadence in the seed-42 baseline. Promoted to
+    /// `expected_to_fire_per_soak() => true` in ticket 083 when the
+    /// L2 schedule edge activated; the canary now validates the
+    /// Pairing trunk fires on a healthy soak.
     PairingIntentionEmitted,
     /// Ticket 027b §7.M — the L2 drop gate fired on a held Intention
     /// (partner died/banished/incapacitated, bond lost, life-stage
@@ -245,9 +245,13 @@ pub enum Feature {
     /// Intention partner *and* would not have picked them without the
     /// Intention's hard-1.0 pin (pre-pin bond_score < 1.0). Isolates
     /// "L2 actually changed target selection" from "Pairing was held
-    /// but the cat would've picked them anyway". Wired in Commit B;
-    /// activation stays unfired (and `expected_to_fire_per_soak() =>
-    /// false`) until then.
+    /// but the cat would've picked them anyway". Stays
+    /// `expected_to_fire_per_soak() => false` because the observability
+    /// gate (picked target == Intention partner ∧ natural bond_score <
+    /// 1.0) is the load-bearing P3 prediction — the balance doc marks
+    /// it explicitly "untestable single-seed", validated only by the
+    /// multi-seed sweep tracked in ticket 082's closeout. Promote when
+    /// that sweep clears.
     PairingBiasApplied,
     /// Ticket 080 — `evaluate_target_taking` gated a candidate to 0.0
     /// because its `Reserved.owner` named a cat other than the scoring
@@ -620,19 +624,31 @@ impl Feature {
             Feature::KittenBorn => false,
             Feature::KittenFed => false,
             Feature::ItemRetrieved => false,
-            // Ticket 027b §7.M L2 PairingActivity — **activation
-            // deferred**. The author system at
-            // Ticket 027b / 082 — L2 PairingActivity activation
-            // deferred (round 2): sub-epic 071's substrate hardening
-            // prevents the starvation cascade but not the Bevy 0.18
-            // topological-sort collapse on Farming. Both Pairing
-            // Positive features therefore remain unable to fire on
-            // main; exempt from the never-fired canary until
-            // activation lands via a follow-on ticket. When the
-            // schedule edge is uncommented, remove these two
-            // false-arms so the canary can validate them.
-            Feature::PairingIntentionEmitted => false,
+            // Ticket 083 — L2 PairingActivity activated; the trunk
+            // `PairingIntentionEmitted` falls through to `_ => true`
+            // and is canary-validated. `PairingBiasApplied` stays
+            // exempt: its observability gate (picked target ==
+            // Intention partner ∧ natural bond_score < 1.0) is
+            // P3-load-bearing and explicitly "untestable single-seed"
+            // per `docs/balance/027-l2-pairing-activity.md`. Promote
+            // when ticket 082's multi-seed sweep clears it.
             Feature::PairingBiasApplied => false,
+            // Ticket 083 — Farm-dormancy reconciliation. Wave 2
+            // substrate hardening + L2 PairingActivity raise the
+            // food economy (more efficient hunts and cooking, higher
+            // median food_fraction) enough that Farm DSE's
+            // CompensatedProduct(food_scarcity, diligence,
+            // garden_distance) correctly gates dormant on healthy
+            // soaks. The original "silent-dead farming pipeline"
+            // class of bug — Farm firing but `tend`/`harvest` no-ops
+            // — is now a type/test failure under Phase 5a's
+            // `record_if_witnessed` discipline + step-resolver tests
+            // on `tend.rs`/`harvest.rs`, not a runtime canary's job.
+            // Promote back to `true` when ticket 084 ties Farm to
+            // herb/ward stockpile demand so gardens stay productive
+            // when food is full but Thornbriar is short.
+            Feature::CropTended => false,
+            Feature::CropHarvested => false,
             // Ticket 080 — `ReservationContended` is exempt until the
             // producer side (`record_target_picked` writes) ships.
             Feature::ReservationContended => false,
@@ -1085,13 +1101,16 @@ mod tests {
         // Representative check: trunk Features (each one independent)
         // show up when the tracker is empty.
         assert!(missing.contains(&"MatingOccurred"));
-        assert!(missing.contains(&"CropTended"));
         assert!(missing.contains(&"FoodEaten"));
         assert!(missing.contains(&"Socialized"));
         assert!(missing.contains(&"MentoredCat"));
         // Rare-legend features are excluded.
         assert!(!missing.contains(&"ShadowFoxBanished"));
         assert!(!missing.contains(&"FateAwakened"));
+        // Ticket 083 — Farm-dormancy reconciliation. Crop features
+        // are demoted; they no longer flag the canary.
+        assert!(!missing.contains(&"CropTended"));
+        assert!(!missing.contains(&"CropHarvested"));
         // Cascade-exempt features are excluded — they cascade from
         // their trunk and don't add independent canary signal.
         assert!(!missing.contains(&"KittenFed"));
@@ -1105,17 +1124,16 @@ mod tests {
         let mut sa = SystemActivation::default();
         let before = sa.never_fired_expected_positives();
         sa.record(Feature::FoodEaten);
-        sa.record(Feature::CropTended);
+        sa.record(Feature::Socialized);
         let after = sa.never_fired_expected_positives();
         assert_eq!(after.len(), before.len() - 2);
         assert!(!after.contains(&"FoodEaten"));
-        assert!(!after.contains(&"CropTended"));
+        assert!(!after.contains(&"Socialized"));
     }
 
     #[test]
     fn expected_to_fire_per_soak_classification() {
         // Core-subsystem trunks must be expected.
-        assert!(Feature::CropTended.expected_to_fire_per_soak());
         assert!(Feature::FoodEaten.expected_to_fire_per_soak());
         assert!(Feature::Socialized.expected_to_fire_per_soak());
         assert!(Feature::MentoredCat.expected_to_fire_per_soak());
@@ -1126,6 +1144,12 @@ mod tests {
         assert!(Feature::GroomedOther.expected_to_fire_per_soak());
         // Promoted by ticket 027 Bug 1 (courtship-drift emits per-tick).
         assert!(Feature::CourtshipInteraction.expected_to_fire_per_soak());
+        // Ticket 083 — L2 PairingActivity activated; the trunk emit
+        // is canary-validated. `PairingBiasApplied` stays exempt
+        // until ticket 082's multi-seed sweep validates the P3
+        // bias-readout prediction.
+        assert!(Feature::PairingIntentionEmitted.expected_to_fire_per_soak());
+        assert!(!Feature::PairingBiasApplied.expected_to_fire_per_soak());
         // Rare-legend events must be exempted.
         assert!(!Feature::ShadowFoxBanished.expected_to_fire_per_soak());
         assert!(!Feature::FateAwakened.expected_to_fire_per_soak());
@@ -1137,5 +1161,11 @@ mod tests {
         assert!(!Feature::KittenBorn.expected_to_fire_per_soak());
         assert!(!Feature::KittenFed.expected_to_fire_per_soak());
         assert!(!Feature::ItemRetrieved.expected_to_fire_per_soak());
+        // Ticket 083 — Farm-dormancy reconciliation. Demoted: the
+        // food-economy lift correctly silences Farm via its
+        // CompensatedProduct gate. Re-promote when ticket 084 ties
+        // Farm to herb/ward demand.
+        assert!(!Feature::CropTended.expected_to_fire_per_soak());
+        assert!(!Feature::CropHarvested.expected_to_fire_per_soak());
     }
 }
