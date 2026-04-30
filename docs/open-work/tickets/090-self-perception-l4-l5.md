@@ -1,11 +1,11 @@
 ---
 id: 090
 title: L4/L5 self-perception — mastery-confidence, purpose-clarity, esteem-distress
-status: blocked
+status: ready
 cluster: ai-substrate
 added: 2026-04-30
 parked: null
-blocked-by: [087]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []

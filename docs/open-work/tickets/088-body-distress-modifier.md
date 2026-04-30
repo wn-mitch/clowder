@@ -1,11 +1,11 @@
 ---
 id: 088
 title: Body-distress Modifier — uniform self-care promotion under §L2.10 Modifier substrate
-status: blocked
+status: ready
 cluster: ai-substrate
 added: 2026-04-30
 parked: null
-blocked-by: [087]
+blocked-by: [014]
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
