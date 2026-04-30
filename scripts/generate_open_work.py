@@ -154,7 +154,7 @@ def load_tickets(tickets_dir: Path) -> list[Ticket]:
     if not tickets_dir.exists():
         return tickets
     for p in sorted(tickets_dir.glob("*.md")):
-        if p.name.startswith("_"):
+        if p.name.startswith("_") or p.name.lower() == "readme.md":
             continue
         text = p.read_text(encoding="utf-8")
         fm = parse_frontmatter(text)
@@ -302,35 +302,40 @@ def render_index(
             lines.append(f"- **[{t.id}]({rel})** — {t.title}")
         lines.append("")
 
-    # Landed archive — link to month files, most recent first
+    # Landed archive — per-ticket files grouped by year-month (most recent first)
     if landed_dir.exists():
-        month_files = sorted(
-            [p for p in landed_dir.glob("*.md") if p.name != "README.md"],
-            reverse=True,
-        )
-        if month_files:
-            lines.append("## Landed archive")
+        landed_tickets = load_tickets(landed_dir)
+        if landed_tickets:
+            by_month: dict[str, list[Ticket]] = {}
+            for lt in landed_tickets:
+                month = "unknown"
+                landed_on = lt.frontmatter.get("landed-on")
+                if isinstance(landed_on, str) and len(landed_on) >= 7:
+                    month = landed_on[:7]
+                by_month.setdefault(month, []).append(lt)
+
+            lines.append(f"## Landed archive ({len(landed_tickets)})")
             lines.append("")
             lines.append(
-                "Full history: [`docs/open-work/landed/`]("
-                + str(landed_dir.relative_to(repo_root))
-                + "/). Recent months:"
+                f"Full history: [`docs/open-work/landed/`]("
+                f"{landed_dir.relative_to(repo_root)}/)."
             )
             lines.append("")
-            for mf in month_files[:6]:
-                # Count entries in month file (H2 sections)
-                try:
-                    text = mf.read_text(encoding="utf-8")
-                    n = sum(
-                        1
-                        for line in text.splitlines()
-                        if line.startswith("## ") and not line.startswith("## Landed")
+            for month in sorted(by_month.keys(), reverse=True):
+                bucket = sorted(
+                    by_month[month],
+                    key=lambda x: (x.frontmatter.get("landed-on") or "", x.id),
+                    reverse=True,
+                )
+                lines.append(f"### {month} ({len(bucket)})")
+                lines.append("")
+                for lt in bucket:
+                    rel = lt.path.relative_to(repo_root)
+                    landed_on = lt.frontmatter.get("landed-on") or "?"
+                    lines.append(
+                        f"- **[{lt.id}]({rel})** — {lt.title} _({landed_on})_"
                     )
-                    rel = mf.relative_to(repo_root)
-                    lines.append(f"- [{mf.stem}]({rel}) — {n} entries")
-                except OSError:
-                    continue
-            lines.append("")
+                lines.append("")
 
     # Conventions footer
     lines.append("## Conventions")
@@ -401,8 +406,8 @@ def main() -> int:
     print(f"  tickets:       {len(tickets)}")
     print(f"  pre-existing:  {len(pre_existing)}")
     if landed_dir.exists():
-        months = [p for p in landed_dir.glob("*.md") if p.name != "README.md"]
-        print(f"  landed months: {len(months)}")
+        landed = load_tickets(landed_dir)
+        print(f"  landed:        {len(landed)}")
     return 0
 
 

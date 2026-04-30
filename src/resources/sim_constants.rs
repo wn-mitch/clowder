@@ -1267,6 +1267,23 @@ pub struct ScoringConstants {
     pub fox_scent_suppression_threshold: f32,
     /// Scale for how much fox scent suppresses risky action scores.
     pub fox_scent_suppression_scale: f32,
+    /// `food_fraction` floor below which `StockpileSatiation` does not
+    /// suppress food-acquisition DSEs. Above this, the modifier
+    /// multiplicatively damps Hunt and Forage so the IAUS contest tilts
+    /// toward Eat at the existing stockpile. The desperation-hunting
+    /// case (`food_fraction = 0`) is preserved by construction. See
+    /// `src/ai/modifier.rs::StockpileSatiation` and ticket 094.
+    #[serde(default = "default_stockpile_satiation_threshold")]
+    pub stockpile_satiation_threshold: f32,
+    /// Maximum suppression `StockpileSatiation` applies to Hunt/Forage
+    /// when `food_fraction = 1.0`. The score multiplier is
+    /// `(1 - suppression).max(0.0)` where
+    /// `suppression = ((food_fraction - threshold) / (1 - threshold)) *
+    /// scale`. With scale = 0.85 and threshold = 0.5, full stores
+    /// reduce Hunt/Forage scores to ~15% of their pre-modifier value
+    /// — the IAUS contest then yields to Eat at the stockpile.
+    #[serde(default = "default_stockpile_satiation_scale")]
+    pub stockpile_satiation_scale: f32,
     pub wander_curiosity_scale: f32,
     pub wander_base: f32,
     pub wander_playfulness_bonus: f32,
@@ -1457,6 +1474,8 @@ impl Default for ScoringConstants {
             explore_curiosity_scale: 0.7,
             fox_scent_suppression_threshold: 0.3,
             fox_scent_suppression_scale: 0.8,
+            stockpile_satiation_threshold: default_stockpile_satiation_threshold(),
+            stockpile_satiation_scale: default_stockpile_satiation_scale(),
             wander_curiosity_scale: 0.4,
             wander_base: 0.08,
             wander_playfulness_bonus: 0.2,
@@ -2038,6 +2057,21 @@ fn default_cook_hunger_gate() -> f32 {
 
 fn default_cook_food_scarcity_scale() -> f32 {
     0.6
+}
+
+/// Ticket 094 — `StockpileSatiation` Modifier threshold. Mirrors the
+/// shape of `fox_scent_suppression_threshold`: below this `food_fraction`
+/// no suppression is applied. 0.5 = colony stockpile half-full.
+fn default_stockpile_satiation_threshold() -> f32 {
+    0.5
+}
+
+/// Ticket 094 — `StockpileSatiation` Modifier scale. Maximum
+/// multiplicative suppression on Hunt/Forage scores at full stores
+/// (`food_fraction = 1.0`). 0.85 means full stores reduce Hunt/Forage
+/// to ~15% of their pre-modifier value.
+fn default_stockpile_satiation_scale() -> f32 {
+    0.85
 }
 
 fn default_build_pressure_cooking_min_raw_food() -> usize {

@@ -1,10 +1,10 @@
 ---
 id: 058
 title: §3.5.3 item 1 Tradition modifier — fix unfiltered-loop port
-status: ready
+status: parked
 cluster: null
 added: 2026-04-27
-parked: null
+parked: 2026-04-30
 blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
@@ -82,3 +82,14 @@ neutral), then a separate balance ticket sets a non-zero bonus.
 - 2026-04-27: opened from ticket 013 retirement (spec-follow-on debts
   umbrella decomposition). Original sub-task 13.7 in spec
   `docs/systems/ai-substrate-refactor.md` §3.5.3 item 1.
+- 2026-04-30: Parked. The Tradition modifier is dormant in production
+  (`tradition_location_bonus = 0.0` hard-coded at
+  `src/systems/goap.rs:1330`), so the unfiltered-loop smell is
+  invisible on every shipping path. The design choice between (a)
+  per-action-keyed structural fix and (b) flat tile-familiarity
+  reframe is best decided alongside the magnitude question — i.e.,
+  as a balance ticket when someone wants the bonus turned on.
+  Pre-emptive refactor front-loads cost on a knob that may never
+  activate, or that may activate with a shape that doesn't fit
+  either (a) or (b). Unpark when a balance ticket opens for
+  Tradition's bonus magnitude.

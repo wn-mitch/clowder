@@ -71,6 +71,13 @@ const PATIENCE: &str = "patience";
 const TRADITION_LOCATION_BONUS: &str = "tradition_location_bonus";
 const FOX_SCENT_LEVEL: &str = "fox_scent_level";
 const TILE_CORRUPTION: &str = "tile_corruption";
+/// §3.5.1 `StockpileSatiation` Modifier trigger input. The cat-side
+/// scalar `ctx_scalars` already publishes is `food_scarcity` =
+/// `1.0 - food_fraction` (see `scoring.rs::ctx_scalars`); the modifier
+/// fetches scarcity and inverts to `food_fraction` for the threshold
+/// check. Centralising the constant here keeps the
+/// modifier-trigger surface alongside its peers.
+const FOOD_SCARCITY: &str = "food_scarcity";
 const ACTIVE_DISPOSITION_ORDINAL: &str = "active_disposition_ordinal";
 /// §075 — `CommitmentTenure` Modifier. Drift between this name and
 /// `plan_substrate::COMMITMENT_TENURE_INPUT` (the canonical
@@ -741,6 +748,113 @@ impl ScoreModifier for CorruptionTerritorySuppression {
 }
 
 // ---------------------------------------------------------------------------
+// StockpileSatiation
+// ---------------------------------------------------------------------------
+
+/// §3.5.1 stockpile-satiation suppression — companion to
+/// `FoxTerritorySuppression` for the food economy. Ticket 094.
+///
+/// **Why:** Hunt and Forage have *no* spatial axis — they score the
+/// same anywhere on the map. Eat composes hunger × stores-distance
+/// under `CompensatedProduct`, so its score collapses multiplicatively
+/// with distance to stores. A bold/diligent cat at the territory
+/// boundary near forageable terrain will keep electing
+/// Hunt/Forage even when the colony's stockpile is brimming, because
+/// the personal-hunger axis on Hunt/Forage stays high while Eat's
+/// long-range score is gated by the spatial multiplier. Result:
+/// the colony hauls food into Stores constantly but rarely consumes
+/// it; hunger silently decays toward starvation. This Modifier
+/// re-balances the contest by damping the *acquisition* DSEs
+/// proportional to colony abundance — when the stockpile is full the
+/// score "I should go get more food" naturally decays, leaving the
+/// IAUS contest in Eat's favor at any range.
+///
+/// **Trigger:** `food_fraction > stockpile_satiation_threshold`
+/// (default `0.5`). The cat-side scalar surface publishes
+/// `food_scarcity = 1.0 - food_fraction`; the modifier fetches
+/// `food_scarcity` and inverts.
+///
+/// **Transform:** multiplicative damp on Hunt and Forage — same shape
+/// as `FoxTerritorySuppression`'s damp branch:
+///   `score *= (1 − suppression).max(0.0)` where
+///   `suppression = ((food_fraction − threshold) / (1 − threshold)) ×
+///   stockpile_satiation_scale`.
+///
+/// **Applies to:** `hunt`, `forage`. *Not* `eat` (the destination of
+/// the contest), *not* `cook` (cooks raw food the colony already has,
+/// so abundance is its *reason* to fire), *not* `farm`/`herbcraft_*`
+/// (different ecological axis — herb/ward demand, ticket 084), *not*
+/// the Sleep/Groom/etc self-care class.
+///
+/// **Desperation case preserved:** at `food_fraction = 0`,
+/// `suppression = 0` (clamped via the threshold gate), so a starving
+/// colony's Hunt/Forage scores are unchanged. The modifier is
+/// asymmetric — it only damps when the stockpile is full enough that
+/// going to acquire more is *unnecessary*, never when acquisition is
+/// urgent.
+///
+/// **Composition with later Modifiers:** when ticket 088's
+/// `BodyDistressPromotion` lands (additive lift on the self-care
+/// class incl. Eat), the two compose cleanly: the additive lift on
+/// Eat fires before this multiplicative damp on Hunt/Forage, so the
+/// IAUS contest tilts even harder toward Eat under combined high
+/// stockpile + high body distress. Registering this modifier *after*
+/// the additive ones (Pride / Patience / CommitmentTenure / Tradition)
+/// matches the existing convention from `FoxTerritorySuppression` /
+/// `CorruptionTerritorySuppression`.
+///
+/// **Gate semantics:** the multiplicative damp is naturally safe on
+/// `score <= 0` (0 × anything = 0), so no short-circuit is needed.
+/// Mirrors `FoxTerritorySuppression`'s damp branch.
+pub struct StockpileSatiation {
+    threshold: f32,
+    scale: f32,
+}
+
+impl StockpileSatiation {
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            threshold: sc.stockpile_satiation_threshold,
+            scale: sc.stockpile_satiation_scale,
+        }
+    }
+
+    /// Returns the suppression coefficient in `[0, 1]` given the
+    /// colony's `food_fraction`. Below `threshold` returns 0; above,
+    /// scales linearly to `scale` at `food_fraction = 1.0`.
+    fn suppression(&self, food_fraction: f32) -> f32 {
+        if food_fraction <= self.threshold {
+            return 0.0;
+        }
+        ((food_fraction - self.threshold) / (1.0 - self.threshold)) * self.scale
+    }
+}
+
+impl ScoreModifier for StockpileSatiation {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        if !matches!(dse_id.0, HUNT | FORAGE) {
+            return score;
+        }
+        let food_fraction = (1.0 - fetch(FOOD_SCARCITY, ctx.cat)).clamp(0.0, 1.0);
+        let suppression = self.suppression(food_fraction);
+        if suppression <= 0.0 {
+            return score;
+        }
+        score * (1.0 - suppression).max(0.0)
+    }
+
+    fn name(&self) -> &'static str {
+        "stockpile_satiation"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Default pipeline builder
 // ---------------------------------------------------------------------------
 
@@ -787,6 +901,14 @@ pub fn default_modifier_pipeline(
     pipeline.push(Box::new(Tradition::new()));
     pipeline.push(Box::new(FoxTerritorySuppression::new(sc)));
     pipeline.push(Box::new(CorruptionTerritorySuppression::new(sc)));
+    // §3.5.1 ticket 094 — `StockpileSatiation` registers after the
+    // existing multiplicative damps (Fox + Corruption). Order doesn't
+    // load-bear among the damps: each is gated by a different DSE-id
+    // matrix and a different scalar trigger. Sitting next to its
+    // sibling `FoxTerritorySuppression` keeps the food-economy and
+    // territory-pressure modifiers visually adjacent in the trace
+    // output.
+    pipeline.push(Box::new(StockpileSatiation::new(sc)));
     pipeline
 }
 
@@ -1445,18 +1567,156 @@ mod tests {
     }
 
     #[test]
-    fn default_pipeline_registers_eight_modifiers() {
-        // Eight §3.5.1 foundational modifiers — the seven original
+    fn default_pipeline_registers_nine_modifiers() {
+        // Nine §3.5.1 foundational modifiers — the seven original
         // (`Pride`, `IndependenceSolo`, `IndependenceGroup`, `Patience`,
         // `Tradition`, `FoxTerritorySuppression`,
         // `CorruptionTerritorySuppression`) plus §075's
-        // `CommitmentTenure`. The three Phase 4.2 emergency modifiers
+        // `CommitmentTenure` plus ticket 094's `StockpileSatiation`.
+        // The three Phase 4.2 emergency modifiers
         // (`WardCorruptionEmergency`, `CleanseEmergency`,
         // `SensedRotBoost`) retired in §13.1 — their contribution is
         // now produced at the axis level by the Logistic curves on
         // the corresponding sibling DSEs.
         let constants = crate::resources::sim_constants::SimConstants::default();
         let pipeline = default_modifier_pipeline(&constants);
-        assert_eq!(pipeline.len(), 8, "expected 8 registered modifiers");
+        assert_eq!(pipeline.len(), 9, "expected 9 registered modifiers");
+    }
+
+    // -----------------------------------------------------------------------
+    // §3.5.1 ticket 094 StockpileSatiation
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn stockpile_satiation_no_damp_below_threshold() {
+        // food_fraction = 0.4 < threshold (0.5). Hunt and Forage pass
+        // through unchanged. The desperation-hunting case: a starving
+        // colony's food-acquisition DSEs MUST NOT be suppressed.
+        let modifier = StockpileSatiation { threshold: 0.5, scale: 0.85 };
+        let (_, ctx) = test_ctx();
+        // food_scarcity = 0.6 ⇒ food_fraction = 0.4
+        let fetch = |name: &str, _: Entity| match name {
+            FOOD_SCARCITY => 0.6,
+            _ => 0.0,
+        };
+        let hunt = modifier.apply(DseId(HUNT), 0.85, &ctx, &fetch);
+        let forage = modifier.apply(DseId(FORAGE), 0.61, &ctx, &fetch);
+        assert!((hunt - 0.85).abs() < 1e-6, "below-threshold Hunt unchanged; got {hunt}");
+        assert!((forage - 0.61).abs() < 1e-6, "below-threshold Forage unchanged; got {forage}");
+    }
+
+    #[test]
+    fn stockpile_satiation_damps_hunt_and_forage_above_threshold() {
+        // food_fraction = 0.96 (post-091 baseline level).
+        // suppression = (0.96 - 0.5) / (1 - 0.5) * 0.85 = 0.782
+        // Hunt 0.85 × (1 - 0.782) = ~0.185; Forage 0.61 × ~0.218 = ~0.133
+        let modifier = StockpileSatiation { threshold: 0.5, scale: 0.85 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            FOOD_SCARCITY => 0.04,
+            _ => 0.0,
+        };
+        let hunt = modifier.apply(DseId(HUNT), 0.85, &ctx, &fetch);
+        let forage = modifier.apply(DseId(FORAGE), 0.61, &ctx, &fetch);
+        // Hunt: 0.85 × 0.218 = 0.1853 (allow 1e-3 for f32 rounding).
+        assert!((hunt - 0.1853).abs() < 1e-3, "Hunt damped; got {hunt}");
+        assert!((forage - 0.13298).abs() < 1e-3, "Forage damped; got {forage}");
+    }
+
+    #[test]
+    fn stockpile_satiation_full_stores_collapses_acquisition_dses() {
+        // food_fraction = 1.0 ⇒ suppression = 0.85 ⇒ score × 0.15.
+        let modifier = StockpileSatiation { threshold: 0.5, scale: 0.85 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            FOOD_SCARCITY => 0.0,
+            _ => 0.0,
+        };
+        let hunt = modifier.apply(DseId(HUNT), 0.85, &ctx, &fetch);
+        // 0.85 × (1 - 0.85) = 0.85 × 0.15 = 0.1275
+        assert!((hunt - 0.1275).abs() < 1e-3, "full-stores Hunt collapses; got {hunt}");
+    }
+
+    #[test]
+    fn stockpile_satiation_targets_only_hunt_and_forage() {
+        // Eat (the destination of the contest), Cook (consumes raw
+        // food, abundance is its *reason* to fire), Sleep / Groom /
+        // etc. self-care must pass through unchanged. The asymmetry
+        // is the point: damp the *acquisition* DSEs, leave the
+        // *consumption* and self-care DSEs alone so the IAUS contest
+        // tilts toward Eat at the existing food.
+        let modifier = StockpileSatiation { threshold: 0.5, scale: 0.85 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            FOOD_SCARCITY => 0.0, // food_fraction = 1.0
+            _ => 0.0,
+        };
+        for dse in [EAT, SLEEP, GROOM_SELF, GROOM_OTHER, FLEE] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "dse {dse} (non-acquisition) unchanged; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn stockpile_satiation_zero_score_stays_zero() {
+        // Multiplicative damp on score == 0 is naturally safe (0 × x = 0).
+        // No resurrection.
+        let modifier = StockpileSatiation { threshold: 0.5, scale: 0.85 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            FOOD_SCARCITY => 0.0,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(HUNT), 0.0, &ctx, &fetch);
+        assert_eq!(out, 0.0, "zero score stays zero — multiplicative damp is safe");
+    }
+
+    #[test]
+    fn stockpile_satiation_lever_breaks_lark_contest_synthetic() {
+        // Ticket 094 synthetic regression: at hunger=0.20 (urgency 0.80)
+        // with food_fraction = 0.96 (post-091 baseline) and Lark's
+        // bold/diligent personality near forageable terrain, Hunt ≈ 0.85
+        // and Eat (long-range) ≈ 0.27. Without StockpileSatiation, Hunt
+        // dominates and the cat re-elects Hunt forever. With it, Hunt
+        // collapses to ~0.19 and Eat (unchanged) wins the contest.
+        use crate::ai::eval::ModifierPipeline;
+        let mut pipeline = ModifierPipeline::new();
+        pipeline.push(Box::new(StockpileSatiation { threshold: 0.5, scale: 0.85 }));
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            FOOD_SCARCITY => 0.04, // food_fraction = 0.96
+            _ => 0.0,
+        };
+        let hunt_after = pipeline.apply(DseId(HUNT), 0.85, &ctx, &fetch);
+        let eat_after = pipeline.apply(DseId(EAT), 0.27, &ctx, &fetch);
+        assert!(
+            eat_after > hunt_after,
+            "post-modifier: Eat ({eat_after}) wins over Hunt ({hunt_after}) under abundant stockpile"
+        );
+        // Concrete bounds — Hunt drops to ~0.185, Eat stays at 0.27.
+        assert!(hunt_after < 0.20, "Hunt sufficiently damped; got {hunt_after}");
+        assert!((eat_after - 0.27).abs() < 1e-6, "Eat unchanged by modifier; got {eat_after}");
+    }
+
+    #[test]
+    fn stockpile_satiation_preserves_desperation_hunting() {
+        // Symmetric guarantee: at food_fraction = 0 (starving colony,
+        // empty stockpile), Hunt and Forage MUST be unchanged so the
+        // food-acquisition response can fire at full strength. This
+        // is the "this modifier never kicks in when acquisition is
+        // urgent" property — the modifier is asymmetric by design.
+        let modifier = StockpileSatiation { threshold: 0.5, scale: 0.85 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            FOOD_SCARCITY => 1.0, // food_fraction = 0.0
+            _ => 0.0,
+        };
+        let hunt = modifier.apply(DseId(HUNT), 0.85, &ctx, &fetch);
+        let forage = modifier.apply(DseId(FORAGE), 0.61, &ctx, &fetch);
+        assert!((hunt - 0.85).abs() < 1e-6, "starving Hunt unchanged; got {hunt}");
+        assert!((forage - 0.61).abs() < 1e-6, "starving Forage unchanged; got {forage}");
     }
 }

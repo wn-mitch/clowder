@@ -363,6 +363,16 @@ open-work-wip:
 open-work-index:
     uv run scripts/generate_open_work.py
 
+# Render ticket dependency tree (blocked-by edges). Pass flags through.
+#
+# Examples:
+#   just open-work-tree                        # default downward forest
+#   just open-work-tree --upward               # invert: blocked → blockers
+#   just open-work-tree --root 011             # subtree rooted at 011
+#   just open-work-tree --format mermaid       # paste into docs
+open-work-tree *ARGS:
+    uv run scripts/open_work_tree.py {{ARGS}}
+
 # Generate wiki and open in browser
 wiki-serve:
     uv run scripts/generate_wiki.py

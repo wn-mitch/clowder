@@ -15,11 +15,10 @@ _Last generated: 2026-04-30._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 37 |
-| Parked | 5 |
+| Ready | 35 |
+| Parked | 6 |
 | Blocked | 10 |
-| Done (awaiting archive) | 3 |
-| **Open total** | **58** |
+| **Open total** | **57** |
 | Pre-existing | 1 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -35,7 +34,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[071](docs/open-work/tickets/071-planning-substrate-hardening.md)** — Planning-substrate hardening — gird against the stuck-cat bug class (sub-epic) — _[planning-substrate] · added 2026-04-29_
 - **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** — Substrate-over-override — retire control-yanking hacks in favor of IAUS levers — _[substrate-over-override] · added 2026-04-30_
 
-## Ready (37)
+## Ready (35)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -61,7 +60,6 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[051](docs/open-work/tickets/051-fox-dse-eligibility-migration.md)** — Fox DSE eligibility migration — `.require()`/`.forbid()` cutover for §4 fox markers — _added 2026-04-27_
 - **[054](docs/open-work/tickets/054-fate-event-vocabulary-expansion.md)** — §7.7.c Fate event-vocabulary expansion — Calling, destiny, fated-pair convergence — _added 2026-04-27_
 - **[056](docs/open-work/tickets/056-aspiration-compatibility-matrix.md)** — §7.7.1 aspiration compatibility matrix — hard/soft conflict enumeration — _added 2026-04-27_
-- **[058](docs/open-work/tickets/058-tradition-unfiltered-loop-fix.md)** — §3.5.3 item 1 Tradition modifier — fix unfiltered-loop port — _added 2026-04-27_
 - **[062](docs/open-work/tickets/062-prey-species-split-maps.md)** — Prey-species split — per-species scent maps (§5.6.3 row #5) — _added 2026-04-27_
 - **[063](docs/open-work/tickets/063-ward-strength-promotion.md)** — Ward-strength promotion — first-class spatial axis (§5.6.3 row #3) — _added 2026-04-27_
 - **[064](docs/open-work/tickets/064-carcass-scent-consumer-cutover.md)** — Carcass-scent consumer cutover — replace observer_smells_at (§5.6.3 row #6) — _added 2026-04-27_
@@ -69,15 +67,15 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[088](docs/open-work/tickets/088-body-distress-modifier.md)** — Body-distress Modifier — uniform self-care promotion under §L2.10 Modifier substrate — _[ai-substrate] · blocked-by 014 · added 2026-04-30_
 - **[089](docs/open-work/tickets/089-interoceptive-self-anchors.md)** — Interoceptive self-anchors — spatial self-perception (OwnInjurySite, OwnSafeRestSpot) — _[ai-substrate] · added 2026-04-30_
 - **[090](docs/open-work/tickets/090-self-perception-l4-l5.md)** — L4/L5 self-perception — mastery-confidence, purpose-clarity, esteem-distress — _[ai-substrate] · added 2026-04-30_
-- **[094](docs/open-work/tickets/094-eat-vs-forage-imbalance.md)** — Eat-vs-Forage IAUS imbalance — colony hauls food but doesn't consume it — _[substrate-over-override] · blocked-by 091 · added 2026-04-30_
 - **[095](docs/open-work/tickets/095-body-zones-epic.md)** — Body zones — anatomical injury model for all animal species — _added 2026-05-01_
-- **[096](docs/open-work/tickets/096-materials-available-substrate-split.md)** — Split `PlannerState.materials_available` into marker-backed entry + per-plan search field — _[ai-substrate] · blocked-by 092 · added 2026-04-30_
+- **[096](docs/open-work/tickets/096-materials-available-substrate-split.md)** — Split `PlannerState.materials_available` into marker-backed entry + per-plan search field — _[ai-substrate] · added 2026-04-30_
 - **[097](docs/open-work/tickets/097-non-cat-planner-substrate-audit.md)** — Audit fox / hawk / snake planners for the parallel-feasibility-language smell 092 retired for cats — _[ai-substrate] · added 2026-04-30_
 - **[098](docs/open-work/tickets/098-search-state-vs-substrate-doctrine.md)** — Document the substrate-vs-search-state boundary in `docs/systems/ai-substrate-refactor.md` — _[docs] · added 2026-04-30_
 
-## Parked (5)
+## Parked (6)
 
 - **[015](docs/open-work/tickets/015-alloparenting-reframe-b.md)** — Alloparenting Reframe B — mama drops kitten at hearth near resting elder — _parked 2026-04-22 · added 2026-04-22_
+- **[058](docs/open-work/tickets/058-tradition-unfiltered-loop-fix.md)** — §3.5.3 item 1 Tradition modifier — fix unfiltered-loop port — _parked 2026-04-30 · added 2026-04-27_
 - **[059](docs/open-work/tickets/059-phase-7-substrate-cleanup.md)** — Phase 7 substrate cleanup — `ScoringContext` removal, §10 unblock map sweep, spec drift reconcile — _parked 2026-04-27 · added 2026-04-27_
 - **[076](docs/open-work/tickets/076-last-resort-promotion-modifier.md)** — LastResortPromotion Modifier + no-target step resolvers (spiral-of-failure escalation) — _[planning-substrate] · parked 2026-04-29 · added 2026-04-29_
 - **[081](docs/open-work/tickets/081-coordination-directive-failure-demotion.md)** — Coordination directive-failure demotion (colony-side stuck-loop guard) — _[planning-substrate] · parked 2026-04-29 · added 2026-04-29_
@@ -96,21 +94,81 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[057](docs/open-work/tickets/057-coordinator-directive-intention-strategy-row.md)** — §7.3 coordinator-directive Intention strategy row — `SingleMinded` with override — _blocked-by 007 · added 2026-04-27_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _blocked-by 071 · added 2026-04-28_
 
-## Done (awaiting archive) (3)
-
-- **[012](docs/open-work/tickets/012-warmth-split.md)** — Warmth split — temperature need vs social-warmth fulfillment axis — _added 2026-04-21_
-- **[024](docs/open-work/tickets/024-fulfillment-register.md)** — §7.W Fulfillment register — MVP container + social_warmth axis — _[C] · added 2026-04-24_
-- **[091](docs/open-work/tickets/091-post-087-action-collapse.md)** — Post-087 seed-42 plan-execution collapse — Eat picks 62% but FoodEaten never witnesses; no Forage/Hunt; founder starvation cascade — _[substrate-over-override] · added 2026-04-30_
-
 ## Pre-existing (1)
 
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 
-## Landed archive
+## Landed archive (65)
 
-Full history: [`docs/open-work/landed/`](docs/open-work/landed/). Recent months:
+Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-- [2026-04](docs/open-work/landed/2026-04.md) — 70 entries
+### 2026-04 (65)
+
+- **[094](docs/open-work/landed/094-eat-vs-forage-imbalance.md)** — Eat-vs-Forage IAUS imbalance — colony hauls food but doesn't consume it _(2026-04-30)_
+- **[092](docs/open-work/landed/092-unify-markersnapshot-plannerstate-statepredicate-feasibility.md)** — Unify MarkerSnapshot ↔ PlannerState/StatePredicate feasibility languages _(2026-04-30)_
+- **[091](docs/open-work/landed/091-post-087-seed-42-plan-execution-collapse-eat-picks-62-but-fo.md)** — Post-087 seed-42 plan-execution collapse — Eat picks 62% but FoodEaten never witnesses; no Forage/Hunt; founder starvation cascade _(2026-04-30)_
+- **[087](docs/open-work/landed/087-interoceptive-perception-substrate.md)** — Interoceptive perception substrate _(2026-04-30)_
+- **[085](docs/open-work/landed/085-build-pressure-farming-gate-disjunctive-food-or-herb-demand.md)** — Build-pressure farming gate: disjunctive food-or-herb demand _(2026-04-30)_
+- **[083](docs/open-work/landed/083-l2-pairingactivity-farming-dormancy-reconciliation.md)** — L2 PairingActivity Farming dormancy reconciliation _(2026-04-29)_
+- **[082](docs/open-work/landed/082-027b-l2-pairingactivity-reactivation-on-the-hardened-substra.md)** — 027b L2 PairingActivity reactivation on the hardened substrate _(2026-04-29)_
+- **[079](docs/open-work/landed/079-check-iaus-coherence-sh-process-gate-against-macgyvered-pins.md)** — `check_iaus_coherence.sh` process gate against MacGyvered pins _(2026-04-29)_
+- **[077](docs/open-work/landed/077-anxiety-cadence-root-cause-investigation-no-op-close.md)** — anxiety-cadence root-cause investigation (no-op close) _(2026-04-29)_
+- **[073](docs/open-work/landed/073-wave-2-substrate-hardening.md)** — Wave 2 substrate hardening _(2026-04-29)_
+- **[072](docs/open-work/landed/072-plan-substrate-module-extraction-refactor-2026-04-29.md)** — `plan_substrate` module extraction (refactor) _(2026-04-29)_
+- **[072](docs/open-work/landed/072-plan-substrate-module-extraction-refactor.md)** — plan_substrate module extraction (refactor) _(2026-04-29)_
+- **[PE-001](docs/open-work/landed/PE-001-test-harness-drift-retired.md)** — Test-harness drift retired _(2026-04-28)_
+- **[065](docs/open-work/landed/065-l2-10-7-spatialconsideration-roster-sweep-cat-self-state-dse.md)** — §L2.10.7 SpatialConsideration roster sweep (cat self-state DSEs + fox dispositions) _(2026-04-28)_
+- **[061](docs/open-work/landed/061-herb-location-influence-map-producer-scaffold-5-6-3-row-8.md)** — Herb-location influence map producer scaffold (§5.6.3 row #8) _(2026-04-28)_
+- **[052](docs/open-work/landed/052-l2-10-7-plan-cost-feedback-substrate-cat-target-taking-roste.md)** — §L2.10.7 plan-cost feedback substrate + cat target-taking roster _(2026-04-28)_
+- **[049](docs/open-work/landed/049-9-2-faction-overlay-markers.md)** — §9.2 faction overlay markers _(2026-04-27)_
+- **[048](docs/open-work/landed/048-phase-2c-carcassscentmap-the-5-6-3-6-influence-map.md)** — Phase 2C CarcassScentMap, the §5.6.3 #6 influence map _(2026-04-27)_
+- **[045](docs/open-work/landed/045-ward-perimeter-placement-via-l1-influence-maps.md)** — Ward perimeter placement via L1 influence maps _(2026-04-27)_
+- **[044](docs/open-work/landed/044-recalibrate-hangry-curve-to-logistic-8-0-5.md)** — Recalibrate hangry curve to Logistic(8, 0.5) _(2026-04-27)_
+- **[043](docs/open-work/landed/043-combat-side-action-flee-left-ticks-remaining-stale.md)** — Combat-side Action::Flee left ticks_remaining stale _(2026-04-27)_
+- **[042](docs/open-work/landed/042-non-threatnearby-urgency-preempt-left-ticks-remaining-stale.md)** — Non-ThreatNearby urgency preempt left ticks_remaining stale _(2026-04-27)_
+- **[033](docs/open-work/landed/033-time-unit-typing-phases-0-6-complete.md)** — Time-unit typing (Phases 0-6 complete) _(2026-04-27)_
+- **[014](docs/open-work/landed/014-phase-4-follow-ons-closeout.md)** — Phase 4 follow-ons closeout _(2026-04-27)_
+- **[013](docs/open-work/landed/013-spec-follow-on-debts-umbrella-retirement.md)** — Spec-follow-on debts umbrella retirement _(2026-04-27)_
+- **[006](docs/open-work/landed/006-cluster-b-shared-spatial-slow-state-closeout.md)** — Cluster-B shared spatial slow-state closeout _(2026-04-27)_
+- **[005](docs/open-work/landed/005-cluster-a-scoring-substrate-refactor-closeout.md)** — Cluster-A scoring substrate refactor closeout _(2026-04-27)_
+- **[038](docs/open-work/landed/038-materialsdelivered-routing-gap-full-pickup-carry-deliver-pip.md)** — MaterialsDelivered routing gap → full Pickup/Carry/Deliver pipeline (infrastructure landed, founding spawn parked) _(2026-04-26)_
+- **[036](docs/open-work/landed/036-goap-rs-crafting-hint-derivation-drops-the-cook-branch.md)** — `goap.rs` crafting_hint derivation drops the Cook branch _(2026-04-26)_
+- **[031](docs/open-work/landed/031-balance-tooling-composition-layer-verdict-hypothesize-sweep.md)** — Balance-tooling composition layer (verdict / hypothesize / sweep-stats / fingerprint / explain / bisect-canary / promote) _(2026-04-26)_
+- **[2026-04-25](docs/open-work/landed/2026-04-25-respect-restoration-iteration-2-witness-magnitude-tune.md)** — Respect restoration — iteration 2 (witness magnitude tune) _(2026-04-25)_
+- **[028](docs/open-work/landed/028-observer-registration-regression-unified-headless-windowed-p.md)** — observer registration regression + unified headless/windowed pipeline _(2026-04-25)_
+- **[014](docs/open-work/landed/014-4-2-state-marker-trio-incombat-oncorruptedtile-onspecialterr.md)** — §4.2 State marker trio — `InCombat` / `OnCorruptedTile` / `OnSpecialTerrain` authors _(2026-04-25)_
+- **[2026-04-24](docs/open-work/landed/2026-04-24-acceptance-mastery-restoration-iteration-1.md)** — Acceptance & mastery restoration — iteration 1 _(2026-04-24)_
+- **[2026-04-24](docs/open-work/landed/2026-04-24-guarding-safety-recovered-achievement-believed-recipe.md)** — Guarding safety-recovered achievement_believed recipe _(2026-04-24)_
+- **[2026-04-24](docs/open-work/landed/2026-04-24-phase-6a-7-commitment-gate-resolve-goap-plans-split.md)** — Phase 6a §7 commitment gate + `resolve_goap_plans` split _(2026-04-24)_
+- **[2026-04-24](docs/open-work/landed/2026-04-24-respect-witness-multiplier-ghost-twin-relocation.md)** — Respect witness-multiplier — ghost-twin relocation _(2026-04-24)_
+- **[024](docs/open-work/landed/024-7-w-fulfillment-register-mvp-container-social-warmth-axis.md)** — §7.W Fulfillment register — MVP container + social_warmth axis _(2026-04-24)_
+- **[024](docs/open-work/landed/024-7-w-fulfillment-register-mvp-warmth-split-phase-3.md)** — §7.W Fulfillment register MVP + warmth split phase 3 _(2026-04-24)_
+- **[022](docs/open-work/landed/022-11-target-taking-trace-fan-out-8-dse-hooks-l2-lookup-fix.md)** — §11 target-taking trace fan-out — 8 DSE hooks + L2 lookup fix _(2026-04-24)_
+- **[014](docs/open-work/landed/014-4-marker-author-systems-batch-1.md)** — §4 marker author systems batch 1 _(2026-04-24)_
+- **[012](docs/open-work/landed/012-warmth-split-temperature-need-vs-social-warmth-fulfillment-a.md)** — Warmth split — temperature need vs social-warmth fulfillment axis _(2026-04-24)_
+- **[001](docs/open-work/landed/001-explore-dse-rebalance-sub-2-saturation-curve.md)** — Explore DSE rebalance — Sub-2 saturation curve _(2026-04-24)_
+- **[2026-04-23](docs/open-work/landed/2026-04-23-13-1-rows-1-3-incapacitated-consumer-cutover-inline-branch-r.md)** — §13.1 rows 1–3 — Incapacitated consumer cutover + inline-branch retirement _(2026-04-23)_
+- **[2026-04-23](docs/open-work/landed/2026-04-23-13-1-rows-4-6-corruption-axis-logistic-migration-modifier-co.md)** — §13.1 rows 4–6 — corruption-axis Logistic migration + modifier/constant retirement _(2026-04-23)_
+- **[2026-04-23](docs/open-work/landed/2026-04-23-3-5-remaining-modifier-port-seven-modifiers-onto-the-pipelin.md)** — §3.5 remaining-modifier port — seven modifiers onto the pipeline + inline retirement _(2026-04-23)_
+- **[2026-04-23](docs/open-work/landed/2026-04-23-4-3-incapacitated-marker-author-track-c-prereq-for-13-1-rows.md)** — §4.3 `Incapacitated` marker author — Track C prereq for §13.1 rows 1–3 _(2026-04-23)_
+- **[2026-04-23](docs/open-work/landed/2026-04-23-phase-4b-5-4-colony-scoped-marker-batch-hasfunctionalkitchen.md)** — Phase 4b.5 — §4 colony-scoped marker batch: `HasFunctionalKitchen` + `HasRawFoodInStores` + `WardStrengthLow` _(2026-04-23)_
+- **[2026-04-23](docs/open-work/landed/2026-04-23-phase-4c-7-6-5-6-caretake-target-taking-dse-port-resolve-car.md)** — Phase 4c.7 — §6.5.6 `Caretake` target-taking DSE port + `resolve_caretake` retirement _(2026-04-23)_
+- **[2026-04-23](docs/open-work/landed/2026-04-23-phase-a1-2-a5-11-focal-cat-replay-enrichment-at-source-l2-l3.md)** — Phase A1.2 (A5) — §11 focal-cat replay enrichment: at-source L2/L3 trace capture _(2026-04-23)_
+- **[2026-04-22](docs/open-work/landed/2026-04-22-phase-4a-softmax-over-intentions-3-5-modifier-port-adult-win.md)** — Phase 4a — softmax-over-Intentions + §3.5 modifier port + Adult-window retune _(2026-04-22)_
+- **[2026-04-22](docs/open-work/landed/2026-04-22-phase-4b-1-7-m-7-4-resolve-mate-with-gender-fix.md)** — Phase 4b.1 — §7.M.7.4 `resolve_mate_with` gender fix _(2026-04-22)_
+- **[2026-04-22](docs/open-work/landed/2026-04-22-phase-4b-2-mvp-4-marker-lookup-foundation-hasstoredfood-refe.md)** — Phase 4b.2 MVP — §4 marker lookup foundation + `HasStoredFood` reference port _(2026-04-22)_
+- **[2026-04-22](docs/open-work/landed/2026-04-22-phase-4b-3-6-3-targettakingdse-type-evaluator.md)** — Phase 4b.3 — §6.3 `TargetTakingDse` type + evaluator _(2026-04-22)_
+- **[2026-04-22](docs/open-work/landed/2026-04-22-phase-4b-4-4-hasgarden-marker-port.md)** — Phase 4b.4 — §4 `HasGarden` marker port _(2026-04-22)_
+- **[2026-04-22](docs/open-work/landed/2026-04-22-phase-4c-1-6-5-1-socialize-target-taking-dse-port.md)** — Phase 4c.1 — §6.5.1 `Socialize` target-taking DSE port _(2026-04-22)_
+- **[2026-04-22](docs/open-work/landed/2026-04-22-phase-4c-2-6-5-2-mate-target-taking-dse-port.md)** — Phase 4c.2 — §6.5.2 `Mate` target-taking DSE port _(2026-04-22)_
+- **[2026-04-22](docs/open-work/landed/2026-04-22-phase-4c-3-caretake-signal-wiring-feed-kitten-semantics-fix.md)** — Phase 4c.3 — Caretake signal wiring + feed-kitten semantics fix _(2026-04-22)_
+- **[2026-04-22](docs/open-work/landed/2026-04-22-phase-4c-4-alloparenting-reframe-a-goap-caretake-fix-farming.md)** — Phase 4c.4 — Alloparenting Reframe A + GOAP Caretake fix + Farming canaries _(2026-04-22)_
+- **[2026-04-22](docs/open-work/landed/2026-04-22-phase-4c-5-6-5-3-mentor-target-taking-dse-port.md)** — Phase 4c.5 — §6.5.3 `Mentor` target-taking DSE port _(2026-04-22)_
+- **[2026-04-22](docs/open-work/landed/2026-04-22-phase-4c-6-6-5-per-dse-target-taking-closeout-groom-other-hu.md)** — Phase 4c.6 — §6.5 per-DSE target-taking closeout: Groom-other + Hunt + Fight + ApplyRemedy + Build + `find_social_target` retirement _(2026-04-22)_
+- **[2026-04-22](docs/open-work/landed/2026-04-22-phase-5a-silent-advance-audit-stepoutcome-w-contract-never-f.md)** — Phase 5a — silent-advance audit: `StepOutcome<W>` + contract + never-fired canary _(2026-04-22)_
+- **[2026-04-20](docs/open-work/landed/2026-04-20-phase-2b-scent-as-influence-map.md)** — Phase 2B — Scent as influence map _(2026-04-20)_
+- **[2026-04-20](docs/open-work/landed/2026-04-20-phase-3a-3d-ai-substrate-trunk-per-dse-ports-9-faction-model.md)** — Phase 3a–3d — AI substrate trunk + per-DSE ports + §9 faction model _(2026-04-20)_
+- **[2026-04-19](docs/open-work/landed/2026-04-19-v0-2-0-release-aca13acf.md)** — v0.2.0 release — `aca13acf` _(2026-04-19)_
 
 ## Conventions
 
