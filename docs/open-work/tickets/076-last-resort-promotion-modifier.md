@@ -1,11 +1,11 @@
 ---
 id: 076
 title: LastResortPromotion Modifier + no-target step resolvers (spiral-of-failure escalation)
-status: blocked
+status: parked
 cluster: planning-substrate
 added: 2026-04-29
-parked: null
-blocked-by: [072, 073]
+parked: 2026-04-29
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
@@ -61,3 +61,4 @@ Files:
 ## Log
 
 - 2026-04-29: Opened under sub-epic 071.
+- 2026-04-29: Parked. With 073 (cooldown) + 074 (require_alive) + 078 (Pairing Intention Consideration) shipped, the originating mate-selection failure that triggered the seed-42 Nettle/Mocha/Lark cascade should not occur — making this ticket's escalation path moot for the failure mode it was designed to catch. The IAUS-engine score-lift Modifier itself is straightforward, but the two new no-target step resolvers (`rest_in_place`, `eat_inventory_unconditional`) require full §5 contract compliance and DSE registration — substantial new-feature work that's high-risk to ship without targeted soak validation. Decision: defer until Wave 4's 027b reactivation soak (ticket 082) demonstrates whether the post-Wave-2 substrate handles the originating cascade. If 082's soak shows recovery-loop pathology, unpark this ticket and ship the full implementation. If 082 passes hard gates, this becomes follow-on hardening at lower priority.

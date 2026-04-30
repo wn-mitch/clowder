@@ -622,17 +622,15 @@ impl Feature {
             Feature::ItemRetrieved => false,
             // Ticket 027b §7.M L2 PairingActivity — **activation
             // deferred**. The author system at
-            // `crate::ai::pairing::author_pairing_intentions` is built,
-            // tested, and ready, but its schedule edge in
-            // `plugins/simulation.rs` is commented out because
-            // registering it in chain 2a perturbs Bevy 0.18's
-            // topological sort enough to drop seed-42 from
-            // Starvation=0 to Starvation=3 (scheduler-shift hazard
-            // also documented on ticket 061). Both Pairing Positive
-            // features therefore cannot fire and must be exempt
-            // from the never-fired canary until activation lands.
-            // When the schedule edge is uncommented, remove these
-            // two false-arms so the canary can validate them.
+            // Ticket 027b / 082 — L2 PairingActivity activation
+            // deferred (round 2): sub-epic 071's substrate hardening
+            // prevents the starvation cascade but not the Bevy 0.18
+            // topological-sort collapse on Farming. Both Pairing
+            // Positive features therefore remain unable to fire on
+            // main; exempt from the never-fired canary until
+            // activation lands via a follow-on ticket. When the
+            // schedule edge is uncommented, remove these two
+            // false-arms so the canary can validate them.
             Feature::PairingIntentionEmitted => false,
             Feature::PairingBiasApplied => false,
             // Ticket 080 — `ReservationContended` is exempt until the

@@ -1,11 +1,11 @@
 ---
 id: 081
 title: Coordination directive-failure demotion (colony-side stuck-loop guard)
-status: blocked
+status: parked
 cluster: planning-substrate
 added: 2026-04-29
-parked: null
-blocked-by: [072, 073]
+parked: 2026-04-29
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
@@ -57,3 +57,4 @@ Files:
 ## Log
 
 - 2026-04-29: Opened under sub-epic 071.
+- 2026-04-29: Parked. Sub-epic 071 explicitly notes "Tickets 080 and 081 are important hardening but not blocking for 027b reactivation — the seed-42 stuck-loop pattern doesn't involve resource contention or coordination drift specifically. They strengthen the substrate against future failure modes." This ticket touches load-bearing `coordination.rs`; cleanest to land via a focused review pass after Wave 4's 027b soak validates the rest of the substrate. Unpark when the colony-side directive-loop pattern is observed in a soak (or as scheduled cleanup once Wave 4 has stabilized).

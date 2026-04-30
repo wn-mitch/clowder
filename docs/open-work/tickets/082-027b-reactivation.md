@@ -1,11 +1,11 @@
 ---
 id: 082
 title: 027b L2 PairingActivity reactivation on the hardened substrate
-status: blocked
+status: parked
 cluster: planning-substrate
 added: 2026-04-29
-parked: null
-blocked-by: [072, 073, 074]
+parked: 2026-04-29
+blocked-by: [083]
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [027-l2-pairing-activity.md]
@@ -58,3 +58,4 @@ Files:
 ## Log
 
 - 2026-04-29: Opened under sub-epic 071.
+- 2026-04-29: Re-parked. Sub-epic 071's Wave 1 (072) + Wave 2 (073/074/075/078/079/080) substrate hardening landed at main `43cc38a7`. Activation attempt (uncommenting the L2 author at `src/plugins/simulation.rs:327`) confirms the substrate hardening prevents the originating starvation cascade — `Starvation = 0` in `logs/tuned-42-082-pairing-active-farming-regress/` (vs `Starvation = 3` in `logs/tuned-42-027b-active-failed/`). The L2 author works (`PairingIntentionEmitted = 14651`, `PairingDropped = 14650`). However a NEW regression surfaced: registering `author_pairing_intentions` in chain 2a perturbs Bevy 0.18's topological sort enough to collapse Farming entirely (Farming plans 448 → 0; `CropTended` 5070 → 0; `CropHarvested` 176 → 0). The substrate hardening absorbed the originating cascade but not the scheduler-shift effect on Farming. Now `blocked-by: [083]`; ticket 083 investigates and fixes the schedule-shift root cause. Once 083 lands, this ticket's reactivation soak should clear with Farming intact.

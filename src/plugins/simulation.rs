@@ -295,32 +295,34 @@ impl Plugin for SimulationPlugin {
                             // marker, so the DSE returns 0.0 for cats
                             // whose gate is closed.
                             crate::ai::mating::update_mate_eligibility_markers,
-                            // §7.M L2 PairingActivity (ticket 027b) —
-                            // **activation deferred**. Registering
-                            // `crate::ai::pairing::author_pairing_intentions`
-                            // here perturbs Bevy 0.18's topological sort
-                            // enough to flip seed-42's late-soak food/eat
-                            // cadence: the canonical 15-min release deep-
-                            // soak with the system active produced 3
-                            // starvation deaths (clustered tick 1344K, last
-                            // 11% of the run) versus zero pre-027b at the
-                            // same parent commit (cef9137). The author
-                            // system body is a true no-op when no Friends-
-                            // bonded reproductive pair exists, so the
-                            // regression must come from scheduler
-                            // reshuffling, not from any side effect inside
-                            // the system. Deferral mirrors ticket 061's
-                            // producer-scaffold precedent ("DSE is
-                            // registered but dormant; no production caller
-                            // yet"). The substrate is otherwise complete:
-                            // PairingActivity component, drop-gate
-                            // predicate, bias wiring on
-                            // `socialize_target.rs::bond_score`, and
-                            // `Feature::Pairing*` activation variants all
-                            // remain in place. To activate: re-add the
-                            // line below and follow up with the four-
-                            // artifact balance methodology against a
-                            // multi-seed sweep.
+                            // §7.M L2 PairingActivity (ticket 027b /
+                            // 082) — **activation deferred (round 2)**.
+                            // Sub-epic 071's substrate hardening (Wave
+                            // 1: 072 refactor + Wave 2: 073/074/075/
+                            // 078/079/080) successfully prevents the
+                            // ORIGINATING starvation cascade (seed-42
+                            // soak with this line uncommented produces
+                            // Starvation = 0, vs Starvation = 3 in
+                            // 027b-active-failed). However, registering
+                            // `author_pairing_intentions` here STILL
+                            // perturbs Bevy 0.18's topological sort
+                            // enough to collapse the Farming disposition
+                            // entirely — Farming plans drop from 448
+                            // (post-072) to 0 (post-082), and the
+                            // CropTended (5070→0) and CropHarvested
+                            // (176→0) features stop firing. The
+                            // substrate hardening absorbed the starvation
+                            // pathway but not the scheduler-shift effect
+                            // on farming. Activation requires a follow-on
+                            // ticket investigating either (a) the
+                            // ordering of `author_pairing_intentions`
+                            // within chain 2a's marker batch, or (b)
+                            // explicit `.before/.after` constraints
+                            // pinning Farming-relevant systems away
+                            // from the Pairing system. To activate:
+                            // re-add the line below and follow up with
+                            // the four-artifact balance methodology
+                            // against a multi-seed sweep.
                             //
                             //     crate::ai::pairing::author_pairing_intentions,
                             //
