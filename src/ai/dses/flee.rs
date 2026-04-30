@@ -37,11 +37,24 @@ use crate::resources::sim_constants::ScoringConstants;
 
 pub const SAFETY_DEFICIT_INPUT: &str = "safety_deficit";
 pub const BOLDNESS_INPUT: &str = "boldness";
+/// Ticket 087 — interoceptive perception axis. `health_deficit`
+/// gates Flee in a CompensatedProduct so wounded cats flee harder.
+pub const HEALTH_DEFICIT_INPUT: &str = "health_deficit";
 
 /// §L2.10.7 Flee range — Manhattan tiles for the nearest-threat
 /// anchor. 12 ≈ a wildlife detection radius; outside this the
 /// threat-distance signal is meaningless.
 pub const FLEE_THREAT_RANGE: f32 = 12.0;
+
+/// Ticket 087 — Logistic midpoint for the `health_deficit` axis on
+/// Flee (and Sleep). Set to `1.0 - DispositionConstants::critical_health_threshold`
+/// so the inflection lands at the same HP ratio that triggers the
+/// disposition-layer panic interrupt — DSE scoring elevates Flee /
+/// Rest at the same boundary the interrupt cares about, eliminating
+/// the post-interrupt-replan churn (ticket 047 treadmill). 0.6
+/// matches the default `critical_health_threshold = 0.4`; tunable
+/// via `ScoringConstants::health_panic_midpoint` once that knob lands.
+pub const HEALTH_PANIC_MIDPOINT: f32 = 0.6;
 
 pub struct FleeDse {
     id: DseId,
@@ -80,6 +93,27 @@ impl FleeDse {
             }),
             post: PostOp::Invert,
         };
+        // Ticket 087 — `health_deficit` axis as a *bonus lift*, not a
+        // gate. Linear `slope=0.4, intercept=0.6` floors the curve at
+        // 0.6 (full health → 0.6 contribution) and saturates at 1.0
+        // (full deficit → 1.0). This preserves CompensatedProduct
+        // gating on the three pre-existing axes (a bold cat / safe cat
+        // / distant-threat cat still scores Flee near zero) while
+        // making wounded cats flee *harder* relative to healthy cats
+        // under the same threat conditions.
+        //
+        // Logistic gating was tried first and rejected: with full-health
+        // deficit = 0, the Logistic produces ~0.0025 and CP's geometric
+        // mean drags healthy-cat-under-threat scores below Cook /
+        // Wander — a cat at full HP can't flee, which is wrong.
+        // Closes ticket 047's treadmill by making Flee win the
+        // disposition contest at low HP instead of relying on the
+        // post-interrupt panic-replan to find Flee on jitter.
+        let health_curve = Curve::Linear {
+            slope: 0.4,
+            intercept: 0.6,
+        };
+
         Self {
             id: DseId("flee"),
             considerations: vec![
@@ -91,8 +125,12 @@ impl FleeDse {
                     FLEE_THREAT_RANGE,
                     threat_distance,
                 )),
+                Consideration::Scalar(ScalarConsideration::new(
+                    HEALTH_DEFICIT_INPUT,
+                    health_curve,
+                )),
             ],
-            composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
+            composition: Composition::compensated_product(vec![1.0, 1.0, 1.0, 1.0]),
             // §9.3 DSE filter binding — Flee triggers on `Predator` stance.
             // §13.1: `.forbid(markers::Incapacitated::KEY)` blocks downed cats — a
             // cat with an unhealed Severe injury can't flee, matching
@@ -267,6 +305,97 @@ mod tests {
             scored.raw_score < 0.01,
             "bold cat flees: {}",
             scored.raw_score
+        );
+    }
+
+    #[test]
+    fn flee_has_four_axes_with_health() {
+        // Ticket 087 — health_deficit axis added.
+        let s = ScoringConstants::default();
+        assert_eq!(FleeDse::new(&s).considerations().len(), 4);
+    }
+
+    #[test]
+    fn flee_health_deficit_axis_floors_to_preserve_cp_gating() {
+        // Ticket 087 — Linear `slope=0.4, intercept=0.6` so the curve
+        // floors at 0.6 (full health) and saturates at 1.0 (full
+        // deficit). Acts as a bonus lift on Flee, not a gate. CP
+        // composition would crash a Logistic-shaped axis to ~0 at
+        // full health, suppressing healthy-cat-under-threat scores;
+        // the floor preserves the pre-existing three-axis gating
+        // semantics while letting wounded cats outscore healthy cats
+        // under identical threat conditions.
+        let s = ScoringConstants::default();
+        let dse = FleeDse::new(&s);
+        let c = dse
+            .considerations()
+            .iter()
+            .find_map(|c| match c {
+                Consideration::Scalar(sc) if sc.name == HEALTH_DEFICIT_INPUT => Some(&sc.curve),
+                _ => None,
+            })
+            .expect("health_deficit axis must exist");
+        assert!((c.evaluate(0.0) - 0.6).abs() < 1e-4, "full health → 0.6");
+        assert!((c.evaluate(0.5) - 0.8).abs() < 1e-4, "half deficit → 0.8");
+        assert!((c.evaluate(1.0) - 1.0).abs() < 1e-4, "full deficit → 1.0");
+    }
+
+    #[test]
+    fn wounded_cat_scores_flee_above_healthy_cat_under_threat() {
+        // Ticket 087 — a wounded cat under threat must score Flee
+        // *higher* than a healthy cat under the same threat. The
+        // CompensatedProduct gate on health_deficit lifts the wounded
+        // cat's product term while leaving the healthy cat's term
+        // suppressed.
+        use crate::ai::eval::{evaluate_single, ModifierPipeline};
+        use crate::components::physical::Position;
+        let s = ScoringConstants::default();
+        let dse = FleeDse::new(&s);
+        let entity = Entity::from_raw_u32(1).unwrap();
+        let has_marker = |_: &str, _: Entity| false;
+        let entity_position = |_: Entity| -> Option<Position> { None };
+        let anchor_position = |a: LandmarkAnchor| -> Option<Position> {
+            match a {
+                LandmarkAnchor::NearestThreat => Some(Position::new(0, 0)),
+                _ => None,
+            }
+        };
+        let ctx = EvalCtx {
+            cat: entity,
+            tick: 0,
+            entity_position: &entity_position,
+            anchor_position: &anchor_position,
+            has_marker: &has_marker,
+            self_position: Position::new(0, 0),
+            target: None,
+            target_position: None,
+            target_alive: None,
+        };
+        let maslow = |_: u8| 1.0;
+        let modifiers = ModifierPipeline::new();
+
+        let healthy_fetch = |name: &str, _: Entity| match name {
+            "safety_deficit" => 0.7,
+            "boldness" => 0.3,
+            "health_deficit" => 0.0,
+            _ => 0.0,
+        };
+        let wounded_fetch = |name: &str, _: Entity| match name {
+            "safety_deficit" => 0.7,
+            "boldness" => 0.3,
+            "health_deficit" => 0.9,
+            _ => 0.0,
+        };
+        let healthy = evaluate_single(&dse, entity, &ctx, &maslow, &modifiers, &healthy_fetch)
+            .expect("eligible");
+        let wounded = evaluate_single(&dse, entity, &ctx, &maslow, &modifiers, &wounded_fetch)
+            .expect("eligible");
+        assert!(
+            wounded.raw_score > healthy.raw_score,
+            "wounded cat must score Flee higher than healthy cat under same threat: \
+             wounded={}, healthy={}",
+            wounded.raw_score,
+            healthy.raw_score,
         );
     }
 }

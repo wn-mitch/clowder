@@ -1290,6 +1290,16 @@ pub fn evaluate_and_plan(
             allies_fighting_threat,
             combat_effective,
             health: health.current,
+            // Ticket 087 — interoceptive perception. Compute via the
+            // perception module's helpers so the scalar derivation lives
+            // in one place across all consumers.
+            pain_level: crate::systems::interoception::pain_level(
+                &health.injuries,
+                d.pain_normalization_max,
+            ),
+            body_distress_composite: crate::systems::interoception::body_distress_composite(
+                needs, health,
+            ),
             is_incapacitated,
             has_construction_site,
             has_damaged_building,

@@ -35,6 +35,11 @@ use crate::resources::sim_constants::ScoringConstants;
 pub const ENERGY_DEFICIT_INPUT: &str = "energy_deficit";
 pub const DAY_PHASE_INPUT: &str = "day_phase";
 pub const HEALTH_DEFICIT_INPUT: &str = "health_deficit";
+/// Ticket 087 — interoceptive perception axis. Wounded cats accumulate
+/// `pain_level` from `Health.injuries` (severity sum normalized) and
+/// score Sleep higher so the `Resting` disposition wins the contest
+/// before the disposition-layer critical-health interrupt fires.
+pub const PAIN_LEVEL_INPUT: &str = "pain_level";
 
 /// §L2.10.7 Sleep range — Manhattan tiles for the
 /// own-sleeping-spot anchor. 15 ≈ a few-room radius; cats farther
@@ -85,12 +90,26 @@ impl SleepDse {
             }),
             post: PostOp::Invert,
         };
+        // Ticket 087 — `pain_level` axis. Linear curve over the
+        // interoceptive `pain_level` scalar (sum of unhealed-injury
+        // severities normalized into [0, 1]). Same Linear shape as the
+        // pre-existing `injury_rest` axis but driven by injury *count
+        // and severity* rather than health-ratio deficit, so a cat with
+        // multiple wounds at otherwise-restored HP still scores Sleep
+        // up. Pairs with the `health_deficit` axis (HP-ratio-driven)
+        // for the cumulative "I am hurt" signal.
+        let pain_curve = Curve::Linear {
+            slope: 1.0,
+            intercept: 0.0,
+        };
+
         Self {
             id: DseId("sleep"),
             considerations: vec![
                 Consideration::Scalar(ScalarConsideration::new(ENERGY_DEFICIT_INPUT, sleep_dep())),
                 Consideration::Scalar(ScalarConsideration::new(DAY_PHASE_INPUT, day_phase_curve)),
                 Consideration::Scalar(ScalarConsideration::new(HEALTH_DEFICIT_INPUT, injury_curve)),
+                Consideration::Scalar(ScalarConsideration::new(PAIN_LEVEL_INPUT, pain_curve)),
                 Consideration::Spatial(SpatialConsideration::new(
                     "sleep_spot_distance",
                     LandmarkSource::Anchor(LandmarkAnchor::OwnSleepingSpot),
@@ -98,12 +117,19 @@ impl SleepDse {
                     spot_distance,
                 )),
             ],
-            // RtEO sum = 1.0. Energy deficit still dominates; day_phase
-            // carries the circadian rhythm; injury_rest is a recovery
-            // modulator; spot_distance pulls toward a sleeping place.
-            // Original three weights renormalized ×0.80 to make room
-            // for the spatial axis at 0.20.
-            composition: Composition::weighted_sum(vec![0.40, 0.24, 0.16, 0.20]),
+            // Ticket 087 — original four weights [0.40, 0.24, 0.16, 0.20]
+            // sum to 1.0. Adding `pain_level` at weight 0.10 — sized
+            // small enough that uninjured cats score Sleep identically
+            // (pain_level = 0 → axis contributes 0), large enough that
+            // a cat with multiple wounds gets a meaningful bump. The
+            // four originals scale by 0.90 so the sum stays at 1.0.
+            composition: Composition::weighted_sum(vec![
+                0.40 * 0.90,
+                0.24 * 0.90,
+                0.16 * 0.90,
+                0.10,
+                0.20 * 0.90,
+            ]),
             eligibility: EligibilityFilter::new(),
         }
     }
@@ -157,10 +183,11 @@ mod tests {
     }
 
     #[test]
-    fn sleep_has_four_axes() {
-        // §L2.10.7: energy + day_phase + injury_rest + spot_distance.
+    fn sleep_has_five_axes() {
+        // §L2.10.7 + ticket 087: energy + day_phase + injury_rest +
+        // pain_level + spot_distance.
         let s = ScoringConstants::default();
-        assert_eq!(SleepDse::new(&s).considerations().len(), 4);
+        assert_eq!(SleepDse::new(&s).considerations().len(), 5);
     }
 
     #[test]

@@ -284,6 +284,14 @@ impl Plugin for SimulationPlugin {
                             systems::incapacitation::update_incapacitation,
                             systems::growth::update_life_stage_markers,
                             systems::needs::update_injury_marker,
+                            // Ticket 087 — interoceptive perception.
+                            // Authors LowHealth / SevereInjury /
+                            // BodyDistressed from Health + Needs. Runs
+                            // adjacent to update_injury_marker (same
+                            // data sources, different markers); both
+                            // run before the GOAP/scoring pipeline so
+                            // DSE eligibility filters see fresh state.
+                            systems::interoception::author_self_markers,
                             systems::items::update_inventory_markers,
                             systems::coordination::update_directive_markers,
                             // §4 batch — Mate eligibility marker. Reads

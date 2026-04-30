@@ -211,6 +211,19 @@ pub struct ScoringContext<'a> {
     pub combat_effective: f32,
     /// Cat's current health (0.0–1.0).
     pub health: f32,
+    /// Ticket 087 — interoceptive perception. Sum of unhealed-injury
+    /// severity scores normalized into `[0, 1]` by
+    /// `DispositionConstants::pain_normalization_max`. Computed at
+    /// `ScoringContext` construction via
+    /// `crate::systems::interoception::pain_level`.
+    pub pain_level: f32,
+    /// Ticket 087 — interoceptive perception. Composite body-state
+    /// distress: max of {hunger_urgency, energy_deficit, thermal_deficit,
+    /// health_deficit}. The unified "I am unwell" scalar consumed by the
+    /// future §L2.10 distress-promotion Modifier (ticket 088). Computed
+    /// at `ScoringContext` construction via
+    /// `crate::systems::interoception::body_distress_composite`.
+    pub body_distress_composite: f32,
     /// Whether the cat is incapacitated by a severe injury.
     pub is_incapacitated: bool,
     /// Whether a construction site exists that needs work.
@@ -404,6 +417,17 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
     // `health_deficit` through injury-bonus Linear.
     m.insert("energy_deficit", (1.0 - ctx.needs.energy).clamp(0.0, 1.0));
     m.insert("health_deficit", (1.0 - ctx.health).clamp(0.0, 1.0));
+    // Ticket 087 — interoceptive perception. `pain_level` and
+    // `body_distress_composite` are pre-computed at `ScoringContext`
+    // construction by `crate::systems::interoception` helpers; the
+    // deficit math for `health_deficit` above is the same value
+    // `interoception::health_deficit(&Health)` produces (single source
+    // of truth across the perception layer and the scoring surface).
+    m.insert("pain_level", ctx.pain_level.clamp(0.0, 1.0));
+    m.insert(
+        "body_distress_composite",
+        ctx.body_distress_composite.clamp(0.0, 1.0),
+    );
     // Fight: combat_effective is already a `[0, 1]` composite index
     // upstream; flow through directly.
     m.insert("combat_effective", ctx.combat_effective.clamp(0.0, 1.0));
@@ -2070,6 +2094,8 @@ mod tests {
             caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
             health: 1.0,
+            pain_level: 0.0,
+            body_distress_composite: 0.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -2216,6 +2242,8 @@ mod tests {
             caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
             health: 1.0,
+            pain_level: 0.0,
+            body_distress_composite: 0.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -2385,6 +2413,8 @@ mod tests {
             caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
             health: 1.0,
+            pain_level: 0.0,
+            body_distress_composite: 0.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -2644,6 +2674,8 @@ mod tests {
             caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
             health: 1.0,
+            pain_level: 0.0,
+            body_distress_composite: 0.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -2719,6 +2751,8 @@ mod tests {
             caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
             health: 1.0,
+            pain_level: 0.0,
+            body_distress_composite: 0.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -2813,6 +2847,8 @@ mod tests {
             caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
             health: 1.0,
+            pain_level: 0.0,
+            body_distress_composite: 0.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3124,6 +3160,8 @@ mod tests {
             caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
             health: 1.0,
+            pain_level: 0.0,
+            body_distress_composite: 0.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3200,6 +3238,8 @@ mod tests {
             caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
             health: 1.0,
+            pain_level: 0.0,
+            body_distress_composite: 0.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,

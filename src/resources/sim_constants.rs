@@ -1887,6 +1887,20 @@ pub struct DispositionConstants {
     /// Below this HP ratio, FightThreat step fails the chain (morale break).
     #[serde(default = "default_fight_bail_health_threshold")]
     pub fight_bail_health_threshold: f32,
+    /// Ticket 087 — interoceptive perception. Composite gate for the
+    /// `BodyDistressed` ZST marker: fires when any of the cat's body-state
+    /// urgencies (hunger / energy / thermal / health deficit) exceed this
+    /// value. The unified "I am unwell" signal that DSEs and (later) the
+    /// 088 distress-promotion Modifier consume. Default 0.6 — onset of
+    /// real discomfort, well before any single axis hits a panic threshold.
+    #[serde(default = "default_body_distress_threshold")]
+    pub body_distress_threshold: f32,
+    /// Ticket 087 — divisor used by interoceptive perception to normalize
+    /// the `pain_level` scalar. `pain_level` is the sum of severity scores
+    /// (Minor=0.1 / Moderate=0.3 / Severe=0.7) across unhealed injuries,
+    /// divided by this max. Default 2.0 ≈ three Severe wounds saturate.
+    #[serde(default = "default_pain_normalization_max")]
+    pub pain_normalization_max: f32,
     // --- Contextual threat evaluation (zoo vs bush) ---
     /// Threat intensity multiplier when the cat is inside a ward's repel radius.
     #[serde(default = "default_threat_ward_dampening")]
@@ -2046,6 +2060,14 @@ fn default_critical_health_threshold() -> f32 {
 
 fn default_fight_bail_health_threshold() -> f32 {
     0.35
+}
+
+fn default_body_distress_threshold() -> f32 {
+    0.6
+}
+
+fn default_pain_normalization_max() -> f32 {
+    2.0
 }
 
 fn default_gate_reckless_health_threshold() -> f32 {
@@ -2358,6 +2380,8 @@ impl Default for DispositionConstants {
             anti_stack_jitter: true,
             critical_health_threshold: 0.4,
             fight_bail_health_threshold: 0.35,
+            body_distress_threshold: default_body_distress_threshold(),
+            pain_normalization_max: default_pain_normalization_max(),
             threat_ward_dampening: 0.3,
             threat_colony_building_dampening: 0.5,
             threat_building_safety_range: 5,

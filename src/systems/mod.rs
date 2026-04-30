@@ -42,6 +42,7 @@ pub mod goap;
 pub mod growth;
 pub mod incapacitation;
 pub mod influence_map;
+pub mod interoception;
 pub mod items;
 pub mod magic;
 pub mod memory;

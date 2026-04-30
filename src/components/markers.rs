@@ -121,6 +121,37 @@ impl Injured {
     pub const KEY: &str = "Injured";
 }
 
+/// HP ratio at or below `DispositionConstants::critical_health_threshold`.
+/// Authoring: `interoception::author_self_markers` — fires *before* the
+/// disposition-layer critical-health interrupt at the same threshold so
+/// DSE scoring can elect Flee or Rest before the interrupt's panic-fallback.
+/// Ticket 087.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct LowHealth;
+impl LowHealth {
+    pub const KEY: &str = "LowHealth";
+}
+
+/// At least one unhealed `InjuryKind::Severe` injury.
+/// Authoring: `interoception::author_self_markers`. Ticket 087.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct SevereInjury;
+impl SevereInjury {
+    pub const KEY: &str = "SevereInjury";
+}
+
+/// Composite body-distress: hunger, energy, thermal, or health deficit
+/// above `DispositionConstants::body_distress_threshold`. The unified
+/// "I am unwell" perception — analog of how external perception's
+/// `HasThreatNearby` is a unified "I am in danger" signal across many
+/// possible threats. Authoring: `interoception::author_self_markers`.
+/// Ticket 087.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct BodyDistressed;
+impl BodyDistressed {
+    pub const KEY: &str = "BodyDistressed";
+}
+
 /// Cat is in an active combat step or hostile-adjacent.
 /// `combat.rs::update_combat_marker`.
 #[derive(Component, Debug, Clone, Copy)]
@@ -529,6 +560,9 @@ mod tests {
     fn state_markers_queryable() {
         assert_marker_queryable(Incapacitated);
         assert_marker_queryable(Injured);
+        assert_marker_queryable(LowHealth);
+        assert_marker_queryable(SevereInjury);
+        assert_marker_queryable(BodyDistressed);
         assert_marker_queryable(InCombat);
         assert_marker_queryable(OnCorruptedTile);
         assert_marker_queryable(OnSpecialTerrain);
