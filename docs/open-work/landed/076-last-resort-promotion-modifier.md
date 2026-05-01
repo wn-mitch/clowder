@@ -1,7 +1,7 @@
 ---
 id: 076
 title: LastResortPromotion Modifier + no-target step resolvers (spiral-of-failure escalation)
-status: parked
+status: done
 cluster: planning-substrate
 added: 2026-04-29
 parked: 2026-04-29
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 0b95bbd9
+landed-on: 2026-05-01
 ---
 
 ## Why
@@ -74,3 +74,4 @@ Files:
 
 - 2026-04-29: Opened under sub-epic 071.
 - 2026-04-29: Parked. With 073 (cooldown) + 074 (require_alive) + 078 (Pairing Intention Consideration) shipped, the originating mate-selection failure that triggered the seed-42 Nettle/Mocha/Lark cascade should not occur — making this ticket's escalation path moot for the failure mode it was designed to catch. The IAUS-engine score-lift Modifier itself is straightforward, but the two new no-target step resolvers (`rest_in_place`, `eat_inventory_unconditional`) require full §5 contract compliance and DSE registration — substantial new-feature work that's high-risk to ship without targeted soak validation. Decision: defer until Wave 4's 027b reactivation soak (ticket 082) demonstrates whether the post-Wave-2 substrate handles the originating cascade. If 082's soak shows recovery-loop pathology, unpark this ticket and ship the full implementation. If 082 passes hard gates, this becomes follow-on hardening at lower priority.
+- 2026-05-01: **Retired without implementation.** The substrate-over-override lens (epic 093) reframed this ticket: the *reactive* "lift on failure-count" shape is itself override-shaped, while the *proactive* "lift on body-distress scalar" shape that 088 actually shipped is the cleaner substrate primitive for the same problem class. 088's `BodyDistressPromotion` Modifier reads 087's `body_distress_composite` (composite of hunger / energy / thermal / health deficits) and lifts the six-DSE self-care class (Flee/Sleep/Eat/Hunt/Forage/GroomSelf) when distress crosses 0.7 — addresses the same "cat keeps failing recovery and dies" pathology this ticket targeted, but via continuous interoceptive perception rather than a per-failure counter. 094's `StockpileSatiation` damp + 088's lift compose to keep the score landscape honest under stockpile / distress states without the no-target step resolvers (`rest_in_place`, `eat_inventory_unconditional`) this ticket would have introduced. 123's `RecentDispositionFailures` cooldown (landed 2026-05-01) is the *failure-history* substrate axis the planner was lacking — it covers the per-cat memory dimension this ticket also gestured at, but at the disposition-scope rather than the action-scope, which fits the planner-elects-but-cannot-satisfy retry-storm shape that's the actual symptom. **Net:** 088 + 094 + 123 between them cover the "post-failure escalation" surface this ticket scoped, in substrate-doctrine-compliant shapes. No new no-target step resolvers needed; no `LastResortPromotion` Modifier needed. If a future failure mode surfaces that none of those three address, open a fresh ticket framed around the *specific* substrate gap rather than reviving this one.

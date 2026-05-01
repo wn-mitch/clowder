@@ -16,9 +16,9 @@ _Last generated: 2026-05-01._
 |---|---|
 | In progress | 5 |
 | Ready | 49 |
-| Parked | 6 |
+| Parked | 5 |
 | Blocked | 14 |
-| **Open total** | **74** |
+| **Open total** | **73** |
 | Pre-existing | 1 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -85,12 +85,11 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[118](docs/open-work/tickets/118-modifier-lift-vs-plan-completion-momentum.md)** — Modifier lifts gated by plan-completion momentum — substrate raises score but cat completes mid-plan first — _[ai-substrate] · added 2026-05-01_
 - **[120](docs/open-work/tickets/120-shadow-fox-spawn-vs-cat-presence-coupling.md)** — Characterize shadow-fox spawn-rate coupling to cat-presence (047 Phase 3 surfaced +93%) — _[ai-substrate] · added 2026-05-01_
 
-## Parked (6)
+## Parked (5)
 
 - **[015](docs/open-work/tickets/015-alloparenting-reframe-b.md)** — Alloparenting Reframe B — mama drops kitten at hearth near resting elder — _parked 2026-04-22 · added 2026-04-22_
 - **[058](docs/open-work/tickets/058-tradition-unfiltered-loop-fix.md)** — §3.5.3 item 1 Tradition modifier — fix unfiltered-loop port — _parked 2026-04-30 · added 2026-04-27_
 - **[059](docs/open-work/tickets/059-phase-7-substrate-cleanup.md)** — Phase 7 substrate cleanup — `ScoringContext` removal, §10 unblock map sweep, spec drift reconcile — _parked 2026-04-27 · added 2026-04-27_
-- **[076](docs/open-work/tickets/076-last-resort-promotion-modifier.md)** — LastResortPromotion Modifier + no-target step resolvers (spiral-of-failure escalation) — _[planning-substrate] · parked 2026-04-29 · added 2026-04-29_
 - **[081](docs/open-work/tickets/081-coordination-directive-failure-demotion.md)** — Coordination directive-failure demotion (colony-side stuck-loop guard) — _[planning-substrate] · parked 2026-04-29 · added 2026-04-29_
 - **[084](docs/open-work/tickets/084-farm-herb-ward-demand-axis.md)** — Farm DSE — tie scoring to herb/ward stockpile demand so gardens stay productive under abundant food — _[balance] · parked 2026-04-30 · blocked-by 086 · added 2026-04-29_
 
@@ -115,11 +114,11 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 
-## Landed archive (73)
+## Landed archive (74)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (8)
+### 2026-05 (9)
 
 - **[123](docs/open-work/landed/123-recent-disposition-failures-cooldown.md)** — RecentDispositionFailures cooldown so cats stop spamming dispositions the planner can't satisfy _(2026-05-01)_
 - **[122](docs/open-work/landed/122-socialize-dse-iaus-vs-gate-still-goal-mismatch.md)** — Socialize IAUS scoring elects plans the OpenMinded gate drops on the same tick _(2026-05-01)_
@@ -127,6 +126,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[116](docs/open-work/landed/116-bereavement-bond-grief.md)** — Bereavement — bond-specific grief modifier on partner/friend death _(2026-05-01)_
 - **[114](docs/open-work/landed/114-mood-source-typing.md)** — MoodSource enum — typed emotional category for MoodModifier _(2026-05-01)_
 - **[088](docs/open-work/landed/088-body-distress-modifier.md)** — Body-distress Modifier — uniform self-care promotion under §L2.10 Modifier substrate _(2026-05-01)_
+- **[076](docs/open-work/landed/076-last-resort-promotion-modifier.md)** — LastResortPromotion Modifier + no-target step resolvers (spiral-of-failure escalation) _(2026-05-01)_
 - **[047](docs/open-work/landed/047-critical-health-interrupt-treadmill.md)** — CriticalHealth interrupt is a treadmill, not a brake — replan picks the same disposition while damage accumulates _(2026-05-01)_
 - **[027](docs/open-work/landed/027-mating-cadence-three-bug-cascade.md)** — Mating cadence — three-bug cascade blocking MatingOccurred _(2026-05-01)_
 
