@@ -1284,6 +1284,29 @@ pub struct ScoringConstants {
     /// — the IAUS contest then yields to Eat at the stockpile.
     #[serde(default = "default_stockpile_satiation_scale")]
     pub stockpile_satiation_scale: f32,
+    /// Ticket 088. `body_distress_composite` floor below which
+    /// `BodyDistressPromotion` does not lift self-care DSEs. Above this,
+    /// the modifier additively lifts every self-care DSE (Flee, Sleep,
+    /// Eat, Hunt, Forage, GroomSelf) so the IAUS contest tilts toward the
+    /// body-recovery class as a unit. Set deliberately higher than 087's
+    /// `body_distress_threshold` (the marker-insertion gate, default 0.6)
+    /// so the marker fires first as a perception event and the modifier
+    /// engages later as a stronger lift. Substrate prerequisite for
+    /// retiring 047's CriticalHealth interrupt; the 087 perception
+    /// substrate publishes the input scalar via
+    /// `interoception::body_distress_composite`.
+    #[serde(default = "default_body_distress_promotion_threshold")]
+    pub body_distress_promotion_threshold: f32,
+    /// Ticket 088. Maximum additive lift `BodyDistressPromotion` applies
+    /// to each self-care DSE when `body_distress_composite = 1.0`. The
+    /// per-tick lift is
+    /// `((distress - threshold) / (1 - threshold)) * lift`. With lift =
+    /// 0.20 and threshold = 0.7, a fully-distressed cat sees +0.20 added
+    /// to each self-care DSE — enough to flip a 0.55 non-self-care
+    /// competitor below a 0.50 self-care option. Tune empirically before
+    /// 047 retires its CriticalHealth interrupt branch.
+    #[serde(default = "default_body_distress_promotion_lift")]
+    pub body_distress_promotion_lift: f32,
     pub wander_curiosity_scale: f32,
     pub wander_base: f32,
     pub wander_playfulness_bonus: f32,
@@ -1476,6 +1499,8 @@ impl Default for ScoringConstants {
             fox_scent_suppression_scale: 0.8,
             stockpile_satiation_threshold: default_stockpile_satiation_threshold(),
             stockpile_satiation_scale: default_stockpile_satiation_scale(),
+            body_distress_promotion_threshold: default_body_distress_promotion_threshold(),
+            body_distress_promotion_lift: default_body_distress_promotion_lift(),
             wander_curiosity_scale: 0.4,
             wander_base: 0.08,
             wander_playfulness_bonus: 0.2,
@@ -2072,6 +2097,23 @@ fn default_stockpile_satiation_threshold() -> f32 {
 /// to ~15% of their pre-modifier value.
 fn default_stockpile_satiation_scale() -> f32 {
     0.85
+}
+
+/// Ticket 088 — `BodyDistressPromotion` Modifier threshold.
+/// `body_distress_composite` floor below which the modifier is a no-op.
+/// Set above 087's `body_distress_threshold` (0.6) so the marker fires
+/// first as a perception event and the modifier lifts later as a
+/// stronger response.
+fn default_body_distress_promotion_threshold() -> f32 {
+    0.7
+}
+
+/// Ticket 088 — `BodyDistressPromotion` Modifier lift. Maximum additive
+/// lift applied to each self-care DSE at `body_distress_composite = 1.0`.
+/// Lift ramps linearly from 0 at threshold to this value at full
+/// distress.
+fn default_body_distress_promotion_lift() -> f32 {
+    0.20
 }
 
 fn default_build_pressure_cooking_min_raw_food() -> usize {

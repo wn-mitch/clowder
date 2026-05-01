@@ -78,6 +78,12 @@ const TILE_CORRUPTION: &str = "tile_corruption";
 /// check. Centralising the constant here keeps the
 /// modifier-trigger surface alongside its peers.
 const FOOD_SCARCITY: &str = "food_scarcity";
+/// Ticket 088 — `BodyDistressPromotion` Modifier trigger input. The
+/// 087 perception substrate computes
+/// `interoception::body_distress_composite` as max of
+/// {hunger_urgency, energy_deficit, thermal_deficit, health_deficit}
+/// and `scoring::ctx_scalars` publishes the value under this key.
+const BODY_DISTRESS_COMPOSITE: &str = "body_distress_composite";
 const ACTIVE_DISPOSITION_ORDINAL: &str = "active_disposition_ordinal";
 /// §075 — `CommitmentTenure` Modifier. Drift between this name and
 /// `plan_substrate::COMMITMENT_TENURE_INPUT` (the canonical
@@ -122,6 +128,19 @@ const MENTOR: &str = "mentor";
 const MATE: &str = "mate";
 const CARETAKE: &str = "caretake";
 const IDLE: &str = "idle";
+
+/// Ticket 088 — the "self-care" DSE class lifted by
+/// `BodyDistressPromotion` when `body_distress_composite` is high.
+/// Authored as a `&[&str]` constant so the class membership is
+/// grep-discoverable; the modifier's `apply` matches the same set
+/// inline via `matches!` for compile-time efficiency. The two must
+/// stay in sync — the BodyDistressPromotion test suite iterates this
+/// constant against the matches! pattern's effective behavior, so
+/// drift is caught at test time. Note: the 088 ticket lists "Rest"
+/// but no `Rest` DSE exists — `Sleep` covers the energy-recovery
+/// role.
+#[cfg_attr(not(test), allow(dead_code))]
+const SELF_CARE_DSES: &[&str] = &[FLEE, SLEEP, EAT, HUNT, FORAGE, GROOM_SELF];
 
 // ---------------------------------------------------------------------------
 // Pride
@@ -855,6 +874,119 @@ impl ScoreModifier for StockpileSatiation {
 }
 
 // ---------------------------------------------------------------------------
+// BodyDistressPromotion
+// ---------------------------------------------------------------------------
+
+/// §3.5.1 / Ticket 088 body-distress promotion. Companion to
+/// `StockpileSatiation` for the body-state economy.
+///
+/// **Why:** A cat near death from accumulated injury + hunger + cold
+/// can still score Fight or Guarding above Flee/Eat/Sleep when threats
+/// are nearby — each self-care DSE individually competes against
+/// non-self-care DSEs without knowing the body is in collapse. This
+/// modifier reads 087's unified `body_distress_composite` scalar and
+/// lifts the whole self-care class as a unit, so the IAUS contest
+/// tilts toward body recovery before the cat dies in a replan loop
+/// (the failure mode 047 documents). Additive (not multiplicative) so
+/// a zero pre-score self-care DSE can be promoted above a positive
+/// non-self-care competitor when distress is critical.
+///
+/// **Trigger:** `body_distress_composite > body_distress_promotion_threshold`
+/// (default 0.7). Set above 087's `body_distress_threshold` (0.6) so
+/// the marker fires first as a perception event and the modifier
+/// engages later as a stronger response.
+///
+/// **Transform:** additive lift on every self-care DSE:
+///   `score += ((distress − threshold) / (1 − threshold)) × lift_scale`
+/// (lift_scale default 0.20). At distress = 1.0 every self-care DSE
+/// receives the full +0.20 lift; below threshold the modifier is a
+/// no-op for every DSE.
+///
+/// **Applies to:** Flee, Sleep, Eat, Hunt, Forage, GroomSelf — the
+/// "self-care" DSE class. Roster lives in `SELF_CARE_DSES` for
+/// grep-discoverability; `apply` matches the same set inline for
+/// compile-time efficiency. There is no separate `Rest` DSE; Sleep
+/// covers the energy-recovery role.
+///
+/// **Composition:** Registered with the additive bonuses (Pride /
+/// IndependenceSolo / Patience / CommitmentTenure / Tradition) before
+/// the multiplicative damps (Fox / Corruption / Stockpile). Under
+/// combined high stockpile + high body distress, this lift on Eat
+/// fires *before* `StockpileSatiation` damps Hunt/Forage — the
+/// contest tilts twice toward Eat (once by lift, once by damp). The
+/// 094 `StockpileSatiation` doc-comment pre-described this exact
+/// composition order.
+///
+/// **Substrate role:** Prerequisite for ticket 047 (CriticalHealth-
+/// interrupt retirement). 047 cannot safely remove its per-tick
+/// interrupt branch until this modifier provides magnitude sufficient
+/// to suppress non-self-care DSEs through the IAUS contest alone.
+///
+/// **Gated-boost contract:** returns `score` unchanged on score `<= 0`
+/// — matches the established additive-modifier convention (Pride /
+/// IndependenceSolo / Patience / CommitmentTenure / Tradition). High
+/// body-distress should re-rank what's already accessible to the cat,
+/// not resurrect DSEs the Maslow pre-gate or outer scoring layer
+/// already ruled ineligible (no food in range, no safe sleep spot,
+/// etc.). Ecologically: distress doesn't conjure resources into
+/// existence.
+pub struct BodyDistressPromotion {
+    threshold: f32,
+    lift_scale: f32,
+}
+
+impl BodyDistressPromotion {
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            threshold: sc.body_distress_promotion_threshold,
+            lift_scale: sc.body_distress_promotion_lift,
+        }
+    }
+
+    /// Returns the additive lift in `[0, lift_scale]` given the cat's
+    /// `body_distress_composite`. Below `threshold` returns 0; above,
+    /// scales linearly to `lift_scale` at `distress = 1.0`.
+    fn lift(&self, distress: f32) -> f32 {
+        if distress <= self.threshold {
+            return 0.0;
+        }
+        ((distress - self.threshold) / (1.0 - self.threshold)) * self.lift_scale
+    }
+}
+
+impl ScoreModifier for BodyDistressPromotion {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        // Early-out on DSEs outside the self-care class — avoids the
+        // body_distress scalar fetch on every Mate / Coordinate /
+        // Build / etc. apply.
+        if !matches!(dse_id.0, FLEE | SLEEP | EAT | HUNT | FORAGE | GROOM_SELF) {
+            return score;
+        }
+        // Gated-boost contract: don't resurrect a DSE the Maslow
+        // pre-gate or outer scoring layer suppressed.
+        if score <= 0.0 {
+            return score;
+        }
+        let distress = fetch(BODY_DISTRESS_COMPOSITE, ctx.cat).clamp(0.0, 1.0);
+        let lift = self.lift(distress);
+        if lift <= 0.0 {
+            return score;
+        }
+        score + lift
+    }
+
+    fn name(&self) -> &'static str {
+        "body_distress_promotion"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Default pipeline builder
 // ---------------------------------------------------------------------------
 
@@ -899,6 +1031,14 @@ pub fn default_modifier_pipeline(
     // `&ScoringConstants`.
     pipeline.push(Box::new(CommitmentTenure::new(constants)));
     pipeline.push(Box::new(Tradition::new()));
+    // §3.5.1 ticket 088 — `BodyDistressPromotion` registers with the
+    // additive bonuses before the multiplicative damps (Fox /
+    // Corruption / Stockpile). Order matters here: when stockpile is
+    // full *and* the cat is body-distressed, this lift on Eat fires
+    // *before* `StockpileSatiation` damps Hunt/Forage, doubly tilting
+    // the IAUS contest toward Eat. The 094 `StockpileSatiation`
+    // doc-comment pre-described this exact composition order.
+    pipeline.push(Box::new(BodyDistressPromotion::new(sc)));
     pipeline.push(Box::new(FoxTerritorySuppression::new(sc)));
     pipeline.push(Box::new(CorruptionTerritorySuppression::new(sc)));
     // §3.5.1 ticket 094 — `StockpileSatiation` registers after the
@@ -1580,7 +1720,7 @@ mod tests {
         // the corresponding sibling DSEs.
         let constants = crate::resources::sim_constants::SimConstants::default();
         let pipeline = default_modifier_pipeline(&constants);
-        assert_eq!(pipeline.len(), 9, "expected 9 registered modifiers");
+        assert_eq!(pipeline.len(), 10, "expected 10 registered modifiers");
     }
 
     // -----------------------------------------------------------------------
@@ -1718,5 +1858,190 @@ mod tests {
         let forage = modifier.apply(DseId(FORAGE), 0.61, &ctx, &fetch);
         assert!((hunt - 0.85).abs() < 1e-6, "starving Hunt unchanged; got {hunt}");
         assert!((forage - 0.61).abs() < 1e-6, "starving Forage unchanged; got {forage}");
+    }
+
+    // -----------------------------------------------------------------------
+    // §3.5.1 ticket 088 BodyDistressPromotion
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn body_distress_promotion_no_lift_below_threshold() {
+        // distress = 0.5 < threshold (0.7). Every self-care DSE passes
+        // through unchanged. The "modifier engages only at high distress"
+        // property — below the threshold the cat's score landscape is
+        // identical to the no-modifier case.
+        let modifier = BodyDistressPromotion { threshold: 0.7, lift_scale: 0.20 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            BODY_DISTRESS_COMPOSITE => 0.5,
+            _ => 0.0,
+        };
+        for dse in SELF_CARE_DSES {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "below-threshold dse {dse} unchanged; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn body_distress_promotion_zero_lift_at_threshold() {
+        // distress = 0.7 exactly. The `<= threshold` short-circuit
+        // gives zero lift — boundary semantics matter so the modifier
+        // doesn't quietly drift on the edge.
+        let modifier = BodyDistressPromotion { threshold: 0.7, lift_scale: 0.20 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            BODY_DISTRESS_COMPOSITE => 0.7,
+            _ => 0.0,
+        };
+        for dse in SELF_CARE_DSES {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "at-threshold dse {dse} unchanged; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn body_distress_promotion_lifts_above_threshold() {
+        // distress = 0.85, threshold = 0.7, lift_scale = 0.20.
+        // expected lift = ((0.85 - 0.7) / 0.3) * 0.20 = 0.5 * 0.20 = 0.10
+        let modifier = BodyDistressPromotion { threshold: 0.7, lift_scale: 0.20 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            BODY_DISTRESS_COMPOSITE => 0.85,
+            _ => 0.0,
+        };
+        for dse in SELF_CARE_DSES {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.6).abs() < 1e-6,
+                "dse {dse} lifted by 0.10; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn body_distress_promotion_max_lift_at_full_distress() {
+        // distress = 1.0 ⇒ full lift_scale (0.20) added to every
+        // self-care DSE.
+        let modifier = BodyDistressPromotion { threshold: 0.7, lift_scale: 0.20 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            BODY_DISTRESS_COMPOSITE => 1.0,
+            _ => 0.0,
+        };
+        for dse in SELF_CARE_DSES {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.7).abs() < 1e-6,
+                "dse {dse} lifted by full 0.20; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn body_distress_promotion_targets_only_self_care_class() {
+        // At full distress, non-self-care DSEs MUST pass through
+        // unchanged — the substrate property the lift relies on. If
+        // Mate / Coordinate / Build / Mentor / Caretake / Socialize /
+        // Patrol / Fight / Cook / Farm / Wander / Explore / Idle were
+        // also lifted, the modifier wouldn't tilt the contest toward
+        // self-care; it would just inflate every score equally.
+        let modifier = BodyDistressPromotion { threshold: 0.7, lift_scale: 0.20 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            BODY_DISTRESS_COMPOSITE => 1.0,
+            _ => 0.0,
+        };
+        for dse in [
+            MATE,
+            COORDINATE,
+            BUILD,
+            MENTOR,
+            CARETAKE,
+            SOCIALIZE,
+            PATROL,
+            FIGHT,
+            COOK,
+            FARM,
+            WANDER,
+            EXPLORE,
+            IDLE,
+            GROOM_OTHER,
+        ] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "non-self-care dse {dse} unchanged at full distress; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn body_distress_promotion_does_not_resurrect_zero_score() {
+        // Gated-boost contract — matches Pride / IndependenceSolo /
+        // Patience / CommitmentTenure / Tradition. A self-care DSE the
+        // Maslow pre-gate or outer scoring layer suppressed (score == 0)
+        // MUST stay at 0; high body-distress doesn't conjure food into
+        // existence or create a safe sleep spot. The modifier only
+        // re-ranks already-accessible considerations.
+        let modifier = BodyDistressPromotion { threshold: 0.7, lift_scale: 0.20 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            BODY_DISTRESS_COMPOSITE => 1.0,
+            _ => 0.0,
+        };
+        for dse in SELF_CARE_DSES {
+            let out = modifier.apply(DseId(dse), 0.0, &ctx, &fetch);
+            assert_eq!(
+                out, 0.0,
+                "zero-score dse {dse} stays zero — no resurrection"
+            );
+        }
+    }
+
+    #[test]
+    fn body_distress_promotion_composes_with_stockpile_satiation() {
+        // Substrate composition: under high stockpile + high body
+        // distress, BodyDistressPromotion lifts Eat (+0.20) BEFORE
+        // StockpileSatiation damps Hunt/Forage. Eat wins by a margin
+        // larger than either modifier alone could produce. Mirrors
+        // the registration order documented at modifier.rs:883
+        // (additive lifts before multiplicative damps) and the 094
+        // doc-comment that pre-described this composition.
+        use crate::ai::eval::ModifierPipeline;
+        let mut pipeline = ModifierPipeline::new();
+        pipeline.push(Box::new(BodyDistressPromotion { threshold: 0.7, lift_scale: 0.20 }));
+        pipeline.push(Box::new(StockpileSatiation { threshold: 0.5, scale: 0.85 }));
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            FOOD_SCARCITY => 0.04,           // food_fraction = 0.96 (full stockpile)
+            BODY_DISTRESS_COMPOSITE => 1.0,  // full body distress
+            _ => 0.0,
+        };
+        // Hunt: lift +0.20 then damp × (1 - 0.782) = ~0.218 ⇒
+        //   pre-modifier 0.85 → +0.20 = 1.05 → × 0.218 ≈ 0.229
+        let hunt_after = pipeline.apply(DseId(HUNT), 0.85, &ctx, &fetch);
+        // Eat: lift +0.20, no damp ⇒ 0.27 → 0.47.
+        let eat_after = pipeline.apply(DseId(EAT), 0.27, &ctx, &fetch);
+        assert!(
+            eat_after > hunt_after,
+            "post-pipeline: Eat ({eat_after}) wins over Hunt ({hunt_after}) under high stockpile + high distress"
+        );
+        // Eat lifted by exactly +0.20 (no damp on Eat).
+        assert!(
+            (eat_after - 0.47).abs() < 1e-6,
+            "Eat lifted by +0.20; got {eat_after}"
+        );
+        // Hunt lifted then damped — bounded check rather than exact
+        // (the f32 chain through both transforms accumulates ~1e-5).
+        assert!(
+            hunt_after < 0.25,
+            "Hunt damped despite lift; got {hunt_after}"
+        );
     }
 }
