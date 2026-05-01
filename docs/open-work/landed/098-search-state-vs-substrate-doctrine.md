@@ -1,7 +1,7 @@
 ---
 id: 098
 title: Document the substrate-vs-search-state boundary in `docs/systems/ai-substrate-refactor.md`
-status: ready
+status: done
 cluster: docs
 added: 2026-04-30
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 250d384d
+landed-on: 2026-05-01
 ---
 
 ## Why
@@ -45,3 +45,4 @@ Manual review: pick a hypothetical new planner field (e.g., `enemy_engaged: bool
 ## Log
 
 - 2026-04-30: Opened by 092's land commit, per the antipattern-migration follow-up convention codified in `CLAUDE.md` §Long-horizon coordination.
+- 2026-05-01: Landed at 250d384d. Added §4.7 (Substrate vs search-state) to `docs/systems/ai-substrate-refactor.md` with the four-part structure (definitions / classifier / hybrid case / anti-pattern) and cross-refs to §4.3, §4.6, §7.7, the per-domain `PlannerState` types, and tickets 092 / 096. CLAUDE.md §Major in-flight flagged §4.7 as required reading before opening any substrate-migration ticket.
