@@ -105,6 +105,7 @@
 - [§4.4 Crosswalk: ScoringContext → markers](#44-crosswalk-scoringcontext--markers)
 - [§4.5 Scalar carve-out](#45-scalar-carve-out)
 - [§4.6 Authoring-system roster](#46-authoring-system-roster)
+- [§4.7 Substrate vs search-state](#47-substrate-vs-search-state)
 
 **§5 Influence-map substrate**
 - [§5.1 Base maps, templates, working maps](#51-base-maps-templates-working-maps)
@@ -2239,6 +2240,139 @@ marker cluster, to know who the downstream query consumers are.
 (pre-enumeration sketch — see §4.3 for the full catalog), §L2.10.3
 (DSE registration consumes these markers via `Query<With<…>>`
 signatures).
+
+---
+
+### §4.7 Substrate vs search-state
+
+The substrate-over-override pattern (§4 generally, and the [093
+epic](../open-work/landed/093-substrate-over-override-epic.md)
+specifically) gives every "world fact" a single authoritative
+representation: an ECS marker, authored by one system from
+observable state, read identically by the IAUS via
+`MarkerConsideration` and by the GOAP planner via
+`StatePredicate::HasMarker(...)`. The single-source rule prevents
+L2 (eligibility) and L3 (planning) from disagreeing about whether
+a fact holds.
+
+But **not every boolean on `PlannerState` is a world fact.** Some
+are per-A*-node simulation state: `prey_found = true` means "the
+hypothetical cat being simulated by *this* A* expansion has
+already executed `SearchPrey`," not "prey exists in the world."
+Forcing such fields through the marker substrate is a category
+error — `MarkerSnapshot` is a single shared read-only reference
+across the whole search, while A* needs per-node mutable
+feasibility.
+
+This section names the boundary so future substrate-migration
+tickets don't repeat the audit error 092's opening text made
+(listing 7 "mirror" candidates of which only 2 were real mirrors —
+the other 5 were either search-state-only or hybrid).
+
+#### §4.7.1 Definitions
+
+- **Substrate** — facts authored from observable world state by
+  exactly one system, exposed as ECS markers. Read by IAUS DSE
+  eligibility (`Query<With<Marker>>` and `MarkerConsideration`)
+  and by GOAP via `StatePredicate::HasMarker(Marker::KEY)`. Single
+  source of truth across L2 and L3. Examples: `HasStoredFood`,
+  `ThornbriarAvailable`, `HasFunctionalKitchen`, `LowHealth`,
+  `BodyDistressed`. Catalogued in §4.3.
+- **Search-state** — fields on a domain's `PlannerState` set by
+  `StateEffect::Set*` variants during A* expansion. Per-node
+  mutable: each successor node clones-then-mutates its predecessor's
+  state. **No external authorship path** — the planner's own state
+  machine is the only writer. Examples (cat planner, see
+  `src/ai/planner/mod.rs`): `prey_found`, `interaction_done`,
+  `construction_done`, `farm_tended`, `trips_done`. These appear in
+  `StatePredicate::PreyFound(bool)` etc. but **not** in any
+  marker-authoring system; their truth value is "this hypothetical
+  plan has executed step X," not "the world has fact X."
+
+#### §4.7.2 The classifier
+
+Given a candidate field, ask in order:
+
+1. **Does any `StateEffect::Set*` mutate it during A* expansion?**
+   - **Yes** → search-state. Stop. Do not author a marker; the
+     field has no out-of-search authorship and must remain
+     per-node-mutable.
+   - **No** → continue to (2).
+2. **Is there an external authorship path** — a system in §4.6
+   that asserts/clears the fact from observable world state?
+   - **Yes** → substrate. The field is a `MarkerSnapshot` read
+     mirrored onto `PlannerState`; replace
+     `StatePredicate::CustomFlag(true)` with
+     `StatePredicate::HasMarker(Marker::KEY)` and delete the
+     mirror.
+   - **No** → the candidate isn't substrate *yet*. Either author
+     it (open a §4.6 entry) or recognise it isn't actually a fact
+     about the world.
+
+The test is mechanical: `grep` for `StateEffect::Set<FieldName>`
+in the planner's `actions.rs`. A hit means search-state; absence
+means a marker may be the right home.
+
+#### §4.7.3 Hybrid case
+
+A field can be both: a marker authors the *entry* condition (the
+plan can only start if the world fact holds), and a per-plan
+boolean tracks the *progress* within the plan. The canonical
+exemplar in flight is `materials_available` ([096](../open-work/tickets/096-materials-available-substrate-split.md)
+— this cross-reference will resolve to the landed split once 096
+ships):
+
+- **Entry marker** — `MaterialsAvailable` ZST, authored by
+  `buildings.rs` whenever a stockpile holds construction
+  materials. Gates plan-start via
+  `StatePredicate::HasMarker(MaterialsAvailable::KEY)`.
+- **Per-plan field** — `materials_delivered: bool` on
+  `PlannerState`, set true by `DeliverMaterials`'s
+  `StateEffect::SetMaterialsDelivered(true)` once the plan has
+  executed the delivery step. Read by downstream actions'
+  preconditions (`StatePredicate::MaterialsDelivered(true)`).
+
+The split resolves the category error: the entry condition is a
+world fact (substrate); progress within a single plan is a search-
+state boolean (the planner's own state machine).
+
+#### §4.7.4 Anti-pattern: marker-ifying search-state
+
+**Symptom.** A migration ticket lists `prey_found`,
+`interaction_done`, `construction_done`, `farm_tended`, etc. as
+"mirror" candidates for `StatePredicate::HasMarker(...)` migration.
+
+**Why it fails.** These fields are exclusively written by
+`StateEffect::Set*` during A* expansion (see
+`src/ai/planner/mod.rs` `enum StateEffect` —
+`SetPreyFound(bool)`, `SetInteractionDone(bool)`,
+`SetConstructionDone(bool)`, `SetFarmTended(bool)`). There is no
+authoring system in §4.6's roster that could compute their values
+from world state, because their values aren't *about* world state
+— they're about which simulated steps the search has expanded.
+Marker-ifying them would mean either inventing a fictitious
+authoring rule (silently dropping the per-node mutation, breaking
+A*'s feasibility model) or requiring `MarkerSnapshot` to be per-
+node-mutable (breaking its shared-read-only invariant, which is
+load-bearing for IAUS L2 throughput).
+
+**Reference.** [Ticket 092](../open-work/landed/092-unify-markersnapshot-plannerstate-statepredicate-feasibility.md)
+§Scope's opening list named 7 mirror candidates; the planning
+audit found only 2 (`HasStoredFood`,
+`ThornbriarAvailable`) were true mirrors. The remaining 5 split
+1 hybrid (`materials_available` → 096) + 4 search-state-only.
+This doctrine section exists so the next substrate-migration
+ticket doesn't repeat the audit error.
+
+#### §4.7.5 Cross-ref
+
+§4.3 (marker catalog — what can be substrate today), §4.6
+(authoring-system roster — where new substrate is authored from),
+§7.7 (commitment / re-planning — search-state's role inside one
+A* run). For the per-domain planner state types referenced above,
+see `src/ai/planner/mod.rs::PlannerState`,
+`src/ai/fox_planner`, `src/ai/hawk_planner`,
+`src/ai/snake_planner`.
 
 ---
 
