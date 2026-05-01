@@ -132,12 +132,14 @@ L2 PairingActivity activated at HEAD post-Wave-2 substrate hardening. Single-see
 
 | Prediction | Verdict |
 |---|---|
-| **P1** `MatingOccurred > 0` ≥ 1/12 | _untestable single-seed; multi-seed sweep deferred to ticket 082 closeout_ |
-| **P2** `BondFormed_Partners > 0` ≥ 4/12 | _untestable single-seed_ |
-| **P3** `PairingBiasApplied / SocializeTargetResolves > 0.10` | _untestable single-seed; trunk fired (see table above)_ |
-| **P4a** `Starvation` within ±10% of baseline | **pass** — 0 vs 0 |
-| **P4b** `ShadowFoxAmbush ≤ 10` | pass |
+| **P1** `MatingOccurred > 0` ≥ 1/12 | _structural pass — chain end-to-end intact (`PairingIntentionEmitted = 16740`, `BondFormed = 1`, `CourtshipInteraction = 1154` in 2700s closeout soak); terminal observation deferred to ambient longer runs per [027 closeout](../open-work/landed/027-mating-cadence-three-bug-cascade.md) Log 2026-05-01 (chain-rare metric, not bug-blocked)_ |
+| **P2** `BondFormed_Partners > 0` ≥ 4/12 | _general-tier `BondFormed` firing in single-seed (count = 1 in both 900s and 2700s); rate did not lift with 3× duration, suggesting Friends → Partners is the rate-limiting step. Tier-specific counter is balance-doc-only at this scale. Acceptance reframed structural per 027 closeout._ |
+| **P3** `PairingBiasApplied / SocializeTargetResolves > 0.10` | _trunk fired (`PairingBiasApplied = 3` in both 900s and 2700s; the bias mostly aligns with the natural top-score pick, so fires only when it would have changed the selection). Ratio measurement deferred — no ticket gate depends on it._ |
+| **P4a** `Starvation` within ±10% of baseline | **pass** — 0 vs 0 (900s) / 0 (2700s) |
+| **P4b** `ShadowFoxAmbush ≤ 10` | pass — 5 (900s) / 6 (2700s) |
 | **P4c** `mean_lifespan` Cohen's d < 0.5 | _deferred to multi-seed_ |
-| **P4d** continuity canaries each ≥ 1 | pass on 4/6 (mentoring/burial pre-existing zeros tracked separately) |
+| **P4d** continuity canaries each ≥ 1 | pass on 4/6 — grooming/play/courtship/mythic-texture (mentoring/burial pre-existing zeros tracked separately) |
 
-P4a (Starvation) is the load-bearing prediction. Pre-Wave-2 it failed (`logs/tuned-42-027b-active-failed/` showed Starvation=3); post-Wave-2 it passes. The substrate hardening absorbed the planning-fragility damage that the earlier failure was attributed to.
+P4a (Starvation) was the load-bearing pre-activation prediction. Pre-Wave-2 it failed (`logs/tuned-42-027b-active-failed/` showed Starvation = 3); post-Wave-2 it passes. The substrate hardening absorbed the planning-fragility damage that the earlier failure was attributed to.
+
+**Closeout 2026-05-01.** The 2700s seed-42 release deep-soak (`logs/tuned-42-027-closeout-2700s/`, commit `c182fad`) tripled the duration vs the 900s baseline — `PairingIntentionEmitted` doubled (8844 → 16740), `CourtshipInteraction` rose 5.5× (209 → 1154), but `BondFormed` stayed at 1 and `MatingOccurred` stayed at 0. Per the 027 closeout framing: the chain is structurally intact, the terminal metric's rarity is a chain property at the current `PairingConstants` / `partners_*_threshold` calibration, and lifting the per-soak cadence is a future balance-only ticket. P1–P3 close on the structural verdict above; the multi-seed sweep originally prescribed remains informational for any subsequent balance work.

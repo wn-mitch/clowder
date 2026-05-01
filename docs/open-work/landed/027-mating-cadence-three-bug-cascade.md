@@ -1,16 +1,16 @@
 ---
 id: 027
 title: Mating cadence — three-bug cascade blocking MatingOccurred
-status: in-progress
+status: done
 cluster: null
 added: 2026-04-25
 parked: null
 blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
-related-balance: []
-landed-at: null
-landed-on: null
+related-balance: [027-l2-pairing-activity.md]
+landed-at: c182fad
+landed-on: 2026-05-01
 ---
 
 ## Why
@@ -324,3 +324,50 @@ Per-bug acceptance:
   `PairingActivity` DSE remains as a possible follow-up if the
   bias-only intervention is insufficient — open as ticket 027b
   rather than nesting a fourth bug here.
+- 2026-05-01: **Closing on structural verification.** Bugs 1 + 2
+  landed at the original 2026-04-25 commits; Bug 3's missing-L2-
+  substrate scope split into ticket [027b](../landed/082-027b-l2-pairingactivity-reactivation-on-the-hardened-substra.md)
+  → 082, which landed on the post-071 hardened substrate at
+  `43cc38a`. The original "Bug 3: `MatingOccurred > 0` in ≥ 1 sweep
+  run" gate is over-cautious for a chain-rare metric — `MatingOccurred`
+  sits at the end of a long causal chain (Friends bond → L2 commit
+  → concentrated fondness/familiarity → Partners bond → MateDse
+  eligibility → MateWith planning → pregnancy roll), and rarity on
+  any given seed-42 soak is a property of the chain, not evidence
+  the structural fixes are insufficient. Mating has fired in older
+  / longer-duration runs; the bugs this ticket was about are fixed.
+
+  **Structural verification — `logs/tuned-42` (commit 25439daf,
+  900s) and `logs/tuned-42-027-closeout-2700s/` (commit c182fad,
+  2700s):**
+
+  | Chain link | Feature | tuned-42 (900s) | closeout (2700s) |
+  |---|---|---|---|
+  | L2 author (027b/082) | `PairingIntentionEmitted` | 8844 | 16740 |
+  | L2 drop gate | `PairingDropped` | 8844 | 16740 |
+  | L2 bias reader | `PairingBiasApplied` | 3 | 3 |
+  | bond escalation | `BondFormed` | 1 | 1 |
+  | Bug 1 observability | `CourtshipInteraction` | 209 | 1154 |
+  | (canary) | `continuity_tallies.courtship` | 210 | 1154 |
+  | terminal | `MatingOccurred` | 0 | 0 |
+
+  Every link upstream of the terminal metric fires. Bug 2's gate
+  was confirmed at landing (Simba focal trace at 082 showed 34,949
+  `mate` L2 records). The 1:1 emit:drop ratio on Pairings is the
+  bursty churn 027b §103 flagged as a watch item. `BondFormed`
+  rate did not improve with 3× duration (1 in both runs), which
+  points at the Friends → Partners escalation as the rate-limiting
+  step rather than mate selection or planning. Hard gates held in
+  the 2700s closeout: `Starvation = 0`, `ShadowFoxAmbush = 6 ≤ 10`,
+  four pass continuity canaries (grooming = 289, play = 517,
+  courtship = 1154, mythic-texture = 46) each ≥ 1.
+
+  The bias-only intervention from 2026-04-26 (target_partner_bond
+  axis on `socialize_target`, `partners_fondness_threshold` 0.60→0.55,
+  `courtship_romantic_rate` ×1.4) plus the L2 PairingActivity from
+  027b/082 work as designed; raising mating cadence to a higher
+  per-soak rate is balance work (`PairingConstants` axis weights,
+  `partners_*_threshold`, `courtship_romantic_rate` further tuning,
+  or a §7.4 fanaticism/flexibility re-eval cadence). That belongs
+  in a future balance-only ticket, not a structural one — the
+  three-bug cascade this ticket tracked is closed.

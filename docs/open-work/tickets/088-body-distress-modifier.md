@@ -5,7 +5,7 @@ status: ready
 cluster: ai-substrate
 added: 2026-04-30
 parked: null
-blocked-by: [014]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
@@ -19,7 +19,7 @@ Once interoceptive perception (087) publishes `body_distress_composite`, the nat
 
 Reframes 076 (last-resort-promotion-modifier, parked). 076 frames promotion as *post-failure* (after N recovery attempts fail); 088 frames it as *proactive* (when distress is high, before failures accumulate). The two are complementary: 088 is the early-warning lift, 076 is the panic-fallback. Both can ship.
 
-Blocked-by 087 (the perception module that publishes the signal) and the §L2.10 Modifier substrate work which is in flight under ticket 014 / 060 epic.
+Originally opened blocked-by 087 (the perception module that publishes the signal) and the §L2.10 Modifier substrate work then in flight under ticket 014 / 060 epic. Both prerequisites have since landed: 087 at `fc4e1ab` (2026-04-30); 014 at `453ea83` (2026-04-27); §L2.10 / §3.5.1 Modifier pipeline production-stable with `FoxTerritorySuppression` and `StockpileSatiation` (094, 2026-04-30) shipping through it. Frontmatter `blocked-by` cleared 2026-05-01.
 
 ## Substrate-over-override pattern
 
@@ -56,3 +56,4 @@ Part of the substrate-over-override thread (see [093](093-substrate-over-overrid
 ## Log
 
 - 2026-04-30: Opened alongside 087. Blocked-by 087 (perception substrate) until that lands.
+- 2026-05-01: Unblocked — frontmatter `blocked-by: [014]` cleared. 014 landed at `453ea83` (2026-04-27, three days before this ticket was opened — the block was stale at creation), 087 landed at `fc4e1ab` (2026-04-30), and the §L2.10 / §3.5.1 Modifier pipeline is production-stable (`FoxTerritorySuppression`, `StockpileSatiation` 094 both ship through `src/ai/modifier.rs`). 088 is actionable as the substrate prerequisite for 047 (`CriticalHealth` interrupt retirement).

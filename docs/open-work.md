@@ -8,28 +8,27 @@
 > fresh. See `CLAUDE.md` §"Long-horizon coordination" for the request-time
 > checklist and maintenance rules.
 
-_Last generated: 2026-04-30._
+_Last generated: 2026-05-01._
 
 ## Summary
 
 | Status | Count |
 |---|---|
-| In progress | 6 |
+| In progress | 5 |
 | Ready | 35 |
 | Parked | 6 |
 | Blocked | 10 |
-| **Open total** | **57** |
+| **Open total** | **56** |
 | Pre-existing | 1 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-index` (regenerate this file).
 
-## In progress (6)
+## In progress (5)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
-- **[027](docs/open-work/tickets/027-mating-cadence-three-bug-cascade.md)** — Mating cadence — three-bug cascade blocking MatingOccurred — _added 2026-04-25_
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _added 2026-04-27_
 - **[071](docs/open-work/tickets/071-planning-substrate-hardening.md)** — Planning-substrate hardening — gird against the stuck-cat bug class (sub-epic) — _[planning-substrate] · added 2026-04-29_
 - **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** — Substrate-over-override — retire control-yanking hacks in favor of IAUS levers — _[substrate-over-override] · added 2026-04-30_
@@ -64,7 +63,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[063](docs/open-work/tickets/063-ward-strength-promotion.md)** — Ward-strength promotion — first-class spatial axis (§5.6.3 row #3) — _added 2026-04-27_
 - **[064](docs/open-work/tickets/064-carcass-scent-consumer-cutover.md)** — Carcass-scent consumer cutover — replace observer_smells_at (§5.6.3 row #6) — _added 2026-04-27_
 - **[086](docs/open-work/tickets/086-farm-canary-triggering-scenario.md)** — Find a triggering scenario for Farm DSE canary (CropTended / CropHarvested) — _[balance] · added 2026-04-30_
-- **[088](docs/open-work/tickets/088-body-distress-modifier.md)** — Body-distress Modifier — uniform self-care promotion under §L2.10 Modifier substrate — _[ai-substrate] · blocked-by 014 · added 2026-04-30_
+- **[088](docs/open-work/tickets/088-body-distress-modifier.md)** — Body-distress Modifier — uniform self-care promotion under §L2.10 Modifier substrate — _[ai-substrate] · added 2026-04-30_
 - **[089](docs/open-work/tickets/089-interoceptive-self-anchors.md)** — Interoceptive self-anchors — spatial self-perception (OwnInjurySite, OwnSafeRestSpot) — _[ai-substrate] · added 2026-04-30_
 - **[090](docs/open-work/tickets/090-self-perception-l4-l5.md)** — L4/L5 self-perception — mastery-confidence, purpose-clarity, esteem-distress — _[ai-substrate] · added 2026-04-30_
 - **[095](docs/open-work/tickets/095-body-zones-epic.md)** — Body zones — anatomical injury model for all animal species — _added 2026-05-01_
@@ -98,9 +97,13 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 
-## Landed archive (65)
+## Landed archive (66)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
+
+### 2026-05 (1)
+
+- **[027](docs/open-work/landed/027-mating-cadence-three-bug-cascade.md)** — Mating cadence — three-bug cascade blocking MatingOccurred _(2026-05-01)_
 
 ### 2026-04 (65)
 

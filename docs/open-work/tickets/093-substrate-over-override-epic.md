@@ -98,7 +98,7 @@ The categories below are the surfaces where hack-shaped patterns live. Each row 
 
 | Location | Hack | Lever | Ticket |
 |---|---|---|---|
-| `src/ai/scoring.rs:916` (retired) + `socialize_target.rs:193` | lifted-condition outer gate (Bug 2, retired); bias-pin for missing L2 layer (Bug 3) | marker-based eligibility + L2 PairingActivity component | **027** (in-progress, Bugs 1+2 landed); **[027b](027b-l2-pairing-activity.md)** (blocked-by 071) |
+| `src/ai/scoring.rs:916` (retired) + `socialize_target.rs:193` (retired by 078) | lifted-condition outer gate (Bug 2, retired); bias-pin for missing L2 layer (Bug 3, retired by 027b/082) | marker-based eligibility + L2 PairingActivity component | **027** (closed 2026-05-01 on structural verification); **[027b](027b-l2-pairing-activity.md)** (blocked-by 071, reactivation landed via 082) |
 
 ## Substrate prerequisites for hack retirement
 
@@ -106,7 +106,7 @@ The sequencing rule applied across the inventory:
 
 | Hack to retire | Substrate prerequisite | Status |
 |---|---|---|
-| 047's `CriticalHealth` interrupt | [088](088-body-distress-modifier.md) (Body-distress Modifier) — must land first with sufficient magnitude | 088 blocked-by 014 |
+| 047's `CriticalHealth` interrupt | [088](088-body-distress-modifier.md) (Body-distress Modifier) — must land first with sufficient magnitude | 088 ready (unblocked 2026-05-01; 014 + 087 + Modifier pipeline all landed) |
 | 047's `Starvation`/`Exhaustion`/`CriticalSafety` interrupts | hunger_distress / exhaustion_distress / threat_proximity axes (extend 087's pattern; new sub-tickets) | not opened — open as 047 lands |
 | 091's `EatAtStores` precondition gap | `HasStoredFood` plumbed into `StatePredicate` | landed (091, 2026-04-30) — generalized via 092's `HasMarker` |
 | 091's silent-advance steps | `Fail` not `Advance` | landed (091, 2026-04-30) |
@@ -122,20 +122,20 @@ The sequencing rule applied across the inventory:
 
 | Ticket | Status | Pattern role |
 |---|---|---|
-| [027](027-mating-cadence-three-bug-cascade.md) | in-progress | multi-bug mating cascade (Bugs 1+2 landed; Bug 3 → 027b) |
+| ~~[027](../landed/027-mating-cadence-three-bug-cascade.md)~~ | done 2026-05-01 | multi-bug mating cascade (Bugs 1+2 landed; Bug 3 → 027b; closed on structural verification) |
 | [027b](027b-l2-pairing-activity.md) | blocked-by 071 | L2 substrate retiring 027 Bug 3's bias-pin |
 | [047](047-critical-health-interrupt-treadmill.md) | ready | **prototypical case** — interrupt → continuous IAUS axes |
 | [058](058-tradition-unfiltered-loop-fix.md) | parked 2026-04-30 | over-broad modifier → per-action keyed history axis (deferred until balance ticket) |
 | [076](076-last-resort-promotion-modifier.md) | parked | **re-evaluate with the lens** — possibly wrong shape |
 | [081](081-coordination-directive-failure-demotion.md) | parked | colony-level failure memory as substrate axis |
-| [088](088-body-distress-modifier.md) | blocked-by 014 | **substrate prerequisite for 047** |
+| [088](088-body-distress-modifier.md) | ready | **substrate prerequisite for 047** (unblocked 2026-05-01) |
 | [089](089-interoceptive-self-anchors.md) | ready | substrate expansion (spatial self-perception) |
 | [090](090-self-perception-l4-l5.md) | ready | substrate expansion (L4/L5 perception coverage) |
 | [096](096-materials-available-substrate-split.md) | ready (092 unblocked) | hybrid `PlannerState.materials_available` split — substrate-side marker + per-plan search field |
 | [097](097-non-cat-planner-substrate-audit.md) | ready | apply 092's structural cure to fox/hawk/snake planners |
 | [098](098-search-state-vs-substrate-doctrine.md) | ready | substrate-vs-search-state boundary doctrine in `docs/systems/ai-substrate-refactor.md` |
 
-**Total open: 12** (1 in-progress, 6 ready, 2 blocked, 3 parked).
+**Total open: 11** (0 in-progress, 8 ready, 0 blocked, 3 parked) — after 027 closeout (2026-05-01) and 088 unblock (2026-05-01).
 
 **Canonical exemplars (landed)**:
 - **087** — interoceptive perception substrate (CriticalHealth interrupt → `pain_level` + `body_distress_composite` axes), landed 2026-04-30 at `fc4e1ab`.
@@ -158,8 +158,8 @@ Opened 2026-04-30. Inventory cataloged 11 child tickets initially. As of 2026-04
 
 1. ~~Close 091~~ (landed 2026-04-30, bundled into 092).
 2. ~~Land 092~~ (landed 2026-04-30 at `25439daf` — structural cure for L2↔L3 sync drift).
-3. Promote 088 (currently blocked-by 014; it's the substrate prerequisite for 047).
-4. Tackle 047 (the prototypical case) with the lens explicit; per-disposition exemption lists fold in.
+3. ~~Promote 088~~ (unblocked 2026-05-01; 014 was landed at `453ea83` three days before 088 was opened — frontmatter `blocked-by: [014]` was stale at creation). 088 is the substrate prerequisite for 047.
+4. Land 088 (Body-distress Modifier reading 087's `body_distress_composite` into a uniform self-care lift) as the substrate axis. Then tackle 047 (the prototypical case) with the lens explicit; per-disposition exemption lists fold in.
 5. ~~058 (warm-up)~~ — parked 2026-04-30; revisit when a balance ticket opens for Tradition's bonus magnitude.
 6. 027/027b/078 thread runs in parallel under 071.
 7. Re-evaluate 076 and 081 with the lens before unparking.
@@ -188,4 +188,5 @@ Opened 2026-04-30. Inventory cataloged 11 child tickets initially. As of 2026-04
 - 2026-04-30: Opened from substrate-over-override pattern review session. Inventory enumerated 10 in-flight children plus canonical exemplar 087. Plan stored at `~/.claude/plans/looking-at-091-i-stateful-wand.md`. The pattern was implicitly being chased ticket-by-ticket; this epic is the explicit naming. The sequencing rule (substrate axes land before the corresponding hack retires) was extracted from the 087→091 cascade as a load-bearing discipline.
 - 2026-04-30: Renumbered 092 → 093 to resolve collision with concurrent ticket 092 (marker / state-predicate unification). Added 092 itself as the 11th child — it's the structural cure for the L2↔L3 feasibility-language drift class, the most general substrate-over-override case in the inventory.
 - 2026-04-30: **Reconciliation pass.** 091 landed (bundled into 092's commit at `25439daf` per jj history; the standalone `fa0f3a84` SHA in 091's frontmatter was a hidden pre-rebase snapshot). 092 landed at `25439daf`, opening follow-ons 096 (materials_available hybrid split), 097 (non-cat planner audit), 098 (substrate-vs-search-state doctrine) per CLAUDE.md §Long-horizon coordination antipattern-migration-follow-ups rule. 058 parked — Tradition's unfiltered-loop smell is dormant in production (`tradition_location_bonus = 0.0`); design choice (a) per-action-keyed vs (b) flat tile-familiarity deferred to a balance ticket when someone wants the bonus turned on. 091's investigation surfaced a third hack falling out under the 093 lens (`enforce_survival_floor` post-hoc score clamp), which was removed as part of 091's land. Archived 012 / 024 / 091 to `landed/2026-04.md`. Roster delta: +094 (Eat-vs-Forage natural-lever follow-up surfaced by 091, `cluster: substrate-over-override`), +096, +097, +098, -091 (done), -092 (landed). Total open 11 → 13. New cautionary-and-cure exemplar pair (091 + 092) joins 087 as the canonical landed set.
+- 2026-05-01: **027 closed on structural verification + 088 unblocked.** Ticket 027 (mating cadence three-bug cascade) closed at `e9efb4a6` — Bugs 1 + 2 landed at original commits; Bug 3 split into 027b → 082 (post-Wave-2 hardened substrate). The 2700s seed-42 closeout soak (`logs/tuned-42-027-closeout-2700s/`) confirmed every chain link upstream of `MatingOccurred` fires intact (PairingIntentionEmitted = 16740, CourtshipInteraction = 1154, BondFormed = 1) at 3× duration; terminal-tail rarity reframed as a chain property rather than a structural blocker. 088 (Body-distress Modifier) frontmatter `blocked-by: [014]` cleared — 014 had landed at `453ea83` (2026-04-27, three days before 088 was opened); 087 + the §L2.10 / §3.5.1 Modifier pipeline are also live. 088 is now `ready` and is the substrate prerequisite for 047 (`CriticalHealth` interrupt retirement). Roster delta: -027 (done), 088 blocked → ready. Total open 12 → 11 (0 in-progress, 8 ready, 0 blocked, 3 parked).
 - 2026-04-30: **094 landed.** New `StockpileSatiation` Modifier in §3.5.1 mirroring `FoxTerritorySuppression`'s shape — multiplicative damp on Hunt and Forage scaled by `food_fraction` excess over a threshold (default 0.5) up to a max suppression scale (default 0.85). Two new `ScoringConstants` tunables; seven new unit tests. Verification on the seed-42 deep-soak: total deaths 8 → 1 (no starvations), `FoodEaten` 207 → 407 (2.0×), Hunting plans −57%, Foraging plans −85%, Resting plans 4×, Lark hunger end 0.20 → 0.89, Nettle alive. **Cascade observation**: damping the food-acquisition class freed election cycles for the rest of the catalog — three never-fired social positives (`BondFormed`, `CourtshipInteraction`, `PairingIntentionEmitted`) started firing, courtship canary 0 → 210, anxiety interrupts −59%, ShadowFoxAmbush deaths 4 → 0. The case for the doctrine: get the score landscape right and three orthogonal behaviors recover for free. Roster delta: -094 (done). Total open 13 → 12. 094 joins 087 / 091 / 092 as the canonical landed set — 094 is the **natural-lever exemplar** (additive substrate, no override to retire).
