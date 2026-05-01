@@ -15,9 +15,9 @@ _Last generated: 2026-05-01._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 49 |
+| Ready | 50 |
 | Parked | 5 |
-| Blocked | 14 |
+| Blocked | 13 |
 | **Open total** | **73** |
 | Pre-existing | 1 |
 
@@ -33,7 +33,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[071](docs/open-work/tickets/071-planning-substrate-hardening.md)** — Planning-substrate hardening — gird against the stuck-cat bug class (sub-epic) — _[planning-substrate] · added 2026-04-29_
 - **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** — Substrate-over-override — retire control-yanking hacks in favor of IAUS levers — _[substrate-over-override] · added 2026-04-30_
 
-## Ready (49)
+## Ready (50)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -68,6 +68,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[096](docs/open-work/tickets/096-materials-available-substrate-split.md)** — Split `PlannerState.materials_available` into marker-backed entry + per-plan search field — _[ai-substrate] · added 2026-04-30_
 - **[097](docs/open-work/tickets/097-non-cat-planner-substrate-audit.md)** — Audit fox / hawk / snake planners for the parallel-feasibility-language smell 092 retired for cats — _[ai-substrate] · added 2026-04-30_
 - **[098](docs/open-work/tickets/098-search-state-vs-substrate-doctrine.md)** — Document the substrate-vs-search-state boundary in `docs/systems/ai-substrate-refactor.md` — _[docs] · added 2026-04-30_
+- **[099](docs/open-work/tickets/099-modifier-feature-emission.md)** — Feature emission for §3.5.1 Modifiers — colony-wide canary surface for substrate-lift signals — _[ai-substrate] · added 2026-05-01_
 - **[100](docs/open-work/tickets/100-tremor-action-multiplier-wiring.md)** — Tremor map, Action::Stalk, and personality-driven hunt approach — _blocked-by 062 · added 2026-05-01_
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _blocked-by 100 · added 2026-05-01_
 - **[102](docs/open-work/tickets/102-acute-health-adrenaline-fight-branch.md)** — AcuteHealthAdrenaline Fight branch — cornered/maternal-defense valence — _[ai-substrate] · blocked-by 103 · added 2026-05-01_
@@ -93,7 +94,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[081](docs/open-work/tickets/081-coordination-directive-failure-demotion.md)** — Coordination directive-failure demotion (colony-side stuck-loop guard) — _[planning-substrate] · parked 2026-04-29 · added 2026-04-29_
 - **[084](docs/open-work/tickets/084-farm-herb-ward-demand-axis.md)** — Farm DSE — tie scoring to herb/ward stockpile demand so gardens stay productive under abundant food — _[balance] · parked 2026-04-30 · blocked-by 086 · added 2026-04-29_
 
-## Blocked (14)
+## Blocked (13)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _blocked-by 007, 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _blocked-by 016 · added 2026-04-22_
@@ -104,7 +105,6 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[053](docs/open-work/tickets/053-death-event-grief-emission.md)** — §7.7.b death-event grief emission — relationship-classified survivors payload — _blocked-by 007 · added 2026-04-27_
 - **[055](docs/open-work/tickets/055-mood-drift-threshold-detection.md)** — §7.7.d mood drift-threshold detection — sustain-duration + arc-misalignment trigger — _blocked-by 056 · added 2026-04-27_
 - **[057](docs/open-work/tickets/057-coordinator-directive-intention-strategy-row.md)** — §7.3 coordinator-directive Intention strategy row — `SingleMinded` with override — _blocked-by 007 · added 2026-04-27_
-- **[099](docs/open-work/tickets/099-modifier-feature-emission.md)** — Feature emission for §3.5.1 Modifiers — colony-wide canary surface for substrate-lift signals — _[ai-substrate] · blocked-by 047 · added 2026-05-01_
 - **[105](docs/open-work/tickets/105-acute-health-adrenaline-freeze-branch.md)** — AcuteHealthAdrenaline Freeze branch — overmatched-predator response — _[ai-substrate] · blocked-by 103, 104 · added 2026-05-01_
 - **[111](docs/open-work/tickets/111-088-body-distress-promotion-retire.md)** — Retire 088 BodyDistressPromotion once kind-specific modifiers cover its surface — _[ai-substrate] · blocked-by 106, 107, 110 · added 2026-05-01_
 - **[119](docs/open-work/tickets/119-critical-health-interrupt-retire.md)** — Retire CriticalHealth interrupt — final substrate-over-override step for ticket 047 — _[ai-substrate] · blocked-by 118 · added 2026-05-01_
