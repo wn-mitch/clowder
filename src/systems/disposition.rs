@@ -2983,12 +2983,14 @@ pub fn resolve_disposition_chains(
                     // `docs/balance/respect-restoration.md`.
                     // Building completion grants extra mood boost ("built something").
                     if disp.kind == DispositionKind::Building {
-                        mood.modifiers
-                            .push_back(crate::components::mental::MoodModifier {
-                                amount: 0.2,
-                                ticks_remaining: 100,
-                                source: "built something".to_string(),
-                            });
+                        mood.modifiers.push_back(
+                            crate::components::mental::MoodModifier::new(
+                                0.2,
+                                100,
+                                "built something",
+                            )
+                            .with_kind(crate::components::mental::MoodSource::Pride),
+                        );
                     }
                 }
                 if let Some(mut hist) = history {

@@ -1,16 +1,16 @@
 ---
 id: 047
 title: CriticalHealth interrupt is a treadmill, not a brake — replan picks the same disposition while damage accumulates
-status: ready
-cluster: null
+status: done
+cluster: ai-substrate
 added: 2026-04-27
 parked: null
 blocked-by: []
 supersedes: []
-related-systems: [needs.md]
-related-balance: []
-landed-at: null
-landed-on: null
+related-systems: [needs.md, ai-substrate-refactor.md]
+related-balance: [047-acute-health-adrenaline.md]
+landed-at: pending
+landed-on: 2026-05-01
 ---
 
 ## Why
@@ -103,3 +103,9 @@ Part of the substrate-over-override thread (see [093](093-substrate-over-overrid
 ## Log
 
 - 2026-04-27: Ticket opened during post-043+044 collapse-probe drill-down. Mallow's 1Hz Guarding/Crafting oscillation at the moment of his death is the smoking-gun trace; same family as 042 and 043.
+- 2026-05-01: Phase 0 confirmed threshold misalignment — Mallow's `body_distress_composite ≈ 0.61` at his death window sits below 088's threshold of 0.7, so 088's substrate categorically did not fire. Required a kind-specific modifier reading `health_deficit` directly.
+- 2026-05-01: Phase 1 landed `AcuteHealthAdrenalineFlee` modifier (`src/ai/modifier.rs`) — sigmoid lurch on `health_deficit >= 0.4`, lifts Flee (+0.60) and Sleep (+0.50) per the fight-or-flight semantic model. Defaults shipped at 0.0/0.0 (modifier inert) so Phase 3 hypothesize can contrast vs the lift-active treatment. 8 unit tests, full lib suite 1667 passing, `just check` clean.
+- 2026-05-01: Phase 2 focal-trace soak at seed 42 / 3600s (logs/tuned-42) confirmed the modifier fires with correct deltas (+0.50 Sleep, +0.60 Flee) and Mallow survived past tick 1.27M (vs death at tick 1.21M in the collapse-probe). Sleep wins the L2 scoring layer in 99.3% of injured-window L3 ticks but is **chosen** only 1.4% — a momentum/plan-completion gap where in-flight Hunt/Forage/Patrol plans complete before Sleep can be selected. Substrate works at scoring layer; behavioral expression is gated.
+- 2026-05-01: Phase 4 (interrupt retirement) **deferred** to follow-on ticket 119 because removing the legacy CriticalHealth interrupt would lose its force-Flee path (responsible for ~64% of the actual life-saving in the verification soak). Substrate-over-override discipline requires the substrate to drive behavior, not just rank highest in the scoring layer. Opened ticket 118 (modifier-lift-vs-plan-completion-momentum) as the substrate-quality fix that unblocks 119.
+- 2026-05-01: Phase 3 hypothesize sweep (3 seeds × 3 reps × 900s): primary metric (CriticalHealth interrupt count) returned wrong-direction +89% — predicted side effect of cats surviving longer in injured states (more ticks alive = more interrupt firings). Cross-metric `sweep-stats --vs` analysis: only one metric crossed `significant` band — `shadow_fox_spawn_total` +93% (p=0.017, d=1.35). Positive signals: `continuity_tallies.courtship` 0 → 1197 (NEW NONZERO; major continuity restoration), `welfare_axes.purpose.min` +288%, single-seed `anxiety_interrupt_total` -80%. Other shifts to characterize (not classified as regressions): `welfare_axes.social_warmth.max` -96%, `deaths_by_cause.Injury` 0 → 0.67 mean (NEW). Hard survival gates (Starvation, ShadowFoxAmbush) hold across the sweep. **The colony equilibrium itself shifts under the new substrate** — cats live longer in injured states and downstream metrics shift accordingly; surfaced drifts may reflect the new regime rather than regressions to fix. Decision: **ship the modifier wired but inert** (defaults stay at 0.0/0.0). Substrate infrastructure + paradigm land; magnitudes are an independent tuning question for the next iteration once 118's momentum fix lands and 120/117 characterize the equilibrium shifts. Balance doc at `docs/balance/047-acute-health-adrenaline.md` carries the full analysis + decision.
+- 2026-05-01: Follow-on tickets opened in this commit (per CLAUDE.md substrate-over-override discipline): 102 (AcuteHealthAdrenaline.Fight), 103 (escape_viability scalar), 104 (Hide/Freeze DSE), 105 (AcuteHealthAdrenaline.Freeze), 106 (HungerUrgency), 107 (ExhaustionPressure), 108 (ThreatProximityAdrenaline), 109 (IntraspeciesConflictResponse — full four-valence including fawn), 110 (ThermalDistress), 111 (retire 088 BodyDistressPromotion), 112 (retire per-disposition exemption lists), 113 (interrupt-invariant + distress-modifiers doc), 118 (modifier-lift-vs-plan-completion-momentum), 119 (CriticalHealth interrupt retirement, blocked by 118), 120 (shadow-fox spawn vs cat-presence coupling — investigates the only `significant`-band metric drift from this ticket's sweep), 117 (social-warmth tradeoff — investigates -96% drift, blocked by 118).

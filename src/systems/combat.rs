@@ -3,7 +3,7 @@ use rand::Rng;
 
 use crate::ai::{Action, CurrentAction};
 use crate::components::identity::{Gender, LifeStage, Name};
-use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier};
+use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier, MoodSource};
 use crate::components::personality::Personality;
 use crate::components::physical::{
     Dead, Health, Injury, InjuryKind, InjurySource, Needs, Position,
@@ -340,11 +340,14 @@ pub fn resolve_combat(
                 // Cat flees.
                 cats_to_flee.push(fight.cat_entity);
 
-                mood.modifiers.push_back(MoodModifier {
-                    amount: c.flee_mood_penalty,
-                    ticks_remaining: c.flee_mood_duration.ticks(&time_scale),
-                    source: "fled from combat".to_string(),
-                });
+                mood.modifiers.push_back(
+                    MoodModifier::new(
+                        c.flee_mood_penalty,
+                        c.flee_mood_duration.ticks(&time_scale),
+                        "fled from combat",
+                    )
+                    .with_kind(MoodSource::Fear),
+                );
             }
         }
     }
@@ -430,11 +433,10 @@ pub fn resolve_combat(
                 let gain = c.banishment_combat_skill_grow
                     / (1.0 + prior_triumphs * c.banishment_skill_gain_diminish_factor);
                 skills.combat = (skills.combat + gain).min(5.0);
-                mood.modifiers.push_back(MoodModifier {
-                    amount: c.banishment_valor_mood,
-                    ticks_remaining: valor_ticks,
-                    source: "valor from banishment".to_string(),
-                });
+                mood.modifiers.push_back(
+                    MoodModifier::new(c.banishment_valor_mood, valor_ticks, "valor from banishment")
+                        .with_kind(MoodSource::Triumph),
+                );
                 memory.remember(MemoryEntry {
                     event_type: MemoryType::Triumph,
                     location: Some(*target_pos),
@@ -452,11 +454,14 @@ pub fn resolve_combat(
                 cats.get_mut(*witness)
             {
                 w_needs.safety = w_needs.safety.max(c.banishment_witness_safety_floor);
-                w_mood.modifiers.push_back(MoodModifier {
-                    amount: c.banishment_witness_mood,
-                    ticks_remaining: seasonal_ticks,
-                    source: "witnessed a banishment".to_string(),
-                });
+                w_mood.modifiers.push_back(
+                    MoodModifier::new(
+                        c.banishment_witness_mood,
+                        seasonal_ticks,
+                        "witnessed a banishment",
+                    )
+                    .with_kind(MoodSource::Triumph),
+                );
                 w_memory.remember(MemoryEntry {
                     event_type: MemoryType::Triumph,
                     location: Some(*target_pos),
@@ -551,11 +556,12 @@ pub fn resolve_combat(
             needs.safety = (needs.safety + c.victory_safety_gain).min(1.0);
             current.ticks_remaining = 0; // Allow new action selection.
 
-            let mut victory_mod = MoodModifier {
-                amount: c.victory_mood_bonus,
-                ticks_remaining: c.victory_mood_duration.ticks(&time_scale),
-                source: "won a fight".to_string(),
-            };
+            let mut victory_mod = MoodModifier::new(
+                c.victory_mood_bonus,
+                c.victory_mood_duration.ticks(&time_scale),
+                "won a fight",
+            )
+            .with_kind(MoodSource::Pride);
             crate::systems::mood::patience_extend(
                 &mut victory_mod,
                 personality.patience,

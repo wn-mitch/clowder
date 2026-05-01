@@ -4,7 +4,7 @@ use rand::Rng;
 use crate::ai::{Action, CurrentAction};
 use crate::components::coordination::ActiveDirective;
 use crate::components::identity::{Age, Gender, Name};
-use crate::components::mental::{Mood, MoodModifier, PrideCooldown};
+use crate::components::mental::{Mood, MoodModifier, MoodSource, PrideCooldown};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Needs, Position};
 use crate::events::personality::{DirectiveRefused, PlayInitiated, PrideCrisis, TemperFlared};
@@ -174,11 +174,10 @@ fn on_temper_flared(
 
         // Mood hit on target.
         if let Ok(mut target_mood) = moods.get_mut(target) {
-            target_mood.modifiers.push_back(MoodModifier {
-                amount: -0.2,
-                ticks_remaining: 20,
-                source: format!("snapped at by {cat_name}"),
-            });
+            target_mood.modifiers.push_back(
+                MoodModifier::new(-0.2, 20, format!("snapped at by {cat_name}"))
+                    .with_kind(MoodSource::Social),
+            );
         }
 
         log.push(
@@ -209,11 +208,10 @@ fn on_directive_refused(
 
     // Coordinator mood penalty.
     if let Ok(mut coord_mood) = moods.get_mut(event.coordinator) {
-        coord_mood.modifiers.push_back(MoodModifier {
-            amount: -0.15,
-            ticks_remaining: 20,
-            source: format!("directive ignored by {cat_name}"),
-        });
+        coord_mood.modifiers.push_back(
+            MoodModifier::new(-0.15, 20, format!("directive ignored by {cat_name}"))
+                .with_kind(MoodSource::Social),
+        );
     }
     relationships.modify_fondness(event.coordinator, event.cat, -0.03);
 
@@ -231,11 +229,14 @@ fn on_directive_refused(
                 .map_or(0.0, |r| r.fondness);
             if fondness_to_coord > 0.3 {
                 if let Ok(mut bystander_mood) = moods.get_mut(other) {
-                    bystander_mood.modifiers.push_back(MoodModifier {
-                        amount: -0.08,
-                        ticks_remaining: 15,
-                        source: format!("saw {cat_name} ignore the coordinator"),
-                    });
+                    bystander_mood.modifiers.push_back(
+                        MoodModifier::new(
+                            -0.08,
+                            15,
+                            format!("saw {cat_name} ignore the coordinator"),
+                        )
+                        .with_kind(MoodSource::Social),
+                    );
                 }
                 relationships.modify_fondness(other, event.cat, -0.01);
             }
@@ -296,11 +297,8 @@ fn on_play_initiated(
         }
         // Mood boost to all nearby.
         if let Ok(mut other_mood) = moods.get_mut(other) {
-            let mut modifier = MoodModifier {
-                amount: 0.1,
-                ticks_remaining: 15,
-                source: "watched play nearby".to_string(),
-            };
+            let mut modifier = MoodModifier::new(0.1, 15, "watched play nearby")
+                .with_kind(MoodSource::Social);
             patience_extend(&mut modifier, other_pers.patience, &constants.mood);
             other_mood.modifiers.push_back(modifier);
         }
@@ -435,11 +433,7 @@ mod tests {
     #[test]
     fn patience_extend_positive_modifier() {
         let mc = &crate::resources::SimConstants::default().mood;
-        let mut m = MoodModifier {
-            amount: 0.3,
-            ticks_remaining: 50,
-            source: "test".to_string(),
-        };
+        let mut m = MoodModifier::new(0.3, 50, "test");
         patience_extend(&mut m, 1.0, mc);
         // 50 + (1.0 * 50 * 0.3).round() = 50 + 15 = 65
         assert_eq!(m.ticks_remaining, 65);
@@ -448,11 +442,7 @@ mod tests {
     #[test]
     fn patience_extend_does_not_affect_negative() {
         let mc = &crate::resources::SimConstants::default().mood;
-        let mut m = MoodModifier {
-            amount: -0.3,
-            ticks_remaining: 50,
-            source: "test".to_string(),
-        };
+        let mut m = MoodModifier::new(-0.3, 50, "test");
         patience_extend(&mut m, 1.0, mc);
         assert_eq!(m.ticks_remaining, 50);
     }
@@ -460,11 +450,7 @@ mod tests {
     #[test]
     fn patience_extend_zero_patience() {
         let mc = &crate::resources::SimConstants::default().mood;
-        let mut m = MoodModifier {
-            amount: 0.3,
-            ticks_remaining: 50,
-            source: "test".to_string(),
-        };
+        let mut m = MoodModifier::new(0.3, 50, "test");
         patience_extend(&mut m, 0.0, mc);
         assert_eq!(m.ticks_remaining, 50);
     }

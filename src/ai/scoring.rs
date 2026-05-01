@@ -459,6 +459,13 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
     // inverted-need-penalty Logistic sees the satisfaction scalar
     // directly (per §2.3 row 1021).
     m.insert("social_deficit", (1.0 - ctx.needs.social).clamp(0.0, 1.0));
+    // §7.2 satiation axis (ticket 122). Raw `social` (NOT a deficit) —
+    // the Socialize DSE's curve maps high satiation → low score so the
+    // producer side mirrors the OpenMinded gate's `still_goal` proxy
+    // (`needs.social < social_satiation_threshold`). Lifting the gate's
+    // predicate into IAUS scoring eliminates same-tick PlanCreated →
+    // CommitmentDropOpenMinded round-trips on already-bonded cats.
+    m.insert("social_satiation", ctx.needs.social.clamp(0.0, 1.0));
     m.insert("mating_deficit", (1.0 - ctx.needs.mating).clamp(0.0, 1.0));
     m.insert(
         "thermal_deficit",

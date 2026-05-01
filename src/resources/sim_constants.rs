@@ -769,6 +769,14 @@ pub struct MoodConstants {
     pub contentment_mood_bonus: f32,
     pub bond_proximity_mood: f32,
 
+    // --- Per-kind decay / amplification (ticket 114) ---
+    /// Ticks subtracted per game-tick from Fear modifiers (default 2 = fades twice as fast).
+    pub fear_decay_rate: u64,
+    /// Anxiety amplification weight for Fear modifiers (default 1.5 — fear hits harder).
+    pub fear_anxiety_amp_weight: f32,
+    /// Anxiety amplification weight for Grief modifiers (default 0.3 — grief is inward).
+    pub grief_anxiety_amp_weight: f32,
+
     // --- Counts / radii ---
     pub contagion_range: i32,
     pub bond_proximity_range: i32,
@@ -797,6 +805,11 @@ impl Default for MoodConstants {
             contentment_mood_bonus: 0.05,
             bond_proximity_mood: 0.03,
 
+            // Per-kind decay / amplification
+            fear_decay_rate: 2,
+            fear_anxiety_amp_weight: 1.5,
+            grief_anxiety_amp_weight: 0.3,
+
             // Counts / radii
             contagion_range: 3,
             bond_proximity_range: 3,
@@ -816,6 +829,18 @@ pub struct DeathConstants {
     pub grief_detection_range: i32,
     pub grief_memory_strength: f32,
     pub cleanup_grace_period: u64,
+
+    // --- Bond-grief (ticket 116) ---
+    /// Mood-penalty magnitude for losing a bonded partner. Applied as
+    /// `-(intensity * fondness)` so a fondness-0.0 bond produces no grief.
+    pub bereavement_mates_intensity: f32,
+    pub bereavement_partners_intensity: f32,
+    pub bereavement_friends_intensity: f32,
+    /// How long bond grief lasts in raw ticks. Mates grief outlasts Partners outlasts Friends.
+    /// Default at 1000 ticks/day: 3 days / 1.5 days / 0.5 day.
+    pub bereavement_mates_ticks: u64,
+    pub bereavement_partners_ticks: u64,
+    pub bereavement_friends_ticks: u64,
 }
 
 impl Default for DeathConstants {
@@ -837,6 +862,14 @@ impl Default for DeathConstants {
             grief_detection_range: 5,
             grief_memory_strength: 1.0,
             cleanup_grace_period: 500,
+
+            // Bond grief (ticket 116) — ships active at meaningful intensities.
+            bereavement_mates_intensity: 0.7,
+            bereavement_partners_intensity: 0.5,
+            bereavement_friends_intensity: 0.3,
+            bereavement_mates_ticks: 3000,
+            bereavement_partners_ticks: 1500,
+            bereavement_friends_ticks: 500,
         }
     }
 }
@@ -1307,6 +1340,42 @@ pub struct ScoringConstants {
     /// 047 retires its CriticalHealth interrupt branch.
     #[serde(default = "default_body_distress_promotion_lift")]
     pub body_distress_promotion_lift: f32,
+    /// Ticket 047 — `AcuteHealthAdrenalineFlee` Modifier threshold. The
+    /// `health_deficit` floor below which the lurch is a no-op. Set to
+    /// align with `disposition.critical_health_threshold` (0.4) so the
+    /// substrate engages whenever the legacy `CriticalHealth` interrupt
+    /// would have. Distinct from `body_distress_promotion_threshold`
+    /// (0.7, applied to the `max()`-composite scalar): this modifier
+    /// reads `health_deficit` directly so it fires on injury alone, even
+    /// when other axes are quiet — matching the predator-injury scenario
+    /// the legacy interrupt was built to catch.
+    #[serde(default = "default_acute_health_adrenaline_threshold")]
+    pub acute_health_adrenaline_threshold: f32,
+    /// Ticket 047 — `AcuteHealthAdrenalineFlee` lift on the Flee DSE
+    /// when `health_deficit >= threshold + transition_width`. Ramps via
+    /// a narrow smoothstep (width 0.1) from threshold so the lift feels
+    /// like an adrenaline *lurch* rather than a gentle preference shift.
+    /// Default 0.60 — large enough that an injured cat's Flee score can
+    /// dominate other actions even when Flee's underlying score is low
+    /// (e.g. 0.06 + 0.60 = 0.66 puts Flee competitive with the typical
+    /// 0.55–0.70 Forage / Fight winners). Note: Flee is filtered from
+    /// the disposition softmax pool today (`scoring.rs`), so this lift
+    /// primarily intervenes via the Flee behavior-gate path; pair with
+    /// the Sleep lift below for the in-pool re-rank effect.
+    #[serde(default = "default_acute_health_adrenaline_flee_lift")]
+    pub acute_health_adrenaline_flee_lift: f32,
+    /// Ticket 047 — `AcuteHealthAdrenalineFlee` lift on the Sleep DSE,
+    /// the in-pool partner to the Flee lift. Adrenaline-driven retreat
+    /// to a safer position is mechanically expressed in Clowder as the
+    /// cat selecting Sleep (which routes to a den) rather than staying
+    /// in combat. Default 0.50 — smaller than Flee (escape is
+    /// preferred) but large enough to overtake mid-tier Forage / Hunt
+    /// scores in the disposition softmax. Composes additively with
+    /// 088's `BodyDistressPromotion` lift; under combined high
+    /// composite + acute health-deficit a cat sees up to ~0.70 lift on
+    /// Sleep (0.50 here + up to 0.20 from 088).
+    #[serde(default = "default_acute_health_adrenaline_sleep_lift")]
+    pub acute_health_adrenaline_sleep_lift: f32,
     pub wander_curiosity_scale: f32,
     pub wander_base: f32,
     pub wander_playfulness_bonus: f32,
@@ -1501,6 +1570,9 @@ impl Default for ScoringConstants {
             stockpile_satiation_scale: default_stockpile_satiation_scale(),
             body_distress_promotion_threshold: default_body_distress_promotion_threshold(),
             body_distress_promotion_lift: default_body_distress_promotion_lift(),
+            acute_health_adrenaline_threshold: default_acute_health_adrenaline_threshold(),
+            acute_health_adrenaline_flee_lift: default_acute_health_adrenaline_flee_lift(),
+            acute_health_adrenaline_sleep_lift: default_acute_health_adrenaline_sleep_lift(),
             wander_curiosity_scale: 0.4,
             wander_base: 0.08,
             wander_playfulness_bonus: 0.2,
@@ -2114,6 +2186,38 @@ fn default_body_distress_promotion_threshold() -> f32 {
 /// distress.
 fn default_body_distress_promotion_lift() -> f32 {
     0.20
+}
+
+/// Ticket 047 — `AcuteHealthAdrenalineFlee` threshold. Mirrors
+/// `disposition.critical_health_threshold = 0.4` so the substrate fires
+/// in the same regime the legacy interrupt did. Threshold is the
+/// `health_deficit` (= `1 - health.current/health.max`) value at which
+/// the smoothstep ramp begins.
+fn default_acute_health_adrenaline_threshold() -> f32 {
+    0.4
+}
+
+/// Ticket 047 — `AcuteHealthAdrenalineFlee` Flee-DSE lurch magnitude.
+/// **Defaults to 0.0** so the modifier ships inert; the proposed
+/// magnitude (0.60) is enabled via `CLOWDER_OVERRIDES` for the Phase 3
+/// hypothesis sweep. The hypothesize harness compares baseline (no
+/// patch) against treatment (lift active), measuring the substrate's
+/// behavioral effect before Phase 4 retires the legacy CriticalHealth
+/// interrupt and promotes 0.60 (or the swept-validated value) to the
+/// shipped default.
+fn default_acute_health_adrenaline_flee_lift() -> f32 {
+    0.0
+}
+
+/// Ticket 047 — `AcuteHealthAdrenalineFlee` Sleep-DSE lurch magnitude.
+/// **Defaults to 0.0** so the modifier ships inert; the proposed
+/// magnitude (0.50) is enabled via `CLOWDER_OVERRIDES` for the Phase 3
+/// hypothesis sweep. Sleep is the in-pool partner to Flee (Flee is
+/// filtered from the disposition softmax) — the Sleep lift is what
+/// actually flips the contest away from Guarding/Crafting under
+/// injury, since Sleep routes the cat to a den.
+fn default_acute_health_adrenaline_sleep_lift() -> f32 {
+    0.0
 }
 
 fn default_build_pressure_cooking_min_raw_food() -> usize {
@@ -3834,6 +3938,14 @@ pub struct PlanningSubstrateConstants {
     /// per ticket 073's Out-of-scope note. Quarterly
     /// `just rebuild-sensitivity-map` will re-tune.
     pub target_failure_cooldown_ticks: u64,
+    /// Ticket 123 — how long a `PlanningFailed/no_plan_found` penalty
+    /// persists for the offending disposition on a cat's
+    /// `RecentDispositionFailures` map. Default `4000` ≈ 1 sim-hour at
+    /// the 1000-ticks-per-day scale; half the target-failure window
+    /// because dispositions are coarser-grained than per-target
+    /// failures and we want recovery on the same in-day timescale.
+    /// Quarterly `just rebuild-sensitivity-map` will re-tune.
+    pub disposition_failure_cooldown_ticks: u64,
 }
 
 impl Default for PlanningSubstrateConstants {
@@ -3841,6 +3953,7 @@ impl Default for PlanningSubstrateConstants {
         Self {
             reservation_ttl_ticks: 600,
             target_failure_cooldown_ticks: 8000,
+            disposition_failure_cooldown_ticks: 4000,
         }
     }
 }

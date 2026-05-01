@@ -1,6 +1,6 @@
 use bevy_ecs::prelude::*;
 
-use crate::components::mental::{Mood, MoodModifier};
+use crate::components::mental::{Mood, MoodModifier, MoodSource};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Needs, Position};
 use crate::resources::relationships::Relationships;
@@ -25,9 +25,13 @@ pub fn update_mood(
     let c = &constants.mood;
     let contentment_mood_ticks = c.contentment_mood_duration.ticks(&time_scale);
     for (mut mood, personality, needs) in &mut query {
-        // Tick down and remove expired modifiers.
+        // Tick down and remove expired modifiers. Fear decays faster.
         mood.modifiers.retain_mut(|m| {
-            m.ticks_remaining = m.ticks_remaining.saturating_sub(1);
+            let step = match m.kind {
+                MoodSource::Fear => c.fear_decay_rate,
+                _ => 1,
+            };
+            m.ticks_remaining = m.ticks_remaining.saturating_sub(step);
             m.ticks_remaining > 0
         });
 
@@ -41,19 +45,26 @@ pub fn update_mood(
             .map(|m| m.amount)
             .sum();
 
-        let negative_sum: f32 = mood
-            .modifiers
-            .iter()
-            .filter(|m| m.amount < 0.0)
-            .map(|m| m.amount)
-            .sum();
-
-        // Anxious cats feel negative events more intensely.
+        // Anxious cats feel negative events more intensely — but the weight
+        // varies by kind: fear hits hard, grief is more inward.
         // Temper amplifies negatives when physiological needs are unmet.
         let phys = needs.physiological_satisfaction();
         let temper_amp = personality.temper * c.temper_amplification_scale * (1.0 - phys);
-        let amplified_negative =
-            negative_sum * (1.0 + personality.anxiety * c.anxiety_amplification + temper_amp);
+        let amplified_negative: f32 = mood
+            .modifiers
+            .iter()
+            .filter(|m| m.amount < 0.0)
+            .map(|m| {
+                let amp_weight = match m.kind {
+                    MoodSource::Fear  => c.fear_anxiety_amp_weight,
+                    MoodSource::Grief => c.grief_anxiety_amp_weight,
+                    _                 => 1.0,
+                };
+                m.amount
+                    * (1.0 + personality.anxiety * c.anxiety_amplification * amp_weight
+                        + temper_amp)
+            })
+            .sum();
 
         mood.valence = (baseline + positive_sum + amplified_negative).clamp(-1.0, 1.0);
 
@@ -62,22 +73,20 @@ pub fn update_mood(
         if needs.respect < c.wounded_pride_respect_threshold
             && !mood.modifiers.iter().any(|m| m.source == "wounded pride")
         {
-            mood.modifiers.push_back(MoodModifier {
-                amount: -(personality.pride * c.wounded_pride_scale),
-                ticks_remaining: 1,
-                source: "wounded pride".to_string(),
-            });
+            mood.modifiers.push_back(
+                MoodModifier::new(-(personality.pride * c.wounded_pride_scale), 1, "wounded pride")
+                    .with_kind(MoodSource::Pride),
+            );
         }
 
         // Contentment: well-fed, rested, warm cats feel a small positive glow.
         if needs.physiological_satisfaction() >= c.contentment_phys_threshold
             && !mood.modifiers.iter().any(|m| m.source == "contentment")
         {
-            mood.modifiers.push_back(MoodModifier {
-                amount: c.contentment_mood_bonus,
-                ticks_remaining: contentment_mood_ticks,
-                source: "contentment".to_string(),
-            });
+            mood.modifiers.push_back(
+                MoodModifier::new(c.contentment_mood_bonus, contentment_mood_ticks, "contentment")
+                    .with_kind(MoodSource::Physical),
+            );
         }
     }
 }
@@ -146,11 +155,10 @@ pub fn mood_contagion(
                 * (1.0 - personality.stubbornness * c.contagion_stubbornness_resistance);
 
             activation.record(Feature::MoodContagion);
-            mood.modifiers.push_back(MoodModifier {
-                amount: influence,
-                ticks_remaining: contagion_modifier_ticks,
-                source: "contagion".to_string(),
-            });
+            mood.modifiers.push_back(
+                MoodModifier::new(influence, contagion_modifier_ticks, "contagion")
+                    .with_kind(MoodSource::Social),
+            );
         }
     }
 }
@@ -193,11 +201,10 @@ pub fn bond_proximity_mood(
         });
 
         if has_nearby_bond {
-            mood.modifiers.push_back(MoodModifier {
-                amount: c.bond_proximity_mood,
-                ticks_remaining: bond_proximity_mood_ticks,
-                source: "social warmth".to_string(),
-            });
+            mood.modifiers.push_back(
+                MoodModifier::new(c.bond_proximity_mood, bond_proximity_mood_ticks, "social warmth")
+                    .with_kind(MoodSource::Social),
+            );
         }
     }
 }
@@ -271,11 +278,7 @@ mod tests {
         let entity = spawn_cat_mood(
             &mut world,
             default_personality(),
-            vec![MoodModifier {
-                amount: 0.5,
-                ticks_remaining: 3,
-                source: "test".to_string(),
-            }],
+            vec![MoodModifier::new(0.5, 3, "test")],
         );
         // Give the cat low hunger so contentment doesn't fire and add extra modifiers.
         world.get_mut::<Needs>(entity).unwrap().hunger = 0.1;
@@ -300,11 +303,7 @@ mod tests {
         let entity = spawn_cat_mood(
             &mut world,
             default_personality(),
-            vec![MoodModifier {
-                amount: 0.5,
-                ticks_remaining: 10,
-                source: "happy".to_string(),
-            }],
+            vec![MoodModifier::new(0.5, 10, "happy")],
         );
 
         schedule.run(&mut world);
@@ -329,11 +328,7 @@ mod tests {
         let cat_anxious = spawn_cat_mood(
             &mut world_high,
             anxious,
-            vec![MoodModifier {
-                amount: -0.3,
-                ticks_remaining: 10,
-                source: "bad".to_string(),
-            }],
+            vec![MoodModifier::new(-0.3, 10, "bad")],
         );
 
         let (mut world_low, mut schedule_low) = setup_mood_world();
@@ -342,11 +337,7 @@ mod tests {
         let cat_calm = spawn_cat_mood(
             &mut world_low,
             calm,
-            vec![MoodModifier {
-                amount: -0.3,
-                ticks_remaining: 10,
-                source: "bad".to_string(),
-            }],
+            vec![MoodModifier::new(-0.3, 10, "bad")],
         );
 
         schedule_high.run(&mut world_high);
@@ -401,11 +392,7 @@ mod tests {
         let entity = spawn_cat_mood(
             &mut world,
             default_personality(),
-            vec![MoodModifier {
-                amount: 5.0,
-                ticks_remaining: 10,
-                source: "extreme".to_string(),
-            }],
+            vec![MoodModifier::new(5.0, 10, "extreme")],
         );
 
         schedule.run(&mut world);
@@ -415,11 +402,7 @@ mod tests {
         // Replace with extreme negative
         let mood = world.get_mut::<Mood>(entity).unwrap().into_inner();
         mood.modifiers.clear();
-        mood.modifiers.push_back(MoodModifier {
-            amount: -5.0,
-            ticks_remaining: 10,
-            source: "extreme".to_string(),
-        });
+        mood.modifiers.push_back(MoodModifier::new(-5.0, 10, "extreme"));
 
         schedule.run(&mut world);
         let valence = world.get::<Mood>(entity).unwrap().valence;

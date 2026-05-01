@@ -7,7 +7,7 @@ use crate::components::magic::{
     FlavorPlant, GrowthStage, Harvestable, Herb, Inventory, MisfireEffect, RemedyEffect,
     RemedyKind, Seasonal, Ward, WardKind,
 };
-use crate::components::mental::{Memory, Mood, MoodModifier};
+use crate::components::mental::{Memory, Mood, MoodModifier, MoodSource};
 use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::components::skills::{Corruption, MagicAffinity, Skills};
 use crate::components::task_chain::{StepKind, StepStatus, TaskChain};
@@ -271,11 +271,10 @@ pub fn apply_remedy_effects(
             RemedyKind::MoodTonic => {
                 // Only on the first tick of application.
                 if remedy.ticks_remaining == remedy.kind.duration() {
-                    mood.modifiers.push_back(MoodModifier {
-                        amount: m.mood_tonic_bonus,
-                        ticks_remaining: mood_tonic_ticks,
-                        source: "herbal remedy".to_string(),
-                    });
+                    mood.modifiers.push_back(
+                        MoodModifier::new(m.mood_tonic_bonus, mood_tonic_ticks, "herbal remedy")
+                            .with_kind(MoodSource::Physical),
+                    );
                 }
             }
         }
@@ -313,11 +312,14 @@ pub fn personal_corruption_effects(
             && rng.rng.random::<f32>() < m.personal_corruption_mood_chance
         {
             activation.record(Feature::PersonalCorruptionEffect);
-            mood.modifiers.push_back(MoodModifier {
-                amount: m.personal_corruption_mood_penalty,
-                ticks_remaining: personal_corruption_mood_ticks,
-                source: "corruption".to_string(),
-            });
+            mood.modifiers.push_back(
+                MoodModifier::new(
+                    m.personal_corruption_mood_penalty,
+                    personal_corruption_mood_ticks,
+                    "corruption",
+                )
+                .with_kind(MoodSource::Magic),
+            );
         }
 
         if corruption.0 > m.personal_corruption_erratic_threshold
@@ -360,11 +362,14 @@ pub fn corruption_tile_effects(
                 .any(|md| md.source == "corrupted ground");
             if !already_has {
                 activation.record(Feature::CorruptionTileEffect);
-                mood.modifiers.push_back(MoodModifier {
-                    amount: -m.corruption_tile_mood_threshold * corruption,
-                    ticks_remaining: corruption_tile_mood_ticks,
-                    source: "corrupted ground".to_string(),
-                });
+                mood.modifiers.push_back(
+                    MoodModifier::new(
+                        -m.corruption_tile_mood_threshold * corruption,
+                        corruption_tile_mood_ticks,
+                        "corrupted ground",
+                    )
+                    .with_kind(MoodSource::Magic),
+                );
             }
         }
         // Health drain on heavily corrupted tiles.
@@ -1060,11 +1065,14 @@ pub fn apply_misfire(
 ) {
     match effect {
         MisfireEffect::Fizzle => {
-            mood.modifiers.push_back(MoodModifier {
-                amount: m.misfire_fizzle_mood_penalty,
-                ticks_remaining: m.misfire_fizzle_mood_duration.ticks(time_scale),
-                source: "embarrassment".to_string(),
-            });
+            mood.modifiers.push_back(
+                MoodModifier::new(
+                    m.misfire_fizzle_mood_penalty,
+                    m.misfire_fizzle_mood_duration.ticks(time_scale),
+                    "embarrassment",
+                )
+                .with_kind(MoodSource::Pride),
+            );
             log.push(
                 tick,
                 format!("{cat_name} concentrates... and nothing happens."),

@@ -66,7 +66,7 @@ check-continuity LOGFILE="logs/events.jsonl":
 #   just q anomalies logs/tuned-42
 #   just q cat-timeline logs/tuned-42 Simba --tick-range=3800..4000
 q *ARGS:
-    python3 scripts/logq/logq.py {{ARGS}}
+    @python3 scripts/logq/logq.py {{ARGS}}
 
 # Run logq's envelope + subtool tests (stdlib unittest, no pytest dep).
 # Runs the file directly because `unittest discover` requires the
@@ -79,7 +79,7 @@ test-logq:
 # logs/tuned-<seed>/{events,narrative,trace-<focal>}.jsonl. Trace
 # records decompose per-tick L1/L2/L3 state for one focal cat per §11
 # of docs/systems/ai-substrate-refactor.md.
-soak-trace SEED="42" FOCAL_CAT="Simba":
+soak-trace SEED="42" FOCAL_CAT="Simba" DURATION="900":
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -s "logs/tuned-{{SEED}}/events.jsonl" ] || [ -s "logs/tuned-{{SEED}}/trace-{{FOCAL_CAT}}.jsonl" ]; then
@@ -89,7 +89,7 @@ soak-trace SEED="42" FOCAL_CAT="Simba":
       exit 2
     fi
     mkdir -p logs/tuned-{{SEED}}
-    cargo run --release -- --headless --seed {{SEED}} --duration 900 \
+    cargo run --release -- --headless --seed {{SEED}} --duration {{DURATION}} \
       --focal-cat {{FOCAL_CAT}} \
       --log logs/tuned-{{SEED}}/narrative.jsonl \
       --event-log logs/tuned-{{SEED}}/events.jsonl \
@@ -124,7 +124,7 @@ frame-diff BASELINE NEW HYPOTHESIS="":
 #   just verdict logs/tuned-42 --text
 #   just verdict logs/tuned-42 --baseline logs/baseline-2026-04-25/events.jsonl
 verdict *ARGS:
-    uv run scripts/verdict.py {{ARGS}}
+    @uv run scripts/verdict.py {{ARGS}}
 
 # Run a balance hypothesis end-to-end: baseline + treatment sweeps,
 # concordance check, draft balance doc. Formalizes the four-artifact
@@ -140,7 +140,7 @@ verdict *ARGS:
 #   just hypothesize SPEC --duration 60 --seeds 42 --reps 1   # smoke test
 #   just hypothesize SPEC --text                              # human summary
 hypothesize *ARGS:
-    uv run scripts/hypothesize.py {{ARGS}}
+    @uv run scripts/hypothesize.py {{ARGS}}
 
 # Per-metric "is this run in band?" verdict against
 # docs/balance/healthy-colony.md. Pure sense-making companion to
@@ -154,7 +154,7 @@ hypothesize *ARGS:
 #   just fingerprint logs/tuned-42
 #   just fingerprint logs/tuned-42 --text
 fingerprint *ARGS:
-    uv run scripts/fingerprint.py {{ARGS}}
+    @uv run scripts/fingerprint.py {{ARGS}}
 
 # Explain a SimConstants field: doc comment, current value (read from a
 # recent events.jsonl header), every read site in src/, and (if Tier 4.2
@@ -166,7 +166,7 @@ fingerprint *ARGS:
 #   just explain fulfillment.social_warmth_socialize_per_tick --text
 #   just explain --list                                # every constant path
 explain *ARGS:
-    uv run scripts/explain_constant.py {{ARGS}}
+    @uv run scripts/explain_constant.py {{ARGS}}
 
 # Friction-log breadcrumb. Appends one JSON line to
 # logs/agent-friction.jsonl when an agent (Claude or otherwise) hits a

@@ -3,7 +3,7 @@ use bevy_ecs::prelude::*;
 use crate::components::identity::{Age, LifeStage, Orientation};
 use crate::components::magic::Inventory;
 use crate::components::markers::Injured;
-use crate::components::mental::{LocationPreferences, Mood, MoodModifier};
+use crate::components::mental::{LocationPreferences, Mood, MoodModifier, MoodSource};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::components::pregnancy::Pregnant;
@@ -117,11 +117,10 @@ pub fn decay_needs(
 
             // Persistent mood penalty (refresh each tick while starving).
             if !mood.modifiers.iter().any(|m| m.source == "starvation") {
-                mood.modifiers.push_back(MoodModifier {
-                    amount: c.starvation_mood_penalty,
-                    ticks_remaining: c.starvation_mood_ticks,
-                    source: "starvation".to_string(),
-                });
+                mood.modifiers.push_back(
+                    MoodModifier::new(c.starvation_mood_penalty, c.starvation_mood_ticks, "starvation")
+                        .with_kind(MoodSource::Physical),
+                );
             } else {
                 // Refresh the existing starvation modifier.
                 for m in mood.modifiers.iter_mut() {

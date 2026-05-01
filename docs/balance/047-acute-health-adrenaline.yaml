@@ -1,0 +1,38 @@
+# Hypothesize spec — ticket 047 AcuteHealthAdrenalineFlee modifier.
+#
+# Substrate-over-override: shipping the new modifier (Phase 1, this run)
+# *before* removing the legacy CriticalHealth interrupt (Phase 4). The
+# prediction therefore measures the *behavioral* impact of adding the
+# lift alone — does promoting Sleep/Flee under acute health-deficit
+# defuse the Mallow-shaped 1Hz Guarding/Crafting alternation enough to
+# reduce CriticalHealth interrupts in the same regime?
+#
+# Magnitude logic: legacy CriticalHealth fires every tick a cat is
+# below 0.4 health AND not Resting. The 047 modifier promotes Sleep
+# (which routes to Resting) by up to +0.50 when health_deficit > 0.5.
+# An injured cat that picks Sleep stops triggering the interrupt the
+# next tick (Resting is exempt at goap.rs:496). Predicted: ~50%
+# reduction in CriticalHealth interrupts vs baseline, possibly more.
+# The acceptance band [30, 80] is wide because the modifier's reach
+# depends on whether competing scores leave room for a +0.50 lift to
+# flip the contest.
+#
+# Phase 4 (interrupt retirement) will run a second hypothesis predicting
+# the count → 0; this run isolates the substrate's behavioral effect.
+
+hypothesis: "Promoting Sleep + Flee under acute health-deficit redirects injured cats to den-recovery before the CriticalHealth interrupt cascade engages, defusing the 1Hz Guarding/Crafting replan loop"
+
+constants_patch:
+  scoring:
+    acute_health_adrenaline_threshold: 0.4
+    acute_health_adrenaline_flee_lift: 0.60
+    acute_health_adrenaline_sleep_lift: 0.50
+
+prediction:
+  metric: interrupts_by_reason.CriticalHealth
+  direction: decrease
+  rough_magnitude_pct: [30, 80]
+
+seeds: [42, 99, 7]
+reps: 3
+duration: 900

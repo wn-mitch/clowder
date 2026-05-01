@@ -84,6 +84,14 @@ const FOOD_SCARCITY: &str = "food_scarcity";
 /// {hunger_urgency, energy_deficit, thermal_deficit, health_deficit}
 /// and `scoring::ctx_scalars` publishes the value under this key.
 const BODY_DISTRESS_COMPOSITE: &str = "body_distress_composite";
+/// Ticket 047 — `AcuteHealthAdrenalineFlee` trigger input.
+/// `health_deficit` = `1 - health.current/health.max`, already published
+/// by `scoring::ctx_scalars`. Read directly (not through the
+/// `body_distress_composite` `max()` flatten) so the lurch fires on
+/// injury alone, even when other axes are quiet — matching the
+/// predator-injury scenario the legacy `CriticalHealth` interrupt was
+/// built to catch.
+const HEALTH_DEFICIT: &str = "health_deficit";
 const ACTIVE_DISPOSITION_ORDINAL: &str = "active_disposition_ordinal";
 /// §075 — `CommitmentTenure` Modifier. Drift between this name and
 /// `plan_substrate::COMMITMENT_TENURE_INPUT` (the canonical
@@ -987,6 +995,132 @@ impl ScoreModifier for BodyDistressPromotion {
 }
 
 // ---------------------------------------------------------------------------
+// AcuteHealthAdrenalineFlee — ticket 047
+// ---------------------------------------------------------------------------
+
+/// Ticket 047 — `AcuteHealthAdrenalineFlee` Modifier. Models the
+/// adrenaline / fight-or-flight lurch on injury, the substrate that
+/// retires the per-tick `CriticalHealth` interrupt branch.
+///
+/// **Trigger:** `health_deficit >= acute_health_adrenaline_threshold`
+/// (default 0.4 — aligned with `disposition.critical_health_threshold`
+/// so the substrate fires in the same regime the legacy interrupt did).
+///
+/// **Transform:** narrow smoothstep from `threshold` to
+/// `threshold + transition_width` (width 0.1) ramping to a per-DSE lift
+/// magnitude. Distinct from 088's `BodyDistressPromotion` linear ramp
+/// in two ways: (1) reads `health_deficit` directly rather than the
+/// `body_distress_composite = max(deficits)` flatten, so injury alone
+/// fires it; (2) sigmoid-style sharp onset rather than gentle ramp,
+/// because adrenaline is a phase transition not a weighted preference.
+///
+/// **Applies to:** Flee (lift `acute_health_adrenaline_flee_lift`) and
+/// Sleep (lift `acute_health_adrenaline_sleep_lift`). **Both default
+/// to 0.0** so the modifier ships inert; the proposed magnitudes
+/// (Flee 0.60, Sleep 0.50) are enabled via `CLOWDER_OVERRIDES` for the
+/// Phase 3 hypothesis sweep, validated, then promoted to defaults in
+/// Phase 4 alongside the legacy interrupt's removal. Flee is the
+/// primary lurch target; Sleep is the in-pool partner because Flee is
+/// filtered from the disposition softmax
+/// (`scoring.rs::select_disposition_via_intention_softmax_…`).
+/// The Sleep lift is what flips the disposition contest away from
+/// Guarding/Crafting under injury — Sleep routes to a den, mechanically
+/// expressing retreat.
+///
+/// **Composition:** Registered immediately after `BodyDistressPromotion`
+/// in the additive section of the pipeline. Under combined high
+/// composite + high health-deficit, Sleep sees both lifts add (e.g.
+/// 088's +0.20 + this +0.50 = +0.70 total), strongly tilting the
+/// contest. This double-stacking is intentional: composite-distress
+/// names "the cat is unwell on average," while health-deficit names
+/// "the cat is being injured *now*"; both lifting Sleep simultaneously
+/// is the right ecological answer.
+///
+/// **Substrate role:** This modifier is the substrate-over-override
+/// retirement of the `CriticalHealth` interrupt branch in
+/// `disposition.rs:301-302` and `goap.rs:493-498`. Phase 4 of ticket
+/// 047 removes those branches once this modifier is verified to flip
+/// Sleep above Fight/Build/Forage at the right magnitude in the IAUS
+/// contest.
+///
+/// **Future split (follow-on tickets):** the `Flee` valence shipped
+/// here is one of three predator-response branches in the planned
+/// N-valence framework — Fight (when escape is not viable but combat
+/// is winnable) and Freeze (requires new Hide/Freeze DSE) follow as
+/// independent tickets. Each shares the `health_deficit` scalar but
+/// gates on a different perception predicate.
+///
+/// **Gated-boost contract:** returns `score` unchanged on score `<= 0`
+/// — matches the established additive-modifier convention. Adrenaline
+/// doesn't conjure a Flee path into existence if the cat has nowhere
+/// to flee to (nothing scoring above zero in the Flee DSE means no
+/// safe direction was found by the underlying score function).
+pub struct AcuteHealthAdrenalineFlee {
+    threshold: f32,
+    flee_lift: f32,
+    sleep_lift: f32,
+}
+
+impl AcuteHealthAdrenalineFlee {
+    /// Smoothstep transition width above `threshold` over which the
+    /// lift ramps from 0 to its full magnitude. Narrow (0.1) so the
+    /// onset feels like a phase transition rather than a graded
+    /// preference. At `health_deficit = threshold + 0.1` the lift is
+    /// at full magnitude; between threshold and threshold + 0.1 it
+    /// follows the canonical smoothstep `3t² - 2t³`.
+    const TRANSITION_WIDTH: f32 = 0.1;
+
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            threshold: sc.acute_health_adrenaline_threshold,
+            flee_lift: sc.acute_health_adrenaline_flee_lift,
+            sleep_lift: sc.acute_health_adrenaline_sleep_lift,
+        }
+    }
+
+    /// Returns the smoothstep ramp `[0, 1]` for the given `health_deficit`.
+    /// Below `threshold` returns 0; above `threshold + TRANSITION_WIDTH`
+    /// returns 1; in between, `3t² - 2t³` for `t = (deficit - threshold) /
+    /// TRANSITION_WIDTH`.
+    fn ramp(&self, health_deficit: f32) -> f32 {
+        if health_deficit <= self.threshold {
+            return 0.0;
+        }
+        let t = ((health_deficit - self.threshold) / Self::TRANSITION_WIDTH).clamp(0.0, 1.0);
+        t * t * (3.0 - 2.0 * t)
+    }
+}
+
+impl ScoreModifier for AcuteHealthAdrenalineFlee {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        let lift_scale = match dse_id.0 {
+            FLEE => self.flee_lift,
+            SLEEP => self.sleep_lift,
+            _ => return score,
+        };
+        if score <= 0.0 {
+            return score;
+        }
+        let deficit = fetch(HEALTH_DEFICIT, ctx.cat).clamp(0.0, 1.0);
+        let ramp = self.ramp(deficit);
+        if ramp <= 0.0 {
+            return score;
+        }
+        score + ramp * lift_scale
+    }
+
+    fn name(&self) -> &'static str {
+        "acute_health_adrenaline_flee"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Default pipeline builder
 // ---------------------------------------------------------------------------
 
@@ -1039,6 +1173,17 @@ pub fn default_modifier_pipeline(
     // the IAUS contest toward Eat. The 094 `StockpileSatiation`
     // doc-comment pre-described this exact composition order.
     pipeline.push(Box::new(BodyDistressPromotion::new(sc)));
+    // Ticket 047 — `AcuteHealthAdrenalineFlee` registers immediately
+    // after `BodyDistressPromotion` so under combined high composite
+    // distress + high health deficit, both lifts compose additively on
+    // Sleep before the multiplicative damps run. Order matters within
+    // the additive section: the two lifts must both apply before
+    // Stockpile / Fox / Corruption damp Hunt/Forage/etc. — composing
+    // injury-driven Sleep/Flee promotion with stockpile-driven
+    // Hunt/Forage suppression yields the strongest contest-tilt away
+    // from Guarding/Crafting under injury, which is the ticket-047
+    // behavioral target.
+    pipeline.push(Box::new(AcuteHealthAdrenalineFlee::new(sc)));
     pipeline.push(Box::new(FoxTerritorySuppression::new(sc)));
     pipeline.push(Box::new(CorruptionTerritorySuppression::new(sc)));
     // §3.5.1 ticket 094 — `StockpileSatiation` registers after the
@@ -1707,20 +1852,19 @@ mod tests {
     }
 
     #[test]
-    fn default_pipeline_registers_nine_modifiers() {
-        // Nine §3.5.1 foundational modifiers — the seven original
+    fn default_pipeline_registers_eleven_modifiers() {
+        // Eleven §3.5.1 foundational modifiers — the seven original
         // (`Pride`, `IndependenceSolo`, `IndependenceGroup`, `Patience`,
         // `Tradition`, `FoxTerritorySuppression`,
         // `CorruptionTerritorySuppression`) plus §075's
-        // `CommitmentTenure` plus ticket 094's `StockpileSatiation`.
-        // The three Phase 4.2 emergency modifiers
-        // (`WardCorruptionEmergency`, `CleanseEmergency`,
-        // `SensedRotBoost`) retired in §13.1 — their contribution is
-        // now produced at the axis level by the Logistic curves on
-        // the corresponding sibling DSEs.
+        // `CommitmentTenure`, ticket 094's `StockpileSatiation`,
+        // ticket 088's `BodyDistressPromotion`, and ticket 047's
+        // `AcuteHealthAdrenalineFlee`. The three Phase 4.2 emergency
+        // modifiers (`WardCorruptionEmergency`, `CleanseEmergency`,
+        // `SensedRotBoost`) retired in §13.1.
         let constants = crate::resources::sim_constants::SimConstants::default();
         let pipeline = default_modifier_pipeline(&constants);
-        assert_eq!(pipeline.len(), 10, "expected 10 registered modifiers");
+        assert_eq!(pipeline.len(), 11, "expected 11 registered modifiers");
     }
 
     // -----------------------------------------------------------------------
@@ -2002,6 +2146,212 @@ mod tests {
                 "zero-score dse {dse} stays zero — no resurrection"
             );
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // ticket 047 AcuteHealthAdrenalineFlee
+    // -----------------------------------------------------------------------
+
+    fn test_adrenaline() -> AcuteHealthAdrenalineFlee {
+        AcuteHealthAdrenalineFlee {
+            threshold: 0.4,
+            flee_lift: 0.60,
+            sleep_lift: 0.50,
+        }
+    }
+
+    #[test]
+    fn acute_health_adrenaline_no_lift_below_threshold() {
+        // health_deficit = 0.3 < threshold (0.4). Flee and Sleep
+        // unchanged. Mirrors the "modifier engages only at high
+        // distress" property of BodyDistressPromotion but on the
+        // health-deficit axis directly.
+        let modifier = test_adrenaline();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 0.3,
+            _ => 0.0,
+        };
+        for dse in [FLEE, SLEEP] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "below-threshold dse {dse} unchanged; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn acute_health_adrenaline_zero_lift_at_threshold() {
+        // Boundary semantics — `<= threshold` short-circuits to zero
+        // lift, so the smoothstep doesn't drift off the edge.
+        let modifier = test_adrenaline();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 0.4,
+            _ => 0.0,
+        };
+        for dse in [FLEE, SLEEP] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "at-threshold dse {dse} unchanged; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn acute_health_adrenaline_full_lift_above_transition_band() {
+        // health_deficit = 0.55 > threshold + transition_width (0.5).
+        // Smoothstep saturates at 1.0 ⇒ Flee + 0.60 = 1.10, Sleep + 0.50 = 1.00.
+        let modifier = test_adrenaline();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 0.55,
+            _ => 0.0,
+        };
+        let flee = modifier.apply(DseId(FLEE), 0.5, &ctx, &fetch);
+        let sleep = modifier.apply(DseId(SLEEP), 0.5, &ctx, &fetch);
+        assert!((flee - 1.10).abs() < 1e-5, "Flee saturated lift; got {flee}");
+        assert!((sleep - 1.00).abs() < 1e-5, "Sleep saturated lift; got {sleep}");
+    }
+
+    #[test]
+    fn acute_health_adrenaline_smoothstep_midpoint() {
+        // health_deficit = 0.45 = threshold + half-width. Smoothstep at
+        // t = 0.5 evaluates to 3*0.25 - 2*0.125 = 0.5. So Flee gets
+        // half its full lift (+0.30) and Sleep gets half (+0.25).
+        let modifier = test_adrenaline();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 0.45,
+            _ => 0.0,
+        };
+        let flee = modifier.apply(DseId(FLEE), 0.5, &ctx, &fetch);
+        let sleep = modifier.apply(DseId(SLEEP), 0.5, &ctx, &fetch);
+        assert!((flee - 0.80).abs() < 1e-5, "Flee half-lift; got {flee}");
+        assert!((sleep - 0.75).abs() < 1e-5, "Sleep half-lift; got {sleep}");
+    }
+
+    #[test]
+    fn acute_health_adrenaline_targets_only_flee_and_sleep() {
+        // The lurch is two-DSE only — Hunt / Forage / Eat / GroomSelf
+        // (also self-care) and the entire non-self-care class must pass
+        // through unchanged. If the lift bled into Fight or Hunt the
+        // contest tilt would invert (Fight rising under injury defeats
+        // the substrate's purpose).
+        let modifier = test_adrenaline();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 1.0,
+            _ => 0.0,
+        };
+        for dse in [
+            EAT, HUNT, FORAGE, GROOM_SELF, MATE, COORDINATE, BUILD, MENTOR, CARETAKE, SOCIALIZE,
+            PATROL, FIGHT, COOK, FARM, WANDER, EXPLORE, IDLE, GROOM_OTHER,
+        ] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "non-Flee/Sleep dse {dse} unchanged at full deficit; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn acute_health_adrenaline_does_not_resurrect_zero_score() {
+        // Gated-boost contract — adrenaline doesn't conjure a Flee
+        // path into existence if the cat has nowhere to flee to. Sleep
+        // gated to zero (no safe rest spot in range) similarly stays
+        // suppressed.
+        let modifier = test_adrenaline();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 1.0,
+            _ => 0.0,
+        };
+        for dse in [FLEE, SLEEP] {
+            let out = modifier.apply(DseId(dse), 0.0, &ctx, &fetch);
+            assert_eq!(
+                out, 0.0,
+                "zero-score dse {dse} stays zero — no adrenaline resurrection"
+            );
+        }
+    }
+
+    #[test]
+    fn acute_health_adrenaline_composes_additively_with_body_distress_promotion() {
+        // Under combined high body_distress_composite (088) AND high
+        // health_deficit (047), Sleep sees both lifts add. This is
+        // intentional: composite says "the cat is unwell on average,"
+        // health_deficit says "the cat is being injured *now*"; both
+        // lifting Sleep simultaneously is the right ecological response.
+        // Mirrors the Mallow scenario where the cat would have died
+        // even with 088 alone (composite ~0.61 sat below 088's 0.7
+        // threshold), but the 047 modifier reading health_deficit
+        // directly fires.
+        use crate::ai::eval::ModifierPipeline;
+        let mut pipeline = ModifierPipeline::new();
+        pipeline.push(Box::new(BodyDistressPromotion {
+            threshold: 0.7,
+            lift_scale: 0.20,
+        }));
+        pipeline.push(Box::new(test_adrenaline()));
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            BODY_DISTRESS_COMPOSITE => 1.0,
+            HEALTH_DEFICIT => 1.0,
+            _ => 0.0,
+        };
+        // Sleep: 088 lifts +0.20 (composite at 1.0), 047 lifts +0.50
+        // (deficit at 1.0). Pre-modifier 0.30 → 0.30 + 0.20 + 0.50 = 1.00.
+        let sleep_after = pipeline.apply(DseId(SLEEP), 0.30, &ctx, &fetch);
+        assert!(
+            (sleep_after - 1.00).abs() < 1e-5,
+            "Sleep after combined lift = 1.00; got {sleep_after}"
+        );
+        // Flee: 088 lifts +0.20, 047 lifts +0.60. Pre 0.06 → 0.86.
+        let flee_after = pipeline.apply(DseId(FLEE), 0.06, &ctx, &fetch);
+        assert!(
+            (flee_after - 0.86).abs() < 1e-5,
+            "Flee after combined lift; got {flee_after}"
+        );
+    }
+
+    #[test]
+    fn acute_health_adrenaline_fires_when_088_does_not_mallow_scenario() {
+        // The Mallow scenario from logs/collapse-probe-42-fix-043-044
+        // tick 1216300: health=0.637 → health_deficit=0.363. The 047
+        // modifier with threshold=0.4 does NOT fire here — confirming
+        // the alignment: the substrate engages where the legacy
+        // CriticalHealth interrupt did (health < 0.4), not earlier.
+        // Once damage takes Mallow below health=0.4 (deficit > 0.6),
+        // the lurch saturates immediately. This test pins the alignment
+        // so future threshold tweaks don't silently break it.
+        let modifier = test_adrenaline();
+        let (_, ctx) = test_ctx();
+        // Mallow's last-snapshot deficit, BEFORE the next-tick injury
+        // tick that would have crossed 0.4: no lift expected.
+        let fetch_pre = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 0.363,
+            _ => 0.0,
+        };
+        let sleep_pre = modifier.apply(DseId(SLEEP), 0.30, &ctx, &fetch_pre);
+        assert!(
+            (sleep_pre - 0.30).abs() < 1e-6,
+            "deficit 0.363 below 0.4 threshold — no lift; got {sleep_pre}"
+        );
+        // One more injury tick puts deficit > 0.5 (transition band end):
+        // saturated lift fires.
+        let fetch_post = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 0.55,
+            _ => 0.0,
+        };
+        let sleep_post = modifier.apply(DseId(SLEEP), 0.30, &ctx, &fetch_post);
+        assert!(
+            (sleep_post - 0.80).abs() < 1e-5,
+            "deficit 0.55 saturates 0.50 lift; got {sleep_post}"
+        );
     }
 
     #[test]

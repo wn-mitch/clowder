@@ -8,7 +8,7 @@ use crate::components::aspirations::{
 };
 use crate::components::identity::{Age, LifeStage, Name, Species};
 use crate::components::markers;
-use crate::components::mental::{Memory, MemoryType, MoodModifier};
+use crate::components::mental::{Memory, MemoryType, MoodModifier, MoodSource};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Needs, Position};
 use crate::components::skills::{Skills, Training};
@@ -565,11 +565,10 @@ pub fn track_milestones(
                 );
 
                 // Mood boost.
-                mood.modifiers.push_back(MoodModifier {
-                    amount: 0.2,
-                    ticks_remaining: 100,
-                    source: format!("achieved {}", milestone.name),
-                });
+                mood.modifiers.push_back(
+                    MoodModifier::new(0.2, 100, format!("achieved {}", milestone.name))
+                        .with_kind(MoodSource::Pride),
+                );
 
                 // Need restoration.
                 needs.mastery = (needs.mastery + 0.05).min(1.0);
@@ -608,11 +607,10 @@ pub fn track_milestones(
                 );
             }
 
-            mood.modifiers.push_back(MoodModifier {
-                amount: 0.4,
-                ticks_remaining: 200,
-                source: format!("fulfilled aspiration: {}", asp.chain_name),
-            });
+            mood.modifiers.push_back(
+                MoodModifier::new(0.4, 200, format!("fulfilled aspiration: {}", asp.chain_name))
+                    .with_kind(MoodSource::Pride),
+            );
             needs.purpose = (needs.purpose + 0.1).min(1.0);
 
             aspirations.completed.push(asp.chain_name);

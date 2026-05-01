@@ -49,7 +49,11 @@ pub use disposition::record_disposition_switch;
 pub use lifecycle::{
     abandon_plan, record_step_failure, try_preempt, PreemptKind, PreemptOutcome,
 };
-pub use sensors::{cooldown_curve, prune_recent_target_failures, target_recent_failure_age_normalized};
+pub use sensors::{
+    apply_disposition_failure_cooldown, cooldown_curve,
+    disposition_recent_failure_age_normalized, prune_recent_disposition_failures,
+    prune_recent_target_failures, target_recent_failure_age_normalized,
+};
 pub use target::{
     carry_target_forward, expire_reservations, release_target, require_alive_and_unreserved_filter,
     require_alive_filter, require_unreserved_filter, reserve_target, validate_target,
@@ -67,6 +71,13 @@ pub use target::{
 
 /// 073 — `RecentTargetFailures` Consideration on all 6 target DSEs.
 pub const TARGET_RECENT_FAILURE_INPUT: &str = "target_recent_failure";
+
+/// 123 — `RecentDispositionFailures` Consideration on the six
+/// failure-prone cat-action DSEs (Hunting, Foraging, Crafting,
+/// Caretaking, Building, Mating). Mirrors the §7.2 OpenMinded gate's
+/// `make_plan → None` rejection so the producer doesn't keep
+/// electing dispositions the planner can't satisfy.
+pub const DISPOSITION_RECENT_FAILURE_INPUT: &str = "disposition_recent_failure";
 
 /// 075 — `CommitmentTenure` Modifier (per-disposition tenure curve).
 pub const COMMITMENT_TENURE_INPUT: &str = "commitment_tenure_progress";

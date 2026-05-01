@@ -22,6 +22,7 @@ pub mod personality;
 pub mod physical;
 pub mod pregnancy;
 pub mod prey;
+pub mod recent_disposition_failures;
 pub mod recent_target_failures;
 pub mod reserved;
 pub mod sensing;
@@ -67,6 +68,7 @@ pub use prey::{
     DenRaided, FleeStrategy, PreyAiState, PreyAnimal, PreyConfig, PreyDen, PreyDensity, PreyKilled,
     PreyKind, PreyState,
 };
+pub use recent_disposition_failures::RecentDispositionFailures;
 pub use recent_target_failures::RecentTargetFailures;
 pub use reserved::Reserved;
 pub use sensing::{SensoryModifier, SensorySignature, SensorySpecies};

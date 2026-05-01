@@ -384,6 +384,10 @@ impl Plugin for SimulationPlugin {
                         // map size by expiring entries older than
                         // `target_failure_cooldown_ticks`.
                         systems::plan_substrate::sensors::prune_recent_target_failures,
+                        // Ticket 123 — bound per-cat `RecentDispositionFailures`
+                        // map size by expiring entries older than
+                        // `disposition_failure_cooldown_ticks`.
+                        systems::plan_substrate::sensors::prune_recent_disposition_failures,
                         systems::needs::eat_from_inventory,
                         systems::needs::decay_exploration,
                         systems::needs::stamp_passive_exploration,

@@ -2,9 +2,11 @@ use bevy_ecs::prelude::*;
 use rand::Rng;
 
 use crate::components::identity::{Age, Name};
-use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier};
+use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier, MoodSource};
+use crate::components::personality::Personality;
 use crate::components::physical::{Dead, DeathCause, Health, Needs, Position};
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
+use crate::resources::relationships::{BondType, Relationships};
 use crate::resources::rng::SimRng;
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::system_activation::{Feature, SystemActivation};
@@ -25,13 +27,14 @@ pub fn check_death(
     mut log: ResMut<NarrativeLog>,
     mut rng: ResMut<SimRng>,
     alive_query: Query<(Entity, &Name, &Health, &Needs, &Age, &Position), Without<Dead>>,
-    mut mood_query: Query<(&Position, &mut Mood, &mut Memory), Without<Dead>>,
+    mut mood_query: Query<(Entity, &Position, &mut Mood, &mut Memory, &Personality), Without<Dead>>,
     event_log: Option<ResMut<crate::resources::event_log::EventLog>>,
     love_query: Query<(Entity, &Name, &crate::components::fate::FatedLove), Without<Dead>>,
     rival_query: Query<(Entity, &Name, &crate::components::fate::FatedRival), Without<Dead>>,
     mut colony_score: Option<ResMut<crate::resources::colony_score::ColonyScore>>,
     constants: Res<SimConstants>,
     mut activation: ResMut<SystemActivation>,
+    relationships: Res<Relationships>,
 ) {
     let c = &constants.death;
     let tick = time.tick;
@@ -123,7 +126,12 @@ pub fn check_death(
 
         // Nearby living cats react. Phase 4 migration: visual-channel
         // check via the unified sensory model.
-        for (pos, mut mood, mut memory) in &mut mood_query {
+        for (entity, pos, mut mood, mut memory, personality) in &mut mood_query {
+            // Skip the dying cat itself — Dead component not yet applied (deferred commands).
+            if entity == *dead_entity {
+                continue;
+            }
+
             if crate::systems::sensing::observer_sees_at(
                 crate::components::SensorySpecies::Cat,
                 *pos,
@@ -132,11 +140,10 @@ pub fn check_death(
                 crate::components::SensorySignature::CAT,
                 c.grief_detection_range as f32,
             ) {
-                mood.modifiers.push_back(MoodModifier {
-                    amount: c.grief_mood_penalty,
-                    ticks_remaining: c.grief_mood_ticks,
-                    source: format!("{dead_name} died"),
-                });
+                mood.modifiers.push_back(
+                    MoodModifier::new(c.grief_mood_penalty, c.grief_mood_ticks, format!("{dead_name} died"))
+                        .with_kind(MoodSource::Grief),
+                );
 
                 memory.remember(MemoryEntry {
                     event_type: MemoryType::Death,
@@ -147,6 +154,32 @@ pub fn check_death(
                     firsthand: true,
                 });
             }
+
+            // Bond grief: cats with a named bond receive a lasting grief modifier
+            // regardless of proximity. Intensity and duration scale by bond type.
+            let Some(rel) = relationships.get(*dead_entity, entity) else {
+                continue;
+            };
+            let Some(bond) = rel.bond else {
+                continue;
+            };
+            let (intensity, duration) = match bond {
+                BondType::Mates => (c.bereavement_mates_intensity, c.bereavement_mates_ticks),
+                BondType::Partners => (c.bereavement_partners_intensity, c.bereavement_partners_ticks),
+                BondType::Friends => (c.bereavement_friends_intensity, c.bereavement_friends_ticks),
+            };
+            let grief_amount = -(intensity * rel.fondness.max(0.0));
+            if grief_amount > -0.05 {
+                continue;
+            }
+            let mut modifier = MoodModifier::new(
+                grief_amount,
+                duration,
+                format!("{dead_name} (bonded)"),
+            )
+            .with_kind(MoodSource::Grief);
+            crate::systems::mood::patience_extend(&mut modifier, personality.patience, &constants.mood);
+            mood.modifiers.push_back(modifier);
         }
 
         // Fated love: permanent grief for the survivor.
@@ -240,6 +273,7 @@ mod tests {
         world.insert_resource(SimRng::new(42));
         world.insert_resource(crate::resources::SimConstants::default());
         world.insert_resource(SystemActivation::default());
+        world.insert_resource(Relationships::default());
         let mut schedule = Schedule::default();
         schedule.add_systems(check_death);
         (world, schedule)
@@ -374,6 +408,101 @@ mod tests {
 
         let dead = world.get::<Dead>(entity).unwrap();
         assert_eq!(dead.cause, DeathCause::Starvation);
+    }
+
+    fn spawn_cat_at(world: &mut World, name: &str, health: f32, hunger: f32, x: i32, y: i32) -> Entity {
+        let mut needs = Needs::default();
+        needs.hunger = hunger;
+        world
+            .spawn((
+                (
+                    Name(name.to_string()),
+                    Species,
+                    Age { born_tick: 0 },
+                    Gender::Queen,
+                    Orientation::Bisexual,
+                    test_personality(),
+                    Appearance {
+                        fur_color: "tabby".into(),
+                        pattern: "striped".into(),
+                        eye_color: "green".into(),
+                        distinguishing_marks: vec![],
+                    },
+                ),
+                (
+                    Position::new(x, y),
+                    Health {
+                        current: health,
+                        max: 1.0,
+                        injuries: vec![],
+                    },
+                    needs,
+                    Mood::default(),
+                    Memory::default(),
+                    Skills::default(),
+                    MagicAffinity(0.0),
+                    Corruption(0.0),
+                    Training::default(),
+                    CurrentAction::default(),
+                ),
+            ))
+            .id()
+    }
+
+    #[test]
+    fn bonded_cat_gets_grief_modifier_on_partner_death() {
+        use crate::resources::relationships::BondType;
+        let (mut world, mut schedule) = setup_world();
+
+        // Dying cat at (5,5).
+        let dying = spawn_cat_at(&mut world, "Moss", 0.0, 0.0, 5, 5);
+        // Survivor with a Mates bond — far away so proximity grief doesn't fire.
+        let survivor = spawn_cat_at(&mut world, "Fern", 1.0, 0.8, 30, 30);
+
+        // Create a Mates bond with positive fondness.
+        {
+            let mut rels = world.resource_mut::<Relationships>();
+            let rel = rels.get_or_insert(dying, survivor);
+            rel.fondness = 0.8;
+            rel.bond = Some(BondType::Mates);
+        }
+
+        schedule.run(&mut world);
+
+        let mood = world.get::<Mood>(survivor).unwrap();
+        let bond_grief = mood
+            .modifiers
+            .iter()
+            .find(|m| m.source.contains("(bonded)"));
+        assert!(
+            bond_grief.is_some(),
+            "bonded survivor should receive a grief modifier; modifiers: {:?}",
+            mood.modifiers
+        );
+        let modifier = bond_grief.unwrap();
+        assert!(modifier.amount < 0.0, "bond grief should be negative");
+        assert_eq!(modifier.kind, crate::components::mental::MoodSource::Grief);
+        assert!(
+            modifier.ticks_remaining > 0,
+            "grief modifier should have positive duration"
+        );
+    }
+
+    #[test]
+    fn distant_unbonded_cat_gets_no_grief_on_death() {
+        let (mut world, mut schedule) = setup_world();
+
+        spawn_cat_at(&mut world, "Moss", 0.0, 0.0, 5, 5);
+        let distant = spawn_cat_at(&mut world, "Fern", 1.0, 0.8, 30, 30);
+
+        schedule.run(&mut world);
+
+        let mood = world.get::<Mood>(distant).unwrap();
+        assert!(
+            mood.modifiers.is_empty(),
+            "distant unbonded cat should have no grief; modifiers: {:?}",
+            mood.modifiers
+        );
     }
 
     #[test]

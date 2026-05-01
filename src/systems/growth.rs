@@ -3,7 +3,7 @@ use bevy_ecs::prelude::*;
 use crate::components::identity::{Age, LifeStage, Species};
 use crate::components::kitten::KittenDependency;
 use crate::components::markers;
-use crate::components::mental::{Mood, MoodModifier};
+use crate::components::mental::{Mood, MoodModifier, MoodSource};
 use crate::components::physical::{Dead, Needs, Position};
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::system_activation::{Feature, SystemActivation};
@@ -94,11 +94,9 @@ pub fn kitten_mood_aura(
             existing.amount = total;
             existing.ticks_remaining = 2;
         } else {
-            mood.modifiers.push_back(MoodModifier {
-                amount: total,
-                ticks_remaining: 2,
-                source: "kitten_aura".to_string(),
-            });
+            mood.modifiers.push_back(
+                MoodModifier::new(total, 2, "kitten_aura").with_kind(MoodSource::Social),
+            );
         }
     }
 }

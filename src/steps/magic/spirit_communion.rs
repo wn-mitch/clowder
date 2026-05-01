@@ -2,7 +2,7 @@ use bevy_ecs::prelude::*;
 use rand::Rng;
 
 use crate::components::magic::MisfireEffect;
-use crate::components::mental::{Mood, MoodModifier};
+use crate::components::mental::{Mood, MoodModifier, MoodSource};
 use crate::components::physical::{Health, Position};
 use crate::components::skills::{Corruption, MagicAffinity, Skills};
 use crate::resources::narrative::NarrativeLog;
@@ -64,11 +64,14 @@ pub fn resolve_spirit_communion(
     }
     if ticks >= m.spirit_communion_duration.ticks(time_scale) {
         activation.record(Feature::SpiritCommunion);
-        mood.modifiers.push_back(MoodModifier {
-            amount: m.spirit_communion_mood_bonus,
-            ticks_remaining: m.spirit_communion_mood_duration.ticks(time_scale),
-            source: "spirit communion".to_string(),
-        });
+        mood.modifiers.push_back(
+            MoodModifier::new(
+                m.spirit_communion_mood_bonus,
+                m.spirit_communion_mood_duration.ticks(time_scale),
+                "spirit communion",
+            )
+            .with_kind(MoodSource::Magic),
+        );
         skills.magic += skills.growth_rate() * m.spirit_communion_skill_growth;
         StepResult::Advance
     } else {

@@ -7,7 +7,7 @@ use crate::ai::{Action, CurrentAction};
 use crate::components::building::{ConstructionSite, Structure};
 use crate::components::identity::Name;
 use crate::components::magic::Ward;
-use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier};
+use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier, MoodSource};
 use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::components::prey::{PreyAnimal, PreyConfig};
 use crate::components::wildlife::{
@@ -557,11 +557,14 @@ pub fn detect_threats(
                 firsthand: true,
             });
 
-            mood.modifiers.push_back(MoodModifier {
-                amount: c.threat_mood_penalty,
-                ticks_remaining: c.threat_mood_ticks,
-                source: format!("{} spotted", species.name()),
-            });
+            mood.modifiers.push_back(
+                MoodModifier::new(
+                    c.threat_mood_penalty,
+                    c.threat_mood_ticks,
+                    format!("{} spotted", species.name()),
+                )
+                .with_kind(MoodSource::Fear),
+            );
 
             // Detection narrative with per-cat cooldown.
             let on_cooldown = cooldowns
@@ -1001,12 +1004,14 @@ pub fn predator_stalk_cats(
                                 );
                             }
 
-                            mood.modifiers
-                                .push_back(crate::components::mental::MoodModifier {
-                                    amount: c.threat_mood_penalty,
-                                    ticks_remaining: c.threat_mood_ticks,
-                                    source: "ambushed by predator".to_string(),
-                                });
+                            mood.modifiers.push_back(
+                                MoodModifier::new(
+                                    c.threat_mood_penalty,
+                                    c.threat_mood_ticks,
+                                    "ambushed by predator",
+                                )
+                                .with_kind(MoodSource::Fear),
+                            );
                         }
 
                         // Nearby cats witness the ambush — drain their safety.
@@ -1021,11 +1026,12 @@ pub fn predator_stalk_cats(
                                     w_needs.safety =
                                         (w_needs.safety - c.ambush_witness_safety_drain).max(0.0);
                                     w_mood.modifiers.push_back(
-                                        crate::components::mental::MoodModifier {
-                                            amount: c.threat_mood_penalty * 0.5,
-                                            ticks_remaining: c.threat_mood_ticks,
-                                            source: "witnessed predator attack".to_string(),
-                                        },
+                                        MoodModifier::new(
+                                            c.threat_mood_penalty * 0.5,
+                                            c.threat_mood_ticks,
+                                            "witnessed predator attack",
+                                        )
+                                        .with_kind(MoodSource::Fear),
                                     );
                                 }
                             }
@@ -2242,11 +2248,14 @@ pub fn fox_confrontation_tick(
                     crate::components::physical::InjurySource::FoxConfrontation,
                     &constants.combat,
                 );
-                mood.modifiers.push_back(MoodModifier {
-                    amount: constants.wildlife.threat_mood_penalty,
-                    ticks_remaining: constants.wildlife.threat_mood_ticks,
-                    source: "fox fight".to_string(),
-                });
+                mood.modifiers.push_back(
+                    MoodModifier::new(
+                        constants.wildlife.threat_mood_penalty,
+                        constants.wildlife.threat_mood_ticks,
+                        "fox fight",
+                    )
+                    .with_kind(MoodSource::Fear),
+                );
                 log.push(
                     time.tick,
                     format!(

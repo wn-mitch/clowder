@@ -41,6 +41,7 @@ use crate::components::skills::{Corruption, MagicAffinity, Skills};
 use crate::components::wildlife::WildAnimal;
 use crate::resources::colony_hunting_map::ColonyHuntingMap;
 use crate::resources::event_log::{EventKind, EventLog};
+use crate::resources::exploration_map::ExplorationMap;
 use crate::resources::food::FoodStores;
 use crate::resources::map::{Terrain, TileMap};
 use crate::resources::narrative_templates::{
@@ -789,6 +790,12 @@ pub fn evaluate_and_plan(
                 Option<&crate::components::fate::FatedLove>,
                 Option<&crate::components::fate::FatedRival>,
                 Option<&crate::components::fulfillment::Fulfillment>,
+                // Ticket 123 — IAUS-side mirror of the planner's
+                // `make_plan → None` veto. Lazy-inserted on first
+                // failure; `None` here means the cat has never failed
+                // a disposition and the consideration scores 1.0
+                // (no penalty).
+                Option<&mut crate::components::RecentDispositionFailures>,
             ),
         ),
         (
@@ -997,7 +1004,7 @@ pub fn evaluate_and_plan(
     let action_snapshot: Vec<(Entity, Position, Action)> = query
         .iter()
         .map(
-            |((entity, _, _, _, pos, _, _, _), (_, _, current, _, _, _, _, _))| {
+            |((entity, _, _, _, pos, _, _, _), (_, _, current, _, _, _, _, _, _))| {
                 (entity, *pos, current.action)
             },
         )
@@ -1039,6 +1046,7 @@ pub fn evaluate_and_plan(
             fated_love,
             fated_rival,
             fulfillment,
+            mut recent_disposition_failures,
         ),
     ) in &mut query
     {
@@ -1434,6 +1442,23 @@ pub fn evaluate_and_plan(
         }
         let mut scores = result.scores;
 
+        // Ticket 123 — damp the IAUS scores of dispositions that
+        // recently hit `make_plan → None`. Runs before the additive
+        // bonus layers so a recently-failed disposition is dimmed
+        // down before memory / colony-knowledge / cascading bonuses
+        // potentially re-lift it; that ordering matches the
+        // `apply_*_bonuses` chain's intent (bonuses fight for
+        // attention against a baseline that already reflects
+        // cross-tick failure history). Non-applicable cats (no
+        // `RecentDispositionFailures` component, or all entries
+        // expired) pass through unchanged.
+        crate::systems::plan_substrate::apply_disposition_failure_cooldown(
+            &mut scores,
+            recent_disposition_failures.as_deref(),
+            res.time.tick,
+            res.constants.planning_substrate.disposition_failure_cooldown_ticks,
+        );
+
         // Apply all bonus layers.
         apply_memory_bonuses(&mut scores, memory, pos, sc);
         if let Some(ref ck) = colony.knowledge {
@@ -1765,29 +1790,49 @@ pub fn evaluate_and_plan(
 
             current.ticks_remaining = u64::MAX;
             commands.entity(entity).insert(plan);
-        } else if let Some(ref mut log) = event_log {
-            // Ticket 091: surface the silent `make_plan → None` path.
-            // Pre-091 this branch emitted nothing — the cat just idled
-            // with `ticks_remaining = 0` and replanned next tick. When
-            // IAUS elects a disposition (e.g., Foraging) but the GOAP
-            // planner can't satisfy it (e.g., no reachable foraging
-            // zone, or `Carrying` vetoes ForageItem), the producer side
-            // collapses with no canary-visible signal. The footer field
-            // `planning_failures_by_disposition` is the cheap pre-trace
-            // disambiguator for that pattern.
-            log.push(
-                res.time.tick,
-                EventKind::PlanningFailed {
-                    cat: name.0.clone(),
-                    disposition: format!("{:?}", chosen),
-                    reason: "no_plan_found".into(),
-                    hunger: needs.hunger,
-                    energy: needs.energy,
-                    temperature: needs.temperature,
-                    food_available,
-                    has_stored_food: planner_has_stored_food,
-                },
-            );
+        } else {
+            // Ticket 123 — author the disposition-failure memory
+            // before the event push. The IAUS-side cooldown reads
+            // this on the next tick to suppress the same-disposition
+            // re-pick (3059 wasted planning rounds in seed-42's
+            // 1500-tick cold-start window came from the unbroken
+            // retry loop). Lazy-insert via Commands when the cat
+            // doesn't yet have the component — Commands buffer until
+            // apply, but the cooldown signal degrades gracefully
+            // (single-tick miss vs the 4000-tick cooldown window).
+            if let Some(ref mut recent) = recent_disposition_failures {
+                recent.record(chosen, res.time.tick);
+            } else {
+                let mut fresh = crate::components::RecentDispositionFailures::default();
+                fresh.record(chosen, res.time.tick);
+                commands.entity(entity).insert(fresh);
+            }
+            if let Some(ref mut log) = event_log {
+                // Ticket 091: surface the silent `make_plan → None`
+                // path. Pre-091 this branch emitted nothing — the
+                // cat just idled with `ticks_remaining = 0` and
+                // replanned next tick. When IAUS elects a
+                // disposition (e.g., Foraging) but the GOAP planner
+                // can't satisfy it (e.g., no reachable foraging
+                // zone, or `Carrying` vetoes ForageItem), the
+                // producer side collapses with no canary-visible
+                // signal. The footer field
+                // `planning_failures_by_disposition` is the cheap
+                // pre-trace disambiguator for that pattern.
+                log.push(
+                    res.time.tick,
+                    EventKind::PlanningFailed {
+                        cat: name.0.clone(),
+                        disposition: format!("{:?}", chosen),
+                        reason: "no_plan_found".into(),
+                        hunger: needs.hunger,
+                        energy: needs.energy,
+                        temperature: needs.temperature,
+                        food_available,
+                        has_stored_food: planner_has_stored_food,
+                    },
+                );
+            }
         }
     }
 }
@@ -2221,12 +2266,10 @@ pub fn resolve_goap_plans(
 
             // Building completion mood boost.
             if plan.kind == DispositionKind::Building {
-                mood.modifiers
-                    .push_back(crate::components::mental::MoodModifier {
-                        amount: 0.2,
-                        ticks_remaining: 100,
-                        source: "built something".to_string(),
-                    });
+                mood.modifiers.push_back(
+                    crate::components::mental::MoodModifier::new(0.2, 100, "built something")
+                        .with_kind(crate::components::mental::MoodSource::Pride),
+                );
             }
 
             // Check if disposition goal is fully met.
@@ -2968,6 +3011,7 @@ fn dispatch_step_action(
             &mut plan.step_state[step_idx],
             pos,
             &ec.map,
+            &prey_params.exploration_map,
             &snaps.cat_tile_counts,
             &snaps.stores_positions,
             &snaps.construction_positions,
@@ -4511,6 +4555,7 @@ fn resolve_travel_to(
     state: &mut StepExecutionState,
     pos: &mut Position,
     map: &TileMap,
+    exploration_map: &ExplorationMap,
     cat_tile_counts: &HashMap<Position, u32>,
     stores_positions: &[Position],
     construction_positions: &[(Entity, Position)],
@@ -4527,6 +4572,7 @@ fn resolve_travel_to(
             zone,
             pos,
             map,
+            exploration_map,
             stores_positions,
             construction_positions,
             farm_positions,
@@ -5482,11 +5528,20 @@ fn respect_for_disposition(kind: DispositionKind, d: &DispositionConstants) -> f
 // Zone resolution and planner state construction
 // ===========================================================================
 
+/// Substrate-aligned `PlannerZone::Wilds` resolves through the same
+/// `ExplorationMap::frontier_centroid` the IAUS `Explore` DSE scores
+/// against (`LandmarkAnchor::UnexploredFrontierCentroid` →
+/// `src/ai/scoring.rs`). Closes the L2↔L3 feasibility-language drift
+/// `find_nearest_tile(...).or(Some(*pos))` previously authored: when no
+/// frontier and no nearby passable tile resolves, returns `None` so the
+/// planner surfaces `no_plan_found` instead of stamping a degenerate
+/// self-target. Ticket 121 (substrate-over-override epic 093).
 #[allow(clippy::too_many_arguments)]
 fn resolve_zone_position(
     zone: PlannerZone,
     pos: &Position,
     map: &TileMap,
+    exploration_map: &ExplorationMap,
     stores_positions: &[Position],
     construction_positions: &[(Entity, Position)],
     farm_positions: &[Position],
@@ -5538,7 +5593,10 @@ fn resolve_zone_position(
             .filter(|(other, _)| *other != cat_entity)
             .min_by_key(|(_, op)| pos.manhattan_distance(op))
             .map(|(_, p)| *p),
-        PlannerZone::Wilds => find_nearest_tile(pos, map, 20, |t| t.is_passable()).or(Some(*pos)),
+        PlannerZone::Wilds => exploration_map
+            .frontier_centroid()
+            .filter(|p| map.in_bounds(p.x, p.y) && map.get(p.x, p.y).terrain.is_passable())
+            .or_else(|| find_nearest_tile(pos, map, 20, |t| t.is_passable())),
         PlannerZone::PatrolZone => stores_positions
             .iter()
             .min_by_key(|sp| pos.manhattan_distance(sp))
@@ -5973,5 +6031,125 @@ mod tests {
         assert_ne!(h1, h3);
         assert_ne!(h1, h4);
         assert_ne!(h2, h3);
+    }
+
+    // -----------------------------------------------------------------------
+    // Ticket 121 — substrate-aligned `PlannerZone::Wilds` resolution.
+    // -----------------------------------------------------------------------
+
+    fn resolve_wilds(
+        cat: Position,
+        map: &TileMap,
+        exploration: &ExplorationMap,
+    ) -> Option<Position> {
+        let d = DispositionConstants::default();
+        let entity = Entity::from_raw_u32(1).unwrap();
+        resolve_zone_position(
+            PlannerZone::Wilds,
+            &cat,
+            map,
+            exploration,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            entity,
+            &d,
+        )
+    }
+
+    /// Substrate alignment: when `ExplorationMap` has authored a
+    /// frontier-centroid, `PlannerZone::Wilds` must return that centroid —
+    /// the same point `LandmarkAnchor::UnexploredFrontierCentroid` resolves
+    /// to in `score_dse_by_id`. By construction, the IAUS Explore DSE and
+    /// the GOAP planner agree on "where the wilds are."
+    #[test]
+    fn wilds_targets_frontier_centroid_when_present() {
+        let map = TileMap::new(41, 41, Terrain::Grass);
+        let mut exploration = ExplorationMap::new(41, 41);
+        // Mark the left half (x in 0..20) as explored. The right half stays
+        // at 0.0 (below FRONTIER_THRESHOLD = 0.5), so the centroid lands
+        // somewhere in (20..41, 0..41).
+        for y in 0..41 {
+            for x in 0..20 {
+                exploration.explore_tile(x, y);
+            }
+        }
+        exploration.recompute_frontier_centroid(
+            crate::resources::exploration_map::FRONTIER_THRESHOLD,
+        );
+        let centroid = exploration
+            .frontier_centroid()
+            .expect("right half is unexplored");
+        assert!(centroid.x >= 20, "centroid sits in the unexplored half");
+
+        let cat = Position::new(5, 5);
+        let resolved = resolve_wilds(cat, &map, &exploration);
+        assert_eq!(
+            resolved,
+            Some(centroid),
+            "Wilds must resolve to the same anchor IAUS Explore scores against"
+        );
+    }
+
+    /// When the frontier is empty (fully-explored world) the resolver falls
+    /// through to the `find_nearest_tile` scan. The result must still be a
+    /// real adjacent passable tile — never the cat's own position. This
+    /// closes the degenerate self-target the pre-121 `.or(Some(*pos))`
+    /// fallback authored.
+    #[test]
+    fn wilds_falls_back_to_passable_distant_tile_when_frontier_empty() {
+        let map = TileMap::new(21, 21, Terrain::Grass);
+        let mut exploration = ExplorationMap::new(21, 21);
+        for y in 0..21 {
+            for x in 0..21 {
+                exploration.explore_tile(x, y);
+            }
+        }
+        exploration.recompute_frontier_centroid(
+            crate::resources::exploration_map::FRONTIER_THRESHOLD,
+        );
+        assert!(exploration.frontier_centroid().is_none());
+
+        let cat = Position::new(10, 10);
+        let resolved = resolve_wilds(cat, &map, &exploration).expect("open map has neighbors");
+        assert_ne!(
+            resolved, cat,
+            "fallback must never return the cat's own tile (degenerate path)"
+        );
+        assert!(cat.manhattan_distance(&resolved) >= 1);
+    }
+
+    /// When neither the frontier nor any nearby passable tile resolves,
+    /// `PlannerZone::Wilds` returns `None`. The planner then surfaces this
+    /// as `no_plan_found` (an observable signal post-091), instead of the
+    /// pre-121 silent self-target that masked the failure as a successful
+    /// Travel.
+    #[test]
+    fn wilds_returns_none_when_frontier_empty_and_no_passable_neighbor() {
+        let mut map = TileMap::new(21, 21, Terrain::Water);
+        // The cat stands on the only passable tile. `find_nearest_tile`
+        // skips dist == 0, so no candidate exists.
+        map.set(10, 10, Terrain::Grass);
+        let mut exploration = ExplorationMap::new(21, 21);
+        for y in 0..21 {
+            for x in 0..21 {
+                exploration.explore_tile(x, y);
+            }
+        }
+        exploration.recompute_frontier_centroid(
+            crate::resources::exploration_map::FRONTIER_THRESHOLD,
+        );
+        assert!(exploration.frontier_centroid().is_none());
+
+        let cat = Position::new(10, 10);
+        assert_eq!(
+            resolve_wilds(cat, &map, &exploration),
+            None,
+            "no frontier + no reachable passable neighbor → fail visibly"
+        );
     }
 }

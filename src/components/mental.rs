@@ -6,6 +6,28 @@ use std::collections::VecDeque;
 // Mood
 // ---------------------------------------------------------------------------
 
+/// Emotional category of a [`MoodModifier`]. Enables per-kind decay rates and
+/// anxiety-amplification weights. Mirrors the pattern of [`MemoryType`].
+///
+/// - **Fear** decays faster (adrenaline fades); anxiety amplifies it more.
+/// - **Grief** decays slower (loss lingers); anxiety amplifies it less.
+/// - **Triumph** decays slowly (identity-defining).
+/// - **Misc** (default) uses standard rates — unclassified push sites.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default,
+)]
+pub enum MoodSource {
+    Physical,  // physiological: contentment, hunger relief, warmth, remedy
+    Social,    // social: warmth, contagion, play, kitten proximity
+    Fear,      // acute threat: fled combat, predator encounter
+    Grief,     // loss: death of bonded cat, witnessed death
+    Triumph,   // shared victory: banishment, aspiration completion
+    Pride,     // esteem: wounded pride, built something, combat win
+    Magic,     // magical events: spirit communion, ward success, corruption
+    #[default]
+    Misc, // unclassified — uses standard rates
+}
+
 /// A time-limited mood modifier applied additively to a cat's base mood.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct MoodModifier {
@@ -15,6 +37,27 @@ pub struct MoodModifier {
     pub ticks_remaining: u64,
     /// Human-readable source for debugging / narrative ("ate a nice fish").
     pub source: String,
+    /// Emotional category — drives per-kind decay rate and anxiety weighting.
+    #[serde(default)]
+    pub kind: MoodSource,
+}
+
+impl MoodModifier {
+    /// Construct a `Misc`-kind modifier. Use `.with_kind()` to classify.
+    pub fn new(amount: f32, ticks_remaining: u64, source: impl Into<String>) -> Self {
+        Self {
+            amount,
+            ticks_remaining,
+            source: source.into(),
+            kind: MoodSource::Misc,
+        }
+    }
+
+    /// Override the emotional category. Builder-style, returns `self`.
+    pub fn with_kind(mut self, kind: MoodSource) -> Self {
+        self.kind = kind;
+        self
+    }
 }
 
 /// Current emotional state. Valence is the net mood signal after applying all
