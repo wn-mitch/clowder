@@ -64,7 +64,10 @@ pub use relationships::{BondType, Relationship, Relationships};
 pub use rng::SimRng;
 pub use sim_constants::SimConstants;
 pub use system_activation::{Feature, SystemActivation};
-pub use time::{DayPhase, Season, SimConfig, SimSpeed, TimeScale, TimeState, TransitionTracker};
+pub use time::{
+    DayPhase, RenderTickProgress, Season, SimConfig, SimSpeed, TimeScale, TimeState,
+    TransitionTracker,
+};
 pub use time_units::{DurationDays, DurationSeasons, IntervalPerDay, RatePerDay, Ticks};
 pub use trace_log::{
     CapturedDse, FocalScoreCapture, FocalScoreCaptureInner, FocalTraceTarget, TraceEntry, TraceLog,

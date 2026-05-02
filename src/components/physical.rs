@@ -1,3 +1,4 @@
+use bevy::math::Vec2;
 use bevy_ecs::prelude::*;
 
 // ---------------------------------------------------------------------------
@@ -20,6 +21,17 @@ pub struct PreviousPosition {
     pub x: i32,
     pub y: i32,
 }
+
+/// Ticket 129 — Phase 0 of the continuous-position migration epic
+/// (#127). World-space smooth position in pixels, computed each render
+/// frame from `Position` + `PreviousPosition` + `RenderTickProgress`
+/// using a smoothstep ease-in/out curve. Sim state (containing tile,
+/// pathfinding, perception) still reads `Position` (i32 grid); only
+/// the render path consumes this. By Phase 2 (#131), `Position` itself
+/// becomes `Vec2<f32>` and this component remains as the per-frame
+/// interpolation target without changing its public shape.
+#[derive(Component, Clone, Copy, Default, Debug)]
+pub struct RenderPosition(pub Vec2);
 
 impl Position {
     pub fn new(x: i32, y: i32) -> Self {

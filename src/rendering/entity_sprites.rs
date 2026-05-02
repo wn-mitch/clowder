@@ -12,7 +12,7 @@ use crate::components::items::{Item, ItemKind, ItemLocation};
 use crate::components::magic::{
     FlavorKind, FlavorPlant, GrowthStage, Harvestable, Herb, HerbKind, Ward,
 };
-use crate::components::physical::{Dead, Position, PreviousPosition};
+use crate::components::physical::{Dead, Position, PreviousPosition, RenderPosition};
 use crate::components::prey::{PreyAnimal, PreyConfig, PreyDen, PreyKind};
 use crate::components::wildlife::{FoxDen, WildAnimal};
 use crate::rendering::sprite_assets::SpriteAssets;
@@ -767,18 +767,68 @@ pub fn snapshot_previous_positions(mut query: Query<(&Position, &mut PreviousPos
     }
 }
 
-/// Sync Position → Transform for all entities, interpolating smoothly between
-/// the previous tick's position and the current one using the fixed-timestep
-/// overstep fraction.
+/// Ticket 129 — refresh `RenderTickProgress` from
+/// `Time<Fixed>::overstep_fraction()` once per render frame so every
+/// downstream interpolation system reads the same `[0, 1]` parameter
+/// without re-pulling `fixed_time` itself. Must run before
+/// [`sync_entity_positions`] in the rendering schedule.
+pub fn update_render_tick_progress(
+    fixed_time: Res<Time<Fixed>>,
+    mut progress: ResMut<crate::resources::RenderTickProgress>,
+) {
+    progress.0 = fixed_time.overstep_fraction().clamp(0.0, 1.0);
+}
+
+/// Ticket 129 — backfill `RenderPosition` on any entity that already
+/// has `Position` + `PreviousPosition` + sprite marker but is missing
+/// the new component (existing spawn sites manually inserted
+/// `PreviousPosition` only). Runs in `Update` before
+/// `sync_entity_positions` so the interpolation always has a target
+/// component to write into.
+#[allow(clippy::type_complexity)]
+pub fn backfill_render_position(
+    mut commands: Commands,
+    query: Query<
+        Entity,
+        (
+            With<Position>,
+            With<PreviousPosition>,
+            With<EntitySpriteMarker>,
+            Without<RenderPosition>,
+        ),
+    >,
+) {
+    for entity in &query {
+        commands.entity(entity).insert(RenderPosition::default());
+    }
+}
+
+/// Smoothstep ease-in/out — Hermite `3t² − 2t³`, clamped to `[0, 1]`.
+/// Inline so the optimizer can fold it into the call site.
+#[inline]
+fn smoothstep(t: f32) -> f32 {
+    let t = t.clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+/// Sync Position → RenderPosition → Transform for all entities. The
+/// per-frame interpolation reads `RenderTickProgress`, applies a
+/// smoothstep ease-in/out (ticket 129's curve choice — linear was
+/// the pre-129 default), writes the result to `RenderPosition`, and
+/// then composes per-entity layout offsets (item-stack columns,
+/// non-item hash-deterministic sub-tile jitter) into
+/// `Transform.translation`. Tile texture index and z-layer reads
+/// elsewhere still use `Position` (containing tile).
 #[allow(clippy::type_complexity)]
 pub fn sync_entity_positions(
     map: Res<TileMap>,
-    fixed_time: Res<Time<Fixed>>,
+    progress: Res<crate::resources::RenderTickProgress>,
     mut query: Query<
         (
             Entity,
             &Position,
             &PreviousPosition,
+            &mut RenderPosition,
             &mut Transform,
             Option<&ItemDisplaySlot>,
         ),
@@ -787,12 +837,15 @@ pub fn sync_entity_positions(
 ) {
     let world_px = TILE_PX * TILE_SCALE;
     let map_h = map.height as f32;
-    let t = fixed_time.overstep_fraction();
+    let smoothed = smoothstep(progress.0);
 
-    for (entity, pos, prev, mut transform, display_slot) in &mut query {
+    for (entity, pos, prev, mut render_pos, mut transform, display_slot) in &mut query {
         let (curr_x, curr_y) = grid_to_world(pos, map_h, world_px);
 
-        // Snap directly for large jumps (spawn, teleport) — skip lerp.
+        // Snap directly for large jumps (spawn, teleport) — skip
+        // interpolation. Threshold of 5 grid cells matches pre-129
+        // behavior; sub-tile interpolation only makes sense for
+        // tick-by-tick step movement.
         let dist = (pos.x - prev.x).unsigned_abs() + (pos.y - prev.y).unsigned_abs();
         let (x, y) = if dist > 5 {
             (curr_x, curr_y)
@@ -800,10 +853,15 @@ pub fn sync_entity_positions(
             let prev_x = prev.x as f32 * world_px;
             let prev_y = (map_h - 1.0 - prev.y as f32) * world_px;
             (
-                prev_x + (curr_x - prev_x) * t,
-                prev_y + (curr_y - prev_y) * t,
+                prev_x + (curr_x - prev_x) * smoothed,
+                prev_y + (curr_y - prev_y) * smoothed,
             )
         };
+
+        // Tile-center smooth position (no per-entity offsets) — the
+        // public render-substrate value. Phase 2 (#131) reads this
+        // unchanged when `Position` itself becomes `Vec2<f32>`.
+        render_pos.0 = bevy::math::Vec2::new(x, y);
 
         if let Some(slot) = display_slot {
             // Structured layout for items: columns per kind, stacks per item.

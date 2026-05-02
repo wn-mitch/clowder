@@ -17,6 +17,7 @@ pub struct RenderingPlugin;
 impl Plugin for RenderingPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(TilemapPlugin)
+            .init_resource::<crate::resources::RenderTickProgress>()
             .add_systems(
                 Startup,
                 (
@@ -44,6 +45,10 @@ impl Plugin for RenderingPlugin {
                     entity_sprites::update_gate_sprites,
                     entity_sprites::update_crop_sprites,
                     entity_sprites::swap_seasonal_building_sprites,
+                    // Ticket 129 — refresh tick progress + backfill
+                    // RenderPosition before the sync system reads them.
+                    entity_sprites::update_render_tick_progress,
+                    entity_sprites::backfill_render_position,
                     entity_sprites::sync_entity_positions,
                     sprite_animation::tick_sprite_animations,
                     debug_grid::toggle_grid,

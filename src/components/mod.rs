@@ -62,6 +62,7 @@ pub use pairing::{PairingActivity, PairingDropBranch, PairingDropConfig, Pairing
 pub use personality::Personality;
 pub use physical::{
     Dead, Health, Injury, InjuryKind, InjurySource, Needs, Position, PreviousPosition,
+    RenderPosition,
 };
 pub use pregnancy::{GestationStage, Pregnant};
 pub use prey::{

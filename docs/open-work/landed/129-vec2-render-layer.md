@@ -1,16 +1,16 @@
 ---
 id: 129
 title: Phase 0 — Vec2 render layer (visual interpolation, no sim-state change)
-status: ready
+status: done
 cluster: substrate-migration
 added: 2026-05-02
 parked: null
-blocked-by: [127]
+blocked-by: []
 supersedes: []
 related-systems: [project-vision.md]
 related-balance: []
 landed-at: null
-landed-on: null
+landed-on: 2026-05-02
 ---
 
 ## Why
@@ -52,3 +52,4 @@ Lands first because it's the lowest-risk, highest-visibility phase: shippable in
 ## Log
 
 - 2026-05-02: Opened as Phase 0 of the 127 continuous-position-migration epic.
+- 2026-05-02: Landed. The pre-129 render path already had `PreviousPosition` (i32 snapshot) and a linear-lerp `sync_entity_positions` reading `Time<Fixed>::overstep_fraction()`. This commit adds the architectural plumbing the epic needs: (1) new `RenderPosition(pub Vec2)` component in `src/components/physical.rs` — public smooth tile-center position with no per-entity layout offsets, the substrate Phase 2 (#131) consumes unchanged when `Position` itself becomes `Vec2<f32>`. (2) New `RenderTickProgress(pub f32)` resource in `src/resources/time.rs` — single read of `overstep_fraction()` per render frame, downstream interpolators read this instead of re-pulling `Time<Fixed>`. (3) Switched the lerp curve from linear to **smoothstep ease-in/out** (`3t² − 2t³`) per the ticket spec — gives cats a more natural acceleration profile across tile transitions. (4) `update_render_tick_progress` system refreshes the resource per frame; `backfill_render_position` system inserts the new component on entities that already have `Position + PreviousPosition + EntitySpriteMarker` (avoids touching the dozen-plus spawn sites in `entity_sprites.rs`). All three new pieces register in `RenderingPlugin` (windowed only). Headless is untouched — `simulation_is_deterministic` integration test confirms `events.jsonl` is byte-identical post-change, which is the footer-match invariant verdict's gate depends on. **Visual check pending:** user can run `just run-game` to confirm cats glide; `just soak 42 && just verdict logs/tuned-42` confirms verdict 0 + footer match.
