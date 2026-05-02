@@ -4,7 +4,7 @@ use crate::components::building::{Structure, StructureType};
 use crate::components::identity::Species;
 use crate::components::mental::Mood;
 use crate::components::physical::{Dead, Health, Needs, Position};
-use crate::resources::colony_score::ColonyScore;
+use crate::resources::colony_score::{ColonyScore, ColonyScoreSnapshot};
 use crate::resources::event_log::{EventKind, EventLog};
 use crate::resources::relationships::{BondType, Relationships};
 use crate::resources::sim_constants::SimConstants;
@@ -169,6 +169,19 @@ pub fn emit_colony_score(
     let neutral_features_total = SystemActivation::features_total_in(FeatureCategory::Neutral);
 
     let aggregate = score.aggregate(welfare, positive_activation_score, cs);
+
+    // Cache the per-tick computation on the resource so the post-loop
+    // footer writer (and ticket-125 verdict tooling) can read welfare
+    // axes + aggregate without re-tailing the events.jsonl.
+    score.last_snapshot = Some(ColonyScoreSnapshot {
+        shelter,
+        nourishment,
+        health,
+        happiness,
+        fulfillment,
+        welfare,
+        aggregate,
+    });
 
     // --- Bond tier snapshot ---
     let mut friends_count = 0u64;

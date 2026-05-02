@@ -3,14 +3,34 @@ use bevy_ecs::prelude::*;
 use crate::resources::sim_constants::ColonyScoreConstants;
 
 // ---------------------------------------------------------------------------
+// ColonyScoreSnapshot — last emit_colony_score per-tick computation.
+// ---------------------------------------------------------------------------
+
+/// Snapshot of the welfare axes and aggregate score from the most recent
+/// `emit_colony_score` emission. Stored on `ColonyScore` so the headless
+/// `_footer` line (and any post-hoc consumer) can read the run's final
+/// welfare/aggregate without re-tailing the events.jsonl.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct ColonyScoreSnapshot {
+    pub shelter: f32,
+    pub nourishment: f32,
+    pub health: f32,
+    pub happiness: f32,
+    pub fulfillment: f32,
+    pub welfare: f32,
+    pub aggregate: f64,
+}
+
+// ---------------------------------------------------------------------------
 // ColonyScore
 // ---------------------------------------------------------------------------
 
 /// Cumulative ledger of colony-wide achievements and milestones.
 ///
-/// Point-in-time welfare axes are computed fresh each emission by the
-/// `emit_colony_score` system — they don't live here. This resource only
-/// tracks counters that accumulate over the life of a simulation run.
+/// Cumulative counters live here; the per-tick welfare axes + aggregate
+/// are computed fresh each emission and cached on `last_snapshot` so
+/// post-loop consumers (footer writer, verdict tooling) can read the
+/// run's final point-in-time score without re-tailing events.jsonl.
 #[derive(Resource, Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct ColonyScore {
     /// Total season transitions survived (at least 1 cat alive).
@@ -41,6 +61,10 @@ pub struct ColonyScore {
     pub banishments: u64,
     /// Season number at last season-tick update, to detect transitions.
     pub last_recorded_season: u64,
+    /// Last welfare/aggregate snapshot from `emit_colony_score`. `None`
+    /// before the first emission; populated each subsequent emission.
+    #[serde(default)]
+    pub last_snapshot: Option<ColonyScoreSnapshot>,
 }
 
 impl ColonyScore {

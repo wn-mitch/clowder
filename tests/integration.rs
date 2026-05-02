@@ -164,6 +164,60 @@ fn simulation_runs_1000_ticks_without_panic() {
     cleanup(&dir);
 }
 
+/// Ticket 125: the headless footer carries a `colony_score` block populated
+/// from `ColonyScore.last_snapshot`. Runs for >= 1 emission interval so the
+/// snapshot is non-null, then parses the footer and asserts shape.
+#[test]
+fn footer_carries_colony_score_block() {
+    let dir = make_test_dir("colony-score-footer");
+    let mut app = build_test_app(42, &dir);
+    // economy_interval defaults to 100 — drive for 200 ticks so at least
+    // one emission landed before footer write.
+    for _ in 0..200 {
+        if app.should_exit().is_some() {
+            break;
+        }
+        app.update();
+    }
+    let footer_str = emit_headless_footer(app.world_mut());
+    drop(app);
+
+    let footer: serde_json::Value =
+        serde_json::from_str(&footer_str).expect("footer must parse as JSON");
+    let block = footer
+        .get("colony_score")
+        .expect("footer must include colony_score field");
+    assert!(
+        !block.is_null(),
+        "colony_score must be non-null after 200 ticks (>=1 emission interval)"
+    );
+    for field in [
+        "aggregate",
+        "welfare",
+        "shelter",
+        "nourishment",
+        "health",
+        "happiness",
+        "fulfillment",
+        "seasons_survived",
+        "peak_population",
+        "kittens_born",
+        "kittens_surviving",
+        "structures_built",
+        "bonds_formed",
+        "deaths_starvation",
+        "deaths_old_age",
+        "deaths_injury",
+    ] {
+        assert!(
+            block.get(field).is_some(),
+            "colony_score block missing field {field}"
+        );
+    }
+
+    cleanup(&dir);
+}
+
 /// Drive cats to near-starvation, then run for long enough that at least one
 /// of them eats. Verifies the eat plumbing (sense food → plan → travel →
 /// EatAtStores → hunger restored) is wired up end to end. Targeted at the

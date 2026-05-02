@@ -555,6 +555,36 @@ pub fn emit_headless_footer(world: &mut World) -> String {
     let neutral_features_total = SystemActivation::features_total_in(FeatureCategory::Neutral);
     let never_fired_expected_positives = activation.never_fired_expected_positives();
 
+    // Ticket 125: surface ColonyScore.aggregate (and welfare axes +
+    // cumulative ledger) in the footer so `just verdict` can read the
+    // run's final score without re-tailing events.jsonl. The snapshot
+    // is populated by `emit_colony_score`; if the run exited before
+    // the first emission, the field is `null`.
+    let colony_score_block = {
+        let score = world.resource::<crate::resources::ColonyScore>();
+        match &score.last_snapshot {
+            Some(snap) => serde_json::json!({
+                "aggregate": snap.aggregate,
+                "welfare": snap.welfare,
+                "shelter": snap.shelter,
+                "nourishment": snap.nourishment,
+                "health": snap.health,
+                "happiness": snap.happiness,
+                "fulfillment": snap.fulfillment,
+                "seasons_survived": score.seasons_survived,
+                "peak_population": score.peak_population,
+                "kittens_born": score.kittens_born,
+                "kittens_surviving": score.kittens_surviving,
+                "structures_built": score.structures_built,
+                "bonds_formed": score.bonds_formed,
+                "deaths_starvation": score.deaths_starvation,
+                "deaths_old_age": score.deaths_old_age,
+                "deaths_injury": score.deaths_injury,
+            }),
+            None => serde_json::Value::Null,
+        }
+    };
+
     let event_log = world.resource::<EventLog>();
     let footer = serde_json::json!({
         "_footer": true,
@@ -578,6 +608,7 @@ pub fn emit_headless_footer(world: &mut World) -> String {
         "interrupts_by_reason": event_log.interrupts_by_reason,
         "continuity_tallies": event_log.continuity_tallies,
         "welfare_axes": welfare_axes,
+        "colony_score": colony_score_block,
     });
 
     let footer_str = footer.to_string();
