@@ -224,6 +224,24 @@ pub struct ScoringContext<'a> {
     /// at `ScoringContext` construction via
     /// `crate::systems::interoception::body_distress_composite`.
     pub body_distress_composite: f32,
+    /// Ticket 090 — interoceptive perception. Mean of all six `Skills`
+    /// field values normalized into `[0, 1]`; `skills.total() / 6.0`.
+    /// High skill → high felt-competence. Freshly spawned cats ≈ 0.07.
+    /// Computed via
+    /// `crate::systems::interoception::mastery_confidence`.
+    pub mastery_confidence: f32,
+    /// Ticket 090 — interoceptive perception. `1.0` if the cat has at
+    /// least one active `ActiveAspiration`, `0.0` if none or if the
+    /// `Aspirations` component is absent. Binary presence signal —
+    /// not a gradient. Computed via
+    /// `crate::systems::interoception::purpose_clarity`.
+    pub purpose_clarity: f32,
+    /// Ticket 090 — interoceptive perception. Max of the two L4
+    /// (esteem) need deficits: `max(1 - respect, 1 - mastery)`.
+    /// Parallels `body_distress_composite` for the esteem tier.
+    /// Range `[0, 1]`. Computed via
+    /// `crate::systems::interoception::esteem_distress`.
+    pub esteem_distress: f32,
     /// Whether the cat is incapacitated by a severe injury.
     pub is_incapacitated: bool,
     /// Whether a construction site exists that needs work.
@@ -428,6 +446,17 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
         "body_distress_composite",
         ctx.body_distress_composite.clamp(0.0, 1.0),
     );
+    // Ticket 090 — interoceptive perception. L4/L5 Maslow scalars.
+    // `mastery_confidence` and `esteem_distress` are continuous [0, 1];
+    // `purpose_clarity` is binary {0.0, 1.0}. All three are pre-computed
+    // at `ScoringContext` construction by
+    // `crate::systems::interoception` helpers.
+    m.insert(
+        "mastery_confidence",
+        ctx.mastery_confidence.clamp(0.0, 1.0),
+    );
+    m.insert("purpose_clarity", ctx.purpose_clarity.clamp(0.0, 1.0));
+    m.insert("esteem_distress", ctx.esteem_distress.clamp(0.0, 1.0));
     // Fight: combat_effective is already a `[0, 1]` composite index
     // upstream; flow through directly.
     m.insert("combat_effective", ctx.combat_effective.clamp(0.0, 1.0));
@@ -2065,6 +2094,9 @@ mod tests {
             health: 1.0,
             pain_level: 0.0,
             body_distress_composite: 0.0,
+            mastery_confidence: 0.0,
+            purpose_clarity: 0.0,
+            esteem_distress: 0.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -2213,6 +2245,9 @@ mod tests {
             health: 1.0,
             pain_level: 0.0,
             body_distress_composite: 0.0,
+            mastery_confidence: 0.0,
+            purpose_clarity: 0.0,
+            esteem_distress: 0.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -2384,6 +2419,9 @@ mod tests {
             health: 1.0,
             pain_level: 0.0,
             body_distress_composite: 0.0,
+            mastery_confidence: 0.0,
+            purpose_clarity: 0.0,
+            esteem_distress: 0.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -2645,6 +2683,9 @@ mod tests {
             health: 1.0,
             pain_level: 0.0,
             body_distress_composite: 0.0,
+            mastery_confidence: 0.0,
+            purpose_clarity: 0.0,
+            esteem_distress: 0.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -2722,6 +2763,9 @@ mod tests {
             health: 1.0,
             pain_level: 0.0,
             body_distress_composite: 0.0,
+            mastery_confidence: 0.0,
+            purpose_clarity: 0.0,
+            esteem_distress: 0.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -2818,6 +2862,9 @@ mod tests {
             health: 1.0,
             pain_level: 0.0,
             body_distress_composite: 0.0,
+            mastery_confidence: 0.0,
+            purpose_clarity: 0.0,
+            esteem_distress: 0.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3131,6 +3178,9 @@ mod tests {
             health: 1.0,
             pain_level: 0.0,
             body_distress_composite: 0.0,
+            mastery_confidence: 0.0,
+            purpose_clarity: 0.0,
+            esteem_distress: 0.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3209,6 +3259,9 @@ mod tests {
             health: 1.0,
             pain_level: 0.0,
             body_distress_composite: 0.0,
+            mastery_confidence: 0.0,
+            purpose_clarity: 0.0,
+            esteem_distress: 0.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,

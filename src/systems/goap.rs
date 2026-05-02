@@ -1308,6 +1308,11 @@ pub fn evaluate_and_plan(
             body_distress_composite: crate::systems::interoception::body_distress_composite(
                 needs, health,
             ),
+            // Ticket 090 — interoceptive perception. `skills` and
+            // `aspirations` already bound from the cat query.
+            mastery_confidence: crate::systems::interoception::mastery_confidence(skills),
+            purpose_clarity: crate::systems::interoception::purpose_clarity(aspirations),
+            esteem_distress: crate::systems::interoception::esteem_distress(needs),
             is_incapacitated,
             has_construction_site,
             has_damaged_building,

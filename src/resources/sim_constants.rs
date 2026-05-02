@@ -2015,6 +2015,30 @@ pub struct DispositionConstants {
     /// divided by this max. Default 2.0 ≈ three Severe wounds saturate.
     #[serde(default = "default_pain_normalization_max")]
     pub pain_normalization_max: f32,
+    /// Ticket 090 — `LowMastery` ZST marker gate. Fires when
+    /// `mastery_confidence` (mean of all six `Skills` fields) is strictly
+    /// below this threshold. Default 0.35: a cat averaging 35% skill across
+    /// all six axes has meaningfully low felt-competence; above 35% the cat
+    /// is coping. Freshly spawned cats start near 0.07 (default skills),
+    /// well below this — `LowMastery` fires for all novice cats and clears
+    /// as they practise.
+    #[serde(default = "default_low_mastery_threshold")]
+    pub low_mastery_threshold: f32,
+    /// Ticket 090 — `LackingPurpose` ZST marker gate. Fires when
+    /// `purpose_clarity` is strictly below this threshold. Default 0.5:
+    /// since `purpose_clarity` is binary {0.0, 1.0}, the 0.5 midpoint is
+    /// the conventional binary-signal threshold — fires exactly when the
+    /// cat has no active aspiration.
+    #[serde(default = "default_lacking_purpose_threshold")]
+    pub lacking_purpose_threshold: f32,
+    /// Ticket 090 — `EsteemDistressed` ZST marker gate. Fires when
+    /// `esteem_distress` (max of L4 deficits) strictly exceeds this
+    /// threshold. Default 0.55: intentionally lower than
+    /// `body_distress_threshold` (0.6) because L4 distress is chronic /
+    /// slow-onset, not acute. A cat whose respect or mastery need is below
+    /// 45% satisfied is meaningfully esteem-distressed.
+    #[serde(default = "default_esteem_distressed_threshold")]
+    pub esteem_distressed_threshold: f32,
     // --- Contextual threat evaluation (zoo vs bush) ---
     /// Threat intensity multiplier when the cat is inside a ward's repel radius.
     #[serde(default = "default_threat_ward_dampening")]
@@ -2246,6 +2270,18 @@ fn default_body_distress_threshold() -> f32 {
 
 fn default_pain_normalization_max() -> f32 {
     2.0
+}
+
+fn default_low_mastery_threshold() -> f32 {
+    0.35
+}
+
+fn default_lacking_purpose_threshold() -> f32 {
+    0.5
+}
+
+fn default_esteem_distressed_threshold() -> f32 {
+    0.55
 }
 
 fn default_gate_reckless_health_threshold() -> f32 {
@@ -2560,6 +2596,9 @@ impl Default for DispositionConstants {
             fight_bail_health_threshold: 0.35,
             body_distress_threshold: default_body_distress_threshold(),
             pain_normalization_max: default_pain_normalization_max(),
+            low_mastery_threshold: default_low_mastery_threshold(),
+            lacking_purpose_threshold: default_lacking_purpose_threshold(),
+            esteem_distressed_threshold: default_esteem_distressed_threshold(),
             threat_ward_dampening: 0.3,
             threat_colony_building_dampening: 0.5,
             threat_building_safety_range: 5,

@@ -152,6 +152,40 @@ impl BodyDistressed {
     pub const KEY: &str = "BodyDistressed";
 }
 
+/// Mean skill level across all six `Skills` fields below
+/// `DispositionConstants::low_mastery_threshold`. The cat's
+/// felt-competence is meaningfully low — drives future
+/// "seek-mastery" / "pursue-practice" DSEs. Note: fires for
+/// all freshly spawned cats (default mean ~0.07) and clears as
+/// skills grow past the threshold. Authoring:
+/// `interoception::author_self_markers`. Ticket 090.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct LowMastery;
+impl LowMastery {
+    pub const KEY: &str = "LowMastery";
+}
+
+/// No active aspiration (`Aspirations::active.is_empty()` or no
+/// `Aspirations` component). The cat has no directed striving —
+/// drives future "adopt-aspiration" / "pursue-purpose" DSEs.
+/// Authoring: `interoception::author_self_markers`. Ticket 090.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct LackingPurpose;
+impl LackingPurpose {
+    pub const KEY: &str = "LackingPurpose";
+}
+
+/// Max of L4 deficits — `max(1 - respect, 1 - mastery)` exceeds
+/// `DispositionConstants::esteem_distressed_threshold`. Parallels
+/// `BodyDistressed` for the esteem tier: the unified "I feel
+/// undervalued or incompetent" signal. Authoring:
+/// `interoception::author_self_markers`. Ticket 090.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct EsteemDistressed;
+impl EsteemDistressed {
+    pub const KEY: &str = "EsteemDistressed";
+}
+
 /// Cat is in an active combat step or hostile-adjacent.
 /// `combat.rs::update_combat_marker`.
 #[derive(Component, Debug, Clone, Copy)]
@@ -563,6 +597,9 @@ mod tests {
         assert_marker_queryable(LowHealth);
         assert_marker_queryable(SevereInjury);
         assert_marker_queryable(BodyDistressed);
+        assert_marker_queryable(LowMastery);
+        assert_marker_queryable(LackingPurpose);
+        assert_marker_queryable(EsteemDistressed);
         assert_marker_queryable(InCombat);
         assert_marker_queryable(OnCorruptedTile);
         assert_marker_queryable(OnSpecialTerrain);
@@ -651,6 +688,30 @@ mod tests {
                 assert_ne!(
                     keys[i], keys[j],
                     "§9.2 marker KEYs must be unique — collision between {} and {}",
+                    keys[i], keys[j]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn l4_l5_self_perception_marker_keys_unique() {
+        let keys = [
+            LowHealth::KEY,
+            SevereInjury::KEY,
+            BodyDistressed::KEY,
+            LowMastery::KEY,
+            LackingPurpose::KEY,
+            EsteemDistressed::KEY,
+        ];
+        for k in keys {
+            assert!(!k.is_empty(), "marker KEY must be non-empty");
+        }
+        for i in 0..keys.len() {
+            for j in (i + 1)..keys.len() {
+                assert_ne!(
+                    keys[i], keys[j],
+                    "ticket 087/090 self-perception marker KEYs must be unique — collision between {} and {}",
                     keys[i], keys[j]
                 );
             }

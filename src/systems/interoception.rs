@@ -42,8 +42,12 @@
 
 use bevy::prelude::*;
 
-use crate::components::markers::{BodyDistressed, LowHealth, SevereInjury};
+use crate::components::aspirations::Aspirations;
+use crate::components::markers::{
+    BodyDistressed, EsteemDistressed, LackingPurpose, LowHealth, LowMastery, SevereInjury,
+};
 use crate::components::physical::{Dead, Health, Injury, InjuryKind, Needs};
+use crate::components::skills::Skills;
 use crate::resources::sim_constants::SimConstants;
 
 /// Per-`InjuryKind` severity score used to derive `pain_level`. Minor
@@ -110,6 +114,41 @@ pub fn body_distress_composite(needs: &Needs, health: &Health) -> f32 {
         .max(h)
 }
 
+/// Mean of all six `Skills` field values, normalized into `[0, 1]`.
+/// High skill → high felt-competence. Uses `Skills::total() / 6.0`,
+/// clamped because `Skills` fields have no hard upper bound (in
+/// practice diminishing-returns growth keeps them near `[0, 1]`).
+///
+/// Default cats (total ≈ 0.4) → ~0.067. A cat with all six fields
+/// at 0.6 → 0.6. Saturated cats clamp to 1.0. Ticket 090.
+pub fn mastery_confidence(skills: &Skills) -> f32 {
+    (skills.total() / 6.0).clamp(0.0, 1.0)
+}
+
+/// `1.0` if the cat has at least one active aspiration, `0.0` if
+/// none or if the `Aspirations` component is absent. Binary signal
+/// — presence of directed striving, not degree of progress.
+/// Gradient progress within an aspiration lives in
+/// `ActiveAspiration::progress`, not in this scalar. Ticket 090.
+pub fn purpose_clarity(aspirations: Option<&Aspirations>) -> f32 {
+    if aspirations.is_some_and(|a| !a.active.is_empty()) {
+        1.0
+    } else {
+        0.0
+    }
+}
+
+/// Higher of the two L4 (esteem) need deficits: `max(1 - respect,
+/// 1 - mastery)`. Parallels `body_distress_composite`'s
+/// max-of-deficits semantics — any one L4 axis going critical is
+/// enough to signal esteem distress, regardless of the other.
+/// Range `[0, 1]`. Ticket 090.
+pub fn esteem_distress(needs: &Needs) -> f32 {
+    (1.0 - needs.respect)
+        .max(1.0 - needs.mastery)
+        .clamp(0.0, 1.0)
+}
+
 /// Per-tick author system for interoceptive ZST markers.
 ///
 /// Reads each living cat's `Health` and `Needs`; computes the three
@@ -133,18 +172,37 @@ pub fn author_self_markers(
             Entity,
             &Health,
             &Needs,
+            &Skills,
+            Option<&Aspirations>,
             Has<LowHealth>,
             Has<SevereInjury>,
             Has<BodyDistressed>,
+            Has<LowMastery>,
+            Has<LackingPurpose>,
+            Has<EsteemDistressed>,
         ),
         Without<Dead>,
     >,
 ) {
     let critical_health_threshold = constants.disposition.critical_health_threshold;
     let body_distress_threshold = constants.disposition.body_distress_threshold;
+    let low_mastery_threshold = constants.disposition.low_mastery_threshold;
+    let lacking_purpose_threshold = constants.disposition.lacking_purpose_threshold;
+    let esteem_distressed_threshold = constants.disposition.esteem_distressed_threshold;
 
-    for (entity, health, needs, has_low_health, has_severe_injury, has_body_distressed) in
-        cats.iter()
+    for (
+        entity,
+        health,
+        needs,
+        skills,
+        aspirations,
+        has_low_health,
+        has_severe_injury,
+        has_body_distressed,
+        has_low_mastery,
+        has_lacking_purpose,
+        has_esteem_distressed,
+    ) in cats.iter()
     {
         let health_ratio = if health.max > 0.0 {
             health.current / health.max
@@ -158,6 +216,9 @@ pub fn author_self_markers(
             .any(|i| !i.healed && i.kind == InjuryKind::Severe);
         let want_body_distressed =
             body_distress_composite(needs, health) >= body_distress_threshold;
+        let want_low_mastery = mastery_confidence(skills) < low_mastery_threshold;
+        let want_lacking_purpose = purpose_clarity(aspirations) < lacking_purpose_threshold;
+        let want_esteem_distressed = esteem_distress(needs) > esteem_distressed_threshold;
 
         match (want_low_health, has_low_health) {
             (true, false) => {
@@ -186,13 +247,42 @@ pub fn author_self_markers(
             }
             _ => {}
         }
+        match (want_low_mastery, has_low_mastery) {
+            (true, false) => {
+                commands.entity(entity).insert(LowMastery);
+            }
+            (false, true) => {
+                commands.entity(entity).remove::<LowMastery>();
+            }
+            _ => {}
+        }
+        match (want_lacking_purpose, has_lacking_purpose) {
+            (true, false) => {
+                commands.entity(entity).insert(LackingPurpose);
+            }
+            (false, true) => {
+                commands.entity(entity).remove::<LackingPurpose>();
+            }
+            _ => {}
+        }
+        match (want_esteem_distressed, has_esteem_distressed) {
+            (true, false) => {
+                commands.entity(entity).insert(EsteemDistressed);
+            }
+            (false, true) => {
+                commands.entity(entity).remove::<EsteemDistressed>();
+            }
+            _ => {}
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::components::aspirations::{ActiveAspiration, AspirationDomain, Aspirations};
     use crate::components::physical::{Health, Injury, InjuryKind, InjurySource, Needs};
+    use crate::components::skills::Skills;
     use bevy::ecs::schedule::Schedule;
 
     fn full_health() -> Health {
@@ -351,6 +441,7 @@ mod tests {
                     injuries: Vec::new(),
                 },
                 comfortable_needs(),
+                Skills::default(),
             ))
             .id();
         schedule.run(&mut world);
@@ -368,6 +459,7 @@ mod tests {
                     injuries: Vec::new(),
                 },
                 comfortable_needs(),
+                Skills::default(),
             ))
             .id();
         schedule.run(&mut world);
@@ -392,7 +484,7 @@ mod tests {
         };
         h.injuries.push(injury(InjuryKind::Moderate, false));
         h.injuries.push(injury(InjuryKind::Severe, true));
-        let cat = world.spawn((h, comfortable_needs())).id();
+        let cat = world.spawn((h, comfortable_needs(), Skills::default())).id();
         schedule.run(&mut world);
         // Moderate unhealed + Severe healed → no SevereInjury marker.
         assert!(world.get::<SevereInjury>(cat).is_none());
@@ -410,7 +502,7 @@ mod tests {
         let (mut world, mut schedule) = setup_world();
         let mut needs = comfortable_needs();
         needs.energy = 0.2; // deficit 0.8 > default 0.6 threshold
-        let cat = world.spawn((full_health(), needs)).id();
+        let cat = world.spawn((full_health(), needs, Skills::default())).id();
         schedule.run(&mut world);
         assert!(world.get::<BodyDistressed>(cat).is_some());
     }
@@ -426,6 +518,7 @@ mod tests {
                     injuries: Vec::new(),
                 },
                 comfortable_needs(),
+                Skills::default(),
                 Dead {
                     tick: 0,
                     cause: crate::components::physical::DeathCause::Injury,
@@ -434,5 +527,268 @@ mod tests {
             .id();
         schedule.run(&mut world);
         assert!(world.get::<LowHealth>(cat).is_none());
+        assert!(world.get::<LowMastery>(cat).is_none());
+        assert!(world.get::<LackingPurpose>(cat).is_none());
+        assert!(world.get::<EsteemDistressed>(cat).is_none());
+    }
+
+    fn no_aspirations() -> Aspirations {
+        Aspirations::default()
+    }
+
+    fn one_aspiration() -> Aspirations {
+        Aspirations {
+            active: vec![ActiveAspiration {
+                chain_name: "TestChain".to_string(),
+                domain: AspirationDomain::Hunting,
+                current_milestone: 0,
+                progress: 0,
+                adopted_tick: 0,
+                last_progress_tick: 0,
+            }],
+            completed: Vec::new(),
+        }
+    }
+
+    fn skills_all(value: f32) -> Skills {
+        Skills {
+            hunting: value,
+            foraging: value,
+            herbcraft: value,
+            building: value,
+            combat: value,
+            magic: value,
+        }
+    }
+
+    // ---- Ticket 090 pure-function tests ----
+
+    #[test]
+    fn mastery_confidence_zero_skills() {
+        assert_eq!(mastery_confidence(&skills_all(0.0)), 0.0);
+    }
+
+    #[test]
+    fn mastery_confidence_full_skills() {
+        assert!((mastery_confidence(&skills_all(1.0)) - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn mastery_confidence_default_skills() {
+        // Skills::default() total = 0.4; mean = 0.4 / 6 ≈ 0.0667.
+        let mc = mastery_confidence(&Skills::default());
+        assert!((mc - (0.4 / 6.0)).abs() < 1e-4, "got {mc}");
+    }
+
+    #[test]
+    fn mastery_confidence_clamped_above_one() {
+        assert_eq!(mastery_confidence(&skills_all(2.0)), 1.0);
+    }
+
+    #[test]
+    fn mastery_confidence_partial_mean() {
+        let mut s = skills_all(0.0);
+        s.hunting = 0.6;
+        // Total 0.6, mean = 0.1.
+        assert!((mastery_confidence(&s) - 0.1).abs() < 1e-6);
+    }
+
+    #[test]
+    fn purpose_clarity_none() {
+        assert_eq!(purpose_clarity(None), 0.0);
+    }
+
+    #[test]
+    fn purpose_clarity_empty_active() {
+        let asp = no_aspirations();
+        assert_eq!(purpose_clarity(Some(&asp)), 0.0);
+    }
+
+    #[test]
+    fn purpose_clarity_nonempty_active() {
+        let asp = one_aspiration();
+        assert_eq!(purpose_clarity(Some(&asp)), 1.0);
+    }
+
+    #[test]
+    fn esteem_distress_full_needs() {
+        let mut needs = comfortable_needs();
+        needs.respect = 1.0;
+        needs.mastery = 1.0;
+        assert_eq!(esteem_distress(&needs), 0.0);
+    }
+
+    #[test]
+    fn esteem_distress_both_zero() {
+        let mut needs = comfortable_needs();
+        needs.respect = 0.0;
+        needs.mastery = 0.0;
+        assert_eq!(esteem_distress(&needs), 1.0);
+    }
+
+    #[test]
+    fn esteem_distress_takes_max() {
+        let mut needs = comfortable_needs();
+        needs.respect = 0.3;
+        needs.mastery = 0.8;
+        // max(1 - 0.3, 1 - 0.8) = max(0.7, 0.2) = 0.7
+        assert!((esteem_distress(&needs) - 0.7).abs() < 1e-6);
+    }
+
+    #[test]
+    fn esteem_distress_takes_max_other_way() {
+        let mut needs = comfortable_needs();
+        needs.respect = 0.9;
+        needs.mastery = 0.2;
+        // max(1 - 0.9, 1 - 0.2) = max(0.1, 0.8) = 0.8
+        assert!((esteem_distress(&needs) - 0.8).abs() < 1e-6);
+    }
+
+    #[test]
+    fn esteem_distress_clamps() {
+        let mut needs = comfortable_needs();
+        needs.respect = -0.1;
+        needs.mastery = 1.1;
+        // 1 - (-0.1) = 1.1, 1 - 1.1 = -0.1; max = 1.1; clamped to 1.0.
+        assert_eq!(esteem_distress(&needs), 1.0);
+    }
+
+    // ---- Ticket 090 marker-lifecycle tests ----
+
+    #[test]
+    fn low_mastery_fires_for_default_skills() {
+        let (mut world, mut schedule) = setup_world();
+        let cat = world
+            .spawn((full_health(), comfortable_needs(), Skills::default()))
+            .id();
+        schedule.run(&mut world);
+        assert!(world.get::<LowMastery>(cat).is_some());
+        // Idempotent transition: re-running steady state must not fail.
+        schedule.run(&mut world);
+        assert!(world.get::<LowMastery>(cat).is_some());
+    }
+
+    #[test]
+    fn low_mastery_clears_when_skilled() {
+        let (mut world, mut schedule) = setup_world();
+        let cat = world
+            .spawn((full_health(), comfortable_needs(), Skills::default()))
+            .id();
+        schedule.run(&mut world);
+        assert!(world.get::<LowMastery>(cat).is_some());
+        // Practise hard.
+        world.entity_mut(cat).insert(skills_all(0.8));
+        schedule.run(&mut world);
+        assert!(world.get::<LowMastery>(cat).is_none());
+    }
+
+    #[test]
+    fn low_mastery_boundary_at_threshold() {
+        // mean exactly equals threshold (0.35) — strict `<` means marker
+        // does NOT fire.
+        let (mut world, mut schedule) = setup_world();
+        let cat = world
+            .spawn((full_health(), comfortable_needs(), skills_all(0.35)))
+            .id();
+        schedule.run(&mut world);
+        assert!(
+            world.get::<LowMastery>(cat).is_none(),
+            "LowMastery must not fire at exactly the threshold (strict <)"
+        );
+    }
+
+    #[test]
+    fn lacking_purpose_fires_without_aspirations_component() {
+        let (mut world, mut schedule) = setup_world();
+        let cat = world
+            .spawn((full_health(), comfortable_needs(), Skills::default()))
+            .id();
+        schedule.run(&mut world);
+        assert!(world.get::<LackingPurpose>(cat).is_some());
+    }
+
+    #[test]
+    fn lacking_purpose_fires_with_empty_active() {
+        let (mut world, mut schedule) = setup_world();
+        let cat = world
+            .spawn((
+                full_health(),
+                comfortable_needs(),
+                Skills::default(),
+                no_aspirations(),
+            ))
+            .id();
+        schedule.run(&mut world);
+        assert!(world.get::<LackingPurpose>(cat).is_some());
+    }
+
+    #[test]
+    fn lacking_purpose_clears_when_aspiration_adopted() {
+        let (mut world, mut schedule) = setup_world();
+        let cat = world
+            .spawn((full_health(), comfortable_needs(), Skills::default()))
+            .id();
+        schedule.run(&mut world);
+        assert!(world.get::<LackingPurpose>(cat).is_some());
+        world.entity_mut(cat).insert(one_aspiration());
+        schedule.run(&mut world);
+        assert!(world.get::<LackingPurpose>(cat).is_none());
+    }
+
+    #[test]
+    fn esteem_distressed_fires_when_respect_low() {
+        let (mut world, mut schedule) = setup_world();
+        let mut needs = comfortable_needs();
+        needs.respect = 0.3; // distress = 0.7 > 0.55
+        needs.mastery = 0.9;
+        let cat = world
+            .spawn((full_health(), needs, Skills::default()))
+            .id();
+        schedule.run(&mut world);
+        assert!(world.get::<EsteemDistressed>(cat).is_some());
+    }
+
+    #[test]
+    fn esteem_distressed_fires_when_mastery_low() {
+        let (mut world, mut schedule) = setup_world();
+        let mut needs = comfortable_needs();
+        needs.respect = 0.9;
+        needs.mastery = 0.2; // distress = 0.8 > 0.55
+        let cat = world
+            .spawn((full_health(), needs, Skills::default()))
+            .id();
+        schedule.run(&mut world);
+        assert!(world.get::<EsteemDistressed>(cat).is_some());
+    }
+
+    #[test]
+    fn esteem_distressed_absent_when_needs_satisfied() {
+        let (mut world, mut schedule) = setup_world();
+        let mut needs = comfortable_needs();
+        needs.respect = 0.6; // distress = 0.4
+        needs.mastery = 0.6;
+        let cat = world
+            .spawn((full_health(), needs, Skills::default()))
+            .id();
+        schedule.run(&mut world);
+        assert!(world.get::<EsteemDistressed>(cat).is_none());
+    }
+
+    #[test]
+    fn esteem_distressed_clears_on_recovery() {
+        let (mut world, mut schedule) = setup_world();
+        let mut needs = comfortable_needs();
+        needs.respect = 0.3;
+        needs.mastery = 0.9;
+        let cat = world
+            .spawn((full_health(), needs.clone(), Skills::default()))
+            .id();
+        schedule.run(&mut world);
+        assert!(world.get::<EsteemDistressed>(cat).is_some());
+        // Recover.
+        needs.respect = 0.7;
+        world.entity_mut(cat).insert(needs);
+        schedule.run(&mut world);
+        assert!(world.get::<EsteemDistressed>(cat).is_none());
     }
 }
