@@ -9,7 +9,7 @@ blocked-by: []
 supersedes: []
 related-systems: [project-vision.md]
 related-balance: []
-landed-at: null
+landed-at: f571f23c
 landed-on: 2026-05-02
 ---
 

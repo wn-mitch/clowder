@@ -9,7 +9,7 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
+landed-at: 2216a44f
 landed-on: 2026-05-02
 ---
 
