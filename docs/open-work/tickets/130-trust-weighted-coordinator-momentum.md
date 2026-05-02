@@ -5,7 +5,7 @@ status: blocked
 cluster: C
 added: 2026-05-02
 parked: null
-blocked-by: [126, 057, 081]
+blocked-by: [126, 057]
 supersedes: []
 related-systems: [ai-substrate-refactor.md, strategist-coordinator.md, scoring-layer-second-order.md]
 related-balance: []
@@ -18,11 +18,12 @@ landed-on: null
 Spun out of 126 (`## Out of scope`). 126 commits the
 `IntentionSource` provenance field on `HeldIntention` and a
 source-aware read-site on `IntentionMomentum`. 057 emits
-coordinator-directive intentions. 081 demotes failing coordinators.
-130 is the axis that closes the loop — directive lift scales with
-recipient trust, so high-trust coordinators' orders override
-marginal scores while low-trust coordinators' orders mostly fail to
-adopt.
+coordinator-directive intentions. (081 — coordinator-side
+failure demotion — was retired without implementation 2026-05-02;
+130 no longer pairs with it.) 130 is the axis that closes the loop
+— directive lift scales with recipient trust, so high-trust
+coordinators' orders override marginal scores while low-trust
+coordinators' orders mostly fail to adopt.
 
 Enables observable good-vs-bad coordinator effects without an
 out-of-fiction director. Per CLAUDE.md "no director" doctrine: a
@@ -48,9 +49,11 @@ The shape this ticket has to commit:
   outcome calibrates).
 - Footer-line addition: `directive_compliance_by_coordinator` —
   per-coordinator adoption-rate, fulfillment-rate, and abandonment
-  reasons. Substrate for 081's demotion logic and post-hoc
-  narrative ("Coordinator Whisker's directives were ignored 70% of
-  the time after the failed cache raid").
+  reasons. Substrate for post-hoc narrative ("Coordinator Whisker's
+  directives were ignored 70% of the time after the failed cache
+  raid"). (Originally framed as "substrate for 081's demotion
+  logic"; 081 retired 2026-05-02, so the metric stands on its own
+  narrative-and-tuning use.)
 - Possibly a `coordinator_authority_axis` on the coordinator side
   (a coordinator with high authority issues directives that *all*
   recipients weight up, independent of personal trust). TBD —
@@ -68,8 +71,10 @@ coordinator vs bad coordinator has an effect."
 - Blocked by 126 (`IntentionSource` substrate).
 - Blocked by 057 (something must actually emit
   `CoordinatorDirective` intentions for the trust axis to lift).
-- Blocked by 081 (failure-demotion is the consumer of the
-  compliance metric this ticket adds).
+- ~~Blocked by 081~~ — 081 retired without implementation
+  2026-05-02. The directive-failure demotion consumer it would have
+  provided no longer exists; the compliance-by-coordinator metric
+  this ticket adds is justified on narrative + tuning grounds alone.
 - Pairs with C3 (subjective belief) — if mental models have
   landed, trust is a facet on the recipient's belief about the
   coordinator; if not, it's a flat Component.
@@ -88,3 +93,8 @@ coordinator vs bad coordinator has an effect."
 - 2026-05-02: opened as 126 follow-on per CLAUDE.md
   antipattern-migration rule. Carries the user-requested
   good-vs-bad-coordinator-effects design.
+- 2026-05-02: 081 retired without implementation; dropped from
+  `blocked-by` (now `[126, 057]`). The directive-failure-demotion
+  consumer this ticket originally paired with no longer exists; the
+  compliance-by-coordinator metric stands on narrative + tuning
+  grounds. No status change — 126 and 057 still block.

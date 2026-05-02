@@ -1,11 +1,11 @@
 ---
 id: 027b
 title: L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor)
-status: blocked
+status: ready
 cluster: null
 added: 2026-04-28
 parked: null
-blocked-by: [071]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
@@ -280,3 +280,11 @@ all four predictions P1–P4 above.
   economy — fully traceable, tunable via curve parameters,
   and inspectable in the modifier-pipeline trace. This is
   in scope of 071 (not deferred to 027c).
+- 2026-05-02: 071 sub-epic retired (every child closed; 081 retired
+  same day). `blocked-by: [071]` dropped; status flipped from
+  `blocked` to `ready`. The hardened substrate this ticket targets
+  for activation is in place (072 / 073 with 074 / 075 / 078 / 080
+  bundled / 077 / 079; 076 and 081 retired without implementation;
+  082 already landed 027b's first reactivation pass). Ready to be
+  picked up by the next available scheduler-resilient activation
+  attempt (or by 027c if that's the chosen path).
