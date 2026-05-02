@@ -15,10 +15,10 @@ _Last generated: 2026-05-02._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 47 |
+| Ready | 48 |
 | Parked | 6 |
-| Blocked | 18 |
-| **Open total** | **76** |
+| Blocked | 21 |
+| **Open total** | **80** |
 | Pre-existing | 1 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -33,7 +33,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[071](docs/open-work/tickets/071-planning-substrate-hardening.md)** — Planning-substrate hardening — gird against the stuck-cat bug class (sub-epic) — _[planning-substrate] · added 2026-04-29_
 - **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** — Substrate-over-override — retire control-yanking hacks in favor of IAUS levers — _[substrate-over-override] · added 2026-04-30_
 
-## Ready (47)
+## Ready (48)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -82,6 +82,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[138](docs/open-work/tickets/138-movement-budget-and-mobility-term.md)** — Phase 1 — MovementBudget per entity + escape_viability mobility term — _[substrate-migration] · blocked-by 135 · added 2026-05-02_
 - **[139](docs/open-work/tickets/139-position-vec2-substrate.md)** — Phase 2 — Position becomes Vec2<f32> (continuous-position substrate migration) — _[substrate-migration] · blocked-by 135 · added 2026-05-02_
 - **[141](docs/open-work/tickets/141-combat-winnability-scalar.md)** — combat_winnability perception scalar — sibling to escape_viability — _[ai-substrate] · added 2026-05-02_
+- **[145](docs/open-work/tickets/145-submit-gesture-dse.md)** — Submit gesture DSE — appeasement infrastructure for IntraspeciesConflict.Fawn — _[ai-substrate] · added 2026-05-02_
 
 ## Parked (6)
 
@@ -92,7 +93,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[084](docs/open-work/tickets/084-farm-herb-ward-demand-axis.md)** — Farm DSE — tie scoring to herb/ward stockpile demand so gardens stay productive under abundant food — _[balance] · parked 2026-04-30 · blocked-by 086 · added 2026-04-29_
 - **[099](docs/open-work/tickets/099-modifier-feature-emission.md)** — Feature emission for §3.5.1 Modifiers — colony-wide canary surface for substrate-lift signals — _[ai-substrate] · parked 2026-05-01 · blocked-by 119 · added 2026-05-01_
 
-## Blocked (18)
+## Blocked (21)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _blocked-by 007, 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _blocked-by 016 · added 2026-04-22_
@@ -111,6 +112,9 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[129](docs/open-work/tickets/129-care-dses-perceivable-intentions.md)** — Care DSEs over perceivable intentions — _[C] · blocked-by 126 · added 2026-05-02_
 - **[130](docs/open-work/tickets/130-trust-weighted-coordinator-momentum.md)** — Trust-weighted coordinator directive momentum — _[C] · blocked-by 126, 057, 081 · added 2026-05-02_
 - **[140](docs/open-work/tickets/140-steering-and-pursuit-polish.md)** — Phase 3 — Steering, smooth pursuit / flee, pathfinder polish — _[substrate-migration] · blocked-by 139 · added 2026-05-02_
+- **[142](docs/open-work/tickets/142-intraspecies-conflict-freeze.md)** — IntraspeciesConflictResponseFreeze — hold-position low-body-posture social valence — _[ai-substrate] · blocked-by 104, 109 · added 2026-05-02_
+- **[143](docs/open-work/tickets/143-intraspecies-conflict-fight.md)** — IntraspeciesConflictResponseFight — territorial combat valence (same-species) — _[ai-substrate] · blocked-by 109 · added 2026-05-02_
+- **[144](docs/open-work/tickets/144-intraspecies-conflict-fawn.md)** — IntraspeciesConflictResponseFawn — appeasement valence (belly-up, slow blink) — _[ai-substrate] · blocked-by 109, 145 · added 2026-05-02_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _blocked-by 071 · added 2026-04-28_
 
 ## Pre-existing (1)

@@ -1481,6 +1481,21 @@ pub struct ScoringConstants {
     /// pivot.
     #[serde(default = "default_threat_proximity_adrenaline_viability_threshold")]
     pub threat_proximity_adrenaline_viability_threshold: f32,
+    /// Ticket 109 (Phase A) — `IntraspeciesConflictResponseFlight`
+    /// Modifier threshold. The `social_status_distress` floor below
+    /// which the lift is a no-op. Default 0.6 — mirrors the pressure-
+    /// modifier family (106 on hunger). Pressure shape, not lurch:
+    /// social-status pressure is gradual.
+    #[serde(default = "default_intraspecies_conflict_flight_threshold")]
+    pub intraspecies_conflict_flight_threshold: f32,
+    /// Ticket 109 (Phase A) — `IntraspeciesConflictResponseFlight`
+    /// lift on Flee (subordinate-retreat valence — the cat withdraws
+    /// from the dominant). **Default 0.0** (ships inert); proposed
+    /// magnitude 0.30. Promotion lands alongside the
+    /// `social_status_distress` composition + per-tick computation in
+    /// the same Phase-3 commit.
+    #[serde(default = "default_intraspecies_conflict_flight_lift")]
+    pub intraspecies_conflict_flight_lift: f32,
     pub wander_curiosity_scale: f32,
     pub wander_base: f32,
     pub wander_playfulness_bonus: f32,
@@ -1698,6 +1713,9 @@ impl Default for ScoringConstants {
                 default_threat_proximity_adrenaline_sleep_lift(),
             threat_proximity_adrenaline_viability_threshold:
                 default_threat_proximity_adrenaline_viability_threshold(),
+            intraspecies_conflict_flight_threshold:
+                default_intraspecies_conflict_flight_threshold(),
+            intraspecies_conflict_flight_lift: default_intraspecies_conflict_flight_lift(),
             wander_curiosity_scale: 0.4,
             wander_base: 0.08,
             wander_playfulness_bonus: 0.2,
@@ -2505,6 +2523,22 @@ fn default_threat_proximity_adrenaline_sleep_lift() -> f32 {
 /// future Fight valence (108b) takes over. Default 0.4 mirrors 102.
 fn default_threat_proximity_adrenaline_viability_threshold() -> f32 {
     0.4
+}
+
+/// Ticket 109 (Phase A) — `IntraspeciesConflictResponseFlight`
+/// threshold. Default 0.6 mirrors 106's hunger threshold — pressure
+/// modifiers share onset semantics (gradual physiological/social
+/// build).
+fn default_intraspecies_conflict_flight_threshold() -> f32 {
+    0.6
+}
+
+/// Ticket 109 (Phase A) — `IntraspeciesConflictResponseFlight` lift on
+/// Flee. **Defaults to 0.0** (ships inert); proposed magnitude 0.30.
+/// Promotion lands alongside the social_status_distress composition
+/// + per-tick computation in the same Phase-3 commit.
+fn default_intraspecies_conflict_flight_lift() -> f32 {
+    0.0
 }
 
 fn default_build_pressure_cooking_min_raw_food() -> usize {

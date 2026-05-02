@@ -138,6 +138,19 @@ const THERMAL_DEFICIT: &str = "thermal_deficit";
 /// regardless of scalar value, so the stub is bit-identical to the
 /// pre-Wave-1 baseline.
 const THREAT_PROXIMITY_DERIVATIVE: &str = "threat_proximity_derivative";
+/// Ticket 109 — `IntraspeciesConflictResponseFlight` Modifier trigger
+/// input. The social-status pressure scalar — distinct from physical
+/// body distress and from predator threat. Composes status differential
+/// vs the nearest cat with a proximity / intrusion factor.
+///
+/// **Phase 1 stub:** published as 0.0 from `scoring::ctx_scalars`. The
+/// v1 composition `(status_diff_to_nearest_cat × proximity_factor)`
+/// requires (a) a defensible status-differential signal — no explicit
+/// dominance hierarchy exists yet; `needs.respect` and bond strength
+/// are candidate proxies — and (b) per-cat nearest-cat resolution
+/// during scoring. Both land with the lift activation (Phase 3 spec).
+/// With the lift at 0.0, the stub is bit-identical to baseline.
+const SOCIAL_STATUS_DISTRESS: &str = "social_status_distress";
 const ACTIVE_DISPOSITION_ORDINAL: &str = "active_disposition_ordinal";
 /// §075 — `CommitmentTenure` Modifier. Drift between this name and
 /// `plan_substrate::COMMITMENT_TENURE_INPUT` (the canonical
@@ -1682,6 +1695,87 @@ impl ScoreModifier for ThreatProximityAdrenalineFlee {
 }
 
 // ---------------------------------------------------------------------------
+// IntraspeciesConflictResponseFlight — ticket 109 (Phase A)
+// ---------------------------------------------------------------------------
+
+/// Ticket 109 (Phase A) — `IntraspeciesConflictResponseFlight`
+/// Modifier. The social analog of 047's `AcuteHealthAdrenalineFlee`,
+/// but reading `social_status_distress` instead of `health_deficit`.
+/// Predators don't accept appeasement; cats *do* — intraspecies
+/// conflict has a fuller four-valence response repertoire. Phase A
+/// ships only the Flight (subordinate retreat) valence; Freeze, Fight,
+/// and Fawn open as sub-tickets (109b/c/d).
+///
+/// **Trigger:** `social_status_distress >= intraspecies_conflict_flight_threshold`.
+///
+/// **Transform:** linear ramp (pressure shape — social-status pressure
+/// is gradual, not a phase transition like physical adrenaline). Same
+/// curve as the 088 / 106 / 107 / 110 family.
+///
+/// **Applies to:** Flee (subordinate-retreat valence — the cat
+/// withdraws from the dominant). Default 0.0 (inert).
+///
+/// **Composition:** Registered after `ThreatProximityAdrenalineFlee`
+/// (108) and before `FoxTerritorySuppression`. Composes additively
+/// with 047's Flee adrenaline lift if both fire — physically wounded
+/// AND socially subordinate cat sees both lifts.
+///
+/// **Phase 1 perception coupling:** the input scalar
+/// `social_status_distress` is published as 0.0 (stub). The actual
+/// composition `(status_diff_to_nearest_cat × proximity_factor)`
+/// requires a defensible status-differential signal and per-cat
+/// nearest-cat resolution; both land with lift activation.
+///
+/// **Gated-boost contract:** returns `score` unchanged on score `<= 0`.
+pub struct IntraspeciesConflictResponseFlight {
+    threshold: f32,
+    flee_lift: f32,
+}
+
+impl IntraspeciesConflictResponseFlight {
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            threshold: sc.intraspecies_conflict_flight_threshold,
+            flee_lift: sc.intraspecies_conflict_flight_lift,
+        }
+    }
+
+    fn ramp(&self, distress: f32) -> f32 {
+        if distress <= self.threshold {
+            return 0.0;
+        }
+        ((distress - self.threshold) / (1.0 - self.threshold)).clamp(0.0, 1.0)
+    }
+}
+
+impl ScoreModifier for IntraspeciesConflictResponseFlight {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        if !matches!(dse_id.0, FLEE) {
+            return score;
+        }
+        if score <= 0.0 {
+            return score;
+        }
+        let distress = fetch(SOCIAL_STATUS_DISTRESS, ctx.cat).clamp(0.0, 1.0);
+        let ramp = self.ramp(distress);
+        if ramp <= 0.0 {
+            return score;
+        }
+        score + ramp * self.flee_lift
+    }
+
+    fn name(&self) -> &'static str {
+        "intraspecies_conflict_flight"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Default pipeline builder
 // ---------------------------------------------------------------------------
 
@@ -1775,6 +1869,11 @@ pub fn default_modifier_pipeline(
     // `threat_proximity_derivative` scalar (also 0.0) — actual
     // perception coupling lands with lift activation.
     pipeline.push(Box::new(ThreatProximityAdrenalineFlee::new(sc)));
+    // Ticket 109 (Phase A) — `IntraspeciesConflictResponseFlight`
+    // registers after the predator-threat adrenaline branch (108) and
+    // before the multiplicative damps. The social Flight valence is
+    // the substrate analog to 047 / 102 on the social axis.
+    pipeline.push(Box::new(IntraspeciesConflictResponseFlight::new(sc)));
     pipeline.push(Box::new(FoxTerritorySuppression::new(sc)));
     pipeline.push(Box::new(CorruptionTerritorySuppression::new(sc)));
     // §3.5.1 ticket 094 — `StockpileSatiation` registers after the
@@ -2443,8 +2542,8 @@ mod tests {
     }
 
     #[test]
-    fn default_pipeline_registers_sixteen_modifiers() {
-        // Sixteen §3.5.1 foundational modifiers — the seven original
+    fn default_pipeline_registers_seventeen_modifiers() {
+        // Seventeen §3.5.1 foundational modifiers — the seven original
         // (`Pride`, `IndependenceSolo`, `IndependenceGroup`, `Patience`,
         // `Tradition`, `FoxTerritorySuppression`,
         // `CorruptionTerritorySuppression`) plus §075's
@@ -2453,13 +2552,14 @@ mod tests {
         // `AcuteHealthAdrenalineFlee`, ticket 102's
         // `AcuteHealthAdrenalineFight`, ticket 106's `HungerUrgency`,
         // ticket 107's `ExhaustionPressure`, ticket 110's
-        // `ThermalDistress`, and ticket 108's
-        // `ThreatProximityAdrenalineFlee`. The three Phase 4.2
+        // `ThermalDistress`, ticket 108's
+        // `ThreatProximityAdrenalineFlee`, and ticket 109 Phase A's
+        // `IntraspeciesConflictResponseFlight`. The three Phase 4.2
         // emergency modifiers (`WardCorruptionEmergency`,
         // `CleanseEmergency`, `SensedRotBoost`) retired in §13.1.
         let constants = crate::resources::sim_constants::SimConstants::default();
         let pipeline = default_modifier_pipeline(&constants);
-        assert_eq!(pipeline.len(), 16, "expected 16 registered modifiers");
+        assert_eq!(pipeline.len(), 17, "expected 17 registered modifiers");
     }
 
     // -----------------------------------------------------------------------
@@ -3729,6 +3829,102 @@ mod tests {
                 "Phase-1 inert: dse {dse} unchanged at default 0.0 lifts; got {out}"
             );
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // ticket 109 IntraspeciesConflictResponseFlight (Phase A)
+    // -----------------------------------------------------------------------
+
+    fn test_intraspecies_conflict_flight() -> IntraspeciesConflictResponseFlight {
+        IntraspeciesConflictResponseFlight {
+            threshold: 0.6,
+            flee_lift: 0.30,
+        }
+    }
+
+    #[test]
+    fn intraspecies_conflict_flight_no_lift_below_threshold() {
+        let modifier = test_intraspecies_conflict_flight();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            SOCIAL_STATUS_DISTRESS => 0.5,
+            _ => 0.0,
+        };
+        let flee = modifier.apply(DseId(FLEE), 0.5, &ctx, &fetch);
+        assert!((flee - 0.5).abs() < 1e-6, "below-threshold Flee unchanged; got {flee}");
+    }
+
+    #[test]
+    fn intraspecies_conflict_flight_lifts_above_threshold() {
+        // distress = 0.8, threshold = 0.6. ramp = 0.5. Flee += 0.15.
+        let modifier = test_intraspecies_conflict_flight();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            SOCIAL_STATUS_DISTRESS => 0.8,
+            _ => 0.0,
+        };
+        let flee = modifier.apply(DseId(FLEE), 0.5, &ctx, &fetch);
+        assert!((flee - 0.65).abs() < 1e-5, "Flee half-lift; got {flee}");
+    }
+
+    #[test]
+    fn intraspecies_conflict_flight_max_lift_at_full_distress() {
+        let modifier = test_intraspecies_conflict_flight();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            SOCIAL_STATUS_DISTRESS => 1.0,
+            _ => 0.0,
+        };
+        let flee = modifier.apply(DseId(FLEE), 0.5, &ctx, &fetch);
+        assert!((flee - 0.80).abs() < 1e-5, "Flee full lift +0.30; got {flee}");
+    }
+
+    #[test]
+    fn intraspecies_conflict_flight_targets_only_flee() {
+        let modifier = test_intraspecies_conflict_flight();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            SOCIAL_STATUS_DISTRESS => 1.0,
+            _ => 0.0,
+        };
+        for dse in [
+            EAT, HUNT, FORAGE, GROOM_SELF, SLEEP, GROOM_OTHER, FIGHT, MATE, COORDINATE, BUILD,
+            MENTOR, CARETAKE, SOCIALIZE, PATROL, COOK, FARM, WANDER, EXPLORE, IDLE,
+        ] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "non-Flee dse {dse} unchanged at full social distress; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn intraspecies_conflict_flight_does_not_resurrect_zero_score() {
+        let modifier = test_intraspecies_conflict_flight();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            SOCIAL_STATUS_DISTRESS => 1.0,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(FLEE), 0.0, &ctx, &fetch);
+        assert_eq!(out, 0.0, "zero-score Flee stays zero — no resurrection");
+    }
+
+    #[test]
+    fn intraspecies_conflict_flight_default_inert() {
+        let constants = crate::resources::sim_constants::SimConstants::default();
+        let modifier = IntraspeciesConflictResponseFlight::new(&constants.scoring);
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            SOCIAL_STATUS_DISTRESS => 1.0,
+            _ => 0.0,
+        };
+        let flee = modifier.apply(DseId(FLEE), 0.5, &ctx, &fetch);
+        assert!(
+            (flee - 0.5).abs() < 1e-6,
+            "Phase-1 inert: Flee unchanged at default 0.0 lift; got {flee}"
+        );
     }
 
     #[test]

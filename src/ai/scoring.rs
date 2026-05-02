@@ -482,6 +482,16 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
     // at 0.0 (Phase 1), this stub is bit-identical to baseline
     // regardless of value.
     m.insert("threat_proximity_derivative", 0.0);
+    // Ticket 109 (Phase A) — `IntraspeciesConflictResponseFlight`
+    // Modifier trigger. **Phase 1 stub**: published as 0.0 always.
+    // The v1 composition `(status_diff_to_nearest_cat ×
+    // proximity_factor)` requires a defensible status-differential
+    // signal (no explicit dominance hierarchy exists yet —
+    // `needs.respect` and bond strength are candidate proxies) plus
+    // per-cat nearest-cat resolution. Both land alongside the lift's
+    // promotion in the same Phase-3 commit; with the lift at 0.0
+    // here, this stub is bit-identical to baseline.
+    m.insert("social_status_distress", 0.0);
     // Ticket 090 — interoceptive perception. L4/L5 Maslow scalars.
     // `mastery_confidence` and `esteem_distress` are continuous [0, 1];
     // `purpose_clarity` is binary {0.0, 1.0}. All three are pre-computed
