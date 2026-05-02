@@ -372,7 +372,7 @@ fn print_needs_timeline(snapshots: &[Value]) {
     let need_keys = [
         "hunger",
         "energy",
-        "warmth",
+        "temperature",
         "safety",
         "social",
         "acceptance",
@@ -401,6 +401,9 @@ fn print_needs_timeline(snapshots: &[Value]) {
         let critical_threshold = match *key {
             "hunger" | "energy" => 0.15,
             "safety" => 0.3,
+            // Thermal distress modifier (ticket 110) fires at
+            // `thermal_deficit >= 0.7`, i.e. `temperature <= 0.3`.
+            "temperature" => 0.3,
             _ => 0.1,
         };
         let dips = values.iter().filter(|v| **v < critical_threshold).count();
