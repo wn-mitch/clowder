@@ -21,7 +21,7 @@ A first-class `escape_viability` scalar in `src/systems/interoception.rs` mirror
 
 ## Design
 
-`escape_viability(self_pos, nearest_threat, map, has_nearby_dependent, constants) -> f32`. **Single-axis discipline:** pure threat-coupled physics — "given an active threat, can this cat escape?" Ambient closed-space anxiety (claustrophobia / agoraphobia) lives on a separate axis owned by ticket 126's phobia modifier family.
+`escape_viability(self_pos, nearest_threat, map, has_nearby_dependent, constants) -> f32`. **Single-axis discipline:** pure threat-coupled physics — "given an active threat, can this cat escape?" Ambient closed-space anxiety (claustrophobia / agoraphobia) lives on a separate axis owned by ticket 134's phobia modifier family.
 
 Composed when a threat is present from:
 
@@ -53,8 +53,8 @@ Published via `ScoringContext.escape_viability` and the `"escape_viability"` key
 - `combat_winnability` scalar (separate ticket if Fight-branch needs more than escape-viability inversion).
 - Marker emission (087 pattern); modifiers can read the scalar directly.
 - Hide/Freeze viability (Freeze branch needs both escape-viable=false AND combat-winnable=false; ticket 104 is the DSE, ticket 105 is the modifier branch).
-- **Mobility-differential term** — punted because every entity moves 1 tile/tick today. Parked into the **127 continuous-position migration epic**; the term re-enters `escape_viability` in Phase 1 (#130 — per-entity `MovementBudget`).
-- **Positional dependent proximity + WoundedAlly axis** — v1 ships marker-only dependent presence. Positional refinement ("dependent within strike radius") and the `WoundedAlly` marker for the third leg of the original spec parked as ticket 128.
+- **Mobility-differential term** — punted because every entity moves 1 tile/tick today. Parked into the **135 continuous-position migration epic**; the term re-enters `escape_viability` in Phase 1 (#138 — per-entity `MovementBudget`).
+- **Positional dependent proximity + WoundedAlly axis** — v1 ships marker-only dependent presence. Positional refinement ("dependent within strike radius") and the `WoundedAlly` marker for the third leg of the original spec parked as ticket 136.
 
 ## Log
 
@@ -63,4 +63,4 @@ Published via `ScoringContext.escape_viability` and the `"escape_viability"` key
   - 126 — phobia modifier family (Crusader-Kings-style trait modifiers on urge response).
   - 127 — continuous-position migration **epic** (Vec2<f32> substrate, smooth motion, species speed). Originally drafted as a small "per-species cooldowns" ticket; reframed mid-session into the four-phase epic after the user asked how cooldowns would compose with gridded movement.
   - 128 — WoundedAlly marker + positional dependent proximity (`escape_viability` v1 ships marker-only; this tightens it).
-  - 129 / 130 / 131 / 132 — Phase 0 / 1 / 2 / 3 of epic 127. Phase 1 (#130) re-enables `escape_viability`'s mobility-differential term.
+  - 129 / 130 / 131 / 132 — Phase 0 / 1 / 2 / 3 of epic 135. Phase 1 (#138) re-enables `escape_viability`'s mobility-differential term.

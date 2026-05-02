@@ -1,11 +1,11 @@
 ---
-id: 132
+id: 140
 title: Phase 3 — Steering, smooth pursuit / flee, pathfinder polish
 status: blocked
 cluster: substrate-migration
 added: 2026-05-02
 parked: null
-blocked-by: [131]
+blocked-by: [139]
 supersedes: []
 related-systems: [project-vision.md]
 related-balance: []
@@ -15,7 +15,7 @@ landed-on: null
 
 ## Why
 
-Phase 3 of the continuous-position migration (epic ticket 127). With Phase 2 (#131) landed — `Position` is `Vec2<f32>`, pathfinding returns continuous waypoints — cats and wildlife still move in straight lines from tile center to tile center. Phase 3 introduces **steering** so motion curves naturally around obstacles, around each other, and along pursuit / flee arcs. This is the "doing it well" pass on top of the substrate migration.
+Phase 3 of the continuous-position migration (epic ticket 135). With Phase 2 (#139) landed — `Position` is `Vec2<f32>`, pathfinding returns continuous waypoints — cats and wildlife still move in straight lines from tile center to tile center. Phase 3 introduces **steering** so motion curves naturally around obstacles, around each other, and along pursuit / flee arcs. This is the "doing it well" pass on top of the substrate migration.
 
 ## Scope
 
@@ -30,7 +30,7 @@ Phase 3 of the continuous-position migration (epic ticket 127). With Phase 2 (#1
    - `wander(pos, last_velocity, jitter) -> Vec2` — for idle / patrol motion.
    - Optional v1: `obstacle_avoidance(pos, velocity, map) -> Vec2` — short-range raycast avoidance for unwalkable tiles.
 
-3. **Movement integrator system** in Chain 2 (after AI decisions, before render). Reads `Velocity`, integrates to `Position`, clamps speed by `MovementBudget` (Phase 1 #130) — budget tracks distance traveled this tick rather than discrete steps.
+3. **Movement integrator system** in Chain 2 (after AI decisions, before render). Reads `Velocity`, integrates to `Position`, clamps speed by `MovementBudget` (Phase 1 #138) — budget tracks distance traveled this tick rather than discrete steps.
 
 ### Pathfinder polish
 
@@ -42,7 +42,7 @@ Phase 3 of the continuous-position migration (epic ticket 127). With Phase 2 (#1
 
 ### Distance-spent vs. tile-counted budget
 
-7. **`MovementBudget` (#130) reframes** to budget *distance per tick* rather than *step opportunities*. Default cat budget = 1.0 distance unit per tick (one tile-side per tick at typical pace). Snake = 0.5 distance units per tick. The existing `escape_viability` mobility term (#130) keeps reading `budget_per_tick`; semantic survives.
+7. **`MovementBudget` (#138) reframes** to budget *distance per tick* rather than *step opportunities*. Default cat budget = 1.0 distance unit per tick (one tile-side per tick at typical pace). Snake = 0.5 distance units per tick. The existing `escape_viability` mobility term (#138) keeps reading `budget_per_tick`; semantic survives.
 
 ## Verification
 
@@ -69,4 +69,4 @@ Phase 3 of the continuous-position migration (epic ticket 127). With Phase 2 (#1
 
 ## Log
 
-- 2026-05-02: Opened as Phase 3 of the 127 continuous-position-migration epic. Blocked-by 131 (Phase 2 substrate); independent of Phase 0 (#129) and Phase 1 (#130).
+- 2026-05-02: Opened as Phase 3 of the 135 continuous-position-migration epic. Blocked-by 131 (Phase 2 substrate); independent of Phase 0 (#137) and Phase 1 (#138).

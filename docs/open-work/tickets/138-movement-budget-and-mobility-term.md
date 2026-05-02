@@ -1,11 +1,11 @@
 ---
-id: 130
+id: 138
 title: Phase 1 — MovementBudget per entity + escape_viability mobility term
 status: ready
 cluster: substrate-migration
 added: 2026-05-02
 parked: null
-blocked-by: [127]
+blocked-by: [135]
 supersedes: []
 related-systems: [project-vision.md, ai-substrate-refactor.md]
 related-balance: []
@@ -15,13 +15,13 @@ landed-on: null
 
 ## Why
 
-Phase 1 of the continuous-position migration (epic ticket 127). Lands **per-entity speed differentiation** without touching position type. Cats and wildlife still live on the integer grid; each gains a `MovementBudget` component that accumulates fractional movement points per tick at a species-specific rate. An entity gets to step a tile when its budget exceeds 1.0 (spending 1.0 per step). Sub-unit budget rates produce the right gameplay shape on the discrete grid:
+Phase 1 of the continuous-position migration (epic ticket 135). Lands **per-entity speed differentiation** without touching position type. Cats and wildlife still live on the integer grid; each gains a `MovementBudget` component that accumulates fractional movement points per tick at a species-specific rate. An entity gets to step a tile when its budget exceeds 1.0 (spending 1.0 per step). Sub-unit budget rates produce the right gameplay shape on the discrete grid:
 
 - `budget_per_tick = 1.0` → every tick (today's universal default; cats, hawks, foxes, shadow foxes).
 - `budget_per_tick = 0.5` → every other tick (snakes — sluggish, ambush-not-chase).
 - `budget_per_tick = 1.5` → 3 moves per 2 ticks (future fast species; not used in v1).
 
-Independent of Phase 0 (#129) and Phase 2 (#131); ships when ready. **This phase re-enables the mobility-differential term in `escape_viability`** that was punted at ticket 103's landing.
+Independent of Phase 0 (#137) and Phase 2 (#139); ships when ready. **This phase re-enables the mobility-differential term in `escape_viability`** that was punted at ticket 103's landing.
 
 ## Scope
 
@@ -75,8 +75,8 @@ Independent of Phase 0 (#129) and Phase 2 (#131); ships when ready. **This phase
 
 - **Burst abilities** — hawk dive, shadow-fox lurch, etc. Each is its own ticket (own DSE, own narrative event).
 - **Cat-side personality cadence** — sprightly elders, lumbering hunters. Separate axis.
-- **Continuous (sub-tile) movement** — that's Phase 2 (#131). Phase 1 stays on the integer grid.
+- **Continuous (sub-tile) movement** — that's Phase 2 (#139). Phase 1 stays on the integer grid.
 
 ## Log
 
-- 2026-05-02: Opened as Phase 1 of the 127 continuous-position-migration epic. Re-enables the mobility term punted at ticket 103 landing.
+- 2026-05-02: Opened as Phase 1 of the 135 continuous-position-migration epic. Re-enables the mobility term punted at ticket 103 landing.

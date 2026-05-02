@@ -1,5 +1,5 @@
 ---
-id: 127
+id: 135
 title: Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed)
 status: ready
 cluster: substrate-migration
@@ -27,10 +27,10 @@ This epic plans the migration from "discrete grid" to **shape 2 of the work-103 
 
 The grid isn't a layer — it's a vocabulary woven through perception, scoring, memory, save format, and tests. Migrating it in one shot would create a multi-thousand-line PR with weeks of integration risk. Splitting into four phases lets each ship independently, each phase deliver a visible win, and each phase be revertable in isolation:
 
-- **Phase 0 (#129)** — `Vec2<f32>` *render layer* alongside integer `Position`. Cats interpolate visually; sim state unchanged. Pure render improvement.
-- **Phase 1 (#130)** — per-entity `MovementBudget` for speed differentiation. Re-enables `escape_viability`'s mobility term. Sim still on integer grid; budget gates per-tick step opportunity. Independent of Phase 0.
-- **Phase 2 (#131)** — `Position` itself becomes `Vec2<f32>`. Manhattan → Euclidean (with Chebyshev for tactical-reach reads). Pathfinding becomes A*/flow-field over the tile cost grid. Save migration with version bump. The big lift.
-- **Phase 3 (#132)** — steering, avoidance, smooth pursuit / flee curves. Cleanup pass on top of the f32 substrate.
+- **Phase 0 (#137)** — `Vec2<f32>` *render layer* alongside integer `Position`. Cats interpolate visually; sim state unchanged. Pure render improvement.
+- **Phase 1 (#138)** — per-entity `MovementBudget` for speed differentiation. Re-enables `escape_viability`'s mobility term. Sim still on integer grid; budget gates per-tick step opportunity. Independent of Phase 0.
+- **Phase 2 (#139)** — `Position` itself becomes `Vec2<f32>`. Manhattan → Euclidean (with Chebyshev for tactical-reach reads). Pathfinding becomes A*/flow-field over the tile cost grid. Save migration with version bump. The big lift.
+- **Phase 3 (#140)** — steering, avoidance, smooth pursuit / flee curves. Cleanup pass on top of the f32 substrate.
 
 Phases ship in any order Phase 0 / Phase 1 are mutually independent; Phase 2 should land before Phase 3 but can land before or after Phases 0/1. Recommendation: 0 first (visible win, low risk), then 1 (gameplay payoff via 103's punted term), then 2 (the big lift), then 3 (polish).
 
@@ -50,7 +50,7 @@ Phases ship in any order Phase 0 / Phase 1 are mutually independent; Phase 2 sho
 
 7. **Distance metric.** Euclidean for "how close" reads (perception, pursuit, social spacing). Keep an explicit Chebyshev helper for tactical reads ("can I be hit this tick?"). Manhattan retires from sim code; tests get a `Vec2::distance` helper to replace `manhattan_distance`.
 
-8. **Save format.** Bumps version. One-shot loader migrates pre-127 saves by snapping integer Position to `Vec2::new(x as f32 + 0.5, y as f32 + 0.5)`. Memory entries the same.
+8. **Save format.** Bumps version. One-shot loader migrates pre-135 saves by snapping integer Position to `Vec2::new(x as f32 + 0.5, y as f32 + 0.5)`. Memory entries the same.
 
 ## Out of scope (across the whole epic)
 
@@ -75,10 +75,10 @@ Each phase MUST land its own four-artifact balance check (`just hypothesize <spe
 ## Risks
 
 - **Test churn.** Hundreds of tests assume integer positions. Migration is mechanical (`Position::new(5, 5)` → `Vec2::new(5.0, 5.0)`) but volume is real. Mitigation: a `Position` type alias to `Vec2<f32>` in Phase 2 minimizes textual diff; tests that did `assert_eq!` on positions migrate to `assert!((p - expected).length() < ε)`.
-- **Save format break.** Pre-127 saves don't load on post-127 binaries without the migration loader. Mitigation: version-bump in Phase 2; loader is small and well-tested in isolation.
+- **Save format break.** Pre-127 saves don't load on post-135 binaries without the migration loader. Mitigation: version-bump in Phase 2; loader is small and well-tested in isolation.
 - **Determinism regressions.** f32 arithmetic order matters. Mitigation: pin Bevy query iteration order via sorted-by-Entity-id traversal in any system that does positional reductions; test with N-tick deterministic-replay assertions.
 - **Pathfinding cost.** Phase 2 introduces A* / flow-field. Today's `step_toward` is O(1); A* is O(tiles in frontier). For 80×60 maps with ~30 cats, this is fine; verify with `just soak` wall-clock budget.
 
 ## Log
 
-- 2026-05-02: Opened as a deferred follow-on of work 103 (escape_viability mobility-term punt). Originally drafted as a small "per-species cooldowns" ticket; reframed via user feedback into the epic-shape continuous-position migration. Phase tickets 129/130/131/132 opened in the same commit.
+- 2026-05-02: Opened as a deferred follow-on of work 103 (escape_viability mobility-term punt). Originally drafted as a small "per-species cooldowns" ticket; reframed via user feedback into the epic-shape continuous-position migration. Phase tickets 137/138/139/140 opened in the same commit.

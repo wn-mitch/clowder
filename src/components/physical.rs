@@ -23,11 +23,11 @@ pub struct PreviousPosition {
 }
 
 /// Ticket 129 — Phase 0 of the continuous-position migration epic
-/// (#127). World-space smooth position in pixels, computed each render
+/// (#135). World-space smooth position in pixels, computed each render
 /// frame from `Position` + `PreviousPosition` + `RenderTickProgress`
 /// using a smoothstep ease-in/out curve. Sim state (containing tile,
 /// pathfinding, perception) still reads `Position` (i32 grid); only
-/// the render path consumes this. By Phase 2 (#131), `Position` itself
+/// the render path consumes this. By Phase 2 (#139), `Position` itself
 /// becomes `Vec2<f32>` and this component remains as the per-frame
 /// interpolation target without changing its public shape.
 #[derive(Component, Clone, Copy, Default, Debug)]

@@ -1,5 +1,5 @@
 ---
-id: 133
+id: 141
 title: combat_winnability perception scalar — sibling to escape_viability
 status: ready
 cluster: ai-substrate

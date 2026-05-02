@@ -1,11 +1,11 @@
 ---
-id: 131
+id: 139
 title: Phase 2 — Position becomes Vec2<f32> (continuous-position substrate migration)
 status: ready
 cluster: substrate-migration
 added: 2026-05-02
 parked: null
-blocked-by: [127]
+blocked-by: [135]
 supersedes: []
 related-systems: [project-vision.md, ai-substrate-refactor.md]
 related-balance: []
@@ -15,9 +15,9 @@ landed-on: null
 
 ## Why
 
-Phase 2 of the continuous-position migration (epic ticket 127). The big lift: `Position` itself becomes `Vec2<f32>`. Every component, every memory entry, every landmark anchor stores world-space coordinates. Manhattan retires from sim code in favor of Euclidean. `TileMap` stays as the terrain palette + cost field; cats query their containing tile via `(pos.x.floor() as i32, pos.y.floor() as i32)`. Influence maps stay tile-grids. Buildings stay tile-aligned.
+Phase 2 of the continuous-position migration (epic ticket 135). The big lift: `Position` itself becomes `Vec2<f32>`. Every component, every memory entry, every landmark anchor stores world-space coordinates. Manhattan retires from sim code in favor of Euclidean. `TileMap` stays as the terrain palette + cost field; cats query their containing tile via `(pos.x.floor() as i32, pos.y.floor() as i32)`. Influence maps stay tile-grids. Buildings stay tile-aligned.
 
-This phase is the substrate change that unblocks Phase 3 (#132) steering / smooth pursuit and gives perception its Euclidean intuition.
+This phase is the substrate change that unblocks Phase 3 (#140) steering / smooth pursuit and gives perception its Euclidean intuition.
 
 ## Scope
 
@@ -25,7 +25,7 @@ This phase is the substrate change that unblocks Phase 3 (#132) steering / smoot
 
 1. **`Position` → `Vec2<f32>`.** Either a thin newtype `Position(pub Vec2)` (preserves textual diff in tests; `Position::new(5, 5)` becomes `Position::new(5.0, 5.0)`) or a direct `pub type Position = Vec2;` alias. Recommend the newtype — preserves documentation, lets us add tile-snap helpers (`pos.tile() -> (i32, i32)`).
 
-2. **`PreviousPosition`, `RenderPosition` (from #129) update.** All become `Vec2`-based. Phase-0 interpolation work simplifies — no integer→float conversion at the render seam.
+2. **`PreviousPosition`, `RenderPosition` (from #137) update.** All become `Vec2`-based. Phase-0 interpolation work simplifies — no integer→float conversion at the render seam.
 
 3. **Memory entries.** `MemoryEntry::location: Option<Vec2>`. Save migration snaps existing i32 locations to `Vec2::new(x as f32 + 0.5, y as f32 + 0.5)` (tile center).
 
@@ -41,15 +41,15 @@ This phase is the substrate change that unblocks Phase 3 (#132) steering / smoot
 
 ### Pathfinding
 
-8. **`step_toward(from, to, map)` retires.** Replaced by `path_toward(from, to, map) -> Option<Vec2>` that returns the next-frame world-space target. v1 implementation: A* over the tile cost grid, returning the next tile center along the path; the steering layer (#132) then steers toward that center.
+8. **`step_toward(from, to, map)` retires.** Replaced by `path_toward(from, to, map) -> Option<Vec2>` that returns the next-frame world-space target. v1 implementation: A* over the tile cost grid, returning the next tile center along the path; the steering layer (#140) then steers toward that center.
 
 9. **`find_free_adjacent` and friends.** Stay tile-based, return `(i32, i32)` tile coords; callers convert to `Vec2` via `Vec2::new(tx as f32 + 0.5, ty as f32 + 0.5)`.
 
 ### Save / load migration
 
-10. **Save format version bump.** `SAVE_FORMAT_VERSION` increments. Loader detects pre-131 format by version and applies the snap-to-tile-center migration to every Position and MemoryEntry::location.
+10. **Save format version bump.** `SAVE_FORMAT_VERSION` increments. Loader detects pre-139 format by version and applies the snap-to-tile-center migration to every Position and MemoryEntry::location.
 
-11. **Migration test.** `tests/save_migration_131.rs` loads a checked-in pre-131 save and asserts post-load positions snap to tile centers; sim runs N ticks without panic.
+11. **Migration test.** `tests/save_migration_139.rs` loads a checked-in pre-139 save and asserts post-load positions snap to tile centers; sim runs N ticks without panic.
 
 ### Tests
 
@@ -94,11 +94,11 @@ This phase is the substrate change that unblocks Phase 3 (#132) steering / smoot
 
 ## Out of scope
 
-- **Steering / continuous movement.** Phase 2 still moves cats *to* tile centers; the smoothness comes from Phase 0 interpolation. Phase 3 (#132) introduces actual steering between tile centers.
+- **Steering / continuous movement.** Phase 2 still moves cats *to* tile centers; the smoothness comes from Phase 0 interpolation. Phase 3 (#140) introduces actual steering between tile centers.
 - **Sub-tile influence maps.** Tile-grid influence maps stay (epic constraint).
 - **Building-as-region.** Tile-aligned (epic constraint).
 - **Cross-platform determinism.** Single-platform bar.
 
 ## Log
 
-- 2026-05-02: Opened as Phase 2 of the 127 continuous-position-migration epic.
+- 2026-05-02: Opened as Phase 2 of the 135 continuous-position-migration epic.

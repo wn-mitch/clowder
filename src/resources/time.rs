@@ -7,7 +7,7 @@ use crate::resources::weather::Weather;
 // ---------------------------------------------------------------------------
 
 /// Ticket 129 — Phase 0 of the continuous-position migration epic
-/// (#127). Per-frame interpolation parameter `[0.0, 1.0]` between the
+/// (#135). Per-frame interpolation parameter `[0.0, 1.0]` between the
 /// previous and current sim ticks, computed from
 /// `Time<Fixed>::overstep_fraction()` once per render frame and read by
 /// the `RenderPosition` interpolation system. Headless runs don't
