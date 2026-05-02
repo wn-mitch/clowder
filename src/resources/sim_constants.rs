@@ -47,6 +47,9 @@ pub struct SimConstants {
     pub pairing: PairingConstants,
     #[serde(default)]
     pub planning_substrate: PlanningSubstrateConstants,
+    /// Ticket 103 — `escape_viability` perception scalar tunables.
+    #[serde(default)]
+    pub escape_viability: EscapeViabilityConstants,
 }
 
 // ---------- NeedsConstants ----------
@@ -4021,6 +4024,68 @@ impl Default for PlanningSubstrateConstants {
             reservation_ttl_ticks: 600,
             target_failure_cooldown_ticks: 8000,
             disposition_failure_cooldown_ticks: 4000,
+        }
+    }
+}
+
+// ---------- EscapeViabilityConstants (ticket 103) ----------
+
+/// Knobs for the `escape_viability` perception scalar
+/// (`crate::systems::interoception::escape_viability`). Pure
+/// threat-coupled physics; ambient closed-space anxiety
+/// (claustrophobia / agoraphobia) lives on a separate axis owned by
+/// ticket 126's phobia modifier family.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct EscapeViabilityConstants {
+    /// Half-extent of the bounding box scanned for walkable tiles
+    /// around the cat. The full sample is `(2 * sprint_radius + 1)²`
+    /// tiles. Default 3 → 7×7 = 49-tile sample, roughly the cat's
+    /// "two-turn flight options" footprint at the current 1
+    /// tile/tick movement rate.
+    #[serde(default = "default_escape_viability_sprint_radius")]
+    pub sprint_radius: i32,
+    /// Multiplier on the terrain-openness term
+    /// (walkable / box-area). `terrain_weight + dependent_weight`
+    /// should remain ≤ 1.0 so the scalar saturates at 1.0 in fully
+    /// open terrain with no dependents. Default 0.7.
+    #[serde(default = "default_escape_viability_terrain_weight")]
+    pub terrain_weight: f32,
+    /// Multiplier on the dependent-presence penalty term. Subtracted
+    /// from the terrain term when `has_nearby_dependent` is true,
+    /// modeling cost-of-abandonment for parents and pair-bonded
+    /// cats. Default 0.3.
+    #[serde(default = "default_escape_viability_dependent_weight")]
+    pub dependent_weight: f32,
+    /// Bool-style penalty magnitude — when present, the dependent
+    /// term is exactly `dependent_weight * dependent_penalty`. Held
+    /// at `1.0` by default so all tuning happens via
+    /// `dependent_weight`; left as a separate knob to allow phobia /
+    /// trait modifiers (ticket 126) to override the per-cat
+    /// magnitude without disturbing the global weight. Default 1.0.
+    #[serde(default = "default_escape_viability_dependent_penalty")]
+    pub dependent_penalty: f32,
+}
+
+fn default_escape_viability_sprint_radius() -> i32 {
+    3
+}
+fn default_escape_viability_terrain_weight() -> f32 {
+    0.7
+}
+fn default_escape_viability_dependent_weight() -> f32 {
+    0.3
+}
+fn default_escape_viability_dependent_penalty() -> f32 {
+    1.0
+}
+
+impl Default for EscapeViabilityConstants {
+    fn default() -> Self {
+        Self {
+            sprint_radius: default_escape_viability_sprint_radius(),
+            terrain_weight: default_escape_viability_terrain_weight(),
+            dependent_weight: default_escape_viability_dependent_weight(),
+            dependent_penalty: default_escape_viability_dependent_penalty(),
         }
     }
 }

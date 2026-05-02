@@ -1,7 +1,7 @@
 ---
 id: 113
-title: Document the interrupt invariant + lurch-vs-pressure modifier doctrine
-status: ready
+title: Document the lurch-vs-pressure distress-modifier doctrine
+status: done
 cluster: ai-substrate
 added: 2026-05-01
 parked: null
@@ -10,7 +10,7 @@ supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
 landed-at: null
-landed-on: null
+landed-on: 2026-05-02
 ---
 
 ## Why
@@ -35,3 +35,5 @@ Two doctrines surfaced during ticket 047's work that deserve doc-stub status to 
 ## Log
 
 - 2026-05-01: Opened as doctrine follow-on from ticket 047. The 047 ticket text explicitly anticipated this work ("worth a doc note in `docs/systems/`").
+- 2026-05-02: Re-scoped during planning. Dropped the `interrupt-invariant.md` half — codifying "how to author a safe per-tick interrupt branch" contradicts the project direction (047 → 088 → 106 → 107 → 108 → 119) of retiring interrupt branches in favor of substrate modifiers. Kept the `distress-modifiers.md` half — that's substrate-aligned doctrine for the modifier shapes replacing the interrupts. The 042/043/047 case-law is preserved in the landed ticket bodies + the new doc's "Why this replaces interrupts" section.
+- 2026-05-02: Landed. Wrote `docs/systems/distress-modifiers.md` (lurch-vs-pressure curve doctrine + worked-examples table for 047/088/106/107/108/110). Cross-referenced from `docs/systems/ai-substrate-refactor.md` §3.5.4 (new sub-section after §3.5.3 close, sibling to the §3.5.1 modifier catalog).

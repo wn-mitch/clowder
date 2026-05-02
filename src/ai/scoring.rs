@@ -249,6 +249,17 @@ pub struct ScoringContext<'a> {
     /// Range `[0, 1]`. Computed via
     /// `crate::systems::interoception::esteem_distress`.
     pub esteem_distress: f32,
+    /// Ticket 103 — threat-coupled escape viability in `[0, 1]`.
+    /// Pure physics: terrain openness around the cat minus a flat
+    /// penalty when a dependent (kitten or pair-bonded mate) is
+    /// present. `1.0` when no threat is nearby (the question is
+    /// undefined-but-safe; consumers gate on threat presence first).
+    /// **Single-axis** — ambient closed-space anxiety
+    /// (claustrophobia / agoraphobia) is a *separate* signal owned
+    /// by ticket 126's phobia modifier family, not folded here.
+    /// Computed at construction via
+    /// `crate::systems::interoception::escape_viability`.
+    pub escape_viability: f32,
     /// Whether the cat is incapacitated by a severe injury.
     pub is_incapacitated: bool,
     /// Whether a construction site exists that needs work.
@@ -452,6 +463,13 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
     m.insert(
         "body_distress_composite",
         ctx.body_distress_composite.clamp(0.0, 1.0),
+    );
+    // Ticket 103 — threat-coupled escape viability. Pure physics
+    // signal published for future Fight (102) / Freeze (105)
+    // modifiers; no consumer at landing.
+    m.insert(
+        "escape_viability",
+        ctx.escape_viability.clamp(0.0, 1.0),
     );
     // Ticket 090 — interoceptive perception. L4/L5 Maslow scalars.
     // `mastery_confidence` and `esteem_distress` are continuous [0, 1];
@@ -2114,6 +2132,7 @@ mod tests {
             mastery_confidence: 0.0,
             purpose_clarity: 0.0,
             esteem_distress: 0.0,
+            escape_viability: 1.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -2265,6 +2284,7 @@ mod tests {
             mastery_confidence: 0.0,
             purpose_clarity: 0.0,
             esteem_distress: 0.0,
+            escape_viability: 1.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -2439,6 +2459,7 @@ mod tests {
             mastery_confidence: 0.0,
             purpose_clarity: 0.0,
             esteem_distress: 0.0,
+            escape_viability: 1.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -2703,6 +2724,7 @@ mod tests {
             mastery_confidence: 0.0,
             purpose_clarity: 0.0,
             esteem_distress: 0.0,
+            escape_viability: 1.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -2783,6 +2805,7 @@ mod tests {
             mastery_confidence: 0.0,
             purpose_clarity: 0.0,
             esteem_distress: 0.0,
+            escape_viability: 1.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -2882,6 +2905,7 @@ mod tests {
             mastery_confidence: 0.0,
             purpose_clarity: 0.0,
             esteem_distress: 0.0,
+            escape_viability: 1.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3198,6 +3222,7 @@ mod tests {
             mastery_confidence: 0.0,
             purpose_clarity: 0.0,
             esteem_distress: 0.0,
+            escape_viability: 1.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3279,6 +3304,7 @@ mod tests {
             mastery_confidence: 0.0,
             purpose_clarity: 0.0,
             esteem_distress: 0.0,
+            escape_viability: 1.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,

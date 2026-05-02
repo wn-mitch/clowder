@@ -26,6 +26,12 @@ Pressure modifier (graded ramp). Sibling to ticket 106 (HungerUrgency).
 - Constants: `exhaustion_pressure_threshold`, `exhaustion_pressure_sleep_lift`, `exhaustion_pressure_groom_lift`. Default 0.0; enable via hypothesize patch.
 - Phase 3 hypothesize predicting `interrupts_by_reason.Exhaustion` decreases.
 - Phase 4 retire `InterruptReason::Exhaustion` branch (`disposition.rs:314-316`).
+- **Wrapper cleanup (per landed-112's supersession Log):** if 106 has already
+  landed at the time 107's Phase 4 ships, also delete the wrapping
+  `if !matches!(disposition.kind, Resting | Hunting | Foraging)` block at
+  `disposition.rs:305-317` — both arms inside it are gone, the wrapper is
+  dead code. If 106 hasn't landed yet, leave the wrapper for 106's Phase 4
+  to remove.
 
 ## Verification
 

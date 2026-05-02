@@ -15,9 +15,9 @@ _Last generated: 2026-05-02._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 48 |
+| Ready | 47 |
 | Parked | 6 |
-| Blocked | 17 |
+| Blocked | 18 |
 | **Open total** | **76** |
 | Pre-existing | 1 |
 
@@ -33,7 +33,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[071](docs/open-work/tickets/071-planning-substrate-hardening.md)** — Planning-substrate hardening — gird against the stuck-cat bug class (sub-epic) — _[planning-substrate] · added 2026-04-29_
 - **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** — Substrate-over-override — retire control-yanking hacks in favor of IAUS levers — _[substrate-over-override] · added 2026-04-30_
 
-## Ready (48)
+## Ready (47)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -53,7 +53,6 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[039](docs/open-work/tickets/039-foodcooked-still-silent-post-036.md)** — FoodCooked still silent after 036 — Cook chain execution failure downstream of CraftingHint::Cook — _added 2026-04-26_
 - **[040](docs/open-work/tickets/040-disposition-shift-courtship-grooming-regression.md)** — Disposition shift after 036 collapsed Courtship / Grooming / Mythic-texture continuity — _added 2026-04-26_
 - **[041](docs/open-work/tickets/041-founding-haul-balance-tuning.md)** — Founding wagon-dismantling haul — balance the early-game cost so cats don't starve while hauling — _added 2026-04-26_
-- **[046](docs/open-work/tickets/046-fight-target-combat-advantage-damage-per-tick.md)** — FightTarget combat-advantage uses skill-points difference, not damage-per-tick exchange — cats engage threats they can't survive — _added 2026-04-27_
 - **[050](docs/open-work/tickets/050-marker-predicate-refinements.md)** — §4 marker predicate refinements — species-attenuated threat, ward-near-fox truth, event-driven cubs/den — _added 2026-04-27_
 - **[051](docs/open-work/tickets/051-fox-dse-eligibility-migration.md)** — Fox DSE eligibility migration — `.require()`/`.forbid()` cutover for §4 fox markers — _added 2026-04-27_
 - **[054](docs/open-work/tickets/054-fate-event-vocabulary-expansion.md)** — §7.7.c Fate event-vocabulary expansion — Calling, destiny, fated-pair convergence — _added 2026-04-27_
@@ -63,26 +62,26 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[064](docs/open-work/tickets/064-carcass-scent-consumer-cutover.md)** — Carcass-scent consumer cutover — replace observer_smells_at (§5.6.3 row #6) — _added 2026-04-27_
 - **[086](docs/open-work/tickets/086-farm-canary-triggering-scenario.md)** — Find a triggering scenario for Farm DSE canary (CropTended / CropHarvested) — _[balance] · added 2026-04-30_
 - **[095](docs/open-work/tickets/095-body-zones-epic.md)** — Body zones — anatomical injury model for all animal species — _added 2026-05-01_
-- **[097](docs/open-work/tickets/097-non-cat-planner-substrate-audit.md)** — Audit fox / hawk / snake planners for the parallel-feasibility-language smell 092 retired for cats — _[ai-substrate] · added 2026-04-30_
 - **[100](docs/open-work/tickets/100-tremor-action-multiplier-wiring.md)** — Tremor map, Action::Stalk, and personality-driven hunt approach — _blocked-by 062 · added 2026-05-01_
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _blocked-by 100 · added 2026-05-01_
-- **[102](docs/open-work/tickets/102-acute-health-adrenaline-fight-branch.md)** — AcuteHealthAdrenaline Fight branch — cornered/maternal-defense valence — _[ai-substrate] · blocked-by 103 · added 2026-05-01_
-- **[103](docs/open-work/tickets/103-escape-viability-scalar.md)** — escape_viability perception scalar — first-class predicate for adrenaline-valence gates — _[ai-substrate] · added 2026-05-01_
 - **[104](docs/open-work/tickets/104-hide-freeze-dse.md)** — Hide/Freeze DSE — predator-avoidance third valence ("remain still and hope") — _[ai-substrate] · added 2026-05-01_
 - **[106](docs/open-work/tickets/106-hunger-urgency-modifier.md)** — HungerUrgency modifier — substrate axis for Starvation interrupt retirement — _[ai-substrate] · added 2026-05-01_
 - **[107](docs/open-work/tickets/107-exhaustion-pressure-modifier.md)** — ExhaustionPressure modifier — substrate axis for Exhaustion interrupt retirement — _[ai-substrate] · added 2026-05-01_
-- **[108](docs/open-work/tickets/108-threat-proximity-adrenaline.md)** — ThreatProximityAdrenaline modifier — substrate axis for CriticalSafety interrupt retirement — _[ai-substrate] · blocked-by 103 · added 2026-05-01_
+- **[108](docs/open-work/tickets/108-threat-proximity-adrenaline.md)** — ThreatProximityAdrenaline modifier — substrate axis for CriticalSafety interrupt retirement — _[ai-substrate] · added 2026-05-01_
 - **[109](docs/open-work/tickets/109-intraspecies-conflict-response.md)** — IntraspeciesConflictResponse — full four-valence (fight/flight/freeze/fawn) social response — _[ai-substrate] · blocked-by 104 · added 2026-05-01_
 - **[110](docs/open-work/tickets/110-thermal-distress-modifier.md)** — ThermalDistress modifier — substrate axis for thermal interrupts (and shelter-seeking) — _[ai-substrate] · added 2026-05-01_
-- **[112](docs/open-work/tickets/112-disposition-exemption-list-retire.md)** — Retire per-disposition exemption lists (Resting/Hunting/Foraging/Guarding) — substrate replacement via commitment momentum — _[ai-substrate] · added 2026-05-01_
-- **[113](docs/open-work/tickets/113-interrupt-invariant-doc.md)** — Document the interrupt invariant + lurch-vs-pressure modifier doctrine — _[ai-substrate] · added 2026-05-01_
 - **[115](docs/open-work/tickets/115-bond-weighted-social-recovery.md)** — Bond-weighted social recovery — fondness scales Needs.social inflow — _[emotional-fidelity] · added 2026-05-01_
 - **[117](docs/open-work/tickets/117-social-warmth-vs-self-care-tradeoff.md)** — Characterize social-warmth max shift under 047 substrate (Phase 3 surfaced -96% on max) — _[ai-substrate] · blocked-by 118 · added 2026-05-01_
 - **[118](docs/open-work/tickets/118-modifier-lift-vs-plan-completion-momentum.md)** — Modifier lifts gated by plan-completion momentum — substrate raises score but cat completes mid-plan first — _[ai-substrate] · added 2026-05-01_
 - **[120](docs/open-work/tickets/120-shadow-fox-spawn-vs-cat-presence-coupling.md)** — Characterize shadow-fox spawn-rate coupling to cat-presence (047 Phase 3 surfaced +93%) — _[ai-substrate] · added 2026-05-01_
 - **[124](docs/open-work/tickets/124-own-territory-center-anchor.md)** — `LandmarkAnchor::OwnTerritoryCenter` — third interoceptive self-anchor (territory bias) — _[ai-substrate] · added 2026-05-01_
-- **[125](docs/open-work/tickets/125-colony-score-aggregate-in-footer-and-verdict.md)** — Surface `ColonyScore.aggregate` in the footer and add numerical-delta gating to `just verdict` — _[tooling] · blocked-by 097 · added 2026-05-01_
 - **[126](docs/open-work/tickets/126-bdi-intention-substrate.md)** — BDI intention substrate — perceivable per-cat commitment with momentum — _[C] · added 2026-05-02_
+- **[134](docs/open-work/tickets/134-phobia-modifier-family.md)** — Phobia modifier family — Crusader-Kings-style trait modifiers on urge response — _[ai-substrate] · added 2026-05-02_
+- **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[substrate-migration] · added 2026-05-02_
+- **[136](docs/open-work/tickets/136-wounded-ally-and-positional-dependents.md)** — WoundedAlly marker + positional dependent-proximity for escape_viability — _[ai-substrate] · added 2026-05-02_
+- **[138](docs/open-work/tickets/138-movement-budget-and-mobility-term.md)** — Phase 1 — MovementBudget per entity + escape_viability mobility term — _[substrate-migration] · blocked-by 135 · added 2026-05-02_
+- **[139](docs/open-work/tickets/139-position-vec2-substrate.md)** — Phase 2 — Position becomes Vec2<f32> (continuous-position substrate migration) — _[substrate-migration] · blocked-by 135 · added 2026-05-02_
+- **[141](docs/open-work/tickets/141-combat-winnability-scalar.md)** — combat_winnability perception scalar — sibling to escape_viability — _[ai-substrate] · added 2026-05-02_
 
 ## Parked (6)
 
@@ -93,7 +92,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[084](docs/open-work/tickets/084-farm-herb-ward-demand-axis.md)** — Farm DSE — tie scoring to herb/ward stockpile demand so gardens stay productive under abundant food — _[balance] · parked 2026-04-30 · blocked-by 086 · added 2026-04-29_
 - **[099](docs/open-work/tickets/099-modifier-feature-emission.md)** — Feature emission for §3.5.1 Modifiers — colony-wide canary surface for substrate-lift signals — _[ai-substrate] · parked 2026-05-01 · blocked-by 119 · added 2026-05-01_
 
-## Blocked (17)
+## Blocked (18)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _blocked-by 007, 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _blocked-by 016 · added 2026-04-22_
@@ -104,25 +103,34 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[053](docs/open-work/tickets/053-death-event-grief-emission.md)** — §7.7.b death-event grief emission — relationship-classified survivors payload — _blocked-by 007 · added 2026-04-27_
 - **[055](docs/open-work/tickets/055-mood-drift-threshold-detection.md)** — §7.7.d mood drift-threshold detection — sustain-duration + arc-misalignment trigger — _blocked-by 056 · added 2026-04-27_
 - **[057](docs/open-work/tickets/057-coordinator-directive-intention-strategy-row.md)** — §7.3 coordinator-directive Intention strategy row — `SingleMinded` with override — _blocked-by 007 · added 2026-04-27_
-- **[105](docs/open-work/tickets/105-acute-health-adrenaline-freeze-branch.md)** — AcuteHealthAdrenaline Freeze branch — overmatched-predator response — _[ai-substrate] · blocked-by 103, 104 · added 2026-05-01_
+- **[105](docs/open-work/tickets/105-acute-health-adrenaline-freeze-branch.md)** — AcuteHealthAdrenaline Freeze branch — overmatched-predator response — _[ai-substrate] · blocked-by 104 · added 2026-05-01_
 - **[111](docs/open-work/tickets/111-088-body-distress-promotion-retire.md)** — Retire 088 BodyDistressPromotion once kind-specific modifiers cover its surface — _[ai-substrate] · blocked-by 106, 107, 110 · added 2026-05-01_
 - **[119](docs/open-work/tickets/119-critical-health-interrupt-retire.md)** — Retire CriticalHealth interrupt — final substrate-over-override step for ticket 047 — _[ai-substrate] · blocked-by 118 · added 2026-05-01_
 - **[127](docs/open-work/tickets/127-joint-intention-substrate.md)** — Joint-intention substrate for two-cat practices — _[C] · blocked-by 126 · added 2026-05-02_
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition over `HeldIntention.goal` — _[C] · blocked-by 126 · added 2026-05-02_
 - **[129](docs/open-work/tickets/129-care-dses-perceivable-intentions.md)** — Care DSEs over perceivable intentions — _[C] · blocked-by 126 · added 2026-05-02_
 - **[130](docs/open-work/tickets/130-trust-weighted-coordinator-momentum.md)** — Trust-weighted coordinator directive momentum — _[C] · blocked-by 126, 057, 081 · added 2026-05-02_
+- **[140](docs/open-work/tickets/140-steering-and-pursuit-polish.md)** — Phase 3 — Steering, smooth pursuit / flee, pathfinder polish — _[substrate-migration] · blocked-by 139 · added 2026-05-02_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _blocked-by 071 · added 2026-04-28_
 
 ## Pre-existing (1)
 
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 
-## Landed archive (78)
+## Landed archive (86)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (13)
+### 2026-05 (21)
 
+- **[137](docs/open-work/landed/137-vec2-render-layer.md)** — Phase 0 — Vec2 render layer (visual interpolation, no sim-state change) _(2026-05-02)_
+- **[125](docs/open-work/landed/125-colony-score-aggregate-in-footer-and-verdict.md)** — Surface `ColonyScore.aggregate` in the footer and add numerical-delta gating to `just verdict` _(2026-05-02)_
+- **[113](docs/open-work/landed/113-interrupt-invariant-doc.md)** — Document the lurch-vs-pressure distress-modifier doctrine _(2026-05-02)_
+- **[112](docs/open-work/landed/112-disposition-exemption-list-retire.md)** — Retire per-disposition exemption lists (Resting/Hunting/Foraging/Guarding) — substrate replacement via commitment momentum _(2026-05-02)_
+- **[103](docs/open-work/landed/103-escape-viability-scalar.md)** — escape_viability perception scalar — first-class predicate for adrenaline-valence gates _(2026-05-02)_
+- **[102](docs/open-work/landed/102-acute-health-adrenaline-fight-branch.md)** — AcuteHealthAdrenaline Fight branch — cornered/maternal-defense valence _(2026-05-02)_
+- **[097](docs/open-work/landed/097-non-cat-planner-substrate-audit.md)** — Audit fox / hawk / snake planners for the parallel-feasibility-language smell 092 retired for cats _(2026-05-02)_
+- **[046](docs/open-work/landed/046-fight-target-combat-advantage-damage-per-tick.md)** — FightTarget combat-advantage uses skill-points difference, not damage-per-tick exchange — cats engage threats they can't survive _(2026-05-02)_
 - **[123](docs/open-work/landed/123-recent-disposition-failures-cooldown.md)** — RecentDispositionFailures cooldown so cats stop spamming dispositions the planner can't satisfy _(2026-05-01)_
 - **[122](docs/open-work/landed/122-socialize-dse-iaus-vs-gate-still-goal-mismatch.md)** — Socialize IAUS scoring elects plans the OpenMinded gate drops on the same tick _(2026-05-01)_
 - **[121](docs/open-work/landed/121-early-game-plan-churn-pre-kitchen.md)** — Cats stand around for ~1500 ticks at game start until first kitchen lands _(2026-05-01)_

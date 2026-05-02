@@ -1753,6 +1753,14 @@ Resolution of (1) is a behavior change under CLAUDE.md's balance
 methodology — file a hypothesis + A/B result before landing. (2) and
 (3) are documentation/cleanup and land without gating.
 
+#### §3.5.4 Distress-modifier curves — lurch vs. pressure
+
+See `docs/systems/distress-modifiers.md` — codifies the
+sigmoid-lurch (acute distress, valence-split) vs. linear-ramp
+(sustained pressure, single-direction) curve doctrine for
+modifiers in the §3.5.1 catalog. Worked examples under tickets
+047 / 088 / 106 / 107 / 108 / 110.
+
 ### §3.6 Granularity (ch 13 pain-scale discipline)
 
 Today's `f32` scoring gives 2²³ ≈ 8M discrete levels. Ch 13

@@ -5,7 +5,7 @@ status: ready
 cluster: ai-substrate
 added: 2026-05-01
 parked: null
-blocked-by: [103]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [047-acute-health-adrenaline.md]

@@ -106,11 +106,19 @@ pub struct MarkerQueries<'w, 's> {
             Has<markers::OnSpecialTerrain>,
         ),
     >,
-    /// Ticket 027 Bug 2 — eligibility marker for `MateDse`. Solo query
-    /// so future related markers (HasEligiblePartnerCandidate per
-    /// §7.M Bug 3 PairingActivity) can sit alongside without disturbing
-    /// the State tuple.
-    pub mate_eligibility: Query<'w, 's, Has<markers::HasEligibleMate>>,
+    /// Ticket 027 Bug 2 — eligibility marker for `MateDse` paired
+    /// with ticket 103 — `Has<PairingActivity>` for the
+    /// dependent-presence half of `escape_viability`. Bundling lets
+    /// the disposition populator answer "does this cat have an
+    /// active pair-bond?" without threading a separate query.
+    pub mate_eligibility: Query<
+        'w,
+        's,
+        (
+            Has<markers::HasEligibleMate>,
+            Has<crate::components::PairingActivity>,
+        ),
+    >,
     /// Ticket 014 Mentoring batch — Mentor / Apprentice / HasMentoringTarget.
     /// Authored by `aspirations::update_training_markers` (Mentor /
     /// Apprentice) and `aspirations::update_mentoring_target_markers`
@@ -714,10 +722,17 @@ pub fn evaluate_dispositions(
             markers.set_entity(markers::OnSpecialTerrain::KEY, entity, on_special_marker);
         }
         // Ticket 027 Bug 2 — HasEligibleMate authored by
-        // `mating::update_mate_eligibility_markers`.
-        if let Ok(has_mate) = side_effects.marker_queries.mate_eligibility.get(entity) {
+        // `mating::update_mate_eligibility_markers`. Ticket 103 —
+        // `has_pair_bond` is the second tuple element, used below for
+        // the `escape_viability` dependent-presence term.
+        let has_pair_bond = if let Ok((has_mate, has_pairing)) =
+            side_effects.marker_queries.mate_eligibility.get(entity)
+        {
             markers.set_entity(markers::HasEligibleMate::KEY, entity, has_mate);
-        }
+            has_pairing
+        } else {
+            false
+        };
         // Ticket 014 Mentoring batch — Mentor / Apprentice authored by
         // `aspirations::update_training_markers`; HasMentoringTarget by
         // `aspirations::update_mentoring_target_markers`.
@@ -824,6 +839,22 @@ pub fn evaluate_dispositions(
             mastery_confidence: crate::systems::interoception::mastery_confidence(skills),
             purpose_clarity: crate::systems::interoception::purpose_clarity(aspirations),
             esteem_distress: crate::systems::interoception::esteem_distress(needs),
+            // Ticket 103 — threat-coupled escape viability. Dependent
+            // presence is marker-only in v1: parent-of-living-kittens
+            // (Parent ZST authored colony-wide by
+            // `growth::update_parent_markers`) OR holds an active
+            // pair-bond (`PairingActivity` component). Positional
+            // refinement ("dependent within strike radius") parked as
+            // ticket 128. `nearest_threat` above is `Option<&(Entity,
+            // Position)>` from the wildlife scan; map to bare
+            // `Option<Position>`.
+            escape_viability: crate::systems::interoception::escape_viability(
+                *pos,
+                nearest_threat.map(|(_, p)| *p),
+                &map,
+                markers.has(markers::Parent::KEY, entity) || has_pair_bond,
+                &constants.escape_viability,
+            ),
             is_incapacitated,
             has_construction_site,
             has_damaged_building,

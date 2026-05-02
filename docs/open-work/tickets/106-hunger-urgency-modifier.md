@@ -238,6 +238,12 @@ If proceeding:
 - Remove `disposition.rs:311-313` (the Starvation arm of the interrupt branch).
   Leave the Resting/Hunting/Foraging exemption block in place — the Exhaustion
   arm at line 314-316 still uses it (ticket 107 retires that arm separately).
+- **Wrapper cleanup (per landed-112's supersession Log):** if 107 has already
+  landed at the time 106's Phase 4 ships, also delete the wrapping
+  `if !matches!(disposition.kind, Resting | Hunting | Foraging)` block at
+  `disposition.rs:305-317` — both arms inside it are gone, the wrapper is
+  dead code. If 107 hasn't landed yet, leave the wrapper for 107's Phase 4
+  to remove.
 - Audit `goap.rs:615-625` (`accumulate_urgencies` Starvation arm) and lines
   627-636 (the critical-hunger override for Hunting/Foraging). These are
   separate consumers of `starvation_interrupt_threshold` and

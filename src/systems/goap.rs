@@ -848,10 +848,15 @@ pub fn evaluate_and_plan(
         Has<markers::OnSpecialTerrain>,
     )>,
     // Ticket 027 Bug 2 — HasEligibleMate authored by
-    // `mating::update_mate_eligibility_markers`. Solo query so future
-    // related markers (HasEligiblePartnerCandidate per §7.M Bug 3) can
-    // sit alongside without disturbing the State tuple.
-    mate_eligibility_q: Query<Has<markers::HasEligibleMate>>,
+    // `mating::update_mate_eligibility_markers`, paired with ticket
+    // 103 — `Has<PairingActivity>` for the dependent-presence half of
+    // `escape_viability`. Bundling both in one query keeps the
+    // mate/pairing state colocated and stays under the SystemParam
+    // count budget.
+    mate_eligibility_q: Query<(
+        Has<markers::HasEligibleMate>,
+        Has<crate::components::PairingActivity>,
+    )>,
     // Ticket 014 Mentoring batch — Mentor / Apprentice / HasMentoringTarget
     // authored by `aspirations::update_training_markers` and
     // `aspirations::update_mentoring_target_markers`.
@@ -1169,10 +1174,16 @@ pub fn evaluate_and_plan(
             markers.set_entity(markers::OnSpecialTerrain::KEY, entity, on_special_marker);
         }
         // Ticket 027 Bug 2 — HasEligibleMate authored by
-        // `mating::update_mate_eligibility_markers`.
-        if let Ok(has_mate) = mate_eligibility_q.get(entity) {
+        // `mating::update_mate_eligibility_markers`. Ticket 103 —
+        // second tuple element is `Has<PairingActivity>`; carried out
+        // of the snapshot block so the populator below can read it
+        // for `escape_viability`'s dependent-presence term.
+        let has_pair_bond = if let Ok((has_mate, has_pairing)) = mate_eligibility_q.get(entity) {
             markers.set_entity(markers::HasEligibleMate::KEY, entity, has_mate);
-        }
+            has_pairing
+        } else {
+            false
+        };
         // Ticket 014 Mentoring batch — Mentor / Apprentice authored by
         // `aspirations::update_training_markers`; HasMentoringTarget by
         // `aspirations::update_mentoring_target_markers`.
@@ -1313,6 +1324,19 @@ pub fn evaluate_and_plan(
             mastery_confidence: crate::systems::interoception::mastery_confidence(skills),
             purpose_clarity: crate::systems::interoception::purpose_clarity(aspirations),
             esteem_distress: crate::systems::interoception::esteem_distress(needs),
+            // Ticket 103 — threat-coupled escape viability.
+            // `nearest_threat` here (line ~1232 above) is the same
+            // `Option<&(Entity, Position)>` shape as the disposition
+            // populator. Dependent presence is marker-only in v1:
+            // Parent ZST OR active pair-bond. Positional refinement
+            // parked as ticket 128.
+            escape_viability: crate::systems::interoception::escape_viability(
+                *pos,
+                nearest_threat.map(|(_, p)| *p),
+                &res.map,
+                markers.has(markers::Parent::KEY, entity) || has_pair_bond,
+                &res.constants.escape_viability,
+            ),
             is_incapacitated,
             has_construction_site,
             has_damaged_building,

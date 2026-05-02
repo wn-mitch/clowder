@@ -39,6 +39,17 @@
 //! `health_deficit` continues to be exposed there but is now sourced from
 //! the same `Health` read this perception layer uses, rather than the raw
 //! component-read in `disposition.rs`'s `ScoringContext` populator.
+//!
+//! `escape_viability` (ticket 103) — pure threat-coupled physics signal:
+//! "given an active threat, can this cat escape?" Composed from terrain
+//! openness around the cat plus a flat penalty when the cat has a
+//! dependent (kitten or pair-bonded mate). Returns `1.0` when no threat
+//! is present — the question is undefined-but-safe; downstream consumers
+//! (Fight branch ticket 102, Freeze branch ticket 105) gate on threat
+//! presence before reading the scalar. The single-axis discipline holds
+//! — *ambient* anxiety about closed spaces (claustrophobia) is a
+//! separate axis owned by ticket 126's phobia modifier family, not
+//! folded into this scalar.
 
 use bevy::prelude::*;
 
@@ -49,7 +60,8 @@ use crate::components::markers::{
 use crate::components::mental::{Memory, MemoryType};
 use crate::components::physical::{Dead, Health, Injury, InjuryKind, Needs, Position};
 use crate::components::skills::Skills;
-use crate::resources::sim_constants::SimConstants;
+use crate::resources::map::TileMap;
+use crate::resources::sim_constants::{EscapeViabilityConstants, SimConstants};
 
 /// Per-`InjuryKind` severity score used to derive `pain_level`. Minor
 /// wounds register a small ache; Moderate is meaningfully painful; Severe
@@ -148,6 +160,87 @@ pub fn esteem_distress(needs: &Needs) -> f32 {
     (1.0 - needs.respect)
         .max(1.0 - needs.mastery)
         .clamp(0.0, 1.0)
+}
+
+/// Count walkable tiles inside the `(2 * radius + 1) × (2 * radius + 1)`
+/// bounding box centered on `center`. Out-of-bounds tiles do not count
+/// toward the walkable total but *do* count toward the box area — this
+/// makes a cat near a map edge register as more cornered than one in
+/// the same shape of walls in the interior, which matches the
+/// "fewer escape options" intent.
+///
+/// `radius == 0` returns `1` if `center` is in-bounds and passable,
+/// else `0`. Negative radius is treated as `0`.
+fn count_walkable_tiles_in_box(center: Position, radius: i32, map: &TileMap) -> u32 {
+    let r = radius.max(0);
+    let mut count: u32 = 0;
+    for dy in -r..=r {
+        for dx in -r..=r {
+            let x = center.x + dx;
+            let y = center.y + dy;
+            if map.in_bounds(x, y) && map.get(x, y).terrain.is_passable() {
+                count += 1;
+            }
+        }
+    }
+    count
+}
+
+/// Box-area helper for `(2 * radius + 1)²`. Negative radius treated
+/// as `0` (single tile). Used as the openness denominator.
+fn sprint_box_area(radius: i32) -> u32 {
+    let r = radius.max(0) as u32;
+    let side = 2 * r + 1;
+    side * side
+}
+
+/// Threat-coupled escape viability in `[0, 1]`. **Single-axis** — pure
+/// physics about whether the cat can escape an *active* threat;
+/// ambient/personality anxiety lives on separate scalars (ticket 126's
+/// phobia family). Ticket 103.
+///
+/// Returns `1.0` when `nearest_threat` is `None`. Rationale: with no
+/// active threat, escape is trivially viable, and the no-threat
+/// short-circuit ensures the scalar never reads the map (locking in
+/// the contract that downstream Fight/Freeze gates which forget to
+/// check threat presence don't accidentally trigger on a low-openness
+/// peacetime cat).
+///
+/// When a threat is present, composes two terms:
+///
+/// 1. **Terrain openness** — fraction of walkable tiles in the
+///    `(2 * sprint_radius + 1)²` bounding box centered on the cat.
+///    Closed terrain (walls, water, cliff) drops viability.
+/// 2. **Dependent penalty** — flat subtractive when
+///    `has_nearby_dependent` is true. Models cost-of-abandonment: a
+///    cat next to a kitten or bonded mate registers escape as less
+///    viable.
+///
+/// Composition: `terrain_weight * openness - dependent_weight *
+/// dependent_penalty (if has_nearby_dependent)`, clamped to `[0, 1]`.
+/// Weights configurable via `EscapeViabilityConstants`.
+pub fn escape_viability(
+    self_pos: Position,
+    nearest_threat: Option<Position>,
+    map: &TileMap,
+    has_nearby_dependent: bool,
+    constants: &EscapeViabilityConstants,
+) -> f32 {
+    if nearest_threat.is_none() {
+        return 1.0;
+    }
+
+    let walkable = count_walkable_tiles_in_box(self_pos, constants.sprint_radius, map) as f32;
+    let area = sprint_box_area(constants.sprint_radius) as f32;
+    let openness = if area > 0.0 { walkable / area } else { 0.0 };
+
+    let dependent_term = if has_nearby_dependent {
+        constants.dependent_weight * constants.dependent_penalty
+    } else {
+        0.0
+    };
+
+    (constants.terrain_weight * openness - dependent_term).clamp(0.0, 1.0)
 }
 
 /// Body-state-appropriate safe-rest tile. Scans the cat's `Memory`
@@ -964,5 +1057,139 @@ mod tests {
         // Healed injury is most recent but ignored; falls back to
         // the older unhealed one.
         assert_eq!(own_injury_site(&h), Some(Position::new(1, 1)));
+    }
+
+    // ---- Ticket 103 — `escape_viability` ----
+
+    use crate::resources::map::{Terrain, TileMap};
+
+    fn open_grass_map(width: i32, height: i32) -> TileMap {
+        TileMap::new(width, height, Terrain::Grass)
+    }
+
+    #[test]
+    fn escape_viability_one_with_no_threat() {
+        let map = open_grass_map(20, 20);
+        let constants = EscapeViabilityConstants::default();
+        let v = escape_viability(Position::new(10, 10), None, &map, false, &constants);
+        assert_eq!(v, 1.0);
+    }
+
+    #[test]
+    fn escape_viability_no_threat_short_circuits_terrain() {
+        // Same `None` threat in two very different terrains must
+        // produce the same 1.0 — locks in the contract that the
+        // no-threat branch never reads the map.
+        let mut walled = open_grass_map(20, 20);
+        for x in 0..20 {
+            for y in 0..20 {
+                walled.set(x, y, Terrain::Wall);
+            }
+        }
+        let open = open_grass_map(20, 20);
+        let constants = EscapeViabilityConstants::default();
+        let pos = Position::new(10, 10);
+        assert_eq!(escape_viability(pos, None, &walled, false, &constants), 1.0);
+        assert_eq!(escape_viability(pos, None, &open, false, &constants), 1.0);
+    }
+
+    #[test]
+    fn escape_viability_high_in_open_terrain() {
+        // Threat present, all-grass map, no dependents → terrain
+        // weight × full openness = 0.7 (with default weights).
+        let map = open_grass_map(20, 20);
+        let constants = EscapeViabilityConstants::default();
+        let v = escape_viability(
+            Position::new(10, 10),
+            Some(Position::new(3, 3)),
+            &map,
+            false,
+            &constants,
+        );
+        // Default terrain_weight = 0.7, full openness, no dependent.
+        assert!((v - 0.7).abs() < 1e-4, "got {v}");
+    }
+
+    #[test]
+    fn escape_viability_low_in_corner() {
+        // Cat at (1, 1) surrounded by walls within the sprint box —
+        // openness should drop below half. Build a 9×9 map of walls
+        // with only a 3×3 patch of grass around (1, 1).
+        let mut map = TileMap::new(9, 9, Terrain::Wall);
+        for x in 0..=2 {
+            for y in 0..=2 {
+                map.set(x, y, Terrain::Grass);
+            }
+        }
+        let constants = EscapeViabilityConstants::default();
+        let v = escape_viability(
+            Position::new(1, 1),
+            Some(Position::new(8, 8)),
+            &map,
+            false,
+            &constants,
+        );
+        // Sprint radius 3 → 7×7 = 49-tile box. Walkable subset is
+        // the 3×3 grass patch = 9 tiles. Openness = 9/49 ≈ 0.184.
+        // viability = 0.7 × 0.184 ≈ 0.129. Well below 0.3.
+        assert!(v < 0.3, "expected low viability in corner, got {v}");
+    }
+
+    #[test]
+    fn escape_viability_reduced_with_dependent() {
+        let map = open_grass_map(20, 20);
+        let constants = EscapeViabilityConstants::default();
+        let pos = Position::new(10, 10);
+        let threat = Some(Position::new(3, 3));
+
+        let without = escape_viability(pos, threat, &map, false, &constants);
+        let with = escape_viability(pos, threat, &map, true, &constants);
+
+        // Penalty = 0.3 × 1.0 = 0.3 → 0.7 - 0.3 = 0.4.
+        assert!((without - 0.7).abs() < 1e-4);
+        assert!((with - 0.4).abs() < 1e-4);
+        assert!(with < without);
+    }
+
+    #[test]
+    fn escape_viability_clamps_to_unit_range() {
+        let map = open_grass_map(20, 20);
+        // Pathological weights — dependent_penalty inflated past
+        // terrain_weight. Should still clamp at 0.0, not go negative.
+        let constants = EscapeViabilityConstants {
+            sprint_radius: 3,
+            terrain_weight: 0.5,
+            dependent_weight: 1.0,
+            dependent_penalty: 1.0,
+        };
+        let v = escape_viability(
+            Position::new(10, 10),
+            Some(Position::new(3, 3)),
+            &map,
+            true,
+            &constants,
+        );
+        assert_eq!(v, 0.0);
+    }
+
+    #[test]
+    fn count_walkable_tiles_in_box_handles_radius_zero() {
+        let map = open_grass_map(5, 5);
+        // Single passable tile at center.
+        assert_eq!(count_walkable_tiles_in_box(Position::new(2, 2), 0, &map), 1);
+        // Negative radius treated as 0 — still single tile.
+        assert_eq!(
+            count_walkable_tiles_in_box(Position::new(2, 2), -3, &map),
+            1
+        );
+    }
+
+    #[test]
+    fn count_walkable_tiles_in_box_skips_oob() {
+        // Cat near map edge — out-of-bounds tiles do not count.
+        let map = open_grass_map(5, 5);
+        // Center at (0, 0), radius 1 → 3×3 box from (-1,-1) to (1,1).
+        // Only (0,0), (1,0), (0,1), (1,1) are in-bounds → 4 walkable.
+        assert_eq!(count_walkable_tiles_in_box(Position::new(0, 0), 1, &map), 4);
     }
 }

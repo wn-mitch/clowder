@@ -1,16 +1,16 @@
 ---
 id: 046
 title: FightTarget combat-advantage uses skill-points difference, not damage-per-tick exchange — cats engage threats they can't survive
-status: ready
-cluster: null
+status: done
+cluster: ai-substrate
 added: 2026-04-27
 parked: null
 blocked-by: []
 supersedes: []
-related-systems: [combat.md]
+related-systems: [combat.md, ai-substrate-refactor.md, body-zones.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-02
 ---
 
 ## Why
@@ -111,3 +111,8 @@ Defer (1) to a balance-iteration ticket. The damage-per-tick rebuild is real but
 ## Log
 
 - 2026-04-27: Ticket opened during post-043+044 collapse-probe drill-down. The cluster's proximate cause was inadequate ward perimeter (045), but the inner-ring failure was cats willingly engaging an apex predator they could not survive.
+- 2026-05-02: Closed as superseded by the substrate-over-override approach. Both layers of the proposed fix are override-shaped (formula rebuild, eligibility gate); the substrate replacements ship under their own tickets:
+  - **Layer 1** (combat-advantage formula units mismatch — `combat + health − threat` mixes capability-and-capacity with per-tick output, producing the "12× advantage" misperception). Superseded by **095** §IAUS Integration §2 (`combat_advantage_normalized` reads `health_derived` instead of `Health.current` — Phase 1 explicitly carries this as a "Breaking change to track") plus **095** §IAUS Integration §1 (dynamic `threat_power` per key-part condition — wounded predators read as less urgent through the Quadratic curve's convex amplification). The remaining piece — a real "is this engagement winnable?" perception scalar capturing dps balance + time-to-kill + ally factor — opens as ticket **133** in this commit.
+  - **Layer 2** (lone cats engage ShadowFox; intent: gate engagement on having ≥1 ally nearby). Superseded by the adrenaline-valence substrate framework opened off ticket 047: **103** (`escape_viability`, landed) + **102** (`AcuteHealthAdrenalineFight`, gated on low `escape_viability`) + **105** (`AcuteHealthAdrenalineFreeze`, gated on low `escape_viability` AND low `combat_winnability`) + **108** (`ThreatProximityAdrenalineFlee`, lurches Flee on rising threat density). The eligibility-gate intent ("a lone cat shouldn't engage a SF") becomes substrate score-shaping — `combat_winnability` (133) reads ally count as one of its sub-axes, and a future `EngagementUrgency` modifier consumes it to suppress Fight when winnability is low — rather than a `.require_when(...)` override on FightTarget DSE.
+
+  No code change in this retirement. The substrate work proceeds under 095 / 102 / 105 / 108 / 133 with their own verification playbooks. This closure follows the 112 precedent (close-as-superseded with downstream substrate not yet all landed; the 047 cluster's first-class ticket-level handling).

@@ -126,3 +126,13 @@ Suggested landing order: Phase 1 → Fox zones (Phase 2 partial) → Phase 3
 
 - 2026-05-01: Opened. Spec expanded from cat-only to full species coverage.
   Phased implementation plan added to decouple Phase 1 from ticket 025.
+- 2026-05-02: Cross-link to ticket 046 (retired in this commit). Phase 1's
+  `combat_advantage_normalized` rewiring (spec §IAUS Integration §2 — read
+  `health_derived` instead of `Health.current`) carries the 046-Layer-1
+  partial fix and is load-bearing for 046's retirement, not optional.
+  Phase 2's dynamic `threat_power` per key-part condition (§IAUS §1)
+  reduces opening-engagement urgency against wounded predators across
+  encounters. The full time-to-kill rebuild (046-Layer-1 in its
+  substrate-over-override form) lands as ticket **133**'s
+  `combat_winnability` scalar's consumer wiring (separate follow-on
+  tickets per 133's §Out of scope).
