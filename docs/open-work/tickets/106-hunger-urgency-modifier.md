@@ -376,3 +376,45 @@ rule:
   doubled to 0.2/day reproduces the slow-starvation regime). Also flipped
   the focal-cat discovery recipe from raw `jq` to `/logq events` per the
   skill-surface rule. No source change.
+- 2026-05-02: **Phase 2 verdict — TRIGGER CONDITION RARELY MET; SHIP INERT.**
+  900s focal-trace soak at seed 42, focal Simba, with proposed lifts (0.40 /
+  0.20 / 0.20 above urgency 0.6) AND doubled hunger decay (0.2/day) applied
+  via `CLOWDER_OVERRIDES` (run dir: `logs/tuned-trace-42-106-phase-2`).
+  Survey of all 8 cats' CatSnapshot hunger trajectories: **no cat reaches
+  the legacy interrupt threshold (hunger ≤ 0.15) and only Nettle reaches
+  the modifier window at all** (3 ticks / 1,756 = 0.2%, hunger floor 0.383).
+  Simba's hunger floor is 0.466 — never crosses the 0.4 boundary. Footer
+  confirms `interrupts_by_reason.Starvation == 0` even under doubled decay
+  (only `CriticalHealth: 8616` and one ThreatNearby preempt). The legacy
+  `Starvation` interrupt is **structurally vestigial** in the post-091
+  regime: cats route to food via the Hunting/Foraging disposition pull plus
+  the GOAP urgency arm at `goap.rs:619` (which exempts Hunting/Foraging
+  cats from the disposition-replan path the interrupt at
+  `disposition.rs:319` would have driven). Mechanical wiring of the
+  modifier is verified: override JSON propagated into the events.jsonl
+  header (echoed `hunger_urgency_eat_lift: 0.4` etc.), Simba's L2 trace
+  shows other pipeline modifiers (`independence_solo`,
+  `stockpile_satiation`) firing correctly on hunt/forage at non-trigger
+  ticks while `hunger_urgency` correctly stays silent (gated-boost
+  contract honored). Lift magnitude IS sufficient to flip the L2 contest
+  IF triggered (Simba's average hunt = 0.61, forage = 0.64; full-ramp lift
+  pushes to 0.81 / 0.84, well above wander = 0.74). Phase 3 hypothesize
+  sweep skipped: `Starvation == 0` is the noise floor for both baseline
+  AND treatment, so a `direction: decrease` prediction is unmeasurable.
+- 2026-05-02: Phase 4 reframed — **interrupt retirement becomes structural
+  cleanup, not behavior change.** Because the legacy `Starvation`
+  interrupt fires `0/run` in the canonical post-091 regime (and even
+  under 2× decay), removing the arm at `disposition.rs:319-321` is a
+  zero-risk code-hygiene commit: the substrate-over-override pattern
+  applies (the substrate IS the modifier registered in the pipeline,
+  even if dormant), and the legacy code is dead. The GOAP urgency arm
+  at `goap.rs:615-637` is the actual food-routing driver and stays in
+  place. Phase 4 may proceed in a follow-up session without a behavioral
+  validation gate; the canary suite (`just verdict`) will confirm no
+  regression.
+- 2026-05-02: Phase 5 doc target — append `docs/balance/106-hunger-urgency.md`
+  with the verdict above. **Do not draft the spec YAML** — Phase 3 sweep
+  is skipped per the verdict reasoning. Documentation should explicitly
+  call out the "trigger rarely met → substrate is redundant safety, not
+  active driver" finding as a worked example for ticket 113's
+  `docs/systems/distress-modifiers.md` doctrine table.
