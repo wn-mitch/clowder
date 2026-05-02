@@ -58,20 +58,34 @@ impl SocializeDse {
             intercept: 0.0,
         };
 
-        // Ticket 122 — satiation axis. Logistic(8, 0.85) centred on
-        // `social_satiation_threshold = 0.85`; the Invert post-op
+        // Ticket 122 — satiation axis. Logistic(8, 0.90) centred
+        // *above* the L3 commitment-gate threshold
+        // (`social_satiation_threshold = 0.85`); the Invert post-op
         // gives `social = 0` → ~1 (no penalty) and `social = 1` →
-        // ~0 (fully suppressed). Steepness 8 (vs the 5 used in
-        // `inverted_need_penalty()`) gives a sharper drop at the
-        // threshold so the axis bites visibly around 0.85, matching
-        // the gate's hard cutoff in shape if not in value. Stays
-        // additive (not multiplicative) — the §"Out of scope" note
-        // on ticket 122 cautions against turning this into an
-        // eligibility filter.
+        // ~0 (fully suppressed).
+        //
+        // Balance tweak (2026-05-01) — midpoint shifted from 0.85
+        // to 0.90 to fix a continuity-canary collapse surfaced by
+        // the post-089 soak (courtship 1405 → 0; play 341 → 33).
+        // Hypothesis: the 0.85 midpoint mirrored the L3 gate but
+        // bit too hard at mid-social (0.5–0.7), starving the
+        // bond-building loop. Fondness/familiarity grew too slowly
+        // to clear the courtship gates (`courtship_fondness_gate` /
+        // `courtship_familiarity_gate`), so `CourtshipInteraction`
+        // never fired. Shifting midpoint to 0.90 keeps the IAUS
+        // axis as a soft-finish above the L3 hard cutoff: cats at
+        // social < 0.85 socialize normally; cats at 0.85–0.90 see
+        // a moderate axis nerf (axis ≈ 0.55–0.65 vs old 0.5–0.6);
+        // cats at ≥0.95 still get strong suppression (axis ≈ 0.4
+        // vs old 0.31). The L3 commitment gate at 0.85 continues
+        // to do the hard work of dropping plans for fully-sated
+        // cats. Steepness stays 8 — the curve shape (sharp bite)
+        // is intentional; only the inflection point moves. Stays
+        // additive (not multiplicative).
         let social_satiation_curve = Curve::Composite {
             inner: Box::new(Curve::Logistic {
                 steepness: 8.0,
-                midpoint: 0.85,
+                midpoint: 0.90,
             }),
             post: PostOp::Invert,
         };
@@ -240,18 +254,22 @@ mod tests {
 
     #[test]
     fn socialize_satiation_curve_suppresses_above_threshold() {
-        // Ticket 122 — the curve must read near 0 at full satiation
-        // and near 1 at zero satiation, with the steepness-8 logistic
-        // crossing ≈ 0.5 at the gate threshold (0.85). Without these
-        // monotonicity properties the producer cannot mirror the
-        // gate's `still_goal` predicate.
+        // Ticket 122 + 2026-05-01 balance tweak — the curve must
+        // read near 0 at full satiation and near 1 at zero
+        // satiation. Midpoint shifted 0.85 → 0.90 so the IAUS axis
+        // sits *above* the L3 commitment gate (still 0.85): at the
+        // L3-gate threshold (social=0.85), the IAUS axis remains
+        // mostly permissive (~0.6) so mid-social cats keep
+        // socializing and the bond-building loop survives.
+        // Sharpness preserved at steepness=8.
         let dse = SocializeDse::new();
         let satiation = match dse.considerations().last().unwrap() {
             Consideration::Scalar(s) => s,
             _ => panic!("expected Scalar consideration"),
         };
         let unsated = satiation.score(0.0);
-        let at_threshold = satiation.score(0.85);
+        let at_l3_gate_threshold = satiation.score(0.85);
+        let at_iaus_midpoint = satiation.score(0.90);
         let sated = satiation.score(1.0);
 
         assert!(
@@ -259,16 +277,33 @@ mod tests {
             "unsated cat should score ~1.0 (no penalty); got {unsated}"
         );
         assert!(
-            sated < 0.30,
-            "fully-sated cat should score near 0; got {sated}"
+            sated < 0.40,
+            "fully-sated cat should score < 0.4 (strong suppression near full); got {sated}"
+        );
+        // Permissiveness at the L3-gate threshold (0.85) is the
+        // load-bearing property — this is what lets bond-building
+        // proceed for mid-social cats so courtship gates can open.
+        assert!(
+            at_l3_gate_threshold > 0.55,
+            "at the L3 gate threshold (social=0.85), the IAUS axis must remain >0.55 \
+             so mid-social cats still socialize and bond growth survives. \
+             Pre-tweak midpoint=0.85 gave ~0.5; post-tweak midpoint=0.90 gives ~0.6. \
+             Got {at_l3_gate_threshold}"
+        );
+        // Logistic midpoint at 0.90 → ~0.5 at social=0.90.
+        assert!(
+            (at_iaus_midpoint - 0.5).abs() < 0.10,
+            "logistic midpoint at 0.90 should give ~0.5 at social=0.90; got {at_iaus_midpoint}"
+        );
+        // Monotone-decreasing across the relevant range.
+        assert!(
+            unsated > at_l3_gate_threshold && at_l3_gate_threshold > at_iaus_midpoint,
+            "axis must decrease monotonically: unsated > 0.85-gate > 0.90-midpoint. \
+             unsated={unsated}, gate={at_l3_gate_threshold}, midpoint={at_iaus_midpoint}"
         );
         assert!(
-            at_threshold < unsated && at_threshold > sated,
-            "threshold score must sit between sated and unsated; got {at_threshold}"
-        );
-        assert!(
-            (at_threshold - 0.5).abs() < 0.10,
-            "logistic midpoint at 0.85 should give ~0.5 at the threshold; got {at_threshold}"
+            at_iaus_midpoint > sated,
+            "midpoint must sit above fully-sated; got midpoint={at_iaus_midpoint} sated={sated}"
         );
     }
 }
