@@ -1401,6 +1401,58 @@ pub struct ScoringConstants {
     /// stays quiet in open terrain.
     #[serde(default = "default_acute_health_adrenaline_fight_viability_threshold")]
     pub acute_health_adrenaline_fight_viability_threshold: f32,
+    /// Ticket 106 — `HungerUrgency` Modifier threshold. The
+    /// `hunger_urgency` floor below which the lift is a no-op. Default
+    /// 0.6 (cat at hunger 0.4 or below). Mirrors `1 -
+    /// starvation_interrupt_threshold` (1 - 0.15 = 0.85) lifted earlier
+    /// so the substrate engages well *before* the legacy interrupt
+    /// would have, giving the IAUS contest time to re-rank Eat / Hunt
+    /// / Forage above non-food dispositions.
+    #[serde(default = "default_hunger_urgency_threshold")]
+    pub hunger_urgency_threshold: f32,
+    /// Ticket 106 — `HungerUrgency` lift on Eat. Largest of the three —
+    /// Eat is the direct solution; Hunt / Forage are upstream.
+    /// **Default 0.0** (ships inert); proposed magnitude 0.40 enabled
+    /// via `CLOWDER_OVERRIDES` for the Phase 3 hypothesize sweep.
+    #[serde(default = "default_hunger_urgency_eat_lift")]
+    pub hunger_urgency_eat_lift: f32,
+    /// Ticket 106 — `HungerUrgency` lift on Hunt. Smaller than Eat —
+    /// Hunt is upstream of Eat in the food chain. Default 0.0;
+    /// proposed magnitude 0.20.
+    #[serde(default = "default_hunger_urgency_hunt_lift")]
+    pub hunger_urgency_hunt_lift: f32,
+    /// Ticket 106 — `HungerUrgency` lift on Forage. Symmetric to Hunt
+    /// — both are food-acquisition fallbacks. Default 0.0; proposed
+    /// 0.20.
+    #[serde(default = "default_hunger_urgency_forage_lift")]
+    pub hunger_urgency_forage_lift: f32,
+    /// Ticket 107 — `ExhaustionPressure` Modifier threshold. The
+    /// `energy_deficit` floor below which the lift is a no-op. Default
+    /// 0.7 (cat at energy 0.3 or below). Engages before the legacy
+    /// `Exhaustion` interrupt (`energy < 0.10` ⇒ deficit > 0.90).
+    #[serde(default = "default_exhaustion_pressure_threshold")]
+    pub exhaustion_pressure_threshold: f32,
+    /// Ticket 107 — `ExhaustionPressure` lift on Sleep. Largest lift —
+    /// Sleep is the direct rest. Default 0.0 (inert); proposed 0.40.
+    #[serde(default = "default_exhaustion_pressure_sleep_lift")]
+    pub exhaustion_pressure_sleep_lift: f32,
+    /// Ticket 107 — `ExhaustionPressure` lift on GroomSelf. Smaller
+    /// lift — exhausted cats sometimes groom-then-sleep as a settling
+    /// ritual per ticket §Scope. Default 0.0; proposed 0.10.
+    #[serde(default = "default_exhaustion_pressure_groom_lift")]
+    pub exhaustion_pressure_groom_lift: f32,
+    /// Ticket 110 — `ThermalDistress` Modifier threshold. The
+    /// `thermal_deficit` floor below which the lift is a no-op. Default
+    /// 0.7 — a cat well outside its thermal comfort band. No legacy
+    /// interrupt to retire on this axis; pure perception-richness lever.
+    #[serde(default = "default_thermal_distress_threshold")]
+    pub thermal_distress_threshold: f32,
+    /// Ticket 110 — `ThermalDistress` lift on Sleep (find a den /
+    /// hearth — routes the cat to a warm tile). Default 0.0 (inert);
+    /// proposed 0.30. Build-shelter lift deferred per ticket §Out-of-
+    /// scope.
+    #[serde(default = "default_thermal_distress_sleep_lift")]
+    pub thermal_distress_sleep_lift: f32,
     pub wander_curiosity_scale: f32,
     pub wander_base: f32,
     pub wander_playfulness_bonus: f32,
@@ -1601,6 +1653,15 @@ impl Default for ScoringConstants {
             acute_health_adrenaline_fight_lift: default_acute_health_adrenaline_fight_lift(),
             acute_health_adrenaline_fight_viability_threshold:
                 default_acute_health_adrenaline_fight_viability_threshold(),
+            hunger_urgency_threshold: default_hunger_urgency_threshold(),
+            hunger_urgency_eat_lift: default_hunger_urgency_eat_lift(),
+            hunger_urgency_hunt_lift: default_hunger_urgency_hunt_lift(),
+            hunger_urgency_forage_lift: default_hunger_urgency_forage_lift(),
+            exhaustion_pressure_threshold: default_exhaustion_pressure_threshold(),
+            exhaustion_pressure_sleep_lift: default_exhaustion_pressure_sleep_lift(),
+            exhaustion_pressure_groom_lift: default_exhaustion_pressure_groom_lift(),
+            thermal_distress_threshold: default_thermal_distress_threshold(),
+            thermal_distress_sleep_lift: default_thermal_distress_sleep_lift(),
             wander_curiosity_scale: 0.4,
             wander_base: 0.08,
             wander_playfulness_bonus: 0.2,
@@ -2308,6 +2369,73 @@ fn default_acute_health_adrenaline_fight_lift() -> f32 {
 /// triggers the Fight gate.
 fn default_acute_health_adrenaline_fight_viability_threshold() -> f32 {
     0.4
+}
+
+/// Ticket 106 — `HungerUrgency` Modifier threshold. Mirrors `1 -
+/// starvation_interrupt_threshold` lifted earlier (0.6 vs 0.85) so the
+/// substrate engages well before the legacy interrupt would have. The
+/// threshold is the `hunger_urgency` value at which the linear ramp
+/// begins; below, the modifier is a no-op.
+fn default_hunger_urgency_threshold() -> f32 {
+    0.6
+}
+
+/// Ticket 106 — `HungerUrgency` lift on Eat. **Defaults to 0.0** so the
+/// modifier ships inert; the proposed magnitude (0.40) is enabled via
+/// `CLOWDER_OVERRIDES` for the Phase 3 hypothesize sweep before
+/// promoting to the shipped default in Phase 4 alongside the legacy
+/// Starvation interrupt's removal.
+fn default_hunger_urgency_eat_lift() -> f32 {
+    0.0
+}
+
+/// Ticket 106 — `HungerUrgency` lift on Hunt. Defaults to 0.0 (inert);
+/// proposed magnitude 0.20 — smaller than Eat because Hunt is upstream
+/// in the food chain.
+fn default_hunger_urgency_hunt_lift() -> f32 {
+    0.0
+}
+
+/// Ticket 106 — `HungerUrgency` lift on Forage. Defaults to 0.0
+/// (inert); proposed magnitude 0.20 — symmetric to Hunt.
+fn default_hunger_urgency_forage_lift() -> f32 {
+    0.0
+}
+
+/// Ticket 107 — `ExhaustionPressure` Modifier threshold. The
+/// `energy_deficit` floor below which the lift is a no-op. Default 0.7
+/// (cat at energy 0.3 or below) — engages before the legacy
+/// `Exhaustion` interrupt (`energy < 0.10` ⇒ deficit > 0.90).
+fn default_exhaustion_pressure_threshold() -> f32 {
+    0.7
+}
+
+/// Ticket 107 — `ExhaustionPressure` lift on Sleep. **Defaults to 0.0**
+/// (inert); proposed magnitude 0.40 enabled via `CLOWDER_OVERRIDES` for
+/// the Phase 3 hypothesize sweep.
+fn default_exhaustion_pressure_sleep_lift() -> f32 {
+    0.0
+}
+
+/// Ticket 107 — `ExhaustionPressure` lift on GroomSelf. Defaults to 0.0
+/// (inert); proposed magnitude 0.10 — exhausted cats sometimes
+/// groom-then-sleep as a settling ritual.
+fn default_exhaustion_pressure_groom_lift() -> f32 {
+    0.0
+}
+
+/// Ticket 110 — `ThermalDistress` Modifier threshold. The
+/// `thermal_deficit` floor below which the lift is a no-op. Default 0.7
+/// — a cat well outside its thermal comfort band.
+fn default_thermal_distress_threshold() -> f32 {
+    0.7
+}
+
+/// Ticket 110 — `ThermalDistress` lift on Sleep (find a den / hearth).
+/// **Defaults to 0.0** (inert); proposed magnitude 0.30. Build-shelter
+/// lift deferred per ticket §Out-of-scope.
+fn default_thermal_distress_sleep_lift() -> f32 {
+    0.0
 }
 
 fn default_build_pressure_cooking_min_raw_food() -> usize {

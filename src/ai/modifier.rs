@@ -100,6 +100,28 @@ const HEALTH_DEFICIT: &str = "health_deficit";
 /// gate trip) when no threat is present; downstream Fight branch
 /// short-circuits there because there's nothing to fight.
 const ESCAPE_VIABILITY: &str = "escape_viability";
+/// Ticket 106 — `HungerUrgency` Modifier trigger input. Already
+/// published by `scoring::ctx_scalars` as `(1 - needs.hunger).clamp(0,1)`.
+/// Read directly (not through `body_distress_composite`) so hunger alone
+/// fires the lift even when other axes are quiet — matching the
+/// slow-starvation regime where the legacy `Starvation` interrupt
+/// fires. The substrate threshold (0.6) engages well before the legacy
+/// interrupt (`hunger < 0.15` ⇒ urgency > 0.85), giving the contest
+/// time to re-rank Eat / Hunt / Forage before crisis.
+const HUNGER_URGENCY: &str = "hunger_urgency";
+/// Ticket 107 — `ExhaustionPressure` Modifier trigger input. Already
+/// published by `scoring::ctx_scalars` as `(1 - needs.energy).clamp(0,1)`.
+/// Read directly so exhaustion alone fires the Sleep / GroomSelf lift
+/// even when `body_distress_composite` is below 088's threshold. Engages
+/// before the legacy `Exhaustion` interrupt (`energy < 0.10` ⇒
+/// energy_deficit > 0.90).
+const ENERGY_DEFICIT: &str = "energy_deficit";
+/// Ticket 110 — `ThermalDistress` Modifier trigger input. Already
+/// published by `scoring::ctx_scalars` as the cat's distance from the
+/// thermal comfort band. Read directly (not through composite) so cold
+/// alone fires the shelter-seeking lift on Sleep. No legacy interrupt
+/// to retire here — pure perception-richness lever per ticket §Why.
+const THERMAL_DEFICIT: &str = "thermal_deficit";
 const ACTIVE_DISPOSITION_ORDINAL: &str = "active_disposition_ordinal";
 /// §075 — `CommitmentTenure` Modifier. Drift between this name and
 /// `plan_substrate::COMMITMENT_TENURE_INPUT` (the canonical
@@ -1261,6 +1283,266 @@ impl ScoreModifier for AcuteHealthAdrenalineFight {
 }
 
 // ---------------------------------------------------------------------------
+// HungerUrgency — ticket 106
+// ---------------------------------------------------------------------------
+
+/// Ticket 106 — `HungerUrgency` Modifier. Pressure-shape lift on the
+/// food-acquisition class (Eat / Hunt / Forage) gated by
+/// `hunger_urgency`. The substrate that retires the per-tick
+/// `InterruptReason::Starvation` override branch.
+///
+/// **Trigger:** `hunger_urgency >= hunger_urgency_threshold`
+/// (default 0.6 — the cat is at hunger 0.4 or below). Engages well
+/// before the legacy interrupt (`hunger < 0.15`) so the IAUS contest
+/// has time to re-rank Eat / Hunt / Forage above Guarding / Crafting /
+/// Patrol before crisis.
+///
+/// **Transform:** linear ramp from `threshold` to 1.0 ramping to a
+/// per-DSE lift magnitude. Sibling shape to 088's
+/// `BodyDistressPromotion` (gradual physiological build, not a phase
+/// transition) — distinct from 047's smoothstep lurch on injury.
+///
+/// **Applies to:** Eat (largest lift — direct solution), Hunt (smaller
+/// — upstream of Eat), Forage (symmetric to Hunt). All default to 0.0
+/// so the modifier ships inert; proposed magnitudes (Eat 0.40, Hunt
+/// 0.20, Forage 0.20) are enabled via `CLOWDER_OVERRIDES` for the
+/// Phase 3 hypothesize sweep.
+///
+/// **Composition:** Registered after `AcuteHealthAdrenalineFight` (102)
+/// and before `FoxTerritorySuppression`. Order within the additive
+/// section matters: under combined high urgency + low stockpile, the
+/// Eat lift fires *before* `StockpileSatiation` damps Hunt/Forage —
+/// composing toward the same Eat-wins-the-contest target as 088 + 094.
+///
+/// **Substrate role:** Phase 1 ships inert — defaults 0.0 keep the
+/// post-modifier scores bit-identical to pre-Wave-1 baseline. Phase 4
+/// (gated on Phase 3 sufficiency) retires
+/// `disposition.rs:319-321` (the Starvation interrupt arm) and the
+/// `goap.rs::accumulate_urgencies` Starvation arm at 615-625 once the
+/// substrate is shown sufficient.
+///
+/// **Gated-boost contract:** returns `score` unchanged on score `<= 0`
+/// — hunger doesn't conjure food into existence. Mirrors the 088 / 047
+/// / 102 convention.
+pub struct HungerUrgency {
+    threshold: f32,
+    eat_lift: f32,
+    hunt_lift: f32,
+    forage_lift: f32,
+}
+
+impl HungerUrgency {
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            threshold: sc.hunger_urgency_threshold,
+            eat_lift: sc.hunger_urgency_eat_lift,
+            hunt_lift: sc.hunger_urgency_hunt_lift,
+            forage_lift: sc.hunger_urgency_forage_lift,
+        }
+    }
+
+    /// Returns the linear ramp `[0, 1]` for the given `hunger_urgency`.
+    /// Below `threshold` returns 0; above, scales linearly to 1.0 at
+    /// urgency = 1.0. Mirror of `BodyDistressPromotion::lift` shape.
+    fn ramp(&self, urgency: f32) -> f32 {
+        if urgency <= self.threshold {
+            return 0.0;
+        }
+        ((urgency - self.threshold) / (1.0 - self.threshold)).clamp(0.0, 1.0)
+    }
+}
+
+impl ScoreModifier for HungerUrgency {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        let lift_scale = match dse_id.0 {
+            EAT => self.eat_lift,
+            HUNT => self.hunt_lift,
+            FORAGE => self.forage_lift,
+            _ => return score,
+        };
+        if score <= 0.0 {
+            return score;
+        }
+        let urgency = fetch(HUNGER_URGENCY, ctx.cat).clamp(0.0, 1.0);
+        let ramp = self.ramp(urgency);
+        if ramp <= 0.0 {
+            return score;
+        }
+        score + ramp * lift_scale
+    }
+
+    fn name(&self) -> &'static str {
+        "hunger_urgency"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ExhaustionPressure — ticket 107
+// ---------------------------------------------------------------------------
+
+/// Ticket 107 — `ExhaustionPressure` Modifier. Pressure-shape lift on
+/// the rest class (Sleep, GroomSelf) gated by `energy_deficit`. The
+/// substrate that retires the per-tick `InterruptReason::Exhaustion`
+/// override branch. Sibling to 106's `HungerUrgency` on the energy
+/// axis.
+///
+/// **Trigger:** `energy_deficit >= exhaustion_pressure_threshold`
+/// (default 0.7 — the cat is at energy 0.3 or below). Engages before
+/// the legacy interrupt (`energy < 0.10` ⇒ deficit > 0.90).
+///
+/// **Transform:** linear ramp from `threshold` to 1.0. Pressure shape:
+/// fatigue is a gradual physiological build, not a phase transition.
+///
+/// **Applies to:** Sleep (largest lift — direct rest), GroomSelf
+/// (smaller — exhausted cats sometimes groom-then-sleep as a settling
+/// ritual per ticket §Scope). Defaults 0.0 (inert).
+///
+/// **Composition:** Registered after `HungerUrgency` (106), before
+/// `FoxTerritorySuppression`. Order within the additive section:
+/// composes additively with 088's `BodyDistressPromotion` Sleep lift
+/// (when both fire, total Sleep lift can saturate around 1.0).
+///
+/// **Substrate role:** Phase 4 (gated on sufficiency) retires
+/// `disposition.rs:322-324` (the Exhaustion interrupt arm) and the
+/// `goap.rs::accumulate_urgencies` Exhaustion arm at 644-650.
+///
+/// **Gated-boost contract:** returns `score` unchanged on score `<= 0`
+/// — fatigue doesn't conjure a safe sleep spot into existence.
+pub struct ExhaustionPressure {
+    threshold: f32,
+    sleep_lift: f32,
+    groom_lift: f32,
+}
+
+impl ExhaustionPressure {
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            threshold: sc.exhaustion_pressure_threshold,
+            sleep_lift: sc.exhaustion_pressure_sleep_lift,
+            groom_lift: sc.exhaustion_pressure_groom_lift,
+        }
+    }
+
+    fn ramp(&self, deficit: f32) -> f32 {
+        if deficit <= self.threshold {
+            return 0.0;
+        }
+        ((deficit - self.threshold) / (1.0 - self.threshold)).clamp(0.0, 1.0)
+    }
+}
+
+impl ScoreModifier for ExhaustionPressure {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        let lift_scale = match dse_id.0 {
+            SLEEP => self.sleep_lift,
+            GROOM_SELF => self.groom_lift,
+            _ => return score,
+        };
+        if score <= 0.0 {
+            return score;
+        }
+        let deficit = fetch(ENERGY_DEFICIT, ctx.cat).clamp(0.0, 1.0);
+        let ramp = self.ramp(deficit);
+        if ramp <= 0.0 {
+            return score;
+        }
+        score + ramp * lift_scale
+    }
+
+    fn name(&self) -> &'static str {
+        "exhaustion_pressure"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ThermalDistress — ticket 110
+// ---------------------------------------------------------------------------
+
+/// Ticket 110 — `ThermalDistress` Modifier. Pressure-shape lift on
+/// Sleep (find a den / hearth — routes the cat to a warm tile) gated
+/// by `thermal_deficit`. Lower-priority sibling to 106/107 because no
+/// legacy `InterruptReason::ThermalCritical` exists to retire — this
+/// is purely a perception-richness lever (the "shake the tree" pattern
+/// from 047's design — richer cat understanding ⇒ more levers).
+///
+/// **Trigger:** `thermal_deficit >= thermal_distress_threshold`
+/// (default 0.7 — the cat is well outside its thermal comfort band).
+///
+/// **Transform:** linear ramp from `threshold` to 1.0. Pressure shape:
+/// thermal stress is gradual.
+///
+/// **Applies to:** Sleep only in v1 (Build-shelter lift deferred per
+/// ticket §Out-of-scope — needs a "BuildShelter" disposition variant
+/// to make sense). Default 0.0 (inert).
+///
+/// **Composition:** Registered after `ExhaustionPressure` (107),
+/// before `FoxTerritorySuppression`. Composes additively with 088 and
+/// 107 on Sleep when multiple axes fire simultaneously.
+///
+/// **Gated-boost contract:** returns `score` unchanged on score `<= 0`
+/// — cold doesn't conjure a den path into existence.
+pub struct ThermalDistress {
+    threshold: f32,
+    sleep_lift: f32,
+}
+
+impl ThermalDistress {
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            threshold: sc.thermal_distress_threshold,
+            sleep_lift: sc.thermal_distress_sleep_lift,
+        }
+    }
+
+    fn ramp(&self, deficit: f32) -> f32 {
+        if deficit <= self.threshold {
+            return 0.0;
+        }
+        ((deficit - self.threshold) / (1.0 - self.threshold)).clamp(0.0, 1.0)
+    }
+}
+
+impl ScoreModifier for ThermalDistress {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        let lift_scale = match dse_id.0 {
+            SLEEP => self.sleep_lift,
+            _ => return score,
+        };
+        if score <= 0.0 {
+            return score;
+        }
+        let deficit = fetch(THERMAL_DEFICIT, ctx.cat).clamp(0.0, 1.0);
+        let ramp = self.ramp(deficit);
+        if ramp <= 0.0 {
+            return score;
+        }
+        score + ramp * lift_scale
+    }
+
+    fn name(&self) -> &'static str {
+        "thermal_distress"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Default pipeline builder
 // ---------------------------------------------------------------------------
 
@@ -1333,6 +1615,18 @@ pub fn default_modifier_pipeline(
     // the full lurch). Order within the additive section is preserved:
     // this composes before the multiplicative damps run.
     pipeline.push(Box::new(AcuteHealthAdrenalineFight::new(sc)));
+    // Tickets 106 / 107 / 110 — pressure modifiers on the per-axis
+    // physiological deficits (hunger, energy, thermal). Registered
+    // after the adrenaline-lurch valences (047 / 102) and before the
+    // multiplicative damps (Fox / Corruption / Stockpile) so each
+    // pressure lift composes additively with 088's
+    // `BodyDistressPromotion` and the adrenaline lifts before any
+    // multiplicative pass. Order among the three doesn't load-bear:
+    // each gates on a different scalar and a different DSE matrix
+    // (Eat/Hunt/Forage vs Sleep/GroomSelf vs Sleep), so they commute.
+    pipeline.push(Box::new(HungerUrgency::new(sc)));
+    pipeline.push(Box::new(ExhaustionPressure::new(sc)));
+    pipeline.push(Box::new(ThermalDistress::new(sc)));
     pipeline.push(Box::new(FoxTerritorySuppression::new(sc)));
     pipeline.push(Box::new(CorruptionTerritorySuppression::new(sc)));
     // §3.5.1 ticket 094 — `StockpileSatiation` registers after the
@@ -2001,20 +2295,22 @@ mod tests {
     }
 
     #[test]
-    fn default_pipeline_registers_twelve_modifiers() {
-        // Twelve §3.5.1 foundational modifiers — the seven original
+    fn default_pipeline_registers_fifteen_modifiers() {
+        // Fifteen §3.5.1 foundational modifiers — the seven original
         // (`Pride`, `IndependenceSolo`, `IndependenceGroup`, `Patience`,
         // `Tradition`, `FoxTerritorySuppression`,
         // `CorruptionTerritorySuppression`) plus §075's
         // `CommitmentTenure`, ticket 094's `StockpileSatiation`,
         // ticket 088's `BodyDistressPromotion`, ticket 047's
-        // `AcuteHealthAdrenalineFlee`, and ticket 102's
-        // `AcuteHealthAdrenalineFight`. The three Phase 4.2 emergency
-        // modifiers (`WardCorruptionEmergency`, `CleanseEmergency`,
+        // `AcuteHealthAdrenalineFlee`, ticket 102's
+        // `AcuteHealthAdrenalineFight`, ticket 106's `HungerUrgency`,
+        // ticket 107's `ExhaustionPressure`, and ticket 110's
+        // `ThermalDistress`. The three Phase 4.2 emergency modifiers
+        // (`WardCorruptionEmergency`, `CleanseEmergency`,
         // `SensedRotBoost`) retired in §13.1.
         let constants = crate::resources::sim_constants::SimConstants::default();
         let pipeline = default_modifier_pipeline(&constants);
-        assert_eq!(pipeline.len(), 12, "expected 12 registered modifiers");
+        assert_eq!(pipeline.len(), 15, "expected 15 registered modifiers");
     }
 
     // -----------------------------------------------------------------------
@@ -2733,5 +3029,438 @@ mod tests {
             hunt_after < 0.25,
             "Hunt damped despite lift; got {hunt_after}"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // ticket 106 HungerUrgency
+    // -----------------------------------------------------------------------
+
+    fn test_hunger_urgency() -> HungerUrgency {
+        HungerUrgency {
+            threshold: 0.6,
+            eat_lift: 0.40,
+            hunt_lift: 0.20,
+            forage_lift: 0.20,
+        }
+    }
+
+    #[test]
+    fn hunger_urgency_no_lift_below_threshold() {
+        // urgency = 0.5 < threshold (0.6). Eat / Hunt / Forage unchanged.
+        let modifier = test_hunger_urgency();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HUNGER_URGENCY => 0.5,
+            _ => 0.0,
+        };
+        for dse in [EAT, HUNT, FORAGE] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "below-threshold dse {dse} unchanged; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn hunger_urgency_zero_lift_at_threshold() {
+        // urgency = 0.6 exactly. `<= threshold` short-circuits to zero
+        // lift — boundary semantics.
+        let modifier = test_hunger_urgency();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HUNGER_URGENCY => 0.6,
+            _ => 0.0,
+        };
+        for dse in [EAT, HUNT, FORAGE] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "at-threshold dse {dse} unchanged; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn hunger_urgency_lifts_above_threshold() {
+        // urgency = 0.8, threshold = 0.6. ramp = (0.8 - 0.6) / 0.4 = 0.5.
+        // Eat: 0.5 + 0.5 * 0.40 = 0.70. Hunt / Forage: 0.5 + 0.5 * 0.20 = 0.60.
+        let modifier = test_hunger_urgency();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HUNGER_URGENCY => 0.8,
+            _ => 0.0,
+        };
+        let eat = modifier.apply(DseId(EAT), 0.5, &ctx, &fetch);
+        let hunt = modifier.apply(DseId(HUNT), 0.5, &ctx, &fetch);
+        let forage = modifier.apply(DseId(FORAGE), 0.5, &ctx, &fetch);
+        assert!((eat - 0.70).abs() < 1e-5, "Eat half-ramp lift; got {eat}");
+        assert!((hunt - 0.60).abs() < 1e-5, "Hunt half-ramp lift; got {hunt}");
+        assert!((forage - 0.60).abs() < 1e-5, "Forage half-ramp lift; got {forage}");
+    }
+
+    #[test]
+    fn hunger_urgency_max_lift_at_full_urgency() {
+        // urgency = 1.0 ⇒ ramp = 1.0 ⇒ full per-DSE lift.
+        let modifier = test_hunger_urgency();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HUNGER_URGENCY => 1.0,
+            _ => 0.0,
+        };
+        let eat = modifier.apply(DseId(EAT), 0.5, &ctx, &fetch);
+        let hunt = modifier.apply(DseId(HUNT), 0.5, &ctx, &fetch);
+        let forage = modifier.apply(DseId(FORAGE), 0.5, &ctx, &fetch);
+        assert!((eat - 0.90).abs() < 1e-5, "Eat full lift +0.40; got {eat}");
+        assert!((hunt - 0.70).abs() < 1e-5, "Hunt full lift +0.20; got {hunt}");
+        assert!((forage - 0.70).abs() < 1e-5, "Forage full lift +0.20; got {forage}");
+    }
+
+    #[test]
+    fn hunger_urgency_targets_only_eat_hunt_forage() {
+        // At full urgency, every non-target DSE passes through unchanged.
+        // The asymmetry is the substrate property: only food-acquisition
+        // class is lifted; other self-care DSEs (Sleep / GroomSelf /
+        // Flee) and the entire non-self-care class stay flat.
+        let modifier = test_hunger_urgency();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HUNGER_URGENCY => 1.0,
+            _ => 0.0,
+        };
+        for dse in [
+            SLEEP, GROOM_SELF, GROOM_OTHER, FLEE, FIGHT, MATE, COORDINATE, BUILD, MENTOR, CARETAKE,
+            SOCIALIZE, PATROL, COOK, FARM, WANDER, EXPLORE, IDLE,
+        ] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "non-food-class dse {dse} unchanged at full urgency; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn hunger_urgency_does_not_resurrect_zero_score() {
+        // Gated-boost contract — hunger doesn't conjure food into
+        // existence. Zero-score Eat / Hunt / Forage stays zero.
+        let modifier = test_hunger_urgency();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HUNGER_URGENCY => 1.0,
+            _ => 0.0,
+        };
+        for dse in [EAT, HUNT, FORAGE] {
+            let out = modifier.apply(DseId(dse), 0.0, &ctx, &fetch);
+            assert_eq!(out, 0.0, "zero-score dse {dse} stays zero — no resurrection");
+        }
+    }
+
+    #[test]
+    fn hunger_urgency_composes_with_stockpile_satiation() {
+        // Substrate composition: under high urgency + high stockpile,
+        // Eat is lifted (+0.40 at full urgency) BEFORE StockpileSatiation
+        // damps Hunt / Forage. Mirrors the 088 / 094 composition test.
+        // The Eat-wins-the-contest target is preserved.
+        use crate::ai::eval::ModifierPipeline;
+        let mut pipeline = ModifierPipeline::new();
+        pipeline.push(Box::new(test_hunger_urgency()));
+        pipeline.push(Box::new(StockpileSatiation { threshold: 0.5, scale: 0.85 }));
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            FOOD_SCARCITY => 0.04, // food_fraction = 0.96
+            HUNGER_URGENCY => 1.0,
+            _ => 0.0,
+        };
+        let eat_after = pipeline.apply(DseId(EAT), 0.27, &ctx, &fetch);
+        let hunt_after = pipeline.apply(DseId(HUNT), 0.85, &ctx, &fetch);
+        // Eat: 0.27 + 0.40 = 0.67 (no damp).
+        assert!((eat_after - 0.67).abs() < 1e-5, "Eat lifted by +0.40; got {eat_after}");
+        // Hunt: (0.85 + 0.20) × ~0.218 ≈ 0.229.
+        assert!(
+            eat_after > hunt_after,
+            "post-pipeline: Eat ({eat_after}) wins over Hunt ({hunt_after}) under abundance + urgency"
+        );
+    }
+
+    #[test]
+    fn hunger_urgency_starvation_regime_pinned() {
+        // Pin the alignment between substrate and legacy interrupt:
+        // at urgency 0.85 (hunger 0.15 — exactly the legacy
+        // `starvation_interrupt_threshold`), the substrate is well
+        // into the lift regime. ramp = (0.85 - 0.6) / 0.4 = 0.625.
+        // Eat: 0.5 + 0.625 * 0.40 = 0.75 (substantial promotion).
+        let modifier = test_hunger_urgency();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HUNGER_URGENCY => 0.85,
+            _ => 0.0,
+        };
+        let eat = modifier.apply(DseId(EAT), 0.5, &ctx, &fetch);
+        assert!(
+            (eat - 0.75).abs() < 1e-5,
+            "Eat at legacy-interrupt-equivalent urgency 0.85; got {eat}"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // ticket 107 ExhaustionPressure
+    // -----------------------------------------------------------------------
+
+    fn test_exhaustion_pressure() -> ExhaustionPressure {
+        ExhaustionPressure {
+            threshold: 0.7,
+            sleep_lift: 0.40,
+            groom_lift: 0.10,
+        }
+    }
+
+    #[test]
+    fn exhaustion_pressure_no_lift_below_threshold() {
+        let modifier = test_exhaustion_pressure();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            ENERGY_DEFICIT => 0.5,
+            _ => 0.0,
+        };
+        for dse in [SLEEP, GROOM_SELF] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "below-threshold dse {dse} unchanged; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn exhaustion_pressure_zero_lift_at_threshold() {
+        let modifier = test_exhaustion_pressure();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            ENERGY_DEFICIT => 0.7,
+            _ => 0.0,
+        };
+        for dse in [SLEEP, GROOM_SELF] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "at-threshold dse {dse} unchanged; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn exhaustion_pressure_lifts_above_threshold() {
+        // deficit = 0.85, threshold = 0.7. ramp = 0.5.
+        // Sleep: 0.5 + 0.5 * 0.40 = 0.70. Groom: 0.5 + 0.5 * 0.10 = 0.55.
+        let modifier = test_exhaustion_pressure();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            ENERGY_DEFICIT => 0.85,
+            _ => 0.0,
+        };
+        let sleep = modifier.apply(DseId(SLEEP), 0.5, &ctx, &fetch);
+        let groom = modifier.apply(DseId(GROOM_SELF), 0.5, &ctx, &fetch);
+        assert!((sleep - 0.70).abs() < 1e-5, "Sleep half-lift; got {sleep}");
+        assert!((groom - 0.55).abs() < 1e-5, "Groom half-lift; got {groom}");
+    }
+
+    #[test]
+    fn exhaustion_pressure_max_lift_at_full_deficit() {
+        let modifier = test_exhaustion_pressure();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            ENERGY_DEFICIT => 1.0,
+            _ => 0.0,
+        };
+        let sleep = modifier.apply(DseId(SLEEP), 0.5, &ctx, &fetch);
+        let groom = modifier.apply(DseId(GROOM_SELF), 0.5, &ctx, &fetch);
+        assert!((sleep - 0.90).abs() < 1e-5, "Sleep full lift +0.40; got {sleep}");
+        assert!((groom - 0.60).abs() < 1e-5, "Groom full lift +0.10; got {groom}");
+    }
+
+    #[test]
+    fn exhaustion_pressure_targets_only_sleep_and_groom_self() {
+        // Eat / Hunt / Forage / Flee + non-self-care class all unchanged.
+        let modifier = test_exhaustion_pressure();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            ENERGY_DEFICIT => 1.0,
+            _ => 0.0,
+        };
+        for dse in [
+            EAT, HUNT, FORAGE, GROOM_OTHER, FLEE, FIGHT, MATE, COORDINATE, BUILD, MENTOR, CARETAKE,
+            SOCIALIZE, PATROL, COOK, FARM, WANDER, EXPLORE, IDLE,
+        ] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "non-rest-class dse {dse} unchanged at full deficit; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn exhaustion_pressure_does_not_resurrect_zero_score() {
+        let modifier = test_exhaustion_pressure();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            ENERGY_DEFICIT => 1.0,
+            _ => 0.0,
+        };
+        for dse in [SLEEP, GROOM_SELF] {
+            let out = modifier.apply(DseId(dse), 0.0, &ctx, &fetch);
+            assert_eq!(out, 0.0, "zero-score dse {dse} stays zero — no resurrection");
+        }
+    }
+
+    #[test]
+    fn exhaustion_pressure_composes_additively_with_body_distress() {
+        // Under high body_distress_composite (088) AND high
+        // energy_deficit (107), Sleep sees both lifts add. 088 lift
+        // +0.20 at composite 1.0 + 107 sleep_lift 0.40 = +0.60 total.
+        use crate::ai::eval::ModifierPipeline;
+        let mut pipeline = ModifierPipeline::new();
+        pipeline.push(Box::new(BodyDistressPromotion {
+            threshold: 0.7,
+            lift_scale: 0.20,
+        }));
+        pipeline.push(Box::new(test_exhaustion_pressure()));
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            BODY_DISTRESS_COMPOSITE => 1.0,
+            ENERGY_DEFICIT => 1.0,
+            _ => 0.0,
+        };
+        let sleep_after = pipeline.apply(DseId(SLEEP), 0.30, &ctx, &fetch);
+        // 0.30 + 0.20 (088) + 0.40 (107) = 0.90.
+        assert!(
+            (sleep_after - 0.90).abs() < 1e-5,
+            "Sleep additive composition; got {sleep_after}"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // ticket 110 ThermalDistress
+    // -----------------------------------------------------------------------
+
+    fn test_thermal_distress() -> ThermalDistress {
+        ThermalDistress {
+            threshold: 0.7,
+            sleep_lift: 0.30,
+        }
+    }
+
+    #[test]
+    fn thermal_distress_no_lift_below_threshold() {
+        let modifier = test_thermal_distress();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            THERMAL_DEFICIT => 0.5,
+            _ => 0.0,
+        };
+        let sleep = modifier.apply(DseId(SLEEP), 0.5, &ctx, &fetch);
+        assert!((sleep - 0.5).abs() < 1e-6, "below-threshold Sleep unchanged; got {sleep}");
+    }
+
+    #[test]
+    fn thermal_distress_zero_lift_at_threshold() {
+        let modifier = test_thermal_distress();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            THERMAL_DEFICIT => 0.7,
+            _ => 0.0,
+        };
+        let sleep = modifier.apply(DseId(SLEEP), 0.5, &ctx, &fetch);
+        assert!((sleep - 0.5).abs() < 1e-6, "at-threshold Sleep unchanged; got {sleep}");
+    }
+
+    #[test]
+    fn thermal_distress_lifts_above_threshold() {
+        // deficit = 0.85, threshold = 0.7. ramp = 0.5.
+        // Sleep: 0.5 + 0.5 * 0.30 = 0.65.
+        let modifier = test_thermal_distress();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            THERMAL_DEFICIT => 0.85,
+            _ => 0.0,
+        };
+        let sleep = modifier.apply(DseId(SLEEP), 0.5, &ctx, &fetch);
+        assert!((sleep - 0.65).abs() < 1e-5, "Sleep half-lift; got {sleep}");
+    }
+
+    #[test]
+    fn thermal_distress_max_lift_at_full_deficit() {
+        let modifier = test_thermal_distress();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            THERMAL_DEFICIT => 1.0,
+            _ => 0.0,
+        };
+        let sleep = modifier.apply(DseId(SLEEP), 0.5, &ctx, &fetch);
+        assert!((sleep - 0.80).abs() < 1e-5, "Sleep full lift +0.30; got {sleep}");
+    }
+
+    #[test]
+    fn thermal_distress_targets_only_sleep() {
+        // GroomSelf is *not* lifted by ThermalDistress in v1 (Build
+        // also out-of-scope per ticket §Out-of-scope). Pure
+        // sleep-lift modifier.
+        let modifier = test_thermal_distress();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            THERMAL_DEFICIT => 1.0,
+            _ => 0.0,
+        };
+        for dse in [
+            EAT, HUNT, FORAGE, GROOM_SELF, GROOM_OTHER, FLEE, FIGHT, MATE, COORDINATE, BUILD,
+            MENTOR, CARETAKE, SOCIALIZE, PATROL, COOK, FARM, WANDER, EXPLORE, IDLE,
+        ] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "non-Sleep dse {dse} unchanged at full thermal deficit; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn thermal_distress_does_not_resurrect_zero_score() {
+        let modifier = test_thermal_distress();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            THERMAL_DEFICIT => 1.0,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(SLEEP), 0.0, &ctx, &fetch);
+        assert_eq!(out, 0.0, "zero-score Sleep stays zero — no resurrection");
+    }
+
+    #[test]
+    fn pressure_modifiers_default_inert() {
+        // Phase-1 substrate contract: with the shipped 0.0 lift defaults,
+        // the new pressure modifiers MUST be score-bit-identical to the
+        // pre-Wave-1 baseline regardless of scalar inputs. Composes the
+        // three at default magnitude against a saturated-everything
+        // scalar profile and asserts no score moves.
+        let constants = crate::resources::sim_constants::SimConstants::default();
+        let sc = &constants.scoring;
+        use crate::ai::eval::ModifierPipeline;
+        let mut pipeline = ModifierPipeline::new();
+        pipeline.push(Box::new(HungerUrgency::new(sc)));
+        pipeline.push(Box::new(ExhaustionPressure::new(sc)));
+        pipeline.push(Box::new(ThermalDistress::new(sc)));
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HUNGER_URGENCY | ENERGY_DEFICIT | THERMAL_DEFICIT => 1.0,
+            _ => 0.0,
+        };
+        for dse in [EAT, HUNT, FORAGE, SLEEP, GROOM_SELF] {
+            let out = pipeline.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "Phase-1 inert: dse {dse} unchanged with 0.0 default lifts; got {out}"
+            );
+        }
     }
 }
