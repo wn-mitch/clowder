@@ -1401,6 +1401,28 @@ pub struct ScoringConstants {
     /// stays quiet in open terrain.
     #[serde(default = "default_acute_health_adrenaline_fight_viability_threshold")]
     pub acute_health_adrenaline_fight_viability_threshold: f32,
+    /// Ticket 105 — `AcuteHealthAdrenalineFreeze` lift on the Hide
+    /// DSE (ticket 104). Fires under combined high `health_deficit`
+    /// AND low `escape_viability` — the cornered + overmatched
+    /// scenario where neither Flee nor Fight is viable. **Default
+    /// 0.0** (ships inert); proposed magnitude 0.70 (largest of the
+    /// three valences — freeze is the last-resort response per the
+    /// 047 N-valence framework). Promotion gated on the
+    /// `HideEligible` authoring system landing alongside, so the
+    /// double-inert contract holds: this commit is bit-identical to
+    /// baseline.
+    #[serde(default = "default_acute_health_adrenaline_freeze_lift")]
+    pub acute_health_adrenaline_freeze_lift: f32,
+    /// Ticket 105 — `escape_viability` gate threshold for the Freeze
+    /// branch. Below this value, the Freeze branch fires (in concert
+    /// with 102's Fight gate when applicable; the choice between
+    /// Fight and Freeze is owned by the magnitudes
+    /// `acute_health_adrenaline_fight_lift` vs
+    /// `acute_health_adrenaline_freeze_lift`). Default 0.4 mirrors
+    /// 102's gate so the two cornered-scenario valences share onset
+    /// semantics.
+    #[serde(default = "default_acute_health_adrenaline_freeze_viability_threshold")]
+    pub acute_health_adrenaline_freeze_viability_threshold: f32,
     /// Ticket 106 — `HungerUrgency` Modifier threshold. The
     /// `hunger_urgency` floor below which the lift is a no-op. Default
     /// 0.6 (cat at hunger 0.4 or below). Mirrors `1 -
@@ -1696,6 +1718,9 @@ impl Default for ScoringConstants {
             acute_health_adrenaline_fight_lift: default_acute_health_adrenaline_fight_lift(),
             acute_health_adrenaline_fight_viability_threshold:
                 default_acute_health_adrenaline_fight_viability_threshold(),
+            acute_health_adrenaline_freeze_lift: default_acute_health_adrenaline_freeze_lift(),
+            acute_health_adrenaline_freeze_viability_threshold:
+                default_acute_health_adrenaline_freeze_viability_threshold(),
             hunger_urgency_threshold: default_hunger_urgency_threshold(),
             hunger_urgency_eat_lift: default_hunger_urgency_eat_lift(),
             hunger_urgency_hunt_lift: default_hunger_urgency_hunt_lift(),
@@ -2422,6 +2447,26 @@ fn default_acute_health_adrenaline_fight_lift() -> f32 {
 /// the Flee valence; a parent cat in a corner drops below 0.4 and
 /// triggers the Fight gate.
 fn default_acute_health_adrenaline_fight_viability_threshold() -> f32 {
+    0.4
+}
+
+/// Ticket 105 — `AcuteHealthAdrenalineFreeze` Hide-DSE lurch
+/// magnitude. **Defaults to 0.0** (ships inert); proposed magnitude
+/// 0.70 (largest of the three valences — freeze is the last-resort
+/// response). Promotion gated on the Phase-2/3 commit that lands
+/// the `HideEligible` authoring system; until then the
+/// `HideEligible`-gated DSE keeps Hide at score 0 and the
+/// gated-boost contract makes this lift a no-op anyway
+/// (double-inert).
+fn default_acute_health_adrenaline_freeze_lift() -> f32 {
+    0.0
+}
+
+/// Ticket 105 — `escape_viability` gate threshold for the Freeze
+/// branch. Mirrors 102's Fight gate (0.4) — the two cornered-scenario
+/// valences share onset semantics; the choice between them is owned
+/// by their relative lift magnitudes once activated.
+fn default_acute_health_adrenaline_freeze_viability_threshold() -> f32 {
     0.4
 }
 

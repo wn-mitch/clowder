@@ -187,13 +187,10 @@ const EXPLORE: &str = "explore";
 const WANDER: &str = "wander";
 const COOK: &str = "cook";
 /// Ticket 104 — Hide/Freeze DSE id. The "remain still and hope"
-/// predator-avoidance valence; companion to FLEE / FIGHT. No Phase-1
-/// modifier targets Hide directly — ticket 105
-/// (`AcuteHealthAdrenalineFreeze`) and ticket 142
-/// (`IntraspeciesConflictResponseFreeze`) lift it once they land. The
-/// const is referenced in the constituent-DSE-mapping test for
-/// exhaustivity over `Action::*`.
-#[cfg_attr(not(test), allow(dead_code))]
+/// predator-avoidance valence; companion to FLEE / FIGHT. Targeted
+/// by ticket 105 (`AcuteHealthAdrenalineFreeze`) — also will be
+/// lifted by ticket 142 (`IntraspeciesConflictResponseFreeze`) once
+/// it lands.
 const HIDE: &str = "hide";
 const HERBCRAFT_PREPARE: &str = "herbcraft_prepare";
 const MAGIC_SCRY: &str = "magic_scry";
@@ -1321,6 +1318,128 @@ impl ScoreModifier for AcuteHealthAdrenalineFight {
 }
 
 // ---------------------------------------------------------------------------
+// AcuteHealthAdrenalineFreeze — ticket 105
+// ---------------------------------------------------------------------------
+
+/// Ticket 105 — `AcuteHealthAdrenalineFreeze` Modifier. The third
+/// valence in the §6 N-valence framework that 047 / 102 set up. When
+/// escape is not viable AND combat is not winnable (predator
+/// approaching, cat overmatched, no cover within sprint range), real
+/// cats freeze flat against the ground. The substrate that completes
+/// the predator-response trio (Flee / Fight / Freeze).
+///
+/// **Trigger:** `health_deficit >= acute_health_adrenaline_threshold`
+/// (shared with 047 / 102) AND `escape_viability <
+/// acute_health_adrenaline_freeze_viability_threshold` (cornered).
+/// Phase 1 uses `1.0 - escape_viability` as a `combat_winnability`
+/// proxy — a future ticket lands a dedicated `combat_winnability`
+/// scalar (per ticket §Out-of-scope guidance), but the proxy is
+/// directionally correct: low escape viability correlates with
+/// terrain-locked / dependent-burdened scenarios where combat is
+/// also unwinnable.
+///
+/// **Transform:** same narrow smoothstep ramp on `health_deficit`
+/// as 047's Flee and 102's Fight — adrenaline lurch shape shared
+/// across the three valences. The viability gate is binary: under
+/// it, this branch fires; above it, 102's Fight branch fires (when
+/// 102's gate trips for combat-winnable scenarios) or 047's Flee
+/// (open terrain).
+///
+/// **Applies to:** Hide (lift `acute_health_adrenaline_freeze_lift`,
+/// default 0.0). The Hide DSE (ticket 104) is the action surface
+/// for this valence; Phase 1 ships the modifier inert AND with Hide
+/// dormant via `HideEligible`, so this commit is bit-identical to
+/// baseline. Activation requires both (a) the `HideEligible`
+/// authoring system to land and (b) this lift to promote from 0.0
+/// to the swept-validated magnitude (~0.70 per ticket §Scope).
+///
+/// **Composition:** Registered after `IntraspeciesConflictResponseFlight`
+/// (109A) and before `FoxTerritorySuppression`. Order with respect
+/// to 047 / 102 doesn't load-bear because Freeze targets a
+/// different DSE (Hide), but the three valences share the
+/// adrenaline scalar so they compose cleanly: under combined high
+/// deficit + cornered terrain, 102's Fight gate + 105's Freeze gate
+/// can both trip; the choice between them is owned by the relative
+/// magnitudes of `acute_health_adrenaline_fight_lift` and
+/// `acute_health_adrenaline_freeze_lift`. The 105 spec proposes
+/// freeze_lift > fight_lift (0.70 vs 0.50) so freeze is the
+/// preferred valence under the cornered gate.
+///
+/// **Substrate role:** Completes the 047 N-valence framework's third
+/// branch. With Phase 1 inert, the framework is structurally
+/// present but behaviorally dormant pending each branch's
+/// activation commit.
+///
+/// **Gated-boost contract:** returns `score` unchanged on score
+/// `<= 0` — adrenaline doesn't conjure a Hide path into existence.
+/// In Phase 1 Hide always scores 0 (gated off by `HideEligible`),
+/// so the modifier is doubly inert.
+pub struct AcuteHealthAdrenalineFreeze {
+    threshold: f32,
+    freeze_lift: f32,
+    viability_threshold: f32,
+}
+
+impl AcuteHealthAdrenalineFreeze {
+    /// Same smoothstep transition width as 047 / 102. Adrenaline-
+    /// lurch shape shared across the three valences.
+    const TRANSITION_WIDTH: f32 = 0.1;
+
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            threshold: sc.acute_health_adrenaline_threshold,
+            freeze_lift: sc.acute_health_adrenaline_freeze_lift,
+            viability_threshold: sc.acute_health_adrenaline_freeze_viability_threshold,
+        }
+    }
+
+    fn ramp(&self, health_deficit: f32) -> f32 {
+        if health_deficit <= self.threshold {
+            return 0.0;
+        }
+        let t = ((health_deficit - self.threshold) / Self::TRANSITION_WIDTH).clamp(0.0, 1.0);
+        t * t * (3.0 - 2.0 * t)
+    }
+
+    /// Returns `true` when the cat is cornered enough that Freeze
+    /// owns the response. Strict-less-than mirrors 102's gate.
+    fn gate_trips(&self, escape_viability: f32) -> bool {
+        escape_viability < self.viability_threshold
+    }
+}
+
+impl ScoreModifier for AcuteHealthAdrenalineFreeze {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        if !matches!(dse_id.0, HIDE) {
+            return score;
+        }
+        if score <= 0.0 {
+            return score;
+        }
+        let deficit = fetch(HEALTH_DEFICIT, ctx.cat).clamp(0.0, 1.0);
+        let ramp = self.ramp(deficit);
+        if ramp <= 0.0 {
+            return score;
+        }
+        let viability = fetch(ESCAPE_VIABILITY, ctx.cat).clamp(0.0, 1.0);
+        if !self.gate_trips(viability) {
+            return score;
+        }
+        score + ramp * self.freeze_lift
+    }
+
+    fn name(&self) -> &'static str {
+        "acute_health_adrenaline_freeze"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // HungerUrgency — ticket 106
 // ---------------------------------------------------------------------------
 
@@ -1857,6 +1976,14 @@ pub fn default_modifier_pipeline(
     // the full lurch). Order within the additive section is preserved:
     // this composes before the multiplicative damps run.
     pipeline.push(Box::new(AcuteHealthAdrenalineFight::new(sc)));
+    // Ticket 105 — `AcuteHealthAdrenalineFreeze` registers immediately
+    // after the Fight branch. The three adrenaline valences (047 Flee
+    // / 102 Fight / 105 Freeze) share the `health_deficit` scalar but
+    // target disjoint DSEs (Flee+Sleep / Fight+Flee-suppress / Hide),
+    // so registration order among them doesn't load-bear on a single
+    // DSE's score. Adjacency in the pipeline keeps the trace output
+    // visually grouped.
+    pipeline.push(Box::new(AcuteHealthAdrenalineFreeze::new(sc)));
     // Tickets 106 / 107 / 110 — pressure modifiers on the per-axis
     // physiological deficits (hunger, energy, thermal). Registered
     // after the adrenaline-lurch valences (047 / 102) and before the
@@ -2556,15 +2683,16 @@ mod tests {
     }
 
     #[test]
-    fn default_pipeline_registers_seventeen_modifiers() {
-        // Seventeen §3.5.1 foundational modifiers — the seven original
+    fn default_pipeline_registers_eighteen_modifiers() {
+        // Eighteen §3.5.1 foundational modifiers — the seven original
         // (`Pride`, `IndependenceSolo`, `IndependenceGroup`, `Patience`,
         // `Tradition`, `FoxTerritorySuppression`,
         // `CorruptionTerritorySuppression`) plus §075's
         // `CommitmentTenure`, ticket 094's `StockpileSatiation`,
         // ticket 088's `BodyDistressPromotion`, ticket 047's
         // `AcuteHealthAdrenalineFlee`, ticket 102's
-        // `AcuteHealthAdrenalineFight`, ticket 106's `HungerUrgency`,
+        // `AcuteHealthAdrenalineFight`, ticket 105's
+        // `AcuteHealthAdrenalineFreeze`, ticket 106's `HungerUrgency`,
         // ticket 107's `ExhaustionPressure`, ticket 110's
         // `ThermalDistress`, ticket 108's
         // `ThreatProximityAdrenalineFlee`, and ticket 109 Phase A's
@@ -2573,7 +2701,7 @@ mod tests {
         // `CleanseEmergency`, `SensedRotBoost`) retired in §13.1.
         let constants = crate::resources::sim_constants::SimConstants::default();
         let pipeline = default_modifier_pipeline(&constants);
-        assert_eq!(pipeline.len(), 17, "expected 17 registered modifiers");
+        assert_eq!(pipeline.len(), 18, "expected 18 registered modifiers");
     }
 
     // -----------------------------------------------------------------------
@@ -3291,6 +3419,133 @@ mod tests {
         assert!(
             hunt_after < 0.25,
             "Hunt damped despite lift; got {hunt_after}"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // ticket 105 AcuteHealthAdrenalineFreeze
+    // -----------------------------------------------------------------------
+
+    fn test_adrenaline_freeze() -> AcuteHealthAdrenalineFreeze {
+        AcuteHealthAdrenalineFreeze {
+            threshold: 0.4,
+            freeze_lift: 0.70,
+            viability_threshold: 0.4,
+        }
+    }
+
+    #[test]
+    fn adrenaline_freeze_no_lift_below_health_threshold() {
+        let modifier = test_adrenaline_freeze();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 0.3,
+            ESCAPE_VIABILITY => 0.1,
+            _ => 0.0,
+        };
+        let hide = modifier.apply(DseId(HIDE), 0.5, &ctx, &fetch);
+        assert!((hide - 0.5).abs() < 1e-6, "Hide unchanged below threshold; got {hide}");
+    }
+
+    #[test]
+    fn adrenaline_freeze_no_lift_when_escape_viable() {
+        // 047's Flee / 102's Fight take the response when escape is
+        // viable. Freeze stays quiet.
+        let modifier = test_adrenaline_freeze();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 0.55,
+            ESCAPE_VIABILITY => 0.8,
+            _ => 0.0,
+        };
+        let hide = modifier.apply(DseId(HIDE), 0.5, &ctx, &fetch);
+        assert!((hide - 0.5).abs() < 1e-6, "Hide unchanged when escape viable; got {hide}");
+    }
+
+    #[test]
+    fn adrenaline_freeze_full_lift_under_gate() {
+        let modifier = test_adrenaline_freeze();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 0.55,
+            ESCAPE_VIABILITY => 0.1,
+            _ => 0.0,
+        };
+        let hide = modifier.apply(DseId(HIDE), 0.5, &ctx, &fetch);
+        // 0.5 + 1.0 * 0.70 = 1.20
+        assert!((hide - 1.20).abs() < 1e-5, "Hide saturated lift; got {hide}");
+    }
+
+    #[test]
+    fn adrenaline_freeze_smoothstep_midpoint_under_gate() {
+        let modifier = test_adrenaline_freeze();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 0.45,
+            ESCAPE_VIABILITY => 0.1,
+            _ => 0.0,
+        };
+        let hide = modifier.apply(DseId(HIDE), 0.5, &ctx, &fetch);
+        // 0.5 + 0.5 * 0.70 = 0.85
+        assert!((hide - 0.85).abs() < 1e-5, "Hide half-lift; got {hide}");
+    }
+
+    #[test]
+    fn adrenaline_freeze_targets_only_hide() {
+        let modifier = test_adrenaline_freeze();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 1.0,
+            ESCAPE_VIABILITY => 0.0,
+            _ => 0.0,
+        };
+        for dse in [
+            EAT, SLEEP, HUNT, FORAGE, GROOM_SELF, GROOM_OTHER, FLEE, FIGHT, MATE, COORDINATE,
+            BUILD, MENTOR, CARETAKE, SOCIALIZE, PATROL, COOK, FARM, WANDER, EXPLORE, IDLE,
+        ] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "non-Hide dse {dse} unchanged at full deficit + corner; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn adrenaline_freeze_does_not_resurrect_zero_score() {
+        // The double-inert contract: in Phase 1, Hide always scores
+        // 0 (gated off by `HideEligible`), so even if 105's lift
+        // were nonzero the gated-boost contract keeps Hide at 0.
+        let modifier = test_adrenaline_freeze();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 1.0,
+            ESCAPE_VIABILITY => 0.0,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(HIDE), 0.0, &ctx, &fetch);
+        assert_eq!(out, 0.0, "zero-score Hide stays zero — double-inert");
+    }
+
+    #[test]
+    fn adrenaline_freeze_default_inert() {
+        // Phase 1 substrate contract: with the shipped 0.0 lift
+        // default, 105 MUST be score-bit-identical to baseline
+        // regardless of inputs. This is the modifier-level half of
+        // the double-inert contract; the DSE-level half is `HideDse`'s
+        // never-eligible gate.
+        let constants = crate::resources::sim_constants::SimConstants::default();
+        let modifier = AcuteHealthAdrenalineFreeze::new(&constants.scoring);
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 1.0,
+            ESCAPE_VIABILITY => 0.0,
+            _ => 0.0,
+        };
+        let hide = modifier.apply(DseId(HIDE), 0.5, &ctx, &fetch);
+        assert!(
+            (hide - 0.5).abs() < 1e-6,
+            "Phase-1 inert: Hide unchanged at default 0.0 lift; got {hide}"
         );
     }
 
