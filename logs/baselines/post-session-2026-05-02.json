@@ -1,0 +1,131 @@
+{
+  "label": "post-session-2026-05-02",
+  "run_dir": "/Users/will.mitchell/clowder/logs/tuned-42",
+  "events_path": "/Users/will.mitchell/clowder/logs/tuned-42/events.jsonl",
+  "commit_hash_short": "0783194",
+  "commit_dirty": true,
+  "seed": 42,
+  "duration_secs": 900,
+  "promoted_at": "2026-05-02T16:11:56Z",
+  "footer_snapshot": {
+    "_footer": true,
+    "anxiety_interrupt_total": 43017,
+    "colony_score": {
+      "aggregate": 997.4789657047063,
+      "bonds_formed": 3,
+      "deaths_injury": 8,
+      "deaths_old_age": 0,
+      "deaths_starvation": 0,
+      "fulfillment": 0.0,
+      "happiness": 0.625,
+      "health": 0.2445983588695526,
+      "kittens_born": 0,
+      "kittens_surviving": 0,
+      "nourishment": 0.8237920999526978,
+      "peak_population": 8,
+      "seasons_survived": 7,
+      "shelter": 0.0,
+      "structures_built": 8,
+      "welfare": 0.3386780917644501
+    },
+    "continuity_tallies": {
+      "burial": 0,
+      "courtship": 999,
+      "grooming": 194,
+      "mentoring": 0,
+      "mythic-texture": 41,
+      "play": 219
+    },
+    "deaths_by_cause": {
+      "ShadowFoxAmbush": 8
+    },
+    "interrupts_by_reason": {
+      "CriticalHealth": 43017,
+      "urgency ThreatNearby (level 2) preempted level 4 plan": 1
+    },
+    "negative_events_total": 53116,
+    "neutral_features_active": 20,
+    "neutral_features_total": 28,
+    "never_fired_expected_positives": [
+      "FoodCooked",
+      "MatingOccurred",
+      "GroomedOther",
+      "MentoredCat"
+    ],
+    "plan_failures_by_reason": {
+      "Construct: no target for Construct": 1,
+      "EngagePrey: anxiety spooked prey": 18,
+      "EngagePrey: lost prey during approach": 2983,
+      "EngagePrey: no prey target for engage": 54,
+      "EngagePrey: prey teleported": 97,
+      "EngagePrey: seeking another target": 835,
+      "EngagePrey: stuck while stalking": 508,
+      "EngagePrey: target invalid at step entry: Despawned": 95,
+      "EngageThreat: global step timeout": 7,
+      "EngageThreat: morale_break": 9,
+      "EngageThreat: target invalid at step entry: Despawned": 181,
+      "ForageItem: nothing found while foraging": 1846,
+      "GatherHerb: target invalid at step entry: Despawned": 2,
+      "SearchPrey: no scent found": 10,
+      "TravelTo(ConstructionSite): no reachable zone target": 1,
+      "TravelTo(HerbPatch): no path and stuck": 1
+    },
+    "planning_failures_by_disposition": {
+      "Crafting": 15480,
+      "Foraging": 200,
+      "Guarding": 298,
+      "Hunting": 228
+    },
+    "positive_features_active": 23,
+    "positive_features_total": 47,
+    "shadow_fox_spawn_total": 16,
+    "shadow_foxes_avoided_ward_total": 0,
+    "ward_avg_strength_final": 0.0,
+    "ward_count_final": 0,
+    "ward_siege_started_total": 0,
+    "wards_despawned_total": 0,
+    "wards_placed_total": 0,
+    "welfare_axes": {
+      "acceptance": {
+        "axis": "acceptance",
+        "max": 0.0,
+        "mean": 0.0,
+        "min": 0.0,
+        "n": 1,
+        "stdev": 0.0
+      },
+      "mastery": {
+        "axis": "mastery",
+        "max": 0.0,
+        "mean": 0.0,
+        "min": 0.0,
+        "n": 1,
+        "stdev": 0.0
+      },
+      "purpose": {
+        "axis": "purpose",
+        "max": 0.16754360496997833,
+        "mean": 0.16754360496997833,
+        "min": 0.16754360496997833,
+        "n": 1,
+        "stdev": 0.0
+      },
+      "respect": {
+        "axis": "respect",
+        "max": 0.9399438500404358,
+        "mean": 0.9399438500404358,
+        "min": 0.9399438500404358,
+        "n": 1,
+        "stdev": 0.0
+      },
+      "social_warmth": {
+        "axis": "social_warmth",
+        "max": 0.0,
+        "mean": 0.0,
+        "min": 0.0,
+        "n": 1,
+        "stdev": 0.0
+      }
+    }
+  }
+}
