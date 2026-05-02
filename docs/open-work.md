@@ -15,8 +15,8 @@ _Last generated: 2026-05-01._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 48 |
-| Parked | 5 |
+| Ready | 47 |
+| Parked | 6 |
 | Blocked | 13 |
 | **Open total** | **71** |
 | Pre-existing | 1 |
@@ -33,7 +33,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[071](docs/open-work/tickets/071-planning-substrate-hardening.md)** — Planning-substrate hardening — gird against the stuck-cat bug class (sub-epic) — _[planning-substrate] · added 2026-04-29_
 - **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** — Substrate-over-override — retire control-yanking hacks in favor of IAUS levers — _[substrate-over-override] · added 2026-04-30_
 
-## Ready (48)
+## Ready (47)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -62,11 +62,9 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[063](docs/open-work/tickets/063-ward-strength-promotion.md)** — Ward-strength promotion — first-class spatial axis (§5.6.3 row #3) — _added 2026-04-27_
 - **[064](docs/open-work/tickets/064-carcass-scent-consumer-cutover.md)** — Carcass-scent consumer cutover — replace observer_smells_at (§5.6.3 row #6) — _added 2026-04-27_
 - **[086](docs/open-work/tickets/086-farm-canary-triggering-scenario.md)** — Find a triggering scenario for Farm DSE canary (CropTended / CropHarvested) — _[balance] · added 2026-04-30_
-- **[089](docs/open-work/tickets/089-interoceptive-self-anchors.md)** — Interoceptive self-anchors — spatial self-perception (OwnInjurySite, OwnSafeRestSpot) — _[ai-substrate] · added 2026-04-30_
 - **[095](docs/open-work/tickets/095-body-zones-epic.md)** — Body zones — anatomical injury model for all animal species — _added 2026-05-01_
 - **[096](docs/open-work/tickets/096-materials-available-substrate-split.md)** — Split `PlannerState.materials_available` into marker-backed entry + per-plan search field — _[ai-substrate] · added 2026-04-30_
 - **[097](docs/open-work/tickets/097-non-cat-planner-substrate-audit.md)** — Audit fox / hawk / snake planners for the parallel-feasibility-language smell 092 retired for cats — _[ai-substrate] · added 2026-04-30_
-- **[099](docs/open-work/tickets/099-modifier-feature-emission.md)** — Feature emission for §3.5.1 Modifiers — colony-wide canary surface for substrate-lift signals — _[ai-substrate] · added 2026-05-01_
 - **[100](docs/open-work/tickets/100-tremor-action-multiplier-wiring.md)** — Tremor map, Action::Stalk, and personality-driven hunt approach — _blocked-by 062 · added 2026-05-01_
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _blocked-by 100 · added 2026-05-01_
 - **[102](docs/open-work/tickets/102-acute-health-adrenaline-fight-branch.md)** — AcuteHealthAdrenaline Fight branch — cornered/maternal-defense valence — _[ai-substrate] · blocked-by 103 · added 2026-05-01_
@@ -83,14 +81,16 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[117](docs/open-work/tickets/117-social-warmth-vs-self-care-tradeoff.md)** — Characterize social-warmth max shift under 047 substrate (Phase 3 surfaced -96% on max) — _[ai-substrate] · blocked-by 118 · added 2026-05-01_
 - **[118](docs/open-work/tickets/118-modifier-lift-vs-plan-completion-momentum.md)** — Modifier lifts gated by plan-completion momentum — substrate raises score but cat completes mid-plan first — _[ai-substrate] · added 2026-05-01_
 - **[120](docs/open-work/tickets/120-shadow-fox-spawn-vs-cat-presence-coupling.md)** — Characterize shadow-fox spawn-rate coupling to cat-presence (047 Phase 3 surfaced +93%) — _[ai-substrate] · added 2026-05-01_
+- **[124](docs/open-work/tickets/124-own-territory-center-anchor.md)** — `LandmarkAnchor::OwnTerritoryCenter` — third interoceptive self-anchor (territory bias) — _[ai-substrate] · added 2026-05-01_
 
-## Parked (5)
+## Parked (6)
 
 - **[015](docs/open-work/tickets/015-alloparenting-reframe-b.md)** — Alloparenting Reframe B — mama drops kitten at hearth near resting elder — _parked 2026-04-22 · added 2026-04-22_
 - **[058](docs/open-work/tickets/058-tradition-unfiltered-loop-fix.md)** — §3.5.3 item 1 Tradition modifier — fix unfiltered-loop port — _parked 2026-04-30 · added 2026-04-27_
 - **[059](docs/open-work/tickets/059-phase-7-substrate-cleanup.md)** — Phase 7 substrate cleanup — `ScoringContext` removal, §10 unblock map sweep, spec drift reconcile — _parked 2026-04-27 · added 2026-04-27_
 - **[081](docs/open-work/tickets/081-coordination-directive-failure-demotion.md)** — Coordination directive-failure demotion (colony-side stuck-loop guard) — _[planning-substrate] · parked 2026-04-29 · added 2026-04-29_
 - **[084](docs/open-work/tickets/084-farm-herb-ward-demand-axis.md)** — Farm DSE — tie scoring to herb/ward stockpile demand so gardens stay productive under abundant food — _[balance] · parked 2026-04-30 · blocked-by 086 · added 2026-04-29_
+- **[099](docs/open-work/tickets/099-modifier-feature-emission.md)** — Feature emission for §3.5.1 Modifiers — colony-wide canary surface for substrate-lift signals — _[ai-substrate] · parked 2026-05-01 · blocked-by 119 · added 2026-05-01_
 
 ## Blocked (13)
 
@@ -112,11 +112,11 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 
-## Landed archive (76)
+## Landed archive (77)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (11)
+### 2026-05 (12)
 
 - **[123](docs/open-work/landed/123-recent-disposition-failures-cooldown.md)** — RecentDispositionFailures cooldown so cats stop spamming dispositions the planner can't satisfy _(2026-05-01)_
 - **[122](docs/open-work/landed/122-socialize-dse-iaus-vs-gate-still-goal-mismatch.md)** — Socialize IAUS scoring elects plans the OpenMinded gate drops on the same tick _(2026-05-01)_
@@ -125,6 +125,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[114](docs/open-work/landed/114-mood-source-typing.md)** — MoodSource enum — typed emotional category for MoodModifier _(2026-05-01)_
 - **[098](docs/open-work/landed/098-search-state-vs-substrate-doctrine.md)** — Document the substrate-vs-search-state boundary in `docs/systems/ai-substrate-refactor.md` _(2026-05-01)_
 - **[090](docs/open-work/landed/090-self-perception-l4-l5.md)** — L4/L5 self-perception — mastery-confidence, purpose-clarity, esteem-distress _(2026-05-01)_
+- **[089](docs/open-work/landed/089-interoceptive-self-anchors.md)** — Interoceptive self-anchors — spatial self-perception (OwnInjurySite, OwnSafeRestSpot) _(2026-05-01)_
 - **[088](docs/open-work/landed/088-body-distress-modifier.md)** — Body-distress Modifier — uniform self-care promotion under §L2.10 Modifier substrate _(2026-05-01)_
 - **[076](docs/open-work/landed/076-last-resort-promotion-modifier.md)** — LastResortPromotion Modifier + no-target step resolvers (spiral-of-failure escalation) _(2026-05-01)_
 - **[047](docs/open-work/landed/047-critical-health-interrupt-treadmill.md)** — CriticalHealth interrupt is a treadmill, not a brake — replan picks the same disposition while damage accumulates _(2026-05-01)_

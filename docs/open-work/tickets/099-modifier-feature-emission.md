@@ -1,11 +1,11 @@
 ---
 id: 099
 title: Feature emission for §3.5.1 Modifiers — colony-wide canary surface for substrate-lift signals
-status: ready
+status: parked
 cluster: ai-substrate
 added: 2026-05-01
-parked: null
-blocked-by: []
+parked: 2026-05-01
+blocked-by: [119]
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
@@ -95,3 +95,13 @@ matches the §3.5.1 modifier-pipeline aesthetic. Defer until unblocked.
   because emission is only worth designing once we know whether 047's
   retirement actually needs colony-wide canary visibility or whether focal-
   trace inspection suffices.
+- 2026-05-01: Parked. 047 (phase 1) landed and answered the gating question —
+  focal-trace inspection of `ModifierDelta` was sufficient for verifying that
+  `BodyDistressPromotion` fires with correct deltas (047 Log: "+0.50 Sleep,
+  +0.60 Flee"). No colony-wide canary need surfaced. 047 deferred phase 4
+  (CriticalHealth interrupt retirement) to ticket 119 (blocked-by 118 for the
+  modifier-lift-vs-plan-completion-momentum substrate fix). The next gating
+  event for 099 is 119's land: if removing the interrupt re-surfaces the need
+  for ongoing canary visibility on the modifier, this ticket unblocks; if
+  focal-trace inspection continues to suffice, this ticket can close as
+  superseded. `blocked-by: [119]`.

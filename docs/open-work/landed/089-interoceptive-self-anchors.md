@@ -1,16 +1,16 @@
 ---
 id: 089
 title: Interoceptive self-anchors — spatial self-perception (OwnInjurySite, OwnSafeRestSpot)
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-04-30
 parked: null
 blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
-related-balance: []
-landed-at: null
-landed-on: null
+related-balance: [122-socialize-satiation-curve.md]
+landed-at: 87b91ff6
+landed-on: 2026-05-01
 ---
 
 ## Why
@@ -636,3 +636,24 @@ artifact prediction-vs-observation evidence side.
   out of scope). `OwnTerritoryCenter` confirmed out of scope per
   substrate-over-override discipline; follow-on ticket to open
   in lands-day commit.
+- 2026-05-01 — Landed at 87b91ff6. All seven implementation steps
+  shipped: `MemoryType::Sleep` variant + `resolve_sleep` authoring;
+  `Injury.at: Position` field threaded through all four
+  `apply_injury` callers; `LandmarkAnchor::OwnSafeRestSpot` /
+  `OwnInjurySite` enum variants + `CatAnchorPositions` fields +
+  resolver arms (with the `_ => None` catch-all retired so future
+  anchors are a compilation gate); two `interoception` helpers
+  (`own_safe_rest_spot` with ThreatSeen/Death suppression,
+  `own_injury_site` for most-recent-unhealed); Sleep DSE wires the
+  `OwnSafeRestSpot` axis at 0.05 weight (existing five weights ×
+  0.95 — sum holds at 1.0); `tests/own_injury_site_resolver.rs`
+  proves the full authoring → resolver path. 1742 tests pass.
+  Soak surfaced a courtship/play continuity collapse traced to
+  ticket 122's pre-existing mid-social over-suppression — fixed
+  via paired balance tweak in commit 82606c83 (midpoint 0.85 →
+  0.90, see `docs/balance/122-socialize-satiation-curve.md`).
+  Post-tweak combined-soak: courtship 999 / play 219 / grooming
+  194 / mythic-texture 41; hard gates hold (Starvation=0,
+  ShadowFoxAmbush=8 ≤ 10); never_fired=4 matches c15dbcf baseline.
+  Follow-on ticket 124 (`OwnTerritoryCenter` anchor) opens with
+  this land per the antipattern-migration discipline.
