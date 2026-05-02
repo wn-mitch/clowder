@@ -471,6 +471,17 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
         "escape_viability",
         ctx.escape_viability.clamp(0.0, 1.0),
     );
+    // Ticket 108 — `ThreatProximityAdrenalineFlee` Modifier trigger.
+    // **Phase 1 stub**: published as 0.0 always. The actual derivative
+    // is `max(0, safety_deficit_now - safety_deficit_prev_tick)` —
+    // computing it requires a `PrevSafetyDeficit(f32)` per-cat
+    // Component plus a per-tick update system that snapshots the
+    // current value after the scoring pass runs. That ECS plumbing
+    // lands in the same Phase-3-or-Phase-4 commit that promotes 108's
+    // lift from 0.0 to the swept-validated magnitude. With the lift
+    // at 0.0 (Phase 1), this stub is bit-identical to baseline
+    // regardless of value.
+    m.insert("threat_proximity_derivative", 0.0);
     // Ticket 090 — interoceptive perception. L4/L5 Maslow scalars.
     // `mastery_confidence` and `esteem_distress` are continuous [0, 1];
     // `purpose_clarity` is binary {0.0, 1.0}. All three are pre-computed

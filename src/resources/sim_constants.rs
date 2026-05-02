@@ -1453,6 +1453,34 @@ pub struct ScoringConstants {
     /// scope.
     #[serde(default = "default_thermal_distress_sleep_lift")]
     pub thermal_distress_sleep_lift: f32,
+    /// Ticket 108 — `ThreatProximityAdrenalineFlee` Modifier threshold.
+    /// `threat_proximity_derivative` floor below which the lurch is a
+    /// no-op. Default 0.4 — mirrors 047's adrenaline threshold so the
+    /// two adrenaline branches have sibling onset semantics.
+    #[serde(default = "default_threat_proximity_adrenaline_threshold")]
+    pub threat_proximity_adrenaline_threshold: f32,
+    /// Ticket 108 — `ThreatProximityAdrenalineFlee` lift on Flee.
+    /// **Default 0.0** (ships inert); proposed magnitude 0.60 mirrors
+    /// 047's Flee lift. Promotion happens in the same Phase-3-or-Phase-4
+    /// commit that lands the `PrevSafetyDeficit` Component + per-tick
+    /// derivative-update system (the actual perception coupling — Phase
+    /// 1 ships with a stub scalar at 0.0).
+    #[serde(default = "default_threat_proximity_adrenaline_flee_lift")]
+    pub threat_proximity_adrenaline_flee_lift: f32,
+    /// Ticket 108 — `ThreatProximityAdrenalineFlee` lift on Sleep
+    /// (in-pool partner since Flee is filtered from disposition
+    /// softmax; Sleep routes the cat to a den). Default 0.0 (inert);
+    /// proposed magnitude 0.50 mirrors 047's Sleep lift.
+    #[serde(default = "default_threat_proximity_adrenaline_sleep_lift")]
+    pub threat_proximity_adrenaline_sleep_lift: f32,
+    /// Ticket 108 — `escape_viability` gate threshold for the Flee
+    /// branch. Above this value, the Flee branch owns the response;
+    /// below, the future Fight valence (108b) takes over. Default 0.4
+    /// mirrors 102's gate — the two adrenaline frameworks (047/102 on
+    /// health, 108/108b on threat-proximity) share the same viability
+    /// pivot.
+    #[serde(default = "default_threat_proximity_adrenaline_viability_threshold")]
+    pub threat_proximity_adrenaline_viability_threshold: f32,
     pub wander_curiosity_scale: f32,
     pub wander_base: f32,
     pub wander_playfulness_bonus: f32,
@@ -1662,6 +1690,14 @@ impl Default for ScoringConstants {
             exhaustion_pressure_groom_lift: default_exhaustion_pressure_groom_lift(),
             thermal_distress_threshold: default_thermal_distress_threshold(),
             thermal_distress_sleep_lift: default_thermal_distress_sleep_lift(),
+            threat_proximity_adrenaline_threshold:
+                default_threat_proximity_adrenaline_threshold(),
+            threat_proximity_adrenaline_flee_lift:
+                default_threat_proximity_adrenaline_flee_lift(),
+            threat_proximity_adrenaline_sleep_lift:
+                default_threat_proximity_adrenaline_sleep_lift(),
+            threat_proximity_adrenaline_viability_threshold:
+                default_threat_proximity_adrenaline_viability_threshold(),
             wander_curiosity_scale: 0.4,
             wander_base: 0.08,
             wander_playfulness_bonus: 0.2,
@@ -2436,6 +2472,39 @@ fn default_thermal_distress_threshold() -> f32 {
 /// lift deferred per ticket §Out-of-scope.
 fn default_thermal_distress_sleep_lift() -> f32 {
     0.0
+}
+
+/// Ticket 108 — `ThreatProximityAdrenalineFlee` Modifier threshold.
+/// Mirrors 047's adrenaline threshold (0.4) so the two adrenaline
+/// branches have sibling onset semantics. The threshold is the
+/// `threat_proximity_derivative` value at which the smoothstep ramp
+/// begins; below, the modifier is a no-op.
+fn default_threat_proximity_adrenaline_threshold() -> f32 {
+    0.4
+}
+
+/// Ticket 108 — `ThreatProximityAdrenalineFlee` Flee-DSE lurch
+/// magnitude. **Defaults to 0.0** (ships inert); proposed magnitude
+/// 0.60 mirrors 047. Promotion lands alongside the
+/// `PrevSafetyDeficit` Component + derivative-update system in the
+/// same Phase-3-or-Phase-4 commit.
+fn default_threat_proximity_adrenaline_flee_lift() -> f32 {
+    0.0
+}
+
+/// Ticket 108 — `ThreatProximityAdrenalineFlee` Sleep-DSE lurch
+/// magnitude (in-pool partner — Flee filtered from disposition
+/// softmax). Defaults to 0.0 (inert); proposed magnitude 0.50 mirrors
+/// 047.
+fn default_threat_proximity_adrenaline_sleep_lift() -> f32 {
+    0.0
+}
+
+/// Ticket 108 — `escape_viability` gate threshold for the Flee branch.
+/// Above this value, the Flee branch owns the response; below, the
+/// future Fight valence (108b) takes over. Default 0.4 mirrors 102.
+fn default_threat_proximity_adrenaline_viability_threshold() -> f32 {
+    0.4
 }
 
 fn default_build_pressure_cooking_min_raw_food() -> usize {

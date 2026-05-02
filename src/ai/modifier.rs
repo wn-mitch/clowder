@@ -122,6 +122,22 @@ const ENERGY_DEFICIT: &str = "energy_deficit";
 /// alone fires the shelter-seeking lift on Sleep. No legacy interrupt
 /// to retire here — pure perception-richness lever per ticket §Why.
 const THERMAL_DEFICIT: &str = "thermal_deficit";
+/// Ticket 108 — `ThreatProximityAdrenalineFlee` Modifier trigger
+/// input. Adrenaline lurch on **rising** threat proximity (the cat
+/// noticed danger getting worse this tick), not on a steady-state
+/// scalar — adrenaline is about change-detection, not absolute level.
+///
+/// **Phase 1 stub:** this scalar is currently published as 0.0 from
+/// `scoring::ctx_scalars`. Computing the actual derivative requires a
+/// `PrevSafetyDeficit(f32)` per-cat Component plus a per-tick update
+/// system (snapshot `safety_deficit_now → prev` after the scoring
+/// pass runs). That ECS plumbing lands in the same commit that
+/// activates 108's lift (default 0.0 → swept-validated value), per
+/// the "ship inert until verified sufficient" 047 playbook. With
+/// the lift at 0.0 (this commit), the modifier never fires
+/// regardless of scalar value, so the stub is bit-identical to the
+/// pre-Wave-1 baseline.
+const THREAT_PROXIMITY_DERIVATIVE: &str = "threat_proximity_derivative";
 const ACTIVE_DISPOSITION_ORDINAL: &str = "active_disposition_ordinal";
 /// §075 — `CommitmentTenure` Modifier. Drift between this name and
 /// `plan_substrate::COMMITMENT_TENURE_INPUT` (the canonical
@@ -1543,6 +1559,129 @@ impl ScoreModifier for ThermalDistress {
 }
 
 // ---------------------------------------------------------------------------
+// ThreatProximityAdrenalineFlee — ticket 108
+// ---------------------------------------------------------------------------
+
+/// Ticket 108 — `ThreatProximityAdrenalineFlee` Modifier. The Flee
+/// valence of the threat-perception N-valence framework — sibling to
+/// 047's `AcuteHealthAdrenalineFlee` (same lurch shape, different
+/// scalar source). Models the adrenaline lurch on **rising** threat
+/// proximity: change-detection, not steady-state. The substrate that
+/// retires the per-tick `InterruptReason::CriticalSafety` override
+/// branch.
+///
+/// **Trigger:** `threat_proximity_derivative >= threat_proximity_adrenaline_threshold`
+/// AND `escape_viability >= threat_proximity_adrenaline_viability_threshold`
+/// (the Flee gate — open-terrain cat that just noticed danger
+/// approaching). Above the viability threshold, this Flee branch owns
+/// the response; below, the future Fight valence (108b) takes over.
+///
+/// **Transform:** narrow smoothstep from `threshold` to
+/// `threshold + transition_width` (width 0.1) ramping to per-DSE lift
+/// magnitudes. Same lurch shape as 047 — adrenaline is a phase
+/// transition, not a graded preference.
+///
+/// **Applies to:** Flee (lift `threat_proximity_adrenaline_flee_lift`)
+/// and Sleep (lift `threat_proximity_adrenaline_sleep_lift`, the
+/// in-pool partner — Flee is filtered from the disposition softmax,
+/// Sleep routes the cat to a den). Both default to 0.0 (inert).
+///
+/// **Composition:** Registered after `ThermalDistress` (110) and
+/// before `FoxTerritorySuppression`. Composes additively with 047's
+/// AcuteHealthAdrenalineFlee on Flee and with 088 / 107 / 110 on
+/// Sleep when multiple axes fire simultaneously.
+///
+/// **Substrate role:** Phase 4 (gated on Phase 3 sufficiency) retires
+/// `disposition.rs::check_interrupt` `CriticalSafety` arm.
+///
+/// **Phase 1 perception coupling:** the input scalar
+/// `threat_proximity_derivative` is currently published as 0.0
+/// (stub). The actual derivative requires a `PrevSafetyDeficit`
+/// per-cat Component + per-tick update system; that plumbing lands
+/// alongside the lift's promotion from 0.0 to the swept-validated
+/// magnitude in the same Phase-3-or-Phase-4 commit. With the lift at
+/// 0.0 here, the modifier never fires regardless of the scalar's
+/// value, so this commit is score-bit-identical to the pre-Wave-1
+/// baseline.
+///
+/// **Gated-boost contract:** returns `score` unchanged on score `<= 0`
+/// — adrenaline doesn't conjure a Flee path or a safe sleep spot
+/// where none exists. Mirrors the 047 / 102 convention.
+pub struct ThreatProximityAdrenalineFlee {
+    threshold: f32,
+    flee_lift: f32,
+    sleep_lift: f32,
+    viability_threshold: f32,
+}
+
+impl ThreatProximityAdrenalineFlee {
+    /// Smoothstep transition width — narrow (0.1), matching 047's Flee
+    /// to keep the lurch shape sibling. The two adrenaline branches
+    /// share curve shape because they share the underlying biological
+    /// mechanism; the only differences are the scalar input and the
+    /// viability gate.
+    const TRANSITION_WIDTH: f32 = 0.1;
+
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            threshold: sc.threat_proximity_adrenaline_threshold,
+            flee_lift: sc.threat_proximity_adrenaline_flee_lift,
+            sleep_lift: sc.threat_proximity_adrenaline_sleep_lift,
+            viability_threshold: sc.threat_proximity_adrenaline_viability_threshold,
+        }
+    }
+
+    fn ramp(&self, derivative: f32) -> f32 {
+        if derivative <= self.threshold {
+            return 0.0;
+        }
+        let t = ((derivative - self.threshold) / Self::TRANSITION_WIDTH).clamp(0.0, 1.0);
+        t * t * (3.0 - 2.0 * t)
+    }
+
+    /// Returns `true` when escape is viable enough that this Flee
+    /// branch owns the response. When viability < threshold, the
+    /// future Fight valence (108b) takes over (same scalar input,
+    /// different action surface).
+    fn gate_trips(&self, escape_viability: f32) -> bool {
+        escape_viability >= self.viability_threshold
+    }
+}
+
+impl ScoreModifier for ThreatProximityAdrenalineFlee {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        let lift_scale = match dse_id.0 {
+            FLEE => self.flee_lift,
+            SLEEP => self.sleep_lift,
+            _ => return score,
+        };
+        if score <= 0.0 {
+            return score;
+        }
+        let derivative = fetch(THREAT_PROXIMITY_DERIVATIVE, ctx.cat).clamp(0.0, 1.0);
+        let ramp = self.ramp(derivative);
+        if ramp <= 0.0 {
+            return score;
+        }
+        let viability = fetch(ESCAPE_VIABILITY, ctx.cat).clamp(0.0, 1.0);
+        if !self.gate_trips(viability) {
+            return score;
+        }
+        score + ramp * lift_scale
+    }
+
+    fn name(&self) -> &'static str {
+        "threat_proximity_adrenaline_flee"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Default pipeline builder
 // ---------------------------------------------------------------------------
 
@@ -1627,6 +1766,15 @@ pub fn default_modifier_pipeline(
     pipeline.push(Box::new(HungerUrgency::new(sc)));
     pipeline.push(Box::new(ExhaustionPressure::new(sc)));
     pipeline.push(Box::new(ThermalDistress::new(sc)));
+    // Ticket 108 — `ThreatProximityAdrenalineFlee` registers after the
+    // pressure modifiers (106 / 107 / 110) and before the
+    // multiplicative damps. Composes additively with 047's Flee
+    // adrenaline lift on Flee and with 088 / 107 / 110 on Sleep when
+    // multiple axes fire simultaneously. Phase 1 ships with both lifts
+    // at 0.0 default (inert) and reads a stub
+    // `threat_proximity_derivative` scalar (also 0.0) — actual
+    // perception coupling lands with lift activation.
+    pipeline.push(Box::new(ThreatProximityAdrenalineFlee::new(sc)));
     pipeline.push(Box::new(FoxTerritorySuppression::new(sc)));
     pipeline.push(Box::new(CorruptionTerritorySuppression::new(sc)));
     // §3.5.1 ticket 094 — `StockpileSatiation` registers after the
@@ -2295,8 +2443,8 @@ mod tests {
     }
 
     #[test]
-    fn default_pipeline_registers_fifteen_modifiers() {
-        // Fifteen §3.5.1 foundational modifiers — the seven original
+    fn default_pipeline_registers_sixteen_modifiers() {
+        // Sixteen §3.5.1 foundational modifiers — the seven original
         // (`Pride`, `IndependenceSolo`, `IndependenceGroup`, `Patience`,
         // `Tradition`, `FoxTerritorySuppression`,
         // `CorruptionTerritorySuppression`) plus §075's
@@ -2304,13 +2452,14 @@ mod tests {
         // ticket 088's `BodyDistressPromotion`, ticket 047's
         // `AcuteHealthAdrenalineFlee`, ticket 102's
         // `AcuteHealthAdrenalineFight`, ticket 106's `HungerUrgency`,
-        // ticket 107's `ExhaustionPressure`, and ticket 110's
-        // `ThermalDistress`. The three Phase 4.2 emergency modifiers
-        // (`WardCorruptionEmergency`, `CleanseEmergency`,
-        // `SensedRotBoost`) retired in §13.1.
+        // ticket 107's `ExhaustionPressure`, ticket 110's
+        // `ThermalDistress`, and ticket 108's
+        // `ThreatProximityAdrenalineFlee`. The three Phase 4.2
+        // emergency modifiers (`WardCorruptionEmergency`,
+        // `CleanseEmergency`, `SensedRotBoost`) retired in §13.1.
         let constants = crate::resources::sim_constants::SimConstants::default();
         let pipeline = default_modifier_pipeline(&constants);
-        assert_eq!(pipeline.len(), 15, "expected 15 registered modifiers");
+        assert_eq!(pipeline.len(), 16, "expected 16 registered modifiers");
     }
 
     // -----------------------------------------------------------------------
@@ -3434,6 +3583,152 @@ mod tests {
         };
         let out = modifier.apply(DseId(SLEEP), 0.0, &ctx, &fetch);
         assert_eq!(out, 0.0, "zero-score Sleep stays zero — no resurrection");
+    }
+
+    // -----------------------------------------------------------------------
+    // ticket 108 ThreatProximityAdrenalineFlee
+    // -----------------------------------------------------------------------
+
+    fn test_threat_proximity_adrenaline() -> ThreatProximityAdrenalineFlee {
+        ThreatProximityAdrenalineFlee {
+            threshold: 0.4,
+            flee_lift: 0.60,
+            sleep_lift: 0.50,
+            viability_threshold: 0.4,
+        }
+    }
+
+    #[test]
+    fn threat_proximity_adrenaline_no_lift_below_derivative_threshold() {
+        // derivative = 0.3 < threshold (0.4). Flee / Sleep unchanged
+        // even with viability above gate.
+        let modifier = test_threat_proximity_adrenaline();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            THREAT_PROXIMITY_DERIVATIVE => 0.3,
+            ESCAPE_VIABILITY => 0.8,
+            _ => 0.0,
+        };
+        for dse in [FLEE, SLEEP] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "below-derivative-threshold dse {dse} unchanged; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn threat_proximity_adrenaline_no_lift_when_escape_not_viable() {
+        // Derivative saturated, but escape_viability < gate threshold ⇒
+        // future Fight valence (108b) owns the response, this Flee
+        // branch stays quiet. The viability predicate is what splits
+        // Flee from Fight under the same threat-proximity scalar.
+        let modifier = test_threat_proximity_adrenaline();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            THREAT_PROXIMITY_DERIVATIVE => 0.55,
+            ESCAPE_VIABILITY => 0.1, // cornered ⇒ Fight branch territory
+            _ => 0.0,
+        };
+        for dse in [FLEE, SLEEP] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "no Flee lift when escape not viable; dse {dse} got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn threat_proximity_adrenaline_full_lift_under_viability_gate() {
+        // Saturated derivative + viable escape. Flee +0.60, Sleep +0.50.
+        let modifier = test_threat_proximity_adrenaline();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            THREAT_PROXIMITY_DERIVATIVE => 0.55,
+            ESCAPE_VIABILITY => 0.8,
+            _ => 0.0,
+        };
+        let flee = modifier.apply(DseId(FLEE), 0.5, &ctx, &fetch);
+        let sleep = modifier.apply(DseId(SLEEP), 0.5, &ctx, &fetch);
+        assert!((flee - 1.10).abs() < 1e-5, "Flee saturated lift; got {flee}");
+        assert!((sleep - 1.00).abs() < 1e-5, "Sleep saturated lift; got {sleep}");
+    }
+
+    #[test]
+    fn threat_proximity_adrenaline_smoothstep_midpoint() {
+        // derivative = 0.45 = threshold + half-width. Smoothstep at
+        // t = 0.5 ⇒ ramp = 0.5 ⇒ Flee +0.30, Sleep +0.25.
+        let modifier = test_threat_proximity_adrenaline();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            THREAT_PROXIMITY_DERIVATIVE => 0.45,
+            ESCAPE_VIABILITY => 0.8,
+            _ => 0.0,
+        };
+        let flee = modifier.apply(DseId(FLEE), 0.5, &ctx, &fetch);
+        let sleep = modifier.apply(DseId(SLEEP), 0.5, &ctx, &fetch);
+        assert!((flee - 0.80).abs() < 1e-5, "Flee half-lift; got {flee}");
+        assert!((sleep - 0.75).abs() < 1e-5, "Sleep half-lift; got {sleep}");
+    }
+
+    #[test]
+    fn threat_proximity_adrenaline_targets_only_flee_and_sleep() {
+        let modifier = test_threat_proximity_adrenaline();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            THREAT_PROXIMITY_DERIVATIVE => 1.0,
+            ESCAPE_VIABILITY => 1.0,
+            _ => 0.0,
+        };
+        for dse in [
+            EAT, HUNT, FORAGE, GROOM_SELF, GROOM_OTHER, FIGHT, MATE, COORDINATE, BUILD, MENTOR,
+            CARETAKE, SOCIALIZE, PATROL, COOK, FARM, WANDER, EXPLORE, IDLE,
+        ] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "non-Flee/Sleep dse {dse} unchanged at full derivative; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn threat_proximity_adrenaline_does_not_resurrect_zero_score() {
+        let modifier = test_threat_proximity_adrenaline();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            THREAT_PROXIMITY_DERIVATIVE => 1.0,
+            ESCAPE_VIABILITY => 1.0,
+            _ => 0.0,
+        };
+        for dse in [FLEE, SLEEP] {
+            let out = modifier.apply(DseId(dse), 0.0, &ctx, &fetch);
+            assert_eq!(out, 0.0, "zero-score dse {dse} stays zero — no resurrection");
+        }
+    }
+
+    #[test]
+    fn threat_proximity_adrenaline_default_inert() {
+        // Phase 1 substrate contract: with the shipped 0.0 lift defaults,
+        // 108 MUST be score-bit-identical to baseline regardless of
+        // derivative or viability inputs.
+        let constants = crate::resources::sim_constants::SimConstants::default();
+        let modifier = ThreatProximityAdrenalineFlee::new(&constants.scoring);
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            THREAT_PROXIMITY_DERIVATIVE => 1.0,
+            ESCAPE_VIABILITY => 1.0,
+            _ => 0.0,
+        };
+        for dse in [FLEE, SLEEP] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "Phase-1 inert: dse {dse} unchanged at default 0.0 lifts; got {out}"
+            );
+        }
     }
 
     #[test]
