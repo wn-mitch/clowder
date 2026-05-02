@@ -286,8 +286,6 @@ pub fn check_anxiety_interrupts(
 
 #[derive(Debug)]
 enum InterruptReason {
-    Starvation,
-    Exhaustion,
     ThreatDetected { threat_pos: Position },
     CriticalSafety,
     CriticalHealth,
@@ -310,19 +308,16 @@ fn check_interrupt(
         return Some(InterruptReason::CriticalHealth);
     }
 
-    // Resting, Hunting, and Foraging are exempt from hunger interrupts.
-    // Resting is already handling it; Hunting/Foraging ARE the food solution.
-    if !matches!(
-        disposition.kind,
-        DispositionKind::Resting | DispositionKind::Hunting | DispositionKind::Foraging
-    ) {
-        if needs.hunger < d.starvation_interrupt_threshold {
-            return Some(InterruptReason::Starvation);
-        }
-        if needs.energy < d.exhaustion_interrupt_threshold {
-            return Some(InterruptReason::Exhaustion);
-        }
-    }
+    // Tickets 106 + 107: the Starvation and Exhaustion arms used to live here,
+    // each gated by a Resting/Hunting/Foraging exemption wrapper. Both arms
+    // were vestigial in the post-091 regime — Phase 2 focal-trace soaks
+    // confirmed `interrupts_by_reason.{Starvation, Exhaustion} == 0` even
+    // under doubled need-decay, because the exemption wrapper structurally
+    // shielded cats during the only times they reached the threshold.
+    // Substrate replacements: `HungerUrgency` and `ExhaustionPressure`
+    // modifiers in `src/ai/modifier.rs`. The GOAP urgency arms at
+    // `goap.rs:615-637` are the actual food/sleep-routing drivers and
+    // remain in place.
 
     // Guards are exempt from threat interrupts — they handle threats directly
     // via guard_threat_detection_range.

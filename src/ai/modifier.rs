@@ -1445,8 +1445,13 @@ impl ScoreModifier for AcuteHealthAdrenalineFreeze {
 
 /// Ticket 106 — `HungerUrgency` Modifier. Pressure-shape lift on the
 /// food-acquisition class (Eat / Hunt / Forage) gated by
-/// `hunger_urgency`. The substrate that retires the per-tick
-/// `InterruptReason::Starvation` override branch.
+/// `hunger_urgency`. The substrate that replaced the per-tick
+/// `InterruptReason::Starvation` override branch — that arm at
+/// `disposition.rs:312-325` was retired in the same wave (Phase 2
+/// focal-trace verified the interrupt fired 0/run even under 2× hunger
+/// decay, structurally vestigial behind the Hunting/Foraging
+/// exemption). The GOAP urgency arm at `goap.rs:615-626` remains as
+/// the actual food-routing driver.
 ///
 /// **Trigger:** `hunger_urgency >= hunger_urgency_threshold`
 /// (default 0.6 — the cat is at hunger 0.4 or below). Engages well
@@ -1471,12 +1476,14 @@ impl ScoreModifier for AcuteHealthAdrenalineFreeze {
 /// Eat lift fires *before* `StockpileSatiation` damps Hunt/Forage —
 /// composing toward the same Eat-wins-the-contest target as 088 + 094.
 ///
-/// **Substrate role:** Phase 1 ships inert — defaults 0.0 keep the
-/// post-modifier scores bit-identical to pre-Wave-1 baseline. Phase 4
-/// (gated on Phase 3 sufficiency) retires
-/// `disposition.rs:319-321` (the Starvation interrupt arm) and the
-/// `goap.rs::accumulate_urgencies` Starvation arm at 615-625 once the
-/// substrate is shown sufficient.
+/// **Substrate role:** ships inert — defaults 0.0 keep the
+/// post-modifier scores bit-identical to pre-Wave-1 baseline.
+/// Activation of meaningful lifts is gated on the plan-completion
+/// momentum work (ticket 118 / sibling) — see ticket 106 §Log for
+/// the Phase 2 verdict. The legacy `disposition.rs` Starvation arm
+/// is already retired; the `goap.rs::accumulate_urgencies`
+/// Starvation arm at 615-626 is the live food-routing driver and
+/// remains in place.
 ///
 /// **Gated-boost contract:** returns `score` unchanged on score `<= 0`
 /// — hunger doesn't conjure food into existence. Mirrors the 088 / 047
@@ -1545,9 +1552,12 @@ impl ScoreModifier for HungerUrgency {
 
 /// Ticket 107 — `ExhaustionPressure` Modifier. Pressure-shape lift on
 /// the rest class (Sleep, GroomSelf) gated by `energy_deficit`. The
-/// substrate that retires the per-tick `InterruptReason::Exhaustion`
-/// override branch. Sibling to 106's `HungerUrgency` on the energy
-/// axis.
+/// substrate that replaced the per-tick `InterruptReason::Exhaustion`
+/// override branch — that arm at `disposition.rs:312-325` was retired
+/// in the same wave (Phase 2 focal-trace verified the interrupt fired
+/// 0/run even under 2× energy decay). The GOAP urgency arm at
+/// `goap.rs:642-651` remains as the live rest-routing driver.
+/// Sibling to 106's `HungerUrgency` on the energy axis.
 ///
 /// **Trigger:** `energy_deficit >= exhaustion_pressure_threshold`
 /// (default 0.7 — the cat is at energy 0.3 or below). Engages before
@@ -1565,9 +1575,14 @@ impl ScoreModifier for HungerUrgency {
 /// composes additively with 088's `BodyDistressPromotion` Sleep lift
 /// (when both fire, total Sleep lift can saturate around 1.0).
 ///
-/// **Substrate role:** Phase 4 (gated on sufficiency) retires
-/// `disposition.rs:322-324` (the Exhaustion interrupt arm) and the
-/// `goap.rs::accumulate_urgencies` Exhaustion arm at 644-650.
+/// **Substrate role:** ships inert — defaults 0.0 keep the
+/// post-modifier scores bit-identical to pre-Wave-2 baseline.
+/// Activation of meaningful lifts is gated on the plan-completion
+/// momentum work (ticket 118 / sibling) — see ticket 107 §Log for
+/// the Phase 2 verdict (Nettle stuck Foraging at energy 0.0 despite
+/// Sleep winning L2). The legacy `disposition.rs` Exhaustion arm is
+/// already retired; the `goap.rs::accumulate_urgencies` Exhaustion
+/// arm at 642-651 is the live rest-routing driver.
 ///
 /// **Gated-boost contract:** returns `score` unchanged on score `<= 0`
 /// — fatigue doesn't conjure a safe sleep spot into existence.
