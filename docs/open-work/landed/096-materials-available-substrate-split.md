@@ -1,7 +1,7 @@
 ---
 id: 096
 title: Split `PlannerState.materials_available` into marker-backed entry + per-plan search field
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-04-30
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: f01a3205
+landed-on: 2026-05-01
 ---
 
 ## Why
@@ -54,3 +54,4 @@ Building canaries (multi-trip founding builds, coordinator-spawned prefunded sit
 ## Log
 
 - 2026-04-30: Opened by 092's land commit, per the antipattern-migration follow-up convention codified in `CLAUDE.md` §Long-horizon coordination.
+- 2026-05-01: Landed at f01a3205. World-fact half migrated to per-cat `markers::MaterialsAvailable` substrate marker (authored at the planner-marker build sites in `evaluate_and_plan` and `resolve_goap_plans` against each cat's nearest reachable site's `materials_complete()`). Search-state half became `PlannerState.materials_delivered_this_plan: bool`, set by the renamed `StateEffect::SetMaterialsDeliveredThisPlan(true)` on `DeliverMaterials`. `Construct` is two action defs sharing kind/cost/effect — substrate branch reads `HasMarker(MaterialsAvailable::KEY)`, plan branch reads `MaterialsDeliveredThisPlan(true)` — so prefunded sites and in-flight haul→deliver→construct compose paths both resolve without a disjunction combinator. `PlannerState` now carries zero mirror fields; the `construction_materials_complete` field on `StepSnapshots` was retired (consumed at marker-author time, not stashed). Existing `building_haul_then_construct` and `building_construct_short_circuit_when_materials_already_available` tests pin both branches.

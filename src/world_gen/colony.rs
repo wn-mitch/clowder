@@ -450,7 +450,7 @@ pub fn spawn_starting_buildings(world: &mut World, colony_site: Position, map: &
     // hunting/eating in the first few in-game days, pushing seed-42
     // starvation 0 → 5 in the canonical soak even with a small (4 Wood)
     // founding cost. The infrastructure (Pickup/Deliver step resolvers,
-    // PlannerZone::MaterialPile, materials_available state, GOAP
+    // PlannerZone::MaterialPile, MaterialsAvailable substrate marker (096), GOAP
     // dispatch) is wired and tested; only the spawn anchor is parked.
     // Activate via env var until a balance pass clears the regression.
     if std::env::var("CLOWDER_FOUNDING_HAUL").is_ok() {

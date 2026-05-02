@@ -2318,19 +2318,26 @@ means a marker may be the right home.
 A field can be both: a marker authors the *entry* condition (the
 plan can only start if the world fact holds), and a per-plan
 boolean tracks the *progress* within the plan. The canonical
-exemplar in flight is `materials_available` ([096](../open-work/tickets/096-materials-available-substrate-split.md)
-— this cross-reference will resolve to the landed split once 096
-ships):
+exemplar is `materials_available` ([096](../open-work/landed/096-materials-available-substrate-split.md)):
 
-- **Entry marker** — `MaterialsAvailable` ZST, authored by
-  `buildings.rs` whenever a stockpile holds construction
-  materials. Gates plan-start via
+- **Entry marker** — `MaterialsAvailable` ZST, authored per-cat
+  by `goap.rs::materials_available_for` against this cat's nearest
+  reachable construction site's `materials_complete()`. Construct's
+  substrate-branch precondition reads
   `StatePredicate::HasMarker(MaterialsAvailable::KEY)`.
-- **Per-plan field** — `materials_delivered: bool` on
+- **Per-plan field** — `materials_delivered_this_plan: bool` on
   `PlannerState`, set true by `DeliverMaterials`'s
-  `StateEffect::SetMaterialsDelivered(true)` once the plan has
-  executed the delivery step. Read by downstream actions'
-  preconditions (`StatePredicate::MaterialsDelivered(true)`).
+  `StateEffect::SetMaterialsDeliveredThisPlan(true)` once the plan
+  has executed the delivery step. Construct's plan-branch
+  precondition reads
+  `StatePredicate::MaterialsDeliveredThisPlan(true)`.
+
+The disjunction ("Construct can run if substrate has materials OR
+this plan delivered them") lives at the action-table level: two
+`Construct` action defs share kind/cost/effect, differing only on
+which precondition they consult. No `Or` combinator was added to
+`StatePredicate` — each variant still consults exactly one source
+(state OR ctx.markers).
 
 The split resolves the category error: the entry condition is a
 world fact (substrate); progress within a single plan is a search-
@@ -2360,9 +2367,9 @@ load-bearing for IAUS L2 throughput).
 §Scope's opening list named 7 mirror candidates; the planning
 audit found only 2 (`HasStoredFood`,
 `ThornbriarAvailable`) were true mirrors. The remaining 5 split
-1 hybrid (`materials_available` → 096) + 4 search-state-only.
-This doctrine section exists so the next substrate-migration
-ticket doesn't repeat the audit error.
+1 hybrid ([`materials_available` → 096](../open-work/landed/096-materials-available-substrate-split.md))
++ 4 search-state-only. This doctrine section exists so the next
+substrate-migration ticket doesn't repeat the audit error.
 
 #### §4.7.5 Cross-ref
 

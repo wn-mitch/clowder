@@ -63,7 +63,6 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[064](docs/open-work/tickets/064-carcass-scent-consumer-cutover.md)** — Carcass-scent consumer cutover — replace observer_smells_at (§5.6.3 row #6) — _added 2026-04-27_
 - **[086](docs/open-work/tickets/086-farm-canary-triggering-scenario.md)** — Find a triggering scenario for Farm DSE canary (CropTended / CropHarvested) — _[balance] · added 2026-04-30_
 - **[095](docs/open-work/tickets/095-body-zones-epic.md)** — Body zones — anatomical injury model for all animal species — _added 2026-05-01_
-- **[096](docs/open-work/tickets/096-materials-available-substrate-split.md)** — Split `PlannerState.materials_available` into marker-backed entry + per-plan search field — _[ai-substrate] · added 2026-04-30_
 - **[097](docs/open-work/tickets/097-non-cat-planner-substrate-audit.md)** — Audit fox / hawk / snake planners for the parallel-feasibility-language smell 092 retired for cats — _[ai-substrate] · added 2026-04-30_
 - **[100](docs/open-work/tickets/100-tremor-action-multiplier-wiring.md)** — Tremor map, Action::Stalk, and personality-driven hunt approach — _blocked-by 062 · added 2026-05-01_
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _blocked-by 100 · added 2026-05-01_
@@ -82,6 +81,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[118](docs/open-work/tickets/118-modifier-lift-vs-plan-completion-momentum.md)** — Modifier lifts gated by plan-completion momentum — substrate raises score but cat completes mid-plan first — _[ai-substrate] · added 2026-05-01_
 - **[120](docs/open-work/tickets/120-shadow-fox-spawn-vs-cat-presence-coupling.md)** — Characterize shadow-fox spawn-rate coupling to cat-presence (047 Phase 3 surfaced +93%) — _[ai-substrate] · added 2026-05-01_
 - **[124](docs/open-work/tickets/124-own-territory-center-anchor.md)** — `LandmarkAnchor::OwnTerritoryCenter` — third interoceptive self-anchor (territory bias) — _[ai-substrate] · added 2026-05-01_
+- **[125](docs/open-work/tickets/125-colony-score-aggregate-in-footer-and-verdict.md)** — Surface `ColonyScore.aggregate` in the footer and add numerical-delta gating to `just verdict` — _[tooling] · blocked-by 097 · added 2026-05-01_
 
 ## Parked (6)
 
@@ -112,11 +112,11 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 
-## Landed archive (77)
+## Landed archive (78)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (12)
+### 2026-05 (13)
 
 - **[123](docs/open-work/landed/123-recent-disposition-failures-cooldown.md)** — RecentDispositionFailures cooldown so cats stop spamming dispositions the planner can't satisfy _(2026-05-01)_
 - **[122](docs/open-work/landed/122-socialize-dse-iaus-vs-gate-still-goal-mismatch.md)** — Socialize IAUS scoring elects plans the OpenMinded gate drops on the same tick _(2026-05-01)_
@@ -124,6 +124,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[116](docs/open-work/landed/116-bereavement-bond-grief.md)** — Bereavement — bond-specific grief modifier on partner/friend death _(2026-05-01)_
 - **[114](docs/open-work/landed/114-mood-source-typing.md)** — MoodSource enum — typed emotional category for MoodModifier _(2026-05-01)_
 - **[098](docs/open-work/landed/098-search-state-vs-substrate-doctrine.md)** — Document the substrate-vs-search-state boundary in `docs/systems/ai-substrate-refactor.md` _(2026-05-01)_
+- **[096](docs/open-work/landed/096-materials-available-substrate-split.md)** — Split `PlannerState.materials_available` into marker-backed entry + per-plan search field _(2026-05-01)_
 - **[090](docs/open-work/landed/090-self-perception-l4-l5.md)** — L4/L5 self-perception — mastery-confidence, purpose-clarity, esteem-distress _(2026-05-01)_
 - **[089](docs/open-work/landed/089-interoceptive-self-anchors.md)** — Interoceptive self-anchors — spatial self-perception (OwnInjurySite, OwnSafeRestSpot) _(2026-05-01)_
 - **[088](docs/open-work/landed/088-body-distress-modifier.md)** — Body-distress Modifier — uniform self-care promotion under §L2.10 Modifier substrate _(2026-05-01)_
