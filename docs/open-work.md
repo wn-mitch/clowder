@@ -14,26 +14,24 @@ _Last generated: 2026-05-02._
 
 | Status | Count |
 |---|---|
-| In progress | 10 |
+| In progress | 8 |
 | Ready | 42 |
 | Parked | 6 |
 | Blocked | 20 |
-| **Open total** | **78** |
+| **Open total** | **76** |
 | Pre-existing | 1 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-index` (regenerate this file).
 
-## In progress (10)
+## In progress (8)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _added 2026-04-27_
 - **[071](docs/open-work/tickets/071-planning-substrate-hardening.md)** — Planning-substrate hardening — gird against the stuck-cat bug class (sub-epic) — _[planning-substrate] · added 2026-04-29_
 - **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** — Substrate-over-override — retire control-yanking hacks in favor of IAUS levers — _[substrate-over-override] · added 2026-04-30_
-- **[106](docs/open-work/tickets/106-hunger-urgency-modifier.md)** — HungerUrgency modifier — substrate axis for Starvation interrupt retirement — _[ai-substrate] · added 2026-05-01_
-- **[107](docs/open-work/tickets/107-exhaustion-pressure-modifier.md)** — ExhaustionPressure modifier — substrate axis for Exhaustion interrupt retirement — _[ai-substrate] · added 2026-05-01_
 - **[108](docs/open-work/tickets/108-threat-proximity-adrenaline.md)** — ThreatProximityAdrenaline modifier — substrate axis for CriticalSafety interrupt retirement — _[ai-substrate] · added 2026-05-01_
 - **[109](docs/open-work/tickets/109-intraspecies-conflict-response.md)** — IntraspeciesConflictResponse — full four-valence (fight/flight/freeze/fawn) social response — _[ai-substrate] · added 2026-05-01_
 - **[110](docs/open-work/tickets/110-thermal-distress-modifier.md)** — ThermalDistress modifier — substrate axis for thermal interrupts (and shelter-seeking) — _[ai-substrate] · added 2026-05-01_
@@ -119,16 +117,18 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 
-## Landed archive (88)
+## Landed archive (90)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (23)
+### 2026-05 (25)
 
 - **[137](docs/open-work/landed/137-vec2-render-layer.md)** — Phase 0 — Vec2 render layer (visual interpolation, no sim-state change) _(2026-05-02)_
 - **[125](docs/open-work/landed/125-colony-score-aggregate-in-footer-and-verdict.md)** — Surface `ColonyScore.aggregate` in the footer and add numerical-delta gating to `just verdict` _(2026-05-02)_
 - **[113](docs/open-work/landed/113-interrupt-invariant-doc.md)** — Document the lurch-vs-pressure distress-modifier doctrine _(2026-05-02)_
 - **[112](docs/open-work/landed/112-disposition-exemption-list-retire.md)** — Retire per-disposition exemption lists (Resting/Hunting/Foraging/Guarding) — substrate replacement via commitment momentum _(2026-05-02)_
+- **[107](docs/open-work/landed/107-exhaustion-pressure-modifier.md)** — ExhaustionPressure modifier — substrate axis for Exhaustion interrupt retirement _(2026-05-02)_
+- **[106](docs/open-work/landed/106-hunger-urgency-modifier.md)** — HungerUrgency modifier — substrate axis for Starvation interrupt retirement _(2026-05-02)_
 - **[105](docs/open-work/landed/105-acute-health-adrenaline-freeze-branch.md)** — AcuteHealthAdrenaline Freeze branch — overmatched-predator response _(2026-05-02)_
 - **[104](docs/open-work/landed/104-hide-freeze-dse.md)** — Hide/Freeze DSE — predator-avoidance third valence ("remain still and hope") _(2026-05-02)_
 - **[103](docs/open-work/landed/103-escape-viability-scalar.md)** — escape_viability perception scalar — first-class predicate for adrenaline-valence gates _(2026-05-02)_

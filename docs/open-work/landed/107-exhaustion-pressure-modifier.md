@@ -1,16 +1,16 @@
 ---
 id: 107
 title: ExhaustionPressure modifier — substrate axis for Exhaustion interrupt retirement
-status: in-progress
+status: done
 cluster: ai-substrate
 added: 2026-05-01
 parked: null
 blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
-related-balance: []
-landed-at: null
-landed-on: null
+related-balance: [107-exhaustion-pressure.md]
+landed-at: 03f9f541
+landed-on: 2026-05-02
 ---
 
 ## Why
@@ -85,3 +85,21 @@ Pressure modifier (graded ramp). Sibling to ticket 106 (HungerUrgency).
   energy axis. Until that gap is fixed, ExhaustionPressure activation
   (lifts > 0.0) won't translate to behavioral change at L3 — same
   outcome as 047 on health.
+- 2026-05-02: **Phase 4 landed** — retired the `Exhaustion` arm at
+  `disposition.rs:312-325` (wrapper + arm) and the
+  `InterruptReason::Exhaustion` enum variant. `ExhaustionPressure`
+  modifier doc-comment updated to reflect the retirement. 1798 lib
+  tests pass, `just check` clean. Landed jointly with 106's Phase 4 in
+  one commit (the wrapper covered both arms). The GOAP urgency arm at
+  `goap.rs:642-651` remains as the live rest-routing driver — that
+  retirement is out of scope here per the §Wrapper-cleanup notes.
+- 2026-05-02: **Phase 5 landed** — `docs/balance/107-exhaustion-pressure.md`
+  written with the full four-artifact record + Decision section. The doc
+  carries the Nettle-stuck-Foraging-at-energy-0.0 diagnostic case for the
+  energy-axis plan-completion-momentum gap (047 pattern), and names this
+  ticket as the worked example for the
+  "lift wins L2, blocked by plan-completion momentum" branch in ticket
+  113's distress-modifiers doctrine table. Activation of meaningful
+  lifts remains gated on the 118 / sibling momentum-fix work — flagged
+  in the doc's Decision section. Status flipped to `done`; ticket moves
+  to `landed/`.

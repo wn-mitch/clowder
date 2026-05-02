@@ -1,16 +1,16 @@
 ---
 id: 106
 title: HungerUrgency modifier — substrate axis for Starvation interrupt retirement
-status: in-progress
+status: done
 cluster: ai-substrate
 added: 2026-05-01
 parked: null
 blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
-related-balance: []
-landed-at: null
-landed-on: null
+related-balance: [106-hunger-urgency.md]
+landed-at: 03f9f541
+landed-on: 2026-05-02
 ---
 
 ## Why
@@ -418,3 +418,21 @@ rule:
   call out the "trigger rarely met → substrate is redundant safety, not
   active driver" finding as a worked example for ticket 113's
   `docs/systems/distress-modifiers.md` doctrine table.
+- 2026-05-02: **Phase 4 landed** — retired the `Starvation` arm at
+  `disposition.rs:312-325` (wrapper + arm) and the
+  `InterruptReason::Starvation` enum variant. `HungerUrgency` modifier
+  doc-comment updated to reflect the retirement. 1798 lib tests pass,
+  `just check` clean. Combined with 107's Exhaustion-arm retirement in
+  the same commit. The GOAP urgency arm at `goap.rs:615-626` remains
+  as the live food-routing driver — that retirement is out of scope
+  here per Phase 4 §Wrapper-cleanup notes (would need a Phase-3 finding
+  showing it's redundant under the modifier).
+- 2026-05-02: **Phase 5 landed** — `docs/balance/106-hunger-urgency.md`
+  written with the full four-artifact (hypothesis · prediction ·
+  observation · concordance) record + Decision section. The doc
+  explicitly names this ticket as the worked example for the
+  "trigger rarely met → substrate is redundant safety, not active
+  driver" branch in ticket 113's `docs/systems/distress-modifiers.md`
+  doctrine table (107 is the worked example for the sibling
+  "lift wins L2, blocked by plan-completion momentum" branch).
+  Status flipped to `done`; ticket moves to `landed/`.
