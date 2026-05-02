@@ -1,7 +1,7 @@
 ---
 id: 125
 title: Surface `ColonyScore.aggregate` in the footer and add numerical-delta gating to `just verdict`
-status: ready
+status: done
 cluster: tooling
 added: 2026-05-01
 parked: null
@@ -10,7 +10,7 @@ supersedes: []
 related-systems: []
 related-balance: []
 landed-at: null
-landed-on: null
+landed-on: 2026-05-02
 ---
 
 ## Why
@@ -111,3 +111,4 @@ The verdict output for the seed-42 deep-soak should now include `colony_score_dr
 ## Log
 
 - 2026-05-01: Opened as a follow-on to 096's landing soak. The user proposed using `aggregate` as the verdict gate ("we can ensure that they will guaranteed be controls against each other"). Counter-proposal recorded above: keep canaries as hard gates, add aggregate as a continuous-delta channel. Blocked on 097 to avoid double-landing the footer schema.
+- 2026-05-02: Landed in two commits. **Commit 1** added `ColonyScoreSnapshot` (welfare axes + aggregate) on `Res<ColonyScore>`, populated by `emit_colony_score`, and serialized into the headless footer's new `colony_score` block. New integration test `footer_carries_colony_score_block` asserts every spec'd field is present after one emission interval. **Commit 2** added the `colony_score_drift` channel to `just verdict`: per-field `{baseline, observed, delta_pct, band}` rows with bucket boundaries `pass(<=5%)` / `concern(<=15%)` / `fail(>15%)`. Aggregate or welfare hitting concern/fail bands escalates an otherwise-pass overall verdict to concern (canary fails still dominate). Text-mode summary surfaces aggregate + welfare headlines plus the top out-of-band axis. 16-test stdlib-unittest suite at `tests/verdict/test_colony_score_drift.py`, wired via `just test-verdict`. Unblocked by 097's no-op close earlier in this session.

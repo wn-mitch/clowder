@@ -75,6 +75,12 @@ q *ARGS:
 test-logq:
     python3 tests/logq/test_envelope.py -v
 
+# Ticket 125: verdict's colony_score_drift channel — bucket boundaries
+# + escalation logic + per-field shape. Same stdlib-unittest pattern as
+# test-logq.
+test-verdict:
+    python3 tests/verdict/test_colony_score_drift.py -v
+
 # Deep-soak with a focal-cat trace sidecar. Writes to
 # logs/tuned-<seed>/{events,narrative,trace-<focal>}.jsonl. Trace
 # records decompose per-tick L1/L2/L3 state for one focal cat per §11

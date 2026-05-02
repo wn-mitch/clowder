@@ -54,6 +54,11 @@ class Verdict:
     constants_drift_vs_baseline: str = "no-baseline"
     seed_match_vs_baseline: str = "no-baseline"  # match | mismatch | no-baseline
     footer_drift: list[dict[str, Any]] = field(default_factory=list)
+    # Ticket 125: per-field numerical-delta channel for `_footer.colony_score`.
+    # `None` when either side lacks the block (older baselines, or a run that
+    # exited before the first ColonyScore emission). Each value is a dict of
+    # `{baseline, observed, delta_pct, band}` keyed by colony-score field name.
+    colony_score_drift: dict[str, dict[str, Any]] | None = None
     baseline: str | None = None
     commit: str | None = None
     seed: int | None = None
@@ -212,14 +217,85 @@ def footer_drift(baseline: dict[str, Any], observed: dict[str, Any]) -> list[dic
 
 
 def derive_overall(canary_survival: str, canary_continuity: str,
-                   constants: str, drift: list[dict[str, Any]]) -> str:
+                   constants: str, drift: list[dict[str, Any]],
+                   colony_score: dict[str, dict[str, Any]] | None) -> str:
     if canary_survival == "fail":
         return "fail"
     if canary_continuity == "fail" or constants == "drift":
         return "concern"
     if any(r["band"] == "significant" for r in drift):
         return "concern"
+    # Ticket 125: aggregate-only drift escalates to concern but never to
+    # fail — canaries gate hard, this is a continuous-health lens. The
+    # gap this closes is "all canaries green but aggregate moved 30%."
+    if colony_score:
+        for axis in ("aggregate", "welfare"):
+            row = colony_score.get(axis)
+            if row and row.get("band") in ("concern", "fail"):
+                return "concern"
     return "pass"
+
+
+# Ticket 125: per-field numerical-delta surface for `_footer.colony_score`.
+# Bucket boundaries differ from `footer_drift`'s NOISE/SIGNIFICANT bands
+# because aggregate is a continuous health signal, not a count metric:
+# small drift is normal noise, mid drift wants a hypothesis, large drift
+# is a regression signal worth surfacing even with green canaries.
+COLONY_SCORE_FIELDS: tuple[str, ...] = (
+    "aggregate", "welfare",
+    "shelter", "nourishment", "health", "happiness", "fulfillment",
+    "seasons_survived", "peak_population",
+    "kittens_born", "kittens_surviving",
+    "structures_built", "bonds_formed",
+    "deaths_starvation", "deaths_old_age", "deaths_injury",
+)
+COLONY_SCORE_PASS_PCT = 5.0
+COLONY_SCORE_CONCERN_PCT = 15.0
+
+
+def colony_score_band(delta_pct: float) -> str:
+    a = abs(delta_pct)
+    if a <= COLONY_SCORE_PASS_PCT:
+        return "pass"
+    if a <= COLONY_SCORE_CONCERN_PCT:
+        return "concern"
+    return "fail"
+
+
+def colony_score_drift(baseline: dict[str, Any],
+                       observed: dict[str, Any]) -> dict[str, dict[str, Any]] | None:
+    """Per-field numerical drift on `_footer.colony_score`.
+
+    Returns `None` if either side lacks the block (older baseline, or a
+    run that exited before first emission). Returns an empty dict only
+    when both blocks exist but contain no comparable numeric fields.
+    """
+    b_block = baseline.get("colony_score")
+    o_block = observed.get("colony_score")
+    if not isinstance(b_block, dict) or not isinstance(o_block, dict):
+        return None
+
+    rows: dict[str, dict[str, Any]] = {}
+    for field_name in COLONY_SCORE_FIELDS:
+        b = b_block.get(field_name)
+        o = o_block.get(field_name)
+        if not isinstance(b, (int, float)) or not isinstance(o, (int, float)):
+            continue
+        if b == 0 and o == 0:
+            rows[field_name] = {"baseline": b, "observed": o,
+                                "delta_pct": 0.0, "band": "pass"}
+            continue
+        if b == 0:
+            rows[field_name] = {"baseline": b, "observed": o,
+                                "delta_pct": None, "band": "new-nonzero"}
+            continue
+        delta = (o - b) / b * 100.0
+        rows[field_name] = {
+            "baseline": b, "observed": o,
+            "delta_pct": round(delta, 1),
+            "band": colony_score_band(delta),
+        }
+    return rows
 
 
 def derive_next_steps(v: Verdict, run_dir: Path, footer: dict[str, Any]) -> list[str]:
@@ -238,6 +314,23 @@ def derive_next_steps(v: Verdict, run_dir: Path, footer: dict[str, Any]) -> list
     sig = [r for r in v.footer_drift if r["band"] == "significant"]
     if sig:
         steps.append(f"just q events {run_dir} --type=Death")
+    # Ticket 125: name colony_score axes that moved out of band so the
+    # caller can decide whether the drift is intentional (file a hypothesis)
+    # or a regression (bisect-canary on the moved axis).
+    if v.colony_score_drift:
+        notable = [
+            (axis, row) for axis, row in v.colony_score_drift.items()
+            if row.get("band") in ("concern", "fail")
+        ]
+        if notable:
+            notable.sort(key=lambda kv: -abs(kv[1].get("delta_pct") or 0.0))
+            top = ", ".join(
+                f"{axis} {row['delta_pct']:+.1f}%" for axis, row in notable[:3]
+            )
+            steps.append(
+                f"colony_score drift: {top} — file a hypothesis if intentional, "
+                f"`just bisect-canary <axis>` if not"
+            )
     return steps
 
 
@@ -292,14 +385,17 @@ def main(argv: list[str]) -> int:
     seed_status = "no-baseline"
     baseline_seed: int | None = None
     drift_rows: list[dict[str, Any]] = []
+    cs_drift: dict[str, dict[str, Any]] | None = None
     if baseline_path:
         constants_status = constants_drift(baseline_path, events_path)
         seed_status, baseline_seed, _ = seed_match(baseline_path, events_path)
         baseline_footer = read_footer(baseline_path)
         if baseline_footer:
             drift_rows = footer_drift(baseline_footer, footer)
+            cs_drift = colony_score_drift(baseline_footer, footer)
 
-    overall = derive_overall(surv_status, cont_status, constants_status, drift_rows)
+    overall = derive_overall(surv_status, cont_status, constants_status,
+                             drift_rows, cs_drift)
     # Seed mismatch is a comparability failure: the drift table is bogus
     # because we're comparing different control worlds. Downgrade the
     # verdict (but never below the survival/continuity verdict) and let
@@ -320,6 +416,7 @@ def main(argv: list[str]) -> int:
         constants_drift_vs_baseline=constants_status,
         seed_match_vs_baseline=seed_status,
         footer_drift=drift_rows,
+        colony_score_drift=cs_drift,
         baseline=str(baseline_path) if baseline_path else None,
         commit=commit if isinstance(commit, str) else None,
         seed=observed_seed,
@@ -368,6 +465,27 @@ def _text(v: Verdict) -> str:
             d = r["delta_pct"]
             d_s = "  new" if d is None else f"{d:+5.1f}%"
             lines.append(f"    {r['band']:11s} {d_s}  {r['field']} ({r['baseline']} → {r['observed']})")
+    if v.colony_score_drift:
+        # Headline two axes (aggregate + welfare) plus the top out-of-band
+        # axis if any. Keeps the text mode terse; full per-field readout is
+        # in the JSON envelope.
+        lines.append("  colony_score drift:")
+        for axis in ("aggregate", "welfare"):
+            row = v.colony_score_drift.get(axis)
+            if row:
+                d = row["delta_pct"]
+                d_s = "  new" if d is None else f"{d:+5.1f}%"
+                lines.append(f"    {row['band']:8s} {d_s}  {axis} ({row['baseline']} → {row['observed']})")
+        notable = [
+            (a, r) for a, r in v.colony_score_drift.items()
+            if a not in ("aggregate", "welfare") and r.get("band") in ("concern", "fail")
+        ]
+        if notable:
+            notable.sort(key=lambda kv: -abs(kv[1].get("delta_pct") or 0.0))
+            for axis, row in notable[:2]:
+                d = row["delta_pct"]
+                d_s = "  new" if d is None else f"{d:+5.1f}%"
+                lines.append(f"    {row['band']:8s} {d_s}  {axis} ({row['baseline']} → {row['observed']})")
     if v.next_steps:
         lines.append("  next:")
         for s in v.next_steps:
