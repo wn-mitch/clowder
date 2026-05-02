@@ -8,17 +8,17 @@
 > fresh. See `CLAUDE.md` §"Long-horizon coordination" for the request-time
 > checklist and maintenance rules.
 
-_Last generated: 2026-05-01._
+_Last generated: 2026-05-02._
 
 ## Summary
 
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 47 |
+| Ready | 48 |
 | Parked | 6 |
-| Blocked | 13 |
-| **Open total** | **71** |
+| Blocked | 17 |
+| **Open total** | **76** |
 | Pre-existing | 1 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -33,7 +33,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[071](docs/open-work/tickets/071-planning-substrate-hardening.md)** — Planning-substrate hardening — gird against the stuck-cat bug class (sub-epic) — _[planning-substrate] · added 2026-04-29_
 - **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** — Substrate-over-override — retire control-yanking hacks in favor of IAUS levers — _[substrate-over-override] · added 2026-04-30_
 
-## Ready (47)
+## Ready (48)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -82,6 +82,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[120](docs/open-work/tickets/120-shadow-fox-spawn-vs-cat-presence-coupling.md)** — Characterize shadow-fox spawn-rate coupling to cat-presence (047 Phase 3 surfaced +93%) — _[ai-substrate] · added 2026-05-01_
 - **[124](docs/open-work/tickets/124-own-territory-center-anchor.md)** — `LandmarkAnchor::OwnTerritoryCenter` — third interoceptive self-anchor (territory bias) — _[ai-substrate] · added 2026-05-01_
 - **[125](docs/open-work/tickets/125-colony-score-aggregate-in-footer-and-verdict.md)** — Surface `ColonyScore.aggregate` in the footer and add numerical-delta gating to `just verdict` — _[tooling] · blocked-by 097 · added 2026-05-01_
+- **[126](docs/open-work/tickets/126-bdi-intention-substrate.md)** — BDI intention substrate — perceivable per-cat commitment with momentum — _[C] · added 2026-05-02_
 
 ## Parked (6)
 
@@ -92,7 +93,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[084](docs/open-work/tickets/084-farm-herb-ward-demand-axis.md)** — Farm DSE — tie scoring to herb/ward stockpile demand so gardens stay productive under abundant food — _[balance] · parked 2026-04-30 · blocked-by 086 · added 2026-04-29_
 - **[099](docs/open-work/tickets/099-modifier-feature-emission.md)** — Feature emission for §3.5.1 Modifiers — colony-wide canary surface for substrate-lift signals — _[ai-substrate] · parked 2026-05-01 · blocked-by 119 · added 2026-05-01_
 
-## Blocked (13)
+## Blocked (17)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _blocked-by 007, 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _blocked-by 016 · added 2026-04-22_
@@ -106,6 +107,10 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[105](docs/open-work/tickets/105-acute-health-adrenaline-freeze-branch.md)** — AcuteHealthAdrenaline Freeze branch — overmatched-predator response — _[ai-substrate] · blocked-by 103, 104 · added 2026-05-01_
 - **[111](docs/open-work/tickets/111-088-body-distress-promotion-retire.md)** — Retire 088 BodyDistressPromotion once kind-specific modifiers cover its surface — _[ai-substrate] · blocked-by 106, 107, 110 · added 2026-05-01_
 - **[119](docs/open-work/tickets/119-critical-health-interrupt-retire.md)** — Retire CriticalHealth interrupt — final substrate-over-override step for ticket 047 — _[ai-substrate] · blocked-by 118 · added 2026-05-01_
+- **[127](docs/open-work/tickets/127-joint-intention-substrate.md)** — Joint-intention substrate for two-cat practices — _[C] · blocked-by 126 · added 2026-05-02_
+- **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition over `HeldIntention.goal` — _[C] · blocked-by 126 · added 2026-05-02_
+- **[129](docs/open-work/tickets/129-care-dses-perceivable-intentions.md)** — Care DSEs over perceivable intentions — _[C] · blocked-by 126 · added 2026-05-02_
+- **[130](docs/open-work/tickets/130-trust-weighted-coordinator-momentum.md)** — Trust-weighted coordinator directive momentum — _[C] · blocked-by 126, 057, 081 · added 2026-05-02_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _blocked-by 071 · added 2026-04-28_
 
 ## Pre-existing (1)

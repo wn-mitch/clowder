@@ -22,50 +22,9 @@ additive layer can't cleanly express.
 
 ### C1. BDI-style intention persistence
 
-**Why it matters:** `docs/balance/scoring-layer-second-order.md` framing
-#1 is a direct restatement of the BDI (Belief-Desire-Intention) thesis
-(Rao & Georgeff 1991): *intentions are commitments that persist across
-deliberation cycles*. Clowder's GOAP has *partial* intention persistence
-(once a plan is picked, steps execute sequentially), but at the scoring
-layer there is no commitment — each tick re-scores from scratch.
-Result: flipper behavior near equal scores, and social/skill
-accumulation supply chains that can't survive the per-tick churn.
+**Spun out as ticket 126 — see [`126-bdi-intention-substrate.md`](126-bdi-intention-substrate.md).** This cluster entry retained as a roadmap pointer; 126 carries the worked design.
 
-**Current state:** Scoring is stateless per tick. GOAP adds per-plan
-continuity but not per-goal continuity (a goal is re-deliberated every
-time a plan completes or fails).
-
-**Proposed approach:** add a lightweight intention layer between
-scoring and GOAP — a per-cat `CurrentIntention` component carrying
-a goal + commitment strength + expiry, scored with a momentum bonus
-during deliberation. New plans inherit the intention if valid; new
-deliberations only override if the alternative's margin exceeds the
-commitment strength.
-
-**Touch points:**
-- New: `src/components/intention.rs` (or similar)
-- `src/systems/goap.rs` — read intentions when picking plans
-- `src/ai/scoring.rs` — momentum bonus as an axis (needs A1 for clean
-  addition)
-
-**Preparation reading:**
-- Rao & Georgeff (1991), "Modeling Rational Agents within a
-  BDI-Architecture" — KR 1991; canonical paper; Google Scholar PDF
-  widely mirrored. Short, formal, readable.
-- Michael Wooldridge, *An Introduction to MultiAgent Systems* (2nd
-  ed., Wiley 2009) ch. 4 "Practical Reasoning Agents" — textbook BDI
-  treatment with examples
-- Jeff Orkin, "Three States and a Plan: The AI of F.E.A.R." (GDC
-  2006) — free at <https://alumni.media.mit.edu/~jorkin/goap.html>;
-  commitment and plan persistence in practical game AI
-- `docs/balance/scoring-layer-second-order.md` (in repo) — framing #1
-  is the BDI thesis in Clowder terms; re-read before starting
-
-**Exit criterion:** seed-42 deep-soak shows reduced plan-preemption
-rate without increased starvation or other canary degradation.
-
-**Dependency:** gated on A1 (momentum is a scoring axis); pairs well
-with A4 (target commitment and intention commitment interact).
+Cluster role: BDI persistence is the substrate that C2 (Versu practices), C3 (subjective belief), and C4 (HTN strategist) all compose against. 126's planned follow-ons (127 joint-intention substrate, 128 HTN method composition, 129 care DSEs over perceivable intentions, 130 trust-weighted coordinator momentum) trace the cluster's expansion.
 
 ---
 
