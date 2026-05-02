@@ -9,7 +9,7 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [027-l2-pairing-activity.md]
-landed-at: null
+landed-at: acb30b9d
 landed-on: 2026-05-02
 ---
 
