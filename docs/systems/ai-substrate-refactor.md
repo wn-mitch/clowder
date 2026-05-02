@@ -2389,6 +2389,30 @@ see `src/ai/planner/mod.rs::PlannerState`,
 `src/ai/fox_planner`, `src/ai/hawk_planner`,
 `src/ai/snake_planner`.
 
+#### §4.7.6 Non-cat planner audit (2026-05-02)
+
+[Ticket 097](../open-work/landed/097-non-cat-planner-substrate-audit.md)
+extended the §4.7 audit across the three non-cat planners. Verdict:
+**no marker-mirror smell present**. Every field in `FoxPlannerState`,
+`HawkPlannerState`, and `SnakePlannerState` is mutated by at least
+one `*StateEffect::Set*` during A* expansion (`SetZone`,
+`SetCarryingFood`, `SetPreyFound`, `SetCubsFed`, `SetDenSecured`,
+`SetTerritoryMarked`, `SetInteractionDone`, `IncrementTrips`, and
+the species-specific equivalents) — i.e., all are search state per
+§4.7.1. The fox marker substrate (`HasDen`, `HasCubs`, `CubsHungry`,
+`StoreVisible`, `StoreGuarded`, `CatThreateningDen`, `WardNearbyFox`,
+`IsDispersingJuvenile`) is read by IAUS DSE eligibility filters out
+of `MarkerSnapshot` at `src/systems/fox_goap.rs:448`; none of those
+markers is paralleled by a `*StatePredicate` variant. Hawks and
+snakes carry no markers and only minimal predicate sets
+(`PreySpotted`/`PreyInRange`, `HungerOk`, `Warm`, `ZoneIs`); all are
+plan-projected.
+
+The non-cat planners pre-emptively avoided the smell by keeping the
+two layers cleanly separated from the start: `MarkerSnapshot` for
+world-fact substrate (IAUS L2 eligibility), `*PlannerState` for
+plan-projection search state (GOAP A*). Nothing to migrate.
+
 ---
 
 ## §5 Influence-map substrate
