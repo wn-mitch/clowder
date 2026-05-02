@@ -15,10 +15,10 @@ _Last generated: 2026-05-01._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 49 |
+| Ready | 48 |
 | Parked | 5 |
 | Blocked | 13 |
-| **Open total** | **72** |
+| **Open total** | **71** |
 | Pre-existing | 1 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -33,7 +33,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[071](docs/open-work/tickets/071-planning-substrate-hardening.md)** — Planning-substrate hardening — gird against the stuck-cat bug class (sub-epic) — _[planning-substrate] · added 2026-04-29_
 - **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** — Substrate-over-override — retire control-yanking hacks in favor of IAUS levers — _[substrate-over-override] · added 2026-04-30_
 
-## Ready (49)
+## Ready (48)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -63,7 +63,6 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[064](docs/open-work/tickets/064-carcass-scent-consumer-cutover.md)** — Carcass-scent consumer cutover — replace observer_smells_at (§5.6.3 row #6) — _added 2026-04-27_
 - **[086](docs/open-work/tickets/086-farm-canary-triggering-scenario.md)** — Find a triggering scenario for Farm DSE canary (CropTended / CropHarvested) — _[balance] · added 2026-04-30_
 - **[089](docs/open-work/tickets/089-interoceptive-self-anchors.md)** — Interoceptive self-anchors — spatial self-perception (OwnInjurySite, OwnSafeRestSpot) — _[ai-substrate] · added 2026-04-30_
-- **[090](docs/open-work/tickets/090-self-perception-l4-l5.md)** — L4/L5 self-perception — mastery-confidence, purpose-clarity, esteem-distress — _[ai-substrate] · added 2026-04-30_
 - **[095](docs/open-work/tickets/095-body-zones-epic.md)** — Body zones — anatomical injury model for all animal species — _added 2026-05-01_
 - **[096](docs/open-work/tickets/096-materials-available-substrate-split.md)** — Split `PlannerState.materials_available` into marker-backed entry + per-plan search field — _[ai-substrate] · added 2026-04-30_
 - **[097](docs/open-work/tickets/097-non-cat-planner-substrate-audit.md)** — Audit fox / hawk / snake planners for the parallel-feasibility-language smell 092 retired for cats — _[ai-substrate] · added 2026-04-30_
@@ -113,11 +112,11 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 
-## Landed archive (75)
+## Landed archive (76)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (10)
+### 2026-05 (11)
 
 - **[123](docs/open-work/landed/123-recent-disposition-failures-cooldown.md)** — RecentDispositionFailures cooldown so cats stop spamming dispositions the planner can't satisfy _(2026-05-01)_
 - **[122](docs/open-work/landed/122-socialize-dse-iaus-vs-gate-still-goal-mismatch.md)** — Socialize IAUS scoring elects plans the OpenMinded gate drops on the same tick _(2026-05-01)_
@@ -125,6 +124,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[116](docs/open-work/landed/116-bereavement-bond-grief.md)** — Bereavement — bond-specific grief modifier on partner/friend death _(2026-05-01)_
 - **[114](docs/open-work/landed/114-mood-source-typing.md)** — MoodSource enum — typed emotional category for MoodModifier _(2026-05-01)_
 - **[098](docs/open-work/landed/098-search-state-vs-substrate-doctrine.md)** — Document the substrate-vs-search-state boundary in `docs/systems/ai-substrate-refactor.md` _(2026-05-01)_
+- **[090](docs/open-work/landed/090-self-perception-l4-l5.md)** — L4/L5 self-perception — mastery-confidence, purpose-clarity, esteem-distress _(2026-05-01)_
 - **[088](docs/open-work/landed/088-body-distress-modifier.md)** — Body-distress Modifier — uniform self-care promotion under §L2.10 Modifier substrate _(2026-05-01)_
 - **[076](docs/open-work/landed/076-last-resort-promotion-modifier.md)** — LastResortPromotion Modifier + no-target step resolvers (spiral-of-failure escalation) _(2026-05-01)_
 - **[047](docs/open-work/landed/047-critical-health-interrupt-treadmill.md)** — CriticalHealth interrupt is a treadmill, not a brake — replan picks the same disposition while damage accumulates _(2026-05-01)_

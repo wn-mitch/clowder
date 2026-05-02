@@ -1,7 +1,7 @@
 ---
 id: 090
 title: L4/L5 self-perception — mastery-confidence, purpose-clarity, esteem-distress
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-04-30
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: fffa5499
+landed-on: 2026-05-01
 ---
 
 ## Why
@@ -553,3 +553,4 @@ Expected: nonzero — most cats will have some L4 deficit by mid-run.
 
 - 2026-04-30: Opened alongside 087. Blocked-by 087 (perception substrate) until that lands. Catalog gap surfaced during inventory: `populate_dse_registry` has zero DSE coverage for Maslow L4/L5 yet those needs decay.
 - 2026-04-30: Expanded to full implementation-ready spec. Blocked-by resolved (087 landed fc4e1ab). Status: ready.
+- 2026-05-01: Landed at fffa5499. All seven implementation steps shipped per the spec: three `DispositionConstants` thresholds, three ZST markers (`LowMastery` / `LackingPurpose` / `EsteemDistressed`), three pure derivation fns in `interoception.rs`, `author_self_markers` extended with `&Skills` + `Option<&Aspirations>`, three `ScoringContext` fields + `ctx_scalars` inserts, both `goap.rs` and `disposition.rs` `ScoringContext` literals updated with `mastery_confidence` / `purpose_clarity` / `esteem_distress` calls. 15 new unit tests (5 pure-fn + 10 marker-lifecycle) all pass; full suite 1719/1719. No behavior change — perception-only ticket, no soak required.
