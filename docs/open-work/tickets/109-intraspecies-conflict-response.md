@@ -1,11 +1,11 @@
 ---
 id: 109
 title: IntraspeciesConflictResponse — full four-valence (fight/flight/freeze/fawn) social response
-status: ready
+status: in-progress
 cluster: ai-substrate
 added: 2026-05-01
 parked: null
-blocked-by: [104]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
@@ -45,3 +45,4 @@ Reads a separate `social_status_distress` scalar (subordinate cat in dominant ca
 ## Log
 
 - 2026-05-01: Opened as the social analog to ticket 047's AcuteHealthAdrenaline framework. Blocked by 104 (Hide/Freeze DSE) for the Freeze sub-valence; Phase A (Flee) can ship without it.
+- 2026-05-02: 104 landed (2a68f595). **Phase A landed** at ca140e5d — `IntraspeciesConflictResponseFlight` modifier registered (pipeline +1), 2 ScoringConstants, 6 unit tests. The `social_status_distress` scalar is published as a 0.0 stub from `ctx_scalars`; v1 composition `(status_diff_to_nearest_cat × proximity_factor)` requires a defensible status-differential signal + per-cat nearest-cat resolution, which lands alongside lift activation. Phase B sub-tickets opened: 142 (Freeze), 143 (Fight), 144 (Fawn), 145 (Submit gesture DSE infrastructure).

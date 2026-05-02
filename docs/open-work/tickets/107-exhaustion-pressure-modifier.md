@@ -1,7 +1,7 @@
 ---
 id: 107
 title: ExhaustionPressure modifier — substrate axis for Exhaustion interrupt retirement
-status: ready
+status: in-progress
 cluster: ai-substrate
 added: 2026-05-01
 parked: null
@@ -44,3 +44,4 @@ Pressure modifier (graded ramp). Sibling to ticket 106 (HungerUrgency).
 ## Log
 
 - 2026-05-01: Opened as substrate-axis follow-on from ticket 047, applying the playbook to the energy axis.
+- 2026-05-02: **Phase 1 landed** at c83de3cd alongside 106/110 — modifier registered (pipeline +1), 3 ScoringConstants fields with 0.0 lift defaults (ships inert), 7 unit tests pass. Phases 2-5 remain.

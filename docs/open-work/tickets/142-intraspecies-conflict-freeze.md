@@ -5,7 +5,7 @@ status: blocked
 cluster: ai-substrate
 added: 2026-05-02
 parked: null
-blocked-by: [104, 109]
+blocked-by: [109]
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
@@ -52,4 +52,6 @@ Hide/Freeze DSE infrastructure from ticket 104.
 ## Log
 
 - 2026-05-02: Opened as 109 Phase B Freeze sub-ticket alongside 109
-  Phase A landing.
+  Phase A landing. 104 (Hide DSE) landed at 2a68f595 in the same
+  Wave 1 batch; only 109's scalar composition work remains as
+  blocker.

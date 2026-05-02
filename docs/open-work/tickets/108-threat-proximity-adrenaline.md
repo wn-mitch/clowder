@@ -1,7 +1,7 @@
 ---
 id: 108
 title: ThreatProximityAdrenaline modifier — substrate axis for CriticalSafety interrupt retirement
-status: ready
+status: in-progress
 cluster: ai-substrate
 added: 2026-05-01
 parked: null
@@ -42,3 +42,4 @@ Sibling to 047's AcuteHealthAdrenaline (same lurch shape, different scalar sourc
 ## Log
 
 - 2026-05-01: Opened as third substrate-axis follow-on from ticket 047.
+- 2026-05-02: **Phase 1 landed** at cd96eced — modifier registered (pipeline 15 → 16), 4 ScoringConstants fields, 7 unit tests. The `threat_proximity_derivative` scalar is published as a 0.0 stub from `ctx_scalars`; actual derivative computation (max(0, safety_deficit_now - prev)) requires a `PrevSafetyDeficit` per-cat Component + per-tick update system that lands alongside the lift activation in the same Phase-3-or-Phase-4 commit. Double-inert (lift 0.0 + scalar stub). Phases 2-5 + perception coupling remain.

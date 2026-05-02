@@ -1,7 +1,7 @@
 ---
 id: 106
 title: HungerUrgency modifier — substrate axis for Starvation interrupt retirement
-status: ready
+status: in-progress
 cluster: ai-substrate
 added: 2026-05-01
 parked: null
@@ -149,17 +149,25 @@ pipeline; this modifier is registered in the cat pipeline only.
 Pin that the modifier fires at the right magnitude on a hunger-stressed cat
 *before* running the multi-seed sweep.
 
-- `just soak-trace 42 <cat>` with `CLOWDER_OVERRIDES` set to the proposed values
-  from the table above. Focal cat: pick whichever cat hit
-  `interrupts_by_reason.Starvation` highest in the most recent
-  `logs/tuned-42-*` run. (TBD: identify by running
-  `just q events logs/tuned-42-<latest>/` then `jq 'select(.kind ==
-  "PlanInterrupted" and .reason == "Starvation")'` and grouping by cat name.)
-  If no current tuned-42 has any Starvation interrupts (the post-091 baseline
-  is `Starvation == 0` per CLAUDE.md hard gate), generate a hunger-stressed
-  scenario: `CLOWDER_OVERRIDES='{"food":{"food_per_meal":0.5}}'` halves the
-  per-meal satiation so cats hit the threshold during the trace window.
-  Document the exact override stack in the trace sidecar.
+- `just soak-trace 42 <cat>` with `CLOWDER_OVERRIDES` set to the proposed lift
+  values from the table above. Focal cat: pick whichever cat hit
+  `interrupts_by_reason.Starvation` highest in the canonical baseline
+  (`logs/tuned-42`, the run pointed at by `logs/baselines/current.json`). Use
+  `/logq events <run-dir>` to query the run, filtered to
+  `kind=PlanInterrupted reason=Starvation` and grouped by cat (skill surface
+  per CLAUDE memory — no raw `jq` / `grep` on logs/).
+
+  **Override-fallback (mandatory in the post-091 regime).** The promoted
+  baseline carries `interrupts_by_reason.Starvation == 0` as a hard gate, so
+  there are no natural Starvation candidates to focal-trace. Generate a
+  hunger-stressed scenario by **doubling the hunger drain rate**:
+  `CLOWDER_OVERRIDES='{"needs":{"hunger_decay":0.2}}'` (default is 0.1 per
+  in-game day, see `src/resources/sim_constants.rs:120` and the
+  `RatePerDay` newtype at `src/resources/time_units.rs:50`). Doubling decay
+  reproduces the slow-starvation regime the legacy interrupt was built for
+  without compounding food-stockpile dynamics (which a per-meal-satiation
+  knob would). Stack with the lift overrides into one JSON object and
+  document the exact stack in the trace sidecar's commit notes.
 - Verify in the trace's `modifier_deltas` rows: `hunger_urgency` fires on Eat /
   Hunt / Forage with the expected ramp = `((urgency - 0.6) / 0.4)`, multiplied
   by the per-DSE lift. Sanity: at `urgency = 0.85` (cat at hunger 0.15, the
@@ -357,3 +365,14 @@ rule:
   Starvation interrupts), explicit cross-metric watch-list including the
   shadow-fox spawn coupling 047 surfaced, and the Phase 4 gating discipline
   that punted 047's interrupt retirement to ticket 119.
+- 2026-05-02: **Phase 1 landed** at c83de3cd alongside 107/110 — modifier
+  registered (pipeline 12 → 15), 4 ScoringConstants fields added with 0.0
+  lift defaults (ships inert; bit-identical baseline), 8 unit tests pass.
+  Phases 2-5 (focal trace + hypothesize sweep + interrupt retirement + docs)
+  remain — pick up in a follow-up session per the 047 playbook.
+- 2026-05-02: Phase 2 prep — corrected the override-fallback recipe in
+  §Phase 2 from a non-existent `food.food_per_meal` knob to the real
+  `needs.hunger_decay` rate (default 0.1/day at `sim_constants.rs:120`,
+  doubled to 0.2/day reproduces the slow-starvation regime). Also flipped
+  the focal-cat discovery recipe from raw `jq` to `/logq events` per the
+  skill-surface rule. No source change.

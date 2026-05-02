@@ -1,7 +1,7 @@
 ---
 id: 110
 title: ThermalDistress modifier — substrate axis for thermal interrupts (and shelter-seeking)
-status: ready
+status: in-progress
 cluster: ai-substrate
 added: 2026-05-01
 parked: null
@@ -34,3 +34,4 @@ Lower priority than 106/107/108 because no current `InterruptReason::ThermalCrit
 ## Log
 
 - 2026-05-01: Opened as the fourth substrate-axis follow-on from ticket 047 — the lower-priority "more levers" application of the doctrine.
+- 2026-05-02: **Phase 1 landed** at c83de3cd alongside 106/107 — modifier registered (pipeline +1), 2 ScoringConstants fields with 0.0 lift defaults, 6 unit tests. Phase 3 (hypothesize sweep predicting cold-weather mortality drops) and Build-shelter lift remain.

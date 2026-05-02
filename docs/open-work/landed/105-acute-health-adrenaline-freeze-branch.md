@@ -1,16 +1,16 @@
 ---
 id: 105
 title: AcuteHealthAdrenaline Freeze branch — overmatched-predator response
-status: blocked
+status: done
 cluster: ai-substrate
 added: 2026-05-01
 parked: null
-blocked-by: [104]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [047-acute-health-adrenaline.md]
-landed-at: null
-landed-on: null
+landed-at: 9b024a60
+landed-on: 2026-05-02
 ---
 
 ## Why
@@ -38,3 +38,4 @@ Third predator-response valence in the §6 N-valence framework. When escape is n
 ## Log
 
 - 2026-05-01: Opened as third predator-response branch from ticket 047's N-valence framework. Blocked by 103 (gate) + 104 (DSE).
+- 2026-05-02: 103 (escape_viability) landed (2216a44); 104 landed (2a68f595). Landed Phase 1 substrate inert via the double-inert contract: lift defaults 0.0 + Hide gated by HideEligible (never authored). Uses 1.0 - escape_viability as combat_winnability proxy v1; dedicated scalar deferred. Pipeline 17 → 18.

@@ -1,7 +1,7 @@
 ---
 id: 104
 title: Hide/Freeze DSE — predator-avoidance third valence ("remain still and hope")
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-01
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 2a68f595
+landed-on: 2026-05-02
 ---
 
 ## Why
@@ -40,3 +40,4 @@ Cats currently have Fight and Flee but no "remain still and hope" action. Real c
 ## Log
 
 - 2026-05-01: Opened as required DSE infrastructure for two follow-ons from ticket 047's N-valence framework decision.
+- 2026-05-02: Landed Phase 1 dormancy contract — Action::Hide variant + HideEligible marker (no authoring system) + HideDse with bounded curve (organic score caps at 0.5) + resolve_hide step + Feature::HideFreezeFired (rare-event class). Sensing visibility coupling deferred — multi-system change with zero runtime effect while Hide is dormant; tracked as a separate predicate-refinement ticket. Sibling 105 lifted alongside.
