@@ -46,7 +46,8 @@ use crate::components::aspirations::Aspirations;
 use crate::components::markers::{
     BodyDistressed, EsteemDistressed, LackingPurpose, LowHealth, LowMastery, SevereInjury,
 };
-use crate::components::physical::{Dead, Health, Injury, InjuryKind, Needs};
+use crate::components::mental::{Memory, MemoryType};
+use crate::components::physical::{Dead, Health, Injury, InjuryKind, Needs, Position};
 use crate::components::skills::Skills;
 use crate::resources::sim_constants::SimConstants;
 
@@ -147,6 +148,54 @@ pub fn esteem_distress(needs: &Needs) -> f32 {
     (1.0 - needs.respect)
         .max(1.0 - needs.mastery)
         .clamp(0.0, 1.0)
+}
+
+/// Body-state-appropriate safe-rest tile. Scans the cat's `Memory`
+/// for `MemoryType::Sleep` entries; returns the strongest entry's
+/// position whose location is not within `suppression_radius`
+/// Manhattan tiles of any `MemoryType::ThreatSeen` or
+/// `MemoryType::Death` memory. Returns `None` when no qualifying
+/// memory exists.
+///
+/// Suppression: a Sleep memory at L is rejected if any
+/// ThreatSeen/Death memory exists at L' with
+/// `L.manhattan_distance(L') <= suppression_radius`. The "I
+/// remember resting here, but I also remember a hawk here last
+/// week" gate. Ticket 089.
+pub fn own_safe_rest_spot(memory: &Memory, suppression_radius: i32) -> Option<Position> {
+    let suppressors: Vec<Position> = memory
+        .events
+        .iter()
+        .filter(|e| matches!(e.event_type, MemoryType::ThreatSeen | MemoryType::Death))
+        .filter_map(|e| e.location)
+        .collect();
+
+    memory
+        .events
+        .iter()
+        .filter(|e| e.event_type == MemoryType::Sleep)
+        .filter_map(|e| e.location.map(|loc| (loc, e.strength)))
+        .filter(|(loc, _)| {
+            !suppressors
+                .iter()
+                .any(|s| loc.manhattan_distance(s) <= suppression_radius)
+        })
+        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|(loc, _)| loc)
+}
+
+/// Most-recent unhealed-injury site. Scans `health.injuries` for
+/// `!healed` entries and returns the one with the highest
+/// `tick_received`'s `at`. `None` when no unhealed injuries.
+/// Future TendInjury DSE consumes this via
+/// `LandmarkAnchor::OwnInjurySite`. Ticket 089.
+pub fn own_injury_site(health: &Health) -> Option<Position> {
+    health
+        .injuries
+        .iter()
+        .filter(|i| !i.healed)
+        .max_by_key(|i| i.tick_received)
+        .map(|i| i.at)
 }
 
 /// Per-tick author system for interoceptive ZST markers.
@@ -299,6 +348,7 @@ mod tests {
             tick_received: 0,
             healed,
             source: InjurySource::Unknown,
+            at: crate::components::physical::Position::new(0, 0),
         }
     }
 
@@ -790,5 +840,129 @@ mod tests {
         world.entity_mut(cat).insert(needs);
         schedule.run(&mut world);
         assert!(world.get::<EsteemDistressed>(cat).is_none());
+    }
+
+    // ---- Ticket 089 — `own_safe_rest_spot` / `own_injury_site` ----
+
+    use crate::components::mental::{Memory, MemoryEntry, MemoryType};
+
+    fn sleep_memory(loc: Position, strength: f32, tick: u64) -> MemoryEntry {
+        MemoryEntry {
+            event_type: MemoryType::Sleep,
+            location: Some(loc),
+            involved: Vec::new(),
+            tick,
+            strength,
+            firsthand: true,
+        }
+    }
+
+    fn threat_memory(loc: Position, tick: u64) -> MemoryEntry {
+        MemoryEntry {
+            event_type: MemoryType::ThreatSeen,
+            location: Some(loc),
+            involved: Vec::new(),
+            tick,
+            strength: 0.7,
+            firsthand: true,
+        }
+    }
+
+    #[test]
+    fn own_safe_rest_spot_none_with_empty_memory() {
+        let memory = Memory::default();
+        assert_eq!(own_safe_rest_spot(&memory, 5), None);
+    }
+
+    #[test]
+    fn own_safe_rest_spot_picks_strongest_sleep_memory() {
+        let mut memory = Memory::default();
+        memory.remember(sleep_memory(Position::new(1, 1), 0.3, 10));
+        memory.remember(sleep_memory(Position::new(2, 2), 0.5, 20));
+        memory.remember(sleep_memory(Position::new(3, 3), 0.4, 30));
+        assert_eq!(own_safe_rest_spot(&memory, 5), Some(Position::new(2, 2)));
+    }
+
+    #[test]
+    fn own_safe_rest_spot_suppressed_by_nearby_threat() {
+        let mut memory = Memory::default();
+        memory.remember(sleep_memory(Position::new(10, 10), 0.6, 5));
+        memory.remember(threat_memory(Position::new(12, 10), 6));
+        // ThreatSeen at Manhattan distance 2 — within radius 5 → Sleep
+        // memory suppressed; no other Sleep memories → None.
+        assert_eq!(own_safe_rest_spot(&memory, 5), None);
+    }
+
+    #[test]
+    fn own_safe_rest_spot_unsuppressed_by_distant_threat() {
+        let mut memory = Memory::default();
+        memory.remember(sleep_memory(Position::new(10, 10), 0.6, 5));
+        memory.remember(threat_memory(Position::new(50, 50), 6));
+        assert_eq!(own_safe_rest_spot(&memory, 5), Some(Position::new(10, 10)));
+    }
+
+    #[test]
+    fn own_safe_rest_spot_stable_across_ticks() {
+        let mut memory = Memory::default();
+        memory.remember(sleep_memory(Position::new(1, 1), 0.5, 10));
+        memory.remember(sleep_memory(Position::new(2, 2), 0.5, 20));
+        let first = own_safe_rest_spot(&memory, 5);
+        let second = own_safe_rest_spot(&memory, 5);
+        assert_eq!(first, second, "resolver must be deterministic");
+    }
+
+    #[test]
+    fn own_injury_site_none_with_no_injuries() {
+        let h = full_health();
+        assert_eq!(own_injury_site(&h), None);
+    }
+
+    #[test]
+    fn own_injury_site_picks_most_recent_unhealed() {
+        let mut h = full_health();
+        h.injuries.push(Injury {
+            kind: InjuryKind::Minor,
+            tick_received: 100,
+            healed: false,
+            source: InjurySource::Unknown,
+            at: Position::new(1, 1),
+        });
+        h.injuries.push(Injury {
+            kind: InjuryKind::Moderate,
+            tick_received: 200,
+            healed: false,
+            source: InjurySource::Unknown,
+            at: Position::new(2, 2),
+        });
+        h.injuries.push(Injury {
+            kind: InjuryKind::Severe,
+            tick_received: 150,
+            healed: false,
+            source: InjurySource::Unknown,
+            at: Position::new(3, 3),
+        });
+        assert_eq!(own_injury_site(&h), Some(Position::new(2, 2)));
+    }
+
+    #[test]
+    fn own_injury_site_ignores_healed() {
+        let mut h = full_health();
+        h.injuries.push(Injury {
+            kind: InjuryKind::Minor,
+            tick_received: 100,
+            healed: false,
+            source: InjurySource::Unknown,
+            at: Position::new(1, 1),
+        });
+        h.injuries.push(Injury {
+            kind: InjuryKind::Moderate,
+            tick_received: 200,
+            healed: true,
+            source: InjurySource::Unknown,
+            at: Position::new(2, 2),
+        });
+        // Healed injury is most recent but ignored; falls back to
+        // the older unhealed one.
+        assert_eq!(own_injury_site(&h), Some(Position::new(1, 1)));
     }
 }

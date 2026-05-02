@@ -48,6 +48,14 @@ pub const PAIN_LEVEL_INPUT: &str = "pain_level";
 /// spec line 5622).
 pub const SLEEP_SPOT_RANGE: f32 = 15.0;
 
+/// Ticket 089 — `safe_rest_distance` axis range. Tighter than
+/// `SLEEP_SPOT_RANGE` (15.0) because the safe-rest signal is
+/// "I'd rest here right now if I happened to be near," not "I
+/// should travel across the colony to get here." 10 tiles
+/// matches the home-range scale where memory-based associations
+/// stay vivid.
+pub const SAFE_REST_RANGE: f32 = 10.0;
+
 // Phase-to-knot encoding; must match `fox_hunting` + the scoring-layer
 // `day_phase_scalar` encoder.
 pub const DAWN_KNOT: f32 = 0.0;
@@ -90,6 +98,19 @@ impl SleepDse {
             }),
             post: PostOp::Invert,
         };
+        // Ticket 089 — `safe_rest_distance` axis. Same Power-Invert
+        // shape as `spot_distance` but on the body-state-derived
+        // safe-rest anchor (memory-suppressed-by-threats). Cats with
+        // empty Sleep memory have `cat_anchors.own_safe_rest_spot =
+        // None`; the spatial axis evaluates to 0.0, leaving Sleep
+        // selection behaviorally identical to pre-089 for those cats.
+        let safe_rest_distance = Curve::Composite {
+            inner: Box::new(Curve::Polynomial {
+                exponent: 2,
+                divisor: 1.0,
+            }),
+            post: PostOp::Invert,
+        };
         // Ticket 087 — `pain_level` axis. Linear curve over the
         // interoceptive `pain_level` scalar (sum of unhealed-injury
         // severities normalized into [0, 1]). Same Linear shape as the
@@ -116,6 +137,12 @@ impl SleepDse {
                     SLEEP_SPOT_RANGE,
                     spot_distance,
                 )),
+                Consideration::Spatial(SpatialConsideration::new(
+                    "safe_rest_distance",
+                    LandmarkSource::Anchor(LandmarkAnchor::OwnSafeRestSpot),
+                    SAFE_REST_RANGE,
+                    safe_rest_distance,
+                )),
             ],
             // Ticket 087 — original four weights [0.40, 0.24, 0.16, 0.20]
             // sum to 1.0. Adding `pain_level` at weight 0.10 — sized
@@ -123,12 +150,19 @@ impl SleepDse {
             // (pain_level = 0 → axis contributes 0), large enough that
             // a cat with multiple wounds gets a meaningful bump. The
             // four originals scale by 0.90 so the sum stays at 1.0.
+            //
+            // Ticket 089 — adding `safe_rest_distance` at weight 0.05;
+            // existing five weights scale by 0.95 to keep the sum at
+            // 1.0. The 0.05 is sized so cats with empty Sleep memory
+            // (axis = 0.0 via `None` resolver path) score Sleep
+            // identically to pre-089.
             composition: Composition::weighted_sum(vec![
-                0.40 * 0.90,
-                0.24 * 0.90,
-                0.16 * 0.90,
-                0.10,
-                0.20 * 0.90,
+                0.40 * 0.90 * 0.95,
+                0.24 * 0.90 * 0.95,
+                0.16 * 0.90 * 0.95,
+                0.10 * 0.95,
+                0.20 * 0.90 * 0.95,
+                0.05,
             ]),
             eligibility: EligibilityFilter::new(),
         }
@@ -183,11 +217,29 @@ mod tests {
     }
 
     #[test]
-    fn sleep_has_five_axes() {
-        // §L2.10.7 + ticket 087: energy + day_phase + injury_rest +
-        // pain_level + spot_distance.
+    fn sleep_has_six_axes() {
+        // §L2.10.7 + ticket 087 + ticket 089: energy + day_phase +
+        // injury_rest + pain_level + spot_distance + safe_rest_distance.
         let s = ScoringConstants::default();
-        assert_eq!(SleepDse::new(&s).considerations().len(), 5);
+        assert_eq!(SleepDse::new(&s).considerations().len(), 6);
+    }
+
+    #[test]
+    fn sleep_uses_own_safe_rest_spot_anchor() {
+        let s = ScoringConstants::default();
+        let dse = SleepDse::new(&s);
+        let spatial = dse
+            .considerations()
+            .iter()
+            .find_map(|c| match c {
+                Consideration::Spatial(sp) if sp.name == "safe_rest_distance" => Some(sp),
+                _ => None,
+            })
+            .expect("safe_rest_distance axis must exist");
+        assert!(matches!(
+            spatial.landmark,
+            LandmarkSource::Anchor(LandmarkAnchor::OwnSafeRestSpot)
+        ));
     }
 
     #[test]

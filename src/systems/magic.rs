@@ -1105,6 +1105,7 @@ pub fn apply_misfire(
                 synthetic_damage,
                 tick,
                 crate::components::physical::InjurySource::MagicMisfire,
+                *pos,
                 combat,
             );
             log.push(

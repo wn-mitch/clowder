@@ -1420,6 +1420,12 @@ pub fn evaluate_and_plan(
                 // §L2.10.7 Coordinate anchor: colony center as the
                 // coordinator's perch (single-perch model).
                 coordinator_perch: Some(res.colony_center.0),
+                // Ticket 089 — interoceptive self-anchors.
+                own_safe_rest_spot: crate::systems::interoception::own_safe_rest_spot(
+                    memory,
+                    d.safe_rest_threat_suppression_radius,
+                ),
+                own_injury_site: crate::systems::interoception::own_injury_site(health),
             },
         };
 
@@ -3189,7 +3195,15 @@ fn dispatch_step_action(
             } else {
                 0.0
             };
-            let outcome = crate::steps::disposition::resolve_sleep(ticks, duration, needs, d);
+            let outcome = crate::steps::disposition::resolve_sleep(
+                ticks,
+                duration,
+                needs,
+                memory,
+                pos,
+                ec.time.tick,
+                d,
+            );
             if tile_corruption > 0.0 {
                 let penalty = tile_corruption * (1.0 - ec.constants.magic.corruption_rest_penalty);
                 needs.energy = (needs.energy - d.sleep_energy_per_tick * penalty).max(0.0);

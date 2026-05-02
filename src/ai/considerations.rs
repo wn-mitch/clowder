@@ -174,6 +174,16 @@ pub enum LandmarkAnchor {
     /// Cat's preferred sleeping spot — nearest acceptable sleeping
     /// tile. Sleep.
     OwnSleepingSpot,
+    /// Body-state-appropriate safe rest spot — strongest recent
+    /// `MemoryType::Sleep` entry not suppressed by nearby
+    /// `MemoryType::ThreatSeen` / `Death` memories. Sleep.
+    /// Ticket 089.
+    OwnSafeRestSpot,
+    /// Position where the cat was most recently wounded — most-
+    /// recent unhealed `Injury.at`. Reserved for the future
+    /// `TendInjury` DSE; in 089 the resolver is exercised by an
+    /// integration test only. Ticket 089.
+    OwnInjurySite,
     /// Nearest threat entity (Manhattan-nearest hostile within
     /// detection range). Flee.
     NearestThreat,

@@ -74,6 +74,18 @@ pub struct Injury {
     pub healed: bool,
     /// What system inflicted this injury.
     pub source: InjurySource,
+    /// Where the cat was when the injury was inflicted. Read by
+    /// `interoception::own_injury_site` to author the
+    /// `LandmarkAnchor::OwnInjurySite` anchor for future TendInjury
+    /// DSE consumers. Defaults to map origin via
+    /// `default_injury_position` for legacy serde fixtures encoded
+    /// before the field existed. Ticket 089.
+    #[serde(default = "default_injury_position")]
+    pub at: Position,
+}
+
+fn default_injury_position() -> Position {
+    Position::new(0, 0)
 }
 
 /// Health component. `current` and `max` are normalised to `[0.0, 1.0]`.

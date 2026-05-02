@@ -82,7 +82,7 @@ pub fn update_incapacitation(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::components::physical::{DeathCause, Injury, InjurySource};
+    use crate::components::physical::{DeathCause, Injury, InjurySource, Position};
     use bevy_ecs::schedule::Schedule;
 
     fn setup_world() -> (World, Schedule) {
@@ -102,6 +102,7 @@ mod tests {
             tick_received: 0,
             healed,
             source: InjurySource::Unknown,
+            at: Position::new(0, 0),
         }
     }
 

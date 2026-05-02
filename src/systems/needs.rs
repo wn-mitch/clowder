@@ -953,7 +953,7 @@ mod tests {
 
     // --- update_injury_marker ---
 
-    use crate::components::physical::{DeathCause, Injury, InjuryKind, InjurySource};
+    use crate::components::physical::{DeathCause, Injury, InjuryKind, InjurySource, Position};
 
     fn setup_injury_marker() -> (World, Schedule) {
         let world = World::new();
@@ -968,6 +968,7 @@ mod tests {
             tick_received: 0,
             healed,
             source: InjurySource::Unknown,
+            at: Position::new(0, 0),
         }
     }
 

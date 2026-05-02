@@ -7,7 +7,7 @@ use clowder::ai::CurrentAction;
 use clowder::components::hunting_priors::HuntingPriors;
 use clowder::components::identity::{Gender, Name};
 use clowder::components::magic::Inventory;
-use clowder::components::mental::Mood;
+use clowder::components::mental::{Memory, Mood};
 use clowder::components::personality::Personality;
 use clowder::components::physical::{Needs, Position};
 use clowder::components::skills::Skills;
@@ -95,6 +95,7 @@ fn mentoring_restores_mastery() {
             Gender::Tom,
             HuntingPriors::default(),
             Mood::default(),
+            Memory::default(),
         ))
         .id();
 
@@ -148,6 +149,7 @@ fn mentoring_grows_apprentice_skill() {
         Gender::Tom,
         HuntingPriors::default(),
         Mood::default(),
+        Memory::default(),
     ));
 
     let hunting_before = world.get::<Skills>(apprentice).unwrap().hunting;
@@ -195,6 +197,7 @@ fn mentoring_builds_fondness() {
             Gender::Tom,
             HuntingPriors::default(),
             Mood::default(),
+            Memory::default(),
         ))
         .id();
 

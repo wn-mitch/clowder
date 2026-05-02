@@ -182,6 +182,13 @@ pub struct CatAnchorPositions {
     pub territory_perimeter_anchor: Option<Position>,
     /// `LandmarkAnchor::OwnSleepingSpot` — Sleep (B2).
     pub own_sleeping_spot: Option<Position>,
+    /// `LandmarkAnchor::OwnSafeRestSpot` — Sleep, body-state safe-
+    /// rest axis. Memory-derived; `None` if the cat has no Sleep
+    /// memories yet (newly-spawned cats). Ticket 089.
+    pub own_safe_rest_spot: Option<Position>,
+    /// `LandmarkAnchor::OwnInjurySite` — future TendInjury DSE.
+    /// `None` if the cat has no unhealed injuries. Ticket 089.
+    pub own_injury_site: Option<Position>,
     /// `LandmarkAnchor::NearestThreat` — Flee (B15).
     pub nearest_threat: Option<Position>,
     /// `LandmarkAnchor::NearestCorruptedTile` — Cleanse (B1) +
@@ -786,10 +793,20 @@ fn score_dse_by_id(dse_id: &str, ctx: &ScoringContext, inputs: &EvalInputs) -> f
             LandmarkAnchor::CoordinatorPerch => ctx.cat_anchors.coordinator_perch,
             LandmarkAnchor::TerritoryPerimeterAnchor => ctx.cat_anchors.territory_perimeter_anchor,
             LandmarkAnchor::OwnSleepingSpot => ctx.cat_anchors.own_sleeping_spot,
+            // Ticket 089 — interoceptive self-anchors.
+            LandmarkAnchor::OwnSafeRestSpot => ctx.cat_anchors.own_safe_rest_spot,
+            LandmarkAnchor::OwnInjurySite => ctx.cat_anchors.own_injury_site,
             LandmarkAnchor::NearestThreat => ctx.cat_anchors.nearest_threat,
             LandmarkAnchor::NearestCorruptedTile => ctx.cat_anchors.nearest_corrupted_tile,
-            // Fox-side anchors aren't relevant to cat scoring.
-            _ => None,
+            // Fox-side & centroid-only anchors aren't relevant to cat
+            // scoring. Listed explicitly (no `_ => None`) so adding a
+            // new anchor variant is a compilation gate, not a silent
+            // resolve-to-None. Ticket 089.
+            LandmarkAnchor::PreyBeliefCentroid
+            | LandmarkAnchor::CatClusterCentroid
+            | LandmarkAnchor::OwnDen
+            | LandmarkAnchor::NearestVisibleStore
+            | LandmarkAnchor::NearestMapEdge => None,
         }
     };
     let needs_ref = ctx.needs;
@@ -2106,7 +2123,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
-            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)) },
+            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)), own_safe_rest_spot: Some(Position::new(0, 0)), own_injury_site: Some(Position::new(0, 0)) },
         }
     }
 
@@ -2257,7 +2274,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
-            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)) },
+            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)), own_safe_rest_spot: Some(Position::new(0, 0)), own_injury_site: Some(Position::new(0, 0)) },
         };
         // §L2.10.7: this test sets `food_available: false`,
         // `has_functional_kitchen: false`, etc. on the context, but
@@ -2431,7 +2448,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
-            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)) },
+            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)), own_safe_rest_spot: Some(Position::new(0, 0)), own_injury_site: Some(Position::new(0, 0)) },
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let socialize_score = scores
@@ -2695,7 +2712,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
-            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)) },
+            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)), own_safe_rest_spot: Some(Position::new(0, 0)), own_injury_site: Some(Position::new(0, 0)) },
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let best = select_best_action(&scores);
@@ -2775,7 +2792,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
-            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)) },
+            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)), own_safe_rest_spot: Some(Position::new(0, 0)), own_injury_site: Some(Position::new(0, 0)) },
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let fight_score = scores.iter().find(|(a, _)| *a == Action::Fight).unwrap().1;
@@ -2874,7 +2891,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
-            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)) },
+            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)), own_safe_rest_spot: Some(Position::new(0, 0)), own_injury_site: Some(Position::new(0, 0)) },
         };
         // Build a per-test MarkerSnapshot with Incapacitated set for
         // this cat (the cached shared snapshot only carries colony
@@ -3190,7 +3207,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
-            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)) },
+            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)), own_safe_rest_spot: Some(Position::new(0, 0)), own_injury_site: Some(Position::new(0, 0)) },
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let wander = scores.iter().find(|(a, _)| *a == Action::Wander).unwrap().1;
@@ -3271,7 +3288,7 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
-            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)) },
+            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)), own_safe_rest_spot: Some(Position::new(0, 0)), own_injury_site: Some(Position::new(0, 0)) },
         };
 
         let scores_full = score_actions(&base, &test_eval_inputs(), &mut rng_full).scores;

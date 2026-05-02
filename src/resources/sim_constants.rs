@@ -2039,6 +2039,24 @@ pub struct DispositionConstants {
     /// 45% satisfied is meaningfully esteem-distressed.
     #[serde(default = "default_esteem_distressed_threshold")]
     pub esteem_distressed_threshold: f32,
+    /// Ticket 089 — initial strength assigned to a `MemoryType::Sleep`
+    /// entry written by `resolve_sleep` on chain advance. Default 0.6,
+    /// chosen below the per-injury memory strengths (Severe = 0.8) so
+    /// rest memories fade faster than wound memories under the
+    /// `decay_memories` per-tick decay (0.001 firsthand). At 0.6 a Sleep
+    /// memory persists ≈ 600 ticks (~one sim day) before fading below
+    /// 0.0 — matches "I rested here a few sim-hours ago."
+    #[serde(default = "default_safe_rest_memory_strength_initial")]
+    pub safe_rest_memory_strength_initial: f32,
+    /// Ticket 089 — Manhattan radius (tiles) within which a
+    /// `MemoryType::ThreatSeen` or `MemoryType::Death` memory suppresses
+    /// a `MemoryType::Sleep` memory's eligibility for
+    /// `LandmarkAnchor::OwnSafeRestSpot`. Default 5: a one-room ward
+    /// scale, calibrated against `threat_awareness_range`. The "I
+    /// remember resting here, but I also remember a hawk near here last
+    /// week" gate.
+    #[serde(default = "default_safe_rest_threat_suppression_radius")]
+    pub safe_rest_threat_suppression_radius: i32,
     // --- Contextual threat evaluation (zoo vs bush) ---
     /// Threat intensity multiplier when the cat is inside a ward's repel radius.
     #[serde(default = "default_threat_ward_dampening")]
@@ -2282,6 +2300,14 @@ fn default_lacking_purpose_threshold() -> f32 {
 
 fn default_esteem_distressed_threshold() -> f32 {
     0.55
+}
+
+fn default_safe_rest_memory_strength_initial() -> f32 {
+    0.6
+}
+
+fn default_safe_rest_threat_suppression_radius() -> i32 {
+    5
 }
 
 fn default_gate_reckless_health_threshold() -> f32 {
@@ -2599,6 +2625,8 @@ impl Default for DispositionConstants {
             low_mastery_threshold: default_low_mastery_threshold(),
             lacking_purpose_threshold: default_lacking_purpose_threshold(),
             esteem_distressed_threshold: default_esteem_distressed_threshold(),
+            safe_rest_memory_strength_initial: default_safe_rest_memory_strength_initial(),
+            safe_rest_threat_suppression_radius: default_safe_rest_threat_suppression_radius(),
             threat_ward_dampening: 0.3,
             threat_colony_building_dampening: 0.5,
             threat_building_safety_range: 5,

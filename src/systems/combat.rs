@@ -287,12 +287,13 @@ pub fn resolve_combat(
             _needs,
             mut skills,
             personality,
-            _,
+            cat_pos,
             name,
             mut memory,
             mut mood,
         )) = cats.get_mut(fight.cat_entity)
         {
+            let injury_pos = *cat_pos;
             cat_health.current = (cat_health.current - wildlife_damage).max(0.0);
 
             // Apply injury based on damage.
@@ -301,6 +302,7 @@ pub fn resolve_combat(
                 wildlife_damage,
                 time.tick,
                 InjurySource::WildlifeCombat,
+                injury_pos,
                 c,
             ) {
                 // Narrative for injuries.
@@ -311,7 +313,7 @@ pub fn resolve_combat(
 
                 memory.remember(MemoryEntry {
                     event_type: MemoryType::Injury,
-                    location: None,
+                    location: Some(injury_pos),
                     involved: vec![fight.target_entity],
                     tick: time.tick,
                     strength: match kind {
@@ -634,6 +636,7 @@ fn damage_to_injury(
     damage: f32,
     tick: u64,
     source: InjurySource,
+    at: Position,
     c: &crate::resources::sim_constants::CombatConstants,
 ) -> Option<Injury> {
     if damage < c.injury_negligible_threshold {
@@ -651,6 +654,7 @@ fn damage_to_injury(
         tick_received: tick,
         healed: false,
         source,
+        at,
     })
 }
 
@@ -658,14 +662,19 @@ fn damage_to_injury(
 /// exceeds the negligible threshold, creates an `Injury` record, subtracts
 /// the severity-specific HP penalty, and pushes the injury onto the `Health`
 /// component. Returns the injury kind if one was created.
+///
+/// `at` is the cat's position at the time of injury — recorded on the
+/// `Injury.at` field so future `TendInjury` DSEs can route via
+/// `LandmarkAnchor::OwnInjurySite` (ticket 089).
 pub(crate) fn apply_injury(
     health: &mut Health,
     damage: f32,
     tick: u64,
     source: InjurySource,
+    at: Position,
     c: &crate::resources::sim_constants::CombatConstants,
 ) -> Option<InjuryKind> {
-    let inj = damage_to_injury(damage, tick, source, c)?;
+    let inj = damage_to_injury(damage, tick, source, at, c)?;
     let kind = inj.kind;
     let penalty = match kind {
         InjuryKind::Minor => c.injury_minor_health_penalty,
@@ -816,21 +825,37 @@ mod tests {
     #[test]
     fn damage_to_injury_thresholds() {
         let c = &SimConstants::default().combat;
+        let at = Position::new(0, 0);
         assert!(
-            damage_to_injury(0.02, 0, InjurySource::Unknown, c).is_none(),
+            damage_to_injury(0.02, 0, InjurySource::Unknown, at, c).is_none(),
             "negligible damage should not create injury"
         );
 
-        let minor = damage_to_injury(0.05, 100, InjurySource::Unknown, c).unwrap();
+        let minor = damage_to_injury(0.05, 100, InjurySource::Unknown, at, c).unwrap();
         assert_eq!(minor.kind, InjuryKind::Minor);
         assert_eq!(minor.tick_received, 100);
         assert!(!minor.healed);
 
-        let moderate = damage_to_injury(0.15, 200, InjurySource::Unknown, c).unwrap();
+        let moderate = damage_to_injury(0.15, 200, InjurySource::Unknown, at, c).unwrap();
         assert_eq!(moderate.kind, InjuryKind::Moderate);
 
-        let severe = damage_to_injury(0.30, 300, InjurySource::Unknown, c).unwrap();
+        let severe = damage_to_injury(0.30, 300, InjurySource::Unknown, at, c).unwrap();
         assert_eq!(severe.kind, InjuryKind::Severe);
+    }
+
+    #[test]
+    fn apply_injury_records_inflicted_position() {
+        let c = &SimConstants::default().combat;
+        let mut h = Health {
+            current: 1.0,
+            max: 1.0,
+            injuries: Vec::new(),
+        };
+        let at = Position::new(7, 3);
+        let kind = apply_injury(&mut h, 0.05, 10, InjurySource::Unknown, at, c);
+        assert!(matches!(kind, Some(InjuryKind::Minor)));
+        assert_eq!(h.injuries.len(), 1);
+        assert_eq!(h.injuries[0].at, at);
     }
 
     #[test]
@@ -875,12 +900,14 @@ mod tests {
                         tick_received: 100,
                         healed: false,
                         source: InjurySource::Unknown,
+                        at: Position::new(0, 0),
                     },
                     Injury {
                         kind: InjuryKind::Severe,
                         tick_received: 100,
                         healed: false,
                         source: InjurySource::Unknown,
+                        at: Position::new(0, 0),
                     },
                 ],
             })
@@ -922,8 +949,9 @@ mod tests {
             injuries: Vec::new(),
         };
 
+        let at = Position::new(0, 0);
         // Damage above negligible threshold should create a minor injury.
-        let kind = apply_injury(&mut health, 0.05, 10, InjurySource::Unknown, c);
+        let kind = apply_injury(&mut health, 0.05, 10, InjurySource::Unknown, at, c);
         assert_eq!(kind, Some(InjuryKind::Minor));
         assert_eq!(health.injuries.len(), 1);
         assert_eq!(health.injuries[0].tick_received, 10);
@@ -935,7 +963,7 @@ mod tests {
         );
 
         // Negligible damage should not create an injury.
-        let kind = apply_injury(&mut health, 0.01, 11, InjurySource::Unknown, c);
+        let kind = apply_injury(&mut health, 0.01, 11, InjurySource::Unknown, at, c);
         assert_eq!(kind, None);
         assert_eq!(health.injuries.len(), 1, "no new injury for negligible hit");
     }
@@ -963,6 +991,7 @@ mod tests {
             raw_damage,
             tick_of_injury,
             InjurySource::Unknown,
+            Position::new(0, 0),
             &c.combat,
         );
         assert_eq!(kind, Some(InjuryKind::Moderate));

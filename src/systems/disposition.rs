@@ -925,6 +925,12 @@ pub fn evaluate_dispositions(
                 // origin tile — single-perch model. Future refinement
                 // could store a per-coordinator perch component.
                 coordinator_perch: Some(colony.colony_center.0),
+                // Ticket 089 — interoceptive self-anchors.
+                own_safe_rest_spot: crate::systems::interoception::own_safe_rest_spot(
+                    memory,
+                    d.safe_rest_threat_suppression_radius,
+                ),
+                own_injury_site: crate::systems::interoception::own_injury_site(health),
             },
         };
 
@@ -2642,6 +2648,7 @@ pub fn resolve_disposition_chains(
                 &mut Needs,
                 &mut Inventory,
                 &Personality,
+                &mut Memory,
             ),
             (
                 &Name,
@@ -2695,19 +2702,23 @@ pub fn resolve_disposition_chains(
         // Grooming condition for target lookups during social interactions.
         grooming: cats
             .iter()
-            .map(|((e, _, _, _, _, _, _, _), (_, _, _, _, _, g, _, _))| (e, g.map_or(0.8, |g| g.0)))
+            .map(
+                |((e, _, _, _, _, _, _, _, _), (_, _, _, _, _, g, _, _))| {
+                    (e, g.map_or(0.8, |g| g.0))
+                },
+            )
             .collect(),
         // Gender snapshot — used by `MateWith` to look up the partner's
         // gender for §7.M.7.4's gestator-selection fix without double-
         // borrowing the mutable `cats` query.
         gender: cats
             .iter()
-            .map(|((e, _, _, _, _, _, _, _), (_, g, _, _, _, _, _, _))| (e, *g))
+            .map(|((e, _, _, _, _, _, _, _, _), (_, g, _, _, _, _, _, _))| (e, *g))
             .collect(),
         // Tile occupancy for anti-stacking jitter on PatrolTo arrival.
         cat_tile_counts: {
             let mut counts = std::collections::HashMap::new();
-            for ((_, _, _, pos, _, _, _, _), _) in &cats {
+            for ((_, _, _, pos, _, _, _, _, _), _) in &cats {
                 *counts.entry(*pos).or_insert(0) += 1;
             }
             counts
@@ -2724,6 +2735,7 @@ pub fn resolve_disposition_chains(
             mut needs,
             mut inventory,
             personality,
+            mut memory,
         ),
         (
             name,
@@ -2950,6 +2962,7 @@ pub fn resolve_disposition_chains(
             &mut needs,
             &mut inventory,
             personality,
+            &mut memory,
             name,
             gender,
             &mut hunting_priors,
@@ -3023,7 +3036,7 @@ pub fn resolve_disposition_chains(
     // Kitten also gains acceptance — being fed is the highest-signal
     // "cared for" event in a kitten's life.
     for kitten_entity in accum.kitten_feedings {
-        if let Ok(((_, _, _, _, _, mut k_needs, _, _), _)) = cats.get_mut(kitten_entity) {
+        if let Ok(((_, _, _, _, _, mut k_needs, _, _, _), _)) = cats.get_mut(kitten_entity) {
             k_needs.hunger = (k_needs.hunger + 0.5).min(1.0);
             k_needs.acceptance = (k_needs.acceptance + d.acceptance_per_kitten_fed).min(1.0);
         }
@@ -3034,7 +3047,10 @@ pub fn resolve_disposition_chains(
     // of social warmth, which otherwise has no sim-level restorer.
     // §7.W: also apply social_warmth delta to the groomed target.
     for groom in accum.grooming_restorations {
-        if let Ok(((_, _, _, _, _, mut needs, _, _), (_, _, _, _, _, grooming, _, fulfillment))) =
+        if let Ok((
+            (_, _, _, _, _, mut needs, _, _, _),
+            (_, _, _, _, _, grooming, _, fulfillment),
+        )) =
             cats.get_mut(groom.target)
         {
             if let Some(mut g) = grooming {
@@ -3061,7 +3077,7 @@ pub fn resolve_disposition_chains(
                 s.magic,
                 s.growth_rate(),
             ))
-        } else if let Ok(((_, _, _, _, s, _, _, _), _)) = cats.get(effect.apprentice) {
+        } else if let Ok(((_, _, _, _, s, _, _, _, _), _)) = cats.get(effect.apprentice) {
             Some((
                 s.hunting,
                 s.foraging,
@@ -3116,7 +3132,7 @@ pub fn resolve_disposition_chains(
                         5 => s.magic += growth,
                         _ => {}
                     }
-                } else if let Ok(((_, _, _, _, mut s, _, _, _), _)) =
+                } else if let Ok(((_, _, _, _, mut s, _, _, _, _), _)) =
                     cats.get_mut(effect.apprentice)
                 {
                     match idx {
@@ -3153,6 +3169,7 @@ fn dispatch_chain_step(
     needs: &mut Needs,
     inventory: &mut Inventory,
     personality: &Personality,
+    memory: &mut Memory,
     name: &Name,
     gender: &Gender,
     hunting_priors: &mut HuntingPriors,
@@ -3779,7 +3796,9 @@ fn dispatch_chain_step(
         }
 
         StepKind::Sleep { ticks: duration } => {
-            let outcome = crate::steps::disposition::resolve_sleep(ticks, duration, needs, d);
+            let outcome = crate::steps::disposition::resolve_sleep(
+                ticks, duration, needs, memory, pos, time.tick, d,
+            );
             apply_step_result(outcome.result, chain, current);
         }
 

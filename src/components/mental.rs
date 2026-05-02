@@ -98,6 +98,10 @@ pub enum MemoryType {
     /// very long-lasting emotional weight; defines the cat's sense of
     /// identity and courage for the rest of its life.
     Triumph,
+    /// A completed sleep cycle — recorded on `resolve_sleep`'s Advance
+    /// branch with the cat's position at wake. Personal-history layer
+    /// for `LandmarkAnchor::OwnSafeRestSpot`. Ticket 089.
+    Sleep,
 }
 
 /// A single memory entry.

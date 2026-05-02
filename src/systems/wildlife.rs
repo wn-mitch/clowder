@@ -954,11 +954,12 @@ pub fn predator_stalk_cats(
                 if dist <= 1 {
                     // Ambush! Find the nearest cat at the target position.
                     let target_pos = Position::new(target_x, target_y);
-                    if let Some((cat_entity, _)) = cat_positions
+                    if let Some((cat_entity, cat_pos)) = cat_positions
                         .iter()
                         .filter(|(_, cp)| cp.manhattan_distance(&target_pos) <= 1)
                         .min_by_key(|(_, cp)| wl_pos.manhattan_distance(cp))
                     {
+                        let cat_pos = *cat_pos;
                         if let Ok((_, _, mut cat_health, mut needs, mut mood, name)) =
                             cats.get_mut(*cat_entity)
                         {
@@ -975,6 +976,7 @@ pub fn predator_stalk_cats(
                                 damage,
                                 time.tick,
                                 crate::components::physical::InjurySource::ShadowFoxAmbush,
+                                cat_pos,
                                 &constants.combat,
                             );
                             needs.safety = (needs.safety - c.threat_safety_drain).max(0.0);
@@ -2238,7 +2240,8 @@ pub fn fox_confrontation_tick(
 
             // Try to find the target cat and damage it.
             let target_entity = Entity::from_bits(target_id);
-            if let Ok((_, mut cat_health, mut mood, name)) = cats.get_mut(target_entity) {
+            if let Ok((cat_pos, mut cat_health, mut mood, name)) = cats.get_mut(target_entity) {
+                let injury_pos = *cat_pos;
                 cat_health.current =
                     (cat_health.current - fc.standoff_damage_on_escalation).max(0.0);
                 crate::systems::combat::apply_injury(
@@ -2246,6 +2249,7 @@ pub fn fox_confrontation_tick(
                     fc.standoff_damage_on_escalation,
                     time.tick,
                     crate::components::physical::InjurySource::FoxConfrontation,
+                    injury_pos,
                     &constants.combat,
                 );
                 mood.modifiers.push_back(
