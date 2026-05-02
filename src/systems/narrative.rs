@@ -355,6 +355,21 @@ pub fn generate_narrative(
                 let idx = rng.rng.random_range(0..options.len());
                 (options[idx].clone(), NarrativeTier::Action)
             }
+
+            Action::Hide => {
+                // Ticket 104 — Hide/Freeze valence. Phase 1 ships
+                // dormant (HideEligible marker never authored), so
+                // this arm is unreachable at runtime today; lands the
+                // narrative anchor so once lift activation wakes the
+                // DSE up, the ticker has prose ready.
+                let options = [
+                    format!("{cat} flattens against the ground, holding still."),
+                    format!("{cat} freezes in place, ears pinned back."),
+                    format!("{cat} crouches low, breathing shallowly."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
         };
 
         log.push(tick, text, tier);

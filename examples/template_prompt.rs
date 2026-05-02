@@ -65,6 +65,11 @@ fn main() {
             Action::Mate => "socialize.ron",
             Action::Caretake => "socialize.ron",
             Action::Cook => "cook.ron",
+            // Ticket 104 — Hide is dormant in Phase 1. No template
+            // file yet; reuse flee.ron until the Phase-2/3 awakening
+            // commit lands a dedicated hide.ron with Tier::Action
+            // freeze prose.
+            Action::Hide => "flee.ron",
         };
 
         let tier = match action {

@@ -271,6 +271,16 @@ pub enum Feature {
     /// Stays `expected_to_fire_per_soak() => false` until soak data
     /// confirms a healthy seed-42 run sees ≥1 cooldown penalty fire.
     TargetCooldownApplied,
+    /// Ticket 104 — `HideDse` selected and a freeze cycle concluded
+    /// (resolved as `Advance` in `resolve_hide`). Positive — colony
+    /// is exercising the third predator-avoidance valence ("remain
+    /// still and hope") alongside Flee and Fight.
+    /// `expected_to_fire_per_soak() => false` initially: Phase 1 ships
+    /// dormant (the `HideEligible` marker is never authored), and
+    /// even after activation the freeze valence is rare-event class
+    /// — it requires the cornered-and-overmatched gate from modifier
+    /// 105 to trip, which most healthy soaks won't see.
+    HideFreezeFired,
 }
 
 impl Feature {
@@ -376,6 +386,8 @@ impl Feature {
         // §sub-epic 071 — planning-substrate hardening
         Feature::ReservationContended,
         Feature::TargetCooldownApplied,
+        // Ticket 104 — Hide/Freeze DSE infrastructure (dormant in Phase 1).
+        Feature::HideFreezeFired,
     ];
 
     /// The valence of this feature.
@@ -439,6 +451,8 @@ impl Feature {
             // §7.M L2 PairingActivity (ticket 027b)
             Feature::PairingIntentionEmitted => Positive,
             Feature::PairingBiasApplied => Positive,
+            // Ticket 104 — Hide/Freeze valence
+            Feature::HideFreezeFired => Positive,
 
             // --- Negative: adverse events, colony loss signals ---
             Feature::DeathStarvation => Negative,
@@ -655,6 +669,11 @@ impl Feature {
             // Ticket 073 — Neutral feature; promotion to canary waits
             // for empirical baseline data.
             Feature::TargetCooldownApplied => false,
+            // Ticket 104 — Hide/Freeze valence is rare-event class
+            // and Phase-1 dormant (HideEligible never authored).
+            // Promote when the activation system + lift land and
+            // canonical seed-42 produces ≥1 freeze per soak.
+            Feature::HideFreezeFired => false,
             // Every other feature is expected to fire per soak.
             _ => true,
         }
@@ -766,6 +785,7 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::PairingBiasApplied => "PairingBiasApplied",
         Feature::ReservationContended => "ReservationContended",
         Feature::TargetCooldownApplied => "TargetCooldownApplied",
+        Feature::HideFreezeFired => "HideFreezeFired",
     }
 }
 
@@ -987,7 +1007,10 @@ mod tests {
         // Ticket 080 added 1 Neutral (ReservationContended) for the
         // resource-reservation substrate. Ticket 073 added 1 Neutral
         // (TargetCooldownApplied) for the RecentTargetFailures cooldown.
-        assert_eq!(positive, 47);
+        // Ticket 104 added 1 Positive (HideFreezeFired) for the
+        // Hide/Freeze valence — Phase-1 dormant via the HideEligible
+        // gate, but already classified.
+        assert_eq!(positive, 48);
         assert_eq!(negative, 20);
         assert_eq!(neutral, 28);
     }
@@ -1055,7 +1078,7 @@ mod tests {
     fn features_total_in_matches_category_counts() {
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            47
+            48
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),

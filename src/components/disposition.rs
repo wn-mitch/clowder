@@ -104,7 +104,11 @@ impl DispositionKind {
             Action::Explore | Action::Wander => Some(Self::Exploring),
             Action::Mate => Some(Self::Mating),
             Action::Caretake => Some(Self::Caretaking),
-            Action::Idle | Action::Flee => None,
+            // Anxiety-interrupt class — actions without a parent
+            // disposition. `Flee` (047) drives retreat; `Hide` (104) is
+            // the "remain still and hope" sibling valence; `Idle` is
+            // the no-op fallback.
+            Action::Idle | Action::Flee | Action::Hide => None,
         }
     }
 

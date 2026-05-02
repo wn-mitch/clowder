@@ -56,6 +56,14 @@ pub enum Action {
     /// Prepare raw food at a Kitchen structure, transforming it into a cooked
     /// item that restores more hunger when eaten. Fulfillment-tier.
     Cook,
+    /// Ticket 104 — Hide/Freeze response. The third predator-avoidance
+    /// valence ("remain still and hope") alongside Flee and Fight. The
+    /// cat flattens against the ground at its current position, no
+    /// movement, ticking a freeze counter. Anxiety-interrupt class
+    /// alongside `Flee` and `Idle` — has no parent disposition.
+    /// Phase 1 ships dormant: the `HideEligible` marker that gates
+    /// `HideDse` is never authored until lift activation.
+    Hide,
 }
 
 // ---------------------------------------------------------------------------

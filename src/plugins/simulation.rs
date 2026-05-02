@@ -22,6 +22,12 @@ pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConsta
     registry.cat_dses.push(dses::cook_dse());
     registry.cat_dses.push(dses::flee_dse(scoring));
     registry.cat_dses.push(dses::fight_dse(scoring));
+    // Ticket 104 — Hide/Freeze DSE. Phase 1 ships dormant: gated
+    // behind the `HideEligible` marker which has no authoring system,
+    // so it's never eligible. Awakens alongside the lift activation
+    // in modifiers 105 (`AcuteHealthAdrenalineFreeze`) and 142
+    // (`IntraspeciesConflictResponseFreeze`) in a future commit.
+    registry.cat_dses.push(dses::hide_dse());
     registry.target_taking_dses.push(dses::fight_target_dse());
     registry.cat_dses.push(dses::sleep_dse(scoring));
     registry.cat_dses.push(dses::idle_dse(scoring));

@@ -218,6 +218,21 @@ impl HasThreatNearby {
     pub const KEY: &str = "HasThreatNearby";
 }
 
+/// Ticket 104 — Hide/Freeze DSE eligibility gate. Authored when the
+/// cat has a threat in sight AND a low-cover tile within sprint range
+/// (the "remain still and hope" predator-response valence is viable
+/// here — fleeing is too risky, fighting unwinnable). **Phase 1: no
+/// authoring system exists** — the marker is defined so the DSE can
+/// gate against it, but never fires until a Phase-2/3 authoring system
+/// lands alongside the 105 modifier's lift activation. With the marker
+/// never authored, Hide is never eligible, so the DSE is dormant and
+/// score-bit-identical to baseline.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HideEligible;
+impl HideEligible {
+    pub const KEY: &str = "HideEligible";
+}
+
 // ---------------------------------------------------------------------------
 // Capability markers (§4.3 Capability — derived per-tick from parent tags)
 // ---------------------------------------------------------------------------

@@ -186,6 +186,15 @@ const SOCIALIZE: &str = "socialize";
 const EXPLORE: &str = "explore";
 const WANDER: &str = "wander";
 const COOK: &str = "cook";
+/// Ticket 104 — Hide/Freeze DSE id. The "remain still and hope"
+/// predator-avoidance valence; companion to FLEE / FIGHT. No Phase-1
+/// modifier targets Hide directly — ticket 105
+/// (`AcuteHealthAdrenalineFreeze`) and ticket 142
+/// (`IntraspeciesConflictResponseFreeze`) lift it once they land. The
+/// const is referenced in the constituent-DSE-mapping test for
+/// exhaustivity over `Action::*`.
+#[cfg_attr(not(test), allow(dead_code))]
+const HIDE: &str = "hide";
 const HERBCRAFT_PREPARE: &str = "herbcraft_prepare";
 const MAGIC_SCRY: &str = "magic_scry";
 const MAGIC_HARVEST: &str = "magic_harvest";
@@ -2325,6 +2334,11 @@ mod tests {
                 Action::Caretake => &[CARETAKE],
                 Action::Cook => &[COOK],
                 Action::Idle => &[IDLE],
+                // Ticket 104 — Hide is anxiety-interrupt class (no
+                // parent disposition), so it has no constituent role
+                // in this map. Test never queries it. Listed for
+                // exhaustivity.
+                Action::Hide => &[HIDE],
             }
         }
 
