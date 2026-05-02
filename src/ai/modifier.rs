@@ -92,6 +92,14 @@ const BODY_DISTRESS_COMPOSITE: &str = "body_distress_composite";
 /// predator-injury scenario the legacy `CriticalHealth` interrupt was
 /// built to catch.
 const HEALTH_DEFICIT: &str = "health_deficit";
+/// Ticket 102 — `AcuteHealthAdrenalineFight` viability gate input.
+/// `escape_viability` ∈ [0, 1]: 0 = cornered/dependent-burdened, 1 =
+/// open terrain with no escape penalty. Authored by 103's pure helper
+/// in `interoception::escape_viability` and published into
+/// `ScoringContext.escape_viability` / `ctx_scalars`. Returns 1.0 (no
+/// gate trip) when no threat is present; downstream Fight branch
+/// short-circuits there because there's nothing to fight.
+const ESCAPE_VIABILITY: &str = "escape_viability";
 const ACTIVE_DISPOSITION_ORDINAL: &str = "active_disposition_ordinal";
 /// §075 — `CommitmentTenure` Modifier. Drift between this name and
 /// `plan_substrate::COMMITMENT_TENURE_INPUT` (the canonical
@@ -1121,6 +1129,138 @@ impl ScoreModifier for AcuteHealthAdrenalineFlee {
 }
 
 // ---------------------------------------------------------------------------
+// AcuteHealthAdrenalineFight — ticket 102
+// ---------------------------------------------------------------------------
+
+/// Ticket 102 — `AcuteHealthAdrenalineFight` Modifier. The Fight valence
+/// of the N-valence framework codified in 047 (Flee branch) and 103
+/// (`escape_viability` substrate). Models cornered-cat ferocity and
+/// maternal defense: when a wounded cat can't realistically escape
+/// (low `escape_viability` from walled terrain or held-back by
+/// kittens / a partner), the same adrenaline scalar that drives 047's
+/// Flee branch instead promotes Fight.
+///
+/// **Trigger:** `health_deficit >= acute_health_adrenaline_threshold`
+/// (shared with 047) **AND** `escape_viability < acute_health_adrenaline_fight_viability_threshold`
+/// (the new gate). Above the viability threshold, the Flee branch owns
+/// the response; below, this branch takes over.
+///
+/// **Transform:** same narrow smoothstep ramp on `health_deficit` as
+/// 047's Flee. The viability check is binary (gate trip) rather than
+/// graded — it's a "which valence" predicate, not a magnitude knob.
+///
+/// **Applies to:** Fight (lift `acute_health_adrenaline_fight_lift`,
+/// default 0.0 — inert at ship). Additionally **suppresses Flee by
+/// the same magnitude** so the cornered cat doesn't see Flee promoted
+/// by 047's branch on the same tick: when the gate trips, the modifier
+/// elects Fight and zeroes Flee's adrenaline lift in one composition
+/// step. The two branches are mutually exclusive by construction.
+///
+/// **Composition:** Registered immediately after `AcuteHealthAdrenalineFlee`
+/// so the Flee suppression applies *after* 047's Flee lift was added —
+/// net Flee score under the gate is `(base + flee_lift) − fight_lift`,
+/// which is approximately `base` when the lifts are equal (the design
+/// target). Order within the additive section is preserved: this lift
+/// runs before Stockpile / Fox / Corruption multiplicative damps.
+///
+/// **Substrate role:** Completes the 047 framework's first two
+/// valences (Flee + Fight). Freeze (ticket 105) requires the Hide DSE
+/// from ticket 104 and lands separately. The intraspecies fawn valence
+/// (ticket 109) reads a different scalar and lives in its own modifier.
+///
+/// **Gated-boost contract:** returns `score` unchanged on score `<= 0`,
+/// matching 047. Adrenaline doesn't conjure a Fight path into existence
+/// when the underlying Fight DSE scored zero (no winnable contest in
+/// view). Same convention for the Flee suppression — won't drag a
+/// zero-base Flee below zero, so non-additive composition doesn't
+/// accidentally invent suppression for absent paths.
+pub struct AcuteHealthAdrenalineFight {
+    threshold: f32,
+    fight_lift: f32,
+    viability_threshold: f32,
+}
+
+impl AcuteHealthAdrenalineFight {
+    /// Same smoothstep transition width as 047's Flee — the two branches
+    /// share the adrenaline scalar, so they share the lurch shape.
+    const TRANSITION_WIDTH: f32 = 0.1;
+
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            threshold: sc.acute_health_adrenaline_threshold,
+            fight_lift: sc.acute_health_adrenaline_fight_lift,
+            viability_threshold: sc.acute_health_adrenaline_fight_viability_threshold,
+        }
+    }
+
+    /// Smoothstep ramp on `health_deficit`. Identical to 047's Flee
+    /// ramp; duplicated because the modifier types are siblings rather
+    /// than a hierarchy and folding the ramp into a shared helper would
+    /// couple their evolution unnecessarily (e.g. if 102 ever wants a
+    /// different transition width or threshold offset).
+    fn ramp(&self, health_deficit: f32) -> f32 {
+        if health_deficit <= self.threshold {
+            return 0.0;
+        }
+        let t = ((health_deficit - self.threshold) / Self::TRANSITION_WIDTH).clamp(0.0, 1.0);
+        t * t * (3.0 - 2.0 * t)
+    }
+
+    /// Returns `true` when `escape_viability` is below the gate
+    /// threshold (cat is cornered / burdened — fight, don't flee).
+    /// Returns `false` when viability is high (above gate — let 047's
+    /// Flee branch handle it).
+    fn gate_trips(&self, escape_viability: f32) -> bool {
+        escape_viability < self.viability_threshold
+    }
+}
+
+impl ScoreModifier for AcuteHealthAdrenalineFight {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        // Two action surfaces: Fight (additive lift) and Flee
+        // (additive suppression by the same magnitude). Anything else
+        // is untouched.
+        let suppress = match dse_id.0 {
+            FIGHT => false,
+            FLEE => true,
+            _ => return score,
+        };
+        if score <= 0.0 {
+            return score;
+        }
+        let deficit = fetch(HEALTH_DEFICIT, ctx.cat).clamp(0.0, 1.0);
+        let ramp = self.ramp(deficit);
+        if ramp <= 0.0 {
+            return score;
+        }
+        let viability = fetch(ESCAPE_VIABILITY, ctx.cat).clamp(0.0, 1.0);
+        if !self.gate_trips(viability) {
+            return score;
+        }
+        let delta = ramp * self.fight_lift;
+        if suppress {
+            // Flee suppression — clamp so we never push a positive
+            // base below zero (consistent with the gated-boost
+            // contract — no invented adrenaline-driven suppression
+            // for a Flee path the underlying scoring already rejected).
+            (score - delta).max(0.0)
+        } else {
+            score + delta
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "acute_health_adrenaline_fight"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Default pipeline builder
 // ---------------------------------------------------------------------------
 
@@ -1184,6 +1324,15 @@ pub fn default_modifier_pipeline(
     // from Guarding/Crafting under injury, which is the ticket-047
     // behavioral target.
     pipeline.push(Box::new(AcuteHealthAdrenalineFlee::new(sc)));
+    // Ticket 102 — `AcuteHealthAdrenalineFight` registers immediately
+    // after the Flee branch so its Flee-suppression component runs
+    // *after* 047's Flee lift was added: under the viability gate,
+    // (base + flee_lift) − fight_lift ≈ base when the magnitudes match
+    // (047 0.60 vs 102 0.50 — close enough that the cornered cat sees
+    // Flee held near baseline rather than promoted, while Fight gets
+    // the full lurch). Order within the additive section is preserved:
+    // this composes before the multiplicative damps run.
+    pipeline.push(Box::new(AcuteHealthAdrenalineFight::new(sc)));
     pipeline.push(Box::new(FoxTerritorySuppression::new(sc)));
     pipeline.push(Box::new(CorruptionTerritorySuppression::new(sc)));
     // §3.5.1 ticket 094 — `StockpileSatiation` registers after the
@@ -1852,19 +2001,20 @@ mod tests {
     }
 
     #[test]
-    fn default_pipeline_registers_eleven_modifiers() {
-        // Eleven §3.5.1 foundational modifiers — the seven original
+    fn default_pipeline_registers_twelve_modifiers() {
+        // Twelve §3.5.1 foundational modifiers — the seven original
         // (`Pride`, `IndependenceSolo`, `IndependenceGroup`, `Patience`,
         // `Tradition`, `FoxTerritorySuppression`,
         // `CorruptionTerritorySuppression`) plus §075's
         // `CommitmentTenure`, ticket 094's `StockpileSatiation`,
-        // ticket 088's `BodyDistressPromotion`, and ticket 047's
-        // `AcuteHealthAdrenalineFlee`. The three Phase 4.2 emergency
+        // ticket 088's `BodyDistressPromotion`, ticket 047's
+        // `AcuteHealthAdrenalineFlee`, and ticket 102's
+        // `AcuteHealthAdrenalineFight`. The three Phase 4.2 emergency
         // modifiers (`WardCorruptionEmergency`, `CleanseEmergency`,
         // `SensedRotBoost`) retired in §13.1.
         let constants = crate::resources::sim_constants::SimConstants::default();
         let pipeline = default_modifier_pipeline(&constants);
-        assert_eq!(pipeline.len(), 11, "expected 11 registered modifiers");
+        assert_eq!(pipeline.len(), 12, "expected 12 registered modifiers");
     }
 
     // -----------------------------------------------------------------------
@@ -2351,6 +2501,196 @@ mod tests {
         assert!(
             (sleep_post - 0.80).abs() < 1e-5,
             "deficit 0.55 saturates 0.50 lift; got {sleep_post}"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // ticket 102 AcuteHealthAdrenalineFight
+    // -----------------------------------------------------------------------
+
+    fn test_adrenaline_fight() -> AcuteHealthAdrenalineFight {
+        AcuteHealthAdrenalineFight {
+            threshold: 0.4,
+            fight_lift: 0.50,
+            viability_threshold: 0.4,
+        }
+    }
+
+    #[test]
+    fn adrenaline_fight_no_lift_below_health_threshold() {
+        // Deficit below threshold ⇒ no lift, even when escape_viability
+        // is far below the gate. The two predicates AND together;
+        // failing either short-circuits.
+        let modifier = test_adrenaline_fight();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 0.3,
+            ESCAPE_VIABILITY => 0.1, // cornered, but cat is not yet wounded enough
+            _ => 0.0,
+        };
+        let fight = modifier.apply(DseId(FIGHT), 0.5, &ctx, &fetch);
+        let flee = modifier.apply(DseId(FLEE), 0.5, &ctx, &fetch);
+        assert!((fight - 0.5).abs() < 1e-6, "Fight unchanged when deficit below threshold; got {fight}");
+        assert!((flee - 0.5).abs() < 1e-6, "Flee unchanged when deficit below threshold; got {flee}");
+    }
+
+    #[test]
+    fn adrenaline_fight_no_lift_when_escape_viable() {
+        // Deficit saturated, but escape_viability >= gate threshold ⇒
+        // 047's Flee branch owns the response, this branch stays quiet.
+        // The viability predicate is the substrate that splits Flee from
+        // Fight under the same adrenaline scalar.
+        let modifier = test_adrenaline_fight();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 0.55,
+            ESCAPE_VIABILITY => 0.8, // open terrain, no dependents
+            _ => 0.0,
+        };
+        let fight = modifier.apply(DseId(FIGHT), 0.5, &ctx, &fetch);
+        let flee = modifier.apply(DseId(FLEE), 0.5, &ctx, &fetch);
+        assert!((fight - 0.5).abs() < 1e-6, "Fight unchanged when escape viable; got {fight}");
+        assert!((flee - 0.5).abs() < 1e-6, "Flee unchanged when escape viable; got {flee}");
+    }
+
+    #[test]
+    fn adrenaline_fight_full_lift_under_gate() {
+        // Deficit saturates the smoothstep (>= 0.5), viability below gate.
+        // Fight gets +0.50, Flee gets -0.50.
+        let modifier = test_adrenaline_fight();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 0.55,
+            ESCAPE_VIABILITY => 0.1,
+            _ => 0.0,
+        };
+        let fight = modifier.apply(DseId(FIGHT), 0.5, &ctx, &fetch);
+        let flee = modifier.apply(DseId(FLEE), 0.5, &ctx, &fetch);
+        assert!((fight - 1.0).abs() < 1e-5, "Fight saturated lift; got {fight}");
+        assert!((flee - 0.0).abs() < 1e-5, "Flee suppressed to base − lift; got {flee}");
+    }
+
+    #[test]
+    fn adrenaline_fight_smoothstep_midpoint_under_gate() {
+        // Deficit at threshold + half-width = 0.45, viability below gate.
+        // Smoothstep ramp = 0.5 ⇒ Fight +0.25, Flee -0.25.
+        let modifier = test_adrenaline_fight();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 0.45,
+            ESCAPE_VIABILITY => 0.1,
+            _ => 0.0,
+        };
+        let fight = modifier.apply(DseId(FIGHT), 0.5, &ctx, &fetch);
+        let flee = modifier.apply(DseId(FLEE), 0.5, &ctx, &fetch);
+        assert!((fight - 0.75).abs() < 1e-5, "Fight half-lift; got {fight}");
+        assert!((flee - 0.25).abs() < 1e-5, "Flee half-suppression; got {flee}");
+    }
+
+    #[test]
+    fn adrenaline_fight_targets_only_fight_and_flee() {
+        // Lurch is two-DSE only — Sleep / Hunt / Forage / Eat / etc. all
+        // pass through unchanged. If the lift bled into Sleep we'd
+        // double-promote it (047 Flee branch already lifts Sleep).
+        let modifier = test_adrenaline_fight();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 1.0,
+            ESCAPE_VIABILITY => 0.0,
+            _ => 0.0,
+        };
+        for dse in [
+            EAT, SLEEP, HUNT, FORAGE, GROOM_SELF, MATE, COORDINATE, BUILD, MENTOR, CARETAKE,
+            SOCIALIZE, PATROL, COOK, FARM, WANDER, EXPLORE, IDLE, GROOM_OTHER,
+        ] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "non-Fight/Flee dse {dse} unchanged at full deficit + corner; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn adrenaline_fight_does_not_resurrect_zero_score() {
+        // Gated-boost contract — Fight at zero stays at zero (no
+        // adrenaline-conjured combat). Flee at zero stays at zero (no
+        // negative-resurrection: suppressing a non-existent path
+        // shouldn't drag the score below zero).
+        let modifier = test_adrenaline_fight();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 1.0,
+            ESCAPE_VIABILITY => 0.0,
+            _ => 0.0,
+        };
+        for dse in [FIGHT, FLEE] {
+            let out = modifier.apply(DseId(dse), 0.0, &ctx, &fetch);
+            assert_eq!(
+                out, 0.0,
+                "zero-score dse {dse} stays zero — no resurrection / no negative dive"
+            );
+        }
+    }
+
+    #[test]
+    fn adrenaline_fight_gate_strict_inequality_at_boundary() {
+        // Boundary semantics — `escape_viability == threshold` does NOT
+        // trip the gate (strict `<`). Above-or-at threshold belongs to
+        // 047's Flee branch; only strictly-below trips into Fight.
+        let modifier = test_adrenaline_fight();
+        let (_, ctx) = test_ctx();
+        let fetch_at = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 0.55,
+            ESCAPE_VIABILITY => 0.4, // exactly at threshold
+            _ => 0.0,
+        };
+        let fight_at = modifier.apply(DseId(FIGHT), 0.5, &ctx, &fetch_at);
+        assert!(
+            (fight_at - 0.5).abs() < 1e-6,
+            "viability at threshold does not trip gate; got {fight_at}"
+        );
+        let fetch_below = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 0.55,
+            ESCAPE_VIABILITY => 0.39,
+            _ => 0.0,
+        };
+        let fight_below = modifier.apply(DseId(FIGHT), 0.5, &ctx, &fetch_below);
+        assert!(
+            (fight_below - 1.0).abs() < 1e-5,
+            "viability below threshold trips gate; got {fight_below}"
+        );
+    }
+
+    #[test]
+    fn adrenaline_fight_mutual_exclusion_with_flee_branch() {
+        // Pipeline composition test: under the gate (cornered cat with
+        // saturated deficit), 047 lifts Flee by +0.60 and 102 suppresses
+        // by -0.50, netting +0.10 — Flee is held near baseline rather
+        // than promoted, while Fight gets the full +0.50 lurch. This is
+        // the design target: under the gate, the cornered cat fights
+        // instead of fleeing, and the two valences don't both fire.
+        use crate::ai::eval::ModifierPipeline;
+        let mut pipeline = ModifierPipeline::new();
+        pipeline.push(Box::new(test_adrenaline()));
+        pipeline.push(Box::new(test_adrenaline_fight()));
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 1.0,
+            ESCAPE_VIABILITY => 0.1,
+            _ => 0.0,
+        };
+        // Flee: pre 0.50 → +0.60 (047) → -0.50 (102) = 0.60.
+        let flee_after = pipeline.apply(DseId(FLEE), 0.50, &ctx, &fetch);
+        assert!(
+            (flee_after - 0.60).abs() < 1e-5,
+            "Flee net under gate ≈ base + (flee_lift − fight_lift); got {flee_after}"
+        );
+        // Fight: pre 0.50 → +0.50 (102 only — 047 doesn't touch Fight) = 1.00.
+        let fight_after = pipeline.apply(DseId(FIGHT), 0.50, &ctx, &fetch);
+        assert!(
+            (fight_after - 1.00).abs() < 1e-5,
+            "Fight under gate gets full Fight lift; got {fight_after}"
         );
     }
 

@@ -1,0 +1,43 @@
+# Ticket 102 — `AcuteHealthAdrenalineFight` Fight valence enable.
+#
+# **Status:** documentation artifact. The Fight gate is chain-rare
+# (fires only when wounded cat + low escape_viability + active threat +
+# the gate predicate trips), so a default-geometry seed-42 soak will
+# rarely engage it. **Structural verification — the 8 unit tests in
+# `src/ai/modifier.rs` — is the primary ship gate** for 102, per the
+# user's feedback memory on chain-rare events.
+#
+# Reach for this spec when you want to soak the substrate in a
+# constrained map (walled corner + dependent-burdened mother cat) or
+# when promoting a different `acute_health_adrenaline_fight_lift`
+# default. The patch below enables the proposed 0.5 magnitude; the
+# baseline is the as-shipped 0.0 (modifier inert).
+#
+# Direction note: the ticket text said "WildlifeCombat" — that is
+# actually an `InjurySource` variant, not a `DeathCause`. The closest
+# proxy in the footer's `deaths_by_cause` map is `Injury`, which goes
+# up when cornered cats fight a fight they would previously have fled.
+# The tradeoff is acceptable iff total deaths stay flat (the hard
+# gate is the survival canary, which this spec doesn't replace).
+
+hypothesis: |
+  Cornered cats with low escape_viability and a dependent burden
+  (kittens / pair-bond) should fight a wounded-but-winnable battle
+  rather than flee into worse terrain. Enabling the Fight valence's
+  +0.50 lift on the gate trips this branch on; the proxy footer
+  signal is a small bump in injury-cause deaths from cats that now
+  engage a threat they previously fled. Survival canaries hold; the
+  Fight branch is a behavioral redirect, not a damage amplifier.
+constants_patch:
+  scoring:
+    acute_health_adrenaline_fight_lift: 0.50
+prediction:
+  metric: deaths_by_cause.Injury
+  direction: increase
+  # Wide band because the gate is chain-rare on default geometry; on
+  # open-meadow seed-42 the substrate may barely fire and the metric
+  # could land at 0% drift. Concordance is informative, not gating.
+  rough_magnitude_pct: [0, 30]
+seeds: [42, 99, 7]
+reps: 3
+duration: 900

@@ -1379,6 +1379,28 @@ pub struct ScoringConstants {
     /// Sleep (0.50 here + up to 0.20 from 088).
     #[serde(default = "default_acute_health_adrenaline_sleep_lift")]
     pub acute_health_adrenaline_sleep_lift: f32,
+    /// Ticket 102 — `AcuteHealthAdrenalineFight` lift on the Fight DSE
+    /// when `health_deficit` is high AND `escape_viability` is below
+    /// `acute_health_adrenaline_fight_viability_threshold` (cornered cat,
+    /// maternal defense, terrain-locked but combat is winnable). The
+    /// same `health_deficit` ramp drives the lift as the Flee branch;
+    /// the additional viability gate is what splits this branch off.
+    /// Default 0.0 (inert at ship) — proposed magnitude 0.50, enabled
+    /// via `CLOWDER_OVERRIDES` for the four-artifact hypothesize sweep.
+    /// The same magnitude is *subtracted* from Flee on the same tick so
+    /// the cornered cat doesn't see Flee promoted by 047's Flee branch
+    /// while Fight is also lifting — the suppression keeps the two
+    /// branches mutually exclusive in a single contest.
+    #[serde(default = "default_acute_health_adrenaline_fight_lift")]
+    pub acute_health_adrenaline_fight_lift: f32,
+    /// Ticket 102 — `escape_viability` threshold below which the Fight
+    /// branch fires. Above this value the cat's `Flee` valence (047)
+    /// drives the response; below it, Fight takes over (with Flee
+    /// suppressed by the same magnitude). Default 0.4 — picked so the
+    /// gate fires in walled corners / dependent-burdened scenarios but
+    /// stays quiet in open terrain.
+    #[serde(default = "default_acute_health_adrenaline_fight_viability_threshold")]
+    pub acute_health_adrenaline_fight_viability_threshold: f32,
     pub wander_curiosity_scale: f32,
     pub wander_base: f32,
     pub wander_playfulness_bonus: f32,
@@ -1576,6 +1598,9 @@ impl Default for ScoringConstants {
             acute_health_adrenaline_threshold: default_acute_health_adrenaline_threshold(),
             acute_health_adrenaline_flee_lift: default_acute_health_adrenaline_flee_lift(),
             acute_health_adrenaline_sleep_lift: default_acute_health_adrenaline_sleep_lift(),
+            acute_health_adrenaline_fight_lift: default_acute_health_adrenaline_fight_lift(),
+            acute_health_adrenaline_fight_viability_threshold:
+                default_acute_health_adrenaline_fight_viability_threshold(),
             wander_curiosity_scale: 0.4,
             wander_base: 0.08,
             wander_playfulness_bonus: 0.2,
@@ -2263,6 +2288,26 @@ fn default_acute_health_adrenaline_flee_lift() -> f32 {
 /// injury, since Sleep routes the cat to a den.
 fn default_acute_health_adrenaline_sleep_lift() -> f32 {
     0.0
+}
+
+/// Ticket 102 — `AcuteHealthAdrenalineFight` Fight-DSE lurch magnitude.
+/// **Defaults to 0.0** so the modifier ships inert; the proposed
+/// magnitude (0.50) is enabled via `CLOWDER_OVERRIDES` for the Fight-branch
+/// hypothesize sweep. The same magnitude is subtracted from Flee on the
+/// same tick (mutual exclusion with the 047 Flee valence).
+fn default_acute_health_adrenaline_fight_lift() -> f32 {
+    0.0
+}
+
+/// Ticket 102 — `escape_viability` gate threshold for the Fight branch.
+/// Below this value, the cat is "cornered" (insufficient open terrain or
+/// burdened by dependents) and the modifier elects Fight over Flee. The
+/// 0.4 default lines up with the dependent-penalty regime in 103: an
+/// unburdened cat in moderately closed terrain (~0.6 viability) stays in
+/// the Flee valence; a parent cat in a corner drops below 0.4 and
+/// triggers the Fight gate.
+fn default_acute_health_adrenaline_fight_viability_threshold() -> f32 {
+    0.4
 }
 
 fn default_build_pressure_cooking_min_raw_food() -> usize {

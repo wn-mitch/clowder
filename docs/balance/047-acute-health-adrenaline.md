@@ -117,3 +117,30 @@ The Phase 3 sweep is preserved at:
 - Treatment: `logs/sweep-promoting-sleep-flee-under-acute-health-deficit-redirects-in-treatment/`
 
 Both available as anchors for the next iteration once 118 lands.
+
+---
+
+## Iteration 2026-05-02 — Fight valence (ticket 102)
+
+The N-valence framework gained its second valence on 2026-05-02:
+ticket 102 ships `AcuteHealthAdrenalineFight`. Reads the same
+`health_deficit` scalar but gated on `escape_viability < 0.4` (the
+substrate from ticket 103). When the gate trips (cornered cat,
+maternal defense, terrain-locked but combat is winnable), the
+modifier lifts Fight by `acute_health_adrenaline_fight_lift` AND
+suppresses Flee by the same magnitude — the two valences are mutually
+exclusive by construction at the modifier-pipeline composition step.
+047's Flee branch owns the response when `escape_viability >= 0.4`;
+102's Fight branch owns it when below.
+
+Same shipping discipline as 047: new lift defaults to 0.0 (modifier
+inert), proposed 0.50 magnitude enabled via
+`docs/balance/hypothesis-102-acute-health-adrenaline-fight.yaml`.
+Per the user's chain-rare-events feedback memory, structural
+verification (the 8 unit tests in `src/ai/modifier.rs`) is the
+primary ship gate; the hypothesize spec is documentation for the
+future enable, not a sweep gate — the gate trips rarely on default
+geometry.
+
+Freeze (ticket 105) and intraspecies fawn (ticket 109) round out the
+N-valence framework when the Hide DSE (ticket 104) lands.

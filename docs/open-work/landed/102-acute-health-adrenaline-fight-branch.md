@@ -1,7 +1,7 @@
 ---
 id: 102
 title: AcuteHealthAdrenaline Fight branch — cornered/maternal-defense valence
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-01
 parked: null
@@ -10,7 +10,7 @@ supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [047-acute-health-adrenaline.md]
 landed-at: null
-landed-on: null
+landed-on: 2026-05-02
 ---
 
 ## Why
@@ -41,3 +41,4 @@ The 047 ticket text codifies the framework as "N-valence" sharing one adrenaline
 ## Log
 
 - 2026-05-01: Opened as one of the §6-valence-framework follow-ons from ticket 047. Blocked-by 103 (escape_viability scalar).
+- 2026-05-02: Landed as the Fight valence of the N-valence framework. New `AcuteHealthAdrenalineFight` modifier in `src/ai/modifier.rs` reads `health_deficit` (047's scalar) and gates on `escape_viability < acute_health_adrenaline_fight_viability_threshold` (default 0.4 — substrate from 103). Lifts Fight by `acute_health_adrenaline_fight_lift` AND suppresses Flee by the same magnitude (mutual exclusion with 047's Flee branch). Default lift 0.0 (modifier inert at ship); proposed 0.50 magnitude enabled via `docs/balance/hypothesis-102-acute-health-adrenaline-fight.yaml`. Pipeline-count test bumped 11 → 12. Eight unit tests cover smoothstep boundary, viability gate, mutual-exclusion composition with 047, and the gated-boost contract on both Fight (no resurrection) and Flee (no negative dive). Per the user's chain-rare-events feedback memory, structural verification is the ship gate — the hypothesize spec is parked as documentation rather than gating.
