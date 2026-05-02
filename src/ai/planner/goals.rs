@@ -88,7 +88,7 @@ mod tests {
             construction_done: false,
             prey_found: false,
             farm_tended: false,
-            materials_available: false,
+            materials_delivered_this_plan: false,
         }
     }
 

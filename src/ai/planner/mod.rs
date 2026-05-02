@@ -94,19 +94,16 @@ pub struct PlannerState {
     pub construction_done: bool,
     pub prey_found: bool,
     pub farm_tended: bool,
-    /// True iff at least one reachable `ConstructionSite` has
-    /// `materials_complete() == true`. Construct gates on this; founding
-    /// builds only flip true after enough Pickup→Deliver cycles fill the
-    /// site's materials ledger. Coarse for the founding-only scope (one
-    /// site at a time); per-site tracking is the open follow-on.
-    ///
-    /// Hybrid (ticket 092 §Out of scope): mirrors a world fact at plan
-    /// entry but is also mutated by `SetMaterialsAvailable(true)` in the
-    /// `DeliverMaterials` action, so it can't migrate to a pure
-    /// `HasMarker` query without splitting into entry-marker + per-plan
-    /// search field. Tracked by the materials-available-substrate-split
-    /// follow-up.
-    pub materials_available: bool,
+    /// Search-state only (ticket 096): `true` iff a `DeliverMaterials`
+    /// step has been simulated earlier in *this* A* expansion. Lets the
+    /// planner reason "after I deliver, the site is fundable, so the
+    /// next `Construct` step is applicable" inside one search without
+    /// re-reading ECS. The world-fact half of the old hybrid
+    /// (`materials_available`) lives in the substrate as the
+    /// `MaterialsAvailable` marker, consulted via
+    /// `StatePredicate::HasMarker`. `Construct` accepts either branch
+    /// (two action defs in `building_actions`).
+    pub materials_delivered_this_plan: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -196,7 +193,12 @@ pub enum StatePredicate {
     ConstructionDone(bool),
     FarmTended(bool),
     TripsAtLeast(u32),
-    MaterialsAvailable(bool),
+    /// Search-state predicate (ticket 096): true iff a
+    /// `DeliverMaterials` step has been simulated earlier in this A*
+    /// expansion. Pair with `HasMarker(MaterialsAvailable::KEY)` as
+    /// alternate `Construct` preconditions — the substrate branch
+    /// covers prefunded sites, this branch covers in-plan delivery.
+    MaterialsDeliveredThisPlan(bool),
     HasMarker(&'static str),
 }
 
@@ -215,7 +217,7 @@ impl StatePredicate {
             Self::ConstructionDone(v) => state.construction_done == *v,
             Self::FarmTended(v) => state.farm_tended == *v,
             Self::TripsAtLeast(n) => state.trips_done >= *n,
-            Self::MaterialsAvailable(v) => state.materials_available == *v,
+            Self::MaterialsDeliveredThisPlan(v) => state.materials_delivered_this_plan == *v,
             Self::HasMarker(name) => ctx.markers.has(name, ctx.entity),
         }
     }
@@ -234,7 +236,7 @@ pub enum StateEffect {
     SetConstructionDone(bool),
     SetFarmTended(bool),
     IncrementTrips,
-    SetMaterialsAvailable(bool),
+    SetMaterialsDeliveredThisPlan(bool),
 }
 
 impl StateEffect {
@@ -250,7 +252,7 @@ impl StateEffect {
             Self::SetConstructionDone(v) => state.construction_done = *v,
             Self::SetFarmTended(v) => state.farm_tended = *v,
             Self::IncrementTrips => state.trips_done += 1,
-            Self::SetMaterialsAvailable(v) => state.materials_available = *v,
+            Self::SetMaterialsDeliveredThisPlan(v) => state.materials_delivered_this_plan = *v,
         }
     }
 }
@@ -498,7 +500,7 @@ mod tests {
             construction_done: false,
             prey_found: false,
             farm_tended: false,
-            materials_available: false,
+            materials_delivered_this_plan: false,
         }
     }
 

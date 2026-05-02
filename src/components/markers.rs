@@ -316,6 +316,19 @@ impl ThornbriarAvailable {
     pub const KEY: &str = "ThornbriarAvailable";
 }
 
+/// Per-cat: the nearest reachable construction site has
+/// `materials_complete()` true. Gates the substrate branch of the
+/// `Construct` GOAP action — when set, the planner can plan
+/// `[TravelTo(ConstructionSite), Construct]` directly without a
+/// haul leg. Authored each tick from
+/// `goap.rs::build_planner_markers` against
+/// `ConstructionSite::materials_complete()`. Ticket 096.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct MaterialsAvailable;
+impl MaterialsAvailable {
+    pub const KEY: &str = "MaterialsAvailable";
+}
+
 // ---------------------------------------------------------------------------
 // TargetExistence markers (§4.3 TargetExistence — gates target-taking DSEs)
 // ---------------------------------------------------------------------------
@@ -623,6 +636,7 @@ mod tests {
         assert_marker_queryable(HasRawFoodInStores);
         assert_marker_queryable(HasStoredFood);
         assert_marker_queryable(ThornbriarAvailable);
+        assert_marker_queryable(MaterialsAvailable);
     }
 
     #[test]

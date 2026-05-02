@@ -1660,6 +1660,15 @@ pub fn evaluate_and_plan(
             .iter()
             .filter_map(|(e, _, _, site, _)| site.map(|s| (e, s.materials_complete())))
             .collect();
+        // Ticket 096: author the per-cat `MaterialsAvailable` substrate
+        // marker against this cat's nearest reachable site. The
+        // planner consults it via `HasMarker(MaterialsAvailable::KEY)`
+        // on the substrate-branch of `Construct`.
+        markers.set_entity(
+            markers::MaterialsAvailable::KEY,
+            entity,
+            materials_available_for(pos, &construction_pos, &construction_materials_complete),
+        );
         let planner_state = build_planner_state(
             pos,
             needs,
@@ -1668,7 +1677,6 @@ pub fn evaluate_and_plan(
             &res.map,
             &stores_positions,
             &construction_pos,
-            &construction_materials_complete,
             &farm_pos,
             &herb_positions,
             &material_pile_positions,
@@ -1867,16 +1875,6 @@ struct StepSnapshots {
     stores_entities: Vec<(Entity, Position)>,
     kitchen_positions: Vec<Position>,
     construction_positions: Vec<(Entity, Position)>,
-    /// Per-site materials-complete state (Entity → bool). Used by
-    /// `build_planner_state` to author the cat's `materials_available`
-    /// flag from the *nearest* site rather than a colony-wide OR.
-    /// Founding non-prefunded sites read `false`; coordinator-spawned
-    /// `new_prefunded` sites read `true` from spawn. Without this
-    /// per-site shape, a cat near the unfunded founding site would see
-    /// `materials_available=true` (because some other prefunded site is
-    /// complete) and the planner would emit `[TravelTo, Construct]`,
-    /// which Fails at `resolve_construct`'s materials check.
-    construction_materials_complete: HashMap<Entity, bool>,
     farm_positions: Vec<Position>,
     herb_positions: Vec<(Entity, Position, HerbKind)>,
     /// Ground items whose `kind.material()` is `Some(_)`. Authored each
@@ -2011,8 +2009,10 @@ pub fn resolve_goap_plans(
     // planner gates on via `HasMarker(...)`. `evaluate_and_plan` builds
     // its own snapshot from the full `world_state` query set; this
     // replan-side snapshot covers the subset the planner actually
-    // consults at replan time (HasStoredFood, ThornbriarAvailable).
-    let planner_markers = {
+    // consults at replan time (HasStoredFood, ThornbriarAvailable,
+    // and the per-cat `MaterialsAvailable` authored below once
+    // `construction_materials_complete` is in scope).
+    let mut planner_markers = {
         let mut m = crate::ai::scoring::MarkerSnapshot::new();
         if has_stored_food {
             m.set_colony(markers::HasStoredFood::KEY, true);
@@ -2078,6 +2078,20 @@ pub fn resolve_goap_plans(
         .filter_map(|(e, _, site, _, _)| site.map(|s| (e, s.materials_complete())))
         .collect();
 
+    // Ticket 096: author the per-cat `MaterialsAvailable` substrate
+    // marker. `Construct`'s substrate-branch precondition consults it
+    // via `HasMarker(MaterialsAvailable::KEY)`; the plan-branch
+    // (`MaterialsDeliveredThisPlan(true)`) covers the in-flight
+    // haul→deliver→construct compose case where the marker still reads
+    // false at plan entry.
+    for ((entity, _, _, pos, _, _, _, _, _), _) in &cats {
+        planner_markers.set_entity(
+            markers::MaterialsAvailable::KEY,
+            entity,
+            materials_available_for(pos, &construction_positions, &construction_materials_complete),
+        );
+    }
+
     // Count cats adjacent to each construction site (for multi-builder bonuses).
     let builders_per_site: HashMap<Entity, usize> = {
         let cat_pos_list: Vec<Position> = cats
@@ -2126,7 +2140,6 @@ pub fn resolve_goap_plans(
         stores_entities,
         kitchen_positions,
         construction_positions,
-        construction_materials_complete,
         farm_positions,
         herb_positions,
         material_pile_positions,
@@ -2349,7 +2362,6 @@ pub fn resolve_goap_plans(
                     &ec.map,
                     &snaps.stores_positions,
                     &snaps.construction_positions,
-                    &snaps.construction_materials_complete,
                     &snaps.farm_positions,
                     &snaps.herb_positions,
                     &snaps.material_pile_positions,
@@ -2642,7 +2654,6 @@ pub fn resolve_goap_plans(
                     &ec.map,
                     &snaps.stores_positions,
                     &snaps.construction_positions,
-                    &snaps.construction_materials_complete,
                     &snaps.farm_positions,
                     &snaps.herb_positions,
                     &snaps.material_pile_positions,
@@ -5659,7 +5670,6 @@ fn build_planner_state(
     map: &TileMap,
     stores_positions: &[Position],
     construction_positions: &[(Entity, Position)],
-    construction_materials_complete: &HashMap<Entity, bool>,
     farm_positions: &[Position],
     herb_positions: &[(Entity, Position, HerbKind)],
     material_pile_positions: &[(Entity, Position, ItemKind)],
@@ -5674,19 +5684,13 @@ fn build_planner_state(
         herb_positions,
         material_pile_positions,
     );
-    // `materials_available` is per-cat: read off the nearest site's
-    // ledger. If no site is reachable, default true so non-Building
-    // dispositions don't accidentally see materials_available=false.
-    let materials_available = construction_positions
-        .iter()
-        .min_by_key(|(_, cp)| pos.manhattan_distance(cp))
-        .map(|(entity, _)| {
-            construction_materials_complete
-                .get(entity)
-                .copied()
-                .unwrap_or(true)
-        })
-        .unwrap_or(true);
+    // Ticket 096: the world-fact "this cat's nearest reachable site
+    // has `materials_complete()` true" lives in the substrate as the
+    // `MaterialsAvailable` marker, authored per-cat in
+    // `materials_available_for` at the planner-marker build site.
+    // The search-state field `materials_delivered_this_plan` starts
+    // false here and is flipped by `DeliverMaterials`'s effect during
+    // A* expansion.
     let carrying = if inventory.slots.iter().any(|s| {
         matches!(
             s,
@@ -5744,8 +5748,33 @@ fn build_planner_state(
         construction_done: false,
         prey_found: false,
         farm_tended: false,
-        materials_available,
+        materials_delivered_this_plan: false,
     }
+}
+
+/// Ticket 096 substrate authoring: returns whether this cat's nearest
+/// reachable construction site has `materials_complete() == true`.
+/// Mirrors the per-cat semantics of the old `PlannerState.materials_available`
+/// field — if no site is reachable, defaults to `true` so non-Building
+/// planning isn't gated by a non-existent fact. Consumed at the
+/// planner-marker build site (and `evaluate_and_plan`) to author the
+/// `MaterialsAvailable` marker, which `Construct`'s substrate-branch
+/// precondition consults.
+fn materials_available_for(
+    pos: &Position,
+    construction_positions: &[(Entity, Position)],
+    construction_materials_complete: &HashMap<Entity, bool>,
+) -> bool {
+    construction_positions
+        .iter()
+        .min_by_key(|(_, cp)| pos.manhattan_distance(cp))
+        .map(|(entity, _)| {
+            construction_materials_complete
+                .get(entity)
+                .copied()
+                .unwrap_or(true)
+        })
+        .unwrap_or(true)
 }
 
 fn classify_zone(

@@ -195,10 +195,16 @@ pub fn socializing_actions() -> Vec<GoapActionDef> {
 /// Building plans a haul→deliver→construct sequence. The planner emits
 /// `[TravelTo(MaterialPile), GatherMaterials, TravelTo(ConstructionSite),
 /// DeliverMaterials, Construct]` for an unfunded site with reachable
-/// material piles. Multi-trip delivery is handled via iterative replanning
-/// — `materials_available` is authored from the site's true
-/// `materials_complete()` status each tick, so a single Deliver that
-/// doesn't fully fund the site results in another haul cycle next replan.
+/// material piles. Multi-trip delivery is handled via iterative replanning.
+///
+/// Ticket 096: the world-fact half ("a reachable site has
+/// `materials_complete()` true") lives in the substrate as the
+/// `MaterialsAvailable` marker, authored each tick by
+/// `goap.rs::build_planner_markers`. The search-state half ("this plan
+/// has executed a Deliver") lives in `PlannerState.materials_delivered_this_plan`,
+/// flipped by `SetMaterialsDeliveredThisPlan(true)`. Two `Construct`
+/// action defs accept either branch — substrate-path for prefunded sites,
+/// plan-path for in-flight haul→deliver cycles.
 pub fn building_actions() -> Vec<GoapActionDef> {
     vec![
         // Pickup: cat at a material pile, hands empty → carrying build
@@ -214,9 +220,12 @@ pub fn building_actions() -> Vec<GoapActionDef> {
             effects: vec![StateEffect::SetCarrying(Carrying::BuildMaterials)],
         },
         // Deliver: cat at the site carrying materials → drops one unit
-        // into the site's ledger. Optimistically flips
-        // `materials_available` true; the next state author rereads from
-        // ECS and corrects to false if the site needs more.
+        // into the site's ledger. Marks the search-state field
+        // `materials_delivered_this_plan` so the subsequent `Construct`
+        // step is applicable inside the same A* expansion. The next
+        // state author rereads from ECS, so a single Deliver that
+        // doesn't fully fund the site triggers another haul cycle on
+        // replan.
         GoapActionDef {
             kind: GoapActionKind::DeliverMaterials,
             cost: 1,
@@ -226,20 +235,33 @@ pub fn building_actions() -> Vec<GoapActionDef> {
             ],
             effects: vec![
                 StateEffect::SetCarrying(Carrying::Nothing),
-                StateEffect::SetMaterialsAvailable(true),
+                StateEffect::SetMaterialsDeliveredThisPlan(true),
                 StateEffect::IncrementTrips,
             ],
         },
-        // Construct: gated on materials_available. Pre-038, this had no
-        // gate — the executor would Fail when materials weren't ready and
-        // the plan dropped. Now the planner reasons about the dependency
-        // explicitly.
+        // Construct (substrate path): the world already has materials
+        // ready at a reachable site (prefunded coordinator-spawned sites,
+        // or a previous tick's haul completed funding). Gates on the
+        // `MaterialsAvailable` marker.
         GoapActionDef {
             kind: GoapActionKind::Construct,
             cost: 6,
             preconditions: vec![
                 StatePredicate::ZoneIs(PlannerZone::ConstructionSite),
-                StatePredicate::MaterialsAvailable(true),
+                StatePredicate::HasMarker(markers::MaterialsAvailable::KEY),
+            ],
+            effects: vec![StateEffect::SetConstructionDone(true)],
+        },
+        // Construct (plan-path): this plan delivered materials earlier
+        // in the same A* expansion. Lets `[..., Deliver, Construct]`
+        // compose without depending on the substrate marker (which is
+        // false for unfunded founding sites until the deliver lands).
+        GoapActionDef {
+            kind: GoapActionKind::Construct,
+            cost: 6,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::ConstructionSite),
+                StatePredicate::MaterialsDeliveredThisPlan(true),
             ],
             effects: vec![StateEffect::SetConstructionDone(true)],
         },
@@ -572,12 +594,20 @@ mod tests {
             construction_done: false,
             prey_found: false,
             farm_tended: false,
-            materials_available: false,
+            materials_delivered_this_plan: false,
         }
     }
 
     fn empty_markers() -> MarkerSnapshot {
         MarkerSnapshot::new()
+    }
+
+    /// Test markers with `MaterialsAvailable` set — exercises the
+    /// substrate branch of `Construct` (prefunded site).
+    fn materials_available_markers() -> MarkerSnapshot {
+        let mut m = food_stocked_markers();
+        m.set_entity(markers::MaterialsAvailable::KEY, test_entity(), true);
+        m
     }
 
     /// Default test context: stores have food. Most tests assume the
@@ -901,10 +931,17 @@ mod tests {
 
     #[test]
     fn building_haul_then_construct() {
-        // Ticket 038 — building plans now thread through a real haul:
+        // Ticket 038 — building plans thread through a real haul:
         // [TravelTo(MaterialPile), GatherMaterials, TravelTo(ConstructionSite),
-        //  DeliverMaterials, Construct].
+        //  DeliverMaterials, Construct]. Ticket 096 split: with
+        // `MaterialsAvailable` marker absent, `Construct` resolves via
+        // the plan-path branch (`MaterialsDeliveredThisPlan(true)`)
+        // after `DeliverMaterials` flips the search-state field.
         let start = default_state();
+        assert!(
+            !start.materials_delivered_this_plan,
+            "search-state field starts false; the Deliver effect must do the work"
+        );
         let goal = GoalState {
             predicates: vec![StatePredicate::ConstructionDone(true)],
         };
@@ -927,21 +964,33 @@ mod tests {
 
     #[test]
     fn building_construct_short_circuit_when_materials_already_available() {
-        // If the state author has already flipped `materials_available`
-        // (the executor saw the site complete from a previous haul cycle),
-        // the planner should skip the haul leg and go straight to
-        // TravelTo + Construct.
-        let start = PlannerState {
-            materials_available: true,
-            ..default_state()
-        };
+        // Ticket 096 substrate path: when the world already has a
+        // funded construction site (the `MaterialsAvailable` marker is
+        // set on the entity), the planner skips the haul leg and goes
+        // straight to TravelTo + Construct. Pre-096 this used a
+        // `materials_available: true` field on PlannerState; post-096
+        // the world fact lives in the substrate marker, the
+        // search-state field stays false throughout.
+        let start = default_state();
+        assert!(
+            !start.materials_delivered_this_plan,
+            "substrate-branch test must not pre-fill the search-state field"
+        );
         let goal = GoalState {
             predicates: vec![StatePredicate::ConstructionDone(true)],
         };
         let distances = basic_distances();
         let actions = actions_for_disposition(DispositionKind::Building, None, &distances);
 
-        let plan = plan!(start, &actions, &goal, 12, 1000).expect("plan found");
+        let plan = plan!(
+            start,
+            &actions,
+            &goal,
+            12,
+            1000,
+            markers = materials_available_markers()
+        )
+        .expect("plan found");
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
         assert_eq!(
             kinds,

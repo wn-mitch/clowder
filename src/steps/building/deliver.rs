@@ -23,12 +23,16 @@ use crate::steps::{StepOutcome, StepResult};
 /// **Plan-level preconditions** — emitted by
 /// `src/ai/planner/actions.rs::building_actions` under
 /// `ZoneIs(ConstructionSite) ∧ CarryingIs(BuildMaterials)` with
-/// effects `SetCarrying(Nothing) ∧ SetMaterialsAvailable(true) ∧
-/// IncrementTrips`. The planner's `materials_available` is
-/// authored coarsely (any reachable site complete); the next
-/// state-author tick re-reads from ECS, so a single Deliver that
-/// doesn't fully fund the site triggers another haul cycle on
-/// replan.
+/// effects `SetCarrying(Nothing) ∧ SetMaterialsDeliveredThisPlan(true)
+/// ∧ IncrementTrips`. Ticket 096: the world-fact half of the old
+/// `materials_available` hybrid moved to the `MaterialsAvailable`
+/// marker (substrate); the search-state half — "this plan delivered
+/// materials, so the next `Construct` step is applicable inside
+/// the same A* expansion" — lives in
+/// `PlannerState.materials_delivered_this_plan`. A single Deliver
+/// that doesn't fully fund the site triggers another haul cycle on
+/// replan, when the marker still reads false and the search-state
+/// field resets to its default.
 ///
 /// **Runtime preconditions** — requires `target_entity` to resolve
 /// to a building with a `ConstructionSite`, AND requires the cat's
