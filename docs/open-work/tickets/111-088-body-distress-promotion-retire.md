@@ -1,11 +1,11 @@
 ---
 id: 111
 title: Retire 088 BodyDistressPromotion once kind-specific modifiers cover its surface
-status: blocked
+status: ready
 cluster: ai-substrate
 added: 2026-05-01
 parked: null
-blocked-by: [106, 107, 110]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [088-body-distress-modifier.md]
@@ -39,3 +39,12 @@ Once HungerUrgency (106), ExhaustionPressure (107), and ThermalDistress (110) la
 ## Log
 
 - 2026-05-01: Opened as cleanup follow-on from ticket 047. Blocked by the three remaining substrate-axis tickets that complete 088's replacement.
+- 2026-05-02: **Unblocked.** 106 + 107 + 110 all landed inert by today (each in its own
+  branch of the substrate-over-override outcome tree per
+  `docs/systems/distress-modifiers.md`). Status flipped `blocked` → `ready`,
+  blocked-by cleared. Note for the implementer: with all four kind-specific
+  modifiers shipping inert by default (047/106/107/110), 088's runtime effect IS
+  still load-bearing in the canonical regime — retirement should be paired with
+  a same-commit verification soak that confirms 088's removal doesn't shift any
+  footer metric (or, if it does, surface the lifts on the kind-specific modifiers
+  to recover whatever 088 was contributing).

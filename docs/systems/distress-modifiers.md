@@ -35,7 +35,7 @@ phase-transition (ramp on an acute scalar).
 | 106 | `HungerUrgency` | pressure | `hunger_urgency` (`1 - needs.hunger`) | Eat, Hunt, Forage | Ready |
 | 107 | `ExhaustionPressure` | pressure | `energy_deficit` | Sleep, GroomSelf | Ready |
 | 108 | `ThreatProximityAdrenalineFlee` | lurch | `threat_proximity_derivative` (rising change) | Flee, Sleep | Ready (blocked-by 103) |
-| 110 | `ThermalDistress` | pressure | `thermal_deficit` | Sleep | Ready |
+| 110 | `ThermalDistress` | pressure | `thermal_deficit` | Sleep | Landed inert |
 
 ## Perception-richness pattern
 
