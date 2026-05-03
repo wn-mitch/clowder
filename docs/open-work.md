@@ -14,18 +14,18 @@ _Last generated: 2026-05-03._
 
 | Status | Count |
 |---|---|
-| In progress | 9 |
+| In progress | 8 |
 | Ready | 47 |
 | Parked | 5 |
 | Blocked | 18 |
-| **Open total** | **79** |
+| **Open total** | **78** |
 | Pre-existing | 1 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-index` (regenerate this file).
 
-## In progress (9)
+## In progress (8)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
@@ -35,7 +35,6 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[108](docs/open-work/tickets/108-threat-proximity-adrenaline.md)** — ThreatProximityAdrenaline modifier — substrate axis for CriticalSafety interrupt retirement — _[ai-substrate] · added 2026-05-01_
 - **[109](docs/open-work/tickets/109-intraspecies-conflict-response.md)** — IntraspeciesConflictResponse — full four-valence (fight/flight/freeze/fawn) social response — _[ai-substrate] · added 2026-05-01_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
-- **[150](docs/open-work/tickets/150-cat-starvation-hunt-deposit-loop-no-eat-path.md)** — Cat starvation despite active food production — hunt-deposit loop has no eat path — _[ai-substrate] · added 2026-05-03_
 
 ## Ready (47)
 
@@ -83,7 +82,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · added 2026-05-02_
 - **[149](docs/open-work/tickets/149-hunt-success-disambiguation.md)** — Hunt-success disambiguation — instrument per-discrete-attempt outcomes — _added 2026-05-02_
 - **[151](docs/open-work/tickets/151-bugfix-discipline-structural-candidate.md)** — Bugfix discipline — force a structural candidate in every fix-shape decision tree — _[process] · added 2026-05-03_
-- **[152](docs/open-work/tickets/152-tier1-disposition-collapse-audit.md)** — Tier-1 disposition-collapse audit — sweep for sibling Eat-into-Resting defects — _[ai-substrate] · blocked-by 150 · added 2026-05-03_
+- **[152](docs/open-work/tickets/152-tier1-disposition-collapse-audit.md)** — Tier-1 disposition-collapse audit — sweep for sibling Eat-into-Resting defects — _[ai-substrate] · added 2026-05-03_
 - **[153](docs/open-work/tickets/153-150-r5a-balance-follow-on.md)** — 150 R5a balance follow-on — Resting score-mass and courtship recovery — _[balance] · added 2026-05-03_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _added 2026-04-28_
 
@@ -120,12 +119,13 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 
-## Landed archive (95)
+## Landed archive (96)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (30)
+### 2026-05 (31)
 
+- **[150](docs/open-work/landed/150-cat-starvation-hunt-deposit-loop-no-eat-path.md)** — Cat starvation despite active food production — hunt-deposit loop has no eat path _(2026-05-03)_
 - **[146](docs/open-work/landed/146-088-courtship-coverage-investigation.md)** — 088 BodyDistressPromotion courtship-coverage investigation _(2026-05-02)_
 - **[137](docs/open-work/landed/137-vec2-render-layer.md)** — Phase 0 — Vec2 render layer (visual interpolation, no sim-state change) _(2026-05-02)_
 - **[125](docs/open-work/landed/125-colony-score-aggregate-in-footer-and-verdict.md)** — Surface `ColonyScore.aggregate` in the footer and add numerical-delta gating to `just verdict` _(2026-05-02)_
