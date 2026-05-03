@@ -932,22 +932,27 @@ impl Default for DeathConstants {
 
 // ---------- FounderAgeConstants ----------
 
-/// Distribution used when rolling ages for starting cats.
+/// Stage quota and per-stage age bands used when rolling starting cats.
 ///
-/// Paired invariant with `DeathConstants`: `elder_max_seasons` must stay
-/// below `elder_entry_seasons + grace_seasons` so founders always have
-/// runway before the old-age mortality ramp activates. The
-/// `founder_ages_leave_elder_grace` test enforces this.
+/// Ticket 148: replaced the prior 60/30/10 Young/Adult/Elder probability
+/// distribution with a hard quota — at most `max_young_founders` Young
+/// founders, with all remaining slots forced Adult. This guarantees a
+/// large orientation-eligible Adult pool every seed, fixing the
+/// `continuity_tallies.courtship` collapse caused by orientation-roll
+/// wipeouts when the founder Adult count was small. Elders are no longer
+/// spawned as founders (the colony grows its first Elders organically as
+/// Adult founders age past `LifeStage::Elder`'s entry season).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FounderAgeConstants {
     pub young_min_seasons: u64,
     pub young_max_seasons: u64,
-    pub young_probability: f32,
     pub adult_min_seasons: u64,
     pub adult_max_seasons: u64,
-    pub adult_probability: f32,
-    pub elder_min_seasons: u64,
-    pub elder_max_seasons: u64,
+    /// Hard ceiling on Young founders per spawn (ticket 148). Slots beyond
+    /// this are forced Adult. With the default of 2, an 8-founder colony
+    /// has 6 Adults — enough that orientation-incompat-wipeout failures
+    /// (whole-seed courtship collapse) become rare.
+    pub max_young_founders: usize,
 }
 
 impl Default for FounderAgeConstants {
@@ -955,20 +960,9 @@ impl Default for FounderAgeConstants {
         Self {
             young_min_seasons: 4,
             young_max_seasons: 11,
-            young_probability: 0.60,
             adult_min_seasons: 12,
             adult_max_seasons: 30,
-            adult_probability: 0.30,
-            // Phase 4.3 retune: the `LifeStage::Elder` boundary moved
-            // from season 48 to 60, so the founder Elder range moves
-            // with it. Paired invariant still holds — the cap stays
-            // below `DeathConstants::elder_entry_seasons +
-            // grace_seasons = 67` so founders get runway before the
-            // mortality ramp. Widening this past 67 reintroduces the
-            // pre-Activation-1 baseline wipe regression (see
-            // docs/balance/activation-1-status.md).
-            elder_min_seasons: 60,
-            elder_max_seasons: 62,
+            max_young_founders: 2,
         }
     }
 }

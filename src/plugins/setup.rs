@@ -199,27 +199,36 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     // Set initial corruption and mystery on special tiles (must be after placement).
     crate::world_gen::herbs::initialize_tile_magic(&mut map, &mut sim_rng.rng);
 
-    // Start the clock high enough that cats can have varied ages.
-    // Must exceed the maximum rolled age in ticks (see
-    // `FounderAgeConstants::elder_max_seasons`) — see main.rs for the detailed
-    // rationale. Short version: saturating_sub silently clamps ages below
-    // start_tick, so too small a value means every founder reads back as Young.
+    // Start the clock high enough that cats can have varied ages. Must exceed
+    // the maximum rolled age in ticks (see `FounderAgeConstants::adult_max_seasons`)
+    // — saturating_sub silently clamps ages below start_tick, so too small a
+    // value means every founder reads back as Young.
     let start_tick: u64 = 60 * config.ticks_per_season;
 
     let age_consts = &constants.founder_age;
+    const TOTAL_FOUNDERS: usize = 8;
+    let stages = crate::world_gen::colony::allocate_founder_stages(
+        TOTAL_FOUNDERS,
+        age_consts,
+        &mut sim_rng.rng,
+    );
+    let mut stage_iter = stages.into_iter();
+
     let mut cat_blueprints = load_custom_cats(
         start_tick,
         config.ticks_per_season,
         age_consts,
+        &mut stage_iter,
         &mut sim_rng.rng,
     );
-    let remaining = 8usize.saturating_sub(cat_blueprints.len());
+    let remaining = TOTAL_FOUNDERS.saturating_sub(cat_blueprints.len());
     if remaining > 0 {
         cat_blueprints.extend(generate_starting_cats(
             remaining,
             start_tick,
             config.ticks_per_season,
             age_consts,
+            &mut stage_iter,
             &mut sim_rng.rng,
         ));
     }

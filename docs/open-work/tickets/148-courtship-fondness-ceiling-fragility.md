@@ -1,7 +1,7 @@
 ---
 id: 148
 title: Courtship-chain fondness ceiling vs gate fragility
-status: ready
+status: in-progress
 cluster: ai-substrate
 added: 2026-05-02
 parked: null

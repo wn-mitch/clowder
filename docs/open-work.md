@@ -14,18 +14,18 @@ _Last generated: 2026-05-02._
 
 | Status | Count |
 |---|---|
-| In progress | 7 |
+| In progress | 8 |
 | Ready | 44 |
 | Parked | 5 |
 | Blocked | 18 |
-| **Open total** | **74** |
+| **Open total** | **75** |
 | Pre-existing | 1 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-index` (regenerate this file).
 
-## In progress (7)
+## In progress (8)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
@@ -34,6 +34,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** — Substrate-over-override — retire control-yanking hacks in favor of IAUS levers — _[substrate-over-override] · added 2026-04-30_
 - **[108](docs/open-work/tickets/108-threat-proximity-adrenaline.md)** — ThreatProximityAdrenaline modifier — substrate axis for CriticalSafety interrupt retirement — _[ai-substrate] · added 2026-05-01_
 - **[109](docs/open-work/tickets/109-intraspecies-conflict-response.md)** — IntraspeciesConflictResponse — full four-valence (fight/flight/freeze/fawn) social response — _[ai-substrate] · added 2026-05-01_
+- **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 
 ## Ready (44)
 
@@ -79,7 +80,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[141](docs/open-work/tickets/141-combat-winnability-scalar.md)** — combat_winnability perception scalar — sibling to escape_viability — _[ai-substrate] · added 2026-05-02_
 - **[145](docs/open-work/tickets/145-submit-gesture-dse.md)** — Submit gesture DSE — appeasement infrastructure for IntraspeciesConflict.Fawn — _[ai-substrate] · added 2026-05-02_
 - **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · added 2026-05-02_
-- **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
+- **[149](docs/open-work/tickets/149-hunt-success-disambiguation.md)** — Hunt-success disambiguation — instrument per-discrete-attempt outcomes — _added 2026-05-02_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _added 2026-04-28_
 
 ## Parked (5)

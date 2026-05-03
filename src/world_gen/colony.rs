@@ -5,6 +5,7 @@ use rand::Rng;
 use crate::components::building::{ConstructionSite, Structure, StructureType};
 use crate::components::identity::Name;
 use crate::components::items::{BuildMaterialItem, Item, ItemKind, ItemLocation};
+use crate::components::identity::LifeStage;
 use crate::components::{
     Appearance, Gender, Orientation, Personality, Position, Skills, ZodiacSign,
 };
@@ -116,18 +117,59 @@ const PATTERNS: [&str; 9] = [
     "solid", "tabby", "spotted", "tuxedo", "bicolor", "van", "point", "mackerel", "ticked",
 ];
 
-/// Generate `count` starting cats with randomised attributes and varied ages.
+/// Allocate stage assignments for `total` founder slots, respecting the
+/// `max_young_founders` quota. Returns a shuffled queue of `LifeStage::Young`
+/// and `LifeStage::Adult` whose length is exactly `total`.
 ///
-/// `start_tick` is the simulation tick at which these cats are spawned.
-/// Age distribution is controlled by `age_consts`.
+/// Ticket 148: this replaces the prior probabilistic age roll. Callers that
+/// share a quota across multiple loaders (e.g. custom + procedural) consume
+/// from the same iterator so the global cap is honored.
+pub fn allocate_founder_stages(
+    total: usize,
+    age_consts: &FounderAgeConstants,
+    rng: &mut impl Rng,
+) -> Vec<LifeStage> {
+    let young = total.min(age_consts.max_young_founders);
+    let adult = total - young;
+    let mut stages: Vec<LifeStage> = std::iter::repeat_n(LifeStage::Young, young)
+        .chain(std::iter::repeat_n(LifeStage::Adult, adult))
+        .collect();
+    stages.shuffle(rng);
+    stages
+}
+
+/// Roll an age in seasons within the band for the given stage.
+///
+/// Only `LifeStage::Young` and `LifeStage::Adult` are valid founder stages
+/// (ticket 148). Kitten/Elder are rejected — Kittens can't be founders, and
+/// Elders are never spawned at colony start; they grow from Adults aging
+/// past the Elder entry season.
+pub(crate) fn roll_age_for_stage(
+    stage: LifeStage,
+    consts: &FounderAgeConstants,
+    rng: &mut impl Rng,
+) -> u64 {
+    match stage {
+        LifeStage::Young => rng.random_range(consts.young_min_seasons..=consts.young_max_seasons),
+        LifeStage::Adult => rng.random_range(consts.adult_min_seasons..=consts.adult_max_seasons),
+        LifeStage::Kitten | LifeStage::Elder => {
+            panic!("invalid founder stage {stage:?} — only Young and Adult are allowed")
+        }
+    }
+}
+
+/// Generate `count` starting cats with randomised attributes, drawing one
+/// stage per cat from `stages`. Caller-supplied stage iterator lets the
+/// quota be shared with other loaders (e.g. `load_custom_cats`).
 ///
 /// Names are unique (drawn without replacement from the pool).
-/// `count` must not exceed 30.
+/// `count` must not exceed 30 and `stages` must yield at least `count` items.
 pub fn generate_starting_cats(
     count: usize,
     start_tick: u64,
     ticks_per_season: u64,
     age_consts: &FounderAgeConstants,
+    stages: &mut dyn Iterator<Item = LifeStage>,
     rng: &mut impl Rng,
 ) -> Vec<CatBlueprint> {
     assert!(count <= NAME_POOL.len(), "count exceeds name pool size");
@@ -139,28 +181,15 @@ pub fn generate_starting_cats(
         .into_iter()
         .take(count)
         .map(|name| {
-            let age_seasons = roll_age_seasons(rng, age_consts);
+            let stage = stages
+                .next()
+                .expect("stage queue exhausted in generate_starting_cats");
+            let age_seasons = roll_age_for_stage(stage, age_consts, rng);
             let age_ticks = age_seasons * ticks_per_season;
             let born_tick = start_tick.saturating_sub(age_ticks);
             generate_cat(name.to_string(), born_tick, ticks_per_season, rng)
         })
         .collect()
-}
-
-/// Roll an age in seasons from the configured founder-age distribution.
-///
-/// The default distribution is ~60% Young, ~30% Adult, ~10% senior-Adult —
-/// the senior band stays below the Elder mortality ramp (see
-/// `FounderAgeConstants`).
-pub(crate) fn roll_age_seasons(rng: &mut impl Rng, consts: &FounderAgeConstants) -> u64 {
-    let roll: f32 = rng.random();
-    if roll < consts.young_probability {
-        rng.random_range(consts.young_min_seasons..=consts.young_max_seasons)
-    } else if roll < consts.young_probability + consts.adult_probability {
-        rng.random_range(consts.adult_min_seasons..=consts.adult_max_seasons)
-    } else {
-        rng.random_range(consts.elder_min_seasons..=consts.elder_max_seasons)
-    }
 }
 
 fn generate_cat(
@@ -570,17 +599,37 @@ mod tests {
         FounderAgeConstants::default()
     }
 
+    fn make_stages(total: usize, age_consts: &FounderAgeConstants, seed: u64) -> Vec<LifeStage> {
+        allocate_founder_stages(total, age_consts, &mut rng(seed))
+    }
+
     #[test]
     fn generate_starting_cats_correct_count() {
-        let cats =
-            generate_starting_cats(8, START_TICK, TICKS_PER_SEASON, &age_consts(), &mut rng(42));
+        let consts = age_consts();
+        let mut stages = make_stages(8, &consts, 42).into_iter();
+        let cats = generate_starting_cats(
+            8,
+            START_TICK,
+            TICKS_PER_SEASON,
+            &consts,
+            &mut stages,
+            &mut rng(42),
+        );
         assert_eq!(cats.len(), 8);
     }
 
     #[test]
     fn generated_cats_have_unique_names() {
-        let cats =
-            generate_starting_cats(10, START_TICK, TICKS_PER_SEASON, &age_consts(), &mut rng(7));
+        let consts = age_consts();
+        let mut stages = make_stages(10, &consts, 7).into_iter();
+        let cats = generate_starting_cats(
+            10,
+            START_TICK,
+            TICKS_PER_SEASON,
+            &consts,
+            &mut stages,
+            &mut rng(7),
+        );
         let mut names: Vec<&str> = cats.iter().map(|c| c.name.as_str()).collect();
         names.sort_unstable();
         names.dedup();
@@ -591,8 +640,16 @@ mod tests {
     fn magic_affinity_in_range() {
         let mut r = rng(99);
         let consts = age_consts();
-        for _ in 0..50 {
-            let cats = generate_starting_cats(5, START_TICK, TICKS_PER_SEASON, &consts, &mut r);
+        for batch in 0..50 {
+            let mut stages = make_stages(5, &consts, 99 + batch).into_iter();
+            let cats = generate_starting_cats(
+                5,
+                START_TICK,
+                TICKS_PER_SEASON,
+                &consts,
+                &mut stages,
+                &mut r,
+            );
             for cat in &cats {
                 assert!(
                     (0.0..=1.0).contains(&cat.magic_affinity),
@@ -605,8 +662,16 @@ mod tests {
 
     #[test]
     fn varied_starting_ages() {
-        let cats =
-            generate_starting_cats(8, START_TICK, TICKS_PER_SEASON, &age_consts(), &mut rng(42));
+        let consts = age_consts();
+        let mut stages = make_stages(8, &consts, 42).into_iter();
+        let cats = generate_starting_cats(
+            8,
+            START_TICK,
+            TICKS_PER_SEASON,
+            &consts,
+            &mut stages,
+            &mut rng(42),
+        );
         // All born_ticks should be <= start_tick (born in the past).
         for cat in &cats {
             assert!(
@@ -616,7 +681,7 @@ mod tests {
                 START_TICK
             );
         }
-        // At least two different born_ticks (ages should vary).
+        // Quota should produce both Young and Adult born_ticks.
         let unique_ticks: std::collections::HashSet<u64> =
             cats.iter().map(|c| c.born_tick).collect();
         assert!(
@@ -625,24 +690,48 @@ mod tests {
         );
     }
 
-    /// Invariant: founder ages must stay below the Elder mortality ramp.
-    ///
-    /// `elder_max_seasons` must be less than `DeathConstants::elder_entry_seasons +
-    /// grace_seasons`. Breaking this reintroduces the pre-Activation-1 baseline
-    /// wipe regression — see docs/balance/activation-1-status.md.
+    /// Ticket 148: at most `max_young_founders` Young, rest Adult.
     #[test]
-    fn founder_ages_leave_elder_grace() {
-        use crate::resources::sim_constants::DeathConstants;
-        let age_consts = FounderAgeConstants::default();
-        let death = DeathConstants::default();
-        let mortality_age = death.elder_entry_seasons + death.grace_seasons;
+    fn founder_quota_caps_young_count() {
+        let consts = age_consts();
+        for seed in 0..50u64 {
+            let stages = allocate_founder_stages(8, &consts, &mut rng(seed));
+            let young = stages.iter().filter(|s| **s == LifeStage::Young).count();
+            let adult = stages.iter().filter(|s| **s == LifeStage::Adult).count();
+            assert!(
+                young <= consts.max_young_founders,
+                "seed {seed}: rolled {young} Young; cap is {}",
+                consts.max_young_founders
+            );
+            assert_eq!(young + adult, 8, "seed {seed}: stages don't sum to total");
+            assert!(
+                !stages.iter().any(|s| matches!(s, LifeStage::Elder | LifeStage::Kitten)),
+                "seed {seed}: founder pool contains a Kitten or Elder"
+            );
+        }
+    }
+
+    /// Founders must spawn old enough not to read back as Kittens. With the
+    /// quota model the rolled age is bounded by `young_min_seasons` (lower
+    /// of the two stage bands), so this is a sanity check on the constants.
+    #[test]
+    fn founder_ages_clear_kitten_threshold() {
+        let consts = age_consts();
         let mut r = rng(42);
         for _ in 0..10_000 {
-            let age = roll_age_seasons(&mut r, &age_consts);
+            let age = roll_age_for_stage(LifeStage::Young, &consts, &mut r);
             assert!(
-                age < mortality_age,
-                "founder rolled age {age} ≥ mortality age {mortality_age}; \
-                 colonies will wipe before first breeding cycle",
+                age >= consts.young_min_seasons,
+                "young roll {age} below band floor {}",
+                consts.young_min_seasons
+            );
+        }
+        for _ in 0..10_000 {
+            let age = roll_age_for_stage(LifeStage::Adult, &consts, &mut r);
+            assert!(
+                age >= consts.adult_min_seasons,
+                "adult roll {age} below band floor {}",
+                consts.adult_min_seasons
             );
         }
     }

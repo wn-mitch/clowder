@@ -1,14 +1,14 @@
 use rand::Rng;
 use std::path::Path;
 
-use crate::components::identity::{Appearance, Gender};
+use crate::components::identity::{Appearance, Gender, LifeStage};
 use crate::components::personality::Personality;
 use crate::components::physical::Position;
 use crate::components::zodiac::ZodiacSign;
 use crate::resources::sim_constants::FounderAgeConstants;
 
 use super::colony::{
-    apply_fur_color_bias, roll_age_seasons, roll_magic_affinity, roll_orientation, roll_skills,
+    apply_fur_color_bias, roll_age_for_stage, roll_magic_affinity, roll_orientation, roll_skills,
     CatBlueprint,
 };
 
@@ -33,6 +33,7 @@ pub fn load_custom_cats(
     start_tick: u64,
     ticks_per_season: u64,
     age_consts: &FounderAgeConstants,
+    stages: &mut dyn Iterator<Item = LifeStage>,
     rng: &mut impl Rng,
 ) -> Vec<CatBlueprint> {
     let dir = Path::new("assets/data/cats");
@@ -77,11 +78,15 @@ pub fn load_custom_cats(
         };
 
         eprintln!("Loaded custom cat: {}", custom.name);
+        let stage = stages
+            .next()
+            .expect("stage queue exhausted in load_custom_cats");
         blueprints.push(custom_to_blueprint(
             custom,
             start_tick,
             ticks_per_season,
             age_consts,
+            stage,
             rng,
         ));
     }
@@ -96,6 +101,7 @@ fn custom_to_blueprint(
     start_tick: u64,
     ticks_per_season: u64,
     age_consts: &FounderAgeConstants,
+    stage: LifeStage,
     rng: &mut impl Rng,
 ) -> CatBlueprint {
     let orientation = roll_orientation(rng);
@@ -104,7 +110,7 @@ fn custom_to_blueprint(
     let magic_affinity = roll_magic_affinity(rng);
     let skills = roll_skills(&personality, magic_affinity, rng);
 
-    let age_seasons = roll_age_seasons(rng, age_consts);
+    let age_seasons = roll_age_for_stage(stage, age_consts, rng);
     let age_ticks = age_seasons * ticks_per_season;
     let born_tick = start_tick.saturating_sub(age_ticks);
     let birth_season = born_tick / ticks_per_season;
@@ -139,7 +145,8 @@ mod tests {
         // The test runner's working directory won't have assets/data/cats/
         // unless explicitly created, so this should return empty.
         let age_consts = FounderAgeConstants::default();
-        let cats = load_custom_cats(100_000, 2000, &age_consts, &mut rng(42));
+        let mut stages = std::iter::repeat_n(LifeStage::Adult, 8);
+        let cats = load_custom_cats(100_000, 2000, &age_consts, &mut stages, &mut rng(42));
         // Either empty (no dir) or whatever is there — just shouldn't panic.
         let _ = cats;
     }
@@ -178,7 +185,14 @@ mod tests {
         };
 
         let age_consts = FounderAgeConstants::default();
-        let bp = custom_to_blueprint(custom, 100_000, 2000, &age_consts, &mut rng(42));
+        let bp = custom_to_blueprint(
+            custom,
+            100_000,
+            2000,
+            &age_consts,
+            LifeStage::Adult,
+            &mut rng(42),
+        );
 
         assert_eq!(bp.name, "Biscuit");
         assert_eq!(bp.gender, Gender::Queen);
