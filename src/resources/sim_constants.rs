@@ -1320,6 +1320,19 @@ pub struct ScoringConstants {
     /// — the IAUS contest then yields to Eat at the stockpile.
     #[serde(default = "default_stockpile_satiation_scale")]
     pub stockpile_satiation_scale: f32,
+    /// Ticket 146 — saturating-composition cap on the cumulative positive
+    /// lift any one DSE can receive across the §3.5.1 modifier pipeline.
+    /// `0.0` disables the cap (raw additive sum). With `0.30` and two
+    /// independent lifts of `+0.20` each (e.g. 107 ExhaustionPressure
+    /// Sleep + 110 ThermalDistress Sleep on a cold tired night), the
+    /// effective combined lift is
+    /// `0.30 * (1 - (1 - 0.20/0.30)^2) ≈ 0.267` — diminishing returns
+    /// instead of unbounded sum. Single-axis behavior is unchanged
+    /// whenever a single modifier's lift is `< cap`. Tuned to bound the
+    /// seed-42 Sleep double-stack that caused colony extinction in
+    /// ticket 146's verification soak.
+    #[serde(default = "default_max_additive_lift_per_dse")]
+    pub max_additive_lift_per_dse: f32,
     /// Ticket 088. `body_distress_composite` floor below which
     /// `BodyDistressPromotion` does not lift self-care DSEs. Above this,
     /// the modifier additively lifts every self-care DSE (Flee, Sleep,
@@ -1710,6 +1723,7 @@ impl Default for ScoringConstants {
             fox_scent_suppression_scale: 0.8,
             stockpile_satiation_threshold: default_stockpile_satiation_threshold(),
             stockpile_satiation_scale: default_stockpile_satiation_scale(),
+            max_additive_lift_per_dse: default_max_additive_lift_per_dse(),
             body_distress_promotion_threshold: default_body_distress_promotion_threshold(),
             body_distress_promotion_lift: default_body_distress_promotion_lift(),
             acute_health_adrenaline_threshold: default_acute_health_adrenaline_threshold(),
@@ -2388,6 +2402,19 @@ fn default_stockpile_satiation_scale() -> f32 {
 /// stronger response.
 fn default_body_distress_promotion_threshold() -> f32 {
     0.7
+}
+
+/// Ticket 146 — saturating-composition cap on cumulative positive lift
+/// per DSE per pipeline pass. **Default 0.0 (disabled)**: ships inert
+/// matching the removal-bare verification regime, since personality
+/// modifier compositions (Pride+Independence+Patience+etc) sum to small
+/// positive deltas that any non-zero cap clips from happiness. The cap
+/// is scaffolding for future balance work — when distress modifier
+/// values surface non-zero in a follow-on tuning ticket, set this to
+/// `0.60` (matches 047's single-modifier Flee design value) to bound
+/// the 107+110 Sleep double-stack without touching 047's lurches.
+fn default_max_additive_lift_per_dse() -> f32 {
+    0.0
 }
 
 /// Ticket 088 — `BodyDistressPromotion` Modifier lift. Maximum additive

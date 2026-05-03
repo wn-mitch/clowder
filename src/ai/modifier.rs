@@ -1948,7 +1948,14 @@ pub fn default_modifier_pipeline(
     constants: &crate::resources::sim_constants::SimConstants,
 ) -> ModifierPipeline {
     let sc = &constants.scoring;
-    let mut pipeline = ModifierPipeline::new();
+    // Ticket 146 — saturating-composition cap. Cumulative positive lift
+    // across the pipeline saturates at `max_additive_lift_per_dse` via
+    // `MAX * (1 - Π(1 - lift_i / MAX))`. Ships at 0.0 (disabled);
+    // activate by setting `max_additive_lift_per_dse > 0` (0.60 matches
+    // 047 single-modifier Flee design value while bounding multi-axis
+    // pile-ups like the 107+110 Sleep double-stack documented in 146).
+    let mut pipeline =
+        ModifierPipeline::new().with_max_additive_lift_per_dse(sc.max_additive_lift_per_dse);
     pipeline.push(Box::new(Pride::new(sc)));
     pipeline.push(Box::new(IndependenceSolo::new(sc)));
     pipeline.push(Box::new(IndependenceGroup::new(sc)));

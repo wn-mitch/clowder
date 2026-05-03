@@ -15,10 +15,10 @@ _Last generated: 2026-05-02._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 44 |
+| Ready | 45 |
 | Parked | 5 |
 | Blocked | 18 |
-| **Open total** | **73** |
+| **Open total** | **74** |
 | Pre-existing | 1 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -34,7 +34,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[108](docs/open-work/tickets/108-threat-proximity-adrenaline.md)** — ThreatProximityAdrenaline modifier — substrate axis for CriticalSafety interrupt retirement — _[ai-substrate] · added 2026-05-01_
 - **[109](docs/open-work/tickets/109-intraspecies-conflict-response.md)** — IntraspeciesConflictResponse — full four-valence (fight/flight/freeze/fawn) social response — _[ai-substrate] · added 2026-05-01_
 
-## Ready (44)
+## Ready (45)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -65,7 +65,6 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[095](docs/open-work/tickets/095-body-zones-epic.md)** — Body zones — anatomical injury model for all animal species — _added 2026-05-01_
 - **[100](docs/open-work/tickets/100-tremor-action-multiplier-wiring.md)** — Tremor map, Action::Stalk, and personality-driven hunt approach — _blocked-by 062 · added 2026-05-01_
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _blocked-by 100 · added 2026-05-01_
-- **[111](docs/open-work/tickets/111-088-body-distress-promotion-retire.md)** — Retire 088 BodyDistressPromotion once kind-specific modifiers cover its surface — _[ai-substrate] · added 2026-05-01_
 - **[115](docs/open-work/tickets/115-bond-weighted-social-recovery.md)** — Bond-weighted social recovery — fondness scales Needs.social inflow — _[emotional-fidelity] · added 2026-05-01_
 - **[117](docs/open-work/tickets/117-social-warmth-vs-self-care-tradeoff.md)** — Characterize social-warmth max shift under 047 substrate (Phase 3 surfaced -96% on max) — _[ai-substrate] · blocked-by 118 · added 2026-05-01_
 - **[118](docs/open-work/tickets/118-modifier-lift-vs-plan-completion-momentum.md)** — Modifier lifts gated by plan-completion momentum — substrate raises score but cat completes mid-plan first — _[ai-substrate] · added 2026-05-01_
@@ -79,6 +78,8 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[139](docs/open-work/tickets/139-position-vec2-substrate.md)** — Phase 2 — Position becomes Vec2<f32> (continuous-position substrate migration) — _[substrate-migration] · blocked-by 135 · added 2026-05-02_
 - **[141](docs/open-work/tickets/141-combat-winnability-scalar.md)** — combat_winnability perception scalar — sibling to escape_viability — _[ai-substrate] · added 2026-05-02_
 - **[145](docs/open-work/tickets/145-submit-gesture-dse.md)** — Submit gesture DSE — appeasement infrastructure for IntraspeciesConflict.Fawn — _[ai-substrate] · added 2026-05-02_
+- **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · added 2026-05-02_
+- **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _added 2026-04-28_
 
 ## Parked (5)
@@ -114,16 +115,18 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 
-## Landed archive (93)
+## Landed archive (95)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (28)
+### 2026-05 (30)
 
+- **[146](docs/open-work/landed/146-088-courtship-coverage-investigation.md)** — 088 BodyDistressPromotion courtship-coverage investigation _(2026-05-02)_
 - **[137](docs/open-work/landed/137-vec2-render-layer.md)** — Phase 0 — Vec2 render layer (visual interpolation, no sim-state change) _(2026-05-02)_
 - **[125](docs/open-work/landed/125-colony-score-aggregate-in-footer-and-verdict.md)** — Surface `ColonyScore.aggregate` in the footer and add numerical-delta gating to `just verdict` _(2026-05-02)_
 - **[113](docs/open-work/landed/113-interrupt-invariant-doc.md)** — Document the lurch-vs-pressure distress-modifier doctrine _(2026-05-02)_
 - **[112](docs/open-work/landed/112-disposition-exemption-list-retire.md)** — Retire per-disposition exemption lists (Resting/Hunting/Foraging/Guarding) — substrate replacement via commitment momentum _(2026-05-02)_
+- **[111](docs/open-work/landed/111-088-body-distress-promotion-retire.md)** — Retire 088 BodyDistressPromotion once kind-specific modifiers cover its surface _(2026-05-02)_
 - **[110](docs/open-work/landed/110-thermal-distress-modifier.md)** — ThermalDistress modifier — substrate axis for thermal interrupts (and shelter-seeking) _(2026-05-02)_
 - **[107](docs/open-work/landed/107-exhaustion-pressure-modifier.md)** — ExhaustionPressure modifier — substrate axis for Exhaustion interrupt retirement _(2026-05-02)_
 - **[106](docs/open-work/landed/106-hunger-urgency-modifier.md)** — HungerUrgency modifier — substrate axis for Starvation interrupt retirement _(2026-05-02)_

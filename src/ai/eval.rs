@@ -253,11 +253,23 @@ pub trait ScoreModifier: Send + Sync + 'static {
 #[derive(Resource, Default)]
 pub struct ModifierPipeline {
     passes: Vec<Box<dyn ScoreModifier>>,
+    /// Saturating-composition cap for the cumulative positive lift any
+    /// one DSE can receive across the pipeline (ticket 146). `0.0`
+    /// disables the cap (raw additive sum). Default constructor sets
+    /// `0.0`; `default_modifier_pipeline` reads
+    /// `ScoringConstants::max_additive_lift_per_dse` and sets it there.
+    max_additive_lift_per_dse: f32,
 }
 
 impl ModifierPipeline {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Configure the saturating-composition cap. See struct doc.
+    pub fn with_max_additive_lift_per_dse(mut self, max_lift: f32) -> Self {
+        self.max_additive_lift_per_dse = max_lift;
+        self
     }
 
     pub fn push(&mut self, modifier: Box<dyn ScoreModifier>) -> &mut Self {
@@ -294,9 +306,33 @@ impl ModifierPipeline {
         fetch_scalar: &dyn Fn(&str, Entity) -> f32,
         mut sink: Option<&mut Vec<ModifierDelta>>,
     ) -> f32 {
+        // Saturating composition of positive lifts (ticket 146).
+        //
+        // Why: when two perception axes agree (e.g. 107 ExhaustionPressure
+        // and 110 ThermalDistress both lift Sleep on a cold tired night),
+        // the raw additive sum doubles the lift (+0.20 + +0.20 = +0.40).
+        // That double-stack pulls cats into Sleep loops away from
+        // Patrol/Guarding, collapsing fox-defense coverage and causing
+        // colony extinction. Diminishing-returns composition is the right
+        // semantic — multi-axis agreement should lift more than one axis,
+        // but not unboundedly.
+        //
+        // We collect each positive delta as it occurs, apply it in-place
+        // (so multiplicative damps later in the pipeline still see the
+        // lifted score and damp it correctly), then at the end subtract
+        // the cap-excess: the gap between the raw sum of positive deltas
+        // and the saturating composition `MAX * (1 - Π(1 - lift_i / MAX))`.
+        let max_lift = self.max_additive_lift_per_dse;
+        // Cumulative positive deltas across all passes. Capacity hint
+        // matches the §3.5.1 lift-modifier count; no realloc in practice.
+        let mut positive_deltas: Vec<f32> = Vec::with_capacity(self.passes.len());
         for pass in &self.passes {
             let pre = score;
             score = pass.apply(dse_id, score, ctx, fetch_scalar);
+            let delta = score - pre;
+            if delta > 0.0 {
+                positive_deltas.push(delta);
+            }
             if let Some(sink) = sink.as_mut() {
                 if (score - pre).abs() > f32::EPSILON {
                     sink.push(ModifierDelta {
@@ -305,6 +341,17 @@ impl ModifierPipeline {
                         post: score,
                     });
                 }
+            }
+        }
+        if positive_deltas.len() > 1 && max_lift > 0.0 {
+            let raw_sum: f32 = positive_deltas.iter().sum();
+            let mut headroom = 1.0_f32;
+            for lift in &positive_deltas {
+                headroom *= (1.0 - lift / max_lift).max(0.0);
+            }
+            let saturated = max_lift * (1.0 - headroom);
+            if raw_sum > saturated {
+                score -= raw_sum - saturated;
             }
         }
         score
