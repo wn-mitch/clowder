@@ -1,7 +1,7 @@
 ---
 id: 151
 title: Bugfix discipline — force a structural candidate in every fix-shape decision tree
-status: ready
+status: done
 cluster: process
 added: 2026-05-03
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-03
 ---
 
 ## Why
@@ -137,3 +137,14 @@ which turned out to be load-bearing. The lesson is now codified here.
   "antipattern migration follow-ups are non-optional" — 150's R5
   surfacing made it clear the category-revision discipline needs to
   be canonized before the next bugfix repeats the same mistake.
+- 2026-05-03: Landed. CLAUDE.md gains a `## Bugfix discipline`
+  section between "Long-horizon coordination" and "ECS rules" with
+  the structural-option menu (split / extend / rebind / retire) and
+  the layer-walk audit prescription. New
+  `docs/open-work/tickets/_template_bugfix.md` embeds the layer-walk
+  audit table and parameter-vs-structural fix-candidate split. The
+  general `_template.md` stays lean for non-bugfix work. The
+  existing user-global memory entry
+  (`feedback_audit_l3_disposition_mapping.md`) is cited by name from
+  the new doctrine; no new memory file. No tickets had `blocked-by:
+  [151]`, so no dependents needed unblocking.

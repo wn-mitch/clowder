@@ -57,6 +57,20 @@ Also: `just logs` · `just trace` · `just narrative-editor` (Writer's Toolkit �
 
 **Major in-flight: AI substrate refactor.** Spec [`docs/systems/ai-substrate-refactor.md`](docs/systems/ai-substrate-refactor.md) (§4 markers + §6 target-taking DSEs are load-bearing; **§4.7 substrate-vs-search-state is required reading before opening any substrate-migration ticket** — it names the boundary that 092 misclassified). Status [`docs/open-work/tickets/014-phase-4-follow-ons.md`](docs/open-work/tickets/014-phase-4-follow-ons.md) — read before any DSE port. Balance-tuning on refactor-affected metrics is **deferred** until the substrate stabilizes. DSE registration: `populate_dse_registry` in `src/plugins/simulation.rs`. Exemplar port: `src/ai/dses/socialize_target.rs`.
 
+## Bugfix discipline
+
+Every bugfix plan MUST include at least one **structural-revision candidate** alongside parameter-level options. "Structural" means one of: **split / extend / rebind / retire** an existing `DispositionKind`, DSE, Marker, or plan template. The structural candidate doesn't have to ship — it has to be drafted, named, and explicitly considered. If you can't draft one, you haven't audited `src/components/disposition.rs::from_action`, the plan templates under `src/ai/planner/` (and `goap_plan.rs`), or the completion proxies in `src/components/commitment.rs` carefully enough.
+
+**Structural-option menu** (mirror in every fix-shape decision tree):
+- **split** — give the action its own `DispositionKind` / DSE / Marker variant. (Precedent: ticket 150 R5a, `Eat` out of `Resting`.)
+- **extend** — keep the umbrella, branch the plan template / completion proxy / scoring shape on entry conditions so the umbrella varies by trigger. (Precedent: ticket 148 distress → adrenaline-facet refactor.)
+- **rebind** — change the Action → Disposition (or sibling) mapping without inventing a new variant.
+- **retire** — delete the variant entirely if the layer-walk shows it has no load-bearing job.
+
+**Layer-walk audit before listing fix candidates.** Walk **L1 markers → L2 DSE scores → L3 softmax → Action→Disposition mapping → plan template → completion proxy → resolver.** For each layer, mark the relevant facts `[verified-correct]` or `[suspect]` in the ticket's "Current architecture" section. A plan that lists only resolver-level fixes against `[suspect]` mappings or templates has not been audited.
+
+Precedent: ticket 150's first plan listed R1 (resolver) / R2 (predicate) / R3 (scoring), all parameter-level; the user surfaced R5 (split Eat from Resting), which was load-bearing. The same lesson lives in the auto-memory entry "Audit L3 Action→Disposition mapping when investigating Clowder AI defects" at the user-global layer. Bugfix tickets should use [`docs/open-work/tickets/_template_bugfix.md`](docs/open-work/tickets/_template_bugfix.md), which embeds the layer-walk table and structural-option slot.
+
 ## ECS rules (Bevy 0.18)
 
 - **Messages, not Events:** `#[derive(Message)]`, `MessageWriter<T>` / `MessageReader<T>`, `app.add_message::<T>()`. Register in `SimulationPlugin::build()` — windowed and headless paths share that plugin (ticket 030). Names are verbs (`SpawnCat`, `CatDied`), not `*Event`.
