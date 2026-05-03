@@ -1,7 +1,7 @@
 ---
 id: 032
 title: Starvation rebalance — align with IRL cat biology, interesting not cutthroat
-status: ready
+status: in-progress
 cluster: null
 added: 2026-04-26
 parked: null
@@ -154,3 +154,4 @@ Predicted-direction match + magnitude in band + no survival canary regression (`
 
 - 2026-04-26: Ticket opened. Triggered by tooling pass surfacing two intersecting bugs: (a) `social.bond_proximity_social_rate` mis-spelled but `nearest` suggested the right path; (b) `fingerprint`'s silent-subsystem check now flags the ward-pipeline collapse on iter2 logs. Both in turn made the starvation-as-attractor pattern visible across the colony's whole continuity register.
 - 2026-05-02: Approach hardened into an executable, ship-inert scaffolding plan (Steps 0–9). All five scope items implemented behind `CLOWDER_OVERRIDES`-friendly knobs at legacy-reproducing defaults; hypothesis YAMLs drafted (run order `3 → 1 → 2 → 5`); sweeps deferred until 111+146 land and a clean post-substrate baseline is promoted. 032 work lives on a fresh jj revision off `main`, untouched by the 111 WIP at `1f3153cf`.
+- 2026-05-02: Scaffolding landed (this commit). `NeedsConstants` gains `starvation_cliff_use_legacy: true` (sentinel reproducing legacy cliff), `starvation_cliff_exponent: 2.0`, `starvation_mood_threshold: 0.0`, four `starvation_drain_multiplier_*` (all `1.0`), and `starvation_attribution_threshold: 0.1`. `Health` gains `total_starvation_damage` accumulator. `decay_needs` rewires the cascade through a unified `cliff_factor`; `check_death` discriminator gates on the legacy bool. `Fulfillment` gains `body_condition` axis; `FulfillmentConstants` gains decay/recovery/pivot knobs (all `0.0`) plus `use_body_condition_for_breeding_gate` toggle (`false`). `update_body_condition` system registered with run-if guard. Mating gate `is_sated_and_happy` reads `body_condition` when toggle on. Hypothesis YAMLs at `docs/balance/032-{1,2,3,5}-*.yaml`. Investigation thread opened at `docs/balance/starvation-rebalance.md` — surfaced **(a)** sim hunt success rate ≈25.6% vs 30–50% real-cat target (item 4 closes inconclusive, follow-on suggested for hunt-success disambiguation); **(b)** `continuity_tallies.courtship` is *not* zero (~999) — the reproduction-collapse bottleneck is on the *completion* side (`MatingOccurred` never-fired), not the gate. Item 3's predicted magnitude needs reframing accordingly. Default-config `just check`/`just test` clean (1798 unit tests pass). Override path validated via `CLOWDER_OVERRIDES='{"needs":{"starvation_cliff_use_legacy":false,"starvation_cliff_exponent":2.0}}'` smoke run — header `applied_overrides` confirms wire-up. **Next:** wait for clean post-111/146 baseline, then `just hypothesize docs/balance/032-3-breeding-floor.yaml` first.

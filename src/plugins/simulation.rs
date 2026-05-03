@@ -401,6 +401,7 @@ impl Plugin for SimulationPlugin {
                         systems::needs::bond_proximity_social,
                         systems::fulfillment::decay_fulfillment,
                         systems::fulfillment::bond_proximity_social_warmth,
+                        systems::fulfillment::update_body_condition,
                         systems::pregnancy::tick_pregnancy,
                         // Fertility transitions (§7.M.7) — run after
                         // tick_pregnancy so `RemovedComponents<Pregnant>`

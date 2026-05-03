@@ -39,6 +39,14 @@ pub struct MatingFitness {
     /// Toms and for any cat pre-/post-Fertility-marker (Kitten, Young,
     /// Elder, pregnant). §7.M.7.6 hard-gate reads this field.
     pub fertility_phase: Option<FertilityPhase>,
+    /// Ticket 032 — `Fulfillment.body_condition` snapshot, falling back
+    /// to `1.0` for cats without the `Fulfillment` component (a gap
+    /// noted on this ticket — initial-colony cats have it via
+    /// `setup.rs`; kittens born mid-run currently do not). Read by
+    /// `is_sated_and_happy` only when
+    /// `FulfillmentConstants::use_body_condition_for_breeding_gate`
+    /// is `true`.
+    pub body_condition: f32,
 }
 
 /// SystemParam bundle gathering everything the mating gate needs beyond what
@@ -60,6 +68,7 @@ pub struct MatingFitnessParams<'w, 's> {
             &'static Needs,
             Option<&'static Pregnant>,
             Option<&'static Fertility>,
+            Option<&'static crate::components::fulfillment::Fulfillment>,
         ),
         Without<Dead>,
     >,
@@ -75,7 +84,7 @@ impl<'w, 's> MatingFitnessParams<'w, 's> {
         self.query
             .iter()
             .map(
-                |(e, age, gender, orient, mood, needs, pregnant, fertility)| {
+                |(e, age, gender, orient, mood, needs, pregnant, fertility, fulfillment)| {
                     (
                         e,
                         MatingFitness {
@@ -87,6 +96,7 @@ impl<'w, 's> MatingFitnessParams<'w, 's> {
                             energy: needs.energy,
                             is_pregnant: pregnant.is_some(),
                             fertility_phase: fertility.map(|f| f.phase),
+                            body_condition: fulfillment.map_or(1.0, |f| f.body_condition),
                         },
                     )
                 },
@@ -129,8 +139,23 @@ fn is_conception_viable(f: &MatingFitness) -> bool {
 }
 
 /// Does this cat (by fitness snapshot) meet the "sated and happy" floor?
-fn is_sated_and_happy(f: &MatingFitness, scoring: &ScoringConstants) -> bool {
-    f.hunger > scoring.breeding_hunger_floor
+///
+/// Ticket 032 — when `fc.use_body_condition_for_breeding_gate` is on,
+/// the hunger leg of the gate reads `f.body_condition` instead of raw
+/// `f.hunger`. Body condition is a slow-moving accumulator across hunger
+/// oscillations; reading it makes the gate less brittle to per-tick
+/// hunger noise. Default config keeps legacy hunger-based behavior.
+fn is_sated_and_happy(
+    f: &MatingFitness,
+    scoring: &ScoringConstants,
+    fc: &crate::resources::sim_constants::FulfillmentConstants,
+) -> bool {
+    let hunger_input = if fc.use_body_condition_for_breeding_gate {
+        f.body_condition
+    } else {
+        f.hunger
+    };
+    hunger_input > scoring.breeding_hunger_floor
         && f.energy > scoring.breeding_energy_floor
         && f.mood_valence > scoring.breeding_mood_floor
 }
@@ -149,6 +174,7 @@ pub fn has_eligible_mate(
     self_mating_need: f32,
     season: Season,
     scoring: &ScoringConstants,
+    fulfillment_c: &crate::resources::sim_constants::FulfillmentConstants,
     fitness: &HashMap<Entity, MatingFitness>,
     cat_positions: &[(Entity, Position)],
     relationships: &Relationships,
@@ -162,7 +188,7 @@ pub fn has_eligible_mate(
     let Some(self_fit) = fitness.get(&self_entity) else {
         return false;
     };
-    if !is_fertile(self_fit) || !is_sated_and_happy(self_fit, scoring) {
+    if !is_fertile(self_fit) || !is_sated_and_happy(self_fit, scoring, fulfillment_c) {
         return false;
     }
 
@@ -173,7 +199,7 @@ pub fn has_eligible_mate(
         let Some(other_fit) = fitness.get(other) else {
             return false;
         };
-        if !is_fertile(other_fit) || !is_sated_and_happy(other_fit, scoring) {
+        if !is_fertile(other_fit) || !is_sated_and_happy(other_fit, scoring, fulfillment_c) {
             return false;
         }
         if !are_orientation_compatible(
@@ -225,6 +251,7 @@ pub fn update_mate_eligibility_markers(
     let fitness = mating.snapshot();
     let season = mating.current_season();
     let scoring = &constants.scoring;
+    let fulfillment_c = &constants.fulfillment;
     let cat_positions: Vec<(Entity, Position)> = cats.iter().map(|(e, p, _, _)| (e, *p)).collect();
 
     for (entity, _pos, needs, has_marker) in cats.iter() {
@@ -233,6 +260,7 @@ pub fn update_mate_eligibility_markers(
             needs.mating,
             season,
             scoring,
+            fulfillment_c,
             &fitness,
             &cat_positions,
             &relationships,
@@ -265,6 +293,7 @@ mod tests {
             // Default to Estrus so the §7.M.7.6 viability gate opens —
             // tests that exercise the gate override this explicitly.
             fertility_phase: Some(FertilityPhase::Estrus),
+            body_condition: 1.0,
         }
     }
 
@@ -303,6 +332,7 @@ mod tests {
     #[test]
     fn eligible_when_all_gates_pass_in_spring() {
         let scoring = ScoringConstants::default();
+        let fulfillment_c = crate::resources::sim_constants::FulfillmentConstants::default();
         let (a, _, fitness, relationships, positions) = setup_eligible_pair();
 
         assert!(has_eligible_mate(
@@ -310,6 +340,7 @@ mod tests {
             0.3,
             Season::Spring,
             &scoring,
+            &fulfillment_c,
             &fitness,
             &positions,
             &relationships
@@ -319,6 +350,7 @@ mod tests {
     #[test]
     fn eligible_in_summer_secondary_peak() {
         let scoring = ScoringConstants::default();
+        let fulfillment_c = crate::resources::sim_constants::FulfillmentConstants::default();
         let (a, _, fitness, relationships, positions) = setup_eligible_pair();
 
         assert!(has_eligible_mate(
@@ -326,6 +358,7 @@ mod tests {
             0.3,
             Season::Summer,
             &scoring,
+            &fulfillment_c,
             &fitness,
             &positions,
             &relationships
@@ -335,6 +368,7 @@ mod tests {
     #[test]
     fn eligible_in_autumn_tail() {
         let scoring = ScoringConstants::default();
+        let fulfillment_c = crate::resources::sim_constants::FulfillmentConstants::default();
         let (a, _, fitness, relationships, positions) = setup_eligible_pair();
 
         assert!(has_eligible_mate(
@@ -342,6 +376,7 @@ mod tests {
             0.3,
             Season::Autumn,
             &scoring,
+            &fulfillment_c,
             &fitness,
             &positions,
             &relationships
@@ -351,6 +386,7 @@ mod tests {
     #[test]
     fn ineligible_in_winter_anestrous() {
         let scoring = ScoringConstants::default();
+        let fulfillment_c = crate::resources::sim_constants::FulfillmentConstants::default();
         let (a, _, fitness, relationships, positions) = setup_eligible_pair();
 
         assert!(!has_eligible_mate(
@@ -358,6 +394,7 @@ mod tests {
             0.3,
             Season::Winter,
             &scoring,
+            &fulfillment_c,
             &fitness,
             &positions,
             &relationships
@@ -368,6 +405,7 @@ mod tests {
     fn ineligible_when_configured_spring_fertility_is_zero() {
         let mut scoring = ScoringConstants::default();
         scoring.mating_fertility_spring = 0.0;
+        let fulfillment_c = crate::resources::sim_constants::FulfillmentConstants::default();
         let (a, _, fitness, relationships, positions) = setup_eligible_pair();
 
         assert!(!has_eligible_mate(
@@ -375,6 +413,7 @@ mod tests {
             0.3,
             Season::Spring,
             &scoring,
+            &fulfillment_c,
             &fitness,
             &positions,
             &relationships
@@ -384,6 +423,7 @@ mod tests {
     #[test]
     fn ineligible_when_hungry() {
         let scoring = ScoringConstants::default();
+        let fulfillment_c = crate::resources::sim_constants::FulfillmentConstants::default();
         let (a, _, mut fitness, relationships, positions) = setup_eligible_pair();
         fitness.get_mut(&a).unwrap().hunger = 0.3; // below floor
 
@@ -392,6 +432,7 @@ mod tests {
             0.3,
             Season::Spring,
             &scoring,
+            &fulfillment_c,
             &fitness,
             &positions,
             &relationships
@@ -401,6 +442,7 @@ mod tests {
     #[test]
     fn ineligible_when_sad() {
         let scoring = ScoringConstants::default();
+        let fulfillment_c = crate::resources::sim_constants::FulfillmentConstants::default();
         let (a, _, mut fitness, relationships, positions) = setup_eligible_pair();
         fitness.get_mut(&a).unwrap().mood_valence = 0.0; // below floor (0.2)
 
@@ -409,6 +451,7 @@ mod tests {
             0.3,
             Season::Spring,
             &scoring,
+            &fulfillment_c,
             &fitness,
             &positions,
             &relationships
@@ -418,6 +461,7 @@ mod tests {
     #[test]
     fn ineligible_when_partner_is_pregnant() {
         let scoring = ScoringConstants::default();
+        let fulfillment_c = crate::resources::sim_constants::FulfillmentConstants::default();
         let (a, b, mut fitness, relationships, positions) = setup_eligible_pair();
         fitness.get_mut(&b).unwrap().is_pregnant = true;
 
@@ -426,6 +470,7 @@ mod tests {
             0.3,
             Season::Spring,
             &scoring,
+            &fulfillment_c,
             &fitness,
             &positions,
             &relationships
@@ -435,6 +480,7 @@ mod tests {
     #[test]
     fn ineligible_when_mating_need_too_high() {
         let scoring = ScoringConstants::default();
+        let fulfillment_c = crate::resources::sim_constants::FulfillmentConstants::default();
         let (a, _, fitness, relationships, positions) = setup_eligible_pair();
 
         assert!(!has_eligible_mate(
@@ -442,6 +488,7 @@ mod tests {
             0.95, // above mating_interest_threshold (0.6)
             Season::Spring,
             &scoring,
+            &fulfillment_c,
             &fitness,
             &positions,
             &relationships
@@ -451,6 +498,7 @@ mod tests {
     #[test]
     fn ineligible_without_partners_bond() {
         let scoring = ScoringConstants::default();
+        let fulfillment_c = crate::resources::sim_constants::FulfillmentConstants::default();
         let (a, b, fitness, mut relationships, positions) = setup_eligible_pair();
         relationships.get_or_insert(a, b).bond = Some(BondType::Friends);
 
@@ -459,6 +507,7 @@ mod tests {
             0.3,
             Season::Spring,
             &scoring,
+            &fulfillment_c,
             &fitness,
             &positions,
             &relationships
@@ -470,6 +519,7 @@ mod tests {
         // §7.M.7.6 hard gate: with both partners in Anestrus or
         // Postpartum, the pair cannot conceive — gate rejects.
         let scoring = ScoringConstants::default();
+        let fulfillment_c = crate::resources::sim_constants::FulfillmentConstants::default();
         let (a, b, mut fitness, relationships, positions) = setup_eligible_pair();
         // Partner b is a Tom per `setup_eligible_pair` — make self (a)
         // Anestrus. Neither partner is now conception-viable.
@@ -482,6 +532,7 @@ mod tests {
             0.3,
             Season::Spring,
             &scoring,
+            &fulfillment_c,
             &fitness,
             &positions,
             &relationships
@@ -492,12 +543,14 @@ mod tests {
     fn eligible_when_queen_is_in_estrus_with_tom_partner() {
         // §7.M.7.6 hard gate opens on a single viable Queen + Tom pair.
         let scoring = ScoringConstants::default();
+        let fulfillment_c = crate::resources::sim_constants::FulfillmentConstants::default();
         let (a, _, fitness, relationships, positions) = setup_eligible_pair();
         assert!(has_eligible_mate(
             a,
             0.3,
             Season::Spring,
             &scoring,
+            &fulfillment_c,
             &fitness,
             &positions,
             &relationships
@@ -510,6 +563,7 @@ mod tests {
         // must reject the pair even though the Tom partner is viable
         // in a seasonal sense.
         let scoring = ScoringConstants::default();
+        let fulfillment_c = crate::resources::sim_constants::FulfillmentConstants::default();
         let (a, _, mut fitness, relationships, positions) = setup_eligible_pair();
         fitness.get_mut(&a).unwrap().fertility_phase = Some(FertilityPhase::Postpartum);
         assert!(!has_eligible_mate(
@@ -517,6 +571,7 @@ mod tests {
             0.3,
             Season::Spring,
             &scoring,
+            &fulfillment_c,
             &fitness,
             &positions,
             &relationships
@@ -526,6 +581,7 @@ mod tests {
     #[test]
     fn ineligible_when_orientation_incompatible() {
         let scoring = ScoringConstants::default();
+        let fulfillment_c = crate::resources::sim_constants::FulfillmentConstants::default();
         let (a, b, mut fitness, relationships, positions) = setup_eligible_pair();
         // Make both straight Toms — not compatible.
         fitness.get_mut(&a).unwrap().gender = Gender::Tom;
@@ -536,6 +592,7 @@ mod tests {
             0.3,
             Season::Spring,
             &scoring,
+            &fulfillment_c,
             &fitness,
             &positions,
             &relationships

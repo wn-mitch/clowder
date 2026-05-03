@@ -432,6 +432,7 @@ mod tests {
             current: 1.0,
             max: 1.0,
             injuries: Vec::new(),
+            total_starvation_damage: 0.0,
         }
     }
 
@@ -519,6 +520,7 @@ mod tests {
             current: 0.5,
             max: 1.0,
             injuries: Vec::new(),
+            total_starvation_damage: 0.0,
         };
         assert!((health_deficit(&h) - 0.5).abs() < 1e-4);
     }
@@ -529,6 +531,7 @@ mod tests {
             current: 0.0,
             max: 0.0,
             injuries: Vec::new(),
+            total_starvation_damage: 0.0,
         };
         assert_eq!(health_deficit(&h), 1.0);
     }
@@ -560,6 +563,7 @@ mod tests {
             current: 0.2,
             max: 1.0,
             injuries: Vec::new(),
+            total_starvation_damage: 0.0,
         };
         let composite = body_distress_composite(&needs, &health);
         assert!((composite - 0.8).abs() < 1e-4);
@@ -582,6 +586,7 @@ mod tests {
                     current: 0.3,
                     max: 1.0,
                     injuries: Vec::new(),
+                    total_starvation_damage: 0.0,
                 },
                 comfortable_needs(),
                 Skills::default(),
@@ -600,6 +605,7 @@ mod tests {
                     current: 0.3,
                     max: 1.0,
                     injuries: Vec::new(),
+                    total_starvation_damage: 0.0,
                 },
                 comfortable_needs(),
                 Skills::default(),
@@ -612,6 +618,7 @@ mod tests {
             current: 1.0,
             max: 1.0,
             injuries: Vec::new(),
+            total_starvation_damage: 0.0,
         });
         schedule.run(&mut world);
         assert!(world.get::<LowHealth>(cat).is_none());
@@ -624,6 +631,7 @@ mod tests {
             current: 0.6,
             max: 1.0,
             injuries: Vec::new(),
+            total_starvation_damage: 0.0,
         };
         h.injuries.push(injury(InjuryKind::Moderate, false));
         h.injuries.push(injury(InjuryKind::Severe, true));
@@ -659,6 +667,7 @@ mod tests {
                     current: 0.0,
                     max: 1.0,
                     injuries: Vec::new(),
+                    total_starvation_damage: 0.0,
                 },
                 comfortable_needs(),
                 Skills::default(),

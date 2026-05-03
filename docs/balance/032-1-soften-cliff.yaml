@@ -1,0 +1,31 @@
+# Hypothesize spec — ticket 032 §Scope item 1.
+#
+# Replaces the all-or-nothing `if hunger == 0.0` cliff in
+# src/systems/needs.rs with a graded `(1 − hunger)²` curve. Default config
+# preserves legacy semantics; this treatment flips
+# `starvation_cliff_use_legacy: false` and exercises the quadratic curve.
+#
+# Magnitude logic: at hunger=0.5, cliff_factor=0.25 → 25% of legacy drain.
+# At hunger=0.1, cliff_factor=0.81 → 81% of legacy drain. The curve smears
+# damage across mid-hunger but a cat at sustained low hunger still dies in
+# a comparable window. Predicted reduction in `Starvation` deaths comes
+# from cats that previously reached `hunger == 0` for many ticks (full
+# legacy drain) now seeing partial drain at hunger 0.1–0.3 long enough to
+# self-rescue via Eat. Welfare-axis lift (acceptance) follows because the
+# panic-mode social cascade no longer hard-engages at the cliff.
+
+hypothesis: "Replacing the all-or-nothing hunger==0 cliff with quadratic graded drain reduces starvation mortality and lifts welfare-axis means by giving cats at mid-hunger time to self-rescue before the full cascade engages"
+
+constants_patch:
+  needs:
+    starvation_cliff_use_legacy: false
+    starvation_cliff_exponent: 2.0
+
+prediction:
+  metric: deaths_by_cause.Starvation
+  direction: decrease
+  rough_magnitude_pct: [60, 90]
+
+seeds: [42, 99, 7]
+reps: 3
+duration: 900

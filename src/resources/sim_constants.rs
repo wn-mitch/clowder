@@ -72,9 +72,10 @@ pub struct NeedsConstants {
     /// `RatePerDay::new(0.5)` (0.0005/tick at the default 1000
     /// ticks/day scale), a continuously-starving cat dies from this
     /// drain in ~2 in-sim days. Pair with `starvation_safety_drain`
-    /// and `starvation_mood_penalty` for the full cascade. See ticket
-    /// 032 for the open work to soften this cliff into a graded
-    /// body-condition axis.
+    /// and `starvation_mood_penalty` for the full cascade. Under
+    /// graded mode (ticket 032) this rate is multiplied by
+    /// `cliff_factor` and the matching `starvation_drain_multiplier_*`
+    /// life-stage knob.
     pub starvation_health_drain: RatePerDay,
     pub starvation_safety_drain: RatePerDay,
     pub safety_recovery_rate: RatePerDay,
@@ -108,6 +109,49 @@ pub struct NeedsConstants {
     /// Scales food_value reduction from tile corruption (e.g. 0.5 = half nourishment at full corruption).
     pub corruption_food_penalty: f32,
     pub mating_temperature_scale: f32,
+    // --- Ticket 032: graded starvation cliff (ship-inert) ---
+    /// Ticket 032 — selects the starvation cascade form. **Default `true`**
+    /// (ship inert) reproduces the legacy all-or-nothing `hunger == 0.0`
+    /// cliff exactly: `cliff_factor = 1.0` iff `hunger == 0.0`, else `0.0`.
+    /// Treatment override `false` enables graded mode where
+    /// `cliff_factor = (1.0 − hunger).powf(starvation_cliff_exponent)`,
+    /// scaling `starvation_health_drain`, `starvation_safety_drain`, and
+    /// the social-decay multiplier continuously.
+    pub starvation_cliff_use_legacy: bool,
+    /// Ticket 032 — exponent on the graded `(1 − hunger)^k` cliff curve
+    /// (only consulted when `starvation_cliff_use_legacy = false`).
+    /// `2.0` ⇒ quadratic — drain scales gently across mid-hunger and
+    /// ramps up near `hunger = 0`. Default `2.0` (only takes effect when
+    /// the legacy bool is flipped). Treatment values `1.0` (linear) and
+    /// `3.0` (steeper cubic) reserved for sweep variants.
+    pub starvation_cliff_exponent: f32,
+    /// Ticket 032 — under graded mode, the persistent starvation mood
+    /// modifier only fires when `cliff_factor > starvation_mood_threshold`
+    /// (so brief mid-hunger dips don't spam mood-modifier creation).
+    /// Default `0.0` ⇒ mood fires whenever the cliff is non-zero, matching
+    /// legacy semantics where any starving tick lands the modifier.
+    /// Treatment value `0.5` reserves the mood penalty for the deeper
+    /// half of the cliff curve.
+    pub starvation_mood_threshold: f32,
+    /// Ticket 032 — per-life-stage multipliers on starvation health and
+    /// safety drains. **All default to `1.0` (ship inert).** Treatment
+    /// override per ticket §Scope item 2: kittens 2.0×, young 1.3×,
+    /// adults 1.0×, elders 1.5× — kittens and elders are far more
+    /// vulnerable to acute hunger than prime adults in real cat biology.
+    /// Compounds with `cliff_factor` (Step 2) when graded mode is on.
+    pub starvation_drain_multiplier_kitten: f32,
+    pub starvation_drain_multiplier_young: f32,
+    pub starvation_drain_multiplier_adult: f32,
+    pub starvation_drain_multiplier_elder: f32,
+    /// Ticket 032 — under graded-cliff mode (`starvation_cliff_use_legacy
+    /// = false`), the death-cause discriminator attributes a death to
+    /// `DeathCause::Starvation` when `Health.total_starvation_damage`
+    /// exceeds this threshold. **Default `0.1`** — a cat that has lost
+    /// more than 10% of max health to the starvation cascade counts as
+    /// starved (the graded curve smears damage across many ticks at
+    /// non-zero hunger, so a discrete threshold replaces the legacy
+    /// `hunger == 0.0` discriminator). Ignored under legacy mode.
+    pub starvation_attribution_threshold: f32,
     // --- Counts / distances ---
     pub starvation_mood_ticks: u64,
     pub tradition_familiar_distance: i32,
@@ -157,6 +201,15 @@ impl Default for NeedsConstants {
             eat_from_inventory_threshold: 0.4,
             corruption_food_penalty: 0.5,
             mating_temperature_scale: 0.5,
+            // Ticket 032: graded starvation cliff (ship-inert defaults)
+            starvation_cliff_use_legacy: true,
+            starvation_cliff_exponent: 2.0,
+            starvation_mood_threshold: 0.0,
+            starvation_drain_multiplier_kitten: 1.0,
+            starvation_drain_multiplier_young: 1.0,
+            starvation_drain_multiplier_adult: 1.0,
+            starvation_drain_multiplier_elder: 1.0,
+            starvation_attribution_threshold: 0.1,
             // Counts / distances
             starvation_mood_ticks: 5,
             tradition_familiar_distance: 5,
@@ -1645,6 +1698,14 @@ pub struct ScoringConstants {
     pub caretake_bond_compassion_boost_max: f32,
     /// Minimum hunger a cat (and its prospective partner) must have to be
     /// eligible to mate. Hungry cats breed hungry kittens.
+    ///
+    /// Ticket 032 — colony-wide reproduction collapse traces partly to this
+    /// floor: at `0.6`, the AND-gate of (hunger > 0.6 ∧ energy > 0.5 ∧
+    /// mood > 0.2 ∧ partners-bond ∧ photoperiod) is rarely satisfied because
+    /// the colony lives in survival mode. Treatment override `0.4` for the
+    /// 032 hypothesize sweep (`docs/balance/hypotheses/032-3-breeding-floor.yaml`).
+    /// See `docs/balance/social-target-range.report.md` finding 2 — bond
+    /// progression is the deeper bottleneck, but the hunger gate amplifies it.
     pub breeding_hunger_floor: f32,
     /// Minimum energy a cat (and its prospective partner) must have to be
     /// eligible to mate. Exhausted cats don't court.
@@ -4145,6 +4206,32 @@ pub struct FulfillmentConstants {
     pub social_warmth_bond_proximity_range: i32,
     /// Per-tick social_warmth gain while actively socializing with a target.
     pub social_warmth_socialize_per_tick: f32,
+    // --- Ticket 032: body-condition axis (ship-inert) ---
+    /// Ticket 032 — per-tick decay rate on `body_condition` per unit
+    /// hunger deficit below `body_condition_pivot`. **Default `0.0`**
+    /// (axis ships flat at 1.0). Treatment values exercise the slow-
+    /// moving body-condition curve; ~`0.0001` is a reasonable starting
+    /// magnitude (loses 10% body condition over 1000 ticks of moderate
+    /// hunger deficit).
+    pub body_condition_decay_per_unit_hunger_deficit: f32,
+    /// Ticket 032 — per-tick recovery rate on `body_condition` per unit
+    /// satiation above `body_condition_pivot`. **Default `0.0`**.
+    /// Recovery is typically slower than decay (real cats lose
+    /// condition fast under fasting and rebuild it slowly under
+    /// re-feeding); a treatment value of half the decay rate is a
+    /// sensible starting asymmetry.
+    pub body_condition_recovery_per_unit_satiation: f32,
+    /// Ticket 032 — pivot hunger value above which `body_condition`
+    /// recovers and below which it decays. Default `0.5` — neutral when
+    /// hunger is at the midpoint of its range. Low-relevance knob when
+    /// the decay/recovery rates are 0.
+    pub body_condition_pivot: f32,
+    /// Ticket 032 — when `true`, the mating gate `is_sated_and_happy`
+    /// reads `Fulfillment.body_condition` instead of raw `needs.hunger`
+    /// for its hunger leg. **Default `false`** (legacy behavior). Set
+    /// to `true` only in concert with non-zero body-condition rates,
+    /// otherwise the axis is flat at 1.0 and the gate becomes free.
+    pub use_body_condition_for_breeding_gate: bool,
 }
 
 impl Default for FulfillmentConstants {
@@ -4157,6 +4244,11 @@ impl Default for FulfillmentConstants {
             social_warmth_bond_proximity_rate: 0.0002,
             social_warmth_bond_proximity_range: 3,
             social_warmth_socialize_per_tick: 0.001,
+            // Ticket 032 — body_condition axis ships inert.
+            body_condition_decay_per_unit_hunger_deficit: 0.0,
+            body_condition_recovery_per_unit_satiation: 0.0,
+            body_condition_pivot: 0.5,
+            use_body_condition_for_breeding_gate: false,
         }
     }
 }

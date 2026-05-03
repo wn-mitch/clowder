@@ -850,6 +850,7 @@ mod tests {
             current: 1.0,
             max: 1.0,
             injuries: Vec::new(),
+            total_starvation_damage: 0.0,
         };
         let at = Position::new(7, 3);
         let kind = apply_injury(&mut h, 0.05, 10, InjurySource::Unknown, at, c);
@@ -910,6 +911,7 @@ mod tests {
                         at: Position::new(0, 0),
                     },
                 ],
+                total_starvation_damage: 0.0,
             })
             .id();
 
@@ -947,6 +949,7 @@ mod tests {
             current: 1.0,
             max: 1.0,
             injuries: Vec::new(),
+            total_starvation_damage: 0.0,
         };
 
         let at = Position::new(0, 0);
@@ -982,6 +985,7 @@ mod tests {
             current: 1.0,
             max: 1.0,
             injuries: Vec::new(),
+            total_starvation_damage: 0.0,
         };
 
         // Apply raw damage (same as predator_stalk_cats).

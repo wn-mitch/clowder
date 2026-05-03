@@ -37,12 +37,24 @@ pub fn check_death(
     relationships: Res<Relationships>,
 ) {
     let c = &constants.death;
+    let needs_c = &constants.needs;
     let tick = time.tick;
     let mut newly_dead: Vec<(Entity, Position, String, DeathCause, Option<String>)> = Vec::new();
 
     for (entity, name, health, needs, age, pos) in &alive_query {
         let cause = if health.current <= 0.0 {
-            if needs.hunger == 0.0 {
+            // Ticket 032 — discriminator branches on cliff mode. Legacy:
+            // hard `hunger == 0.0 ⇒ Starvation`. Graded: the cat may bottom
+            // out at `hunger > 0`, so attribute to Starvation when the
+            // monotonic `total_starvation_damage` accumulator crossed the
+            // attribution threshold. Default config keeps legacy semantics.
+            if needs_c.starvation_cliff_use_legacy {
+                if needs.hunger == 0.0 {
+                    Some(DeathCause::Starvation)
+                } else {
+                    Some(DeathCause::Injury)
+                }
+            } else if health.total_starvation_damage > needs_c.starvation_attribution_threshold {
                 Some(DeathCause::Starvation)
             } else {
                 Some(DeathCause::Injury)
@@ -310,6 +322,7 @@ mod tests {
                         current: health,
                         max: 1.0,
                         injuries: vec![],
+                        total_starvation_damage: 0.0,
                     },
                     needs,
                     Mood::default(),
@@ -435,6 +448,7 @@ mod tests {
                         current: health,
                         max: 1.0,
                         injuries: vec![],
+                        total_starvation_damage: 0.0,
                     },
                     needs,
                     Mood::default(),

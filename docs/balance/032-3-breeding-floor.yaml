@@ -1,0 +1,31 @@
+# Hypothesize spec — ticket 032 §Scope item 3.
+#
+# Drops the breeding hunger floor from 0.6 → 0.4. The mating gate AND-gates
+# (hunger > floor ∧ energy > 0.5 ∧ mood > 0.2 ∧ Partners-bond ∧ photoperiod);
+# at 0.6 the colony rarely accumulates enough hunger headroom to compose the
+# AND. social-target-range.report.md finding 2 traces reproduction collapse
+# partly to bond-progression, but the hunger floor amplifies the gate-starve.
+#
+# Magnitude logic: current `continuity_tallies.courtship` is ~0 on canonical
+# baseline (post-session-2026-05-02 footer: kittens_born=0, bonds_formed=3).
+# Lowering the floor by 33% gives a wider eligibility window across the
+# typical 1000-tick hunger oscillation. Acceptance band 25–300% wide because
+# rising from ~0 means even modest absolute increase reads as large
+# percentage; band guards against cliff-overshoot (cats mating while
+# nutritionally compromised producing kittens that can't survive — watch
+# `kittens_surviving / kittens_born` ratio if this passes).
+
+hypothesis: "Lowering breeding_hunger_floor 0.6 → 0.4 widens the AND-gate eligibility window enough to recover courtship cadence after the post-substrate reproduction collapse"
+
+constants_patch:
+  scoring:
+    breeding_hunger_floor: 0.4
+
+prediction:
+  metric: continuity_tallies.courtship
+  direction: increase
+  rough_magnitude_pct: [25, 300]
+
+seeds: [42, 99, 7]
+reps: 3
+duration: 900

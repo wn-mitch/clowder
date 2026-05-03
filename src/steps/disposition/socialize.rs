@@ -210,6 +210,7 @@ mod tests {
         let mut needs = Needs::default();
         let mut fulfillment = Fulfillment {
             social_warmth: 0.9999,
+            body_condition: 1.0,
         };
 
         let mut world = World::new();

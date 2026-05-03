@@ -123,6 +123,7 @@ pub fn tick_pregnancy(
                             current: kitten_health,
                             max: 1.0,
                             injuries: Vec::new(),
+                            total_starvation_damage: 0.0,
                         },
                         Needs {
                             hunger: 0.5,

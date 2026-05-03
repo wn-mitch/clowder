@@ -14,8 +14,8 @@ _Last generated: 2026-05-02._
 
 | Status | Count |
 |---|---|
-| In progress | 6 |
-| Ready | 45 |
+| In progress | 7 |
+| Ready | 44 |
 | Parked | 5 |
 | Blocked | 18 |
 | **Open total** | **74** |
@@ -25,16 +25,17 @@ Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-index` (regenerate this file).
 
-## In progress (6)
+## In progress (7)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
+- **[032](docs/open-work/tickets/032-starvation-cat-biology-realignment.md)** — Starvation rebalance — align with IRL cat biology, interesting not cutthroat — _added 2026-04-26_
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _added 2026-04-27_
 - **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** — Substrate-over-override — retire control-yanking hacks in favor of IAUS levers — _[substrate-over-override] · added 2026-04-30_
 - **[108](docs/open-work/tickets/108-threat-proximity-adrenaline.md)** — ThreatProximityAdrenaline modifier — substrate axis for CriticalSafety interrupt retirement — _[ai-substrate] · added 2026-05-01_
 - **[109](docs/open-work/tickets/109-intraspecies-conflict-response.md)** — IntraspeciesConflictResponse — full four-valence (fight/flight/freeze/fawn) social response — _[ai-substrate] · added 2026-05-01_
 
-## Ready (45)
+## Ready (44)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -47,7 +48,6 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[020](docs/open-work/tickets/020-namedlandmark-substrate.md)** — NamedLandmark substrate (cross-consumer naming) — _added 2026-04-22_
 - **[023](docs/open-work/tickets/023-shadowfox-distinct-motivations.md)** — Shadowfox motivations distinct from normal foxes — _added 2026-04-14_
 - **[029](docs/open-work/tickets/029-cross-run-log-database.md)** — Cross-run log database — collate baseline + diagnostic archives for SQL-style queries — _added 2026-04-25_
-- **[032](docs/open-work/tickets/032-starvation-cat-biology-realignment.md)** — Starvation rebalance — align with IRL cat biology, interesting not cutthroat — _added 2026-04-26_
 - **[034](docs/open-work/tickets/034-time-anchor-continuity-rebalance.md)** — Time-anchor continuity rebalance — restore play/grooming/mythic-texture under fixed prey-scent — _added 2026-04-26_
 - **[035](docs/open-work/tickets/035-burial-not-implemented.md)** — Burial — implement the §5 broaden-sideways capability so the continuity canary can pass — _added 2026-04-26_
 - **[037](docs/open-work/tickets/037-grooming-fired-masks-silent-advance.md)** — GroomingFired event masks silent-advance — continuity canary lies when target picker returns None — _added 2026-04-26_

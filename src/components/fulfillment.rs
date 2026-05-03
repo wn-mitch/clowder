@@ -23,11 +23,27 @@ pub struct Fulfillment {
     /// grooming-other (both parties), socializing, bond proximity.
     /// Split from the old conflated `needs.warmth` — see `warmth-split.md`.
     pub social_warmth: f32,
+    /// Ticket 032 — body-condition fulfillment axis. Slow-moving scalar
+    /// that decays under sustained low hunger and recovers under sustained
+    /// satiation; loosely modeling real-cat body condition (fat reserves,
+    /// muscle, coat). Default 1.0; **default decay/recovery rates are 0.0
+    /// so the axis ships flat** until a treatment override exercises it.
+    /// `#[serde(default = "default_body_condition")]` keeps existing
+    /// save-files compatible.
+    #[serde(default = "default_body_condition")]
+    pub body_condition: f32,
+}
+
+fn default_body_condition() -> f32 {
+    1.0
 }
 
 impl Default for Fulfillment {
     fn default() -> Self {
-        Self { social_warmth: 0.6 }
+        Self {
+            social_warmth: 0.6,
+            body_condition: 1.0,
+        }
     }
 }
 
@@ -66,7 +82,7 @@ mod tests {
 
     #[test]
     fn deficit_inverse_of_level() {
-        let f = Fulfillment { social_warmth: 0.3 };
+        let f = Fulfillment { social_warmth: 0.3, body_condition: 1.0 };
         assert!((f.social_warmth_deficit() - 0.7).abs() < f32::EPSILON);
     }
 
@@ -74,10 +90,11 @@ mod tests {
     fn deficit_clamps_at_boundaries() {
         let low = Fulfillment {
             social_warmth: -0.1,
+            body_condition: 1.0,
         };
         assert!((low.social_warmth_deficit() - 1.0).abs() < f32::EPSILON);
 
-        let high = Fulfillment { social_warmth: 1.5 };
+        let high = Fulfillment { social_warmth: 1.5, body_condition: 1.0 };
         assert!((high.social_warmth_deficit() - 0.0).abs() < f32::EPSILON);
     }
 
@@ -100,6 +117,7 @@ mod tests {
     fn serde_round_trip() {
         let original = Fulfillment {
             social_warmth: 0.42,
+            body_condition: 0.7,
         };
         let json = serde_json::to_string(&original).unwrap();
         let restored: Fulfillment = serde_json::from_str(&json).unwrap();

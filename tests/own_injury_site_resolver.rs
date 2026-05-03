@@ -41,6 +41,7 @@ fn own_injury_site_resolves_to_most_recent_unhealed_injury_position() {
                 at: Position::new(7, 3),
             },
         ],
+        total_starvation_damage: 0.0,
     };
 
     let resolved = own_injury_site(&health);
@@ -96,6 +97,7 @@ fn own_injury_site_none_when_only_healed_injuries() {
             source: InjurySource::Unknown,
             at: Position::new(5, 5),
         }],
+        total_starvation_damage: 0.0,
     };
     assert_eq!(
         own_injury_site(&health),

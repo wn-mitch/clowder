@@ -1,0 +1,40 @@
+# Hypothesize spec — ticket 032 §Scope item 2.
+#
+# Stratifies starvation drain by life stage. Real cat biology: kittens
+# survive far less time without food (days, not weeks) and elders are
+# more vulnerable than prime adults. Today the constants are flat across
+# stages.
+#
+# Multipliers compound with `cliff_factor` from item 1; this YAML lands
+# alongside the graded cliff so kitten/elder mortality reflects the
+# combined model. Run after item 1 lands as a baseline; otherwise the
+# legacy cliff drowns out the per-stage multiplier signal.
+#
+# Magnitude logic: under graded cliff alone, expect adult Starvation to
+# drop ~70% from item 1. Stratifying further: kittens at 2.0× drain die
+# more often during food-pressure events (Winter, fog, prey crashes) but
+# adults survive more consistently. Net: total `Starvation` lower than
+# adult-only, but kitten-mortality-as-a-fraction-of-deaths rises. Use a
+# multi-metric prediction; the primary gate is `kittens_surviving` ↓ to
+# verify stage stratification engaged, plus adult-population stability.
+
+hypothesis: "Per-life-stage starvation multipliers (kitten 2.0×, young 1.3×, adult 1.0×, elder 1.5×) stratify mortality so food-pressure events affect kittens and elders more than prime adults — matching real cat ecology"
+
+constants_patch:
+  needs:
+    # Build on item 1's graded cliff; item 2 layers stage stratification.
+    starvation_cliff_use_legacy: false
+    starvation_cliff_exponent: 2.0
+    starvation_drain_multiplier_kitten: 2.0
+    starvation_drain_multiplier_young: 1.3
+    starvation_drain_multiplier_adult: 1.0
+    starvation_drain_multiplier_elder: 1.5
+
+prediction:
+  metric: kittens_surviving
+  direction: decrease
+  rough_magnitude_pct: [10, 40]
+
+seeds: [42, 99, 7]
+reps: 3
+duration: 900

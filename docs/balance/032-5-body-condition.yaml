@@ -1,0 +1,49 @@
+# Hypothesize spec — ticket 032 §Scope item 5.
+#
+# Activates the body_condition welfare axis (decay/recovery rates rise
+# from 0 to non-trivial magnitudes) and rewires the breeding gate to
+# read body_condition instead of raw hunger. body_condition is a slow-
+# moving accumulator across hunger oscillations; reading it makes the
+# Mate gate less brittle to per-tick hunger noise and aligns with the
+# real-cat semantic that brief fasting cycles are normal.
+#
+# Magnitude logic: under raw-hunger gating, a cat at hunger=0.55 is
+# eligible to mate; one at hunger=0.45 is not. Across a 1000-tick
+# hunger oscillation a bonded pair only co-passes the gate in narrow
+# windows. body_condition smooths this — a cat that ate 200 ticks ago
+# and is currently hunting at hunger=0.45 still has body_condition≈0.85
+# and remains eligible. Predicted reduction in courtship variance
+# across reps; primary gate is the variance metric where available, or
+# fall back to courtship-rate stability.
+#
+# Decay/recovery values target ~10% body_condition swing per 1000-tick
+# hunger excursion (i.e., body_condition tracks the *envelope* of
+# hunger, not its per-tick value). Threshold 0.6 above which gate
+# passes — slightly tighter than item-3's hunger floor 0.4 because
+# body_condition is itself smoother and less forgiving.
+
+hypothesis: "Routing the mating gate through the body_condition welfare axis (slow-moving across hunger oscillations) reduces courtship variance and stabilizes reproduction cadence across the photoperiod — replicating the real-cat 'eat-rest cycle' tolerance the legacy gate fails on"
+
+constants_patch:
+  fulfillment:
+    body_condition_decay_per_unit_hunger_deficit: 0.0001
+    body_condition_recovery_per_unit_satiation: 0.00005
+    body_condition_pivot: 0.5
+    use_body_condition_for_breeding_gate: true
+  scoring:
+    # Body condition lives in [0, 1] like hunger but is smoother;
+    # reading it through the same floor of 0.6 is sensible. Could
+    # tune to 0.5 in a follow-up if the gate becomes too tight.
+    breeding_hunger_floor: 0.6
+
+prediction:
+  # No `dse_score_volatility` metric available; falling back to courtship
+  # cadence as a robustness proxy. If this metric proves insensitive,
+  # rerun with `kittens_born_total` direction=increase, magnitude wide.
+  metric: continuity_tallies.courtship
+  direction: increase
+  rough_magnitude_pct: [25, 300]
+
+seeds: [42, 99, 7]
+reps: 3
+duration: 900

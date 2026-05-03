@@ -4157,6 +4157,7 @@ mod tests {
             current: 0.3,
             max: 1.0,
             injuries: Vec::new(),
+            total_starvation_damage: 0.0,
         };
         let disposition = default_disposition(DispositionKind::Guarding);
         let d = SimConstants::default().disposition;
@@ -4221,6 +4222,7 @@ mod tests {
             current: 0.2,
             max: 1.0,
             injuries: Vec::new(),
+            total_starvation_damage: 0.0,
         };
         let disposition = default_disposition(DispositionKind::Resting);
         let d = SimConstants::default().disposition;
@@ -4255,6 +4257,7 @@ mod tests {
             current: 0.5,
             max: 1.0,
             injuries: Vec::new(),
+            total_starvation_damage: 0.0,
         };
         let disposition = default_disposition(DispositionKind::Guarding);
         let d = SimConstants::default().disposition;

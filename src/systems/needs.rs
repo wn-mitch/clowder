@@ -106,26 +106,54 @@ pub fn decay_needs(
         needs.energy = (needs.energy - energy_decay).max(0.0);
         needs.temperature = (needs.temperature - temperature_drain).max(0.0);
 
-        // --- Starvation cascade ---
-        let starving = needs.hunger == 0.0;
+        // --- Starvation cascade (ticket 032: graded cliff scaffolding) ---
+        // `cliff_factor` is 1.0 at the legacy `hunger == 0.0` boundary and 0.0
+        // when the cat is sated. Default config preserves the all-or-nothing
+        // cliff; flipping `starvation_cliff_use_legacy: false` enables a
+        // continuous `(1 − hunger)^k` curve. `stage_multiplier` is 1.0 by
+        // default; treatment values stratify mortality by life stage.
+        let cliff_factor = if c.starvation_cliff_use_legacy {
+            if needs.hunger == 0.0 { 1.0 } else { 0.0 }
+        } else {
+            (1.0 - needs.hunger)
+                .powf(c.starvation_cliff_exponent)
+                .clamp(0.0, 1.0)
+        };
+        let starving = cliff_factor > 0.0;
+        let stage_multiplier = match age.stage(time.tick, config.ticks_per_season) {
+            LifeStage::Kitten => c.starvation_drain_multiplier_kitten,
+            LifeStage::Young => c.starvation_drain_multiplier_young,
+            LifeStage::Adult => c.starvation_drain_multiplier_adult,
+            LifeStage::Elder => c.starvation_drain_multiplier_elder,
+        };
         if starving {
-            // Health drains when starving.
-            health.current = (health.current - starvation_health_drain).max(0.0);
+            let drain_scale = cliff_factor * stage_multiplier;
+            let starvation_damage = starvation_health_drain * drain_scale;
+
+            // Health drains when starving; tally on the cat for the
+            // graded-mode death-cause discriminator (ticket 032).
+            health.current = (health.current - starvation_damage).max(0.0);
+            health.total_starvation_damage += starvation_damage;
 
             // Safety drops from existential anxiety.
-            needs.safety = (needs.safety - starvation_safety_drain).max(0.0);
+            needs.safety = (needs.safety - starvation_safety_drain * drain_scale).max(0.0);
 
-            // Persistent mood penalty (refresh each tick while starving).
-            if !mood.modifiers.iter().any(|m| m.source == "starvation") {
-                mood.modifiers.push_back(
-                    MoodModifier::new(c.starvation_mood_penalty, c.starvation_mood_ticks, "starvation")
-                        .with_kind(MoodSource::Physical),
-                );
-            } else {
-                // Refresh the existing starvation modifier.
-                for m in mood.modifiers.iter_mut() {
-                    if m.source == "starvation" {
-                        m.ticks_remaining = c.starvation_mood_ticks;
+            // Persistent mood penalty — only fires above the threshold so brief
+            // mid-hunger dips under graded mode don't spam modifier creation.
+            // Default threshold 0.0 reproduces the legacy "any starving tick
+            // lands the modifier" semantic.
+            if cliff_factor > c.starvation_mood_threshold {
+                if !mood.modifiers.iter().any(|m| m.source == "starvation") {
+                    mood.modifiers.push_back(
+                        MoodModifier::new(c.starvation_mood_penalty, c.starvation_mood_ticks, "starvation")
+                            .with_kind(MoodSource::Physical),
+                    );
+                } else {
+                    // Refresh the existing starvation modifier.
+                    for m in mood.modifiers.iter_mut() {
+                        if m.source == "starvation" {
+                            m.ticks_remaining = c.starvation_mood_ticks;
+                        }
                     }
                 }
             }
@@ -137,8 +165,12 @@ pub fn decay_needs(
         }
 
         // --- Level 3: Belonging ---
+        // Under graded mode, the social multiplier lerps between 1.0 (sated)
+        // and `starvation_social_multiplier` (full cliff) by `cliff_factor`.
+        // Legacy `cliff_factor == 1.0` collapses this back to the original
+        // 2.0× multiplier.
         let social_multiplier = if starving {
-            c.starvation_social_multiplier
+            1.0 + (c.starvation_social_multiplier - 1.0) * cliff_factor
         } else {
             1.0
         };

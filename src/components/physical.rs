@@ -106,6 +106,15 @@ pub struct Health {
     pub current: f32,
     pub max: f32,
     pub injuries: Vec<Injury>,
+    /// Ticket 032 — monotonic accumulator of all health drained by the
+    /// starvation cascade in `decay_needs`. Used by the death-cause
+    /// discriminator under graded-cliff mode (`starvation_cliff_use_legacy
+    /// = false`) to attribute deaths to `DeathCause::Starvation` when the
+    /// cat may die at `hunger > 0` (the graded-drain regime). Under legacy
+    /// mode the field still increments but the discriminator ignores it.
+    /// `#[serde(default)]` keeps existing save-files compatible.
+    #[serde(default)]
+    pub total_starvation_damage: f32,
 }
 
 impl Default for Health {
@@ -114,6 +123,7 @@ impl Default for Health {
             current: 1.0,
             max: 1.0,
             injuries: Vec::new(),
+            total_starvation_damage: 0.0,
         }
     }
 }

@@ -11,7 +11,7 @@
 use bevy_ecs::prelude::*;
 
 use crate::components::fulfillment::Fulfillment;
-use crate::components::physical::{Dead, Position};
+use crate::components::physical::{Dead, Needs, Position};
 use crate::resources::relationships::Relationships;
 use crate::resources::sim_constants::SimConstants;
 
@@ -96,6 +96,35 @@ pub fn bond_proximity_social_warmth(
             fulfillment.social_warmth =
                 (fulfillment.social_warmth + fc.social_warmth_bond_proximity_rate).min(1.0);
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// update_body_condition (ticket 032 §Scope item 5)
+// ---------------------------------------------------------------------------
+
+/// Slow-moving `body_condition` axis driven by hunger trajectory. Below
+/// `body_condition_pivot` the axis decays, above it the axis recovers.
+/// **Default rates of `0.0` make this a no-op.** Run-if guard ensures the
+/// system itself is skipped when both rates are zero.
+pub fn update_body_condition(
+    mut query: Query<(&Needs, &mut Fulfillment), Without<Dead>>,
+    constants: Res<SimConstants>,
+) {
+    let fc = &constants.fulfillment;
+    if fc.body_condition_decay_per_unit_hunger_deficit <= 0.0
+        && fc.body_condition_recovery_per_unit_satiation <= 0.0
+    {
+        return;
+    }
+    let pivot = fc.body_condition_pivot;
+    for (needs, mut fulfillment) in &mut query {
+        let delta = if needs.hunger < pivot {
+            -(pivot - needs.hunger) * fc.body_condition_decay_per_unit_hunger_deficit
+        } else {
+            (needs.hunger - pivot) * fc.body_condition_recovery_per_unit_satiation
+        };
+        fulfillment.body_condition = (fulfillment.body_condition + delta).clamp(0.0, 1.0);
     }
 }
 
