@@ -720,6 +720,13 @@ fn active_disposition_ordinal(
     active: Option<crate::components::disposition::DispositionKind>,
 ) -> f32 {
     use crate::components::disposition::DispositionKind;
+    // 150 R5a: `Eating` is appended at ordinal 13 rather than inserted
+    // between Resting and Hunting so existing ordinals 1..=12 stay
+    // stable. The ordinal is consumed by the Patience and
+    // CommitmentTenure modifiers via
+    // `modifier::constituent_dses_for_ordinal`; keeping the older
+    // numbers stable means saved soaks and hand-written tests don't
+    // need rebasing.
     match active {
         None => 0.0,
         Some(DispositionKind::Resting) => 1.0,
@@ -734,6 +741,7 @@ fn active_disposition_ordinal(
         Some(DispositionKind::Exploring) => 10.0,
         Some(DispositionKind::Mating) => 11.0,
         Some(DispositionKind::Caretaking) => 12.0,
+        Some(DispositionKind::Eating) => 13.0,
     }
 }
 
@@ -1255,12 +1263,23 @@ pub fn score_actions(
     // `.require("HasFunctionalKitchen").require("HasRawFoodInStores")`;
     // the outer `cook_base_conditions && ctx.has_functional_kitchen`
     // gate retires. The `hunger > cook_hunger_gate` threshold is a
-    // §4.5 scalar precondition and stays as an inline wrap so Cook
-    // isn't scored while the cat is stuffed. The
-    // `wants_cook_but_no_kitchen` latent signal (read by BuildPressure
-    // in `goap.rs`) is preserved by disambiguating the zero-score case
-    // against the raw ScoringContext booleans — "raw food is present
-    // but no kitchen" is still the only trigger.
+    // §4.5 scalar precondition and stays as an inline wrap so a
+    // *starving* cat doesn't wander off to the Kitchen instead of
+    // eating — the gate fires only when the cat is at-least-half-full
+    // (canonical semantic: `hunger=1.0` is sated, `hunger=0.0` is
+    // starving, so `hunger > cook_hunger_gate (0.5)` means "hunger has
+    // some headroom"). See sim_constants doc on `cook_hunger_gate`.
+    // The `wants_cook_but_no_kitchen` latent signal (read by
+    // BuildPressure in `goap.rs`) is preserved by disambiguating the
+    // zero-score case against the raw ScoringContext booleans — "raw
+    // food is present but no kitchen" is still the only trigger.
+    //
+    // 150 hygiene: comment polarity corrected from the pre-150 wording
+    // "so Cook isn't scored while the cat is stuffed" — that read as
+    // the opposite of what the gate does. The variable name
+    // `hungry_enough_to_cook` is also misleading (it actually means
+    // "satiated enough to cook"); the SimConstants doc on
+    // `cook_hunger_gate` is the authoritative reference.
     let hungry_enough_to_cook = ctx.needs.hunger > s.cook_hunger_gate;
     let mut wants_cook_but_no_kitchen = false;
     if hungry_enough_to_cook {

@@ -1,4 +1,5 @@
 use crate::components::disposition::DispositionKind;
+#[cfg(test)]
 use crate::components::markers;
 
 use super::{GoalState, PlanContext, StatePredicate};
@@ -9,37 +10,39 @@ use super::{GoalState, PlanContext, StatePredicate};
 /// The executor handles the trip loop — it checks `trips_done < target_trips` and re-invokes
 /// the planner for each subsequent trip.
 ///
-/// `ctx` is consulted by the Resting branch only — see tickets 091/092. The
-/// builder reads the colony-scoped `HasStoredFood` marker directly, so the
-/// goal-side branching shares the source of truth with the action-side
-/// `EatAtStores` precondition (`StatePredicate::HasMarker(...)`).
+/// 150 R5a: `ctx` is no longer consulted — the Resting partial-goal
+/// branch (091/092) was retired when Eating took ownership of hunger.
+/// The parameter stays in the signature for shape compatibility with
+/// the rest of the planner surface; future per-disposition goal
+/// branches that need marker context will re-engage it.
 pub fn goal_for_disposition(
     kind: DispositionKind,
     current_trips: u32,
-    ctx: &PlanContext<'_>,
+    _ctx: &PlanContext<'_>,
 ) -> GoalState {
     match kind {
-        // Resting completes on need thresholds, not trip count.
-        //
-        // Tickets 091/092: when the `HasStoredFood` marker is absent,
-        // drop `HungerOk` from the Resting goal. `EatAtStores` gates on
-        // the same marker, so the full three-need Resting goal is
-        // unreachable for a hungry cat with empty stores → `make_plan`
-        // returns None → cat can never sleep its way through the food-
-        // shortage period. The partial Resting goal lets the cat address
-        // Energy/Temperature even when Hunger is unrecoverable here,
-        // then re-elects on the next decision tick (ideally Foraging or
-        // Hunting once producer paths plan).
-        DispositionKind::Resting => {
-            let mut predicates = vec![
+        // 150 R5a: Resting now covers Sleep + SelfGroom only. Goal
+        // gates on energy + temperature; hunger is handled by the
+        // separate `Eating` disposition. The 091/092 partial-goal
+        // dance (drop HungerOk when stores are empty) is no longer
+        // needed here — the marker-gated branch lives on `Eating`'s
+        // eligibility instead.
+        DispositionKind::Resting => GoalState {
+            predicates: vec![
                 StatePredicate::EnergyOk(true),
                 StatePredicate::TemperatureOk(true),
-            ];
-            if ctx.markers.has(markers::HasStoredFood::KEY, ctx.entity) {
-                predicates.insert(0, StatePredicate::HungerOk(true));
-            }
-            GoalState { predicates }
-        }
+            ],
+        },
+
+        // 150 R5a: Eating's goal is hunger-only. Single-trip plan:
+        // `[TravelTo(Stores), EatAtStores]`. The action's effect is
+        // `SetHungerOk(true)`, so a successful chain reaches the goal
+        // in one trip. Marker eligibility (HasStoredFood) gates the
+        // EatAtStores precondition; if the marker flips false mid-plan
+        // the cat re-plans.
+        DispositionKind::Eating => GoalState {
+            predicates: vec![StatePredicate::HungerOk(true)],
+        },
 
         // Building completes when construction is done.
         DispositionKind::Building => GoalState {
@@ -114,21 +117,55 @@ mod tests {
     }
 
     #[test]
-    fn resting_goal_checks_needs() {
+    fn resting_goal_checks_energy_and_temperature() {
+        // 150 R5a: Resting goal gates on energy + temperature only.
+        // Hunger is owned by the new `Eating` disposition (see
+        // `eating_goal_checks_hunger` below).
         let m = food_stocked_markers();
         let cx = ctx(&m);
         let goal = goal_for_disposition(DispositionKind::Resting, 0, &cx);
         let satisfied = PlannerState {
-            hunger_ok: true,
             energy_ok: true,
             temperature_ok: true,
             ..default_state()
         };
         assert!(goal.is_satisfied(&satisfied, &cx));
 
+        let tired = PlannerState {
+            energy_ok: false,
+            ..satisfied.clone()
+        };
+        assert!(!goal.is_satisfied(&tired, &cx));
+        assert_eq!(goal.heuristic(&tired, &cx), 1);
+
+        // Hunger no longer gates Resting — a hungry-but-rested cat is
+        // "resting-satisfied."
+        let hungry_only = PlannerState {
+            hunger_ok: false,
+            energy_ok: true,
+            temperature_ok: true,
+            ..default_state()
+        };
+        assert!(goal.is_satisfied(&hungry_only, &cx));
+    }
+
+    #[test]
+    fn eating_goal_checks_hunger() {
+        // 150 R5a sibling test: Eating's goal is a single HungerOk
+        // predicate. Reaching it is the planner's job; the chain
+        // template lives in `actions::eating_actions`.
+        let m = food_stocked_markers();
+        let cx = ctx(&m);
+        let goal = goal_for_disposition(DispositionKind::Eating, 0, &cx);
+        let satisfied = PlannerState {
+            hunger_ok: true,
+            ..default_state()
+        };
+        assert!(goal.is_satisfied(&satisfied, &cx));
+
         let hungry = PlannerState {
             hunger_ok: false,
-            ..satisfied.clone()
+            ..satisfied
         };
         assert!(!goal.is_satisfied(&hungry, &cx));
         assert_eq!(goal.heuristic(&hungry, &cx), 1);
@@ -196,50 +233,41 @@ mod tests {
     }
 
     #[test]
-    fn resting_goal_drops_hunger_when_stores_empty() {
-        // Tickets 091/092: with `HasStoredFood` absent, the Resting goal
-        // drops `HungerOk` so a hungry-tired-cold cat with empty stores
-        // can still Sleep + SelfGroom and re-elect on the next decision
-        // tick. The same marker gates `EatAtStores`'s precondition, so
-        // the goal-side and action-side branching share one source of
-        // truth (092 unification).
+    fn resting_goal_unaffected_by_stores_marker() {
+        // 150 R5a: the 091/092 partial-goal branching (drop HungerOk
+        // when stores are empty) was retired when Eating took over
+        // hunger. Resting now has the same two-predicate goal
+        // regardless of marker state — `HasStoredFood` only affects
+        // Eating's eligibility.
         let stocked = food_stocked_markers();
         let empty = empty_markers();
-        let goal_full = goal_for_disposition(DispositionKind::Resting, 0, &ctx(&stocked));
-        assert_eq!(goal_full.predicates.len(), 3);
-        assert!(goal_full
-            .predicates
-            .contains(&StatePredicate::HungerOk(true)));
-
-        let goal_partial = goal_for_disposition(DispositionKind::Resting, 0, &ctx(&empty));
-        assert_eq!(goal_partial.predicates.len(), 2);
-        assert!(!goal_partial
-            .predicates
-            .contains(&StatePredicate::HungerOk(true)));
-        assert!(goal_partial
-            .predicates
-            .contains(&StatePredicate::EnergyOk(true)));
-        assert!(goal_partial
-            .predicates
-            .contains(&StatePredicate::TemperatureOk(true)));
+        let goal_stocked = goal_for_disposition(DispositionKind::Resting, 0, &ctx(&stocked));
+        let goal_empty = goal_for_disposition(DispositionKind::Resting, 0, &ctx(&empty));
+        assert_eq!(goal_stocked.predicates.len(), 2);
+        assert_eq!(goal_empty.predicates.len(), 2);
+        for predicates in [&goal_stocked.predicates, &goal_empty.predicates] {
+            assert!(!predicates.contains(&StatePredicate::HungerOk(true)));
+            assert!(predicates.contains(&StatePredicate::EnergyOk(true)));
+            assert!(predicates.contains(&StatePredicate::TemperatureOk(true)));
+        }
     }
 
     #[test]
-    fn heuristic_counts_unsatisfied() {
+    fn resting_heuristic_counts_unsatisfied() {
+        // 150 R5a: heuristic over Resting's 2-predicate goal (energy +
+        // temperature). Hunger no longer participates.
         let m = food_stocked_markers();
         let cx = ctx(&m);
         let goal = goal_for_disposition(DispositionKind::Resting, 0, &cx);
-        let all_bad = PlannerState {
-            hunger_ok: false,
+        let both_bad = PlannerState {
             energy_ok: false,
             temperature_ok: false,
             ..default_state()
         };
-        assert_eq!(goal.heuristic(&all_bad, &cx), 3);
+        assert_eq!(goal.heuristic(&both_bad, &cx), 2);
 
         let one_bad = PlannerState {
-            hunger_ok: false,
-            energy_ok: true,
+            energy_ok: false,
             temperature_ok: true,
             ..default_state()
         };

@@ -492,9 +492,10 @@ pub fn check_anxiety_interrupts(
         };
 
         // --- Hard interrupt: CriticalHealth only ---
-        // A critically injured cat that chose Resting is already recovering;
-        // interrupting it creates the same oscillation we're fixing.
-        if plan.kind != DispositionKind::Resting
+        // A critically injured cat that chose Resting (or, post-150,
+        // Eating) is already recovering; interrupting it creates the
+        // same oscillation we're fixing.
+        if !matches!(plan.kind, DispositionKind::Resting | DispositionKind::Eating)
             && health.current / health.max < d.critical_health_threshold
         {
             activation.record(Feature::AnxietyInterrupt);
@@ -613,9 +614,17 @@ fn accumulate_urgencies(
     urgencies.needs.clear();
 
     // --- Starvation (maslow 1) ---
+    // 150 R5a: Eating is now the canonical "I'm fixing my hunger"
+    // disposition; firing a Starvation urgency mid-Eating would just
+    // re-elect the same disposition. Resting stays excluded as a
+    // backstop (an old soak's saved state may still hold a Resting
+    // plan that addresses hunger via the legacy three-need recipe).
     if !matches!(
         kind,
-        DispositionKind::Resting | DispositionKind::Hunting | DispositionKind::Foraging
+        DispositionKind::Resting
+            | DispositionKind::Eating
+            | DispositionKind::Hunting
+            | DispositionKind::Foraging
     ) && needs.hunger < d.starvation_interrupt_threshold
     {
         urgencies.needs.push(UrgentNeed {
@@ -625,7 +634,13 @@ fn accumulate_urgencies(
             threat_pos: None,
         });
     }
-    // Critical starvation override for Hunting/Foraging.
+    // Critical starvation override for Hunting/Foraging — when a
+    // production-coded cat dips below the critical-hunger threshold
+    // even mid-disposition, fire the urgency so the cat re-elects to
+    // Eating (or Resting if stores are empty). 150 R1's eat-the-catch
+    // path normally rescues these cats before they reach this depth,
+    // but if the catch fails (low success_chance, prey teleports, etc.)
+    // the urgency is the safety net.
     if matches!(kind, DispositionKind::Hunting | DispositionKind::Foraging)
         && needs.hunger < d.critical_hunger_interrupt_threshold
     {
@@ -1761,8 +1776,30 @@ pub fn evaluate_and_plan(
         let goal = goal_for_disposition(chosen, 0, &plan_ctx);
 
         if let Some(steps) = make_plan(planner_state, &actions, &goal, 12, 1000, &plan_ctx) {
+            // 150 R5a: an empty plan means the goal is *already*
+            // satisfied at planning time (e.g., the cat picked Eating
+            // at hunger=0.84 — already above the resting-complete
+            // threshold, so HungerOk(true) is met before any action
+            // runs). Don't commit to a 0-step plan: it would exhaust
+            // immediately, increment trips_done, fire
+            // `disposition_complete`, and re-elect — burning a tick
+            // per cycle and starving longer-form activities (Mentor,
+            // Mate, Burial) of the contiguous tick budget they need.
+            // Pre-150 this branch was unreachable for tier-1 dispositions
+            // because Resting's three-need goal was almost never met at
+            // planning time; with Eating's single-axis goal it became
+            // reachable. Fall through silently — no PlanningFailed,
+            // no cooldown — and let the cat re-elect on the next tick
+            // when scoring runs again.
+            if steps.is_empty() {
+                continue;
+            }
             let mut plan = GoapPlan::new(chosen, res.time.tick, personality, steps, crafting_hint);
-            if chosen == DispositionKind::Resting {
+            // 150 R5a: Eating shares Resting's runaway-replan cap. Both
+            // are physiological-completion dispositions; reusing the
+            // existing `resting_max_replans` keeps the comparability
+            // invariant from breaking on the events.jsonl header.
+            if matches!(chosen, DispositionKind::Resting | DispositionKind::Eating) {
                 plan.max_replans = d.resting_max_replans;
             }
             // Flow ward placement position from coordinator directive.
@@ -2321,12 +2358,17 @@ pub fn resolve_goap_plans(
             }
 
             // Check if disposition goal is fully met.
+            //
+            // 150 R5a: Resting drops hunger from the three-need check
+            // (Eating owns hunger now). Eating gets its own arm so the
+            // count-based fallback (`trips_done >= target_trips`)
+            // doesn't spin on `target_trips=u32::MAX`.
             let disposition_complete = match plan.kind {
                 DispositionKind::Resting => {
-                    needs.hunger >= d.resting_complete_hunger
-                        && needs.energy >= d.resting_complete_energy
+                    needs.energy >= d.resting_complete_energy
                         && needs.temperature >= d.resting_complete_temperature
                 }
+                DispositionKind::Eating => needs.hunger >= d.resting_complete_hunger,
                 _ => plan.trips_done >= plan.target_trips,
             };
 
@@ -5000,7 +5042,12 @@ fn resolve_engage_prey(
     personality: &Personality,
     name: &Name,
     gender: &Gender,
-    needs: &Needs,
+    // 150 R1: `&mut Needs` (was `&Needs`) so a hungry catch can be
+    // consumed in-place — see the consume-on-spot branch after the
+    // POUNCE arm. Was read-only because the legacy hunt cycle pushed
+    // the catch to inventory and deferred all hunger restoration to
+    // EatAtStores.
+    needs: &mut Needs,
     d: &DispositionConstants,
     mut event_log: Option<&mut EventLog>,
 ) -> crate::steps::StepResult {
@@ -5076,7 +5123,26 @@ fn resolve_engage_prey(
             } else {
                 0.0
             };
-            if !inventory.is_full() {
+
+            // 150 R1 — eat-the-catch. A cat below `production_self_eat_threshold`
+            // consumes the prey on the spot instead of carrying it home; the
+            // hunger arithmetic mirrors `resolve_eat_at_stores` (food_value
+            // × freshness, raw prey so no cooked multiplier). This closes
+            // the structural starvation hole where hungry hunters walked
+            // food past their own mouths to deposit it. Skill gain, kill
+            // event, narrative beat, and prey-density bookkeeping all
+            // still fire — the catch is real either way; only the
+            // disposition of the carcass changes.
+            let consumed_in_place = needs.hunger < d.production_self_eat_threshold;
+            if consumed_in_place {
+                let freshness =
+                    (1.0 - catch_corruption * d.corruption_food_penalty).max(0.0);
+                needs.hunger =
+                    (needs.hunger + item_kind.food_value() * freshness).min(1.0);
+                if let Some(act) = narr.activation.as_deref_mut() {
+                    act.record(crate::resources::system_activation::Feature::FoodEaten);
+                }
+            } else if !inventory.is_full() {
                 inventory.slots.push(ItemSlot::Item(
                     item_kind,
                     crate::components::items::ItemModifiers::with_corruption(catch_corruption),
@@ -5099,7 +5165,19 @@ fn resolve_engage_prey(
                 );
             }
 
-            let catch_desc = if catch_corruption > 0.3 {
+            let catch_desc = if consumed_in_place {
+                if catch_corruption > 0.3 {
+                    format!(
+                        "{} catches and devours a corrupted {} where it falls.",
+                        name.0, species_name
+                    )
+                } else {
+                    format!(
+                        "{} catches and eats a {} on the spot.",
+                        name.0, species_name
+                    )
+                }
+            } else if catch_corruption > 0.3 {
                 format!("{} catches a corrupted {}.", name.0, species_name)
             } else {
                 format!("{} catches a {}.", name.0, species_name)
@@ -5122,6 +5200,16 @@ fn resolve_engage_prey(
 
             hunting_priors.record_catch(&prey_pos);
 
+            if consumed_in_place {
+                // Plan dies here — the cat's hunt-and-deposit chain is
+                // moot once the prey is consumed. Fail forces a replan;
+                // the now-fed cat re-elects (typically Resting for
+                // sleep/groom, or Hunt again if drives are still high).
+                state.target_entity = None;
+                return crate::steps::StepResult::Fail(
+                    "consumed catch in place".into(),
+                );
+            }
             if inventory.is_full() {
                 return crate::steps::StepResult::Advance;
             } else {
@@ -5258,7 +5346,9 @@ fn resolve_forage_item(
     personality: &Personality,
     name: &Name,
     gender: &Gender,
-    needs: &Needs,
+    // 150 R1: `&mut Needs` (was `&Needs`) — see resolve_engage_prey for
+    // the consume-on-spot branch this enables.
+    needs: &mut Needs,
     d: &DispositionConstants,
 ) -> crate::steps::StepResult {
     use crate::components::items::ItemKind;
@@ -5309,7 +5399,21 @@ fn resolve_forage_item(
             } else {
                 0.0
             };
-            if !inventory.is_full() {
+
+            // 150 R1 — eat-the-catch (forage edition). A hungry cat
+            // consumes the foraged item on the spot rather than walking
+            // it home. Mirror's `resolve_eat_at_stores` arithmetic;
+            // foraged items are raw so no cooked multiplier applies.
+            let consumed_in_place = needs.hunger < d.production_self_eat_threshold;
+            if consumed_in_place {
+                let freshness =
+                    (1.0 - forage_corruption * d.corruption_food_penalty).max(0.0);
+                needs.hunger =
+                    (needs.hunger + item_kind.food_value() * freshness).min(1.0);
+                if let Some(act) = narr.activation.as_deref_mut() {
+                    act.record(crate::resources::system_activation::Feature::FoodEaten);
+                }
+            } else if !inventory.is_full() {
                 inventory.slots.push(ItemSlot::Item(
                     item_kind,
                     crate::components::items::ItemModifiers::with_corruption(forage_corruption),
@@ -5317,7 +5421,13 @@ fn resolve_forage_item(
             }
             skills.foraging += skills.growth_rate() * d.forage_skill_growth;
 
-            let item_name = if forage_corruption > 0.3 {
+            let item_name = if consumed_in_place {
+                if forage_corruption > 0.3 {
+                    format!("eats a corrupted {} on the spot", item_kind.name())
+                } else {
+                    format!("nibbles {} where they grow", item_kind.name())
+                }
+            } else if forage_corruption > 0.3 {
                 format!("corrupted {}", item_kind.name())
             } else {
                 item_kind.name().to_string()
@@ -5354,11 +5464,16 @@ fn resolve_forage_item(
                 item_singular: Some(item_kind.singular_name()),
                 quality: None,
             };
+            let fallback = if consumed_in_place {
+                format!("{} {}.", name.0, item_name)
+            } else {
+                format!("{} finds {}.", name.0, item_name)
+            };
             emit_event_narrative(
                 narr.registry.as_deref(),
                 &mut narr.log,
                 time.tick,
-                format!("{} finds {}.", name.0, item_name),
+                fallback,
                 crate::resources::narrative::NarrativeTier::Action,
                 &ctx,
                 &var_ctx,
@@ -5366,7 +5481,14 @@ fn resolve_forage_item(
                 needs,
                 &mut rng.rng,
             );
-            return crate::steps::StepResult::Advance;
+            // 150 R1: consumed-in-place fails the plan to force replan
+            // (no item to deposit; cat is now fed). Otherwise advance to
+            // the deposit step.
+            return if consumed_in_place {
+                crate::steps::StepResult::Fail("consumed forage in place".into())
+            } else {
+                crate::steps::StepResult::Advance
+            };
         }
     }
 

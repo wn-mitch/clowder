@@ -102,25 +102,13 @@ pub fn foraging_actions() -> Vec<GoapActionDef> {
     ]
 }
 
+/// 150 R5a: Resting plan is Sleep + SelfGroom only. EatAtStores
+/// migrated to the new `eating_actions` template — picking Eat at the
+/// L3 softmax no longer commits the cat to a Sleep beat. Resting still
+/// runs both Sleep and SelfGroom because they're naturally co-located:
+/// a cat that lies down to sleep also self-grooms during the same lull.
 pub fn resting_actions() -> Vec<GoapActionDef> {
     vec![
-        GoapActionDef {
-            kind: GoapActionKind::EatAtStores,
-            cost: 2,
-            // Ticket 091/092: gate on the colony-scoped `HasStoredFood`
-            // marker in addition to zone. `ZoneIs(Stores)` alone lets the
-            // planner schedule EatAtStores against empty stores; the
-            // resolver then silent-no-ops and the Resting cat lock-loops
-            // until it starves. 092 unifies the IAUS marker substrate with
-            // the GOAP planner's feasibility language — `HasMarker(...)`
-            // consults the same `MarkerSnapshot` the DSE `EligibilityFilter`
-            // uses, so L2 and L3 cannot disagree.
-            preconditions: vec![
-                StatePredicate::ZoneIs(PlannerZone::Stores),
-                StatePredicate::HasMarker(markers::HasStoredFood::KEY),
-            ],
-            effects: vec![StateEffect::SetHungerOk(true)],
-        },
         GoapActionDef {
             kind: GoapActionKind::Sleep,
             cost: 2,
@@ -135,6 +123,23 @@ pub fn resting_actions() -> Vec<GoapActionDef> {
             effects: vec![StateEffect::SetTemperatureOk(true)],
         },
     ]
+}
+
+/// 150 R5a: single-action template for the new `Eating` disposition.
+/// Plan = `[TravelTo(Stores), EatAtStores]` once travel is composed in.
+/// Tickets 091/092: `HasStoredFood` marker still gates EatAtStores so
+/// the planner can't schedule it against empty stores. Mirrors the
+/// substrate-vs-search-state unification that 092 established.
+pub fn eating_actions() -> Vec<GoapActionDef> {
+    vec![GoapActionDef {
+        kind: GoapActionKind::EatAtStores,
+        cost: 2,
+        preconditions: vec![
+            StatePredicate::ZoneIs(PlannerZone::Stores),
+            StatePredicate::HasMarker(markers::HasStoredFood::KEY),
+        ],
+        effects: vec![StateEffect::SetHungerOk(true)],
+    }]
 }
 
 pub fn guarding_actions() -> Vec<GoapActionDef> {
@@ -557,6 +562,7 @@ pub fn actions_for_disposition(
         DispositionKind::Hunting => hunting_actions(),
         DispositionKind::Foraging => foraging_actions(),
         DispositionKind::Resting => resting_actions(),
+        DispositionKind::Eating => eating_actions(),
         DispositionKind::Guarding => guarding_actions(),
         DispositionKind::Socializing => socializing_actions(),
         DispositionKind::Building => building_actions(),
@@ -726,16 +732,16 @@ mod tests {
     }
 
     #[test]
-    fn resting_addresses_all_unmet_needs() {
+    fn resting_addresses_energy_and_temperature() {
+        // 150 R5a: Resting plan is Sleep + SelfGroom. EatAtStores is
+        // owned by Eating's plan template — it must NOT appear here.
         let start = PlannerState {
-            hunger_ok: false,
             energy_ok: false,
             temperature_ok: false,
             ..default_state()
         };
         let goal = GoalState {
             predicates: vec![
-                StatePredicate::HungerOk(true),
                 StatePredicate::EnergyOk(true),
                 StatePredicate::TemperatureOk(true),
             ],
@@ -745,56 +751,70 @@ mod tests {
 
         let plan = plan!(start, &actions, &goal, 12, 1000).expect("plan found");
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
-        assert!(kinds.contains(&GoapActionKind::EatAtStores));
         assert!(kinds.contains(&GoapActionKind::Sleep));
         assert!(kinds.contains(&GoapActionKind::SelfGroom));
-    }
-
-    #[test]
-    fn resting_with_empty_stores_does_not_plan_eat_at_stores() {
-        // Tickets 091 + 092: when the `HasStoredFood` colony marker is
-        // absent, the planner must not schedule EatAtStores. Pre-091 the
-        // EatAtStores def required only `ZoneIs(Stores)`, so a hungry
-        // Resting cat looped on [TravelTo(Stores), EatAtStores]
-        // indefinitely as the resolver silently no-op'd against empty
-        // stores. 092 unifies the gating: `HasMarker(HasStoredFood::KEY)`
-        // reads the same `MarkerSnapshot` the IAUS uses.
-        let start = PlannerState {
-            hunger_ok: false,
-            energy_ok: false,
-            temperature_ok: false,
-            ..default_state()
-        };
-        let goal = GoalState {
-            predicates: vec![
-                StatePredicate::HungerOk(true),
-                StatePredicate::EnergyOk(true),
-                StatePredicate::TemperatureOk(true),
-            ],
-        };
-        let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Resting, None, &distances);
         assert!(
-            plan!(start, &actions, &goal, 12, 1000, markers = empty_markers()).is_none(),
-            "Resting must be unreachable with empty stores + unmet hunger"
+            !kinds.contains(&GoapActionKind::EatAtStores),
+            "Resting plan must not include EatAtStores post-150 R5a"
         );
     }
 
     #[test]
-    fn resting_with_empty_stores_but_only_energy_and_temp_unmet() {
-        // Companion case: if hunger is already satisfied (cat is fed
-        // but tired/cold), Resting must still produce a plan via Sleep
-        // + SelfGroom, ignoring stores state. Confirms the new
-        // precondition doesn't over-gate.
+    fn eating_plans_eat_at_stores_when_stocked() {
+        // 150 R5a sibling test: Eating's plan template is
+        // [TravelTo(Stores), EatAtStores]. The marker-eligibility on
+        // `HasStoredFood` is exercised in
+        // `eating_unreachable_when_stores_empty`.
         let start = PlannerState {
-            hunger_ok: true,
+            hunger_ok: false,
+            ..default_state()
+        };
+        let goal = GoalState {
+            predicates: vec![StatePredicate::HungerOk(true)],
+        };
+        let distances = basic_distances();
+        let actions = actions_for_disposition(DispositionKind::Eating, None, &distances);
+
+        let plan = plan!(start, &actions, &goal, 8, 500).expect("Eating must plan a chain when stores are stocked");
+        let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
+        assert!(kinds.contains(&GoapActionKind::EatAtStores));
+        assert!(kinds.contains(&GoapActionKind::TravelTo(PlannerZone::Stores)));
+    }
+
+    #[test]
+    fn eating_unreachable_when_stores_empty() {
+        // 150 R5a: with HasStoredFood absent, EatAtStores has no valid
+        // precondition path. The planner returns None — the cat
+        // re-elects (Hunt or Forage become the productive paths).
+        // Mirrors the 091/092 substrate-marker discipline.
+        let start = PlannerState {
+            hunger_ok: false,
+            ..default_state()
+        };
+        let goal = GoalState {
+            predicates: vec![StatePredicate::HungerOk(true)],
+        };
+        let distances = basic_distances();
+        let actions = actions_for_disposition(DispositionKind::Eating, None, &distances);
+        assert!(
+            plan!(start, &actions, &goal, 8, 500, markers = empty_markers()).is_none(),
+            "Eating plan must be unreachable when HasStoredFood marker is absent"
+        );
+    }
+
+    #[test]
+    fn resting_independent_of_stores_marker() {
+        // 150 R5a: Resting plans Sleep + SelfGroom regardless of stores
+        // state. The 091/092 marker-gated partial-goal dance was
+        // retired when Eating took over hunger; Resting's plan never
+        // mentions stores at all now.
+        let start = PlannerState {
             energy_ok: false,
             temperature_ok: false,
             ..default_state()
         };
         let goal = GoalState {
             predicates: vec![
-                StatePredicate::HungerOk(true),
                 StatePredicate::EnergyOk(true),
                 StatePredicate::TemperatureOk(true),
             ],
@@ -802,12 +822,22 @@ mod tests {
         let distances = basic_distances();
         let actions = actions_for_disposition(DispositionKind::Resting, None, &distances);
 
-        let plan = plan!(start, &actions, &goal, 12, 1000, markers = empty_markers())
-            .expect("plan found");
-        let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
-        assert!(!kinds.contains(&GoapActionKind::EatAtStores));
-        assert!(kinds.contains(&GoapActionKind::Sleep));
-        assert!(kinds.contains(&GoapActionKind::SelfGroom));
+        // Empty stores: still plans.
+        let plan_empty = plan!(start.clone(), &actions, &goal, 12, 1000, markers = empty_markers())
+            .expect("Resting plans Sleep + SelfGroom even with empty stores");
+        let kinds_empty: Vec<_> = plan_empty.iter().map(|s| s.action).collect();
+        assert!(kinds_empty.contains(&GoapActionKind::Sleep));
+        assert!(kinds_empty.contains(&GoapActionKind::SelfGroom));
+        assert!(!kinds_empty.contains(&GoapActionKind::EatAtStores));
+
+        // Stocked stores: same plan; stores marker irrelevant.
+        let plan_stocked =
+            plan!(start, &actions, &goal, 12, 1000, markers = food_stocked_markers())
+                .expect("plan found");
+        let kinds_stocked: Vec<_> = plan_stocked.iter().map(|s| s.action).collect();
+        assert!(kinds_stocked.contains(&GoapActionKind::Sleep));
+        assert!(kinds_stocked.contains(&GoapActionKind::SelfGroom));
+        assert!(!kinds_stocked.contains(&GoapActionKind::EatAtStores));
     }
 
     #[test]
@@ -864,51 +894,39 @@ mod tests {
     }
 
     #[test]
-    fn resting_with_empty_stores_and_hunger_unmet_cannot_plan_sleep_via_full_resting_goal() {
-        // Tickets 091 + 092: when a cat is hungry, tired, and cold AND
-        // stores are empty, the legacy three-need Resting goal
-        // `[HungerOk, EnergyOk, TemperatureOk]` is unreachable (HungerOk
-        // requires EatAtStores which gates on the `HasStoredFood` marker).
-        // `make_plan` returns None for the full goal but the partial goal
-        // (no HungerOk) still produces Sleep + SelfGroom. The
-        // `goal_for_disposition` builder drops HungerOk based on the same
-        // marker, so the planner-side branching matches the goal-side
-        // branching.
-        let start = PlannerState {
-            hunger_ok: false,
-            energy_ok: false,
-            temperature_ok: false,
-            ..default_state()
+    fn resting_full_goal_no_longer_includes_hunger() {
+        // 150 R5a regression-pin: pre-150 the Resting goal was a
+        // three-need [HungerOk, EnergyOk, TemperatureOk] vector that
+        // had to drop HungerOk via the 091/092 marker-gated branch
+        // when stores were empty (otherwise hungry-cold cats deadlocked
+        // out of Resting). Post-150 hunger isn't part of Resting at
+        // all — Eating owns it. This test pins the new shape: the
+        // planner-built Resting goal carries exactly two predicates,
+        // never including HungerOk, regardless of marker state.
+        let empty = empty_markers();
+        let stocked = food_stocked_markers();
+        let cx_empty = PlanContext {
+            markers: &empty,
+            entity: test_entity(),
         };
-        let full_goal = GoalState {
-            predicates: vec![
-                StatePredicate::HungerOk(true),
-                StatePredicate::EnergyOk(true),
-                StatePredicate::TemperatureOk(true),
-            ],
+        let cx_stocked = PlanContext {
+            markers: &stocked,
+            entity: test_entity(),
         };
-        let partial_goal = GoalState {
-            predicates: vec![
-                StatePredicate::EnergyOk(true),
-                StatePredicate::TemperatureOk(true),
-            ],
-        };
-        let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Resting, None, &distances);
-
-        // Pinned regression: full goal is unreachable, partial goal works.
-        assert!(
-            plan!(start.clone(), &actions, &full_goal, 12, 1000, markers = empty_markers())
-                .is_none(),
-            "full Resting goal must be unreachable when stores are empty + hunger unmet"
+        let goal_empty = crate::ai::planner::goals::goal_for_disposition(
+            DispositionKind::Resting,
+            0,
+            &cx_empty,
         );
-        let partial_plan =
-            plan!(start, &actions, &partial_goal, 12, 1000, markers = empty_markers())
-                .expect("partial Resting goal (no HungerOk) must still plan Sleep + SelfGroom");
-        let kinds: Vec<_> = partial_plan.iter().map(|s| s.action).collect();
-        assert!(kinds.contains(&GoapActionKind::Sleep));
-        assert!(kinds.contains(&GoapActionKind::SelfGroom));
-        assert!(!kinds.contains(&GoapActionKind::EatAtStores));
+        let goal_stocked = crate::ai::planner::goals::goal_for_disposition(
+            DispositionKind::Resting,
+            0,
+            &cx_stocked,
+        );
+        for goal in [&goal_empty, &goal_stocked] {
+            assert_eq!(goal.predicates.len(), 2);
+            assert!(!goal.predicates.contains(&StatePredicate::HungerOk(true)));
+        }
     }
 
     #[test]
@@ -1164,66 +1182,53 @@ mod tests {
         );
     }
 
-    /// 092 substrate test: with the `HasStoredFood` colony marker
-    /// present, a hungry cat can plan `EatAtStores` and reach `HungerOk`.
-    /// Symmetric positive to `resting_with_empty_stores_does_not_plan_eat_at_stores`.
+    /// 092 substrate test ported to 150 R5a: with `HasStoredFood`
+    /// present, a hungry cat picking the new `Eating` disposition can
+    /// plan `EatAtStores` and reach `HungerOk`. The substrate-marker
+    /// gating moved from Resting → Eating but the invariant (planner
+    /// and DSE eligibility share one source of truth) is preserved.
     #[test]
-    fn eat_at_stores_unblocked_by_has_stored_food_marker() {
+    fn eat_at_stores_reachable_via_eating_when_food_marker_set() {
         let start = PlannerState {
             hunger_ok: false,
-            energy_ok: true,
-            temperature_ok: true,
             ..default_state()
         };
         let goal = GoalState {
-            predicates: vec![
-                StatePredicate::HungerOk(true),
-                StatePredicate::EnergyOk(true),
-                StatePredicate::TemperatureOk(true),
-            ],
+            predicates: vec![StatePredicate::HungerOk(true)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Resting, None, &distances);
+        let actions = actions_for_disposition(DispositionKind::Eating, None, &distances);
 
-        let plan = plan!(start, &actions, &goal, 12, 1000, markers = food_stocked_markers())
+        let plan = plan!(start, &actions, &goal, 8, 500, markers = food_stocked_markers())
             .expect("EatAtStores must be reachable when HasStoredFood marker is set");
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
         assert!(kinds.contains(&GoapActionKind::EatAtStores));
     }
 
-    /// 092 substrate-invariant test: the planner reads the same
-    /// `MarkerSnapshot` the IAUS uses, so flipping the marker between
-    /// two `make_plan` calls flips the planning outcome — there is one
-    /// source of truth, not two parallel records that can drift.
+    /// 092 substrate-invariant ported to 150 R5a: flipping the
+    /// `HasStoredFood` marker flips Eating's reachability. The shared-
+    /// source-of-truth between planner preconditions and DSE
+    /// eligibility holds with the disposition split.
     #[test]
-    fn marker_change_flips_plan_reachability() {
+    fn marker_change_flips_eating_plan_reachability() {
         let start = PlannerState {
             hunger_ok: false,
-            energy_ok: true,
-            temperature_ok: true,
             ..default_state()
         };
         let goal = GoalState {
-            predicates: vec![
-                StatePredicate::HungerOk(true),
-                StatePredicate::EnergyOk(true),
-                StatePredicate::TemperatureOk(true),
-            ],
+            predicates: vec![StatePredicate::HungerOk(true)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Resting, None, &distances);
+        let actions = actions_for_disposition(DispositionKind::Eating, None, &distances);
 
         let with_food =
-            plan!(start.clone(), &actions, &goal, 12, 1000, markers = food_stocked_markers());
-        assert!(
-            with_food.is_some(),
-            "marker present → plan reachable"
-        );
+            plan!(start.clone(), &actions, &goal, 8, 500, markers = food_stocked_markers());
+        assert!(with_food.is_some(), "marker present → Eating reachable");
 
-        let without_food = plan!(start, &actions, &goal, 12, 1000, markers = empty_markers());
+        let without_food = plan!(start, &actions, &goal, 8, 500, markers = empty_markers());
         assert!(
             without_food.is_none(),
-            "marker absent → plan unreachable (full goal)"
+            "marker absent → Eating unreachable (HungerOk goal)"
         );
     }
 }

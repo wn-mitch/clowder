@@ -193,6 +193,9 @@ pub fn strategy_for_disposition(kind: DispositionKind) -> CommitmentStrategy {
         // Physiological completion; Maslow gate handles preemption already.
         // AI8 caps runaway sleeps via `resting_max_replans`.
         DispositionKind::Resting => Blind,
+        // 150 R5a: Eating mirrors Resting's Blind. Single-trip,
+        // physiological completion gated on hunger only.
+        DispositionKind::Eating => Blind,
         // Territory defense shouldn't flinch mid-patrol. AI8 caps fixation.
         DispositionKind::Guarding => Blind,
         // Goal-shaped — flipper-proof without fanaticism.
@@ -256,11 +259,22 @@ pub fn proxies_for_plan(
         // cascaded plan-churn (2026-04-23 PM regression) — keep both
         // arms together or the lifted condition answers a different
         // question than `disposition_complete` does.
+        // 150 R5a: Resting now covers Sleep + SelfGroom only. Hunger
+        // is owned by the new `Eating` disposition; gating Resting on
+        // hunger would resurrect the multi-need plan-duration cost
+        // asymmetry that R5a removes.
         DispositionKind::Resting => {
             plan.trips_done > 0
-                && needs.hunger >= d.resting_complete_hunger
                 && needs.energy >= d.resting_complete_energy
                 && needs.temperature >= d.resting_complete_temperature
+        }
+        // 150 R5a: Eating completes as soon as one chain has run AND
+        // hunger has climbed above the resting-complete threshold.
+        // Reusing `resting_complete_hunger` (default 0.65) so the
+        // existing Resting tests still characterize the same satiation
+        // band; Eating doesn't introduce a new balance knob.
+        DispositionKind::Eating => {
+            plan.trips_done > 0 && needs.hunger >= d.resting_complete_hunger
         }
         DispositionKind::Mating => plan.trips_done >= 1,
         // Guarding is triggered by low safety (`CriticalSafety` urgency
@@ -638,14 +652,16 @@ mod tests {
     }
 
     // -----------------------------------------------------------------
-    // §7.3 strategy-table coverage — 12 DispositionKind rows
+    // §7.3 strategy-table coverage — DispositionKind rows
+    // 150 R5a: 12 → 13 with the addition of Eating.
     // -----------------------------------------------------------------
 
     #[test]
-    fn strategy_table_covers_all_12_dispositions() {
+    fn strategy_table_covers_every_disposition() {
         use CommitmentStrategy::*;
         use DispositionKind::*;
         assert_eq!(strategy_for_disposition(Resting), Blind);
+        assert_eq!(strategy_for_disposition(Eating), Blind);
         assert_eq!(strategy_for_disposition(Guarding), Blind);
         assert_eq!(strategy_for_disposition(Hunting), SingleMinded);
         assert_eq!(strategy_for_disposition(Foraging), SingleMinded);
@@ -663,6 +679,7 @@ mod tests {
         // will diverge from the covered set below.
         let covered = [
             Resting,
+            Eating,
             Guarding,
             Hunting,
             Foraging,

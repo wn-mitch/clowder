@@ -55,10 +55,12 @@ pub const EAT_STORES_RANGE: f32 = 20.0;
 /// raw `Needs.hunger` satiation scalar. See `scoring.rs::ctx_scalars`.
 pub const HUNGER_INPUT: &str = "hunger_urgency";
 
-/// Hunger threshold that satisfies the Eat goal. Below this, the cat
-/// is sated; above, the goal state is unreached. 0.3 matches today's
-/// `needs.rs` typical post-meal hunger drop.
-pub const HUNGER_GOAL_THRESHOLD: f32 = 0.3;
+/// Hunger threshold that satisfies the Eat goal. At or above this,
+/// the cat is full enough to stop eating; below, the goal state is
+/// unreached and the cat keeps wanting food. Anchored to ~0.7 — slightly
+/// below `needs.rs::DEFAULT_RESTING_COMPLETE_HUNGER` so the Eat goal
+/// can complete a beat before Resting's three-need gate would.
+pub const HUNGER_GOAL_THRESHOLD: f32 = 0.7;
 
 pub struct EatDse {
     id: DseId,
@@ -162,16 +164,28 @@ impl Dse for EatDse {
     }
 }
 
-/// Goal predicate: hunger has dropped below the satiation threshold.
+/// Goal predicate: hunger has risen above the satiation threshold (the
+/// cat is full enough that the eat-need is met).
 ///
-/// Reads `Needs.hunger` from the cat's components. When the component
-/// is missing (happens in isolated unit tests that spawn a bare
-/// entity), the predicate returns `false` — a missing needs component
-/// is not "sated," it's undefined.
+/// Reads `Needs.hunger` from the cat's components, where `1.0` is a
+/// full belly and `0.0` is starvation (canonical semantic, see
+/// `src/systems/needs.rs:116` and `src/components/physical.rs:206`).
+/// When the component is missing (happens in isolated unit tests that
+/// spawn a bare entity), the predicate returns `false` — a missing
+/// needs component is not "sated," it's undefined.
+///
+/// **Polarity history.** Pre-150 this body read `hunger <
+/// HUNGER_GOAL_THRESHOLD` with threshold 0.3, which fired the
+/// "achieved" predicate when the cat was *dangerously hungry* rather
+/// than sated. The bug was confirmed dead code (zero runtime call
+/// sites — `Intention::Goal { state, .. }` is never destructured for
+/// its `achieved` field outside `#[test]` blocks and `trace_emit.rs`),
+/// so the misfire was latent. The fix is recorded here so a future
+/// §7.2 reconsideration-gate wiring doesn't inherit the inversion.
 fn eat_goal_achieved(world: &World, cat: Entity) -> bool {
     world
         .get::<crate::components::physical::Needs>(cat)
-        .is_some_and(|needs| needs.hunger < HUNGER_GOAL_THRESHOLD)
+        .is_some_and(|needs| needs.hunger >= HUNGER_GOAL_THRESHOLD)
 }
 
 // ---------------------------------------------------------------------------
@@ -308,22 +322,29 @@ mod tests {
     }
 
     #[test]
-    fn eat_goal_achieved_below_threshold() {
+    fn eat_goal_achieved_when_full() {
+        // 150 polarity fix: predicate fires when the cat is sated
+        // (hunger high), not when starving. Spawn at hunger above the
+        // threshold and assert achievement.
         let mut world = World::new();
         let entity = {
             let mut needs = crate::components::physical::Needs::default();
-            needs.hunger = HUNGER_GOAL_THRESHOLD - 0.05;
+            needs.hunger = HUNGER_GOAL_THRESHOLD + 0.05;
             world.spawn(needs).id()
         };
         assert!(eat_goal_achieved(&world, entity));
     }
 
     #[test]
-    fn eat_goal_not_achieved_above_threshold() {
+    fn eat_goal_not_achieved_when_hungry() {
+        // 150 polarity fix companion: a hungry cat (hunger low) has
+        // NOT achieved the eat goal — they should keep wanting food.
+        // Pre-150 this case (hunger=0.1) returned true because the
+        // predicate was inverted. Post-150 it correctly returns false.
         let mut world = World::new();
         let entity = {
             let mut needs = crate::components::physical::Needs::default();
-            needs.hunger = 0.8;
+            needs.hunger = 0.1;
             world.spawn(needs).id()
         };
         assert!(!eat_goal_achieved(&world, entity));

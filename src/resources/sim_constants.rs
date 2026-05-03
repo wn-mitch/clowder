@@ -2059,6 +2059,17 @@ pub struct DispositionConstants {
     pub eat_at_stores_duration: u64,
     /// Scales food_value reduction from tile corruption when eating at stores.
     pub corruption_food_penalty: f32,
+    /// Ticket 150 R1 — hunger threshold below which a hunting/foraging
+    /// cat consumes the catch in-place rather than depositing it. Uses
+    /// the canonical `Needs.hunger` semantic (`1.0` = full belly, `0.0`
+    /// = starving), so `hunger < production_self_eat_threshold` means
+    /// "cat is at least this hungry." Default 0.5 matches the hangry
+    /// curve midpoint: a cat below half-full eats the catch where they
+    /// stand instead of walking it home, then re-plans (the original
+    /// production plan dies on the consume-on-spot fail). A cat above
+    /// 0.5 deposits as today.
+    #[serde(default = "default_production_self_eat_threshold")]
+    pub production_self_eat_threshold: f32,
     pub sleep_energy_per_tick: f32,
     pub sleep_temperature_per_tick: f32,
     pub self_groom_duration: u64,
@@ -2428,6 +2439,15 @@ fn default_cook_diligence_scale() -> f32 {
 }
 
 fn default_cook_hunger_gate() -> f32 {
+    0.5
+}
+
+/// Ticket 150 R1 — see `DispositionConstants::production_self_eat_threshold`.
+/// 0.5 anchors at the hangry-curve midpoint: cats below half-full eat the
+/// catch in-place; cats above it deposit. The threshold becomes a tunable
+/// knob for §3.7 plan-duration-symmetry follow-on work without further code
+/// changes.
+fn default_production_self_eat_threshold() -> f32 {
     0.5
 }
 
@@ -2948,6 +2968,7 @@ impl Default for DispositionConstants {
             deposit_quality_skill_scale: 0.4,
             eat_at_stores_duration: 50,
             corruption_food_penalty: 0.5,
+            production_self_eat_threshold: default_production_self_eat_threshold(),
             sleep_energy_per_tick: 0.0035,
             sleep_temperature_per_tick: 0.002,
             self_groom_duration: 8,

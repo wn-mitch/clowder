@@ -1482,6 +1482,18 @@ pub fn disposition_to_chain(
                 d,
                 &mut rng.rng,
             ),
+            // 150 R5a: legacy chain-building path (not registered in
+            // any plugin since the GOAP migration). Eating's chain
+            // mirrors the hunger arm of `build_resting_chain` —
+            // Move→EatAtStores. The GOAP planner is the canonical
+            // path; this arm exists so the dead-code path still type-
+            // checks and historical tests don't break.
+            DispositionKind::Eating => build_eating_chain(
+                pos,
+                &building_query,
+                nearest_store,
+                res.food.is_empty(),
+            ),
             DispositionKind::Hunting => {
                 build_hunting_chain(pos, memory, &res.map, nearest_store, &mut rng.rng)
             }
@@ -1600,11 +1612,14 @@ fn should_complete_disposition(
     d: &DispositionConstants,
 ) -> bool {
     match disposition.kind {
+        // 150 R5a: legacy path mirrors the new GOAP completion arms.
+        // Resting now gates on energy + temperature only; Eating gates
+        // on hunger only.
         DispositionKind::Resting => {
-            needs.hunger >= d.resting_complete_hunger
-                && needs.energy >= d.resting_complete_energy
+            needs.energy >= d.resting_complete_energy
                 && needs.temperature >= d.resting_complete_temperature
         }
+        DispositionKind::Eating => needs.hunger >= d.resting_complete_hunger,
         _ => disposition.is_count_complete(),
     }
 }
@@ -1797,6 +1812,46 @@ fn build_resting_chain(
         );
         Some((chain, Action::Groom))
     }
+}
+
+/// 150 R5a: Eating's chain — `MoveTo(Stores) + EatAtStores`. The
+/// canonical execution path is the GOAP planner (`src/systems/goap.rs`);
+/// this helper exists so `evaluate_dispositions` (legacy, not plugin-
+/// registered) still type-checks against the new DispositionKind variant.
+#[allow(clippy::type_complexity)]
+fn build_eating_chain(
+    pos: &Position,
+    building_query: &Query<(
+        Entity,
+        &Structure,
+        &Position,
+        Option<&ConstructionSite>,
+        Option<&CropState>,
+    )>,
+    nearest_store: Option<(Entity, Position)>,
+    food_empty: bool,
+) -> Option<(TaskChain, Action)> {
+    if food_empty {
+        return None;
+    }
+    let store = nearest_store.or_else(|| {
+        building_query
+            .iter()
+            .filter(|(_, s, _, site, _)| s.kind == StructureType::Stores && site.is_none())
+            .min_by_key(|(_, _, bp, _, _)| pos.manhattan_distance(bp))
+            .map(|(e, _, bp, _, _)| (e, *bp))
+    });
+    let (store_entity, store_pos) = store?;
+    let chain = TaskChain::new(
+        vec![
+            TaskStep::new(StepKind::MoveTo).with_position(store_pos),
+            TaskStep::new(StepKind::EatAtStores)
+                .with_position(store_pos)
+                .with_entity(store_entity),
+        ],
+        FailurePolicy::AbortChain,
+    );
+    Some((chain, Action::Eat))
 }
 
 fn build_hunting_chain(

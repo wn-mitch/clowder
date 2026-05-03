@@ -37,8 +37,21 @@ pub enum CraftingHint {
 /// sub-actions (via TaskChain) until a goal is met or anxiety interrupts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum DispositionKind {
-    /// Eat, sleep, self-groom until physiological needs are satisfied.
+    /// Sleep + self-groom until energy and temperature recover.
+    ///
+    /// 150 R5a: split — Eat is no longer a constituent of Resting.
+    /// Picking `Action::Eat` now commits to `Eating`, not Resting; a
+    /// hungry-but-not-tired cat reaches the stockpile without first
+    /// committing to a multi-need Sleep + SelfGroom chain. See
+    /// `docs/open-work/tickets/150-cat-starvation-hunt-deposit-loop-no-eat-path.md`.
     Resting,
+    /// Travel to stores and consume one food item until hunger is sated.
+    ///
+    /// 150 R5a: new — separated from Resting so picking Eat at the L3
+    /// softmax doesn't drag in Sleep and SelfGroom. Plan template is
+    /// `[TravelTo(Stores), EatAtStores]`; completion gates on hunger
+    /// only. Tier 1, Blind strategy, single-trip target.
+    Eating,
     /// Hunt prey, carry to stores, deposit. Loop until target trips met.
     Hunting,
     /// Forage items, carry to stores, deposit. Loop until target trips met.
@@ -80,18 +93,30 @@ impl DispositionKind {
             Self::Mating => return 1,
             // Chain-driven dispositions complete when their chain finishes.
             Self::Building | Self::Farming | Self::Crafting | Self::Coordinating => 1,
+            // 150 R5a: Eating completes on need threshold, not count.
+            // Like Resting, target_completions returns MAX so the count-
+            // based completion check never fires; the actual
+            // completion arm in `goap.rs::resolve_goap_plans` is need-
+            // based (`needs.hunger >= resting_complete_hunger`).
+            Self::Eating => return u32::MAX,
             // Resting completes on need thresholds, not count.
             Self::Resting => return u32::MAX,
         };
-        // Patience adds to all non-Resting/Mating dispositions: patient cats commit longer.
+        // Patience adds to all non-Resting/Eating/Mating dispositions: patient cats commit longer.
         base + (personality.patience * 1.0).round() as u32
     }
 
     /// Maps each action to the disposition that contains it.
     /// Flee has no disposition — it's an anxiety interrupt.
+    ///
+    /// 150 R5a: `Action::Eat` now maps to `DispositionKind::Eating`
+    /// (not `Resting`). `Action::Sleep` still maps to `Resting`.
+    /// Picking Eat at the softmax pool no longer drags Sleep + SelfGroom
+    /// into the same plan.
     pub fn from_action(action: Action) -> Option<Self> {
         match action {
-            Action::Eat | Action::Sleep => Some(Self::Resting),
+            Action::Eat => Some(Self::Eating),
+            Action::Sleep => Some(Self::Resting),
             Action::Hunt => Some(Self::Hunting),
             Action::Forage => Some(Self::Foraging),
             Action::Patrol | Action::Fight => Some(Self::Guarding),
@@ -113,9 +138,13 @@ impl DispositionKind {
     }
 
     /// The actions that contribute to this disposition's score.
+    ///
+    /// 150 R5a: Resting drops `Action::Eat`; the new `Eating` variant
+    /// owns it.
     pub fn constituent_actions(&self) -> &[Action] {
         match self {
-            Self::Resting => &[Action::Eat, Action::Sleep, Action::Groom],
+            Self::Resting => &[Action::Sleep, Action::Groom],
+            Self::Eating => &[Action::Eat],
             Self::Hunting => &[Action::Hunt],
             Self::Foraging => &[Action::Forage],
             Self::Guarding => &[Action::Patrol, Action::Fight],
@@ -131,6 +160,13 @@ impl DispositionKind {
     }
 
     /// All disposition variants, for iteration.
+    ///
+    /// 150 R5a: `Eating` is appended at the end (rather than inserted
+    /// near `Resting`) to keep the positional ordinals in
+    /// `scoring::active_disposition_ordinal` and
+    /// `modifier::constituent_dses_for_ordinal` stable for the
+    /// pre-existing 12 variants. Saved soaks and hand-written
+    /// ordinal-equality tests don't need rebasing.
     pub const ALL: &[Self] = &[
         Self::Resting,
         Self::Hunting,
@@ -144,12 +180,14 @@ impl DispositionKind {
         Self::Exploring,
         Self::Mating,
         Self::Caretaking,
+        Self::Eating,
     ];
 
     /// Human-readable label for the inspect panel.
     pub fn label(&self) -> &'static str {
         match self {
             Self::Resting => "Resting",
+            Self::Eating => "Eating",
             Self::Hunting => "Hunting",
             Self::Foraging => "Foraging",
             Self::Guarding => "Guarding",
@@ -169,7 +207,8 @@ impl DispositionKind {
     /// higher (less fundamental).
     pub fn maslow_level(&self) -> u8 {
         match self {
-            Self::Resting | Self::Hunting | Self::Foraging => 1,
+            // 150 R5a: Eating shares Resting's tier 1 — both physiological.
+            Self::Resting | Self::Eating | Self::Hunting | Self::Foraging => 1,
             Self::Guarding => 2,
             Self::Socializing | Self::Caretaking | Self::Mating => 3,
             Self::Crafting | Self::Coordinating | Self::Building | Self::Farming => 4,
@@ -181,6 +220,7 @@ impl DispositionKind {
     pub fn verb_infinitive(&self) -> &'static str {
         match self {
             Self::Resting => "rest",
+            Self::Eating => "eat",
             Self::Hunting => "hunt",
             Self::Foraging => "forage",
             Self::Guarding => "guard",
@@ -409,6 +449,78 @@ mod tests {
         assert_eq!(
             DispositionKind::from_action(Action::Build),
             Some(DispositionKind::Building)
+        );
+    }
+
+    #[test]
+    fn action_eat_maps_to_eating_not_resting() {
+        // 150 R5a regression-pin: picking `Action::Eat` at the L3
+        // softmax must commit to the new `Eating` disposition, not to
+        // `Resting`. The old mapping bundled Eat with Sleep + SelfGroom
+        // under Resting, which forced hungry-not-tired cats into a
+        // multi-need plan they never finished, leaving them to starve
+        // mid-Sleep beat.
+        assert_eq!(
+            DispositionKind::from_action(Action::Eat),
+            Some(DispositionKind::Eating)
+        );
+        // Sleep stays under Resting — Resting still owns sleep + groom.
+        assert_eq!(
+            DispositionKind::from_action(Action::Sleep),
+            Some(DispositionKind::Resting)
+        );
+    }
+
+    #[test]
+    fn resting_constituents_drop_eat() {
+        // 150 R5a: Resting owns Sleep + Groom only; Eating owns Eat.
+        assert_eq!(
+            DispositionKind::Resting.constituent_actions(),
+            &[Action::Sleep, Action::Groom]
+        );
+        assert_eq!(
+            DispositionKind::Eating.constituent_actions(),
+            &[Action::Eat]
+        );
+    }
+
+    #[test]
+    fn eating_target_completions_is_max_like_resting() {
+        // 150 R5a: Eating completes on hunger threshold (need-based),
+        // not on a trip count. `target_completions` returns MAX so the
+        // count-based fallback in `should_complete_disposition` /
+        // `disposition_complete` never fires for Eating; the need-based
+        // arms are authoritative.
+        let p = test_personality();
+        assert_eq!(
+            DispositionKind::Eating.target_completions(&p),
+            u32::MAX
+        );
+    }
+
+    #[test]
+    fn eating_shares_resting_maslow_tier() {
+        // 150 R5a: both physiological — Maslow tier 1.
+        assert_eq!(DispositionKind::Eating.maslow_level(), 1);
+        assert_eq!(DispositionKind::Resting.maslow_level(), 1);
+    }
+
+    #[test]
+    fn all_includes_eating_appended() {
+        // 150 R5a: Eating is appended to ALL (not inserted between
+        // Resting and Hunting) so positional ordinals in
+        // `scoring::active_disposition_ordinal` and
+        // `modifier::constituent_dses_for_ordinal` stay stable for the
+        // pre-existing 12 variants.
+        assert_eq!(DispositionKind::ALL.len(), 13);
+        assert_eq!(
+            DispositionKind::ALL.last(),
+            Some(&DispositionKind::Eating)
+        );
+        assert_eq!(
+            DispositionKind::ALL.first(),
+            Some(&DispositionKind::Resting),
+            "Resting must remain at ordinal-1 position"
         );
     }
 
