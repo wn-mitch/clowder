@@ -1,30 +1,57 @@
-# Hypothesize spec — ticket 032 §Scope item 1.
+# Hypothesize spec — ticket 032 §Scope item 1 (revised after Iter 4).
 #
-# Replaces the all-or-nothing `if hunger == 0.0` cliff in
-# src/systems/needs.rs with a graded `(1 − hunger)²` curve. Default config
-# preserves legacy semantics; this treatment flips
-# `starvation_cliff_use_legacy: false` and exercises the quadratic curve.
+# REVISED CURVE — threshold-gated, not always-on (1−hunger)^k.
 #
-# Magnitude logic: at hunger=0.5, cliff_factor=0.25 → 25% of legacy drain.
-# At hunger=0.1, cliff_factor=0.81 → 81% of legacy drain. The curve smears
-# damage across mid-hunger but a cat at sustained low hunger still dies in
-# a comparable window. Predicted reduction in `Starvation` deaths comes
-# from cats that previously reached `hunger == 0` for many ticks (full
-# legacy drain) now seeing partial drain at hunger 0.1–0.3 long enough to
-# self-rescue via Eat. Welfare-axis lift (acceptance) follows because the
-# panic-mode social cascade no longer hard-engages at the cliff.
+# Iter 1's draft shipped `(1 − hunger)^k` which is non-zero across the
+# entire hunger range. Over a 1.34M-tick soak the integrated drain
+# killed even well-fed cats (Mocha focal trace: hunger min=0.50, never
+# below 0.15, yet "starved" at tick 1.21M from cumulative drain). See
+# Iter 4 in starvation-rebalance.md.
+#
+# Revised model — two curves, leading + trailing:
+#
+# Damage curve (TRAILING, fires only when really starving):
+#   `cliff_factor = ((threshold - hunger) / threshold)^k` for hunger
+#   below threshold, 0 above. Threshold 0.15 mirrors the Maslow tier
+#   (`critical_hunger_interrupt_threshold`) — health damage starts at
+#   the same boundary where the planner already interrupts to send the
+#   cat to eat. Brief mid-hunger excursions (hunger 0.3, 0.4) take ZERO
+#   damage. Only sustained sub-threshold hunger accumulates damage,
+#   back-loaded near zero (parabolic ramp).
+#
+# Input curve (LEADING, nerve-impulse shape):
+#   `HungerUrgency.ramp = ((urgency - 0.6) / 0.4)^k_input` with k_input
+#   < 1 → sub-linear, fast-saturating. The cat is at ~92% of full
+#   motivation lift by hunger=0.15 (where damage onset begins) instead
+#   of ~62%. Cat fights harder for food *before* she bleeds.
+#
+# Treatment overrides BOTH curves together because they're physically
+# coupled: input must lead damage by enough margin or cats die in the
+# damage band before the input has saturated. Plus the existing
+# HungerUrgency lifts (eat=0.40, hunt=0.20, forage=0.20) which ship
+# inert at 0.0 — without these the modifier can't actually motivate.
 
-hypothesis: "Replacing the all-or-nothing hunger==0 cliff with quadratic graded drain reduces starvation mortality and lifts welfare-axis means by giving cats at mid-hunger time to self-rescue before the full cascade engages"
+hypothesis: "Threshold-gated graded cliff (drain only below hunger=0.15) paired with a leading nerve-impulse HungerUrgency ramp produces colony-survivable starvation cascade — drain stays at zero in normal feeding range, input motivation saturates before damage onset, and only cats that genuinely fail to eat take damage"
 
 constants_patch:
   needs:
     starvation_cliff_use_legacy: false
     starvation_cliff_exponent: 2.0
+    starvation_cliff_threshold: 0.15
+    starvation_attribution_threshold: 0.5
+  scoring:
+    # Lifts must be non-zero or the modifier has no effect even with
+    # a leading curve shape. These are ticket 106 Phase 3 magnitudes.
+    hunger_urgency_eat_lift: 0.40
+    hunger_urgency_hunt_lift: 0.20
+    hunger_urgency_forage_lift: 0.20
+    # Sub-linear leading curve — saturates by ~hunger=0.2 instead of 0.0.
+    hunger_urgency_curve_exponent: 0.4
 
 prediction:
   metric: deaths_by_cause.Starvation
   direction: decrease
-  rough_magnitude_pct: [60, 90]
+  rough_magnitude_pct: [50, 100]
 
 seeds: [42, 99, 7]
 reps: 3

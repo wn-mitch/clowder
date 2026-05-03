@@ -1497,6 +1497,7 @@ pub struct HungerUrgency {
     eat_lift: f32,
     hunt_lift: f32,
     forage_lift: f32,
+    curve_exponent: f32,
 }
 
 impl HungerUrgency {
@@ -1506,17 +1507,32 @@ impl HungerUrgency {
             eat_lift: sc.hunger_urgency_eat_lift,
             hunt_lift: sc.hunger_urgency_hunt_lift,
             forage_lift: sc.hunger_urgency_forage_lift,
+            curve_exponent: sc.hunger_urgency_curve_exponent,
         }
     }
 
-    /// Returns the linear ramp `[0, 1]` for the given `hunger_urgency`.
-    /// Below `threshold` returns 0; above, scales linearly to 1.0 at
-    /// urgency = 1.0. Mirror of `BodyDistressPromotion::lift` shape.
+    /// Returns the lift fraction `[0, 1]` for the given `hunger_urgency`.
+    /// Below `threshold` returns 0; above, scales to 1.0 at urgency = 1.0.
+    ///
+    /// Curve shape is `((urgency − threshold) / (1 − threshold))^k` where
+    /// `k = curve_exponent`. **Default `k = 1.0` is linear** (preserves
+    /// shipped behavior). Sub-linear `k < 1.0` (e.g. `0.4`) gives a
+    /// *leading nerve-impulse* shape: the lift saturates fast in the
+    /// early band and plateaus near max well before hunger drops into
+    /// starvation territory. This is the input-curve half of the
+    /// 032 leading/trailing pair (input leads damage); see
+    /// `docs/balance/starvation-rebalance.md` for the matched-pair
+    /// rationale.
     fn ramp(&self, urgency: f32) -> f32 {
         if urgency <= self.threshold {
             return 0.0;
         }
-        ((urgency - self.threshold) / (1.0 - self.threshold)).clamp(0.0, 1.0)
+        let raw = ((urgency - self.threshold) / (1.0 - self.threshold)).clamp(0.0, 1.0);
+        if self.curve_exponent == 1.0 {
+            raw
+        } else {
+            raw.powf(self.curve_exponent)
+        }
     }
 }
 
@@ -3585,6 +3601,7 @@ mod tests {
             eat_lift: 0.40,
             hunt_lift: 0.20,
             forage_lift: 0.20,
+            curve_exponent: 1.0,
         }
     }
 

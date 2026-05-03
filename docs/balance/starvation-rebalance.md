@@ -278,3 +278,50 @@ Truly zero above the threshold, monotonic ramp below. Matches the ticket's state
 
 The 8/8 attribution pattern (every death labeled Starvation) is *also* real, but it's downstream of the actual integrated-drain bug. With `exponent=8`, total_starvation_damage stays well below `0.1` for healthy cats, and the threshold of `0.1` becomes a reasonable discriminator. **Do not raise the threshold without first fixing the curve shape** — at the wrong curve shape, *any* threshold under 1.0 still attributes incorrectly because the integrated drain is enormous.
 
+## Iter 5 — 2026-05-03 — Curve fix shipped + soak verification (landable)
+
+Two changes landed this iteration: the curve-shape fix from Iter 4's diagnosis, and a paired leading-input curve to give the cat's "I should eat" motivation a nerve-impulse shape that saturates *before* damage onset.
+
+### Code changes
+
+1. **Damage curve** (`src/systems/needs.rs:109-134`): replaced the always-on `(1 − hunger)^k` formula with a threshold-gated ramp:
+    ```
+    cliff_factor = 0                            for hunger ≥ starvation_cliff_threshold
+                 = ((threshold − hunger) / threshold)^k    otherwise
+    ```
+    Default `starvation_cliff_threshold: 0.15` mirrors `critical_hunger_interrupt_threshold` — health damage starts at the same Maslow boundary where the planner already interrupts to eat.
+
+2. **Input curve** (`src/ai/modifier.rs::HungerUrgency::ramp`): added `hunger_urgency_curve_exponent` (default `1.0` = current linear behavior; treatment `0.4` = sub-linear/saturating, nerve-impulse shape). Sub-linear shape lifts the modifier to ~83% saturation by hunger=0.15 (vs ~62% under linear), so the cat is at near-maximum motivation by the time damage onset begins.
+
+3. **Death discriminator** unchanged from Iter 3 (gates on `starvation_cliff_use_legacy`).
+
+### Verification — single-seed soaks (per `feedback_chain_rare_events.md`)
+
+`Starvation` is at-floor (0) in baseline; sweep-side % change is meaningless from a 0 baseline. Per the chain-rare-events feedback memory, structural verification via single soak beats sweep gating for at-floor metrics. Two seed-42 15-min soaks against `commit ?` (post-Iter 4 fix):
+
+```
+                  Default (legacy)         Treatment (graded + leading)
+deaths_by_cause   MagicMisfire: 1          ShadowFoxAmbush: 7
+                  ShadowFoxAmbush: 6       WildlifeCombat: 1
+                  WildlifeCombat: 1
+                  ──────────────           ──────────────
+                  8 total                  8 total
+                  0 Starvation             0 Starvation
+```
+
+Same total mortality budget, same predator/wildlife distribution, **zero mass-wipeout** under treatment. Hard-gate `Starvation == 0` holds in both modes. The Iter 3/4 8/8-Starvation wipeout was confirmed to be a stale-release-binary artifact: the v2 sweep ran a binary built before the new fields existed, so the `applied_overrides` echo showed the patch but the constants block silently dropped them at deserialization.
+
+Constants block now correctly shows the new fields: `starvation_cliff_threshold: 0.15`, `starvation_attribution_threshold: 0.5`, `hunger_urgency_curve_exponent: 0.4` — all three plumb through to the running binary as designed.
+
+### Verdict for ticket 032 landing
+
+**Land the scaffolding now.** The code ships ship-inert (default = legacy cliff), new knobs work correctly under override. Survival hard-gate preserved. No regressions.
+
+What this commit does NOT yet ship as a *balance change*:
+- Promoting `starvation_cliff_use_legacy: false` to the ship default. Requires welfare-axis sweep verification against a healthy colony.
+- The colony has an upstream `courtship: 999 → 0` regression (Iter 2) that prevents welfare-axis sweeps from reading meaningful signal *now*. Sweeps deferred until that's fixed.
+- 032-2 (per-stage multipliers) — code scaffolded, treatment-side sweep deferred for the same reason.
+- 032-5 (body_condition gate) — code scaffolded, behavior verification deferred.
+
+Ticket 032 status stays `in-progress`. Log entry captures: scaffolding + curve-fix landed and verified by structural soak. Sweep-side promotion of the new defaults is a follow-on iteration once upstream regressions clear.
+

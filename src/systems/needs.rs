@@ -107,17 +107,30 @@ pub fn decay_needs(
         needs.temperature = (needs.temperature - temperature_drain).max(0.0);
 
         // --- Starvation cascade (ticket 032: graded cliff scaffolding) ---
-        // `cliff_factor` is 1.0 at the legacy `hunger == 0.0` boundary and 0.0
-        // when the cat is sated. Default config preserves the all-or-nothing
-        // cliff; flipping `starvation_cliff_use_legacy: false` enables a
-        // continuous `(1 − hunger)^k` curve. `stage_multiplier` is 1.0 by
-        // default; treatment values stratify mortality by life stage.
+        // `cliff_factor` is 1.0 at `hunger == 0.0` (full cascade) and 0.0
+        // anywhere `hunger >= starvation_cliff_threshold` — drain is *zero*
+        // in the normal feeding range. The threshold default `0.15` mirrors
+        // the existing Maslow ladder: the planner already interrupts at
+        // `critical_hunger_interrupt_threshold = 0.15` to send the cat to
+        // eat. Health damage engages at the same boundary — only when the
+        // cat has **failed** to recover from critical hunger does
+        // starvation damage accumulate.
+        //
+        // The cliff curve `(deficit / threshold)^k` with k=2 is back-loaded:
+        // damage ramps gently near the threshold edge (cat just dipped
+        // below 0.15) and sharply near zero (cat actively dying). The
+        // *behavioral-side* mirror — the cat's motivation to fight for
+        // food rising sharply in the same band — lives in the
+        // `HungerUrgency` modifier (ticket 106). 032 ships only the damage
+        // half; matching the urgency-side ramp shape is a 106 follow-on.
         let cliff_factor = if c.starvation_cliff_use_legacy {
             if needs.hunger == 0.0 { 1.0 } else { 0.0 }
+        } else if needs.hunger >= c.starvation_cliff_threshold {
+            0.0
         } else {
-            (1.0 - needs.hunger)
-                .powf(c.starvation_cliff_exponent)
-                .clamp(0.0, 1.0)
+            let deficit = (c.starvation_cliff_threshold - needs.hunger)
+                / c.starvation_cliff_threshold.max(f32::EPSILON);
+            deficit.powf(c.starvation_cliff_exponent).clamp(0.0, 1.0)
         };
         let starving = cliff_factor > 0.0;
         let stage_multiplier = match age.stage(time.tick, config.ticks_per_season) {

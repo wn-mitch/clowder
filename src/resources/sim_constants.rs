@@ -113,18 +113,42 @@ pub struct NeedsConstants {
     /// Ticket 032 — selects the starvation cascade form. **Default `true`**
     /// (ship inert) reproduces the legacy all-or-nothing `hunger == 0.0`
     /// cliff exactly: `cliff_factor = 1.0` iff `hunger == 0.0`, else `0.0`.
-    /// Treatment override `false` enables graded mode where
-    /// `cliff_factor = (1.0 − hunger).powf(starvation_cliff_exponent)`,
-    /// scaling `starvation_health_drain`, `starvation_safety_drain`, and
-    /// the social-decay multiplier continuously.
+    /// Treatment override `false` enables graded mode where the cliff
+    /// factor ramps from 0 (at `hunger = starvation_cliff_threshold`) to
+    /// 1 (at `hunger = 0`) via `((threshold − hunger) / threshold)^k`.
+    /// Drain is **zero** above the threshold — the normal feeding range
+    /// does not damage health.
     pub starvation_cliff_use_legacy: bool,
-    /// Ticket 032 — exponent on the graded `(1 − hunger)^k` cliff curve
-    /// (only consulted when `starvation_cliff_use_legacy = false`).
-    /// `2.0` ⇒ quadratic — drain scales gently across mid-hunger and
-    /// ramps up near `hunger = 0`. Default `2.0` (only takes effect when
-    /// the legacy bool is flipped). Treatment values `1.0` (linear) and
-    /// `3.0` (steeper cubic) reserved for sweep variants.
+    /// Ticket 032 — exponent on the graded `(deficit / threshold)^k`
+    /// cliff curve (only consulted when `starvation_cliff_use_legacy =
+    /// false`). `1.0` ⇒ linear ramp from 0 (at `hunger = threshold`) to
+    /// 1 (at `hunger = 0`); `2.0` ⇒ quadratic — gentler near the
+    /// threshold edge, sharper near zero. Default `2.0`.
     pub starvation_cliff_exponent: f32,
+    /// Ticket 032 — hunger value above which the graded starvation
+    /// cascade does **not** fire. Only consulted when
+    /// `starvation_cliff_use_legacy = false`. The cliff factor is zero
+    /// for `hunger >= starvation_cliff_threshold` and ramps up below.
+    ///
+    /// **Default `0.15` — mirrors `critical_hunger_interrupt_threshold`**
+    /// (the Maslow tier where the planner already interrupts the cat's
+    /// current plan to send her to eat). The composition is intentional:
+    /// at hunger=0.6 the cat feels urgency (`hunger_urgency_threshold`);
+    /// at hunger=0.5 the planner stops calling hunger "OK"
+    /// (`planner_hunger_ok_threshold`); at hunger=0.15 the planner
+    /// interrupts whatever she's doing to eat *now*. Health damage
+    /// engaging at the same boundary models the real-cat ladder: brief
+    /// mid-hunger excursions are normal (Maslow Level 1 driving
+    /// behavior), only sustained sub-critical hunger (the cat has
+    /// **failed** to recover despite the planner trying) constitutes
+    /// starvation.
+    ///
+    /// **Earlier scaffolding used `(1 − hunger)^k` directly**, which has
+    /// no zero except at hunger=1.0 — over a 1.34M-tick soak the
+    /// integrated drain killed even well-fed cats (focal-cat trace on
+    /// Mocha: hunger min=0.50, max=0.99, final=0.84, yet "starved").
+    /// See `docs/balance/starvation-rebalance.md` Iter 4.
+    pub starvation_cliff_threshold: f32,
     /// Ticket 032 — under graded mode, the persistent starvation mood
     /// modifier only fires when `cliff_factor > starvation_mood_threshold`
     /// (so brief mid-hunger dips don't spam mood-modifier creation).
@@ -204,6 +228,7 @@ impl Default for NeedsConstants {
             // Ticket 032: graded starvation cliff (ship-inert defaults)
             starvation_cliff_use_legacy: true,
             starvation_cliff_exponent: 2.0,
+            starvation_cliff_threshold: 0.15,
             starvation_mood_threshold: 0.0,
             starvation_drain_multiplier_kitten: 1.0,
             starvation_drain_multiplier_young: 1.0,
@@ -1492,6 +1517,21 @@ pub struct ScoringConstants {
     /// / Forage above non-food dispositions.
     #[serde(default = "default_hunger_urgency_threshold")]
     pub hunger_urgency_threshold: f32,
+    /// Ticket 032 (cross-cutting with 106) — exponent on the
+    /// `HungerUrgency` ramp shape. **Default `1.0` = linear** (current
+    /// shipped behavior — gentle uniform rise from `hunger_urgency =
+    /// threshold` to `urgency = 1.0`). Values `< 1.0` give a *leading*
+    /// nerve-impulse shape: the lift saturates fast in the early band
+    /// and plateaus near max well before hunger reaches starvation
+    /// territory — the cat is "already as motivated as she can be" by
+    /// the time the cliff fires. Treatment override `0.4` paired with
+    /// 032's damage curve is the matched nerve-impulse / consequence
+    /// pair: input leads, damage trails. Per `docs/balance/starvation-rebalance.md`
+    /// Iter 5 (TBD): the linear default lets the cat enter the damage
+    /// band at ~62% of full motivation lift; sub-linear shape lifts that
+    /// to ~92% so cats fight harder for food before they bleed.
+    #[serde(default = "default_hunger_urgency_curve_exponent")]
+    pub hunger_urgency_curve_exponent: f32,
     /// Ticket 106 — `HungerUrgency` lift on Eat. Largest of the three —
     /// Eat is the direct solution; Hunt / Forage are upstream.
     /// **Default 0.0** (ships inert); proposed magnitude 0.40 enabled
@@ -1791,6 +1831,7 @@ impl Default for ScoringConstants {
             acute_health_adrenaline_freeze_viability_threshold:
                 default_acute_health_adrenaline_freeze_viability_threshold(),
             hunger_urgency_threshold: default_hunger_urgency_threshold(),
+            hunger_urgency_curve_exponent: default_hunger_urgency_curve_exponent(),
             hunger_urgency_eat_lift: default_hunger_urgency_eat_lift(),
             hunger_urgency_hunt_lift: default_hunger_urgency_hunt_lift(),
             hunger_urgency_forage_lift: default_hunger_urgency_forage_lift(),
@@ -2579,6 +2620,13 @@ fn default_acute_health_adrenaline_freeze_viability_threshold() -> f32 {
 /// begins; below, the modifier is a no-op.
 fn default_hunger_urgency_threshold() -> f32 {
     0.6
+}
+
+/// Ticket 032 (cross-cutting with 106) — exponent on the HungerUrgency
+/// ramp. **Default 1.0 (linear)** keeps current shipped behavior; sub-1
+/// values reshape the curve to lead damage onset (nerve-impulse shape).
+fn default_hunger_urgency_curve_exponent() -> f32 {
+    1.0
 }
 
 /// Ticket 106 — `HungerUrgency` lift on Eat. **Defaults to 0.0** so the
