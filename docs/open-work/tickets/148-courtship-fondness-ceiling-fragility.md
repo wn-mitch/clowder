@@ -72,3 +72,11 @@ small. Other seeds may not have this fragility.
 - 2026-05-02: Opened from 146 close-out. Mocha+Birch evidence preserved
   in `logs/tuned-42-baseline-0783194/` (999 events) vs
   `logs/tuned-42-111-removal-bare/` (0 events).
+- 2026-05-02: **History note** — commit `705ac36f` ("docs: 149 — open
+  hunt-success disambiguation ticket") accidentally bundled this
+  ticket's in-flight WIP (this file's edits, `scripts/diag_courtship_ceiling.py`,
+  `src/plugins/setup.rs`, `src/resources/sim_constants.rs`,
+  `src/world_gen/colony.rs`, `src/world_gen/custom_cats.rs`) alongside
+  the 149 ticket creation. The misleading commit-message subject is
+  acknowledged here (forward fix); no data lost. Future session: treat
+  148's content above as landed in `705ac36f` and continue from there.
