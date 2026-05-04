@@ -80,3 +80,26 @@ small. Other seeds may not have this fragility.
   the 149 ticket creation. The misleading commit-message subject is
   acknowledged here (forward fix); no data lost. Future session: treat
   148's content above as landed in `705ac36f` and continue from there.
+- 2026-05-03: **Post-balancing evidence — courtship signal collapsed
+  to zero.** Surfaced during ticket 152's tier-1 disposition-collapse
+  audit on `logs/032-soak-treatment/` (seed 42, header
+  `commit_hash_short=883e9f3+dirty` — post-150 Eating split + 032
+  threshold-gated cliff WIP). Footer fields:
+  - `continuity_tallies.courtship = 0` — collapsed from **999** in the
+    pre-150 baseline (`tuned-42-baseline-0783194`). The Mocha+Birch
+    dyad's CourtshipDrifted firings appear to have stopped entirely,
+    not just narrowed.
+  - `never_fired_expected_positives` now includes `CourtshipInteraction`
+    and `PairingIntentionEmitted` (both new entries — neither was on
+    the pre-150 list).
+  This is a *qualitative* shift, not a six-thousandths fragility
+  question: the courtship chain is dark across the entire 8-season
+  soak. Hypothesis (a) "fondness ceiling" is now the leading
+  candidate — either the ceiling dropped further below 0.30
+  post-balancing, OR a structural change in 150 (Eating split) /
+  032 (threshold-gated cliff) starved Adult-Adult socialization
+  airtime entirely. Action: rerun the `diag_courtship_ceiling.py`
+  diagnostic (or its successor) against `032-soak-treatment` to
+  measure the post-balancing fondness ceiling for the Mocha+Birch
+  dyad and the Adult-Adult pool, then compare against the pre-150
+  ceiling values to see whether (a)'s threshold dropped.
