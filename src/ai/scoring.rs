@@ -438,7 +438,19 @@ pub struct ScoringContext<'a> {
     /// `1` Defense, `2` Building, `3` Exploration. Read by
     /// `ColonyPriorityLift`.
     pub colony_priority_ordinal: f32,
+    /// Per-action cascade counts: `cascade_counts[Action as usize]` is
+    /// the number of nearby cats currently performing that action.
+    /// Populated at builder time from the colony-wide action snapshot.
+    /// `Fight` slot stays 0 — the legacy chain excluded Fight from
+    /// cascading (Fight has its own `fight_ally_bonus_per_cat` baked
+    /// into its scoring axes); the modifier carves Fight out
+    /// independently.
+    pub cascade_counts: [f32; CASCADE_COUNTS_LEN],
 }
+
+/// Length of the per-action cascade-count array. Equals the number of
+/// `Action` enum variants — index via `action as usize`.
+pub const CASCADE_COUNTS_LEN: usize = 22;
 
 // ---------------------------------------------------------------------------
 // ScoringResult
@@ -804,8 +816,42 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
         ctx.colony_knowledge_threat_proximity,
     );
     m.insert("colony_priority_ordinal", ctx.colony_priority_ordinal);
+    // Per-action cascade counts — Σ nearby cats performing each
+    // action. Read by `NeighborActionCascade`.
+    for (idx, key) in CASCADE_COUNT_KEYS.iter().enumerate() {
+        m.insert(key, ctx.cascade_counts[idx]);
+    }
     m
 }
+
+/// Per-action ctx-scalar keys for cascade counts, indexed parallel to
+/// `Action as usize` (entry `i` corresponds to the i-th `Action`
+/// variant). Source of truth for both the scalar producer and the
+/// `NeighborActionCascade` modifier.
+pub const CASCADE_COUNT_KEYS: [&str; CASCADE_COUNTS_LEN] = [
+    "cascade_count_eat",
+    "cascade_count_sleep",
+    "cascade_count_hunt",
+    "cascade_count_forage",
+    "cascade_count_wander",
+    "cascade_count_idle",
+    "cascade_count_socialize",
+    "cascade_count_groom",
+    "cascade_count_explore",
+    "cascade_count_flee",
+    "cascade_count_fight",
+    "cascade_count_patrol",
+    "cascade_count_build",
+    "cascade_count_farm",
+    "cascade_count_herbcraft",
+    "cascade_count_practicemagic",
+    "cascade_count_coordinate",
+    "cascade_count_mentor",
+    "cascade_count_mate",
+    "cascade_count_caretake",
+    "cascade_count_cook",
+    "cascade_count_hide",
+];
 
 /// Encode the active `DispositionKind` as an `f32` ordinal for the
 /// Patience modifier's scalar surface. 0.0 = no active disposition;
@@ -1458,27 +1504,35 @@ pub fn memory_proximity_sums(
     (resource_found, death, threat_seen)
 }
 
-/// Boost action scores based on what nearby cats are doing.
-///
-/// For each action (except Fight, which has its own dedicated ally bonus),
-/// adds `cascading_bonus_per_cat * count` where `count` is the number of cats
-/// within range performing that action. Creates emergent group behaviors.
-pub fn apply_cascading_bonuses(
-    scores: &mut [(Action, f32)],
-    nearby_actions: &HashMap<Action, usize>,
-    sc: &ScoringConstants,
-) {
-    for (action, score) in scores.iter_mut() {
-        // Fight already has fight_ally_bonus_per_cat in its base scoring;
-        // applying the generic cascade on top creates a positive feedback
-        // loop that snowballs into colony-wide fight charges.
-        if *action == Action::Fight {
+/// Aggregate the colony-wide action snapshot into per-action cascade
+/// counts for the focal cat. Returns an array indexed by
+/// `Action as usize`. Entries beyond `cascading_bonus_range` (Manhattan
+/// distance) and the focal cat's own slot contribute 0. The Fight slot
+/// stays 0 — the legacy chain excluded Fight from cascading and the
+/// modifier preserves that.
+pub fn compute_cascade_counts(
+    action_snapshot: &[(Entity, Position, Action)],
+    self_entity: Entity,
+    self_pos: &Position,
+    range: i32,
+) -> [f32; CASCADE_COUNTS_LEN] {
+    let mut counts = [0.0_f32; CASCADE_COUNTS_LEN];
+    for &(other_entity, other_pos, other_action) in action_snapshot {
+        if other_entity == self_entity {
             continue;
         }
-        if let Some(&count) = nearby_actions.get(action) {
-            *score += count as f32 * sc.cascading_bonus_per_cat;
+        if other_action == Action::Fight {
+            continue;
+        }
+        if self_pos.manhattan_distance(&other_pos) > range {
+            continue;
+        }
+        let idx = other_action as usize;
+        if idx < CASCADE_COUNTS_LEN {
+            counts[idx] += 1.0;
         }
     }
+    counts
 }
 
 /// Apply a coordinator's directive bonus to the target action's score.
@@ -2275,6 +2329,7 @@ mod tests {
             colony_knowledge_resource_proximity: 0.0,
             colony_knowledge_threat_proximity: 0.0,
             colony_priority_ordinal: -1.0,
+            cascade_counts: [0.0; CASCADE_COUNTS_LEN],
         }
     }
 
@@ -2441,6 +2496,7 @@ mod tests {
             colony_knowledge_resource_proximity: 0.0,
             colony_knowledge_threat_proximity: 0.0,
             colony_priority_ordinal: -1.0,
+            cascade_counts: [0.0; CASCADE_COUNTS_LEN],
         };
         // §L2.10.7: this test sets `food_available: false`,
         // `has_functional_kitchen: false`, etc. on the context, but
@@ -2630,6 +2686,7 @@ mod tests {
             colony_knowledge_resource_proximity: 0.0,
             colony_knowledge_threat_proximity: 0.0,
             colony_priority_ordinal: -1.0,
+            cascade_counts: [0.0; CASCADE_COUNTS_LEN],
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let socialize_score = scores
@@ -2676,7 +2733,6 @@ mod tests {
 
     use crate::components::mental::{Memory, MemoryEntry, MemoryType};
     use crate::components::physical::Position;
-    use std::collections::HashMap;
 
     fn make_memory(event_type: MemoryType, location: Position, strength: f32) -> MemoryEntry {
         MemoryEntry {
@@ -2748,33 +2804,19 @@ mod tests {
         assert_eq!(t, 0.0);
     }
 
-    // --- Activity cascading tests ---
-
     #[test]
-    fn cascading_boosts_matching_action() {
-        let sc = default_scoring();
-        let mut scores = vec![(Action::Hunt, 1.0), (Action::Idle, 0.5)];
-        let nearby = HashMap::from([(Action::Hunt, 3)]);
-
-        apply_cascading_bonuses(&mut scores, &nearby, &sc);
-
-        let hunt = scores.iter().find(|(a, _)| *a == Action::Hunt).unwrap().1;
-        assert!(
-            (hunt - 1.24).abs() < 1e-5,
-            "3 nearby hunters should add 0.24; got {hunt}"
-        );
-    }
-
-    #[test]
-    fn cascading_does_not_boost_unrelated_actions() {
-        let sc = default_scoring();
-        let mut scores = vec![(Action::Hunt, 1.0), (Action::Sleep, 0.5)];
-        let nearby = HashMap::from([(Action::Hunt, 2)]);
-
-        apply_cascading_bonuses(&mut scores, &nearby, &sc);
-
-        let sleep = scores.iter().find(|(a, _)| *a == Action::Sleep).unwrap().1;
-        assert_eq!(sleep, 0.5, "Sleep should be unaffected; got {sleep}");
+    fn cascade_counts_aggregate_nearby_actions_excluding_self_and_fight() {
+        let self_entity = Entity::from_raw_u32(1).unwrap();
+        let snapshot = vec![
+            (self_entity, Position::new(5, 5), Action::Hunt),
+            (Entity::from_raw_u32(2).unwrap(), Position::new(5, 6), Action::Hunt),
+            (Entity::from_raw_u32(3).unwrap(), Position::new(6, 5), Action::Hunt),
+            (Entity::from_raw_u32(4).unwrap(), Position::new(5, 4), Action::Fight),
+            (Entity::from_raw_u32(5).unwrap(), Position::new(20, 20), Action::Hunt),
+        ];
+        let counts = compute_cascade_counts(&snapshot, self_entity, &Position::new(5, 5), 5);
+        assert_eq!(counts[Action::Hunt as usize], 2.0, "self + far cat excluded");
+        assert_eq!(counts[Action::Fight as usize], 0.0, "Fight excluded by design");
     }
 
     // --- Flee / Fight / Patrol scoring tests ---
@@ -2863,6 +2905,7 @@ mod tests {
             colony_knowledge_resource_proximity: 0.0,
             colony_knowledge_threat_proximity: 0.0,
             colony_priority_ordinal: -1.0,
+            cascade_counts: [0.0; CASCADE_COUNTS_LEN],
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let best = select_best_action(&scores);
@@ -2958,6 +3001,7 @@ mod tests {
             colony_knowledge_resource_proximity: 0.0,
             colony_knowledge_threat_proximity: 0.0,
             colony_priority_ordinal: -1.0,
+            cascade_counts: [0.0; CASCADE_COUNTS_LEN],
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let fight_score = scores.iter().find(|(a, _)| *a == Action::Fight).unwrap().1;
@@ -3072,6 +3116,7 @@ mod tests {
             colony_knowledge_resource_proximity: 0.0,
             colony_knowledge_threat_proximity: 0.0,
             colony_priority_ordinal: -1.0,
+            cascade_counts: [0.0; CASCADE_COUNTS_LEN],
         };
         // Build a per-test MarkerSnapshot with Incapacitated set for
         // this cat (the cached shared snapshot only carries colony
@@ -3362,6 +3407,7 @@ mod tests {
             colony_knowledge_resource_proximity: 0.0,
             colony_knowledge_threat_proximity: 0.0,
             colony_priority_ordinal: -1.0,
+            cascade_counts: [0.0; CASCADE_COUNTS_LEN],
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let wander = scores.iter().find(|(a, _)| *a == Action::Wander).unwrap().1;
@@ -3458,6 +3504,7 @@ mod tests {
             colony_knowledge_resource_proximity: 0.0,
             colony_knowledge_threat_proximity: 0.0,
             colony_priority_ordinal: -1.0,
+            cascade_counts: [0.0; CASCADE_COUNTS_LEN],
         };
 
         let scores_full = score_actions(&base, &test_eval_inputs(), &mut rng_full).scores;

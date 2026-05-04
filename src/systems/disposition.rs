@@ -5,8 +5,8 @@ use rand::Rng;
 
 use crate::ai::pathfinding::{find_free_adjacent, step_toward};
 use crate::ai::scoring::{
-    apply_aspiration_bonuses, apply_cascading_bonuses, apply_directive_bonus, apply_fated_bonuses,
-    apply_preference_bonuses, score_actions, ScoringContext,
+    apply_aspiration_bonuses, apply_directive_bonus, apply_fated_bonuses, apply_preference_bonuses,
+    score_actions, ScoringContext,
 };
 use crate::ai::{Action, CurrentAction};
 use crate::components::building::{
@@ -831,6 +831,12 @@ pub fn evaluate_dispositions(
             .as_ref()
             .map(|ck| crate::ai::scoring::colony_knowledge_proximity_sums(ck, pos, sc))
             .unwrap_or((0.0, 0.0));
+        let presence_cascade_counts = crate::ai::scoring::compute_cascade_counts(
+            &action_snapshot,
+            entity,
+            pos,
+            d.cascading_bonus_range,
+        );
 
         let ctx = ScoringContext {
             scoring: sc,
@@ -1001,6 +1007,7 @@ pub fn evaluate_dispositions(
             colony_priority_ordinal: crate::ai::scoring::colony_priority_ordinal(
                 colony.priority.as_ref().and_then(|cp| cp.active),
             ),
+            cascade_counts: presence_cascade_counts,
         };
 
         // §11 trace plumbing — dormant except when running headless
@@ -1027,15 +1034,6 @@ pub fn evaluate_dispositions(
         let mut scores = result.scores;
 
         // Apply all bonus layers (identical to evaluate_actions).
-        let mut nearby_actions = HashMap::new();
-        for &(other_entity, other_pos, other_action) in &action_snapshot {
-            if other_entity != entity
-                && pos.manhattan_distance(&other_pos) <= d.cascading_bonus_range
-            {
-                *nearby_actions.entry(other_action).or_insert(0usize) += 1;
-            }
-        }
-        apply_cascading_bonuses(&mut scores, &nearby_actions, sc);
         if let Some(asp) = aspirations {
             apply_aspiration_bonuses(&mut scores, asp, sc);
         }

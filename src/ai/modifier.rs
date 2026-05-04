@@ -240,6 +240,29 @@ const COLONY_PRIORITY_DEFENSE: f32 = 1.0;
 const COLONY_PRIORITY_BUILDING: f32 = 2.0;
 const COLONY_PRIORITY_EXPLORATION: f32 = 3.0;
 
+// Per-action cascade-count keys, read by `NeighborActionCascade`.
+const CASCADE_COUNT_HUNT: &str = "cascade_count_hunt";
+const CASCADE_COUNT_FORAGE: &str = "cascade_count_forage";
+const CASCADE_COUNT_EAT: &str = "cascade_count_eat";
+const CASCADE_COUNT_SLEEP: &str = "cascade_count_sleep";
+const CASCADE_COUNT_WANDER: &str = "cascade_count_wander";
+const CASCADE_COUNT_IDLE: &str = "cascade_count_idle";
+const CASCADE_COUNT_SOCIALIZE: &str = "cascade_count_socialize";
+const CASCADE_COUNT_GROOM: &str = "cascade_count_groom";
+const CASCADE_COUNT_EXPLORE: &str = "cascade_count_explore";
+const CASCADE_COUNT_FLEE: &str = "cascade_count_flee";
+const CASCADE_COUNT_PATROL: &str = "cascade_count_patrol";
+const CASCADE_COUNT_BUILD: &str = "cascade_count_build";
+const CASCADE_COUNT_FARM: &str = "cascade_count_farm";
+const CASCADE_COUNT_HERBCRAFT: &str = "cascade_count_herbcraft";
+const CASCADE_COUNT_PRACTICEMAGIC: &str = "cascade_count_practicemagic";
+const CASCADE_COUNT_COORDINATE: &str = "cascade_count_coordinate";
+const CASCADE_COUNT_MENTOR: &str = "cascade_count_mentor";
+const CASCADE_COUNT_MATE: &str = "cascade_count_mate";
+const CASCADE_COUNT_CARETAKE: &str = "cascade_count_caretake";
+const CASCADE_COUNT_COOK: &str = "cascade_count_cook";
+const CASCADE_COUNT_HIDE: &str = "cascade_count_hide";
+
 /// Ticket 088 — the "self-care" DSE class lifted by
 /// `BodyDistressPromotion` when `body_distress_composite` is high.
 /// Authored as a `&[&str]` constant so the class membership is
@@ -2493,6 +2516,88 @@ impl ScoreModifier for ColonyPriorityLift {
 }
 
 // ---------------------------------------------------------------------------
+// NeighborActionCascade
+// ---------------------------------------------------------------------------
+
+/// §3.5.1 additive lift driven by what nearby cats are currently doing.
+/// Reads `cascade_count_<action>` (count of cats within
+/// `cascading_bonus_range` performing that action) and adds
+/// `count × cascading_bonus_per_cat`.
+///
+/// Routes each DSE id to the cascade key for its parent Action,
+/// collapsing per-DSE-within-Action sibling DSEs to one shared count
+/// (groom_self / groom_other → cascade_count_groom; herbcraft sub-modes
+/// → cascade_count_herbcraft; magic sub-modes → cascade_count_practicemagic).
+///
+/// **Fight is excluded** — Fight has its own `fight_ally_bonus_per_cat`
+/// inline; cascading on top would create a positive feedback loop.
+pub struct NeighborActionCascade {
+    bonus_per_cat: f32,
+}
+
+impl NeighborActionCascade {
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            bonus_per_cat: sc.cascading_bonus_per_cat,
+        }
+    }
+
+    fn cascade_key(dse_id: DseId) -> Option<&'static str> {
+        match dse_id.0 {
+            HUNT => Some(CASCADE_COUNT_HUNT),
+            FORAGE => Some(CASCADE_COUNT_FORAGE),
+            EAT => Some(CASCADE_COUNT_EAT),
+            SLEEP => Some(CASCADE_COUNT_SLEEP),
+            WANDER => Some(CASCADE_COUNT_WANDER),
+            IDLE => Some(CASCADE_COUNT_IDLE),
+            SOCIALIZE => Some(CASCADE_COUNT_SOCIALIZE),
+            GROOM_SELF | GROOM_OTHER => Some(CASCADE_COUNT_GROOM),
+            EXPLORE => Some(CASCADE_COUNT_EXPLORE),
+            FLEE => Some(CASCADE_COUNT_FLEE),
+            PATROL => Some(CASCADE_COUNT_PATROL),
+            BUILD => Some(CASCADE_COUNT_BUILD),
+            FARM => Some(CASCADE_COUNT_FARM),
+            HERBCRAFT_GATHER | HERBCRAFT_PREPARE | HERBCRAFT_WARD => {
+                Some(CASCADE_COUNT_HERBCRAFT)
+            }
+            MAGIC_SCRY | MAGIC_DURABLE_WARD | MAGIC_CLEANSE | MAGIC_COLONY_CLEANSE
+            | MAGIC_HARVEST | MAGIC_COMMUNE => Some(CASCADE_COUNT_PRACTICEMAGIC),
+            COORDINATE => Some(CASCADE_COUNT_COORDINATE),
+            MENTOR => Some(CASCADE_COUNT_MENTOR),
+            MATE => Some(CASCADE_COUNT_MATE),
+            CARETAKE => Some(CASCADE_COUNT_CARETAKE),
+            COOK => Some(CASCADE_COUNT_COOK),
+            HIDE => Some(CASCADE_COUNT_HIDE),
+            // FIGHT excluded by design.
+            _ => None,
+        }
+    }
+}
+
+impl ScoreModifier for NeighborActionCascade {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        let Some(key) = Self::cascade_key(dse_id) else {
+            return score;
+        };
+        let count = fetch(key, ctx.cat);
+        if count <= 0.0 {
+            return score;
+        }
+        score + count * self.bonus_per_cat
+    }
+
+    fn name(&self) -> &'static str {
+        "neighbor_action_cascade"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Default pipeline builder
 // ---------------------------------------------------------------------------
 
@@ -2564,6 +2669,7 @@ pub fn default_modifier_pipeline(
     pipeline.push(Box::new(MemoryThreatSeenSuppress::new(sc)));
     pipeline.push(Box::new(ColonyKnowledgeLift::new(sc)));
     pipeline.push(Box::new(ColonyPriorityLift::new(sc)));
+    pipeline.push(Box::new(NeighborActionCascade::new(sc)));
     // Ticket 047 — `AcuteHealthAdrenalineFlee` registers immediately
     // after `BodyDistressPromotion` so under combined high composite
     // distress + high health deficit, both lifts compose additively on
@@ -3306,7 +3412,7 @@ mod tests {
     fn default_pipeline_registers_expected_modifier_count() {
         let constants = crate::resources::sim_constants::SimConstants::default();
         let pipeline = default_modifier_pipeline(&constants);
-        assert_eq!(pipeline.len(), 26, "expected 26 registered modifiers");
+        assert_eq!(pipeline.len(), 27, "expected 27 registered modifiers");
     }
 
     // -----------------------------------------------------------------------
@@ -5281,6 +5387,43 @@ mod tests {
         for dse in [HUNT, FORAGE, FARM, PATROL, FIGHT, BUILD, EXPLORE] {
             assert!((m.apply(DseId(dse), 0.4, &ctx, &fetch) - 0.4).abs() < 1e-6);
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // NeighborActionCascade
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn cascade_lifts_hunt_proportional_to_count() {
+        let m = NeighborActionCascade { bonus_per_cat: 0.08 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            CASCADE_COUNT_HUNT => 3.0,
+            _ => 0.0,
+        };
+        // 0.5 + 3 × 0.08 = 0.74
+        assert!((m.apply(DseId(HUNT), 0.5, &ctx, &fetch) - 0.74).abs() < 1e-6);
+    }
+
+    #[test]
+    fn cascade_collapses_groom_siblings_to_shared_count() {
+        let m = NeighborActionCascade { bonus_per_cat: 0.08 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            CASCADE_COUNT_GROOM => 2.0,
+            _ => 0.0,
+        };
+        // Both groom DSEs read the same cascade key.
+        assert!((m.apply(DseId(GROOM_SELF), 0.5, &ctx, &fetch) - 0.66).abs() < 1e-6);
+        assert!((m.apply(DseId(GROOM_OTHER), 0.5, &ctx, &fetch) - 0.66).abs() < 1e-6);
+    }
+
+    #[test]
+    fn cascade_carves_out_fight() {
+        let m = NeighborActionCascade { bonus_per_cat: 0.08 };
+        let (_, ctx) = test_ctx();
+        let fetch = |_: &str, _: Entity| 5.0;
+        assert!((m.apply(DseId(FIGHT), 0.5, &ctx, &fetch) - 0.5).abs() < 1e-6);
     }
 
     #[test]
