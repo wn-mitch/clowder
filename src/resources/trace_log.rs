@@ -278,6 +278,19 @@ pub enum TraceRecord {
         chosen: String,
         intention: IntentionSummary,
         goap_plan: Vec<String>,
+        /// Ticket-163 trace surface: action-keyed score Vec at
+        /// `score_actions` exit (before any bonus pass mutates it).
+        /// Empty when the softmax did not fire (fall-through path).
+        /// Locked invariant in `tests/scenarios.rs` asserts this
+        /// equals `pre_penalty_pool` per-action — i.e. nothing mutates
+        /// scores between `score_actions` and softmax.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        pre_bonus_pool: Vec<(String, f32)>,
+        /// Ticket-163 trace surface: post-filter, pre-Independence-
+        /// penalty pool the softmax saw. Empty when the softmax did
+        /// not fire.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        pre_penalty_pool: Vec<(String, f32)>,
         /// Schema slot for §8.6 apophenia canary — `None` at Phase 1.
         #[serde(skip_serializing_if = "Option::is_none")]
         apophenia: Option<ApopheniaSummary>,
@@ -577,6 +590,8 @@ mod tests {
                 goal_state: Some("prey_caught".into()),
             },
             goap_plan: vec!["MoveToTile(15,10)".into(), "PouncePrey(Mouse#42)".into()],
+            pre_bonus_pool: Vec::new(),
+            pre_penalty_pool: Vec::new(),
             apophenia: None,
         }
     }

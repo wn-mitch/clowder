@@ -1522,6 +1522,18 @@ pub fn evaluate_and_plan(
         }
         let mut scores = result.scores;
 
+        // Ticket-163 trace surface: snapshot the score Vec at score_actions
+        // exit, before any bonus pass mutates it. The locked invariant in
+        // `tests/scenarios.rs` asserts this snapshot equals
+        // `softmax.pool_pre_penalty` per-action — i.e. nothing mutates
+        // scores between here and the softmax. Today's `apply_*` chain
+        // breaks the invariant; ticket 163 retires it.
+        let pre_bonus_pool_snapshot = if focal_cat == Some(entity) && focal_capture.is_some() {
+            Some(scores.clone())
+        } else {
+            None
+        };
+
         // Ticket 123 — damp the IAUS scores of dispositions that
         // recently hit `make_plan → None`. Runs before the additive
         // bonus layers so a recently-failed disposition is dimmed
@@ -1635,7 +1647,13 @@ pub fn evaluate_and_plan(
             &mut rng.rng,
             softmax_trace.as_mut(),
         );
-        if let (Some(capture), Some(trace)) = (focal_capture, softmax_trace) {
+        if let (Some(capture), Some(mut trace)) = (focal_capture, softmax_trace) {
+            // Ticket-163 trace surface: forward the pre-bonus snapshot
+            // into the softmax capture so `emit_focal_trace` and the
+            // scenario runner can publish both pools side-by-side.
+            if let Some(snap) = pre_bonus_pool_snapshot {
+                trace.pre_bonus_pool = snap;
+            }
             capture.set_softmax(trace, res.time.tick);
         }
 

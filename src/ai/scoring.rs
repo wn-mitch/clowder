@@ -1843,6 +1843,13 @@ pub fn select_disposition_via_intention_softmax_with_trace(
         .copied()
         .collect();
 
+    // Ticket-163 trace surface: snapshot the post-filter, pre-Independence-
+    // penalty pool. Locks the §11.3 L2-vs-pool invariant — comparing this
+    // against the caller-snapshotted `pre_bonus_pool` detects regressions
+    // where a future code path mutates scores between `score_actions` exit
+    // and softmax entry.
+    let pool_pre_penalty_snapshot = pool.clone();
+
     // Port of the legacy disposition-level Independence penalty on
     // Coordinating + Socializing peer-groups. Applied at action level here
     // on the constituent actions of those dispositions. Groom routes to
@@ -1868,6 +1875,7 @@ pub fn select_disposition_via_intention_softmax_with_trace(
         if let Some(sink) = sink.as_mut() {
             sink.temperature = sc.intention_softmax_temperature;
             sink.empty_pool = true;
+            sink.pool_pre_penalty = pool_pre_penalty_snapshot;
         }
         return DispositionKind::Resting;
     }
@@ -1909,6 +1917,7 @@ pub fn select_disposition_via_intention_softmax_with_trace(
         sink.chosen_idx = Some(chosen_idx);
         sink.chosen_action = Some(chosen_action);
         sink.empty_pool = false;
+        sink.pool_pre_penalty = pool_pre_penalty_snapshot;
     }
 
     // Map the winning Intention → Disposition. Groom routes via
@@ -1935,6 +1944,15 @@ pub fn select_disposition_via_intention_softmax_with_trace(
 /// without invoking the RNG. Keeping the default `Vec::new()` shapes
 /// lets consumers distinguish "softmax ran and picked" from
 /// "softmax skipped entirely".
+///
+/// `pre_bonus_pool` and `pool_pre_penalty` are ticket-163 trace surfaces
+/// that lock the §11.3 L2-vs-pool invariant: post-migration the score
+/// Vec is identical at score_actions exit and at softmax entry, so the
+/// L2 trace's `final_score` mirrors what the softmax sees (modulo jitter,
+/// DSE→Action max-collapse, and the Independence penalty applied last).
+/// Caller-side, `pre_bonus_pool` is a clone of the score Vec at
+/// score_actions exit; `pool_pre_penalty` is the post-filter,
+/// pre-Independence-penalty pool the softmax saw.
 #[derive(Debug, Default, Clone)]
 pub struct SoftmaxCapture {
     pub pool: Vec<(Action, f32)>,
@@ -1945,6 +1963,14 @@ pub struct SoftmaxCapture {
     pub chosen_idx: Option<usize>,
     pub chosen_action: Option<Action>,
     pub empty_pool: bool,
+    /// Score Vec snapshot at `score_actions` exit (caller-populated).
+    /// Empty when the caller did not snapshot (non-focal cat path or
+    /// pre-163 callers).
+    pub pre_bonus_pool: Vec<(Action, f32)>,
+    /// Post-filter, pre-Independence-penalty pool the softmax saw.
+    /// Populated inside the softmax helper. Empty on the early-return
+    /// empty-pool branch.
+    pub pool_pre_penalty: Vec<(Action, f32)>,
 }
 
 // ---------------------------------------------------------------------------

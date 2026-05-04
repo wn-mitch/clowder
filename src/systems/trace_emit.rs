@@ -242,7 +242,9 @@ pub fn emit_focal_trace(
         })
         .unwrap_or_default();
 
-    let (ranked, softmax_summary) = if let Some(sm) = &captured.softmax {
+    let (ranked, softmax_summary, pre_bonus_pool, pre_penalty_pool) = if let Some(sm) =
+        &captured.softmax
+    {
         let ranked: Vec<(String, f32)> = sm
             .pool
             .iter()
@@ -252,7 +254,20 @@ pub fn emit_focal_trace(
             temperature: sm.temperature,
             probabilities: sm.probabilities.clone(),
         };
-        (ranked, summary)
+        // Ticket-163 trace surfaces — empty when the caller did not
+        // snapshot (non-focal cat path) or on the empty-pool early-
+        // return branch.
+        let pre_bonus: Vec<(String, f32)> = sm
+            .pre_bonus_pool
+            .iter()
+            .map(|(a, s)| (format!("{a:?}"), *s))
+            .collect();
+        let pre_penalty: Vec<(String, f32)> = sm
+            .pool_pre_penalty
+            .iter()
+            .map(|(a, s)| (format!("{a:?}"), *s))
+            .collect();
+        (ranked, summary, pre_bonus, pre_penalty)
     } else {
         // Edge case: L2 captured but softmax didn't (e.g. ineligible
         // pool after filtering). Fall back to the pre-softmax ranking
@@ -268,7 +283,7 @@ pub fn emit_focal_trace(
             temperature: constants.scoring.intention_softmax_temperature,
             probabilities: Vec::new(),
         };
-        (ranked, summary)
+        (ranked, summary, Vec::new(), Vec::new())
     };
 
     trace_log.push(TraceEntry {
@@ -290,6 +305,8 @@ pub fn emit_focal_trace(
                 goal_state: None,
             },
             goap_plan: goap_plan_steps,
+            pre_bonus_pool,
+            pre_penalty_pool,
             apophenia: None,
         },
     });
