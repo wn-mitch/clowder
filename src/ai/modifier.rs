@@ -2872,6 +2872,99 @@ impl ScoreModifier for FatedRivalLift {
 }
 
 // ---------------------------------------------------------------------------
+// ActiveDirectiveLift
+// ---------------------------------------------------------------------------
+
+const ACTIVE_DIRECTIVE_ACTION_ORDINAL: &str = "active_directive_action_ordinal";
+const ACTIVE_DIRECTIVE_BONUS: &str = "active_directive_bonus";
+
+/// §3.5.1 additive lift on the single Action a coordinator's directive
+/// targets. The bonus magnitude is pre-computed at ScoringContext
+/// build time (priority × coordinator_social_weight × base_weight ×
+/// diligence × fondness × (1 - independence_penalty) × (1 -
+/// stubbornness_penalty)) — identical to the legacy `apply_directive_bonus`
+/// arithmetic.
+///
+/// Reads `active_directive_action_ordinal` (`-1` = no directive,
+/// otherwise `Action as usize`) and `active_directive_bonus`. The
+/// modifier resolves each DSE id to its parent Action via
+/// `parent_action_ordinal`, applies the bonus when the ordinal matches.
+pub struct ActiveDirectiveLift;
+
+impl ActiveDirectiveLift {
+    pub fn new() -> Self {
+        Self
+    }
+
+    fn parent_action_ordinal(dse_id: DseId) -> Option<i32> {
+        use crate::ai::Action;
+        let action = match dse_id.0 {
+            HUNT => Action::Hunt,
+            FORAGE => Action::Forage,
+            EAT => Action::Eat,
+            SLEEP => Action::Sleep,
+            WANDER => Action::Wander,
+            IDLE => Action::Idle,
+            SOCIALIZE => Action::Socialize,
+            GROOM_SELF | GROOM_OTHER => Action::Groom,
+            EXPLORE => Action::Explore,
+            FLEE => Action::Flee,
+            FIGHT => Action::Fight,
+            PATROL => Action::Patrol,
+            BUILD => Action::Build,
+            FARM => Action::Farm,
+            HERBCRAFT_GATHER | HERBCRAFT_PREPARE | HERBCRAFT_WARD => Action::Herbcraft,
+            MAGIC_SCRY | MAGIC_DURABLE_WARD | MAGIC_CLEANSE | MAGIC_COLONY_CLEANSE
+            | MAGIC_HARVEST | MAGIC_COMMUNE => Action::PracticeMagic,
+            COORDINATE => Action::Coordinate,
+            MENTOR => Action::Mentor,
+            MATE => Action::Mate,
+            CARETAKE => Action::Caretake,
+            COOK => Action::Cook,
+            HIDE => Action::Hide,
+            _ => return None,
+        };
+        Some(action as i32)
+    }
+}
+
+impl Default for ActiveDirectiveLift {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ScoreModifier for ActiveDirectiveLift {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        let target_ordinal = fetch(ACTIVE_DIRECTIVE_ACTION_ORDINAL, ctx.cat);
+        if target_ordinal < 0.0 {
+            return score;
+        }
+        let Some(dse_ordinal) = Self::parent_action_ordinal(dse_id) else {
+            return score;
+        };
+        if (target_ordinal - dse_ordinal as f32).abs() > 0.5 {
+            return score;
+        }
+        let bonus = fetch(ACTIVE_DIRECTIVE_BONUS, ctx.cat);
+        if bonus <= 0.0 {
+            return score;
+        }
+        score + bonus
+    }
+
+    fn name(&self) -> &'static str {
+        "active_directive_lift"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Default pipeline builder
 // ---------------------------------------------------------------------------
 
@@ -2949,6 +3042,7 @@ pub fn default_modifier_pipeline(
     pipeline.push(Box::new(PreferencePenalty::new(sc)));
     pipeline.push(Box::new(FatedLoveLift::new(sc)));
     pipeline.push(Box::new(FatedRivalLift::new(sc)));
+    pipeline.push(Box::new(ActiveDirectiveLift::new()));
     // Ticket 047 — `AcuteHealthAdrenalineFlee` registers immediately
     // after `BodyDistressPromotion` so under combined high composite
     // distress + high health deficit, both lifts compose additively on
@@ -3691,7 +3785,7 @@ mod tests {
     fn default_pipeline_registers_expected_modifier_count() {
         let constants = crate::resources::sim_constants::SimConstants::default();
         let pipeline = default_modifier_pipeline(&constants);
-        assert_eq!(pipeline.len(), 32, "expected 32 registered modifiers");
+        assert_eq!(pipeline.len(), 33, "expected 33 registered modifiers");
     }
 
     // -----------------------------------------------------------------------

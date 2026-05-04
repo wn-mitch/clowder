@@ -459,6 +459,13 @@ pub struct ScoringContext<'a> {
     /// `1.0` when the cat has an awakened `FatedRival` and the rival
     /// is nearby (sensory check), else `0.0`. Read by `FatedRivalLift`.
     pub fated_rival_nearby: f32,
+    /// `Action as usize` of the cat's active directive target, or
+    /// `-1.0` when no directive is active. Read by `ActiveDirectiveLift`.
+    pub active_directive_action_ordinal: f32,
+    /// Pre-multiplied directive bonus magnitude (priority × social
+    /// weight × base × personality × relationships). Read by
+    /// `ActiveDirectiveLift`.
+    pub active_directive_bonus: f32,
 }
 
 /// Length of the per-action cascade-count array. Equals the number of
@@ -846,6 +853,11 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
     }
     m.insert("fated_love_visible", ctx.fated_love_visible);
     m.insert("fated_rival_nearby", ctx.fated_rival_nearby);
+    m.insert(
+        "active_directive_action_ordinal",
+        ctx.active_directive_action_ordinal,
+    );
+    m.insert("active_directive_bonus", ctx.active_directive_bonus);
     m
 }
 
@@ -1614,18 +1626,6 @@ pub fn compute_cascade_counts(
     counts
 }
 
-/// Apply a coordinator's directive bonus to the target action's score.
-///
-/// Called after base scoring and cascading bonuses. The bonus is pre-computed
-/// from the directive priority, coordinator social weight, and the target cat's
-/// personality (diligence, independence, stubbornness).
-pub fn apply_directive_bonus(scores: &mut [(Action, f32)], target_action: Action, bonus: f32) {
-    for (action, score) in scores.iter_mut() {
-        if *action == target_action {
-            *score += bonus;
-        }
-    }
-}
 
 /// Aggregate `ColonyKnowledge` entries into the two proximity sums
 /// `ColonyKnowledgeLift` reads. Returns `(resource, threat)` where each
@@ -2408,6 +2408,8 @@ mod tests {
             preference_signals: [0.0; CASCADE_COUNTS_LEN],
             fated_love_visible: 0.0,
             fated_rival_nearby: 0.0,
+            active_directive_action_ordinal: -1.0,
+            active_directive_bonus: 0.0,
         }
     }
 
@@ -2579,6 +2581,8 @@ mod tests {
             preference_signals: [0.0; CASCADE_COUNTS_LEN],
             fated_love_visible: 0.0,
             fated_rival_nearby: 0.0,
+            active_directive_action_ordinal: -1.0,
+            active_directive_bonus: 0.0,
         };
         // §L2.10.7: this test sets `food_available: false`,
         // `has_functional_kitchen: false`, etc. on the context, but
@@ -2773,6 +2777,8 @@ mod tests {
             preference_signals: [0.0; CASCADE_COUNTS_LEN],
             fated_love_visible: 0.0,
             fated_rival_nearby: 0.0,
+            active_directive_action_ordinal: -1.0,
+            active_directive_bonus: 0.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let socialize_score = scores
@@ -2996,6 +3002,8 @@ mod tests {
             preference_signals: [0.0; CASCADE_COUNTS_LEN],
             fated_love_visible: 0.0,
             fated_rival_nearby: 0.0,
+            active_directive_action_ordinal: -1.0,
+            active_directive_bonus: 0.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let best = select_best_action(&scores);
@@ -3096,6 +3104,8 @@ mod tests {
             preference_signals: [0.0; CASCADE_COUNTS_LEN],
             fated_love_visible: 0.0,
             fated_rival_nearby: 0.0,
+            active_directive_action_ordinal: -1.0,
+            active_directive_bonus: 0.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let fight_score = scores.iter().find(|(a, _)| *a == Action::Fight).unwrap().1;
@@ -3215,6 +3225,8 @@ mod tests {
             preference_signals: [0.0; CASCADE_COUNTS_LEN],
             fated_love_visible: 0.0,
             fated_rival_nearby: 0.0,
+            active_directive_action_ordinal: -1.0,
+            active_directive_bonus: 0.0,
         };
         // Build a per-test MarkerSnapshot with Incapacitated set for
         // this cat (the cached shared snapshot only carries colony
@@ -3510,6 +3522,8 @@ mod tests {
             preference_signals: [0.0; CASCADE_COUNTS_LEN],
             fated_love_visible: 0.0,
             fated_rival_nearby: 0.0,
+            active_directive_action_ordinal: -1.0,
+            active_directive_bonus: 0.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let wander = scores.iter().find(|(a, _)| *a == Action::Wander).unwrap().1;
@@ -3611,6 +3625,8 @@ mod tests {
             preference_signals: [0.0; CASCADE_COUNTS_LEN],
             fated_love_visible: 0.0,
             fated_rival_nearby: 0.0,
+            active_directive_action_ordinal: -1.0,
+            active_directive_bonus: 0.0,
         };
 
         let scores_full = score_actions(&base, &test_eval_inputs(), &mut rng_full).scores;

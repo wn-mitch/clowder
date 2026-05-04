@@ -4,7 +4,7 @@ use bevy_ecs::prelude::*;
 use rand::Rng;
 
 use crate::ai::pathfinding::{find_free_adjacent, step_toward};
-use crate::ai::scoring::{apply_directive_bonus, score_actions, ScoringContext};
+use crate::ai::scoring::{score_actions, ScoringContext};
 use crate::ai::{Action, CurrentAction};
 use crate::components::building::{
     ConstructionSite, CropState, StoredItems, Structure, StructureType,
@@ -866,6 +866,22 @@ pub fn evaluate_dispositions(
                     d.fated_rival_detection_range as f32,
                 )
             });
+        let (presence_directive_action_ordinal, presence_directive_bonus) =
+            if let Ok(directive) = active_directive_query.get(entity) {
+                let fondness_factor = relationships
+                    .get(entity, directive.coordinator)
+                    .map_or(d.fondness_default, |r| (r.fondness + 1.0) / 2.0);
+                let bonus = directive.priority
+                    * directive.coordinator_social_weight
+                    * d.directive_bonus_base_weight
+                    * personality.diligence
+                    * fondness_factor
+                    * (1.0 - personality.independence * d.directive_independence_penalty)
+                    * (1.0 - personality.stubbornness * d.directive_stubbornness_penalty);
+                (directive.kind.to_action() as usize as f32, bonus)
+            } else {
+                (-1.0, 0.0)
+            };
 
         let ctx = ScoringContext {
             scoring: sc,
@@ -1041,6 +1057,8 @@ pub fn evaluate_dispositions(
             preference_signals: presence_preference_signals,
             fated_love_visible: if presence_love_visible { 1.0 } else { 0.0 },
             fated_rival_nearby: if presence_rival_nearby { 1.0 } else { 0.0 },
+            active_directive_action_ordinal: presence_directive_action_ordinal,
+            active_directive_bonus: presence_directive_bonus,
         };
 
         // §11 trace plumbing — dormant except when running headless
@@ -1064,22 +1082,7 @@ pub fn evaluate_dispositions(
             focal_capture,
         };
         let result = score_actions(&ctx, &eval_inputs, &mut rng.rng);
-        let mut scores = result.scores;
-
-        // Apply all bonus layers (identical to evaluate_actions).
-        if let Ok(directive) = active_directive_query.get(entity) {
-            let fondness_factor = relationships
-                .get(entity, directive.coordinator)
-                .map_or(d.fondness_default, |r| (r.fondness + 1.0) / 2.0);
-            let bonus = directive.priority
-                * directive.coordinator_social_weight
-                * d.directive_bonus_base_weight
-                * personality.diligence
-                * fondness_factor
-                * (1.0 - personality.independence * d.directive_independence_penalty)
-                * (1.0 - personality.stubbornness * d.directive_stubbornness_penalty);
-            apply_directive_bonus(&mut scores, directive.kind.to_action(), bonus);
-        }
+        let scores = result.scores;
 
         // Determine Groom routing.
         let self_groom_score = (1.0 - needs.temperature)

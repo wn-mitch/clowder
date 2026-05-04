@@ -9,7 +9,7 @@ use crate::ai::planner::goals::goal_for_disposition;
 use crate::ai::planner::{
     make_plan, Carrying, GoapActionKind, PlannerState, PlannerZone, ZoneDistances,
 };
-use crate::ai::scoring::{apply_directive_bonus, score_actions, ScoringContext};
+use crate::ai::scoring::{score_actions, ScoringContext};
 use crate::ai::{Action, CurrentAction};
 use crate::components::building::{
     ConstructionSite, CropState, StoredItems, Structure, StructureType,
@@ -1382,6 +1382,23 @@ pub fn evaluate_and_plan(
                     d.fated_rival_detection_range as f32,
                 )
             });
+        let (active_directive_action_ordinal, active_directive_bonus) =
+            if let Ok(directive) = world_state.active_directive_query.get(entity) {
+                let fondness_factor = res
+                    .relationships
+                    .get(entity, directive.coordinator)
+                    .map_or(d.fondness_default, |r| (r.fondness + 1.0) / 2.0);
+                let bonus = directive.priority
+                    * directive.coordinator_social_weight
+                    * d.directive_bonus_base_weight
+                    * personality.diligence
+                    * fondness_factor
+                    * (1.0 - personality.independence * d.directive_independence_penalty)
+                    * (1.0 - personality.stubbornness * d.directive_stubbornness_penalty);
+                (directive.kind.to_action() as usize as f32, bonus)
+            } else {
+                (-1.0, 0.0)
+            };
 
         let ctx = ScoringContext {
             scoring: sc,
@@ -1599,6 +1616,8 @@ pub fn evaluate_and_plan(
             preference_signals,
             fated_love_visible: if love_visible { 1.0 } else { 0.0 },
             fated_rival_nearby: if rival_nearby { 1.0 } else { 0.0 },
+            active_directive_action_ordinal,
+            active_directive_bonus,
         };
 
         let focal_cat = res.focal_target.as_deref().and_then(|t| t.entity);
@@ -1623,7 +1642,7 @@ pub fn evaluate_and_plan(
         if result.wants_cook_but_no_kitchen {
             unmet_demand.record(crate::components::building::StructureType::Kitchen);
         }
-        let mut scores = result.scores;
+        let scores = result.scores;
 
         // Snapshot for the L2-vs-pool invariant in tests/scenarios.rs:
         // nothing should mutate the score Vec between this point and the
@@ -1633,22 +1652,6 @@ pub fn evaluate_and_plan(
         } else {
             None
         };
-
-        // Apply all bonus layers.
-        if let Ok(directive) = world_state.active_directive_query.get(entity) {
-            let fondness_factor = res
-                .relationships
-                .get(entity, directive.coordinator)
-                .map_or(d.fondness_default, |r| (r.fondness + 1.0) / 2.0);
-            let bonus = directive.priority
-                * directive.coordinator_social_weight
-                * d.directive_bonus_base_weight
-                * personality.diligence
-                * fondness_factor
-                * (1.0 - personality.independence * d.directive_independence_penalty)
-                * (1.0 - personality.stubbornness * d.directive_stubbornness_penalty);
-            apply_directive_bonus(&mut scores, directive.kind.to_action(), bonus);
-        }
 
         // Groom routing.
         let self_groom_score = (1.0 - needs.temperature)
