@@ -417,6 +417,15 @@ pub struct ScoringContext<'a> {
     pub disposition_failure_signal_building: f32,
     pub disposition_failure_signal_mating: f32,
     pub disposition_failure_signal_mentoring: f32,
+    // --- Memory-event proximity sums: per-cat aggregate of
+    // `proximity * strength` across the cat's `Memory.events` filtered
+    // by event type. Each sum feeds the matching §3.5.1 modifier:
+    // `MemoryResourceFoundLift` / `MemoryDeathPenalty` /
+    // `MemoryThreatSeenSuppress`. Built once per scoring tick from
+    // the same iteration the legacy `apply_memory_bonuses` ran.
+    pub memory_resource_found_proximity_sum: f32,
+    pub memory_death_proximity_sum: f32,
+    pub memory_threat_seen_proximity_sum: f32,
 }
 
 // ---------------------------------------------------------------------------
@@ -759,6 +768,20 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
     m.insert(
         "disposition_failure_signal_mentoring",
         ctx.disposition_failure_signal_mentoring,
+    );
+    // Memory-event proximity sums — read by the §3.5.1 memory
+    // modifiers (src/ai/modifier.rs).
+    m.insert(
+        "memory_resource_found_proximity_sum",
+        ctx.memory_resource_found_proximity_sum,
+    );
+    m.insert(
+        "memory_death_proximity_sum",
+        ctx.memory_death_proximity_sum,
+    );
+    m.insert(
+        "memory_threat_seen_proximity_sum",
+        ctx.memory_threat_seen_proximity_sum,
     );
     m
 }
@@ -1383,54 +1406,35 @@ pub fn score_actions(
 // Context bonuses (applied after base scoring)
 // ---------------------------------------------------------------------------
 
-/// Boost action scores based on remembered events near the cat's position.
-///
-/// - `ResourceFound` memories boost Hunt and Forage.
-/// - `Death` memories suppress Wander and Idle (safety instinct).
-///
-/// Both scale with memory strength and proximity to the remembered location.
-pub fn apply_memory_bonuses(
-    scores: &mut [(Action, f32)],
+/// Compute the per-cat memory-event proximity sums for the
+/// `MemoryResourceFoundLift` / `MemoryDeathPenalty` /
+/// `MemoryThreatSeenSuppress` modifiers. One pass over `memory.events`,
+/// returning `(resource_found, death, threat_seen)` sums of
+/// `proximity * strength`. Entries without a location or beyond
+/// `memory_nearby_radius` contribute 0.
+pub fn memory_proximity_sums(
     memory: &Memory,
     pos: &Position,
     sc: &ScoringConstants,
-) {
+) -> (f32, f32, f32) {
+    let mut resource_found = 0.0;
+    let mut death = 0.0;
+    let mut threat_seen = 0.0;
     for entry in &memory.events {
         let Some(loc) = &entry.location else { continue };
         let dist = pos.distance_to(loc);
         if dist > sc.memory_nearby_radius {
             continue;
         }
-
-        let proximity = 1.0 - (dist / sc.memory_nearby_radius);
-        let bonus = proximity * entry.strength;
-
+        let weight = (1.0 - dist / sc.memory_nearby_radius) * entry.strength;
         match entry.event_type {
-            MemoryType::ResourceFound => {
-                for (action, score) in scores.iter_mut() {
-                    if matches!(action, Action::Hunt | Action::Forage) {
-                        *score += bonus * sc.memory_resource_bonus;
-                    }
-                }
-            }
-            MemoryType::Death => {
-                for (action, score) in scores.iter_mut() {
-                    if matches!(action, Action::Wander | Action::Idle) {
-                        *score -= bonus * sc.memory_death_penalty;
-                    }
-                }
-            }
-            MemoryType::ThreatSeen => {
-                // Suppress exploration and hunting near known threat locations.
-                for (action, score) in scores.iter_mut() {
-                    if matches!(action, Action::Wander | Action::Explore | Action::Hunt) {
-                        *score -= bonus * sc.memory_threat_penalty;
-                    }
-                }
-            }
+            MemoryType::ResourceFound => resource_found += weight,
+            MemoryType::Death => death += weight,
+            MemoryType::ThreatSeen => threat_seen += weight,
             _ => {}
         }
     }
+    (resource_found, death, threat_seen)
 }
 
 /// Boost action scores based on what nearby cats are doing.
@@ -2263,6 +2267,9 @@ mod tests {
             disposition_failure_signal_building: 1.0,
             disposition_failure_signal_mating: 1.0,
             disposition_failure_signal_mentoring: 1.0,
+            memory_resource_found_proximity_sum: 0.0,
+            memory_death_proximity_sum: 0.0,
+            memory_threat_seen_proximity_sum: 0.0,
         }
     }
 
@@ -2423,6 +2430,9 @@ mod tests {
             disposition_failure_signal_building: 1.0,
             disposition_failure_signal_mating: 1.0,
             disposition_failure_signal_mentoring: 1.0,
+            memory_resource_found_proximity_sum: 0.0,
+            memory_death_proximity_sum: 0.0,
+            memory_threat_seen_proximity_sum: 0.0,
         };
         // §L2.10.7: this test sets `food_available: false`,
         // `has_functional_kitchen: false`, etc. on the context, but
@@ -2606,6 +2616,9 @@ mod tests {
             disposition_failure_signal_building: 1.0,
             disposition_failure_signal_mating: 1.0,
             disposition_failure_signal_mentoring: 1.0,
+            memory_resource_found_proximity_sum: 0.0,
+            memory_death_proximity_sum: 0.0,
+            memory_threat_seen_proximity_sum: 0.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let socialize_score = scores
@@ -2666,81 +2679,29 @@ mod tests {
     }
 
     #[test]
-    fn resource_memory_boosts_hunt_score() {
+    fn memory_proximity_sums_split_by_event_type() {
         let sc = default_scoring();
-        let mut scores = vec![
-            (Action::Hunt, 1.0),
-            (Action::Forage, 1.0),
-            (Action::Idle, 0.5),
-        ];
         let mut memory = Memory::default();
         memory.remember(make_memory(
             MemoryType::ResourceFound,
             Position::new(5, 5),
             1.0,
         ));
+        memory.remember(make_memory(MemoryType::Death, Position::new(6, 5), 1.0));
+        memory.remember(make_memory(MemoryType::ThreatSeen, Position::new(5, 6), 1.0));
 
-        // Cat at (5, 5) — same tile as remembered resource.
-        apply_memory_bonuses(&mut scores, &memory, &Position::new(5, 5), &sc);
-
-        let hunt = scores.iter().find(|(a, _)| *a == Action::Hunt).unwrap().1;
-        let idle = scores.iter().find(|(a, _)| *a == Action::Idle).unwrap().1;
-        assert!(
-            hunt > 1.0,
-            "Hunt should be boosted above base 1.0; got {hunt}"
-        );
-        assert_eq!(idle, 0.5, "Idle should be unaffected; got {idle}");
+        let (resource, death, threat) =
+            memory_proximity_sums(&memory, &Position::new(5, 5), &sc);
+        assert!(resource > 0.0, "resource sum should fire on ResourceFound");
+        assert!(death > 0.0, "death sum should fire on Death");
+        assert!(threat > 0.0, "threat sum should fire on ThreatSeen");
+        // Same-tile ResourceFound: proximity 1.0, strength 1.0 → sum = 1.0.
+        assert!((resource - 1.0).abs() < 1e-6);
     }
 
     #[test]
-    fn death_memory_suppresses_wander() {
+    fn memory_proximity_sums_decay_with_distance_and_strength() {
         let sc = default_scoring();
-        let mut scores = vec![(Action::Wander, 1.0), (Action::Hunt, 1.0)];
-        let mut memory = Memory::default();
-        memory.remember(make_memory(MemoryType::Death, Position::new(5, 5), 1.0));
-
-        apply_memory_bonuses(&mut scores, &memory, &Position::new(5, 5), &sc);
-
-        let wander = scores.iter().find(|(a, _)| *a == Action::Wander).unwrap().1;
-        let hunt = scores.iter().find(|(a, _)| *a == Action::Hunt).unwrap().1;
-        assert!(
-            wander < 1.0,
-            "Wander should be suppressed near death site; got {wander}"
-        );
-        assert_eq!(
-            hunt, 1.0,
-            "Hunt should be unaffected by death memory; got {hunt}"
-        );
-    }
-
-    #[test]
-    fn distant_memories_have_less_effect() {
-        let sc = default_scoring();
-        let mut scores_near = vec![(Action::Hunt, 1.0)];
-        let mut scores_far = vec![(Action::Hunt, 1.0)];
-        let mut memory = Memory::default();
-        memory.remember(make_memory(
-            MemoryType::ResourceFound,
-            Position::new(5, 5),
-            1.0,
-        ));
-
-        apply_memory_bonuses(&mut scores_near, &memory, &Position::new(5, 5), &sc);
-        apply_memory_bonuses(&mut scores_far, &memory, &Position::new(15, 5), &sc);
-
-        let near = scores_near[0].1;
-        let far = scores_far[0].1;
-        assert!(
-            near > far,
-            "nearby memory should give bigger boost; near={near}, far={far}"
-        );
-    }
-
-    #[test]
-    fn decayed_memories_have_less_effect() {
-        let sc = default_scoring();
-        let mut scores_strong = vec![(Action::Hunt, 1.0)];
-        let mut scores_weak = vec![(Action::Hunt, 1.0)];
         let mut memory_strong = Memory::default();
         memory_strong.remember(make_memory(
             MemoryType::ResourceFound,
@@ -2753,21 +2714,27 @@ mod tests {
             Position::new(5, 5),
             0.2,
         ));
+        let near = memory_proximity_sums(&memory_strong, &Position::new(5, 5), &sc).0;
+        let far = memory_proximity_sums(&memory_strong, &Position::new(15, 5), &sc).0;
+        let weak = memory_proximity_sums(&memory_weak, &Position::new(5, 5), &sc).0;
+        assert!(near > far, "nearby > far; near={near}, far={far}");
+        assert!(near > weak, "strong > weak; strong={near}, weak={weak}");
+    }
 
-        apply_memory_bonuses(
-            &mut scores_strong,
-            &memory_strong,
-            &Position::new(5, 5),
-            &sc,
-        );
-        apply_memory_bonuses(&mut scores_weak, &memory_weak, &Position::new(5, 5), &sc);
-
-        let strong = scores_strong[0].1;
-        let weak = scores_weak[0].1;
-        assert!(
-            strong > weak,
-            "strong memory should give bigger boost; strong={strong}, weak={weak}"
-        );
+    #[test]
+    fn memory_proximity_sums_skip_out_of_radius() {
+        let sc = default_scoring();
+        let mut memory = Memory::default();
+        // Place at distance 100 — beyond memory_nearby_radius (15).
+        memory.remember(make_memory(
+            MemoryType::ResourceFound,
+            Position::new(105, 5),
+            1.0,
+        ));
+        let (r, d, t) = memory_proximity_sums(&memory, &Position::new(5, 5), &sc);
+        assert_eq!(r, 0.0);
+        assert_eq!(d, 0.0);
+        assert_eq!(t, 0.0);
     }
 
     // --- Activity cascading tests ---
@@ -2879,6 +2846,9 @@ mod tests {
             disposition_failure_signal_building: 1.0,
             disposition_failure_signal_mating: 1.0,
             disposition_failure_signal_mentoring: 1.0,
+            memory_resource_found_proximity_sum: 0.0,
+            memory_death_proximity_sum: 0.0,
+            memory_threat_seen_proximity_sum: 0.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let best = select_best_action(&scores);
@@ -2968,6 +2938,9 @@ mod tests {
             disposition_failure_signal_building: 1.0,
             disposition_failure_signal_mating: 1.0,
             disposition_failure_signal_mentoring: 1.0,
+            memory_resource_found_proximity_sum: 0.0,
+            memory_death_proximity_sum: 0.0,
+            memory_threat_seen_proximity_sum: 0.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let fight_score = scores.iter().find(|(a, _)| *a == Action::Fight).unwrap().1;
@@ -3076,6 +3049,9 @@ mod tests {
             disposition_failure_signal_building: 1.0,
             disposition_failure_signal_mating: 1.0,
             disposition_failure_signal_mentoring: 1.0,
+            memory_resource_found_proximity_sum: 0.0,
+            memory_death_proximity_sum: 0.0,
+            memory_threat_seen_proximity_sum: 0.0,
         };
         // Build a per-test MarkerSnapshot with Incapacitated set for
         // this cat (the cached shared snapshot only carries colony
@@ -3148,47 +3124,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn threat_memory_suppresses_wander_near_threat() {
-        let sc = default_scoring();
-        let mut scores = vec![
-            (Action::Wander, 1.0),
-            (Action::Explore, 1.0),
-            (Action::Hunt, 1.0),
-            (Action::Idle, 0.5),
-        ];
-        let mut memory = Memory::default();
-        memory.remember(make_memory(
-            MemoryType::ThreatSeen,
-            Position::new(5, 5),
-            1.0,
-        ));
-
-        apply_memory_bonuses(&mut scores, &memory, &Position::new(5, 5), &sc);
-
-        let wander = scores.iter().find(|(a, _)| *a == Action::Wander).unwrap().1;
-        let explore = scores
-            .iter()
-            .find(|(a, _)| *a == Action::Explore)
-            .unwrap()
-            .1;
-        let hunt = scores.iter().find(|(a, _)| *a == Action::Hunt).unwrap().1;
-        let idle = scores.iter().find(|(a, _)| *a == Action::Idle).unwrap().1;
-
-        assert!(
-            wander < 1.0,
-            "wander should be suppressed near threat; got {wander}"
-        );
-        assert!(
-            explore < 1.0,
-            "explore should be suppressed near threat; got {explore}"
-        );
-        assert!(
-            hunt < 1.0,
-            "hunt should be suppressed near threat; got {hunt}"
-        );
-        assert_eq!(idle, 0.5, "idle should be unaffected; got {idle}");
-    }
 
     // --- Herbcraft / PracticeMagic scoring tests ---
 
@@ -3401,6 +3336,9 @@ mod tests {
             disposition_failure_signal_building: 1.0,
             disposition_failure_signal_mating: 1.0,
             disposition_failure_signal_mentoring: 1.0,
+            memory_resource_found_proximity_sum: 0.0,
+            memory_death_proximity_sum: 0.0,
+            memory_threat_seen_proximity_sum: 0.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let wander = scores.iter().find(|(a, _)| *a == Action::Wander).unwrap().1;
@@ -3491,6 +3429,9 @@ mod tests {
             disposition_failure_signal_building: 1.0,
             disposition_failure_signal_mating: 1.0,
             disposition_failure_signal_mentoring: 1.0,
+            memory_resource_found_proximity_sum: 0.0,
+            memory_death_proximity_sum: 0.0,
+            memory_threat_seen_proximity_sum: 0.0,
         };
 
         let scores_full = score_actions(&base, &test_eval_inputs(), &mut rng_full).scores;

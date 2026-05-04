@@ -6,8 +6,8 @@ use rand::Rng;
 use crate::ai::pathfinding::{find_free_adjacent, step_toward};
 use crate::ai::scoring::{
     apply_aspiration_bonuses, apply_cascading_bonuses, apply_colony_knowledge_bonuses,
-    apply_directive_bonus, apply_fated_bonuses, apply_memory_bonuses, apply_preference_bonuses,
-    apply_priority_bonus, score_actions, ScoringContext,
+    apply_directive_bonus, apply_fated_bonuses, apply_preference_bonuses, apply_priority_bonus,
+    score_actions, ScoringContext,
 };
 use crate::ai::{Action, CurrentAction};
 use crate::components::building::{
@@ -825,6 +825,9 @@ pub fn evaluate_dispositions(
         // `HasEligibleMate` ZST per tick, and `MateDse.eligibility()`
         // requires it. The marker is read via the snapshot below.
 
+        let presence_memory_sums =
+            crate::ai::scoring::memory_proximity_sums(memory, pos, sc);
+
         let ctx = ScoringContext {
             scoring: sc,
             disposition_constants: d,
@@ -978,8 +981,7 @@ pub fn evaluate_dispositions(
             },
             // No-damp signals: this path doesn't query
             // `RecentDispositionFailures`, so the modifier sees a
-            // perpetual "no recent failure" signal here (preserves
-            // pre-163 behavior for cat_presence_tick).
+            // perpetual "no recent failure" signal here.
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,
             disposition_failure_signal_crafting: 1.0,
@@ -987,6 +989,9 @@ pub fn evaluate_dispositions(
             disposition_failure_signal_building: 1.0,
             disposition_failure_signal_mating: 1.0,
             disposition_failure_signal_mentoring: 1.0,
+            memory_resource_found_proximity_sum: presence_memory_sums.0,
+            memory_death_proximity_sum: presence_memory_sums.1,
+            memory_threat_seen_proximity_sum: presence_memory_sums.2,
         };
 
         // §11 trace plumbing — dormant except when running headless
@@ -1013,7 +1018,6 @@ pub fn evaluate_dispositions(
         let mut scores = result.scores;
 
         // Apply all bonus layers (identical to evaluate_actions).
-        apply_memory_bonuses(&mut scores, memory, pos, sc);
         if let Some(ref ck) = colony.knowledge {
             apply_colony_knowledge_bonuses(&mut scores, ck, pos, sc);
         }

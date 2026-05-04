@@ -220,6 +220,13 @@ const DISPOSITION_FAILURE_SIGNAL_BUILDING: &str = "disposition_failure_signal_bu
 const DISPOSITION_FAILURE_SIGNAL_MATING: &str = "disposition_failure_signal_mating";
 const DISPOSITION_FAILURE_SIGNAL_MENTORING: &str = "disposition_failure_signal_mentoring";
 
+// Memory-event proximity sums — Σ proximity × strength across the
+// cat's memory entries filtered by event type. Aggregated at
+// ScoringContext build time.
+const MEMORY_RESOURCE_FOUND_PROXIMITY_SUM: &str = "memory_resource_found_proximity_sum";
+const MEMORY_DEATH_PROXIMITY_SUM: &str = "memory_death_proximity_sum";
+const MEMORY_THREAT_SEEN_PROXIMITY_SUM: &str = "memory_threat_seen_proximity_sum";
+
 /// Ticket 088 — the "self-care" DSE class lifted by
 /// `BodyDistressPromotion` when `body_distress_composite` is high.
 /// Authored as a `&[&str]` constant so the class membership is
@@ -2236,6 +2243,134 @@ impl ScoreModifier for DispositionFailureCooldown {
 }
 
 // ---------------------------------------------------------------------------
+// MemoryResourceFoundLift
+// ---------------------------------------------------------------------------
+
+/// §3.5.1 additive lift on Hunt / Forage when the cat remembers a
+/// nearby `ResourceFound` event. Reads
+/// `memory_resource_found_proximity_sum` (Σ proximity × strength
+/// across qualifying entries; aggregated at ScoringContext build
+/// time). `score += sum × memory_resource_bonus`.
+pub struct MemoryResourceFoundLift {
+    bonus: f32,
+}
+
+impl MemoryResourceFoundLift {
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            bonus: sc.memory_resource_bonus,
+        }
+    }
+}
+
+impl ScoreModifier for MemoryResourceFoundLift {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        if !matches!(dse_id.0, HUNT | FORAGE) {
+            return score;
+        }
+        let sum = fetch(MEMORY_RESOURCE_FOUND_PROXIMITY_SUM, ctx.cat);
+        if sum <= 0.0 {
+            return score;
+        }
+        score + sum * self.bonus
+    }
+
+    fn name(&self) -> &'static str {
+        "memory_resource_found_lift"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MemoryDeathPenalty
+// ---------------------------------------------------------------------------
+
+/// §3.5.1 subtractive lift on Wander / Idle when the cat remembers a
+/// nearby `Death` event (safety instinct). Reads
+/// `memory_death_proximity_sum`. `score -= sum × memory_death_penalty`.
+pub struct MemoryDeathPenalty {
+    penalty: f32,
+}
+
+impl MemoryDeathPenalty {
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            penalty: sc.memory_death_penalty,
+        }
+    }
+}
+
+impl ScoreModifier for MemoryDeathPenalty {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        if !matches!(dse_id.0, WANDER | IDLE) {
+            return score;
+        }
+        let sum = fetch(MEMORY_DEATH_PROXIMITY_SUM, ctx.cat);
+        if sum <= 0.0 {
+            return score;
+        }
+        score - sum * self.penalty
+    }
+
+    fn name(&self) -> &'static str {
+        "memory_death_penalty"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MemoryThreatSeenSuppress
+// ---------------------------------------------------------------------------
+
+/// §3.5.1 subtractive lift on Wander / Explore / Hunt when the cat
+/// remembers a nearby `ThreatSeen` event. Reads
+/// `memory_threat_seen_proximity_sum`. `score -= sum × memory_threat_penalty`.
+pub struct MemoryThreatSeenSuppress {
+    penalty: f32,
+}
+
+impl MemoryThreatSeenSuppress {
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            penalty: sc.memory_threat_penalty,
+        }
+    }
+}
+
+impl ScoreModifier for MemoryThreatSeenSuppress {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        if !matches!(dse_id.0, WANDER | EXPLORE | HUNT) {
+            return score;
+        }
+        let sum = fetch(MEMORY_THREAT_SEEN_PROXIMITY_SUM, ctx.cat);
+        if sum <= 0.0 {
+            return score;
+        }
+        score - sum * self.penalty
+    }
+
+    fn name(&self) -> &'static str {
+        "memory_threat_seen_suppress"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Default pipeline builder
 // ---------------------------------------------------------------------------
 
@@ -2298,6 +2433,13 @@ pub fn default_modifier_pipeline(
     // the IAUS contest toward Eat. The 094 `StockpileSatiation`
     // doc-comment pre-described this exact composition order.
     pipeline.push(Box::new(BodyDistressPromotion::new(sc)));
+    // Memory family — additive lift on Hunt/Forage near remembered
+    // resource finds; subtractive on Wander/Idle near remembered Death;
+    // subtractive on Wander/Explore/Hunt near remembered ThreatSeen.
+    // Each reads a pre-aggregated proximity sum from ctx_scalars.
+    pipeline.push(Box::new(MemoryResourceFoundLift::new(sc)));
+    pipeline.push(Box::new(MemoryDeathPenalty::new(sc)));
+    pipeline.push(Box::new(MemoryThreatSeenSuppress::new(sc)));
     // Ticket 047 — `AcuteHealthAdrenalineFlee` registers immediately
     // after `BodyDistressPromotion` so under combined high composite
     // distress + high health deficit, both lifts compose additively on
@@ -3040,7 +3182,7 @@ mod tests {
     fn default_pipeline_registers_expected_modifier_count() {
         let constants = crate::resources::sim_constants::SimConstants::default();
         let pipeline = default_modifier_pipeline(&constants);
-        assert_eq!(pipeline.len(), 21, "expected 21 registered modifiers");
+        assert_eq!(pipeline.len(), 24, "expected 24 registered modifiers");
     }
 
     // -----------------------------------------------------------------------
@@ -4873,6 +5015,62 @@ mod tests {
         };
         let out = m.apply(DseId(HUNT), 0.0, &ctx, &fetch);
         assert_eq!(out, 0.0);
+    }
+
+    // -----------------------------------------------------------------------
+    // Memory family
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn memory_resource_found_lift_boosts_hunt_and_forage() {
+        let m = MemoryResourceFoundLift { bonus: 0.2 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            MEMORY_RESOURCE_FOUND_PROXIMITY_SUM => 1.0,
+            _ => 0.0,
+        };
+        // 0.5 + 1.0 × 0.2 = 0.7
+        assert!((m.apply(DseId(HUNT), 0.5, &ctx, &fetch) - 0.7).abs() < 1e-6);
+        assert!((m.apply(DseId(FORAGE), 0.5, &ctx, &fetch) - 0.7).abs() < 1e-6);
+        // Other DSEs are unchanged.
+        assert!((m.apply(DseId(EAT), 0.5, &ctx, &fetch) - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn memory_resource_found_lift_inert_when_sum_zero() {
+        let m = MemoryResourceFoundLift { bonus: 0.2 };
+        let (_, ctx) = test_ctx();
+        let fetch = |_: &str, _: Entity| 0.0;
+        assert!((m.apply(DseId(HUNT), 0.5, &ctx, &fetch) - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn memory_death_penalty_subtracts_from_wander_and_idle() {
+        let m = MemoryDeathPenalty { penalty: 0.1 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            MEMORY_DEATH_PROXIMITY_SUM => 1.0,
+            _ => 0.0,
+        };
+        // 0.6 - 1.0 × 0.1 = 0.5
+        assert!((m.apply(DseId(WANDER), 0.6, &ctx, &fetch) - 0.5).abs() < 1e-6);
+        assert!((m.apply(DseId(IDLE), 0.6, &ctx, &fetch) - 0.5).abs() < 1e-6);
+        assert!((m.apply(DseId(HUNT), 0.6, &ctx, &fetch) - 0.6).abs() < 1e-6);
+    }
+
+    #[test]
+    fn memory_threat_seen_suppress_subtracts_from_wander_explore_hunt() {
+        let m = MemoryThreatSeenSuppress { penalty: 0.15 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            MEMORY_THREAT_SEEN_PROXIMITY_SUM => 1.0,
+            _ => 0.0,
+        };
+        // 0.6 - 1.0 × 0.15 = 0.45
+        assert!((m.apply(DseId(WANDER), 0.6, &ctx, &fetch) - 0.45).abs() < 1e-6);
+        assert!((m.apply(DseId(EXPLORE), 0.6, &ctx, &fetch) - 0.45).abs() < 1e-6);
+        assert!((m.apply(DseId(HUNT), 0.6, &ctx, &fetch) - 0.45).abs() < 1e-6);
+        assert!((m.apply(DseId(FORAGE), 0.6, &ctx, &fetch) - 0.6).abs() < 1e-6);
     }
 
     #[test]
