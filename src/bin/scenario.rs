@@ -119,13 +119,74 @@ fn print_report(report: &scenarios::runner::ScenarioReport, elapsed: std::time::
         }
     }
 
-    if let Some(last_with_score) = report.ticks.iter().rev().find(|t| !t.ranked.is_empty()) {
+    if let Some(last_tick) = report.ticks.iter().rev().find(|t| !t.ranked.is_empty()) {
         println!();
-        println!("final-tick L2 ranked DSE table (tick={}):", last_with_score.tick);
-        let mut sorted = last_with_score.ranked.clone();
-        sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        for (name, score) in sorted {
-            println!("  {:25}  {:>8.4}", name, score);
+        println!(
+            "softmax pool (tick={}, post-Independence penalty):",
+            last_tick.tick
+        );
+        // Pair pool entries with their probabilities so the reader can
+        // see "Hunt 0.62 → 91.2%" rather than scoring without context.
+        // `softmax_probs` is parallel-indexed with `ranked` when the
+        // softmax actually rolled; empty when the fallthrough path
+        // (no eligible pool, or capture missing) was taken — in that
+        // case we just omit the probability column.
+        let probs_present = last_tick.softmax_probs.len() == last_tick.ranked.len();
+        let mut paired: Vec<(String, f32, Option<f32>)> = last_tick
+            .ranked
+            .iter()
+            .enumerate()
+            .map(|(i, (name, score))| {
+                (
+                    name.clone(),
+                    *score,
+                    probs_present.then(|| last_tick.softmax_probs[i]),
+                )
+            })
+            .collect();
+        paired.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        for (name, score, prob) in &paired {
+            match prob {
+                Some(p) => println!("  {:25}  {:>8.4}   p={:>6.2}%", name, score, p * 100.0),
+                None => println!("  {:25}  {:>8.4}   p=  —    ", name, score),
+            }
+        }
+        if !probs_present {
+            println!("  (softmax fallthrough — no rolled distribution; ranking from current.last_scores)");
+        }
+    }
+
+    if let Some(last_tick) = report.ticks.iter().rev().find(|t| !t.l2.is_empty()) {
+        println!();
+        println!(
+            "L2 score columns (tick={}, per-DSE, pre-Independence penalty):",
+            last_tick.tick
+        );
+        println!(
+            "  {:25}  {:>8}  {:>8}  {:>8}   modifiers",
+            "dse", "raw", "gated", "final"
+        );
+        let mut sorted = last_tick.l2.clone();
+        sorted.sort_by(|a, b| {
+            b.final_score
+                .partial_cmp(&a.final_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        for row in sorted {
+            let mods = if row.modifier_deltas.is_empty() {
+                "—".to_string()
+            } else {
+                row.modifier_deltas
+                    .iter()
+                    .map(|(name, value)| format!("{name}{value:+.3}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            };
+            let elig = if row.eligible { "  " } else { "!!" };
+            println!(
+                "  {} {:23}  {:>8.4}  {:>8.4}  {:>8.4}   {}",
+                elig, row.dse, row.raw_score, row.gated_score, row.final_score, mods
+            );
         }
     }
 

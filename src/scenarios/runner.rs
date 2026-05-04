@@ -12,7 +12,7 @@ use crate::plugins::headless_io::HeadlessConfig;
 use crate::plugins::setup::{AppArgs, WorldSetup};
 use crate::plugins::simulation::SimulationPlugin;
 use crate::resources::trace_log::{
-    FocalScoreCapture, FocalTraceTarget, TraceEntry, TraceLog, TraceRecord,
+    FocalScoreCapture, FocalTraceTarget, ModifierApplication, TraceEntry, TraceLog, TraceRecord,
 };
 use crate::resources::{SimConfig, TimeScale};
 
@@ -25,13 +25,55 @@ const TEST_GAME_DAY_SECONDS: f32 = 16.666_667;
 #[derive(Debug, Clone)]
 pub struct TickReport {
     pub tick: u64,
-    /// The DSE name that won at L3 (`TraceRecord::L3.chosen`). `None` if
-    /// the focal cat hadn't been resolved yet on this tick (e.g.,
-    /// pre-spawn) or the trace was missing for some other reason.
+    /// The action string that the resolver is executing this tick — read
+    /// from `current.action` after `resolve_goap_plans`. Note: this is
+    /// **not** the softmax winner. If a Hunt plan won softmax, its first
+    /// GOAP step may be `Action::Explore` (move toward prey scent), so
+    /// `chosen == "Explore"` while the actual disposition is Hunting.
+    /// `None` if the focal cat hadn't been resolved yet.
     pub chosen: Option<String>,
-    /// `(dse_name, score)` rows from `TraceRecord::L3.ranked`, sorted
-    /// descending by score. Empty if `chosen.is_none()`.
+    /// `(action_name, score)` rows from `TraceRecord::L3.ranked` — the
+    /// post-Independence-penalty softmax pool, sorted descending. Empty
+    /// when `chosen.is_none()`.
     pub ranked: Vec<(String, f32)>,
+    /// Softmax probabilities parallel-indexed with `ranked`. Empty when
+    /// the softmax-fallthrough path was taken (no rolled distribution).
+    pub softmax_probs: Vec<f32>,
+    /// Per-DSE L2 score breakdown captured this tick, projected from
+    /// `TraceRecord::L2`. Critical for the L2-vs-L3 boundary investigation:
+    /// `final_score` here is **pre-Independence-penalty**, while the
+    /// `ranked` field above is **post-penalty**. A divergence between an
+    /// L2 row's `final_score` and its corresponding pool entry in
+    /// `ranked` is the Independence penalty showing itself.
+    pub l2: Vec<L2RowSummary>,
+}
+
+/// Compact per-DSE L2 row for the scenario report. Trims
+/// `TraceRecord::L2`'s full shape (per-consideration breakdown, target
+/// rankings) down to the score columns + modifier deltas needed for
+/// boundary triage. If the per-consideration view is needed, read
+/// `TraceLog` directly via the runner — this summary is for the CLI
+/// and the assertion path.
+#[derive(Debug, Clone)]
+pub struct L2RowSummary {
+    pub dse: String,
+    pub eligible: bool,
+    pub maslow_pregate: f32,
+    /// Composition output before Maslow tier suppression.
+    pub raw_score: f32,
+    /// `raw_score * maslow_pregate` — the score the modifier pipeline
+    /// receives. Derived (the trace record stores `raw_score` and
+    /// `maslow_pregate` separately but never the product).
+    pub gated_score: f32,
+    /// After the modifier pipeline. **Pre-Independence-penalty** — the
+    /// post-penalty value lives in `TickReport.ranked`.
+    pub final_score: f32,
+    /// `(modifier_name, delta_or_multiplier)` pairs. Modifiers in the
+    /// live §3.5.1 catalog are additive-only today; multiplicative
+    /// modifiers serialize as `(name, multiplier)` with the multiplier
+    /// in the same slot for readability — callers that need to
+    /// distinguish should consult the trace directly.
+    pub modifier_deltas: Vec<(String, f32)>,
 }
 
 /// Output of [`run`]. Carries one row per tick plus convenience accessors
@@ -189,23 +231,69 @@ fn drain_tick_report(app: &mut App) -> TickReport {
     let world = app.world_mut();
     let tick = world.resource::<crate::resources::TimeState>().tick;
     let mut log = world.resource_mut::<TraceLog>();
-    // Pull the L3 record (one per tick) and the ranked table out of
-    // whatever was emitted; clear so the next tick starts fresh.
+    // Pull the L3 record (one per tick), the L2 records (one per
+    // captured DSE), and the ranked softmax pool out of whatever was
+    // emitted; clear so the next tick starts fresh. L1 / L3Commitment /
+    // L3PlanFailure variants flow through but aren't surfaced in the
+    // CLI report — read `TraceLog` directly if a future investigation
+    // needs them.
     let mut chosen: Option<String> = None;
     let mut ranked: Vec<(String, f32)> = Vec::new();
+    let mut softmax_probs: Vec<f32> = Vec::new();
+    let mut l2: Vec<L2RowSummary> = Vec::new();
     for entry in log.entries.drain(..) {
         let TraceEntry { record, .. } = entry;
-        if let TraceRecord::L3 {
-            chosen: c, ranked: r, ..
-        } = record
-        {
-            chosen = Some(c);
-            ranked = r;
+        match record {
+            TraceRecord::L3 {
+                chosen: c,
+                ranked: r,
+                softmax,
+                ..
+            } => {
+                chosen = Some(c);
+                ranked = r;
+                softmax_probs = softmax.probabilities;
+            }
+            TraceRecord::L2 {
+                dse,
+                eligibility,
+                composition,
+                maslow_pregate,
+                modifiers,
+                final_score,
+                ..
+            } => {
+                l2.push(L2RowSummary {
+                    dse,
+                    eligible: eligibility.passed,
+                    maslow_pregate,
+                    raw_score: composition.raw,
+                    gated_score: composition.raw * maslow_pregate,
+                    final_score,
+                    modifier_deltas: modifiers
+                        .into_iter()
+                        .map(|ModifierApplication { name, delta, multiplier }| {
+                            // Additive modifiers carry `delta`; the few
+                            // multiplicative ones surface their multiplier
+                            // here so a future fox-territory suppression
+                            // (or similar) is visible without the caller
+                            // re-reading the trace. Drop rows where both
+                            // are absent (shouldn't happen — guard rather
+                            // than panic).
+                            let value = delta.or(multiplier).unwrap_or(0.0);
+                            (name, value)
+                        })
+                        .collect(),
+                });
+            }
+            _ => {}
         }
     }
     TickReport {
         tick,
         chosen,
         ranked,
+        softmax_probs,
+        l2,
     }
 }
