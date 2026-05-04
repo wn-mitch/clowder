@@ -434,6 +434,10 @@ pub struct ScoringContext<'a> {
     /// event type `ThreatSeen` or `Death`. Read by
     /// `ColonyKnowledgeLift`'s threat arm.
     pub colony_knowledge_threat_proximity: f32,
+    /// Ordinal of the active `ColonyPriority`: `-1` = none, `0` Food,
+    /// `1` Defense, `2` Building, `3` Exploration. Read by
+    /// `ColonyPriorityLift`.
+    pub colony_priority_ordinal: f32,
 }
 
 // ---------------------------------------------------------------------------
@@ -799,6 +803,7 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
         "colony_knowledge_threat_proximity",
         ctx.colony_knowledge_threat_proximity,
     );
+    m.insert("colony_priority_ordinal", ctx.colony_priority_ordinal);
     m
 }
 
@@ -1517,25 +1522,18 @@ pub fn colony_knowledge_proximity_sums(
     (resource, threat)
 }
 
-/// Boost action scores based on an active player-set colony priority.
-pub fn apply_priority_bonus(
-    scores: &mut [(Action, f32)],
+/// Encode the active `PriorityKind` as an `f32` ordinal for the
+/// `ColonyPriorityLift` modifier. `-1.0` = none.
+pub fn colony_priority_ordinal(
     priority: Option<crate::resources::colony_priority::PriorityKind>,
-    sc: &ScoringConstants,
-) {
-    let Some(kind) = priority else { return };
+) -> f32 {
     use crate::resources::colony_priority::PriorityKind;
-    let bonus = sc.priority_bonus;
-    let matching: &[Action] = match kind {
-        PriorityKind::Food => &[Action::Hunt, Action::Forage, Action::Farm],
-        PriorityKind::Defense => &[Action::Patrol, Action::Fight],
-        PriorityKind::Building => &[Action::Build],
-        PriorityKind::Exploration => &[Action::Explore],
-    };
-    for (action, score) in scores.iter_mut() {
-        if matching.contains(action) {
-            *score += bonus;
-        }
+    match priority {
+        None => -1.0,
+        Some(PriorityKind::Food) => 0.0,
+        Some(PriorityKind::Defense) => 1.0,
+        Some(PriorityKind::Building) => 2.0,
+        Some(PriorityKind::Exploration) => 3.0,
     }
 }
 
@@ -2276,6 +2274,7 @@ mod tests {
             memory_threat_seen_proximity_sum: 0.0,
             colony_knowledge_resource_proximity: 0.0,
             colony_knowledge_threat_proximity: 0.0,
+            colony_priority_ordinal: -1.0,
         }
     }
 
@@ -2441,6 +2440,7 @@ mod tests {
             memory_threat_seen_proximity_sum: 0.0,
             colony_knowledge_resource_proximity: 0.0,
             colony_knowledge_threat_proximity: 0.0,
+            colony_priority_ordinal: -1.0,
         };
         // §L2.10.7: this test sets `food_available: false`,
         // `has_functional_kitchen: false`, etc. on the context, but
@@ -2629,6 +2629,7 @@ mod tests {
             memory_threat_seen_proximity_sum: 0.0,
             colony_knowledge_resource_proximity: 0.0,
             colony_knowledge_threat_proximity: 0.0,
+            colony_priority_ordinal: -1.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let socialize_score = scores
@@ -2861,6 +2862,7 @@ mod tests {
             memory_threat_seen_proximity_sum: 0.0,
             colony_knowledge_resource_proximity: 0.0,
             colony_knowledge_threat_proximity: 0.0,
+            colony_priority_ordinal: -1.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let best = select_best_action(&scores);
@@ -2955,6 +2957,7 @@ mod tests {
             memory_threat_seen_proximity_sum: 0.0,
             colony_knowledge_resource_proximity: 0.0,
             colony_knowledge_threat_proximity: 0.0,
+            colony_priority_ordinal: -1.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let fight_score = scores.iter().find(|(a, _)| *a == Action::Fight).unwrap().1;
@@ -3068,6 +3071,7 @@ mod tests {
             memory_threat_seen_proximity_sum: 0.0,
             colony_knowledge_resource_proximity: 0.0,
             colony_knowledge_threat_proximity: 0.0,
+            colony_priority_ordinal: -1.0,
         };
         // Build a per-test MarkerSnapshot with Incapacitated set for
         // this cat (the cached shared snapshot only carries colony
@@ -3357,6 +3361,7 @@ mod tests {
             memory_threat_seen_proximity_sum: 0.0,
             colony_knowledge_resource_proximity: 0.0,
             colony_knowledge_threat_proximity: 0.0,
+            colony_priority_ordinal: -1.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let wander = scores.iter().find(|(a, _)| *a == Action::Wander).unwrap().1;
@@ -3452,6 +3457,7 @@ mod tests {
             memory_threat_seen_proximity_sum: 0.0,
             colony_knowledge_resource_proximity: 0.0,
             colony_knowledge_threat_proximity: 0.0,
+            colony_priority_ordinal: -1.0,
         };
 
         let scores_full = score_actions(&base, &test_eval_inputs(), &mut rng_full).scores;

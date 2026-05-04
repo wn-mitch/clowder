@@ -232,6 +232,14 @@ const MEMORY_THREAT_SEEN_PROXIMITY_SUM: &str = "memory_threat_seen_proximity_sum
 const COLONY_KNOWLEDGE_RESOURCE_PROXIMITY: &str = "colony_knowledge_resource_proximity";
 const COLONY_KNOWLEDGE_THREAT_PROXIMITY: &str = "colony_knowledge_threat_proximity";
 
+// ColonyPriority ordinal: -1 = none, 0 Food, 1 Defense, 2 Building,
+// 3 Exploration. Read by `ColonyPriorityLift`.
+const COLONY_PRIORITY_ORDINAL: &str = "colony_priority_ordinal";
+const COLONY_PRIORITY_FOOD: f32 = 0.0;
+const COLONY_PRIORITY_DEFENSE: f32 = 1.0;
+const COLONY_PRIORITY_BUILDING: f32 = 2.0;
+const COLONY_PRIORITY_EXPLORATION: f32 = 3.0;
+
 /// Ticket 088 — the "self-care" DSE class lifted by
 /// `BodyDistressPromotion` when `body_distress_composite` is high.
 /// Authored as a `&[&str]` constant so the class membership is
@@ -2431,6 +2439,60 @@ impl ScoreModifier for ColonyKnowledgeLift {
 }
 
 // ---------------------------------------------------------------------------
+// ColonyPriorityLift
+// ---------------------------------------------------------------------------
+
+/// §3.5.1 additive lift on the DSE family aligned with the active
+/// `ColonyPriority`. Reads `colony_priority_ordinal` (-1 = none) and
+/// adds `priority_bonus` to:
+/// - Food: hunt, forage, farm
+/// - Defense: patrol, fight
+/// - Building: build
+/// - Exploration: explore
+pub struct ColonyPriorityLift {
+    bonus: f32,
+}
+
+impl ColonyPriorityLift {
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            bonus: sc.priority_bonus,
+        }
+    }
+}
+
+impl ScoreModifier for ColonyPriorityLift {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        let ordinal = fetch(COLONY_PRIORITY_ORDINAL, ctx.cat);
+        let matches_priority = if (ordinal - COLONY_PRIORITY_FOOD).abs() < 0.5 {
+            matches!(dse_id.0, HUNT | FORAGE | FARM)
+        } else if (ordinal - COLONY_PRIORITY_DEFENSE).abs() < 0.5 {
+            matches!(dse_id.0, PATROL | FIGHT)
+        } else if (ordinal - COLONY_PRIORITY_BUILDING).abs() < 0.5 {
+            dse_id.0 == BUILD
+        } else if (ordinal - COLONY_PRIORITY_EXPLORATION).abs() < 0.5 {
+            dse_id.0 == EXPLORE
+        } else {
+            false
+        };
+        if !matches_priority {
+            return score;
+        }
+        score + self.bonus
+    }
+
+    fn name(&self) -> &'static str {
+        "colony_priority_lift"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Default pipeline builder
 // ---------------------------------------------------------------------------
 
@@ -2501,6 +2563,7 @@ pub fn default_modifier_pipeline(
     pipeline.push(Box::new(MemoryDeathPenalty::new(sc)));
     pipeline.push(Box::new(MemoryThreatSeenSuppress::new(sc)));
     pipeline.push(Box::new(ColonyKnowledgeLift::new(sc)));
+    pipeline.push(Box::new(ColonyPriorityLift::new(sc)));
     // Ticket 047 — `AcuteHealthAdrenalineFlee` registers immediately
     // after `BodyDistressPromotion` so under combined high composite
     // distress + high health deficit, both lifts compose additively on
@@ -3243,7 +3306,7 @@ mod tests {
     fn default_pipeline_registers_expected_modifier_count() {
         let constants = crate::resources::sim_constants::SimConstants::default();
         let pipeline = default_modifier_pipeline(&constants);
-        assert_eq!(pipeline.len(), 25, "expected 25 registered modifiers");
+        assert_eq!(pipeline.len(), 26, "expected 26 registered modifiers");
     }
 
     // -----------------------------------------------------------------------
@@ -5171,6 +5234,52 @@ mod tests {
         let fetch = |_: &str, _: Entity| 1.0;
         for dse in [EAT, SLEEP, BUILD, MATE, MENTOR, COORDINATE, IDLE] {
             assert!((m.apply(DseId(dse), 0.5, &ctx, &fetch) - 0.5).abs() < 1e-6);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // ColonyPriorityLift
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn colony_priority_food_lifts_hunt_forage_farm() {
+        let m = ColonyPriorityLift { bonus: 0.15 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            COLONY_PRIORITY_ORDINAL => 0.0, // Food
+            _ => 0.0,
+        };
+        for dse in [HUNT, FORAGE, FARM] {
+            assert!((m.apply(DseId(dse), 0.4, &ctx, &fetch) - 0.55).abs() < 1e-6);
+        }
+        // Patrol/Fight aren't in Food's list.
+        assert!((m.apply(DseId(PATROL), 0.4, &ctx, &fetch) - 0.4).abs() < 1e-6);
+    }
+
+    #[test]
+    fn colony_priority_defense_lifts_patrol_fight() {
+        let m = ColonyPriorityLift { bonus: 0.15 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            COLONY_PRIORITY_ORDINAL => 1.0, // Defense
+            _ => 0.0,
+        };
+        for dse in [PATROL, FIGHT] {
+            assert!((m.apply(DseId(dse), 0.4, &ctx, &fetch) - 0.55).abs() < 1e-6);
+        }
+        assert!((m.apply(DseId(HUNT), 0.4, &ctx, &fetch) - 0.4).abs() < 1e-6);
+    }
+
+    #[test]
+    fn colony_priority_none_inert() {
+        let m = ColonyPriorityLift { bonus: 0.15 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            COLONY_PRIORITY_ORDINAL => -1.0,
+            _ => 0.0,
+        };
+        for dse in [HUNT, FORAGE, FARM, PATROL, FIGHT, BUILD, EXPLORE] {
+            assert!((m.apply(DseId(dse), 0.4, &ctx, &fetch) - 0.4).abs() < 1e-6);
         }
     }
 

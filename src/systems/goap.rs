@@ -11,7 +11,7 @@ use crate::ai::planner::{
 };
 use crate::ai::scoring::{
     apply_aspiration_bonuses, apply_cascading_bonuses, apply_directive_bonus, apply_fated_bonuses,
-    apply_preference_bonuses, apply_priority_bonus, score_actions, ScoringContext,
+    apply_preference_bonuses, score_actions, ScoringContext,
 };
 use crate::ai::{Action, CurrentAction};
 use crate::components::building::{
@@ -1556,6 +1556,9 @@ pub fn evaluate_and_plan(
             memory_threat_seen_proximity_sum: memory_sums.2,
             colony_knowledge_resource_proximity: colony_knowledge_sums.0,
             colony_knowledge_threat_proximity: colony_knowledge_sums.1,
+            colony_priority_ordinal: crate::ai::scoring::colony_priority_ordinal(
+                colony.priority.as_ref().and_then(|cp| cp.active),
+            ),
         };
 
         let focal_cat = res.focal_target.as_deref().and_then(|t| t.entity);
@@ -1592,9 +1595,6 @@ pub fn evaluate_and_plan(
         };
 
         // Apply all bonus layers.
-        if let Some(ref cp) = colony.priority {
-            apply_priority_bonus(&mut scores, cp.active, sc);
-        }
         let mut nearby_actions = HashMap::new();
         for &(other_entity, other_pos, other_action) in &action_snapshot {
             if other_entity != entity

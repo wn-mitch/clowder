@@ -6,7 +6,7 @@ use rand::Rng;
 use crate::ai::pathfinding::{find_free_adjacent, step_toward};
 use crate::ai::scoring::{
     apply_aspiration_bonuses, apply_cascading_bonuses, apply_directive_bonus, apply_fated_bonuses,
-    apply_preference_bonuses, apply_priority_bonus, score_actions, ScoringContext,
+    apply_preference_bonuses, score_actions, ScoringContext,
 };
 use crate::ai::{Action, CurrentAction};
 use crate::components::building::{
@@ -998,6 +998,9 @@ pub fn evaluate_dispositions(
             memory_threat_seen_proximity_sum: presence_memory_sums.2,
             colony_knowledge_resource_proximity: presence_colony_knowledge_sums.0,
             colony_knowledge_threat_proximity: presence_colony_knowledge_sums.1,
+            colony_priority_ordinal: crate::ai::scoring::colony_priority_ordinal(
+                colony.priority.as_ref().and_then(|cp| cp.active),
+            ),
         };
 
         // §11 trace plumbing — dormant except when running headless
@@ -1024,9 +1027,6 @@ pub fn evaluate_dispositions(
         let mut scores = result.scores;
 
         // Apply all bonus layers (identical to evaluate_actions).
-        if let Some(ref cp) = colony.priority {
-            apply_priority_bonus(&mut scores, cp.active, sc);
-        }
         let mut nearby_actions = HashMap::new();
         for &(other_entity, other_pos, other_action) in &action_snapshot {
             if other_entity != entity
