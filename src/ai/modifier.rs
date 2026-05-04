@@ -1573,6 +1573,96 @@ impl ScoreModifier for HungerUrgency {
 }
 
 // ---------------------------------------------------------------------------
+// KittenEatBoost — ticket 156
+// ---------------------------------------------------------------------------
+
+/// Ticket 156 — kitten-cohort Eat lift. Multiplicatively boosts the
+/// `eat` DSE score for cats carrying the `Kitten` lifestage marker
+/// once their hunger urgency exceeds `kitten_eat_boost_threshold`,
+/// reshaping the L2 breakdown so a hungry kitten's physiological
+/// priorities (Eat) dominate the social / grooming DSEs instead of
+/// being dominated by them.
+///
+/// **Why a per-cohort modifier vs a per-cohort DSE variant.** The
+/// existing `EatDse` is a single weighted-product DSE with a hunger
+/// curve and a stores-distance spatial axis. Splitting Eat into
+/// `EatDse` + `KittenEatDse` would duplicate the struct + planner
+/// wiring + completion proxy across two DseIds for a kitten cohort
+/// that doesn't actually act on its own (kittens are passive feeders
+/// — the action layer reduces all kitten DSE winners to Idle). The
+/// load-bearing value of this modifier is **breakdown honesty** —
+/// `just inspect` and the focal-trace L2 score panel must reflect
+/// the kitten's physiological priorities, even when the action layer
+/// can't act on them. A multiplicative lift composes correctly with
+/// the existing `HungerUrgency` modifier (additive on the same DSE)
+/// and with the kitten cohort's spatial-discount (the modifier
+/// doesn't touch the spatial axis).
+///
+/// **Trigger:** `Kitten` marker present AND `hunger_urgency >
+/// threshold`.
+///
+/// **Transform:** linear ramp from `threshold` (multiplier 1.0) to
+/// `urgency = 1.0` (multiplier `multiplier`). At intermediate
+/// urgencies the multiplier is `1 + ramp × (multiplier − 1)`.
+///
+/// **Composition:** Registered after `HungerUrgency` so the kitten
+/// boost amplifies the post-Urgency lifted score, not the bare DSE
+/// score. The two pass orders compose to a kitten-Eat score that
+/// dominates other physiological DSEs as soon as urgency clears the
+/// threshold.
+///
+/// **Gated-boost contract:** returns `score` unchanged on score `<= 0`
+/// — the lift doesn't conjure food into existence (mirrors the 088
+/// / 047 / 102 / 106 conventions).
+pub struct KittenEatBoost {
+    threshold: f32,
+    multiplier: f32,
+}
+
+impl KittenEatBoost {
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            threshold: sc.kitten_eat_boost_threshold,
+            multiplier: sc.kitten_eat_boost_multiplier,
+        }
+    }
+}
+
+impl ScoreModifier for KittenEatBoost {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        if dse_id.0 != EAT {
+            return score;
+        }
+        if score <= 0.0 {
+            return score;
+        }
+        if !(ctx.has_marker)(crate::components::markers::Kitten::KEY, ctx.cat) {
+            return score;
+        }
+        if self.multiplier <= 1.0 {
+            return score;
+        }
+        let urgency = fetch(HUNGER_URGENCY, ctx.cat).clamp(0.0, 1.0);
+        if urgency <= self.threshold {
+            return score;
+        }
+        let ramp = ((urgency - self.threshold) / (1.0 - self.threshold)).clamp(0.0, 1.0);
+        let mul = 1.0 + ramp * (self.multiplier - 1.0);
+        score * mul
+    }
+
+    fn name(&self) -> &'static str {
+        "kitten_eat_boost"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // ExhaustionPressure — ticket 107
 // ---------------------------------------------------------------------------
 
@@ -2042,6 +2132,11 @@ pub fn default_modifier_pipeline(
     // each gates on a different scalar and a different DSE matrix
     // (Eat/Hunt/Forage vs Sleep/GroomSelf vs Sleep), so they commute.
     pipeline.push(Box::new(HungerUrgency::new(sc)));
+    // Ticket 156 — `KittenEatBoost` multiplies the kitten cohort's
+    // Eat score after `HungerUrgency` so the kitten boost amplifies
+    // the post-urgency lifted score rather than the bare DSE score.
+    // Behavior-neutral for non-kitten cats (Kitten-marker gate).
+    pipeline.push(Box::new(KittenEatBoost::new(sc)));
     pipeline.push(Box::new(ExhaustionPressure::new(sc)));
     pipeline.push(Box::new(ThermalDistress::new(sc)));
     // Ticket 108 — `ThreatProximityAdrenalineFlee` registers after the
@@ -2731,8 +2826,8 @@ mod tests {
     }
 
     #[test]
-    fn default_pipeline_registers_eighteen_modifiers() {
-        // Eighteen §3.5.1 foundational modifiers — the seven original
+    fn default_pipeline_registers_nineteen_modifiers() {
+        // Nineteen §3.5.1 foundational modifiers — the seven original
         // (`Pride`, `IndependenceSolo`, `IndependenceGroup`, `Patience`,
         // `Tradition`, `FoxTerritorySuppression`,
         // `CorruptionTerritorySuppression`) plus §075's
@@ -2743,13 +2838,14 @@ mod tests {
         // `AcuteHealthAdrenalineFreeze`, ticket 106's `HungerUrgency`,
         // ticket 107's `ExhaustionPressure`, ticket 110's
         // `ThermalDistress`, ticket 108's
-        // `ThreatProximityAdrenalineFlee`, and ticket 109 Phase A's
-        // `IntraspeciesConflictResponseFlight`. The three Phase 4.2
-        // emergency modifiers (`WardCorruptionEmergency`,
-        // `CleanseEmergency`, `SensedRotBoost`) retired in §13.1.
+        // `ThreatProximityAdrenalineFlee`, ticket 109 Phase A's
+        // `IntraspeciesConflictResponseFlight`, and ticket 156's
+        // `KittenEatBoost`. The three Phase 4.2 emergency modifiers
+        // (`WardCorruptionEmergency`, `CleanseEmergency`,
+        // `SensedRotBoost`) retired in §13.1.
         let constants = crate::resources::sim_constants::SimConstants::default();
         let pipeline = default_modifier_pipeline(&constants);
-        assert_eq!(pipeline.len(), 18, "expected 18 registered modifiers");
+        assert_eq!(pipeline.len(), 19, "expected 19 registered modifiers");
     }
 
     // -----------------------------------------------------------------------
@@ -3705,6 +3801,145 @@ mod tests {
                 "non-food-class dse {dse} unchanged at full urgency; got {out}"
             );
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // ticket 156 KittenEatBoost
+    // -----------------------------------------------------------------------
+
+    fn test_kitten_eat_boost() -> KittenEatBoost {
+        KittenEatBoost {
+            threshold: 0.4,
+            multiplier: 4.0,
+        }
+    }
+
+    fn test_ctx_with_kitten_marker() -> (Entity, EvalCtx<'static>) {
+        static KITTEN_MARKER: fn(&str, Entity) -> bool = |name, _| {
+            name == crate::components::markers::Kitten::KEY
+        };
+        static NO_ENTITY_POS: fn(Entity) -> Option<Position> = |_| None;
+        static NO_ANCHOR_POS: fn(LandmarkAnchor) -> Option<Position> = |_| None;
+        let entity = Entity::from_raw_u32(1).unwrap();
+        let ctx = EvalCtx {
+            cat: entity,
+            tick: 0,
+            entity_position: &NO_ENTITY_POS,
+            anchor_position: &NO_ANCHOR_POS,
+            has_marker: &KITTEN_MARKER,
+            self_position: Position::new(0, 0),
+            target: None,
+            target_position: None,
+            target_alive: None,
+        };
+        (entity, ctx)
+    }
+
+    #[test]
+    fn kitten_eat_boost_no_lift_for_non_kitten() {
+        // Adult cat (no Kitten marker): Eat passes through unchanged
+        // even at full hunger urgency.
+        let modifier = test_kitten_eat_boost();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HUNGER_URGENCY => 1.0,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(EAT), 0.5, &ctx, &fetch);
+        assert!(
+            (out - 0.5).abs() < 1e-6,
+            "non-kitten Eat unchanged; got {out}"
+        );
+    }
+
+    #[test]
+    fn kitten_eat_boost_no_lift_below_threshold() {
+        // Kitten with hunger urgency below threshold: no boost.
+        let modifier = test_kitten_eat_boost();
+        let (_, ctx) = test_ctx_with_kitten_marker();
+        let fetch = |name: &str, _: Entity| match name {
+            HUNGER_URGENCY => 0.3,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(EAT), 0.5, &ctx, &fetch);
+        assert!(
+            (out - 0.5).abs() < 1e-6,
+            "below-threshold kitten Eat unchanged; got {out}"
+        );
+    }
+
+    #[test]
+    fn kitten_eat_boost_lifts_above_threshold() {
+        // Kitten at urgency=0.8 (hunger=0.2). ramp = (0.8 - 0.4) / 0.6 = 0.667.
+        // multiplier = 1.0 + 0.667 * (4.0 - 1.0) = 3.0. Eat 0.39 → 1.17.
+        // The kitten Eat now beats the empirical Groom 1.13 baseline.
+        let modifier = test_kitten_eat_boost();
+        let (_, ctx) = test_ctx_with_kitten_marker();
+        let fetch = |name: &str, _: Entity| match name {
+            HUNGER_URGENCY => 0.8,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(EAT), 0.39, &ctx, &fetch);
+        // 0.39 * 3.0 = 1.17
+        assert!(
+            (out - 1.17).abs() < 1e-3,
+            "kitten Eat boosted past Groom baseline; got {out}"
+        );
+        assert!(
+            out > 1.13,
+            "kitten Eat must exceed empirical Groom 1.13 baseline; got {out}"
+        );
+    }
+
+    #[test]
+    fn kitten_eat_boost_max_lift_at_full_urgency() {
+        // Kitten at urgency=1.0: full multiplier 4.0× applied.
+        let modifier = test_kitten_eat_boost();
+        let (_, ctx) = test_ctx_with_kitten_marker();
+        let fetch = |name: &str, _: Entity| match name {
+            HUNGER_URGENCY => 1.0,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(EAT), 0.5, &ctx, &fetch);
+        assert!(
+            (out - 2.0).abs() < 1e-5,
+            "full-urgency kitten Eat = score × 4.0; got {out}"
+        );
+    }
+
+    #[test]
+    fn kitten_eat_boost_targets_only_eat() {
+        // Even with Kitten marker + full urgency, only the Eat DSE is
+        // boosted; every other DSE id passes through unchanged.
+        let modifier = test_kitten_eat_boost();
+        let (_, ctx) = test_ctx_with_kitten_marker();
+        let fetch = |name: &str, _: Entity| match name {
+            HUNGER_URGENCY => 1.0,
+            _ => 0.0,
+        };
+        for dse in [
+            HUNT, FORAGE, SLEEP, GROOM_SELF, GROOM_OTHER, FLEE, FIGHT, MATE, COORDINATE, BUILD,
+            MENTOR, CARETAKE, SOCIALIZE, PATROL, COOK, FARM, WANDER, EXPLORE, IDLE,
+        ] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "non-Eat dse {dse} unchanged for kitten; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn kitten_eat_boost_does_not_resurrect_zero_score() {
+        // Gated-boost contract — multiplying by zero stays zero.
+        let modifier = test_kitten_eat_boost();
+        let (_, ctx) = test_ctx_with_kitten_marker();
+        let fetch = |name: &str, _: Entity| match name {
+            HUNGER_URGENCY => 1.0,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(EAT), 0.0, &ctx, &fetch);
+        assert_eq!(out, 0.0, "zero-score Eat stays zero — no resurrection");
     }
 
     #[test]

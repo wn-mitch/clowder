@@ -1548,6 +1548,24 @@ pub struct ScoringConstants {
     /// 0.20.
     #[serde(default = "default_hunger_urgency_forage_lift")]
     pub hunger_urgency_forage_lift: f32,
+    /// Ticket 156 — `KittenEatBoost` Modifier threshold. The
+    /// `hunger_urgency` floor above which the kitten-only Eat lift
+    /// engages. Calibrated below the colony-wide `HungerUrgency`
+    /// threshold (0.6) so kittens lift earlier than adults — kittens
+    /// have smaller stomachs and shorter starvation runways. Default
+    /// 0.4 (kitten at hunger 0.6 or below).
+    #[serde(default = "default_kitten_eat_boost_threshold")]
+    pub kitten_eat_boost_threshold: f32,
+    /// Ticket 156 — `KittenEatBoost` Modifier multiplier. The maximum
+    /// multiplicative lift on a kitten's Eat score at
+    /// `hunger_urgency = 1.0`. Default 4.0: at the empirical
+    /// Robinkit-33 / Maplekit-98 frozen-breakdown urgency (~0.81)
+    /// the lift is enough to push the kitten's Eat score past the
+    /// social/grooming DSEs that previously dominated the breakdown.
+    /// Multiplicative because the underlying Eat score is already
+    /// shaped by curve + spatial axes; this just shifts the cohort.
+    #[serde(default = "default_kitten_eat_boost_multiplier")]
+    pub kitten_eat_boost_multiplier: f32,
     /// Ticket 107 — `ExhaustionPressure` Modifier threshold. The
     /// `energy_deficit` floor below which the lift is a no-op. Default
     /// 0.7 (cat at energy 0.3 or below). Engages before the legacy
@@ -1835,6 +1853,8 @@ impl Default for ScoringConstants {
             hunger_urgency_eat_lift: default_hunger_urgency_eat_lift(),
             hunger_urgency_hunt_lift: default_hunger_urgency_hunt_lift(),
             hunger_urgency_forage_lift: default_hunger_urgency_forage_lift(),
+            kitten_eat_boost_threshold: default_kitten_eat_boost_threshold(),
+            kitten_eat_boost_multiplier: default_kitten_eat_boost_multiplier(),
             exhaustion_pressure_threshold: default_exhaustion_pressure_threshold(),
             exhaustion_pressure_sleep_lift: default_exhaustion_pressure_sleep_lift(),
             exhaustion_pressure_groom_lift: default_exhaustion_pressure_groom_lift(),
@@ -2649,6 +2669,26 @@ fn default_hunger_urgency_hunt_lift() -> f32 {
 /// (inert); proposed magnitude 0.20 — symmetric to Hunt.
 fn default_hunger_urgency_forage_lift() -> f32 {
     0.0
+}
+
+/// Ticket 156 — `KittenEatBoost` Modifier threshold. Default `0.4`
+/// — engages once a kitten's hunger urgency exceeds 0.4 (i.e., the
+/// kitten is at hunger 0.6 or below), well before the colony-wide
+/// `HungerUrgency` threshold (0.6). Earlier engagement reflects
+/// kittens' shorter starvation runway.
+fn default_kitten_eat_boost_threshold() -> f32 {
+    0.4
+}
+
+/// Ticket 156 — `KittenEatBoost` Modifier multiplier ceiling.
+/// Default `4.0`. At the empirical post-154 frozen-breakdown urgency
+/// (~0.81) the resulting multiplier (~3.05) lifts the kitten's Eat
+/// score past the social / grooming DSEs that previously dominated
+/// the breakdown, restoring breakdown honesty about physiological
+/// priorities for the kitten cohort. Behavior-neutral for non-kitten
+/// cats (the Kitten marker gate).
+fn default_kitten_eat_boost_multiplier() -> f32 {
+    4.0
 }
 
 /// Ticket 107 — `ExhaustionPressure` Modifier threshold. The
