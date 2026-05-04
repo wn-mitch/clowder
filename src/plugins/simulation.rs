@@ -412,11 +412,12 @@ impl Plugin for SimulationPlugin {
                         systems::growth::tick_kitten_growth,
                         systems::growth::kitten_mood_aura,
                         // Ticket 006 §5.6.3 row #13 — re-stamp the
-                        // kitten-urgency influence map after growth so
+                        // kitten-cry influence map after growth so
                         // matured kittens (KittenDependency removed in
                         // tick_kitten_growth) drop out of the same
-                        // frame.
-                        systems::growth::update_kitten_urgency_map,
+                        // frame. Ticket 156 repurposed the map from
+                        // Sight to Hearing channel.
+                        systems::growth::update_kitten_cry_map,
                     )
                         .chain(),
                     // Chain 2b: mood + memory + coordination

@@ -102,35 +102,41 @@ pub fn kitten_mood_aura(
 }
 
 // ---------------------------------------------------------------------------
-// update_kitten_urgency_map (ticket 006 — §5.6.3 row #13)
+// update_kitten_cry_map (ticket 006 — §5.6.3 row #13;
+// repurposed by ticket 156)
 // ---------------------------------------------------------------------------
 
-/// Re-stamp `KittenUrgencyMap` from live kittens, weighted by hunger
-/// deficit. §5.6.3 row #13 — sight × colony.
+/// Re-stamp `KittenCryMap` from live kittens whose hunger has fallen
+/// below `kitten_cry_hunger_threshold`. §5.6.3 row #13 — repurposed
+/// from sight × colony to hearing × colony by ticket 156.
 ///
-/// Each `KittenDependency` cat paints a linear-falloff disc of
-/// `kitten_urgency_sense_range` tiles weighted by `(1 - hunger)`.
-/// Adults near multiple hungry kittens see the contributions sum
-/// (clamped to 1.0). Re-stamped per tick rather than decayed because
-/// kittens move and need-state changes fast.
-///
-/// Producer-only at landing — Caretake target ranking continues to use
-/// the existing per-kitten lookup at `caretake_target.rs` until ticket
-/// 052's `SpatialConsideration` cutover.
+/// Each crying kitten paints a linear-falloff disc of
+/// `kitten_cry_sense_range` tiles, strength `(threshold - hunger) /
+/// threshold` so a quiet kitten doesn't paint and a starving kitten
+/// paints loudly. Adults near multiple crying kittens see the
+/// contributions sum (clamped to 1.0). Re-stamped per tick rather than
+/// decayed because kittens move and hunger changes fast.
 #[allow(clippy::type_complexity)]
-pub fn update_kitten_urgency_map(
+pub fn update_kitten_cry_map(
     kittens: Query<(&Position, &Needs), (With<KittenDependency>, Without<Dead>)>,
-    mut map: ResMut<crate::resources::KittenUrgencyMap>,
+    mut map: ResMut<crate::resources::KittenCryMap>,
     constants: Res<SimConstants>,
 ) {
-    let sense_range = constants.influence_maps.kitten_urgency_sense_range;
+    let sense_range = constants.influence_maps.kitten_cry_sense_range;
+    let threshold = constants.influence_maps.kitten_cry_hunger_threshold;
     map.clear();
+    if threshold <= 0.0 {
+        return;
+    }
     for (pos, needs) in &kittens {
-        let urgency = (1.0 - needs.hunger).clamp(0.0, 1.0);
-        if urgency <= 0.0 {
+        if needs.hunger >= threshold {
             continue;
         }
-        map.stamp(pos.x, pos.y, urgency, sense_range);
+        let strength = ((threshold - needs.hunger) / threshold).clamp(0.0, 1.0);
+        if strength <= 0.0 {
+            continue;
+        }
+        map.stamp(pos.x, pos.y, strength, sense_range);
     }
 }
 

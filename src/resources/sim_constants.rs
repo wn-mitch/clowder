@@ -4341,9 +4341,19 @@ pub struct InfluenceMapConstants {
     /// damaged `Structure` (urgency = `1 - condition` when condition
     /// falls below `damaged_threshold`).
     pub construction_site_sense_range: f32,
-    /// Falloff radius for `KittenUrgencyMap` — §5.6.3 row #13. Each
-    /// kitten paints a disc weighted by hunger deficit (`1 - hunger`).
-    pub kitten_urgency_sense_range: f32,
+    /// Falloff radius for `KittenCryMap` — §5.6.3 row #13, repurposed
+    /// by ticket 156 from a sight-channel "kitten urgency" gradient to
+    /// a hearing-channel cry broadcast. Sound travels farther than
+    /// sight, so this is bumped above `CARETAKE_TARGET_RANGE = 12`;
+    /// a non-parent adult outside caretake range may still hear and
+    /// pivot toward the kitten.
+    pub kitten_cry_sense_range: f32,
+    /// Hunger threshold below which a `KittenDependency` cat starts
+    /// crying (and thus painting `KittenCryMap`). A quiet kitten with
+    /// `hunger >= threshold` paints nothing; a kitten at `hunger=0`
+    /// paints at full strength. Calibrated so the cry precedes the
+    /// starvation point with enough lead-time for adults to react.
+    pub kitten_cry_hunger_threshold: f32,
     /// Falloff radius for `HerbLocationMap` — §5.6.3 row #8. Each
     /// `Harvestable` herb paints a per-kind disc scaled by growth
     /// stage (`Sprout=0.25` → `Blossom=1.0`). Default mirrors
@@ -4365,7 +4375,8 @@ impl Default for InfluenceMapConstants {
             food_location_sense_range: 15.0,
             garden_location_sense_range: 15.0,
             construction_site_sense_range: 15.0,
-            kitten_urgency_sense_range: 12.0,
+            kitten_cry_sense_range: 30.0,
+            kitten_cry_hunger_threshold: 0.5,
             herb_location_sense_range: 15.0,
             damaged_threshold: 0.4,
         }

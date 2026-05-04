@@ -1,28 +1,37 @@
 use bevy_ecs::prelude::*;
 
-/// Spatial influence map of hungry kittens, weighted by hunger deficit.
+/// Spatial influence map of kitten distress cries, gated by hunger
+/// and broadcast on the `Hearing` channel.
 ///
-/// §5.6.3 row #13 of `docs/systems/ai-substrate-refactor.md` — sight ×
-/// colony. Re-stamped each tick (kittens move and need-state changes
-/// fast, so any decay-based scheme would lag the actual urgency
-/// signal). Each kitten paints a linear-falloff disc of
-/// `kitten_urgency_sense_range` tiles weighted by `1 - hunger`. Adults
-/// near multiple hungry kittens see the contributions sum (clamped to
-/// 1.0).
+/// §5.6.3 row #13 of `docs/systems/ai-substrate-refactor.md` —
+/// originally landed by ticket 006 as a sight-channel "kitten urgency"
+/// map producer-only awaiting ticket 052's `SpatialConsideration`
+/// cutover. 052 retired the `sample_map` consideration shape ("zero
+/// production callers") and the substrate sat dead until ticket 156
+/// repurposed it as a Hearing-channel cry broadcast: kittens cry,
+/// adults hear.
 ///
-/// Producer-only landing per ticket 006. Consumer cutover (Caretake
-/// target ranking via `SpatialConsideration`) is owned by ticket 052;
-/// the existing per-kitten lookup at `caretake_target.rs` continues to
-/// drive selection until that lands.
+/// Each `KittenDependency` cat with `hunger < kitten_cry_hunger_threshold`
+/// paints a linear-falloff disc of `kitten_cry_sense_range` tiles,
+/// strength `(threshold - hunger) / threshold` so quiet kittens don't
+/// paint and starving kittens paint loudly. Adults near multiple
+/// crying kittens see the contributions sum (clamped to 1.0).
+/// Re-stamped per tick rather than decayed because kittens move and
+/// hunger changes fast.
+///
+/// Consumer: `update_kitten_cry_perceived` reads the map at each
+/// adult's position and writes a per-cat `kitten_cry_perceived`
+/// scalar; `CaretakeDse` (`src/ai/dses/caretake.rs`) reads the
+/// scalar via `ScalarConsideration`.
 #[derive(Resource, Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct KittenUrgencyMap {
+pub struct KittenCryMap {
     pub marks: Vec<f32>,
     pub grid_w: usize,
     pub grid_h: usize,
     pub bucket_size: i32,
 }
 
-impl KittenUrgencyMap {
+impl KittenCryMap {
     pub fn new(map_w: usize, map_h: usize, bucket_size: i32) -> Self {
         let bs = bucket_size.max(1) as usize;
         let grid_w = map_w.div_ceil(bs);
@@ -99,7 +108,7 @@ impl KittenUrgencyMap {
     }
 }
 
-impl Default for KittenUrgencyMap {
+impl Default for KittenCryMap {
     fn default() -> Self {
         Self::default_map()
     }
@@ -111,21 +120,21 @@ mod tests {
 
     #[test]
     fn empty_map_reads_zero() {
-        let map = KittenUrgencyMap::new(20, 20, 5);
+        let map = KittenCryMap::new(20, 20, 5);
         assert_eq!(map.get(10, 10), 0.0);
     }
 
     #[test]
     fn stamp_paints_falloff_within_radius() {
-        let mut map = KittenUrgencyMap::new(40, 40, 5);
+        let mut map = KittenCryMap::new(40, 40, 5);
         map.stamp(20, 20, 1.0, 12.0);
         assert!(map.get(22, 22) > 0.5);
         assert_eq!(map.get(0, 0), 0.0);
     }
 
     #[test]
-    fn weak_urgency_paints_weak_signal() {
-        let mut map = KittenUrgencyMap::new(40, 40, 5);
+    fn weak_cry_paints_weak_signal() {
+        let mut map = KittenCryMap::new(40, 40, 5);
         map.stamp(20, 20, 0.3, 12.0);
         let center = map.get(22, 22);
         assert!(center < 0.4);
@@ -134,7 +143,7 @@ mod tests {
 
     #[test]
     fn multiple_kittens_sum() {
-        let mut map = KittenUrgencyMap::new(40, 40, 5);
+        let mut map = KittenCryMap::new(40, 40, 5);
         map.stamp(20, 20, 0.4, 12.0);
         map.stamp(20, 20, 0.4, 12.0);
         let center = map.get(22, 22);
@@ -146,7 +155,7 @@ mod tests {
 
     #[test]
     fn clear_zeroes_all_buckets() {
-        let mut map = KittenUrgencyMap::new(40, 40, 5);
+        let mut map = KittenCryMap::new(40, 40, 5);
         map.stamp(20, 20, 1.0, 12.0);
         map.clear();
         for v in &map.marks {
@@ -156,7 +165,7 @@ mod tests {
 
     #[test]
     fn out_of_bounds_returns_zero() {
-        let map = KittenUrgencyMap::new(20, 20, 5);
+        let map = KittenCryMap::new(20, 20, 5);
         assert_eq!(map.get(-1, 5), 0.0);
         assert_eq!(map.get(100, 5), 0.0);
     }

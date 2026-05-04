@@ -373,8 +373,9 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     // Insert construction-site map resource (ticket 006 — §5.6.3 row #9).
     world.insert_resource(crate::resources::ConstructionSiteMap::default());
 
-    // Insert kitten-urgency map resource (ticket 006 — §5.6.3 row #13).
-    world.insert_resource(crate::resources::KittenUrgencyMap::default());
+    // Insert kitten-cry map resource (ticket 006 — §5.6.3 row #13;
+    // repurposed by ticket 156 from Sight to Hearing channel).
+    world.insert_resource(crate::resources::KittenCryMap::default());
 
     // Insert herb-location map resource (ticket 061 — §5.6.3 row #8).
     world.insert_resource(crate::resources::HerbLocationMap::default());

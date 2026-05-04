@@ -297,14 +297,16 @@ impl InfluenceMap for crate::resources::ConstructionSiteMap {
     }
 }
 
-impl InfluenceMap for crate::resources::KittenUrgencyMap {
+impl InfluenceMap for crate::resources::KittenCryMap {
     fn metadata(&self) -> MapMetadata {
         MapMetadata {
-            // §5.6.3 row #13: kitten-urgency — sight × colony.
-            // Producer landed by ticket 006; consumer cutover
-            // (Caretake target ranking) lives in ticket 052.
-            name: "kitten_urgency",
-            channel: ChannelKind::Sight,
+            // §5.6.3 row #13: kitten-cry — hearing × colony.
+            // Producer originally landed by ticket 006 as
+            // "kitten-urgency / sight"; ticket 156 repurposed it as
+            // a Hearing-channel cry broadcast and wired the consumer
+            // (`update_kitten_cry_perceived` → `CaretakeDse`).
+            name: "kitten_cry",
+            channel: ChannelKind::Hearing,
             faction: Faction::Colony,
         }
     }
@@ -678,12 +680,12 @@ mod tests {
     }
 
     #[test]
-    fn kitten_urgency_map_implements_influence_map() {
-        use crate::resources::KittenUrgencyMap;
-        let mut map = KittenUrgencyMap::default_map();
+    fn kitten_cry_map_implements_influence_map() {
+        use crate::resources::KittenCryMap;
+        let mut map = KittenCryMap::default_map();
         let md = map.metadata();
-        assert_eq!(md.name, "kitten_urgency");
-        assert_eq!(md.channel, ChannelKind::Sight);
+        assert_eq!(md.name, "kitten_cry");
+        assert_eq!(md.channel, ChannelKind::Hearing);
         assert!(matches!(md.faction, Faction::Colony));
 
         map.stamp(20, 20, 1.0, 10.0);
