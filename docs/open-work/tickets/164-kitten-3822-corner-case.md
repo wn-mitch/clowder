@@ -1,11 +1,11 @@
 ---
-id: 158
+id: 164
 title: Seed-42 (38,22) kitten cohort starves despite KittenCryMap
-status: ready
+status: blocked
 cluster: ai-substrate
 added: 2026-05-03
 parked: null
-blocked-by: []
+blocked-by: [165]
 supersedes: []
 related-systems: []
 related-balance: [mentoring-extraction.md]
@@ -213,3 +213,39 @@ spawn-locality (R3), orphan-marker substrate (R2), kitten movement
   that ended before the late-born cohort matured (kittens take 4
   seasons), or whether a separate kitten-attrition issue needs
   follow-up. Will close pending that read.
+
+- 2026-05-04: closeout investigation halts. Renumbered 158 → 164
+  to resolve the frontmatter id-collision with
+  `landed/158-groomed-other-structural.md` (both carried `id: 158`,
+  same `added: 2026-05-03`). Fresh `just soak 42` against current
+  HEAD (`2b6b49fb6054`, post-d1722a33) is **deterministically RED**:
+  `Starvation=3` (Thymekit-19 @ (24,19), Wispkit-21 + Emberkit-3 @
+  (41,22)), `kittens_born=3` (down from the post-161 baseline of 5),
+  `kittens_surviving=0`, `continuity_tallies.burial=0`. Verdict:
+  `fail`. The pre-d1722a33 `logs/tuned-42-e9d9ac1d` reproduces the
+  same 3/3/3 starvation pattern at the same tiles — the regression
+  was already present in the dirty post-158 run referenced by
+  `mentoring-extraction.md` Iter 2. The `kittens_surviving=0` half
+  of the prior acceptance question turns out to be a double artifact
+  (truncation + unimplemented metric: `colony_score.rs:56` is
+  declared and `headless_io.rs:577` emits, but **zero increment-sites
+  exist in `src/`** — same substrate-bypass shape as the
+  `IsParentOfHungryKitten` defect this ticket itself fixed; tracked
+  by ticket 166).
+
+  Critically, the (38,22) structural fix shipped by this ticket is
+  **intact on main** — verified by code-walk: `parent_marker_active:
+  bool` parameter at `caretake_target.rs:215` + empty-pool fallback
+  at `:257`, plus the `IsParentOfHungryKitten` author at
+  `growth.rs:182,187` (inside `update_kitten_cry_map` per 161's
+  merge, comment at `:124`). The starved kittens are at (24,19) and
+  (41,22) — **not** the (38,22) Robinkit-33 / Maplekit-98 cohort
+  this ticket targeted. So this is a *new* attrition pattern
+  introduced by the GroomedOther 158 affiliative redistribution
+  (mentoring-extraction.md Iter 2 records grooming 499 → 1,279, a
+  +156% jump; Caretake share almost certainly fell with it). Opening
+  ticket 165 to track the post-d1722a33 regression. Status stays
+  `blocked` on 165 — same precedent as the original 161-block: a
+  structural fix is shipped, sibling change introduces a new
+  perturbation, hard-gate acceptance waits for the new defect to
+  close. Will not ship a closeout against a red canonical run.

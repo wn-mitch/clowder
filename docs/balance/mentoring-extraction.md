@@ -265,11 +265,18 @@ L3 softmax.
 
 This is the same failure cluster as ticket 156 (kitten-feeding
 gap post-154 cascade), now exercised by a different per-tick
-attention-share pattern. Tracked under 156's umbrella; not opening
-a separate ticket because the underlying ecological question is
-the same: the colony reaches reproduction, the kittens get born,
-and the existing `caretake_dse` scoring shape doesn't keep
-parent attention focused tightly enough on own-kitten hunger.
+attention-share pattern.
+
+**Updated 2026-05-04 during ticket 164 closeout:** the original
+Iter 2 framing was "tracked under 156's umbrella; not opening a
+separate ticket". That framing did not hold up against ticket
+164's (renumbered from 158-kitten-3822) acceptance: the seed-42
+hard gate `Starvation == 0` requires *some* concrete
+trackable owner, and 156 is already landed. Ticket 165
+(`165-groomedother-kitten-cohort-regression`) now formally tracks
+this attention-share regression and blocks 164's close-out.
+Ticket 166 separately tracks the unrelated `kittens_surviving`
+substrate-bypass that surfaced during the same investigation.
 
 ### Knobs touched
 
