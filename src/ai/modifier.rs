@@ -3002,9 +3002,6 @@ pub fn default_modifier_pipeline(
     // pile-ups like the 107+110 Sleep double-stack documented in 146).
     let mut pipeline =
         ModifierPipeline::new().with_max_additive_lift_per_dse(sc.max_additive_lift_per_dse);
-    // DispositionFailureCooldown is multiplicative; registers first so
-    // the additive bonuses below compose on already-damped scores.
-    pipeline.push(Box::new(DispositionFailureCooldown::new()));
     pipeline.push(Box::new(Pride::new(sc)));
     pipeline.push(Box::new(IndependenceSolo::new(sc)));
     pipeline.push(Box::new(IndependenceGroup::new(sc)));
@@ -3027,22 +3024,6 @@ pub fn default_modifier_pipeline(
     // the IAUS contest toward Eat. The 094 `StockpileSatiation`
     // doc-comment pre-described this exact composition order.
     pipeline.push(Box::new(BodyDistressPromotion::new(sc)));
-    // Memory family — additive lift on Hunt/Forage near remembered
-    // resource finds; subtractive on Wander/Idle near remembered Death;
-    // subtractive on Wander/Explore/Hunt near remembered ThreatSeen.
-    // Each reads a pre-aggregated proximity sum from ctx_scalars.
-    pipeline.push(Box::new(MemoryResourceFoundLift::new(sc)));
-    pipeline.push(Box::new(MemoryDeathPenalty::new(sc)));
-    pipeline.push(Box::new(MemoryThreatSeenSuppress::new(sc)));
-    pipeline.push(Box::new(ColonyKnowledgeLift::new(sc)));
-    pipeline.push(Box::new(ColonyPriorityLift::new(sc)));
-    pipeline.push(Box::new(NeighborActionCascade::new(sc)));
-    pipeline.push(Box::new(AspirationLift::new(sc)));
-    pipeline.push(Box::new(PreferenceLift::new(sc)));
-    pipeline.push(Box::new(PreferencePenalty::new(sc)));
-    pipeline.push(Box::new(FatedLoveLift::new(sc)));
-    pipeline.push(Box::new(FatedRivalLift::new(sc)));
-    pipeline.push(Box::new(ActiveDirectiveLift::new()));
     // Ticket 047 — `AcuteHealthAdrenalineFlee` registers immediately
     // after `BodyDistressPromotion` so under combined high composite
     // distress + high health deficit, both lifts compose additively on
@@ -3119,6 +3100,29 @@ pub fn default_modifier_pipeline(
     // territory-pressure modifiers visually adjacent in the trace
     // output.
     pipeline.push(Box::new(StockpileSatiation::new(sc)));
+    // The retired `apply_disposition_failure_cooldown` damped scores
+    // *after* the existing modifier pipeline ran and *before* the
+    // additive bonus passes. DispositionFailureCooldown registers here
+    // (after the existing-19-modifier block ending at StockpileSatiation,
+    // before the additive bonuses below) to preserve that semantic
+    // exactly.
+    pipeline.push(Box::new(DispositionFailureCooldown::new()));
+    // The retired additive bonus passes (memory / colony-knowledge /
+    // priority / cascade / aspiration / preference / fated / directive)
+    // ran in this order in `goap.rs`'s legacy chain; the registration
+    // order here matches.
+    pipeline.push(Box::new(MemoryResourceFoundLift::new(sc)));
+    pipeline.push(Box::new(MemoryDeathPenalty::new(sc)));
+    pipeline.push(Box::new(MemoryThreatSeenSuppress::new(sc)));
+    pipeline.push(Box::new(ColonyKnowledgeLift::new(sc)));
+    pipeline.push(Box::new(ColonyPriorityLift::new(sc)));
+    pipeline.push(Box::new(NeighborActionCascade::new(sc)));
+    pipeline.push(Box::new(AspirationLift::new(sc)));
+    pipeline.push(Box::new(PreferenceLift::new(sc)));
+    pipeline.push(Box::new(PreferencePenalty::new(sc)));
+    pipeline.push(Box::new(FatedLoveLift::new(sc)));
+    pipeline.push(Box::new(FatedRivalLift::new(sc)));
+    pipeline.push(Box::new(ActiveDirectiveLift::new()));
     pipeline
 }
 
