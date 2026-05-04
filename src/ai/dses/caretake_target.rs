@@ -89,10 +89,18 @@ pub const TARGET_KITTEN_HUNGER_INPUT: &str = "target_kitten_hunger";
 pub const TARGET_KINSHIP_INPUT: &str = "target_kinship";
 pub const TARGET_KITTEN_ISOLATION_INPUT: &str = "target_kitten_isolation";
 
-/// Candidate-pool range in Manhattan tiles. Matches spec §6.4 row #9
-/// (range=12) and the pre-refactor `CARETAKE_RANGE` constant —
-/// parents cross the colony for a hungry kitten.
-pub const CARETAKE_TARGET_RANGE: f32 = 12.0;
+/// Candidate-pool range in Manhattan tiles. Originally 12 (matched
+/// spec §6.4 row #9 and the pre-refactor `CARETAKE_RANGE`). Bumped
+/// to 30 by ticket 156 to match `kitten_cry_sense_range`: an adult
+/// who hears a kitten's distress cry from up to 30 tiles away must
+/// also be able to *target* that kitten when scoring caretake-target,
+/// or the cry-broadcast lift on `CaretakeDse` (modifier 156) lifts
+/// the wrong-target — adults pivot to Caretake but pick a closer
+/// less-hungry kitten over the loud one. Coupling the two ranges
+/// makes "hear" and "target" the same predicate; without it the
+/// post-156 soak still loses Robinkit-33 / Maplekit-98 at (38,22)
+/// despite the cry firing correctly.
+pub const CARETAKE_TARGET_RANGE: f32 = 30.0;
 
 /// Kittens below this hunger threshold are candidates for Caretake.
 /// Hunger is satisfaction (1.0 = sated, 0.0 = starving); kittens under
@@ -490,7 +498,7 @@ mod tests {
         let mut registry = DseRegistry::new();
         registry.target_taking_dses.push(caretake_target_dse());
         let adult = Entity::from_raw_u32(1).unwrap();
-        // Hungry but beyond CARETAKE_TARGET_RANGE (12).
+        // Hungry but beyond CARETAKE_TARGET_RANGE (30 post-156).
         let kittens = vec![kitten(10, 50, 0, 0.1)];
         let out = resolve_caretake_target(
             &registry,
