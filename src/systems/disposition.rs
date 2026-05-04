@@ -163,6 +163,9 @@ pub struct ChainResources<'w> {
     /// Cat-presence influence map — sampled by `compute_ward_placement`
     /// to bias ward placement toward tiles where cats actually live.
     pub cat_presence_map: Res<'w, crate::resources::CatPresenceMap>,
+    /// Hearing-channel kitten-cry broadcast (ticket 156). Sampled at
+    /// each cat's position to populate `ScoringContext::kitten_cry_perceived`.
+    pub kitten_cry_map: Res<'w, crate::resources::KittenCryMap>,
     /// Ward-coverage influence map — sampled by `compute_ward_placement`
     /// for anti-clustering (skip tiles already covered by other wards).
     pub ward_coverage_map: Res<'w, crate::resources::WardCoverageMap>,
@@ -883,6 +886,7 @@ pub fn evaluate_dispositions(
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: caretake_resolution.urgency,
             is_parent_of_hungry_kitten: caretake_resolution.is_parent,
+            kitten_cry_perceived: colony.kitten_cry_map.get(pos.x, pos.y),
             caretake_compassion_bond_scale: caretake_bond_scale,
             unexplored_nearby: colony.exploration_map.unexplored_fraction_nearby(
                 pos.x,

@@ -351,6 +351,14 @@ pub struct ScoringContext<'a> {
     pub hungry_kitten_urgency: f32,
     /// Whether this cat is a parent of the hungriest nearby kitten.
     pub is_parent_of_hungry_kitten: bool,
+    /// Hearing-channel perception of nearby kitten distress cries,
+    /// sampled from `KittenCryMap` at the cat's tile (0.0–1.0). Painted
+    /// by `update_kitten_cry_map` for any kitten whose hunger drops
+    /// below `kitten_cry_hunger_threshold`. Consumed by `CaretakeDse`
+    /// as a fourth axis (substrate-refactor §4.7 — the map is
+    /// externally-authored substrate, this scalar is the single-axis
+    /// perception bridge to the DSE consumer).
+    pub kitten_cry_perceived: f32,
     /// Phase 4c.4 alloparenting Reframe A: multiplier applied to the
     /// `personality.compassion` input when scoring the Caretake DSE.
     /// 1.0 = no boost (default); 1.25 = 25% boost for bonded friends
@@ -557,6 +565,10 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
         } else {
             0.0
         },
+    );
+    m.insert(
+        "kitten_cry_perceived",
+        ctx.kitten_cry_perceived.clamp(0.0, 1.0),
     );
     // Exploration peer group.
     m.insert("curiosity", ctx.personality.curiosity.clamp(0.0, 1.0));
@@ -2165,6 +2177,7 @@ mod tests {
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
+            kitten_cry_perceived: 0.0,
             caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
             health: 1.0,
@@ -2317,6 +2330,7 @@ mod tests {
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
+            kitten_cry_perceived: 0.0,
             caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
             health: 1.0,
@@ -2492,6 +2506,7 @@ mod tests {
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
+            kitten_cry_perceived: 0.0,
             caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
             health: 1.0,
@@ -2757,6 +2772,7 @@ mod tests {
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
+            kitten_cry_perceived: 0.0,
             caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
             health: 1.0,
@@ -2838,6 +2854,7 @@ mod tests {
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
+            kitten_cry_perceived: 0.0,
             caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
             health: 1.0,
@@ -2938,6 +2955,7 @@ mod tests {
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
+            kitten_cry_perceived: 0.0,
             caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
             health: 1.0,
@@ -3255,6 +3273,7 @@ mod tests {
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
+            kitten_cry_perceived: 0.0,
             caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
             health: 1.0,
@@ -3337,6 +3356,7 @@ mod tests {
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
+            kitten_cry_perceived: 0.0,
             caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
             health: 1.0,

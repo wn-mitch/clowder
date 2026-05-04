@@ -9,6 +9,9 @@ pub struct ColonyContext<'w> {
     pub exploration_map: Res<'w, crate::resources::ExplorationMap>,
     pub fox_scent_map: Res<'w, crate::resources::FoxScentMap>,
     pub cat_presence_map: ResMut<'w, crate::resources::CatPresenceMap>,
+    /// Hearing-channel kitten-cry broadcast (ticket 156). Sampled at
+    /// each cat's position to populate `ScoringContext::kitten_cry_perceived`.
+    pub kitten_cry_map: Res<'w, crate::resources::KittenCryMap>,
     /// §L2.10.7 colony-wide single-instance building positions
     /// (kitchen, stores, garden). Read by the cat-side
     /// `EvalCtx::anchor_position` closure for `LandmarkAnchor::Nearest{Kitchen,Stores,Garden}`.
