@@ -5,8 +5,7 @@ use rand::Rng;
 
 use crate::ai::pathfinding::{find_free_adjacent, step_toward};
 use crate::ai::scoring::{
-    apply_aspiration_bonuses, apply_directive_bonus, apply_fated_bonuses, apply_preference_bonuses,
-    score_actions, ScoringContext,
+    apply_directive_bonus, apply_fated_bonuses, score_actions, ScoringContext,
 };
 use crate::ai::{Action, CurrentAction};
 use crate::components::building::{
@@ -837,6 +836,12 @@ pub fn evaluate_dispositions(
             pos,
             d.cascading_bonus_range,
         );
+        let presence_aspiration_action_counts = aspirations
+            .map(crate::ai::scoring::compute_aspiration_action_counts)
+            .unwrap_or([0.0; crate::ai::scoring::CASCADE_COUNTS_LEN]);
+        let presence_preference_signals = preferences
+            .map(crate::ai::scoring::compute_preference_signals)
+            .unwrap_or([0.0; crate::ai::scoring::CASCADE_COUNTS_LEN]);
 
         let ctx = ScoringContext {
             scoring: sc,
@@ -1008,6 +1013,8 @@ pub fn evaluate_dispositions(
                 colony.priority.as_ref().and_then(|cp| cp.active),
             ),
             cascade_counts: presence_cascade_counts,
+            aspiration_action_counts: presence_aspiration_action_counts,
+            preference_signals: presence_preference_signals,
         };
 
         // §11 trace plumbing — dormant except when running headless
@@ -1034,12 +1041,6 @@ pub fn evaluate_dispositions(
         let mut scores = result.scores;
 
         // Apply all bonus layers (identical to evaluate_actions).
-        if let Some(asp) = aspirations {
-            apply_aspiration_bonuses(&mut scores, asp, sc);
-        }
-        if let Some(pref) = preferences {
-            apply_preference_bonuses(&mut scores, pref, sc);
-        }
         let love_visible = fated_love
             .filter(|l| l.awakened)
             .and_then(|l| cat_positions.iter().find(|(e, _)| *e == l.partner))

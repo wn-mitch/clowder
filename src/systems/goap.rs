@@ -10,8 +10,7 @@ use crate::ai::planner::{
     make_plan, Carrying, GoapActionKind, PlannerState, PlannerZone, ZoneDistances,
 };
 use crate::ai::scoring::{
-    apply_aspiration_bonuses, apply_directive_bonus, apply_fated_bonuses, apply_preference_bonuses,
-    score_actions, ScoringContext,
+    apply_directive_bonus, apply_fated_bonuses, score_actions, ScoringContext,
 };
 use crate::ai::{Action, CurrentAction};
 use crate::components::building::{
@@ -1353,6 +1352,12 @@ pub fn evaluate_and_plan(
             pos,
             d.cascading_bonus_range,
         );
+        let aspiration_action_counts = aspirations
+            .map(crate::ai::scoring::compute_aspiration_action_counts)
+            .unwrap_or([0.0; crate::ai::scoring::CASCADE_COUNTS_LEN]);
+        let preference_signals = preferences
+            .map(crate::ai::scoring::compute_preference_signals)
+            .unwrap_or([0.0; crate::ai::scoring::CASCADE_COUNTS_LEN]);
 
         let ctx = ScoringContext {
             scoring: sc,
@@ -1566,6 +1571,8 @@ pub fn evaluate_and_plan(
                 colony.priority.as_ref().and_then(|cp| cp.active),
             ),
             cascade_counts,
+            aspiration_action_counts,
+            preference_signals,
         };
 
         let focal_cat = res.focal_target.as_deref().and_then(|t| t.entity);
@@ -1602,12 +1609,6 @@ pub fn evaluate_and_plan(
         };
 
         // Apply all bonus layers.
-        if let Some(asp) = aspirations {
-            apply_aspiration_bonuses(&mut scores, asp, sc);
-        }
-        if let Some(pref) = preferences {
-            apply_preference_bonuses(&mut scores, pref, sc);
-        }
         let love_visible = fated_love
             .filter(|l| l.awakened)
             .and_then(|l| cat_positions.iter().find(|(e, _)| *e == l.partner))

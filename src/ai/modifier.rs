@@ -2598,6 +2598,190 @@ impl ScoreModifier for NeighborActionCascade {
 }
 
 // ---------------------------------------------------------------------------
+// AspirationLift
+// ---------------------------------------------------------------------------
+
+/// §3.5.1 additive lift: `score += count × aspiration_bonus`, where
+/// `count` is the number of active aspirations whose domain includes
+/// the DSE's parent action. Reads `aspiration_action_<action>` keyed
+/// by the DSE's parent Action via `cascade_key` (collapse rules
+/// shared with `NeighborActionCascade`).
+pub struct AspirationLift {
+    bonus: f32,
+}
+
+impl AspirationLift {
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            bonus: sc.aspiration_bonus,
+        }
+    }
+
+    fn aspiration_key(dse_id: DseId) -> Option<&'static str> {
+        match dse_id.0 {
+            HUNT => Some("aspiration_action_hunt"),
+            FORAGE => Some("aspiration_action_forage"),
+            EAT => Some("aspiration_action_eat"),
+            SLEEP => Some("aspiration_action_sleep"),
+            WANDER => Some("aspiration_action_wander"),
+            IDLE => Some("aspiration_action_idle"),
+            SOCIALIZE => Some("aspiration_action_socialize"),
+            GROOM_SELF | GROOM_OTHER => Some("aspiration_action_groom"),
+            EXPLORE => Some("aspiration_action_explore"),
+            FLEE => Some("aspiration_action_flee"),
+            FIGHT => Some("aspiration_action_fight"),
+            PATROL => Some("aspiration_action_patrol"),
+            BUILD => Some("aspiration_action_build"),
+            FARM => Some("aspiration_action_farm"),
+            HERBCRAFT_GATHER | HERBCRAFT_PREPARE | HERBCRAFT_WARD => {
+                Some("aspiration_action_herbcraft")
+            }
+            MAGIC_SCRY | MAGIC_DURABLE_WARD | MAGIC_CLEANSE | MAGIC_COLONY_CLEANSE
+            | MAGIC_HARVEST | MAGIC_COMMUNE => Some("aspiration_action_practicemagic"),
+            COORDINATE => Some("aspiration_action_coordinate"),
+            MENTOR => Some("aspiration_action_mentor"),
+            MATE => Some("aspiration_action_mate"),
+            CARETAKE => Some("aspiration_action_caretake"),
+            COOK => Some("aspiration_action_cook"),
+            HIDE => Some("aspiration_action_hide"),
+            _ => None,
+        }
+    }
+}
+
+impl ScoreModifier for AspirationLift {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        let Some(key) = Self::aspiration_key(dse_id) else {
+            return score;
+        };
+        let count = fetch(key, ctx.cat);
+        if count <= 0.0 {
+            return score;
+        }
+        score + count * self.bonus
+    }
+
+    fn name(&self) -> &'static str {
+        "aspiration_lift"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PreferenceLift / PreferencePenalty
+// ---------------------------------------------------------------------------
+
+fn preference_key(dse_id: DseId) -> Option<&'static str> {
+    match dse_id.0 {
+        HUNT => Some("preference_for_hunt"),
+        FORAGE => Some("preference_for_forage"),
+        EAT => Some("preference_for_eat"),
+        SLEEP => Some("preference_for_sleep"),
+        WANDER => Some("preference_for_wander"),
+        IDLE => Some("preference_for_idle"),
+        SOCIALIZE => Some("preference_for_socialize"),
+        GROOM_SELF | GROOM_OTHER => Some("preference_for_groom"),
+        EXPLORE => Some("preference_for_explore"),
+        FLEE => Some("preference_for_flee"),
+        FIGHT => Some("preference_for_fight"),
+        PATROL => Some("preference_for_patrol"),
+        BUILD => Some("preference_for_build"),
+        FARM => Some("preference_for_farm"),
+        HERBCRAFT_GATHER | HERBCRAFT_PREPARE | HERBCRAFT_WARD => Some("preference_for_herbcraft"),
+        MAGIC_SCRY | MAGIC_DURABLE_WARD | MAGIC_CLEANSE | MAGIC_COLONY_CLEANSE | MAGIC_HARVEST
+        | MAGIC_COMMUNE => Some("preference_for_practicemagic"),
+        COORDINATE => Some("preference_for_coordinate"),
+        MENTOR => Some("preference_for_mentor"),
+        MATE => Some("preference_for_mate"),
+        CARETAKE => Some("preference_for_caretake"),
+        COOK => Some("preference_for_cook"),
+        HIDE => Some("preference_for_hide"),
+        _ => None,
+    }
+}
+
+/// §3.5.1 additive lift on actions the cat Likes:
+/// `score += preference_like_bonus` when the DSE's parent action has
+/// preference signal `+1.0`.
+pub struct PreferenceLift {
+    bonus: f32,
+}
+
+impl PreferenceLift {
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            bonus: sc.preference_like_bonus,
+        }
+    }
+}
+
+impl ScoreModifier for PreferenceLift {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        let Some(key) = preference_key(dse_id) else {
+            return score;
+        };
+        let signal = fetch(key, ctx.cat);
+        if signal <= 0.0 {
+            return score;
+        }
+        score + self.bonus
+    }
+
+    fn name(&self) -> &'static str {
+        "preference_lift"
+    }
+}
+
+/// §3.5.1 subtractive lift on actions the cat Dislikes:
+/// `score -= preference_dislike_penalty` when the DSE's parent action
+/// has preference signal `-1.0`.
+pub struct PreferencePenalty {
+    penalty: f32,
+}
+
+impl PreferencePenalty {
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            penalty: sc.preference_dislike_penalty,
+        }
+    }
+}
+
+impl ScoreModifier for PreferencePenalty {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        let Some(key) = preference_key(dse_id) else {
+            return score;
+        };
+        let signal = fetch(key, ctx.cat);
+        if signal >= 0.0 {
+            return score;
+        }
+        score - self.penalty
+    }
+
+    fn name(&self) -> &'static str {
+        "preference_penalty"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Default pipeline builder
 // ---------------------------------------------------------------------------
 
@@ -2670,6 +2854,9 @@ pub fn default_modifier_pipeline(
     pipeline.push(Box::new(ColonyKnowledgeLift::new(sc)));
     pipeline.push(Box::new(ColonyPriorityLift::new(sc)));
     pipeline.push(Box::new(NeighborActionCascade::new(sc)));
+    pipeline.push(Box::new(AspirationLift::new(sc)));
+    pipeline.push(Box::new(PreferenceLift::new(sc)));
+    pipeline.push(Box::new(PreferencePenalty::new(sc)));
     // Ticket 047 — `AcuteHealthAdrenalineFlee` registers immediately
     // after `BodyDistressPromotion` so under combined high composite
     // distress + high health deficit, both lifts compose additively on
@@ -3412,7 +3599,7 @@ mod tests {
     fn default_pipeline_registers_expected_modifier_count() {
         let constants = crate::resources::sim_constants::SimConstants::default();
         let pipeline = default_modifier_pipeline(&constants);
-        assert_eq!(pipeline.len(), 27, "expected 27 registered modifiers");
+        assert_eq!(pipeline.len(), 30, "expected 30 registered modifiers");
     }
 
     // -----------------------------------------------------------------------

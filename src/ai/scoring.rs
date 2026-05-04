@@ -446,6 +446,13 @@ pub struct ScoringContext<'a> {
     /// into its scoring axes); the modifier carves Fight out
     /// independently.
     pub cascade_counts: [f32; CASCADE_COUNTS_LEN],
+    /// Per-action count of active aspirations whose domain includes
+    /// the action. Read by `AspirationLift`.
+    pub aspiration_action_counts: [f32; CASCADE_COUNTS_LEN],
+    /// Per-action preference signal: `+1.0` Like, `-1.0` Dislike,
+    /// `0.0` no preference. Read by `PreferenceLift` (Like arm) and
+    /// `PreferencePenalty` (Dislike arm).
+    pub preference_signals: [f32; CASCADE_COUNTS_LEN],
 }
 
 /// Length of the per-action cascade-count array. Equals the number of
@@ -821,6 +828,16 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
     for (idx, key) in CASCADE_COUNT_KEYS.iter().enumerate() {
         m.insert(key, ctx.cascade_counts[idx]);
     }
+    // Per-action aspiration counts — how many active aspirations cover
+    // each action. Read by `AspirationLift`.
+    for (idx, key) in ASPIRATION_ACTION_KEYS.iter().enumerate() {
+        m.insert(key, ctx.aspiration_action_counts[idx]);
+    }
+    // Per-action preference signals — Like = +1, Dislike = -1, none = 0.
+    // Read by `PreferenceLift` / `PreferencePenalty`.
+    for (idx, key) in PREFERENCE_KEYS.iter().enumerate() {
+        m.insert(key, ctx.preference_signals[idx]);
+    }
     m
 }
 
@@ -851,6 +868,60 @@ pub const CASCADE_COUNT_KEYS: [&str; CASCADE_COUNTS_LEN] = [
     "cascade_count_caretake",
     "cascade_count_cook",
     "cascade_count_hide",
+];
+
+/// Per-action ctx-scalar keys for aspiration counts, parallel to
+/// `Action as usize`.
+pub const ASPIRATION_ACTION_KEYS: [&str; CASCADE_COUNTS_LEN] = [
+    "aspiration_action_eat",
+    "aspiration_action_sleep",
+    "aspiration_action_hunt",
+    "aspiration_action_forage",
+    "aspiration_action_wander",
+    "aspiration_action_idle",
+    "aspiration_action_socialize",
+    "aspiration_action_groom",
+    "aspiration_action_explore",
+    "aspiration_action_flee",
+    "aspiration_action_fight",
+    "aspiration_action_patrol",
+    "aspiration_action_build",
+    "aspiration_action_farm",
+    "aspiration_action_herbcraft",
+    "aspiration_action_practicemagic",
+    "aspiration_action_coordinate",
+    "aspiration_action_mentor",
+    "aspiration_action_mate",
+    "aspiration_action_caretake",
+    "aspiration_action_cook",
+    "aspiration_action_hide",
+];
+
+/// Per-action ctx-scalar keys for preference signals, parallel to
+/// `Action as usize`.
+pub const PREFERENCE_KEYS: [&str; CASCADE_COUNTS_LEN] = [
+    "preference_for_eat",
+    "preference_for_sleep",
+    "preference_for_hunt",
+    "preference_for_forage",
+    "preference_for_wander",
+    "preference_for_idle",
+    "preference_for_socialize",
+    "preference_for_groom",
+    "preference_for_explore",
+    "preference_for_flee",
+    "preference_for_fight",
+    "preference_for_patrol",
+    "preference_for_build",
+    "preference_for_farm",
+    "preference_for_herbcraft",
+    "preference_for_practicemagic",
+    "preference_for_coordinate",
+    "preference_for_mentor",
+    "preference_for_mate",
+    "preference_for_caretake",
+    "preference_for_cook",
+    "preference_for_hide",
 ];
 
 /// Encode the active `DispositionKind` as an `f32` ordinal for the
@@ -1595,47 +1666,70 @@ pub fn colony_priority_ordinal(
 // Aspiration, preference, and fate bonuses
 // ---------------------------------------------------------------------------
 
-/// Boost action scores based on active aspirations.
-///
-/// For each active aspiration, adds a flat desire bonus to actions in the
-/// aspiration's domain. This makes cats *want* to do things related to
-/// their goals, without changing their skill at doing them.
-pub fn apply_aspiration_bonuses(
-    scores: &mut [(Action, f32)],
+/// Per-action aspiration counts: how many active aspirations include
+/// each action in their domain. Used by `AspirationLift`.
+pub fn compute_aspiration_action_counts(
     aspirations: &crate::components::aspirations::Aspirations,
-    sc: &ScoringConstants,
-) {
+) -> [f32; CASCADE_COUNTS_LEN] {
+    let mut counts = [0.0_f32; CASCADE_COUNTS_LEN];
     for asp in &aspirations.active {
-        let matching = asp.domain.matching_actions();
-        for (action, score) in scores.iter_mut() {
-            if matching.contains(action) {
-                *score += sc.aspiration_bonus;
+        for action in asp.domain.matching_actions() {
+            let idx = *action as usize;
+            if idx < CASCADE_COUNTS_LEN {
+                counts[idx] += 1.0;
             }
         }
     }
+    counts
 }
 
-/// Adjust action scores based on personal likes and dislikes.
-///
-/// Like: +0.08 desire bonus. Dislike: -0.08 desire penalty.
-/// Smaller than aspiration bonuses — preferences are background flavor.
-pub fn apply_preference_bonuses(
-    scores: &mut [(Action, f32)],
+/// Per-action preference signal: `+1.0` for Like, `-1.0` for Dislike,
+/// `0.0` for no preference. Used by `PreferenceLift` /
+/// `PreferencePenalty`.
+pub fn compute_preference_signals(
     preferences: &crate::components::aspirations::Preferences,
-    sc: &ScoringConstants,
-) {
-    for (action, score) in scores.iter_mut() {
-        match preferences.get(*action) {
-            Some(crate::components::aspirations::Preference::Like) => {
-                *score += sc.preference_like_bonus
-            }
-            Some(crate::components::aspirations::Preference::Dislike) => {
-                *score -= sc.preference_dislike_penalty
-            }
-            None => {}
+) -> [f32; CASCADE_COUNTS_LEN] {
+    use crate::components::aspirations::Preference;
+    let mut signals = [0.0_f32; CASCADE_COUNTS_LEN];
+    for variant in ALL_ACTIONS {
+        let idx = variant as usize;
+        if idx >= CASCADE_COUNTS_LEN {
+            continue;
         }
+        signals[idx] = match preferences.get(variant) {
+            Some(Preference::Like) => 1.0,
+            Some(Preference::Dislike) => -1.0,
+            None => 0.0,
+        };
     }
+    signals
 }
+
+/// Every Action variant — used to walk per-action arrays.
+pub const ALL_ACTIONS: [Action; CASCADE_COUNTS_LEN] = [
+    Action::Eat,
+    Action::Sleep,
+    Action::Hunt,
+    Action::Forage,
+    Action::Wander,
+    Action::Idle,
+    Action::Socialize,
+    Action::Groom,
+    Action::Explore,
+    Action::Flee,
+    Action::Fight,
+    Action::Patrol,
+    Action::Build,
+    Action::Farm,
+    Action::Herbcraft,
+    Action::PracticeMagic,
+    Action::Coordinate,
+    Action::Mentor,
+    Action::Mate,
+    Action::Caretake,
+    Action::Cook,
+    Action::Hide,
+];
 
 /// Boost action scores based on awakened fated connections.
 ///
@@ -2330,6 +2424,8 @@ mod tests {
             colony_knowledge_threat_proximity: 0.0,
             colony_priority_ordinal: -1.0,
             cascade_counts: [0.0; CASCADE_COUNTS_LEN],
+            aspiration_action_counts: [0.0; CASCADE_COUNTS_LEN],
+            preference_signals: [0.0; CASCADE_COUNTS_LEN],
         }
     }
 
@@ -2497,6 +2593,8 @@ mod tests {
             colony_knowledge_threat_proximity: 0.0,
             colony_priority_ordinal: -1.0,
             cascade_counts: [0.0; CASCADE_COUNTS_LEN],
+            aspiration_action_counts: [0.0; CASCADE_COUNTS_LEN],
+            preference_signals: [0.0; CASCADE_COUNTS_LEN],
         };
         // §L2.10.7: this test sets `food_available: false`,
         // `has_functional_kitchen: false`, etc. on the context, but
@@ -2687,6 +2785,8 @@ mod tests {
             colony_knowledge_threat_proximity: 0.0,
             colony_priority_ordinal: -1.0,
             cascade_counts: [0.0; CASCADE_COUNTS_LEN],
+            aspiration_action_counts: [0.0; CASCADE_COUNTS_LEN],
+            preference_signals: [0.0; CASCADE_COUNTS_LEN],
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let socialize_score = scores
@@ -2906,6 +3006,8 @@ mod tests {
             colony_knowledge_threat_proximity: 0.0,
             colony_priority_ordinal: -1.0,
             cascade_counts: [0.0; CASCADE_COUNTS_LEN],
+            aspiration_action_counts: [0.0; CASCADE_COUNTS_LEN],
+            preference_signals: [0.0; CASCADE_COUNTS_LEN],
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let best = select_best_action(&scores);
@@ -3002,6 +3104,8 @@ mod tests {
             colony_knowledge_threat_proximity: 0.0,
             colony_priority_ordinal: -1.0,
             cascade_counts: [0.0; CASCADE_COUNTS_LEN],
+            aspiration_action_counts: [0.0; CASCADE_COUNTS_LEN],
+            preference_signals: [0.0; CASCADE_COUNTS_LEN],
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let fight_score = scores.iter().find(|(a, _)| *a == Action::Fight).unwrap().1;
@@ -3117,6 +3221,8 @@ mod tests {
             colony_knowledge_threat_proximity: 0.0,
             colony_priority_ordinal: -1.0,
             cascade_counts: [0.0; CASCADE_COUNTS_LEN],
+            aspiration_action_counts: [0.0; CASCADE_COUNTS_LEN],
+            preference_signals: [0.0; CASCADE_COUNTS_LEN],
         };
         // Build a per-test MarkerSnapshot with Incapacitated set for
         // this cat (the cached shared snapshot only carries colony
@@ -3408,6 +3514,8 @@ mod tests {
             colony_knowledge_threat_proximity: 0.0,
             colony_priority_ordinal: -1.0,
             cascade_counts: [0.0; CASCADE_COUNTS_LEN],
+            aspiration_action_counts: [0.0; CASCADE_COUNTS_LEN],
+            preference_signals: [0.0; CASCADE_COUNTS_LEN],
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let wander = scores.iter().find(|(a, _)| *a == Action::Wander).unwrap().1;
@@ -3505,6 +3613,8 @@ mod tests {
             colony_knowledge_threat_proximity: 0.0,
             colony_priority_ordinal: -1.0,
             cascade_counts: [0.0; CASCADE_COUNTS_LEN],
+            aspiration_action_counts: [0.0; CASCADE_COUNTS_LEN],
+            preference_signals: [0.0; CASCADE_COUNTS_LEN],
         };
 
         let scores_full = score_actions(&base, &test_eval_inputs(), &mut rng_full).scores;
