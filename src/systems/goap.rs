@@ -1654,22 +1654,19 @@ pub fn evaluate_and_plan(
             None
         };
 
-        // Groom routing.
-        let self_groom_score = (1.0 - needs.temperature)
-            * sc.self_groom_temperature_scale
-            * needs.level_suppression(1);
-        let other_groom_score = if has_social_target {
-            personality.warmth * (1.0 - needs.social) * needs.level_suppression(2)
-        } else {
-            0.0
-        };
-        let self_groom_won = self_groom_score >= other_groom_score;
+        // 158: the side-channel `self_groom_won` resolver retired.
+        // `Action::Groom` split into sibling `Action::GroomSelf` /
+        // `Action::GroomOther`, each scored independently in
+        // `score_actions` and routed via `from_action` (Resting /
+        // Grooming respectively). The resolver's parallel scoring
+        // formula is no longer needed because the L3 softmax pick
+        // directly carries the self-vs-other distinction.
 
         // §L2.10.6 softmax-over-Intentions: softmax the flat action pool
         // directly, then map the winning Intention to its disposition. The
         // helper preserves the legacy disposition-level independence penalty
         // by applying it as an action-level transform on Coordinate /
-        // Socialize / Mentor (and Groom when socializing) before softmax.
+        // Socialize / Mentor before softmax.
         //
         // §11.3 L3 capture — when the focal cat is selecting, surface
         // the pool + probabilities + RNG roll to `FocalScoreCapture` so
@@ -1678,7 +1675,6 @@ pub fn evaluate_and_plan(
         let mut softmax_trace = capture_this_cat.then(crate::ai::scoring::SoftmaxCapture::default);
         let chosen = crate::ai::scoring::select_disposition_via_intention_softmax_with_trace(
             &scores,
-            self_groom_won,
             personality.independence,
             d.disposition_independence_penalty,
             sc,

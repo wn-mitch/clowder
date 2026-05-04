@@ -219,9 +219,12 @@ pub fn tidy_buildings(
     let b = &constants.buildings;
     let tidy_cleanliness_rate = b.tidy_cleanliness_rate.per_tick(&time_scale);
     for (cat_pos, action) in &cats {
+        // 158: tidiness only ticks while a cat is genuinely loitering
+        // — Idle or self-grooming. Allogrooming (`GroomOther`) is a
+        // social interaction; it doesn't tidy the building.
         if !matches!(
             action.action,
-            crate::ai::Action::Idle | crate::ai::Action::Groom
+            crate::ai::Action::Idle | crate::ai::Action::GroomSelf
         ) {
             continue;
         }

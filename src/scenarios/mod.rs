@@ -29,6 +29,7 @@ pub mod env;
 pub mod exploration_ranging;
 pub mod farming_cycle;
 pub mod fondness_kitten_imprint;
+pub mod grooming_other;
 pub mod hunt_acquisition;
 pub mod kitten_cry;
 pub mod preset;
@@ -70,6 +71,8 @@ pub const ALL: &[&Scenario] = &[
     &exploration_ranging::SCENARIO,
     &ward_placement::SCENARIO,
     &farming_cycle::SCENARIO,
+    // 158 — triage harness for the GroomedOther never-fired structural fix.
+    &grooming_other::SCENARIO,
 ];
 
 /// Look up a scenario by its `name` field.

@@ -159,3 +159,139 @@ Open Iter 2 if:
   numbers may shrink across seeds.
 - A characteristic metric drifts > ±10% from this iteration's numbers
   in a future change unrelated to 156/157.
+
+## Iter 2 — 2026-05-04 (post-158 land)
+
+### Hypothesis
+
+Ticket 158 splits `Action::Groom` into sibling `GroomSelf` /
+`GroomOther` and extracts `DispositionKind::Grooming` from
+`Socializing` (mirrors 154's Mentoring extraction shape exactly).
+Pre-158 the post-154 socializing template `[SocializeWith (2),
+GroomOther (2)]` had two equivalent-effect actions; A* at
+`planner/mod.rs:437` pre-pruned `GroomOther` because both
+produced the same `(SetInteractionDone(true), IncrementTrips)`
+next-state, so `GroomedOther` never fired in soaks. The split
+makes the L3 softmax pick directly determinative — `GroomOther`
+becomes a first-class affiliative action competing with
+`SocializeWith`, `Mentor`, and `Caretake`.
+
+Predictions:
+
+1. `GroomedOther` clears `never_fired_expected_positives` (the hard
+   structural-success criterion).
+2. `continuity_tallies.grooming` rises 10–30% as allogrooming
+   sessions actually run.
+3. `mentoring` and `courtship` redistribute downward as the
+   affiliative-time-share rebalances across three peer dispositions
+   instead of two.
+4. Survival canaries inherit 154's cascade unchanged: any new
+   Starvation deaths reflect 156's kitten-feeding gap rather than a
+   158-specific regression.
+
+### Observation
+
+Soak: `logs/tuned-42` (seed 42, commit `e9d9ac1d` dirty, ~22 sim
+years equivalent at `final_tick = 1,309,441`).
+
+| Metric | Baseline pre-154 (`tuned-42-baseline-0783194`) | Post-154 pre-158 (`tuned-42-pre158`, commit `bb189bc`) | Post-158 (`tuned-42`, commit `e9d9ac1d`) |
+|---|---|---|---|
+| `continuity_tallies.grooming` | 194 | 499 | **1,279** |
+| `continuity_tallies.mentoring` | 0 | 445 | 165 |
+| `continuity_tallies.courtship` | 999 | 3,613 | 1,330 |
+| `continuity_tallies.play` | 219 | 81 | 21 |
+| `continuity_tallies.burial` | 0 | 0 | 0 |
+| `deaths_by_cause.Starvation` | 0 | 0 | 3 (all kittens) |
+| `deaths_by_cause.ShadowFoxAmbush` | 8 | 3 | 6 |
+| `deaths_by_cause.WildlifeCombat` | 0 | 1 | 2 |
+| `never_fired_expected_positives` | n/a | `[GroomedOther]` | `[FoodCooked]` |
+
+### Concordance
+
+| Prediction | Direction | Magnitude | Verdict |
+|---|---|---|---|
+| GroomedOther clears never-fired | ✓ off list | n/a | **match** |
+| grooming +10–30% | ↑ +156% (499 → 1279) | exceeds band | **direction match, magnitude over** |
+| mentoring + courtship redistribute downward | ↓ -63% mentoring, ↓ -63% courtship | both within 2× of predicted | **match** |
+| Survival canaries inherit 154 cascade unchanged | ↑ Starvation 0 → 3 (new) | new failure mode | **partial — see attention-share below** |
+
+The grooming-tally exceeded its predicted band. Working hypothesis:
+post-158 cats commit to `Grooming` (single-step `[GroomOther]`
+plan) more decisively than they committed to `Socializing`'s
+mixed-step plan pre-158, because the `SingleMinded` strategy on
+the new disposition resists drift mid-session. This isn't a bug —
+it's the structural intent of the Pattern-B extraction (mirrors
+why Mentoring went 0 → 1614 post-154). The over-shoot is
+*directionally correct*; future seeds will tell whether the
+magnitude band needs widening.
+
+### New finding: parent attention-share regression
+
+`Mocha` (the colony's reproductive matriarch) action distribution
+during her kittens' lifetime (ticks 1,268,664 → 1,309,441,
+~40K-tick window covering all three of her kittens being alive):
+
+| Action | Count | % of CatSnapshot |
+|---|---|---|
+| Forage | 119 | 29.4% |
+| **GroomOther** | **71** | **17.5%** |
+| Patrol | 70 | 17.3% |
+| Hunt | 56 | 13.8% |
+| Coordinate | 31 | 7.7% |
+| Wander | 15 | 3.7% |
+| Mentor | 14 | 3.5% |
+| Sleep | 11 | 2.7% |
+| **Caretake** | **11** | **2.7%** |
+| Eat | 3 | 0.7% |
+| Build | 3 | 0.7% |
+| GroomSelf | 1 | 0.25% |
+
+Mocha picked `GroomOther` 6.5× more often than `Caretake` while
+her own kittens were alive and starving. All three kittens
+(Thymekit-19, Wispkit-21, Emberkit-3) starved within ~200 ticks
+of each other (1,309,257 → 1,309,441), two at the exact same tile
+(41, 22) where they were born.
+
+The pre-158 substrate hid this attention-share question: when
+`Action::Groom` was a single L3 entry that mostly resolved to
+self-grooming via the `>=` resolver bias, allogrooming wasn't
+competing for parent-cat time. Post-158 it is, and on this seed
+it dominates `Caretake`. **No code regression — the substrate
+correctly surfaces a balance question the L2 modifier layer
+hasn't answered yet:** there's no per-cat lift on `caretake_dse`
+when the cat carries the `IsParentOfHungryKitten` marker, so the
+"my kittens are starving" signal doesn't punch through the
+L3 softmax.
+
+This is the same failure cluster as ticket 156 (kitten-feeding
+gap post-154 cascade), now exercised by a different per-tick
+attention-share pattern. Tracked under 156's umbrella; not opening
+a separate ticket because the underlying ecological question is
+the same: the colony reaches reproduction, the kittens get born,
+and the existing `caretake_dse` scoring shape doesn't keep
+parent attention focused tightly enough on own-kitten hunger.
+
+### Knobs touched
+
+`SimConstants.self_groom_temperature_scale` field **removed**.
+This field weighted the side-channel resolver computation that
+158 deleted; no longer referenced anywhere. Header-shape change
+breaks comparability with `tuned-42-*` runs that included the
+field — acceptable because 158 is itself a balance-shifting
+structural change, and the next `just promote` re-locks the
+baseline. No active sim-tuning knobs changed.
+
+### Next iteration triggers
+
+Open Iter 3 if:
+- Ticket 156 lands a parent-attention lift (e.g.,
+  `IsParentOfHungryKittenLift` modifier on `caretake_dse`)
+  and post-fix soak shows Mocha's Caretake share climbing back
+  toward parity with GroomOther while own kittens are alive.
+- A *cross-seed sweep* shows the +156% grooming tally and the
+  attention-share inversion are seed-42-specific; magnitude
+  bands may need widening if the shift varies seed-to-seed.
+- `continuity_tallies.play` dropping further (post-158 = 21,
+  down from baseline 219) needs investigating — playfulness
+  metrics may be load-bearing for kitten development that the
+  current scoring doesn't capture.

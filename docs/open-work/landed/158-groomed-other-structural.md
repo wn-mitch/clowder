@@ -1,7 +1,7 @@
 ---
 id: 158
-title: GroomedOther never-fired post-154 — equal-cost tie-break or self-vs-other resolver bias?
-status: ready
+title: GroomedOther never-fired post-154 — split Action::Groom + extract DispositionKind::Grooming
+status: done
 cluster: ai-substrate
 added: 2026-05-03
 parked: null
@@ -10,7 +10,7 @@ supersedes: []
 related-systems: []
 related-balance: [mentoring-extraction.md]
 landed-at: null
-landed-on: null
+landed-on: 2026-05-04
 ---
 
 ## Why
@@ -144,3 +144,60 @@ papers over the structural issue.
   154 §"Out of scope" allowed for this conditional follow-on if
   GroomedOther stayed dark post-split — confirmed dark, opening
   the structural ticket.
+- 2026-05-04: investigation pass — both `[suspect]` audit-table rows
+  promoted to `[verified-defect]`:
+  - **Defect A (resolver bias)** — `let self_groom_won =
+    self_groom_score >= other_groom_score;` lives at
+    `src/systems/goap.rs:1666` AND duplicated identically at
+    `src/systems/disposition.rs:1097`. The `>=` ties to self-groom
+    on equality. Even when other > self, routing flows through a
+    side-channel boolean into `select_disposition_via_intention_softmax_with_trace`
+    — a substrate-vs-search-state confusion (the self-vs-other
+    distinction is load-bearing semantic info, not ephemeral
+    resolver state).
+  - **Defect B (planner pre-pruning, not tie-break)** —
+    `socializing_actions()` returns `[SocializeWith (2),
+    GroomOther (2)]` with **identical effects**
+    (`SetInteractionDone(true), IncrementTrips`). At
+    `src/ai/planner/mod.rs:437`, once `SocializeWith` (vec[0])
+    writes `best_g[next_state] = 2`, `GroomOther`'s `tentative_g
+    (2) >= 2` triggers `continue` — GroomOther is **never even
+    pushed to the open set**. This is correct A* over a degenerate
+    plan template, not a tie-break bug.
+  R3 alone (Action enum split) addresses A but not B. Recommended
+  direction: **R3 + DispositionKind::Grooming extraction** —
+  mirrors 154's Mentoring split exactly and 150 R5a's Eating
+  precedent. Single-action `[GroomOther]` template makes
+  equivalent-sibling pruning structurally impossible. Bonus: the
+  duplicate resolver block becomes deletable.
+- 2026-05-04: status flipped to in-progress; implementation begins.
+- 2026-05-04: landed. R3 implemented as
+  **Action enum split + `DispositionKind::Grooming` extraction**
+  per the 154 / 150 R5a precedent. Bridge at
+  `src/ai/scoring.rs::score_actions` no longer max-collapses the
+  two DSE scores — emits `Action::GroomSelf` and `Action::GroomOther`
+  as distinct L3 pool entries. Both duplicate `self_groom_won`
+  resolver blocks (`src/systems/goap.rs:1657-1666` +
+  `src/systems/disposition.rs:1088-1097`) deleted; the
+  `self_groom_won` parameter on
+  `select_disposition_via_intention_softmax_with_trace` retired;
+  `Action::Groom` special-case in `aggregate_to_dispositions`
+  retired; the orphaned `self_groom_temperature_scale` `SimConstants`
+  field removed (header-shape change documented in
+  `docs/balance/mentoring-extraction.md` Iter 2). New
+  `src/scenarios/grooming_other.rs` triage scenario per ticket 162's
+  harness wires this defect class into the bugfix-discipline tooling.
+- 2026-05-04 verdict: `GroomedOther` **off**
+  `never_fired_expected_positives` (only `FoodCooked` remains —
+  separate kitchen-construction question); `continuity_tallies.grooming
+  = 1279` (+156% vs pre-158 baseline 499); `MentoredCat` still firing
+  (`mentoring = 165`). Verdict overall = `fail` on inherited
+  post-154 cascade (Starvation = 3 kitten deaths at (41,22) and
+  (24,19) → ticket 156's same-shape kitten-feeding gap;
+  `burial = 0` → ticket 157). 158-specific structural success
+  criterion met. Drift from pre-158 documented as Iter 2 in
+  `docs/balance/mentoring-extraction.md` — the substrate split
+  surfaced an attention-share regression (parent cats picking
+  GroomOther 6.5× more often than Caretake while own kittens
+  starve), called out as a follow-on observation under 156's
+  cluster.

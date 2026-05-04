@@ -22,7 +22,7 @@
     (
         text: "{name} grooms {other} with careful, deliberate strokes. The stars watch.",
         tier: Action,
-        action: Some(Groom),
+        action: Some(GroomOther),
     ),
     (
         text: "{name} hunts harder when {other} is watching.",

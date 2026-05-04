@@ -40,7 +40,17 @@ pub enum Action {
     Wander,
     Idle,
     Socialize,
-    Groom,
+    /// 158: split from `Groom`. Self-grooming (thermal-comfort) — rides
+    /// `DispositionKind::Resting` alongside `Sleep`. The L3 softmax now
+    /// picks `GroomSelf` vs `GroomOther` directly; the side-channel
+    /// `self_groom_won` resolver retired.
+    GroomSelf,
+    /// 158: split from `Groom`. Allogrooming (bond-building) — rides
+    /// the new `DispositionKind::Grooming` (single-step plan template
+    /// `[GroomOther]` mirroring 154's Mentoring extraction). Replaces
+    /// the equivalent-effect sibling under Socializing that A* was
+    /// pre-pruning at `planner/mod.rs:437`.
+    GroomOther,
     Explore,
     Flee,
     Fight,

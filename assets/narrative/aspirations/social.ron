@@ -32,12 +32,12 @@
         milestones: [
             Milestone(
                 name: "Gentle Touch",
-                condition: ActionCount(action: "Groom", count: 10),
+                condition: ActionCount(action: "GroomOther", count: 10),
                 narrative_on_complete: "{name} grooms with the gentleness of a parent.",
             ),
             Milestone(
                 name: "Steady Presence",
-                condition: ActionCount(action: "Groom", count: 25),
+                condition: ActionCount(action: "GroomOther", count: 25),
                 narrative_on_complete: "The kits gravitate to {name} without being called.",
             ),
             Milestone(

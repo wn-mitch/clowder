@@ -24,7 +24,7 @@ impl AspirationDomain {
         match self {
             Self::Hunting => &[Action::Hunt, Action::Forage],
             Self::Combat => &[Action::Fight, Action::Patrol],
-            Self::Social => &[Action::Socialize, Action::Groom],
+            Self::Social => &[Action::Socialize, Action::GroomOther],
             Self::Herbcraft => &[Action::Herbcraft],
             Self::Exploration => &[Action::Explore, Action::Wander],
             Self::Building => &[Action::Build],

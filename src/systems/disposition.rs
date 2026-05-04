@@ -1085,16 +1085,12 @@ pub fn evaluate_dispositions(
         let result = score_actions(&ctx, &eval_inputs, &mut rng.rng);
         let scores = result.scores;
 
-        // Determine Groom routing.
-        let self_groom_score = (1.0 - needs.temperature)
-            * sc.self_groom_temperature_scale
-            * needs.level_suppression(1);
-        let other_groom_score = if has_social_target {
-            personality.warmth * (1.0 - needs.social) * needs.level_suppression(2)
-        } else {
-            0.0
-        };
-        let self_groom_won = self_groom_score >= other_groom_score;
+        // 158: the side-channel `self_groom_won` resolver retired
+        // here too (the duplicate of the `evaluate_and_plan` block —
+        // a code-smell from the dual-system-call era). `Action::Groom`
+        // split into sibling variants; the L3 softmax pick directly
+        // routes to Resting (GroomSelf) or Grooming (GroomOther) via
+        // `from_action`.
 
         // §L2.10.6 softmax-over-Intentions: flat-pool softmax in place of
         // the legacy `aggregate_to_dispositions → select_disposition_softmax`
@@ -1109,7 +1105,6 @@ pub fn evaluate_dispositions(
         let mut softmax_trace = capture_this_cat.then(crate::ai::scoring::SoftmaxCapture::default);
         let chosen = crate::ai::scoring::select_disposition_via_intention_softmax_with_trace(
             &scores,
-            self_groom_won,
             personality.independence,
             d.disposition_independence_penalty,
             sc,
@@ -1618,6 +1613,14 @@ pub fn disposition_to_chain(
             // interaction shape. Dead-code arm (the GOAP planner is the
             // live path), retained for type-system completeness.
             DispositionKind::Mentoring => build_mentoring_chain(mentor_target, &cat_pos_list),
+            // 158: legacy chain-building path mirrors Mentoring's
+            // single-interaction shape. Dead-code arm (the GOAP planner
+            // is the live path); the new `Grooming` disposition runs
+            // its single-step `[GroomOther]` template through the
+            // planner just like Mentoring's `[MentorCat]`.
+            DispositionKind::Grooming => {
+                build_grooming_chain(groom_other_target, &cat_pos_list)
+            }
         };
 
         if let Some((mut chain, action)) = chain {
@@ -1859,7 +1862,7 @@ fn build_resting_chain(
             vec![TaskStep::new(StepKind::SelfGroom).with_position(*pos)],
             FailurePolicy::AbortChain,
         );
-        Some((chain, Action::Groom))
+        Some((chain, Action::GroomSelf))
     }
 }
 
@@ -2119,7 +2122,7 @@ fn build_socializing_chain(
             )
         } else if personality.warmth > d.groom_temperature_threshold {
             let target = groom_other_target.or(socialize_target)?;
-            (target, StepKind::GroomOther, Action::Groom)
+            (target, StepKind::GroomOther, Action::GroomOther)
         } else {
             (socialize_target?, StepKind::Socialize, Action::Socialize)
         };
@@ -2685,6 +2688,37 @@ fn build_mentoring_chain(
         FailurePolicy::AbortChain,
     );
     Some((chain, Action::Mentor))
+}
+
+// ===========================================================================
+// build_grooming_chain
+// ===========================================================================
+
+/// 158: legacy chain-building path for the new `Grooming` disposition.
+/// Mirrors `build_mentoring_chain`'s single-interaction Pattern-B shape.
+/// The GOAP planner (`grooming_actions()` returning the single
+/// `[GroomOther]` step) is the live path; this helper exists so the
+/// dead-code dispatch arm in `evaluate_dispositions` still type-checks.
+fn build_grooming_chain(
+    groom_other_target: Option<Entity>,
+    cat_positions: &[(Entity, Position)],
+) -> Option<(TaskChain, Action)> {
+    let partner = groom_other_target?;
+    let partner_pos = *cat_positions
+        .iter()
+        .find(|(e, _)| *e == partner)
+        .map(|(_, p)| p)?;
+
+    let chain = TaskChain::new(
+        vec![
+            TaskStep::new(StepKind::MoveTo).with_position(partner_pos),
+            TaskStep::new(StepKind::GroomOther)
+                .with_position(partner_pos)
+                .with_entity(partner),
+        ],
+        FailurePolicy::AbortChain,
+    );
+    Some((chain, Action::GroomOther))
 }
 
 // ===========================================================================

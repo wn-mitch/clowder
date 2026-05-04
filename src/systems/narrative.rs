@@ -83,7 +83,11 @@ pub fn generate_narrative(
                     continue;
                 }
             }
-            Action::Groom if !has_target => {
+            // 158: rate-limit applies to *self*-grooming (the high-
+            // frequency thermal-care variant). Allogrooming
+            // (`GroomOther`) is rarer and has its own narration line
+            // below.
+            Action::GroomSelf if !has_target => {
                 let roll: u32 = rng.rng.random_range(0..2);
                 if roll != 0 {
                     continue;
@@ -202,7 +206,7 @@ pub fn generate_narrative(
                 (options[idx].clone(), NarrativeTier::Action)
             }
 
-            Action::Groom => {
+            Action::GroomSelf => {
                 let options = [
                     format!("{cat} grooms carefully."),
                     format!("{cat} smooths down ruffled fur."),
@@ -210,6 +214,16 @@ pub fn generate_narrative(
                 ];
                 let idx = rng.rng.random_range(0..options.len());
                 (options[idx].clone(), NarrativeTier::Micro)
+            }
+
+            Action::GroomOther => {
+                let options = [
+                    format!("{cat} grooms a companion's coat."),
+                    format!("{cat} returns a friend's affectionate licks."),
+                    format!("{cat} settles in to groom another cat."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
             }
 
             Action::Explore => {

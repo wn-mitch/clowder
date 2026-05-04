@@ -169,28 +169,23 @@ pub fn socializing_actions() -> Vec<GoapActionDef> {
     // 154: MentorCat extracted into `mentoring_actions()` so the L3
     // pick on `Action::Mentor` survives the disposition collapse instead
     // of getting crowded out by the cheaper sibling steps under a
-    // count-based completion goal. See ticket 154 for the cost-asymmetry
-    // rationale.
-    vec![
-        GoapActionDef {
-            kind: GoapActionKind::SocializeWith,
-            cost: 2,
-            preconditions: vec![StatePredicate::ZoneIs(PlannerZone::SocialTarget)],
-            effects: vec![
-                StateEffect::SetInteractionDone(true),
-                StateEffect::IncrementTrips,
-            ],
-        },
-        GoapActionDef {
-            kind: GoapActionKind::GroomOther,
-            cost: 2,
-            preconditions: vec![StatePredicate::ZoneIs(PlannerZone::SocialTarget)],
-            effects: vec![
-                StateEffect::SetInteractionDone(true),
-                StateEffect::IncrementTrips,
-            ],
-        },
-    ]
+    // count-based completion goal.
+    // 158: GroomOther extracted into `grooming_actions()` for the
+    // same shape of bug — the post-154 `[SocializeWith (2), GroomOther
+    // (2)]` template had two equivalent-effect actions
+    // (`SetInteractionDone(true), IncrementTrips`), and A* at
+    // `mod.rs:437` pre-pruned the second action because both produced
+    // the same `next_state`. The single-action template here makes
+    // equivalent-sibling pre-pruning structurally impossible.
+    vec![GoapActionDef {
+        kind: GoapActionKind::SocializeWith,
+        cost: 2,
+        preconditions: vec![StatePredicate::ZoneIs(PlannerZone::SocialTarget)],
+        effects: vec![
+            StateEffect::SetInteractionDone(true),
+            StateEffect::IncrementTrips,
+        ],
+    }]
 }
 
 /// 154: single-action template for the new `Mentoring` disposition.
@@ -203,6 +198,23 @@ pub fn mentoring_actions() -> Vec<GoapActionDef> {
     vec![GoapActionDef {
         kind: GoapActionKind::MentorCat,
         cost: 3,
+        preconditions: vec![StatePredicate::ZoneIs(PlannerZone::SocialTarget)],
+        effects: vec![StateEffect::SetInteractionDone(true)],
+    }]
+}
+
+/// 158: single-action template for the new `Grooming` disposition.
+/// Pattern-B (interaction-based, single-trip) — direct sibling of
+/// `mentoring_actions()`. Completion proxy is `InteractionDone(true)`
+/// so the L3 GroomOther pick can't be planner-shadowed by an
+/// equivalent-effect sibling step. (Pre-158, GroomOther rode under
+/// Socializing's `[SocializeWith (2), GroomOther (2)]` template, and
+/// A* pre-pruned it because both actions produced the same
+/// `(SetInteractionDone(true), IncrementTrips)` next-state.)
+pub fn grooming_actions() -> Vec<GoapActionDef> {
+    vec![GoapActionDef {
+        kind: GoapActionKind::GroomOther,
+        cost: 2,
         preconditions: vec![StatePredicate::ZoneIs(PlannerZone::SocialTarget)],
         effects: vec![StateEffect::SetInteractionDone(true)],
     }]
@@ -584,6 +596,7 @@ pub fn actions_for_disposition(
         DispositionKind::Mating => mating_actions(),
         DispositionKind::Caretaking => caretaking_actions(),
         DispositionKind::Mentoring => mentoring_actions(),
+        DispositionKind::Grooming => grooming_actions(),
     };
     actions.extend(domain_actions);
     actions
@@ -1117,11 +1130,15 @@ mod tests {
     }
 
     #[test]
-    fn socializing_plan_drops_mentor_step() {
-        // 154 sibling: Socializing's template is now 2-action
-        // `[SocializeWith, GroomOther]` after MentorCat extracted into
-        // `mentoring_actions`. `actions_for_disposition` for Socializing
-        // must not contain MentorCat.
+    fn socializing_plan_drops_mentor_and_groom_other_steps() {
+        // 154 dropped MentorCat into `mentoring_actions`. 158 dropped
+        // GroomOther into `grooming_actions` for the same shape of
+        // bug — equivalent-effect siblings under Socializing's
+        // count-based goal had A* pre-pruning the second action
+        // (`tentative_g >= best_g` at planner/mod.rs:437) because
+        // both produced the same `(SetInteractionDone, IncrementTrips)`
+        // next-state. Socializing's template is now single-action
+        // `[SocializeWith]`.
         let distances = basic_distances();
         let actions = actions_for_disposition(DispositionKind::Socializing, None, &distances);
         let kinds: Vec<_> = actions.iter().map(|a| a.kind).collect();
@@ -1129,8 +1146,34 @@ mod tests {
             !kinds.contains(&GoapActionKind::MentorCat),
             "Socializing template must not include MentorCat after 154 split"
         );
+        assert!(
+            !kinds.contains(&GoapActionKind::GroomOther),
+            "Socializing template must not include GroomOther after 158 split"
+        );
         assert!(kinds.contains(&GoapActionKind::SocializeWith));
-        assert!(kinds.contains(&GoapActionKind::GroomOther));
+    }
+
+    #[test]
+    fn grooming_plan_pattern_b_shape() {
+        // 158: Grooming mirrors `mentoring_actions`'s Pattern B —
+        // single GoapActionDef, `SetInteractionDone(true)` effect, no
+        // `IncrementTrips`. The single-action template is the structural
+        // guarantee that A* can never pre-prune GroomOther in favor of
+        // an equivalent-effect sibling.
+        let only = grooming_actions();
+        assert_eq!(only.len(), 1);
+        assert_eq!(only[0].kind, GoapActionKind::GroomOther);
+        assert!(only[0]
+            .effects
+            .iter()
+            .any(|e| matches!(e, StateEffect::SetInteractionDone(true))));
+        assert!(
+            !only[0]
+                .effects
+                .iter()
+                .any(|e| matches!(e, StateEffect::IncrementTrips)),
+            "grooming_actions must not IncrementTrips — Pattern B (interaction-based, single-trip)"
+        );
     }
 
     #[test]

@@ -49,13 +49,15 @@ pub fn goal_for_disposition(
             predicates: vec![StatePredicate::ConstructionDone(true)],
         },
 
-        // Mating, Coordinating, and Mentoring complete on interaction.
-        // 154: Mentoring joins Pattern B so MentorCat resolves on the
-        // first successful interaction instead of fighting cheaper
-        // sibling Socialize/Groom steps under a count-based goal.
+        // Mating, Coordinating, Mentoring, and Grooming complete on
+        // interaction. 154 added Mentoring to Pattern B; 158 added
+        // Grooming for the same reason — equivalent-effect sibling
+        // pre-pruning under Socializing's count-based goal hid
+        // GroomOther entirely.
         DispositionKind::Mating
         | DispositionKind::Coordinating
-        | DispositionKind::Mentoring => GoalState {
+        | DispositionKind::Mentoring
+        | DispositionKind::Grooming => GoalState {
             predicates: vec![StatePredicate::InteractionDone(true)],
         },
 

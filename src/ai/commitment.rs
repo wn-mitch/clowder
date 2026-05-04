@@ -212,6 +212,11 @@ pub fn strategy_for_disposition(kind: DispositionKind) -> CommitmentStrategy {
         // mirrors Mating). SingleMinded prevents mid-session drop on
         // mood drift — a brief, high-value act should resolve.
         DispositionKind::Mentoring => SingleMinded,
+        // 158: Grooming mirrors Mentoring (single-interaction Pattern
+        // B). One groom session per commitment; SingleMinded prevents
+        // a partner-fondness wobble from dropping the act before the
+        // single chain step resolves.
+        DispositionKind::Grooming => SingleMinded,
         // Activity-shaped — desire drift should terminate.
         DispositionKind::Socializing => OpenMinded,
         DispositionKind::Exploring => OpenMinded,
@@ -289,6 +294,10 @@ pub fn proxies_for_plan(
         // IncrementTrips effect), so `>= 1` reads as "one mentor
         // session has resolved."
         DispositionKind::Mentoring => plan.trips_done >= 1,
+        // 158: Grooming mirrors Mentoring — single-interaction
+        // Pattern B with the same `[GroomOther]` / `InteractionDone(true)`
+        // shape. One groom session per commitment.
+        DispositionKind::Grooming => plan.trips_done >= 1,
         // Guarding is triggered by low safety (`CriticalSafety` urgency
         // fires when `needs.safety < critical_safety_threshold`; the
         // Patrol DSE's `safety_deficit` consideration gates on the same
@@ -704,6 +713,9 @@ mod tests {
             Socializing,
             Exploring,
             Mentoring,
+            // 158: Grooming — single-interaction Pattern B, mirrors
+            // Mentoring (`SingleMinded`).
+            Grooming,
         ];
         assert_eq!(
             covered.len(),

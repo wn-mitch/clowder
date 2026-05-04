@@ -91,6 +91,19 @@ pub enum DispositionKind {
     /// `InteractionDone(true)` completion proxy (Pattern B, mirrors
     /// Mating). Tier 3.
     Mentoring,
+    /// Allogrooming a peer — single-interaction bond-building.
+    ///
+    /// 158: new — separated from Socializing because the post-154
+    /// `[SocializeWith (2), GroomOther (2)]` template had two
+    /// equivalent-effect actions (`SetInteractionDone(true),
+    /// IncrementTrips`), and A* at `planner/mod.rs:437` pre-pruned
+    /// the second action via `tentative_g >= best_g` — `GroomOther`
+    /// was never even pushed to the open set. Single-action plan
+    /// template `[GroomOther]` with `InteractionDone(true)` completion
+    /// proxy (Pattern B, mirrors Mentoring / Mating). Tier 2: above
+    /// thermal self-care, below socialize-with-peers in the
+    /// affiliative ladder.
+    Grooming,
 }
 
 impl DispositionKind {
@@ -112,6 +125,13 @@ impl DispositionKind {
             // matches Mating). One mentor session per commitment; the
             // completion proxy is `InteractionDone(true)`, not a trip count.
             Self::Mentoring => return 1,
+            // 158: Grooming is a single-interaction disposition (Pattern B,
+            // matches Mentoring / Mating). One groom session per commitment;
+            // the completion proxy is `InteractionDone(true)`. Single-action
+            // template `[GroomOther]` makes equivalent-effect sibling
+            // pre-pruning (the bug that hid `GroomedOther` post-154)
+            // structurally impossible.
+            Self::Grooming => return 1,
             // Chain-driven dispositions complete when their chain finishes.
             Self::Building | Self::Farming | Self::Crafting | Self::Coordinating => 1,
             // 150 R5a: Eating completes on need threshold, not count.
@@ -134,6 +154,11 @@ impl DispositionKind {
     /// (not `Resting`). `Action::Sleep` still maps to `Resting`.
     /// Picking Eat at the softmax pool no longer drags Sleep + SelfGroom
     /// into the same plan.
+    /// 158: `Action::Groom` retired into sibling variants — `GroomSelf`
+    /// rides `Resting` (alongside `Sleep`) and `GroomOther` rides the
+    /// new `Grooming` disposition (single-action template, mirrors
+    /// 154's Mentoring split). The side-channel `self_groom_won`
+    /// resolver retires with the split.
     pub fn from_action(action: Action) -> Option<Self> {
         match action {
             Action::Eat => Some(Self::Eating),
@@ -145,7 +170,10 @@ impl DispositionKind {
             // doc-comment for the cost-asymmetry rationale.
             Action::Socialize => Some(Self::Socializing),
             Action::Mentor => Some(Self::Mentoring),
-            Action::Groom => None, // Depends on self vs other — caller decides
+            // 158: sibling Action variants route directly to their
+            // respective dispositions; no resolver in between.
+            Action::GroomSelf => Some(Self::Resting),
+            Action::GroomOther => Some(Self::Grooming),
             Action::Build => Some(Self::Building),
             Action::Farm => Some(Self::Farming),
             Action::Herbcraft | Action::PracticeMagic | Action::Cook => Some(Self::Crafting),
@@ -167,14 +195,18 @@ impl DispositionKind {
     /// owns it.
     /// 154: Socializing drops `Action::Mentor`; the new `Mentoring`
     /// variant owns it.
+    /// 158: `Action::Groom` retired. `Resting` keeps the self-groom
+    /// constituent via `Action::GroomSelf`; `Socializing` drops the
+    /// allogrooming constituent (which moves to the new `Grooming`
+    /// disposition with its single-action `[GroomOther]` template).
     pub fn constituent_actions(&self) -> &[Action] {
         match self {
-            Self::Resting => &[Action::Sleep, Action::Groom],
+            Self::Resting => &[Action::Sleep, Action::GroomSelf],
             Self::Eating => &[Action::Eat],
             Self::Hunting => &[Action::Hunt],
             Self::Foraging => &[Action::Forage],
             Self::Guarding => &[Action::Patrol, Action::Fight],
-            Self::Socializing => &[Action::Socialize, Action::Groom],
+            Self::Socializing => &[Action::Socialize],
             Self::Building => &[Action::Build],
             Self::Farming => &[Action::Farm],
             Self::Crafting => &[Action::Herbcraft, Action::PracticeMagic, Action::Cook],
@@ -183,6 +215,7 @@ impl DispositionKind {
             Self::Mating => &[Action::Mate],
             Self::Caretaking => &[Action::Caretake],
             Self::Mentoring => &[Action::Mentor],
+            Self::Grooming => &[Action::GroomOther],
         }
     }
 
@@ -195,6 +228,7 @@ impl DispositionKind {
     /// pre-existing 12 variants. Saved soaks and hand-written
     /// ordinal-equality tests don't need rebasing.
     /// 154: `Mentoring` is appended at ordinal 14 for the same reason.
+    /// 158: `Grooming` is appended at ordinal 15 for the same reason.
     pub const ALL: &[Self] = &[
         Self::Resting,
         Self::Hunting,
@@ -210,6 +244,7 @@ impl DispositionKind {
         Self::Caretaking,
         Self::Eating,
         Self::Mentoring,
+        Self::Grooming,
     ];
 
     /// Human-readable label for the inspect panel.
@@ -229,6 +264,7 @@ impl DispositionKind {
             Self::Mating => "Mating",
             Self::Caretaking => "Caretaking",
             Self::Mentoring => "Mentoring",
+            Self::Grooming => "Grooming",
         }
     }
 
@@ -239,7 +275,11 @@ impl DispositionKind {
         match self {
             // 150 R5a: Eating shares Resting's tier 1 — both physiological.
             Self::Resting | Self::Eating | Self::Hunting | Self::Foraging => 1,
-            Self::Guarding => 2,
+            // 158: Grooming sits at tier 2 — above thermal self-care
+            // (now `Action::GroomSelf` riding `Resting` at tier 1) and
+            // below the affiliative-coordination tier the Socializing
+            // peer group anchors. Matches `groom_other_dse.maslow_tier()`.
+            Self::Guarding | Self::Grooming => 2,
             Self::Socializing | Self::Caretaking | Self::Mating | Self::Mentoring => 3,
             Self::Crafting | Self::Coordinating | Self::Building | Self::Farming => 4,
             Self::Exploring => 5,
@@ -263,6 +303,7 @@ impl DispositionKind {
             Self::Mating => "find a mate",
             Self::Caretaking => "tend the young",
             Self::Mentoring => "mentor",
+            Self::Grooming => "groom a friend",
         }
     }
 }
@@ -505,9 +546,11 @@ mod tests {
     #[test]
     fn resting_constituents_drop_eat() {
         // 150 R5a: Resting owns Sleep + Groom only; Eating owns Eat.
+        // 158: Resting owns Sleep + GroomSelf (allogrooming moved to
+        // Grooming).
         assert_eq!(
             DispositionKind::Resting.constituent_actions(),
-            &[Action::Sleep, Action::Groom]
+            &[Action::Sleep, Action::GroomSelf]
         );
         assert_eq!(
             DispositionKind::Eating.constituent_actions(),
@@ -537,18 +580,23 @@ mod tests {
     }
 
     #[test]
-    fn all_includes_eating_then_mentoring_appended() {
+    fn all_includes_eating_then_mentoring_then_grooming_appended() {
         // 150 R5a appends Eating at ordinal 13; 154 appends Mentoring
-        // at ordinal 14. Both append (rather than insert near related
-        // variants) so positional ordinals in
-        // `scoring::active_disposition_ordinal` and
-        // `modifier::constituent_dses_for_ordinal` stay stable for the
-        // pre-existing variants. Saved soaks and ordinal-equality
+        // at ordinal 14; 158 appends Grooming at ordinal 15. All
+        // append (rather than insert near related variants) so
+        // positional ordinals in `scoring::active_disposition_ordinal`
+        // and `modifier::constituent_dses_for_ordinal` stay stable for
+        // the pre-existing variants. Saved soaks and ordinal-equality
         // tests don't need rebasing.
-        assert_eq!(DispositionKind::ALL.len(), 14);
+        assert_eq!(DispositionKind::ALL.len(), 15);
         assert_eq!(
             DispositionKind::ALL.last(),
-            Some(&DispositionKind::Mentoring)
+            Some(&DispositionKind::Grooming)
+        );
+        assert_eq!(
+            DispositionKind::ALL[13],
+            DispositionKind::Mentoring,
+            "Mentoring must remain at ordinal-14 position"
         );
         assert_eq!(
             DispositionKind::ALL[12],
@@ -583,17 +631,64 @@ mod tests {
     }
 
     #[test]
-    fn socializing_constituents_drop_mentor() {
-        // 154: Socializing owns Socialize + Groom only; Mentoring
-        // owns Mentor.
+    fn socializing_constituents_drop_mentor_and_groom() {
+        // 154: Socializing dropped Mentor.
+        // 158: Socializing also drops GroomOther — both single-trip
+        // peers extracted into their own dispositions to break the
+        // equivalent-effect A* pre-pruning at planner/mod.rs:437.
         assert_eq!(
             DispositionKind::Socializing.constituent_actions(),
-            &[Action::Socialize, Action::Groom]
+            &[Action::Socialize]
         );
         assert_eq!(
             DispositionKind::Mentoring.constituent_actions(),
             &[Action::Mentor]
         );
+        assert_eq!(
+            DispositionKind::Grooming.constituent_actions(),
+            &[Action::GroomOther]
+        );
+    }
+
+    #[test]
+    fn action_groom_other_maps_to_grooming_not_socializing() {
+        // 158 regression-pin: picking `Action::GroomOther` at the L3
+        // softmax must commit to the new `Grooming` disposition, not
+        // to `Socializing`. The pre-158 path bundled allogrooming
+        // with `SocializeWith` under Socializing's
+        // `[SocializeWith (2), GroomOther (2)]` template, where A*
+        // pre-pruned the second action because both produced the
+        // same `(SetInteractionDone(true), IncrementTrips)` next-state.
+        assert_eq!(
+            DispositionKind::from_action(Action::GroomOther),
+            Some(DispositionKind::Grooming)
+        );
+        // GroomSelf stays under Resting — Resting still owns the
+        // self-care groom constituent.
+        assert_eq!(
+            DispositionKind::from_action(Action::GroomSelf),
+            Some(DispositionKind::Resting)
+        );
+    }
+
+    #[test]
+    fn grooming_target_completions_is_one_like_mentoring() {
+        // 158: Grooming is single-interaction (Pattern B). Mirrors
+        // Mentoring (also Pattern B, also extracted from Socializing
+        // for the equivalent-effect pre-pruning bug class).
+        let p = test_personality();
+        assert_eq!(DispositionKind::Grooming.target_completions(&p), 1);
+        assert_eq!(DispositionKind::Mentoring.target_completions(&p), 1);
+    }
+
+    #[test]
+    fn grooming_maslow_tier_matches_groom_other_dse() {
+        // 158: Grooming sits at tier 2, matching
+        // `groom_other_dse.maslow_tier()`. One step up from thermal
+        // self-care (GroomSelf rides Resting at tier 1), one step
+        // below Socializing (tier 3) — keeps the affiliative ladder
+        // monotone in need-priority.
+        assert_eq!(DispositionKind::Grooming.maslow_level(), 2);
     }
 
     #[test]

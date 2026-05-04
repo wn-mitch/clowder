@@ -1368,7 +1368,12 @@ pub struct ScoringConstants {
     pub socialize_sociability_scale: f32,
     pub socialize_temper_penalty_scale: f32,
     pub socialize_playfulness_bonus: f32,
-    pub self_groom_temperature_scale: f32,
+    // 158: `self_groom_temperature_scale` retired with the
+    // `self_groom_won` resolver. The field weighted a side-channel
+    // computation (raw thermal-deficit × scale × level_suppression(1))
+    // used only to derive the routing boolean — never the actual L2
+    // score the L3 softmax saw. Splitting `Action::Groom` made the L3
+    // pick directly determinative, so the side-channel went away.
     pub groom_temper_penalty_scale: f32,
     pub explore_curiosity_scale: f32,
     /// Fox scent threshold above which Hunt/Explore scores are suppressed.
@@ -1845,7 +1850,6 @@ impl Default for ScoringConstants {
             socialize_sociability_scale: 2.0,
             socialize_temper_penalty_scale: 0.3,
             socialize_playfulness_bonus: 0.3,
-            self_groom_temperature_scale: 0.6,
             groom_temper_penalty_scale: 0.3,
             explore_curiosity_scale: 0.7,
             fox_scent_suppression_threshold: 0.3,

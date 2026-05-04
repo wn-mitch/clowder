@@ -470,7 +470,10 @@ pub struct ScoringContext<'a> {
 
 /// Length of the per-action cascade-count array. Equals the number of
 /// `Action` enum variants — index via `action as usize`.
-pub const CASCADE_COUNTS_LEN: usize = 22;
+// 158: bumped 22 → 23 to give `Action::GroomSelf` and
+// `Action::GroomOther` distinct cascade / aspiration / preference
+// slots after the `Action::Groom` umbrella retired.
+pub const CASCADE_COUNTS_LEN: usize = 23;
 
 // ---------------------------------------------------------------------------
 // ScoringResult
@@ -873,7 +876,8 @@ pub const CASCADE_COUNT_KEYS: [&str; CASCADE_COUNTS_LEN] = [
     "cascade_count_wander",
     "cascade_count_idle",
     "cascade_count_socialize",
-    "cascade_count_groom",
+    "cascade_count_groom_self",
+    "cascade_count_groom_other",
     "cascade_count_explore",
     "cascade_count_flee",
     "cascade_count_fight",
@@ -900,7 +904,8 @@ pub const ASPIRATION_ACTION_KEYS: [&str; CASCADE_COUNTS_LEN] = [
     "aspiration_action_wander",
     "aspiration_action_idle",
     "aspiration_action_socialize",
-    "aspiration_action_groom",
+    "aspiration_action_groom_self",
+    "aspiration_action_groom_other",
     "aspiration_action_explore",
     "aspiration_action_flee",
     "aspiration_action_fight",
@@ -927,7 +932,8 @@ pub const PREFERENCE_KEYS: [&str; CASCADE_COUNTS_LEN] = [
     "preference_for_wander",
     "preference_for_idle",
     "preference_for_socialize",
-    "preference_for_groom",
+    "preference_for_groom_self",
+    "preference_for_groom_other",
     "preference_for_explore",
     "preference_for_flee",
     "preference_for_fight",
@@ -977,6 +983,10 @@ fn active_disposition_ordinal(
         Some(DispositionKind::Caretaking) => 12.0,
         Some(DispositionKind::Eating) => 13.0,
         Some(DispositionKind::Mentoring) => 14.0,
+        // 158: Grooming appended at ordinal 15 to keep prior ordinals
+        // stable (matches the `DispositionKind::ALL` append-only
+        // discipline established by 150 R5a / 154).
+        Some(DispositionKind::Grooming) => 15.0,
     }
 }
 
@@ -1260,24 +1270,18 @@ pub fn score_actions(
         scores.push((Action::Socialize, score + jitter(rng, s.jitter_range)));
     }
 
-    // --- Groom (§L2.10.10 sibling split: Groom_self + Groom_other;
-    // Max composition retires, the planner reads whichever sibling
-    // scores higher through the DSE registry). For backward
-    // compatibility with the existing `Action::Groom` enum, this
-    // emits a single score that's the max of the two siblings. Phase
-    // 3d will teach selection about the sibling-id mapping so the
-    // Action variant carries which sibling won.
+    // --- Groom (158 / §L2.10.10 Phase 3d): sibling DSEs emit distinct
+    // Action variants. The L3 softmax picks GroomSelf vs GroomOther
+    // directly — no `Max`-collapse, no side-channel `self_groom_won`
+    // resolver. Each Action routes via `from_action` to its own
+    // DispositionKind (GroomSelf → Resting, GroomOther → Grooming).
     {
         let self_score = score_dse_by_id("groom_self", ctx, inputs);
-        let other_score = if ctx.has_social_target {
-            score_dse_by_id("groom_other", ctx, inputs)
-        } else {
-            0.0
-        };
-        scores.push((
-            Action::Groom,
-            self_score.max(other_score) + jitter(rng, s.jitter_range),
-        ));
+        scores.push((Action::GroomSelf, self_score + jitter(rng, s.jitter_range)));
+    }
+    if ctx.has_social_target {
+        let other_score = score_dse_by_id("groom_other", ctx, inputs);
+        scores.push((Action::GroomOther, other_score + jitter(rng, s.jitter_range)));
     }
 
     // --- Explore (§2.3: CP of curiosity + unexplored_nearby) ---
@@ -1713,7 +1717,9 @@ pub fn compute_preference_signals(
     signals
 }
 
-/// Every Action variant — used to walk per-action arrays.
+/// Every Action variant — used to walk per-action arrays. The order
+/// must mirror `Action`'s declaration order so cascade / aspiration /
+/// preference keys map by `Action as usize` ordinal.
 pub const ALL_ACTIONS: [Action; CASCADE_COUNTS_LEN] = [
     Action::Eat,
     Action::Sleep,
@@ -1722,7 +1728,11 @@ pub const ALL_ACTIONS: [Action; CASCADE_COUNTS_LEN] = [
     Action::Wander,
     Action::Idle,
     Action::Socialize,
-    Action::Groom,
+    // 158: Action::Groom split into sibling variants. Each gets its
+    // own cascade slot so per-Action neighbor counts and aspiration
+    // tallies stay distinct between thermal self-care and allogrooming.
+    Action::GroomSelf,
+    Action::GroomOther,
     Action::Explore,
     Action::Flee,
     Action::Fight,
@@ -1863,12 +1873,13 @@ use crate::components::disposition::DispositionKind;
 /// Actions not present in the score list contribute nothing (the disposition
 /// may still appear with score 0.0 if no constituent scored).
 ///
-/// Groom is special: it appears in both Resting (self-groom) and Socializing
-/// (groom-other). The caller should set `self_groom_won` based on whether the
-/// self-groom sub-score beat the other-groom sub-score during action scoring.
+/// 158: the `Action::Groom` umbrella retired into sibling
+/// `Action::GroomSelf` + `Action::GroomOther`, each with a 1:1
+/// disposition mapping (`Resting` and `Grooming` respectively). The
+/// `self_groom_won` resolver parameter retired with the split — the
+/// L3 softmax pick directly carries the self-vs-other distinction.
 pub fn aggregate_to_dispositions(
     action_scores: &[(Action, f32)],
-    self_groom_won: bool,
 ) -> Vec<(DispositionKind, f32)> {
     let mut disposition_scores: Vec<(DispositionKind, f32)> = DispositionKind::ALL
         .iter()
@@ -1878,22 +1889,6 @@ pub fn aggregate_to_dispositions(
     for &(action, score) in action_scores {
         // Skip Flee and Idle — not dispositions.
         if matches!(action, Action::Flee | Action::Idle) {
-            continue;
-        }
-
-        // Groom routes to Resting or Socializing depending on which sub-score won.
-        if action == Action::Groom {
-            let target_kind = if self_groom_won {
-                DispositionKind::Resting
-            } else {
-                DispositionKind::Socializing
-            };
-            if let Some((_, existing)) = disposition_scores
-                .iter_mut()
-                .find(|(k, _)| *k == target_kind)
-            {
-                *existing = existing.max(score);
-            }
             continue;
         }
 
@@ -1963,19 +1958,21 @@ pub fn select_disposition_softmax(
 /// Softmax-over-Intentions dissolves the peer-group collapse: each action
 /// competes equally in the softmax pool with temperature-controlled variety.
 ///
-/// Current behavior vs. legacy path is preserved with two action-level
-/// transforms applied before softmax, so this function is a drop-in
+/// Current behavior vs. legacy path is preserved with one action-level
+/// transform applied before softmax, so this function is a drop-in
 /// replacement for the 2-step aggregate/softmax dance (documented inline
 /// below).
 ///
-/// `self_groom_won` disambiguates the Groom action's disposition (Resting
-/// when self-groom dominates, Socializing when other-groom does).
+/// 158: the `self_groom_won` parameter retired — the `Action::Groom`
+/// umbrella split into `Action::GroomSelf` + `Action::GroomOther`, each
+/// with a 1:1 disposition mapping. The L3 softmax pick directly carries
+/// the self-vs-other distinction; no resolver in between.
+///
 /// `independence` is the cat's personality score; `sc` carries the
 /// `intention_softmax_temperature` and `disposition_independence_penalty`
 /// constants.
 pub fn select_disposition_via_intention_softmax(
     scores: &[(Action, f32)],
-    self_groom_won: bool,
     independence: f32,
     disposition_independence_penalty: f32,
     sc: &ScoringConstants,
@@ -1983,7 +1980,6 @@ pub fn select_disposition_via_intention_softmax(
 ) -> DispositionKind {
     select_disposition_via_intention_softmax_with_trace(
         scores,
-        self_groom_won,
         independence,
         disposition_independence_penalty,
         sc,
@@ -2002,7 +1998,6 @@ pub fn select_disposition_via_intention_softmax(
 /// Non-focal cats pass `None` and incur zero capture cost.
 pub fn select_disposition_via_intention_softmax_with_trace(
     scores: &[(Action, f32)],
-    self_groom_won: bool,
     independence: f32,
     disposition_independence_penalty: f32,
     sc: &ScoringConstants,
@@ -2025,17 +2020,24 @@ pub fn select_disposition_via_intention_softmax_with_trace(
 
     // Port of the legacy disposition-level Independence penalty on
     // Coordinating + Socializing peer-groups. Applied at action level here
-    // on the constituent actions of those dispositions. Groom routes to
-    // Socializing when `self_groom_won == false` and gets the penalty in
-    // that case only — matching legacy behavior where the penalty landed
-    // on `DispositionKind::Socializing` post-aggregation.
+    // on the constituent actions of those dispositions.
+    //
+    // 158: pre-split, `Action::Groom` carried the penalty when
+    // `self_groom_won == false` (matching the legacy
+    // `DispositionKind::Socializing` post-aggregation behavior). Post-split,
+    // the constituent action of `Socializing` is just `Action::Socialize`;
+    // `GroomOther` rides its own `DispositionKind::Grooming` and is not in
+    // the penalty set. This matches the legacy intent: independence
+    // suppresses *coordination-with-others* (Coordinate / Socialize /
+    // Mentor) and *not* the affiliative-touch behavior, which was always
+    // a Resting-tier act when self_groom_won.
     if independence > 0.0 {
         let penalty = independence * disposition_independence_penalty;
         for (action, score) in pool.iter_mut() {
             let penalize = matches!(
                 action,
                 Action::Coordinate | Action::Socialize | Action::Mentor
-            ) || (*action == Action::Groom && !self_groom_won);
+            );
             if penalize {
                 *score = (*score - penalty).max(0.0);
             }
@@ -2093,15 +2095,10 @@ pub fn select_disposition_via_intention_softmax_with_trace(
         sink.pool_pre_penalty = pool_pre_penalty_snapshot;
     }
 
-    // Map the winning Intention → Disposition. Groom routes via
-    // `self_groom_won`; all other dispositioned actions have a 1:1 mapping.
-    if chosen_action == Action::Groom {
-        return if self_groom_won {
-            DispositionKind::Resting
-        } else {
-            DispositionKind::Socializing
-        };
-    }
+    // 158: 1:1 mapping for every dispositioned action. The pre-158
+    // `Action::Groom` umbrella required a side-channel `self_groom_won`
+    // resolver; the sibling-Action split makes the L3 pick directly
+    // determinative.
     DispositionKind::from_action(chosen_action).unwrap_or(DispositionKind::Resting)
 }
 
@@ -2797,6 +2794,10 @@ mod tests {
     /// Cold cat should score Groom highly (self-groom for warmth).
     #[test]
     fn cold_cat_scores_groom_high() {
+        // 158: `Action::Groom` retired into sibling variants — thermal
+        // self-care now scores under `Action::GroomSelf`. The test
+        // pins the underlying invariant: a cold cat should prefer
+        // self-grooming over idling.
         let sc = default_scoring();
         let mut needs = Needs::default();
         needs.temperature = 0.1;
@@ -2812,12 +2813,16 @@ mod tests {
             &mut rng,
         )
         .scores;
-        let groom_score = scores.iter().find(|(a, _)| *a == Action::Groom).unwrap().1;
+        let groom_score = scores
+            .iter()
+            .find(|(a, _)| *a == Action::GroomSelf)
+            .unwrap()
+            .1;
         let idle_score = scores.iter().find(|(a, _)| *a == Action::Idle).unwrap().1;
 
         assert!(
             groom_score > idle_score,
-            "cold cat should score Groom ({groom_score}) above Idle ({idle_score})"
+            "cold cat should score GroomSelf ({groom_score}) above Idle ({idle_score})"
         );
     }
 
@@ -3662,7 +3667,7 @@ mod tests {
             (Action::Eat, 1.0),
             (Action::Sleep, 0.8),
         ];
-        let disp = aggregate_to_dispositions(&scores, true);
+        let disp = aggregate_to_dispositions(&scores);
         let hunting = disp.iter().find(|(k, _)| *k == DispositionKind::Hunting);
         assert_eq!(hunting.unwrap().1, 1.5);
     }
@@ -3670,32 +3675,37 @@ mod tests {
     #[test]
     fn aggregate_takes_max_of_constituent_actions() {
         let scores = vec![(Action::Patrol, 0.5), (Action::Fight, 1.2)];
-        let disp = aggregate_to_dispositions(&scores, true);
+        let disp = aggregate_to_dispositions(&scores);
         let guarding = disp.iter().find(|(k, _)| *k == DispositionKind::Guarding);
         assert_eq!(guarding.unwrap().1, 1.2);
     }
 
     #[test]
     fn aggregate_routes_self_groom_to_resting() {
-        let scores = vec![(Action::Groom, 0.9), (Action::Eat, 0.5)];
-        let disp = aggregate_to_dispositions(&scores, true);
+        // 158: `Action::GroomSelf` maps directly to Resting; no
+        // `self_groom_won` resolver in the loop.
+        let scores = vec![(Action::GroomSelf, 0.9), (Action::Eat, 0.5)];
+        let disp = aggregate_to_dispositions(&scores);
         let resting = disp.iter().find(|(k, _)| *k == DispositionKind::Resting);
         assert_eq!(resting.unwrap().1, 0.9);
-        // Should NOT appear under Socializing
-        let socializing = disp
+        // Should NOT appear under Socializing or Grooming.
+        assert!(disp
             .iter()
-            .find(|(k, _)| *k == DispositionKind::Socializing);
-        assert!(socializing.is_none());
+            .all(|(k, _)| *k != DispositionKind::Socializing && *k != DispositionKind::Grooming));
     }
 
     #[test]
-    fn aggregate_routes_other_groom_to_socializing() {
-        let scores = vec![(Action::Groom, 0.9), (Action::Socialize, 0.5)];
-        let disp = aggregate_to_dispositions(&scores, false);
-        let socializing = disp
-            .iter()
-            .find(|(k, _)| *k == DispositionKind::Socializing);
-        assert_eq!(socializing.unwrap().1, 0.9);
+    fn aggregate_routes_other_groom_to_grooming() {
+        // 158: `Action::GroomOther` maps to the new `Grooming`
+        // disposition (single-action template). Pre-158 this routed
+        // to Socializing via the side-channel `self_groom_won == false`
+        // branch, but the equivalent-effect plan-template caused A* to
+        // pre-prune `GroomOther` after `SocializeWith` claimed the
+        // single goal-state.
+        let scores = vec![(Action::GroomOther, 0.9), (Action::Socialize, 0.5)];
+        let disp = aggregate_to_dispositions(&scores);
+        let grooming = disp.iter().find(|(k, _)| *k == DispositionKind::Grooming);
+        assert_eq!(grooming.unwrap().1, 0.9);
     }
 
     #[test]
@@ -3705,7 +3715,7 @@ mod tests {
             (Action::Idle, 0.1),
             (Action::Hunt, 1.0),
         ];
-        let disp = aggregate_to_dispositions(&scores, true);
+        let disp = aggregate_to_dispositions(&scores);
         assert!(disp.iter().all(|(k, _)| *k != DispositionKind::Resting
             || !disp.iter().any(|(dk, _)| *dk == DispositionKind::Resting)));
         // No disposition should have the Flee score
@@ -3715,7 +3725,7 @@ mod tests {
     #[test]
     fn aggregate_omits_zero_score_dispositions() {
         let scores = vec![(Action::Hunt, 1.0)];
-        let disp = aggregate_to_dispositions(&scores, true);
+        let disp = aggregate_to_dispositions(&scores);
         // Only Hunting should appear
         assert_eq!(disp.len(), 1);
         assert_eq!(disp[0].0, DispositionKind::Hunting);
@@ -4045,7 +4055,6 @@ mod tests {
         let mut capture = SoftmaxCapture::default();
         let _ = select_disposition_via_intention_softmax_with_trace(
             &scores,
-            false,
             0.0,
             0.0,
             &sc,
@@ -4080,7 +4089,6 @@ mod tests {
         let mut capture = SoftmaxCapture::default();
         let chosen = select_disposition_via_intention_softmax_with_trace(
             &scores,
-            false,
             0.0,
             0.0,
             &sc,
@@ -4111,7 +4119,6 @@ mod tests {
         ];
         let plain = select_disposition_via_intention_softmax(
             &scores,
-            false,
             0.0,
             0.0,
             &sc,
@@ -4119,7 +4126,6 @@ mod tests {
         );
         let traced = select_disposition_via_intention_softmax_with_trace(
             &scores,
-            false,
             0.0,
             0.0,
             &sc,

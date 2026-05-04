@@ -517,16 +517,18 @@ impl ScoreModifier for Patience {
 /// one DSE.
 fn constituent_dses_for_ordinal(ordinal: f32) -> Option<&'static [&'static str]> {
     // Round to nearest integer in case of float-fetch noise; compare
-    // against known variants. Values outside `[0, 14]` are treated as
+    // against known variants. Values outside `[0, 15]` are treated as
     // "no active disposition" defensively. 150 R5a appends `Eating` as
-    // ordinal 13; 154 appends `Mentoring` as ordinal 14. Existing
-    // 1..=12 ordinals stay stable across both extensions.
+    // ordinal 13; 154 appends `Mentoring` as ordinal 14; 158 appends
+    // `Grooming` as ordinal 15. Existing 1..=12 ordinals stay stable
+    // across all three extensions.
     let rounded = ordinal.round() as i32;
     match rounded {
         0 => None,
-        // 150 R5a: Resting drops EAT (which moved to the new Eating
-        // disposition at ordinal 13). Sleep + Groom remain.
-        1 => Some(&[SLEEP, GROOM_SELF, GROOM_OTHER]),
+        // 150 R5a: Resting drops EAT (which moved to Eating at
+        // ordinal 13). 158: Resting also drops GROOM_OTHER (which
+        // moved to Grooming at ordinal 15). Sleep + GroomSelf remain.
+        1 => Some(&[SLEEP, GROOM_SELF]),
         // Hunting → Hunt.
         2 => Some(&[HUNT]),
         // Foraging → Forage.
@@ -534,9 +536,10 @@ fn constituent_dses_for_ordinal(ordinal: f32) -> Option<&'static [&'static str]>
         // Guarding → Patrol, Fight.
         4 => Some(&[PATROL, FIGHT]),
         // 154: Socializing drops MENTOR (which moved to the new
-        // Mentoring disposition at ordinal 14). Socialize + Groom
-        // remain.
-        5 => Some(&[SOCIALIZE, GROOM_SELF, GROOM_OTHER]),
+        // Mentoring disposition at ordinal 14). 158: Socializing also
+        // drops GROOM_OTHER (which moved to Grooming at ordinal 15).
+        // Only Socialize remains.
+        5 => Some(&[SOCIALIZE]),
         // Building → Build.
         6 => Some(&[BUILD]),
         // Farming → Farm.
@@ -576,6 +579,10 @@ fn constituent_dses_for_ordinal(ordinal: f32) -> Option<&'static [&'static str]>
         // 154: Mentoring → Mentor. Single-action disposition; lifts
         // apply to the Mentor DSE alone while the cat is committed.
         14 => Some(&[MENTOR]),
+        // 158: Grooming → GroomOther. Single-action disposition;
+        // lifts apply to the groom_other DSE alone while the cat is
+        // committed.
+        15 => Some(&[GROOM_OTHER]),
         _ => None,
     }
 }
@@ -2810,12 +2817,11 @@ const FATED_RIVAL_NEARBY: &str = "fated_rival_nearby";
 /// cat's `FatedLove` partner is awakened and visible (`fated_love_visible
 /// == 1.0`). `score += fated_love_social_bonus`.
 ///
-/// Per-DSE specificity: targets `groom_other` only (not `groom_self`),
-/// ticking up the social-direction interpretation of the legacy
-/// per-Action `Action::Groom` bonus. When `groom_self` outscores
-/// `groom_other` pre-bonus, the post-bonus winner is whichever
-/// `score_actions`'s `max(self, other)` resolves — same selection
-/// shape, but the signal is now per-DSE-honest.
+/// Per-DSE specificity: targets `groom_other` only (not `groom_self`).
+/// 158 split the umbrella `Action::Groom` into sibling
+/// `Action::GroomSelf` + `Action::GroomOther`, so the lift now flows
+/// through `groom_other`'s own L3 pool entry instead of the retired
+/// `max(self, other)` collapse.
 pub struct FatedLoveLift {
     bonus: f32,
 }
@@ -2924,7 +2930,8 @@ impl ActiveDirectiveLift {
             WANDER => Action::Wander,
             IDLE => Action::Idle,
             SOCIALIZE => Action::Socialize,
-            GROOM_SELF | GROOM_OTHER => Action::Groom,
+            GROOM_SELF => Action::GroomSelf,
+            GROOM_OTHER => Action::GroomOther,
             EXPLORE => Action::Explore,
             FLEE => Action::Flee,
             FIGHT => Action::Fight,
@@ -3562,7 +3569,8 @@ mod tests {
                 Action::Hunt => &[HUNT],
                 Action::Forage => &[FORAGE],
                 Action::Socialize => &[SOCIALIZE],
-                Action::Groom => &[GROOM_SELF, GROOM_OTHER],
+                Action::GroomSelf => &[GROOM_SELF],
+                Action::GroomOther => &[GROOM_OTHER],
                 Action::Explore => &[EXPLORE],
                 Action::Wander => &[WANDER],
                 Action::Flee => &[FLEE],
