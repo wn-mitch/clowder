@@ -1,7 +1,7 @@
 ---
 id: 163
 title: Migrate the 9 apply_*_bonus passes into §3.5.1 modifiers (full-batch)
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-04
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: b086c05e
+landed-on: 2026-05-04
 ---
 
 ## Why

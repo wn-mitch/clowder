@@ -4,6 +4,7 @@ version = "0.2.0"
 edition = "2021"
 description = "A terminal-based colony simulation"
 license-file = "LICENSE"
+default-run = "clowder"
 
 [dependencies]
 bevy = "0.18"

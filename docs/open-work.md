@@ -15,10 +15,10 @@ _Last generated: 2026-05-04._
 | Status | Count |
 |---|---|
 | In progress | 9 |
-| Ready | 52 |
+| Ready | 51 |
 | Parked | 5 |
 | Blocked | 19 |
-| **Open total** | **85** |
+| **Open total** | **84** |
 | Pre-existing | 1 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -37,7 +37,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[162](docs/open-work/tickets/162-scenario-harness.md)** — Scenario harness — fast deterministic "what wins" experiments for AI decision triage — _[tooling] · added 2026-05-04_
 
-## Ready (52)
+## Ready (51)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -89,7 +89,6 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[159](docs/open-work/tickets/159-parent-grief-consumer.md)** — Parent grief consumer for kitten / dependent death — _[ai-substrate] · added 2026-05-04_
 - **[160](docs/open-work/tickets/160-substrate-stub-catalogue.md)** — Substrate stub catalogue + lint — fail the build on orphan markers — _[ai-substrate] · added 2026-05-04_
 - **[161](docs/open-work/tickets/161-seed42-fox-attrition-perturbation.md)** — Seed-42 colony collapse after ticket 158 — Bevy scheduler perturbation cascade — _[ai-substrate] · added 2026-05-04_
-- **[163](docs/open-work/tickets/163-l2-trace-incomplete-bonus-pipeline.md)** — Migrate the 9 apply_*_bonus passes into §3.5.1 modifiers (full-batch) — _[ai-substrate] · added 2026-05-04_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _added 2026-04-28_
 
 ## Parked (5)
@@ -126,12 +125,13 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 
-## Landed archive (100)
+## Landed archive (101)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (35)
+### 2026-05 (36)
 
+- **[163](docs/open-work/landed/163-l2-trace-incomplete-bonus-pipeline.md)** — Migrate the 9 apply_*_bonus passes into §3.5.1 modifiers (full-batch) _(2026-05-04)_
 - **[156](docs/open-work/landed/156-kitten-starvation-locality.md)** — Kitten starvation localized at (38,22) post-154 cascade — non-parent adults can't perceive distress _(2026-05-04)_
 - **[154](docs/open-work/landed/154-socializing-mentoring-extraction.md)** — Extract Mentoring from Socializing — split DispositionKind so MentoredCat fires _(2026-05-03)_
 - **[152](docs/open-work/landed/152-tier1-disposition-collapse-audit.md)** — Tier-1 disposition-collapse audit — sweep for sibling Eat-into-Resting defects _(2026-05-03)_

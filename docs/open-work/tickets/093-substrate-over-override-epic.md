@@ -103,6 +103,12 @@ The categories below are the surfaces where hack-shaped patterns live. Each row 
 |---|---|---|---|
 | `src/ai/scoring.rs:916` (retired) + `socialize_target.rs:193` (retired by 078) | lifted-condition outer gate (Bug 2, retired); bias-pin for missing L2 layer (Bug 3, retired by 027b/082) | marker-based eligibility + L2 PairingActivity component | **027** (closed 2026-05-01 on structural verification); **[027b](027b-l2-pairing-activity.md)** (blocked-by 071, reactivation landed via 082) |
 
+### 9. Imperative bonus-passes outside the §3.5 modifier pipeline
+
+| Location | Hack | Lever | Ticket |
+|---|---|---|---|
+| `goap.rs:evaluate_and_plan` + `disposition.rs:cat_presence_tick` (both retired) | nine `apply_*_bonus` passes mutated the per-Action `scores: Vec<(Action, f32)>` after `score_actions` returned and before the softmax read it. The mutations were invisible to the L2 trace's `modifier_deltas` and broke the §11.3 L2-vs-pool invariant by up to ±0.98. | each pass ports to a registered §3.5.1 `ScoreModifier` reading pre-aggregated scalars from `ctx_scalars`. Pre-aggregation lives in the `ScoringContext` builder. | **landed via [163](../landed/163-l2-trace-incomplete-bonus-pipeline.md)** (2026-05-04) — full-batch single-PR migration; locked-invariant test in `tests/scenarios.rs` becomes a permanent CI guard against re-introduction |
+
 ## Substrate prerequisites for hack retirement
 
 The sequencing rule applied across the inventory:

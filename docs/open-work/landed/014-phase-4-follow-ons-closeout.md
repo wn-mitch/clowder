@@ -44,4 +44,12 @@ landed-on: 2026-04-27
 
 **§4 marker catalog status:** all §4.3 markers except the §9.2 faction overlay now have author systems.
 
+**Retro-note (2026-05-04, ticket 163):** the 014 closeout shipped the
+§3.5 modifier-pipeline framework but did not enumerate the 9 pre-existing
+imperative `apply_*_bonus` passes in `goap.rs` / `disposition.rs` as
+out-of-scope. Per CLAUDE.md "antipattern migration follow-ons are
+non-optional" this should have produced a follow-on at land. Ticket 163
+is that follow-on, opened retroactively and migrated all 9 passes into
+registered §3.5.1 modifiers.
+
 ---
