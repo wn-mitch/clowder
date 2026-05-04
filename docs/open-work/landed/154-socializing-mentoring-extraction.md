@@ -1,16 +1,16 @@
 ---
 id: 154
 title: Extract Mentoring from Socializing — split DispositionKind so MentoredCat fires
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-03
 parked: null
 blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
-related-balance: []
-landed-at: null
-landed-on: null
+related-balance: [mentoring-extraction.md]
+landed-at: PENDING
+landed-on: 2026-05-03
 ---
 
 ## Why
@@ -139,3 +139,28 @@ implementation plan.
 - 2026-05-03: opened by ticket 152's audit verdict on the Socializing
   cluster. See `docs/open-work/landed/152-...md` for the layer-walk and
   evidence trail.
+- 2026-05-03: landed at PENDING. R3 (split) implemented per the recommended
+  direction: new `DispositionKind::Mentoring` with single-action
+  `mentoring_actions()` plan template + `InteractionDone(true)` completion
+  proxy (Pattern B, mirrors Mating). Seed-42 deep-soak verification —
+  ticket-154 hard gates pass cleanly: `MentoredCat` off
+  `never_fired_expected_positives`; `continuity_tallies.mentoring = 1614`;
+  Socialize/Groom didn't collapse. A structural cascade fired through the
+  social/relational layer (predicted in `docs/balance/mentoring-extraction.md`
+  Iter 1): bonds_formed +867%, kittens_born 0→6, welfare +40%, aggregate
+  score +88%, anxiety_interrupt_total −65%, deaths_injury −63%. The
+  cascade enabled two new failure modes that violate CLAUDE.md hard
+  gates and are tracked as follow-on tickets opened in this same commit:
+  - **156** — kitten starvation localized at (38,22) post-cascade
+    (`Starvation = 2`, both kittens; CLAUDE.md `==0` gate). Caretaking
+    is healthy run-wide (1631 KittenFed events) — localized
+    range/scheduling miss, not systemic break.
+  - **157** — burial continuity canary dark (`burial = 0`). Likely an
+    eligibility-predicate match against the new death distribution;
+    investigation step required.
+  - **158** — `GroomedOther` stays in `never_fired_expected_positives`
+    after the split, confirming the parent ticket's permitted
+    investigation step. Defect-shape is either self-vs-other resolver
+    bias or planner equal-cost tie-break; structural recommended
+    direction is splitting `Action::Groom` into `GroomSelf` +
+    `GroomOther` (R3).

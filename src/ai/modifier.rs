@@ -456,9 +456,10 @@ impl ScoreModifier for Patience {
 /// one DSE.
 fn constituent_dses_for_ordinal(ordinal: f32) -> Option<&'static [&'static str]> {
     // Round to nearest integer in case of float-fetch noise; compare
-    // against known variants. Values outside `[0, 13]` are treated as
+    // against known variants. Values outside `[0, 14]` are treated as
     // "no active disposition" defensively. 150 R5a appends `Eating` as
-    // ordinal 13 so existing 1..=12 ordinals stay stable.
+    // ordinal 13; 154 appends `Mentoring` as ordinal 14. Existing
+    // 1..=12 ordinals stay stable across both extensions.
     let rounded = ordinal.round() as i32;
     match rounded {
         0 => None,
@@ -471,8 +472,10 @@ fn constituent_dses_for_ordinal(ordinal: f32) -> Option<&'static [&'static str]>
         3 => Some(&[FORAGE]),
         // Guarding → Patrol, Fight.
         4 => Some(&[PATROL, FIGHT]),
-        // Socializing → Socialize, Groom, Mentor.
-        5 => Some(&[SOCIALIZE, GROOM_SELF, GROOM_OTHER, MENTOR]),
+        // 154: Socializing drops MENTOR (which moved to the new
+        // Mentoring disposition at ordinal 14). Socialize + Groom
+        // remain.
+        5 => Some(&[SOCIALIZE, GROOM_SELF, GROOM_OTHER]),
         // Building → Build.
         6 => Some(&[BUILD]),
         // Farming → Farm.
@@ -509,6 +512,9 @@ fn constituent_dses_for_ordinal(ordinal: f32) -> Option<&'static [&'static str]>
         // Patience and CommitmentTenure lifts apply to the Eat DSE
         // alone while the cat is committed to Eating.
         13 => Some(&[EAT]),
+        // 154: Mentoring → Mentor. Single-action disposition; lifts
+        // apply to the Mentor DSE alone while the cat is committed.
+        14 => Some(&[MENTOR]),
         _ => None,
     }
 }

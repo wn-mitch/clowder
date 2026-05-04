@@ -180,6 +180,10 @@ pub fn apply_disposition_failure_cooldown(
 /// because their step graphs don't share the
 /// `make_plan → None` retry pattern (different completion semantics
 /// or different planner-failure modes).
+///
+/// 154: Mentoring joins the whitelist alongside Mating — same shape
+/// (single SocialTarget zone precondition; no reachable target →
+/// `make_plan` fails).
 fn is_failure_prone_disposition(kind: DispositionKind) -> bool {
     matches!(
         kind,
@@ -189,6 +193,7 @@ fn is_failure_prone_disposition(kind: DispositionKind) -> bool {
             | DispositionKind::Caretaking
             | DispositionKind::Building
             | DispositionKind::Mating
+            | DispositionKind::Mentoring
     )
 }
 

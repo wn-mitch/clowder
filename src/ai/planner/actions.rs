@@ -166,6 +166,11 @@ pub fn guarding_actions() -> Vec<GoapActionDef> {
 }
 
 pub fn socializing_actions() -> Vec<GoapActionDef> {
+    // 154: MentorCat extracted into `mentoring_actions()` so the L3
+    // pick on `Action::Mentor` survives the disposition collapse instead
+    // of getting crowded out by the cheaper sibling steps under a
+    // count-based completion goal. See ticket 154 for the cost-asymmetry
+    // rationale.
     vec![
         GoapActionDef {
             kind: GoapActionKind::SocializeWith,
@@ -185,16 +190,22 @@ pub fn socializing_actions() -> Vec<GoapActionDef> {
                 StateEffect::IncrementTrips,
             ],
         },
-        GoapActionDef {
-            kind: GoapActionKind::MentorCat,
-            cost: 3,
-            preconditions: vec![StatePredicate::ZoneIs(PlannerZone::SocialTarget)],
-            effects: vec![
-                StateEffect::SetInteractionDone(true),
-                StateEffect::IncrementTrips,
-            ],
-        },
     ]
+}
+
+/// 154: single-action template for the new `Mentoring` disposition.
+/// Pattern-B (interaction-based, single-trip) — clones the shape of
+/// `mating_actions()`. Completion proxy is `InteractionDone(true)`
+/// (set in `goal_for_disposition`); no trip counter, so the executor
+/// resolves on the first successful mentor session and the L3 Mentor
+/// pick can't be overridden by sibling cost-asymmetry.
+pub fn mentoring_actions() -> Vec<GoapActionDef> {
+    vec![GoapActionDef {
+        kind: GoapActionKind::MentorCat,
+        cost: 3,
+        preconditions: vec![StatePredicate::ZoneIs(PlannerZone::SocialTarget)],
+        effects: vec![StateEffect::SetInteractionDone(true)],
+    }]
 }
 
 /// Building plans a haul→deliver→construct sequence. The planner emits
@@ -572,6 +583,7 @@ pub fn actions_for_disposition(
         DispositionKind::Exploring => exploring_actions(),
         DispositionKind::Mating => mating_actions(),
         DispositionKind::Caretaking => caretaking_actions(),
+        DispositionKind::Mentoring => mentoring_actions(),
     };
     actions.extend(domain_actions);
     actions
@@ -1057,6 +1069,68 @@ mod tests {
                 GoapActionKind::MateWith,
             ]
         );
+    }
+
+    #[test]
+    fn mentoring_plan() {
+        // 154: Mentoring's plan template is single-action
+        // `[TravelTo(SocialTarget), MentorCat]`, mirroring Mating.
+        // Critically, MentorCat's effect is `SetInteractionDone(true)`
+        // only — no `IncrementTrips`. The completion proxy at
+        // `goal_for_disposition` is `InteractionDone(true)` (Pattern
+        // B), so the planner resolves on the first successful mentor
+        // session and the L3 Mentor pick can't be overridden by
+        // sibling-step cost-asymmetry.
+        let start = default_state();
+        let goal = GoalState {
+            predicates: vec![StatePredicate::InteractionDone(true)],
+        };
+        let distances = basic_distances();
+        let actions = actions_for_disposition(DispositionKind::Mentoring, None, &distances);
+
+        let plan = plan!(start, &actions, &goal, 12, 1000).expect("plan found");
+        let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                GoapActionKind::TravelTo(PlannerZone::SocialTarget),
+                GoapActionKind::MentorCat,
+            ]
+        );
+
+        // Direct shape check: mentoring_actions returns exactly one
+        // GoapActionDef whose effects are InteractionDone-only.
+        let only = mentoring_actions();
+        assert_eq!(only.len(), 1);
+        assert_eq!(only[0].kind, GoapActionKind::MentorCat);
+        assert!(only[0]
+            .effects
+            .iter()
+            .any(|e| matches!(e, StateEffect::SetInteractionDone(true))));
+        assert!(
+            !only[0]
+                .effects
+                .iter()
+                .any(|e| matches!(e, StateEffect::IncrementTrips)),
+            "mentoring_actions must not IncrementTrips — Pattern B (interaction-based, single-trip)"
+        );
+    }
+
+    #[test]
+    fn socializing_plan_drops_mentor_step() {
+        // 154 sibling: Socializing's template is now 2-action
+        // `[SocializeWith, GroomOther]` after MentorCat extracted into
+        // `mentoring_actions`. `actions_for_disposition` for Socializing
+        // must not contain MentorCat.
+        let distances = basic_distances();
+        let actions = actions_for_disposition(DispositionKind::Socializing, None, &distances);
+        let kinds: Vec<_> = actions.iter().map(|a| a.kind).collect();
+        assert!(
+            !kinds.contains(&GoapActionKind::MentorCat),
+            "Socializing template must not include MentorCat after 154 split"
+        );
+        assert!(kinds.contains(&GoapActionKind::SocializeWith));
+        assert!(kinds.contains(&GoapActionKind::GroomOther));
     }
 
     #[test]

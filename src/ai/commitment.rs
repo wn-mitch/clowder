@@ -208,6 +208,10 @@ pub fn strategy_for_disposition(kind: DispositionKind) -> CommitmentStrategy {
         DispositionKind::Caretaking => SingleMinded,
         // L3 layer — goal-shaped single event.
         DispositionKind::Mating => SingleMinded,
+        // 154: Mentoring is L3-shaped (single-interaction Pattern B,
+        // mirrors Mating). SingleMinded prevents mid-session drop on
+        // mood drift — a brief, high-value act should resolve.
+        DispositionKind::Mentoring => SingleMinded,
         // Activity-shaped — desire drift should terminate.
         DispositionKind::Socializing => OpenMinded,
         DispositionKind::Exploring => OpenMinded,
@@ -277,6 +281,14 @@ pub fn proxies_for_plan(
             plan.trips_done > 0 && needs.hunger >= d.resting_complete_hunger
         }
         DispositionKind::Mating => plan.trips_done >= 1,
+        // 154: Mentoring mirrors Mating's single-interaction proxy.
+        // The plan template has one MentorCat step with
+        // `SetInteractionDone(true)` and no `IncrementTrips`; the
+        // executor still bumps `plan.trips_done` to 1 on plan
+        // exhaustion (goap.rs:2329 increments per-exhaustion, not per
+        // IncrementTrips effect), so `>= 1` reads as "one mentor
+        // session has resolved."
+        DispositionKind::Mentoring => plan.trips_done >= 1,
         // Guarding is triggered by low safety (`CriticalSafety` urgency
         // fires when `needs.safety < critical_safety_threshold`; the
         // Patrol DSE's `safety_deficit` consideration gates on the same
@@ -691,6 +703,7 @@ mod tests {
             Mating,
             Socializing,
             Exploring,
+            Mentoring,
         ];
         assert_eq!(
             covered.len(),

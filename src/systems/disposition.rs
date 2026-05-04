@@ -1569,6 +1569,10 @@ pub fn disposition_to_chain(
                 caretake_resolution.target_pos,
                 nearest_store,
             ),
+            // 154: legacy chain-building path mirrors Mating's single-
+            // interaction shape. Dead-code arm (the GOAP planner is the
+            // live path), retained for type-system completeness.
+            DispositionKind::Mentoring => build_mentoring_chain(mentor_target, &cat_pos_list),
         };
 
         if let Some((mut chain, action)) = chain {
@@ -2610,6 +2614,32 @@ fn build_mating_chain(
         FailurePolicy::AbortChain,
     );
     Some((chain, Action::Mate))
+}
+
+/// 154: Mentoring chain — MoveTo apprentice, then MentorCat. Mirrors
+/// `build_mating_chain` since both are single-interaction Pattern-B
+/// dispositions. Legacy path (per the 150 R5a comment on the chain
+/// dispatch); the GOAP planner is the live path.
+fn build_mentoring_chain(
+    mentor_target: Option<Entity>,
+    cat_positions: &[(Entity, Position)],
+) -> Option<(TaskChain, Action)> {
+    let apprentice = mentor_target?;
+    let apprentice_pos = *cat_positions
+        .iter()
+        .find(|(e, _)| *e == apprentice)
+        .map(|(_, p)| p)?;
+
+    let chain = TaskChain::new(
+        vec![
+            TaskStep::new(StepKind::MoveTo).with_position(apprentice_pos),
+            TaskStep::new(StepKind::MentorCat)
+                .with_position(apprentice_pos)
+                .with_entity(apprentice),
+        ],
+        FailurePolicy::AbortChain,
+    );
+    Some((chain, Action::Mentor))
 }
 
 // ===========================================================================

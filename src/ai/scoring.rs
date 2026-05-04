@@ -742,6 +742,7 @@ fn active_disposition_ordinal(
         Some(DispositionKind::Mating) => 11.0,
         Some(DispositionKind::Caretaking) => 12.0,
         Some(DispositionKind::Eating) => 13.0,
+        Some(DispositionKind::Mentoring) => 14.0,
     }
 }
 

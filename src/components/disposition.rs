@@ -58,7 +58,14 @@ pub enum DispositionKind {
     Foraging,
     /// Patrol perimeter and fight threats until safety is restored.
     Guarding,
-    /// Socialize, groom others, mentor until social needs are met.
+    /// Socialize and groom others until social needs are met.
+    ///
+    /// 154: split — Mentor is no longer a constituent of Socializing.
+    /// Picking `Action::Mentor` now commits to `Mentoring`, not
+    /// Socializing; the L3 softmax pick survives the
+    /// disposition-collapse instead of getting crowded out by the
+    /// cheaper sibling steps under a count-based completion goal.
+    /// See `docs/open-work/tickets/154-socializing-mentoring-extraction.md`.
     Socializing,
     /// Build or repair structures (existing TaskChain-driven).
     Building,
@@ -74,6 +81,16 @@ pub enum DispositionKind {
     Mating,
     /// Feed and groom dependent kittens.
     Caretaking,
+    /// Mentor a younger or less-skilled cat — single-interaction skill
+    /// transfer.
+    ///
+    /// 154: new — separated from Socializing so picking Mentor at the
+    /// L3 softmax doesn't get crowded out by cheaper sibling steps
+    /// (SocializeWith / GroomOther) under a `TripsAtLeast(N+1)`
+    /// completion goal. Plan template is `[MentorCat]` with
+    /// `InteractionDone(true)` completion proxy (Pattern B, mirrors
+    /// Mating). Tier 3.
+    Mentoring,
 }
 
 impl DispositionKind {
@@ -91,6 +108,10 @@ impl DispositionKind {
             Self::Caretaking => 1 + (personality.compassion * 2.0).round() as u32,
             // Single-event dispositions.
             Self::Mating => return 1,
+            // 154: Mentoring is a single-interaction disposition (Pattern B,
+            // matches Mating). One mentor session per commitment; the
+            // completion proxy is `InteractionDone(true)`, not a trip count.
+            Self::Mentoring => return 1,
             // Chain-driven dispositions complete when their chain finishes.
             Self::Building | Self::Farming | Self::Crafting | Self::Coordinating => 1,
             // 150 R5a: Eating completes on need threshold, not count.
@@ -120,7 +141,10 @@ impl DispositionKind {
             Action::Hunt => Some(Self::Hunting),
             Action::Forage => Some(Self::Foraging),
             Action::Patrol | Action::Fight => Some(Self::Guarding),
-            Action::Socialize | Action::Mentor => Some(Self::Socializing),
+            // 154: Mentor splits out of Socializing — see DispositionKind
+            // doc-comment for the cost-asymmetry rationale.
+            Action::Socialize => Some(Self::Socializing),
+            Action::Mentor => Some(Self::Mentoring),
             Action::Groom => None, // Depends on self vs other — caller decides
             Action::Build => Some(Self::Building),
             Action::Farm => Some(Self::Farming),
@@ -141,6 +165,8 @@ impl DispositionKind {
     ///
     /// 150 R5a: Resting drops `Action::Eat`; the new `Eating` variant
     /// owns it.
+    /// 154: Socializing drops `Action::Mentor`; the new `Mentoring`
+    /// variant owns it.
     pub fn constituent_actions(&self) -> &[Action] {
         match self {
             Self::Resting => &[Action::Sleep, Action::Groom],
@@ -148,7 +174,7 @@ impl DispositionKind {
             Self::Hunting => &[Action::Hunt],
             Self::Foraging => &[Action::Forage],
             Self::Guarding => &[Action::Patrol, Action::Fight],
-            Self::Socializing => &[Action::Socialize, Action::Groom, Action::Mentor],
+            Self::Socializing => &[Action::Socialize, Action::Groom],
             Self::Building => &[Action::Build],
             Self::Farming => &[Action::Farm],
             Self::Crafting => &[Action::Herbcraft, Action::PracticeMagic, Action::Cook],
@@ -156,6 +182,7 @@ impl DispositionKind {
             Self::Exploring => &[Action::Explore, Action::Wander],
             Self::Mating => &[Action::Mate],
             Self::Caretaking => &[Action::Caretake],
+            Self::Mentoring => &[Action::Mentor],
         }
     }
 
@@ -167,6 +194,7 @@ impl DispositionKind {
     /// `modifier::constituent_dses_for_ordinal` stable for the
     /// pre-existing 12 variants. Saved soaks and hand-written
     /// ordinal-equality tests don't need rebasing.
+    /// 154: `Mentoring` is appended at ordinal 14 for the same reason.
     pub const ALL: &[Self] = &[
         Self::Resting,
         Self::Hunting,
@@ -181,6 +209,7 @@ impl DispositionKind {
         Self::Mating,
         Self::Caretaking,
         Self::Eating,
+        Self::Mentoring,
     ];
 
     /// Human-readable label for the inspect panel.
@@ -199,6 +228,7 @@ impl DispositionKind {
             Self::Exploring => "Exploring",
             Self::Mating => "Mating",
             Self::Caretaking => "Caretaking",
+            Self::Mentoring => "Mentoring",
         }
     }
 
@@ -210,7 +240,7 @@ impl DispositionKind {
             // 150 R5a: Eating shares Resting's tier 1 — both physiological.
             Self::Resting | Self::Eating | Self::Hunting | Self::Foraging => 1,
             Self::Guarding => 2,
-            Self::Socializing | Self::Caretaking | Self::Mating => 3,
+            Self::Socializing | Self::Caretaking | Self::Mating | Self::Mentoring => 3,
             Self::Crafting | Self::Coordinating | Self::Building | Self::Farming => 4,
             Self::Exploring => 5,
         }
@@ -232,6 +262,7 @@ impl DispositionKind {
             Self::Exploring => "explore",
             Self::Mating => "find a mate",
             Self::Caretaking => "tend the young",
+            Self::Mentoring => "mentor",
         }
     }
 }
@@ -506,22 +537,85 @@ mod tests {
     }
 
     #[test]
-    fn all_includes_eating_appended() {
-        // 150 R5a: Eating is appended to ALL (not inserted between
-        // Resting and Hunting) so positional ordinals in
+    fn all_includes_eating_then_mentoring_appended() {
+        // 150 R5a appends Eating at ordinal 13; 154 appends Mentoring
+        // at ordinal 14. Both append (rather than insert near related
+        // variants) so positional ordinals in
         // `scoring::active_disposition_ordinal` and
         // `modifier::constituent_dses_for_ordinal` stay stable for the
-        // pre-existing 12 variants.
-        assert_eq!(DispositionKind::ALL.len(), 13);
+        // pre-existing variants. Saved soaks and ordinal-equality
+        // tests don't need rebasing.
+        assert_eq!(DispositionKind::ALL.len(), 14);
         assert_eq!(
             DispositionKind::ALL.last(),
-            Some(&DispositionKind::Eating)
+            Some(&DispositionKind::Mentoring)
+        );
+        assert_eq!(
+            DispositionKind::ALL[12],
+            DispositionKind::Eating,
+            "Eating must remain at ordinal-13 position"
         );
         assert_eq!(
             DispositionKind::ALL.first(),
             Some(&DispositionKind::Resting),
             "Resting must remain at ordinal-1 position"
         );
+    }
+
+    #[test]
+    fn action_mentor_maps_to_mentoring_not_socializing() {
+        // 154 regression-pin: picking `Action::Mentor` at the L3
+        // softmax must commit to the new `Mentoring` disposition, not
+        // to `Socializing`. The old mapping bundled Mentor with
+        // Socialize + Groom under Socializing, where MentorCat (cost
+        // 3) lost on every plan to the cheaper SocializeWith /
+        // GroomOther steps under a count-based completion goal.
+        assert_eq!(
+            DispositionKind::from_action(Action::Mentor),
+            Some(DispositionKind::Mentoring)
+        );
+        // Socialize stays under Socializing — Socializing still owns
+        // the chitchat constituent.
+        assert_eq!(
+            DispositionKind::from_action(Action::Socialize),
+            Some(DispositionKind::Socializing)
+        );
+    }
+
+    #[test]
+    fn socializing_constituents_drop_mentor() {
+        // 154: Socializing owns Socialize + Groom only; Mentoring
+        // owns Mentor.
+        assert_eq!(
+            DispositionKind::Socializing.constituent_actions(),
+            &[Action::Socialize, Action::Groom]
+        );
+        assert_eq!(
+            DispositionKind::Mentoring.constituent_actions(),
+            &[Action::Mentor]
+        );
+    }
+
+    #[test]
+    fn mentoring_target_completions_is_one_like_mating() {
+        // 154: Mentoring is single-interaction (Pattern B). Mirrors
+        // Mating's hardcoded `return 1`. The completion proxy at the
+        // planner layer is `InteractionDone(true)`, not a trip count;
+        // `target_completions` of 1 keeps the count-based fallback in
+        // sync (`trips_done >= target_trips` reads as complete after
+        // one plan-exhaustion).
+        let p = test_personality();
+        assert_eq!(DispositionKind::Mentoring.target_completions(&p), 1);
+        assert_eq!(DispositionKind::Mating.target_completions(&p), 1);
+    }
+
+    #[test]
+    fn mentoring_shares_socializing_maslow_tier() {
+        // 154: Mentoring is tier 3 (matches Mating / Socializing /
+        // Caretaking). Skill transfer is social-coordination work,
+        // not physiological.
+        assert_eq!(DispositionKind::Mentoring.maslow_level(), 3);
+        assert_eq!(DispositionKind::Socializing.maslow_level(), 3);
     }
 
     #[test]

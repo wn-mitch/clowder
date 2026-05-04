@@ -49,8 +49,13 @@ pub fn goal_for_disposition(
             predicates: vec![StatePredicate::ConstructionDone(true)],
         },
 
-        // Mating and Coordinating complete on interaction.
-        DispositionKind::Mating | DispositionKind::Coordinating => GoalState {
+        // Mating, Coordinating, and Mentoring complete on interaction.
+        // 154: Mentoring joins Pattern B so MentorCat resolves on the
+        // first successful interaction instead of fighting cheaper
+        // sibling Socialize/Groom steps under a count-based goal.
+        DispositionKind::Mating
+        | DispositionKind::Coordinating
+        | DispositionKind::Mentoring => GoalState {
             predicates: vec![StatePredicate::InteractionDone(true)],
         },
 
@@ -223,6 +228,23 @@ mod tests {
         let m = food_stocked_markers();
         let cx = ctx(&m);
         let goal = goal_for_disposition(DispositionKind::Mating, 0, &cx);
+        assert!(!goal.is_satisfied(&default_state(), &cx));
+
+        let done = PlannerState {
+            interaction_done: true,
+            ..default_state()
+        };
+        assert!(goal.is_satisfied(&done, &cx));
+    }
+
+    #[test]
+    fn mentoring_goal_checks_interaction() {
+        // 154: Mentoring's completion proxy is `InteractionDone(true)`
+        // (Pattern B, mirrors Mating). Sharing the proxy ensures the
+        // L3 Mentor pick survives the disposition collapse intact.
+        let m = food_stocked_markers();
+        let cx = ctx(&m);
+        let goal = goal_for_disposition(DispositionKind::Mentoring, 0, &cx);
         assert!(!goal.is_satisfied(&default_state(), &cx));
 
         let done = PlannerState {
