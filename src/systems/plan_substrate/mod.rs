@@ -50,9 +50,9 @@ pub use lifecycle::{
     abandon_plan, record_step_failure, try_preempt, PreemptKind, PreemptOutcome,
 };
 pub use sensors::{
-    apply_disposition_failure_cooldown, cooldown_curve,
-    disposition_recent_failure_age_normalized, prune_recent_disposition_failures,
-    prune_recent_target_failures, target_recent_failure_age_normalized,
+    cooldown_curve, disposition_recent_failure_age_normalized,
+    prune_recent_disposition_failures, prune_recent_target_failures,
+    target_recent_failure_age_normalized,
 };
 pub use target::{
     carry_target_forward, expire_reservations, release_target, require_alive_and_unreserved_filter,

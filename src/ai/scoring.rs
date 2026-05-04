@@ -406,6 +406,17 @@ pub struct ScoringContext<'a> {
     /// Populated by the ScoringContext builders (`goap.rs`, `disposition.rs`)
     /// once per scoring tick. See [`CatAnchorPositions`] doc for details.
     pub cat_anchors: CatAnchorPositions,
+    // --- Disposition-failure cooldown signals: 1.0 = no recent failure
+    // (no damp), 0.0 = just failed (full damp). One per failure-prone
+    // `DispositionKind`. Read by `DispositionFailureCooldown` in
+    // `src/ai/modifier.rs`.
+    pub disposition_failure_signal_hunting: f32,
+    pub disposition_failure_signal_foraging: f32,
+    pub disposition_failure_signal_crafting: f32,
+    pub disposition_failure_signal_caretaking: f32,
+    pub disposition_failure_signal_building: f32,
+    pub disposition_failure_signal_mating: f32,
+    pub disposition_failure_signal_mentoring: f32,
 }
 
 // ---------------------------------------------------------------------------
@@ -718,6 +729,36 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
     m.insert(
         "social_warmth_deficit",
         ctx.social_warmth_deficit.clamp(0.0, 1.0),
+    );
+    // Disposition-failure cooldown signals — read by
+    // `DispositionFailureCooldown` (src/ai/modifier.rs).
+    m.insert(
+        "disposition_failure_signal_hunting",
+        ctx.disposition_failure_signal_hunting,
+    );
+    m.insert(
+        "disposition_failure_signal_foraging",
+        ctx.disposition_failure_signal_foraging,
+    );
+    m.insert(
+        "disposition_failure_signal_crafting",
+        ctx.disposition_failure_signal_crafting,
+    );
+    m.insert(
+        "disposition_failure_signal_caretaking",
+        ctx.disposition_failure_signal_caretaking,
+    );
+    m.insert(
+        "disposition_failure_signal_building",
+        ctx.disposition_failure_signal_building,
+    );
+    m.insert(
+        "disposition_failure_signal_mating",
+        ctx.disposition_failure_signal_mating,
+    );
+    m.insert(
+        "disposition_failure_signal_mentoring",
+        ctx.disposition_failure_signal_mentoring,
     );
     m
 }
@@ -1843,11 +1884,9 @@ pub fn select_disposition_via_intention_softmax_with_trace(
         .copied()
         .collect();
 
-    // Ticket-163 trace surface: snapshot the post-filter, pre-Independence-
-    // penalty pool. Locks the §11.3 L2-vs-pool invariant — comparing this
-    // against the caller-snapshotted `pre_bonus_pool` detects regressions
-    // where a future code path mutates scores between `score_actions` exit
-    // and softmax entry.
+    // Snapshot for the L2-vs-pool invariant in tests/scenarios.rs:
+    // pairs with the caller's pre-bonus snapshot to detect any code
+    // that mutates scores between score_actions exit and softmax entry.
     let pool_pre_penalty_snapshot = pool.clone();
 
     // Port of the legacy disposition-level Independence penalty on
@@ -1945,14 +1984,10 @@ pub fn select_disposition_via_intention_softmax_with_trace(
 /// lets consumers distinguish "softmax ran and picked" from
 /// "softmax skipped entirely".
 ///
-/// `pre_bonus_pool` and `pool_pre_penalty` are ticket-163 trace surfaces
-/// that lock the §11.3 L2-vs-pool invariant: post-migration the score
-/// Vec is identical at score_actions exit and at softmax entry, so the
-/// L2 trace's `final_score` mirrors what the softmax sees (modulo jitter,
-/// DSE→Action max-collapse, and the Independence penalty applied last).
-/// Caller-side, `pre_bonus_pool` is a clone of the score Vec at
-/// score_actions exit; `pool_pre_penalty` is the post-filter,
-/// pre-Independence-penalty pool the softmax saw.
+/// `pre_bonus_pool` and `pool_pre_penalty` lock the §11.3 L2-vs-pool
+/// invariant: the score Vec must be identical at score_actions exit
+/// and at softmax entry. The locked test in `tests/scenarios.rs`
+/// asserts equality per-action.
 #[derive(Debug, Default, Clone)]
 pub struct SoftmaxCapture {
     pub pool: Vec<(Action, f32)>,
@@ -1963,13 +1998,11 @@ pub struct SoftmaxCapture {
     pub chosen_idx: Option<usize>,
     pub chosen_action: Option<Action>,
     pub empty_pool: bool,
-    /// Score Vec snapshot at `score_actions` exit (caller-populated).
-    /// Empty when the caller did not snapshot (non-focal cat path or
-    /// pre-163 callers).
+    /// Score Vec snapshot at `score_actions` exit. Empty for non-focal
+    /// cats (caller skips the snapshot when there's no trace consumer).
     pub pre_bonus_pool: Vec<(Action, f32)>,
     /// Post-filter, pre-Independence-penalty pool the softmax saw.
-    /// Populated inside the softmax helper. Empty on the early-return
-    /// empty-pool branch.
+    /// Empty on the early-return empty-pool branch.
     pub pool_pre_penalty: Vec<(Action, f32)>,
 }
 
@@ -2223,6 +2256,13 @@ mod tests {
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
             cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)), own_safe_rest_spot: Some(Position::new(0, 0)), own_injury_site: Some(Position::new(0, 0)) },
+            disposition_failure_signal_hunting: 1.0,
+            disposition_failure_signal_foraging: 1.0,
+            disposition_failure_signal_crafting: 1.0,
+            disposition_failure_signal_caretaking: 1.0,
+            disposition_failure_signal_building: 1.0,
+            disposition_failure_signal_mating: 1.0,
+            disposition_failure_signal_mentoring: 1.0,
         }
     }
 
@@ -2376,6 +2416,13 @@ mod tests {
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
             cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)), own_safe_rest_spot: Some(Position::new(0, 0)), own_injury_site: Some(Position::new(0, 0)) },
+            disposition_failure_signal_hunting: 1.0,
+            disposition_failure_signal_foraging: 1.0,
+            disposition_failure_signal_crafting: 1.0,
+            disposition_failure_signal_caretaking: 1.0,
+            disposition_failure_signal_building: 1.0,
+            disposition_failure_signal_mating: 1.0,
+            disposition_failure_signal_mentoring: 1.0,
         };
         // §L2.10.7: this test sets `food_available: false`,
         // `has_functional_kitchen: false`, etc. on the context, but
@@ -2552,6 +2599,13 @@ mod tests {
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
             cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)), own_safe_rest_spot: Some(Position::new(0, 0)), own_injury_site: Some(Position::new(0, 0)) },
+            disposition_failure_signal_hunting: 1.0,
+            disposition_failure_signal_foraging: 1.0,
+            disposition_failure_signal_crafting: 1.0,
+            disposition_failure_signal_caretaking: 1.0,
+            disposition_failure_signal_building: 1.0,
+            disposition_failure_signal_mating: 1.0,
+            disposition_failure_signal_mentoring: 1.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let socialize_score = scores
@@ -2818,6 +2872,13 @@ mod tests {
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
             cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)), own_safe_rest_spot: Some(Position::new(0, 0)), own_injury_site: Some(Position::new(0, 0)) },
+            disposition_failure_signal_hunting: 1.0,
+            disposition_failure_signal_foraging: 1.0,
+            disposition_failure_signal_crafting: 1.0,
+            disposition_failure_signal_caretaking: 1.0,
+            disposition_failure_signal_building: 1.0,
+            disposition_failure_signal_mating: 1.0,
+            disposition_failure_signal_mentoring: 1.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let best = select_best_action(&scores);
@@ -2900,6 +2961,13 @@ mod tests {
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
             cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)), own_safe_rest_spot: Some(Position::new(0, 0)), own_injury_site: Some(Position::new(0, 0)) },
+            disposition_failure_signal_hunting: 1.0,
+            disposition_failure_signal_foraging: 1.0,
+            disposition_failure_signal_crafting: 1.0,
+            disposition_failure_signal_caretaking: 1.0,
+            disposition_failure_signal_building: 1.0,
+            disposition_failure_signal_mating: 1.0,
+            disposition_failure_signal_mentoring: 1.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let fight_score = scores.iter().find(|(a, _)| *a == Action::Fight).unwrap().1;
@@ -3001,6 +3069,13 @@ mod tests {
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
             cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)), own_safe_rest_spot: Some(Position::new(0, 0)), own_injury_site: Some(Position::new(0, 0)) },
+            disposition_failure_signal_hunting: 1.0,
+            disposition_failure_signal_foraging: 1.0,
+            disposition_failure_signal_crafting: 1.0,
+            disposition_failure_signal_caretaking: 1.0,
+            disposition_failure_signal_building: 1.0,
+            disposition_failure_signal_mating: 1.0,
+            disposition_failure_signal_mentoring: 1.0,
         };
         // Build a per-test MarkerSnapshot with Incapacitated set for
         // this cat (the cached shared snapshot only carries colony
@@ -3319,6 +3394,13 @@ mod tests {
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
             cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)), own_safe_rest_spot: Some(Position::new(0, 0)), own_injury_site: Some(Position::new(0, 0)) },
+            disposition_failure_signal_hunting: 1.0,
+            disposition_failure_signal_foraging: 1.0,
+            disposition_failure_signal_crafting: 1.0,
+            disposition_failure_signal_caretaking: 1.0,
+            disposition_failure_signal_building: 1.0,
+            disposition_failure_signal_mating: 1.0,
+            disposition_failure_signal_mentoring: 1.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let wander = scores.iter().find(|(a, _)| *a == Action::Wander).unwrap().1;
@@ -3402,6 +3484,13 @@ mod tests {
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
             cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)), own_safe_rest_spot: Some(Position::new(0, 0)), own_injury_site: Some(Position::new(0, 0)) },
+            disposition_failure_signal_hunting: 1.0,
+            disposition_failure_signal_foraging: 1.0,
+            disposition_failure_signal_crafting: 1.0,
+            disposition_failure_signal_caretaking: 1.0,
+            disposition_failure_signal_building: 1.0,
+            disposition_failure_signal_mating: 1.0,
+            disposition_failure_signal_mentoring: 1.0,
         };
 
         let scores_full = score_actions(&base, &test_eval_inputs(), &mut rng_full).scores;

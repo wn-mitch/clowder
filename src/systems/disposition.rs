@@ -976,6 +976,17 @@ pub fn evaluate_dispositions(
                 ),
                 own_injury_site: crate::systems::interoception::own_injury_site(health),
             },
+            // No-damp signals: this path doesn't query
+            // `RecentDispositionFailures`, so the modifier sees a
+            // perpetual "no recent failure" signal here (preserves
+            // pre-163 behavior for cat_presence_tick).
+            disposition_failure_signal_hunting: 1.0,
+            disposition_failure_signal_foraging: 1.0,
+            disposition_failure_signal_crafting: 1.0,
+            disposition_failure_signal_caretaking: 1.0,
+            disposition_failure_signal_building: 1.0,
+            disposition_failure_signal_mating: 1.0,
+            disposition_failure_signal_mentoring: 1.0,
         };
 
         // §11 trace plumbing — dormant except when running headless

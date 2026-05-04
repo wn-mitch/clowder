@@ -67,31 +67,10 @@ fn kitten_cry_basic_emits_focal_trace_with_caretake_in_ranked_list() {
     );
 }
 
-/// Ticket-163 locked invariant: nothing mutates the action-keyed score
-/// Vec between `score_actions` exit and softmax entry.
-///
-/// Two snapshots are captured per focal-cat tick:
-/// - `pre_bonus_pool` — score Vec at `score_actions` exit, before any
-///   bonus pass mutates it. Snapshotted in
-///   `goap.rs::evaluate_and_plan` for the focal cat.
-/// - `pre_penalty_pool` — post-filter, pre-Independence-penalty pool
-///   the softmax saw, snapshotted in
-///   `select_disposition_via_intention_softmax_with_trace`.
-///
-/// Both are action-keyed, both include jitter (jitter is added once
-/// at `score_actions` push time and is therefore identical in both
-/// snapshots — no jitter accounting needed). The softmax filter drops
-/// `Flee` / `Idle` / zero-scoring actions; the test compares only the
-/// actions present in `pre_penalty_pool`.
-///
-/// Today the §3.5.1 modifier pipeline ships with 19 modifiers but
-/// `goap.rs::evaluate_and_plan` runs 9 additional `apply_*` passes
-/// after `score_actions` returns. Each of those passes mutates the
-/// score Vec, so this invariant fails on every focal cat where any
-/// of the 9 fire. Ticket 163's full-batch migration ports each pass
-/// to a registered `ScoreModifier`, retiring the imperative chain;
-/// once landed, this test becomes a permanent CI guard against
-/// re-introducing the antipattern.
+/// Locked §11.3 invariant: nothing mutates the action-keyed score Vec
+/// between `score_actions` exit and softmax entry. The two snapshots
+/// (`pre_bonus_pool` from goap.rs, `pre_penalty_pool` from the softmax
+/// helper) include jitter identically and must agree per-action.
 #[test]
 fn pre_bonus_equals_pre_penalty_across_all_scenarios() {
     const EPSILON: f32 = 1e-4;
@@ -120,7 +99,7 @@ fn pre_bonus_equals_pre_penalty_across_all_scenarios() {
                 };
                 assert!(
                     (pre_bonus_score - pre_penalty_score).abs() < EPSILON,
-                    "scenario `{}` tick {} action `{}`: pre-bonus {} vs pre-penalty {} (Δ={}). Some code mutates the score Vec between score_actions and softmax — see ticket 163.",
+                    "scenario `{}` tick {} action `{}`: pre-bonus {} vs pre-penalty {} (Δ={}). Some code mutates the score Vec between score_actions and softmax.",
                     scenario.name,
                     tick.tick,
                     action,

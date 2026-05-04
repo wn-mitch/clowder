@@ -254,9 +254,6 @@ pub fn emit_focal_trace(
             temperature: sm.temperature,
             probabilities: sm.probabilities.clone(),
         };
-        // Ticket-163 trace surfaces — empty when the caller did not
-        // snapshot (non-focal cat path) or on the empty-pool early-
-        // return branch.
         let pre_bonus: Vec<(String, f32)> = sm
             .pre_bonus_pool
             .iter()

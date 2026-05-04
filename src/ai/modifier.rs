@@ -209,6 +209,17 @@ const MATE: &str = "mate";
 const CARETAKE: &str = "caretake";
 const IDLE: &str = "idle";
 
+// Disposition-failure cooldown scalar keys, one per failure-prone
+// DispositionKind. 1.0 = no recent failure (no damp);
+// 0.0 = just failed (full damp).
+const DISPOSITION_FAILURE_SIGNAL_HUNTING: &str = "disposition_failure_signal_hunting";
+const DISPOSITION_FAILURE_SIGNAL_FORAGING: &str = "disposition_failure_signal_foraging";
+const DISPOSITION_FAILURE_SIGNAL_CRAFTING: &str = "disposition_failure_signal_crafting";
+const DISPOSITION_FAILURE_SIGNAL_CARETAKING: &str = "disposition_failure_signal_caretaking";
+const DISPOSITION_FAILURE_SIGNAL_BUILDING: &str = "disposition_failure_signal_building";
+const DISPOSITION_FAILURE_SIGNAL_MATING: &str = "disposition_failure_signal_mating";
+const DISPOSITION_FAILURE_SIGNAL_MENTORING: &str = "disposition_failure_signal_mentoring";
+
 /// Ticket 088 — the "self-care" DSE class lifted by
 /// `BodyDistressPromotion` when `body_distress_composite` is high.
 /// Authored as a `&[&str]` constant so the class membership is
@@ -2131,6 +2142,100 @@ impl ScoreModifier for IntraspeciesConflictResponseFlight {
 }
 
 // ---------------------------------------------------------------------------
+// DispositionFailureCooldown
+// ---------------------------------------------------------------------------
+
+/// §3.5.1 disposition-failure cooldown damp.
+///
+/// **Trigger:** the DSE belongs to one of the seven failure-prone
+/// dispositions (Hunting, Foraging, Crafting, Caretaking, Building,
+/// Mating, Mentoring) AND that disposition's failure signal `< 1.0`.
+///
+/// **Transform:** multiplicative `score *= 0.1 + 0.9 * signal`. Signal
+/// 0 → 0.1× (just-failed floor); signal 1 → 1.0× (no damp). Linear
+/// interpolation inside the cooldown window.
+///
+/// **Applies to:**
+/// - Hunting: `hunt`
+/// - Foraging: `forage`
+/// - Crafting: `cook`, `herbcraft_gather`, `herbcraft_prepare`,
+///   `herbcraft_ward`, `magic_scry`, `magic_durable_ward`,
+///   `magic_cleanse`, `magic_colony_cleanse`, `magic_harvest`,
+///   `magic_commune`
+/// - Caretaking: `caretake`
+/// - Building: `build`
+/// - Mating: `mate`
+/// - Mentoring: `mentor`
+///
+/// Resting / Guarding / Socializing / Farming / Coordinating /
+/// Exploring are exempt — their step graphs don't share the
+/// `make_plan → None` retry pattern (different completion semantics
+/// or different planner-failure modes).
+///
+/// **Pipeline position:** prepended *before* every other modifier so
+/// additive bonuses (Pride / Independence / Patience / …) compose on
+/// already-damped scores when the cat is in cooldown.
+pub struct DispositionFailureCooldown;
+
+impl DispositionFailureCooldown {
+    pub fn new() -> Self {
+        Self
+    }
+
+    fn signal_key(dse_id: DseId) -> Option<&'static str> {
+        match dse_id.0 {
+            HUNT => Some(DISPOSITION_FAILURE_SIGNAL_HUNTING),
+            FORAGE => Some(DISPOSITION_FAILURE_SIGNAL_FORAGING),
+            COOK
+            | HERBCRAFT_GATHER
+            | HERBCRAFT_PREPARE
+            | HERBCRAFT_WARD
+            | MAGIC_SCRY
+            | MAGIC_DURABLE_WARD
+            | MAGIC_CLEANSE
+            | MAGIC_COLONY_CLEANSE
+            | MAGIC_HARVEST
+            | MAGIC_COMMUNE => Some(DISPOSITION_FAILURE_SIGNAL_CRAFTING),
+            CARETAKE => Some(DISPOSITION_FAILURE_SIGNAL_CARETAKING),
+            BUILD => Some(DISPOSITION_FAILURE_SIGNAL_BUILDING),
+            MATE => Some(DISPOSITION_FAILURE_SIGNAL_MATING),
+            MENTOR => Some(DISPOSITION_FAILURE_SIGNAL_MENTORING),
+            _ => None,
+        }
+    }
+}
+
+impl Default for DispositionFailureCooldown {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ScoreModifier for DispositionFailureCooldown {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        let Some(signal_key) = Self::signal_key(dse_id) else {
+            return score;
+        };
+        let signal = fetch(signal_key, ctx.cat);
+        if signal >= 1.0 {
+            return score;
+        }
+        let damp = 0.1 + 0.9 * signal;
+        score * damp
+    }
+
+    fn name(&self) -> &'static str {
+        "disposition_failure_cooldown"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Default pipeline builder
 // ---------------------------------------------------------------------------
 
@@ -2168,6 +2273,9 @@ pub fn default_modifier_pipeline(
     // pile-ups like the 107+110 Sleep double-stack documented in 146).
     let mut pipeline =
         ModifierPipeline::new().with_max_additive_lift_per_dse(sc.max_additive_lift_per_dse);
+    // DispositionFailureCooldown is multiplicative; registers first so
+    // the additive bonuses below compose on already-damped scores.
+    pipeline.push(Box::new(DispositionFailureCooldown::new()));
     pipeline.push(Box::new(Pride::new(sc)));
     pipeline.push(Box::new(IndependenceSolo::new(sc)));
     pipeline.push(Box::new(IndependenceGroup::new(sc)));
@@ -2929,27 +3037,10 @@ mod tests {
     }
 
     #[test]
-    fn default_pipeline_registers_twenty_modifiers() {
-        // Nineteen §3.5.1 foundational modifiers — the seven original
-        // (`Pride`, `IndependenceSolo`, `IndependenceGroup`, `Patience`,
-        // `Tradition`, `FoxTerritorySuppression`,
-        // `CorruptionTerritorySuppression`) plus §075's
-        // `CommitmentTenure`, ticket 094's `StockpileSatiation`,
-        // ticket 088's `BodyDistressPromotion`, ticket 047's
-        // `AcuteHealthAdrenalineFlee`, ticket 102's
-        // `AcuteHealthAdrenalineFight`, ticket 105's
-        // `AcuteHealthAdrenalineFreeze`, ticket 106's `HungerUrgency`,
-        // ticket 107's `ExhaustionPressure`, ticket 110's
-        // `ThermalDistress`, ticket 108's
-        // `ThreatProximityAdrenalineFlee`, ticket 109 Phase A's
-        // `IntraspeciesConflictResponseFlight`, ticket 156's
-        // `KittenEatBoost`, and ticket 156's `KittenCryCaretakeLift`.
-        // The three Phase 4.2 emergency modifiers
-        // (`WardCorruptionEmergency`, `CleanseEmergency`,
-        // `SensedRotBoost`) retired in §13.1.
+    fn default_pipeline_registers_expected_modifier_count() {
         let constants = crate::resources::sim_constants::SimConstants::default();
         let pipeline = default_modifier_pipeline(&constants);
-        assert_eq!(pipeline.len(), 20, "expected 20 registered modifiers");
+        assert_eq!(pipeline.len(), 21, "expected 21 registered modifiers");
     }
 
     // -----------------------------------------------------------------------
@@ -4678,6 +4769,110 @@ mod tests {
             (flee - 0.5).abs() < 1e-6,
             "Phase-1 inert: Flee unchanged at default 0.0 lift; got {flee}"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // DispositionFailureCooldown
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn cooldown_passes_through_when_signal_full() {
+        let m = DispositionFailureCooldown::new();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            DISPOSITION_FAILURE_SIGNAL_HUNTING => 1.0,
+            _ => 1.0,
+        };
+        let out = m.apply(DseId(HUNT), 0.7, &ctx, &fetch);
+        assert!((out - 0.7).abs() < 1e-6);
+    }
+
+    #[test]
+    fn cooldown_full_damp_at_fresh_failure() {
+        let m = DispositionFailureCooldown::new();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            DISPOSITION_FAILURE_SIGNAL_HUNTING => 0.0,
+            _ => 1.0,
+        };
+        // signal 0 → damp 0.1 → 0.7 × 0.1 = 0.07
+        let out = m.apply(DseId(HUNT), 0.7, &ctx, &fetch);
+        assert!((out - 0.07).abs() < 1e-6, "got {out}");
+    }
+
+    #[test]
+    fn cooldown_midpoint_damps_to_55_percent() {
+        let m = DispositionFailureCooldown::new();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            DISPOSITION_FAILURE_SIGNAL_CRAFTING => 0.5,
+            _ => 1.0,
+        };
+        // signal 0.5 → damp 0.1 + 0.45 = 0.55 → 1.0 × 0.55 = 0.55
+        let out = m.apply(DseId(COOK), 1.0, &ctx, &fetch);
+        assert!((out - 0.55).abs() < 1e-6, "got {out}");
+    }
+
+    #[test]
+    fn cooldown_routes_each_dse_to_its_disposition_signal() {
+        let m = DispositionFailureCooldown::new();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            DISPOSITION_FAILURE_SIGNAL_HUNTING => 0.0,
+            DISPOSITION_FAILURE_SIGNAL_FORAGING => 0.0,
+            DISPOSITION_FAILURE_SIGNAL_CRAFTING => 0.0,
+            DISPOSITION_FAILURE_SIGNAL_CARETAKING => 0.0,
+            DISPOSITION_FAILURE_SIGNAL_BUILDING => 0.0,
+            DISPOSITION_FAILURE_SIGNAL_MATING => 0.0,
+            DISPOSITION_FAILURE_SIGNAL_MENTORING => 0.0,
+            _ => 1.0,
+        };
+        for dse in [
+            HUNT,
+            FORAGE,
+            COOK,
+            HERBCRAFT_GATHER,
+            HERBCRAFT_PREPARE,
+            HERBCRAFT_WARD,
+            MAGIC_SCRY,
+            MAGIC_DURABLE_WARD,
+            MAGIC_CLEANSE,
+            MAGIC_COLONY_CLEANSE,
+            MAGIC_HARVEST,
+            MAGIC_COMMUNE,
+            CARETAKE,
+            BUILD,
+            MATE,
+            MENTOR,
+        ] {
+            let out = m.apply(DseId(dse), 1.0, &ctx, &fetch);
+            assert!((out - 0.1).abs() < 1e-6, "dse {dse} got {out}");
+        }
+    }
+
+    #[test]
+    fn cooldown_skips_exempt_dispositions() {
+        let m = DispositionFailureCooldown::new();
+        let (_, ctx) = test_ctx();
+        // Even with every signal pinned at full damp, exempt DSEs pass
+        // through unchanged because `signal_key` returns None for them.
+        let fetch = |_: &str, _: Entity| 0.0;
+        for dse in [SLEEP, EAT, PATROL, FIGHT, COORDINATE, EXPLORE, WANDER, FARM, SOCIALIZE, GROOM_SELF, GROOM_OTHER, FLEE, IDLE, HIDE] {
+            let out = m.apply(DseId(dse), 0.6, &ctx, &fetch);
+            assert!((out - 0.6).abs() < 1e-6, "dse {dse} got {out}");
+        }
+    }
+
+    #[test]
+    fn cooldown_zero_score_stays_zero() {
+        let m = DispositionFailureCooldown::new();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            DISPOSITION_FAILURE_SIGNAL_HUNTING => 0.0,
+            _ => 1.0,
+        };
+        let out = m.apply(DseId(HUNT), 0.0, &ctx, &fetch);
+        assert_eq!(out, 0.0);
     }
 
     #[test]

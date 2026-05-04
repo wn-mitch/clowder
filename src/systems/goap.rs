@@ -1496,6 +1496,55 @@ pub fn evaluate_and_plan(
                 ),
                 own_injury_site: crate::systems::interoception::own_injury_site(health),
             },
+            disposition_failure_signal_hunting:
+                crate::systems::plan_substrate::disposition_recent_failure_age_normalized(
+                    recent_disposition_failures.as_deref(),
+                    crate::components::disposition::DispositionKind::Hunting,
+                    res.time.tick,
+                    res.constants.planning_substrate.disposition_failure_cooldown_ticks,
+                ),
+            disposition_failure_signal_foraging:
+                crate::systems::plan_substrate::disposition_recent_failure_age_normalized(
+                    recent_disposition_failures.as_deref(),
+                    crate::components::disposition::DispositionKind::Foraging,
+                    res.time.tick,
+                    res.constants.planning_substrate.disposition_failure_cooldown_ticks,
+                ),
+            disposition_failure_signal_crafting:
+                crate::systems::plan_substrate::disposition_recent_failure_age_normalized(
+                    recent_disposition_failures.as_deref(),
+                    crate::components::disposition::DispositionKind::Crafting,
+                    res.time.tick,
+                    res.constants.planning_substrate.disposition_failure_cooldown_ticks,
+                ),
+            disposition_failure_signal_caretaking:
+                crate::systems::plan_substrate::disposition_recent_failure_age_normalized(
+                    recent_disposition_failures.as_deref(),
+                    crate::components::disposition::DispositionKind::Caretaking,
+                    res.time.tick,
+                    res.constants.planning_substrate.disposition_failure_cooldown_ticks,
+                ),
+            disposition_failure_signal_building:
+                crate::systems::plan_substrate::disposition_recent_failure_age_normalized(
+                    recent_disposition_failures.as_deref(),
+                    crate::components::disposition::DispositionKind::Building,
+                    res.time.tick,
+                    res.constants.planning_substrate.disposition_failure_cooldown_ticks,
+                ),
+            disposition_failure_signal_mating:
+                crate::systems::plan_substrate::disposition_recent_failure_age_normalized(
+                    recent_disposition_failures.as_deref(),
+                    crate::components::disposition::DispositionKind::Mating,
+                    res.time.tick,
+                    res.constants.planning_substrate.disposition_failure_cooldown_ticks,
+                ),
+            disposition_failure_signal_mentoring:
+                crate::systems::plan_substrate::disposition_recent_failure_age_normalized(
+                    recent_disposition_failures.as_deref(),
+                    crate::components::disposition::DispositionKind::Mentoring,
+                    res.time.tick,
+                    res.constants.planning_substrate.disposition_failure_cooldown_ticks,
+                ),
         };
 
         let focal_cat = res.focal_target.as_deref().and_then(|t| t.entity);
@@ -1522,34 +1571,14 @@ pub fn evaluate_and_plan(
         }
         let mut scores = result.scores;
 
-        // Ticket-163 trace surface: snapshot the score Vec at score_actions
-        // exit, before any bonus pass mutates it. The locked invariant in
-        // `tests/scenarios.rs` asserts this snapshot equals
-        // `softmax.pool_pre_penalty` per-action — i.e. nothing mutates
-        // scores between here and the softmax. Today's `apply_*` chain
-        // breaks the invariant; ticket 163 retires it.
+        // Snapshot for the L2-vs-pool invariant in tests/scenarios.rs:
+        // nothing should mutate the score Vec between this point and the
+        // softmax. Focal cat only — non-focal cats skip the trace path.
         let pre_bonus_pool_snapshot = if focal_cat == Some(entity) && focal_capture.is_some() {
             Some(scores.clone())
         } else {
             None
         };
-
-        // Ticket 123 — damp the IAUS scores of dispositions that
-        // recently hit `make_plan → None`. Runs before the additive
-        // bonus layers so a recently-failed disposition is dimmed
-        // down before memory / colony-knowledge / cascading bonuses
-        // potentially re-lift it; that ordering matches the
-        // `apply_*_bonuses` chain's intent (bonuses fight for
-        // attention against a baseline that already reflects
-        // cross-tick failure history). Non-applicable cats (no
-        // `RecentDispositionFailures` component, or all entries
-        // expired) pass through unchanged.
-        crate::systems::plan_substrate::apply_disposition_failure_cooldown(
-            &mut scores,
-            recent_disposition_failures.as_deref(),
-            res.time.tick,
-            res.constants.planning_substrate.disposition_failure_cooldown_ticks,
-        );
 
         // Apply all bonus layers.
         apply_memory_bonuses(&mut scores, memory, pos, sc);
@@ -1648,9 +1677,6 @@ pub fn evaluate_and_plan(
             softmax_trace.as_mut(),
         );
         if let (Some(capture), Some(mut trace)) = (focal_capture, softmax_trace) {
-            // Ticket-163 trace surface: forward the pre-bonus snapshot
-            // into the softmax capture so `emit_focal_trace` and the
-            // scenario runner can publish both pools side-by-side.
             if let Some(snap) = pre_bonus_pool_snapshot {
                 trace.pre_bonus_pool = snap;
             }

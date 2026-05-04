@@ -46,17 +46,10 @@ pub struct TickReport {
     /// L2 row's `final_score` and its corresponding pool entry in
     /// `ranked` is the Independence penalty showing itself.
     pub l2: Vec<L2RowSummary>,
-    /// Ticket-163 trace surface: action-keyed score Vec at
-    /// `score_actions` exit, before any bonus pass mutates it. Locked
-    /// invariant in `tests/scenarios.rs` asserts this equals
-    /// `pre_penalty_pool` per-action — i.e. nothing mutates scores
-    /// between `score_actions` and softmax. Empty when the focal cat
-    /// did not score this tick (focal-resolution race on first ticks)
-    /// or the softmax fall-through path was taken.
+    /// Action-keyed score Vec at `score_actions` exit. Empty when the
+    /// focal cat hasn't been resolved yet or the softmax fell through.
     pub pre_bonus_pool: Vec<(String, f32)>,
-    /// Ticket-163 trace surface: post-filter, pre-Independence-penalty
-    /// pool the softmax saw. Same shape as `ranked` (action-keyed) but
-    /// captured one step earlier in the softmax helper.
+    /// Post-filter, pre-Independence-penalty pool the softmax saw.
     pub pre_penalty_pool: Vec<(String, f32)>,
 }
 
