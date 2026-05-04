@@ -1,7 +1,7 @@
 ---
 id: 162
 title: Scenario harness — fast deterministic "what wins" experiments for AI decision triage
-status: in-progress
+status: done
 cluster: tooling
 added: 2026-05-04
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 9d96235
+landed-on: 2026-05-04
 ---
 
 ## Why
