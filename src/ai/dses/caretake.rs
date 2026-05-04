@@ -1,11 +1,23 @@
 //! `Caretake` — Social-urgency peer (§3.3.2 anchor = 1.0).
 //!
-//! Per §2.3 + §3.1.1 row 1509: `WeightedSum` of 3 axes —
-//! kitten_urgency, compassion, is_parent. RtEO composition: parent
-//! bonus drives low-compassion parents (bloodline override);
-//! compassion drives non-parents responding to hungry kittens.
-//! `is_parent` is a 0/1 axis — the non-trivial RtEO weight encodes
-//! the bloodline-override signal numerically.
+//! Per §2.3 + §3.1.1 row 1509: `WeightedSum` of 4 axes —
+//! kitten_cry_perceived, kitten_urgency, compassion, is_parent.
+//!
+//! - `kitten_cry_perceived` (ticket 156) reads the Hearing-channel
+//!   `KittenCryMap` at the cat's tile. The cry is threshold-gated on
+//!   the kitten's hunger so this axis only fires when a nearby kitten
+//!   is critically hungry — that's exactly when Caretake should
+//!   dominate, including for non-parent adults out of the
+//!   `IsParentOfHungryKitten` marker's parent-only reach.
+//! - `kitten_urgency` (per-cat caretake_resolution.urgency) is the
+//!   in-engine non-spatial urgency.
+//! - `compassion` (caretake-local, bond-scaled) drives non-parents.
+//! - `is_parent_of_hungry_kitten` is the 0/1 bloodline-override.
+//!
+//! RtEO composition: cry dominates when fired so non-parents pivot
+//! to Caretake on perceptible distress; the legacy three axes
+//! continue to work when no cry is painted (e.g., parent-of-quiet-
+//! kitten responding to early urgency).
 
 use bevy::prelude::*;
 
@@ -17,6 +29,10 @@ use crate::ai::dse::{
 };
 use crate::components::markers;
 
+/// Cry-broadcast perception axis (ticket 156). Reads
+/// `ScoringContext::kitten_cry_perceived` — the Hearing-channel
+/// `KittenCryMap` sample at the cat's tile.
+pub const KITTEN_CRY_PERCEIVED_INPUT: &str = "kitten_cry_perceived";
 pub const KITTEN_URGENCY_INPUT: &str = "kitten_urgency";
 /// Caretake-local compassion axis (Phase 4c.4 alloparenting Reframe A).
 /// `ctx_scalars` populates this as `personality.compassion ×
@@ -44,16 +60,22 @@ impl CaretakeDse {
             id: DseId("caretake"),
             considerations: vec![
                 Consideration::Scalar(ScalarConsideration::new(
+                    KITTEN_CRY_PERCEIVED_INPUT,
+                    linear.clone(),
+                )),
+                Consideration::Scalar(ScalarConsideration::new(
                     KITTEN_URGENCY_INPUT,
                     linear.clone(),
                 )),
                 Consideration::Scalar(ScalarConsideration::new(COMPASSION_INPUT, linear.clone())),
                 Consideration::Scalar(ScalarConsideration::new(IS_PARENT_INPUT, linear)),
             ],
-            // RtEO sum = 1.0. Urgency dominates (hungry kitten is
-            // time-sensitive); compassion is the non-parent driver;
-            // parent-axis 0/1 carries the bloodline-override signal.
-            composition: Composition::weighted_sum(vec![0.45, 0.30, 0.25]),
+            // RtEO sum = 1.0. Cry-perception dominates when fired
+            // (Hearing-channel kitten distress is the most direct
+            // signal "a kitten near me is critically hungry"); the
+            // legacy three axes continue to fire when no cry is
+            // painted (parent-of-quiet-kitten early urgency).
+            composition: Composition::weighted_sum(vec![0.40, 0.25, 0.20, 0.15]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
             eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
         }
