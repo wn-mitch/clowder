@@ -426,6 +426,14 @@ pub struct ScoringContext<'a> {
     pub memory_resource_found_proximity_sum: f32,
     pub memory_death_proximity_sum: f32,
     pub memory_threat_seen_proximity_sum: f32,
+    /// Σ proximity × strength across `ColonyKnowledge` entries with
+    /// event type `ResourceFound`. Read by `ColonyKnowledgeLift`'s
+    /// resource arm.
+    pub colony_knowledge_resource_proximity: f32,
+    /// Σ proximity × strength across `ColonyKnowledge` entries with
+    /// event type `ThreatSeen` or `Death`. Read by
+    /// `ColonyKnowledgeLift`'s threat arm.
+    pub colony_knowledge_threat_proximity: f32,
 }
 
 // ---------------------------------------------------------------------------
@@ -782,6 +790,14 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
     m.insert(
         "memory_threat_seen_proximity_sum",
         ctx.memory_threat_seen_proximity_sum,
+    );
+    m.insert(
+        "colony_knowledge_resource_proximity",
+        ctx.colony_knowledge_resource_proximity,
+    );
+    m.insert(
+        "colony_knowledge_threat_proximity",
+        ctx.colony_knowledge_threat_proximity,
     );
     m
 }
@@ -1473,44 +1489,32 @@ pub fn apply_directive_bonus(scores: &mut [(Action, f32)], target_action: Action
     }
 }
 
-/// Boost action scores based on colony-wide knowledge of the environment.
-///
-/// ThreatSeen/Death entries near the cat boost Patrol scores.
-/// ResourceFound entries near the cat boost Hunt/Forage scores.
-pub fn apply_colony_knowledge_bonuses(
-    scores: &mut [(Action, f32)],
+/// Aggregate `ColonyKnowledge` entries into the two proximity sums
+/// `ColonyKnowledgeLift` reads. Returns `(resource, threat)` where each
+/// is Σ `proximity × strength` over qualifying entries (ResourceFound
+/// for resource; ThreatSeen ∨ Death for threat). Entries beyond
+/// `colony_knowledge_radius` contribute 0.
+pub fn colony_knowledge_proximity_sums(
     knowledge: &crate::resources::colony_knowledge::ColonyKnowledge,
     pos: &Position,
     sc: &ScoringConstants,
-) {
+) -> (f32, f32) {
+    let mut resource = 0.0;
+    let mut threat = 0.0;
     for entry in &knowledge.entries {
         let Some(loc) = &entry.location else { continue };
         let dist = pos.distance_to(loc);
         if dist > sc.colony_knowledge_radius {
             continue;
         }
-
-        let proximity = 1.0 - (dist / sc.colony_knowledge_radius);
-        let bonus = proximity * entry.strength * sc.colony_knowledge_bonus_scale;
-
+        let weight = (1.0 - dist / sc.colony_knowledge_radius) * entry.strength;
         match entry.event_type {
-            MemoryType::ThreatSeen | MemoryType::Death => {
-                for (action, score) in scores.iter_mut() {
-                    if matches!(action, Action::Patrol) {
-                        *score += bonus;
-                    }
-                }
-            }
-            MemoryType::ResourceFound => {
-                for (action, score) in scores.iter_mut() {
-                    if matches!(action, Action::Forage | Action::Hunt) {
-                        *score += bonus;
-                    }
-                }
-            }
+            MemoryType::ResourceFound => resource += weight,
+            MemoryType::ThreatSeen | MemoryType::Death => threat += weight,
             _ => {}
         }
     }
+    (resource, threat)
 }
 
 /// Boost action scores based on an active player-set colony priority.
@@ -2270,6 +2274,8 @@ mod tests {
             memory_resource_found_proximity_sum: 0.0,
             memory_death_proximity_sum: 0.0,
             memory_threat_seen_proximity_sum: 0.0,
+            colony_knowledge_resource_proximity: 0.0,
+            colony_knowledge_threat_proximity: 0.0,
         }
     }
 
@@ -2433,6 +2439,8 @@ mod tests {
             memory_resource_found_proximity_sum: 0.0,
             memory_death_proximity_sum: 0.0,
             memory_threat_seen_proximity_sum: 0.0,
+            colony_knowledge_resource_proximity: 0.0,
+            colony_knowledge_threat_proximity: 0.0,
         };
         // §L2.10.7: this test sets `food_available: false`,
         // `has_functional_kitchen: false`, etc. on the context, but
@@ -2619,6 +2627,8 @@ mod tests {
             memory_resource_found_proximity_sum: 0.0,
             memory_death_proximity_sum: 0.0,
             memory_threat_seen_proximity_sum: 0.0,
+            colony_knowledge_resource_proximity: 0.0,
+            colony_knowledge_threat_proximity: 0.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let socialize_score = scores
@@ -2849,6 +2859,8 @@ mod tests {
             memory_resource_found_proximity_sum: 0.0,
             memory_death_proximity_sum: 0.0,
             memory_threat_seen_proximity_sum: 0.0,
+            colony_knowledge_resource_proximity: 0.0,
+            colony_knowledge_threat_proximity: 0.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let best = select_best_action(&scores);
@@ -2941,6 +2953,8 @@ mod tests {
             memory_resource_found_proximity_sum: 0.0,
             memory_death_proximity_sum: 0.0,
             memory_threat_seen_proximity_sum: 0.0,
+            colony_knowledge_resource_proximity: 0.0,
+            colony_knowledge_threat_proximity: 0.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let fight_score = scores.iter().find(|(a, _)| *a == Action::Fight).unwrap().1;
@@ -3052,6 +3066,8 @@ mod tests {
             memory_resource_found_proximity_sum: 0.0,
             memory_death_proximity_sum: 0.0,
             memory_threat_seen_proximity_sum: 0.0,
+            colony_knowledge_resource_proximity: 0.0,
+            colony_knowledge_threat_proximity: 0.0,
         };
         // Build a per-test MarkerSnapshot with Incapacitated set for
         // this cat (the cached shared snapshot only carries colony
@@ -3339,6 +3355,8 @@ mod tests {
             memory_resource_found_proximity_sum: 0.0,
             memory_death_proximity_sum: 0.0,
             memory_threat_seen_proximity_sum: 0.0,
+            colony_knowledge_resource_proximity: 0.0,
+            colony_knowledge_threat_proximity: 0.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let wander = scores.iter().find(|(a, _)| *a == Action::Wander).unwrap().1;
@@ -3432,6 +3450,8 @@ mod tests {
             memory_resource_found_proximity_sum: 0.0,
             memory_death_proximity_sum: 0.0,
             memory_threat_seen_proximity_sum: 0.0,
+            colony_knowledge_resource_proximity: 0.0,
+            colony_knowledge_threat_proximity: 0.0,
         };
 
         let scores_full = score_actions(&base, &test_eval_inputs(), &mut rng_full).scores;

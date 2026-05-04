@@ -10,9 +10,8 @@ use crate::ai::planner::{
     make_plan, Carrying, GoapActionKind, PlannerState, PlannerZone, ZoneDistances,
 };
 use crate::ai::scoring::{
-    apply_aspiration_bonuses, apply_cascading_bonuses, apply_colony_knowledge_bonuses,
-    apply_directive_bonus, apply_fated_bonuses, apply_preference_bonuses, apply_priority_bonus,
-    score_actions, ScoringContext,
+    apply_aspiration_bonuses, apply_cascading_bonuses, apply_directive_bonus, apply_fated_bonuses,
+    apply_preference_bonuses, apply_priority_bonus, score_actions, ScoringContext,
 };
 use crate::ai::{Action, CurrentAction};
 use crate::components::building::{
@@ -1343,6 +1342,11 @@ pub fn evaluate_and_plan(
         // requires it via the marker snapshot populated above.
 
         let memory_sums = crate::ai::scoring::memory_proximity_sums(memory, pos, sc);
+        let colony_knowledge_sums = colony
+            .knowledge
+            .as_ref()
+            .map(|ck| crate::ai::scoring::colony_knowledge_proximity_sums(ck, pos, sc))
+            .unwrap_or((0.0, 0.0));
 
         let ctx = ScoringContext {
             scoring: sc,
@@ -1550,6 +1554,8 @@ pub fn evaluate_and_plan(
             memory_resource_found_proximity_sum: memory_sums.0,
             memory_death_proximity_sum: memory_sums.1,
             memory_threat_seen_proximity_sum: memory_sums.2,
+            colony_knowledge_resource_proximity: colony_knowledge_sums.0,
+            colony_knowledge_threat_proximity: colony_knowledge_sums.1,
         };
 
         let focal_cat = res.focal_target.as_deref().and_then(|t| t.entity);
@@ -1586,9 +1592,6 @@ pub fn evaluate_and_plan(
         };
 
         // Apply all bonus layers.
-        if let Some(ref ck) = colony.knowledge {
-            apply_colony_knowledge_bonuses(&mut scores, ck, pos, sc);
-        }
         if let Some(ref cp) = colony.priority {
             apply_priority_bonus(&mut scores, cp.active, sc);
         }

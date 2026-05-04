@@ -5,9 +5,8 @@ use rand::Rng;
 
 use crate::ai::pathfinding::{find_free_adjacent, step_toward};
 use crate::ai::scoring::{
-    apply_aspiration_bonuses, apply_cascading_bonuses, apply_colony_knowledge_bonuses,
-    apply_directive_bonus, apply_fated_bonuses, apply_preference_bonuses, apply_priority_bonus,
-    score_actions, ScoringContext,
+    apply_aspiration_bonuses, apply_cascading_bonuses, apply_directive_bonus, apply_fated_bonuses,
+    apply_preference_bonuses, apply_priority_bonus, score_actions, ScoringContext,
 };
 use crate::ai::{Action, CurrentAction};
 use crate::components::building::{
@@ -827,6 +826,11 @@ pub fn evaluate_dispositions(
 
         let presence_memory_sums =
             crate::ai::scoring::memory_proximity_sums(memory, pos, sc);
+        let presence_colony_knowledge_sums = colony
+            .knowledge
+            .as_ref()
+            .map(|ck| crate::ai::scoring::colony_knowledge_proximity_sums(ck, pos, sc))
+            .unwrap_or((0.0, 0.0));
 
         let ctx = ScoringContext {
             scoring: sc,
@@ -992,6 +996,8 @@ pub fn evaluate_dispositions(
             memory_resource_found_proximity_sum: presence_memory_sums.0,
             memory_death_proximity_sum: presence_memory_sums.1,
             memory_threat_seen_proximity_sum: presence_memory_sums.2,
+            colony_knowledge_resource_proximity: presence_colony_knowledge_sums.0,
+            colony_knowledge_threat_proximity: presence_colony_knowledge_sums.1,
         };
 
         // §11 trace plumbing — dormant except when running headless
@@ -1018,9 +1024,6 @@ pub fn evaluate_dispositions(
         let mut scores = result.scores;
 
         // Apply all bonus layers (identical to evaluate_actions).
-        if let Some(ref ck) = colony.knowledge {
-            apply_colony_knowledge_bonuses(&mut scores, ck, pos, sc);
-        }
         if let Some(ref cp) = colony.priority {
             apply_priority_bonus(&mut scores, cp.active, sc);
         }

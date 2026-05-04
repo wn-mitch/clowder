@@ -227,6 +227,11 @@ const MEMORY_RESOURCE_FOUND_PROXIMITY_SUM: &str = "memory_resource_found_proximi
 const MEMORY_DEATH_PROXIMITY_SUM: &str = "memory_death_proximity_sum";
 const MEMORY_THREAT_SEEN_PROXIMITY_SUM: &str = "memory_threat_seen_proximity_sum";
 
+// ColonyKnowledge proximity sums — same shape as memory sums but
+// across colony-wide hearsay entries.
+const COLONY_KNOWLEDGE_RESOURCE_PROXIMITY: &str = "colony_knowledge_resource_proximity";
+const COLONY_KNOWLEDGE_THREAT_PROXIMITY: &str = "colony_knowledge_threat_proximity";
+
 /// Ticket 088 — the "self-care" DSE class lifted by
 /// `BodyDistressPromotion` when `body_distress_composite` is high.
 /// Authored as a `&[&str]` constant so the class membership is
@@ -2371,6 +2376,61 @@ impl ScoreModifier for MemoryThreatSeenSuppress {
 }
 
 // ---------------------------------------------------------------------------
+// ColonyKnowledgeLift
+// ---------------------------------------------------------------------------
+
+/// §3.5.1 additive lift driven by colony-wide hearsay. Two arms keyed
+/// by event type:
+/// - resource arm: `score += colony_knowledge_resource_proximity × scale`
+///   on hunt, forage.
+/// - threat arm: `score += colony_knowledge_threat_proximity × scale`
+///   on patrol.
+///
+/// Both sums are pre-aggregated at ScoringContext build time over
+/// `ColonyKnowledge.entries` filtered by event type and proximity.
+pub struct ColonyKnowledgeLift {
+    scale: f32,
+}
+
+impl ColonyKnowledgeLift {
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            scale: sc.colony_knowledge_bonus_scale,
+        }
+    }
+}
+
+impl ScoreModifier for ColonyKnowledgeLift {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        let resource_arm = matches!(dse_id.0, HUNT | FORAGE);
+        let threat_arm = dse_id.0 == PATROL;
+        if !resource_arm && !threat_arm {
+            return score;
+        }
+        let key = if resource_arm {
+            COLONY_KNOWLEDGE_RESOURCE_PROXIMITY
+        } else {
+            COLONY_KNOWLEDGE_THREAT_PROXIMITY
+        };
+        let sum = fetch(key, ctx.cat);
+        if sum <= 0.0 {
+            return score;
+        }
+        score + sum * self.scale
+    }
+
+    fn name(&self) -> &'static str {
+        "colony_knowledge_lift"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Default pipeline builder
 // ---------------------------------------------------------------------------
 
@@ -2440,6 +2500,7 @@ pub fn default_modifier_pipeline(
     pipeline.push(Box::new(MemoryResourceFoundLift::new(sc)));
     pipeline.push(Box::new(MemoryDeathPenalty::new(sc)));
     pipeline.push(Box::new(MemoryThreatSeenSuppress::new(sc)));
+    pipeline.push(Box::new(ColonyKnowledgeLift::new(sc)));
     // Ticket 047 — `AcuteHealthAdrenalineFlee` registers immediately
     // after `BodyDistressPromotion` so under combined high composite
     // distress + high health deficit, both lifts compose additively on
@@ -3182,7 +3243,7 @@ mod tests {
     fn default_pipeline_registers_expected_modifier_count() {
         let constants = crate::resources::sim_constants::SimConstants::default();
         let pipeline = default_modifier_pipeline(&constants);
-        assert_eq!(pipeline.len(), 24, "expected 24 registered modifiers");
+        assert_eq!(pipeline.len(), 25, "expected 25 registered modifiers");
     }
 
     // -----------------------------------------------------------------------
@@ -5071,6 +5132,46 @@ mod tests {
         assert!((m.apply(DseId(EXPLORE), 0.6, &ctx, &fetch) - 0.45).abs() < 1e-6);
         assert!((m.apply(DseId(HUNT), 0.6, &ctx, &fetch) - 0.45).abs() < 1e-6);
         assert!((m.apply(DseId(FORAGE), 0.6, &ctx, &fetch) - 0.6).abs() < 1e-6);
+    }
+
+    // -----------------------------------------------------------------------
+    // ColonyKnowledgeLift
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn colony_knowledge_resource_arm_lifts_hunt_and_forage() {
+        let m = ColonyKnowledgeLift { scale: 0.15 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            COLONY_KNOWLEDGE_RESOURCE_PROXIMITY => 1.0,
+            _ => 0.0,
+        };
+        // 0.5 + 1.0 × 0.15 = 0.65
+        assert!((m.apply(DseId(HUNT), 0.5, &ctx, &fetch) - 0.65).abs() < 1e-6);
+        assert!((m.apply(DseId(FORAGE), 0.5, &ctx, &fetch) - 0.65).abs() < 1e-6);
+    }
+
+    #[test]
+    fn colony_knowledge_threat_arm_lifts_patrol_only() {
+        let m = ColonyKnowledgeLift { scale: 0.15 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            COLONY_KNOWLEDGE_THREAT_PROXIMITY => 1.0,
+            _ => 0.0,
+        };
+        assert!((m.apply(DseId(PATROL), 0.5, &ctx, &fetch) - 0.65).abs() < 1e-6);
+        // Hunt is in the resource arm; with threat-only sum it's inert.
+        assert!((m.apply(DseId(HUNT), 0.5, &ctx, &fetch) - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn colony_knowledge_skips_unrelated_dses() {
+        let m = ColonyKnowledgeLift { scale: 0.15 };
+        let (_, ctx) = test_ctx();
+        let fetch = |_: &str, _: Entity| 1.0;
+        for dse in [EAT, SLEEP, BUILD, MATE, MENTOR, COORDINATE, IDLE] {
+            assert!((m.apply(DseId(dse), 0.5, &ctx, &fetch) - 0.5).abs() < 1e-6);
+        }
     }
 
     #[test]
