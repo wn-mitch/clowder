@@ -9,7 +9,7 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [mentoring-extraction.md]
-landed-at: PENDING
+landed-at: ba217bd5
 landed-on: 2026-05-03
 ---
 
@@ -139,7 +139,7 @@ implementation plan.
 - 2026-05-03: opened by ticket 152's audit verdict on the Socializing
   cluster. See `docs/open-work/landed/152-...md` for the layer-walk and
   evidence trail.
-- 2026-05-03: landed at PENDING. R3 (split) implemented per the recommended
+- 2026-05-03: landed at ba217bd5. R3 (split) implemented per the recommended
   direction: new `DispositionKind::Mentoring` with single-action
   `mentoring_actions()` plan template + `InteractionDone(true)` completion
   proxy (Pattern B, mirrors Mating). Seed-42 deep-soak verification —
