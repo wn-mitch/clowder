@@ -145,6 +145,12 @@ pub struct MarkerQueries<'w, 's> {
             Has<markers::CarcassNearby>,
         ),
     >,
+    /// Ticket 158 — kinship-channel substrate. Authored each tick by
+    /// `growth::update_parent_hungry_kitten_markers`. The populate sites
+    /// in `evaluate_dispositions` / `evaluate_and_plan` read this and
+    /// pass the bool to `resolve_caretake_target` as the
+    /// `parent_marker_active` fallback gate.
+    pub parent_hungry_kitten: Query<'w, 's, Has<markers::IsParentOfHungryKitten>>,
 }
 
 use crate::resources::food::FoodStores;
@@ -614,7 +620,14 @@ pub fn evaluate_dispositions(
         // Piecewise / isolation). `hungry_kitten_urgency` now reads the
         // aggregated Best score; `is_parent_of_hungry_kitten` stays
         // derived from any hungry own-kitten in range (bloodline override
-        // fires regardless of argmax).
+        // fires regardless of argmax). Ticket 158 — parent_marker_active
+        // promotes the closest hungry own-kitten as a fallback candidate
+        // when the per-tick range gate excludes every in-range option.
+        let parent_marker_active = side_effects
+            .marker_queries
+            .parent_hungry_kitten
+            .get(entity)
+            .unwrap_or(false);
         let caretake_resolution = crate::ai::dses::caretake_target::resolve_caretake_target(
             &side_effects.dse_registry,
             entity,
@@ -625,6 +638,7 @@ pub fn evaluate_dispositions(
             // Scorer pre-check; focal capture happens at the
             // step-resolution site, not here.
             None,
+            parent_marker_active,
         );
         // §Phase 4c.4 alloparenting Reframe A: bond-weighted compassion.
         // Non-parent adults with a positive bond to the kitten's mother
@@ -1301,7 +1315,13 @@ pub fn disposition_to_chain(
         // §6.5.6 target-taking DSE: argmax kitten flows into
         // `build_caretaking_chain`'s navigate-TO-kitten step. Same bundle
         // as evaluate_dispositions so scoring + chain-building see the
-        // same winner.
+        // same winner. Ticket 158 — parent_marker_active is `false`
+        // here because `disposition_to_chain` is unregistered in the
+        // schedule today (the GOAP path owns chain-building); this site
+        // mirrors `evaluate_dispositions` for forward-compat parity but
+        // does not consume the kinship-channel substrate. If this path
+        // is re-enabled, add a `parent_hungry_kitten` query param and
+        // route the marker presence through here.
         let caretake_resolution = crate::ai::dses::caretake_target::resolve_caretake_target(
             &res.dse_registry,
             entity,
@@ -1312,6 +1332,7 @@ pub fn disposition_to_chain(
             // Chain-building side; the focal capture happens at the
             // GOAP step-resolver site (goap.rs: FeedKitten step).
             None,
+            false,
         );
 
         // §6.5.1 + §6.5.2: resolve target-taking DSE winners once per

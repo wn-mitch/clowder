@@ -406,11 +406,26 @@ impl HasEligibleMate {
     pub const KEY: &str = "HasEligibleMate";
 }
 
-/// Cat is the parent side of a `KittenDependency` whose kitten's
-/// hunger exceeds threshold.
-/// `growth.rs::update_parent_hungry_kitten_markers`.
+/// Cat has at least one living dependent kitten whose hunger has
+/// dropped below `kitten_cry_hunger_threshold`. Authored each tick;
+/// removed when no own kitten is hungry. The 0/1 substrate signal
+/// that lets parents score Caretake even when their kitten is
+/// outside the per-tick `CaretakeTargetDse` candidate pool (range
+/// gate or hunger-cycle gate). Pairs with the `KittenCryMap` cell
+/// sample at the cat's tile — the cry-map is the spatial-perception
+/// channel; this marker is the kinship-channel substrate fact.
+///
+/// Author: `growth.rs::update_parent_hungry_kitten_markers`.
+/// Read: `MarkerSnapshot.has(IsParentOfHungryKitten::KEY, entity)`
+/// in `disposition.rs` / `goap.rs` populate sites; passed into
+/// `caretake_target::resolve_caretake_target` as
+/// `parent_marker_active` to enable the own-kitten-anywhere
+/// fallback (ticket 158).
 #[derive(Component, Debug, Clone, Copy)]
 pub struct IsParentOfHungryKitten;
+impl IsParentOfHungryKitten {
+    pub const KEY: &str = "IsParentOfHungryKitten";
+}
 
 // ---------------------------------------------------------------------------
 // Colony markers (§4.3 Colony)

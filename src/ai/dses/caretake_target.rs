@@ -203,6 +203,7 @@ fn caretake_intention(_target: Entity) -> Intention {
 /// Returns `CaretakeResolution::default()` (all-None / 0.0) when no
 /// hungry kitten is in range or the DSE isn't registered — matches the
 /// pre-refactor contract.
+#[allow(clippy::too_many_arguments)]
 pub fn resolve_caretake_target(
     registry: &DseRegistry,
     adult: Entity,
@@ -211,6 +212,7 @@ pub fn resolve_caretake_target(
     cat_positions: &[(Entity, Position)],
     tick: u64,
     focal_hook: Option<FocalTargetHook<'_>>,
+    parent_marker_active: bool,
 ) -> CaretakeResolution {
     let Some(dse) = registry
         .target_taking_dses
@@ -237,6 +239,34 @@ pub fn resolve_caretake_target(
         }
         candidates.push(kitten.entity);
         positions.push(kitten.pos);
+    }
+
+    // Ticket 158 — kinship-channel fallback. If the per-tick range
+    // gate excludes every hungry kitten but the
+    // `IsParentOfHungryKitten` marker says this adult has at least one
+    // hungry own-kitten somewhere, promote the closest own-kitten as a
+    // single candidate so the Caretake plan can bind. The plan
+    // template `[RetrieveFoodForKitten@Stores, FeedKitten@Stores]` is
+    // position-independent on the kitten side (the +0.5 hunger pass at
+    // `goap.rs:2924-2934` is entity-keyed), so feeding a distant
+    // own-kitten remotely is the same physical operation as feeding a
+    // nearby one — the previous behavior of dropping urgency to zero
+    // forced the parent to choose a non-Caretake action when their
+    // kitten just happened to fall outside the 12-tile gate or above
+    // the 0.6-hunger gate.
+    if candidates.is_empty() && parent_marker_active {
+        let closest_own = kittens
+            .iter()
+            .filter(|k| {
+                k.hunger < KITTEN_HUNGER_THRESHOLD
+                    && (k.mother == Some(adult) || k.father == Some(adult))
+            })
+            .min_by_key(|k| adult_pos.manhattan_distance(&k.pos));
+        if let Some(k) = closest_own {
+            candidates.push(k.entity);
+            positions.push(k.pos);
+            any_parent_hit = true;
+        }
     }
 
     if candidates.is_empty() {
@@ -452,7 +482,8 @@ mod tests {
     fn resolver_returns_default_with_no_registered_dse() {
         let registry = DseRegistry::new();
         let adult = Entity::from_raw_u32(1).unwrap();
-        let out = resolve_caretake_target(&registry, adult, Position::new(0, 0), &[], &[], 0, None);
+        let out =
+            resolve_caretake_target(&registry, adult, Position::new(0, 0), &[], &[], 0, None, false);
         assert!(out.target.is_none());
         assert_eq!(out.urgency, 0.0);
         assert!(!out.is_parent);
@@ -463,7 +494,8 @@ mod tests {
         let mut registry = DseRegistry::new();
         registry.target_taking_dses.push(caretake_target_dse());
         let adult = Entity::from_raw_u32(1).unwrap();
-        let out = resolve_caretake_target(&registry, adult, Position::new(0, 0), &[], &[], 0, None);
+        let out =
+            resolve_caretake_target(&registry, adult, Position::new(0, 0), &[], &[], 0, None, false);
         assert!(out.target.is_none());
     }
 
@@ -481,6 +513,7 @@ mod tests {
             &[],
             0,
             None,
+            false,
         );
         assert!(out.target.is_none());
     }
@@ -500,6 +533,7 @@ mod tests {
             &[],
             0,
             None,
+            false,
         );
         assert!(out.target.is_none());
     }
@@ -525,6 +559,7 @@ mod tests {
             &[],
             0,
             None,
+            false,
         );
         assert_eq!(out.target, Some(Entity::from_raw_u32(11).unwrap()));
     }
@@ -547,6 +582,7 @@ mod tests {
             &[],
             0,
             None,
+            false,
         );
         assert_eq!(out.target, Some(Entity::from_raw_u32(10).unwrap()));
         assert!(out.urgency > 0.0);
@@ -573,6 +609,7 @@ mod tests {
             &[],
             0,
             None,
+            false,
         );
         assert_eq!(out.target, Some(Entity::from_raw_u32(11).unwrap()));
         assert!(out.is_parent, "own-kitten hit sets is_parent");
@@ -598,6 +635,7 @@ mod tests {
             &[],
             0,
             None,
+            false,
         );
         assert_eq!(out.target, Some(Entity::from_raw_u32(10).unwrap()));
         assert!(
@@ -623,6 +661,7 @@ mod tests {
             &[],
             0,
             None,
+            false,
         );
         assert_eq!(out.target, Some(Entity::from_raw_u32(10).unwrap()));
     }
@@ -653,6 +692,7 @@ mod tests {
             &[],
             0,
             None,
+            false,
         );
         assert_eq!(
             out.target,
@@ -685,6 +725,7 @@ mod tests {
             &cat_positions,
             0,
             None,
+            false,
         );
         assert_eq!(
             out.target,
@@ -718,6 +759,7 @@ mod tests {
             &[],
             0,
             None,
+            false,
         );
         assert_eq!(out.target_mother, Some(mother));
         assert_eq!(out.target_father, Some(father));
@@ -739,6 +781,7 @@ mod tests {
             &[],
             0,
             None,
+            false,
         );
         assert!(out.target.is_some());
         assert!(
@@ -751,5 +794,142 @@ mod tests {
             "urgent own-kitten-starving case should score > 0.5, got {}",
             out.urgency
         );
+    }
+
+    // -- Ticket 158 parent-marker fallback ------------------------------------
+
+    #[test]
+    fn parent_marker_fallback_promotes_distant_own_kitten() {
+        // Adult is parent of a hungry kitten that is OUT of range
+        // (Manhattan > 12). With marker inactive, target is None
+        // (legacy behavior). With marker active, the function falls
+        // back to the closest hungry own-kitten and produces a target +
+        // urgency > 0, clearing the scoring.rs:1308 gate.
+        let mut registry = DseRegistry::new();
+        registry.target_taking_dses.push(caretake_target_dse());
+        let adult = Entity::from_raw_u32(1).unwrap();
+        // Own kitten at distance 30 (>> CARETAKE_TARGET_RANGE = 12), hungry.
+        let kittens = vec![kitten_with_parents(10, 30, 0, 0.2, Some(adult), None)];
+
+        // Marker inactive — legacy gate excludes the kitten.
+        let baseline = resolve_caretake_target(
+            &registry,
+            adult,
+            Position::new(0, 0),
+            &kittens,
+            &[],
+            0,
+            None,
+            false,
+        );
+        assert!(baseline.target.is_none());
+        assert_eq!(baseline.urgency, 0.0);
+        assert!(!baseline.is_parent);
+
+        // Marker active — fallback promotes the own-kitten.
+        let lifted = resolve_caretake_target(
+            &registry,
+            adult,
+            Position::new(0, 0),
+            &kittens,
+            &[],
+            0,
+            None,
+            true,
+        );
+        assert_eq!(lifted.target, Some(Entity::from_raw_u32(10).unwrap()));
+        assert!(lifted.urgency > 0.0);
+        assert!(lifted.is_parent);
+        assert_eq!(lifted.target_mother, Some(adult));
+    }
+
+    #[test]
+    fn parent_marker_fallback_picks_closest_own_kitten() {
+        // Two own kittens, both out-of-range. Fallback picks the
+        // closer one (the only spatial signal we have when the per-tick
+        // candidate pool is empty).
+        let mut registry = DseRegistry::new();
+        registry.target_taking_dses.push(caretake_target_dse());
+        let adult = Entity::from_raw_u32(1).unwrap();
+        let kittens = vec![
+            // Father side, dist 25, hungry.
+            kitten_with_parents(10, 25, 0, 0.2, None, Some(adult)),
+            // Mother side, dist 20, hungry.
+            kitten_with_parents(11, 20, 0, 0.2, Some(adult), None),
+        ];
+        let out = resolve_caretake_target(
+            &registry,
+            adult,
+            Position::new(0, 0),
+            &kittens,
+            &[],
+            0,
+            None,
+            true,
+        );
+        assert_eq!(
+            out.target,
+            Some(Entity::from_raw_u32(11).unwrap()),
+            "closer own-kitten should win the fallback selection"
+        );
+    }
+
+    #[test]
+    fn parent_marker_does_not_fire_for_well_fed_kittens() {
+        // Marker active, but the only own-kitten has hunger above the
+        // threshold — fallback should still skip it. The marker is a
+        // stale signal in this corner (authored at the start of the
+        // tick by `update_parent_hungry_kitten_markers` and read here
+        // after the tick's feeding pass may have already lifted hunger).
+        let mut registry = DseRegistry::new();
+        registry.target_taking_dses.push(caretake_target_dse());
+        let adult = Entity::from_raw_u32(1).unwrap();
+        let kittens = vec![kitten_with_parents(10, 30, 0, 0.9, Some(adult), None)];
+        let out = resolve_caretake_target(
+            &registry,
+            adult,
+            Position::new(0, 0),
+            &kittens,
+            &[],
+            0,
+            None,
+            true,
+        );
+        assert!(out.target.is_none());
+        assert_eq!(out.urgency, 0.0);
+    }
+
+    #[test]
+    fn parent_marker_does_not_steal_targets_from_in_range_pool() {
+        // Adult has both an in-range stranger kitten AND an out-of-range
+        // own-kitten. The marker must NOT short-circuit the per-tick
+        // candidate pool — the in-range path runs as before, fallback
+        // only fires when in-range pool is empty.
+        let mut registry = DseRegistry::new();
+        registry.target_taking_dses.push(caretake_target_dse());
+        let adult = Entity::from_raw_u32(1).unwrap();
+        let kittens = vec![
+            kitten_with_parents(10, 1, 0, 0.05, None, None), // stranger, in-range, very hungry
+            kitten_with_parents(11, 30, 0, 0.1, Some(adult), None), // own, out-of-range
+        ];
+        let out = resolve_caretake_target(
+            &registry,
+            adult,
+            Position::new(0, 0),
+            &kittens,
+            &[],
+            0,
+            None,
+            true,
+        );
+        assert_eq!(
+            out.target,
+            Some(Entity::from_raw_u32(10).unwrap()),
+            "in-range stranger keeps the target slot when candidate pool is non-empty"
+        );
+        // is_parent stays false because the stranger is the argmax and
+        // no own-kitten passed the in-range filter (out-of-range own
+        // kitten isn't counted toward `any_parent_hit`).
+        assert!(!out.is_parent);
     }
 }

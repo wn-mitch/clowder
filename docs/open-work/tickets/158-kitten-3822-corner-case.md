@@ -1,11 +1,11 @@
 ---
 id: 158
 title: Seed-42 (38,22) kitten cohort starves despite KittenCryMap
-status: ready
+status: blocked
 cluster: ai-substrate
 added: 2026-05-03
 parked: null
-blocked-by: []
+blocked-by: [161]
 supersedes: []
 related-systems: []
 related-balance: [mentoring-extraction.md]
@@ -142,3 +142,63 @@ spawn-locality (R3), orphan-marker substrate (R2), kitten movement
   identical ticks across all five 156 iteration attempts —
   the failure mode is structural and orthogonal to 156's
   cry-broadcast architecture.
+
+- 2026-05-04: investigation completed. Spatial topology is NOT
+  the failure mode (audit row "Pathfinding / Geometric isolation"
+  promoted to `[verified-correct]`): adult-position scan during
+  the death window (ticks 1340000-1357784) shows Mocha avg
+  position (36.3, 21.1), Manhattan **2.6** from her starving
+  twins; 99.1% of adult-snapshots within Manhattan 30 cry-disc;
+  92.8% within Manhattan 12 `CARETAKE_TARGET_RANGE`. (38, 22) is
+  at the colony heart. Both kittens are litter-mates born to
+  Mocha at tick 1268164 at (38, 22); Mocha gave birth to three
+  subsequent litters elsewhere and never returned to feed her
+  firstborn twins. Caretake feeding chain is correct
+  (`[RetrieveFoodForKitten@Stores, FeedKitten@Stores]` plan
+  template; +0.5 hunger applied via deferred entity-keyed pass at
+  `goap.rs:2924-2934`; position-independent on the kitten side).
+  H1 verdict promoted to `[verified-defect]`: scoring gate at
+  `src/ai/scoring.rs:1308` (`if ctx.hungry_kitten_urgency > 0.0`)
+  filters Caretake out of L3 entirely when no kitten meets BOTH
+  the per-tick range (Manhattan ≤ 12) AND hunger (< 0.6) gates
+  simultaneously for the adult; the cry-lift modifier can't fire
+  because of the gated-boost short-circuit at
+  `modifier.rs:1649` (`if score <= 0 { return score; }`). The
+  orphan marker `IsParentOfHungryKitten` (defined at
+  `markers.rs:413` but with zero readers across `src/`, despite
+  being load-bearing in `docs/systems/ai-substrate-refactor.md`
+  §4.3) is the spec'd substrate bypass — never authored.
+
+- 2026-05-04: structural fix written but does NOT yet land. Authored
+  `update_parent_hungry_kitten_markers` in `growth.rs` (sibling
+  of `update_parent_markers`); registered in `simulation.rs`
+  Chain 2a; added `parent_marker_active: bool` parameter to
+  `resolve_caretake_target` with own-kitten-anywhere fallback
+  when the per-tick range gate excludes every candidate; threaded
+  marker state through 4 production call sites in
+  `disposition.rs` / `goap.rs`. 9 new unit tests (5 in `growth.rs`,
+  4 in `caretake_target.rs`) all pass; existing 1833 lib tests
+  still pass; full `just check` clean. Opened ticket 159
+  (parent-grief consumer) and ticket 160 (substrate stub catalogue).
+- 2026-05-04: post-fix seed-42 deep-soak fails the hard gate in
+  an unexpected way: `Starvation == 2` remains, but the failure
+  mode is totally different. **0 kittens born** (the fix's bypass
+  never even fires); 6/8 adult cohort wiped by shadow-fox
+  ambush in a 57k-tick window 1250-1307k; 2 surviving cats
+  (Nettle, Heron) starve as orphans. Same-seed position
+  comparison shows the trajectory diverges at **tick 1201300**
+  with Mocha and Simba's positions swapped — well before any
+  kittens exist. The new system's `&Needs` reader perturbs Bevy's
+  parallel-execution order. Ticket 161 (seed-42 fox-attrition
+  perturbation cascade) is the active blocker.
+
+- 2026-05-04: structural fix lands on main alongside the 161
+  investigation ticket. Code (the new
+  `update_parent_hungry_kitten_markers` system + `parent_marker_active`
+  fallback through `resolve_caretake_target` + four production
+  call-site reads) ships in the same commit as the doc updates so
+  the perturbation is reproducible from `main` while 161 is being
+  diagnosed. Status stays `blocked` on 161 because the seed-42
+  hard gate is still red — landing the code does not close 158's
+  acceptance criteria, only stages the substrate so 161 can
+  investigate from a single shared workspace state.

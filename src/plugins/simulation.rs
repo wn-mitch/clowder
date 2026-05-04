@@ -351,6 +351,14 @@ impl Plugin for SimulationPlugin {
                             // parenthood authored from
                             // `KittenDependency` references.
                             systems::growth::update_parent_markers,
+                            // Ticket 158 — kinship-channel substrate:
+                            // marks parents with at least one hungry
+                            // own-kitten so Caretake survives the
+                            // `resolve_caretake_target` per-tick gates
+                            // (range / hunger-cycle). Authored before
+                            // scoring so the populate sites in
+                            // disposition.rs / goap.rs see the marker.
+                            systems::growth::update_parent_hungry_kitten_markers,
                             // Ticket 014 §4 sensing batch — broad-phase
                             // target-existence: HasThreatNearby,
                             // HasSocialTarget, HasHerbsNearby, PreyNearby,

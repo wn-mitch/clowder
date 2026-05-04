@@ -265,6 +265,84 @@ pub fn update_parent_markers(
 }
 
 // ---------------------------------------------------------------------------
+// update_parent_hungry_kitten_markers (ticket 158 — §4.3 substrate fix)
+// ---------------------------------------------------------------------------
+
+/// Author the `IsParentOfHungryKitten` ZST on every living parent
+/// whose dependent kitten has hunger below `kitten_cry_hunger_threshold`.
+/// Same threshold as the `KittenCryMap` so kinship-channel parent
+/// eligibility lights up at the same hunger level as the perceptual
+/// cry channel — the two are paired channels, not redundant.
+///
+/// **Predicate** — `IsParentOfHungryKitten` iff
+/// `∃ living KittenDependency d : (d.mother == self ∨ d.father == self)
+/// ∧ d.hunger < kitten_cry_hunger_threshold`.
+///
+/// **Why** — ticket 158: prior to this system the marker was defined
+/// in `markers.rs` but neither authored nor read, so parents whose
+/// kittens cycled out of the `CaretakeTargetDse` per-tick candidate
+/// pool (range > 12 OR hunger ≥ 0.6) had Caretake filtered out of
+/// L3 entirely by `scoring.rs::evaluate_internal`'s
+/// `if ctx.hungry_kitten_urgency > 0.0` gate. The marker carries a
+/// kinship-channel eligibility signal that survives the per-tick
+/// gates, and the `resolve_caretake_target` fallback path
+/// (parent_marker_active) uses it to produce a non-zero urgency
+/// when a parent has any hungry own-kitten anywhere on the map.
+///
+/// **§4.3 ordering hazard.** Same shape as `update_parent_markers` —
+/// when a kitten dies, the surviving parent's marker is removed
+/// within the same tick (the kitten's `KittenDependency` stops
+/// counting once `With<Dead>` filters it out). Don't infer
+/// parent-at-death status from this marker on the death tick.
+///
+/// **Ordering** — Chain 2a, immediately after `update_parent_markers`
+/// and before the GOAP / disposition scoring loops, so the snapshot
+/// population in those scorers sees the freshly-authored marker.
+#[allow(clippy::type_complexity)]
+pub fn update_parent_hungry_kitten_markers(
+    mut commands: Commands,
+    kittens: Query<(&Needs, &KittenDependency), Without<Dead>>,
+    cats: Query<
+        (Entity, Has<markers::IsParentOfHungryKitten>),
+        (With<Species>, Without<Dead>),
+    >,
+    constants: Res<SimConstants>,
+) {
+    use std::collections::HashSet;
+    let threshold = constants.influence_maps.kitten_cry_hunger_threshold;
+    let mut parents_with_hungry_kitten: HashSet<Entity> = HashSet::new();
+    if threshold > 0.0 {
+        for (needs, dep) in kittens.iter() {
+            if needs.hunger >= threshold {
+                continue;
+            }
+            if let Some(m) = dep.mother {
+                parents_with_hungry_kitten.insert(m);
+            }
+            if let Some(f) = dep.father {
+                parents_with_hungry_kitten.insert(f);
+            }
+        }
+    }
+    for (entity, has_marker) in cats.iter() {
+        let want = parents_with_hungry_kitten.contains(&entity);
+        match (want, has_marker) {
+            (true, false) => {
+                commands
+                    .entity(entity)
+                    .insert(markers::IsParentOfHungryKitten);
+            }
+            (false, true) => {
+                commands
+                    .entity(entity)
+                    .remove::<markers::IsParentOfHungryKitten>();
+            }
+            _ => {}
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -561,5 +639,145 @@ mod tests {
             .id();
         schedule.run(&mut world);
         assert!(world.entity(mother).contains::<markers::Parent>());
+    }
+
+    // -----------------------------------------------------------------------
+    // Ticket 158 — IsParentOfHungryKitten marker tests
+    // -----------------------------------------------------------------------
+
+    fn setup_hungry_marker() -> (World, Schedule) {
+        let mut world = World::new();
+        // Constants resource — the system reads kitten_cry_hunger_threshold
+        // from `influence_maps`. Default constants put the threshold at
+        // 0.5; we rely on the default here.
+        world.insert_resource(SimConstants::default());
+        let mut schedule = Schedule::default();
+        schedule.add_systems(update_parent_hungry_kitten_markers);
+        (world, schedule)
+    }
+
+    fn spawn_kitten_with_hunger(
+        world: &mut World,
+        mother: Entity,
+        father: Entity,
+        hunger: f32,
+    ) -> Entity {
+        use crate::components::physical::Needs;
+        world
+            .spawn((
+                Species,
+                KittenDependency::new(mother, father),
+                Needs {
+                    hunger,
+                    ..Needs::default()
+                },
+            ))
+            .id()
+    }
+
+    #[test]
+    fn hungry_kitten_marks_both_parents() {
+        let (mut world, mut schedule) = setup_hungry_marker();
+        let mother = spawn_adult(&mut world);
+        let father = spawn_adult(&mut world);
+        let _kitten = spawn_kitten_with_hunger(&mut world, mother, father, 0.2);
+        schedule.run(&mut world);
+        assert!(
+            world
+                .entity(mother)
+                .contains::<markers::IsParentOfHungryKitten>(),
+            "mother should be marked when kitten hunger is below threshold"
+        );
+        assert!(
+            world
+                .entity(father)
+                .contains::<markers::IsParentOfHungryKitten>(),
+            "father should be marked when kitten hunger is below threshold"
+        );
+    }
+
+    #[test]
+    fn well_fed_kitten_does_not_mark_parents() {
+        let (mut world, mut schedule) = setup_hungry_marker();
+        let mother = spawn_adult(&mut world);
+        let father = spawn_adult(&mut world);
+        // Hunger 0.8 is above the default 0.5 threshold.
+        let _kitten = spawn_kitten_with_hunger(&mut world, mother, father, 0.8);
+        schedule.run(&mut world);
+        assert!(!world
+            .entity(mother)
+            .contains::<markers::IsParentOfHungryKitten>());
+        assert!(!world
+            .entity(father)
+            .contains::<markers::IsParentOfHungryKitten>());
+    }
+
+    #[test]
+    fn marker_clears_when_kitten_recovers() {
+        let (mut world, mut schedule) = setup_hungry_marker();
+        let mother = spawn_adult(&mut world);
+        let father = spawn_adult(&mut world);
+        let kitten = spawn_kitten_with_hunger(&mut world, mother, father, 0.1);
+        schedule.run(&mut world);
+        assert!(world
+            .entity(mother)
+            .contains::<markers::IsParentOfHungryKitten>());
+        // Feed the kitten — hunger jumps above threshold.
+        use crate::components::physical::Needs;
+        world.entity_mut(kitten).insert(Needs {
+            hunger: 0.9,
+            ..Needs::default()
+        });
+        schedule.run(&mut world);
+        assert!(
+            !world
+                .entity(mother)
+                .contains::<markers::IsParentOfHungryKitten>(),
+            "marker should clear once kitten hunger rises above threshold"
+        );
+    }
+
+    #[test]
+    fn dead_kitten_clears_marker() {
+        let (mut world, mut schedule) = setup_hungry_marker();
+        let mother = spawn_adult(&mut world);
+        let father = spawn_adult(&mut world);
+        let kitten = spawn_kitten_with_hunger(&mut world, mother, father, 0.1);
+        schedule.run(&mut world);
+        assert!(world
+            .entity(mother)
+            .contains::<markers::IsParentOfHungryKitten>());
+        // Kitten dies — the `Without<Dead>` filter on the kittens
+        // query excludes it, so the marker drops within the same tick.
+        // Same §4.3 ordering hazard as `update_parent_markers`.
+        world.entity_mut(kitten).insert(Dead {
+            tick: 0,
+            cause: DeathCause::Starvation,
+        });
+        schedule.run(&mut world);
+        assert!(!world
+            .entity(mother)
+            .contains::<markers::IsParentOfHungryKitten>());
+        assert!(!world
+            .entity(father)
+            .contains::<markers::IsParentOfHungryKitten>());
+    }
+
+    #[test]
+    fn one_hungry_kitten_among_siblings_keeps_marker() {
+        // Mother has two kittens — one well-fed, one starving. The marker
+        // fires on ANY hungry dependent.
+        let (mut world, mut schedule) = setup_hungry_marker();
+        let mother = spawn_adult(&mut world);
+        let father = spawn_adult(&mut world);
+        let _well_fed = spawn_kitten_with_hunger(&mut world, mother, father, 0.9);
+        let _hungry = spawn_kitten_with_hunger(&mut world, mother, father, 0.2);
+        schedule.run(&mut world);
+        assert!(world
+            .entity(mother)
+            .contains::<markers::IsParentOfHungryKitten>());
+        assert!(world
+            .entity(father)
+            .contains::<markers::IsParentOfHungryKitten>());
     }
 }

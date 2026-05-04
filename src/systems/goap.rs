@@ -285,6 +285,13 @@ pub struct TargetMarkerQueries<'w, 's> {
             Has<markers::BefriendedAlly>,
         ),
     >,
+    /// Ticket 158 — kinship-channel substrate for the Caretake DSE
+    /// scoring gate. Authored each tick by
+    /// `growth::update_parent_hungry_kitten_markers`; read at the
+    /// `resolve_caretake_target` call site to enable the
+    /// own-kitten-anywhere fallback when the per-tick range gate
+    /// would otherwise filter every candidate out.
+    pub parent_hungry_kitten_q: Query<'w, 's, Has<markers::IsParentOfHungryKitten>>,
 }
 
 #[allow(clippy::type_complexity)]
@@ -380,6 +387,17 @@ pub struct ExecutorContext<'w, 's> {
             Has<crate::components::markers::BefriendedAlly>,
         ),
         Without<Dead>,
+    >,
+    /// Ticket 158 — kinship-channel substrate for Caretake plan
+    /// rebinding. Same query as `TargetMarkerQueries::parent_hungry_kitten_q`
+    /// in `evaluate_and_plan`; read at the goap.rs:3843 call site so
+    /// the FeedKitten step's target-rebinding inherits the
+    /// own-kitten-anywhere fallback when the per-tick range gate
+    /// excludes every candidate.
+    pub parent_hungry_kitten_q: bevy_ecs::prelude::Query<
+        'w,
+        's,
+        Has<crate::components::markers::IsParentOfHungryKitten>,
     >,
     /// Ticket 027b §7.M — L2 PairingActivity Intention lookup. The
     /// `SocializeWith` step resolver reads this to pin the Intention
@@ -1082,6 +1100,16 @@ pub fn evaluate_and_plan(
         // `hungry_kitten_urgency` and surfaces the argmax kitten for the
         // FeedKitten step below. `is_parent_of_hungry_kitten` stays
         // bloodline-override (any own-kitten in range, not just argmax).
+        // Ticket 158 — the `parent_marker_active` flag promotes the
+        // adult's closest hungry own-kitten as a fallback candidate
+        // when the per-tick range gate excludes every in-range option,
+        // so a parent at the colony heart whose kittens momentarily
+        // drift out of the 12-tile gate still gets a non-zero urgency
+        // and clears the `if hungry_kitten_urgency > 0.0` scoring gate.
+        let parent_marker_active = marker_qs
+            .parent_hungry_kitten_q
+            .get(entity)
+            .unwrap_or(false);
         let caretake_resolution = crate::ai::dses::caretake_target::resolve_caretake_target(
             &res.dse_registry,
             entity,
@@ -1092,6 +1120,7 @@ pub fn evaluate_and_plan(
             // Scorer pre-check; focal capture happens at the
             // step-resolution site (goap.rs: FeedKitten step).
             None,
+            parent_marker_active,
         );
         // §Phase 4c.4 alloparenting Reframe A: bond-weighted compassion.
         // See disposition.rs companion site.
@@ -3839,6 +3868,10 @@ fn dispatch_step_action(
                 } else {
                     None
                 };
+                let parent_marker_active = ec
+                    .parent_hungry_kitten_q
+                    .get(cat_entity)
+                    .unwrap_or(false);
                 plan.step_state[step_idx].target_entity =
                     crate::ai::dses::caretake_target::resolve_caretake_target(
                         &ec.dse_registry,
@@ -3848,6 +3881,7 @@ fn dispatch_step_action(
                         &[],
                         ec.time.tick,
                         focal_hook,
+                        parent_marker_active,
                     )
                     .target;
             }
