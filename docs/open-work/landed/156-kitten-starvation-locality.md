@@ -1,7 +1,7 @@
 ---
 id: 156
 title: Kitten starvation localized at (38,22) post-154 cascade — non-parent adults can't perceive distress
-status: in-progress
+status: done
 cluster: ai-substrate
 added: 2026-05-03
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: [mentoring-extraction.md]
-landed-at: null
-landed-on: null
+landed-at: 2771f397
+landed-on: 2026-05-04
 ---
 
 <!--
