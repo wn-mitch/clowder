@@ -1,8 +1,10 @@
 use std::path::PathBuf;
 
 use bevy::prelude::Resource;
+use bevy_ecs::entity::Entity;
 use bevy_ecs::world::World;
 
+use crate::components::fulfillment::Fulfillment;
 use crate::components::hunting_priors::HuntingPriors;
 use crate::components::identity::{Age, Name, Species};
 use crate::components::magic::Inventory;
@@ -16,10 +18,98 @@ use crate::resources::{
     WeatherState,
 };
 use crate::world_gen::colony::{
-    find_colony_site, generate_starting_cats, spawn_starting_buildings,
+    find_colony_site, generate_starting_cats, spawn_starting_buildings, CatBlueprint,
 };
 use crate::world_gen::custom_cats::load_custom_cats;
 use crate::world_gen::terrain::generate_terrain;
+
+/// Ticket 162 — scenario harness world-setup override. When inserted as a
+/// resource before `SimulationPlugin` builds, the contained closure replaces
+/// `build_new_world` inside `setup_world_exclusive`. The rest of
+/// `setup_world_exclusive` (template loading, narrative, TimeScale rebuild,
+/// default-resource backfills) still runs, so the closure is responsible
+/// only for the resource + entity setup that `build_new_world` normally
+/// performs (terrain, SimConfig, SimRng, SimConstants, all influence maps,
+/// cats, prey, herbs).
+///
+/// Scenarios use `crate::scenarios::env` helpers to do the heavy lifting
+/// rather than reimplementing all of `build_new_world`'s resource init.
+type ScenarioSetupFn = Box<dyn FnOnce(&mut World, u64) + Send + Sync>;
+
+#[derive(Resource)]
+pub struct WorldSetup {
+    setup: ScenarioSetupFn,
+}
+
+impl WorldSetup {
+    pub fn new<F>(f: F) -> Self
+    where
+        F: FnOnce(&mut World, u64) + Send + Sync + 'static,
+    {
+        Self { setup: Box::new(f) }
+    }
+
+    fn run(self, world: &mut World, seed: u64) {
+        (self.setup)(world, seed);
+    }
+}
+
+/// Ticket 162 — single source of truth for the founder spawn bundle. Both
+/// `build_new_world` (production colony spawn) and `crate::scenarios::env`
+/// (microexperiment harness) call this so a missing component on either
+/// path is impossible. Drift control is enforced by an integration test
+/// (see `tests/scenarios.rs::cat_preset_matches_founder_bundle`).
+pub fn spawn_cat_from_blueprint(
+    world: &mut World,
+    blueprint: CatBlueprint,
+    position: Position,
+    needs: Needs,
+    fulfillment: Fulfillment,
+) -> Entity {
+    world
+        .spawn((
+            (
+                Name(blueprint.name),
+                Species,
+                Age {
+                    born_tick: blueprint.born_tick,
+                },
+                blueprint.gender,
+                blueprint.orientation,
+                blueprint.personality,
+                blueprint.appearance,
+                position,
+                Health::default(),
+                needs,
+                fulfillment,
+                Mood::default(),
+                Memory::default(),
+            ),
+            (
+                blueprint.zodiac_sign,
+                blueprint.skills,
+                MagicAffinity(blueprint.magic_affinity),
+                Corruption(0.0),
+                Training::default(),
+                crate::ai::CurrentAction::default(),
+                Inventory::default(),
+                crate::components::disposition::ActionHistory::default(),
+                HuntingPriors::default(),
+                crate::components::grooming::GroomingCondition::default(),
+                crate::components::goap_plan::PendingUrgencies::default(),
+                crate::components::SensorySpecies::Cat,
+                crate::components::SensorySignature::CAT,
+                // Ticket 073 — per-cat recently-failed target memory.
+                // Bundle insertion ensures `resolve_goap_plans`'s
+                // `Option<&mut RecentTargetFailures>` resolves to
+                // `Some` for live-spawned cats. Save-loaded cats
+                // (pre-073 saves) get the lazy-insert path on first
+                // failure.
+                crate::components::RecentTargetFailures::default(),
+            ),
+        ))
+        .id()
+}
 
 /// CLI arguments passed as a Bevy resource so the startup system can read them.
 #[derive(Resource)]
@@ -84,6 +174,11 @@ pub fn setup_world_exclusive(world: &mut World) {
                 build_new_world(world, args_seed, args_test_map);
             }
         }
+    } else if let Some(setup) = world.remove_resource::<WorldSetup>() {
+        // Ticket 162 — scenario harness override. Closure replaces
+        // `build_new_world` entirely; templates / narrative / TimeScale /
+        // default-resource backfills below still run as normal.
+        setup.run(world, args_seed);
     } else {
         build_new_world(world, args_seed, args_test_map);
     }
@@ -286,49 +381,10 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
             )
         };
 
-        let entity = world
-            .spawn((
-                (
-                    Name(cat.name),
-                    Species,
-                    Age {
-                        born_tick: cat.born_tick,
-                    },
-                    cat.gender,
-                    cat.orientation,
-                    cat.personality,
-                    cat.appearance,
-                    Position::new(spawn_x, spawn_y),
-                    Health::default(),
-                    Needs::staggered(i, cat_count),
-                    crate::components::fulfillment::Fulfillment::staggered(i, cat_count),
-                    Mood::default(),
-                    Memory::default(),
-                ),
-                (
-                    cat.zodiac_sign,
-                    cat.skills,
-                    MagicAffinity(cat.magic_affinity),
-                    Corruption(0.0),
-                    Training::default(),
-                    crate::ai::CurrentAction::default(),
-                    Inventory::default(),
-                    crate::components::disposition::ActionHistory::default(),
-                    HuntingPriors::default(),
-                    crate::components::grooming::GroomingCondition::default(),
-                    crate::components::goap_plan::PendingUrgencies::default(),
-                    crate::components::SensorySpecies::Cat,
-                    crate::components::SensorySignature::CAT,
-                    // Ticket 073 — per-cat recently-failed target memory.
-                    // Bundle insertion ensures `resolve_goap_plans`'s
-                    // `Option<&mut RecentTargetFailures>` resolves to
-                    // `Some` for live-spawned cats. Save-loaded cats
-                    // (pre-073 saves) get the lazy-insert path on first
-                    // failure.
-                    crate::components::RecentTargetFailures::default(),
-                ),
-            ))
-            .id();
+        let needs = Needs::staggered(i, cat_count);
+        let fulfillment = Fulfillment::staggered(i, cat_count);
+        let position = Position::new(spawn_x, spawn_y);
+        let entity = spawn_cat_from_blueprint(world, cat, position, needs, fulfillment);
         entity_ids.push(entity);
     }
 

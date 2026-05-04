@@ -12,4 +12,5 @@ pub mod world_gen;
 pub mod persistence;
 pub mod plugins;
 pub mod rendering;
+pub mod scenarios;
 pub mod ui_data;

@@ -101,6 +101,20 @@ soak-trace SEED="42" FOCAL_CAT="Simba" DURATION="900":
       --event-log logs/tuned-{{SEED}}/events.jsonl \
       --trace-log logs/tuned-{{SEED}}/trace-{{FOCAL_CAT}}.jsonl
 
+# Ticket 162 — scenario microexperiment harness. Runs a registered
+# scenario (preset cats, preloaded needs/personality/markers) for a
+# small number of ticks and prints per-tick winning DSE + final-tick
+# ranked score table for the focal cat. Cheap (~3s) decision-landscape
+# triage tool — preferred over `just soak` for hypothesis triage during
+# bugfix loops (see CLAUDE.md "Bugfix discipline").
+#
+# Usage:
+#   just scenario kitten_cry_basic
+#   just scenario kitten_cry_basic --focal Pyre --ticks 20
+#   just scenario list
+scenario *ARGS:
+    cargo run --release --bin scenario --quiet -- {{ARGS}}
+
 # Pairwise frame-diff over two focal-cat traces, with optional
 # hypothesis overlay from a phase balance doc. Emits per-DSE drift
 # stats ranked by |Δ mean| and an overall concordance verdict.

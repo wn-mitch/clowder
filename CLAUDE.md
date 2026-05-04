@@ -10,6 +10,7 @@ A colony sim about a clowder of cats living in a world with its own weight — h
 - `just q <subtool> <run-dir>` — logq drill-down (`run-summary` · `events` · `deaths` · `narrative` · `trace` · `cat-timeline` · `anomalies`); reach for it whenever you ask "why did X happen in this run?"
 
 ### Verifying a change
+- `just scenario <name>` — fast (~3s) deterministic microexperiment harness (preset cats, preloaded state). **Preferred over `just soak` for hypothesis triage** during bugfix loops; `just soak` remains for whole-colony verification once a fix is drafted. See ticket 162.
 - `just soak [seed]` — canonical 15-min release deep-soak (writes `logs/tuned-<seed>/`; refuses overwrite)
 - `just verdict <run-dir>` — **one-call gate; always run after a soak.** Composes canaries + continuity + constants drift + footer-vs-baseline. Exit 0/1/2 = pass/concern/fail.
 - `just fingerprint <run-dir>` — per-metric in-band readout vs `docs/balance/healthy-colony.md`
@@ -68,6 +69,8 @@ Every bugfix plan MUST include at least one **structural-revision candidate** al
 - **retire** — delete the variant entirely if the layer-walk shows it has no load-bearing job.
 
 **Layer-walk audit before listing fix candidates.** Walk **L1 markers → L2 DSE scores → L3 softmax → Action→Disposition mapping → plan template → completion proxy → resolver.** For each layer, mark the relevant facts `[verified-correct]` or `[suspect]` in the ticket's "Current architecture" section. A plan that lists only resolver-level fixes against `[suspect]` mappings or templates has not been audited.
+
+**Scenario microexperiment before a soak.** Once the layer-walk identifies the suspect mapping/template/scoring, isolate the question with `just scenario <name>` (or define a new scenario under `src/scenarios/`) instead of running `just soak`. The harness preloads 1–5 cats with specific needs/personality/markers/positions and prints the focal cat's per-tick winning DSE + ranked L2 score table in ~3 seconds — the right tool for "given this state, which DSE wins?" triage. Reach for `just soak` only when the bug genuinely requires whole-colony dynamics (continuity canaries, drift, multi-system interaction) — and state that explicitly in the ticket's investigation section so future readers see why the cheaper tool was skipped. Ticket 162 ships the harness + 7 archetype scenarios.
 
 Precedent: ticket 150's first plan listed R1 (resolver) / R2 (predicate) / R3 (scoring), all parameter-level; the user surfaced R5 (split Eat from Resting), which was load-bearing. The same lesson lives in the auto-memory entry "Audit L3 Action→Disposition mapping when investigating Clowder AI defects" at the user-global layer. Bugfix tickets should use [`docs/open-work/tickets/_template_bugfix.md`](docs/open-work/tickets/_template_bugfix.md), which embeds the layer-walk table and structural-option slot.
 

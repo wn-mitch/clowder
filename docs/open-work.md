@@ -14,18 +14,18 @@ _Last generated: 2026-05-04._
 
 | Status | Count |
 |---|---|
-| In progress | 8 |
+| In progress | 9 |
 | Ready | 51 |
 | Parked | 5 |
 | Blocked | 19 |
-| **Open total** | **83** |
+| **Open total** | **84** |
 | Pre-existing | 1 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-index` (regenerate this file).
 
-## In progress (8)
+## In progress (9)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
@@ -35,6 +35,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[108](docs/open-work/tickets/108-threat-proximity-adrenaline.md)** — ThreatProximityAdrenaline modifier — substrate axis for CriticalSafety interrupt retirement — _[ai-substrate] · added 2026-05-01_
 - **[109](docs/open-work/tickets/109-intraspecies-conflict-response.md)** — IntraspeciesConflictResponse — full four-valence (fight/flight/freeze/fawn) social response — _[ai-substrate] · added 2026-05-01_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
+- **[162](docs/open-work/tickets/162-scenario-harness.md)** — Scenario harness — fast deterministic "what wins" experiments for AI decision triage — _[tooling] · added 2026-05-04_
 
 ## Ready (51)
 
