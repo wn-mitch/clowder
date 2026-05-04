@@ -15,10 +15,10 @@ _Last generated: 2026-05-03._
 | Status | Count |
 |---|---|
 | In progress | 9 |
-| Ready | 48 |
+| Ready | 49 |
 | Parked | 5 |
 | Blocked | 18 |
-| **Open total** | **80** |
+| **Open total** | **81** |
 | Pre-existing | 1 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -37,7 +37,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[156](docs/open-work/tickets/156-kitten-starvation-locality.md)** — Kitten starvation localized at (38,22) post-154 cascade — non-parent adults can't perceive distress — _[ai-substrate] · added 2026-05-03_
 
-## Ready (48)
+## Ready (49)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -86,6 +86,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[155](docs/open-work/tickets/155-crafting-split.md)** — Split Crafting into Herbalism / Witchcraft / Cooking — retire CraftingHint — _[ai-substrate] · added 2026-05-03_
 - **[157](docs/open-work/tickets/157-burial-canary-dark.md)** — Burial continuity canary dark on post-154 soak — verify eligibility against new death distribution — _[ai-substrate] · added 2026-05-03_
 - **[158](docs/open-work/tickets/158-groomed-other-structural.md)** — GroomedOther never-fired post-154 — equal-cost tie-break or self-vs-other resolver bias? — _[ai-substrate] · added 2026-05-03_
+- **[158](docs/open-work/tickets/158-kitten-3822-corner-case.md)** — Seed-42 (38,22) kitten cohort starves despite KittenCryMap — _[ai-substrate] · added 2026-05-03_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _added 2026-04-28_
 
 ## Parked (5)

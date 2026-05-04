@@ -169,3 +169,28 @@ substrate that 052 left dead becomes load-bearing.
   (Hearing-channel cry broadcast + per-cat perception scalar +
   DSE consumer + kitten curve branch). Implementation plan at
   `~/.claude/plans/work-156-typed-clarke.md`.
+- 2026-05-03: R7 partial landing across five commits
+  (`a3e1b433` ticket rewrite · `bfe7a14b` map repurpose ·
+  `5ee9a4a6` perception scalar · `ac6292d4` initial CaretakeDse
+  axis · `4bd4947c` `KittenEatBoost` modifier ·
+  `ac366023` revert axis to additive `KittenCryCaretakeLift`
+  modifier · `e7176ea0` range bump (reverted in `01197998`)).
+  **Soak verdict:** Caretake colony-wide action count up
+  56 → 63 (+13%); cascade preserved (`kittens_born = 6`,
+  `bonds_formed = 29`, `mentoring = 1614+`); but Robinkit-33 +
+  Maplekit-98 still starve at the same tile (38, 22) at
+  approximately the same ticks across all four iteration
+  attempts. **Hard gate `Starvation == 0` not yet restored.**
+- 2026-05-03: failure mode is structural and seed-42-specific:
+  same kittens at same tile at same ticks regardless of
+  cry-broadcast tuning. Adults outside the immediate (38,22)
+  neighborhood pivot to Caretake when they hear the cry, but
+  the kittens at (38,22) appear to be in a position no adult
+  reaches in time. The cry-broadcast architecture (this ticket)
+  is the substrate for further work; the (38,22) corner case is
+  a different defect shape (orphan-care path, spawn locality,
+  pathfinding, or coordination — TBD by investigation). Opened
+  follow-on ticket 158 to investigate that corner case
+  separately. This ticket's `status` stays in-progress pending
+  user decision on whether to land the partial fix or keep
+  iterating here.
