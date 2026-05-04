@@ -2782,6 +2782,96 @@ impl ScoreModifier for PreferencePenalty {
 }
 
 // ---------------------------------------------------------------------------
+// FatedLoveLift / FatedRivalLift
+// ---------------------------------------------------------------------------
+
+const FATED_LOVE_VISIBLE: &str = "fated_love_visible";
+const FATED_RIVAL_NEARBY: &str = "fated_rival_nearby";
+
+/// §3.5.1 additive lift on socialize / groom_other / mate when the
+/// cat's `FatedLove` partner is awakened and visible (`fated_love_visible
+/// == 1.0`). `score += fated_love_social_bonus`.
+///
+/// Per-DSE specificity: targets `groom_other` only (not `groom_self`),
+/// ticking up the social-direction interpretation of the legacy
+/// per-Action `Action::Groom` bonus. When `groom_self` outscores
+/// `groom_other` pre-bonus, the post-bonus winner is whichever
+/// `score_actions`'s `max(self, other)` resolves — same selection
+/// shape, but the signal is now per-DSE-honest.
+pub struct FatedLoveLift {
+    bonus: f32,
+}
+
+impl FatedLoveLift {
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            bonus: sc.fated_love_social_bonus,
+        }
+    }
+}
+
+impl ScoreModifier for FatedLoveLift {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        if !matches!(dse_id.0, SOCIALIZE | GROOM_OTHER | MATE) {
+            return score;
+        }
+        let visible = fetch(FATED_LOVE_VISIBLE, ctx.cat);
+        if visible <= 0.0 {
+            return score;
+        }
+        score + self.bonus
+    }
+
+    fn name(&self) -> &'static str {
+        "fated_love_lift"
+    }
+}
+
+/// §3.5.1 additive lift on hunt / patrol / fight / explore when the
+/// cat's `FatedRival` is awakened and nearby (`fated_rival_nearby
+/// == 1.0`). `score += fated_rival_competition_bonus`.
+pub struct FatedRivalLift {
+    bonus: f32,
+}
+
+impl FatedRivalLift {
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            bonus: sc.fated_rival_competition_bonus,
+        }
+    }
+}
+
+impl ScoreModifier for FatedRivalLift {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        if !matches!(dse_id.0, HUNT | PATROL | FIGHT | EXPLORE) {
+            return score;
+        }
+        let nearby = fetch(FATED_RIVAL_NEARBY, ctx.cat);
+        if nearby <= 0.0 {
+            return score;
+        }
+        score + self.bonus
+    }
+
+    fn name(&self) -> &'static str {
+        "fated_rival_lift"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Default pipeline builder
 // ---------------------------------------------------------------------------
 
@@ -2857,6 +2947,8 @@ pub fn default_modifier_pipeline(
     pipeline.push(Box::new(AspirationLift::new(sc)));
     pipeline.push(Box::new(PreferenceLift::new(sc)));
     pipeline.push(Box::new(PreferencePenalty::new(sc)));
+    pipeline.push(Box::new(FatedLoveLift::new(sc)));
+    pipeline.push(Box::new(FatedRivalLift::new(sc)));
     // Ticket 047 — `AcuteHealthAdrenalineFlee` registers immediately
     // after `BodyDistressPromotion` so under combined high composite
     // distress + high health deficit, both lifts compose additively on
@@ -3599,7 +3691,7 @@ mod tests {
     fn default_pipeline_registers_expected_modifier_count() {
         let constants = crate::resources::sim_constants::SimConstants::default();
         let pipeline = default_modifier_pipeline(&constants);
-        assert_eq!(pipeline.len(), 30, "expected 30 registered modifiers");
+        assert_eq!(pipeline.len(), 32, "expected 32 registered modifiers");
     }
 
     // -----------------------------------------------------------------------

@@ -9,9 +9,7 @@ use crate::ai::planner::goals::goal_for_disposition;
 use crate::ai::planner::{
     make_plan, Carrying, GoapActionKind, PlannerState, PlannerZone, ZoneDistances,
 };
-use crate::ai::scoring::{
-    apply_directive_bonus, apply_fated_bonuses, score_actions, ScoringContext,
-};
+use crate::ai::scoring::{apply_directive_bonus, score_actions, ScoringContext};
 use crate::ai::{Action, CurrentAction};
 use crate::components::building::{
     ConstructionSite, CropState, StoredItems, Structure, StructureType,
@@ -1358,6 +1356,32 @@ pub fn evaluate_and_plan(
         let preference_signals = preferences
             .map(crate::ai::scoring::compute_preference_signals)
             .unwrap_or([0.0; crate::ai::scoring::CASCADE_COUNTS_LEN]);
+        let love_visible = fated_love
+            .filter(|l| l.awakened)
+            .and_then(|l| cat_positions.iter().find(|(e, _)| *e == l.partner))
+            .is_some_and(|(_, pp)| {
+                crate::systems::sensing::observer_sees_at(
+                    crate::components::SensorySpecies::Cat,
+                    *pos,
+                    &res.constants.sensory.cat,
+                    *pp,
+                    crate::components::SensorySignature::CAT,
+                    d.fated_love_detection_range as f32,
+                )
+            });
+        let rival_nearby = fated_rival
+            .filter(|r| r.awakened)
+            .and_then(|r| cat_positions.iter().find(|(e, _)| *e == r.rival))
+            .is_some_and(|(_, rp)| {
+                crate::systems::sensing::observer_sees_at(
+                    crate::components::SensorySpecies::Cat,
+                    *pos,
+                    &res.constants.sensory.cat,
+                    *rp,
+                    crate::components::SensorySignature::CAT,
+                    d.fated_rival_detection_range as f32,
+                )
+            });
 
         let ctx = ScoringContext {
             scoring: sc,
@@ -1573,6 +1597,8 @@ pub fn evaluate_and_plan(
             cascade_counts,
             aspiration_action_counts,
             preference_signals,
+            fated_love_visible: if love_visible { 1.0 } else { 0.0 },
+            fated_rival_nearby: if rival_nearby { 1.0 } else { 0.0 },
         };
 
         let focal_cat = res.focal_target.as_deref().and_then(|t| t.entity);
@@ -1609,33 +1635,6 @@ pub fn evaluate_and_plan(
         };
 
         // Apply all bonus layers.
-        let love_visible = fated_love
-            .filter(|l| l.awakened)
-            .and_then(|l| cat_positions.iter().find(|(e, _)| *e == l.partner))
-            .is_some_and(|(_, pp)| {
-                crate::systems::sensing::observer_sees_at(
-                    crate::components::SensorySpecies::Cat,
-                    *pos,
-                    &res.constants.sensory.cat,
-                    *pp,
-                    crate::components::SensorySignature::CAT,
-                    d.fated_love_detection_range as f32,
-                )
-            });
-        let rival_nearby = fated_rival
-            .filter(|r| r.awakened)
-            .and_then(|r| cat_positions.iter().find(|(e, _)| *e == r.rival))
-            .is_some_and(|(_, rp)| {
-                crate::systems::sensing::observer_sees_at(
-                    crate::components::SensorySpecies::Cat,
-                    *pos,
-                    &res.constants.sensory.cat,
-                    *rp,
-                    crate::components::SensorySignature::CAT,
-                    d.fated_rival_detection_range as f32,
-                )
-            });
-        apply_fated_bonuses(&mut scores, love_visible, rival_nearby, sc);
         if let Ok(directive) = world_state.active_directive_query.get(entity) {
             let fondness_factor = res
                 .relationships

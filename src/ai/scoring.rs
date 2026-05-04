@@ -453,6 +453,12 @@ pub struct ScoringContext<'a> {
     /// `0.0` no preference. Read by `PreferenceLift` (Like arm) and
     /// `PreferencePenalty` (Dislike arm).
     pub preference_signals: [f32; CASCADE_COUNTS_LEN],
+    /// `1.0` when the cat has an awakened `FatedLove` and the partner
+    /// is currently visible, else `0.0`. Read by `FatedLoveLift`.
+    pub fated_love_visible: f32,
+    /// `1.0` when the cat has an awakened `FatedRival` and the rival
+    /// is nearby (sensory check), else `0.0`. Read by `FatedRivalLift`.
+    pub fated_rival_nearby: f32,
 }
 
 /// Length of the per-action cascade-count array. Equals the number of
@@ -838,6 +844,8 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
     for (idx, key) in PREFERENCE_KEYS.iter().enumerate() {
         m.insert(key, ctx.preference_signals[idx]);
     }
+    m.insert("fated_love_visible", ctx.fated_love_visible);
+    m.insert("fated_rival_nearby", ctx.fated_rival_nearby);
     m
 }
 
@@ -1731,34 +1739,6 @@ pub const ALL_ACTIONS: [Action; CASCADE_COUNTS_LEN] = [
     Action::Hide,
 ];
 
-/// Boost action scores based on awakened fated connections.
-///
-/// - Fated love (awakened, partner visible): +0.15 to Socialize/Groom.
-/// - Fated rival (awakened, rival nearby): +0.1 to Hunt/Patrol/Fight/Explore.
-pub fn apply_fated_bonuses(
-    scores: &mut [(Action, f32)],
-    fated_love_visible: bool,
-    fated_rival_nearby: bool,
-    sc: &ScoringConstants,
-) {
-    if fated_love_visible {
-        for (action, score) in scores.iter_mut() {
-            if matches!(action, Action::Socialize | Action::Groom | Action::Mate) {
-                *score += sc.fated_love_social_bonus;
-            }
-        }
-    }
-    if fated_rival_nearby {
-        for (action, score) in scores.iter_mut() {
-            if matches!(
-                action,
-                Action::Hunt | Action::Patrol | Action::Fight | Action::Explore
-            ) {
-                *score += sc.fated_rival_competition_bonus;
-            }
-        }
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Selection
@@ -2426,6 +2406,8 @@ mod tests {
             cascade_counts: [0.0; CASCADE_COUNTS_LEN],
             aspiration_action_counts: [0.0; CASCADE_COUNTS_LEN],
             preference_signals: [0.0; CASCADE_COUNTS_LEN],
+            fated_love_visible: 0.0,
+            fated_rival_nearby: 0.0,
         }
     }
 
@@ -2595,6 +2577,8 @@ mod tests {
             cascade_counts: [0.0; CASCADE_COUNTS_LEN],
             aspiration_action_counts: [0.0; CASCADE_COUNTS_LEN],
             preference_signals: [0.0; CASCADE_COUNTS_LEN],
+            fated_love_visible: 0.0,
+            fated_rival_nearby: 0.0,
         };
         // §L2.10.7: this test sets `food_available: false`,
         // `has_functional_kitchen: false`, etc. on the context, but
@@ -2787,6 +2771,8 @@ mod tests {
             cascade_counts: [0.0; CASCADE_COUNTS_LEN],
             aspiration_action_counts: [0.0; CASCADE_COUNTS_LEN],
             preference_signals: [0.0; CASCADE_COUNTS_LEN],
+            fated_love_visible: 0.0,
+            fated_rival_nearby: 0.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let socialize_score = scores
@@ -3008,6 +2994,8 @@ mod tests {
             cascade_counts: [0.0; CASCADE_COUNTS_LEN],
             aspiration_action_counts: [0.0; CASCADE_COUNTS_LEN],
             preference_signals: [0.0; CASCADE_COUNTS_LEN],
+            fated_love_visible: 0.0,
+            fated_rival_nearby: 0.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let best = select_best_action(&scores);
@@ -3106,6 +3094,8 @@ mod tests {
             cascade_counts: [0.0; CASCADE_COUNTS_LEN],
             aspiration_action_counts: [0.0; CASCADE_COUNTS_LEN],
             preference_signals: [0.0; CASCADE_COUNTS_LEN],
+            fated_love_visible: 0.0,
+            fated_rival_nearby: 0.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let fight_score = scores.iter().find(|(a, _)| *a == Action::Fight).unwrap().1;
@@ -3223,6 +3213,8 @@ mod tests {
             cascade_counts: [0.0; CASCADE_COUNTS_LEN],
             aspiration_action_counts: [0.0; CASCADE_COUNTS_LEN],
             preference_signals: [0.0; CASCADE_COUNTS_LEN],
+            fated_love_visible: 0.0,
+            fated_rival_nearby: 0.0,
         };
         // Build a per-test MarkerSnapshot with Incapacitated set for
         // this cat (the cached shared snapshot only carries colony
@@ -3516,6 +3508,8 @@ mod tests {
             cascade_counts: [0.0; CASCADE_COUNTS_LEN],
             aspiration_action_counts: [0.0; CASCADE_COUNTS_LEN],
             preference_signals: [0.0; CASCADE_COUNTS_LEN],
+            fated_love_visible: 0.0,
+            fated_rival_nearby: 0.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let wander = scores.iter().find(|(a, _)| *a == Action::Wander).unwrap().1;
@@ -3615,6 +3609,8 @@ mod tests {
             cascade_counts: [0.0; CASCADE_COUNTS_LEN],
             aspiration_action_counts: [0.0; CASCADE_COUNTS_LEN],
             preference_signals: [0.0; CASCADE_COUNTS_LEN],
+            fated_love_visible: 0.0,
+            fated_rival_nearby: 0.0,
         };
 
         let scores_full = score_actions(&base, &test_eval_inputs(), &mut rng_full).scores;
