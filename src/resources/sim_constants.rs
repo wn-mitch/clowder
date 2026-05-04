@@ -1566,6 +1566,22 @@ pub struct ScoringConstants {
     /// shaped by curve + spatial axes; this just shifts the cohort.
     #[serde(default = "default_kitten_eat_boost_multiplier")]
     pub kitten_eat_boost_multiplier: f32,
+    /// Ticket 156 — `KittenCryCaretakeLift` Modifier threshold. The
+    /// `kitten_cry_perceived` floor above which the additive lift on
+    /// non-kitten cats' Caretake score engages. Below threshold the
+    /// modifier is a no-op (no quiet-cry over-response). Default
+    /// 0.05 — any non-trivial perception fires the lift.
+    #[serde(default = "default_kitten_cry_caretake_lift_threshold")]
+    pub kitten_cry_caretake_lift_threshold: f32,
+    /// Ticket 156 — `KittenCryCaretakeLift` Modifier additive lift on
+    /// non-kitten cats' Caretake DSE at `kitten_cry_perceived = 1.0`.
+    /// Linear ramp from threshold → 1.0. Default 0.5 — when the
+    /// adult is hearing the loudest possible cry, Caretake's score
+    /// gains +0.5, enough to dominate the legacy weighted-sum
+    /// baseline (which empirically tops out around 0.4–0.6 for
+    /// non-parent compassionate cats).
+    #[serde(default = "default_kitten_cry_caretake_lift")]
+    pub kitten_cry_caretake_lift: f32,
     /// Ticket 107 — `ExhaustionPressure` Modifier threshold. The
     /// `energy_deficit` floor below which the lift is a no-op. Default
     /// 0.7 (cat at energy 0.3 or below). Engages before the legacy
@@ -1855,6 +1871,9 @@ impl Default for ScoringConstants {
             hunger_urgency_forage_lift: default_hunger_urgency_forage_lift(),
             kitten_eat_boost_threshold: default_kitten_eat_boost_threshold(),
             kitten_eat_boost_multiplier: default_kitten_eat_boost_multiplier(),
+            kitten_cry_caretake_lift_threshold:
+                default_kitten_cry_caretake_lift_threshold(),
+            kitten_cry_caretake_lift: default_kitten_cry_caretake_lift(),
             exhaustion_pressure_threshold: default_exhaustion_pressure_threshold(),
             exhaustion_pressure_sleep_lift: default_exhaustion_pressure_sleep_lift(),
             exhaustion_pressure_groom_lift: default_exhaustion_pressure_groom_lift(),
@@ -2689,6 +2708,22 @@ fn default_kitten_eat_boost_threshold() -> f32 {
 /// cats (the Kitten marker gate).
 fn default_kitten_eat_boost_multiplier() -> f32 {
     4.0
+}
+
+/// Ticket 156 — `KittenCryCaretakeLift` threshold. Default `0.05` —
+/// any meaningful cry perception fires the additive lift; very weak
+/// signals (e.g., one quiet kitten 25 tiles away) stay below.
+fn default_kitten_cry_caretake_lift_threshold() -> f32 {
+    0.05
+}
+
+/// Ticket 156 — `KittenCryCaretakeLift` max additive lift. Default
+/// `0.5`. Sits between the typical Caretake legacy-axes baseline
+/// (0.3–0.5) and the dominant social DSEs' typical scores (0.6–1.0),
+/// so a perceived cry meaningfully promotes Caretake without
+/// drowning out competing actions when the cry is partial.
+fn default_kitten_cry_caretake_lift() -> f32 {
+    0.5
 }
 
 /// Ticket 107 — `ExhaustionPressure` Modifier threshold. The

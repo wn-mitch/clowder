@@ -109,6 +109,13 @@ const ESCAPE_VIABILITY: &str = "escape_viability";
 /// interrupt (`hunger < 0.15` ⇒ urgency > 0.85), giving the contest
 /// time to re-rank Eat / Hunt / Forage before crisis.
 const HUNGER_URGENCY: &str = "hunger_urgency";
+/// Ticket 156 — `KittenCryCaretakeLift` Modifier trigger input.
+/// Already published by `scoring::ctx_scalars` as the per-cat
+/// sample of `KittenCryMap` at the cat's tile. Read directly so the
+/// lift fires on perceived distress alone, independent of the
+/// cat's own `kitten_urgency` axis (which is a non-spatial in-engine
+/// urgency, not a spatial perception).
+const KITTEN_CRY_PERCEIVED: &str = "kitten_cry_perceived";
 /// Ticket 107 — `ExhaustionPressure` Modifier trigger input. Already
 /// published by `scoring::ctx_scalars` as `(1 - needs.energy).clamp(0,1)`.
 /// Read directly so exhaustion alone fires the Sleep / GroomSelf lift
@@ -1573,6 +1580,95 @@ impl ScoreModifier for HungerUrgency {
 }
 
 // ---------------------------------------------------------------------------
+// KittenCryCaretakeLift — ticket 156
+// ---------------------------------------------------------------------------
+
+/// Ticket 156 — additive lift on the `caretake` DSE for non-kitten
+/// cats hearing a kitten distress cry. Reads the per-cat
+/// `kitten_cry_perceived` scalar (sampled from `KittenCryMap` at the
+/// cat's tile during `ScoringContext` construction) and adds a
+/// linearly-ramped lift to the Caretake DSE.
+///
+/// **Why a modifier vs a CaretakeDse axis.** Phase 4 of ticket 156
+/// initially added cry as a fourth `WeightedSum` axis on
+/// `CaretakeDse`, requiring a weight rebalance from `[0.45, 0.30,
+/// 0.25]` to `[0.40, 0.25, 0.20, 0.15]`. The rebalance compressed
+/// the legacy three axes by ~40% to make room for the new fourth
+/// axis. Empirically (seed-42 soak post-Phase-4) Caretake count
+/// dropped from 56 → 51 because the cry axis is mostly 0 (no kitten
+/// crying near most adults at most ticks), so the average score
+/// dropped 40% while the cry boost only fired occasionally.
+///
+/// The modifier-layer consumer fixes the regression: when no cry is
+/// heard, the post-modifier score is bit-identical to the pre-156
+/// baseline. When cry is heard, an additive lift on top of the
+/// legacy score promotes Caretake without compressing its base.
+/// Same composition pattern as `KittenEatBoost` for the kitten
+/// cohort — life-stage / cohort effects compose at the modifier
+/// layer per the user-global "single-axis perception scalars"
+/// discipline.
+///
+/// **Trigger:** non-kitten cat (`Kitten` marker absent — adults,
+/// elders, young) AND `kitten_cry_perceived > threshold`.
+///
+/// **Transform:** linear ramp from `threshold` (lift 0) to
+/// `kitten_cry_perceived = 1.0` (lift = `lift`).
+///
+/// **Composition:** Registered after `KittenEatBoost` (which targets
+/// kittens' Eat). Composes additively with the legacy Caretake
+/// weighted-sum score and with `Patience` / `Tradition` etc.
+///
+/// **Gated-boost contract:** returns `score` unchanged on score `<=
+/// 0` — perceived cry doesn't conjure caretake-eligibility into
+/// existence (mirrors the 088 / 047 / 102 / 106 conventions).
+pub struct KittenCryCaretakeLift {
+    threshold: f32,
+    lift: f32,
+}
+
+impl KittenCryCaretakeLift {
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            threshold: sc.kitten_cry_caretake_lift_threshold,
+            lift: sc.kitten_cry_caretake_lift,
+        }
+    }
+}
+
+impl ScoreModifier for KittenCryCaretakeLift {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        if dse_id.0 != CARETAKE {
+            return score;
+        }
+        if score <= 0.0 {
+            return score;
+        }
+        if (ctx.has_marker)(crate::components::markers::Kitten::KEY, ctx.cat) {
+            return score;
+        }
+        if self.lift <= 0.0 {
+            return score;
+        }
+        let perceived = fetch(KITTEN_CRY_PERCEIVED, ctx.cat).clamp(0.0, 1.0);
+        if perceived <= self.threshold {
+            return score;
+        }
+        let ramp = ((perceived - self.threshold) / (1.0 - self.threshold)).clamp(0.0, 1.0);
+        score + ramp * self.lift
+    }
+
+    fn name(&self) -> &'static str {
+        "kitten_cry_caretake_lift"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // KittenEatBoost — ticket 156
 // ---------------------------------------------------------------------------
 
@@ -2137,6 +2233,13 @@ pub fn default_modifier_pipeline(
     // the post-urgency lifted score rather than the bare DSE score.
     // Behavior-neutral for non-kitten cats (Kitten-marker gate).
     pipeline.push(Box::new(KittenEatBoost::new(sc)));
+    // Ticket 156 — `KittenCryCaretakeLift` adds an additive lift on
+    // non-kitten cats' Caretake DSE when the cat is hearing a kitten
+    // distress cry painted by `update_kitten_cry_map`. Composes
+    // additively with the legacy three-axis Caretake score, avoiding
+    // the Phase-4 weight-rebalance regression (verified empirically
+    // — see KittenCryCaretakeLift doc-comment).
+    pipeline.push(Box::new(KittenCryCaretakeLift::new(sc)));
     pipeline.push(Box::new(ExhaustionPressure::new(sc)));
     pipeline.push(Box::new(ThermalDistress::new(sc)));
     // Ticket 108 — `ThreatProximityAdrenalineFlee` registers after the
@@ -2826,7 +2929,7 @@ mod tests {
     }
 
     #[test]
-    fn default_pipeline_registers_nineteen_modifiers() {
+    fn default_pipeline_registers_twenty_modifiers() {
         // Nineteen §3.5.1 foundational modifiers — the seven original
         // (`Pride`, `IndependenceSolo`, `IndependenceGroup`, `Patience`,
         // `Tradition`, `FoxTerritorySuppression`,
@@ -2839,13 +2942,14 @@ mod tests {
         // ticket 107's `ExhaustionPressure`, ticket 110's
         // `ThermalDistress`, ticket 108's
         // `ThreatProximityAdrenalineFlee`, ticket 109 Phase A's
-        // `IntraspeciesConflictResponseFlight`, and ticket 156's
-        // `KittenEatBoost`. The three Phase 4.2 emergency modifiers
+        // `IntraspeciesConflictResponseFlight`, ticket 156's
+        // `KittenEatBoost`, and ticket 156's `KittenCryCaretakeLift`.
+        // The three Phase 4.2 emergency modifiers
         // (`WardCorruptionEmergency`, `CleanseEmergency`,
         // `SensedRotBoost`) retired in §13.1.
         let constants = crate::resources::sim_constants::SimConstants::default();
         let pipeline = default_modifier_pipeline(&constants);
-        assert_eq!(pipeline.len(), 19, "expected 19 registered modifiers");
+        assert_eq!(pipeline.len(), 20, "expected 20 registered modifiers");
     }
 
     // -----------------------------------------------------------------------
@@ -3801,6 +3905,102 @@ mod tests {
                 "non-food-class dse {dse} unchanged at full urgency; got {out}"
             );
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // ticket 156 KittenCryCaretakeLift
+    // -----------------------------------------------------------------------
+
+    fn test_kitten_cry_caretake_lift() -> KittenCryCaretakeLift {
+        KittenCryCaretakeLift {
+            threshold: 0.05,
+            lift: 0.5,
+        }
+    }
+
+    #[test]
+    fn kitten_cry_caretake_lift_no_lift_for_kitten() {
+        // Kittens shouldn't be lifted on Caretake — they're the
+        // recipients, not providers. The Kitten-marker gate suppresses.
+        let modifier = test_kitten_cry_caretake_lift();
+        let (_, ctx) = test_ctx_with_kitten_marker();
+        let fetch = |name: &str, _: Entity| match name {
+            KITTEN_CRY_PERCEIVED => 1.0,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(CARETAKE), 0.5, &ctx, &fetch);
+        assert!(
+            (out - 0.5).abs() < 1e-6,
+            "kitten Caretake unchanged regardless of cry; got {out}"
+        );
+    }
+
+    #[test]
+    fn kitten_cry_caretake_lift_no_lift_below_threshold() {
+        // Adult cat hearing a tiny / sub-threshold cry: no lift.
+        let modifier = test_kitten_cry_caretake_lift();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            KITTEN_CRY_PERCEIVED => 0.04,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(CARETAKE), 0.5, &ctx, &fetch);
+        assert!(
+            (out - 0.5).abs() < 1e-6,
+            "below-threshold Caretake unchanged; got {out}"
+        );
+    }
+
+    #[test]
+    fn kitten_cry_caretake_lift_lifts_above_threshold() {
+        // Adult perceiving full-volume cry: full lift = 0.5.
+        // ramp = (1.0 - 0.05) / (1.0 - 0.05) = 1.0; lift = 0.5.
+        let modifier = test_kitten_cry_caretake_lift();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            KITTEN_CRY_PERCEIVED => 1.0,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(CARETAKE), 0.5, &ctx, &fetch);
+        assert!(
+            (out - 1.0).abs() < 1e-5,
+            "full-cry Caretake lift; got {out}"
+        );
+    }
+
+    #[test]
+    fn kitten_cry_caretake_lift_targets_only_caretake() {
+        // Non-Caretake DSEs pass through unchanged even with full cry.
+        let modifier = test_kitten_cry_caretake_lift();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            KITTEN_CRY_PERCEIVED => 1.0,
+            _ => 0.0,
+        };
+        for dse in [
+            EAT, HUNT, FORAGE, SLEEP, GROOM_SELF, GROOM_OTHER, FLEE, FIGHT, MATE, COORDINATE,
+            BUILD, MENTOR, SOCIALIZE, PATROL, COOK, FARM, WANDER, EXPLORE, IDLE,
+        ] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "non-Caretake dse {dse} unchanged at full cry; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn kitten_cry_caretake_lift_does_not_resurrect_zero_score() {
+        // Gated-boost contract — perceived cry doesn't conjure
+        // caretake-eligibility into existence.
+        let modifier = test_kitten_cry_caretake_lift();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            KITTEN_CRY_PERCEIVED => 1.0,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(CARETAKE), 0.0, &ctx, &fetch);
+        assert_eq!(out, 0.0, "zero-score Caretake stays zero — no resurrection");
     }
 
     // -----------------------------------------------------------------------
