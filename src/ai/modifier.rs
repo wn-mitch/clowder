@@ -2307,7 +2307,7 @@ impl ScoreModifier for MemoryResourceFoundLift {
         ctx: &EvalCtx,
         fetch: &dyn Fn(&str, Entity) -> f32,
     ) -> f32 {
-        if !matches!(dse_id.0, HUNT | FORAGE) {
+        if score <= 0.0 || !matches!(dse_id.0, HUNT | FORAGE) {
             return score;
         }
         let sum = fetch(MEMORY_RESOURCE_FOUND_PROXIMITY_SUM, ctx.cat);
@@ -2349,7 +2349,7 @@ impl ScoreModifier for MemoryDeathPenalty {
         ctx: &EvalCtx,
         fetch: &dyn Fn(&str, Entity) -> f32,
     ) -> f32 {
-        if !matches!(dse_id.0, WANDER | IDLE) {
+        if score <= 0.0 || !matches!(dse_id.0, WANDER | IDLE) {
             return score;
         }
         let sum = fetch(MEMORY_DEATH_PROXIMITY_SUM, ctx.cat);
@@ -2391,7 +2391,7 @@ impl ScoreModifier for MemoryThreatSeenSuppress {
         ctx: &EvalCtx,
         fetch: &dyn Fn(&str, Entity) -> f32,
     ) -> f32 {
-        if !matches!(dse_id.0, WANDER | EXPLORE | HUNT) {
+        if score <= 0.0 || !matches!(dse_id.0, WANDER | EXPLORE | HUNT) {
             return score;
         }
         let sum = fetch(MEMORY_THREAT_SEEN_PROXIMITY_SUM, ctx.cat);
@@ -2439,6 +2439,9 @@ impl ScoreModifier for ColonyKnowledgeLift {
         ctx: &EvalCtx,
         fetch: &dyn Fn(&str, Entity) -> f32,
     ) -> f32 {
+        if score <= 0.0 {
+            return score;
+        }
         let resource_arm = matches!(dse_id.0, HUNT | FORAGE);
         let threat_arm = dse_id.0 == PATROL;
         if !resource_arm && !threat_arm {
@@ -2492,6 +2495,9 @@ impl ScoreModifier for ColonyPriorityLift {
         ctx: &EvalCtx,
         fetch: &dyn Fn(&str, Entity) -> f32,
     ) -> f32 {
+        if score <= 0.0 {
+            return score;
+        }
         let ordinal = fetch(COLONY_PRIORITY_ORDINAL, ctx.cat);
         let matches_priority = if (ordinal - COLONY_PRIORITY_FOOD).abs() < 0.5 {
             matches!(dse_id.0, HUNT | FORAGE | FARM)
@@ -2582,6 +2588,9 @@ impl ScoreModifier for NeighborActionCascade {
         ctx: &EvalCtx,
         fetch: &dyn Fn(&str, Entity) -> f32,
     ) -> f32 {
+        if score <= 0.0 {
+            return score;
+        }
         let Some(key) = Self::cascade_key(dse_id) else {
             return score;
         };
@@ -2657,6 +2666,9 @@ impl ScoreModifier for AspirationLift {
         ctx: &EvalCtx,
         fetch: &dyn Fn(&str, Entity) -> f32,
     ) -> f32 {
+        if score <= 0.0 {
+            return score;
+        }
         let Some(key) = Self::aspiration_key(dse_id) else {
             return score;
         };
@@ -2728,6 +2740,9 @@ impl ScoreModifier for PreferenceLift {
         ctx: &EvalCtx,
         fetch: &dyn Fn(&str, Entity) -> f32,
     ) -> f32 {
+        if score <= 0.0 {
+            return score;
+        }
         let Some(key) = preference_key(dse_id) else {
             return score;
         };
@@ -2766,6 +2781,9 @@ impl ScoreModifier for PreferencePenalty {
         ctx: &EvalCtx,
         fetch: &dyn Fn(&str, Entity) -> f32,
     ) -> f32 {
+        if score <= 0.0 {
+            return score;
+        }
         let Some(key) = preference_key(dse_id) else {
             return score;
         };
@@ -2818,7 +2836,7 @@ impl ScoreModifier for FatedLoveLift {
         ctx: &EvalCtx,
         fetch: &dyn Fn(&str, Entity) -> f32,
     ) -> f32 {
-        if !matches!(dse_id.0, SOCIALIZE | GROOM_OTHER | MATE) {
+        if score <= 0.0 || !matches!(dse_id.0, SOCIALIZE | GROOM_OTHER | MATE) {
             return score;
         }
         let visible = fetch(FATED_LOVE_VISIBLE, ctx.cat);
@@ -2856,7 +2874,7 @@ impl ScoreModifier for FatedRivalLift {
         ctx: &EvalCtx,
         fetch: &dyn Fn(&str, Entity) -> f32,
     ) -> f32 {
-        if !matches!(dse_id.0, HUNT | PATROL | FIGHT | EXPLORE) {
+        if score <= 0.0 || !matches!(dse_id.0, HUNT | PATROL | FIGHT | EXPLORE) {
             return score;
         }
         let nearby = fetch(FATED_RIVAL_NEARBY, ctx.cat);
@@ -2942,6 +2960,9 @@ impl ScoreModifier for ActiveDirectiveLift {
         ctx: &EvalCtx,
         fetch: &dyn Fn(&str, Entity) -> f32,
     ) -> f32 {
+        if score <= 0.0 {
+            return score;
+        }
         let target_ordinal = fetch(ACTIVE_DIRECTIVE_ACTION_ORDINAL, ctx.cat);
         if target_ordinal < 0.0 {
             return score;
