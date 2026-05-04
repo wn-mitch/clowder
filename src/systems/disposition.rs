@@ -142,9 +142,10 @@ pub struct MarkerQueries<'w, 's> {
         ),
     >,
     /// Ticket 158 — kinship-channel substrate. Authored each tick by
-    /// `growth::update_parent_hungry_kitten_markers`. The populate sites
-    /// in `evaluate_dispositions` / `evaluate_and_plan` read this and
-    /// pass the bool to `resolve_caretake_target` as the
+    /// `growth::update_kitten_cry_map` (ticket 161 merged the author
+    /// in there to avoid a new schedule conflict edge). The populate
+    /// sites in `evaluate_dispositions` / `evaluate_and_plan` read
+    /// this and pass the bool to `resolve_caretake_target` as the
     /// `parent_marker_active` fallback gate.
     pub parent_hungry_kitten: Query<'w, 's, Has<markers::IsParentOfHungryKitten>>,
 }

@@ -1,7 +1,7 @@
 ---
 id: 161
 title: Seed-42 colony collapse after ticket 158 — Bevy scheduler perturbation cascade
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-04
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-04
 ---
 
 <!--
@@ -232,3 +232,16 @@ If R2 still produces divergence, fall through to R3 (function-only).
   Mocha/Simba position-swap, before any kittens exist. Most likely
   cause: the new system's `&Needs` reader adds a schedule conflict
   edge that re-orders parallel sibling systems.
+- 2026-05-04: landed R2 (merge into `update_kitten_cry_map`). The
+  cry-map already reads `&Needs` on kittens with the same
+  hunger-threshold predicate, so co-locating the marker authoring
+  there introduces no new schedule conflict edge. Standalone
+  `update_parent_hungry_kitten_markers` deleted; Chain 2a
+  registration removed; doc references updated in markers.rs,
+  goap.rs, disposition.rs, ai/dses/caretake_target.rs, and the
+  substrate-refactor §4.3 row. Verification: `just check` clean,
+  1842 lib tests pass, `just soak 42` → Starvation=0,
+  ShadowFoxAmbush=3, kittens_born=5; `just soak 43` cross-seed →
+  Starvation=0, ShadowFoxAmbush=6. Both hard survival gates pass on
+  both seeds. (`GroomedOther` non-firing is pre-existing on both
+  baselines; not 161-related.) Unblocks ticket 158.

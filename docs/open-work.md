@@ -17,8 +17,8 @@ _Last generated: 2026-05-04._
 | In progress | 8 |
 | Ready | 51 |
 | Parked | 5 |
-| Blocked | 19 |
-| **Open total** | **83** |
+| Blocked | 18 |
+| **Open total** | **82** |
 | Pre-existing | 1 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -85,9 +85,9 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[155](docs/open-work/tickets/155-crafting-split.md)** — Split Crafting into Herbalism / Witchcraft / Cooking — retire CraftingHint — _[ai-substrate] · added 2026-05-03_
 - **[157](docs/open-work/tickets/157-burial-canary-dark.md)** — Burial continuity canary dark on post-154 soak — verify eligibility against new death distribution — _[ai-substrate] · added 2026-05-03_
 - **[158](docs/open-work/tickets/158-groomed-other-structural.md)** — GroomedOther never-fired post-154 — equal-cost tie-break or self-vs-other resolver bias? — _[ai-substrate] · added 2026-05-03_
+- **[158](docs/open-work/tickets/158-kitten-3822-corner-case.md)** — Seed-42 (38,22) kitten cohort starves despite KittenCryMap — _[ai-substrate] · added 2026-05-03_
 - **[159](docs/open-work/tickets/159-parent-grief-consumer.md)** — Parent grief consumer for kitten / dependent death — _[ai-substrate] · added 2026-05-04_
 - **[160](docs/open-work/tickets/160-substrate-stub-catalogue.md)** — Substrate stub catalogue + lint — fail the build on orphan markers — _[ai-substrate] · added 2026-05-04_
-- **[161](docs/open-work/tickets/161-seed42-fox-attrition-perturbation.md)** — Seed-42 colony collapse after ticket 158 — Bevy scheduler perturbation cascade — _[ai-substrate] · added 2026-05-04_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _added 2026-04-28_
 
 ## Parked (5)
@@ -98,7 +98,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[084](docs/open-work/tickets/084-farm-herb-ward-demand-axis.md)** — Farm DSE — tie scoring to herb/ward stockpile demand so gardens stay productive under abundant food — _[balance] · parked 2026-04-30 · blocked-by 086 · added 2026-04-29_
 - **[099](docs/open-work/tickets/099-modifier-feature-emission.md)** — Feature emission for §3.5.1 Modifiers — colony-wide canary surface for substrate-lift signals — _[ai-substrate] · parked 2026-05-01 · blocked-by 119 · added 2026-05-01_
 
-## Blocked (19)
+## Blocked (18)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _blocked-by 007, 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _blocked-by 016 · added 2026-04-22_
@@ -118,20 +118,20 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[142](docs/open-work/tickets/142-intraspecies-conflict-freeze.md)** — IntraspeciesConflictResponseFreeze — hold-position low-body-posture social valence — _[ai-substrate] · blocked-by 109 · added 2026-05-02_
 - **[143](docs/open-work/tickets/143-intraspecies-conflict-fight.md)** — IntraspeciesConflictResponseFight — territorial combat valence (same-species) — _[ai-substrate] · blocked-by 109 · added 2026-05-02_
 - **[144](docs/open-work/tickets/144-intraspecies-conflict-fawn.md)** — IntraspeciesConflictResponseFawn — appeasement valence (belly-up, slow blink) — _[ai-substrate] · blocked-by 109, 145 · added 2026-05-02_
-- **[158](docs/open-work/tickets/158-kitten-3822-corner-case.md)** — Seed-42 (38,22) kitten cohort starves despite KittenCryMap — _[ai-substrate] · blocked-by 161 · added 2026-05-03_
 
 ## Pre-existing (1)
 
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 
-## Landed archive (102)
+## Landed archive (103)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (37)
+### 2026-05 (38)
 
 - **[163](docs/open-work/landed/163-l2-trace-incomplete-bonus-pipeline.md)** — Migrate the 9 apply_*_bonus passes into §3.5.1 modifiers (full-batch) _(2026-05-04)_
 - **[162](docs/open-work/landed/162-scenario-harness.md)** — Scenario harness — fast deterministic "what wins" experiments for AI decision triage _(2026-05-04)_
+- **[161](docs/open-work/landed/161-seed42-fox-attrition-perturbation.md)** — Seed-42 colony collapse after ticket 158 — Bevy scheduler perturbation cascade _(2026-05-04)_
 - **[156](docs/open-work/landed/156-kitten-starvation-locality.md)** — Kitten starvation localized at (38,22) post-154 cascade — non-parent adults can't perceive distress _(2026-05-04)_
 - **[154](docs/open-work/landed/154-socializing-mentoring-extraction.md)** — Extract Mentoring from Socializing — split DispositionKind so MentoredCat fires _(2026-05-03)_
 - **[152](docs/open-work/landed/152-tier1-disposition-collapse-audit.md)** — Tier-1 disposition-collapse audit — sweep for sibling Eat-into-Resting defects _(2026-05-03)_

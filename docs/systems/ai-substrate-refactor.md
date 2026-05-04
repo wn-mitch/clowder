@@ -1978,7 +1978,7 @@ tick fans out multiple markers per cat.
 | `HasGarden` | ≥1 garden building exists. | same | same | `Q<_, With<HasGarden>>` | Absent | `ScoringContext.has_garden:51` |
 | `HasMentoringTarget` | ≥1 other cat has a skill < 0.3 where this cat has the same skill > 0.6. Per-cat (relative predicate). | `tick:aspirations.rs::update_mentoring_markers` (new) | same | `Q<_, With<HasMentoringTarget>>` | Absent | `ScoringContext.has_mentoring_target:93` |
 | `HasEligibleMate` | Orientation-compatible partner with Partners+ bond exists (`mating::has_eligible_mate()`). | `tick:mating.rs::update_mate_eligibility_markers` (new) | same | `Q<_, With<HasEligibleMate>>` | Absent | `ScoringContext.has_eligible_mate:111` |
-| `IsParentOfHungryKitten` | Cat is on the parent side of a `KittenDependency` whose linked kitten's hunger exceeds threshold. | `tick:growth.rs::update_parent_hungry_kitten_markers` (new) | same | `Q<_, With<IsParentOfHungryKitten>>` | Absent | `ScoringContext.is_parent_of_hungry_kitten:115` |
+| `IsParentOfHungryKitten` | Cat is on the parent side of a `KittenDependency` whose linked kitten's hunger exceeds threshold. | `tick:growth.rs::update_kitten_cry_map` (ticket 161 — merged author-site to share `&Needs` access with the cry-map and avoid a new schedule conflict edge) | same | `Q<_, With<IsParentOfHungryKitten>>` | Absent | `ScoringContext.is_parent_of_hungry_kitten:115` |
 
 #### Colony
 

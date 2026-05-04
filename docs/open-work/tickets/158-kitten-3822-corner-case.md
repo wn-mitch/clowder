@@ -1,11 +1,11 @@
 ---
 id: 158
 title: Seed-42 (38,22) kitten cohort starves despite KittenCryMap
-status: blocked
+status: ready
 cluster: ai-substrate
 added: 2026-05-03
 parked: null
-blocked-by: [161]
+blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: [mentoring-extraction.md]
@@ -202,3 +202,14 @@ spawn-locality (R3), orphan-marker substrate (R2), kitten movement
   hard gate is still red — landing the code does not close 158's
   acceptance criteria, only stages the substrate so 161 can
   investigate from a single shared workspace state.
+- 2026-05-04: ticket 161 lands the perturbation fix (merged the
+  marker authoring into `update_kitten_cry_map` to avoid the new
+  schedule conflict edge). Post-161 seed-42 soak: Starvation=0,
+  ShadowFoxAmbush=3, kittens_born=5 — the original (38,22)
+  twin-starvation hard gate now passes. Cross-seed sanity (seed
+  43): Starvation=0, ShadowFoxAmbush=6. Both seeds clear the hard
+  gate. Status flipped to `ready`; remaining acceptance question is
+  whether `kittens_surviving=0` (vs the ≥3 target) reflects a soak
+  that ended before the late-born cohort matured (kittens take 4
+  seasons), or whether a separate kitten-attrition issue needs
+  follow-up. Will close pending that read.

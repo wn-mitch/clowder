@@ -283,7 +283,8 @@ pub struct TargetMarkerQueries<'w, 's> {
     >,
     /// Ticket 158 — kinship-channel substrate for the Caretake DSE
     /// scoring gate. Authored each tick by
-    /// `growth::update_parent_hungry_kitten_markers`; read at the
+    /// `growth::update_kitten_cry_map` (ticket 161 merged the author
+    /// in there to avoid a new schedule conflict edge); read at the
     /// `resolve_caretake_target` call site to enable the
     /// own-kitten-anywhere fallback when the per-tick range gate
     /// would otherwise filter every candidate out.

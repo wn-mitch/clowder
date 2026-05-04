@@ -415,7 +415,11 @@ impl HasEligibleMate {
 /// sample at the cat's tile — the cry-map is the spatial-perception
 /// channel; this marker is the kinship-channel substrate fact.
 ///
-/// Author: `growth.rs::update_parent_hungry_kitten_markers`.
+/// Author: `growth.rs::update_kitten_cry_map` (ticket 161 merged the
+/// authoring here from a separate Chain 2a system; the cry-map and
+/// the marker share the same `&Needs` access and the same hunger
+/// predicate, so co-locating them avoids adding a new schedule
+/// conflict edge to Bevy's parallel scheduler).
 /// Read: `MarkerSnapshot.has(IsParentOfHungryKitten::KEY, entity)`
 /// in `disposition.rs` / `goap.rs` populate sites; passed into
 /// `caretake_target::resolve_caretake_target` as

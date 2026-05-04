@@ -879,8 +879,8 @@ mod tests {
         // Marker active, but the only own-kitten has hunger above the
         // threshold — fallback should still skip it. The marker is a
         // stale signal in this corner (authored at the start of the
-        // tick by `update_parent_hungry_kitten_markers` and read here
-        // after the tick's feeding pass may have already lifted hunger).
+        // tick by `update_kitten_cry_map` and read here after the
+        // tick's feeding pass may have already lifted hunger).
         let mut registry = DseRegistry::new();
         registry.target_taking_dses.push(caretake_target_dse());
         let adult = Entity::from_raw_u32(1).unwrap();
