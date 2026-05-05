@@ -1,7 +1,7 @@
 ---
 id: 164
 title: Seed-42 (38,22) kitten cohort starves despite KittenCryMap
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-03
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: [mentoring-extraction.md]
-landed-at: null
-landed-on: null
+landed-at: 0aba90714c5f
+landed-on: 2026-05-05
 ---
 
 <!--
@@ -249,3 +249,42 @@ spawn-locality (R3), orphan-marker substrate (R2), kitten movement
   structural fix is shipped, sibling change introduces a new
   perturbation, hard-gate acceptance waits for the new defect to
   close. Will not ship a closeout against a red canonical run.
+
+- 2026-05-05: **landed-on-structural-verification** at HEAD `0aba90714c5f`.
+  165 closed wontfix-by-design (lone-mother bereavement-orphan under
+  colony-terminal-decline is WAI), explicitly noting that 164's
+  structural fix "was always intact" and that 164's hard-gate
+  verification "needs a different seed or a hard-gate test that
+  distinguishes systemic-starvation from bereavement-induced
+  starvation."
+
+  Closing on the 165 framing rather than waiting for a green seed-42
+  soak, because the canonical seed-42 hard gate is unreachable on the
+  current architecture: any seed where the lone surviving mother dies
+  to a fox before her cohort matures will produce bereavement-orphan
+  starvations indistinguishable to the gate. The substrate-level
+  resolution path (bereavement carve-out / alloparenting via parked
+  ticket 015 / parent-grief consumer ticket 159) is the open question
+  165 surfaced and is **out of scope for 164's closeout** — 164's
+  charter was the (38,22) twin-starvation defect, not the hard-gate
+  evolution.
+
+  Closeout verification:
+
+  | Check | Result | Source |
+  |---|---|---|
+  | `parent_marker_active` parameter | intact | `src/ai/dses/caretake_target.rs:215` |
+  | empty-pool own-kitten-anywhere fallback | intact | `src/ai/dses/caretake_target.rs:257` |
+  | `IsParentOfHungryKitten` author | intact | `src/systems/growth.rs:193,198` (inside `update_kitten_cry_map` per 161 merge) |
+  | marker definition | intact | `src/components/markers.rs:429` |
+  | unit tests | 9 pass | `growth.rs:629+`, `caretake_target.rs` |
+  | cross-seed (seed-43) `Starvation` | **0** | `just verdict logs/tuned-43` (commit `866999bd`) |
+  | seed-42 (38,22) twin starvation | **gone** | post-161 soak Robinkit-33/Maplekit-98 no longer starve; (24,19) + (41,22) failures are the bereavement cohort 165 reframed |
+  | seed-42 canonical hard gate | red, but not on 164's defect | `just verdict logs/tuned-42` reports `Starvation=3` at (24,19) + (41,22), Mocha-as-lone-mother dies to ShadowFoxAmbush 104 ticks before the first kitten starves — 165 wontfix |
+
+  No code change in this commit; closeout is doc-only (frontmatter
+  flip + this log entry + move to `landed/`). The hard-gate evolution
+  question stays open via 165's resolution-path note and lives next
+  to ticket 159 (parent-grief consumer); CLAUDE.md hard-gate text
+  (`deaths_by_cause.Starvation == 0`) is unchanged because no
+  consensus on the carve-out shape has been reached.
