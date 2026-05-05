@@ -2,6 +2,8 @@ use bevy_ecs::prelude::*;
 use rand::Rng;
 
 use crate::components::identity::{Age, Name};
+use crate::components::kitten::KittenDependency;
+use crate::components::markers;
 use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier, MoodSource};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, DeathCause, Health, Needs, Position};
@@ -26,7 +28,19 @@ pub fn check_death(
     config: Res<SimConfig>,
     mut log: ResMut<NarrativeLog>,
     mut rng: ResMut<SimRng>,
-    alive_query: Query<(Entity, &Name, &Health, &Needs, &Age, &Position), Without<Dead>>,
+    alive_query: Query<
+        (
+            Entity,
+            &Name,
+            &Health,
+            &Needs,
+            &Age,
+            &Position,
+            Has<markers::BornInSim>,
+            Has<KittenDependency>,
+        ),
+        Without<Dead>,
+    >,
     mut mood_query: Query<(Entity, &Position, &mut Mood, &mut Memory, &Personality), Without<Dead>>,
     event_log: Option<ResMut<crate::resources::event_log::EventLog>>,
     love_query: Query<(Entity, &Name, &crate::components::fate::FatedLove), Without<Dead>>,
@@ -41,7 +55,7 @@ pub fn check_death(
     let tick = time.tick;
     let mut newly_dead: Vec<(Entity, Position, String, DeathCause, Option<String>)> = Vec::new();
 
-    for (entity, name, health, needs, age, pos) in &alive_query {
+    for (entity, name, health, needs, age, pos, born_in_sim, has_kitten_dep) in &alive_query {
         let cause = if health.current <= 0.0 {
             // Ticket 032 — discriminator branches on cliff mode. Legacy:
             // hard `hunger == 0.0 ⇒ Starvation`. Graded: the cat may bottom
@@ -107,6 +121,18 @@ pub fn check_death(
                     DeathCause::Starvation => score.deaths_starvation += 1,
                     DeathCause::OldAge => score.deaths_old_age += 1,
                     DeathCause::Injury => score.deaths_injury += 1,
+                }
+                // Ticket 166 — `kittens_surviving` counts living
+                // matured-from-in-sim adults. Only decrement when a
+                // cat both carries the `BornInSim` identity marker AND
+                // is past maturation (no `KittenDependency`). Kittens
+                // that die before maturing were never incremented in
+                // `growth.rs::tick_kitten_growth`, so they must not
+                // decrement here. `saturating_sub` guards against
+                // resource-not-yet-loaded edge cases (the increment
+                // path uses the same optional-resource pattern).
+                if born_in_sim && !has_kitten_dep {
+                    score.kittens_surviving = score.kittens_surviving.saturating_sub(1);
                 }
             }
         }
@@ -543,6 +569,119 @@ mod tests {
         assert!(
             world.get_entity(entity).is_err(),
             "dead entity should be despawned after grace period"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Ticket 166 — kittens_surviving decrement on in-sim-born adult death
+    // -----------------------------------------------------------------------
+
+    fn setup_world_with_score() -> (World, Schedule) {
+        let (mut world, schedule) = setup_world();
+        world.insert_resource(crate::resources::colony_score::ColonyScore::default());
+        (world, schedule)
+    }
+
+    /// Spawn a cat with the controllable bits the kittens_surviving
+    /// decrement gate depends on: `BornInSim` ZST and an optional
+    /// `KittenDependency` (presence = still a kitten, pre-maturation).
+    fn spawn_gated_cat(
+        world: &mut World,
+        name: &str,
+        health: f32,
+        born_in_sim: bool,
+        is_kitten: bool,
+    ) -> Entity {
+        let entity = spawn_cat(world, name, health, 0.0);
+        if born_in_sim {
+            world.entity_mut(entity).insert(markers::BornInSim);
+        }
+        if is_kitten {
+            // mother/father aren't probed in death.rs — placeholders are fine.
+            world
+                .entity_mut(entity)
+                .insert(KittenDependency::new(entity, entity));
+        }
+        entity
+    }
+
+    #[test]
+    fn in_sim_born_adult_death_decrements_kittens_surviving() {
+        let (mut world, mut schedule) = setup_world_with_score();
+        world.resource_mut::<crate::resources::colony_score::ColonyScore>()
+            .kittens_surviving = 3;
+
+        spawn_gated_cat(&mut world, "Cinder", 0.0, true, false);
+
+        schedule.run(&mut world);
+
+        assert_eq!(
+            world
+                .resource::<crate::resources::colony_score::ColonyScore>()
+                .kittens_surviving,
+            2,
+            "in-sim-born matured adult death should decrement kittens_surviving"
+        );
+    }
+
+    #[test]
+    fn founding_member_death_does_not_decrement() {
+        let (mut world, mut schedule) = setup_world_with_score();
+        world.resource_mut::<crate::resources::colony_score::ColonyScore>()
+            .kittens_surviving = 3;
+
+        // Founding cat — no BornInSim marker.
+        spawn_gated_cat(&mut world, "Elder", 0.0, false, false);
+
+        schedule.run(&mut world);
+
+        assert_eq!(
+            world
+                .resource::<crate::resources::colony_score::ColonyScore>()
+                .kittens_surviving,
+            3,
+            "founding-member death must not decrement kittens_surviving"
+        );
+    }
+
+    #[test]
+    fn pre_maturation_kitten_death_does_not_decrement() {
+        // Kitten died before maturation — the increment never happened,
+        // so the decrement must not fire either.
+        let (mut world, mut schedule) = setup_world_with_score();
+        world.resource_mut::<crate::resources::colony_score::ColonyScore>()
+            .kittens_surviving = 3;
+
+        spawn_gated_cat(&mut world, "Sprout", 0.0, true, true);
+
+        schedule.run(&mut world);
+
+        assert_eq!(
+            world
+                .resource::<crate::resources::colony_score::ColonyScore>()
+                .kittens_surviving,
+            3,
+            "pre-maturation kitten death must not decrement"
+        );
+    }
+
+    #[test]
+    fn decrement_saturates_at_zero() {
+        // Defensive: if the count is already 0 (e.g., unmatched pairings
+        // due to load semantics or test setup), the decrement must not
+        // underflow the u64.
+        let (mut world, mut schedule) = setup_world_with_score();
+        // Score starts at 0.
+        spawn_gated_cat(&mut world, "Nettle", 0.0, true, false);
+
+        schedule.run(&mut world);
+
+        assert_eq!(
+            world
+                .resource::<crate::resources::colony_score::ColonyScore>()
+                .kittens_surviving,
+            0,
+            "decrement must saturate at zero, not underflow"
         );
     }
 

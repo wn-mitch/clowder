@@ -5,6 +5,7 @@ use crate::components::kitten::KittenDependency;
 use crate::components::markers;
 use crate::components::mental::{Mood, MoodModifier, MoodSource};
 use crate::components::physical::{Dead, Needs, Position};
+use crate::resources::colony_score::ColonyScore;
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::resources::time::{SimConfig, TimeState};
@@ -19,12 +20,19 @@ use crate::resources::time::{SimConfig, TimeState};
 ///
 /// Maturity rate: `1.0 / (4.0 * ticks_per_season)` per tick — independence
 /// after exactly 4 seasons.
+///
+/// **Ticket 166** — at the maturation transition, increments
+/// `ColonyScore.kittens_surviving`. The `BornInSim` marker added at the
+/// kitten-spawn site (see `pregnancy.rs`) survives maturation, so the
+/// matching decrement in `death.rs::check_death` can identify
+/// in-sim-born matured adults at death-time.
 pub fn tick_kitten_growth(
     time: Res<TimeState>,
     config: Res<SimConfig>,
     mut query: Query<(Entity, &mut KittenDependency), Without<Dead>>,
     mut commands: Commands,
     mut activation: Option<ResMut<SystemActivation>>,
+    mut colony_score: Option<ResMut<ColonyScore>>,
 ) {
     let _ = time; // reserved for future use (e.g. nutrition-based growth rate)
     let rate = 1.0 / (4.0 * config.ticks_per_season as f32);
@@ -36,6 +44,9 @@ pub fn tick_kitten_growth(
             commands.entity(entity).remove::<KittenDependency>();
             if let Some(ref mut act) = activation {
                 act.record(Feature::KittenMatured);
+            }
+            if let Some(ref mut score) = colony_score {
+                score.kittens_surviving += 1;
             }
         }
     }
@@ -759,5 +770,98 @@ mod tests {
         assert!(world
             .entity(father)
             .contains::<markers::IsParentOfHungryKitten>());
+    }
+
+    // -----------------------------------------------------------------------
+    // Ticket 166 — kittens_surviving increment on maturation
+    // -----------------------------------------------------------------------
+
+    fn setup_growth() -> (World, Schedule) {
+        let mut world = World::new();
+        world.insert_resource(TimeState {
+            tick: 0,
+            paused: false,
+            ..Default::default()
+        });
+        world.insert_resource(SimConfig::default());
+        world.insert_resource(SystemActivation::default());
+        world.insert_resource(ColonyScore::default());
+        let mut schedule = Schedule::default();
+        schedule.add_systems(tick_kitten_growth);
+        (world, schedule)
+    }
+
+    #[test]
+    fn maturation_increments_kittens_surviving() {
+        let (mut world, mut schedule) = setup_growth();
+        // Spawn a kitten one tick away from maturation. ticks_per_season
+        // default = 20_000, so rate = 1.0 / 80_000. Setting maturity to
+        // (1.0 - rate) makes the next tick cross the threshold.
+        let rate = 1.0 / (4.0 * SimConfig::default().ticks_per_season as f32);
+        let kitten = world
+            .spawn(KittenDependency {
+                mother: None,
+                father: None,
+                maturity: 1.0 - rate * 0.5,
+            })
+            .id();
+
+        schedule.run(&mut world);
+
+        assert_eq!(
+            world.resource::<ColonyScore>().kittens_surviving,
+            1,
+            "maturation should increment kittens_surviving"
+        );
+        assert!(
+            !world.entity(kitten).contains::<KittenDependency>(),
+            "matured kitten should have KittenDependency removed"
+        );
+    }
+
+    #[test]
+    fn pre_maturation_tick_does_not_increment() {
+        let (mut world, mut schedule) = setup_growth();
+        // Fresh kitten, far from maturation.
+        let _kitten = world
+            .spawn(KittenDependency {
+                mother: None,
+                father: None,
+                maturity: 0.0,
+            })
+            .id();
+
+        schedule.run(&mut world);
+
+        assert_eq!(
+            world.resource::<ColonyScore>().kittens_surviving,
+            0,
+            "non-maturing tick must not increment"
+        );
+    }
+
+    #[test]
+    fn maturation_idempotent_after_dependency_removed() {
+        // Once KittenDependency is gone, the cat no longer matches the
+        // query, so further ticks do not re-increment.
+        let (mut world, mut schedule) = setup_growth();
+        let rate = 1.0 / (4.0 * SimConfig::default().ticks_per_season as f32);
+        let _kitten = world
+            .spawn(KittenDependency {
+                mother: None,
+                father: None,
+                maturity: 1.0 - rate * 0.5,
+            })
+            .id();
+
+        schedule.run(&mut world);
+        schedule.run(&mut world);
+        schedule.run(&mut world);
+
+        assert_eq!(
+            world.resource::<ColonyScore>().kittens_surviving,
+            1,
+            "maturation should increment exactly once per kitten"
+        );
     }
 }

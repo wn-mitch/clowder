@@ -117,7 +117,9 @@ mod tests {
         assert_eq!(score.aspirations_completed, 0);
         assert_eq!(score.structures_built, 0);
         assert_eq!(score.kittens_born, 0);
+        assert_eq!(score.kittens_surviving, 0);
         assert_eq!(score.prey_dens_discovered, 0);
+        assert_eq!(score.banishments, 0);
     }
 
     #[test]

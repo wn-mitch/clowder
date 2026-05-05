@@ -5,6 +5,7 @@ use crate::components::hunting_priors::HuntingPriors;
 use crate::components::identity::{Age, Appearance, Gender, Name, Species};
 use crate::components::kitten::KittenDependency;
 use crate::components::magic::Inventory;
+use crate::components::markers;
 use crate::components::mental::{Memory, Mood};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Health, Needs, Position};
@@ -153,6 +154,10 @@ pub fn tick_pregnancy(
                         crate::components::SensorySignature::CAT,
                         // Ticket 073 — per-cat recently-failed target memory.
                         crate::components::RecentTargetFailures::default(),
+                        // Ticket 166 — born-once identity marker; consumed by
+                        // `colony_score.kittens_surviving` increment/decrement
+                        // in `growth.rs::tick_kitten_growth` and `death.rs::check_death`.
+                        markers::BornInSim,
                     ),
                 ))
                 .id();

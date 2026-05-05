@@ -88,7 +88,7 @@ Baseline: `logs/tuned-42-baseline-0783194/events.jsonl` (commit
 | `deaths_injury`         | 8        | 3        | −62.5%   | direction match, within band |
 | `Starvation`            | 0        | **2**    | new      | **gate violation** — both kittens at tile (38,22), 552 ticks apart |
 | `burial`                | (not tracked baseline) | 0 | flat | **canary dark** |
-| `kittens_surviving`     | 0        | 0        | 0        | (4 of 6 matured pre-run-end; 2 starved) |
+| `kittens_surviving`     | 0        | 0        | 0        | **[unimplemented at the time of run — see ticket 166]** observationally 4 of 6 matured pre-run-end; 2 starved. The footer field had zero increment-sites in `src/`; the working proxy was the `KittenMatured` activation count. Re-derive after ticket 166 lands. |
 | `KittenFed` events      | (n/a; no kittens) | 1631 | new | Caretaking firing healthy run-wide |
 
 ### Concordance

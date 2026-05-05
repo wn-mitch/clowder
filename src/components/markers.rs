@@ -480,6 +480,28 @@ impl Parent {
     pub const KEY: &str = "Parent";
 }
 
+/// Cat was born during this simulation run (not a founding member).
+/// Inserted once at the kitten-spawn site in `pregnancy.rs` alongside
+/// `KittenDependency::new(...)`; never removed. Survives maturation
+/// and persists until `cleanup_dead` despawns the entity.
+///
+/// **Why a born-once marker, not derived from `Age::born_tick`** —
+/// founding cats also carry `born_tick` (set to `start_tick - age_ticks`
+/// in `world_gen/colony.rs::generate_starting_cats`), and at the canonical
+/// `start_tick = 0` they collapse to `born_tick = 0` indistinguishably from
+/// in-sim-born cats. `KittenDependency` is removed at maturation so it can't
+/// serve either. The marker is the canonical "born in this run" substrate.
+///
+/// **Consumer:** `colony_score.kittens_surviving` increments on maturation
+/// (`growth.rs::tick_kitten_growth`) and decrements on the death of a
+/// matured in-sim-born cat (`death.rs::check_death`, gate
+/// `With<BornInSim> + Without<KittenDependency>`). Ticket 166.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct BornInSim;
+impl BornInSim {
+    pub const KEY: &str = "BornInSim";
+}
+
 // Note: `Fertility { phase, … }` is data-bearing (§7.M.7); lands in
 // Phase 3c alongside the MateWithGoal DSE, not here.
 
@@ -698,6 +720,7 @@ mod tests {
     #[test]
     fn reproduction_markers_queryable() {
         assert_marker_queryable(Parent);
+        assert_marker_queryable(BornInSim);
     }
 
     #[test]
