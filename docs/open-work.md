@@ -27,6 +27,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 ## In progress (8)
 
+- **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
 - **[032](docs/open-work/tickets/032-starvation-cat-biology-realignment.md)** — Starvation rebalance — align with IRL cat biology, interesting not cutthroat — _added 2026-04-26_
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _added 2026-04-27_
@@ -34,7 +35,6 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[108](docs/open-work/tickets/108-threat-proximity-adrenaline.md)** — ThreatProximityAdrenaline modifier — substrate axis for CriticalSafety interrupt retirement — _[ai-substrate] · added 2026-05-01_
 - **[109](docs/open-work/tickets/109-intraspecies-conflict-response.md)** — IntraspeciesConflictResponse — full four-valence (fight/flight/freeze/fawn) social response — _[ai-substrate] · added 2026-05-01_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
-- **[149](docs/open-work/tickets/149-hunt-success-disambiguation.md)** — Hunt-success disambiguation — instrument per-discrete-attempt outcomes — _added 2026-05-02_
 
 ## Ready (50)
 
@@ -127,12 +127,13 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (44)
+### 2026-05 (45)
 
 - **[167](docs/open-work/landed/167-action-groom-split-example-templates-follow-on.md)** — Action::Groom split — examples + groom.ron asset follow-on _(2026-05-05)_
 - **[166](docs/open-work/landed/166-kittens-surviving-metric-wiring.md)** — kittens_surviving footer field has zero increment-sites — substrate-bypass shape _(2026-05-05)_
 - **[164](docs/open-work/landed/164-kitten-3822-corner-case.md)** — Seed-42 (38,22) kitten cohort starves despite KittenCryMap _(2026-05-05)_
 - **[160](docs/open-work/landed/160-substrate-stub-catalogue.md)** — Substrate stub catalogue + lint — fail the build on orphan markers _(2026-05-05)_
+- **[149](docs/open-work/landed/149-hunt-success-disambiguation.md)** — Hunt-success disambiguation — instrument per-discrete-attempt outcomes _(2026-05-05)_
 - **[165](docs/open-work/landed/165-groomedother-kitten-cohort-regression.md)** — Post-d1722a33 GroomedOther affiliative redistribution starves entire kitten cohort on seed-42 (wontfix — bereavement-orphan, working as intended) _(2026-05-04)_
 - **[163](docs/open-work/landed/163-l2-trace-incomplete-bonus-pipeline.md)** — Migrate the 9 apply_*_bonus passes into §3.5.1 modifiers (full-batch) _(2026-05-04)_
 - **[162](docs/open-work/landed/162-scenario-harness.md)** — Scenario harness — fast deterministic "what wins" experiments for AI decision triage _(2026-05-04)_
@@ -174,7 +175,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[047](docs/open-work/landed/047-critical-health-interrupt-treadmill.md)** — CriticalHealth interrupt is a treadmill, not a brake — replan picks the same disposition while damage accumulates _(2026-05-01)_
 - **[027](docs/open-work/landed/027-mating-cadence-three-bug-cascade.md)** — Mating cadence — three-bug cascade blocking MatingOccurred _(2026-05-01)_
 
-### 2026-04 (66)
+### 2026-04 (65)
 
 - **[094](docs/open-work/landed/094-eat-vs-forage-imbalance.md)** — Eat-vs-Forage IAUS imbalance — colony hauls food but doesn't consume it _(2026-04-30)_
 - **[092](docs/open-work/landed/092-unify-markersnapshot-plannerstate-statepredicate-feasibility.md)** — Unify MarkerSnapshot ↔ PlannerState/StatePredicate feasibility languages _(2026-04-30)_
@@ -218,7 +219,6 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[022](docs/open-work/landed/022-11-target-taking-trace-fan-out-8-dse-hooks-l2-lookup-fix.md)** — §11 target-taking trace fan-out — 8 DSE hooks + L2 lookup fix _(2026-04-24)_
 - **[014](docs/open-work/landed/014-4-marker-author-systems-batch-1.md)** — §4 marker author systems batch 1 _(2026-04-24)_
 - **[012](docs/open-work/landed/012-warmth-split-temperature-need-vs-social-warmth-fulfillment-a.md)** — Warmth split — temperature need vs social-warmth fulfillment axis _(2026-04-24)_
-- **[001](docs/open-work/landed/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure _(2026-04-24)_
 - **[001](docs/open-work/landed/001-explore-dse-rebalance-sub-2-saturation-curve.md)** — Explore DSE rebalance — Sub-2 saturation curve _(2026-04-24)_
 - **[2026-04-23](docs/open-work/landed/2026-04-23-13-1-rows-1-3-incapacitated-consumer-cutover-inline-branch-r.md)** — §13.1 rows 1–3 — Incapacitated consumer cutover + inline-branch retirement _(2026-04-23)_
 - **[2026-04-23](docs/open-work/landed/2026-04-23-13-1-rows-4-6-corruption-axis-logistic-migration-modifier-co.md)** — §13.1 rows 4–6 — corruption-axis Logistic migration + modifier/constant retirement _(2026-04-23)_

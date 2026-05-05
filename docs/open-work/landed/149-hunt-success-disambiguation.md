@@ -1,7 +1,7 @@
 ---
 id: 149
 title: Hunt-success disambiguation — instrument per-discrete-attempt outcomes
-status: in-progress
+status: done
 cluster: null
 added: 2026-05-02
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: [starvation-rebalance.md]
-landed-at: null
-landed-on: null
+landed-at: 2b98584c
+landed-on: 2026-05-05
 ---
 
 ## Why
