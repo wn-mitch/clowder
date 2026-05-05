@@ -346,6 +346,38 @@ inspect name *ARGS:
 sweep-stats *ARGS:
     uv run scripts/sweep_stats.py {{ARGS}}
 
+# Cross-run log database — collate baseline + diagnostic archives for SQL
+# queries against `logs/runs.duckdb`. Idempotent via mtime cache; re-running
+# build is cheap. Schema reference: docs/diagnostics/logdb.md.
+#
+# Default ingest covers headers, footers, ColonyScore, CatSnapshots, and
+# Death events. Heavy tables (cat_snapshot_scores, trace_l2/l3) are opt-in
+# so the daily build stays under the 5-minute gate.
+#
+# Examples:
+#   just logdb-build                              # ingest every logs/<dir>
+#   just logdb-build baseline-2026-04-25          # ingest one archive
+#   just logdb-build --rebuild                    # drop and recreate the DB
+#   just logdb-build --with-scores                # +cat_snapshot_scores (~5x slower)
+#   just logdb-build --with-traces                # +trace_l2/l3 from sidecars
+logdb-build *ARGS:
+    uv run scripts/logdb.py build {{ARGS}}
+
+# One-shot read-only SQL against logs/runs.duckdb. Quote the SQL.
+#   just logdb-query "SELECT COUNT(*) FROM runs"
+logdb-query SQL:
+    uv run scripts/logdb.py query "{{SQL}}"
+
+# Interactive duckdb shell on logs/runs.duckdb (requires the duckdb CLI).
+logdb-shell:
+    uv run scripts/logdb.py shell
+
+# Render a chart recipe to logs/charts/<recipe>-<ts>.html.
+#   just logdb-chart colony-score-over-time
+#   just logdb-chart colony-score-over-time --archive baseline-2026-04-25 --smooth 5
+logdb-chart RECIPE *ARGS:
+    uv run scripts/logdb.py chart {{RECIPE}} {{ARGS}}
+
 # Generate game wiki and build mdBook site
 wiki:
     uv run scripts/generate_wiki.py

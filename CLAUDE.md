@@ -8,6 +8,7 @@ A colony sim about a clowder of cats living in a world with its own weight — h
 - `just check` / `just test` / `just ci` (`check` includes step-resolver and time-unit linters)
 - `just open-work` / `just open-work-ready` / `just open-work-wip`
 - `just q <subtool> <run-dir>` — logq drill-down (`run-summary` · `events` · `deaths` · `narrative` · `trace` · `cat-timeline` · `anomalies`); reach for it whenever you ask "why did X happen in this run?"
+- `just logdb-build` / `logdb-query SQL` / `logdb-shell` / `logdb-chart <recipe>` — cross-run SQL over every archive in `logs/` (DuckDB at `logs/runs.duckdb`). Use whenever the question spans seeds, commits, or archives ("MatingOccurred across iterations", "softmax mass diff between commits for Mallow", "final colony score by archive"). Complementary to logq: logq drills *into one run*, logdb compares *across many*. Heavy tables (`cat_snapshot_scores`, traces) are opt-in via `--with-scores` / `--with-traces`. Schema + chart recipes: [`docs/diagnostics/logdb.md`](docs/diagnostics/logdb.md).
 
 ### Verifying a change
 - `just scenario <name>` — fast (~3s) deterministic microexperiment harness (preset cats, preloaded state). **Preferred over `just soak` for hypothesis triage** during bugfix loops; `just soak` remains for whole-colony verification once a fix is drafted. See ticket 162.
