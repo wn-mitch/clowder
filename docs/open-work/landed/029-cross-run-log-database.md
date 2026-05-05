@@ -1,7 +1,7 @@
 ---
 id: 029
 title: Cross-run log database — collate baseline + diagnostic archives for SQL-style queries
-status: ready
+status: done
 cluster: null
 added: 2026-04-25
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: d09eed10
+landed-on: 2026-05-05
 ---
 
 ## Why
@@ -191,3 +191,15 @@ backing makes this very cheap.
   hand-rolled `jq` across 27-run datasets when investigating the
   mating cadence and play canary regressions; the cross-run
   comparison surface is now load-bearing for every balance thread.
+- 2026-05-05: Landed at d09eed10. Scope expanded from the original
+  ticket to ship the **charting layer** in v1 alongside the SQL
+  surface (user request: first concrete output is a side-by-side
+  colony-score-over-time chart). Heavy tables — `cat_snapshot_scores`
+  (~2.5M rows) and trace L2/L3 — gated behind `--with-scores` /
+  `--with-traces` flags so the daily build stays under the 5-minute
+  gate (cold rebuild on baseline-2026-04-25: ~2:25; warm cache:
+  <1s). Cold-cache cost when those flags are enabled is a known
+  follow-on for bulk Arrow-based loads. `runs.kind` extends past the
+  ticket's three values to include `probe` / `canary` / `flat` so the
+  broader `logs/` walk works; the canonical 27 footer-complete runs
+  match `WHERE kind IN ('sweep','trace','conditional')`.

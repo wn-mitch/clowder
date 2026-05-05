@@ -15,10 +15,10 @@ _Last generated: 2026-05-05._
 | Status | Count |
 |---|---|
 | In progress | 8 |
-| Ready | 48 |
+| Ready | 47 |
 | Parked | 5 |
 | Blocked | 18 |
-| **Open total** | **79** |
+| **Open total** | **78** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -36,7 +36,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[109](docs/open-work/tickets/109-intraspecies-conflict-response.md)** — IntraspeciesConflictResponse — full four-valence (fight/flight/freeze/fawn) social response — _[ai-substrate] · added 2026-05-01_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 
-## Ready (48)
+## Ready (47)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -48,7 +48,6 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** — Crafting — items, recipes, stations — _added 2026-04-22_
 - **[020](docs/open-work/tickets/020-namedlandmark-substrate.md)** — NamedLandmark substrate (cross-consumer naming) — _added 2026-04-22_
 - **[023](docs/open-work/tickets/023-shadowfox-distinct-motivations.md)** — Shadowfox motivations distinct from normal foxes — _added 2026-04-14_
-- **[029](docs/open-work/tickets/029-cross-run-log-database.md)** — Cross-run log database — collate baseline + diagnostic archives for SQL-style queries — _added 2026-04-25_
 - **[034](docs/open-work/tickets/034-time-anchor-continuity-rebalance.md)** — Time-anchor continuity rebalance — restore play/grooming/mythic-texture under fixed prey-scent — _added 2026-04-26_
 - **[035](docs/open-work/tickets/035-burial-not-implemented.md)** — Burial — implement the §5 broaden-sideways capability so the continuity canary can pass — _added 2026-04-26_
 - **[037](docs/open-work/tickets/037-grooming-fired-masks-silent-advance.md)** — GroomingFired event masks silent-advance — continuity canary lies when target picker returns None — _added 2026-04-26_
@@ -121,11 +120,11 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (113)
+## Landed archive (114)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (48)
+### 2026-05 (49)
 
 - **[171](docs/open-work/landed/171-hasgarden-ecs-level-wiring.md)** — Promote HasGarden to ECS-level singleton writer (parity with 168/169) _(2026-05-05)_
 - **[169](docs/open-work/landed/169-author-construction-and-damaged-building-markers.md)** — Author HasConstructionSite + HasDamagedBuilding markers (buildings.rs) _(2026-05-05)_
@@ -135,6 +134,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[164](docs/open-work/landed/164-kitten-3822-corner-case.md)** — Seed-42 (38,22) kitten cohort starves despite KittenCryMap _(2026-05-05)_
 - **[160](docs/open-work/landed/160-substrate-stub-catalogue.md)** — Substrate stub catalogue + lint — fail the build on orphan markers _(2026-05-05)_
 - **[149](docs/open-work/landed/149-hunt-success-disambiguation.md)** — Hunt-success disambiguation — instrument per-discrete-attempt outcomes _(2026-05-05)_
+- **[029](docs/open-work/landed/029-cross-run-log-database.md)** — Cross-run log database — collate baseline + diagnostic archives for SQL-style queries _(2026-05-05)_
 - **[165](docs/open-work/landed/165-groomedother-kitten-cohort-regression.md)** — Post-d1722a33 GroomedOther affiliative redistribution starves entire kitten cohort on seed-42 (wontfix — bereavement-orphan, working as intended) _(2026-05-04)_
 - **[163](docs/open-work/landed/163-l2-trace-incomplete-bonus-pipeline.md)** — Migrate the 9 apply_*_bonus passes into §3.5.1 modifiers (full-batch) _(2026-05-04)_
 - **[162](docs/open-work/landed/162-scenario-harness.md)** — Scenario harness — fast deterministic "what wins" experiments for AI decision triage _(2026-05-04)_
