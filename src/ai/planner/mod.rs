@@ -361,9 +361,59 @@ struct SearchNode {
     depth: usize,
 }
 
+/// Categorical reason `make_plan` failed to produce a plan. Threaded out
+/// to the `EventKind::PlanningFailed` event so the headless-footer
+/// aggregator (`planning_failures_by_reason`) can attribute the post-155
+/// residual plan-failure surface to a specific cause instead of the
+/// pre-172 opaque `"no_plan_found"` blob.
+///
+/// Distinct from `crate::components::PlanFailureReason` (072), which
+/// classifies step-level failures during plan *execution*; this enum
+/// classifies plan *creation* failures inside the A* search. The two
+/// surfaces are conceptually different and intentionally typed
+/// separately.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize)]
+pub enum PlanningFailureReason {
+    /// No action in `actions` was applicable from `start`. The search
+    /// would have drained the open set on the first expansion. Cheaply
+    /// detected by a precheck so this case is distinguishable from
+    /// `GoalUnreachable` (where actions exist but their effects don't
+    /// reach the goal) — that distinction is the load-bearing one for
+    /// ticket 172's triage of Cooking + Herbalism plan failures.
+    NoApplicableActions,
+    /// A* explored every reachable state and none satisfied the goal.
+    /// Means the action effects available from `start` cannot in
+    /// principle reach the goal — typically a substrate problem (no
+    /// herbs nearby, no remedy patient in range, etc.) rather than a
+    /// search-budget problem.
+    GoalUnreachable,
+    /// A* hit the `max_nodes` budget before finding a plan. Means the
+    /// state space is searchable in principle but the budget was too
+    /// tight; bumping `max_nodes` (currently 1000 at the three cat
+    /// call sites in `goap.rs`) would let it succeed.
+    NodeBudgetExhausted,
+}
+
+impl PlanningFailureReason {
+    /// Stable string key for footer aggregation
+    /// (`planning_failures_by_reason`). Mirrors the variant name so
+    /// the events.jsonl `reason` field and the footer key share a
+    /// vocabulary.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::NoApplicableActions => "NoApplicableActions",
+            Self::GoalUnreachable => "GoalUnreachable",
+            Self::NodeBudgetExhausted => "NodeBudgetExhausted",
+        }
+    }
+}
+
 /// Run A* search over `PlannerState` to find a plan that satisfies `goal`.
 ///
-/// Returns `None` if no plan is found within the search bounds.
+/// Returns `Err(PlanningFailureReason)` if no plan is found within the
+/// search bounds; the typed reason flows out to
+/// `EventKind::PlanningFailed` so the headless footer can attribute
+/// failures by cause (172).
 pub fn make_plan(
     start: PlannerState,
     actions: &[GoapActionDef],
@@ -371,10 +421,19 @@ pub fn make_plan(
     max_depth: usize,
     max_nodes: usize,
     ctx: &PlanContext<'_>,
-) -> Option<Vec<PlannedStep>> {
+) -> Result<Vec<PlannedStep>, PlanningFailureReason> {
     // Early exit: already at goal.
     if goal.is_satisfied(&start, ctx) {
-        return Some(Vec::new());
+        return Ok(Vec::new());
+    }
+
+    // 172 precheck: if no action is applicable from start, the search
+    // would expand the start node, find no successors, and drain the
+    // open set on the next pop. Short-circuit with a typed reason so
+    // triage can attribute "stuck at start" (substrate gating issue)
+    // separately from "explored but no path" (action-effects issue).
+    if !actions.iter().any(|a| a.is_applicable(&start, ctx)) {
+        return Err(PlanningFailureReason::NoApplicableActions);
     }
 
     // Arena of search nodes.
@@ -404,7 +463,7 @@ pub fn make_plan(
     while let Some(Reverse((_, node_idx))) = open.pop() {
         expanded += 1;
         if expanded > max_nodes {
-            return None;
+            return Err(PlanningFailureReason::NodeBudgetExhausted);
         }
 
         let g = arena[node_idx].g_cost;
@@ -418,7 +477,7 @@ pub fn make_plan(
         // Goal check at dequeue — this node has the lowest f-cost among
         // unvisited nodes, so if it satisfies the goal it's optimal.
         if goal.is_satisfied(&arena[node_idx].state, ctx) {
-            return Some(reconstruct_path(&arena, node_idx));
+            return Ok(reconstruct_path(&arena, node_idx));
         }
 
         if depth >= max_depth {
@@ -454,7 +513,7 @@ pub fn make_plan(
         }
     }
 
-    None
+    Err(PlanningFailureReason::GoalUnreachable)
 }
 
 /// Walk parent pointers back to the start to reconstruct the step sequence.
@@ -759,6 +818,9 @@ mod tests {
             predicates: vec![StatePredicate::HungerOk(false)],
         };
         // Hunger is already ok=true, and no action sets it to false.
+        // SelfGroom IS applicable (no preconditions), so the precheck
+        // passes; the search drains the open set and returns
+        // GoalUnreachable.
         let actions = vec![GoapActionDef {
             kind: GoapActionKind::SelfGroom,
             cost: 1,
@@ -767,7 +829,35 @@ mod tests {
         }];
 
         let plan = plan!(start, &actions, &goal, 12, 1000);
-        assert!(plan.is_none());
+        assert_eq!(
+            plan.expect_err("plan should fail"),
+            PlanningFailureReason::GoalUnreachable
+        );
+    }
+
+    #[test]
+    fn no_applicable_actions_at_start_returns_specific_reason() {
+        // 172: distinguish "no action applicable from start" from the
+        // generic GoalUnreachable. Construct a state where every
+        // action's preconditions fail at start, then assert the
+        // typed reason surfaces.
+        let start = default_state(); // zone = Wilds
+        let goal = GoalState {
+            predicates: vec![StatePredicate::ZoneIs(PlannerZone::Stores)],
+        };
+        // The only action requires being IN Stores already — impossible
+        // to apply from Wilds.
+        let actions = vec![GoapActionDef {
+            kind: GoapActionKind::DepositPrey,
+            cost: 1,
+            preconditions: vec![StatePredicate::ZoneIs(PlannerZone::Stores)],
+            effects: vec![StateEffect::IncrementTrips],
+        }];
+        let plan = plan!(start, &actions, &goal, 12, 1000);
+        assert_eq!(
+            plan.expect_err("plan should fail"),
+            PlanningFailureReason::NoApplicableActions
+        );
     }
 
     #[test]
@@ -806,7 +896,10 @@ mod tests {
 
         // Max nodes = 10, but reaching trips=100 requires 100 expansions.
         let plan = plan!(start, &actions, &goal, 200, 10);
-        assert!(plan.is_none());
+        assert_eq!(
+            plan.expect_err("plan should fail"),
+            PlanningFailureReason::NodeBudgetExhausted
+        );
     }
 
     #[test]
@@ -822,9 +915,15 @@ mod tests {
             effects: vec![StateEffect::IncrementTrips],
         }];
 
-        // Max depth = 3, but reaching trips=5 requires 5 steps.
+        // Max depth = 3, but reaching trips=5 requires 5 steps. Depth
+        // pruning leaves the open set drainable without satisfying the
+        // goal, so this surfaces as GoalUnreachable rather than
+        // NodeBudgetExhausted (depth caps don't trip the node budget).
         let plan = plan!(start, &actions, &goal, 3, 1000);
-        assert!(plan.is_none());
+        assert_eq!(
+            plan.expect_err("plan should fail"),
+            PlanningFailureReason::GoalUnreachable
+        );
     }
 
     #[test]

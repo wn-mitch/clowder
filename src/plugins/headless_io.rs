@@ -605,6 +605,7 @@ pub fn emit_headless_footer(world: &mut World) -> String {
         "deaths_by_cause": event_log.deaths_by_cause,
         "plan_failures_by_reason": event_log.plan_failures_by_reason,
         "planning_failures_by_disposition": event_log.planning_failures_by_disposition,
+        "planning_failures_by_reason": event_log.planning_failures_by_reason,
         "interrupts_by_reason": event_log.interrupts_by_reason,
         "continuity_tallies": event_log.continuity_tallies,
         "welfare_axes": welfare_axes,

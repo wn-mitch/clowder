@@ -825,7 +825,7 @@ mod tests {
         let distances = basic_distances();
         let actions = actions_for_disposition(DispositionKind::Eating, Action::Eat, &distances);
         assert!(
-            plan!(start, &actions, &goal, 8, 500, markers = empty_markers()).is_none(),
+            plan!(start, &actions, &goal, 8, 500, markers = empty_markers()).is_err(),
             "Eating plan must be unreachable when HasStoredFood marker is absent"
         );
     }
@@ -1196,7 +1196,7 @@ mod tests {
 
         let plan = plan!(start, &actions, &goal, 12, 1000, markers = empty_markers());
         assert!(
-            plan.is_none(),
+            plan.is_err(),
             "SetWard plan should be impossible without thornbriar"
         );
     }
@@ -1343,11 +1343,11 @@ mod tests {
 
         let with_food =
             plan!(start.clone(), &actions, &goal, 8, 500, markers = food_stocked_markers());
-        assert!(with_food.is_some(), "marker present → Eating reachable");
+        assert!(with_food.is_ok(), "marker present → Eating reachable");
 
         let without_food = plan!(start, &actions, &goal, 8, 500, markers = empty_markers());
         assert!(
-            without_food.is_none(),
+            without_food.is_err(),
             "marker absent → Eating unreachable (HungerOk goal)"
         );
     }

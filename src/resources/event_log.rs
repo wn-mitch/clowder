@@ -4,6 +4,7 @@ use std::collections::VecDeque;
 use bevy_ecs::prelude::Resource;
 
 use crate::ai::Action;
+use crate::ai::planner::PlanningFailureReason;
 use crate::components::personality::Personality;
 use crate::components::physical::Needs;
 use crate::components::skills::Skills;
@@ -470,16 +471,25 @@ pub enum EventKind {
         temperature: f32,
     },
 
-    /// Ticket 091: the planner returned `None` for a chosen disposition —
-    /// the cat had no executable plan and silently idled. Pre-091 this path
-    /// emitted nothing, hiding producer-side starvation cascades from every
-    /// canary. The `reason` field starts as `"no_plan_found"`; future
-    /// variants can disambiguate between unreachable goals, missing
-    /// preconditions, A* depth/iteration exhaustion, etc.
+    /// Ticket 091: the planner returned `Err(_)` for a chosen disposition —
+    /// the cat had no executable plan and silently idled. Pre-091 this
+    /// path emitted nothing, hiding producer-side starvation cascades
+    /// from every canary.
+    ///
+    /// Ticket 172: `reason` was promoted from a stringly-typed
+    /// `"no_plan_found"` constant to the typed
+    /// [`PlanningFailureReason`] enum so the headless-footer aggregator
+    /// (`planning_failures_by_reason`) can attribute the post-155
+    /// residual plan-failure surface to a specific cause —
+    /// substrate eligibility (`NoApplicableActions`), action effects
+    /// (`GoalUnreachable`), or search budget (`NodeBudgetExhausted`).
+    /// The events.jsonl payload now carries the variant name as a
+    /// string (`"NoApplicableActions"` / `"GoalUnreachable"` /
+    /// `"NodeBudgetExhausted"`) instead of the prior `"no_plan_found"`.
     PlanningFailed {
         cat: String,
         disposition: String,
-        reason: String,
+        reason: PlanningFailureReason,
         hunger: f32,
         energy: f32,
         temperature: f32,
@@ -519,12 +529,22 @@ pub struct EventLog {
     // contract notes on `EventKind::SystemActivation::positive`.
     pub deaths_by_cause: BTreeMap<String, u64>,
     pub plan_failures_by_reason: BTreeMap<String, u64>,
-    /// Ticket 091: per-disposition tally of `make_plan → None` outcomes.
+    /// Ticket 091: per-disposition tally of `make_plan → Err` outcomes.
     /// Distinguishes "the planner can't find a plan for X" from runtime
     /// step failures (`plan_failures_by_reason`). A high entry here means
     /// the IAUS layer is electing X but the GOAP layer can't satisfy it —
     /// the producer-side starvation pattern 091 was opened to fix.
     pub planning_failures_by_disposition: BTreeMap<String, u64>,
+    /// Ticket 172: per-`(disposition, reason)` tally of `make_plan → Err`
+    /// outcomes. Keys are formatted as `"<Disposition>:<Reason>"`
+    /// (e.g., `"Cooking:NoApplicableActions"`). Distinguishes
+    /// substrate-eligibility failures (`NoApplicableActions` —
+    /// nothing applicable from start), action-effect failures
+    /// (`GoalUnreachable` — search drained without satisfying goal),
+    /// and search-budget failures (`NodeBudgetExhausted` — `max_nodes`
+    /// hit). Read by the post-155 plan-failure triage to attribute
+    /// the residual Cooking + Herbalism surface to a specific cause.
+    pub planning_failures_by_reason: BTreeMap<String, u64>,
     pub interrupts_by_reason: BTreeMap<String, u64>,
     /// Continuity-canary class counters. Six fixed keys: `grooming`,
     /// `play`, `mentoring`, `burial`, `courtship`, `mythic-texture`.
@@ -558,6 +578,7 @@ impl Default for EventLog {
             deaths_by_cause: BTreeMap::new(),
             plan_failures_by_reason: BTreeMap::new(),
             planning_failures_by_disposition: BTreeMap::new(),
+            planning_failures_by_reason: BTreeMap::new(),
             interrupts_by_reason: BTreeMap::new(),
             continuity_tallies,
         }
@@ -641,10 +662,22 @@ impl EventLog {
             EventKind::PlanInterrupted { reason, .. } => {
                 *self.interrupts_by_reason.entry(reason.clone()).or_insert(0) += 1;
             }
-            EventKind::PlanningFailed { disposition, .. } => {
+            EventKind::PlanningFailed {
+                disposition, reason, ..
+            } => {
                 *self
                     .planning_failures_by_disposition
                     .entry(disposition.clone())
+                    .or_insert(0) += 1;
+                // 172: also tally by `(disposition, reason)` so triage
+                // can attribute the residual post-155 plan-failure
+                // surface (Cooking 2126 / Herbalism 1712) to a
+                // specific cause without re-running the soak with a
+                // focal trace.
+                let composite_key = format!("{}:{}", disposition, reason.as_str());
+                *self
+                    .planning_failures_by_reason
+                    .entry(composite_key)
                     .or_insert(0) += 1;
             }
             _ => {}
@@ -726,7 +759,7 @@ mod tests {
 
     #[test]
     fn planning_failed_increments_per_disposition_tally() {
-        // Ticket 091: silent `make_plan → None` path now witnessed via
+        // Ticket 091: silent `make_plan → Err` path now witnessed via
         // `EventKind::PlanningFailed`. The footer reads
         // `planning_failures_by_disposition`, keyed on the disposition that
         // failed to plan, so an investigator can answer "which DSE is
@@ -738,7 +771,7 @@ mod tests {
             EventKind::PlanningFailed {
                 cat: "Nettle".into(),
                 disposition: "Foraging".into(),
-                reason: "no_plan_found".into(),
+                reason: PlanningFailureReason::NoApplicableActions,
                 hunger: 0.9,
                 energy: 0.4,
                 temperature: 0.3,
@@ -751,7 +784,7 @@ mod tests {
             EventKind::PlanningFailed {
                 cat: "Nettle".into(),
                 disposition: "Foraging".into(),
-                reason: "no_plan_found".into(),
+                reason: PlanningFailureReason::NoApplicableActions,
                 hunger: 0.9,
                 energy: 0.4,
                 temperature: 0.3,
@@ -764,7 +797,7 @@ mod tests {
             EventKind::PlanningFailed {
                 cat: "Mocha".into(),
                 disposition: "Hunting".into(),
-                reason: "no_plan_found".into(),
+                reason: PlanningFailureReason::GoalUnreachable,
                 hunger: 0.95,
                 energy: 0.5,
                 temperature: 0.3,
@@ -781,6 +814,59 @@ mod tests {
         assert_eq!(
             log.planning_failures_by_disposition.get("Hunting").copied(),
             Some(1)
+        );
+    }
+
+    #[test]
+    fn planning_failed_increments_per_reason_tally_172() {
+        // Ticket 172: `(disposition, reason)` composite key surfaces the
+        // failure-cause histogram. Two Cooking failures with different
+        // reasons split into distinct buckets; same-reason failures
+        // accumulate.
+        let mut log = EventLog::default();
+        let push = |log: &mut EventLog, disposition: &str, reason: PlanningFailureReason| {
+            log.push(
+                0,
+                EventKind::PlanningFailed {
+                    cat: "Bramble".into(),
+                    disposition: disposition.into(),
+                    reason,
+                    hunger: 0.5,
+                    energy: 0.5,
+                    temperature: 0.5,
+                    food_available: false,
+                    has_stored_food: false,
+                },
+            );
+        };
+        push(&mut log, "Cooking", PlanningFailureReason::NoApplicableActions);
+        push(&mut log, "Cooking", PlanningFailureReason::NoApplicableActions);
+        push(&mut log, "Cooking", PlanningFailureReason::GoalUnreachable);
+        push(&mut log, "Herbalism", PlanningFailureReason::NodeBudgetExhausted);
+        assert_eq!(
+            log.planning_failures_by_reason
+                .get("Cooking:NoApplicableActions")
+                .copied(),
+            Some(2)
+        );
+        assert_eq!(
+            log.planning_failures_by_reason
+                .get("Cooking:GoalUnreachable")
+                .copied(),
+            Some(1)
+        );
+        assert_eq!(
+            log.planning_failures_by_reason
+                .get("Herbalism:NodeBudgetExhausted")
+                .copied(),
+            Some(1)
+        );
+        // Per-disposition tally still aggregates across reasons.
+        assert_eq!(
+            log.planning_failures_by_disposition
+                .get("Cooking")
+                .copied(),
+            Some(3)
         );
     }
 

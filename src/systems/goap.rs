@@ -1846,7 +1846,8 @@ pub fn evaluate_and_plan(
         let planner_has_stored_food = markers.has(markers::HasStoredFood::KEY, entity);
         let goal = goal_for_disposition(chosen, 0, &plan_ctx);
 
-        if let Some(steps) = make_plan(planner_state, &actions, &goal, 12, 1000, &plan_ctx) {
+        let plan_outcome = make_plan(planner_state, &actions, &goal, 12, 1000, &plan_ctx);
+        if let Ok(steps) = plan_outcome {
             // 150 R5a: an empty plan means the goal is *already*
             // satisfied at planning time (e.g., the cat picked Eating
             // at hunger=0.84 — already above the resting-complete
@@ -1944,6 +1945,17 @@ pub fn evaluate_and_plan(
             current.ticks_remaining = u64::MAX;
             commands.entity(entity).insert(plan);
         } else {
+            // 172: extract the typed reason from the `Err` arm. The
+            // `Ok` arm is handled above; this branch is reachable
+            // only when `plan_outcome` is `Err`.
+            let reason = match plan_outcome {
+                Err(r) => r,
+                Ok(_) => unreachable!(
+                    "Ok arm consumed by the if let above — \
+                     reaching this match would mean the plan_outcome \
+                     variable was reassigned, which it isn't"
+                ),
+            };
             // Ticket 123 — author the disposition-failure memory
             // before the event push. The IAUS-side cooldown reads
             // this on the next tick to suppress the same-disposition
@@ -1972,12 +1984,21 @@ pub fn evaluate_and_plan(
                 // signal. The footer field
                 // `planning_failures_by_disposition` is the cheap
                 // pre-trace disambiguator for that pattern.
+                //
+                // 172: `reason` carries the typed
+                // `PlanningFailureReason` so the footer's new
+                // `planning_failures_by_reason` map can attribute
+                // failures by cause (NoApplicableActions /
+                // GoalUnreachable / NodeBudgetExhausted) — the cull
+                // that distinguishes substrate-eligibility issues
+                // from search-budget issues from action-effect
+                // issues.
                 log.push(
                     res.time.tick,
                     EventKind::PlanningFailed {
                         cat: name.0.clone(),
                         disposition: format!("{:?}", chosen),
-                        reason: "no_plan_found".into(),
+                        reason,
                         hunger: needs.hunger,
                         energy: needs.energy,
                         temperature: needs.temperature,
@@ -2527,12 +2548,17 @@ pub fn resolve_goap_plans(
                 };
                 let goal = goal_for_disposition(plan.kind, plan.trips_done, &plan_ctx);
 
-                if let Some(new_steps) =
+                if let Ok(new_steps) =
                     make_plan(planner_state, &actions, &goal, 12, 1000, &plan_ctx)
                 {
                     plan.replan(new_steps);
                 } else {
-                    // Can't plan next trip — complete anyway.
+                    // Can't plan next trip — complete anyway. The typed
+                    // failure reason isn't surfaced here because this
+                    // path doesn't emit a `PlanningFailed` event (it
+                    // completes the existing plan rather than recording
+                    // a new failure). 172 leaves this site untouched
+                    // semantically.
                     current.ticks_remaining = 0;
                     plans_to_remove.push(cat_entity);
                 }
@@ -2829,7 +2855,7 @@ pub fn resolve_goap_plans(
                 };
                 let goal = goal_for_disposition(plan.kind, plan.trips_done, &plan_ctx);
 
-                if let Some(new_steps) =
+                if let Ok(new_steps) =
                     make_plan(planner_state, &actions, &goal, 12, 1000, &plan_ctx)
                 {
                     if plan.replan(new_steps) {
