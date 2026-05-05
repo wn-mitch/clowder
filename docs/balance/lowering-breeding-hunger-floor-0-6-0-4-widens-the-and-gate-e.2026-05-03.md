@@ -1,4 +1,4 @@
-# Lowering breeding_hunger_floor 0.6 → 0.4 widens the AND-gate eligibility window enough to recover courtship cadence after the post-substrate reproduction collapse (2026-05-04)
+# Lowering breeding_hunger_floor 0.6 → 0.4 widens the AND-gate eligibility window enough to recover courtship cadence after the post-substrate reproduction collapse (2026-05-03)
 
 Drafted by `just hypothesize` (ticket 031). Edit before committing — pre-filled
 fields are starting points.
@@ -34,17 +34,17 @@ Sweeps: 3 seeds × 3 reps × 900s.
 
 | Field | Value |
 |---|---|
-| Observed direction | increase |
-| Observed Δ | 23.9% |
-| p-value (Welch's t) | 0.5358 |
-| Cohen's d | 0.3 |
+| Observed direction | unchanged |
+| Observed Δ | 5.2% |
+| p-value (Welch's t) | 0.944 |
+| Cohen's d | 0.03 |
 
 ## Concordance
 
-**Verdict: off-magnitude**
+**Verdict: wrong-direction**
 
-- Direction match: ✓ (increase vs increase)
-- Magnitude in band: see |Δ|=23.9% vs predicted ±25–300%
+- Direction match: ✗ (increase vs unchanged)
+- Magnitude in band: see |Δ|=5.2% vs predicted ±25–300%
 
 ## Survival canaries
 
