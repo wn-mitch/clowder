@@ -162,7 +162,8 @@ pub struct WorldStateQueries<'w, 's> {
     /// the planner's `StatePredicate::HasMarker` resolve through the
     /// snapshot surface (per `scoring.rs:88-95` MVP-shim doctrine).
     /// Ticket 169 added the `HasConstructionSite` / `HasDamagedBuilding`
-    /// rows.
+    /// rows. Ticket 171 added `HasGarden` and retired the
+    /// `scan_colony_buildings` call that previously sourced it.
     pub colony_state_query: Query<
         'w,
         's,
@@ -175,6 +176,7 @@ pub struct WorldStateQueries<'w, 's> {
             Has<markers::WardsUnderSiege>,
             Has<markers::HasConstructionSite>,
             Has<markers::HasDamagedBuilding>,
+            Has<markers::HasGarden>,
         ),
         With<markers::ColonyState>,
     >,
@@ -942,6 +944,7 @@ pub fn evaluate_and_plan(
         wards_under_siege,
         has_construction_site,
         has_damaged_building,
+        has_garden,
     ) = world_state
         .colony_state_query
         .single()
@@ -983,23 +986,11 @@ pub fn evaluate_and_plan(
         )
         .collect();
 
-    // §4 colony-scoped marker predicates. Markers promoted to the
-    // `ColonyState` singleton in ticket 168 (HasFunctionalKitchen /
-    // HasRawFoodInStores / HasStoredFood / ThornbriarAvailable /
-    // WardStrengthLow / WardsUnderSiege) and ticket 169
-    // (HasConstructionSite / HasDamagedBuilding) are bound from the
-    // singleton readout above. `has_garden` is still computed from
-    // the imperative scan here — promoting it to an ECS-level writer
-    // is a follow-on (the snapshot bridge below already satisfies the
-    // lint).
-    let bldg_state = crate::systems::buildings::scan_colony_buildings(
-        world_state
-            .building_query
-            .iter()
-            .map(|(_, s, _, site, _)| (s, site)),
-        d.damaged_building_threshold,
-    );
-    let has_garden = bldg_state.has_garden;
+    // §4 colony-scoped marker predicates. All nine colony-scoped markers
+    // (ticket 168 batch + 169's HasConstructionSite / HasDamagedBuilding +
+    // 171's HasGarden) are now bound from the `colony_state_query`
+    // readout above. The previous `scan_colony_buildings` call here
+    // existed only to source `has_garden` — retired in 171.
     markers.set_colony(markers::HasGarden::KEY, has_garden);
     markers.set_colony(markers::HasFunctionalKitchen::KEY, has_functional_kitchen);
     markers.set_colony(markers::HasRawFoodInStores::KEY, has_raw_food_in_stores);

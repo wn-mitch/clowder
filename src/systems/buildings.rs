@@ -438,12 +438,7 @@ pub fn update_construction_site_map(
 /// - `HasConstructionSite` — ≥1 reachable `ConstructionSite` (ticket 169).
 /// - `HasDamagedBuilding` — ≥1 `Structure` with condition <
 ///   `DispositionConstants::damaged_building_threshold` (ticket 169).
-///
-/// `HasGarden` is still computed by `scan_colony_buildings` but bridged
-/// into `MarkerSnapshot` via `goap.rs` `set_colony` only — it has no
-/// ECS-level writer here yet (the lint accepts the snapshot-bridge as
-/// a writer pattern). Promoting it to the same shape as the others is
-/// a follow-on.
+/// - `HasGarden` — ≥1 `Garden` `Structure` (ticket 171).
 pub fn update_colony_building_markers(
     mut commands: Commands,
     colony: Single<Entity, With<crate::components::markers::ColonyState>>,
@@ -493,6 +488,11 @@ pub fn update_colony_building_markers(
         em.insert(crate::components::markers::HasDamagedBuilding);
     } else {
         em.remove::<crate::components::markers::HasDamagedBuilding>();
+    }
+    if bldg_state.has_garden {
+        em.insert(crate::components::markers::HasGarden);
+    } else {
+        em.remove::<crate::components::markers::HasGarden>();
     }
 }
 
@@ -879,5 +879,23 @@ mod tests {
         let colony = colony_entity(&mut world);
         assert!(world.entity(colony).contains::<markers::HasConstructionSite>());
         assert!(!world.entity(colony).contains::<markers::HasDamagedBuilding>());
+    }
+
+    #[test]
+    fn colony_garden_marker_set_when_garden_exists() {
+        let (mut world, mut schedule) = setup_colony_markers();
+        world.spawn(Structure::new(StructureType::Garden));
+        schedule.run(&mut world);
+        let colony = colony_entity(&mut world);
+        assert!(world.entity(colony).contains::<markers::HasGarden>());
+    }
+
+    #[test]
+    fn colony_garden_marker_cleared_when_no_garden() {
+        let (mut world, mut schedule) = setup_colony_markers();
+        world.spawn(Structure::new(StructureType::Den));
+        schedule.run(&mut world);
+        let colony = colony_entity(&mut world);
+        assert!(!world.entity(colony).contains::<markers::HasGarden>());
     }
 }

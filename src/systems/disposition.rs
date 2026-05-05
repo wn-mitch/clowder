@@ -482,6 +482,19 @@ pub fn evaluate_dispositions(
     constants: Res<SimConstants>,
     cooking: CookingQueries,
     mut side_effects: EvalDispositionSideEffects,
+    // Ticket 171 — read the four building-derived colony markers from the
+    // `ColonyState` singleton. Bundles 169's deferred follow-on:
+    // `evaluate_dispositions` no longer carries a `scan_colony_buildings`
+    // call. Mirror of the `colony_state_query` slice in `goap.rs`.
+    colony_state_query: Query<
+        (
+            Has<markers::HasFunctionalKitchen>,
+            Has<markers::HasConstructionSite>,
+            Has<markers::HasDamagedBuilding>,
+            Has<markers::HasGarden>,
+        ),
+        With<markers::ColonyState>,
+    >,
 ) {
     let rng = &mut *side_effects.rng;
     let commands = &mut side_effects.commands;
@@ -524,16 +537,18 @@ pub fn evaluate_dispositions(
         )
         .collect();
 
-    // §4 colony-scoped marker predicates — shared helpers eliminate
-    // duplication with goap.rs (previously computed identically in both).
-    let bldg_state = crate::systems::buildings::scan_colony_buildings(
-        building_query.iter().map(|(_, s, _, site, _)| (s, site)),
-        d.damaged_building_threshold,
-    );
-    let has_construction_site = bldg_state.has_construction_site;
-    let has_damaged_building = bldg_state.has_damaged_building;
-    let has_garden = bldg_state.has_garden;
-    let has_functional_kitchen = bldg_state.has_functional_kitchen;
+    // §4 colony-scoped marker predicates. Ticket 171 retired the
+    // `scan_colony_buildings` call here; all four building-derived
+    // markers now source from the `ColonyState` singleton (bundles
+    // 169's deferred `disposition.rs` follow-on). Mirror of goap.rs.
+    let (
+        has_functional_kitchen,
+        has_construction_site,
+        has_damaged_building,
+        has_garden,
+    ) = colony_state_query
+        .single()
+        .expect("ColonyState singleton must exist (spawned by build_new_world / init_scenario_world_with)");
     markers.set_colony(markers::HasGarden::KEY, has_garden);
     markers.set_colony(markers::HasFunctionalKitchen::KEY, has_functional_kitchen);
     let has_raw_food_in_stores = cooking.has_raw_food_in_stores();

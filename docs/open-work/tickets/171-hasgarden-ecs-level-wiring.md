@@ -75,16 +75,23 @@ rustdoc note above `update_colony_building_markers`.
    `bldg_state` binding may then be removable entirely if `has_garden`
    was its last consumer in `goap.rs`. Verify before deleting — keep
    the call if `bldg_state` is still referenced.
-4. **Migrate `disposition.rs:537`** the same way. Its
-   `scan_colony_buildings` call is currently the source for
-   `has_construction_site` / `has_damaged_building` / `has_garden`
-   that flow into `ScoringContext`; if `disposition.rs` has access
-   to a `ColonyState` singleton query (or can be given one via
-   SystemParam), all three can come from the singleton and the
-   scan call drops. If the SystemParam expansion is non-trivial,
-   the minimal change is to leave `has_construction_site` /
-   `has_damaged_building` migration to a follow-on (per 169's
-   "out of scope" entry) and only migrate `has_garden` here.
+4. **Migrate `disposition.rs:529-537` (full scope).** Add a
+   `colony_state_query` SystemParam exposing the four building-derived
+   `Has<>` predicates (`HasFunctionalKitchen`, `HasConstructionSite`,
+   `HasDamagedBuilding`, `HasGarden`) from the `ColonyState` singleton.
+   Source all four from the singleton query; delete the
+   `scan_colony_buildings` call and the four
+   `let has_X = bldg_state.X;` lines entirely. This bundles 169's
+   deferred follow-on (per user direction 2026-05-05; no parallel ticket
+   existed for the deferred items, and CLAUDE.md's antipattern-migration
+   discipline requires concrete tickets for parked subscope — bundling
+   into 171 is the discipline-correct path). `evaluate_dispositions` is
+   not registered in any plugin (verified — dead code path retained for
+   parity), so the migration is mechanically safe; we keep symmetry with
+   `goap.rs` because the `MarkerSnapshot` parity comment at line 494
+   says both paths must populate the same keys. Bevy 16-param check on
+   the SystemParam tuple; bundle into a `#[derive(SystemParam)]` struct
+   if needed.
 5. **Update the rustdoc** above `update_colony_building_markers`
    (`buildings.rs:438-446`) to remove the "follow-on" note.
 6. **Add tick-system test** in `buildings.rs::tests` modeled on the
@@ -93,10 +100,6 @@ rustdoc note above `update_colony_building_markers`.
 
 ## Out of scope
 
-- Migrating `disposition.rs`'s `has_construction_site` /
-  `has_damaged_building` reads (169's deferred follow-on; can ride
-  along if SystemParam expansion is cheap, otherwise its own
-  ticket).
 - Removing `ScoringContext.has_garden` field. The Farm DSE consumes
   it via `MarkerSnapshot::has(HasGarden::KEY, entity)` already
   (`farm.rs:119`); the field consumers (`scoring.rs:2230, 3242,
@@ -130,3 +133,12 @@ rustdoc note above `update_colony_building_markers`.
   substrate-stub lint accepted the `set_colony(KEY, …)` snapshot
   bridge as a writer; this ticket completes the symmetry with the
   other eight colony-scoped markers (six from 168, two from 169).
+- 2026-05-05: scope expanded (per user direction) to bundle 169's
+  deferred `disposition.rs` migration of `has_construction_site` /
+  `has_damaged_building` / `has_functional_kitchen`. No parallel
+  tickets existed for those items, so bundling into 171 is the
+  antipattern-migration-discipline-correct path (CLAUDE.md "open
+  parked items as concrete tickets in the same commit"). All four
+  building-derived predicates now source from the `ColonyState`
+  singleton; `disposition.rs::evaluate_dispositions` drops its
+  `scan_colony_buildings` call entirely.
