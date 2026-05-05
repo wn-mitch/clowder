@@ -1,7 +1,7 @@
 ---
 id: 167
 title: Action::Groom split — examples + groom.ron asset follow-on
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-04
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 3c522740
+landed-on: 2026-05-05
 ---
 
 ## Why
@@ -99,3 +99,14 @@ requires `Action` to grow an iterator or `strum::EnumIter`.
 - 2026-05-04: opened. Surfaced during ticket 166 (kittens_surviving
   wiring) verification when `just check` failed on a working tree
   with no 166-related changes to examples or assets.
+- 2026-05-05: landed at 3c522740 — R1 (rebind) shipped: both Groom
+  variants point at the shared `assets/narrative/groom.ron`. While
+  unblocking, restructured `pick_action` from
+  integer-match-with-wildcard to a slice-index lookup over a
+  `PICKABLE_ACTIONS` const, and added compile-time exhaustiveness
+  witnesses (`assert_pick_pool_covers_action`,
+  `assert_all_actions_covers_action`) so a future Action variant must
+  be classified at the author site instead of being silently absorbed
+  by `_`. R2 (split groom.ron into per-variant assets) and R3 (retire
+  `ALL_ACTIONS` via `strum::EnumIter`) remain follow-ons if narrative
+  authors want flavor-divergence later.

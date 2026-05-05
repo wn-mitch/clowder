@@ -15,10 +15,10 @@ _Last generated: 2026-05-05._
 | Status | Count |
 |---|---|
 | In progress | 8 |
-| Ready | 50 |
+| Ready | 49 |
 | Parked | 5 |
 | Blocked | 18 |
-| **Open total** | **81** |
+| **Open total** | **80** |
 | Pre-existing | 1 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -36,7 +36,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[109](docs/open-work/tickets/109-intraspecies-conflict-response.md)** — IntraspeciesConflictResponse — full four-valence (fight/flight/freeze/fawn) social response — _[ai-substrate] · added 2026-05-01_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 
-## Ready (50)
+## Ready (49)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -86,7 +86,6 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[157](docs/open-work/tickets/157-burial-canary-dark.md)** — Burial continuity canary dark on post-154 soak — verify eligibility against new death distribution — _[ai-substrate] · added 2026-05-03_
 - **[159](docs/open-work/tickets/159-parent-grief-consumer.md)** — Parent grief consumer for kitten / dependent death — _[ai-substrate] · added 2026-05-04_
 - **[160](docs/open-work/tickets/160-substrate-stub-catalogue.md)** — Substrate stub catalogue + lint — fail the build on orphan markers — _[ai-substrate] · added 2026-05-04_
-- **[167](docs/open-work/tickets/167-action-groom-split-example-templates-follow-on.md)** — Action::Groom split — examples + groom.ron asset follow-on — _[ai-substrate] · added 2026-05-04_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _added 2026-04-28_
 
 ## Parked (5)
@@ -122,12 +121,13 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 
-## Landed archive (107)
+## Landed archive (108)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (42)
+### 2026-05 (43)
 
+- **[167](docs/open-work/landed/167-action-groom-split-example-templates-follow-on.md)** — Action::Groom split — examples + groom.ron asset follow-on _(2026-05-05)_
 - **[166](docs/open-work/landed/166-kittens-surviving-metric-wiring.md)** — kittens_surviving footer field has zero increment-sites — substrate-bypass shape _(2026-05-05)_
 - **[164](docs/open-work/landed/164-kitten-3822-corner-case.md)** — Seed-42 (38,22) kitten cohort starves despite KittenCryMap _(2026-05-05)_
 - **[165](docs/open-work/landed/165-groomedother-kitten-cohort-regression.md)** — Post-d1722a33 GroomedOther affiliative redistribution starves entire kitten cohort on seed-42 (wontfix — bereavement-orphan, working as intended) _(2026-05-04)_
