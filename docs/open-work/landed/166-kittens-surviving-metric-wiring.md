@@ -1,7 +1,7 @@
 ---
 id: 166
 title: kittens_surviving footer field has zero increment-sites — substrate-bypass shape
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-04
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: [mentoring-extraction.md, starvation-rebalance.md]
-landed-at: null
-landed-on: null
+landed-at: a3bdfc67
+landed-on: 2026-05-05
 ---
 
 ## Why
@@ -136,3 +136,12 @@ working proxy]`, OR — once R1 lands — re-derive the row's numbers.
   proved structurally unmeetable (soak truncation AND zero
   increment-sites). Same substrate-bypass shape as the
   `IsParentOfHungryKitten` defect 164 fixed.
+- 2026-05-05: landed via R1 (extend two existing systems). New
+  `BornInSim` ZST marker authored at the kitten-spawn site in
+  `pregnancy.rs`; `tick_kitten_growth` increments `kittens_surviving`
+  at maturation; `check_death` decrements it for in-sim-born matured
+  adults gated on `With<BornInSim> + Without<KittenDependency>`.
+  `mentoring-extraction.md:91` annotated. Follow-on ticket 167 opened
+  for the pre-existing 158 `Action::Groom` split breakage in
+  `examples/template_audit.rs`, `examples/template_prompt.rs`, and
+  `assets/narrative/groom.ron`. landed-at: a3bdfc67.

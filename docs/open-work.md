@@ -8,7 +8,7 @@
 > fresh. See `CLAUDE.md` §"Long-horizon coordination" for the request-time
 > checklist and maintenance rules.
 
-_Last generated: 2026-05-04._
+_Last generated: 2026-05-05._
 
 ## Summary
 
@@ -87,7 +87,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[159](docs/open-work/tickets/159-parent-grief-consumer.md)** — Parent grief consumer for kitten / dependent death — _[ai-substrate] · added 2026-05-04_
 - **[160](docs/open-work/tickets/160-substrate-stub-catalogue.md)** — Substrate stub catalogue + lint — fail the build on orphan markers — _[ai-substrate] · added 2026-05-04_
 - **[164](docs/open-work/tickets/164-kitten-3822-corner-case.md)** — Seed-42 (38,22) kitten cohort starves despite KittenCryMap — _[ai-substrate] · added 2026-05-03_
-- **[166](docs/open-work/tickets/166-kittens-surviving-metric-wiring.md)** — kittens_surviving footer field has zero increment-sites — substrate-bypass shape — _[ai-substrate] · added 2026-05-04_
+- **[167](docs/open-work/tickets/167-action-groom-split-example-templates-follow-on.md)** — Action::Groom split — examples + groom.ron asset follow-on — _[ai-substrate] · added 2026-05-04_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _added 2026-04-28_
 
 ## Parked (5)
@@ -123,12 +123,13 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 
-## Landed archive (105)
+## Landed archive (106)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (40)
+### 2026-05 (41)
 
+- **[166](docs/open-work/landed/166-kittens-surviving-metric-wiring.md)** — kittens_surviving footer field has zero increment-sites — substrate-bypass shape _(2026-05-05)_
 - **[165](docs/open-work/landed/165-groomedother-kitten-cohort-regression.md)** — Post-d1722a33 GroomedOther affiliative redistribution starves entire kitten cohort on seed-42 (wontfix — bereavement-orphan, working as intended) _(2026-05-04)_
 - **[163](docs/open-work/landed/163-l2-trace-incomplete-bonus-pipeline.md)** — Migrate the 9 apply_*_bonus passes into §3.5.1 modifiers (full-batch) _(2026-05-04)_
 - **[162](docs/open-work/landed/162-scenario-harness.md)** — Scenario harness — fast deterministic "what wins" experiments for AI decision triage _(2026-05-04)_
