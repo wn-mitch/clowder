@@ -1,11 +1,11 @@
 ---
 id: 164
 title: Seed-42 (38,22) kitten cohort starves despite KittenCryMap
-status: blocked
+status: ready
 cluster: ai-substrate
 added: 2026-05-03
 parked: null
-blocked-by: [165]
+blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: [mentoring-extraction.md]
