@@ -1,7 +1,7 @@
 ---
 id: 171
 title: Promote HasGarden to ECS-level singleton writer (parity with 168/169)
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-05
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: f0564a51
+landed-on: 2026-05-05
 ---
 
 ## Why
@@ -142,3 +142,26 @@ rustdoc note above `update_colony_building_markers`.
   building-derived predicates now source from the `ColonyState`
   singleton; `disposition.rs::evaluate_dispositions` drops its
   `scan_colony_buildings` call entirely.
+- 2026-05-05: **Landed `f0564a51`.** `HasGarden` authored on the
+  `ColonyState` singleton in `update_colony_building_markers`
+  alongside the other five colony-scoped building markers; rustdoc
+  follow-on note dropped. `goap.rs::colony_state_query` extended
+  8→9 tuple; `populate_world_state` retired its
+  `scan_colony_buildings` call (`has_garden` was its only consumer).
+  `disposition.rs::evaluate_dispositions` gained a
+  `colony_state_query` SystemParam exposing the four building-
+  derived markers and dropped its own `scan_colony_buildings` call —
+  bundling 169's deferred follow-on. Two new tick-system tests
+  (`colony_garden_marker_set_when_garden_exists` /
+  `cleared_when_no_garden`) modeled on 169's pattern. `just check`
+  clean; `cargo test --lib --release`: 1860/1860 pass. `just soak
+  42` + `just verdict logs/tuned-42`: survival canaries pass
+  (`deaths_starvation=0`, `peak_population=8`, `structures_built=8`,
+  `seasons_survived=7`); `verdict=concern` reflects accumulated
+  drift vs the 2026-05-02 baseline `0783194` (same as 169's
+  closeout — `burial=0` continuity tracked under ticket 035).
+  Footer diff vs the immediate `c4a80563` predecessor archive
+  (`logs/tuned-42-pre171-c4a80563/`) shows tiny noise (`bonds_formed
+  38→37`, `deaths_injury 6→5`, `mentoring 1090→985`); behavior
+  171-attributable is invariant by construction (same predicate,
+  same threshold, same `.chain()` slot).
