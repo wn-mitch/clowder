@@ -16,7 +16,7 @@ use crate::components::building::{
 };
 use crate::components::coordination::{ActiveDirective, Directive, DirectiveKind, DirectiveQueue};
 use crate::components::disposition::{
-    ActionHistory, ActionOutcome, ActionRecord, CraftingHint, DispositionKind,
+    ActionHistory, ActionOutcome, ActionRecord, DispositionKind,
 };
 use crate::components::goap_plan::{
     GoapPlan, PendingUrgencies, PlanEvent, PlanNarrative, StepExecutionState, UrgencyKind,
@@ -1582,10 +1582,18 @@ pub fn evaluate_and_plan(
                     res.time.tick,
                     res.constants.planning_substrate.disposition_failure_cooldown_ticks,
                 ),
+            // 155: `Crafting` retired into Herbalism / Witchcraft /
+            // Cooking. The per-disposition recent-failure signal field
+            // keeps its existing name for backwards compatibility with
+            // saved soaks and tuning-constant consumers; it now reads
+            // the Herbalism failure rate (the bulk of pre-155 Crafting
+            // plan failures came from herbcraft sub-modes per ticket
+            // 152's audit). Witchcraft / Cooking failure tracking is
+            // follow-on work — see ticket 155 § "Out of scope".
             disposition_failure_signal_crafting:
                 crate::systems::plan_substrate::disposition_recent_failure_age_normalized(
                     recent_disposition_failures.as_deref(),
-                    crate::components::disposition::DispositionKind::Crafting,
+                    crate::components::disposition::DispositionKind::Herbalism,
                     res.time.tick,
                     res.constants.planning_substrate.disposition_failure_cooldown_ticks,
                 ),
@@ -1711,56 +1719,27 @@ pub fn evaluate_and_plan(
             current.last_scores = sorted;
         }
 
-        let crafting_hint = if chosen == DispositionKind::Crafting {
-            // If a corruption-response directive is active, route the plan
-            // directly to the matching narrow action.
-            let directive_hint = world_state
-                .active_directive_query
-                .get(entity)
-                .ok()
-                .and_then(|d| match d.kind {
-                    DirectiveKind::Cleanse => Some(CraftingHint::Cleanse),
-                    DirectiveKind::HarvestCarcass => Some(CraftingHint::HarvestCarcass),
-                    _ => None,
-                });
-
-            if let Some(h) = directive_hint {
-                Some(h)
-            } else {
-                let herbcraft_score = scores
-                    .iter()
-                    .find(|(a, _)| *a == Action::Herbcraft)
-                    .map(|(_, s)| *s)
-                    .unwrap_or(0.0);
-                let magic_score = scores
-                    .iter()
-                    .find(|(a, _)| *a == Action::PracticeMagic)
-                    .map(|(_, s)| *s)
-                    .unwrap_or(0.0);
-                let cook_score = scores
-                    .iter()
-                    .find(|(a, _)| *a == Action::Cook)
-                    .map(|(_, s)| *s)
-                    .unwrap_or(0.0);
-                // Cook must strictly dominate both peers — ties go to the
-                // legacy Magic/Herbcraft routing. Mirrors the dead-code
-                // reference at `disposition.rs:947-969` which had this
-                // branch but was never ported when `evaluate_and_plan`
-                // took over from `evaluate_dispositions`. Without it,
-                // softmax-picked Cook intentions silently route to
-                // PracticeMagic and `Feature::FoodCooked` never fires
-                // (ticket 036).
-                if cook_score > herbcraft_score && cook_score > magic_score {
-                    Some(CraftingHint::Cook)
-                } else if magic_score > herbcraft_score {
-                    result.magic_hint.or(Some(CraftingHint::Magic))
-                } else {
-                    result.herbcraft_hint
-                }
-            }
-        } else {
-            None
-        };
+        // 155: post-softmax `CraftingHint` recovery retired. The L3
+        // softmax's chosen Action is now itself the sub-mode picker —
+        // `Action::HerbcraftGather` / `HerbcraftRemedy` / `HerbcraftSetWard`
+        // fan into Herbalism; the six `MagicX` variants fan into
+        // Witchcraft; `Action::Cook` is its own Disposition. Directive
+        // routing is handled at `DirectiveKind::to_action` (Cleanse →
+        // MagicColonyCleanse, HarvestCarcass → MagicHarvest, Cook → Cook),
+        // which in turn maps to the parent Disposition via `from_action`.
+        //
+        // The chosen sub-action is the highest-scoring Action in the
+        // softmax pool whose parent Disposition matches `chosen`. For
+        // single-constituent Dispositions this trivially picks the only
+        // constituent. For Herbalism / Witchcraft / Cooking it picks
+        // the L3-winning sub-action.
+        let chosen_action = scores
+            .iter()
+            .filter(|(a, _)| DispositionKind::from_action(*a) == Some(chosen))
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(a, _)| *a)
+            .or_else(|| chosen.constituent_actions().first().copied())
+            .unwrap_or(Action::Idle);
 
         // Build planner state and zone distances.
         let construction_pos: Vec<(Entity, Position)> = world_state
@@ -1826,7 +1805,7 @@ pub fn evaluate_and_plan(
             entity,
             d,
         );
-        let mut actions = actions_for_disposition(chosen, crafting_hint, &zone_distances);
+        let mut actions = actions_for_disposition(chosen, chosen_action, &zone_distances);
         // Posse override: when a Fight directive is active on the cat and
         // they've landed in Guarding disposition, replace the generic
         // action list (which A* solves with cheapest = Survey) with a
@@ -1886,7 +1865,8 @@ pub fn evaluate_and_plan(
             if steps.is_empty() {
                 continue;
             }
-            let mut plan = GoapPlan::new(chosen, res.time.tick, personality, steps, crafting_hint);
+            let mut plan =
+                GoapPlan::new(chosen, chosen_action, res.time.tick, personality, steps);
             // 150 R5a: Eating shares Resting's runaway-replan cap. Both
             // are physiological-completion dispositions; reusing the
             // existing `resting_max_replans` keeps the comparability
@@ -1894,8 +1874,9 @@ pub fn evaluate_and_plan(
             if matches!(chosen, DispositionKind::Resting | DispositionKind::Eating) {
                 plan.max_replans = d.resting_max_replans;
             }
-            // Flow ward placement position from coordinator directive.
-            if crafting_hint == Some(CraftingHint::SetWard) {
+            // 155: ward placement position flows from a directive when
+            // the cat picked the Herbalism SetWard sub-action.
+            if chosen_action == Action::HerbcraftSetWard {
                 if let Ok(directive) = world_state.active_directive_query.get(entity) {
                     if directive.kind == DirectiveKind::SetWard {
                         plan.ward_placement_pos = directive.target_position;
@@ -2539,7 +2520,7 @@ pub fn resolve_goap_plans(
                     d,
                 );
                 let actions =
-                    actions_for_disposition(plan.kind, plan.crafting_hint, &zone_distances);
+                    actions_for_disposition(plan.kind, plan.chosen_action, &zone_distances);
                 let plan_ctx = crate::ai::planner::PlanContext {
                     markers: &snaps.planner_markers,
                     entity: cat_entity,
@@ -2566,7 +2547,7 @@ pub fn resolve_goap_plans(
 
         // Initialize step state on first tick.
         if plan.step_state[step_idx].ticks_elapsed == 0 {
-            current.action = action_kind.to_action(plan.kind);
+            current.action = action_kind.to_action(plan.kind, plan.chosen_action);
             current.target_position = plan.step_state[step_idx].target_position;
             current.target_entity = plan.step_state[step_idx].target_entity;
         }
@@ -2644,8 +2625,17 @@ pub fn resolve_goap_plans(
                     // lower (more fundamental) than the current plan's.
                     if urgent.maslow_level < current_maslow {
                         // Preserve Hunt/Herbcraft guard for threats.
+                        // 155: `Action::Herbcraft` retired; the three
+                        // sub-actions (Gather/Remedy/SetWard) all carry
+                        // the same threat-suppression semantics.
                         let suppressed = urgent.kind == UrgencyKind::ThreatNearby
-                            && matches!(current.action, Action::Hunt | Action::Herbcraft);
+                            && matches!(
+                                current.action,
+                                Action::Hunt
+                                    | Action::HerbcraftGather
+                                    | Action::HerbcraftRemedy
+                                    | Action::HerbcraftSetWard
+                            );
 
                         if !suppressed {
                             if let Some(ref mut log) = ec.event_log {
@@ -2747,7 +2737,7 @@ pub fn resolve_goap_plans(
                     current.target_entity = state.target_entity;
                 }
                 if let Some(step) = plan.current() {
-                    current.action = step.action.to_action(plan.kind);
+                    current.action = step.action.to_action(plan.kind, plan.chosen_action);
                 }
             }
             crate::steps::StepResult::Fail(ref fail_reason) => {
@@ -2831,7 +2821,7 @@ pub fn resolve_goap_plans(
                     d,
                 );
                 let mut actions =
-                    actions_for_disposition(plan.kind, plan.crafting_hint, &zone_distances);
+                    actions_for_disposition(plan.kind, plan.chosen_action, &zone_distances);
                 actions.retain(|a| !plan.failed_actions.contains(&a.kind));
                 let plan_ctx = crate::ai::planner::PlanContext {
                     markers: &snaps.planner_markers,
@@ -4036,11 +4026,14 @@ fn dispatch_step_action(
                     }
                     crate::steps::StepResult::Continue
                 } else {
-                    let ward_kind = match plan.crafting_hint {
-                        Some(crate::components::disposition::CraftingHint::DurableWard) => {
-                            crate::components::magic::WardKind::DurableWard
-                        }
-                        _ => crate::components::magic::WardKind::Thornward,
+                    // 155: ward kind is determined by the L3-picked
+                    // sub-action — `MagicDurableWard` for the magic-
+                    // specialist branch, `HerbcraftSetWard` (or any
+                    // other) for the thornward branch.
+                    let ward_kind = if plan.chosen_action == Action::MagicDurableWard {
+                        crate::components::magic::WardKind::DurableWard
+                    } else {
+                        crate::components::magic::WardKind::Thornward
                     };
                     let result = crate::steps::magic::resolve_set_ward(
                         ticks,
@@ -4076,11 +4069,10 @@ fn dispatch_step_action(
                     result
                 }
             } else {
-                let ward_kind = match plan.crafting_hint {
-                    Some(crate::components::disposition::CraftingHint::DurableWard) => {
-                        crate::components::magic::WardKind::DurableWard
-                    }
-                    _ => crate::components::magic::WardKind::Thornward,
+                let ward_kind = if plan.chosen_action == Action::MagicDurableWard {
+                    crate::components::magic::WardKind::DurableWard
+                } else {
+                    crate::components::magic::WardKind::Thornward
                 };
                 let result = crate::steps::magic::resolve_set_ward(
                     ticks,

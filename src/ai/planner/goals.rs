@@ -62,12 +62,19 @@ pub fn goal_for_disposition(
         },
 
         // All other dispositions: one trip increment.
+        // 155: `Crafting` retired in favor of three new dispositions
+        // (Herbalism / Witchcraft / Cooking). Each inherits the
+        // single-trip completion proxy. The chain shape (which step
+        // terminates with `IncrementTrips`) is carried by the
+        // per-Disposition plan template, not the goal predicate.
         DispositionKind::Hunting
         | DispositionKind::Foraging
         | DispositionKind::Guarding
         | DispositionKind::Socializing
         | DispositionKind::Farming
-        | DispositionKind::Crafting
+        | DispositionKind::Herbalism
+        | DispositionKind::Witchcraft
+        | DispositionKind::Cooking
         | DispositionKind::Exploring
         | DispositionKind::Caretaking => GoalState {
             predicates: vec![StatePredicate::TripsAtLeast(current_trips + 1)],

@@ -8,10 +8,15 @@
 //! `HasWardHerbs`; `update_capability_markers` then authors `CanWard`;
 //! the herbcraft_ward DSE becomes eligible.
 //!
-//! Expected on a healthy build: focal cat picks Crafting (SetWard
-//! intention) within a few ticks once the marker chain stabilizes. If the
-//! ward is never placed, the scenario surfaces *which* marker / step in
-//! the chain stalls.
+//! 155: post-Crafting-split, the focal cat now picks the new
+//! `Herbalism` Disposition with `Action::HerbcraftSetWard` as the
+//! chosen sub-action. The plan template branches on the sub-action
+//! and emits the gather-thornbriar → set-ward chain.
+//!
+//! Expected on a healthy build: focal cat picks Herbalism (HerbcraftSetWard
+//! sub-action) within a few ticks once the marker chain stabilizes. If
+//! the ward is never placed, the scenario surfaces *which* marker /
+//! step in the chain stalls.
 
 use bevy_ecs::world::World;
 

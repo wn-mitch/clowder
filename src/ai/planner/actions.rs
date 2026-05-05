@@ -1,4 +1,4 @@
-use crate::components::disposition::CraftingHint;
+use crate::ai::Action;
 use crate::components::markers;
 
 use super::{
@@ -316,10 +316,15 @@ pub fn farming_actions() -> Vec<GoapActionDef> {
     ]
 }
 
-/// Crafting actions depend on which sub-mode the scorer selected.
-pub fn crafting_actions(hint: CraftingHint) -> Vec<GoapActionDef> {
-    match hint {
-        CraftingHint::GatherHerbs => vec![GoapActionDef {
+/// 155: Herbalism plan-template dispatcher. The chosen sub-action
+/// (one of `HerbcraftGather` / `HerbcraftRemedy` / `HerbcraftSetWard`)
+/// determines which chain shape the planner sees. Falls back to the
+/// single-action gather plan if a non-Herbalism Action is supplied —
+/// the caller is responsible for routing correctly via
+/// `actions_for_disposition`.
+pub fn herbalism_actions(chosen_action: Action) -> Vec<GoapActionDef> {
+    match chosen_action {
+        Action::HerbcraftGather => vec![GoapActionDef {
             kind: GoapActionKind::GatherHerb,
             cost: 3,
             preconditions: vec![
@@ -331,7 +336,7 @@ pub fn crafting_actions(hint: CraftingHint) -> Vec<GoapActionDef> {
                 StateEffect::IncrementTrips,
             ],
         }],
-        CraftingHint::PrepareRemedy => vec![
+        Action::HerbcraftRemedy => vec![
             // Gather herbs first if not carrying any.
             GoapActionDef {
                 kind: GoapActionKind::TravelTo(PlannerZone::HerbPatch),
@@ -373,7 +378,7 @@ pub fn crafting_actions(hint: CraftingHint) -> Vec<GoapActionDef> {
                 ],
             },
         ],
-        CraftingHint::SetWard => vec![
+        Action::HerbcraftSetWard => vec![
             // Gather herbs first if not carrying any.
             GoapActionDef {
                 kind: GoapActionKind::TravelTo(PlannerZone::HerbPatch),
@@ -401,99 +406,88 @@ pub fn crafting_actions(hint: CraftingHint) -> Vec<GoapActionDef> {
                 ],
             },
         ],
-        CraftingHint::Magic => vec![
-            GoapActionDef {
-                kind: GoapActionKind::Scry,
-                cost: 2,
-                preconditions: vec![],
-                effects: vec![StateEffect::IncrementTrips],
-            },
-            GoapActionDef {
-                kind: GoapActionKind::SetWard,
-                cost: 3,
-                preconditions: vec![],
-                effects: vec![StateEffect::IncrementTrips],
-            },
-            GoapActionDef {
-                kind: GoapActionKind::SpiritCommunion,
-                cost: 3,
-                preconditions: vec![],
-                effects: vec![StateEffect::IncrementTrips],
-            },
-            GoapActionDef {
-                kind: GoapActionKind::CleanseCorruption,
-                cost: 4,
-                preconditions: vec![],
-                effects: vec![StateEffect::IncrementTrips],
-            },
-            GoapActionDef {
-                kind: GoapActionKind::HarvestCarcass,
-                cost: 3,
-                preconditions: vec![],
-                effects: vec![StateEffect::IncrementTrips],
-            },
-        ],
-        // Directed cleanse — only one action available so the planner must use it.
-        CraftingHint::Cleanse => vec![GoapActionDef {
-            kind: GoapActionKind::CleanseCorruption,
-            cost: 1,
-            preconditions: vec![],
-            effects: vec![StateEffect::IncrementTrips],
+        // Defensive: if a non-Herbalism Action somehow reaches here, return
+        // the cheap single-action gather plan rather than panic.
+        _ => vec![GoapActionDef {
+            kind: GoapActionKind::GatherHerb,
+            cost: 3,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::HerbPatch),
+                StatePredicate::CarryingIs(Carrying::Nothing),
+            ],
+            effects: vec![
+                StateEffect::SetCarrying(Carrying::Herbs),
+                StateEffect::IncrementTrips,
+            ],
         }],
-        // Directed carcass harvest — only HarvestCarcass available.
-        CraftingHint::HarvestCarcass => vec![GoapActionDef {
-            kind: GoapActionKind::HarvestCarcass,
-            cost: 1,
-            preconditions: vec![],
-            effects: vec![StateEffect::IncrementTrips],
-        }],
-        // Directed durable-ward — magic-specialist cats whose durable_ward
-        // sub-score won the PracticeMagic contest. Single action so A* can't
-        // fall back to cheaper alternatives like Scry.
-        CraftingHint::DurableWard => vec![GoapActionDef {
-            kind: GoapActionKind::SetWard,
-            cost: 1,
-            preconditions: vec![],
-            effects: vec![StateEffect::IncrementTrips],
-        }],
-        // Cook: fetch a raw food from Stores, take it to a Kitchen, cook it,
-        // and return it to Stores. Travel legs come from `travel_actions`
-        // (the zone distance matrix); these three actions are the cook-only
-        // steps that transition Carrying between Nothing → RawFood → CookedFood
-        // → Nothing.
-        CraftingHint::Cook => vec![
-            GoapActionDef {
-                kind: GoapActionKind::RetrieveRawFood,
-                cost: 2,
-                preconditions: vec![
-                    StatePredicate::ZoneIs(PlannerZone::Stores),
-                    StatePredicate::CarryingIs(Carrying::Nothing),
-                ],
-                effects: vec![StateEffect::SetCarrying(Carrying::RawFood)],
-            },
-            GoapActionDef {
-                kind: GoapActionKind::Cook,
-                cost: 3,
-                preconditions: vec![
-                    StatePredicate::ZoneIs(PlannerZone::Kitchen),
-                    StatePredicate::CarryingIs(Carrying::RawFood),
-                ],
-                effects: vec![StateEffect::SetCarrying(Carrying::CookedFood)],
-            },
-            GoapActionDef {
-                kind: GoapActionKind::DepositCookedFood,
-                cost: 1,
-                preconditions: vec![
-                    StatePredicate::ZoneIs(PlannerZone::Stores),
-                    StatePredicate::CarryingIs(Carrying::CookedFood),
-                ],
-                effects: vec![
-                    StateEffect::SetCarrying(Carrying::Nothing),
-                    StateEffect::IncrementTrips,
-                ],
-            },
-        ],
     }
+}
+
+/// 155: Witchcraft plan-template dispatcher. Each chosen sub-action
+/// produces a single-action plan whose IncrementTrips effect satisfies
+/// the goal proxy. The pre-155 `CraftingHint::Magic` 5-action pool
+/// (where A* picked the cheapest) collapses into per-sub-action L3
+/// scoring — the softmax now picks Scry vs Commune vs Cleanse etc.
+/// directly rather than letting A* re-decide post-hoc.
+pub fn witchcraft_actions(chosen_action: Action) -> Vec<GoapActionDef> {
+    let kind = match chosen_action {
+        Action::MagicScry => GoapActionKind::Scry,
+        Action::MagicCommune => GoapActionKind::SpiritCommunion,
+        Action::MagicCleanse | Action::MagicColonyCleanse => GoapActionKind::CleanseCorruption,
+        Action::MagicHarvest => GoapActionKind::HarvestCarcass,
+        // MagicDurableWard maps to SetWard — the resolver picks
+        // WardKind::DurableWard based on chosen_action.
+        Action::MagicDurableWard => GoapActionKind::SetWard,
+        // Defensive fallback for non-Witchcraft Actions.
+        _ => GoapActionKind::Scry,
+    };
+    vec![GoapActionDef {
+        kind,
+        cost: 1,
+        preconditions: vec![],
+        effects: vec![StateEffect::IncrementTrips],
+    }]
+}
+
+/// 155: Cooking plan-template — the round-trip Stores → Kitchen →
+/// Stores chain. Travel legs come from `travel_actions` (zone
+/// distance matrix); these three actions transition Carrying between
+/// Nothing → RawFood → CookedFood → Nothing. Only `DepositCookedFood`
+/// terminates with `IncrementTrips` — that forces A* through the
+/// full chain.
+pub fn cooking_actions() -> Vec<GoapActionDef> {
+    vec![
+        GoapActionDef {
+            kind: GoapActionKind::RetrieveRawFood,
+            cost: 2,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::Stores),
+                StatePredicate::CarryingIs(Carrying::Nothing),
+            ],
+            effects: vec![StateEffect::SetCarrying(Carrying::RawFood)],
+        },
+        GoapActionDef {
+            kind: GoapActionKind::Cook,
+            cost: 3,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::Kitchen),
+                StatePredicate::CarryingIs(Carrying::RawFood),
+            ],
+            effects: vec![StateEffect::SetCarrying(Carrying::CookedFood)],
+        },
+        GoapActionDef {
+            kind: GoapActionKind::DepositCookedFood,
+            cost: 1,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::Stores),
+                StatePredicate::CarryingIs(Carrying::CookedFood),
+            ],
+            effects: vec![
+                StateEffect::SetCarrying(Carrying::Nothing),
+                StateEffect::IncrementTrips,
+            ],
+        },
+    ]
 }
 
 pub fn coordinating_actions() -> Vec<GoapActionDef> {
@@ -575,9 +569,16 @@ pub fn caretaking_actions() -> Vec<GoapActionDef> {
 use crate::components::disposition::DispositionKind;
 
 /// Build the full action set for a given disposition, including travel actions.
+///
+/// 155: `chosen_action` replaces the retired `crafting_hint` parameter.
+/// It carries the sub-action the L3 softmax picked; for Herbalism /
+/// Witchcraft / Cooking the per-Disposition dispatcher branches on it
+/// to select the chain shape (which step terminates with
+/// `IncrementTrips`). For all other dispositions it's unused — they
+/// have a single constituent action.
 pub fn actions_for_disposition(
     kind: DispositionKind,
-    crafting_hint: Option<CraftingHint>,
+    chosen_action: Action,
     distances: &ZoneDistances,
 ) -> Vec<GoapActionDef> {
     let mut actions = travel_actions(distances);
@@ -590,7 +591,9 @@ pub fn actions_for_disposition(
         DispositionKind::Socializing => socializing_actions(),
         DispositionKind::Building => building_actions(),
         DispositionKind::Farming => farming_actions(),
-        DispositionKind::Crafting => crafting_actions(crafting_hint.unwrap_or(CraftingHint::Magic)),
+        DispositionKind::Herbalism => herbalism_actions(chosen_action),
+        DispositionKind::Witchcraft => witchcraft_actions(chosen_action),
+        DispositionKind::Cooking => cooking_actions(),
         DispositionKind::Coordinating => coordinating_actions(),
         DispositionKind::Exploring => exploring_actions(),
         DispositionKind::Mating => mating_actions(),
@@ -718,7 +721,7 @@ mod tests {
             predicates: vec![StatePredicate::TripsAtLeast(1)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Hunting, None, &distances);
+        let actions = actions_for_disposition(DispositionKind::Hunting, Action::Hunt, &distances);
 
         let plan = plan!(start, &actions, &goal, 12, 1000).expect("plan found");
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
@@ -741,7 +744,7 @@ mod tests {
             predicates: vec![StatePredicate::TripsAtLeast(1)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Foraging, None, &distances);
+        let actions = actions_for_disposition(DispositionKind::Foraging, Action::Forage, &distances);
 
         let plan = plan!(start, &actions, &goal, 12, 1000).expect("plan found");
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
@@ -772,7 +775,7 @@ mod tests {
             ],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Resting, None, &distances);
+        let actions = actions_for_disposition(DispositionKind::Resting, Action::Sleep, &distances);
 
         let plan = plan!(start, &actions, &goal, 12, 1000).expect("plan found");
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
@@ -798,7 +801,7 @@ mod tests {
             predicates: vec![StatePredicate::HungerOk(true)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Eating, None, &distances);
+        let actions = actions_for_disposition(DispositionKind::Eating, Action::Eat, &distances);
 
         let plan = plan!(start, &actions, &goal, 8, 500).expect("Eating must plan a chain when stores are stocked");
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
@@ -820,7 +823,7 @@ mod tests {
             predicates: vec![StatePredicate::HungerOk(true)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Eating, None, &distances);
+        let actions = actions_for_disposition(DispositionKind::Eating, Action::Eat, &distances);
         assert!(
             plan!(start, &actions, &goal, 8, 500, markers = empty_markers()).is_none(),
             "Eating plan must be unreachable when HasStoredFood marker is absent"
@@ -845,7 +848,7 @@ mod tests {
             ],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Resting, None, &distances);
+        let actions = actions_for_disposition(DispositionKind::Resting, Action::Sleep, &distances);
 
         // Empty stores: still plans.
         let plan_empty = plan!(start.clone(), &actions, &goal, 12, 1000, markers = empty_markers())
@@ -887,7 +890,7 @@ mod tests {
             predicates: vec![StatePredicate::TripsAtLeast(1)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Foraging, None, &distances);
+        let actions = actions_for_disposition(DispositionKind::Foraging, Action::Forage, &distances);
         let plan = plan!(start, &actions, &goal, 12, 1000)
             .expect("Foraging must plan even when carrying non-food (091 fix)");
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
@@ -909,7 +912,7 @@ mod tests {
             predicates: vec![StatePredicate::TripsAtLeast(1)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Hunting, None, &distances);
+        let actions = actions_for_disposition(DispositionKind::Hunting, Action::Hunt, &distances);
         let plan = plan!(start, &actions, &goal, 12, 1000)
             .expect("Hunting must plan even when carrying non-food (091 fix)");
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
@@ -964,7 +967,7 @@ mod tests {
             predicates: vec![StatePredicate::TripsAtLeast(1)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Guarding, None, &distances);
+        let actions = actions_for_disposition(DispositionKind::Guarding, Action::Patrol, &distances);
 
         let plan = plan!(start, &actions, &goal, 12, 1000).expect("plan found");
         assert_eq!(plan.len(), 1);
@@ -989,7 +992,7 @@ mod tests {
             predicates: vec![StatePredicate::ConstructionDone(true)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Building, None, &distances);
+        let actions = actions_for_disposition(DispositionKind::Building, Action::Build, &distances);
 
         let plan = plan!(start, &actions, &goal, 12, 1000).expect("plan found");
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
@@ -1023,7 +1026,7 @@ mod tests {
             predicates: vec![StatePredicate::ConstructionDone(true)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Building, None, &distances);
+        let actions = actions_for_disposition(DispositionKind::Building, Action::Build, &distances);
 
         let plan = plan!(
             start,
@@ -1054,7 +1057,7 @@ mod tests {
             predicates: vec![StatePredicate::TripsAtLeast(1)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Farming, None, &distances);
+        let actions = actions_for_disposition(DispositionKind::Farming, Action::Farm, &distances);
 
         let plan = plan!(start, &actions, &goal, 12, 1000).expect("plan found");
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
@@ -1071,7 +1074,7 @@ mod tests {
             predicates: vec![StatePredicate::InteractionDone(true)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Mating, None, &distances);
+        let actions = actions_for_disposition(DispositionKind::Mating, Action::Mate, &distances);
 
         let plan = plan!(start, &actions, &goal, 12, 1000).expect("plan found");
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
@@ -1099,7 +1102,7 @@ mod tests {
             predicates: vec![StatePredicate::InteractionDone(true)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Mentoring, None, &distances);
+        let actions = actions_for_disposition(DispositionKind::Mentoring, Action::Mentor, &distances);
 
         let plan = plan!(start, &actions, &goal, 12, 1000).expect("plan found");
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
@@ -1140,7 +1143,7 @@ mod tests {
         // next-state. Socializing's template is now single-action
         // `[SocializeWith]`.
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Socializing, None, &distances);
+        let actions = actions_for_disposition(DispositionKind::Socializing, Action::Socialize, &distances);
         let kinds: Vec<_> = actions.iter().map(|a| a.kind).collect();
         assert!(
             !kinds.contains(&GoapActionKind::MentorCat),
@@ -1186,8 +1189,8 @@ mod tests {
         };
         let distances = basic_distances();
         let actions = actions_for_disposition(
-            DispositionKind::Crafting,
-            Some(CraftingHint::SetWard),
+            DispositionKind::Herbalism,
+            Action::HerbcraftSetWard,
             &distances,
         );
 
@@ -1206,8 +1209,8 @@ mod tests {
         };
         let distances = basic_distances();
         let actions = actions_for_disposition(
-            DispositionKind::Crafting,
-            Some(CraftingHint::SetWard),
+            DispositionKind::Herbalism,
+            Action::HerbcraftSetWard,
             &distances,
         );
 
@@ -1234,7 +1237,7 @@ mod tests {
             predicates: vec![StatePredicate::TripsAtLeast(1)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Caretaking, None, &distances);
+        let actions = actions_for_disposition(DispositionKind::Caretaking, Action::Caretake, &distances);
 
         let plan = plan!(start, &actions, &goal, 12, 1000)
             .expect("caretaking plan should succeed even when carrying herbs");
@@ -1256,7 +1259,7 @@ mod tests {
             predicates: vec![StatePredicate::TripsAtLeast(1)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Caretaking, None, &distances);
+        let actions = actions_for_disposition(DispositionKind::Caretaking, Action::Caretake, &distances);
 
         let plan =
             plan!(start, &actions, &goal, 12, 1000).expect("caretaking plan should succeed");
@@ -1279,8 +1282,8 @@ mod tests {
         };
         let distances = basic_distances();
         let actions = actions_for_disposition(
-            DispositionKind::Crafting,
-            Some(CraftingHint::Cook),
+            DispositionKind::Cooking,
+            Action::Cook,
             &distances,
         );
 
@@ -1314,7 +1317,7 @@ mod tests {
             predicates: vec![StatePredicate::HungerOk(true)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Eating, None, &distances);
+        let actions = actions_for_disposition(DispositionKind::Eating, Action::Eat, &distances);
 
         let plan = plan!(start, &actions, &goal, 8, 500, markers = food_stocked_markers())
             .expect("EatAtStores must be reachable when HasStoredFood marker is set");
@@ -1336,7 +1339,7 @@ mod tests {
             predicates: vec![StatePredicate::HungerOk(true)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Eating, None, &distances);
+        let actions = actions_for_disposition(DispositionKind::Eating, Action::Eat, &distances);
 
         let with_food =
             plan!(start.clone(), &actions, &goal, 8, 500, markers = food_stocked_markers());

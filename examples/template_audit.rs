@@ -21,7 +21,7 @@ use clowder::resources::weather::Weather;
 use rand_chacha::rand_core::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 
-const ALL_ACTIONS: [Action; 19] = [
+const ALL_ACTIONS: [Action; 26] = [
     Action::Eat,
     Action::Sleep,
     Action::Hunt,
@@ -37,8 +37,15 @@ const ALL_ACTIONS: [Action; 19] = [
     Action::Patrol,
     Action::Build,
     Action::Farm,
-    Action::Herbcraft,
-    Action::PracticeMagic,
+    Action::HerbcraftGather,
+    Action::HerbcraftRemedy,
+    Action::HerbcraftSetWard,
+    Action::MagicScry,
+    Action::MagicDurableWard,
+    Action::MagicCleanse,
+    Action::MagicColonyCleanse,
+    Action::MagicHarvest,
+    Action::MagicCommune,
     Action::Coordinate,
     Action::Mentor,
 ];
@@ -66,8 +73,15 @@ fn assert_all_actions_covers_action(a: Action) {
         | Action::Patrol
         | Action::Build
         | Action::Farm
-        | Action::Herbcraft
-        | Action::PracticeMagic
+        | Action::HerbcraftGather
+        | Action::HerbcraftRemedy
+        | Action::HerbcraftSetWard
+        | Action::MagicScry
+        | Action::MagicDurableWard
+        | Action::MagicCleanse
+        | Action::MagicColonyCleanse
+        | Action::MagicHarvest
+        | Action::MagicCommune
         | Action::Coordinate
         | Action::Mentor
         | Action::Mate

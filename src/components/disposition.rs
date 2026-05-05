@@ -4,33 +4,17 @@ use crate::ai::Action;
 use crate::components::personality::Personality;
 
 // ---------------------------------------------------------------------------
-// CraftingHint — sub-mode selected by the scorer for crafting dispositions
-// ---------------------------------------------------------------------------
-
-/// Indicates which crafting sub-mode won during scoring, so the chain builder
-/// doesn't re-derive the decision and accidentally shadow PrepareRemedy.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum CraftingHint {
-    GatherHerbs,
-    PrepareRemedy,
-    SetWard,
-    Magic,
-    /// Directed cleanse — planner should only pick CleanseCorruption.
-    Cleanse,
-    /// Directed carcass harvest — planner should only pick HarvestCarcass.
-    HarvestCarcass,
-    /// Magic-specialist ward — planner uses SetWard, resolver picks
-    /// WardKind::DurableWard. Selected when a cat's durable_ward sub-score
-    /// wins the PracticeMagic contest.
-    DurableWard,
-    /// Cook a raw food item at a Kitchen — emits a Stores → Kitchen → Stores
-    /// round-trip chain.
-    Cook,
-}
-
-// ---------------------------------------------------------------------------
 // DispositionKind — the sustained behavioral orientations
 // ---------------------------------------------------------------------------
+//
+// 155: `CraftingHint` retired. The 8-variant sub-mode enum that papered
+// over `DispositionKind::Crafting`'s three-drives-bundled defect (ticket
+// 152's audit) is gone. Each former hint variant is now either (a) its
+// own L3 Action (HerbcraftGather/Remedy/SetWard, MagicScry/DurableWard/
+// Cleanse/ColonyCleanse/Harvest/Commune, Cook), with `from_action`
+// routing to the new `Herbalism` / `Witchcraft` / `Cooking`
+// disposition; or (b) a directive-routing arm at `to_action` on
+// `DirectiveKind` (Cleanse / HarvestCarcass / Cook).
 
 /// A disposition is a sustained behavioral orientation. Instead of re-evaluating
 /// actions every tick, a cat commits to a disposition and mechanically sequences
@@ -71,8 +55,14 @@ pub enum DispositionKind {
     Building,
     /// Tend and harvest crops (existing TaskChain-driven).
     Farming,
-    /// Herbcraft or practice magic (existing TaskChain-driven).
-    Crafting,
+    /// Practical herb-medicine and ward-craft.
+    ///
+    /// 155: split out of the retired `Crafting` umbrella. Owns the
+    /// three Herbcraft sub-actions (`HerbcraftGather`,
+    /// `HerbcraftRemedy`, `HerbcraftSetWard`). The L3 softmax now picks
+    /// the sub-action directly rather than collapsing through a
+    /// post-hoc hint. See `docs/open-work/landed/155-crafting-split.md`.
+    Herbalism,
     /// Deliver coordinator directives until queue is empty.
     Coordinating,
     /// Explore distant tiles, survey surroundings.
@@ -104,6 +94,23 @@ pub enum DispositionKind {
     /// thermal self-care, below socialize-with-peers in the
     /// affiliative ladder.
     Grooming,
+    /// Spiritual / metaphysical work — scrying, spirit communion,
+    /// corruption cleanse, carcass harvest, durable ward placement.
+    ///
+    /// 155: split out of the retired `Crafting` umbrella. Owns the
+    /// six Magic sub-actions (`MagicScry`, `MagicDurableWard`,
+    /// `MagicCleanse`, `MagicColonyCleanse`, `MagicHarvest`,
+    /// `MagicCommune`). Maslow tier 4 (esteem / craft).
+    Witchcraft,
+    /// Prepare cooked food at a Kitchen — physiological-adjacent
+    /// colony-feeding behavior.
+    ///
+    /// 155: split out of the retired `Crafting` umbrella. Owns
+    /// `Action::Cook` exclusively. Maslow tier 1 (mirrors Hunting /
+    /// Foraging shape — Cooking is colony-feeding work, not
+    /// esteem-tier craft. Tier 4 reproduced the suppression that left
+    /// `FoodCooked` on `never_fired_expected_positives` pre-155).
+    Cooking,
 }
 
 impl DispositionKind {
@@ -133,7 +140,14 @@ impl DispositionKind {
             // structurally impossible.
             Self::Grooming => return 1,
             // Chain-driven dispositions complete when their chain finishes.
-            Self::Building | Self::Farming | Self::Crafting | Self::Coordinating => 1,
+            // 155: `Crafting` retired into Herbalism / Witchcraft / Cooking;
+            // each inherits the single-trip target-completion shape.
+            Self::Building
+            | Self::Farming
+            | Self::Herbalism
+            | Self::Witchcraft
+            | Self::Cooking
+            | Self::Coordinating => 1,
             // 150 R5a: Eating completes on need threshold, not count.
             // Like Resting, target_completions returns MAX so the count-
             // based completion check never fires; the actual
@@ -176,7 +190,19 @@ impl DispositionKind {
             Action::GroomOther => Some(Self::Grooming),
             Action::Build => Some(Self::Building),
             Action::Farm => Some(Self::Farming),
-            Action::Herbcraft | Action::PracticeMagic | Action::Cook => Some(Self::Crafting),
+            // 155: Herbcraft / PracticeMagic / Cook split into 9 + 1 +
+            // 0 sub-actions across three new dispositions. Each L3
+            // sub-action routes to its parent Disposition directly.
+            Action::HerbcraftGather
+            | Action::HerbcraftRemedy
+            | Action::HerbcraftSetWard => Some(Self::Herbalism),
+            Action::MagicScry
+            | Action::MagicDurableWard
+            | Action::MagicCleanse
+            | Action::MagicColonyCleanse
+            | Action::MagicHarvest
+            | Action::MagicCommune => Some(Self::Witchcraft),
+            Action::Cook => Some(Self::Cooking),
             Action::Coordinate => Some(Self::Coordinating),
             Action::Explore | Action::Wander => Some(Self::Exploring),
             Action::Mate => Some(Self::Mating),
@@ -209,7 +235,23 @@ impl DispositionKind {
             Self::Socializing => &[Action::Socialize],
             Self::Building => &[Action::Build],
             Self::Farming => &[Action::Farm],
-            Self::Crafting => &[Action::Herbcraft, Action::PracticeMagic, Action::Cook],
+            // 155: Herbalism / Witchcraft / Cooking each own a disjoint
+            // sub-action set; the L3 softmax picks one of these
+            // sub-actions directly.
+            Self::Herbalism => &[
+                Action::HerbcraftGather,
+                Action::HerbcraftRemedy,
+                Action::HerbcraftSetWard,
+            ],
+            Self::Witchcraft => &[
+                Action::MagicScry,
+                Action::MagicDurableWard,
+                Action::MagicCleanse,
+                Action::MagicColonyCleanse,
+                Action::MagicHarvest,
+                Action::MagicCommune,
+            ],
+            Self::Cooking => &[Action::Cook],
             Self::Coordinating => &[Action::Coordinate],
             Self::Exploring => &[Action::Explore, Action::Wander],
             Self::Mating => &[Action::Mate],
@@ -229,6 +271,10 @@ impl DispositionKind {
     /// ordinal-equality tests don't need rebasing.
     /// 154: `Mentoring` is appended at ordinal 14 for the same reason.
     /// 158: `Grooming` is appended at ordinal 15 for the same reason.
+    /// 155: `Crafting` ordinal 8 is replaced in-place by `Herbalism`
+    /// (the herbcraft-DSE-set inherits the slot); `Witchcraft` and
+    /// `Cooking` append at ordinals 16 / 17 to keep upstream ordinals
+    /// stable for saved soaks and ordinal-equality tests.
     pub const ALL: &[Self] = &[
         Self::Resting,
         Self::Hunting,
@@ -237,7 +283,7 @@ impl DispositionKind {
         Self::Socializing,
         Self::Building,
         Self::Farming,
-        Self::Crafting,
+        Self::Herbalism,
         Self::Coordinating,
         Self::Exploring,
         Self::Mating,
@@ -245,6 +291,8 @@ impl DispositionKind {
         Self::Eating,
         Self::Mentoring,
         Self::Grooming,
+        Self::Witchcraft,
+        Self::Cooking,
     ];
 
     /// Human-readable label for the inspect panel.
@@ -258,13 +306,15 @@ impl DispositionKind {
             Self::Socializing => "Socializing",
             Self::Building => "Building",
             Self::Farming => "Farming",
-            Self::Crafting => "Crafting",
+            Self::Herbalism => "Herbalism",
             Self::Coordinating => "Coordinating",
             Self::Exploring => "Exploring",
             Self::Mating => "Mating",
             Self::Caretaking => "Caretaking",
             Self::Mentoring => "Mentoring",
             Self::Grooming => "Grooming",
+            Self::Witchcraft => "Witchcraft",
+            Self::Cooking => "Cooking",
         }
     }
 
@@ -274,14 +324,28 @@ impl DispositionKind {
     pub fn maslow_level(&self) -> u8 {
         match self {
             // 150 R5a: Eating shares Resting's tier 1 — both physiological.
-            Self::Resting | Self::Eating | Self::Hunting | Self::Foraging => 1,
+            // 155: Cooking sits at tier 1 too — colony-feeding behavior
+            // mirrors the Hunting / Foraging shape (Retrieve → produce →
+            // Deposit). Tier 4 reproduces the suppression that left
+            // `FoodCooked` on `never_fired_expected_positives` pre-155.
+            Self::Resting
+            | Self::Eating
+            | Self::Hunting
+            | Self::Foraging
+            | Self::Cooking => 1,
             // 158: Grooming sits at tier 2 — above thermal self-care
             // (now `Action::GroomSelf` riding `Resting` at tier 1) and
             // below the affiliative-coordination tier the Socializing
             // peer group anchors. Matches `groom_other_dse.maslow_tier()`.
             Self::Guarding | Self::Grooming => 2,
             Self::Socializing | Self::Caretaking | Self::Mating | Self::Mentoring => 3,
-            Self::Crafting | Self::Coordinating | Self::Building | Self::Farming => 4,
+            // 155: Herbalism / Witchcraft inherit Crafting's tier 4
+            // (esteem / craft).
+            Self::Herbalism
+            | Self::Witchcraft
+            | Self::Coordinating
+            | Self::Building
+            | Self::Farming => 4,
             Self::Exploring => 5,
         }
     }
@@ -297,13 +361,15 @@ impl DispositionKind {
             Self::Socializing => "socialize",
             Self::Building => "build",
             Self::Farming => "farm",
-            Self::Crafting => "craft",
+            Self::Herbalism => "prepare herbs",
             Self::Coordinating => "coordinate",
             Self::Exploring => "explore",
             Self::Mating => "find a mate",
             Self::Caretaking => "tend the young",
             Self::Mentoring => "mentor",
             Self::Grooming => "groom a friend",
+            Self::Witchcraft => "work magic",
+            Self::Cooking => "cook",
         }
     }
 }
@@ -333,20 +399,31 @@ pub struct Disposition {
     pub completions: u32,
     /// Disposition clears when completions >= target.
     pub target_completions: u32,
-    /// For Crafting dispositions: which sub-mode the scorer selected.
-    /// Threaded from scoring to chain builder so the cascade doesn't re-derive.
-    pub crafting_hint: Option<CraftingHint>,
+    /// The exact L3 sub-action the softmax picked. Threaded from
+    /// scoring to chain builder so the cascade doesn't re-derive.
+    ///
+    /// 155: replaces the retired `crafting_hint: Option<CraftingHint>`
+    /// field. Every disposition records its chosen Action — for
+    /// single-constituent dispositions (Hunting → Hunt, Cooking →
+    /// Cook, etc.) it's trivial; for the new Herbalism / Witchcraft
+    /// dispositions it carries the sub-mode the L3 picked.
+    pub chosen_action: Action,
 }
 
 impl Disposition {
-    pub fn new(kind: DispositionKind, tick: u64, personality: &Personality) -> Self {
+    pub fn new(
+        kind: DispositionKind,
+        chosen_action: Action,
+        tick: u64,
+        personality: &Personality,
+    ) -> Self {
         Self {
             kind,
             adopted_tick: tick,
             disposition_started_tick: 0,
             completions: 0,
             target_completions: kind.target_completions(personality),
-            crafting_hint: None,
+            chosen_action,
         }
     }
 
@@ -588,10 +665,24 @@ mod tests {
         // and `modifier::constituent_dses_for_ordinal` stay stable for
         // the pre-existing variants. Saved soaks and ordinal-equality
         // tests don't need rebasing.
-        assert_eq!(DispositionKind::ALL.len(), 15);
+        // 155: `Crafting` ordinal 8 is replaced in-place by `Herbalism`
+        // (the herbcraft-DSE-set inherits the slot); `Witchcraft` and
+        // `Cooking` append at ordinals 16 / 17 to preserve the upstream
+        // ordinal stability invariant.
+        assert_eq!(DispositionKind::ALL.len(), 17);
         assert_eq!(
             DispositionKind::ALL.last(),
-            Some(&DispositionKind::Grooming)
+            Some(&DispositionKind::Cooking)
+        );
+        assert_eq!(
+            DispositionKind::ALL[15],
+            DispositionKind::Witchcraft,
+            "Witchcraft must remain at ordinal-16 position"
+        );
+        assert_eq!(
+            DispositionKind::ALL[14],
+            DispositionKind::Grooming,
+            "Grooming must remain at ordinal-15 position"
         );
         assert_eq!(
             DispositionKind::ALL[13],
@@ -604,10 +695,63 @@ mod tests {
             "Eating must remain at ordinal-13 position"
         );
         assert_eq!(
+            DispositionKind::ALL[7],
+            DispositionKind::Herbalism,
+            "Herbalism must inherit Crafting's ordinal-8 position"
+        );
+        assert_eq!(
             DispositionKind::ALL.first(),
             Some(&DispositionKind::Resting),
             "Resting must remain at ordinal-1 position"
         );
+    }
+
+    #[test]
+    fn crafting_split_routes_sub_actions_to_three_dispositions() {
+        // 155 regression-pin: each former `Action::Herbcraft` /
+        // `Action::PracticeMagic` / `Action::Cook` sub-action must
+        // route to the correct new disposition via `from_action`,
+        // bypassing the retired `CraftingHint` post-softmax tournament.
+        for a in [
+            Action::HerbcraftGather,
+            Action::HerbcraftRemedy,
+            Action::HerbcraftSetWard,
+        ] {
+            assert_eq!(
+                DispositionKind::from_action(a),
+                Some(DispositionKind::Herbalism),
+                "{a:?} should route to Herbalism"
+            );
+        }
+        for a in [
+            Action::MagicScry,
+            Action::MagicDurableWard,
+            Action::MagicCleanse,
+            Action::MagicColonyCleanse,
+            Action::MagicHarvest,
+            Action::MagicCommune,
+        ] {
+            assert_eq!(
+                DispositionKind::from_action(a),
+                Some(DispositionKind::Witchcraft),
+                "{a:?} should route to Witchcraft"
+            );
+        }
+        assert_eq!(
+            DispositionKind::from_action(Action::Cook),
+            Some(DispositionKind::Cooking)
+        );
+    }
+
+    #[test]
+    fn cooking_is_maslow_tier_one_like_hunting_foraging() {
+        // 155 R3 decision: Cooking is colony-feeding work, not
+        // esteem-tier craft. Tier 4 reproduces the suppression that
+        // left `FoodCooked` on `never_fired_expected_positives`
+        // pre-155.
+        assert_eq!(DispositionKind::Cooking.maslow_level(), 1);
+        assert_eq!(DispositionKind::Hunting.maslow_level(), 1);
+        assert_eq!(DispositionKind::Foraging.maslow_level(), 1);
     }
 
     #[test]
@@ -719,7 +863,7 @@ mod tests {
             diligence: 0.5,
             ..test_personality()
         };
-        let mut d = Disposition::new(DispositionKind::Hunting, 0, &p);
+        let mut d = Disposition::new(DispositionKind::Hunting, Action::Hunt, 0, &p);
         assert!(!d.is_count_complete());
         d.completions = d.target_completions;
         assert!(d.is_count_complete());

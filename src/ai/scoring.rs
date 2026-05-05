@@ -7,7 +7,6 @@ use crate::ai::dse::EvalCtx;
 use crate::ai::considerations::LandmarkAnchor;
 use crate::ai::eval::{evaluate_single, DseRegistry, ModifierPipeline};
 use crate::ai::Action;
-use crate::components::disposition::CraftingHint;
 use crate::components::mental::{Memory, MemoryType};
 use crate::components::personality::Personality;
 use crate::components::physical::{Needs, Position};
@@ -473,7 +472,10 @@ pub struct ScoringContext<'a> {
 // 158: bumped 22 → 23 to give `Action::GroomSelf` and
 // `Action::GroomOther` distinct cascade / aspiration / preference
 // slots after the `Action::Groom` umbrella retired.
-pub const CASCADE_COUNTS_LEN: usize = 23;
+// 155: bumped 23 → 30. `Action::Herbcraft` fanned into 3 sub-actions
+// (net +2) and `Action::PracticeMagic` fanned into 6 sub-actions
+// (net +5); each gets its own slot.
+pub const CASCADE_COUNTS_LEN: usize = 30;
 
 // ---------------------------------------------------------------------------
 // ScoringResult
@@ -482,13 +484,14 @@ pub const CASCADE_COUNTS_LEN: usize = 23;
 /// Bundles action scores with metadata the chain builder needs.
 /// `herbcraft_hint` carries which sub-mode won during herbcraft scoring,
 /// so the chain builder doesn't re-derive it via its own priority cascade.
-/// `magic_hint` is the equivalent for PracticeMagic — without it, the GOAP
-/// planner falls back to A*'s cheapest action (Scry) and never picks
-/// DurableWard even when its sub-score is highest.
+/// 155: `herbcraft_hint` and `magic_hint` retired. The L3 softmax pool
+/// now carries each former hint variant as its own first-class
+/// `Action` entry (HerbcraftGather/Remedy/SetWard,
+/// MagicScry/DurableWard/Cleanse/ColonyCleanse/Harvest/Commune); the
+/// chosen sub-action is the L3-winning Action whose parent Disposition
+/// matches `chosen`. No post-hoc tournament needed.
 pub struct ScoringResult {
     pub scores: Vec<(Action, f32)>,
-    pub herbcraft_hint: Option<CraftingHint>,
-    pub magic_hint: Option<CraftingHint>,
     /// True when the cat would have scored Cook competitively (had raw
     /// food, non-critical hunger, diligent personality) but no functional
     /// Kitchen exists. The caller turns this into a colony-wide
@@ -884,8 +887,16 @@ pub const CASCADE_COUNT_KEYS: [&str; CASCADE_COUNTS_LEN] = [
     "cascade_count_patrol",
     "cascade_count_build",
     "cascade_count_farm",
-    "cascade_count_herbcraft",
-    "cascade_count_practicemagic",
+    // 155: Herbcraft / PracticeMagic fanned to 9 sub-actions.
+    "cascade_count_herbcraft_gather",
+    "cascade_count_herbcraft_remedy",
+    "cascade_count_herbcraft_setward",
+    "cascade_count_magic_scry",
+    "cascade_count_magic_durable_ward",
+    "cascade_count_magic_cleanse",
+    "cascade_count_magic_colony_cleanse",
+    "cascade_count_magic_harvest",
+    "cascade_count_magic_commune",
     "cascade_count_coordinate",
     "cascade_count_mentor",
     "cascade_count_mate",
@@ -912,8 +923,16 @@ pub const ASPIRATION_ACTION_KEYS: [&str; CASCADE_COUNTS_LEN] = [
     "aspiration_action_patrol",
     "aspiration_action_build",
     "aspiration_action_farm",
-    "aspiration_action_herbcraft",
-    "aspiration_action_practicemagic",
+    // 155: Herbcraft / PracticeMagic fanned to 9 sub-actions.
+    "aspiration_action_herbcraft_gather",
+    "aspiration_action_herbcraft_remedy",
+    "aspiration_action_herbcraft_setward",
+    "aspiration_action_magic_scry",
+    "aspiration_action_magic_durable_ward",
+    "aspiration_action_magic_cleanse",
+    "aspiration_action_magic_colony_cleanse",
+    "aspiration_action_magic_harvest",
+    "aspiration_action_magic_commune",
     "aspiration_action_coordinate",
     "aspiration_action_mentor",
     "aspiration_action_mate",
@@ -940,8 +959,16 @@ pub const PREFERENCE_KEYS: [&str; CASCADE_COUNTS_LEN] = [
     "preference_for_patrol",
     "preference_for_build",
     "preference_for_farm",
-    "preference_for_herbcraft",
-    "preference_for_practicemagic",
+    // 155: Herbcraft / PracticeMagic fanned to 9 sub-actions.
+    "preference_for_herbcraft_gather",
+    "preference_for_herbcraft_remedy",
+    "preference_for_herbcraft_setward",
+    "preference_for_magic_scry",
+    "preference_for_magic_durable_ward",
+    "preference_for_magic_cleanse",
+    "preference_for_magic_colony_cleanse",
+    "preference_for_magic_harvest",
+    "preference_for_magic_commune",
     "preference_for_coordinate",
     "preference_for_mentor",
     "preference_for_mate",
@@ -976,17 +1003,20 @@ fn active_disposition_ordinal(
         Some(DispositionKind::Socializing) => 5.0,
         Some(DispositionKind::Building) => 6.0,
         Some(DispositionKind::Farming) => 7.0,
-        Some(DispositionKind::Crafting) => 8.0,
+        // 155: Herbalism inherits Crafting's ordinal-8 slot in-place
+        // (the herbcraft DSE set was the bulk of Crafting's pool).
+        // Witchcraft / Cooking append at ordinals 16 / 17 — same
+        // append-only discipline established by 150 R5a / 154 / 158.
+        Some(DispositionKind::Herbalism) => 8.0,
         Some(DispositionKind::Coordinating) => 9.0,
         Some(DispositionKind::Exploring) => 10.0,
         Some(DispositionKind::Mating) => 11.0,
         Some(DispositionKind::Caretaking) => 12.0,
         Some(DispositionKind::Eating) => 13.0,
         Some(DispositionKind::Mentoring) => 14.0,
-        // 158: Grooming appended at ordinal 15 to keep prior ordinals
-        // stable (matches the `DispositionKind::ALL` append-only
-        // discipline established by 150 R5a / 154).
         Some(DispositionKind::Grooming) => 15.0,
+        Some(DispositionKind::Witchcraft) => 16.0,
+        Some(DispositionKind::Cooking) => 17.0,
     }
 }
 
@@ -1343,72 +1373,67 @@ pub fn score_actions(
     // 4.2 ported it to a modifier; §13.1 retired the modifier) is
     // absorbed into the Logistic(8, 0.1) axis on
     // `territory_max_corruption` inside both `herbcraft_gather` and
-    // `herbcraft_ward`. The outer Max + hint selection is a
-    // selection-layer concern that stays here. The siege bonus
-    // remains inline — it's a narrower-scope siege response, not a
-    // corruption trigger.
-    let herbcraft_hint;
+    // `herbcraft_ward`. The siege bonus remains inline — it's a
+    // narrower-scope siege response, not a corruption trigger.
+    // 155: the post-softmax `herbcraft_hint` / `magic_hint` tournament
+    // retired in favor of per-sub-action L3 entries.
+    // --- Herbcraft (§155: 3-way sibling split) ---
+    // Each sub-DSE pushes its own (sub-Action, score) pair into the
+    // L3 softmax pool. The post-softmax tournament that picked a
+    // hint between gather / prepare / ward retired — softmax now
+    // picks the sub-action directly.
     {
         let gather = if ctx.has_herbs_nearby {
             score_dse_by_id("herbcraft_gather", ctx, inputs)
         } else {
             0.0
         };
+        if gather > 0.0 {
+            scores.push((Action::HerbcraftGather, gather + jitter(rng, s.jitter_range)));
+        }
         let prepare = if ctx.has_remedy_herbs && ctx.colony_injury_count > 0 {
             score_dse_by_id("herbcraft_prepare", ctx, inputs)
         } else {
             0.0
         };
+        if prepare > 0.0 {
+            scores.push((Action::HerbcraftRemedy, prepare + jitter(rng, s.jitter_range)));
+        }
         // §4 batch 2: inline `ctx.has_ward_herbs` gate retired —
         // HerbcraftWardDse carries `.require(CanWard::KEY)` which
-        // subsumes Adult ∧ ¬Injured ∧ HasWardHerbs. score_dse_by_id
-        // returns 0 when eligibility fails.
+        // subsumes Adult ∧ ¬Injured ∧ HasWardHerbs.
         let mut ward = score_dse_by_id("herbcraft_ward", ctx, inputs);
-        // Siege bonus: only meaningful when ward scored > 0 (cat has
-        // CanWard → has ward herbs, colony wards are low, not downed).
         if ward > 0.0 && ctx.wards_under_siege {
             ward += s.herbcraft_ward_siege_bonus * ctx.needs.level_suppression(2);
         }
-        let best = gather.max(prepare).max(ward);
-        herbcraft_hint = if best <= 0.0 {
-            None
-        } else if prepare >= gather && prepare >= ward {
-            Some(CraftingHint::PrepareRemedy)
-        } else if ward >= gather {
-            Some(CraftingHint::SetWard)
-        } else {
-            Some(CraftingHint::GatherHerbs)
-        };
-        if best > 0.0 {
-            scores.push((Action::Herbcraft, best + jitter(rng, s.jitter_range)));
+        if ward > 0.0 {
+            scores.push((Action::HerbcraftSetWard, ward + jitter(rng, s.jitter_range)));
         }
     }
 
-    // --- PracticeMagic (§L2.10.10 sibling split — 6 sub-modes) ---
+    // --- PracticeMagic (§155: 6-way sibling split) ---
     // Outer gate: `magic_affinity + magic_skill > thresholds`.
-    // Sub-mode base scores come from their sibling DSEs. The three
-    // emergency bonuses (ward / cleanse / sensed-rot) retired in
-    // §13.1 once their axis-level Logistic replacements landed:
-    // `magic_durable_ward` grew a Logistic(8, 0.1) axis on
-    // `nearby_corruption_level`; `magic_cleanse` swapped its
-    // `tile_corruption` axis to `Logistic(8,
-    // magic_cleanse_corruption_threshold)`; `magic_colony_cleanse`
-    // swapped its `territory_max_corruption` axis to
-    // Logistic(6, 0.3). The outer Max + hint selection stays here.
-    let mut magic_hint: Option<CraftingHint> = None;
+    // Each sub-DSE pushes its own (sub-Action, score) pair. The
+    // post-softmax tournament that picked a hint between scry /
+    // durable_ward / cleanse / colony_cleanse / harvest / commune
+    // retired — softmax now picks the sub-action directly.
     if ctx.magic_affinity > s.magic_affinity_threshold && ctx.magic_skill > s.magic_skill_threshold
     {
         let scry = score_dse_by_id("magic_scry", ctx, inputs);
-        // §4 marker eligibility (Phase 4b.5): the
-        // `ctx.ward_strength_low` conjunct retires —
-        // `DurableWardDse` now carries `.require("WardStrengthLow")`.
-        // The `magic_skill` threshold stays inline (it's a §4.5
-        // scalar, not a marker).
+        if scry > 0.0 {
+            scores.push((Action::MagicScry, scry + jitter(rng, s.jitter_range)));
+        }
         let durable_ward = if ctx.magic_skill > s.magic_durable_ward_skill_threshold {
             score_dse_by_id("magic_durable_ward", ctx, inputs)
         } else {
             0.0
         };
+        if durable_ward > 0.0 {
+            scores.push((
+                Action::MagicDurableWard,
+                durable_ward + jitter(rng, s.jitter_range),
+            ));
+        }
         let cleanse = if ctx.on_corrupted_tile
             && ctx.tile_corruption > s.magic_cleanse_corruption_threshold
         {
@@ -1416,39 +1441,31 @@ pub fn score_actions(
         } else {
             0.0
         };
+        if cleanse > 0.0 {
+            scores.push((Action::MagicCleanse, cleanse + jitter(rng, s.jitter_range)));
+        }
         let colony_cleanse = score_dse_by_id("magic_colony_cleanse", ctx, inputs);
+        if colony_cleanse > 0.0 {
+            scores.push((
+                Action::MagicColonyCleanse,
+                colony_cleanse + jitter(rng, s.jitter_range),
+            ));
+        }
         let harvest = if ctx.carcass_nearby {
             score_dse_by_id("magic_harvest", ctx, inputs)
         } else {
             0.0
         };
+        if harvest > 0.0 {
+            scores.push((Action::MagicHarvest, harvest + jitter(rng, s.jitter_range)));
+        }
         let commune = if ctx.on_special_terrain {
             score_dse_by_id("magic_commune", ctx, inputs)
         } else {
             0.0
         };
-        let best = scry
-            .max(durable_ward)
-            .max(cleanse)
-            .max(colony_cleanse)
-            .max(harvest)
-            .max(commune);
-        // Pick the winning sub-action as a hint so the GOAP planner uses a
-        // directed action list instead of cost-picking the cheapest option.
-        magic_hint = if best <= 0.0 {
-            None
-        } else if durable_ward >= best {
-            Some(CraftingHint::DurableWard)
-        } else if colony_cleanse >= best || cleanse >= best {
-            Some(CraftingHint::Cleanse)
-        } else if harvest >= best {
-            Some(CraftingHint::HarvestCarcass)
-        } else {
-            // Scry and Commune fall through to the generic Magic action list.
-            Some(CraftingHint::Magic)
-        };
-        if best > 0.0 {
-            scores.push((Action::PracticeMagic, best + jitter(rng, s.jitter_range)));
+        if commune > 0.0 {
+            scores.push((Action::MagicCommune, commune + jitter(rng, s.jitter_range)));
         }
     }
 
@@ -1558,8 +1575,6 @@ pub fn score_actions(
 
     ScoringResult {
         scores,
-        herbcraft_hint,
-        magic_hint,
         wants_cook_but_no_kitchen,
     }
 }
@@ -1739,8 +1754,18 @@ pub const ALL_ACTIONS: [Action; CASCADE_COUNTS_LEN] = [
     Action::Patrol,
     Action::Build,
     Action::Farm,
-    Action::Herbcraft,
-    Action::PracticeMagic,
+    // 155: Herbcraft / PracticeMagic split into 9 sub-actions; each
+    // gets its own cascade slot so per-Action neighbor counts and
+    // aspiration tallies stay distinct.
+    Action::HerbcraftGather,
+    Action::HerbcraftRemedy,
+    Action::HerbcraftSetWard,
+    Action::MagicScry,
+    Action::MagicDurableWard,
+    Action::MagicCleanse,
+    Action::MagicColonyCleanse,
+    Action::MagicHarvest,
+    Action::MagicCommune,
     Action::Coordinate,
     Action::Mentor,
     Action::Mate,
@@ -1845,8 +1870,11 @@ pub fn behavior_gate_check(
         return Some(Action::Fight);
     }
     // Compulsive helper — drop everything to aid an injured cat.
+    // 155: routes to the HerbcraftRemedy sub-action (the apply-remedy
+    // chain) since the override is specifically about helping an
+    // injured cat — gather-only or set-ward sub-modes wouldn't.
     if personality.compassion > sc.gate_compulsive_helper_threshold && has_injured_nearby {
-        return Some(Action::Herbcraft);
+        return Some(Action::HerbcraftRemedy);
     }
     // Compulsive explorer — chance per tick to ignore current action.
     if personality.curiosity > sc.gate_compulsive_explorer_threshold
@@ -2151,6 +2179,20 @@ mod tests {
 
     fn seeded_rng(seed: u64) -> ChaCha8Rng {
         ChaCha8Rng::seed_from_u64(seed)
+    }
+
+    /// 155: helper for tests that need to ask "did any of the six
+    /// Witchcraft sub-actions score?".
+    fn is_magic_subaction(a: Action) -> bool {
+        matches!(
+            a,
+            Action::MagicScry
+                | Action::MagicDurableWard
+                | Action::MagicCleanse
+                | Action::MagicColonyCleanse
+                | Action::MagicHarvest
+                | Action::MagicCommune
+        )
     }
 
     // --- Shared DseRegistry + ModifierPipeline for tests ---
@@ -3324,15 +3366,17 @@ mod tests {
         c.herbcraft_skill = 0.3;
 
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
-        let herbcraft = scores.iter().find(|(a, _)| *a == Action::Herbcraft);
+        // 155: Herbcraft fanned to 3 sub-actions; gather is the
+        // expected entry when herbs are nearby.
+        let herbcraft = scores.iter().find(|(a, _)| *a == Action::HerbcraftGather);
 
         assert!(
             herbcraft.is_some(),
-            "spiritual cat with herbs nearby should score Herbcraft"
+            "spiritual cat with herbs nearby should score HerbcraftGather"
         );
         assert!(
             herbcraft.unwrap().1 > 0.0,
-            "Herbcraft score should be positive"
+            "HerbcraftGather score should be positive"
         );
     }
 
@@ -3347,11 +3391,17 @@ mod tests {
         // no herbs nearby, no inventory herbs
 
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
-        let herbcraft = scores.iter().find(|(a, _)| *a == Action::Herbcraft);
-        assert!(
-            herbcraft.is_none(),
-            "no herbs → no Herbcraft; scores: {scores:?}"
-        );
+        // 155: none of the three Herbcraft sub-actions should appear
+        // when the cat has no herbs and no inventory.
+        let any_herb = scores.iter().any(|(a, _)| {
+            matches!(
+                a,
+                Action::HerbcraftGather
+                    | Action::HerbcraftRemedy
+                    | Action::HerbcraftSetWard
+            )
+        });
+        assert!(!any_herb, "no herbs → no Herbcraft; scores: {scores:?}");
     }
 
     #[test]
@@ -3367,11 +3417,10 @@ mod tests {
         c.magic_skill = 0.3;
 
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
-        let magic = scores.iter().find(|(a, _)| *a == Action::PracticeMagic);
-        assert!(
-            magic.is_none(),
-            "below affinity threshold → no PracticeMagic"
-        );
+        // 155: PracticeMagic fanned to 6 sub-actions; below the
+        // affinity gate, none of them should appear.
+        let any_magic = scores.iter().any(|(a, _)| is_magic_subaction(*a));
+        assert!(!any_magic, "below affinity threshold → no Magic sub-action");
 
         // Below prereqs: skill 0.1 < 0.2 threshold
         let mut c2 = ctx(&needs, &personality, &sc);
@@ -3379,8 +3428,8 @@ mod tests {
         c2.magic_skill = 0.1;
 
         let scores2 = score_actions(&c2, &test_eval_inputs(), &mut rng).scores;
-        let magic2 = scores2.iter().find(|(a, _)| *a == Action::PracticeMagic);
-        assert!(magic2.is_none(), "below skill threshold → no PracticeMagic");
+        let any_magic2 = scores2.iter().any(|(a, _)| is_magic_subaction(*a));
+        assert!(!any_magic2, "below skill threshold → no Magic sub-action");
     }
 
     #[test]
@@ -3402,15 +3451,17 @@ mod tests {
         c.tile_corruption = 0.5;
 
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
-        let magic = scores.iter().find(|(a, _)| *a == Action::PracticeMagic);
+        // 155: a magical cat on a corrupted tile should score
+        // MagicCleanse (the gated tile-targeted sub-action).
+        let cleanse = scores.iter().find(|(a, _)| *a == Action::MagicCleanse);
 
         assert!(
-            magic.is_some(),
-            "magical cat on corrupted tile should score PracticeMagic"
+            cleanse.is_some(),
+            "magical cat on corrupted tile should score MagicCleanse"
         );
         assert!(
-            magic.unwrap().1 > 0.0,
-            "PracticeMagic score should be positive"
+            cleanse.unwrap().1 > 0.0,
+            "MagicCleanse score should be positive"
         );
     }
 
@@ -3433,11 +3484,14 @@ mod tests {
         c.colony_injury_count = 2;
 
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
-        let herbcraft = scores.iter().find(|(a, _)| *a == Action::Herbcraft);
+        // 155: a compassionate cat with remedy herbs and an injured
+        // ally should score HerbcraftRemedy specifically (the apply-
+        // remedy chain), not the gather-only or set-ward sub-modes.
+        let herbcraft = scores.iter().find(|(a, _)| *a == Action::HerbcraftRemedy);
 
         assert!(
             herbcraft.is_some() && herbcraft.unwrap().1 > 0.15,
-            "compassionate cat with remedy herbs and injured allies should score Herbcraft; got {herbcraft:?}"
+            "compassionate cat with remedy herbs and injured allies should score HerbcraftRemedy; got {herbcraft:?}"
         );
     }
 
@@ -3852,7 +3906,7 @@ mod tests {
         let mut rng = seeded_rng(1);
         assert_eq!(
             behavior_gate_check(Action::Wander, &p, true, 1.0, &mut rng, &sc),
-            Some(Action::Herbcraft),
+            Some(Action::HerbcraftRemedy),
         );
         // No injured nearby → no override.
         assert_eq!(
@@ -3910,11 +3964,17 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // Herbcraft hint tests
+    // 155: Herbcraft sub-action L3 emission tests
+    //
+    // The pre-155 tests asserted on `result.herbcraft_hint` — the
+    // post-softmax tournament winner. Post-155 the L3 pool carries
+    // each sub-action as its own first-class entry; we assert the
+    // pool contains the expected dominant sub-action for each
+    // substrate shape.
     // -----------------------------------------------------------------------
 
     #[test]
-    fn herbcraft_hint_prepare() {
+    fn herbcraft_remedy_dominates_when_compassionate_with_injured() {
         let sc = default_scoring();
         let mut needs = Needs::default();
         needs.hunger = 0.8;
@@ -3930,20 +3990,31 @@ mod tests {
         c.has_herbs_in_inventory = true;
         c.herbcraft_skill = 0.4;
         c.colony_injury_count = 2;
-        // Also set herbs nearby so gather *could* fire — hint should still be PrepareRemedy.
+        // Also set herbs nearby so gather could fire — remedy should still
+        // win the L3 sub-action contest within the Herbalism family.
         c.has_herbs_nearby = true;
 
         let result = score_actions(&c, &test_eval_inputs(), &mut rng);
-        assert_eq!(
-            result.herbcraft_hint,
-            Some(CraftingHint::PrepareRemedy),
-            "with remedy herbs + injuries, hint should be PrepareRemedy; got {:?}",
-            result.herbcraft_hint
+        let remedy = result
+            .scores
+            .iter()
+            .find(|(a, _)| *a == Action::HerbcraftRemedy)
+            .map(|(_, s)| *s)
+            .unwrap_or(0.0);
+        let gather = result
+            .scores
+            .iter()
+            .find(|(a, _)| *a == Action::HerbcraftGather)
+            .map(|(_, s)| *s)
+            .unwrap_or(0.0);
+        assert!(
+            remedy > gather && remedy > 0.0,
+            "remedy must dominate gather when compassion + injured; remedy={remedy}, gather={gather}"
         );
     }
 
     #[test]
-    fn herbcraft_hint_gather() {
+    fn herbcraft_gather_appears_when_only_substrate_for_gathering() {
         let sc = default_scoring();
         let mut needs = Needs::default();
         needs.hunger = 0.8;
@@ -3985,16 +4056,14 @@ mod tests {
         };
 
         let result = score_actions(&c, &inputs, &mut rng);
-        assert_eq!(
-            result.herbcraft_hint,
-            Some(CraftingHint::GatherHerbs),
-            "with only herbs nearby, hint should be GatherHerbs; got {:?}",
-            result.herbcraft_hint
-        );
+        let gather = result.scores.iter().find(|(a, _)| *a == Action::HerbcraftGather);
+        assert!(gather.is_some() && gather.unwrap().1 > 0.0,
+            "with only herbs nearby, HerbcraftGather should score positive; scores: {:?}",
+            result.scores);
     }
 
     #[test]
-    fn herbcraft_hint_ward() {
+    fn herbcraft_setward_appears_when_ward_substrate_present() {
         let sc = default_scoring();
         // Ward is Level 2 (Safety) — only physiological needs matter.
         let mut needs = Needs::default();
@@ -4014,12 +4083,10 @@ mod tests {
         // No herbs nearby, no remedy herbs — only ward is viable.
 
         let result = score_actions(&c, &test_eval_inputs(), &mut rng);
-        assert_eq!(
-            result.herbcraft_hint,
-            Some(CraftingHint::SetWard),
-            "with ward herbs + low ward strength, hint should be SetWard; got {:?}",
-            result.herbcraft_hint
-        );
+        let ward = result.scores.iter().find(|(a, _)| *a == Action::HerbcraftSetWard);
+        assert!(ward.is_some() && ward.unwrap().1 > 0.0,
+            "with ward herbs + low ward strength, HerbcraftSetWard should score positive; scores: {:?}",
+            result.scores);
     }
 
     #[test]

@@ -66,10 +66,10 @@ fn sample_steps() -> Vec<PlannedStep> {
 fn fresh_plan() -> GoapPlan {
     GoapPlan::new(
         DispositionKind::Hunting,
+        crate::ai::Action::Hunt,
         100,
         &test_personality(),
         sample_steps(),
-        None,
     )
 }
 
@@ -425,7 +425,7 @@ fn require_alive_filter_sets_require_target_alive() {
 #[test]
 fn record_disposition_switch_writes_started_tick() {
     let p = test_personality();
-    let mut disp = Disposition::new(DispositionKind::Hunting, 0, &p);
+    let mut disp = Disposition::new(DispositionKind::Hunting, crate::ai::Action::Hunt, 0, &p);
     assert_eq!(disp.disposition_started_tick, 0);
 
     record_disposition_switch(&mut disp, DispositionKind::Hunting, 12_345);
@@ -435,7 +435,7 @@ fn record_disposition_switch_writes_started_tick() {
 #[test]
 fn record_disposition_switch_overwrites_prior_tick() {
     let p = test_personality();
-    let mut disp = Disposition::new(DispositionKind::Hunting, 0, &p);
+    let mut disp = Disposition::new(DispositionKind::Hunting, crate::ai::Action::Hunt, 0, &p);
     record_disposition_switch(&mut disp, DispositionKind::Hunting, 100);
     record_disposition_switch(&mut disp, DispositionKind::Foraging, 250);
     assert_eq!(disp.disposition_started_tick, 250);

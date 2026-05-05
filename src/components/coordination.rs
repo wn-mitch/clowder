@@ -46,11 +46,21 @@ impl DirectiveKind {
             DirectiveKind::Build => Action::Build,
             DirectiveKind::Fight => Action::Fight,
             DirectiveKind::Patrol => Action::Patrol,
-            DirectiveKind::Herbcraft => Action::Herbcraft,
+            // 155: directive routing now lands on per-sub-mode Actions
+            // directly (no CraftingHint indirection). The Disposition
+            // is derived via `from_action` (Herbalism / Witchcraft /
+            // Cooking) so the planner sees the correct chain shape.
+            DirectiveKind::Herbcraft => Action::HerbcraftGather,
             DirectiveKind::Cook => Action::Cook,
-            DirectiveKind::SetWard => Action::Herbcraft, // ward-setting is a herbcraft sub-mode
-            DirectiveKind::Cleanse => Action::PracticeMagic, // cleanse is a magic action
-            DirectiveKind::HarvestCarcass => Action::PracticeMagic,
+            // Ward-setting under a coordinator directive uses the
+            // herbcraft chain (gather thornbriar then place ward).
+            DirectiveKind::SetWard => Action::HerbcraftSetWard,
+            // Cleanse routes to the colony-cleanse sub-action when
+            // dispatched by a coordinator (the directive carries a
+            // hotspot position; tile-self-cleanse comes from the
+            // self-driven `MagicCleanse` DSE).
+            DirectiveKind::Cleanse => Action::MagicColonyCleanse,
+            DirectiveKind::HarvestCarcass => Action::MagicHarvest,
         }
     }
 }

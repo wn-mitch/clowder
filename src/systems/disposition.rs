@@ -11,7 +11,7 @@ use crate::components::building::{
 };
 use crate::components::coordination::{ActiveDirective, Directive, DirectiveKind, DirectiveQueue};
 use crate::components::disposition::{
-    ActionHistory, ActionOutcome, ActionRecord, CraftingHint, Disposition, DispositionKind,
+    ActionHistory, ActionOutcome, ActionRecord, Disposition, DispositionKind,
 };
 use crate::components::hunting_priors::HuntingPriors;
 use crate::components::identity::{Gender, LifeStage, Name};
@@ -1140,34 +1140,20 @@ pub fn evaluate_dispositions(
 
         // Insert the Disposition component. Chain creation happens in disposition_to_chain.
         // adopted_tick is 0 here; resolve_disposition_chains will set it from TimeState.
-        let crafting_hint = if chosen == DispositionKind::Crafting {
-            let herbcraft_score = scores
-                .iter()
-                .find(|(a, _)| *a == Action::Herbcraft)
-                .map(|(_, s)| *s)
-                .unwrap_or(0.0);
-            let magic_score = scores
-                .iter()
-                .find(|(a, _)| *a == Action::PracticeMagic)
-                .map(|(_, s)| *s)
-                .unwrap_or(0.0);
-            let cook_score = scores
-                .iter()
-                .find(|(a, _)| *a == Action::Cook)
-                .map(|(_, s)| *s)
-                .unwrap_or(0.0);
-            if cook_score > herbcraft_score && cook_score > magic_score {
-                Some(CraftingHint::Cook)
-            } else if magic_score > herbcraft_score {
-                result.magic_hint.or(Some(CraftingHint::Magic))
-            } else {
-                result.herbcraft_hint
-            }
-        } else {
-            None
-        };
-        let mut disp = Disposition::new(chosen, 0, personality);
-        disp.crafting_hint = crafting_hint;
+        //
+        // 155: the post-softmax `CraftingHint` recovery block retired.
+        // Each Disposition's chosen sub-action is the L3-picked Action
+        // directly (top of `scores` for cats whose disposition matches).
+        // For single-constituent dispositions the sub-action equals the
+        // sole constituent action.
+        let chosen_action = scores
+            .iter()
+            .filter(|(a, _)| DispositionKind::from_action(*a) == Some(chosen))
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(a, _)| *a)
+            .or_else(|| chosen.constituent_actions().first().copied())
+            .unwrap_or(Action::Idle);
+        let mut disp = Disposition::new(chosen, chosen_action, 0, personality);
         // Ticket 072: route the disposition switch through
         // `plan_substrate::record_disposition_switch` so the new
         // `disposition_started_tick` field is consistently written
@@ -1579,7 +1565,13 @@ pub fn disposition_to_chain(
                 build_building_chain(entity, pos, &building_query, build_target, d, &mut commands)
             }
             DispositionKind::Farming => build_farming_chain(pos, &building_query),
-            DispositionKind::Crafting => {
+            DispositionKind::Herbalism
+            | DispositionKind::Witchcraft
+            | DispositionKind::Cooking => {
+                // 155: legacy chain-building path for the retired
+                // `Crafting` umbrella. Dead arm — `disposition_to_chain`
+                // is unscheduled (ticket 027b); the live path is the
+                // GOAP planner. Retained for type-system completeness.
                 let placement_maps = crate::systems::coordination::PlacementMaps {
                     fox_scent: &res.fox_scent_map,
                     cat_presence: &res.cat_presence_map,
@@ -1604,7 +1596,7 @@ pub fn disposition_to_chain(
                     ward_strength_low,
                     d,
                     &mut rng.rng,
-                    disposition.crafting_hint,
+                    disposition.chosen_action,
                 )
             }
             DispositionKind::Coordinating => build_coordinating_chain(
@@ -2258,7 +2250,7 @@ fn build_crafting_chain(
     ward_strength_low: bool,
     d: &DispositionConstants,
     rng: &mut impl Rng,
-    hint: Option<CraftingHint>,
+    chosen_action: Action,
 ) -> Option<(TaskChain, Action)> {
     // Pre-compute ward placement position for SetWard chains.
     let ward_placement_pos = if ward_strength_low {
@@ -2284,39 +2276,38 @@ fn build_crafting_chain(
         None
     };
 
-    // Try hinted mode first.
-    if let Some(h) = hint {
-        if let Some(chain) = try_crafting_sub_mode(
-            h,
-            pos,
-            skills,
-            magic_aff,
-            inventory,
-            herb_query,
-            building_query,
-            injured_cats,
-            apply_remedy_target,
-            map,
-            ward_strength_low,
-            ward_placement_pos,
-            d,
-            rng,
-        ) {
-            return Some(chain);
-        }
+    // 155: try the chosen sub-action first; if its preconditions
+    // aren't met, cascade through the herbcraft/magic sub-actions.
+    if let Some(chain) = try_crafting_sub_mode(
+        chosen_action,
+        pos,
+        skills,
+        magic_aff,
+        inventory,
+        herb_query,
+        building_query,
+        injured_cats,
+        apply_remedy_target,
+        map,
+        ward_strength_low,
+        ward_placement_pos,
+        d,
+        rng,
+    ) {
+        return Some(chain);
     }
 
-    // Fallback: cascade through remaining modes, skipping the hint.
-    // (Cook intentionally absent — it's resolved by the GOAP planner, not
-    // this task-chain path.)
+    // Fallback: cascade through remaining sub-actions, skipping the
+    // already-tried one. Cook is intentionally absent — it's resolved
+    // by the GOAP planner, not this task-chain path.
     for mode in [
-        CraftingHint::GatherHerbs,
-        CraftingHint::PrepareRemedy,
-        CraftingHint::SetWard,
-        CraftingHint::DurableWard,
-        CraftingHint::Magic,
+        Action::HerbcraftGather,
+        Action::HerbcraftRemedy,
+        Action::HerbcraftSetWard,
+        Action::MagicDurableWard,
+        Action::MagicScry,
     ] {
-        if Some(mode) == hint {
+        if mode == chosen_action {
             continue;
         }
         if let Some(chain) = try_crafting_sub_mode(
@@ -2342,11 +2333,14 @@ fn build_crafting_chain(
     None
 }
 
-/// Try to build a crafting chain for a specific sub-mode.
+/// Try to build a crafting chain for a specific sub-action.
 /// Returns `None` if the preconditions for that mode aren't met.
+///
+/// 155: ported from `CraftingHint`-keyed dispatch to `Action`-keyed
+/// dispatch. Each former hint variant maps to its sibling sub-action.
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn try_crafting_sub_mode(
-    mode: CraftingHint,
+    mode: Action,
     pos: &Position,
     skills: &Skills,
     magic_aff: &MagicAffinity,
@@ -2370,7 +2364,7 @@ fn try_crafting_sub_mode(
     use crate::components::magic::{HerbKind, RemedyKind, WardKind};
 
     match mode {
-        CraftingHint::GatherHerbs => {
+        Action::HerbcraftGather => {
             let has_herbs_nearby = herb_query
                 .iter()
                 .any(|(_, _, hp)| pos.manhattan_distance(hp) <= d.crafting_herb_detection_range);
@@ -2394,10 +2388,10 @@ fn try_crafting_sub_mode(
                 ],
                 FailurePolicy::AbortChain,
             );
-            Some((chain, Action::Herbcraft))
+            Some((chain, Action::HerbcraftGather))
         }
 
-        CraftingHint::PrepareRemedy => {
+        Action::HerbcraftRemedy => {
             if !inventory.has_remedy_herb() {
                 return None;
             }
@@ -2450,11 +2444,11 @@ fn try_crafting_sub_mode(
             }
 
             let chain = TaskChain::new(steps, FailurePolicy::AbortChain);
-            Some((chain, Action::Herbcraft))
+            Some((chain, Action::HerbcraftRemedy))
         }
 
-        CraftingHint::SetWard | CraftingHint::DurableWard => {
-            let is_durable = matches!(mode, CraftingHint::DurableWard);
+        Action::HerbcraftSetWard | Action::MagicDurableWard => {
+            let is_durable = matches!(mode, Action::MagicDurableWard);
             // Thornwards need herbs; durable wards skip the herb check.
             if (!is_durable && !inventory.has_ward_herb()) || !ward_strength_low {
                 return None;
@@ -2487,14 +2481,14 @@ fn try_crafting_sub_mode(
                 FailurePolicy::AbortChain,
             );
             let action = if is_durable {
-                Action::PracticeMagic
+                Action::MagicDurableWard
             } else {
-                Action::Herbcraft
+                Action::HerbcraftSetWard
             };
             Some((chain, action))
         }
 
-        CraftingHint::Magic => {
+        Action::MagicScry | Action::MagicCommune => {
             if magic_aff.0 <= d.crafting_magic_affinity_threshold
                 || skills.magic <= d.crafting_magic_skill_threshold
             {
@@ -2515,17 +2509,17 @@ fn try_crafting_sub_mode(
                     vec![TaskStep::new(StepKind::SpiritCommunion).with_position(*pos)],
                     FailurePolicy::AbortChain,
                 );
-                return Some((chain, Action::PracticeMagic));
+                return Some((chain, Action::MagicCommune));
             }
 
             let chain = TaskChain::new(
                 vec![TaskStep::new(StepKind::Scry).with_position(*pos)],
                 FailurePolicy::AbortChain,
             );
-            Some((chain, Action::PracticeMagic))
+            Some((chain, Action::MagicScry))
         }
 
-        CraftingHint::Cleanse => {
+        Action::MagicCleanse | Action::MagicColonyCleanse => {
             if magic_aff.0 <= d.crafting_magic_affinity_threshold {
                 return None;
             }
@@ -2533,10 +2527,10 @@ fn try_crafting_sub_mode(
                 vec![TaskStep::new(StepKind::CleanseCorruption).with_position(*pos)],
                 FailurePolicy::AbortChain,
             );
-            Some((chain, Action::PracticeMagic))
+            Some((chain, mode))
         }
 
-        CraftingHint::HarvestCarcass => {
+        Action::MagicHarvest => {
             // Legacy TaskChain path can't express HarvestCarcass cleanly;
             // the GOAP executor handles it.
             None
@@ -2547,7 +2541,9 @@ fn try_crafting_sub_mode(
         // in `src/systems/goap.rs`). The unmet-demand signal is emitted
         // from `score_cook` via `ScoringResult::wants_cook_but_no_kitchen`,
         // not from here.
-        CraftingHint::Cook => None,
+        Action::Cook => None,
+        // Defensive: any non-craft Action shouldn't reach this dead path.
+        _ => None,
     }
 }
 
@@ -4289,13 +4285,14 @@ mod tests {
     }
 
     fn default_disposition(kind: DispositionKind) -> Disposition {
+        let chosen = kind.constituent_actions().first().copied().unwrap_or(Action::Idle);
         Disposition {
             kind,
             adopted_tick: 0,
             disposition_started_tick: 0,
             completions: 0,
             target_completions: 3,
-            crafting_hint: None,
+            chosen_action: chosen,
         }
     }
 
@@ -4551,11 +4548,11 @@ mod tests {
             false,
             &d,
             &mut rng,
-            Some(CraftingHint::PrepareRemedy),
+            Action::HerbcraftRemedy,
         );
 
         let (chain, action) = result.expect("should produce a chain with PrepareRemedy hint");
-        assert_eq!(action, Action::Herbcraft);
+        assert_eq!(action, Action::HerbcraftRemedy);
 
         // The chain should contain a PrepareRemedy step — NOT GatherHerb.
         let has_prepare = chain

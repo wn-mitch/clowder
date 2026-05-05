@@ -304,7 +304,12 @@ pub fn generate_narrative(
                 (options[idx].clone(), NarrativeTier::Action)
             }
 
-            Action::Herbcraft => {
+            // 155: Herbcraft fanned to 3 sub-actions; each draws from
+            // the same Herbalism prose pool. PracticeMagic fanned to 6
+            // sub-actions; same Witchcraft pool.
+            Action::HerbcraftGather
+            | Action::HerbcraftRemedy
+            | Action::HerbcraftSetWard => {
                 let options = [
                     format!("{cat} carefully harvests herbs from the undergrowth."),
                     format!("{cat} grinds herbs into a poultice with practiced paws."),
@@ -314,7 +319,12 @@ pub fn generate_narrative(
                 (options[idx].clone(), NarrativeTier::Action)
             }
 
-            Action::PracticeMagic => {
+            Action::MagicScry
+            | Action::MagicDurableWard
+            | Action::MagicCleanse
+            | Action::MagicColonyCleanse
+            | Action::MagicHarvest
+            | Action::MagicCommune => {
                 let options = [
                     format!("{cat}'s eyes go distant, seeing something far away..."),
                     format!("{cat} presses paws against the earth, whispering old words."),

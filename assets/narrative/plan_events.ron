@@ -45,7 +45,7 @@
     (
         text: "{name} gathers herbs with purpose.",
         tier: Action,
-        action: Some(Herbcraft),
+        action: Some(HerbcraftGather),
         event: Some("plan_adopted"),
     ),
     (

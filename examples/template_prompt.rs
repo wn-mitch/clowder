@@ -36,7 +36,7 @@ const PREVIEW_GENDERS: [Gender; 3] = [Gender::Tom, Gender::Queen, Gender::Nonbin
 /// `assert_pick_pool_covers_action` below is the compile-time witness
 /// that adding a new `Action` variant must also be classified here —
 /// either added to this pool or explicitly excluded.
-const PICKABLE_ACTIONS: [Action; 19] = [
+const PICKABLE_ACTIONS: [Action; 26] = [
     Action::Eat,
     Action::Sleep,
     Action::Hunt,
@@ -52,8 +52,15 @@ const PICKABLE_ACTIONS: [Action; 19] = [
     Action::Patrol,
     Action::Build,
     Action::Farm,
-    Action::Herbcraft,
-    Action::PracticeMagic,
+    Action::HerbcraftGather,
+    Action::HerbcraftRemedy,
+    Action::HerbcraftSetWard,
+    Action::MagicScry,
+    Action::MagicDurableWard,
+    Action::MagicCleanse,
+    Action::MagicColonyCleanse,
+    Action::MagicHarvest,
+    Action::MagicCommune,
     Action::Coordinate,
     Action::Mentor,
 ];
@@ -79,8 +86,15 @@ fn assert_pick_pool_covers_action(a: Action) {
         | Action::Patrol
         | Action::Build
         | Action::Farm
-        | Action::Herbcraft
-        | Action::PracticeMagic
+        | Action::HerbcraftGather
+        | Action::HerbcraftRemedy
+        | Action::HerbcraftSetWard
+        | Action::MagicScry
+        | Action::MagicDurableWard
+        | Action::MagicCleanse
+        | Action::MagicColonyCleanse
+        | Action::MagicHarvest
+        | Action::MagicCommune
         | Action::Coordinate
         | Action::Mentor
         | Action::Mate
@@ -122,8 +136,15 @@ fn main() {
             Action::Patrol => "patrol.ron",
             Action::Build => "build.ron",
             Action::Farm => "farm.ron",
-            Action::Herbcraft => "herbcraft.ron",
-            Action::PracticeMagic => "magic.ron",
+            Action::HerbcraftGather
+            | Action::HerbcraftRemedy
+            | Action::HerbcraftSetWard => "herbcraft.ron",
+            Action::MagicScry
+            | Action::MagicDurableWard
+            | Action::MagicCleanse
+            | Action::MagicColonyCleanse
+            | Action::MagicHarvest
+            | Action::MagicCommune => "magic.ron",
             Action::Coordinate => "coordinate.ron",
             Action::Mentor => "mentor.ron",
             Action::Mate => "socialize.ron",

@@ -57,14 +57,44 @@ pub enum Action {
     Patrol,
     Build,
     Farm,
-    Herbcraft,
-    PracticeMagic,
+    /// 155: split from `Herbcraft`. Single-action sub-mode — gather a
+    /// herb at a HerbPatch zone. Rides `DispositionKind::Herbalism`.
+    HerbcraftGather,
+    /// 155: split from `Herbcraft`. Multi-step chain (gather + prepare +
+    /// travel + apply) terminating at `ApplyRemedy`. Rides
+    /// `DispositionKind::Herbalism`.
+    HerbcraftRemedy,
+    /// 155: split from `Herbcraft`. Multi-step chain (gather thornbriar +
+    /// place ward) terminating at `SetWard`. Rides
+    /// `DispositionKind::Herbalism`.
+    HerbcraftSetWard,
+    /// 155: split from `PracticeMagic`. Scrying for resource-found
+    /// memories. Rides `DispositionKind::Witchcraft`.
+    MagicScry,
+    /// 155: split from `PracticeMagic`. Magic-specialist durable ward
+    /// placement. Rides `DispositionKind::Witchcraft`.
+    MagicDurableWard,
+    /// 155: split from `PracticeMagic`. Tile-targeted corruption
+    /// cleanse — fires when the cat stands on a corrupted tile. Rides
+    /// `DispositionKind::Witchcraft`.
+    MagicCleanse,
+    /// 155: split from `PracticeMagic`. Colony-wide corruption-hotspot
+    /// cleanse — directive-routed or self-driven. Rides
+    /// `DispositionKind::Witchcraft`.
+    MagicColonyCleanse,
+    /// 155: split from `PracticeMagic`. Carcass harvest for shadowbone
+    /// items. Rides `DispositionKind::Witchcraft`.
+    MagicHarvest,
+    /// 155: split from `PracticeMagic`. Spirit communion at a special
+    /// terrain tile. Rides `DispositionKind::Witchcraft`.
+    MagicCommune,
     Coordinate,
     Mentor,
     Mate,
     Caretake,
     /// Prepare raw food at a Kitchen structure, transforming it into a cooked
     /// item that restores more hunger when eaten. Fulfillment-tier.
+    /// 155: rides `DispositionKind::Cooking` (split from Crafting).
     Cook,
     /// Ticket 104 — Hide/Freeze response. The third predator-avoidance
     /// valence ("remain still and hope") alongside Flee and Fight. The

@@ -402,10 +402,10 @@ mod tests {
     #[test]
     fn disposition_sensor_fresh_failure_returns_zero() {
         let mut recent = RecentDispositionFailures::default();
-        recent.record(DispositionKind::Crafting, 1000);
+        recent.record(DispositionKind::Herbalism, 1000);
         let s = disposition_recent_failure_age_normalized(
             Some(&recent),
-            DispositionKind::Crafting,
+            DispositionKind::Herbalism,
             1000,
             4000,
         );
@@ -454,7 +454,7 @@ mod tests {
     #[test]
     fn disposition_sensor_distinguishes_kinds() {
         let mut recent = RecentDispositionFailures::default();
-        recent.record(DispositionKind::Crafting, 1000);
+        recent.record(DispositionKind::Herbalism, 1000);
         // Different kind → no entry → fail-open
         let s = disposition_recent_failure_age_normalized(
             Some(&recent),

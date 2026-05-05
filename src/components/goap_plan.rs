@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use bevy_ecs::prelude::*;
 
 use crate::ai::planner::{GoapActionKind, PlannedStep};
-use crate::components::disposition::{CraftingHint, DispositionKind};
+use crate::components::disposition::DispositionKind;
 use crate::components::personality::Personality;
 use crate::components::physical::Position;
 
@@ -30,8 +30,15 @@ pub struct GoapPlan {
     pub replan_count: u32,
     /// Maximum replans before the plan is abandoned.
     pub max_replans: u32,
-    /// For Crafting dispositions: which sub-mode the scorer selected.
-    pub crafting_hint: Option<CraftingHint>,
+    /// The exact L3 sub-action the softmax picked. Threaded from
+    /// scoring to the executor so `GoapActionKind::to_action` can
+    /// label `CurrentAction.action` accurately mid-chain.
+    ///
+    /// 155: replaces the retired `crafting_hint: Option<CraftingHint>`
+    /// field. Carries the sub-mode for the new Herbalism / Witchcraft
+    /// dispositions; for single-constituent dispositions it equals the
+    /// disposition's only constituent action.
+    pub chosen_action: Action,
     /// Per-step execution state. Parallel to `steps` — initialized when each
     /// step begins executing.
     #[serde(skip)]
@@ -78,10 +85,10 @@ impl GoapPlan {
 
     pub fn new(
         kind: DispositionKind,
+        chosen_action: Action,
         tick: u64,
         personality: &Personality,
         steps: Vec<PlannedStep>,
-        crafting_hint: Option<CraftingHint>,
     ) -> Self {
         let step_count = steps.len();
         Self {
@@ -93,7 +100,7 @@ impl GoapPlan {
             target_trips: kind.target_completions(personality),
             replan_count: 0,
             max_replans: Self::DEFAULT_MAX_REPLANS,
-            crafting_hint,
+            chosen_action,
             step_state: vec![StepExecutionState::default(); step_count],
             ward_placement_pos: None,
             failed_actions: HashSet::new(),
@@ -296,7 +303,15 @@ use crate::ai::Action;
 impl GoapActionKind {
     /// Map a GOAP action to the `Action` enum for `CurrentAction` sync
     /// and narrative template matching.
-    pub fn to_action(self, disposition: DispositionKind) -> Action {
+    ///
+    /// 155: `chosen_action` is the L3-picked sub-action carried on
+    /// `GoapPlan::chosen_action`. For Herbalism / Witchcraft chains
+    /// where multiple GoapActionKind steps share a sub-action label
+    /// (e.g., `GatherHerb` is reused by all three Herbalism sub-modes),
+    /// this disambiguates correctly: `GatherHerb` mid-chain reports
+    /// the chain's Action label rather than collapsing to a single
+    /// `Herbcraft` umbrella.
+    pub fn to_action(self, disposition: DispositionKind, chosen_action: Action) -> Action {
         match self {
             Self::TravelTo(_) => match disposition {
                 DispositionKind::Hunting => Action::Hunt,
@@ -305,6 +320,12 @@ impl GoapActionKind {
                 DispositionKind::Building => Action::Build,
                 DispositionKind::Farming => Action::Farm,
                 DispositionKind::Exploring => Action::Explore,
+                // 155: TravelTo legs in Herbalism / Witchcraft / Cooking
+                // chains report the chain's chosen sub-action so
+                // CurrentAction stays stable through the chain.
+                DispositionKind::Herbalism
+                | DispositionKind::Witchcraft
+                | DispositionKind::Cooking => chosen_action,
                 _ => Action::Wander,
             },
             Self::SearchPrey | Self::EngagePrey | Self::DepositPrey => Action::Hunt,
@@ -319,12 +340,21 @@ impl GoapActionKind {
             Self::MentorCat => Action::Mentor,
             Self::GatherMaterials | Self::DeliverMaterials | Self::Construct => Action::Build,
             Self::TendCrops | Self::HarvestCrops => Action::Farm,
-            Self::GatherHerb | Self::PrepareRemedy | Self::ApplyRemedy | Self::SetWard => {
-                Action::Herbcraft
-            }
-            Self::Scry | Self::SpiritCommunion | Self::CleanseCorruption | Self::HarvestCarcass => {
-                Action::PracticeMagic
-            }
+            // 155: Herbcraft sub-actions split — each step inherits the
+            // chosen sub-action label so a `GatherHerb` step in a
+            // `HerbcraftRemedy` chain reports `HerbcraftRemedy`, not
+            // `HerbcraftGather`.
+            Self::GatherHerb | Self::PrepareRemedy | Self::ApplyRemedy => chosen_action,
+            // SetWard is shared between Herbalism (HerbcraftSetWard) and
+            // Witchcraft (MagicDurableWard); the chosen_action carries
+            // the disambiguation.
+            Self::SetWard => chosen_action,
+            // 155: Magic sub-actions split — each Witchcraft step
+            // inherits the chosen sub-action label.
+            Self::Scry => chosen_action,
+            Self::SpiritCommunion => chosen_action,
+            Self::CleanseCorruption => chosen_action,
+            Self::HarvestCarcass => chosen_action,
             Self::MateWith => Action::Mate,
             Self::FeedKitten | Self::RetrieveFoodForKitten => Action::Caretake,
             Self::DeliverDirective => Action::Coordinate,
@@ -386,7 +416,7 @@ mod tests {
     #[test]
     fn new_plan_sets_target_trips() {
         let p = test_personality();
-        let plan = GoapPlan::new(DispositionKind::Hunting, 100, &p, sample_steps(), None);
+        let plan = GoapPlan::new(DispositionKind::Hunting, Action::Hunt, 100, &p, sample_steps());
         assert_eq!(
             plan.target_trips,
             DispositionKind::Hunting.target_completions(&p)
@@ -399,7 +429,7 @@ mod tests {
     #[test]
     fn advance_increments_step() {
         let p = test_personality();
-        let mut plan = GoapPlan::new(DispositionKind::Hunting, 0, &p, sample_steps(), None);
+        let mut plan = GoapPlan::new(DispositionKind::Hunting, Action::Hunt, 0, &p, sample_steps());
         assert_eq!(plan.current_step, 0);
         assert!(!plan.is_exhausted());
 
@@ -415,7 +445,7 @@ mod tests {
     #[test]
     fn replan_replaces_steps() {
         let p = test_personality();
-        let mut plan = GoapPlan::new(DispositionKind::Hunting, 0, &p, sample_steps(), None);
+        let mut plan = GoapPlan::new(DispositionKind::Hunting, Action::Hunt, 0, &p, sample_steps());
         plan.advance(); // Move to step 1.
 
         let new_steps = vec![PlannedStep {
@@ -432,7 +462,7 @@ mod tests {
     #[test]
     fn replan_respects_max_replans() {
         let p = test_personality();
-        let mut plan = GoapPlan::new(DispositionKind::Hunting, 0, &p, sample_steps(), None);
+        let mut plan = GoapPlan::new(DispositionKind::Hunting, Action::Hunt, 0, &p, sample_steps());
         plan.max_replans = 2;
 
         assert!(plan.replan(sample_steps())); // replan_count = 1
@@ -443,14 +473,14 @@ mod tests {
     #[test]
     fn step_state_parallel_to_steps() {
         let p = test_personality();
-        let plan = GoapPlan::new(DispositionKind::Hunting, 0, &p, sample_steps(), None);
+        let plan = GoapPlan::new(DispositionKind::Hunting, Action::Hunt, 0, &p, sample_steps());
         assert_eq!(plan.steps.len(), plan.step_state.len());
     }
 
     #[test]
     fn failed_actions_persist_across_replans() {
         let p = test_personality();
-        let mut plan = GoapPlan::new(DispositionKind::Hunting, 0, &p, sample_steps(), None);
+        let mut plan = GoapPlan::new(DispositionKind::Hunting, Action::Hunt, 0, &p, sample_steps());
         assert!(plan.failed_actions.is_empty());
 
         plan.failed_actions.insert(GoapActionKind::SearchPrey);
@@ -460,26 +490,28 @@ mod tests {
         assert_eq!(plan.replan_count, 1);
 
         // A fresh plan starts with empty failed_actions.
-        let fresh = GoapPlan::new(DispositionKind::Hunting, 100, &p, sample_steps(), None);
+        let fresh = GoapPlan::new(DispositionKind::Hunting, Action::Hunt, 100, &p, sample_steps());
         assert!(fresh.failed_actions.is_empty());
     }
 
     #[test]
     fn action_kind_to_action_mapping() {
         assert_eq!(
-            GoapActionKind::SearchPrey.to_action(DispositionKind::Hunting),
+            GoapActionKind::SearchPrey.to_action(DispositionKind::Hunting, Action::Hunt),
             Action::Hunt
         );
         assert_eq!(
-            GoapActionKind::EatAtStores.to_action(DispositionKind::Resting),
+            GoapActionKind::EatAtStores.to_action(DispositionKind::Eating, Action::Eat),
             Action::Eat
         );
         assert_eq!(
-            GoapActionKind::TravelTo(PlannerZone::Stores).to_action(DispositionKind::Hunting),
+            GoapActionKind::TravelTo(PlannerZone::Stores)
+                .to_action(DispositionKind::Hunting, Action::Hunt),
             Action::Hunt
         );
         assert_eq!(
-            GoapActionKind::TravelTo(PlannerZone::Stores).to_action(DispositionKind::Resting),
+            GoapActionKind::TravelTo(PlannerZone::Stores)
+                .to_action(DispositionKind::Resting, Action::Sleep),
             Action::Wander
         );
     }

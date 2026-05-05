@@ -204,7 +204,12 @@ pub fn strategy_for_disposition(kind: DispositionKind) -> CommitmentStrategy {
         DispositionKind::Coordinating => SingleMinded,
         DispositionKind::Building => SingleMinded,
         DispositionKind::Farming => SingleMinded,
-        DispositionKind::Crafting => SingleMinded,
+        // 155: `Crafting` retired into Herbalism / Witchcraft /
+        // Cooking; all three inherit the SingleMinded strategy
+        // (chain-driven plans should resolve without flipping).
+        DispositionKind::Herbalism => SingleMinded,
+        DispositionKind::Witchcraft => SingleMinded,
+        DispositionKind::Cooking => SingleMinded,
         DispositionKind::Caretaking => SingleMinded,
         // L3 layer — goal-shaped single event.
         DispositionKind::Mating => SingleMinded,
@@ -500,6 +505,7 @@ pub fn record_commitment_decision(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ai::Action;
     use crate::components::personality::Personality;
 
     fn test_personality() -> Personality {
@@ -689,7 +695,11 @@ mod tests {
         assert_eq!(strategy_for_disposition(Coordinating), SingleMinded);
         assert_eq!(strategy_for_disposition(Building), SingleMinded);
         assert_eq!(strategy_for_disposition(Farming), SingleMinded);
-        assert_eq!(strategy_for_disposition(Crafting), SingleMinded);
+        // 155: `Crafting` retired into Herbalism / Witchcraft / Cooking;
+        // all three are SingleMinded.
+        assert_eq!(strategy_for_disposition(Herbalism), SingleMinded);
+        assert_eq!(strategy_for_disposition(Witchcraft), SingleMinded);
+        assert_eq!(strategy_for_disposition(Cooking), SingleMinded);
         assert_eq!(strategy_for_disposition(Caretaking), SingleMinded);
         assert_eq!(strategy_for_disposition(Mating), SingleMinded);
         assert_eq!(strategy_for_disposition(Socializing), OpenMinded);
@@ -707,7 +717,9 @@ mod tests {
             Coordinating,
             Building,
             Farming,
-            Crafting,
+            Herbalism,
+            Witchcraft,
+            Cooking,
             Caretaking,
             Mating,
             Socializing,
@@ -747,7 +759,12 @@ mod tests {
 
     fn test_plan(kind: DispositionKind, tick: u64) -> GoapPlan {
         let p = test_personality();
-        GoapPlan::new(kind, tick, &p, vec![], None)
+        // 155: pick the disposition's first constituent action as the
+        // chosen sub-action for tests; for Herbalism/Witchcraft this
+        // gets a real sub-action even though tests don't drive sub-mode
+        // selection.
+        let chosen = kind.constituent_actions().first().copied().unwrap_or(Action::Idle);
+        GoapPlan::new(kind, chosen, tick, &p, vec![])
     }
 
     #[test]
@@ -857,7 +874,10 @@ mod tests {
             DispositionKind::Building,
             DispositionKind::Guarding,
             DispositionKind::Farming,
-            DispositionKind::Crafting,
+            // 155: split into Herbalism / Witchcraft / Cooking.
+            DispositionKind::Herbalism,
+            DispositionKind::Witchcraft,
+            DispositionKind::Cooking,
             DispositionKind::Caretaking,
             DispositionKind::Coordinating,
             DispositionKind::Mating,

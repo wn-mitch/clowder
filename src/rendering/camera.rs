@@ -356,8 +356,17 @@ fn is_interesting_action(action: &Action) -> bool {
         Action::Hunt
             | Action::Fight
             | Action::Socialize
-            | Action::PracticeMagic
-            | Action::Herbcraft
+            // 155: Magic / Herbcraft fanned to 9 sub-actions; the
+            // camera treats every sub-action as photogenic.
+            | Action::MagicScry
+            | Action::MagicDurableWard
+            | Action::MagicCleanse
+            | Action::MagicColonyCleanse
+            | Action::MagicHarvest
+            | Action::MagicCommune
+            | Action::HerbcraftGather
+            | Action::HerbcraftRemedy
+            | Action::HerbcraftSetWard
             | Action::Build
             | Action::Farm
             | Action::Mentor

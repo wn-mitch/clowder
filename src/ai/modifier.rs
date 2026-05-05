@@ -544,26 +544,11 @@ fn constituent_dses_for_ordinal(ordinal: f32) -> Option<&'static [&'static str]>
         6 => Some(&[BUILD]),
         // Farming → Farm.
         7 => Some(&[FARM]),
-        // Crafting → Herbcraft (all 3 siblings), PracticeMagic (all 6
-        // siblings), Cook. The retiring inline block applied the
-        // bonus to `Action::Herbcraft` and `Action::PracticeMagic`
-        // (the composite-score entries); in modifier-pipeline form
-        // the bonus applies to every sibling individually. The
-        // composite `best = max(siblings)` equation absorbs this —
-        // `max(a + Δ, b + Δ, c + Δ) = max(a, b, c) + Δ` — so the
-        // outer Herbcraft/PracticeMagic score receives the same Δ.
-        8 => Some(&[
-            HERBCRAFT_GATHER,
-            HERBCRAFT_PREPARE,
-            HERBCRAFT_WARD,
-            MAGIC_SCRY,
-            MAGIC_DURABLE_WARD,
-            MAGIC_CLEANSE,
-            MAGIC_COLONY_CLEANSE,
-            MAGIC_HARVEST,
-            MAGIC_COMMUNE,
-            COOK,
-        ]),
+        // 155: ordinal 8 was Crafting (Herbcraft + PracticeMagic +
+        // Cook bundled). Post-split, ordinal 8 is Herbalism (only
+        // herbcraft DSEs); Witchcraft owns ordinal 16, Cooking owns
+        // ordinal 17.
+        8 => Some(&[HERBCRAFT_GATHER, HERBCRAFT_PREPARE, HERBCRAFT_WARD]),
         // Coordinating → Coordinate.
         9 => Some(&[COORDINATE]),
         // Exploring → Explore, Wander.
@@ -583,6 +568,17 @@ fn constituent_dses_for_ordinal(ordinal: f32) -> Option<&'static [&'static str]>
         // lifts apply to the groom_other DSE alone while the cat is
         // committed.
         15 => Some(&[GROOM_OTHER]),
+        // 155: Witchcraft → 6 magic sub-DSEs.
+        16 => Some(&[
+            MAGIC_SCRY,
+            MAGIC_DURABLE_WARD,
+            MAGIC_CLEANSE,
+            MAGIC_COLONY_CLEANSE,
+            MAGIC_HARVEST,
+            MAGIC_COMMUNE,
+        ]),
+        // 155: Cooking → Cook. Single-action disposition.
+        17 => Some(&[COOK]),
         _ => None,
     }
 }
@@ -2938,9 +2934,17 @@ impl ActiveDirectiveLift {
             PATROL => Action::Patrol,
             BUILD => Action::Build,
             FARM => Action::Farm,
-            HERBCRAFT_GATHER | HERBCRAFT_PREPARE | HERBCRAFT_WARD => Action::Herbcraft,
-            MAGIC_SCRY | MAGIC_DURABLE_WARD | MAGIC_CLEANSE | MAGIC_COLONY_CLEANSE
-            | MAGIC_HARVEST | MAGIC_COMMUNE => Action::PracticeMagic,
+            // 155: each DSE id now maps to its own first-class
+            // sub-Action (Herbcraft fanned to 3, PracticeMagic to 6).
+            HERBCRAFT_GATHER => Action::HerbcraftGather,
+            HERBCRAFT_PREPARE => Action::HerbcraftRemedy,
+            HERBCRAFT_WARD => Action::HerbcraftSetWard,
+            MAGIC_SCRY => Action::MagicScry,
+            MAGIC_DURABLE_WARD => Action::MagicDurableWard,
+            MAGIC_CLEANSE => Action::MagicCleanse,
+            MAGIC_COLONY_CLEANSE => Action::MagicColonyCleanse,
+            MAGIC_HARVEST => Action::MagicHarvest,
+            MAGIC_COMMUNE => Action::MagicCommune,
             COORDINATE => Action::Coordinate,
             MENTOR => Action::Mentor,
             MATE => Action::Mate,
@@ -3353,11 +3357,9 @@ mod tests {
     }
 
     #[test]
-    fn patience_crafting_applies_to_all_sibling_dses() {
-        // Crafting disposition (ordinal 8) spans Herbcraft + PracticeMagic
-        // + Cook siblings. The composite `max(siblings) + Δ = max + Δ`
-        // identity means the outer Action::Herbcraft/PracticeMagic
-        // scores absorb the same Δ the inline block added.
+    fn patience_herbalism_applies_to_herbcraft_siblings() {
+        // 155: Crafting split. Herbalism (ordinal 8) covers the three
+        // Herbcraft sub-DSEs only.
         let modifier = Patience { bonus: 0.1 };
         let (_, ctx) = test_ctx();
         let fetch = |name: &str, _: Entity| match name {
@@ -3365,21 +3367,47 @@ mod tests {
             PATIENCE => 1.0,
             _ => 0.0,
         };
+        for dse in [HERBCRAFT_GATHER, HERBCRAFT_PREPARE, HERBCRAFT_WARD] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!((out - 0.6).abs() < 1e-6, "dse {dse}: got {out}");
+        }
+    }
+
+    #[test]
+    fn patience_witchcraft_applies_to_magic_siblings() {
+        // 155: Witchcraft (ordinal 16) covers the six magic sub-DSEs.
+        let modifier = Patience { bonus: 0.1 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            ACTIVE_DISPOSITION_ORDINAL => 16.0,
+            PATIENCE => 1.0,
+            _ => 0.0,
+        };
         for dse in [
-            HERBCRAFT_GATHER,
-            HERBCRAFT_PREPARE,
-            HERBCRAFT_WARD,
             MAGIC_SCRY,
             MAGIC_DURABLE_WARD,
             MAGIC_CLEANSE,
             MAGIC_COLONY_CLEANSE,
             MAGIC_HARVEST,
             MAGIC_COMMUNE,
-            COOK,
         ] {
             let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
             assert!((out - 0.6).abs() < 1e-6, "dse {dse}: got {out}");
         }
+    }
+
+    #[test]
+    fn patience_cooking_applies_to_cook() {
+        // 155: Cooking (ordinal 17) covers Cook only.
+        let modifier = Patience { bonus: 0.1 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            ACTIVE_DISPOSITION_ORDINAL => 17.0,
+            PATIENCE => 1.0,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(COOK), 0.5, &ctx, &fetch);
+        assert!((out - 0.6).abs() < 1e-6, "dse cook: got {out}");
     }
 
     #[test]
@@ -3578,15 +3606,18 @@ mod tests {
                 Action::Patrol => &[PATROL],
                 Action::Build => &[BUILD],
                 Action::Farm => &[FARM],
-                Action::Herbcraft => &[HERBCRAFT_GATHER, HERBCRAFT_PREPARE, HERBCRAFT_WARD],
-                Action::PracticeMagic => &[
-                    MAGIC_SCRY,
-                    MAGIC_DURABLE_WARD,
-                    MAGIC_CLEANSE,
-                    MAGIC_COLONY_CLEANSE,
-                    MAGIC_HARVEST,
-                    MAGIC_COMMUNE,
-                ],
+                // 155: Herbcraft / PracticeMagic split — each
+                // sub-action maps to one DSE rather than the whole
+                // family.
+                Action::HerbcraftGather => &[HERBCRAFT_GATHER],
+                Action::HerbcraftRemedy => &[HERBCRAFT_PREPARE],
+                Action::HerbcraftSetWard => &[HERBCRAFT_WARD],
+                Action::MagicScry => &[MAGIC_SCRY],
+                Action::MagicDurableWard => &[MAGIC_DURABLE_WARD],
+                Action::MagicCleanse => &[MAGIC_CLEANSE],
+                Action::MagicColonyCleanse => &[MAGIC_COLONY_CLEANSE],
+                Action::MagicHarvest => &[MAGIC_HARVEST],
+                Action::MagicCommune => &[MAGIC_COMMUNE],
                 Action::Coordinate => &[COORDINATE],
                 Action::Mentor => &[MENTOR],
                 Action::Mate => &[MATE],

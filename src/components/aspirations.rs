@@ -25,7 +25,13 @@ impl AspirationDomain {
             Self::Hunting => &[Action::Hunt, Action::Forage],
             Self::Combat => &[Action::Fight, Action::Patrol],
             Self::Social => &[Action::Socialize, Action::GroomOther],
-            Self::Herbcraft => &[Action::Herbcraft],
+            // 155: Herbcraft fanned into 3 sub-actions; the Herbcraft
+            // aspiration counts all three as contributors.
+            Self::Herbcraft => &[
+                Action::HerbcraftGather,
+                Action::HerbcraftRemedy,
+                Action::HerbcraftSetWard,
+            ],
             Self::Exploration => &[Action::Explore, Action::Wander],
             Self::Building => &[Action::Build],
             Self::Leadership => &[Action::Coordinate],

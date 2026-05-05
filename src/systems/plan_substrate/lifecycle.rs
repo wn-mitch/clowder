@@ -231,13 +231,13 @@ mod tests {
     fn fresh_plan() -> GoapPlan {
         GoapPlan::new(
             DispositionKind::Socializing,
+            crate::ai::Action::Socialize,
             0,
             &test_personality(),
             vec![PlannedStep {
                 action: GoapActionKind::SocializeWith,
                 cost: 1,
             }],
-            None,
         )
     }
 

@@ -115,8 +115,8 @@ mod tests {
     #[test]
     fn record_inserts_kind_with_tick() {
         let mut r = RecentDispositionFailures::default();
-        r.record(DispositionKind::Crafting, 1234);
-        assert_eq!(r.last_failure_tick(DispositionKind::Crafting), Some(1234));
+        r.record(DispositionKind::Herbalism, 1234);
+        assert_eq!(r.last_failure_tick(DispositionKind::Herbalism), Some(1234));
     }
 
     #[test]
@@ -134,10 +134,10 @@ mod tests {
         let mut r = RecentDispositionFailures::default();
         r.record(DispositionKind::Hunting, 100);
         r.record(DispositionKind::Foraging, 200);
-        r.record(DispositionKind::Crafting, 300);
+        r.record(DispositionKind::Herbalism, 300);
         assert_eq!(r.last_failure_tick(DispositionKind::Hunting), Some(100));
         assert_eq!(r.last_failure_tick(DispositionKind::Foraging), Some(200));
-        assert_eq!(r.last_failure_tick(DispositionKind::Crafting), Some(300));
+        assert_eq!(r.last_failure_tick(DispositionKind::Herbalism), Some(300));
         assert_eq!(r.last_failure_tick(DispositionKind::Building), None);
     }
 
@@ -158,7 +158,7 @@ mod tests {
         // "kept". The boundary lives on the kept side of the cliff:
         // an entry recorded `cooldown_ticks - 1` ticks ago survives.
         let mut r = RecentDispositionFailures::default();
-        r.record(DispositionKind::Crafting, 100);
+        r.record(DispositionKind::Herbalism, 100);
         // age = 3999 at now=4099 → kept
         let removed = r.prune_expired(4099, 4000);
         assert_eq!(removed, 0);
