@@ -15,10 +15,10 @@ _Last generated: 2026-05-05._
 | Status | Count |
 |---|---|
 | In progress | 8 |
-| Ready | 47 |
+| Ready | 49 |
 | Parked | 5 |
 | Blocked | 18 |
-| **Open total** | **78** |
+| **Open total** | **80** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -36,7 +36,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[109](docs/open-work/tickets/109-intraspecies-conflict-response.md)** — IntraspeciesConflictResponse — full four-valence (fight/flight/freeze/fawn) social response — _[ai-substrate] · added 2026-05-01_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 
-## Ready (47)
+## Ready (49)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -80,10 +80,12 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[145](docs/open-work/tickets/145-submit-gesture-dse.md)** — Submit gesture DSE — appeasement infrastructure for IntraspeciesConflict.Fawn — _[ai-substrate] · added 2026-05-02_
 - **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · added 2026-05-02_
 - **[153](docs/open-work/tickets/153-150-r5a-balance-follow-on.md)** — 150 R5a balance follow-on — Resting score-mass and courtship recovery — _[balance] · added 2026-05-03_
-- **[155](docs/open-work/tickets/155-crafting-split.md)** — Split Crafting into Herbalism / Witchcraft / Cooking — retire CraftingHint — _[ai-substrate] · added 2026-05-03_
 - **[157](docs/open-work/tickets/157-burial-canary-dark.md)** — Burial continuity canary dark on post-154 soak — verify eligibility against new death distribution — _[ai-substrate] · added 2026-05-03_
 - **[159](docs/open-work/tickets/159-parent-grief-consumer.md)** — Parent grief consumer for kitten / dependent death — _[ai-substrate] · added 2026-05-04_
 - **[170](docs/open-work/tickets/170-hide-eligible-authoring-system.md)** — HideEligible authoring system (Hide DSE Phase 2) — _[ai-substrate] · added 2026-05-05_
+- **[172](docs/open-work/tickets/172-crafting-split-plan-failure-triage.md)** — Plan-failure triage on Cooking + Herbalism (155 follow-on) — _[ai-substrate] · added 2026-05-05_
+- **[173](docs/open-work/tickets/173-crafting-split-capability-markers.md)** — IsHerbalist / IsSpiritualist / HasCorruptionNearby capability markers (155 follow-on) — _[ai-substrate] · added 2026-05-05_
+- **[174](docs/open-work/tickets/174-crafting-split-balance-cascade.md)** — Balance hypothesis for the wards-and-kittens unblock cascade (155 follow-on) — _[balance] · added 2026-05-05_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _added 2026-04-28_
 
 ## Parked (5)
@@ -120,11 +122,11 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (114)
+## Landed archive (115)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (49)
+### 2026-05 (50)
 
 - **[171](docs/open-work/landed/171-hasgarden-ecs-level-wiring.md)** — Promote HasGarden to ECS-level singleton writer (parity with 168/169) _(2026-05-05)_
 - **[169](docs/open-work/landed/169-author-construction-and-damaged-building-markers.md)** — Author HasConstructionSite + HasDamagedBuilding markers (buildings.rs) _(2026-05-05)_
@@ -133,6 +135,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[166](docs/open-work/landed/166-kittens-surviving-metric-wiring.md)** — kittens_surviving footer field has zero increment-sites — substrate-bypass shape _(2026-05-05)_
 - **[164](docs/open-work/landed/164-kitten-3822-corner-case.md)** — Seed-42 (38,22) kitten cohort starves despite KittenCryMap _(2026-05-05)_
 - **[160](docs/open-work/landed/160-substrate-stub-catalogue.md)** — Substrate stub catalogue + lint — fail the build on orphan markers _(2026-05-05)_
+- **[155](docs/open-work/landed/155-crafting-split.md)** — Split Crafting into Herbalism / Witchcraft / Cooking — retire CraftingHint _(2026-05-05)_
 - **[149](docs/open-work/landed/149-hunt-success-disambiguation.md)** — Hunt-success disambiguation — instrument per-discrete-attempt outcomes _(2026-05-05)_
 - **[029](docs/open-work/landed/029-cross-run-log-database.md)** — Cross-run log database — collate baseline + diagnostic archives for SQL-style queries _(2026-05-05)_
 - **[165](docs/open-work/landed/165-groomedother-kitten-cohort-regression.md)** — Post-d1722a33 GroomedOther affiliative redistribution starves entire kitten cohort on seed-42 (wontfix — bereavement-orphan, working as intended) _(2026-05-04)_

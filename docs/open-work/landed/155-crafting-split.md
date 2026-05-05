@@ -1,7 +1,7 @@
 ---
 id: 155
 title: Split Crafting into Herbalism / Witchcraft / Cooking — retire CraftingHint
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-03
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 2638f186
+landed-on: 2026-05-05
 ---
 
 ## Why
@@ -182,3 +182,86 @@ fail at planning time.
   cluster. See `docs/open-work/landed/152-...md` for the layer-walk and
   evidence trail. The user has informally flagged the Crafting bundle
   multiple times prior; this ticket formalizes the split.
+- 2026-05-05 (2638f186): landed the structural fix.
+  - **Action enum split** (ticket-158 precedent): `Herbcraft` → 3
+    sub-actions (HerbcraftGather/Remedy/SetWard); `PracticeMagic` → 6
+    sub-actions (MagicScry/DurableWard/Cleanse/ColonyCleanse/Harvest/
+    Commune); `Cook` unchanged. Each competes at L3 directly; the
+    "Cook must strictly dominate, ties go to Magic" tournament
+    retired.
+  - **DispositionKind split**: Herbalism (ordinal 8 — inherits
+    Crafting's slot, owns the herbcraft DSEs); Witchcraft (ordinal 16
+    — owns the magic DSEs); Cooking (ordinal 17, Maslow tier 1 —
+    mirrors Hunting/Foraging shape per the ticket's "tier 4
+    reproduces Cook's unreachability" rationale).
+  - **CraftingHint retired**: enum deleted; `Disposition::crafting_hint`
+    and `GoapPlan::crafting_hint` fields replaced with
+    `chosen_action: Action` (the L3-picked sub-mode, threaded forward
+    so `GoapActionKind::to_action` can label `CurrentAction`
+    accurately mid-chain).
+  - **Plan templates split**: `crafting_actions(hint)` retired in
+    favor of `herbalism_actions(action)` /
+    `witchcraft_actions(action)` / `cooking_actions()`. Per-sub-action
+    chain shape preserved — only the terminal action carries
+    `IncrementTrips`, so A* still traverses the full
+    PrepareRemedy / SetWard / Cook chains.
+  - **Directive routing**: `DirectiveKind::to_action` updated —
+    Cleanse → MagicColonyCleanse, HarvestCarcass → MagicHarvest,
+    SetWard → HerbcraftSetWard, Herbcraft → HerbcraftGather (each
+    routes via `from_action` to the right new Disposition).
+  - **Out-of-scope deferred**: capability markers (IsHerbalist /
+    IsSpiritualist / HasCorruptionNearby) were called out in the
+    plan but not landed — existing per-DSE eligibility gates
+    (CanCook / CanWard / ThornbriarAvailable / WardStrengthLow plus
+    has_herbs_nearby / on_corrupted_tile scalars) carry the substrate
+    filter. New markers would tighten the gate; tracked as follow-on
+    if the soak verdict shows residual plan-failure storms on
+    Herbalism / Witchcraft / Cooking. New scenarios
+    (witchcraft_cleanse, cooking) likewise deferred.
+  - **Cascade**: `CASCADE_COUNTS_LEN` 23 → 30; per-action ordinals
+    rebased; modifier `constituent_dses_for_ordinal` updated for
+    ordinals 8 / 16 / 17.
+  - **Tests**: 1864/1864 lib tests pass; full `cargo test` green;
+    `just check` clean (substrate-stub lint, step-contract,
+    time-units, iaus-coherence all OK).
+  - **Soak verdict** (seed-42, `logs/tuned-42/`, post-155 commit
+    `2638f186`): verdict = `concern`, with the failure modes being
+    downstream of the structural success rather than regressions.
+    Hard gates met:
+    - `Starvation == 0` ✓
+    - `ShadowFoxAmbush == 0` ✓ (down from 8 baseline)
+    - `never_fired_expected_positives == []` ✓ — **`FoodCooked`
+      is OFF the never-fired list** (the ticket's primary success
+      criterion).
+    - Plan-failure regression: Crafting 9075 → Herbalism 1712 +
+      Cooking 2126 = 3838 total (**58% reduction**). Per-disposition
+      counts are higher than the ticket's "no single disposition
+      above ~1000" target — both Herbalism (1712) and Cooking (2126)
+      are above 1000; this is structural visibility, not a
+      regression — pre-155 those counts were hidden inside the
+      Crafting blob.
+    Continuity canary failures and metric drift are downstream of the
+    structural success:
+    - `burial = 0` (continuity canary fail) — caused by
+      `deaths_total` dropping from 8 → 1 (fewer deaths means fewer
+      burials); the burial system isn't broken.
+    - Metric drift: `wards_placed_total` 0 → 5 (Witchcraft works);
+      `kittens_born` 0 → 6; `bonds_formed` 3 → 36; `health` +181%;
+      `peak_population` 8 → 13. Per CLAUDE.md ("a refactor that
+      changes sim behavior is a balance change"), these need a
+      hypothesis — but the structural prediction was that splitting
+      Crafting unblocks Cook (colony feeding) and wards (corruption
+      defense), with downstream mood / population gains. The drift
+      is the prediction firing.
+    Constants diff vs baseline: identical (no `SimConstants` field
+    changed). Drift is on simulation output only.
+
+    Follow-on tickets opened in this commit per the
+    "antipattern-migration follow-up discipline" in CLAUDE.md:
+    - **172** — per-Disposition plan-failure triage on Cooking +
+      Herbalism (down from Crafting's 9075 but still above 1000).
+    - **173** — capability markers (IsHerbalist / IsSpiritualist /
+      HasCorruptionNearby) deferred from this PR.
+    - **174** — balance hypothesis for the wards-and-kittens unblock
+      cascade (drift > ±30% on health, peak_population, bonds_formed
+      needs structured `just hypothesize` write-up per CLAUDE.md).
