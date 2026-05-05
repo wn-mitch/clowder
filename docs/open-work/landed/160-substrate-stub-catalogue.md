@@ -1,7 +1,7 @@
 ---
 id: 160
 title: Substrate stub catalogue + lint — fail the build on orphan markers
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-04
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-05
 ---
 
 ## Why
@@ -106,3 +106,14 @@ Two deliverables:
   Case-in-point is `IsParentOfHungryKitten` — the marker that 158's
   fix wires up. Without this lint, the next dead marker might cost
   another full-soak round-trip to detect.
+- 2026-05-05: landed. Initial catalogue captures 4 orphans:
+  `ColonyState` (fully-orphan, ticket 168), `HasConstructionSite` +
+  `HasDamagedBuilding` (fully-orphan, ticket 169), `HideEligible`
+  (read-only, ticket 170). Three follow-on tickets opened in same
+  commit per CLAUDE.md "antipattern follow-ups are non-optional"
+  rule. Lint passes `just check` with all 4 allowlisted; verified
+  via 7-test suite (allowlist round-trip, synthetic LintCanary,
+  IsParentOfHungryKitten regression-safety, Audit 2 production-code
+  injection). Discovery: `MarkerConsideration::new` has zero
+  production callsites today — Audit 2 is forward-looking until a
+  caller adopts it.

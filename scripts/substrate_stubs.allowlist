@@ -1,0 +1,17 @@
+# Allowlist for scripts/check_substrate_stubs.sh.
+#
+# Format:    <MarkerName-or-consideration-string> <ticket-id>
+# Comments:  everything after `#` is ignored.
+#
+# Each entry MUST cite the ticket that wires the marker (Audit 1) or
+# fixes the consideration reference (Audit 2). When the wiring lands,
+# drop the entry; the lint will then enforce that the marker stays
+# wired. Adding a new entry without a ticket id is a code-review
+# failure.
+#
+# Catalogue: docs/open-work/pre-existing/substrate-stub-catalogue.md
+
+ColonyState 168            # Phase 4b.2 colony-singleton promotion
+HasConstructionSite 169    # buildings.rs::update_colony_building_markers (substrate §4.3 line 1976)
+HasDamagedBuilding 169     # same author system as HasConstructionSite
+HideEligible 170           # Hide-authoring system (extends ticket 104's Phase 1 dormancy)
