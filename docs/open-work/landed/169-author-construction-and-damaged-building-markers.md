@@ -1,7 +1,7 @@
 ---
 id: 169
 title: Author HasConstructionSite + HasDamagedBuilding markers (buildings.rs)
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-05
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 6b9e8351
+landed-on: 2026-05-05
 ---
 
 ## Why
@@ -79,3 +79,19 @@ singleton entity.
 ## Log
 
 - 2026-05-05: opened in same commit as 160. Blocked on 168.
+- 2026-05-05: **Landed `6b9e8351`** after 168 cleared the blocker.
+  Both markers now have `pub const KEY` impls; `update_colony_building_markers`
+  inserts/removes them on the `ColonyState` singleton from
+  `bldg_state.has_construction_site` / `.has_damaged_building`;
+  `WorldStateQueries::colony_state_query` extended with two more
+  `Has<>` rows; `populate_world_state` now sources both locals from
+  the singleton query and pushes them into `MarkerSnapshot::set_colony`.
+  5 new tick-system tests; allowlist drops both 169 entries (only
+  `HideEligible 170` remains). Behavior invariant by construction:
+  same predicate, same threshold (`damaged_building_threshold = 0.4`),
+  same FixedUpdate ordering — soak `structures_built` 9 → 8 within
+  noise. Verdict shows accumulated drift since the 2026-05-02
+  baseline (commit `0783194`); burial=0 mirrored in pre-169 archive
+  (tracked under ticket 035). `HasGarden` ECS-level promotion left
+  to a follow-on; the `set_colony(HasGarden::KEY, …)` snapshot
+  bridge already satisfies the substrate-stub lint.
