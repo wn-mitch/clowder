@@ -15,10 +15,10 @@ _Last generated: 2026-05-05._
 | Status | Count |
 |---|---|
 | In progress | 8 |
-| Ready | 49 |
-| Parked | 5 |
+| Ready | 46 |
+| Parked | 6 |
 | Blocked | 18 |
-| **Open total** | **80** |
+| **Open total** | **78** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -36,7 +36,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[109](docs/open-work/tickets/109-intraspecies-conflict-response.md)** — IntraspeciesConflictResponse — full four-valence (fight/flight/freeze/fawn) social response — _[ai-substrate] · added 2026-05-01_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 
-## Ready (49)
+## Ready (46)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -83,18 +83,16 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[157](docs/open-work/tickets/157-burial-canary-dark.md)** — Burial continuity canary dark on post-154 soak — verify eligibility against new death distribution — _[ai-substrate] · added 2026-05-03_
 - **[159](docs/open-work/tickets/159-parent-grief-consumer.md)** — Parent grief consumer for kitten / dependent death — _[ai-substrate] · added 2026-05-04_
 - **[170](docs/open-work/tickets/170-hide-eligible-authoring-system.md)** — HideEligible authoring system (Hide DSE Phase 2) — _[ai-substrate] · added 2026-05-05_
-- **[172](docs/open-work/tickets/172-crafting-split-plan-failure-triage.md)** — Plan-failure triage on Cooking + Herbalism (155 follow-on) — _[ai-substrate] · added 2026-05-05_
-- **[173](docs/open-work/tickets/173-crafting-split-capability-markers.md)** — IsHerbalist / IsSpiritualist / HasCorruptionNearby capability markers (155 follow-on) — _[ai-substrate] · added 2026-05-05_
-- **[174](docs/open-work/tickets/174-crafting-split-balance-cascade.md)** — Balance hypothesis for the wards-and-kittens unblock cascade (155 follow-on) — _[balance] · added 2026-05-05_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _added 2026-04-28_
 
-## Parked (5)
+## Parked (6)
 
 - **[015](docs/open-work/tickets/015-alloparenting-reframe-b.md)** — Alloparenting Reframe B — mama drops kitten at hearth near resting elder — _parked 2026-04-22 · added 2026-04-22_
 - **[058](docs/open-work/tickets/058-tradition-unfiltered-loop-fix.md)** — §3.5.3 item 1 Tradition modifier — fix unfiltered-loop port — _parked 2026-04-30 · added 2026-04-27_
 - **[059](docs/open-work/tickets/059-phase-7-substrate-cleanup.md)** — Phase 7 substrate cleanup — `ScoringContext` removal, §10 unblock map sweep, spec drift reconcile — _parked 2026-04-27 · added 2026-04-27_
 - **[084](docs/open-work/tickets/084-farm-herb-ward-demand-axis.md)** — Farm DSE — tie scoring to herb/ward stockpile demand so gardens stay productive under abundant food — _[balance] · parked 2026-04-30 · blocked-by 086 · added 2026-04-29_
 - **[099](docs/open-work/tickets/099-modifier-feature-emission.md)** — Feature emission for §3.5.1 Modifiers — colony-wide canary surface for substrate-lift signals — _[ai-substrate] · parked 2026-05-01 · blocked-by 119 · added 2026-05-01_
+- **[173](docs/open-work/tickets/173-crafting-split-capability-markers.md)** — IsHerbalist / IsSpiritualist / HasCorruptionNearby capability markers (155 follow-on) — _[ai-substrate] · parked 2026-05-05 · added 2026-05-05_
 
 ## Blocked (18)
 
@@ -122,12 +120,13 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (115)
+## Landed archive (116)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (50)
+### 2026-05 (51)
 
+- **[172](docs/open-work/landed/172-crafting-split-plan-failure-triage.md)** — Plan-failure triage on Cooking + Herbalism (155 follow-on) _(2026-05-05)_
 - **[171](docs/open-work/landed/171-hasgarden-ecs-level-wiring.md)** — Promote HasGarden to ECS-level singleton writer (parity with 168/169) _(2026-05-05)_
 - **[169](docs/open-work/landed/169-author-construction-and-damaged-building-markers.md)** — Author HasConstructionSite + HasDamagedBuilding markers (buildings.rs) _(2026-05-05)_
 - **[168](docs/open-work/landed/168-colony-state-singleton-wiring.md)** — Wire ColonyState colony-singleton entity (Phase 4b.2 promotion) _(2026-05-05)_

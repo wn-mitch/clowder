@@ -1,10 +1,10 @@
 ---
 id: 173
 title: IsHerbalist / IsSpiritualist / HasCorruptionNearby capability markers (155 follow-on)
-status: ready
+status: parked
 cluster: ai-substrate
 added: 2026-05-05
-parked: null
+parked: 2026-05-05
 blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
@@ -74,3 +74,24 @@ authored from inventory + adult-and-not-injured gate, read by
   Disposition split alone was sufficient to land FoodCooked off the
   never-fired list. This ticket owns the L1 eligibility-gate
   tightening per CLAUDE.md substrate-refactor §4.
+- 2026-05-05: parked. Ticket 172's diagnostic refactor (commit
+  `055d54ee`) extended `EventKind::PlanningFailed.reason` to a typed
+  `PlanningFailureReason` enum and added a per-`(disposition, reason)`
+  footer aggregator. The post-172 seed-42 soak (`logs/tuned-42/`,
+  commit `055d54ee`) shows **100% of the residual plan-failure
+  surface — Cooking 2076 / Herbalism 1663 / Hunting 243 / Foraging 181
+  — is `GoalUnreachable`**, with zero `NoApplicableActions` and zero
+  `NodeBudgetExhausted`. This **rejects** this ticket's premise: the
+  per-Disposition cull isn't loose because of substrate-eligibility
+  gating (`NoApplicableActions` would dominate); A* finds applicable
+  actions and fully explores reachable states without satisfying
+  the goal predicate. Adding `IsHerbalist` / `IsSpiritualist` /
+  `HasCorruptionNearby` would tighten the wrong layer. The load-
+  bearing question is now: why does the L3 softmax elect Cooking /
+  Herbalism for cats whose action chain — applied from the planner's
+  start state — cannot reach the goal? That's an L1-marker-vs-
+  PlannerState desync (the marker says "go" but the planner state
+  doesn't carry the world-fact the action chain depends on) or a
+  goal-predicate / action-effect mismatch. Both are different fix-
+  shapes from this ticket. Parked pending a new ticket that owns
+  the GoalUnreachable root-cause investigation.
