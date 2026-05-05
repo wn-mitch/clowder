@@ -338,6 +338,22 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
         Position::new(colony_site.x, colony_site.y),
     ));
 
+    // Colony-singleton entity — host for colony-scoped substrate markers
+    // (`HasFunctionalKitchen`, `HasStoredFood`, `ThornbriarAvailable`,
+    // `WardStrengthLow`, `WardsUnderSiege`, …). Authored each tick by
+    // `update_colony_building_markers` / `update_herb_availability_markers`
+    // / `update_ward_coverage_markers` / `update_ward_siege_marker`; read
+    // by `evaluate_and_plan` to populate `MarkerSnapshot`. Ticket 168.
+    world.spawn(crate::components::markers::ColonyState);
+    debug_assert_eq!(
+        world
+            .query_filtered::<bevy_ecs::entity::Entity, bevy_ecs::query::With<crate::components::markers::ColonyState>>()
+            .iter(world)
+            .count(),
+        1,
+        "exactly one ColonyState singleton must exist after build_new_world"
+    );
+
     world.insert_resource(TimeState {
         tick: start_tick,
         paused: false,

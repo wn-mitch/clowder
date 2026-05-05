@@ -164,6 +164,49 @@ fn simulation_runs_1000_ticks_without_panic() {
     cleanup(&dir);
 }
 
+/// Ticket 168: exactly one `ColonyState` singleton entity exists after
+/// `build_new_world` runs, and the count remains 1 over the course of
+/// a short sim. Catches double-spawn (two callers spawning the
+/// singleton) or accidental despawn (some system removing it).
+#[test]
+fn colony_state_singleton_invariant() {
+    use bevy::prelude::With;
+    use bevy_ecs::entity::Entity;
+    use clowder::components::markers::ColonyState;
+
+    let dir = make_test_dir("colony-singleton");
+    let mut app = build_test_app(42, &dir);
+    // After build, before any FixedUpdate ticks: must be exactly 1.
+    app.update();
+    let count_after_startup = app
+        .world_mut()
+        .query_filtered::<Entity, With<ColonyState>>()
+        .iter(app.world())
+        .count();
+    assert_eq!(
+        count_after_startup, 1,
+        "expected exactly one ColonyState singleton after Startup, got {count_after_startup}"
+    );
+    // Drive for 200 ticks and re-check — no system should ever despawn
+    // or duplicate the singleton.
+    for _ in 0..200 {
+        if app.should_exit().is_some() {
+            break;
+        }
+        app.update();
+    }
+    let count_after_ticks = app
+        .world_mut()
+        .query_filtered::<Entity, With<ColonyState>>()
+        .iter(app.world())
+        .count();
+    assert_eq!(
+        count_after_ticks, 1,
+        "expected exactly one ColonyState singleton after 200 ticks, got {count_after_ticks}"
+    );
+    cleanup(&dir);
+}
+
 /// Ticket 125: the headless footer carries a `colony_score` block populated
 /// from `ColonyScore.last_snapshot`. Runs for >= 1 emission interval so the
 /// snapshot is non-null, then parses the footer and asserts shape.

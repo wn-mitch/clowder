@@ -1,7 +1,7 @@
 ---
 id: 168
 title: Wire ColonyState colony-singleton entity (Phase 4b.2 promotion)
-status: ready
+status: in-progress
 cluster: ai-substrate
 added: 2026-05-05
 parked: null

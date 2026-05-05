@@ -500,6 +500,35 @@ impl Plugin for SimulationPlugin {
         // `docs/open-work.md` #5). The inlined form shifts the gate's
         // effect by one tick (replacement next tick instead of same
         // tick) without new scheduler edges.
+        // Ticket 168 — colony-marker author chain. Runs after
+        // sync_food_stores (so HasStoredFood reflects the current tick's
+        // food state) and before evaluate_and_plan (so the snapshot
+        // population reads up-to-date markers). Chained among themselves
+        // for deterministic ordering — the same `reconsider_held_intentions`
+        // schedule-edge perturbation that bit the 2026-04-23 attempt
+        // (see comment at line 492 above) is the reason these are
+        // sequentially chained rather than registered as siblings.
+        app.add_systems(
+            FixedUpdate,
+            (
+                systems::buildings::update_colony_building_markers,
+                systems::magic::update_herb_availability_markers,
+                systems::magic::update_ward_coverage_markers,
+                systems::magic::update_ward_siege_marker,
+            )
+                .chain()
+                .after(systems::items::sync_food_stores)
+                .before(systems::goap::evaluate_and_plan),
+        );
+        // Flush the singleton `.insert()/.remove()` writes so
+        // evaluate_and_plan's `Has<MarkerN>` reads see them within the
+        // same tick.
+        app.add_systems(
+            FixedUpdate,
+            bevy::ecs::schedule::ApplyDeferred
+                .after(systems::magic::update_ward_siege_marker)
+                .before(systems::goap::evaluate_and_plan),
+        );
         app.add_systems(
             FixedUpdate,
             systems::goap::evaluate_and_plan

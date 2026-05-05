@@ -1949,16 +1949,15 @@ because the query only visits cats whose inventory mutated this tick.
 | `HasRemedyHerbs` | `inventory.has_remedy_herb()`. | same | same | `Q<_, With<HasRemedyHerbs>>` | Absent | `ScoringContext.has_remedy_herbs:66` |
 | `HasWardHerbs` | `inventory.has_ward_herb()` (Thornbriar). | same | same | `Q<_, With<HasWardHerbs>>` | Absent | `ScoringContext.has_ward_herbs:68` |
 
-Colony-scoped inventory markers attach to a single `ColonyState`
-entity (or to the current `Coordinator` if the colony-singleton
-pattern isn't yet in place):
+Colony-scoped inventory markers attach to the `ColonyState` singleton
+entity (ticket 168):
 
 | Marker | Predicate | Insert | Remove | Query | Status | Source |
 |---|---|---|---|---|---|---|
-| `HasFunctionalKitchen` | Any `Kitchen` structure with `site.is_none() && effectiveness() > 0.0`. | `tick:buildings.rs::update_colony_building_markers` (new) | same | `Q<With<ColonyState>, With<HasFunctionalKitchen>>` | Absent | `ScoringContext.has_functional_kitchen:141` / `goap.rs:556` |
-| `HasRawFoodInStores` | `Stores` carries ≥1 raw-food item. | same | same | `Q<With<ColonyState>, With<HasRawFoodInStores>>` | Absent | `ScoringContext.has_raw_food_in_stores:143` |
-| `HasStoredFood` | `Stores` carries ≥1 food item (raw or cooked). Gates `Eat`. | same | same | `Q<With<ColonyState>, With<HasStoredFood>>` | Absent | `ScoringContext.food_available:31` |
-| `ThornbriarAvailable` | ≥1 harvestable Thornbriar exists in the world. | `tick:magic.rs::update_herb_availability_markers` (new) | same | `Q<With<ColonyState>, With<ThornbriarAvailable>>` | Absent | `ScoringContext.thornbriar_available:70` |
+| `HasFunctionalKitchen` | Any `Kitchen` structure with `site.is_none() && effectiveness() > 0.0`. | `tick:buildings.rs::update_colony_building_markers` | same | `Q<With<ColonyState>, With<HasFunctionalKitchen>>` (via `WorldStateQueries::colony_state_query`) | Built (ticket 168) | `goap.rs::evaluate_and_plan` |
+| `HasRawFoodInStores` | `Stores` carries ≥1 raw-food item. | same | same | same | Built (ticket 168) | `goap.rs::evaluate_and_plan` |
+| `HasStoredFood` | `FoodStores.is_empty()` is false (sourced from the per-tick `sync_food_stores` cache). Gates `Eat`. | same | same | same | Built (ticket 168) | `goap.rs::evaluate_and_plan`; `resolve_goap_plans::build_planner_markers` deliberately bypasses the cache and reads `StoredItems` directly for freshness. |
+| `ThornbriarAvailable` | ≥1 harvestable Thornbriar exists in the world. | `tick:magic.rs::update_herb_availability_markers` | same | `Q<With<ColonyState>, With<ThornbriarAvailable>>` (via `WorldStateQueries::colony_state_query`) | Built (ticket 168) | `goap.rs::evaluate_and_plan` |
 
 #### TargetExistence
 
@@ -1983,14 +1982,17 @@ tick fans out multiple markers per cat.
 #### Colony
 
 Colony-scoped markers attach to a `ColonyState` singleton entity
-(introduce it as part of this substrate build if not already present).
-DSE queries joining cat + colony use `(cat_q, colony_q.single())`.
+(spawned by `setup.rs::build_new_world` and
+`scenarios/env.rs::init_scenario_world_with`; ticket 168). DSE queries
+joining cat + colony use `(cat_q, colony_q.single())`; the substrate-
+side reads currently flow through `WorldStateQueries::colony_state_query`
+into `MarkerSnapshot.set_colony(...)`.
 
 | Marker | Predicate | Insert | Remove | Query | Status | Source |
 |---|---|---|---|---|---|---|
 | `IsCoordinatorWithDirectives` | `With<Coordinator> + DirectiveQueue.len() > 0`. Per-coordinator-cat, not on `ColonyState`. | `tick:coordination.rs::update_directive_markers` (new) | same | `Q<_, (With<Coordinator>, With<IsCoordinatorWithDirectives>)>` | Absent | `ScoringContext.is_coordinator_with_directives:87` |
-| `WardStrengthLow` | Colony ward coverage: no wards OR average strength < 0.3. | `tick:magic.rs::update_ward_coverage_markers` (new) | same | `Q<With<ColonyState>, With<WardStrengthLow>>` | Absent | `ScoringContext.ward_strength_low:74` |
-| `WardsUnderSiege` | Any colony ward has `WildlifeAiState::EncirclingWard` adjacent. | `tick:magic.rs::update_ward_siege_marker` (new) | same | `Q<With<ColonyState>, With<WardsUnderSiege>>` | Absent | `ScoringContext.wards_under_siege:133` / `goap.rs:620` |
+| `WardStrengthLow` | Colony ward coverage: no wards OR average strength < 0.3. | `tick:magic.rs::update_ward_coverage_markers` | same | `Q<With<ColonyState>, With<WardStrengthLow>>` (via `WorldStateQueries::colony_state_query`) | Built (ticket 168) | `goap.rs::evaluate_and_plan` |
+| `WardsUnderSiege` | Any colony ward has `WildlifeAiState::EncirclingWard` adjacent. | `tick:magic.rs::update_ward_siege_marker` | same | `Q<With<ColonyState>, With<WardsUnderSiege>>` (via `WorldStateQueries::colony_state_query`) | Built (ticket 168) | `goap.rs::evaluate_and_plan` |
 
 #### SpawnImmutable
 

@@ -422,6 +422,67 @@ pub fn update_construction_site_map(
 }
 
 // ---------------------------------------------------------------------------
+// update_colony_building_markers (ticket 168)
+// ---------------------------------------------------------------------------
+
+/// Authors colony-scoped building/food markers on the `ColonyState`
+/// singleton (substrate spec §4.3 Inventory rows). Runs each
+/// FixedUpdate tick before `evaluate_and_plan`; the evaluator reads
+/// these via `Has<MarkerN>` off the singleton to populate `MarkerSnapshot`.
+///
+/// Markers authored:
+/// - `HasFunctionalKitchen` — per `scan_colony_buildings`.
+/// - `HasRawFoodInStores` — ≥1 raw-food item in any `StoredItems`.
+/// - `HasStoredFood` — `FoodStores.is_empty()` is false.
+///
+/// `HasConstructionSite` / `HasDamagedBuilding` / `HasGarden` rows in
+/// `ColonyBuildingState` are left for ticket 169 to wire onto the
+/// singleton; this system computes them via `scan_colony_buildings`
+/// only as a side-effect of reusing the helper for the kitchen
+/// predicate.
+pub fn update_colony_building_markers(
+    mut commands: Commands,
+    colony: Single<Entity, With<crate::components::markers::ColonyState>>,
+    buildings: Query<(&Structure, Option<&ConstructionSite>)>,
+    stored_items: Query<&crate::components::building::StoredItems>,
+    items: Query<
+        &crate::components::items::Item,
+        bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
+    >,
+    food: Res<FoodStores>,
+    constants: Res<SimConstants>,
+) {
+    let d = &constants.disposition;
+    let bldg_state = scan_colony_buildings(buildings.iter(), d.damaged_building_threshold);
+    let has_raw_food_in_stores = stored_items.iter().any(|stored| {
+        stored
+            .items
+            .iter()
+            .copied()
+            .any(|e| items.get(e).is_ok_and(|it| it.kind.is_food() && !it.modifiers.cooked))
+    });
+    let has_stored_food = !food.is_empty();
+
+    let entity = *colony;
+    let mut em = commands.entity(entity);
+    if bldg_state.has_functional_kitchen {
+        em.insert(crate::components::markers::HasFunctionalKitchen);
+    } else {
+        em.remove::<crate::components::markers::HasFunctionalKitchen>();
+    }
+    if has_raw_food_in_stores {
+        em.insert(crate::components::markers::HasRawFoodInStores);
+    } else {
+        em.remove::<crate::components::markers::HasRawFoodInStores>();
+    }
+    if has_stored_food {
+        em.insert(crate::components::markers::HasStoredFood);
+    } else {
+        em.remove::<crate::components::markers::HasStoredFood>();
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 

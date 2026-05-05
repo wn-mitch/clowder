@@ -114,6 +114,19 @@ pub fn init_scenario_world_with(world: &mut World, seed: u64, cfg: ScenarioWorld
     if !world.contains_resource::<crate::resources::ColonyScore>() {
         world.insert_resource(crate::resources::ColonyScore::default());
     }
+
+    // Colony-singleton entity — mirrors `build_new_world` so scenario
+    // harness DSE queries resolve `Single<_, With<ColonyState>>`.
+    // Ticket 168.
+    world.spawn(crate::components::markers::ColonyState);
+    debug_assert_eq!(
+        world
+            .query_filtered::<bevy_ecs::entity::Entity, bevy_ecs::query::With<crate::components::markers::ColonyState>>()
+            .iter(world)
+            .count(),
+        1,
+        "exactly one ColonyState singleton must exist after init_scenario_world_with"
+    );
 }
 
 /// Spawn an adult cat from a preset. Routes through

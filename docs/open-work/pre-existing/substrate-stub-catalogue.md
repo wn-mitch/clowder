@@ -49,20 +49,6 @@ entry drops and the catalogue entry moves to a "## Resolved" section
 
 ## Active orphans
 
-### `ColonyState` — fully-orphan
-
-- **Type:** `pub struct ColonyState;` (no `KEY` constant)
-- **Declaration:** `src/components/markers.rs:300`
-- **Spec reference:** `docs/systems/ai-substrate-refactor.md` §4.3 lines
-  ~1985–1995 (colony-singleton promotion); deferred-comment in
-  `src/systems/goap.rs:913`; target query shape documented in
-  `src/ai/scoring.rs:89-94`.
-- **Failure mode:** never inserted, never queried. Substrate-refactor
-  Phase 4b.2 promotes colony-scoped markers (`HasFunctionalKitchen`,
-  `HasRawFoodInStores`, …) onto a `ColonyState` singleton entity; that
-  promotion is unimplemented and the marker has no live use.
-- **Wiring ticket:** [168](../tickets/168-colony-state-singleton-wiring.md)
-
 ### `HasConstructionSite` — fully-orphan
 
 - **Type:** `pub struct HasConstructionSite;` (no `KEY` constant)
@@ -116,6 +102,21 @@ When a follow-on ticket lands wiring a marker:
 5. The change to `markers.rs` and `substrate_stubs.allowlist` lands
    in the same commit as the wiring code, per CLAUDE.md
    §"Substrate stubs are forbidden".
+
+## Resolved
+
+### `ColonyState` — wired by ticket 168 (2026-05-05)
+
+Singleton spawned in `setup.rs::build_new_world` and
+`scenarios/env.rs::init_scenario_world_with`. Six colony-scoped markers
+(`HasFunctionalKitchen`, `HasRawFoodInStores`, `HasStoredFood`,
+`ThornbriarAvailable`, `WardStrengthLow`, `WardsUnderSiege`) authored
+each FixedUpdate tick by `update_colony_building_markers` /
+`update_herb_availability_markers` / `update_ward_coverage_markers` /
+`update_ward_siege_marker` and read by `goap::evaluate_and_plan` via
+`WorldStateQueries::colony_state_query`. Substrate-stub lint extended
+to recognize `.spawn(X)` writers and `With<markers::X>` readers.
+Allowlist entry dropped.
 
 ## Sibling stub-trackers
 

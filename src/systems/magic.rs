@@ -1188,6 +1188,65 @@ pub fn apply_corruption_pushback(
 }
 
 // ---------------------------------------------------------------------------
+// Colony-marker author systems (ticket 168)
+// ---------------------------------------------------------------------------
+
+/// Authors `ThornbriarAvailable` on the `ColonyState` singleton each
+/// FixedUpdate tick (substrate spec §4.3 Inventory). Wraps the existing
+/// `is_thornbriar_available` predicate helper.
+pub fn update_herb_availability_markers(
+    mut commands: Commands,
+    colony: Single<Entity, With<crate::components::markers::ColonyState>>,
+    herbs: Query<&Herb, With<Harvestable>>,
+) {
+    let present = is_thornbriar_available(herbs.iter());
+    let mut em = commands.entity(*colony);
+    if present {
+        em.insert(crate::components::markers::ThornbriarAvailable);
+    } else {
+        em.remove::<crate::components::markers::ThornbriarAvailable>();
+    }
+}
+
+/// Authors `WardStrengthLow` on the `ColonyState` singleton each
+/// FixedUpdate tick (substrate spec §4.3 Colony). Wraps the existing
+/// `is_ward_strength_low` predicate helper.
+pub fn update_ward_coverage_markers(
+    mut commands: Commands,
+    colony: Single<Entity, With<crate::components::markers::ColonyState>>,
+    wards: Query<&Ward>,
+    constants: Res<SimConstants>,
+) {
+    let present = is_ward_strength_low(
+        wards.iter(),
+        constants.disposition.ward_strength_low_threshold,
+    );
+    let mut em = commands.entity(*colony);
+    if present {
+        em.insert(crate::components::markers::WardStrengthLow);
+    } else {
+        em.remove::<crate::components::markers::WardStrengthLow>();
+    }
+}
+
+/// Authors `WardsUnderSiege` on the `ColonyState` singleton each
+/// FixedUpdate tick (substrate spec §4.3 Colony). Wraps the existing
+/// `is_any_ward_under_siege` predicate helper.
+pub fn update_ward_siege_marker(
+    mut commands: Commands,
+    colony: Single<Entity, With<crate::components::markers::ColonyState>>,
+    wildlife_ai: Query<&WildlifeAiState, With<WildAnimal>>,
+) {
+    let present = is_any_ward_under_siege(wildlife_ai.iter());
+    let mut em = commands.entity(*colony);
+    if present {
+        em.insert(crate::components::markers::WardsUnderSiege);
+    } else {
+        em.remove::<crate::components::markers::WardsUnderSiege>();
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 

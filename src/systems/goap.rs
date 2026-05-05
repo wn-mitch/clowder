@@ -154,6 +154,26 @@ pub struct WorldStateQueries<'w, 's> {
         ),
         Without<Dead>,
     >,
+    /// Ticket 168 — colony singleton readout for the six colony-scoped
+    /// markers authored by `update_colony_building_markers` /
+    /// `update_herb_availability_markers` / `update_ward_coverage_markers`
+    /// / `update_ward_siege_marker`. Drains directly into
+    /// `MarkerSnapshot.set_colony(...)` so DSE eligibility filters and
+    /// the planner's `StatePredicate::HasMarker` resolve through the
+    /// snapshot surface (per `scoring.rs:88-95` MVP-shim doctrine).
+    pub colony_state_query: Query<
+        'w,
+        's,
+        (
+            Has<markers::HasFunctionalKitchen>,
+            Has<markers::HasRawFoodInStores>,
+            Has<markers::HasStoredFood>,
+            Has<markers::ThornbriarAvailable>,
+            Has<markers::WardStrengthLow>,
+            Has<markers::WardsUnderSiege>,
+        ),
+        With<markers::ColonyState>,
+    >,
 }
 
 /// Bundles resources for evaluate_and_plan.
@@ -902,17 +922,31 @@ pub fn evaluate_and_plan(
 ) {
     let sc = &res.constants.scoring;
     let d = &res.constants.disposition;
-    let food_available = !res.food.is_empty();
+    // Ticket 168 — six colony-scoped markers now authored on the
+    // `ColonyState` singleton by the colony-marker author chain
+    // (buildings.rs::update_colony_building_markers,
+    // magic.rs::update_{herb_availability,ward_coverage,ward_siege}_markers).
+    // Read them once here and feed them into `MarkerSnapshot` so the
+    // evaluator-side surface stays identical per scoring.rs:88-95 MVP-
+    // shim doctrine.
+    let (
+        has_functional_kitchen,
+        has_raw_food_in_stores,
+        food_available,
+        thornbriar_available,
+        ward_strength_low,
+        wards_under_siege,
+    ) = world_state
+        .colony_state_query
+        .single()
+        .expect("ColonyState singleton must exist (spawned by build_new_world / init_scenario_world_with)");
     let food_fraction = res.food.fraction();
 
-    // §4 marker snapshot. Populated once at system start from Resources
-    // and Queries, then passed by reference through `EvalInputs` so
-    // `EligibilityFilter::require(marker)` rows resolve without each
-    // DSE carrying its own query bundle. Colony-scoped markers follow
-    // the same "compute from caller-visible state" pattern established
-    // in Phase 4b.2 — `ColonyState` singleton promotion is a later
-    // refactor. `HasGarden` is populated below after the existing
-    // `has_garden` binding computes the same predicate.
+    // §4 marker snapshot. Populated once at system start from the
+    // `ColonyState` singleton (colony-scoped markers, ticket 168) plus
+    // per-cat queries below. Passed by reference through `EvalInputs`
+    // so `EligibilityFilter::require(marker)` rows resolve without
+    // each DSE carrying its own query bundle.
     let mut markers = crate::ai::scoring::MarkerSnapshot::new();
     markers.set_colony(markers::HasStoredFood::KEY, food_available);
 
@@ -943,8 +977,14 @@ pub fn evaluate_and_plan(
         )
         .collect();
 
-    // §4 colony-scoped marker predicates — shared helpers eliminate
-    // duplication with disposition.rs (previously computed identically in both).
+    // §4 colony-scoped marker predicates. The six markers promoted to
+    // the `ColonyState` singleton in ticket 168
+    // (HasFunctionalKitchen / HasRawFoodInStores / HasStoredFood /
+    // ThornbriarAvailable / WardStrengthLow / WardsUnderSiege) are
+    // bound from the singleton readout above. The three remaining
+    // bldg_state fields (has_construction_site / has_damaged_building /
+    // has_garden) are still computed from the imperative scan here —
+    // their singleton-promotion is ticket 169's scope.
     let bldg_state = crate::systems::buildings::scan_colony_buildings(
         world_state
             .building_query
@@ -955,17 +995,8 @@ pub fn evaluate_and_plan(
     let has_construction_site = bldg_state.has_construction_site;
     let has_damaged_building = bldg_state.has_damaged_building;
     let has_garden = bldg_state.has_garden;
-    let has_functional_kitchen = bldg_state.has_functional_kitchen;
     markers.set_colony(markers::HasGarden::KEY, has_garden);
     markers.set_colony(markers::HasFunctionalKitchen::KEY, has_functional_kitchen);
-    let has_raw_food_in_stores = world_state.stored_items_query.iter().any(|stored| {
-        stored.items.iter().copied().any(|e| {
-            world_state
-                .items_query
-                .get(e)
-                .is_ok_and(|it| it.kind.is_food() && !it.modifiers.cooked)
-        })
-    });
     markers.set_colony(markers::HasRawFoodInStores::KEY, has_raw_food_in_stores);
 
     let herb_positions: Vec<(Entity, Position, HerbKind)> = world_state
@@ -974,18 +1005,7 @@ pub fn evaluate_and_plan(
         .map(|(e, herb, p)| (e, *p, herb.kind))
         .collect();
 
-    // Ticket 014 Magic colony batch: shared helper + colony-scoped
-    // marker. Retires the per-cat inline scan at the ScoringContext
-    // assignment below by computing once at the colony scope.
-    let thornbriar_available = crate::systems::magic::is_thornbriar_available(
-        world_state.herb_query.iter().map(|(_, h, _)| h),
-    );
     markers.set_colony(markers::ThornbriarAvailable::KEY, thornbriar_available);
-
-    let ward_strength_low = crate::systems::magic::is_ward_strength_low(
-        world_state.ward_query.iter().map(|(w, _)| w),
-        d.ward_strength_low_threshold,
-    );
     markers.set_colony(markers::WardStrengthLow::KEY, ward_strength_low);
 
     // Snapshot actionable carcasses for scoring.
@@ -1018,11 +1038,6 @@ pub fn evaluate_and_plan(
         max_c
     };
 
-    // Ticket 014 Magic colony batch: shared helper + colony-scoped
-    // marker. Retires the inline `wildlife_ai_query.iter().any(...)`
-    // scan.
-    let wards_under_siege =
-        crate::systems::magic::is_any_ward_under_siege(world_state.wildlife_ai_query.iter());
     markers.set_colony(markers::WardsUnderSiege::KEY, wards_under_siege);
 
     let colony_injury_count = query

@@ -291,11 +291,16 @@ impl HasWardHerbs {
 // Colony singleton
 // ---------------------------------------------------------------------------
 
-/// Marker for the single colony-state entity. Phase 3a introduces the
-/// type; the spawn path attaches exactly one entity with this marker
-/// in Phase 3d. Colony-scoped markers below (ThornbriarAvailable,
-/// HasFunctionalKitchen, …) attach to this entity so DSE queries
-/// joining cat + colony state use `(cat_q, colony_q.single())`.
+/// Marker for the single colony-state entity. Spawned exactly once
+/// per simulation by `setup.rs::build_new_world` (production) and
+/// `scenarios/env.rs::init_scenario_world_with` (scenario harness).
+/// Colony-scoped markers below (ThornbriarAvailable,
+/// HasFunctionalKitchen, …) attach to this entity. Authored each
+/// FixedUpdate tick by the colony-marker chain
+/// (`buildings::update_colony_building_markers`,
+/// `magic::update_{herb_availability,ward_coverage,ward_siege}_markers`)
+/// and read by `goap::evaluate_and_plan` via `WorldStateQueries::colony_state_query`
+/// to populate `MarkerSnapshot`. Ticket 168.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct ColonyState;
 

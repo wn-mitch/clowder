@@ -29,10 +29,10 @@
 #   literal. Verify each such name matches a real marker enumerated by
 #   Audit 1. Catches typos and rename-without-update drift.
 #
-# Limitation (v1): markers attached only via `commands.spawn((X, …))` (i.e.
-# never re-inserted afterwards) won't match the writer pattern. If a
-# real marker hits this case, allowlist it with a ticket id and extend
-# the writer regex below in a follow-on.
+# Writer regex also matches `world.spawn(X)` / `world.spawn((X, …))` so
+# spawn-only markers (e.g. `ColonyState`, ticket 168) count as wired
+# without an additional `.insert()`. Markers spawned and never removed
+# after that are still legitimate substrate.
 #
 # Out of scope (per ticket 160 §"Out of scope"): orphan Components /
 # Resources / Messages / plan templates. Each has different reader
@@ -103,7 +103,7 @@ reader_hit() {
     # Three patterns ORed for a single rg pass. Filter out comment lines.
     rg --type rust -n \
         -e "\\bHas<\\s*(markers::)?${name}\\s*>" \
-        -e "\\bWith(out)?<\\s*${name}\\s*[,>]" \
+        -e "\\bWith(out)?<\\s*(markers::)?${name}\\s*[,>]" \
         -e "\\b${name}::KEY\\b" \
         "$SRC_GLOB" --glob '!src/components/markers.rs' 2>/dev/null \
     | grep -vE '^[^:]*:[0-9]+:[[:space:]]*//' \
@@ -129,6 +129,7 @@ writer_hit() {
         -e "\\.remove::<\\s*${qual}${name}\\s*>" \
         -e "\\.(set_entity|set_colony)\\([^)]*?${name}::KEY" \
         -e "\\btoggle\\([^)]*?${qual}${name}[\\s,)]" \
+        -e "\\.spawn\\(\\s*\\(?\\s*${qual}${name}[\\s,)]" \
         "$SRC_GLOB" --glob '!src/components/markers.rs' 2>/dev/null \
     | grep -vE '^[^:]*:[0-9]+:[[:space:]]*//' \
     | head -1
