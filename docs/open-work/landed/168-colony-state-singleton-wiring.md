@@ -1,16 +1,16 @@
 ---
 id: 168
 title: Wire ColonyState colony-singleton entity (Phase 4b.2 promotion)
-status: in-progress
+status: done
 cluster: ai-substrate
 added: 2026-05-05
 parked: null
 blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
-related-balance: []
-landed-at: null
-landed-on: null
+related-balance: [168-colony-state-singleton-promotion.md]
+landed-at: 1d5e5b95
+landed-on: 2026-05-05
 ---
 
 ## Why
