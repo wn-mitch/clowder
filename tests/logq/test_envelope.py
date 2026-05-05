@@ -73,6 +73,38 @@ def write_bundle(dir_: Path, *, omit_final_tick: bool = False) -> Path:
         {"tick": t, "type": "PlanCreated", "cat": "Mochi"}
         for t in (300, 500, 700)
     ]
+    # HuntAttempt rows (ticket 149) — three attempts per cat with
+    # mixed outcomes so the hunt-success subtool has a non-trivial
+    # success-rate to compute. Whiskers: 2 kills (one direct, one
+    # multi-kill replan) and 1 approach-loss = 2/3 = 66.7% success.
+    # Mochi: 1 kill, 1 stalk-loss, 1 abandoned = 1/3 = 33.3% success.
+    # Colony total: 6 attempts, 3 kills = 50% success.
+    hunt_attempt_events = [
+        {"tick": 110, "type": "HuntAttempt", "cat": "Whiskers",
+         "prey_species": "mouse", "location": [5, 5],
+         "outcome": "killed", "start_tick": 100, "end_tick": 110,
+         "start_distance": 6, "failure_reason": None},
+        {"tick": 220, "type": "HuntAttempt", "cat": "Whiskers",
+         "prey_species": "mouse", "location": [6, 5],
+         "outcome": "killed_and_replanned", "start_tick": 215, "end_tick": 220,
+         "start_distance": 4, "failure_reason": None},
+        {"tick": 330, "type": "HuntAttempt", "cat": "Whiskers",
+         "prey_species": "bird", "location": [9, 9],
+         "outcome": "lost_during_approach", "start_tick": 310, "end_tick": 330,
+         "start_distance": 8, "failure_reason": "lost prey during approach"},
+        {"tick": 540, "type": "HuntAttempt", "cat": "Mochi",
+         "prey_species": "mouse", "location": [3, 3],
+         "outcome": "killed", "start_tick": 530, "end_tick": 540,
+         "start_distance": 5, "failure_reason": None},
+        {"tick": 650, "type": "HuntAttempt", "cat": "Mochi",
+         "prey_species": "bird", "location": [10, 4],
+         "outcome": "lost_during_stalk", "start_tick": 640, "end_tick": 650,
+         "start_distance": 7, "failure_reason": "anxiety spooked prey"},
+        {"tick": 750, "type": "HuntAttempt", "cat": "Mochi",
+         "prey_species": "fish", "location": [12, 6],
+         "outcome": "abandoned", "start_tick": 745, "end_tick": 750,
+         "start_distance": 9, "failure_reason": "prey despawned"},
+    ]
     footer = {
         "_footer": True,
         "deaths_by_cause": {"Starvation": 1, "ShadowFoxAmbush": 1},
@@ -108,6 +140,7 @@ def write_bundle(dir_: Path, *, omit_final_tick: bool = False) -> Path:
          "location": [7, 2], "injury_source": "Fox"},
         *cat_snapshots,
         *plan_create_events,
+        *hunt_attempt_events,
         footer,
     ]
     (log_dir / "events.jsonl").write_text(
@@ -362,6 +395,87 @@ class ActionsSubtoolTests(unittest.TestCase):
         # suggested focal drill.
         nexts = " ".join(env["next"])
         self.assertIn("Whiskers", nexts)
+
+
+class HuntSuccessSubtoolTests(unittest.TestCase):
+    """`hunt-success` aggregates HuntAttempt outcomes (ticket 149)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.log_dir = write_bundle(Path(cls.tmp.name))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def _envelope_keys(self, env: dict) -> None:
+        for key in ("query", "scan_stats", "results", "narrative", "next"):
+            self.assertIn(key, env)
+        for key in ("scanned", "returned", "more_available", "narrow_by"):
+            self.assertIn(key, env["scan_stats"])
+
+    def test_colony_aggregate_computes_success_rate(self):
+        env = invoke(["hunt-success", str(self.log_dir)])
+        self._envelope_keys(env)
+        # Bundle has 6 HuntAttempts: 3 kill-flavored + 3 loss-flavored
+        # = 50% success. Summary row is first; outcome rows follow.
+        summary = env["results"][0]
+        self.assertEqual(summary["kind"], "summary")
+        self.assertEqual(summary["total_attempts"], 6)
+        self.assertEqual(summary["kills"], 3)
+        self.assertEqual(summary["success_rate_pct"], 50.0)
+        outcomes = {r["outcome"]: r["count"] for r in env["results"]
+                    if r["kind"] == "outcome"}
+        self.assertEqual(outcomes["killed"], 2)
+        self.assertEqual(outcomes["killed_and_replanned"], 1)
+        self.assertEqual(outcomes["lost_during_approach"], 1)
+        self.assertEqual(outcomes["lost_during_stalk"], 1)
+        self.assertEqual(outcomes["abandoned"], 1)
+
+    def test_per_cat_filter_isolates_one_cat(self):
+        env = invoke(["hunt-success", str(self.log_dir), "--cat=Whiskers"])
+        summary = env["results"][0]
+        # Whiskers: 2 kills + 1 approach-loss = 66.7%.
+        self.assertEqual(summary["total_attempts"], 3)
+        self.assertEqual(summary["kills"], 2)
+        self.assertAlmostEqual(summary["success_rate_pct"], 66.67, places=1)
+
+    def test_per_species_filter_isolates_prey(self):
+        env = invoke(["hunt-success", str(self.log_dir), "--species=mouse"])
+        summary = env["results"][0]
+        # Mice: 3 attempts, all killed (Whiskers x2, Mochi x1) = 100%.
+        self.assertEqual(summary["total_attempts"], 3)
+        self.assertEqual(summary["kills"], 3)
+        self.assertEqual(summary["success_rate_pct"], 100.0)
+
+    def test_narrative_names_top_failure_reason(self):
+        env = invoke(["hunt-success", str(self.log_dir)])
+        # Three distinct failure reasons each with 1 occurrence; one of
+        # them is named in the narrative as the "top" failure.
+        self.assertTrue(
+            "lost prey during approach" in env["narrative"]
+            or "anxiety spooked prey" in env["narrative"]
+            or "prey despawned" in env["narrative"],
+            env["narrative"],
+        )
+
+    def test_null_result_falls_back_to_prey_killed(self):
+        # tick-range outside any HuntAttempt — should still narrate
+        # how many HuntAttempts exist in the bundle.
+        env = invoke([
+            "hunt-success", str(self.log_dir), "--tick-range=2000..3000",
+        ])
+        self.assertEqual(env["results"], [])
+        self.assertIn("HuntAttempt", env["narrative"])
+
+    def test_query_echoes_filters(self):
+        env = invoke(["hunt-success", str(self.log_dir),
+                      "--cat=Whiskers", "--species=mouse"])
+        q = env["query"]
+        self.assertEqual(q["subtool"], "hunt-success")
+        self.assertEqual(q["cat"], "Whiskers")
+        self.assertEqual(q["species"], "mouse")
 
 
 class FooterSubtoolTests(unittest.TestCase):

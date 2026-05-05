@@ -15,10 +15,10 @@ _Last generated: 2026-05-05._
 | Status | Count |
 |---|---|
 | In progress | 8 |
-| Ready | 51 |
+| Ready | 50 |
 | Parked | 5 |
 | Blocked | 18 |
-| **Open total** | **82** |
+| **Open total** | **81** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -27,7 +27,6 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 
 ## In progress (8)
 
-- **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
 - **[032](docs/open-work/tickets/032-starvation-cat-biology-realignment.md)** — Starvation rebalance — align with IRL cat biology, interesting not cutthroat — _added 2026-04-26_
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _added 2026-04-27_
@@ -35,8 +34,9 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[108](docs/open-work/tickets/108-threat-proximity-adrenaline.md)** — ThreatProximityAdrenaline modifier — substrate axis for CriticalSafety interrupt retirement — _[ai-substrate] · added 2026-05-01_
 - **[109](docs/open-work/tickets/109-intraspecies-conflict-response.md)** — IntraspeciesConflictResponse — full four-valence (fight/flight/freeze/fawn) social response — _[ai-substrate] · added 2026-05-01_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
+- **[149](docs/open-work/tickets/149-hunt-success-disambiguation.md)** — Hunt-success disambiguation — instrument per-discrete-attempt outcomes — _added 2026-05-02_
 
-## Ready (51)
+## Ready (50)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -80,7 +80,6 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[141](docs/open-work/tickets/141-combat-winnability-scalar.md)** — combat_winnability perception scalar — sibling to escape_viability — _[ai-substrate] · added 2026-05-02_
 - **[145](docs/open-work/tickets/145-submit-gesture-dse.md)** — Submit gesture DSE — appeasement infrastructure for IntraspeciesConflict.Fawn — _[ai-substrate] · added 2026-05-02_
 - **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · added 2026-05-02_
-- **[149](docs/open-work/tickets/149-hunt-success-disambiguation.md)** — Hunt-success disambiguation — instrument per-discrete-attempt outcomes — _added 2026-05-02_
 - **[153](docs/open-work/tickets/153-150-r5a-balance-follow-on.md)** — 150 R5a balance follow-on — Resting score-mass and courtship recovery — _[balance] · added 2026-05-03_
 - **[155](docs/open-work/tickets/155-crafting-split.md)** — Split Crafting into Herbalism / Witchcraft / Cooking — retire CraftingHint — _[ai-substrate] · added 2026-05-03_
 - **[157](docs/open-work/tickets/157-burial-canary-dark.md)** — Burial continuity canary dark on post-154 soak — verify eligibility against new death distribution — _[ai-substrate] · added 2026-05-03_
@@ -124,7 +123,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (109)
+## Landed archive (110)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
@@ -175,7 +174,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[047](docs/open-work/landed/047-critical-health-interrupt-treadmill.md)** — CriticalHealth interrupt is a treadmill, not a brake — replan picks the same disposition while damage accumulates _(2026-05-01)_
 - **[027](docs/open-work/landed/027-mating-cadence-three-bug-cascade.md)** — Mating cadence — three-bug cascade blocking MatingOccurred _(2026-05-01)_
 
-### 2026-04 (65)
+### 2026-04 (66)
 
 - **[094](docs/open-work/landed/094-eat-vs-forage-imbalance.md)** — Eat-vs-Forage IAUS imbalance — colony hauls food but doesn't consume it _(2026-04-30)_
 - **[092](docs/open-work/landed/092-unify-markersnapshot-plannerstate-statepredicate-feasibility.md)** — Unify MarkerSnapshot ↔ PlannerState/StatePredicate feasibility languages _(2026-04-30)_
@@ -219,6 +218,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[022](docs/open-work/landed/022-11-target-taking-trace-fan-out-8-dse-hooks-l2-lookup-fix.md)** — §11 target-taking trace fan-out — 8 DSE hooks + L2 lookup fix _(2026-04-24)_
 - **[014](docs/open-work/landed/014-4-marker-author-systems-batch-1.md)** — §4 marker author systems batch 1 _(2026-04-24)_
 - **[012](docs/open-work/landed/012-warmth-split-temperature-need-vs-social-warmth-fulfillment-a.md)** — Warmth split — temperature need vs social-warmth fulfillment axis _(2026-04-24)_
+- **[001](docs/open-work/landed/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure _(2026-04-24)_
 - **[001](docs/open-work/landed/001-explore-dse-rebalance-sub-2-saturation-curve.md)** — Explore DSE rebalance — Sub-2 saturation curve _(2026-04-24)_
 - **[2026-04-23](docs/open-work/landed/2026-04-23-13-1-rows-1-3-incapacitated-consumer-cutover-inline-branch-r.md)** — §13.1 rows 1–3 — Incapacitated consumer cutover + inline-branch retirement _(2026-04-23)_
 - **[2026-04-23](docs/open-work/landed/2026-04-23-13-1-rows-4-6-corruption-axis-logistic-migration-modifier-co.md)** — §13.1 rows 4–6 — corruption-axis Logistic migration + modifier/constant retirement _(2026-04-23)_

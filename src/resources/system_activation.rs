@@ -281,6 +281,15 @@ pub enum Feature {
     /// — it requires the cornered-and-overmatched gate from modifier
     /// 105 to trip, which most healthy soaks won't see.
     HideFreezeFired,
+    /// Ticket 149 — a discrete hunt attempt resolved (kill / lost /
+    /// abandoned). Paired 1:1 with `EventKind::HuntAttempt` events;
+    /// every successful kill, every approach loss, every abandon
+    /// fires this. Lets the never-fired canary catch a silently-dead
+    /// hunting pipeline, and gives the per-discrete-attempt rate a
+    /// canonical activation footer surface alongside the events
+    /// stream. Defaults to `expected_to_fire_per_soak() => true`
+    /// because any healthy colony attempts prey ≥1 per 15-min soak.
+    HuntAttempted,
 }
 
 impl Feature {
@@ -388,6 +397,7 @@ impl Feature {
         Feature::TargetCooldownApplied,
         // Ticket 104 — Hide/Freeze DSE infrastructure (dormant in Phase 1).
         Feature::HideFreezeFired,
+        Feature::HuntAttempted,
     ];
 
     /// The valence of this feature.
@@ -453,6 +463,10 @@ impl Feature {
             Feature::PairingBiasApplied => Positive,
             // Ticket 104 — Hide/Freeze valence
             Feature::HideFreezeFired => Positive,
+            // Ticket 149 — discrete hunt attempts (kill or lost) are
+            // healthy-colony activity; the never-fired canary catches a
+            // dead hunting pipeline.
+            Feature::HuntAttempted => Positive,
 
             // --- Negative: adverse events, colony loss signals ---
             Feature::DeathStarvation => Negative,
@@ -786,6 +800,7 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::ReservationContended => "ReservationContended",
         Feature::TargetCooldownApplied => "TargetCooldownApplied",
         Feature::HideFreezeFired => "HideFreezeFired",
+        Feature::HuntAttempted => "HuntAttempted",
     }
 }
 
@@ -1010,7 +1025,10 @@ mod tests {
         // Ticket 104 added 1 Positive (HideFreezeFired) for the
         // Hide/Freeze valence — Phase-1 dormant via the HideEligible
         // gate, but already classified.
-        assert_eq!(positive, 48);
+        // Ticket 149 added 1 Positive (HuntAttempted) for the
+        // discrete-attempt instrumentation that disambiguates per-Hunt-
+        // action rate from per-discrete-attempt rate.
+        assert_eq!(positive, 49);
         assert_eq!(negative, 20);
         assert_eq!(neutral, 28);
     }
@@ -1078,7 +1096,7 @@ mod tests {
     fn features_total_in_matches_category_counts() {
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            48
+            49
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),

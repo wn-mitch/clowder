@@ -1,7 +1,7 @@
 ---
 id: 149
 title: Hunt-success disambiguation — instrument per-discrete-attempt outcomes
-status: ready
+status: in-progress
 cluster: null
 added: 2026-05-02
 parked: null
@@ -91,3 +91,33 @@ graded-cliff tuning will be tuning around a hunting bug.
   between Hunt-action count (3266) and discrete-attempt count makes the
   current 25.6% headline figure non-actionable — could be measurement
   artifact (true rate ≈34.4%, in band) or real ecology gap.
+- 2026-05-05: Implementation landed. Three artefacts:
+  (1) `EventKind::HuntAttempt` + `HuntOutcome` enum
+  (`src/resources/event_log.rs`); seven outcome variants — three
+  `Killed*` (Killed / KilledAndReplanned / KilledAndConsumed),
+  three `Lost*` (Approach / Stalk / Chase), one `Abandoned`. Maps 1:1
+  onto the existing `EngagePrey: …` failure-reason strings.
+  (2) `Feature::HuntAttempted` (`src/resources/system_activation.rs`),
+  classified Positive, expected-to-fire-per-soak via fallthrough.
+  (3) `just q hunt-success` logq subtool — colony / per-cat /
+  per-species drill-down with success-rate computation, plus matching
+  jq recipes in `docs/diagnostics/log-queries.md` §4b.
+  Determinism preserved: plan-failure counts byte-identical between
+  pre-149 baseline (`logs/tuned-42-2b6b49fb-pre-149`) and post-149
+  (`logs/tuned-42`) at commit 05ba81ea.
+  Audit verdict (Iter 6 in `docs/balance/starvation-rebalance.md`):
+  per-discrete-attempt success rate = 31.78% (504 kills / 1586
+  attempts), **inside the 30–50% real-cat band**. Item 4 of ticket
+  032 closes affirmatively as measurement artifact. The Iter 1
+  estimate of 34.4% was off by ~2.6pp because it assumed every kill
+  triggered "seeking another target" replan; 8 of 504 kills were
+  consumed-on-spot instead.
+  Per-species variance is the surprise: mouse 84.9%, rabbit 45.1%,
+  rat 38.2%, bird 27.3%, fish 6.9%. The colony aggregate is dragged
+  down by fish (39% of attempts but 8.5% of kills, dominated by
+  "stuck during approach" — cats can't reach fish in DeepPool tiles).
+  Two follow-on tickets recommended (NOT this scope): unreachable-prey
+  targeting bug; bird teleport-flee narrative gap. Ticket 002
+  ("Hunt-approach pipeline failures") should be re-anchored or closed —
+  its 11% per-Hunt-plan headline was the same per-action vs
+  per-discrete-attempt conflation 149 disambiguates.

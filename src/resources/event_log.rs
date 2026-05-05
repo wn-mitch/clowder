@@ -59,6 +59,48 @@ pub struct FoxDenRow {
     pub scent_strength: f32,
 }
 
+/// Outcome of a single discrete hunt attempt — one APPROACH→STALK→CHASE→POUNCE
+/// cycle on a single target. Maps 1:1 onto the failure-reason strings emitted
+/// by `resolve_engage_prey` so per-discrete-attempt success rate is recoverable
+/// from `events.jsonl` without conflating with within-attempt retargeting.
+///
+/// All three `Killed*` variants count toward the success numerator: a kill
+/// happened, regardless of what the cat did next (deposit / replan for
+/// multi-kill / consume on-spot). The three `Lost*` variants distinguish
+/// which sub-phase the attempt failed in. `Abandoned` covers external
+/// invalidation (target despawned / plan replaced).
+///
+/// Cross-reference ticket 037: this event is emitted at outcome resolution,
+/// not on `StepResult::Advance` — witness-gated by construction.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HuntOutcome {
+    /// Successful pounce; inventory had space; advance to deposit step.
+    Killed,
+    /// Successful pounce; multi-kill loop replanned for another target.
+    KilledAndReplanned,
+    /// Successful pounce; cat ate the catch on-spot.
+    KilledAndConsumed,
+    /// Prey escaped during approach (fled distance exceeded give-up threshold).
+    LostDuringApproach,
+    /// Cat got stuck while stalking, or anxiety spooked the prey before pounce.
+    LostDuringStalk,
+    /// Chase exceeded duration limit, or cat got stuck while chasing.
+    LostDuringChase,
+    /// Target invalidated externally (despawned, removed, or otherwise gone).
+    Abandoned,
+}
+
+impl HuntOutcome {
+    /// True iff this outcome counts as a successful kill for the audit.
+    pub const fn is_kill(self) -> bool {
+        matches!(
+            self,
+            HuntOutcome::Killed | HuntOutcome::KilledAndReplanned | HuntOutcome::KilledAndConsumed
+        )
+    }
+}
+
 // ---------------------------------------------------------------------------
 // EventKind
 // ---------------------------------------------------------------------------
@@ -200,6 +242,29 @@ pub enum EventKind {
         cat: String,
         species: String,
         location: (i32, i32),
+    },
+    /// A discrete hunt attempt resolved (kill / lost / abandoned).
+    /// Sibling to `PreyKilled`: every `Killed*` variant of this event has a
+    /// matching `PreyKilled` at the same tick, but `HuntAttempt` also fires on
+    /// failed attempts so per-discrete-attempt success rate is recoverable.
+    /// Surface: `just q hunt-success <run-dir>` aggregates these.
+    HuntAttempt {
+        cat: String,
+        prey_species: String,
+        location: (i32, i32),
+        outcome: HuntOutcome,
+        start_tick: u64,
+        end_tick: u64,
+        /// Manhattan distance between cat and prey at attempt start (cached
+        /// from the engage-prey entry tick). Useful for binning success by
+        /// approach difficulty.
+        start_distance: i32,
+        /// Verbatim `StepResult::Fail` reason string when the outcome is a
+        /// `Lost*` or `Abandoned`; `None` for the three `Killed*` outcomes.
+        /// Lets future audits cross-reference the existing
+        /// `plan_failures_by_reason` footer without losing the discrete-attempt
+        /// boundary.
+        failure_reason: Option<String>,
     },
     /// A kitten was born.
     KittenBorn {
@@ -521,6 +586,7 @@ impl EventLog {
             | EventKind::WardPlaced { .. }
             | EventKind::WardDespawned { .. }
             | EventKind::PreyKilled { .. }
+            | EventKind::HuntAttempt { .. }
             | EventKind::KittenBorn { .. }
             | EventKind::BuildingConstructed { .. }
             | EventKind::ShadowFoxSpawn { .. } => {

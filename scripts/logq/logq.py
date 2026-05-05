@@ -1040,6 +1040,218 @@ def cmd_actions(args: argparse.Namespace) -> Envelope:
     )
 
 
+# ── subtool: hunt-success ───────────────────────────────────────────────────
+# Per-discrete-attempt hunt outcomes (ticket 149). Each `HuntAttempt` event
+# corresponds to one APPROACH→STALK→CHASE→POUNCE cycle on a single target,
+# emitted at outcome resolution by `resolve_engage_prey`. Disambiguates the
+# per-Hunt-action rate (which conflates within-Hunt retargeting) from the
+# per-discrete-attempt rate that 30–50% real-cat-biology targets reference.
+
+# Outcome variants that count as kills for success-rate computation. Mirror
+# of `HuntOutcome::is_kill()` in src/resources/event_log.rs.
+HUNT_KILL_OUTCOMES: set[str] = {"killed", "killed_and_replanned", "killed_and_consumed"}
+
+
+def cmd_hunt_success(args: argparse.Namespace) -> Envelope:
+    log_dir = Path(args.log_dir)
+    ev_path = events_path(log_dir)
+    lo, hi = parse_tick_range(args.tick_range)
+
+    query = {
+        "subtool": "hunt-success", "log_dir": str(log_dir),
+        "cat": args.cat, "tick_range": args.tick_range,
+        "species": args.species, "limit": args.limit, "offset": args.offset,
+    }
+
+    preds = ['.type == "HuntAttempt"']
+    if args.cat:
+        preds.append(f'.cat == "{args.cat}"')
+    if args.species:
+        preds.append(f'.prey_species == "{args.species}"')
+    if lo is not None:
+        preds.append(f".tick >= {lo}")
+    if hi is not None:
+        preds.append(f".tick <= {hi}")
+    selector = (
+        f'select({" and ".join(preds)}) | '
+        f'{{tick, cat, species: .prey_species, outcome, '
+        f'start_tick, end_tick, start_distance, '
+        f'failure_reason}}'
+    )
+    records = run_jq(selector, ev_path)
+
+    counts: dict[str, int] = {}
+    by_cat: dict[str, dict[str, int]] = {}
+    by_species: dict[str, dict[str, int]] = {}
+    failure_reasons: dict[str, int] = {}
+    duration_total = 0
+    distance_total = 0
+    for r in records:
+        outcome = r.get("outcome") or "unknown"
+        counts[outcome] = counts.get(outcome, 0) + 1
+        c = r.get("cat") or "?"
+        by_cat.setdefault(c, {})
+        by_cat[c][outcome] = by_cat[c].get(outcome, 0) + 1
+        sp = r.get("species") or "?"
+        by_species.setdefault(sp, {})
+        by_species[sp][outcome] = by_species[sp].get(outcome, 0) + 1
+        fr = r.get("failure_reason")
+        if fr:
+            failure_reasons[fr] = failure_reasons.get(fr, 0) + 1
+        st = r.get("start_tick")
+        et = r.get("end_tick")
+        if isinstance(st, int) and isinstance(et, int):
+            duration_total += max(0, et - st)
+        sd = r.get("start_distance")
+        if isinstance(sd, int):
+            distance_total += sd
+
+    total = sum(counts.values())
+    kills = sum(counts.get(o, 0) for o in HUNT_KILL_OUTCOMES)
+    success_rate = (kills / total) if total > 0 else 0.0
+
+    ranked = sorted(counts.items(), key=lambda kv: -kv[1])
+    page, more = paginate(
+        [{"outcome": o, "count": n} for o, n in ranked],
+        args.limit, args.offset,
+    )
+
+    results: list[dict[str, Any]] = []
+    if total > 0:
+        results.append({
+            "id": f"hunt-success:{args.cat or 'colony'}:summary",
+            "kind": "summary",
+            "total_attempts": total,
+            "kills": kills,
+            "success_rate_pct": round(100.0 * success_rate, 2),
+            "mean_duration_ticks": round(duration_total / total, 2) if total else 0.0,
+            "mean_start_distance": round(distance_total / total, 2) if total else 0.0,
+            "summary": (
+                f"{total} attempts; {round(100.0 * success_rate, 1)}% success "
+                f"({kills} kills); mean duration "
+                f"{round(duration_total / total, 1) if total else 0:.1f}t, "
+                f"mean start_distance "
+                f"{round(distance_total / total, 1) if total else 0:.1f}"
+            ),
+        })
+    for entry in page:
+        o = entry["outcome"]
+        n = entry["count"]
+        results.append({
+            "id": f"hunt-success:{args.cat or 'colony'}:{o}",
+            "kind": "outcome",
+            "outcome": o,
+            "count": n,
+            "pct": round(100.0 * n / total, 2) if total else 0.0,
+            "summary": (
+                f"{o}  {n} ({round(100.0 * n / total, 2) if total else 0:.2f}%)"
+            ),
+        })
+
+    if total == 0:
+        # Null-result nearest-match: tell the caller whether HuntAttempt
+        # exists at all in this bundle.
+        ha_total = run_jq_count('select(.type=="HuntAttempt")', ev_path)
+        if ha_total == 0:
+            # Fall back on PreyKilled — older runs predate ticket 149's
+            # instrumentation, so a non-zero PreyKilled with zero
+            # HuntAttempt means "this run was generated before the
+            # event was added", not "hunting is dead".
+            pk_total = run_jq_count('select(.type=="PreyKilled")', ev_path)
+            if pk_total > 0:
+                narrative = (
+                    f"No HuntAttempt events in this bundle, but {pk_total} "
+                    f"PreyKilled events exist — log predates ticket 149 "
+                    f"instrumentation. Re-run a fresh soak to populate "
+                    f"per-discrete-attempt outcomes."
+                )
+            else:
+                narrative = (
+                    "No HuntAttempt events and no PreyKilled events. "
+                    "Hunting pipeline is silent for this run."
+                )
+        else:
+            narrative = (
+                f"No HuntAttempt events match the filter. "
+                f"{ha_total} HuntAttempt events exist in this bundle; "
+                f"try widening --tick-range or removing --cat / --species."
+            )
+    else:
+        # Top failure reason gives a one-glance lever for follow-on tuning.
+        top_fr = ""
+        if failure_reasons:
+            fr_ranked = sorted(failure_reasons.items(), key=lambda kv: -kv[1])
+            top_fr = (
+                f" Top failure reason: {fr_ranked[0][0]} "
+                f"({fr_ranked[0][1]}, "
+                f"{round(100.0 * fr_ranked[0][1] / max(1, total - kills), 1)}% of losses)."
+            )
+        per_cat_phrase = ""
+        if not args.cat and len(by_cat) > 0:
+            per_cat_phrase = f" across {len(by_cat)} cat(s)"
+        per_species_phrase = ""
+        if not args.species and len(by_species) > 0:
+            per_species_phrase = f" across {len(by_species)} prey species"
+        narrative = (
+            f"{total} discrete hunt attempts{per_cat_phrase}"
+            f"{per_species_phrase}; "
+            f"{round(100.0 * success_rate, 2)}% success rate "
+            f"({kills} kills, {total - kills} losses)."
+            f"{top_fr}"
+        )
+
+    next_cmds: list[str] = []
+    if total > 0:
+        if not args.cat and by_cat:
+            # Suggest the cat with the worst success rate (≥ 5 attempts) for
+            # focal-trace drill-down.
+            worst_cat = None
+            worst_rate = 1.1
+            for c, dist in by_cat.items():
+                c_total = sum(dist.values())
+                if c_total < 5:
+                    continue
+                c_kills = sum(dist.get(o, 0) for o in HUNT_KILL_OUTCOMES)
+                rate = c_kills / c_total
+                if rate < worst_rate:
+                    worst_rate = rate
+                    worst_cat = c
+            if worst_cat:
+                next_cmds.append(
+                    f"just q hunt-success {log_dir} --cat={worst_cat}"
+                )
+                next_cmds.append(
+                    f"just q events {log_dir} --kind=HuntAttempt --cat={worst_cat}"
+                )
+        if not args.species and by_species:
+            # Suggest the prey species with the worst rate for ecology
+            # drill-down (e.g., birds vs mice often differ).
+            worst_sp = None
+            worst_sp_rate = 1.1
+            for sp, dist in by_species.items():
+                sp_total = sum(dist.values())
+                if sp_total < 5:
+                    continue
+                sp_kills = sum(dist.get(o, 0) for o in HUNT_KILL_OUTCOMES)
+                rate = sp_kills / sp_total
+                if rate < worst_sp_rate:
+                    worst_sp_rate = rate
+                    worst_sp = sp
+            if worst_sp:
+                next_cmds.append(
+                    f"just q hunt-success {log_dir} --species={worst_sp}"
+                )
+
+    return Envelope(
+        query=query,
+        scan_stats={"scanned": len(records), "returned": len(results),
+                    "more_available": more,
+                    "narrow_by": ["cat", "species", "tick_range"]},
+        results=results, narrative=narrative,
+        next=list(dict.fromkeys(next_cmds)),
+    )
+
+
 # ── subtool: footer ─────────────────────────────────────────────────────────
 # Full footer drill-down. Complements `run-summary` which only exposes a
 # curated subset. Use when you need a specific footer field that
@@ -1427,6 +1639,22 @@ def build_parser() -> argparse.ArgumentParser:
                         "are usually fewer than 20 distinct actions).")
     s.add_argument("--offset", type=int, default=0, help="Page offset.")
     s.set_defaults(func=cmd_actions)
+
+    s = sub.add_parser("hunt-success",
+                       help="Per-discrete-attempt hunt outcomes from "
+                            "HuntAttempt events (ticket 149). Use to compute "
+                            "the per-attempt success rate against the "
+                            "30-50% real-cat-biology target.")
+    s.add_argument("log_dir")
+    s.add_argument("--cat", help="Filter to a single cat.")
+    s.add_argument("--species", help="Filter to a single prey species "
+                                      "(e.g. mouse, bird, fish, rabbit).")
+    s.add_argument("--tick-range", help="Tick range A..B.")
+    s.add_argument("--limit", type=int,
+                   help="Limit ranked outcome rows (default unlimited; "
+                        "there are only 7 outcome variants).")
+    s.add_argument("--offset", type=int, default=0, help="Page offset.")
+    s.set_defaults(func=cmd_hunt_success)
 
     s = sub.add_parser("footer",
                        help="Drill into _footer fields. Without --field, "

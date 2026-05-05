@@ -36,7 +36,7 @@ use crate::components::prey::{
 use crate::components::skills::{Corruption, MagicAffinity, Skills};
 use crate::components::wildlife::WildAnimal;
 use crate::resources::colony_hunting_map::ColonyHuntingMap;
-use crate::resources::event_log::{EventKind, EventLog};
+use crate::resources::event_log::{EventKind, EventLog, HuntOutcome};
 use crate::resources::exploration_map::ExplorationMap;
 use crate::resources::food::FoodStores;
 use crate::resources::map::{Terrain, TileMap};
@@ -5107,7 +5107,52 @@ fn resolve_search_prey(
 // Helper: resolve EngagePrey (transplanted from HuntPrey stalk/chase/pounce)
 // ===========================================================================
 
+/// Ticket 149 — emit a `HuntAttempt` event and record `Feature::HuntAttempted`
+/// for the never-fired canary. Called from every terminal return path of
+/// `resolve_engage_prey` (kill, lost-during-*, abandoned). The activation
+/// record is witness-gated by virtue of being on the terminal path:
+/// `StepResult::Continue` returns never call this, and the `Continue` →
+/// `Continue` → ... → `Advance|Fail` chain is exactly one attempt.
 #[allow(clippy::too_many_arguments)]
+fn record_hunt_attempt(
+    event_log: Option<&mut EventLog>,
+    activation: Option<&mut crate::resources::system_activation::SystemActivation>,
+    cat_name: &str,
+    species: &str,
+    prey_pos: Position,
+    outcome: HuntOutcome,
+    time_tick: u64,
+    ticks_elapsed: u64,
+    start_distance: i32,
+    failure_reason: Option<String>,
+) {
+    let start_tick = time_tick.saturating_sub(ticks_elapsed);
+    if let Some(elog) = event_log {
+        elog.push(
+            time_tick,
+            EventKind::HuntAttempt {
+                cat: cat_name.to_string(),
+                prey_species: species.to_string(),
+                location: (prey_pos.x, prey_pos.y),
+                outcome,
+                start_tick,
+                end_tick: time_tick,
+                start_distance,
+                failure_reason,
+            },
+        );
+    }
+    if let Some(act) = activation {
+        act.record(crate::resources::system_activation::Feature::HuntAttempted);
+    }
+}
+
+// Ticket 149 — `event_log.as_deref_mut()` at outcome-emission sites is the
+// canonical re-borrow idiom for `Option<&mut EventLog>` across multiple
+// mutually-exclusive return paths. Clippy flags it as a no-op, but the
+// alternative (move at each site) trips NLL when the function has more than
+// a handful of terminal returns. Allow at the function level.
+#[allow(clippy::too_many_arguments, clippy::needless_option_as_deref)]
 fn resolve_engage_prey(
     state: &mut StepExecutionState,
     ticks: u64,
@@ -5143,7 +5188,25 @@ fn resolve_engage_prey(
     };
 
     let Ok((_, prey_pos, prey_cfg, prey_state)) = prey_query.get(target_entity) else {
-        // Prey despawned.
+        // Prey despawned between ticks. Real abandonment of an in-flight
+        // attempt iff `attempt_start_distance` was already captured on a
+        // prior tick — emit with placeholders since species/position are
+        // gone with the entity. If start_distance is None, no real engage
+        // tick ever ran for this target, so skip emission.
+        if let Some(start_dist) = state.attempt_start_distance {
+            record_hunt_attempt(
+                event_log.as_deref_mut(),
+                narr.activation.as_deref_mut(),
+                &name.0,
+                "unknown",
+                Position::new(0, 0),
+                HuntOutcome::Abandoned,
+                time.tick,
+                ticks,
+                start_dist,
+                Some("prey despawned".into()),
+            );
+        }
         return crate::steps::StepResult::Fail("prey despawned".into());
     };
 
@@ -5156,8 +5219,28 @@ fn resolve_engage_prey(
     let flee_strategy = prey_cfg.flee_strategy;
     let dist = pos.manhattan_distance(&prey_pos);
 
+    // Ticket 149 — capture start_distance on the first tick this attempt
+    // executes. Stays Some for the lifetime of this StepExecutionState; the
+    // next attempt (after a kill / loss / abandon) uses a fresh state.
+    if state.attempt_start_distance.is_none() {
+        state.attempt_start_distance = Some(dist);
+    }
+    let start_distance = state.attempt_start_distance.unwrap_or(dist);
+
     // Bird teleport — give up immediately.
     if prey_is_fleeing && flee_strategy == crate::components::prey::FleeStrategy::Teleport {
+        record_hunt_attempt(
+            event_log.as_deref_mut(),
+            narr.activation.as_deref_mut(),
+            &name.0,
+            species_name,
+            prey_pos,
+            HuntOutcome::Abandoned,
+            time.tick,
+            ticks,
+            start_distance,
+            Some("prey teleported".into()),
+        );
         return crate::steps::StepResult::Fail("prey teleported".into());
     }
 
@@ -5290,15 +5373,51 @@ fn resolve_engage_prey(
                 // the now-fed cat re-elects (typically Resting for
                 // sleep/groom, or Hunt again if drives are still high).
                 state.target_entity = None;
+                record_hunt_attempt(
+                    event_log.as_deref_mut(),
+                    narr.activation.as_deref_mut(),
+                    &name.0,
+                    species_name,
+                    prey_pos,
+                    HuntOutcome::KilledAndConsumed,
+                    time.tick,
+                    ticks,
+                    start_distance,
+                    None,
+                );
                 return crate::steps::StepResult::Fail(
                     "consumed catch in place".into(),
                 );
             }
             if inventory.is_full() {
+                record_hunt_attempt(
+                    event_log.as_deref_mut(),
+                    narr.activation.as_deref_mut(),
+                    &name.0,
+                    species_name,
+                    prey_pos,
+                    HuntOutcome::Killed,
+                    time.tick,
+                    ticks,
+                    start_distance,
+                    None,
+                );
                 return crate::steps::StepResult::Advance;
             } else {
                 // Multi-kill: reset target, keep searching.
                 state.target_entity = None;
+                record_hunt_attempt(
+                    event_log.as_deref_mut(),
+                    narr.activation.as_deref_mut(),
+                    &name.0,
+                    species_name,
+                    prey_pos,
+                    HuntOutcome::KilledAndReplanned,
+                    time.tick,
+                    ticks,
+                    start_distance,
+                    None,
+                );
                 return crate::steps::StepResult::Fail("seeking another target".into());
             }
         } else {
@@ -5333,6 +5452,18 @@ fn resolve_engage_prey(
                 d.chase_limit_default
             };
             if ticks > chase_limit {
+                record_hunt_attempt(
+                    event_log.as_deref_mut(),
+                    narr.activation.as_deref_mut(),
+                    &name.0,
+                    species_name,
+                    prey_pos,
+                    HuntOutcome::LostDuringChase,
+                    time.tick,
+                    ticks,
+                    start_distance,
+                    Some("chase timeout".into()),
+                );
                 return crate::steps::StepResult::Fail("chase timeout".into());
             }
         }
@@ -5352,6 +5483,18 @@ fn resolve_engage_prey(
                 state.no_move_ticks += 1;
             }
             if state.no_move_ticks > d.chase_stuck_ticks {
+                record_hunt_attempt(
+                    event_log.as_deref_mut(),
+                    narr.activation.as_deref_mut(),
+                    &name.0,
+                    species_name,
+                    prey_pos,
+                    HuntOutcome::LostDuringChase,
+                    time.tick,
+                    ticks,
+                    start_distance,
+                    Some("stuck while chasing".into()),
+                );
                 return crate::steps::StepResult::Fail("stuck while chasing".into());
             }
             let chase_limit = if personality.boldness > 0.7 {
@@ -5360,6 +5503,18 @@ fn resolve_engage_prey(
                 d.chase_limit_default
             };
             if ticks > chase_limit {
+                record_hunt_attempt(
+                    event_log.as_deref_mut(),
+                    narr.activation.as_deref_mut(),
+                    &name.0,
+                    species_name,
+                    prey_pos,
+                    HuntOutcome::LostDuringChase,
+                    time.tick,
+                    ticks,
+                    start_distance,
+                    Some("chase timeout".into()),
+                );
                 return crate::steps::StepResult::Fail("chase timeout".into());
             }
         } else {
@@ -5379,6 +5534,18 @@ fn resolve_engage_prey(
                         ticks: 0,
                     };
                 }
+                record_hunt_attempt(
+                    event_log.as_deref_mut(),
+                    narr.activation.as_deref_mut(),
+                    &name.0,
+                    species_name,
+                    prey_pos,
+                    HuntOutcome::LostDuringStalk,
+                    time.tick,
+                    ticks,
+                    start_distance,
+                    Some("anxiety spooked prey".into()),
+                );
                 return crate::steps::StepResult::Fail("anxiety spooked prey".into());
             }
             if moved {
@@ -5387,6 +5554,18 @@ fn resolve_engage_prey(
                 state.no_move_ticks += 1;
             }
             if state.no_move_ticks > d.chase_stuck_ticks {
+                record_hunt_attempt(
+                    event_log.as_deref_mut(),
+                    narr.activation.as_deref_mut(),
+                    &name.0,
+                    species_name,
+                    prey_pos,
+                    HuntOutcome::LostDuringStalk,
+                    time.tick,
+                    ticks,
+                    start_distance,
+                    Some("stuck while stalking".into()),
+                );
                 return crate::steps::StepResult::Fail("stuck while stalking".into());
             }
         }
@@ -5405,6 +5584,23 @@ fn resolve_engage_prey(
             state.no_move_ticks += 1;
         }
         if dist > d.approach_give_up_distance || state.no_move_ticks > d.chase_stuck_ticks {
+            let reason = if dist > d.approach_give_up_distance {
+                "lost prey during approach"
+            } else {
+                "stuck during approach"
+            };
+            record_hunt_attempt(
+                event_log.as_deref_mut(),
+                narr.activation.as_deref_mut(),
+                &name.0,
+                species_name,
+                prey_pos,
+                HuntOutcome::LostDuringApproach,
+                time.tick,
+                ticks,
+                start_distance,
+                Some(reason.into()),
+            );
             return crate::steps::StepResult::Fail("lost prey during approach".into());
         }
     }

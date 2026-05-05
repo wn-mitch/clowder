@@ -188,6 +188,13 @@ pub struct StepExecutionState {
     pub patrol_dir: (i32, i32),
     /// Consecutive ticks with zero position change. Reset on any movement.
     pub no_move_ticks: u64,
+    /// Manhattan distance between cat and target at attempt start, captured
+    /// on the first tick a target-bound step (e.g. EngagePrey) actually runs.
+    /// Ticket 149 — used to bin discrete-attempt success by approach
+    /// difficulty in the `HuntAttempt` event payload. `None` until first
+    /// observation; remains `Some` for the lifetime of this `StepExecutionState`.
+    #[serde(default)]
+    pub attempt_start_distance: Option<i32>,
 }
 
 /// Internal phase tracking for complex actions.

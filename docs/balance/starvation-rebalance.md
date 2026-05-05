@@ -325,3 +325,60 @@ What this commit does NOT yet ship as a *balance change*:
 
 Ticket 032 status stays `in-progress`. Log entry captures: scaffolding + curve-fix landed and verified by structural soak. Sweep-side promotion of the new defaults is a follow-on iteration once upstream regressions clear.
 
+## Iter 6 — 2026-05-05 — Hunt-success disambiguation re-audit (ticket 149 closes Item 4)
+
+**Source:** post-149-instrumentation seed-42 deep-soak at `logs/tuned-42` (commit `05ba81ea`, 1.34M ticks). Plan-failure counts byte-identical to the pre-149 baseline at `logs/tuned-42-2b6b49fb-pre-149`, confirming the new `EventKind::HuntAttempt` emission doesn't perturb the Bevy schedule.
+
+### Per-discrete-attempt rate (the question Iter 1 left open)
+
+`just q hunt-success logs/tuned-42` (the new ticket-149 subtool wraps the jq formula in `docs/diagnostics/log-queries.md` §4b):
+
+| Quantity | Count | % of attempts |
+|---|---|---|
+| total discrete attempts | 1586 | 100.0% |
+| `Killed*` (kills) | 504 | **31.78%** |
+| └ `KilledAndReplanned` (multi-kill loop) | 496 | 31.27% |
+| └ `KilledAndConsumed` (eat-on-spot) | 8 | 0.50% |
+| └ `Killed` (inventory full → deposit) | 0 | 0.00% |
+| `LostDuringApproach` (cat stuck or fell behind) | 766 | 48.30% |
+| `LostDuringStalk` (stuck-stalk + spook) | 182 | 11.48% |
+| `Abandoned` (target despawned / teleported) | 134 | 8.45% |
+| `LostDuringChase` | 0 | 0.00% |
+
+**Verdict: per-discrete-attempt rate = 31.78%, INSIDE the 30–50% real-cat-biology band.** Item 4 of ticket 032 closes affirmatively as **measurement artifact, no tuning needed.** The Iter 1 headline of 25.6% (835 / 3266) was per-Hunt-action, not per-discrete-attempt — within-Hunt retargeting via "seeking another target" plan-failure was being conflated with discrete attempts.
+
+The Iter 1 estimate of 34.4% (835 / 2431) was off by ~2.6pp because it assumed every kill triggers "seeking another target". Actually only 496 of 504 kills triggered the multi-kill replan; the other 8 were `KilledAndConsumed` (eat-on-spot when the cat was hungry enough). The corrected math: 504 / (1586) = 31.78%.
+
+### Structural finding surfaced incidentally — per-species variance is enormous
+
+Item 4 closes as measurement-artifact at the colony level, but the per-species drill-down reveals two ecology bugs that the colony aggregate masks. **Not in 149 scope** but worth filing as follow-on tickets:
+
+| Species | Attempts | Kills | Rate | Notes |
+|---|---|---|---|---|
+| mouse | 212 | 180 | **84.9%** | well above 50% — too easy |
+| rabbit | 337 | 152 | **45.1%** | top of band ✓ |
+| rat | 157 | 60 | **38.2%** | mid-band ✓ |
+| bird | 253 | 69 | **27.3%** | 134 of 253 attempts (52.96%) end `Abandoned` via "prey teleported" — birds use the FleeStrategy::Teleport early-abort |
+| fish | 627 | 43 | **6.9%** | 444 of 627 attempts (70.81%) end `LostDuringApproach` with reason "stuck during approach" — cats can't path to fish in DeepPool tiles |
+
+The colony aggregate (31.78%) is dragged down by fish (39% of attempts but 8.5% of kills). If cats stopped trying to hunt fish they can't reach, the rate would jump significantly. Two structural bugs to triage as follow-on:
+
+1. **Fish targeting selects unreachable prey.** `resolve_search_prey` / hunting target picker doesn't gate on "is the prey actually pathable from the cat's current position." Most fish attempts end stuck-during-approach — cat walks toward water, can't enter, gives up. Suggested ticket: "Hunt target picker — exclude unreachable prey (water-tile fish)".
+2. **Bird FleeStrategy::Teleport produces non-narrative abandonment.** Adding it to the `Abandoned` outcome makes it visible, but the 134 teleport-abandons per soak suggest birds are too easy to disengage from. Suggested ticket: "Bird teleport-flee narrative gap — abandon should narrate the flee, not silent-fail".
+
+### What this means for ticket 002
+
+Ticket 002 ("Hunt-approach pipeline failures") logged 1774 lost-prey-during-approach failures and inferred ~11% conversion. Re-anchored against the per-discrete-attempt vocabulary:
+
+- The 766 `LostDuringApproach` events on this seed-42 soak are dominated by **stuck-during-approach** (cats can't reach the target), NOT **lost-prey-during-approach** (prey escaped distance threshold). 002's candidate-levers list (stalk speed, approach speed, prey detection of cat) **doesn't address the actual dominant loss mode**.
+- 002's "11% conversion" headline was per-Hunt-plan, similarly conflated. The per-attempt rate is 31.78% (in band).
+
+Recommend re-scoping or closing 002. The substantive follow-on is the unreachable-prey targeting bug (item 1 above), which is structural rather than parameter-tuning.
+
+### Summary
+
+- 149's instrumentation lands; per-discrete-attempt audit answers the question Iter 1 left open.
+- 032 Item 4 closes affirmatively (measurement artifact, no tuning needed).
+- 002's premise re-anchored — the dominant loss mode is unreachable fish, not approach-distance escape.
+- Per-species variance is enormous and worth filing as follow-on (NOT 149 scope; this ticket is measurement-only).
+

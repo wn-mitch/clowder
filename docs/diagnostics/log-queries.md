@@ -152,6 +152,90 @@ Shape: 20 JSON lines.
 
 ---
 
+## 4b. Hunt success (per-discrete-attempt)
+
+Ticket 149 — `EventKind::HuntAttempt` is emitted at every outcome
+resolution of `resolve_engage_prey` (kill, lost, abandoned). Lets the
+per-discrete-attempt success rate be computed against the 30–50% real-
+cat-biology target without conflating per-Hunt-action retargeting.
+
+The skill-surface wrapper is `just q hunt-success <run-dir>` (with
+optional `--cat`, `--species`, `--tick-range`); the recipes below are
+the underlying jq formulas.
+
+### Query: hunt-success-rate
+Overall per-discrete-attempt success rate. The three `Killed*` outcomes
+all count toward the kill numerator; everything else is a loss.
+
+```bash
+jq -r 'select(.type=="HuntAttempt") | .outcome' logs/events.jsonl \
+  | awk '
+      /^killed/ { kills++ }
+      { total++ }
+      END {
+        if (total > 0) printf "%.2f%% (%d kills / %d attempts)\n",
+          100*kills/total, kills, total
+        else print "no HuntAttempt events"
+      }'
+```
+
+Shape: one summary line. Compare to the 30–50% band.
+
+### Query: hunt-outcomes-by-count
+Distribution across all 7 outcome variants.
+
+```bash
+jq -r 'select(.type=="HuntAttempt") | .outcome' logs/events.jsonl \
+  | sort | uniq -c | sort -rn
+```
+
+Shape: `count outcome` lines.
+
+### Query: hunt-failure-reasons
+Among losses, which `StepResult::Fail` reason dominates? Distinguishes
+"prey-targeting is sub-optimal" from "spook/timeout overhead too high".
+
+```bash
+jq -r 'select(.type=="HuntAttempt" and .failure_reason != null)
+       | .failure_reason' logs/events.jsonl \
+  | sort | uniq -c | sort -rn
+```
+
+Shape: `count reason` lines.
+
+### Query: hunt-success-by-cat
+Per-cat breakdown — useful for spotting one cat with markedly worse
+hit-rate (e.g., a high-anxiety cat spooking prey at the stalk phase).
+
+```bash
+jq -c 'select(.type=="HuntAttempt") | {cat, outcome}' logs/events.jsonl \
+  | jq -s 'group_by(.cat) | map({
+      cat: .[0].cat,
+      total: length,
+      kills: ([.[] | select(.outcome | startswith("killed"))] | length)
+    } | .success_rate_pct = (100 * .kills / .total))'
+```
+
+Shape: JSON array of `{cat, total, kills, success_rate_pct}` rows.
+
+### Query: hunt-success-by-species
+Per-prey-species breakdown — birds/fish/mice/rabbits often have very
+different catch difficulties. Surfaces ecology imbalance.
+
+```bash
+jq -c 'select(.type=="HuntAttempt") | {prey_species, outcome}' \
+       logs/events.jsonl \
+  | jq -s 'group_by(.prey_species) | map({
+      prey_species: .[0].prey_species,
+      total: length,
+      kills: ([.[] | select(.outcome | startswith("killed"))] | length)
+    } | .success_rate_pct = (100 * .kills / .total))'
+```
+
+Shape: JSON array of per-species rows.
+
+---
+
 ## 5. Wards
 
 ### Query: wards-placed
