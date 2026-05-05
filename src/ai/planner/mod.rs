@@ -80,6 +80,73 @@ pub enum Carrying {
     Remedy,
 }
 
+impl Carrying {
+    /// Project a multi-slot `Inventory` into the planner's coarse
+    /// `Carrying` state — "the most important thing the cat is
+    /// holding right now."
+    ///
+    /// Priority cascade: `BuildMaterials > Prey > ForagedFood >
+    /// Herbs > Nothing`. Note the projection only ever produces
+    /// these five variants; `RawFood` / `CookedFood` / `Remedy`
+    /// are search-state-only — set during A* expansion by chain
+    /// effects (`SetCarrying(...)`), never produced from a
+    /// runtime inventory snapshot. (Cooked food in inventory
+    /// projects to `Prey` if its `kind` is a raw-prey variant
+    /// with `modifiers.cooked = true`, else `ForagedFood` —
+    /// preserved verbatim from the pre-175 `build_planner_state`
+    /// behavior.)
+    ///
+    /// Used by both `build_planner_state` (planner-side, ticket
+    /// 175) and `scoring::carry_affinity_bonus` (L2 carry-
+    /// affinity bias, ticket 175). Keep the two callers in
+    /// lockstep — they MUST agree on which carry the cat
+    /// projects to, so "the planner sees `Carrying::X`" and "the
+    /// scorer biased toward X-consuming DSEs" are always
+    /// consistent.
+    pub fn from_inventory(inventory: &crate::components::magic::Inventory) -> Self {
+        use crate::components::items::ItemKind;
+        use crate::components::magic::ItemSlot;
+
+        if inventory
+            .slots
+            .iter()
+            .any(|s| matches!(s, ItemSlot::Item(k, _) if k.material().is_some()))
+        {
+            Carrying::BuildMaterials
+        } else if inventory
+            .slots
+            .iter()
+            .any(|s| matches!(s, ItemSlot::Item(k, _) if k.is_food()))
+        {
+            if inventory.slots.iter().any(|s| {
+                matches!(
+                    s,
+                    ItemSlot::Item(
+                        ItemKind::RawMouse
+                            | ItemKind::RawRat
+                            | ItemKind::RawBird
+                            | ItemKind::RawFish
+                            | ItemKind::RawRabbit,
+                        _
+                    )
+                )
+            }) {
+                Carrying::Prey
+            } else {
+                Carrying::ForagedFood
+            }
+        } else if inventory
+            .slots
+            .iter()
+            .any(|s| matches!(s, ItemSlot::Herb(_)))
+        {
+            Carrying::Herbs
+        } else {
+            Carrying::Nothing
+        }
+    }
+}
+
 /// Compact world state from the planner's perspective.
 /// Constructed from ECS queries on demand — never stored persistently.
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]

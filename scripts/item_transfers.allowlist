@@ -1,0 +1,18 @@
+# Items-are-real contract allowlist (ticket 175).
+#
+# Format: `<file>:<symbol> <ticket-id> [# rationale]`
+#   * `<file>` — path relative to repo root
+#   * `<symbol>` — function name; "*" = whole-file allowlist
+#   * `<ticket-id>` — ticket that authorizes the bypass
+#   * Comment-only lines start with `#`. Trailing comments allowed.
+#
+# Add entries only when the `stored.remove + despawn` pattern is
+# genuinely not a transfer (e.g. cat-death cleanup, world-teardown,
+# entity-replacement that's part of an in-place transformation).
+#
+# The contract module itself (src/components/item_transfer.rs) is
+# auto-skipped by the lint, so it doesn't need an allowlist entry.
+
+# Consumption (despawn-as-real-world-effect), not transfer:
+src/steps/disposition/eat_at_stores.rs 175  # cat eats food from Stores; the despawn IS the consumption
+src/systems/prey.rs 175                     # wild animal raids Stores; despawn is the food being eaten

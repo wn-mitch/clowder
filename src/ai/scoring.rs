@@ -282,6 +282,14 @@ pub struct ScoringContext<'a> {
     pub has_herbs_in_inventory: bool,
     /// Whether the cat has remedy herbs (HealingMoss/Moonpetal/Calmroot).
     pub has_remedy_herbs: bool,
+    /// Ticket 175 — coarse projection of the cat's `Inventory` into a
+    /// single `Carrying` state. Computed once per scoring tick via
+    /// `Carrying::from_inventory`; shared with the planner-side
+    /// projection in `build_planner_state` (priority cascade
+    /// `BuildMaterials > Prey > ForagedFood > Herbs > Nothing`).
+    /// Consumed by `carry_affinity_bonus` to bias L2 DSE scores
+    /// toward chains that consume the cat's current carry.
+    pub carrying: crate::ai::planner::Carrying,
     // Ticket 014 Magic colony batch: `thornbriar_available` field
     // retired — was assigned in disposition.rs / goap.rs but never
     // read. The marker `ThornbriarAvailable` is authored colony-scope
@@ -1211,12 +1219,22 @@ fn score_dse_by_id(dse_id: &str, ctx: &ScoringContext, inputs: &EvalInputs) -> f
                 },
                 inputs.tick,
             );
-            return scored.final_score;
+            // 175: apply carry-affinity bias on the post-trace
+            // path too. Trace records pre-bias `final_score` for
+            // forensic traceability — the bias is a post-eval
+            // multiplier on what the L3 softmax sees, not a
+            // mutation of the L2 evaluation.
+            return apply_carry_affinity(
+                scored.final_score,
+                dse_id,
+                ctx.carrying,
+                ctx.scoring.carry_affinity_bonus,
+            );
         }
         return 0.0;
     }
 
-    evaluate_single(
+    let base = evaluate_single(
         dse,
         inputs.cat,
         &eval_ctx,
@@ -1225,7 +1243,70 @@ fn score_dse_by_id(dse_id: &str, ctx: &ScoringContext, inputs: &EvalInputs) -> f
         &fetch_scalar,
     )
     .map(|s| s.final_score)
-    .unwrap_or(0.0)
+    .unwrap_or(0.0);
+    apply_carry_affinity(base, dse_id, ctx.carrying, ctx.scoring.carry_affinity_bonus)
+}
+
+/// Ticket 175 — L2 carry-affinity bias. Multiplies a DSE's
+/// pre-softmax score by `bonus` when the cat's current
+/// `Carrying` projection maps to that DSE's terminal-product
+/// chain. The principle: "use what you're holding" is a soft
+/// preference, not a hard veto. Cats are biased toward chains
+/// that consume their current carry; the planner stays
+/// flexible enough to plan an alternative when bias is
+/// overridden by acute need (the hunger-while-carrying-Prey
+/// case still picks Eating).
+///
+/// `Carrying::Nothing` and unmapped DSEs return `base` verbatim
+/// (no bias). Setting `bonus = 1.0` disables the bias entirely.
+///
+/// **Mapping** (must stay aligned with `Carrying::from_inventory`'s
+/// projectable variants):
+///
+/// | Carrying | Boosted DSE IDs |
+/// |---|---|
+/// | `Prey` | `hunt` |
+/// | `ForagedFood` | `forage` |
+/// | `Herbs` | `herbcraft_prepare`, `herbcraft_ward`, `apply_remedy_target` |
+/// | `BuildMaterials` | `build` |
+/// | `Nothing` | (none — no bias applies) |
+///
+/// `RawFood` / `CookedFood` / `Remedy` are search-state-only
+/// variants (set during A* expansion by chain effects) and
+/// never appear from `from_inventory`; included here for
+/// completeness so future projection extensions slot in
+/// without a missing-arm regression.
+pub fn apply_carry_affinity(
+    base: f32,
+    dse_id: &str,
+    carrying: crate::ai::planner::Carrying,
+    bonus: f32,
+) -> f32 {
+    use crate::ai::planner::Carrying;
+    let matches = match (carrying, dse_id) {
+        (Carrying::Prey, "hunt") => true,
+        (Carrying::ForagedFood, "forage") => true,
+        (Carrying::Herbs, "herbcraft_prepare" | "herbcraft_ward" | "apply_remedy_target") => true,
+        (Carrying::BuildMaterials, "build") => true,
+        // RawFood / CookedFood: cook-chain-internal. The cat
+        // entering Cooking with raw or cooked food in inventory
+        // is already covered by `Carrying::Prey` /
+        // `Carrying::ForagedFood` projection (raw prey → Prey,
+        // cooked rat → Prey via raw-kind match, cooked rabbit
+        // etc. → ForagedFood). If a future projection extension
+        // adds a RawFood/CookedFood inventory variant, the
+        // boost target is `cook` for both.
+        (Carrying::RawFood | Carrying::CookedFood, "cook") => true,
+        // Remedy is search-state-only; never produced from
+        // inventory by `from_inventory`. If a future extension
+        // tracks held remedies, the boost target is the
+        // applier DSE.
+        (Carrying::Remedy, "apply_remedy_target") => true,
+        // Carrying::Nothing or any unmapped (carry, dse) pair —
+        // no bias.
+        _ => false,
+    };
+    if matches { base * bonus } else { base }
 }
 
 /// Score all available actions for a cat given its current state.
@@ -2181,6 +2262,45 @@ mod tests {
         ChaCha8Rng::seed_from_u64(seed)
     }
 
+    /// Ticket 175: the carry-affinity mapping is the L2 carry-
+    /// affinity bias's structural contract. Adding a new
+    /// `Carrying` variant or a new boost-target DSE ID must
+    /// land an arm here; this test fails closed against silent
+    /// reordering / missing arms / typo'd DSE ID strings.
+    #[test]
+    fn carry_affinity_mapping_is_complete_and_correct() {
+        use crate::ai::planner::Carrying;
+        let bonus = 1.5;
+        // Boosted: carry maps to a chain-consuming DSE.
+        assert_eq!(apply_carry_affinity(10.0, "hunt", Carrying::Prey, bonus), 15.0);
+        assert_eq!(apply_carry_affinity(10.0, "forage", Carrying::ForagedFood, bonus), 15.0);
+        assert_eq!(apply_carry_affinity(10.0, "herbcraft_prepare", Carrying::Herbs, bonus), 15.0);
+        assert_eq!(apply_carry_affinity(10.0, "herbcraft_ward", Carrying::Herbs, bonus), 15.0);
+        assert_eq!(apply_carry_affinity(10.0, "apply_remedy_target", Carrying::Herbs, bonus), 15.0);
+        assert_eq!(apply_carry_affinity(10.0, "build", Carrying::BuildMaterials, bonus), 15.0);
+
+        // Not boosted: carry doesn't match the DSE's chain.
+        assert_eq!(apply_carry_affinity(10.0, "cook", Carrying::Prey, bonus), 10.0);
+        assert_eq!(apply_carry_affinity(10.0, "hunt", Carrying::Herbs, bonus), 10.0);
+        assert_eq!(apply_carry_affinity(10.0, "forage", Carrying::BuildMaterials, bonus), 10.0);
+        assert_eq!(apply_carry_affinity(10.0, "build", Carrying::Prey, bonus), 10.0);
+
+        // Carrying::Nothing — the orthogonality baseline. Bias
+        // is zero across every DSE.
+        for dse_id in ["hunt", "forage", "cook", "herbcraft_prepare", "herbcraft_ward",
+                       "apply_remedy_target", "build", "eat", "sleep", "wander"] {
+            assert_eq!(
+                apply_carry_affinity(10.0, dse_id, Carrying::Nothing, bonus),
+                10.0,
+                "Carrying::Nothing should never bias any DSE (saw bias on '{}')", dse_id
+            );
+        }
+
+        // bonus = 1.0 disables the bias entirely.
+        assert_eq!(apply_carry_affinity(10.0, "hunt", Carrying::Prey, 1.0), 10.0);
+        assert_eq!(apply_carry_affinity(10.0, "build", Carrying::BuildMaterials, 1.0), 10.0);
+    }
+
     /// 155: helper for tests that need to ask "did any of the six
     /// Witchcraft sub-actions score?".
     fn is_magic_subaction(a: Action) -> bool {
@@ -2391,6 +2511,7 @@ mod tests {
             has_herbs_nearby: false,
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
+            carrying: crate::ai::planner::Carrying::Nothing,
 
             colony_injury_count: 0,
             ward_strength_low: false,
@@ -2564,6 +2685,7 @@ mod tests {
             has_herbs_nearby: false,
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
+            carrying: crate::ai::planner::Carrying::Nothing,
 
             colony_injury_count: 0,
             ward_strength_low: false,
@@ -2760,6 +2882,7 @@ mod tests {
             has_herbs_nearby: false,
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
+            carrying: crate::ai::planner::Carrying::Nothing,
 
             colony_injury_count: 0,
             ward_strength_low: false,
@@ -2993,6 +3116,7 @@ mod tests {
             has_herbs_nearby: false,
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
+            carrying: crate::ai::planner::Carrying::Nothing,
 
             colony_injury_count: 0,
             ward_strength_low: false,
@@ -3095,6 +3219,7 @@ mod tests {
             has_herbs_nearby: false,
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
+            carrying: crate::ai::planner::Carrying::Nothing,
 
             colony_injury_count: 0,
             ward_strength_low: false,
@@ -3216,6 +3341,7 @@ mod tests {
             has_herbs_nearby: false,
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
+            carrying: crate::ai::planner::Carrying::Nothing,
 
             colony_injury_count: 0,
             ward_strength_low: false,
@@ -3525,6 +3651,7 @@ mod tests {
             has_herbs_nearby: false,
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
+            carrying: crate::ai::planner::Carrying::Nothing,
 
             colony_injury_count: 0,
             ward_strength_low: false,
@@ -3628,6 +3755,7 @@ mod tests {
             has_herbs_nearby: false,
             has_herbs_in_inventory: false,
             has_remedy_herbs: false,
+            carrying: crate::ai::planner::Carrying::Nothing,
 
             colony_injury_count: 0,
             ward_strength_low: false,

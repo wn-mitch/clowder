@@ -1465,6 +1465,8 @@ pub fn evaluate_and_plan(
             // §4 batch 1: read from authored markers via MarkerSnapshot.
             has_herbs_in_inventory: markers.has(markers::HasHerbsInInventory::KEY, entity),
             has_remedy_herbs: markers.has(markers::HasRemedyHerbs::KEY, entity),
+            // 175: shared with planner-side projection.
+            carrying: crate::ai::planner::Carrying::from_inventory(inventory),
             colony_injury_count,
             ward_strength_low,
             on_corrupted_tile,
@@ -6148,44 +6150,12 @@ fn build_planner_state(
     // The search-state field `materials_delivered_this_plan` starts
     // false here and is flipped by `DeliverMaterials`'s effect during
     // A* expansion.
-    let carrying = if inventory.slots.iter().any(|s| {
-        matches!(
-            s,
-            crate::components::magic::ItemSlot::Item(k, _) if k.material().is_some()
-        )
-    }) {
-        Carrying::BuildMaterials
-    } else if inventory
-        .slots
-        .iter()
-        .any(|s| matches!(s, crate::components::magic::ItemSlot::Item(k, _) if k.is_food()))
-    {
-        if inventory.slots.iter().any(|s| {
-            matches!(
-                s,
-                crate::components::magic::ItemSlot::Item(
-                    crate::components::items::ItemKind::RawMouse
-                        | crate::components::items::ItemKind::RawRat
-                        | crate::components::items::ItemKind::RawBird
-                        | crate::components::items::ItemKind::RawFish
-                        | crate::components::items::ItemKind::RawRabbit,
-                    _
-                )
-            )
-        }) {
-            Carrying::Prey
-        } else {
-            Carrying::ForagedFood
-        }
-    } else if inventory
-        .slots
-        .iter()
-        .any(|s| matches!(s, crate::components::magic::ItemSlot::Herb(_)))
-    {
-        Carrying::Herbs
-    } else {
-        Carrying::Nothing
-    };
+    //
+    // Ticket 175: the inventory→Carrying projection lives on
+    // `Carrying::from_inventory` so the L2 carry-affinity bonus
+    // (`scoring::carry_affinity_bonus`) sees exactly the same state
+    // the planner does.
+    let carrying = Carrying::from_inventory(inventory);
 
     // `herb_positions` is still consumed above by `classify_zone` for
     // `PlannerZone::HerbPatch` mapping. The prior `thornbriar_available`

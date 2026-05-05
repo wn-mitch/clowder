@@ -12,6 +12,7 @@ pub mod goap_plan;
 pub mod grooming;
 pub mod hunting_priors;
 pub mod identity;
+pub mod item_transfer;
 pub mod items;
 pub mod kitten;
 pub mod magic;

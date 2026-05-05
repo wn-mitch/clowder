@@ -235,16 +235,17 @@ pub fn grooming_actions() -> Vec<GoapActionDef> {
 /// plan-path for in-flight haul→deliver cycles.
 pub fn building_actions() -> Vec<GoapActionDef> {
     vec![
-        // Pickup: cat at a material pile, hands empty → carrying build
-        // materials. Real-world effect (in the executor) is item.location
-        // → Carried(cat) and an Inventory slot insert.
+        // Pickup: cat at a material pile → carrying build materials.
+        // Real-world effect (in the executor) is item.location →
+        // Carried(cat) and an Inventory slot insert.
+        // 175: dropped `CarryingIs(Nothing)` veto for symmetry with
+        // hunting/foraging/cooking/herbalism. Construction's
+        // `GoalUnreachable` count was 0 in the post-172 soak so this
+        // didn't surface, but the veto is the same shape.
         GoapActionDef {
             kind: GoapActionKind::GatherMaterials,
             cost: 3,
-            preconditions: vec![
-                StatePredicate::ZoneIs(PlannerZone::MaterialPile),
-                StatePredicate::CarryingIs(Carrying::Nothing),
-            ],
+            preconditions: vec![StatePredicate::ZoneIs(PlannerZone::MaterialPile)],
             effects: vec![StateEffect::SetCarrying(Carrying::BuildMaterials)],
         },
         // Deliver: cat at the site carrying materials → drops one unit
@@ -325,12 +326,12 @@ pub fn farming_actions() -> Vec<GoapActionDef> {
 pub fn herbalism_actions(chosen_action: Action) -> Vec<GoapActionDef> {
     match chosen_action {
         Action::HerbcraftGather => vec![GoapActionDef {
+            // 175: dropped `CarryingIs(Carrying::Nothing)` veto
+            // (mirrors hunting/foraging post-091; runtime gates
+            // on inventory capacity).
             kind: GoapActionKind::GatherHerb,
             cost: 3,
-            preconditions: vec![
-                StatePredicate::ZoneIs(PlannerZone::HerbPatch),
-                StatePredicate::CarryingIs(Carrying::Nothing),
-            ],
+            preconditions: vec![StatePredicate::ZoneIs(PlannerZone::HerbPatch)],
             effects: vec![
                 StateEffect::SetCarrying(Carrying::Herbs),
                 StateEffect::IncrementTrips,
@@ -345,12 +346,10 @@ pub fn herbalism_actions(chosen_action: Action) -> Vec<GoapActionDef> {
                 effects: vec![StateEffect::SetZone(PlannerZone::HerbPatch)],
             },
             GoapActionDef {
+                // 175: dropped `CarryingIs(Nothing)` veto.
                 kind: GoapActionKind::GatherHerb,
                 cost: 3,
-                preconditions: vec![
-                    StatePredicate::ZoneIs(PlannerZone::HerbPatch),
-                    StatePredicate::CarryingIs(Carrying::Nothing),
-                ],
+                preconditions: vec![StatePredicate::ZoneIs(PlannerZone::HerbPatch)],
                 effects: vec![StateEffect::SetCarrying(Carrying::Herbs)],
             },
             GoapActionDef {
@@ -387,11 +386,14 @@ pub fn herbalism_actions(chosen_action: Action) -> Vec<GoapActionDef> {
                 effects: vec![StateEffect::SetZone(PlannerZone::HerbPatch)],
             },
             GoapActionDef {
+                // 175: dropped `CarryingIs(Nothing)` veto.
+                // `HasMarker(ThornbriarAvailable)` retained — that's
+                // real ecological gating (thornbriar must exist to
+                // gather), not a coarse-Carrying veto.
                 kind: GoapActionKind::GatherHerb,
                 cost: 3,
                 preconditions: vec![
                     StatePredicate::ZoneIs(PlannerZone::HerbPatch),
-                    StatePredicate::CarryingIs(Carrying::Nothing),
                     StatePredicate::HasMarker(markers::ThornbriarAvailable::KEY),
                 ],
                 effects: vec![StateEffect::SetCarrying(Carrying::Herbs)],
@@ -408,13 +410,11 @@ pub fn herbalism_actions(chosen_action: Action) -> Vec<GoapActionDef> {
         ],
         // Defensive: if a non-Herbalism Action somehow reaches here, return
         // the cheap single-action gather plan rather than panic.
+        // 175: dropped `CarryingIs(Nothing)` veto for symmetry.
         _ => vec![GoapActionDef {
             kind: GoapActionKind::GatherHerb,
             cost: 3,
-            preconditions: vec![
-                StatePredicate::ZoneIs(PlannerZone::HerbPatch),
-                StatePredicate::CarryingIs(Carrying::Nothing),
-            ],
+            preconditions: vec![StatePredicate::ZoneIs(PlannerZone::HerbPatch)],
             effects: vec![
                 StateEffect::SetCarrying(Carrying::Herbs),
                 StateEffect::IncrementTrips,
@@ -457,13 +457,19 @@ pub fn witchcraft_actions(chosen_action: Action) -> Vec<GoapActionDef> {
 /// full chain.
 pub fn cooking_actions() -> Vec<GoapActionDef> {
     vec![
+        // 175: chain-entry `CarryingIs(Carrying::Nothing)` veto
+        // dropped for the same reason 091 dropped it from
+        // hunting/foraging — the runtime resolver gates on
+        // `inventory.is_full()` (now via the typed transfer
+        // primitive in `components::item_transfer`), and the
+        // planner's `Carrying` is a coarse projection of the
+        // multi-slot inventory. Cats with leftover items can
+        // enter the chain; A* still skips this step when the cat
+        // already has `RawFood` and enters at `Cook`.
         GoapActionDef {
             kind: GoapActionKind::RetrieveRawFood,
             cost: 2,
-            preconditions: vec![
-                StatePredicate::ZoneIs(PlannerZone::Stores),
-                StatePredicate::CarryingIs(Carrying::Nothing),
-            ],
+            preconditions: vec![StatePredicate::ZoneIs(PlannerZone::Stores)],
             effects: vec![StateEffect::SetCarrying(Carrying::RawFood)],
         },
         GoapActionDef {
@@ -919,6 +925,60 @@ mod tests {
         assert!(kinds.contains(&GoapActionKind::SearchPrey));
         assert!(kinds.contains(&GoapActionKind::EngagePrey));
         assert!(kinds.contains(&GoapActionKind::DepositPrey));
+    }
+
+    #[test]
+    fn cooking_with_carried_prey_still_plans() {
+        // Ticket 175 producer-side fix: same 091 pattern applied to
+        // RetrieveRawFood. Pre-175, `RetrieveRawFood` required
+        // `CarryingIs(Carrying::Nothing)` — any cat with leftover
+        // prey/herbs/etc. electing Cook hit `GoalUnreachable` (2076
+        // events on the post-172 seed-42 soak). Post-fix, the
+        // chain plans from any starting carry; the runtime's multi-
+        // slot inventory absorbs the new RawFood alongside the
+        // existing prey, the cooked-food round-trip closes, and
+        // the prey persists.
+        let start = PlannerState {
+            carrying: Carrying::Prey,
+            ..default_state()
+        };
+        let goal = GoalState {
+            predicates: vec![StatePredicate::TripsAtLeast(1)],
+        };
+        let distances = basic_distances();
+        let actions = actions_for_disposition(DispositionKind::Cooking, Action::Cook, &distances);
+        let plan = plan!(start, &actions, &goal, 12, 1000)
+            .expect("Cooking must plan even when carrying prey (175 fix)");
+        let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
+        assert!(kinds.contains(&GoapActionKind::RetrieveRawFood));
+        assert!(kinds.contains(&GoapActionKind::Cook));
+        assert!(kinds.contains(&GoapActionKind::DepositCookedFood));
+    }
+
+    #[test]
+    fn herbcraft_gather_with_carried_prey_still_plans() {
+        // Ticket 175 producer-side fix for the Herbalism chain.
+        // Pre-175, `GatherHerb` (in all three sub-chains) required
+        // `CarryingIs(Carrying::Nothing)`. Same shape regression as
+        // Cooking — Herbalism contributed 1663 GoalUnreachable
+        // events on the post-172 soak.
+        let start = PlannerState {
+            carrying: Carrying::Prey,
+            ..default_state()
+        };
+        let goal = GoalState {
+            predicates: vec![StatePredicate::TripsAtLeast(1)],
+        };
+        let distances = basic_distances();
+        let actions = actions_for_disposition(
+            DispositionKind::Herbalism,
+            Action::HerbcraftGather,
+            &distances,
+        );
+        let plan = plan!(start, &actions, &goal, 12, 1000)
+            .expect("Herbcraft Gather must plan even when carrying prey (175 fix)");
+        let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
+        assert!(kinds.contains(&GoapActionKind::GatherHerb));
     }
 
     #[test]

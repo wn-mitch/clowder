@@ -1,6 +1,9 @@
 use bevy_ecs::prelude::*;
 
 use crate::components::building::StoredItems;
+use crate::components::item_transfer::{
+    transfer_item_stores_to_inventory, TransferError,
+};
 use crate::components::items::{Item, ItemKind};
 use crate::components::magic::Inventory;
 use crate::steps::{StepOutcome, StepResult};
@@ -16,10 +19,17 @@ use crate::steps::{StepOutcome, StepResult};
 /// specific kind (cooked food, herbs, etc).
 ///
 /// **Runtime preconditions** — waits `ticks >= 5`. Requires
-/// `target_entity` to resolve to a `StoredItems`, and for a
-/// matching `ItemKind` to be present. Any miss returns
-/// `unwitnessed(Advance)`: the chain moves on rather than
-/// stalling on a now-empty store.
+/// `target_entity` to resolve to a `StoredItems`, a matching
+/// `ItemKind` to be present, and free inventory capacity.
+/// Ticket 175 routes the transfer through
+/// `components::item_transfer::transfer_item_stores_to_inventory`
+/// to maintain the "items are real" invariant; on capacity miss
+/// the step returns `unwitnessed(Fail("inventory full"))` rather
+/// than silently destroying the item entity. On no-target /
+/// Stores-not-found / no-matching-item: returns
+/// `unwitnessed(Advance)` — the chain moves on (the substrate
+/// said the item was available but the cat arrived after another
+/// cat claimed it).
 ///
 /// **Witness** — `StepOutcome<bool>`. `true` iff an item was
 /// actually transferred.
@@ -52,16 +62,24 @@ pub fn resolve_retrieve_from_stores(
         .iter()
         .copied()
         .find(|&e| items_query.get(e).is_ok_and(|item| item.kind == kind));
-    if let Some(item_entity) = target_item {
-        let modifiers = items_query
-            .get(item_entity)
-            .map(|item| item.modifiers)
-            .unwrap_or_default();
-        stored.remove(item_entity);
-        inventory.add_item_with_modifiers(kind, modifiers);
-        commands.entity(item_entity).despawn();
-        StepOutcome::witnessed(StepResult::Advance)
-    } else {
-        StepOutcome::unwitnessed(StepResult::Advance)
+    let Some(item_entity) = target_item else {
+        return StepOutcome::unwitnessed(StepResult::Advance);
+    };
+    let modifiers = items_query
+        .get(item_entity)
+        .map(|item| item.modifiers)
+        .unwrap_or_default();
+    match transfer_item_stores_to_inventory(
+        &mut stored,
+        item_entity,
+        kind,
+        modifiers,
+        inventory,
+        commands,
+    ) {
+        Ok(()) => StepOutcome::witnessed(StepResult::Advance),
+        Err(TransferError::DestinationFull) => {
+            StepOutcome::unwitnessed(StepResult::Fail("inventory full".into()))
+        }
     }
 }

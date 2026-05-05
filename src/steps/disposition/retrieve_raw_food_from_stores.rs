@@ -1,6 +1,9 @@
 use bevy_ecs::prelude::*;
 
 use crate::components::building::StoredItems;
+use crate::components::item_transfer::{
+    transfer_item_stores_to_inventory, TransferError,
+};
 use crate::components::items::Item;
 use crate::components::magic::Inventory;
 use crate::steps::{StepOutcome, StepResult};
@@ -16,13 +19,25 @@ use crate::steps::{StepOutcome, StepResult};
 /// with a follow-on `SetCarrying(Carrying::RawFood)` effect in
 /// `src/ai/planner/actions.rs::cooking_actions`. `ZoneIs` alone
 /// does not guarantee raw food is actually present — the planner's
-/// `Carrying` state is a coarse abstraction.
+/// `Carrying` state is a coarse projection of the multi-slot
+/// `Inventory` (computed by `Carrying::from_inventory`).
 ///
 /// **Runtime preconditions** — waits `ticks >= 5`. Requires
 /// `target_entity` to resolve to a `StoredItems`, and for at least
 /// one stored item to satisfy `kind.is_food() && !modifiers.cooked`.
-/// Any miss returns `unwitnessed(Advance)`: the chain moves on
-/// rather than stalling.
+/// Inventory must have a free slot — ticket 175 routes the
+/// transfer through `components::item_transfer::transfer_item_stores_to_inventory`,
+/// which encodes "items are real" by checking `Inventory` capacity
+/// before calling `stored.remove` / `commands.entity(_).despawn()`.
+/// On capacity miss the step returns
+/// `unwitnessed(Fail("inventory full"))` so the cat re-plans
+/// rather than silently destroying a real item entity. (Mirrors
+/// `resolve_gather_herb`'s capacity-fail pattern at
+/// `src/steps/magic/gather_herb.rs:54`.)
+/// On no-target / Stores-not-found / no-matching-item: returns
+/// `unwitnessed(Advance)` — the chain moves on (the substrate said
+/// food was available but the cat arrived after another cat
+/// claimed it).
 ///
 /// **Witness** — `StepOutcome<bool>`. `true` iff an item was
 /// actually transferred from Stores to inventory this call.
@@ -58,15 +73,28 @@ pub fn resolve_retrieve_raw_food_from_stores(
             .get(e)
             .is_ok_and(|item| item.kind.is_food() && !item.modifiers.cooked)
     });
-    if let Some(item_entity) = target_item {
-        if let Ok(item) = items_query.get(item_entity) {
-            let kind = item.kind;
-            let modifiers = item.modifiers;
-            stored.remove(item_entity);
-            inventory.add_item_with_modifiers(kind, modifiers);
-            commands.entity(item_entity).despawn();
-            return StepOutcome::witnessed(StepResult::Advance);
+    let Some(item_entity) = target_item else {
+        return StepOutcome::unwitnessed(StepResult::Advance);
+    };
+    let Ok(item) = items_query.get(item_entity) else {
+        return StepOutcome::unwitnessed(StepResult::Advance);
+    };
+    match transfer_item_stores_to_inventory(
+        &mut stored,
+        item_entity,
+        item.kind,
+        item.modifiers,
+        inventory,
+        commands,
+    ) {
+        Ok(()) => StepOutcome::witnessed(StepResult::Advance),
+        // 175: pre-fix this path silently destroyed the item
+        // (stored.remove + despawn ran regardless of the
+        // inventory.add return). The contract now keeps the
+        // item in Stores; the cat re-plans (likely electing
+        // Eating or Hunting once their inventory clears).
+        Err(TransferError::DestinationFull) => {
+            StepOutcome::unwitnessed(StepResult::Fail("inventory full".into()))
         }
     }
-    StepOutcome::unwitnessed(StepResult::Advance)
 }

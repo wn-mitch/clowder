@@ -112,23 +112,39 @@ pub fn resolve_deposit_at_stores(
     }
 
     let store_entity = target_entity.unwrap();
-    let food_items: Vec<(ItemKind, crate::components::items::ItemModifiers)> = inventory
+    // 175: defer the inventory removal until after Stores accepts
+    // each item. Pre-175 the in-store path removed ALL food from
+    // inventory up front, then bailed on the first capacity miss
+    // (`break` at the `add_effective` failure) — every food item
+    // past that point was silently destroyed. Items are real;
+    // un-deposited items must remain in inventory so the cat
+    // either deposits the rest later or finds another sink.
+    let food_slot_indices: Vec<usize> = inventory
         .slots
         .iter()
-        .filter_map(|slot| match slot {
-            ItemSlot::Item(kind, mods) if kind.is_food() => Some((*kind, *mods)),
+        .enumerate()
+        .filter_map(|(i, slot)| match slot {
+            ItemSlot::Item(kind, _) if kind.is_food() => Some(i),
             _ => None,
         })
         .collect();
-    // Remove deposited items from inventory up front.
-    inventory
-        .slots
-        .retain(|slot| !matches!(slot, ItemSlot::Item(k, _) if k.is_food()));
-    // Spawn real item entities in the store.
     if let Ok(mut stored) = stores_query.get_mut(store_entity) {
         let quality = (d.deposit_quality_base + skills.hunting * d.deposit_quality_skill_scale)
             .clamp(0.0, 1.0);
-        for (kind, mods) in food_items {
+        // Track which inventory indices were successfully
+        // deposited so we can remove them after the batch (Vec
+        // index stability requires we don't `swap_remove`
+        // mid-iteration).
+        let mut deposited: Vec<usize> = Vec::with_capacity(food_slot_indices.len());
+        for slot_idx in food_slot_indices {
+            let (kind, mods) = match &inventory.slots[slot_idx] {
+                ItemSlot::Item(k, m) => (*k, *m),
+                // The pre-collection filter only matched
+                // `ItemSlot::Item(food, _)`. If concurrent
+                // mutation changed the slot kind out from
+                // under us, skip silently.
+                _ => continue,
+            };
             let item_entity = commands
                 .spawn(Item::with_modifiers(
                     kind,
@@ -138,7 +154,11 @@ pub fn resolve_deposit_at_stores(
                 ))
                 .id();
             if !stored.add_effective(item_entity, StructureType::Stores, items_query) {
-                // Store is full — despawn the entity we just spawned.
+                // Stores at capacity — despawn the entity we
+                // spawned, mark `rejected`, leave the inventory
+                // slot intact, and stop trying. The caller can
+                // re-plan; the food stays real in the cat's
+                // inventory.
                 commands.entity(item_entity).despawn();
                 rejected = true;
                 break;
@@ -146,6 +166,13 @@ pub fn resolve_deposit_at_stores(
             if kind.capacity_bonus() > 0 {
                 storage_upgraded = true;
             }
+            deposited.push(slot_idx);
+        }
+        // Remove deposited slots in reverse-index order so each
+        // `swap_remove` doesn't disturb earlier indices.
+        deposited.sort_unstable_by(|a, b| b.cmp(a));
+        for idx in deposited {
+            inventory.slots.swap_remove(idx);
         }
     }
     DepositResult {

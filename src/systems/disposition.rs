@@ -610,7 +610,7 @@ pub fn evaluate_dispositions(
         (entity, _name, needs, personality, pos, memory, skills, health),
         (
             magic_aff,
-            _inventory,
+            inventory,
             mut current,
             aspirations,
             preferences,
@@ -954,6 +954,8 @@ pub fn evaluate_dispositions(
             has_herbs_in_inventory: markers
                 .has(crate::components::markers::HasHerbsInInventory::KEY, entity),
             has_remedy_herbs: markers.has(crate::components::markers::HasRemedyHerbs::KEY, entity),
+            // 175: shared with planner-side projection.
+            carrying: crate::ai::planner::Carrying::from_inventory(inventory),
             colony_injury_count,
             ward_strength_low,
             on_corrupted_tile,

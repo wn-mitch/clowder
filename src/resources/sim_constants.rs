@@ -1746,6 +1746,22 @@ pub struct ScoringConstants {
     /// softmaxes retained for diagnostics.
     #[serde(default = "default_intention_softmax_temperature")]
     pub intention_softmax_temperature: f32,
+    /// Ticket 175 — L2 carry-affinity bias. Multiplicative bonus
+    /// applied to a DSE's pre-softmax score when the cat's current
+    /// `Carrying` projection (computed by
+    /// `Carrying::from_inventory`) maps to that DSE's terminal-
+    /// product chain. Encodes "use what you're holding" as a soft
+    /// preference at the L2 election layer rather than a hard
+    /// veto at the planner layer (planner-side vetoes were
+    /// removed in 175 in mirror of ticket 091's
+    /// hunting/foraging fix). Calibrated so a Prey-carrying cat
+    /// strongly prefers Hunting over Cooking when both are
+    /// roughly equally needed, but does NOT override acute
+    /// survival pressure: a starving cat at Stores still picks
+    /// Eating regardless of carry. Setting this to `1.0`
+    /// disables the bias entirely.
+    #[serde(default = "default_carry_affinity_bonus")]
+    pub carry_affinity_bonus: f32,
     pub gate_timid_fight_threshold: f32,
     pub gate_shy_socialize_threshold: f32,
     pub gate_reckless_flee_threshold: f32,
@@ -1954,6 +1970,7 @@ impl Default for ScoringConstants {
             disposition_softmax_temperature: 0.15,
             fox_softmax_temperature: default_fox_softmax_temperature(),
             intention_softmax_temperature: default_intention_softmax_temperature(),
+            carry_affinity_bonus: default_carry_affinity_bonus(),
             gate_timid_fight_threshold: 0.1,
             gate_shy_socialize_threshold: 0.15,
             gate_reckless_flee_threshold: 0.9,
@@ -2873,6 +2890,27 @@ fn default_fox_softmax_temperature() -> f32 {
 
 fn default_intention_softmax_temperature() -> f32 {
     0.15
+}
+
+/// Ticket 175 — see `ScoringConstants::carry_affinity_bonus`.
+///
+/// Default `1.0` (multiplier disabled — the L2 carry-affinity
+/// scaffolding is wired but balance-inactive). The 175 soak with
+/// `1.5` regressed nourishment (-34.5%), happiness (-50.8%), and
+/// seasons-survived (-57.1%) on the canonical seed-42 deep-soak.
+/// The bias was strong enough to override Eating when cats were
+/// holding food-adjacent items, costing the colony more
+/// nourishment than the routing wins. Calibration is a separate
+/// balance task — open as a follow-on ticket once the substrate-
+/// refactor stabilizes (CLAUDE.md substrate-refactor doctrine
+/// defers balance-tuning on refactor-affected metrics until then).
+///
+/// Setting this to a value > 1.0 enables the bias; the mapping
+/// itself (`scoring::apply_carry_affinity`) is exhaustive and
+/// tested, so flipping the knob produces the documented
+/// behavioral shift without code changes.
+fn default_carry_affinity_bonus() -> f32 {
+    1.0
 }
 
 fn default_scent_search_radius() -> i32 {
