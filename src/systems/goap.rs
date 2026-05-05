@@ -154,13 +154,15 @@ pub struct WorldStateQueries<'w, 's> {
         ),
         Without<Dead>,
     >,
-    /// Ticket 168 — colony singleton readout for the six colony-scoped
+    /// Ticket 168 — colony singleton readout for the colony-scoped
     /// markers authored by `update_colony_building_markers` /
     /// `update_herb_availability_markers` / `update_ward_coverage_markers`
     /// / `update_ward_siege_marker`. Drains directly into
     /// `MarkerSnapshot.set_colony(...)` so DSE eligibility filters and
     /// the planner's `StatePredicate::HasMarker` resolve through the
     /// snapshot surface (per `scoring.rs:88-95` MVP-shim doctrine).
+    /// Ticket 169 added the `HasConstructionSite` / `HasDamagedBuilding`
+    /// rows.
     pub colony_state_query: Query<
         'w,
         's,
@@ -171,6 +173,8 @@ pub struct WorldStateQueries<'w, 's> {
             Has<markers::ThornbriarAvailable>,
             Has<markers::WardStrengthLow>,
             Has<markers::WardsUnderSiege>,
+            Has<markers::HasConstructionSite>,
+            Has<markers::HasDamagedBuilding>,
         ),
         With<markers::ColonyState>,
     >,
@@ -936,6 +940,8 @@ pub fn evaluate_and_plan(
         thornbriar_available,
         ward_strength_low,
         wards_under_siege,
+        has_construction_site,
+        has_damaged_building,
     ) = world_state
         .colony_state_query
         .single()
@@ -977,14 +983,15 @@ pub fn evaluate_and_plan(
         )
         .collect();
 
-    // §4 colony-scoped marker predicates. The six markers promoted to
-    // the `ColonyState` singleton in ticket 168
-    // (HasFunctionalKitchen / HasRawFoodInStores / HasStoredFood /
-    // ThornbriarAvailable / WardStrengthLow / WardsUnderSiege) are
-    // bound from the singleton readout above. The three remaining
-    // bldg_state fields (has_construction_site / has_damaged_building /
-    // has_garden) are still computed from the imperative scan here —
-    // their singleton-promotion is ticket 169's scope.
+    // §4 colony-scoped marker predicates. Markers promoted to the
+    // `ColonyState` singleton in ticket 168 (HasFunctionalKitchen /
+    // HasRawFoodInStores / HasStoredFood / ThornbriarAvailable /
+    // WardStrengthLow / WardsUnderSiege) and ticket 169
+    // (HasConstructionSite / HasDamagedBuilding) are bound from the
+    // singleton readout above. `has_garden` is still computed from
+    // the imperative scan here — promoting it to an ECS-level writer
+    // is a follow-on (the snapshot bridge below already satisfies the
+    // lint).
     let bldg_state = crate::systems::buildings::scan_colony_buildings(
         world_state
             .building_query
@@ -992,12 +999,12 @@ pub fn evaluate_and_plan(
             .map(|(_, s, _, site, _)| (s, site)),
         d.damaged_building_threshold,
     );
-    let has_construction_site = bldg_state.has_construction_site;
-    let has_damaged_building = bldg_state.has_damaged_building;
     let has_garden = bldg_state.has_garden;
     markers.set_colony(markers::HasGarden::KEY, has_garden);
     markers.set_colony(markers::HasFunctionalKitchen::KEY, has_functional_kitchen);
     markers.set_colony(markers::HasRawFoodInStores::KEY, has_raw_food_in_stores);
+    markers.set_colony(markers::HasConstructionSite::KEY, has_construction_site);
+    markers.set_colony(markers::HasDamagedBuilding::KEY, has_damaged_building);
 
     let herb_positions: Vec<(Entity, Position, HerbKind)> = world_state
         .herb_query

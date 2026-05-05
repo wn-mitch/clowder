@@ -422,24 +422,28 @@ pub fn update_construction_site_map(
 }
 
 // ---------------------------------------------------------------------------
-// update_colony_building_markers (ticket 168)
+// update_colony_building_markers (ticket 168, extended by 169)
 // ---------------------------------------------------------------------------
 
 /// Authors colony-scoped building/food markers on the `ColonyState`
-/// singleton (substrate spec §4.3 Inventory rows). Runs each
-/// FixedUpdate tick before `evaluate_and_plan`; the evaluator reads
-/// these via `Has<MarkerN>` off the singleton to populate `MarkerSnapshot`.
+/// singleton (substrate spec §4.3 Inventory + TargetExistence rows).
+/// Runs each FixedUpdate tick before `evaluate_and_plan`; the evaluator
+/// reads these via `Has<MarkerN>` off the singleton (`colony_state_query`
+/// in `goap.rs`) to populate `MarkerSnapshot`.
 ///
 /// Markers authored:
 /// - `HasFunctionalKitchen` — per `scan_colony_buildings`.
 /// - `HasRawFoodInStores` — ≥1 raw-food item in any `StoredItems`.
 /// - `HasStoredFood` — `FoodStores.is_empty()` is false.
+/// - `HasConstructionSite` — ≥1 reachable `ConstructionSite` (ticket 169).
+/// - `HasDamagedBuilding` — ≥1 `Structure` with condition <
+///   `DispositionConstants::damaged_building_threshold` (ticket 169).
 ///
-/// `HasConstructionSite` / `HasDamagedBuilding` / `HasGarden` rows in
-/// `ColonyBuildingState` are left for ticket 169 to wire onto the
-/// singleton; this system computes them via `scan_colony_buildings`
-/// only as a side-effect of reusing the helper for the kitchen
-/// predicate.
+/// `HasGarden` is still computed by `scan_colony_buildings` but bridged
+/// into `MarkerSnapshot` via `goap.rs` `set_colony` only — it has no
+/// ECS-level writer here yet (the lint accepts the snapshot-bridge as
+/// a writer pattern). Promoting it to the same shape as the others is
+/// a follow-on.
 pub fn update_colony_building_markers(
     mut commands: Commands,
     colony: Single<Entity, With<crate::components::markers::ColonyState>>,
@@ -479,6 +483,16 @@ pub fn update_colony_building_markers(
         em.insert(crate::components::markers::HasStoredFood);
     } else {
         em.remove::<crate::components::markers::HasStoredFood>();
+    }
+    if bldg_state.has_construction_site {
+        em.insert(crate::components::markers::HasConstructionSite);
+    } else {
+        em.remove::<crate::components::markers::HasConstructionSite>();
+    }
+    if bldg_state.has_damaged_building {
+        em.insert(crate::components::markers::HasDamagedBuilding);
+    } else {
+        em.remove::<crate::components::markers::HasDamagedBuilding>();
     }
 }
 
@@ -780,5 +794,90 @@ mod tests {
         let buildings: Vec<(&Structure, Option<&ConstructionSite>)> = vec![(&structure, None)];
         let state = scan_colony_buildings(buildings.into_iter(), 0.4);
         assert!(!state.has_damaged_building);
+    }
+
+    // --- update_colony_building_markers (ticket 169) ---
+    //
+    // Tick-system tests asserting `HasConstructionSite` and
+    // `HasDamagedBuilding` are inserted/removed on the `ColonyState`
+    // singleton. Modeled on `growth.rs::update_parent_markers` tests
+    // (bare `Schedule` + `World`, no full `App`).
+
+    use crate::components::markers;
+
+    fn setup_colony_markers() -> (World, Schedule) {
+        let mut world = test_world();
+        world.spawn(markers::ColonyState);
+        let mut schedule = Schedule::default();
+        schedule.add_systems(update_colony_building_markers);
+        (world, schedule)
+    }
+
+    fn colony_entity(world: &mut World) -> Entity {
+        world
+            .query_filtered::<Entity, With<markers::ColonyState>>()
+            .single(world)
+            .expect("ColonyState singleton must exist")
+    }
+
+    #[test]
+    fn colony_marker_set_when_construction_site_exists() {
+        let (mut world, mut schedule) = setup_colony_markers();
+        world.spawn((
+            Structure::new(StructureType::Den),
+            ConstructionSite::new(StructureType::Den),
+        ));
+        schedule.run(&mut world);
+        let colony = colony_entity(&mut world);
+        assert!(world.entity(colony).contains::<markers::HasConstructionSite>());
+    }
+
+    #[test]
+    fn colony_marker_cleared_when_no_construction_site() {
+        let (mut world, mut schedule) = setup_colony_markers();
+        // Plain structure, no ConstructionSite.
+        let mut structure = Structure::new(StructureType::Den);
+        structure.condition = 1.0;
+        world.spawn(structure);
+        schedule.run(&mut world);
+        let colony = colony_entity(&mut world);
+        assert!(!world.entity(colony).contains::<markers::HasConstructionSite>());
+    }
+
+    #[test]
+    fn colony_damage_marker_set_when_below_threshold() {
+        let (mut world, mut schedule) = setup_colony_markers();
+        let mut structure = Structure::new(StructureType::Den);
+        structure.condition = 0.3; // below default 0.4 threshold
+        world.spawn(structure);
+        schedule.run(&mut world);
+        let colony = colony_entity(&mut world);
+        assert!(world.entity(colony).contains::<markers::HasDamagedBuilding>());
+    }
+
+    #[test]
+    fn colony_damage_marker_cleared_when_above_threshold() {
+        let (mut world, mut schedule) = setup_colony_markers();
+        let mut structure = Structure::new(StructureType::Den);
+        structure.condition = 0.9; // above 0.4 threshold
+        world.spawn(structure);
+        schedule.run(&mut world);
+        let colony = colony_entity(&mut world);
+        assert!(!world.entity(colony).contains::<markers::HasDamagedBuilding>());
+    }
+
+    #[test]
+    fn colony_damage_marker_skipped_for_in_progress_construction() {
+        // Buildings with a `ConstructionSite` must NOT count as damaged
+        // even if their condition is low — `scan_colony_buildings`
+        // routes those into `has_construction_site` only.
+        let (mut world, mut schedule) = setup_colony_markers();
+        let mut structure = Structure::new(StructureType::Den);
+        structure.condition = 0.1;
+        world.spawn((structure, ConstructionSite::new(StructureType::Den)));
+        schedule.run(&mut world);
+        let colony = colony_entity(&mut world);
+        assert!(world.entity(colony).contains::<markers::HasConstructionSite>());
+        assert!(!world.entity(colony).contains::<markers::HasDamagedBuilding>());
     }
 }

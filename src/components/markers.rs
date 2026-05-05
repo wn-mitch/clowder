@@ -384,9 +384,15 @@ impl CarcassNearby {
 /// `buildings.rs::update_colony_building_markers`.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HasConstructionSite;
+impl HasConstructionSite {
+    pub const KEY: &str = "HasConstructionSite";
+}
 
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HasDamagedBuilding;
+impl HasDamagedBuilding {
+    pub const KEY: &str = "HasDamagedBuilding";
+}
 
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HasGarden;

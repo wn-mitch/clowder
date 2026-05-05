@@ -11,6 +11,4 @@
 #
 # Catalogue: docs/open-work/pre-existing/substrate-stub-catalogue.md
 
-HasConstructionSite 169    # buildings.rs::update_colony_building_markers (substrate §4.3 line 1976)
-HasDamagedBuilding 169     # same author system as HasConstructionSite
 HideEligible 170           # Hide-authoring system (extends ticket 104's Phase 1 dormancy)
