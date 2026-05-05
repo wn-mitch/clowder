@@ -21,7 +21,7 @@ use clowder::resources::weather::Weather;
 use rand_chacha::rand_core::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 
-const ALL_ACTIONS: [Action; 18] = [
+const ALL_ACTIONS: [Action; 19] = [
     Action::Eat,
     Action::Sleep,
     Action::Hunt,
@@ -29,7 +29,8 @@ const ALL_ACTIONS: [Action; 18] = [
     Action::Wander,
     Action::Idle,
     Action::Socialize,
-    Action::Groom,
+    Action::GroomSelf,
+    Action::GroomOther,
     Action::Explore,
     Action::Flee,
     Action::Fight,
@@ -41,6 +42,40 @@ const ALL_ACTIONS: [Action; 18] = [
     Action::Coordinate,
     Action::Mentor,
 ];
+
+/// Compile-time exhaustiveness witness: a new `Action` variant forces
+/// the author to come here and decide whether it joins `ALL_ACTIONS`
+/// (canonical template surface) or is intentionally excluded (Mate /
+/// Caretake / Cook / Hide all alias to other files via the
+/// `template_prompt` match block).
+#[allow(dead_code)]
+fn assert_all_actions_covers_action(a: Action) {
+    match a {
+        Action::Eat
+        | Action::Sleep
+        | Action::Hunt
+        | Action::Forage
+        | Action::Wander
+        | Action::Idle
+        | Action::Socialize
+        | Action::GroomSelf
+        | Action::GroomOther
+        | Action::Explore
+        | Action::Flee
+        | Action::Fight
+        | Action::Patrol
+        | Action::Build
+        | Action::Farm
+        | Action::Herbcraft
+        | Action::PracticeMagic
+        | Action::Coordinate
+        | Action::Mentor
+        | Action::Mate
+        | Action::Caretake
+        | Action::Cook
+        | Action::Hide => {}
+    }
+}
 
 const ALL_MOODS: [MoodBucket; 5] = [
     MoodBucket::Miserable,

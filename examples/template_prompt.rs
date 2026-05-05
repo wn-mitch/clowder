@@ -27,6 +27,69 @@ const PREVIEW_NAMES: [&str; 6] = ["Bramble", "Thistle", "Moss", "Fern", "Ash", "
 const PREVIEW_FUR: [&str; 5] = ["tabby", "black", "tortoiseshell", "ginger", "grey"];
 const PREVIEW_GENDERS: [Gender; 3] = [Gender::Tom, Gender::Queen, Gender::Nonbinary];
 
+/// Actions the random author tool will roll. Excludes Action variants
+/// that have no dedicated template surface and are routed via aliases
+/// in the `ron_file` match (Mate / Caretake → socialize, Hide → flee,
+/// Cook is a dedicated file but not part of the random-roll surface
+/// historically).
+///
+/// `assert_pick_pool_covers_action` below is the compile-time witness
+/// that adding a new `Action` variant must also be classified here —
+/// either added to this pool or explicitly excluded.
+const PICKABLE_ACTIONS: [Action; 19] = [
+    Action::Eat,
+    Action::Sleep,
+    Action::Hunt,
+    Action::Forage,
+    Action::Wander,
+    Action::Idle,
+    Action::Socialize,
+    Action::GroomSelf,
+    Action::GroomOther,
+    Action::Explore,
+    Action::Flee,
+    Action::Fight,
+    Action::Patrol,
+    Action::Build,
+    Action::Farm,
+    Action::Herbcraft,
+    Action::PracticeMagic,
+    Action::Coordinate,
+    Action::Mentor,
+];
+
+/// Compile-time exhaustiveness witness: a new `Action` variant forces
+/// the author to come here and decide whether it joins
+/// `PICKABLE_ACTIONS` or stays in the alias-only group.
+#[allow(dead_code)]
+fn assert_pick_pool_covers_action(a: Action) {
+    match a {
+        Action::Eat
+        | Action::Sleep
+        | Action::Hunt
+        | Action::Forage
+        | Action::Wander
+        | Action::Idle
+        | Action::Socialize
+        | Action::GroomSelf
+        | Action::GroomOther
+        | Action::Explore
+        | Action::Flee
+        | Action::Fight
+        | Action::Patrol
+        | Action::Build
+        | Action::Farm
+        | Action::Herbcraft
+        | Action::PracticeMagic
+        | Action::Coordinate
+        | Action::Mentor
+        | Action::Mate
+        | Action::Caretake
+        | Action::Cook
+        | Action::Hide => {}
+    }
+}
+
 fn main() {
     let seed: u64 = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -51,7 +114,8 @@ fn main() {
             Action::Wander => "wander.ron",
             Action::Idle => "idle.ron",
             Action::Socialize => "socialize.ron",
-            Action::Groom => "groom.ron",
+            Action::GroomSelf => "groom.ron",
+            Action::GroomOther => "groom.ron",
             Action::Explore => "explore.ron",
             Action::Flee => "flee.ron",
             Action::Fight => "fight.ron",
@@ -338,26 +402,7 @@ impl Condition {
 // ---------------------------------------------------------------------------
 
 fn pick_action(rng: &mut impl Rng) -> Action {
-    match rng.random_range(0..18) {
-        0 => Action::Eat,
-        1 => Action::Sleep,
-        2 => Action::Hunt,
-        3 => Action::Forage,
-        4 => Action::Wander,
-        5 => Action::Idle,
-        6 => Action::Socialize,
-        7 => Action::Groom,
-        8 => Action::Explore,
-        9 => Action::Flee,
-        10 => Action::Fight,
-        11 => Action::Patrol,
-        12 => Action::Build,
-        13 => Action::Farm,
-        14 => Action::Herbcraft,
-        15 => Action::PracticeMagic,
-        16 => Action::Coordinate,
-        _ => Action::Mentor,
-    }
+    PICKABLE_ACTIONS[rng.random_range(0..PICKABLE_ACTIONS.len())]
 }
 
 fn pick_conditions(rng: &mut impl Rng) -> Vec<Condition> {
