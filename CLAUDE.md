@@ -78,6 +78,8 @@ Every bugfix plan MUST include at least one **structural-revision candidate** al
 
 Precedent: ticket 150's first plan listed R1 (resolver) / R2 (predicate) / R3 (scoring), all parameter-level; the user surfaced R5 (split Eat from Resting), which was load-bearing. The same lesson lives in the auto-memory entry "Audit L3 Action→Disposition mapping when investigating Clowder AI defects" at the user-global layer. Bugfix tickets should use [`docs/open-work/tickets/_template_bugfix.md`](docs/open-work/tickets/_template_bugfix.md), which embeds the layer-walk table and structural-option slot.
 
+**Sub-agent dispatch discipline.** Before delegating any non-trivial investigation to an Explore / Plan / general-purpose sub-agent, walk [`docs/open-work/_template_subagent_prompt.md`](docs/open-work/_template_subagent_prompt.md) — five required slots (mark load-bearing facts as hypotheses · field-name validation · alternative-mechanism enumeration · skill-surface escape clause · ratio normalization for cross-run comparison). The prompt IS the agent's perception layer; bad framing produces bad sense data, and the failure propagates one layer up. Precedent: ticket 194 §F9 (the 189-cluster diagnostic delay traces back to two Explore-agent prompts that inherited the wrong premise as established context).
+
 ## ECS rules (Bevy 0.18)
 
 - **Messages, not Events:** `#[derive(Message)]`, `MessageWriter<T>` / `MessageReader<T>`, `app.add_message::<T>()`. Register in `SimulationPlugin::build()` — windowed and headless paths share that plugin (ticket 030). Names are verbs (`SpawnCat`, `CatDied`), not `*Event`.

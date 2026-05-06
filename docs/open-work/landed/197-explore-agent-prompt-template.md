@@ -1,7 +1,7 @@
 ---
 id: 197
 title: Explore-agent prompt template (194 P8, subsumes P6)
-status: ready
+status: done
 cluster: process-discipline
 added: 2026-05-06
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-06
 ---
 
 ## Why
@@ -122,3 +122,8 @@ agent author writes once per investigation.
   this as the largest-leverage item in the 194 catalog —
   every future investigation using sub-agents inherits its
   quality from this template.
+- 2026-05-06: landed. Template at
+  `docs/open-work/_template_subagent_prompt.md` with all five
+  slots and worked examples drawn from 194 §F1/§F2/§F5/§F7/§F9.
+  CLAUDE.md "Bugfix discipline" links it. Recommendation (A)+(C)
+  from the ticket honored — text template, not runnable skill.
