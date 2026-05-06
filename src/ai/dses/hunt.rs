@@ -103,8 +103,13 @@ impl HuntDse {
                 saturation_weight,
             ]),
             // §4 batch 2: `.require(CanHunt)` gates on (Adult ∨ Young)
-            // ∧ ¬Injured ∧ ¬InCombat ∧ forest nearby. Retires the
-            // inline `ctx.can_hunt` guard in `scoring.rs`.
+            // ∧ ¬InCombat ∧ forest nearby. Ticket 184 (2026-05-06)
+            // dropped the `¬Injured` clause: injured cats can still
+            // elect Hunt — the skill/health scoring signals already
+            // dampen the L2 appeal, so the eligibility gate was
+            // double-counting and the absence of Hunt for injured
+            // cats shifted action-share to Patrol's Blind-commitment
+            // long plans.
             // §13.1: `.forbid(Incapacitated)` blocks downed cats.
             // §9.3 stance binding migrated to `hunt_target_dse` —
             // candidate-prefilter happens in the target-taking resolver.

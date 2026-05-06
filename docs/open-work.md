@@ -8,17 +8,17 @@
 > fresh. See `CLAUDE.md` §"Long-horizon coordination" for the request-time
 > checklist and maintenance rules.
 
-_Last generated: 2026-05-05._
+_Last generated: 2026-05-06._
 
 ## Summary
 
 | Status | Count |
 |---|---|
 | In progress | 8 |
-| Ready | 51 |
-| Parked | 6 |
+| Ready | 54 |
+| Parked | 7 |
 | Blocked | 19 |
-| **Open total** | **84** |
+| **Open total** | **88** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -36,7 +36,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[109](docs/open-work/tickets/109-intraspecies-conflict-response.md)** — IntraspeciesConflictResponse — full four-valence (fight/flight/freeze/fawn) social response — _[ai-substrate] · added 2026-05-01_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 
-## Ready (51)
+## Ready (54)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -86,11 +86,14 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[177](docs/open-work/tickets/177-disposal-resolver-dispatch-wiring.md)** — Wire Trash/Handoff/PickUp resolvers into GOAP dispatch (176 follow-on) — _[ai-substrate] · added 2026-05-05_
 - **[179](docs/open-work/tickets/179-build-stores-demand-wiring.md)** — ColonyStoresChronicallyFull → Build DSE consumer + Coordinator BuildStores directive (176 follow-on) — _[ai-substrate] · added 2026-05-05_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[world-ecology] · added 2026-05-05_
-- **[181](docs/open-work/tickets/181-hunt-forage-saturation-balance-tune.md)** — Balance-tune Hunt/Forage colony_food_security saturation weights (176 follow-on) — _[balance] · added 2026-05-05_
 - **[182](docs/open-work/tickets/182-courtship-burial-regression-post-176.md)** — Courtship + burial canary regression on post-176 soak (pre-existing or 176-induced?) — _[ai-substrate] · added 2026-05-05_
+- **[183](docs/open-work/tickets/183-paired-axis-or-patrol-collision-investigation.md)** — Paired-axis lift on higher-tier DSEs OR Patrol-collision investigation (181 follow-on) — _[ai-substrate] · added 2026-05-05_
+- **[184](docs/open-work/tickets/184-kill-deposit-pipeline-regression-post-175.md)** — Hunt kill→stockpile pipeline regressed under L3 bandwidth pressure (suspected items-are-real fallout) — _[ai-substrate] · added 2026-05-06_
+- **[185](docs/open-work/tickets/185-extend-picking-up-on-has-ground-carcass.md)** — Extend PickingUp DSE on a HasGroundCarcass colony marker — emergent scavenging — _[ai-substrate] · added 2026-05-06_
+- **[186](docs/open-work/tickets/186-add-effective-bevy-command-buffer-race.md)** — add_effective Bevy command-buffer race silently drops capacity_bonus on just-spawned items — _added 2026-05-06_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _added 2026-04-28_
 
-## Parked (6)
+## Parked (7)
 
 - **[015](docs/open-work/tickets/015-alloparenting-reframe-b.md)** — Alloparenting Reframe B — mama drops kitten at hearth near resting elder — _parked 2026-04-22 · added 2026-04-22_
 - **[058](docs/open-work/tickets/058-tradition-unfiltered-loop-fix.md)** — §3.5.3 item 1 Tradition modifier — fix unfiltered-loop port — _parked 2026-04-30 · added 2026-04-27_
@@ -98,6 +101,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[084](docs/open-work/tickets/084-farm-herb-ward-demand-axis.md)** — Farm DSE — tie scoring to herb/ward stockpile demand so gardens stay productive under abundant food — _[balance] · parked 2026-04-30 · blocked-by 086 · added 2026-04-29_
 - **[099](docs/open-work/tickets/099-modifier-feature-emission.md)** — Feature emission for §3.5.1 Modifiers — colony-wide canary surface for substrate-lift signals — _[ai-substrate] · parked 2026-05-01 · blocked-by 119 · added 2026-05-01_
 - **[173](docs/open-work/tickets/173-crafting-split-capability-markers.md)** — IsHerbalist / IsSpiritualist / HasCorruptionNearby capability markers (155 follow-on) — _[ai-substrate] · parked 2026-05-05 · added 2026-05-05_
+- **[181](docs/open-work/tickets/181-hunt-forage-saturation-balance-tune.md)** — Balance-tune Hunt/Forage colony_food_security saturation weights (176 follow-on) — _[balance] · parked 2026-05-05 · blocked-by 183 · added 2026-05-05_
 
 ## Blocked (19)
 

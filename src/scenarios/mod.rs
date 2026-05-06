@@ -31,6 +31,7 @@ pub mod farming_cycle;
 pub mod fondness_kitten_imprint;
 pub mod grooming_other;
 pub mod hunt_acquisition;
+pub mod hunt_deposit_chain;
 pub mod kitten_cry;
 pub mod preset;
 pub mod runner;
@@ -68,6 +69,10 @@ pub const ALL: &[&Scenario] = &[
     &wildlife_fight::SCENARIO,
     &fondness_kitten_imprint::SCENARIO,
     &hunt_acquisition::SCENARIO,
+    // 184 — kill→travel→DepositPrey pipeline regression triage.
+    &hunt_deposit_chain::SCENARIO,
+    // 184 — fix lock: injured cats can still elect Hunt.
+    &hunt_deposit_chain::SCENARIO_INJURED,
     &exploration_ranging::SCENARIO,
     &ward_placement::SCENARIO,
     &farming_cycle::SCENARIO,

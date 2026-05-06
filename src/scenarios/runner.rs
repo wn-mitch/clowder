@@ -90,6 +90,28 @@ pub struct ScenarioReport {
     pub focal: String,
     pub seed: u64,
     pub ticks: Vec<TickReport>,
+    /// `FoodStores.current` at the end of the run. Lets multi-step
+    /// pipeline scenarios (kill→travel→deposit) assert that food
+    /// actually landed in Stores rather than only verifying L3
+    /// election. Read once after the final tick.
+    pub final_food_current: f32,
+    /// `FoodStores.capacity` at the end of the run. Useful when the
+    /// scenario builds a Stores mid-run (capacity transitions 0 → 50)
+    /// and the assertion needs to verify the building landed.
+    pub final_food_capacity: f32,
+    /// Number of slots used in the focal cat's `Inventory` at end-of-run.
+    /// Lets pipeline scenarios distinguish "cat never killed" (0 inventory)
+    /// from "cat killed but never deposited" (full inventory) from "cat
+    /// killed and deposited" (empty inventory + non-zero stockpile).
+    pub final_focal_inventory_count: usize,
+    /// Number of prey entities remaining alive. With a known starting prey
+    /// count, `start_count - remaining` tells us how many kills happened
+    /// regardless of where the food ended up.
+    pub final_prey_count: usize,
+    /// Number of `Item` entities currently `OnGround` (overflow that wasn't
+    /// retrieved). Distinguishes "kill landed in stores" from "kill went
+    /// to ground via the inventory-full overflow path".
+    pub final_ground_item_count: usize,
 }
 
 impl ScenarioReport {
@@ -145,11 +167,56 @@ pub fn run(
         tick_reports.push(drain_tick_report(&mut app));
     }
 
+    let final_food_current;
+    let final_food_capacity;
+    let final_focal_inventory_count;
+    let final_prey_count;
+    let final_ground_item_count;
+    {
+        let world = app.world_mut();
+        {
+            let food = world.resource::<crate::resources::FoodStores>();
+            final_food_current = food.current;
+            final_food_capacity = food.capacity;
+        }
+        // Focal cat inventory size by name.
+        {
+            use crate::components::identity::Name;
+            use crate::components::magic::Inventory;
+            let mut q = world.query::<(&Name, &Inventory)>();
+            final_focal_inventory_count = q
+                .iter(world)
+                .find(|(n, _)| n.0 == focal)
+                .map(|(_, inv)| inv.slots.len())
+                .unwrap_or(0);
+        }
+        // Live prey entities.
+        {
+            use crate::components::prey::PreyAnimal;
+            let mut q = world.query_filtered::<bevy_ecs::entity::Entity, bevy_ecs::prelude::With<PreyAnimal>>();
+            final_prey_count = q.iter(world).count();
+        }
+        // Ground items (Item entities with ItemLocation::OnGround).
+        {
+            use crate::components::items::{Item, ItemLocation};
+            let mut q = world.query::<&Item>();
+            final_ground_item_count = q
+                .iter(world)
+                .filter(|item| matches!(item.location, ItemLocation::OnGround))
+                .count();
+        }
+    }
+
     ScenarioReport {
         scenario_name: scenario.name,
         focal,
         seed,
         ticks: tick_reports,
+        final_food_current,
+        final_food_capacity,
+        final_focal_inventory_count,
+        final_prey_count,
+        final_ground_item_count,
     }
 }
 

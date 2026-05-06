@@ -12,6 +12,15 @@
 //! - *Elders* forage but don't hunt (reduced physical capacity).
 //! - *Kittens* are excluded from all four capabilities (fed by parents).
 //!
+//! **Injury rule (2026-05-06, ticket 184):** Injury is *not* a
+//! `CanHunt` gate. The same dissuades-not-disables principle applies
+//! at the scoring layer (skill / health interoception dampen Hunt's
+//! L2 appeal) so an injured cat can still elect Hunt when nothing
+//! else is competitive — they still need to eat. The other three
+//! capabilities (`CanForage`, `CanWard`, `CanCook`) retain the
+//! `¬Injured` gate today; revisit if a similar action-share
+//! cascade surfaces for them.
+//!
 //! **CanCook** is purely per-cat (`Adult ∧ ¬Injured`). Colony-scoped
 //! checks (`HasFunctionalKitchen`, `HasRawFoodInStores`) stay on the
 //! CookDse's `EligibilityFilter` so the `wants_cook_but_no_kitchen`
@@ -72,9 +81,18 @@ pub fn update_capability_markers(
         cur_cook,
     ) in cats.iter()
     {
-        // CanHunt: (Adult ∨ Young) ∧ ¬Injured ∧ ¬InCombat ∧ forest nearby
+        // CanHunt: (Adult ∨ Young) ∧ ¬InCombat ∧ forest nearby.
+        // Injury is intentionally NOT a gate (ticket 184 finding,
+        // 2026-05-06): injured cats can still need to eat. Injury
+        // dissuades, doesn't disable — a mangy one-eyed cat still
+        // hunts rats. The skill / health interoception signals the
+        // L2 scoring layer reads already dampen Hunt's appeal for
+        // injured cats; gating eligibility on top of that
+        // double-counted, and the absence of Hunt for injured cats
+        // shifted action-share to Patrol (Blind commitment + long
+        // plans amplified the gap into a +15pp share gain in the
+        // post-181 soak).
         let want_hunt = (is_adult || is_young)
-            && !is_injured
             && !in_combat
             && has_nearby_tile(pos, &map, d.hunt_terrain_search_radius, |t| {
                 matches!(t, Terrain::DenseForest | Terrain::LightForest)
@@ -268,8 +286,15 @@ mod tests {
         assert!(!world.entity(cat).contains::<CanHunt>());
     }
 
+    /// 2026-05-06 (ticket 184): injury is no longer a CanHunt gate.
+    /// Injured cats can still elect Hunt; the skill / health scoring
+    /// signals dampen the L2 score so Hunt becomes less attractive
+    /// without becoming impossible. The "mangy one-eyed cat still
+    /// hunts rats" intuition. Pre-184 this asserted the opposite
+    /// (`!world.entity(cat).contains::<CanHunt>()`); the assertion
+    /// flipped with the gate removal.
     #[test]
-    fn injured_adult_no_can_hunt() {
+    fn injured_adult_keeps_can_hunt() {
         let (mut world, mut schedule) = setup();
         set_terrain(&mut world, 11, 10, Terrain::DenseForest);
         let cat = spawn_cat(&mut world, 10, 10);
@@ -277,7 +302,7 @@ mod tests {
 
         schedule.run(&mut world);
 
-        assert!(!world.entity(cat).contains::<CanHunt>());
+        assert!(world.entity(cat).contains::<CanHunt>());
     }
 
     #[test]
@@ -490,8 +515,9 @@ mod tests {
         world.entity_mut(cat).insert((Adult, Injured, HasWardHerbs));
 
         schedule.run(&mut world);
-        // Injured: no capabilities
-        assert!(!world.entity(cat).contains::<CanHunt>());
+        // Injured: CanHunt stays asserted (injury dissuades, doesn't
+        // disable per ticket 184); CanWard still gates on injury.
+        assert!(world.entity(cat).contains::<CanHunt>());
         assert!(!world.entity(cat).contains::<CanWard>());
 
         // Heal
@@ -503,7 +529,7 @@ mod tests {
     }
 
     #[test]
-    fn injury_transition_removes_markers() {
+    fn injury_transition_keeps_can_hunt_removes_can_ward() {
         let (mut world, mut schedule) = setup();
         set_terrain(&mut world, 11, 10, Terrain::DenseForest);
         let cat = spawn_cat(&mut world, 10, 10);
@@ -513,11 +539,11 @@ mod tests {
         assert!(world.entity(cat).contains::<CanHunt>());
         assert!(world.entity(cat).contains::<CanWard>());
 
-        // Get injured
+        // Get injured — Hunt stays available, Ward drops.
         world.entity_mut(cat).insert(Injured);
         schedule.run(&mut world);
 
-        assert!(!world.entity(cat).contains::<CanHunt>());
+        assert!(world.entity(cat).contains::<CanHunt>());
         assert!(!world.entity(cat).contains::<CanWard>());
     }
 

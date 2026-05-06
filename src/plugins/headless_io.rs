@@ -249,6 +249,7 @@ pub fn write_jsonl_headers(
     sim_constants: Res<SimConstants>,
     sim_config: Res<SimConfig>,
     time_scale: Res<TimeScale>,
+    time_state: Res<TimeState>,
     tile_map: Res<TileMap>,
     mut narrative_writer: ResMut<NarrativeJsonlWriter>,
     mut event_writer: ResMut<EventJsonlWriter>,
@@ -291,6 +292,15 @@ pub fn write_jsonl_headers(
     let wall_seconds_per_game_day = time_scale.wall_seconds_per_game_day();
     let tick_rate_hz = time_scale.tick_rate_hz();
 
+    // Sim epoch. `build_new_world` initializes `TimeState.tick` to
+    // `60 * ticks_per_season` so founder cats can have varied ages
+    // (`born_tick = start_tick.saturating_sub(age_ticks)` would clamp
+    // every founder to Young at tick 0). All ticks written to disk are
+    // absolute and start at this value, never zero. Surfacing it in the
+    // header makes the run self-describing for downstream tooling and
+    // for fresh agents inspecting an old archive.
+    let start_tick = time_state.tick;
+
     // Events: full header with constants + map size.
     let event_header = serde_json::json!({
         "_header": true,
@@ -301,6 +311,7 @@ pub fn write_jsonl_headers(
         "commit_dirty": commit_dirty,
         "commit_time": commit_time,
         "sim_config": sim_config_json,
+        "start_tick": start_tick,
         "wall_seconds_per_game_day": wall_seconds_per_game_day,
         "tick_rate_hz": tick_rate_hz,
         "map_width": tile_map.width,
@@ -329,6 +340,7 @@ pub fn write_jsonl_headers(
             "commit_dirty": commit_dirty,
             "commit_time": commit_time,
             "sim_config": sim_config_json,
+            "start_tick": start_tick,
             "wall_seconds_per_game_day": wall_seconds_per_game_day,
             "tick_rate_hz": tick_rate_hz,
             "map_width": tile_map.width,

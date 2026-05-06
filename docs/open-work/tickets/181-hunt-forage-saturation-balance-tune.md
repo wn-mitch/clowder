@@ -1,14 +1,14 @@
 ---
 id: 181
 title: Balance-tune Hunt/Forage colony_food_security saturation weights (176 follow-on)
-status: ready
+status: parked
 cluster: balance
 added: 2026-05-05
-parked: null
-blocked-by: []
+parked: 2026-05-05
+blocked-by: [183]
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
-related-balance: []
+related-balance: [181-hunt-forage-saturation-tune.md]
 landed-at: null
 landed-on: null
 ---
@@ -75,3 +75,17 @@ Per CLAUDE.md balance-tuning discipline:
 
 - 2026-05-05: opened by ticket 176's closeout. Saturation axis
   wired in stage 5; this ticket lifts the weights.
+- 2026-05-05: iteration 1 ran with `hunt_food_security_weight=0.20`
+  / `forage_food_security_weight=0.15`. Forage % dropped as
+  predicted (-8.6 pp), but Hunt % ROSE (+2.6 pp, wrong direction)
+  and the freed bandwidth flowed to **Patrol (+15 pp)**, not
+  higher-tier DSEs. Continuity canaries collapsed: grooming -34%,
+  mentoring -83%, mythic-texture -100%. colony_score nourishment
+  axis crashed to zero (-100%); aggregate -22%; seasons_survived
+  4 → 2. **Structural model error, not a tuning miss.** Constants
+  reverted to 0.0/0.0. Full numeric breakdown in
+  `docs/balance/181-hunt-forage-saturation-tune.md`. Parked behind
+  follow-on ticket 183 (paired-axis design or Patrol-collision
+  investigation). Soak archives: `logs/tuned-42-pre-181/` (baseline,
+  weights at 0.0) and `logs/tuned-42/` (iteration 1, weights
+  0.20/0.15 — kept for reference, do not promote).

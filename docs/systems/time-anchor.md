@@ -18,6 +18,14 @@ wall_seconds_elapsed = tick_count / tick_rate_hz
 
 Two simulation runs are behaviorally comparable iff their `SimConfig` and `wall_seconds_per_game_day` both match. Both fields land in the `events.jsonl` `_header` line for downstream tooling.
 
+## The tick origin
+
+Every simulation run begins at **`start_tick = 60 × ticks_per_season`** (default: `60 × 20000 = 1,200,000`), set in [`build_new_world`](../../src/plugins/setup.rs) at `setup.rs:297-301` and persisted into `TimeState.tick`. **Ticks written to disk are absolute** — `events.jsonl`, `narrative.jsonl`, and `trace-*.jsonl` all carry the offset value, never a zero-based delta. The events / trace `_header` line includes a top-level `start_tick` field for self-describing archives.
+
+The offset exists so founder cats can have varied ages: `born_tick = start_tick.saturating_sub(age_ticks)`, and `saturating_sub` silently clamps below zero. With `start_tick = 0`, every founder reads back as `LifeStage::Young` and mating eligibility never opens. The current multiplier (60 seasons) must exceed `FounderAgeConstants::adult_max_seasons`. See [`docs/balance/activation-1-status.md`](../balance/activation-1-status.md) for the regression that pinned this in.
+
+`ColonyScore.last_recorded_season` is seeded to `start_tick / ticks_per_season` so `seasons_survived` still counts from 0 (`setup.rs:362-366`). Anything else that wants "ticks since sim start" computes `current_tick - start_tick` rather than treating raw ticks as elapsed time.
+
 ## The peg
 
 `wall_seconds_per_game_day` is the user-facing knob that says *"one in-game day equals N wall-clock seconds."* It governs the FixedUpdate Hz for both build paths:

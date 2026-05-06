@@ -105,6 +105,16 @@ fn print_report(report: &scenarios::runner::ScenarioReport, elapsed: std::time::
     println!("seed:     {}", report.seed);
     println!("ticks:    {}", report.ticks.len());
     println!("elapsed:  {:.2}s", elapsed.as_secs_f64());
+    println!(
+        "stockpile: {:.0} / {:.0}  (FoodStores at end-of-run)",
+        report.final_food_current, report.final_food_capacity
+    );
+    println!(
+        "focal inv: {} slots used  |  prey alive: {}  |  ground items: {}",
+        report.final_focal_inventory_count,
+        report.final_prey_count,
+        report.final_ground_item_count
+    );
     println!("─────────────────────────────────────────────────");
 
     println!();
