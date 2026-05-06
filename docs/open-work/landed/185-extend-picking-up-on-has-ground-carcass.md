@@ -1,7 +1,7 @@
 ---
 id: 185
 title: Extend PickingUp DSE on a HasGroundCarcass colony marker — emergent scavenging
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-06
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-06
 ---
 
 ## Why
@@ -146,6 +146,49 @@ plan template handles execution.
   rises from ~0 to a real positive number; Hunt / Forage L2 means
   unchanged.
 
+## Resolution
+
+Wave-closeout step 2 of 3. Substrate landed:
+
+- `HasGroundCarcass` colony marker authored by
+  `update_colony_building_markers` (`src/systems/buildings.rs`)
+  from any uncleansed/unharvested `Carcass` entity. Threaded
+  through `colony_state_query` in both `goap.rs` and
+  `disposition.rs` into `MarkerSnapshot` via `set_colony`.
+- `PickingUpDse` curve lifted from `Linear { slope: 0.0,
+  intercept: 0.0 }` to a single `colony_food_security` axis
+  shaped as inverted-Logistic — scavenge urgency rises sharply
+  as the colony's `min(food_fraction, hunger_satisfaction)`
+  signal drops. Eligibility filter retains
+  `forbid(Incapacitated) ∧ require(HasGroundCarcass)`; the
+  marker writer landing means the require predicate now
+  resolves to a real value.
+- Allowlist entry `HasGroundCarcass 185` retired in
+  `scripts/substrate_stubs.allowlist`; 2 entries remain
+  (`HideEligible 170`, `HasHandoffRecipient 188`).
+- New unit tests on `picking_up.rs`:
+  `picking_up_scavenges_when_food_security_low` (curve shape),
+  `picking_up_axis_is_food_security` (axis name),
+  `picking_up_eligibility_requires_ground_carcass` (eligibility).
+
+The unit tests cover the load-bearing changes (curve shape,
+eligibility, marker authoring); a full multi-system scenario
+test (`picking_up_scavenging` per the original verification
+section) is **deferred to the balance follow-on** (191) along
+with `OverflowToGround` count regression-checks. Rationale:
+the integration is mediated by well-tested patterns (HasMidden,
+HasFunctionalKitchen authoring sites), and the wave's
+post-closeout multi-seed re-baseline will surface any
+disconnect.
+
+## Land-day follow-on
+
+- **Balance follow-on** — open a tuning ticket for the
+  PickingUp Logistic params + scavenge_urgency formula. Plus
+  the `picking_up_scavenging` scenario test deferred from this
+  landing. The 0.5 midpoint may over- or under-fire scavenging
+  vs Hunt; validate via `just hypothesize` four-artifact loop.
+
 ## Log
 
 - 2026-05-06: opened from ticket 184's diagnostic findings.
@@ -154,3 +197,7 @@ plan template handles execution.
   scavenging as appealing during 184's investigation. Substrate
   classification verified: "ground carcass exists in colony" is
   a true substrate fact per §4.7.
+- 2026-05-06: landed (wave-closeout step 2 of 3). Marker writer
+  + curve lift + eligibility wiring all in one commit;
+  allowlist entry retired. Plan at
+  `~/.claude/plans/i-just-finished-a-compiled-hanrahan.md`.

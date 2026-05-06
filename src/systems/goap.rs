@@ -179,6 +179,7 @@ pub struct WorldStateQueries<'w, 's> {
             Has<markers::HasGarden>,
             Has<markers::ColonyStoresChronicallyFull>,
             Has<markers::HasMidden>,
+            Has<markers::HasGroundCarcass>,
         ),
         With<markers::ColonyState>,
     >,
@@ -949,6 +950,7 @@ pub fn evaluate_and_plan(
         has_garden,
         colony_stores_chronically_full,
         has_midden,
+        has_ground_carcass,
     ) = world_state
         .colony_state_query
         .single()
@@ -1011,6 +1013,10 @@ pub fn evaluate_and_plan(
     // the same `update_colony_building_markers` system from any
     // existing `StructureType::Midden` building.
     markers.set_colony(markers::HasMidden::KEY, has_midden);
+    // 185: HasGroundCarcass — PickingUp DSE eligibility filter for
+    // emergent scavenging. Authored by `update_colony_building_markers`
+    // from any uncleansed/unharvested carcass in the colony.
+    markers.set_colony(markers::HasGroundCarcass::KEY, has_ground_carcass);
 
     let herb_positions: Vec<(Entity, Position, HerbKind)> = world_state
         .herb_query

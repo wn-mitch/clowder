@@ -85,11 +85,11 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[170](docs/open-work/tickets/170-hide-eligible-authoring-system.md)** — HideEligible authoring system (Hide DSE Phase 2) — _[ai-substrate] · added 2026-05-05_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[world-ecology] · added 2026-05-05_
 - **[181](docs/open-work/tickets/181-hunt-forage-saturation-balance-tune.md)** — Balance-tune Hunt/Forage colony_food_security saturation weights (176 follow-on) — _[balance] · added 2026-05-05_
-- **[185](docs/open-work/tickets/185-extend-picking-up-on-has-ground-carcass.md)** — Extend PickingUp DSE on a HasGroundCarcass colony marker — emergent scavenging — _[ai-substrate] · added 2026-05-06_
 - **[186](docs/open-work/tickets/186-add-effective-bevy-command-buffer-race.md)** — add_effective Bevy command-buffer race silently drops capacity_bonus on just-spawned items — _added 2026-05-06_
 - **[187](docs/open-work/tickets/187-kitten-starvation-under-active-mating-pipeline.md)** — Kittens starve in the post-184 soak — RetrieveFoodForKitten plan-fails dominate — _[ai-substrate] · added 2026-05-06_
 - **[188](docs/open-work/tickets/188-handoff-target-picker.md)** — Handoff target-picker — pick the recipient cat at L2 — _[ai-substrate] · added 2026-05-06_
 - **[190](docs/open-work/tickets/190-build-chronic-full-weight-tune.md)** — Tune build_chronic_full_weight (179 follow-on) — _[balance] · added 2026-05-06_
+- **[191](docs/open-work/tickets/191-picking-up-scavenging-tune.md)** — Tune PickingUp scavenge_urgency curve + add scenario test (185 follow-on) — _[balance] · added 2026-05-06_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _added 2026-04-28_
 
 ## Parked (6)
@@ -127,13 +127,14 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (125)
+## Landed archive (126)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (60)
+### 2026-05 (61)
 
 - **[189](docs/open-work/landed/189-post-178-food-available-regression.md)** — Post-178 food_available regression — layer-walk diagnosis _(2026-05-06)_
+- **[185](docs/open-work/landed/185-extend-picking-up-on-has-ground-carcass.md)** — Extend PickingUp DSE on a HasGroundCarcass colony marker — emergent scavenging _(2026-05-06)_
 - **[184](docs/open-work/landed/184-kill-deposit-pipeline-regression-post-175.md)** — Hunt kill→stockpile pipeline regressed under L3 bandwidth pressure (root cause - CanHunt over-gated on Injured) _(2026-05-06)_
 - **[183](docs/open-work/landed/183-paired-axis-or-patrol-collision-investigation.md)** — Paired-axis lift on higher-tier DSEs OR Patrol-collision investigation (181 follow-on) _(2026-05-06)_
 - **[182](docs/open-work/landed/182-courtship-burial-regression-post-176.md)** — Courtship + burial canary regression on post-176 soak (pre-existing or 176-induced?) _(2026-05-06)_

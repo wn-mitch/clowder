@@ -450,7 +450,11 @@ pub fn update_construction_site_map(
 /// - `ColonyStoresChronicallyFull` — ticket 176; toggled when the
 ///   per-window count of `Feature::DepositRejected` divided by colony
 ///   cat-count exceeds `chronicity_threshold`. Drives the Build DSE
-///   "we need more Stores" lift (default-zero weight in stage 4).
+///   "we need more Stores" lift (default-zero weight in stage 4;
+///   wired into BuildDse by ticket 179).
+/// - `HasGroundCarcass` — ticket 185; ≥1 uncleansed/unharvested
+///   `Carcass` exists in the colony. Reader: the PickingUp DSE's
+///   eligibility filter, gating emergent scavenging.
 #[allow(clippy::too_many_arguments)]
 pub fn update_colony_building_markers(
     mut commands: Commands,
@@ -461,6 +465,7 @@ pub fn update_colony_building_markers(
         &crate::components::items::Item,
         bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
     >,
+    carcasses: Query<&crate::components::wildlife::Carcass, Without<Dead>>,
     cats: Query<&crate::components::physical::Health, Without<Dead>>,
     food: Res<FoodStores>,
     constants: Res<SimConstants>,
@@ -550,6 +555,20 @@ pub fn update_colony_building_markers(
         em.insert(crate::components::markers::ColonyStoresChronicallyFull);
     } else {
         em.remove::<crate::components::markers::ColonyStoresChronicallyFull>();
+    }
+    // 185: HasGroundCarcass — any uncleansed and unharvested carcass
+    // in the colony. Reader: PickingUp DSE eligibility. Mirror of the
+    // per-cat `CarcassNearby` predicate in
+    // `update_target_existence_markers`, but at colony scope: PickingUp
+    // is enabled-or-disabled across the whole colony based on the same
+    // condition that drives per-cat carcass perception. Authoring it
+    // here (rather than in `update_target_existence_markers`) keeps
+    // the colony-marker writes co-located on `update_colony_building_markers`.
+    let has_ground_carcass = carcasses.iter().any(|c| !c.cleansed && !c.harvested);
+    if has_ground_carcass {
+        em.insert(crate::components::markers::HasGroundCarcass);
+    } else {
+        em.remove::<crate::components::markers::HasGroundCarcass>();
     }
 }
 
