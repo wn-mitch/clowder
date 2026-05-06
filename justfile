@@ -415,6 +415,18 @@ open-work-wip:
 open-work-index:
     uv run scripts/generate_open_work.py
 
+# Land a ticket: flip status -> done, set landed-at: pending,
+# landed-on: today, append optional Log entry, move file from
+# `tickets/` to `landed/`, drop the id from every dependent's
+# blocked-by, and regenerate `docs/open-work.md`. After committing,
+# backfill the sha:
+#
+#   just land 197                         # initial land
+#   just land 197 --sha 55b6e930          # backfill landed-at after commit
+#   just land 197 --log "shipped X y z"   # initial land with Log entry
+land *ARGS:
+    uv run scripts/land_ticket.py {{ARGS}}
+
 # Render ticket dependency tree (blocked-by edges). Pass flags through.
 #
 # Examples:
