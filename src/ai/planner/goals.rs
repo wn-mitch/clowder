@@ -76,7 +76,16 @@ pub fn goal_for_disposition(
         | DispositionKind::Witchcraft
         | DispositionKind::Cooking
         | DispositionKind::Exploring
-        | DispositionKind::Caretaking => GoalState {
+        | DispositionKind::Caretaking
+        // 176: inventory-disposal dispositions all complete on
+        // the single trip increment fired by their terminal action
+        // (DropItem / TrashItemAtMidden / HandoffItem /
+        // PickUpItemFromGround), mirroring the
+        // Hunting/Foraging shape.
+        | DispositionKind::Discarding
+        | DispositionKind::Trashing
+        | DispositionKind::Handing
+        | DispositionKind::PickingUp => GoalState {
             predicates: vec![StatePredicate::TripsAtLeast(current_trips + 1)],
         },
     }

@@ -87,7 +87,14 @@ fn assert_all_actions_covers_action(a: Action) {
         | Action::Mate
         | Action::Caretake
         | Action::Cook
-        | Action::Hide => {}
+        | Action::Hide
+        // 176: inventory-disposal Action variants. Stage 1 ships
+        // dormant DSEs so the templates aren't authored yet; the
+        // audit arm matches them to keep this assertion exhaustive.
+        | Action::Drop
+        | Action::Trash
+        | Action::Handoff
+        | Action::PickUp => {}
     }
 }
 

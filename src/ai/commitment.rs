@@ -225,6 +225,14 @@ pub fn strategy_for_disposition(kind: DispositionKind) -> CommitmentStrategy {
         // Activity-shaped — desire drift should terminate.
         DispositionKind::Socializing => OpenMinded,
         DispositionKind::Exploring => OpenMinded,
+        // 176: inventory-disposal commitments are short, goal-shaped
+        // single events. SingleMinded prevents a mid-walk mood drift
+        // from dropping the disposal mid-trip and stranding the
+        // surplus item back in the cat's inventory.
+        DispositionKind::Discarding => SingleMinded,
+        DispositionKind::Trashing => SingleMinded,
+        DispositionKind::Handing => SingleMinded,
+        DispositionKind::PickingUp => SingleMinded,
     }
 }
 
@@ -728,6 +736,13 @@ mod tests {
             // 158: Grooming — single-interaction Pattern B, mirrors
             // Mentoring (`SingleMinded`).
             Grooming,
+            // 176: inventory-disposal dispositions — all SingleMinded
+            // (single-event commitments; mid-trip mood drift shouldn't
+            // strand the surplus item back in inventory).
+            Discarding,
+            Trashing,
+            Handing,
+            PickingUp,
         ];
         assert_eq!(
             covered.len(),

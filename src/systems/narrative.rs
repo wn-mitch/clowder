@@ -394,6 +394,46 @@ pub fn generate_narrative(
                 let idx = rng.rng.random_range(0..options.len());
                 (options[idx].clone(), NarrativeTier::Action)
             }
+
+            // 176: inventory-disposal narratives. The DSEs ship with
+            // default-zero scoring weights so these arms are reached
+            // only after balance-tuning lifts the saturation surfaces;
+            // landing the prose now keeps the ticker ready.
+            Action::Drop => {
+                let options = [
+                    format!("{cat} drops a surplus catch where they stand."),
+                    format!("{cat} sets down what they were carrying."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
+
+            Action::Trash => {
+                let options = [
+                    format!("{cat} carries refuse over to the midden."),
+                    format!("{cat} leaves an unwanted item at the colony's discard pile."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
+
+            Action::Handoff => {
+                let options = [
+                    format!("{cat} passes a catch to a colony-mate."),
+                    format!("{cat} hands off what they were carrying."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
+
+            Action::PickUp => {
+                let options = [
+                    format!("{cat} picks up an item from the ground."),
+                    format!("{cat} stoops to gather a ground item into their inventory."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
         };
 
         log.push(tick, text, tier);

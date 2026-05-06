@@ -104,6 +104,28 @@ pub enum Action {
     /// Phase 1 ships dormant: the `HideEligible` marker that gates
     /// `HideDse` is never authored until lift activation.
     Hide,
+    /// 176: drop one carried item on the ground at the cat's current
+    /// position. Single-step plan template `[DropItem]`. Rides
+    /// `DispositionKind::Discarding`. The dropped item becomes a real
+    /// `Item` entity with `ItemLocation::OnGround` — other cats can
+    /// forage it later.
+    Drop,
+    /// 176: carry one item to the nearest Midden and deposit it there.
+    /// Plan template `[TravelTo(Midden), TrashItemAtMidden]`. Rides
+    /// `DispositionKind::Trashing`. Midden has unlimited capacity so
+    /// the deposit cannot fail on capacity grounds.
+    Trash,
+    /// 176: hand one carried item to a nearby cat whose inventory has
+    /// room and who could use it. Plan template `[TravelTo(target_cat),
+    /// HandoffItem]`. Rides `DispositionKind::Handing`.
+    Handoff,
+    /// 176: walk to a desired item with `ItemLocation::OnGround` and
+    /// add it to inventory. Plan template `[TravelTo(item_pos),
+    /// PickUpItemFromGround]`. Rides `DispositionKind::PickingUp`.
+    /// Load-bearing for the kill→carcass-on-ground→pick-up flow:
+    /// `engage_prey` always spawns a real carcass entity, and the cat
+    /// must elect `PickingUp` to retrieve it.
+    PickUp,
 }
 
 // ---------------------------------------------------------------------------

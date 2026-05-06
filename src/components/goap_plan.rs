@@ -360,6 +360,12 @@ impl GoapActionKind {
             Self::DeliverDirective => Action::Coordinate,
             Self::ExploreSurvey => Action::Explore,
             Self::RetrieveRawFood | Self::Cook | Self::DepositCookedFood => Action::Cook,
+            // 176: inventory-disposal GOAP actions map directly to
+            // their parent L3 Action labels.
+            Self::DropItem => Action::Drop,
+            Self::TrashItemAtMidden => Action::Trash,
+            Self::HandoffItem => Action::Handoff,
+            Self::PickUpItemFromGround => Action::PickUp,
         }
     }
 }

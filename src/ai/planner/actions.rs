@@ -220,6 +220,70 @@ pub fn grooming_actions() -> Vec<GoapActionDef> {
     }]
 }
 
+/// 176: single-action template for `Discarding`. No travel — the cat
+/// drops one item where they stand. The plan is `[DropItem]`; the
+/// resolver removes one slot and spawns an `Item` entity with
+/// `ItemLocation::OnGround` at the cat's position. Completion proxy
+/// is `IncrementTrips` (matches Hunting/Foraging shape).
+pub fn discarding_actions() -> Vec<GoapActionDef> {
+    vec![GoapActionDef {
+        kind: GoapActionKind::DropItem,
+        cost: 1,
+        preconditions: vec![],
+        effects: vec![
+            StateEffect::SetCarrying(Carrying::Nothing),
+            StateEffect::IncrementTrips,
+        ],
+    }]
+}
+
+/// 176: plan template for `Trashing` — `[TravelTo(Wilds),
+/// TrashItemAtMidden]`. The Midden building is colony-singleton; the
+/// `Wilds` zone is a placeholder until a `PlannerZone::Midden`
+/// variant lands with the building-spawn wiring (default-zero scoring
+/// keeps the plan never-elected for now). Completion proxy is
+/// `IncrementTrips`.
+pub fn trashing_actions() -> Vec<GoapActionDef> {
+    vec![GoapActionDef {
+        kind: GoapActionKind::TrashItemAtMidden,
+        cost: 2,
+        // Midden has unlimited capacity — no marker gate needed.
+        preconditions: vec![StatePredicate::ZoneIs(PlannerZone::Wilds)],
+        effects: vec![
+            StateEffect::SetCarrying(Carrying::Nothing),
+            StateEffect::IncrementTrips,
+        ],
+    }]
+}
+
+/// 176: plan template for `Handing` — `[TravelTo(SocialTarget),
+/// HandoffItem]`. Reuses `SocialTarget` zone; the L2 DSE picks the
+/// recipient cat and threads it as the disposition's `target_entity`.
+pub fn handing_actions() -> Vec<GoapActionDef> {
+    vec![GoapActionDef {
+        kind: GoapActionKind::HandoffItem,
+        cost: 2,
+        preconditions: vec![StatePredicate::ZoneIs(PlannerZone::SocialTarget)],
+        effects: vec![
+            StateEffect::SetCarrying(Carrying::Nothing),
+            StateEffect::IncrementTrips,
+        ],
+    }]
+}
+
+/// 176: plan template for `PickingUp` — single-step retrieval from
+/// the ground. Reuses `MaterialPile` zone (the existing OnGround-
+/// item zone resolution) until a more general `TargetGroundItem`
+/// zone lands. Default-zero scoring keeps this dormant.
+pub fn picking_up_actions() -> Vec<GoapActionDef> {
+    vec![GoapActionDef {
+        kind: GoapActionKind::PickUpItemFromGround,
+        cost: 1,
+        preconditions: vec![StatePredicate::ZoneIs(PlannerZone::MaterialPile)],
+        effects: vec![StateEffect::IncrementTrips],
+    }]
+}
+
 /// Building plans a haul→deliver→construct sequence. The planner emits
 /// `[TravelTo(MaterialPile), GatherMaterials, TravelTo(ConstructionSite),
 /// DeliverMaterials, Construct]` for an unfunded site with reachable
@@ -606,6 +670,11 @@ pub fn actions_for_disposition(
         DispositionKind::Caretaking => caretaking_actions(),
         DispositionKind::Mentoring => mentoring_actions(),
         DispositionKind::Grooming => grooming_actions(),
+        // 176: inventory-disposal plan templates.
+        DispositionKind::Discarding => discarding_actions(),
+        DispositionKind::Trashing => trashing_actions(),
+        DispositionKind::Handing => handing_actions(),
+        DispositionKind::PickingUp => picking_up_actions(),
     };
     actions.extend(domain_actions);
     actions

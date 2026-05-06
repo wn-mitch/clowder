@@ -1025,6 +1025,13 @@ fn active_disposition_ordinal(
         Some(DispositionKind::Grooming) => 15.0,
         Some(DispositionKind::Witchcraft) => 16.0,
         Some(DispositionKind::Cooking) => 17.0,
+        // 176: inventory-disposal dispositions append at ordinals
+        // 18-21 — same append-only discipline as 150/154/158/155 so
+        // saved soaks and ordinal-equality tests stay valid.
+        Some(DispositionKind::Discarding) => 18.0,
+        Some(DispositionKind::Trashing) => 19.0,
+        Some(DispositionKind::Handing) => 20.0,
+        Some(DispositionKind::PickingUp) => 21.0,
     }
 }
 

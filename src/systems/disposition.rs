@@ -1630,6 +1630,15 @@ pub fn disposition_to_chain(
             DispositionKind::Grooming => {
                 build_grooming_chain(groom_other_target, &cat_pos_list)
             }
+            // 176: inventory-disposal dispositions don't have a legacy
+            // chain-building path — they ship GOAP-only. The arm
+            // returns None so this dead-code path defers cleanly to
+            // the planner. Stage 1 ships dormant DSEs (default-zero
+            // scoring) so this arm is never reached at runtime.
+            DispositionKind::Discarding
+            | DispositionKind::Trashing
+            | DispositionKind::Handing
+            | DispositionKind::PickingUp => None,
         };
 
         if let Some((mut chain, action)) = chain {

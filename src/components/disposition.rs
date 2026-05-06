@@ -111,6 +111,25 @@ pub enum DispositionKind {
     /// esteem-tier craft. Tier 4 reproduced the suppression that left
     /// `FoodCooked` on `never_fired_expected_positives` pre-155).
     Cooking,
+    /// 176: drop one carried item on the ground at the cat's current
+    /// position. Single-step plan template `[DropItem]`, no travel.
+    /// Other cats can forage the dropped item later. Tier 1 — clearing
+    /// inventory of unusable surplus is foundation hardening.
+    Discarding,
+    /// 176: carry one item to the nearest Midden and deposit it there.
+    /// Plan template `[TravelTo(Midden), TrashItemAtMidden]`. The
+    /// Midden has unlimited capacity, so the deposit cannot fail on
+    /// capacity grounds. Tier 1 — keeps the colony commons clean.
+    Trashing,
+    /// 176: hand one carried item to a nearby cat whose inventory has
+    /// room. Tier 1 — direct prosocial transfer.
+    Handing,
+    /// 176: walk to a desired item on the ground and add it to
+    /// inventory. Inverse of `Discarding`. Load-bearing for the
+    /// kill→carcass-on-ground→pick-up flow: `engage_prey` spawns a
+    /// real carcass entity at the kill site; the cat must plan
+    /// `PickingUp` to retrieve it. Tier 1.
+    PickingUp,
 }
 
 impl DispositionKind {
@@ -148,6 +167,13 @@ impl DispositionKind {
             | Self::Witchcraft
             | Self::Cooking
             | Self::Coordinating => 1,
+            // 176: inventory-disposal dispositions complete after one
+            // act. Trashing/Handing/PickingUp involve travel + a single
+            // transfer; Discarding is just the in-place drop.
+            Self::Discarding
+            | Self::Trashing
+            | Self::Handing
+            | Self::PickingUp => return 1,
             // 150 R5a: Eating completes on need threshold, not count.
             // Like Resting, target_completions returns MAX so the count-
             // based completion check never fires; the actual
@@ -207,6 +233,12 @@ impl DispositionKind {
             Action::Explore | Action::Wander => Some(Self::Exploring),
             Action::Mate => Some(Self::Mating),
             Action::Caretake => Some(Self::Caretaking),
+            // 176: inventory-disposal Action variants route directly
+            // to their parent disposition.
+            Action::Drop => Some(Self::Discarding),
+            Action::Trash => Some(Self::Trashing),
+            Action::Handoff => Some(Self::Handing),
+            Action::PickUp => Some(Self::PickingUp),
             // Anxiety-interrupt class — actions without a parent
             // disposition. `Flee` (047) drives retreat; `Hide` (104) is
             // the "remain still and hope" sibling valence; `Idle` is
@@ -258,6 +290,11 @@ impl DispositionKind {
             Self::Caretaking => &[Action::Caretake],
             Self::Mentoring => &[Action::Mentor],
             Self::Grooming => &[Action::GroomOther],
+            // 176: inventory-disposal dispositions own one Action each.
+            Self::Discarding => &[Action::Drop],
+            Self::Trashing => &[Action::Trash],
+            Self::Handing => &[Action::Handoff],
+            Self::PickingUp => &[Action::PickUp],
         }
     }
 
@@ -275,6 +312,9 @@ impl DispositionKind {
     /// (the herbcraft-DSE-set inherits the slot); `Witchcraft` and
     /// `Cooking` append at ordinals 16 / 17 to keep upstream ordinals
     /// stable for saved soaks and ordinal-equality tests.
+    /// 176: inventory-disposal dispositions append at ordinals 17-20
+    /// to keep upstream ordinals stable for saved soaks and ordinal-
+    /// equality tests.
     pub const ALL: &[Self] = &[
         Self::Resting,
         Self::Hunting,
@@ -293,6 +333,10 @@ impl DispositionKind {
         Self::Grooming,
         Self::Witchcraft,
         Self::Cooking,
+        Self::Discarding,
+        Self::Trashing,
+        Self::Handing,
+        Self::PickingUp,
     ];
 
     /// Human-readable label for the inspect panel.
@@ -315,6 +359,10 @@ impl DispositionKind {
             Self::Grooming => "Grooming",
             Self::Witchcraft => "Witchcraft",
             Self::Cooking => "Cooking",
+            Self::Discarding => "Discarding",
+            Self::Trashing => "Trashing",
+            Self::Handing => "Handing",
+            Self::PickingUp => "PickingUp",
         }
     }
 
@@ -332,7 +380,14 @@ impl DispositionKind {
             | Self::Eating
             | Self::Hunting
             | Self::Foraging
-            | Self::Cooking => 1,
+            | Self::Cooking
+            // 176: inventory-disposal is foundation hardening — clearing
+            // surplus and retrieving real ground items is part of the
+            // physiological-tier loop.
+            | Self::Discarding
+            | Self::Trashing
+            | Self::Handing
+            | Self::PickingUp => 1,
             // 158: Grooming sits at tier 2 — above thermal self-care
             // (now `Action::GroomSelf` riding `Resting` at tier 1) and
             // below the affiliative-coordination tier the Socializing
@@ -370,6 +425,10 @@ impl DispositionKind {
             Self::Grooming => "groom a friend",
             Self::Witchcraft => "work magic",
             Self::Cooking => "cook",
+            Self::Discarding => "drop a surplus item",
+            Self::Trashing => "carry a surplus item to the midden",
+            Self::Handing => "hand a surplus item to a colony-mate",
+            Self::PickingUp => "pick up a ground item",
         }
     }
 }
@@ -669,10 +728,33 @@ mod tests {
         // (the herbcraft-DSE-set inherits the slot); `Witchcraft` and
         // `Cooking` append at ordinals 16 / 17 to preserve the upstream
         // ordinal stability invariant.
-        assert_eq!(DispositionKind::ALL.len(), 17);
+        // 176: inventory-disposal dispositions append at ordinals
+        // 18-21 (Discarding, Trashing, Handing, PickingUp).
+        assert_eq!(DispositionKind::ALL.len(), 21);
         assert_eq!(
             DispositionKind::ALL.last(),
-            Some(&DispositionKind::Cooking)
+            Some(&DispositionKind::PickingUp),
+            "PickingUp must remain at ordinal-21 position"
+        );
+        assert_eq!(
+            DispositionKind::ALL[19],
+            DispositionKind::Handing,
+            "Handing must remain at ordinal-20 position"
+        );
+        assert_eq!(
+            DispositionKind::ALL[18],
+            DispositionKind::Trashing,
+            "Trashing must remain at ordinal-19 position"
+        );
+        assert_eq!(
+            DispositionKind::ALL[17],
+            DispositionKind::Discarding,
+            "Discarding must remain at ordinal-18 position"
+        );
+        assert_eq!(
+            DispositionKind::ALL[16],
+            DispositionKind::Cooking,
+            "Cooking must remain at ordinal-17 position"
         );
         assert_eq!(
             DispositionKind::ALL[15],

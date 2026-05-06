@@ -208,6 +208,14 @@ const MENTOR: &str = "mentor";
 const MATE: &str = "mate";
 const CARETAKE: &str = "caretake";
 const IDLE: &str = "idle";
+// 176: inventory-disposal DSE ids. Stage 1 ships dormant — the
+// DSEs aren't registered with the runtime yet, but the constants
+// land alongside the Action variants so the Patience-modifier
+// ordinal→DSE-id table stays exhaustive.
+const DISCARD: &str = "discard";
+const TRASH: &str = "trash";
+const HANDOFF: &str = "handoff";
+const PICK_UP: &str = "pick_up";
 
 // Disposition-failure cooldown scalar keys, one per failure-prone
 // DispositionKind. 1.0 = no recent failure (no damp);
@@ -579,6 +587,13 @@ fn constituent_dses_for_ordinal(ordinal: f32) -> Option<&'static [&'static str]>
         ]),
         // 155: Cooking → Cook. Single-action disposition.
         17 => Some(&[COOK]),
+        // 176: inventory-disposal dispositions append at ordinals
+        // 18-21. Each is a single-action disposition; lifts apply
+        // to the matching DSE alone while the cat is committed.
+        18 => Some(&[DISCARD]),
+        19 => Some(&[TRASH]),
+        20 => Some(&[HANDOFF]),
+        21 => Some(&[PICK_UP]),
         _ => None,
     }
 }
@@ -3629,6 +3644,13 @@ mod tests {
                 // in this map. Test never queries it. Listed for
                 // exhaustivity.
                 Action::Hide => &[HIDE],
+                // 176: inventory-disposal Action variants. Listed for
+                // exhaustivity; Patience-modifier coverage of the new
+                // dispositions wires in stage 2 with the real DSEs.
+                Action::Drop => &[DISCARD],
+                Action::Trash => &[TRASH],
+                Action::Handoff => &[HANDOFF],
+                Action::PickUp => &[PICK_UP],
             }
         }
 

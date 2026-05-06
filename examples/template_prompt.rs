@@ -100,7 +100,14 @@ fn assert_pick_pool_covers_action(a: Action) {
         | Action::Mate
         | Action::Caretake
         | Action::Cook
-        | Action::Hide => {}
+        | Action::Hide
+        // 176: inventory-disposal Action variants. Stage 1 dormant —
+        // no templates authored yet. Reuse the alias-only group's
+        // shape: variants exist but the pick pool stays narrow.
+        | Action::Drop
+        | Action::Trash
+        | Action::Handoff
+        | Action::PickUp => {}
     }
 }
 
@@ -155,6 +162,13 @@ fn main() {
             // commit lands a dedicated hide.ron with Tier::Action
             // freeze prose.
             Action::Hide => "flee.ron",
+            // 176: inventory-disposal templates not authored yet —
+            // reuse the closest existing template per Action so the
+            // template_prompt smoke run still has prose to render.
+            Action::Drop => "forage.ron",
+            Action::Trash => "forage.ron",
+            Action::Handoff => "socialize.ron",
+            Action::PickUp => "forage.ron",
         };
 
         let tier = match action {

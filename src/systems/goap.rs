@@ -4633,6 +4633,24 @@ fn dispatch_step_action(
             )
             .result
         }
+
+        // 176: inventory-disposal resolvers.
+        //
+        // Stage 1 substrate-stub: each arm returns Fail so the GOAP
+        // plan never advances through these steps until the real
+        // resolvers wire in stage 2. The disposal DSEs ship with
+        // default-zero scoring so these arms shouldn't be reached at
+        // runtime; the Fail() guards against an inadvertently-elected
+        // disposition completing without its real-world effect.
+        GoapActionKind::DropItem
+        | GoapActionKind::TrashItemAtMidden
+        | GoapActionKind::HandoffItem
+        | GoapActionKind::PickUpItemFromGround => {
+            crate::steps::StepResult::Fail(format!(
+                "176 stage-1 stub: {action_kind:?} has no resolver yet — \
+                disposal DSEs should be default-zero so this is unreachable"
+            ))
+        }
     }
 }
 

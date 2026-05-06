@@ -232,6 +232,24 @@ pub enum GoapActionKind {
     RetrieveFoodForKitten,
     DeliverDirective,
     ExploreSurvey,
+    // 176: inventory-disposal actions
+    /// Drop a single carried item at the cat's current position. The
+    /// resolver spawns an `Item` entity with `ItemLocation::OnGround`
+    /// and removes one slot from inventory. No travel.
+    DropItem,
+    /// Carry a single item to the nearest Midden building and add it
+    /// to the Midden's `StoredItems`. Midden capacity is unlimited so
+    /// the resolver cannot fail on capacity grounds.
+    TrashItemAtMidden,
+    /// Transfer a single carried item from this cat's inventory to a
+    /// target cat's inventory. Resolver fails if the target's
+    /// inventory is full or the target moved out of range.
+    HandoffItem,
+    /// Add a desired ground item to inventory. Inverse of `DropItem`.
+    /// The cat must be at the item's position; resolver fails if the
+    /// item is gone (despawned, picked up by another cat) or the cat
+    /// arrived too late.
+    PickUpItemFromGround,
 }
 
 // ---------------------------------------------------------------------------
