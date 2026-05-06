@@ -16,8 +16,8 @@ _Last generated: 2026-05-06._
 |---|---|
 | In progress | 8 |
 | Ready | 53 |
-| Parked | 6 |
-| Blocked | 19 |
+| Parked | 7 |
+| Blocked | 18 |
 | **Open total** | **86** |
 | Pre-existing | 2 |
 
@@ -83,7 +83,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[157](docs/open-work/tickets/157-burial-canary-dark.md)** — Burial continuity canary dark on post-154 soak — verify eligibility against new death distribution — _[ai-substrate] · added 2026-05-03_
 - **[159](docs/open-work/tickets/159-parent-grief-consumer.md)** — Parent grief consumer for kitten / dependent death — _[ai-substrate] · added 2026-05-04_
 - **[170](docs/open-work/tickets/170-hide-eligible-authoring-system.md)** — HideEligible authoring system (Hide DSE Phase 2) — _[ai-substrate] · added 2026-05-05_
-- **[177](docs/open-work/tickets/177-disposal-resolver-dispatch-wiring.md)** — Wire Trash/Handoff/PickUp resolvers into GOAP dispatch (176 follow-on) — _[ai-substrate] · added 2026-05-05_
+- **[178](docs/open-work/tickets/178-disposal-dses-balance-tune.md)** — Balance-tune disposal DSEs from default-zero (176 follow-on) — _[ai-substrate] · added 2026-05-05_
 - **[179](docs/open-work/tickets/179-build-stores-demand-wiring.md)** — ColonyStoresChronicallyFull → Build DSE consumer + Coordinator BuildStores directive (176 follow-on) — _[ai-substrate] · added 2026-05-05_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[world-ecology] · added 2026-05-05_
 - **[181](docs/open-work/tickets/181-hunt-forage-saturation-balance-tune.md)** — Balance-tune Hunt/Forage colony_food_security saturation weights (176 follow-on) — _[balance] · added 2026-05-05_
@@ -92,7 +92,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[187](docs/open-work/tickets/187-kitten-starvation-under-active-mating-pipeline.md)** — Kittens starve in the post-184 soak — RetrieveFoodForKitten plan-fails dominate — _[ai-substrate] · added 2026-05-06_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _added 2026-04-28_
 
-## Parked (6)
+## Parked (7)
 
 - **[015](docs/open-work/tickets/015-alloparenting-reframe-b.md)** — Alloparenting Reframe B — mama drops kitten at hearth near resting elder — _parked 2026-04-22 · added 2026-04-22_
 - **[058](docs/open-work/tickets/058-tradition-unfiltered-loop-fix.md)** — §3.5.3 item 1 Tradition modifier — fix unfiltered-loop port — _parked 2026-04-30 · added 2026-04-27_
@@ -100,8 +100,9 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[084](docs/open-work/tickets/084-farm-herb-ward-demand-axis.md)** — Farm DSE — tie scoring to herb/ward stockpile demand so gardens stay productive under abundant food — _[balance] · parked 2026-04-30 · blocked-by 086 · added 2026-04-29_
 - **[099](docs/open-work/tickets/099-modifier-feature-emission.md)** — Feature emission for §3.5.1 Modifiers — colony-wide canary surface for substrate-lift signals — _[ai-substrate] · parked 2026-05-01 · blocked-by 119 · added 2026-05-01_
 - **[173](docs/open-work/tickets/173-crafting-split-capability-markers.md)** — IsHerbalist / IsSpiritualist / HasCorruptionNearby capability markers (155 follow-on) — _[ai-substrate] · parked 2026-05-05 · added 2026-05-05_
+- **[188](docs/open-work/tickets/188-handoff-target-picker.md)** — Handoff target-picker — pick the recipient cat at L2 — _[ai-substrate] · parked 2026-05-06 · added 2026-05-06_
 
-## Blocked (19)
+## Blocked (18)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _blocked-by 007, 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _blocked-by 016 · added 2026-04-22_
@@ -121,22 +122,22 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[142](docs/open-work/tickets/142-intraspecies-conflict-freeze.md)** — IntraspeciesConflictResponseFreeze — hold-position low-body-posture social valence — _[ai-substrate] · blocked-by 109 · added 2026-05-02_
 - **[143](docs/open-work/tickets/143-intraspecies-conflict-fight.md)** — IntraspeciesConflictResponseFight — territorial combat valence (same-species) — _[ai-substrate] · blocked-by 109 · added 2026-05-02_
 - **[144](docs/open-work/tickets/144-intraspecies-conflict-fawn.md)** — IntraspeciesConflictResponseFawn — appeasement valence (belly-up, slow blink) — _[ai-substrate] · blocked-by 109, 145 · added 2026-05-02_
-- **[178](docs/open-work/tickets/178-disposal-dses-balance-tune.md)** — Balance-tune disposal DSEs from default-zero (176 follow-on) — _[ai-substrate] · blocked-by 177 · added 2026-05-05_
 
 ## Pre-existing (2)
 
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (121)
+## Landed archive (122)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (56)
+### 2026-05 (57)
 
 - **[184](docs/open-work/landed/184-kill-deposit-pipeline-regression-post-175.md)** — Hunt kill→stockpile pipeline regressed under L3 bandwidth pressure (root cause - CanHunt over-gated on Injured) _(2026-05-06)_
 - **[183](docs/open-work/landed/183-paired-axis-or-patrol-collision-investigation.md)** — Paired-axis lift on higher-tier DSEs OR Patrol-collision investigation (181 follow-on) _(2026-05-06)_
 - **[182](docs/open-work/landed/182-courtship-burial-regression-post-176.md)** — Courtship + burial canary regression on post-176 soak (pre-existing or 176-induced?) _(2026-05-06)_
+- **[177](docs/open-work/landed/177-disposal-resolver-dispatch-wiring.md)** — Wire Trash/Handoff/PickUp resolvers into GOAP dispatch (176 follow-on) _(2026-05-06)_
 - **[176](docs/open-work/landed/176-deposit-overflow-load-bearing-rot.md)** — cats need real inventory reasoning — trash, build-more-stores, satiation-aware hunting _(2026-05-05)_
 - **[175](docs/open-work/landed/175-goal-unreachable-root-cause.md)** — GoalUnreachable plan-failure root-cause investigation (172 follow-on) _(2026-05-05)_
 - **[172](docs/open-work/landed/172-crafting-split-plan-failure-triage.md)** — Plan-failure triage on Cooking + Herbalism (155 follow-on) _(2026-05-05)_

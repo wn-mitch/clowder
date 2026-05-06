@@ -1,7 +1,7 @@
 ---
 id: 177
 title: Wire Trash/Handoff/PickUp resolvers into GOAP dispatch (176 follow-on)
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-05
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 9b39e2f5
+landed-on: 2026-05-06
 ---
 
 ## Why
@@ -79,3 +79,18 @@ stub-Fail messages as real plan failures.
 - 2026-05-05: opened by ticket 176's closeout. Stage 3 wired Drop
   but deferred the three siblings; this ticket finishes the
   dispatch wiring so balance-tuning is possible.
+- 2026-05-06: landed at `9b39e2f5`. Trash uses a `midden_entities`
+  snapshot (extending `stores_query` would conflict B0001 with
+  `BuildingResolverParams::buildings`); the resolver's signature
+  simplifies from `&mut Query<…>` to `&mut StoredItems + Position`.
+  PickUp passes the existing `items_query` directly — the
+  `Without<BuildMaterialItem>` filter Fails build-material targets
+  at the resolver, which is the correct semantics. Handoff queues a
+  `HandoffPending` accumulator entry from the dispatch arm and
+  drains in a post-loop pass via `cats.get_many_mut::<2>` (mirrors
+  `groom_other`'s deferred-mutation precedent). 3 dispatch-level
+  integration tests added under `src/scenarios/disposal_dispatch.rs`.
+  Soak verification: disposal Features stay at 0 across the entire
+  seed-42 deep-soak (DSE default-zero invariant intact, dispatch
+  arms never reached at runtime). Unblocks 178; opens 188 for
+  the parked Handoff target-picking scope.

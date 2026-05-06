@@ -1,11 +1,11 @@
 ---
 id: 178
 title: Balance-tune disposal DSEs from default-zero (176 follow-on)
-status: blocked
+status: ready
 cluster: ai-substrate
 added: 2026-05-05
 parked: null
-blocked-by: [177]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
