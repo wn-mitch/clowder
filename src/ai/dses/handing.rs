@@ -1,9 +1,14 @@
 //! 176 `Handing` DSE — hand surplus directly to a target cat.
 //! Sibling to Discarding and Trashing.
 //!
-//! Stage 3 ships dormant via a default-zero Linear consideration.
-//! Balance-tuning lifts the score on a per-cat overflow signal
-//! plus a target-cat selection (target-taking sibling DSE TBD).
+//! **Eligibility.** `forbid(Incapacitated)` AND
+//! `require(HasHandoffRecipient)`. The recipient marker is authored
+//! by **ticket 188** (Handoff target picker); pre-188 the marker is
+//! allowlisted in `scripts/substrate_stubs.allowlist` and the
+//! eligibility filter rejects every cat — keeping Handing dormant
+//! and out of the L3 softmax pool while the curve waits for 188's
+//! companion lift. 178 leaves the curve at default-zero so when 188
+//! lifts both pieces the change is single-commit.
 
 use bevy::prelude::*;
 
@@ -36,7 +41,9 @@ impl HandingDse {
                 },
             ))],
             composition: Composition::weighted_sum(vec![1.0]),
-            eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
+            eligibility: EligibilityFilter::new()
+                .forbid(markers::Incapacitated::KEY)
+                .require(markers::HasHandoffRecipient::KEY),
         }
     }
 }

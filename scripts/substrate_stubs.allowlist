@@ -12,3 +12,5 @@
 # Catalogue: docs/open-work/pre-existing/substrate-stub-catalogue.md
 
 HideEligible 170           # Hide-authoring system (extends ticket 104's Phase 1 dormancy)
+HasHandoffRecipient 188    # Handing target picker (178 ships Handing dormant via this gate)
+HasGroundCarcass 185       # PickingUp scavenging marker (178 ships PickingUp dormant via this gate)

@@ -1,17 +1,22 @@
-//! 176 `Discarding` DSE — one of four inventory-disposal DSEs that
-//! give cats real reasoning over surplus inventory (alongside
-//! `Trashing`, `Handing`, `PickingUp`).
+//! 178 `Discarding` DSE — drop a held food item on the ground when
+//! the colony's Stores are chronically full and the cat's own
+//! inventory is overstuffed. Sibling to Trashing (carry to Midden),
+//! Handing (give to peer — deferred to 188), and PickingUp (retrieve
+//! ground item — deferred to 185).
 //!
-//! Stage 3 ships dormant: a single Linear consideration with
-//! `slope: 0.0, intercept: 0.0` keeps the score at 0.0 regardless
-//! of input, so the L3 softmax never elects this DSE. Balance-
-//! tuning lifts the saturation surface in a follow-on by replacing
-//! the zero curve with a real `inventory_overstuffed` consideration
-//! gated on `ColonyStoresChronicallyFull` plus per-cat overflow
-//! signals.
+//! **Composition.** Single `inventory_excess` axis through a Logistic
+//! curve (slope/midpoint sourced from
+//! `ScoringConstants::disposal_inventory_excess_*`). Per memory
+//! feedback "single-axis perception scalars": colony state composes
+//! at the eligibility-filter layer, not by folding into the scalar.
 //!
-//! Eligibility is `forbid(Incapacitated)` — a Maslow-tier-1
-//! disposition; injured cats can't elect it.
+//! **Eligibility.** `forbid(Incapacitated)` (Maslow-tier-1; injured
+//! cats can't elect this) AND `require(ColonyStoresChronicallyFull)`
+//! — Discarding is the *last-resort* disposal: only viable when the
+//! colony has nowhere else to put the food. When the colony has a
+//! Midden, Trashing's curve scores from the same `inventory_excess`
+//! axis but routes through the unlimited-capacity Midden building
+//! instead.
 
 use bevy::prelude::*;
 
@@ -22,8 +27,7 @@ use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
 use crate::components::markers;
-
-pub const ZERO_INPUT: &str = "one";
+use crate::resources::sim_constants::ScoringConstants;
 
 pub struct DiscardingDse {
     id: DseId,
@@ -33,29 +37,21 @@ pub struct DiscardingDse {
 }
 
 impl DiscardingDse {
-    pub fn new() -> Self {
+    pub fn new(scoring: &ScoringConstants) -> Self {
         Self {
             id: DseId("discard"),
             considerations: vec![Consideration::Scalar(ScalarConsideration::new(
-                ZERO_INPUT,
-                // 176 stage 3: default-zero scoring — slope and
-                // intercept both zero so the score collapses to 0.0
-                // regardless of the "one" input. Balance-tuning
-                // replaces this with a real overflow consideration.
-                Curve::Linear {
-                    slope: 0.0,
-                    intercept: 0.0,
+                "inventory_excess",
+                Curve::Logistic {
+                    steepness: scoring.disposal_inventory_excess_slope,
+                    midpoint: scoring.disposal_inventory_excess_midpoint,
                 },
             ))],
             composition: Composition::weighted_sum(vec![1.0]),
-            eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
+            eligibility: EligibilityFilter::new()
+                .forbid(markers::Incapacitated::KEY)
+                .require(markers::ColonyStoresChronicallyFull::KEY),
         }
-    }
-}
-
-impl Default for DiscardingDse {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -89,35 +85,53 @@ impl Dse for DiscardingDse {
     }
 }
 
-pub fn discarding_dse() -> Box<dyn Dse> {
-    Box::new(DiscardingDse::new())
+pub fn discarding_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+    Box::new(DiscardingDse::new(scoring))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn discarding_dse_id_stable() {
-        assert_eq!(DiscardingDse::new().id().0, "discard");
+    fn defaults() -> ScoringConstants {
+        ScoringConstants::default()
     }
 
     #[test]
-    fn discarding_default_zero_scoring() {
-        // Default-zero invariant: the Linear curve has slope=0,
-        // intercept=0, so any input maps to 0.0. Balance-tuning
-        // changes this to a real overflow consideration.
-        let dse = DiscardingDse::new();
+    fn discarding_dse_id_stable() {
+        assert_eq!(DiscardingDse::new(&defaults()).id().0, "discard");
+    }
+
+    #[test]
+    fn discarding_curve_lifts_with_inventory_excess() {
+        // Logistic(8, 0.5) → ~0.018 at 0.0, 0.5 at midpoint, ~0.982 at 1.0.
+        let dse = DiscardingDse::new(&defaults());
         let c = match &dse.considerations()[0] {
             Consideration::Scalar(sc) => &sc.curve,
             _ => panic!("expected scalar"),
         };
-        assert!((c.evaluate(0.0)).abs() < 1e-6);
-        assert!((c.evaluate(1.0)).abs() < 1e-6);
+        assert!(c.evaluate(0.0) < 0.05, "empty inventory → near-zero score");
+        assert!((c.evaluate(0.5) - 0.5).abs() < 1e-3, "midpoint → 0.5");
+        assert!(c.evaluate(1.0) > 0.95, "full inventory → near-one score");
+    }
+
+    #[test]
+    fn discarding_eligibility_requires_chronic_full() {
+        let dse = DiscardingDse::new(&defaults());
+        let elig = dse.eligibility();
+        assert!(
+            elig.required
+                .contains(&markers::ColonyStoresChronicallyFull::KEY),
+            "Discarding must require ColonyStoresChronicallyFull",
+        );
+        assert!(
+            elig.forbidden.contains(&markers::Incapacitated::KEY),
+            "Discarding must forbid Incapacitated",
+        );
     }
 
     #[test]
     fn discarding_maslow_tier_is_one() {
-        assert_eq!(DiscardingDse::new().maslow_tier(), 1);
+        assert_eq!(DiscardingDse::new(&defaults()).maslow_tier(), 1);
     }
 }

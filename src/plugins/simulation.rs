@@ -78,8 +78,8 @@ pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConsta
     // zero curves with real overflow / colony-food considerations
     // in a follow-on once `ColonyStoresChronicallyFull` and the
     // saturation surfaces land.
-    registry.cat_dses.push(dses::discarding_dse());
-    registry.cat_dses.push(dses::trashing_dse());
+    registry.cat_dses.push(dses::discarding_dse(scoring));
+    registry.cat_dses.push(dses::trashing_dse(scoring));
     registry.cat_dses.push(dses::handing_dse());
     registry.cat_dses.push(dses::picking_up_dse());
     registry.fox_dses.push(dses::fox_patrolling_dse(scoring));

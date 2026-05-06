@@ -1,10 +1,10 @@
 ---
 id: 188
 title: Handoff target-picker — pick the recipient cat at L2
-status: parked
+status: ready
 cluster: ai-substrate
 added: 2026-05-06
-parked: 2026-05-06
+parked: null
 blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
@@ -61,3 +61,9 @@ Parked rather than ready because:
   threaded as `target_entity` from the disposition layer";
   no such layer exists today). Becomes load-bearing as soon as
   178 lifts the Handing DSE above default-zero.
+- 2026-05-06: unparked. Ticket 178 landed; the Handing DSE
+  eligibility filter now requires `HasHandoffRecipient`
+  (allowlisted in `scripts/substrate_stubs.allowlist`). This
+  ticket lands the marker writer alongside the curve lift.
+  Removing the allowlist entry is a same-commit step on land
+  day.

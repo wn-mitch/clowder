@@ -370,6 +370,16 @@ impl Inventory {
             _ => unreachable!(),
         }
     }
+
+    /// Number of food slots currently held. Mirrors the predicate
+    /// `take_food` uses (`ItemKind::is_food`); 178 reads this for the
+    /// per-cat `inventory_excess` scoring axis.
+    pub fn food_count(&self) -> usize {
+        self.slots
+            .iter()
+            .filter(|s| matches!(s, ItemSlot::Item(k, _) if k.is_food()))
+            .count()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -529,6 +539,20 @@ mod tests {
         }
         assert!(inv.is_full());
         assert!(!inv.add_herb(HerbKind::Thornbriar));
+    }
+
+    #[test]
+    fn inventory_food_count() {
+        use crate::components::items::ItemKind;
+        let mut inv = Inventory::default();
+        assert_eq!(inv.food_count(), 0);
+        inv.add_item(ItemKind::RawMouse);
+        inv.add_item(ItemKind::RawRat);
+        assert_eq!(inv.food_count(), 2);
+        inv.add_herb(HerbKind::HealingMoss);
+        assert_eq!(inv.food_count(), 2, "herbs are not food");
+        inv.take_food();
+        assert_eq!(inv.food_count(), 1);
     }
 
     #[test]

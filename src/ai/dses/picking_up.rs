@@ -3,10 +3,13 @@
 //! kill→carcass-on-ground→pick-up flow once `engage_prey` overflow
 //! lands real entities (stage 2).
 //!
-//! Stage 3 ships dormant via a default-zero Linear consideration.
-//! Balance-tuning lifts the score when the cat has inventory room
-//! and a desired ground item is in range (per a target-taking
-//! sibling DSE that picks the item entity).
+//! **Eligibility.** `forbid(Incapacitated)` AND
+//! `require(HasGroundCarcass)`. The colony-scoped marker is authored
+//! by **ticket 185** (PickingUp + scavenging composition); pre-185
+//! the marker is allowlisted in `scripts/substrate_stubs.allowlist`
+//! and eligibility rejects every cat — keeping PickingUp dormant and
+//! out of the L3 softmax pool. 178 leaves the curve at default-zero
+//! so when 185 lifts both pieces the change is single-commit.
 
 use bevy::prelude::*;
 
@@ -39,7 +42,9 @@ impl PickingUpDse {
                 },
             ))],
             composition: Composition::weighted_sum(vec![1.0]),
-            eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
+            eligibility: EligibilityFilter::new()
+                .forbid(markers::Incapacitated::KEY)
+                .require(markers::HasGroundCarcass::KEY),
         }
     }
 }

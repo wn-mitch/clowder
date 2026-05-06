@@ -1801,6 +1801,21 @@ pub struct ScoringConstants {
     /// 181 attempted to lift to 0.15 and reverted; see balance doc.
     #[serde(default = "default_forage_food_security_weight")]
     pub forage_food_security_weight: f32,
+    /// 178: Logistic slope on the `inventory_excess` axis used by the
+    /// Discarding and Trashing DSEs. Higher slope → sharper lift past
+    /// the midpoint (cats with full inventory react harder once they
+    /// cross the threshold). Default 8.0 mirrors the post-044 hangry
+    /// curve — a conservative starting shape known to behave well in
+    /// L3 softmax under unit-weight composition.
+    #[serde(default = "default_disposal_inventory_excess_slope")]
+    pub disposal_inventory_excess_slope: f32,
+    /// 178: Logistic midpoint on the `inventory_excess` axis. The
+    /// scalar reaches 0.5 at this fraction of `Inventory::MAX_SLOTS`.
+    /// Default 0.5 — half the inventory's food capacity. Below this
+    /// the disposition score sits near 0; above it the score climbs
+    /// rapidly and beats Hunt/Forage at L3.
+    #[serde(default = "default_disposal_inventory_excess_midpoint")]
+    pub disposal_inventory_excess_midpoint: f32,
     pub gate_timid_fight_threshold: f32,
     pub gate_shy_socialize_threshold: f32,
     pub gate_reckless_flee_threshold: f32,
@@ -2015,6 +2030,8 @@ impl Default for ScoringConstants {
             build_chronic_full_weight: default_build_chronic_full_weight(),
             hunt_food_security_weight: default_hunt_food_security_weight(),
             forage_food_security_weight: default_forage_food_security_weight(),
+            disposal_inventory_excess_slope: default_disposal_inventory_excess_slope(),
+            disposal_inventory_excess_midpoint: default_disposal_inventory_excess_midpoint(),
             gate_timid_fight_threshold: 0.1,
             gate_shy_socialize_threshold: 0.15,
             gate_reckless_flee_threshold: 0.9,
@@ -2991,6 +3008,20 @@ fn default_hunt_food_security_weight() -> f32 {
 /// reverted alongside the Hunt sibling.
 fn default_forage_food_security_weight() -> f32 {
     0.0
+}
+
+/// 178: Logistic slope on the `inventory_excess` axis used by
+/// Discarding and Trashing DSEs. See
+/// `ScoringConstants::disposal_inventory_excess_slope`.
+fn default_disposal_inventory_excess_slope() -> f32 {
+    8.0
+}
+
+/// 178: Logistic midpoint on the `inventory_excess` axis used by
+/// Discarding and Trashing DSEs. See
+/// `ScoringConstants::disposal_inventory_excess_midpoint`.
+fn default_disposal_inventory_excess_midpoint() -> f32 {
+    0.5
 }
 
 fn default_scent_search_radius() -> i32 {

@@ -952,6 +952,8 @@ pub fn evaluate_dispositions(
             has_damaged_building,
             has_garden,
             food_fraction,
+            inventory_food_fraction: inventory.food_count() as f32
+                / Inventory::MAX_SLOTS as f32,
             magic_affinity: magic_aff.0,
             magic_skill: skills.magic,
             herbcraft_skill: skills.herbcraft,

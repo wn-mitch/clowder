@@ -415,6 +415,45 @@ impl ColonyStoresChronicallyFull {
     pub const KEY: &str = "ColonyStoresChronicallyFull";
 }
 
+/// 178: colony has at least one `StructureType::Midden` building.
+/// Authored by `update_colony_building_markers` in `src/systems/buildings.rs`
+/// (single pass: any Midden structure exists ⇒ insert; else remove).
+/// Read by the Trashing DSE's `EligibilityFilter::require(HasMidden::KEY)`
+/// — without it, the disposition is dormant and the cat falls back to
+/// Discarding (which gates on `ColonyStoresChronicallyFull`).
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasMidden;
+impl HasMidden {
+    pub const KEY: &str = "HasMidden";
+}
+
+/// 178: per-cat marker indicating the cat has an identified handoff
+/// recipient (another cat that needs the carried item). Read by the
+/// Handing DSE's `EligibilityFilter::require(HasHandoffRecipient::KEY)`.
+/// Author lands in **ticket 188** (handoff target picker); allowlisted
+/// in `scripts/substrate_stubs.allowlist` until then. While unauthored
+/// the Handing DSE is dormant — eligibility rejects every cat, so the
+/// modifier pipeline never sees its default-zero curve.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasHandoffRecipient;
+impl HasHandoffRecipient {
+    pub const KEY: &str = "HasHandoffRecipient";
+}
+
+/// 178: colony-scoped marker indicating ≥1 ground carcass (food item
+/// with `ItemLocation::OnGround`) exists somewhere in the colony.
+/// Read by the PickingUp DSE's
+/// `EligibilityFilter::require(HasGroundCarcass::KEY)`. Author lands
+/// in **ticket 185** (PickingUp + scavenging composition); allowlisted
+/// in `scripts/substrate_stubs.allowlist` until then. While unauthored
+/// the PickingUp DSE is dormant — eligibility rejects, the modifier
+/// pipeline never sees its default-zero curve.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasGroundCarcass;
+impl HasGroundCarcass {
+    pub const KEY: &str = "HasGroundCarcass";
+}
+
 /// ≥1 other cat has a skill below 0.3 where this cat has the same
 /// skill above 0.6 (per-cat relative predicate).
 /// `aspirations.rs::update_mentoring_target_markers`.

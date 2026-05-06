@@ -269,6 +269,14 @@ pub struct ScoringContext<'a> {
     pub has_garden: bool,
     /// Fraction of food capacity filled (0.0–1.0).
     pub food_fraction: f32,
+    /// 178 — per-cat inventory food load. `food_count / MAX_SLOTS`,
+    /// clamped `[0, 1]`. Single-axis: encodes how much food the cat is
+    /// personally holding (orthogonal to the colony-level
+    /// `food_fraction` above and to `Carrying`'s coarse projection).
+    /// Consumed by Discarding/Trashing DSEs as the `inventory_excess`
+    /// scoring axis; the colony-state composition (chronically-full /
+    /// midden-present) lives in DSE eligibility filters, not here.
+    pub inventory_food_fraction: f32,
     // --- Magic/herbcraft context ---
     /// Cat's innate magical aptitude.
     pub magic_affinity: f32,
@@ -536,6 +544,15 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
     m.insert(
         "colony_food_security",
         ctx.food_fraction.clamp(0.0, 1.0).min(hunger_satisfaction),
+    );
+    // 178: per-cat inventory food load. Discarding/Trashing DSEs read
+    // this through their Logistic curve; the colony-state composition
+    // lives in their EligibilityFilter (`require(ColonyStoresChronicallyFull)`
+    // for Discarding, `require(HasMidden)` for Trashing). Single-axis:
+    // does NOT fold the colony marker into the scalar.
+    m.insert(
+        "inventory_excess",
+        ctx.inventory_food_fraction.clamp(0.0, 1.0),
     );
     // Safety deficit — Flee axis. Safety is a satisfaction scalar; the
     // DSE wants urgency form so the Logistic midpoint semantics line
@@ -1653,6 +1670,48 @@ pub fn score_actions(
         scores.push((Action::Caretake, score + jitter(rng, s.jitter_range)));
     }
 
+    // --- Disposal DSEs (178: lifted from default-zero) ---
+    // All four DSE entries dispatch through `score_dse_by_id` so the
+    // L2/L3 plumbing is uniform across the disposal substrate.
+    // Eligibility filters keep behaviour conservative:
+    //
+    // - **Discarding** / **Trashing** (178) — gate on
+    //   `ColonyStoresChronicallyFull` so cats don't dispose of food
+    //   the colony's Stores could still accept. Trashing additionally
+    //   gates on `HasMidden`.
+    // - **Handing** (deferred to 188) — gates on
+    //   `HasHandoffRecipient` (authored by the future target picker).
+    // - **PickingUp** (deferred to 185) — gates on `HasGroundCarcass`
+    //   (authored by 185's sensing extension).
+    //
+    // Pre-substrate the Handing / PickingUp eligibility filters reject
+    // every cat — the §3.5.1 modifier pipeline never sees their curves
+    // and doesn't lift default-zero scores into the L3 pool.
+    {
+        let score = score_dse_by_id("discard", ctx, inputs);
+        if score > 0.0 {
+            scores.push((Action::Drop, score + jitter(rng, s.jitter_range)));
+        }
+    }
+    {
+        let score = score_dse_by_id("trash", ctx, inputs);
+        if score > 0.0 {
+            scores.push((Action::Trash, score + jitter(rng, s.jitter_range)));
+        }
+    }
+    {
+        let score = score_dse_by_id("handoff", ctx, inputs);
+        if score > 0.0 {
+            scores.push((Action::Handoff, score + jitter(rng, s.jitter_range)));
+        }
+    }
+    {
+        let score = score_dse_by_id("pick_up", ctx, inputs);
+        if score > 0.0 {
+            scores.push((Action::PickUp, score + jitter(rng, s.jitter_range)));
+        }
+    }
+
     // --- Idle (§2.3: WS of base_rate + incuriosity + playfulness_invert) ---
     // The always-available fallback. The base_rate axis's Linear
     // intercept carries `idle_base` and ClampMin floors at
@@ -2524,6 +2583,7 @@ mod tests {
             has_damaged_building: false,
             has_garden: false,
             food_fraction: 0.4,
+            inventory_food_fraction: 0.0,
             magic_affinity: 0.0,
             magic_skill: 0.0,
             herbcraft_skill: 0.0,
@@ -2698,6 +2758,7 @@ mod tests {
             has_damaged_building: false,
             has_garden: false,
             food_fraction: 0.4,
+            inventory_food_fraction: 0.0,
             magic_affinity: 0.0,
             magic_skill: 0.0,
             herbcraft_skill: 0.0,
@@ -2895,6 +2956,7 @@ mod tests {
             has_damaged_building: false,
             has_garden: false,
             food_fraction: 0.4,
+            inventory_food_fraction: 0.0,
             magic_affinity: 0.0,
             magic_skill: 0.0,
             herbcraft_skill: 0.0,
@@ -3129,6 +3191,7 @@ mod tests {
             has_damaged_building: false,
             has_garden: false,
             food_fraction: 0.4,
+            inventory_food_fraction: 0.0,
             magic_affinity: 0.0,
             magic_skill: 0.0,
             herbcraft_skill: 0.0,
@@ -3232,6 +3295,7 @@ mod tests {
             has_damaged_building: false,
             has_garden: false,
             food_fraction: 0.4,
+            inventory_food_fraction: 0.0,
             magic_affinity: 0.0,
             magic_skill: 0.0,
             herbcraft_skill: 0.0,
@@ -3354,6 +3418,7 @@ mod tests {
             has_damaged_building: false,
             has_garden: false,
             food_fraction: 0.4,
+            inventory_food_fraction: 0.0,
             magic_affinity: 0.0,
             magic_skill: 0.0,
             herbcraft_skill: 0.0,
@@ -3664,6 +3729,7 @@ mod tests {
             has_damaged_building: false,
             has_garden: false,
             food_fraction: 0.5,
+            inventory_food_fraction: 0.0,
             magic_affinity: 0.0,
             magic_skill: 0.0,
             herbcraft_skill: 0.0,
@@ -3768,6 +3834,7 @@ mod tests {
             has_damaged_building: false,
             has_garden: false,
             food_fraction: 0.9,
+            inventory_food_fraction: 0.0,
             magic_affinity: 0.0,
             magic_skill: 0.0,
             herbcraft_skill: 0.0,
@@ -3844,6 +3911,7 @@ mod tests {
 
         let low = ScoringContext {
             food_fraction: 0.2,
+            inventory_food_fraction: 0.0,
             ..base
         };
         let scores_low = score_actions(&low, &test_eval_inputs(), &mut rng_low).scores;

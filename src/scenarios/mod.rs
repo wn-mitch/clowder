@@ -26,6 +26,7 @@
 //! invariant in tests via stdout-diff.
 
 pub mod disposal_dispatch;
+pub mod disposal_election;
 pub mod env;
 pub mod exploration_ranging;
 pub mod farming_cycle;
@@ -79,6 +80,11 @@ pub const ALL: &[&Scenario] = &[
     &farming_cycle::SCENARIO,
     // 158 — triage harness for the GroomedOther never-fired structural fix.
     &grooming_other::SCENARIO,
+    // 178 — election-side scenarios for the lifted disposal DSEs.
+    &disposal_election::SCENARIO_TRASHING,
+    &disposal_election::SCENARIO_DISCARDING,
+    &disposal_election::SCENARIO_IDLE,
+    &disposal_election::SCENARIO_DISCARDING_BLOCKED,
 ];
 
 /// Look up a scenario by its `name` field.

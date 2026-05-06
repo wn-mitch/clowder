@@ -178,6 +178,7 @@ pub struct WorldStateQueries<'w, 's> {
             Has<markers::HasDamagedBuilding>,
             Has<markers::HasGarden>,
             Has<markers::ColonyStoresChronicallyFull>,
+            Has<markers::HasMidden>,
         ),
         With<markers::ColonyState>,
     >,
@@ -947,6 +948,7 @@ pub fn evaluate_and_plan(
         has_damaged_building,
         has_garden,
         colony_stores_chronically_full,
+        has_midden,
     ) = world_state
         .colony_state_query
         .single()
@@ -1005,6 +1007,10 @@ pub fn evaluate_and_plan(
         markers::ColonyStoresChronicallyFull::KEY,
         colony_stores_chronically_full,
     );
+    // 178: HasMidden — Trashing DSE eligibility filter. Authored by
+    // the same `update_colony_building_markers` system from any
+    // existing `StructureType::Midden` building.
+    markers.set_colony(markers::HasMidden::KEY, has_midden);
 
     let herb_positions: Vec<(Entity, Position, HerbKind)> = world_state
         .herb_query
@@ -1467,6 +1473,8 @@ pub fn evaluate_and_plan(
             has_damaged_building,
             has_garden,
             food_fraction,
+            inventory_food_fraction: inventory.food_count() as f32
+                / crate::components::magic::Inventory::MAX_SLOTS as f32,
             magic_affinity: magic_aff.0,
             magic_skill: skills.magic,
             herbcraft_skill: skills.herbcraft,
@@ -4748,10 +4756,24 @@ fn dispatch_step_action(
             outcome.result
         }
         GoapActionKind::TrashItemAtMidden => {
+            // 178: resolve nearest Midden as target if not already set —
+            // mirrors the `DepositFood` / `EatAtStores` fallback above.
+            // The plan template uses `PlannerZone::Wilds` as a placeholder
+            // for the Midden zone (a `PlannerZone::Midden` variant is
+            // future work); the dispatch arm threads the nearest Midden
+            // entity from `snaps.midden_entities` so the resolver has a
+            // real target without per-DSE target-picker plumbing.
+            if plan.step_state[step_idx].target_entity.is_none() {
+                plan.step_state[step_idx].target_entity = snaps
+                    .midden_entities
+                    .iter()
+                    .min_by_key(|(_, mp)| pos.manhattan_distance(mp))
+                    .map(|(e, _)| *e);
+            }
             let target = plan.step_state[step_idx].target_entity;
             let Some(midden_entity) = target else {
                 return crate::steps::StepResult::Fail(
-                    "trash: no target midden on disposition".to_string(),
+                    "trash: no target midden on disposition (none in colony)".to_string(),
                 );
             };
             let Some(midden_pos) = snaps

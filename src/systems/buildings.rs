@@ -22,6 +22,7 @@ pub struct ColonyBuildingState {
     pub has_damaged_building: bool,
     pub has_garden: bool,
     pub has_functional_kitchen: bool,
+    pub has_midden: bool,
 }
 
 /// Single-pass scan over the building query to derive all colony-scoped
@@ -36,6 +37,7 @@ pub fn scan_colony_buildings<'a>(
         has_damaged_building: false,
         has_garden: false,
         has_functional_kitchen: false,
+        has_midden: false,
     };
     for (structure, site) in buildings {
         if site.is_some() {
@@ -49,6 +51,9 @@ pub fn scan_colony_buildings<'a>(
             }
             if structure.kind == StructureType::Kitchen && structure.effectiveness() > 0.0 {
                 state.has_functional_kitchen = true;
+            }
+            if structure.kind == StructureType::Midden {
+                state.has_midden = true;
             }
         }
     }
@@ -439,6 +444,9 @@ pub fn update_construction_site_map(
 /// - `HasDamagedBuilding` — ≥1 `Structure` with condition <
 ///   `DispositionConstants::damaged_building_threshold` (ticket 169).
 /// - `HasGarden` — ≥1 `Garden` `Structure` (ticket 171).
+/// - `HasMidden` — ≥1 `Midden` `Structure` (ticket 178). Reader: the
+///   Trashing DSE's eligibility filter — without a Midden the
+///   disposition is dormant and the cat falls back to Discarding.
 /// - `ColonyStoresChronicallyFull` — ticket 176; toggled when the
 ///   per-window count of `Feature::DepositRejected` divided by colony
 ///   cat-count exceeds `chronicity_threshold`. Drives the Build DSE
@@ -532,6 +540,11 @@ pub fn update_colony_building_markers(
         em.insert(crate::components::markers::HasGarden);
     } else {
         em.remove::<crate::components::markers::HasGarden>();
+    }
+    if bldg_state.has_midden {
+        em.insert(crate::components::markers::HasMidden);
+    } else {
+        em.remove::<crate::components::markers::HasMidden>();
     }
     if stores_chronically_full {
         em.insert(crate::components::markers::ColonyStoresChronicallyFull);
@@ -781,6 +794,26 @@ mod tests {
         assert!(!state.has_damaged_building);
         assert!(!state.has_garden);
         assert!(!state.has_functional_kitchen);
+        assert!(!state.has_midden);
+    }
+
+    #[test]
+    fn midden_detected() {
+        let midden = Structure::new(StructureType::Midden);
+        let buildings: Vec<(&Structure, Option<&ConstructionSite>)> = vec![(&midden, None)];
+        let state = scan_colony_buildings(buildings.into_iter(), 0.4);
+        assert!(state.has_midden);
+        assert!(!state.has_garden);
+    }
+
+    #[test]
+    fn midden_under_construction_not_detected() {
+        let midden = Structure::new(StructureType::Midden);
+        let site = ConstructionSite::new(StructureType::Midden);
+        let buildings: Vec<(&Structure, Option<&ConstructionSite>)> = vec![(&midden, Some(&site))];
+        let state = scan_colony_buildings(buildings.into_iter(), 0.4);
+        assert!(!state.has_midden);
+        assert!(state.has_construction_site);
     }
 
     #[test]
