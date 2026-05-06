@@ -1,7 +1,7 @@
 ---
 id: 183
 title: Paired-axis lift on higher-tier DSEs OR Patrol-collision investigation (181 follow-on)
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-05
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [181-hunt-forage-saturation-tune.md]
-landed-at: null
-landed-on: null
+landed-at: 4db67313
+landed-on: 2026-05-06
 ---
 
 ## Why
@@ -101,3 +101,21 @@ Forage cascades to Patrol regardless of higher-tier DSE state.
 ## Log
 
 - 2026-05-05: opened from ticket 181 iteration-1 closeout.
+- 2026-05-06: **closed by ticket 184's fix** (`4db67313`).
+  Path B (Patrol-collision) was the right diagnosis but the
+  mechanism was different: Patrol's L2 score sits at 0.52 mean
+  vs Hunt's 1.07 (Wren focal trace) — Patrol is *not* the
+  immediate runner-up to Hunt at score level. The action-share
+  collision came from elsewhere: `CanHunt` was stripped from
+  injured cats by `update_capability_markers`, making Hunt
+  ineligible 9.7% of evaluations. In those windows, Patrol's
+  Blind commitment + long plan-duration converted small L3
+  selection-share gains into the +15pp action-share gap.
+  Path A (paired-axis lift on higher-tier DSEs) is *not*
+  needed — post-184 soak shows higher-tier DSEs (groom,
+  mentor, courtship) recovering naturally once Hunt's
+  eligibility is restored. The substrate-design assumption
+  behind 181 (suppress Tier-1 → Tier-2+ rises) was correct;
+  it just couldn't manifest while the eligibility gate was
+  amplifying random Hunt-ineligibility windows. 181 unparks
+  for retest under the now-stable L3 dynamics.

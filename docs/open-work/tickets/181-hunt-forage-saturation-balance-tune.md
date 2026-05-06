@@ -1,11 +1,11 @@
 ---
 id: 181
 title: Balance-tune Hunt/Forage colony_food_security saturation weights (176 follow-on)
-status: parked
+status: ready
 cluster: balance
 added: 2026-05-05
-parked: 2026-05-05
-blocked-by: [183]
+parked: null
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [181-hunt-forage-saturation-tune.md]
@@ -87,5 +87,19 @@ Per CLAUDE.md balance-tuning discipline:
   `docs/balance/181-hunt-forage-saturation-tune.md`. Parked behind
   follow-on ticket 183 (paired-axis design or Patrol-collision
   investigation). Soak archives: `logs/tuned-42-pre-181/` (baseline,
-  weights at 0.0) and `logs/tuned-42/` (iteration 1, weights
+  weights at 0.0) and `logs/tuned-42-pre-184/` (iteration 1, weights
   0.20/0.15 — kept for reference, do not promote).
+- 2026-05-06: **unparked.** Ticket 183 closed by 184's fix
+  (`4db67313`); the iteration-1 collapse was an artifact of
+  `CanHunt` over-gating on `Injured`, not a substrate-design
+  problem. With the over-gating removed, post-184 seed-42 soak
+  shows the substrate-design assumption holds: higher-tier
+  DSEs recover bandwidth naturally (continuity courtship 0 →
+  1405, grooming 188 → 678, mentoring 21 → 409). Iteration 2
+  retests 0.20/0.15 weights against the now-stable post-184
+  baseline (`logs/tuned-42` at SHA `4db67313`); expected
+  outcome shifts now that Patrol's spurious +15pp gain is
+  gone. Likely no second iteration needed — the post-184 soak
+  already demonstrates 41% of ticks at stockpile ≥15, peak
+  50/50, all canaries firing — but the four-artifact
+  methodology still applies if weights move.

@@ -1,7 +1,7 @@
 ---
 id: 182
 title: Courtship + burial canary regression on post-176 soak (pre-existing or 176-induced?)
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-05
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 4db67313
+landed-on: 2026-05-06
 ---
 
 ## Why
@@ -171,3 +171,23 @@ investigation surfaces. Likely candidates:
   pipeline is the load-bearing layer to verify next.
   Pre-existing — same shape as the post-175 collapse soak;
   ticket 176 is not the cause.
+- 2026-05-06: **closed by ticket 184's fix** (`4db67313`). The
+  bond-advancement-to-Friends layer was not the load-bearing
+  defect — the underlying cause was `CanHunt` being stripped
+  from injured cats, which over-suppressed Hunt L3 elections,
+  cascaded action-share to Patrol's Blind-commitment long
+  plans, and starved every higher-tier disposition of
+  selection bandwidth (mating eligibility included). With the
+  over-gating removed, the post-184 seed-42 soak shows
+  `MatingOccurred = 2`, `CourtshipInteraction = 1403`,
+  `continuity_tallies.courtship = 1405` (was 0),
+  `never_fired_expected_positives = 0` (cleared
+  `MatingOccurred`, `CourtshipInteraction`,
+  `PairingIntentionEmitted`). The bond-tier-advancement
+  hypothesis from the initial drill was disconfirmed by the
+  fix's effect — bonds did advance once cats had bandwidth to
+  socialize. Burial remains at 0 in the post-184 soak; that
+  half of 182's premise is genuinely separate (no cats died
+  of old age in the 15-min window) and rolls into 187 / a
+  future life-stage-coverage ticket if it persists across
+  longer soaks.

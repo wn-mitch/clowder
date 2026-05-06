@@ -38,7 +38,7 @@ The two weights differ deliberately: Hunt's RtEO is `[0.5 hunger_urgency, 0.25 f
 
 ## Observation
 
-Soak: `just soak-trace 42 Wren` → `logs/tuned-42/` (commit `75586184` + the iteration-1 weight change, seed 42, 900s sim duration).
+Soak: `just soak-trace 42 Wren` → `logs/tuned-42-pre-184/` (commit `75586184` + the iteration-1 weight change, seed 42, 900s sim duration; renamed from `logs/tuned-42/` on 2026-05-06 when the post-184 soak superseded it).
 
 **Action distribution shift (CatSnapshot.current_action, colony-wide):**
 
