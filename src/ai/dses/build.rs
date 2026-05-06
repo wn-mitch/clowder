@@ -18,7 +18,8 @@ use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
 use crate::ai::considerations::{
-    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+    Consideration, LandmarkAnchor, LandmarkSource, MarkerConsideration, ScalarConsideration,
+    SpatialConsideration,
 };
 use crate::ai::curves::{piecewise, Curve, PostOp};
 use crate::ai::dse::{
@@ -30,6 +31,7 @@ use crate::resources::sim_constants::ScoringConstants;
 pub const DILIGENCE_INPUT: &str = "diligence";
 pub const SITE_PRESENCE_INPUT: &str = "has_construction_site";
 pub const REPAIR_PRESENCE_INPUT: &str = "has_damaged_building";
+pub const CHRONIC_FULL_INPUT: &str = "colony_stores_chronically_full";
 
 /// §L2.10.7 Build range — Manhattan tiles for the
 /// nearest-construction-site anchor. 25 ≈ a long colony walk;
@@ -85,11 +87,31 @@ impl BuildDse {
                     REPAIR_PRESENCE_INPUT,
                     piecewise(vec![(0.0, 0.0), (1.0, scoring.build_repair_bonus)]),
                 )),
+                // 179: chronic-full demand axis. The
+                // `ColonyStoresChronicallyFull` marker latches when
+                // `DepositRejected` events have been chronic over a
+                // window (authored by `update_colony_building_markers`,
+                // wired through `colony_state_query` → `MarkerSnapshot`).
+                // Reading it here gives the Build DSE a colony-demand
+                // pull on Stores expansion that's distinct from the
+                // instantaneous `stores_full` signal that
+                // `assess_build_pressure` already tracks: the chronic
+                // signal captures "cats keep trying to deposit and
+                // failing," not just "Stores happens to be full this
+                // tick." Tunable via `build_chronic_full_weight` —
+                // ships at plausibility (`default_build_chronic_full_weight`).
+                Consideration::Marker(MarkerConsideration::new(
+                    CHRONIC_FULL_INPUT,
+                    markers::ColonyStoresChronicallyFull::KEY,
+                    scoring.build_chronic_full_weight,
+                )),
             ],
             // RtEO sum = 1.0. Diligence is primary; spatial axis pulls
-            // toward the site; repair-presence is the auxiliary repair
-            // bonus.
-            composition: Composition::weighted_sum(vec![0.5, 0.25, 0.25]),
+            // toward the site; repair-presence and chronic-full demand
+            // are auxiliary pull signals (each smaller than spatial so
+            // diligence + site dominate when no repair / chronic demand
+            // exists).
+            composition: Composition::weighted_sum(vec![0.4, 0.25, 0.20, 0.15]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
             eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
         }
@@ -145,5 +167,30 @@ mod tests {
         let s = ScoringConstants::default();
         let sum: f32 = BuildDse::new(&s).composition().weights.iter().sum();
         assert!((sum - 1.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn build_consideration_count_is_four() {
+        let s = ScoringConstants::default();
+        // 179: diligence + site_distance + repair_presence + chronic_full
+        assert_eq!(BuildDse::new(&s).considerations().len(), 4);
+    }
+
+    #[test]
+    fn build_chronic_full_axis_reads_colony_marker() {
+        let s = ScoringConstants::default();
+        let dse = BuildDse::new(&s);
+        let chronic = dse
+            .considerations()
+            .iter()
+            .find_map(|c| match c {
+                Consideration::Marker(m) if m.name == CHRONIC_FULL_INPUT => Some(m),
+                _ => None,
+            })
+            .expect("Build DSE must include the chronic-full MarkerConsideration");
+        assert_eq!(chronic.marker, markers::ColonyStoresChronicallyFull::KEY);
+        // Plausibility default — ships nonzero so the marker actually
+        // lifts Build score when set.
+        assert!(chronic.present_score > 0.0);
     }
 }

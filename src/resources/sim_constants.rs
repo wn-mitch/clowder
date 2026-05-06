@@ -1780,10 +1780,11 @@ pub struct ScoringConstants {
     /// toward "more Stores."
     #[serde(default = "default_chronicity_threshold")]
     pub chronicity_threshold: f32,
-    /// 176: weight on the `colony_stores_chronically_full` axis in
-    /// the Build DSE composition. Default 0.0 — the axis is wired but
-    /// dormant. Balance-tuning lifts to a positive value once the
-    /// stage 4 substrate's behavior is observed empirically.
+    /// 179: present-score on the `colony_stores_chronically_full`
+    /// MarkerConsideration in BuildDse. Lifted from 178's dormant 0.0
+    /// once the wave-closeout consumer (179) wired the marker into
+    /// BuildDse — see `src/ai/dses/build.rs`. Plausibility default;
+    /// balance-tuning is the follow-on ticket.
     #[serde(default = "default_build_chronic_full_weight")]
     pub build_chronic_full_weight: f32,
     /// 176: weight on the `colony_food_security` axis in the Hunt
@@ -2986,11 +2987,13 @@ fn default_chronicity_threshold() -> f32 {
     0.10
 }
 
-/// 176: Build DSE bonus weight on the
-/// `colony_stores_chronically_full` axis. Ships dormant at 0.0 —
-/// balance-tuning lifts after the substrate stabilizes.
+/// 179: Build DSE present-score on the
+/// `colony_stores_chronically_full` MarkerConsideration axis. Lifted
+/// from 178's dormant 0.0 once the wave-closeout consumer wired the
+/// marker into BuildDse. Plausibility value — 179 lands the structure
+/// at this default; balance-tuning is the follow-on ticket.
 fn default_build_chronic_full_weight() -> f32 {
-    0.0
+    0.5
 }
 
 /// 176: Hunt DSE saturation weight on the `colony_food_security`
