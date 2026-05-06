@@ -59,10 +59,62 @@ These regressions could be:
   - footer: `continuity_tallies.courtship = 0`,
     `continuity_tallies.burial = 0`,
     `deaths_by_cause.Starvation = 1`,
-    `MatingOccurred` listed in `never_fired_expected_positives`.
-  - bonds_formed = 10 (vs baseline 3) — bonds ARE forming.
+    `MatingOccurred` listed in `never_fired_expected_positives`,
+    `CourtshipInteraction` listed in `never_fired_expected_positives`,
+    `PairingIntentionEmitted` listed in `never_fired_expected_positives`.
+  - `colony_score.bonds_formed = 10` (BondFormed Feature
+    activation count = 10 — bonds DO form).
 - `logs/tuned-42-pre-176-stages` (commit `3c7c6c35`): the
   collapsed post-175 soak — terminated early, no footer.
+  Same `MatingOccurred = 0` shape per the parent-ticket
+  evidence table.
+
+## Ground-truth diagnosis (preliminary, from initial drill)
+
+The L2 PairingActivity layer (`src/ai/pairing.rs::author_pairing_intentions`)
+inserts `PairingActivity` and fires `Feature::PairingIntentionEmitted`
+ONLY when `pick_partner` finds a candidate whose
+`bond_tier_score` is non-zero. `bond_tier_score` returns 0.0 for
+`Acquaintance` / `Companion` and 0.5 for `Friends`, 1.0 for
+`Partners` / `Mates`.
+
+`BondFormed` activation = 10 means 10 bond-tier transitions
+fired, but **the Feature does not distinguish tier**. If all
+10 were `Acquaintance` / `Companion` (the low tiers), no
+candidate would clear `bond_tier_score > 0.0` and
+`PairingIntentionEmitted` would never fire — exactly what we
+observe.
+
+Hypothesis: bond *formation* happens but bond *advancement*
+to Friends is broken or under-firing. The advancement path
+runs through `relationships::modify_fondness` /
+`modify_familiarity` / `modify_romantic` plus the
+`promote_bond` logic in `src/resources/relationships.rs`.
+
+Independent of bond-tier: the courtship→mating chain ALSO
+needs `Action::Mate` to be elected at L3 with a viable
+target. The Mate DSE eligibility filter requires
+`HasEligibleMate`, authored by
+`mating::update_mate_eligibility_markers` based on relationship
+tier. If no relationship reaches the marker's threshold the
+DSE never scores.
+
+## Investigation hooks
+
+1. **`/logq trace` on a high-fondness cat pair** — find a pair
+   in the post-176 soak whose `fondness * familiarity` is in
+   the top decile and check (a) their bond tier, (b) whether
+   `HasEligibleMate` ever gets authored on either side, (c)
+   whether MateDse ever scores > 0 for either.
+2. **`/logq events --type=BondTierAdvanced`** (if such an
+   event exists) — confirm whether ANY bond reaches Friends
+   in the run.
+3. **L2 trace of an Adult cat with the highest `bonds_formed`
+   count** — see whether `pick_partner` is being called at all.
+4. **Compare to pre-175 baseline** — was the
+   bond-advancement-to-Friends rate the same, or did it
+   regress? The 5506 MatingOccurred figure pre-175 implies
+   bond advancement was fast enough.
 
 ## Investigation hooks
 
@@ -111,3 +163,11 @@ investigation surfaces. Likely candidates:
   continuity canaries (courtship, burial) remain dark and one
   cat starves. Investigation needed to disambiguate
   pre-existing-but-masked from 176-induced.
+- 2026-05-05: initial drill confirmed `BondFormed` Feature
+  fires (10 events) but `PairingIntentionEmitted` never does.
+  L2 PairingActivity gates on `bond_tier_score > 0.0`
+  (Friends tier or above); the 10 bond formations may all be
+  at Acquaintance / Companion tier. Bond-advancement-to-Friends
+  pipeline is the load-bearing layer to verify next.
+  Pre-existing — same shape as the post-175 collapse soak;
+  ticket 176 is not the cause.
