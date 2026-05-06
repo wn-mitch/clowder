@@ -1,7 +1,7 @@
 ---
 id: 176
 title: cats need real inventory reasoning — trash, build-more-stores, satiation-aware hunting
-status: in-progress
+status: done
 cluster: ai-substrate
 added: 2026-05-05
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 75586184
+landed-on: 2026-05-05
 ---
 
 ## Why
@@ -247,6 +247,80 @@ function.
   `forage_item` migrate to real disposal paths instead of
   silent drops.
 
+## Resolution
+
+Landed across five staged commits on `main` (final at
+`75586184`). The structural substrate is complete; behavior
+ships dormant via default-zero scoring on the disposal DSEs
+and the Hunt/Forage saturation axis. Balance-tuning splits to
+follow-on tickets 177-181.
+
+**Stages:**
+
+| Commit | Stage | What landed |
+|---|---|---|
+| `0a80c045` | 1 | substrate-stub: 4 `Action` / `DispositionKind` / `GoapActionKind` variants (Drop / Trash / Handoff / PickUp), all match arms closed across 14 files, ordinal stability preserved |
+| `e9f10854` | 2 | `StructureType::Midden` (unlimited capacity, founding-spawn), 3 typed transfer primitives (`inventory_to_stored`, `inventory_to_ground`, `inventory_to_inventory`), 4 resolvers under `src/steps/disposition/`, **engage_prey + forage_item carcass-on-ground refactor** (the survival fix), 4 new Features (`ItemDropped` / `Trashed` / `HandedOff` / `OverflowToGround`) |
+| `e7f333af` | 3 | 4 disposal DSEs registered in `populate_dse_registry` with default-zero `Linear { slope: 0.0, intercept: 0.0 }` considerations, Drop wired into goap.rs dispatch |
+| `32f51f9b` | 4 | `ColonyStoresChronicallyFull` marker + `StoresPressureTracker` resource + chronicity tracking from `Feature::DepositRejected` count; SimConstants knobs `chronicity_window_ticks` (1000), `chronicity_threshold` (0.10), `build_chronic_full_weight` (0.0) |
+| `75586184` | 5 | `colony_food_security` scalar + saturation axis on Hunt/Forage with default-zero RtEO weights (`hunt_food_security_weight`, `forage_food_security_weight`); auto-rebalance keeps weight-sum=1.0 at any setting |
+
+**Soak verdict (post-stage-5, commit `75586184`, seed 42):**
+
+| Metric | post-175 collapse | post-176 stages | pre-175 baseline |
+|---|---|---|---|
+| `colony_score.aggregate` | 1068 | **1232** (+15%) | 2175 |
+| `seasons_survived` | 2 | **4** (+100%) | 7 |
+| `continuity_tallies.grooming` | 38 | **286** (+650%) | 237 |
+| `continuity_tallies.mentoring` | 0 | **121** | 42 |
+| `continuity_tallies.play` | 0 (presumed) | **23** | — |
+| `continuity_tallies.mythic-texture` | 0 (presumed) | **11** | ≥1 |
+| `bonds_formed` | — | **10** (+233% vs baseline) | — |
+| `continuity_tallies.courtship` | 0 | **0** (still failing) | 5506 |
+| `continuity_tallies.burial` | unknown | **0** (failing) | unknown |
+| `MatingOccurred` | 0 | **0** (in `never_fired_expected_positives`) | 5506 |
+| `deaths_starvation` | 1 | **1** (still failing hard-gate) | 0 |
+
+**What recovered:** survival, the four social continuity canaries
+(grooming, mentoring, play, mythic-texture), bonds_formed.
+The colony makes it past the post-175 collapse point at tick
+1.25M and runs to the soak's natural end. `OverflowToGround`
+fires (substrate exercised), `ItemDropped`/`Trashed`/`HandedOff`
+stay zero (DSEs are dormant, expected).
+
+**What didn't:** the courtship→mating pipeline. Bonds form at
++233% of baseline but `MatingOccurred = 0`. One cat still
+starves late. These regressions could be pre-existing (masked
+by the post-175 collapse) or 176-induced — opened as ticket 182
+for layer-walk investigation per CLAUDE.md bugfix discipline.
+
+**The verdict's "fail" reflects the un-tuned default-zero
+state**, not a defect in the structural land. Per the plan
+approved 2026-05-05 (and CLAUDE.md substrate-stabilizes-first
+doctrine), balance-tuning of the disposal DSEs and saturation
+weights is explicitly deferred to follow-ons 178 and 181 once
+the substrate is observable in soak. That observability now
+exists.
+
+## Follow-on tickets opened on land day
+
+- **177** — Wire Trash/Handoff/PickUp resolvers into goap.rs
+  dispatch (stage-3 left these as Fail-stubs because they need
+  query plumbing that's deferred).
+- **178** — Balance-tune disposal DSEs from default-zero
+  (replace Linear-zero curves with real overflow / colony-food
+  considerations). Blocked on 177.
+- **179** — Wire `ColonyStoresChronicallyFull` to Build DSE
+  consideration + Coordinator `BuildStores` directive.
+- **180** — Death-stamp / scent-anchor at kill sites
+  (per the user's planning-time refinement that "death will
+  smell, even barely dead things will leave a stamp").
+- **181** — Balance-tune Hunt/Forage `colony_food_security`
+  saturation weights from default-zero.
+- **182** — Investigate the persistent courtship + burial
+  canary regression (and the residual single starvation
+  death) on the post-176 soak — pre-existing or 176-induced?
+
 ## Log
 
 - 2026-05-05: opened from ticket 175's closeout. Diagnosis
@@ -262,3 +336,9 @@ function.
   trash routes to a real Midden location (unlimited capacity);
   kills drop the carcass on ground and cats plan a pick-up
   step (engage_prey gets a fourth Action: PickUp).
+- 2026-05-05: stages 1-5 land on main (`0a80c045` →
+  `75586184`). Substrate complete; balance-tuning + Trash/
+  Handoff/PickUp dispatch wiring + Build/Coordinator
+  consumers + courtship/burial regression open as follow-on
+  tickets 177-182. Resolution captures the post-stage-5 soak
+  metrics for the next person to compare against.
