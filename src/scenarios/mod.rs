@@ -35,6 +35,7 @@ pub mod grooming_other;
 pub mod hunt_acquisition;
 pub mod hunt_deposit_chain;
 pub mod kitten_cry;
+pub mod picking_up_scavenging;
 pub mod preset;
 pub mod runner;
 pub mod ward_placement;
@@ -85,6 +86,9 @@ pub const ALL: &[&Scenario] = &[
     &disposal_election::SCENARIO_DISCARDING,
     &disposal_election::SCENARIO_IDLE,
     &disposal_election::SCENARIO_DISCARDING_BLOCKED,
+    // 193 — election-side scenario for the rerouted PickingUp plan
+    // template (PlannerZone::CarcassPile).
+    &picking_up_scavenging::SCENARIO,
 ];
 
 /// Look up a scenario by its `name` field.

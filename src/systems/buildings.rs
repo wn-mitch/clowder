@@ -452,9 +452,24 @@ pub fn update_construction_site_map(
 ///   cat-count exceeds `chronicity_threshold`. Drives the Build DSE
 ///   "we need more Stores" lift (default-zero weight in stage 4;
 ///   wired into BuildDse by ticket 179).
-/// - `HasGroundCarcass` — ticket 185; ≥1 uncleansed/unharvested
-///   `Carcass` exists in the colony. Reader: the PickingUp DSE's
-///   eligibility filter, gating emergent scavenging.
+/// - `HasGroundCarcass` — ticket 185 (introduced) / ticket 193
+///   (re-wired): ≥1 `Item` with `location == OnGround` and
+///   `kind.is_food()` exists in the colony. Reader: the PickingUp
+///   DSE's eligibility filter, gating emergent scavenging onto the
+///   surface the resolver actually consumes (engage_prey overflow
+///   today; future carcass-as-container child Items will appear in
+///   the same OnGround food-Item set without further changes).
+///   Pre-193 this gated on uncleansed/unharvested `Carcass` component
+///   entities — but `resolve_pick_up_from_ground` only consumes
+///   `Item` entities, so the marker fired for tiles the resolver
+///   couldn't act on, driving 1367/10kt `PickingUp:GoalUnreachable`
+///   replans (ticket 193 root-cause). Carcass component entities
+///   continue to drive `HarvestCarcass` / `MagicColonyCleanse` /
+///   carcass-corruption — separate surfaces, unchanged.
+/// - `HasHandoffRecipient` — ticket 188; ≥1 `Kitten` exists in the
+///   colony (kittens are perpetual handoff recipients — they can't
+///   fetch their own food). Reader: the Handing DSE's eligibility
+///   filter, gating adult-to-kitten food handoffs.
 #[allow(clippy::too_many_arguments)]
 pub fn update_colony_building_markers(
     mut commands: Commands,
@@ -465,7 +480,13 @@ pub fn update_colony_building_markers(
         &crate::components::items::Item,
         bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
     >,
-    carcasses: Query<&crate::components::wildlife::Carcass, Without<Dead>>,
+    kittens: Query<
+        (),
+        (
+            With<crate::components::markers::Kitten>,
+            Without<Dead>,
+        ),
+    >,
     cats: Query<&crate::components::physical::Health, Without<Dead>>,
     food: Res<FoodStores>,
     constants: Res<SimConstants>,
@@ -556,19 +577,38 @@ pub fn update_colony_building_markers(
     } else {
         em.remove::<crate::components::markers::ColonyStoresChronicallyFull>();
     }
-    // 185: HasGroundCarcass — any uncleansed and unharvested carcass
-    // in the colony. Reader: PickingUp DSE eligibility. Mirror of the
-    // per-cat `CarcassNearby` predicate in
-    // `update_target_existence_markers`, but at colony scope: PickingUp
-    // is enabled-or-disabled across the whole colony based on the same
-    // condition that drives per-cat carcass perception. Authoring it
-    // here (rather than in `update_target_existence_markers`) keeps
-    // the colony-marker writes co-located on `update_colony_building_markers`.
-    let has_ground_carcass = carcasses.iter().any(|c| !c.cleansed && !c.harvested);
+    // 185 (introduced) / 193 (re-wired): HasGroundCarcass —
+    // ≥1 OnGround food-Item exists in the colony. Reader: the
+    // PickingUp DSE's eligibility filter, which drives the cat
+    // through the `PlannerZone::CarcassPile` → `PickUpItemFromGround`
+    // chain. The marker MUST gate on the same surface the resolver
+    // consumes (`Item` entities at `OnGround` with food kinds), or
+    // the eligibility passes, the plan creates, and A* fails to
+    // resolve a target. Pre-193 this gated on `Carcass` component
+    // entities, which the resolver cannot pick up — driving the
+    // 1367/10kt `PickingUp:GoalUnreachable` cascade.
+    let has_ground_carcass = items.iter().any(|item| {
+        matches!(
+            item.location,
+            crate::components::items::ItemLocation::OnGround
+        ) && item.kind.is_food()
+    });
     if has_ground_carcass {
         em.insert(crate::components::markers::HasGroundCarcass);
     } else {
         em.remove::<crate::components::markers::HasGroundCarcass>();
+    }
+    // 188: HasHandoffRecipient — any living kitten in the colony.
+    // Reader: Handing DSE eligibility. Adults give food to kittens;
+    // a colony with no kittens has no Handing recipients, so the DSE
+    // stays dormant. The actual recipient (which kitten) is resolved
+    // at dispatch time in goap.rs::HandoffItem; per-cat picker is a
+    // balance follow-on (ticket 192).
+    let has_handoff_recipient = !kittens.is_empty();
+    if has_handoff_recipient {
+        em.insert(crate::components::markers::HasHandoffRecipient);
+    } else {
+        em.remove::<crate::components::markers::HasHandoffRecipient>();
     }
 }
 

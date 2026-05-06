@@ -427,27 +427,44 @@ impl HasMidden {
     pub const KEY: &str = "HasMidden";
 }
 
-/// 178: per-cat marker indicating the cat has an identified handoff
-/// recipient (another cat that needs the carried item). Read by the
-/// Handing DSE's `EligibilityFilter::require(HasHandoffRecipient::KEY)`.
-/// Author lands in **ticket 188** (handoff target picker); allowlisted
-/// in `scripts/substrate_stubs.allowlist` until then. While unauthored
-/// the Handing DSE is dormant — eligibility rejects every cat, so the
-/// modifier pipeline never sees its default-zero curve.
+/// 188: colony-scoped marker indicating ≥1 cat in the colony is a
+/// plausible handoff recipient — i.e., at least one `Kitten` exists.
+/// Read by the Handing DSE's
+/// `EligibilityFilter::require(HasHandoffRecipient::KEY)`. Authored by
+/// `update_colony_building_markers` (ticket 188 wave-closeout).
+///
+/// Colony-scope rather than per-cat: adults give to kittens; the
+/// existence of *any* kitten in the colony enables Handing for *any*
+/// adult holding food. The actual recipient resolution happens at
+/// dispatch time (`goap.rs::HandoffItem` fallback resolves the nearest
+/// hungry kitten via `caretake_resolution`-style proximity search) —
+/// the per-cat target picker is a balance follow-on, not load-bearing
+/// for the structural plumbing.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HasHandoffRecipient;
 impl HasHandoffRecipient {
     pub const KEY: &str = "HasHandoffRecipient";
 }
 
-/// 178: colony-scoped marker indicating ≥1 ground carcass (food item
-/// with `ItemLocation::OnGround`) exists somewhere in the colony.
-/// Read by the PickingUp DSE's
-/// `EligibilityFilter::require(HasGroundCarcass::KEY)`. Author lands
-/// in **ticket 185** (PickingUp + scavenging composition); allowlisted
-/// in `scripts/substrate_stubs.allowlist` until then. While unauthored
-/// the PickingUp DSE is dormant — eligibility rejects, the modifier
-/// pipeline never sees its default-zero curve.
+/// Colony-scoped marker indicating ≥1 ground carcass (an `Item` with
+/// `kind.is_food()` and `location == ItemLocation::OnGround`) exists
+/// somewhere in the colony. Read by the PickingUp DSE's
+/// `EligibilityFilter::require(HasGroundCarcass::KEY)`; authored by
+/// `update_colony_building_markers`.
+///
+/// Today's source: engage_prey overflow at the kill tile when a cat's
+/// inventory is full and it isn't self-eating
+/// (`goap.rs::resolve_engage_prey`). Forward-compatible with future
+/// carcass-as-container loot tables — child `Item` entities spawned at
+/// a `Carcass` entity's tile will appear in the same query without any
+/// further changes here.
+///
+/// **History.** Spec'd by 178 with the OnGround food-Item semantic;
+/// 185 wired it incorrectly to `Carcass` *component* entities (which
+/// `resolve_pick_up_from_ground` cannot consume — only `Item` entities
+/// move through PickUp). Ticket 193 restored the spec'd semantic after
+/// diagnosing 1367/10kt `PickingUp:GoalUnreachable` replans driven by
+/// the marker/resolver mismatch in the post-185 canonical soak.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HasGroundCarcass;
 impl HasGroundCarcass {

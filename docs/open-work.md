@@ -15,10 +15,10 @@ _Last generated: 2026-05-06._
 | Status | Count |
 |---|---|
 | In progress | 8 |
-| Ready | 53 |
-| Parked | 6 |
+| Ready | 57 |
+| Parked | 7 |
 | Blocked | 18 |
-| **Open total** | **85** |
+| **Open total** | **90** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -36,7 +36,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[109](docs/open-work/tickets/109-intraspecies-conflict-response.md)** — IntraspeciesConflictResponse — full four-valence (fight/flight/freeze/fawn) social response — _[ai-substrate] · added 2026-05-01_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 
-## Ready (53)
+## Ready (57)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -87,12 +87,16 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[181](docs/open-work/tickets/181-hunt-forage-saturation-balance-tune.md)** — Balance-tune Hunt/Forage colony_food_security saturation weights (176 follow-on) — _[balance] · added 2026-05-05_
 - **[186](docs/open-work/tickets/186-add-effective-bevy-command-buffer-race.md)** — add_effective Bevy command-buffer race silently drops capacity_bonus on just-spawned items — _added 2026-05-06_
 - **[187](docs/open-work/tickets/187-kitten-starvation-under-active-mating-pipeline.md)** — Kittens starve in the post-184 soak — RetrieveFoodForKitten plan-fails dominate — _[ai-substrate] · added 2026-05-06_
-- **[188](docs/open-work/tickets/188-handoff-target-picker.md)** — Handoff target-picker — pick the recipient cat at L2 — _[ai-substrate] · added 2026-05-06_
 - **[190](docs/open-work/tickets/190-build-chronic-full-weight-tune.md)** — Tune build_chronic_full_weight (179 follow-on) — _[balance] · added 2026-05-06_
 - **[191](docs/open-work/tickets/191-picking-up-scavenging-tune.md)** — Tune PickingUp scavenge_urgency curve + add scenario test (185 follow-on) — _[balance] · added 2026-05-06_
+- **[192](docs/open-work/tickets/192-handing-target-picker-l2.md)** — handing_target_dse — L2 multi-axis recipient picker (188 follow-on) — _[ai-substrate] · added 2026-05-06_
+- **[195](docs/open-work/tickets/195-plan-template-stub-lint.md)** — Plan-template stub-comment lint extension (194 P2) — _[process-discipline] · added 2026-05-06_
+- **[196](docs/open-work/tickets/196-verdict-substrate-fired-probe.md)** — verdict.py substrate-fired-≥1× probe (194 P7) — _[process-discipline] · added 2026-05-06_
+- **[197](docs/open-work/tickets/197-explore-agent-prompt-template.md)** — Explore-agent prompt template (194 P8, subsumes P6) — _[process-discipline] · added 2026-05-06_
+- **[198](docs/open-work/tickets/198-substrate-fires-landing-gate.md)** — Substrate-fires landing gate — DSE curve-non-zero requires sibling scenario (194 P1) — _[process-discipline] · added 2026-05-06_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _added 2026-04-28_
 
-## Parked (6)
+## Parked (7)
 
 - **[015](docs/open-work/tickets/015-alloparenting-reframe-b.md)** — Alloparenting Reframe B — mama drops kitten at hearth near resting elder — _parked 2026-04-22 · added 2026-04-22_
 - **[058](docs/open-work/tickets/058-tradition-unfiltered-loop-fix.md)** — §3.5.3 item 1 Tradition modifier — fix unfiltered-loop port — _parked 2026-04-30 · added 2026-04-27_
@@ -100,6 +104,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[084](docs/open-work/tickets/084-farm-herb-ward-demand-axis.md)** — Farm DSE — tie scoring to herb/ward stockpile demand so gardens stay productive under abundant food — _[balance] · parked 2026-04-30 · blocked-by 086 · added 2026-04-29_
 - **[099](docs/open-work/tickets/099-modifier-feature-emission.md)** — Feature emission for §3.5.1 Modifiers — colony-wide canary surface for substrate-lift signals — _[ai-substrate] · parked 2026-05-01 · blocked-by 119 · added 2026-05-01_
 - **[173](docs/open-work/tickets/173-crafting-split-capability-markers.md)** — IsHerbalist / IsSpiritualist / HasCorruptionNearby capability markers (155 follow-on) — _[ai-substrate] · parked 2026-05-05 · added 2026-05-05_
+- **[199](docs/open-work/tickets/199-pipeline-walk-skill.md)** — Hunt / production / consumption pipeline-walk skill (194 P4) — _[process-discipline] · parked 2026-05-06 · added 2026-05-06_
 
 ## Blocked (18)
 
@@ -127,13 +132,16 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (126)
+## Landed archive (129)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (61)
+### 2026-05 (64)
 
+- **[194](docs/open-work/landed/194-meta-analysis-189-diagnostic-delay.md)** — Meta — why 189's root cause took three reframes and a full wave-closeout to surface _(2026-05-06)_
+- **[193](docs/open-work/landed/193-picking-up-materialpile-zone-mismatch.md)** — PickingUp plan template routes to MaterialPile but eligibility latches on Carcass — 3302 unreachable plans / soak _(2026-05-06)_
 - **[189](docs/open-work/landed/189-post-178-food-available-regression.md)** — Post-178 food_available regression — layer-walk diagnosis _(2026-05-06)_
+- **[188](docs/open-work/landed/188-handoff-target-picker.md)** — Handoff target-picker — pick the recipient cat at L2 _(2026-05-06)_
 - **[185](docs/open-work/landed/185-extend-picking-up-on-has-ground-carcass.md)** — Extend PickingUp DSE on a HasGroundCarcass colony marker — emergent scavenging _(2026-05-06)_
 - **[184](docs/open-work/landed/184-kill-deposit-pipeline-regression-post-175.md)** — Hunt kill→stockpile pipeline regressed under L3 bandwidth pressure (root cause - CanHunt over-gated on Injured) _(2026-05-06)_
 - **[183](docs/open-work/landed/183-paired-axis-or-patrol-collision-investigation.md)** — Paired-axis lift on higher-tier DSEs OR Patrol-collision investigation (181 follow-on) _(2026-05-06)_

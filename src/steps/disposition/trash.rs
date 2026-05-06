@@ -70,6 +70,7 @@ pub fn resolve_trash_at_midden(
     match transfer_item_inventory_to_stored(
         inventory,
         slot_idx,
+        midden_entity,
         stored,
         StructureType::Midden,
         midden_pos,

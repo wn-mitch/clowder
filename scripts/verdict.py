@@ -59,6 +59,13 @@ class Verdict:
     # exited before the first ColonyScore emission). Each value is a dict of
     # `{baseline, observed, delta_pct, band}` keyed by colony-score field name.
     colony_score_drift: dict[str, dict[str, Any]] | None = None
+    # Ticket 194 / P3: per-tick rate normalization for cross-run comparison
+    # at unequal durations. `duration_drift_pct` is None when either side's
+    # duration is unreadable; the overall verdict only escalates on rate-
+    # band when this exceeds DURATION_DRIFT_PCT_THRESHOLD.
+    baseline_duration_ticks: int | None = None
+    observed_duration_ticks: int | None = None
+    duration_drift_pct: float | None = None
     baseline: str | None = None
     commit: str | None = None
     seed: int | None = None
@@ -86,6 +93,41 @@ def read_footer(events_path: Path) -> dict[str, Any]:
     if not line:
         return {}
     return json.loads(line)
+
+
+def read_final_tick(events_path: Path) -> int | None:
+    """Return the highest `tick` value in `events_path`, or None.
+
+    The `_footer` line is always last and lacks `tick`. The second-to-last
+    line is the last real event, so a tail-scan suffices in the common
+    case; we widen if it doesn't carry a tick (e.g. a SystemActivation
+    block right before footer).
+    """
+    try:
+        proc = subprocess.run(
+            ["bash", "-c",
+             f"tail -n 200 {events_path!s} | jq -c 'select(.tick != null) | .tick' | tail -n 1"],
+            capture_output=True, text=True,
+        )
+    except OSError:
+        return None
+    line = proc.stdout.strip()
+    if not line:
+        return None
+    try:
+        return int(line)
+    except ValueError:
+        return None
+
+
+def run_duration_ticks(events_path: Path) -> int | None:
+    """`final_tick - start_tick`, or None if either is unreadable."""
+    start = read_header_field(events_path, ".start_tick")
+    final = read_final_tick(events_path)
+    if not isinstance(start, int) or not isinstance(final, int):
+        return None
+    delta = final - start
+    return delta if delta > 0 else None
 
 
 def read_header_field(events_path: Path, jq_expr: str) -> Any:
@@ -171,6 +213,22 @@ _NUMERIC_FIELDS = (
     "negative_events_total", "neutral_features_active",
 )
 
+# Ticket 194 / P3: count-style fields are rate-normalized per 10k ticks
+# when run-durations differ; instantaneous fields (*_final / *_active /
+# *_avg_*) are point-in-time, so a per-tick rate is meaningless on them.
+# `deaths_by_cause.*` rows are always counts. The categorization is by
+# field-name suffix so it stays in sync as new metrics land.
+def _is_rate_normalizable(field_name: str) -> bool:
+    if field_name.startswith("deaths_by_cause."):
+        return True
+    return not (
+        field_name.endswith("_final")
+        or field_name.endswith("_active")
+        or "_avg_" in field_name
+    )
+
+DURATION_DRIFT_PCT_THRESHOLD = 10.0
+
 
 def band(delta_pct: float) -> str:
     a = abs(delta_pct)
@@ -181,7 +239,31 @@ def band(delta_pct: float) -> str:
     return "drift"
 
 
-def footer_drift(baseline: dict[str, Any], observed: dict[str, Any]) -> list[dict[str, Any]]:
+def _rate_columns(field_name: str, b: float, o: float,
+                  baseline_dur: int | None, observed_dur: int | None) -> dict[str, Any]:
+    """Compute per-10kt rate delta for a count-style field. Empty dict when
+    either duration is unknown or the field is instantaneous (point-in-time).
+    """
+    if not _is_rate_normalizable(field_name):
+        return {}
+    if not baseline_dur or not observed_dur:
+        return {}
+    rb = b / baseline_dur * 10_000.0
+    ro = o / observed_dur * 10_000.0
+    if rb == 0 and ro == 0:
+        return {"rate_baseline": 0.0, "rate_observed": 0.0,
+                "delta_pct_rate": 0.0, "band_rate": "noise"}
+    if rb == 0:
+        return {"rate_baseline": 0.0, "rate_observed": round(ro, 3),
+                "delta_pct_rate": None, "band_rate": "new-nonzero"}
+    delta_rate = (ro - rb) / rb * 100.0
+    return {"rate_baseline": round(rb, 3), "rate_observed": round(ro, 3),
+            "delta_pct_rate": round(delta_rate, 1), "band_rate": band(delta_rate)}
+
+
+def footer_drift(baseline: dict[str, Any], observed: dict[str, Any],
+                 baseline_dur: int | None = None,
+                 observed_dur: int | None = None) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for field_name in _NUMERIC_FIELDS:
         b = baseline.get(field_name)
@@ -191,12 +273,15 @@ def footer_drift(baseline: dict[str, Any], observed: dict[str, Any]) -> list[dic
         if b == 0 and o == 0:
             continue
         if b == 0:
-            rows.append({"field": field_name, "baseline": b, "observed": o,
-                         "delta_pct": None, "band": "new-nonzero"})
-            continue
-        delta = (o - b) / b * 100.0
-        rows.append({"field": field_name, "baseline": b, "observed": o,
-                     "delta_pct": round(delta, 1), "band": band(delta)})
+            row = {"field": field_name, "baseline": b, "observed": o,
+                   "delta_pct": None, "band": "new-nonzero"}
+        else:
+            delta = (o - b) / b * 100.0
+            row = {"field": field_name, "baseline": b, "observed": o,
+                   "delta_pct": round(delta, 1), "band": band(delta)}
+        row.update(_rate_columns(field_name, float(b), float(o),
+                                 baseline_dur, observed_dur))
+        rows.append(row)
 
     for cause in set((baseline.get("deaths_by_cause") or {}).keys()
                      | (observed.get("deaths_by_cause") or {}).keys()):
@@ -204,13 +289,17 @@ def footer_drift(baseline: dict[str, Any], observed: dict[str, Any]) -> list[dic
         o = (observed.get("deaths_by_cause") or {}).get(cause, 0)
         if b == 0 and o == 0:
             continue
+        field_name = f"deaths_by_cause.{cause}"
         delta = None if b == 0 else round((o - b) / b * 100.0, 1)
-        rows.append({
-            "field": f"deaths_by_cause.{cause}",
+        row = {
+            "field": field_name,
             "baseline": b, "observed": o,
             "delta_pct": delta,
             "band": "new-nonzero" if b == 0 else band(delta),
-        })
+        }
+        row.update(_rate_columns(field_name, float(b), float(o),
+                                 baseline_dur, observed_dur))
+        rows.append(row)
 
     rows.sort(key=lambda r: -abs(r["delta_pct"]) if r["delta_pct"] is not None else -1e9)
     return rows[:20]
@@ -218,12 +307,20 @@ def footer_drift(baseline: dict[str, Any], observed: dict[str, Any]) -> list[dic
 
 def derive_overall(canary_survival: str, canary_continuity: str,
                    constants: str, drift: list[dict[str, Any]],
-                   colony_score: dict[str, dict[str, Any]] | None) -> str:
+                   colony_score: dict[str, dict[str, Any]] | None,
+                   duration_drift_pct: float | None = None) -> str:
     if canary_survival == "fail":
         return "fail"
     if canary_continuity == "fail" or constants == "drift":
         return "concern"
     if any(r["band"] == "significant" for r in drift):
+        return "concern"
+    # Ticket 194 / P3: when durations diverge enough that raw counts are
+    # misleading, escalate on the rate band too. The raw band stays
+    # primary so equal-duration runs keep behaving as before.
+    if (duration_drift_pct is not None
+            and duration_drift_pct > DURATION_DRIFT_PCT_THRESHOLD
+            and any(r.get("band_rate") == "significant" for r in drift)):
         return "concern"
     # Ticket 125: aggregate-only drift escalates to concern but never to
     # fail — canaries gate hard, this is a continuous-health lens. The
@@ -314,6 +411,20 @@ def derive_next_steps(v: Verdict, run_dir: Path, footer: dict[str, Any]) -> list
     sig = [r for r in v.footer_drift if r["band"] == "significant"]
     if sig:
         steps.append(f"just q events {run_dir} --type=Death")
+    # Ticket 194 / P3: when run-durations diverge enough that raw counts
+    # are misleading, point the caller at the rate-band view (which is
+    # already in the JSON envelope per row as `delta_pct_rate`).
+    if (v.duration_drift_pct is not None
+            and v.duration_drift_pct > DURATION_DRIFT_PCT_THRESHOLD):
+        rate_sig = [r for r in v.footer_drift
+                    if r.get("band_rate") == "significant"]
+        if rate_sig:
+            top = rate_sig[0]
+            steps.append(
+                f"durations differ {v.duration_drift_pct:.1f}% — compare on "
+                f"rate: {top['field']} {top.get('delta_pct_rate', 0):+.1f}% "
+                "per 10kt (raw delta is duration-confounded)"
+            )
     # Ticket 125: name colony_score axes that moved out of band so the
     # caller can decide whether the drift is intentional (file a hypothesis)
     # or a regression (bisect-canary on the moved axis).
@@ -386,16 +497,24 @@ def main(argv: list[str]) -> int:
     baseline_seed: int | None = None
     drift_rows: list[dict[str, Any]] = []
     cs_drift: dict[str, dict[str, Any]] | None = None
+    baseline_dur: int | None = None
+    observed_dur = run_duration_ticks(events_path)
+    duration_drift_pct: float | None = None
     if baseline_path:
         constants_status = constants_drift(baseline_path, events_path)
         seed_status, baseline_seed, _ = seed_match(baseline_path, events_path)
         baseline_footer = read_footer(baseline_path)
+        baseline_dur = run_duration_ticks(baseline_path)
         if baseline_footer:
-            drift_rows = footer_drift(baseline_footer, footer)
+            drift_rows = footer_drift(baseline_footer, footer,
+                                      baseline_dur, observed_dur)
             cs_drift = colony_score_drift(baseline_footer, footer)
+        if baseline_dur and observed_dur:
+            duration_drift_pct = round(
+                abs(observed_dur - baseline_dur) / baseline_dur * 100.0, 1)
 
     overall = derive_overall(surv_status, cont_status, constants_status,
-                             drift_rows, cs_drift)
+                             drift_rows, cs_drift, duration_drift_pct)
     # Seed mismatch is a comparability failure: the drift table is bogus
     # because we're comparing different control worlds. Downgrade the
     # verdict (but never below the survival/continuity verdict) and let
@@ -417,6 +536,9 @@ def main(argv: list[str]) -> int:
         seed_match_vs_baseline=seed_status,
         footer_drift=drift_rows,
         colony_score_drift=cs_drift,
+        baseline_duration_ticks=baseline_dur,
+        observed_duration_ticks=observed_dur,
+        duration_drift_pct=duration_drift_pct,
         baseline=str(baseline_path) if baseline_path else None,
         commit=commit if isinstance(commit, str) else None,
         seed=observed_seed,
@@ -459,12 +581,22 @@ def _text(v: Verdict) -> str:
     if v.seed_match_vs_baseline != "no-baseline":
         seed_disp = "" if v.seed is None else f"  (seed={v.seed})"
         lines.append(f"  seed:      {v.seed_match_vs_baseline}{seed_disp}")
+    if v.duration_drift_pct is not None and v.baseline_duration_ticks and v.observed_duration_ticks:
+        lines.append(
+            f"  duration:  {v.observed_duration_ticks:,} vs {v.baseline_duration_ticks:,} ticks "
+            f"({v.duration_drift_pct:+.1f}%)"
+        )
+    show_rate = (v.duration_drift_pct is not None
+                 and v.duration_drift_pct > DURATION_DRIFT_PCT_THRESHOLD)
     if v.footer_drift:
         lines.append("  footer drift (top):")
         for r in v.footer_drift[:5]:
             d = r["delta_pct"]
             d_s = "  new" if d is None else f"{d:+5.1f}%"
-            lines.append(f"    {r['band']:11s} {d_s}  {r['field']} ({r['baseline']} → {r['observed']})")
+            line = f"    {r['band']:11s} {d_s}  {r['field']} ({r['baseline']} → {r['observed']})"
+            if show_rate and r.get("delta_pct_rate") is not None:
+                line += f"  [rate {r['delta_pct_rate']:+5.1f}% / 10kt]"
+            lines.append(line)
     if v.colony_score_drift:
         # Headline two axes (aggregate + welfare) plus the top out-of-band
         # axis if any. Keeps the text mode terse; full per-field readout is

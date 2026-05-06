@@ -139,6 +139,31 @@ pub struct WorldStateQueries<'w, 's> {
             With<crate::components::items::BuildMaterialItem>,
         ),
     >,
+    /// Ticket 193: ground food/non-material item entities, used to author
+    /// the `CarcassPile` planner zone (today's source: engage_prey
+    /// overflow Items at `OnGround`; forward-compatible with carcass-
+    /// as-container child Items once loot tables land). Mirror of
+    /// `material_items_query` with the inverted `BuildMaterialItem`
+    /// gate, which makes the two queries statically disjoint. Read-only
+    /// `&Item` access keeps it disjoint from the cats query
+    /// (cats lack `Item`) and `Without<BuildMaterialItem>` keeps it
+    /// disjoint from `BuildingResolverParams::material_items`. The
+    /// caller filters this set down to `OnGround` + `kind.is_food()`
+    /// at snapshot time.
+    pub food_items_query: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static crate::components::items::Item,
+            &'static Position,
+        ),
+        (
+            Without<GoapPlan>,
+            Without<Structure>,
+            Without<crate::components::items::BuildMaterialItem>,
+        ),
+    >,
     /// Phase 4c.3: kittens + their hunger + parentage for Caretake
     /// urgency wiring. Disjoint from the adult cats query by
     /// `With<KittenDependency>` — kittens carry the marker until the
@@ -180,6 +205,7 @@ pub struct WorldStateQueries<'w, 's> {
             Has<markers::ColonyStoresChronicallyFull>,
             Has<markers::HasMidden>,
             Has<markers::HasGroundCarcass>,
+            Has<markers::HasHandoffRecipient>,
         ),
         With<markers::ColonyState>,
     >,
@@ -276,6 +302,30 @@ pub struct BuildingResolverParams<'w, 's> {
             Without<GoapPlan>,
             Without<Structure>,
             With<crate::components::items::BuildMaterialItem>,
+        ),
+    >,
+    /// Ticket 193: ground food/non-material item entities with
+    /// positions, used to author the `CarcassPile` planner zone in
+    /// `resolve_goap_plans`'s prologue and to fill the dispatch arm
+    /// `target_entity` for `PickUpItemFromGround`. Read-only mirror of
+    /// `material_items` with the inverted `BuildMaterialItem` filter,
+    /// which makes the two statically disjoint. Coexists with the
+    /// top-level `items_query` (also read-only `&Item`,
+    /// `Without<BuildMaterialItem>`) — both are read-only on
+    /// overlapping archetypes, which is permitted by Bevy's borrow
+    /// checker.
+    pub food_items: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static crate::components::items::Item,
+            &'static Position,
+        ),
+        (
+            Without<GoapPlan>,
+            Without<Structure>,
+            Without<crate::components::items::BuildMaterialItem>,
         ),
     >,
 }
@@ -951,6 +1001,7 @@ pub fn evaluate_and_plan(
         colony_stores_chronically_full,
         has_midden,
         has_ground_carcass,
+        has_handoff_recipient,
     ) = world_state
         .colony_state_query
         .single()
@@ -1017,6 +1068,10 @@ pub fn evaluate_and_plan(
     // emergent scavenging. Authored by `update_colony_building_markers`
     // from any uncleansed/unharvested carcass in the colony.
     markers.set_colony(markers::HasGroundCarcass::KEY, has_ground_carcass);
+    // 188: HasHandoffRecipient — Handing DSE eligibility filter.
+    // Authored by `update_colony_building_markers` from any living
+    // kitten in the colony. Adults hand to kittens.
+    markers.set_colony(markers::HasHandoffRecipient::KEY, has_handoff_recipient);
 
     let herb_positions: Vec<(Entity, Position, HerbKind)> = world_state
         .herb_query
@@ -1790,6 +1845,21 @@ pub fn evaluate_and_plan(
             })
             .map(|(e, item, p)| (e, *p, item.kind))
             .collect();
+        // Ticket 193: snapshot OnGround food-Item entities for the
+        // `CarcassPile` zone resolver. Engage_prey overflow drops
+        // these at the kill tile when inventory is full; PickingUp's
+        // plan template routes through this zone to retrieve them.
+        let food_pile_positions: Vec<(Entity, Position, ItemKind)> = world_state
+            .food_items_query
+            .iter()
+            .filter(|(_, item, _)| {
+                matches!(
+                    item.location,
+                    crate::components::items::ItemLocation::OnGround
+                ) && item.kind.is_food()
+            })
+            .map(|(e, item, p)| (e, *p, item.kind))
+            .collect();
         let construction_materials_complete: HashMap<Entity, bool> = world_state
             .building_query
             .iter()
@@ -1815,6 +1885,7 @@ pub fn evaluate_and_plan(
             &farm_pos,
             &herb_positions,
             &material_pile_positions,
+            &food_pile_positions,
             d,
         );
         let zone_distances = build_zone_distances(
@@ -1827,6 +1898,7 @@ pub fn evaluate_and_plan(
             &kitchen_positions,
             &cat_positions,
             &material_pile_positions,
+            &food_pile_positions,
             entity,
             d,
         );
@@ -2067,6 +2139,14 @@ struct StepSnapshots {
     /// tick from a `Without<GoapPlan>` items query so the planner's
     /// `PlannerZone::MaterialPile` resolves to the nearest haulable pile.
     material_pile_positions: Vec<(Entity, Position, ItemKind)>,
+    /// Ticket 193: ground items whose `kind.is_food()` and whose
+    /// `location` is `OnGround` — engage_prey overflow Items today,
+    /// future carcass-as-container child Items tomorrow. Authored once
+    /// per tick alongside `material_pile_positions`. Consumers:
+    /// `PlannerZone::CarcassPile` zone resolution (planning + replans)
+    /// and the `PickUpItemFromGround` dispatch arm's `target_entity`
+    /// fallback.
+    food_pile_positions: Vec<(Entity, Position, ItemKind)>,
     /// Ticket 092: per-tick `MarkerSnapshot` for the colony markers the
     /// planner consults via `StatePredicate::HasMarker(...)` —
     /// `HasStoredFood`, `ThornbriarAvailable`. Authored once per tick
@@ -2278,6 +2358,23 @@ pub fn resolve_goap_plans(
         .map(|(e, item, p)| (e, *p, item.kind))
         .collect();
 
+    // Ticket 193: ground food/carcass-pile Items — engage_prey overflow
+    // drops these at the kill tile when inventory is full and the cat
+    // isn't self-eating. Source for `PlannerZone::CarcassPile` zone
+    // resolution and the `PickUpItemFromGround` dispatch arm's nearest-
+    // target fallback (mirror of `material_pile_positions`).
+    let food_pile_positions: Vec<(Entity, Position, ItemKind)> = building_params
+        .food_items
+        .iter()
+        .filter(|(_, item, _)| {
+            matches!(
+                item.location,
+                crate::components::items::ItemLocation::OnGround
+            ) && item.kind.is_food()
+        })
+        .map(|(e, item, p)| (e, *p, item.kind))
+        .collect();
+
     // Per-site materials_complete map (see StepSnapshots::
     // construction_materials_complete). Coordinator-spawned sites are
     // prefunded → true; founding wagon-dismantling sites are non-
@@ -2354,6 +2451,7 @@ pub fn resolve_goap_plans(
         farm_positions,
         herb_positions,
         material_pile_positions,
+        food_pile_positions,
         planner_markers,
         workshop_bonus: if building_snapshot
             .iter()
@@ -2582,6 +2680,7 @@ pub fn resolve_goap_plans(
                     &snaps.farm_positions,
                     &snaps.herb_positions,
                     &snaps.material_pile_positions,
+                    &snaps.food_pile_positions,
                     d,
                 );
                 let zone_distances = build_zone_distances(
@@ -2594,6 +2693,7 @@ pub fn resolve_goap_plans(
                     &snaps.kitchen_positions,
                     &snaps.cat_positions,
                     &snaps.material_pile_positions,
+                    &snaps.food_pile_positions,
                     cat_entity,
                     d,
                 );
@@ -2888,6 +2988,7 @@ pub fn resolve_goap_plans(
                     &snaps.farm_positions,
                     &snaps.herb_positions,
                     &snaps.material_pile_positions,
+                    &snaps.food_pile_positions,
                     d,
                 );
                 let zone_distances = build_zone_distances(
@@ -2900,6 +3001,7 @@ pub fn resolve_goap_plans(
                     &snaps.kitchen_positions,
                     &snaps.cat_positions,
                     &snaps.material_pile_positions,
+                    &snaps.food_pile_positions,
                     cat_entity,
                     d,
                 );
@@ -3304,6 +3406,7 @@ fn dispatch_step_action(
             &snaps.kitchen_positions,
             &snaps.cat_positions,
             &snaps.material_pile_positions,
+            &snaps.food_pile_positions,
             cat_entity,
             d,
         ),
@@ -4813,6 +4916,22 @@ fn dispatch_step_action(
             outcome.result
         }
         GoapActionKind::PickUpItemFromGround => {
+            // Ticket 193: resolve nearest OnGround food-Item as target if
+            // not already set. Mirrors `TrashItemAtMidden`'s nearest-
+            // Midden fallback above. The `HasGroundCarcass` colony marker
+            // (re-wired to gate on `food_pile_positions`) guarantees ≥1
+            // pickable Item exists when we reach this arm. The TravelTo
+            // step routed via `PlannerZone::CarcassPile` brought the cat
+            // adjacent to *some* food-Item tile; we pick whichever is
+            // closest now in case the world shifted between travel and
+            // dispatch (other cat picked up the original target, etc.).
+            if plan.step_state[step_idx].target_entity.is_none() {
+                plan.step_state[step_idx].target_entity = snaps
+                    .food_pile_positions
+                    .iter()
+                    .min_by_key(|(_, fp, _)| pos.manhattan_distance(fp))
+                    .map(|(e, _, _)| *e);
+            }
             let target = plan.step_state[step_idx].target_entity;
             let outcome = crate::steps::disposition::resolve_pick_up_from_ground(
                 inventory, target, items_query, commands,
@@ -4824,9 +4943,35 @@ fn dispatch_step_action(
             outcome.result
         }
         GoapActionKind::HandoffItem => {
+            // 188: resolve nearest hungry kitten as recipient if not
+            // already set. Mirrors `TrashItemAtMidden`'s nearest-Midden
+            // fallback above. The `HasHandoffRecipient` colony marker
+            // guarantees ≥1 kitten exists when we reach this arm; pick
+            // the closest one with the lowest hunger satisfaction so
+            // adults preferentially feed the most-in-need nearby kitten.
+            // Per-cat target picker DSE (multi-axis: proximity +
+            // hunger + fondness) is a balance follow-on (ticket 192).
+            if plan.step_state[step_idx].target_entity.is_none() {
+                plan.step_state[step_idx].target_entity = snaps
+                    .kitten_snapshot
+                    .iter()
+                    // Sort by (hunger ascending, distance ascending) — most
+                    // hungry kittens first, then nearest. f32 doesn't
+                    // implement Ord; use partial_cmp + manhattan as tie-break.
+                    .min_by(|a, b| {
+                        a.hunger
+                            .partial_cmp(&b.hunger)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                            .then_with(|| {
+                                pos.manhattan_distance(&a.pos)
+                                    .cmp(&pos.manhattan_distance(&b.pos))
+                            })
+                    })
+                    .map(|k| k.entity);
+            }
             let Some(recipient) = plan.step_state[step_idx].target_entity else {
                 return crate::steps::StepResult::Fail(
-                    "handoff: no recipient on disposition".to_string(),
+                    "handoff: no recipient on disposition (no kittens in colony)".to_string(),
                 );
             };
             let has_transferable = inventory.slots.iter().any(|s| {
@@ -4991,6 +5136,7 @@ fn resolve_travel_to(
     kitchen_positions: &[Position],
     cat_positions: &[(Entity, Position)],
     material_pile_positions: &[(Entity, Position, ItemKind)],
+    food_pile_positions: &[(Entity, Position, ItemKind)],
     cat_entity: Entity,
     d: &DispositionConstants,
 ) -> crate::steps::StepResult {
@@ -5007,6 +5153,7 @@ fn resolve_travel_to(
             kitchen_positions,
             cat_positions,
             material_pile_positions,
+            food_pile_positions,
             cat_entity,
             d,
         );
@@ -6306,6 +6453,7 @@ fn resolve_zone_position(
     kitchen_positions: &[Position],
     cat_positions: &[(Entity, Position)],
     material_pile_positions: &[(Entity, Position, ItemKind)],
+    food_pile_positions: &[(Entity, Position, ItemKind)],
     cat_entity: Entity,
     d: &DispositionConstants,
 ) -> Option<Position> {
@@ -6363,6 +6511,10 @@ fn resolve_zone_position(
             .iter()
             .min_by_key(|(_, mp, _)| pos.manhattan_distance(mp))
             .map(|(_, p, _)| *p),
+        PlannerZone::CarcassPile => food_pile_positions
+            .iter()
+            .min_by_key(|(_, fp, _)| pos.manhattan_distance(fp))
+            .map(|(_, p, _)| *p),
     }
 }
 
@@ -6400,6 +6552,7 @@ fn build_planner_state(
     farm_positions: &[Position],
     herb_positions: &[(Entity, Position, HerbKind)],
     material_pile_positions: &[(Entity, Position, ItemKind)],
+    food_pile_positions: &[(Entity, Position, ItemKind)],
     d: &DispositionConstants,
 ) -> PlannerState {
     let zone = classify_zone(
@@ -6410,6 +6563,7 @@ fn build_planner_state(
         farm_positions,
         herb_positions,
         material_pile_positions,
+        food_pile_positions,
     );
     // Ticket 096: the world-fact "this cat's nearest reachable site
     // has `materials_complete()` true" lives in the substrate as the
@@ -6472,6 +6626,7 @@ fn materials_available_for(
         .unwrap_or(true)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn classify_zone(
     pos: &Position,
     map: &TileMap,
@@ -6480,12 +6635,24 @@ fn classify_zone(
     farm_positions: &[Position],
     herb_positions: &[(Entity, Position, HerbKind)],
     material_pile_positions: &[(Entity, Position, ItemKind)],
+    food_pile_positions: &[(Entity, Position, ItemKind)],
 ) -> PlannerZone {
     if stores_positions
         .iter()
         .any(|sp| pos.manhattan_distance(sp) <= 2)
     {
         return PlannerZone::Stores;
+    }
+    // Ticket 193: CarcassPile classifies ahead of ConstructionSite so a
+    // food-Item dropped near a founding site (overflow on a kill near
+    // a wagon-dismantling layout) is recognised as the pickup target,
+    // not the construction zone. Mirrors `MaterialPile`'s classify
+    // radius (≤ 1 tile) for the same reason.
+    if food_pile_positions
+        .iter()
+        .any(|(_, fp, _)| pos.manhattan_distance(fp) <= 1)
+    {
+        return PlannerZone::CarcassPile;
     }
     // MaterialPile classifies before ConstructionSite — a pile placed
     // adjacent to a founding site (the wagon-dismantling layout) sits
@@ -6538,6 +6705,7 @@ fn build_zone_distances(
     kitchen_positions: &[Position],
     cat_positions: &[(Entity, Position)],
     material_pile_positions: &[(Entity, Position, ItemKind)],
+    food_pile_positions: &[(Entity, Position, ItemKind)],
     cat_entity: Entity,
     d: &DispositionConstants,
 ) -> ZoneDistances {
@@ -6619,6 +6787,13 @@ fn build_zone_distances(
             material_pile_positions
                 .iter()
                 .min_by_key(|(_, mp, _)| pos.manhattan_distance(mp))
+                .map(|(_, p, _)| *p),
+        ),
+        (
+            PlannerZone::CarcassPile,
+            food_pile_positions
+                .iter()
+                .min_by_key(|(_, fp, _)| pos.manhattan_distance(fp))
                 .map(|(_, p, _)| *p),
         ),
     ];
@@ -6792,6 +6967,7 @@ mod tests {
             &cat,
             map,
             exploration,
+            &[],
             &[],
             &[],
             &[],

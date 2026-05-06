@@ -80,7 +80,7 @@ pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConsta
     // saturation surfaces land.
     registry.cat_dses.push(dses::discarding_dse(scoring));
     registry.cat_dses.push(dses::trashing_dse(scoring));
-    registry.cat_dses.push(dses::handing_dse());
+    registry.cat_dses.push(dses::handing_dse(scoring));
     registry.cat_dses.push(dses::picking_up_dse());
     registry.fox_dses.push(dses::fox_patrolling_dse(scoring));
     registry.fox_dses.push(dses::fox_hunting_dse(scoring));

@@ -65,6 +65,17 @@ pub enum PlannerZone {
     /// to founding sites; cats haul them in via the
     /// `PickupMaterial` → `DeliverMaterials` plan leg.
     MaterialPile,
+    /// Ticket 193: on-the-ground pickable food. Resolves to the nearest
+    /// `Item` entity whose `kind.is_food()` and whose `location` is
+    /// `OnGround`. Today's source is the `engage_prey` overflow path
+    /// (`goap.rs::resolve_engage_prey` spawns an `Item` at the kill tile
+    /// when inventory is full and the cat isn't self-eating). Forward-
+    /// compatible with the future "carcass-as-container" loot-table
+    /// surface — child Items spawned at a `Carcass` entity's tile will
+    /// appear in the same OnGround food-Item snapshot without any zone
+    /// reshape. Replaces the 176 `MaterialPile` stub that
+    /// `picking_up_actions` previously routed through.
+    CarcassPile,
 }
 
 /// What the cat is carrying.

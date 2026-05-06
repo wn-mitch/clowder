@@ -139,6 +139,7 @@ pub fn transfer_item_stores_to_inventory(
 pub fn transfer_item_inventory_to_stored(
     inventory: &mut Inventory,
     slot_idx: usize,
+    dest_entity: Entity,
     dest_stored: &mut StoredItems,
     dest_kind: crate::components::building::StructureType,
     dest_position: crate::components::physical::Position,
@@ -152,19 +153,20 @@ pub fn transfer_item_inventory_to_stored(
         _ => return Err(TransferError::DestinationFull),
     };
 
-    // Spawn the item entity at the destination's location with
-    // `StoredIn(...)` location-tag — but we don't yet have the
-    // building entity here; the caller passes `dest_position` so
-    // the entity's `Position` component reads correctly for any
-    // ground-location fallback. The location is updated to
-    // `StoredIn(dest_entity)` by the caller after this returns,
-    // since transferring the entity into a specific building
-    // requires the building's `Entity`. (Stage-2 uses a thin
-    // helper signature; future cleanup can fold the building
-    // entity into this primitive.)
+    // Spawn the item entity already located inside the destination
+    // building. Pre-193 this primitive spawned with `OnGround` and the
+    // comment claimed the caller was supposed to fix up the location;
+    // no caller actually did, leaving every trashed/deposited item
+    // with `location == OnGround` even though it was logically in the
+    // building's `StoredItems`. That latent inconsistency was
+    // harmless until 193's `HasGroundCarcass` re-wire scanned for
+    // OnGround food-Items as a substrate signal — a just-trashed
+    // mouse fired the marker and lit up PickingUp on the same tick.
+    // Folding the building entity into this primitive (per the old
+    // comment's deferred cleanup) makes the contract honest.
     let item_entity = commands
         .spawn((
-            Item::with_modifiers(kind, 1.0, ItemLocation::OnGround, modifiers),
+            Item::with_modifiers(kind, 1.0, ItemLocation::StoredIn(dest_entity), modifiers),
             dest_position,
         ))
         .id();

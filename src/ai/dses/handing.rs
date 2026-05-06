@@ -1,14 +1,22 @@
-//! 176 `Handing` DSE — hand surplus directly to a target cat.
-//! Sibling to Discarding and Trashing.
+//! 176 / 188 `Handing` DSE — hand surplus food to a kitten recipient.
+//! Sibling to Discarding (drop on ground) and Trashing (carry to
+//! Midden); shares the `inventory_excess` axis so an adult with a
+//! food-stuffed inventory has parallel disposal options that depend
+//! on which colony substrate is available.
+//!
+//! **Composition.** Single `inventory_excess` axis through a Logistic
+//! curve (slope/midpoint sourced from
+//! `ScoringConstants::disposal_inventory_excess_*`). Per memory
+//! feedback "single-axis perception scalars": colony state composes
+//! at the eligibility-filter layer, not by folding into the scalar.
+//! The recipient identity itself is resolved at dispatch time
+//! (`goap.rs::HandoffItem` falls back to the nearest hungry kitten).
 //!
 //! **Eligibility.** `forbid(Incapacitated)` AND
-//! `require(HasHandoffRecipient)`. The recipient marker is authored
-//! by **ticket 188** (Handoff target picker); pre-188 the marker is
-//! allowlisted in `scripts/substrate_stubs.allowlist` and the
-//! eligibility filter rejects every cat — keeping Handing dormant
-//! and out of the L3 softmax pool while the curve waits for 188's
-//! companion lift. 178 leaves the curve at default-zero so when 188
-//! lifts both pieces the change is single-commit.
+//! `require(HasHandoffRecipient)`. The colony-scoped marker is
+//! authored by `update_colony_building_markers` (ticket 188 wave-
+//! closeout) from the existence of any living kitten — adults hand to
+//! kittens, so the DSE is dormant when the colony has no kittens.
 
 use bevy::prelude::*;
 
@@ -19,8 +27,7 @@ use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
 use crate::components::markers;
-
-pub const ZERO_INPUT: &str = "one";
+use crate::resources::sim_constants::ScoringConstants;
 
 pub struct HandingDse {
     id: DseId,
@@ -30,14 +37,14 @@ pub struct HandingDse {
 }
 
 impl HandingDse {
-    pub fn new() -> Self {
+    pub fn new(scoring: &ScoringConstants) -> Self {
         Self {
             id: DseId("handoff"),
             considerations: vec![Consideration::Scalar(ScalarConsideration::new(
-                ZERO_INPUT,
-                Curve::Linear {
-                    slope: 0.0,
-                    intercept: 0.0,
+                "inventory_excess",
+                Curve::Logistic {
+                    steepness: scoring.disposal_inventory_excess_slope,
+                    midpoint: scoring.disposal_inventory_excess_midpoint,
                 },
             ))],
             composition: Composition::weighted_sum(vec![1.0]),
@@ -45,12 +52,6 @@ impl HandingDse {
                 .forbid(markers::Incapacitated::KEY)
                 .require(markers::HasHandoffRecipient::KEY),
         }
-    }
-}
-
-impl Default for HandingDse {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -84,32 +85,56 @@ impl Dse for HandingDse {
     }
 }
 
-pub fn handing_dse() -> Box<dyn Dse> {
-    Box::new(HandingDse::new())
+pub fn handing_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+    Box::new(HandingDse::new(scoring))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn handing_dse_id_stable() {
-        assert_eq!(HandingDse::new().id().0, "handoff");
+    fn defaults() -> ScoringConstants {
+        ScoringConstants::default()
     }
 
     #[test]
-    fn handing_default_zero_scoring() {
-        let dse = HandingDse::new();
+    fn handing_dse_id_stable() {
+        assert_eq!(HandingDse::new(&defaults()).id().0, "handoff");
+    }
+
+    #[test]
+    fn handing_curve_lifts_with_inventory_excess() {
+        // 188: replaced 178's default-zero curve with the same Logistic
+        // shape Discarding/Trashing use on `inventory_excess`. Empty
+        // inventory → near-zero score; full → near-one. Eligibility
+        // gates the DSE dormant when no kitten exists in the colony,
+        // so this curve only fires when the substrate has a recipient.
+        let dse = HandingDse::new(&defaults());
         let c = match &dse.considerations()[0] {
             Consideration::Scalar(sc) => &sc.curve,
             _ => panic!("expected scalar"),
         };
-        assert!((c.evaluate(0.0)).abs() < 1e-6);
-        assert!((c.evaluate(1.0)).abs() < 1e-6);
+        assert!(c.evaluate(0.0) < 0.05, "empty inventory → near-zero score");
+        assert!((c.evaluate(0.5) - 0.5).abs() < 1e-3, "midpoint → 0.5");
+        assert!(c.evaluate(1.0) > 0.95, "full inventory → near-one score");
+    }
+
+    #[test]
+    fn handing_eligibility_requires_handoff_recipient() {
+        let dse = HandingDse::new(&defaults());
+        let elig = dse.eligibility();
+        assert!(
+            elig.required.contains(&markers::HasHandoffRecipient::KEY),
+            "Handing must require HasHandoffRecipient",
+        );
+        assert!(
+            elig.forbidden.contains(&markers::Incapacitated::KEY),
+            "Handing must forbid Incapacitated",
+        );
     }
 
     #[test]
     fn handing_maslow_tier_is_one() {
-        assert_eq!(HandingDse::new().maslow_tier(), 1);
+        assert_eq!(HandingDse::new(&defaults()).maslow_tier(), 1);
     }
 }

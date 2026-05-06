@@ -271,15 +271,17 @@ pub fn handing_actions() -> Vec<GoapActionDef> {
     }]
 }
 
-/// 176: plan template for `PickingUp` — single-step retrieval from
-/// the ground. Reuses `MaterialPile` zone (the existing OnGround-
-/// item zone resolution) until a more general `TargetGroundItem`
-/// zone lands. Default-zero scoring keeps this dormant.
+/// Plan template for `PickingUp` — single-step retrieval of an
+/// OnGround food `Item` (engage_prey overflow today; forward-
+/// compatible with future carcass-as-container child Items).
+/// Routes through `PlannerZone::CarcassPile` (193); previously
+/// stubbed against `MaterialPile`, which filtered to build
+/// materials only and starved the resolver of valid targets.
 pub fn picking_up_actions() -> Vec<GoapActionDef> {
     vec![GoapActionDef {
         kind: GoapActionKind::PickUpItemFromGround,
         cost: 1,
-        preconditions: vec![StatePredicate::ZoneIs(PlannerZone::MaterialPile)],
+        preconditions: vec![StatePredicate::ZoneIs(PlannerZone::CarcassPile)],
         effects: vec![StateEffect::IncrementTrips],
     }]
 }

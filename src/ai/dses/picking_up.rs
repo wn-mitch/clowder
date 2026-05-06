@@ -1,13 +1,16 @@
-//! 176 / 185 `PickingUp` DSE — retrieve a desired item from the ground.
-//! Inverse of Discarding; load-bearing for the
-//! kill→carcass-on-ground→pick-up flow.
+//! 176 / 185 / 193 `PickingUp` DSE — retrieve a desired item from the
+//! ground. Inverse of Discarding; load-bearing for the
+//! kill→item-on-ground→pick-up flow.
 //!
 //! **Eligibility.** `forbid(Incapacitated)` AND
 //! `require(HasGroundCarcass)`. The colony-scoped marker is authored
-//! by `update_colony_building_markers` (ticket 185) from any
-//! uncleansed/unharvested carcass in the colony — when no ground
-//! carcass exists, eligibility rejects every cat and PickingUp stays
-//! out of the L3 softmax pool.
+//! by `update_colony_building_markers` from any `Item` with
+//! `location == OnGround` and `kind.is_food()` (ticket 193 re-wire of
+//! the 185 author; pre-193 the marker latched on `Carcass` component
+//! entities, which the resolver cannot consume — the planner routed
+//! through `MaterialPile` and failed 1367/10kt on the seed-42
+//! canonical soak). When no ground food-Item exists, eligibility
+//! rejects every cat and PickingUp stays out of the L3 softmax pool.
 //!
 //! **Composition.** Single `colony_food_security` axis with an
 //! inverted Logistic curve: scavenge urgency rises sharply as the
