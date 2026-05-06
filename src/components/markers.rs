@@ -400,6 +400,21 @@ impl HasGarden {
     pub const KEY: &str = "HasGarden";
 }
 
+/// 176: colony Stores have been refusing deposits at a chronic
+/// rate over the trailing window. Author: `update_colony_storage_pressure`
+/// in `src/systems/buildings.rs`. Read: Build DSE's score-bonus
+/// consideration (lifts the colony toward "build another Stores")
+/// and Coordinator's `assess_colony_needs` (queues a `Build` directive
+/// of `StructureType::Stores` when set). Computed from a per-colony
+/// sliding-window count of `Feature::DepositRejected` events scaled by
+/// colony cat-count: when `rejected_per_cat_per_window` exceeds
+/// `chronicity_threshold` the marker is inserted; otherwise removed.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct ColonyStoresChronicallyFull;
+impl ColonyStoresChronicallyFull {
+    pub const KEY: &str = "ColonyStoresChronicallyFull";
+}
+
 /// ≥1 other cat has a skill below 0.3 where this cat has the same
 /// skill above 0.6 (per-cat relative predicate).
 /// `aspirations.rs::update_mentoring_target_markers`.

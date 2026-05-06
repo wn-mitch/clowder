@@ -1762,6 +1762,30 @@ pub struct ScoringConstants {
     /// disables the bias entirely.
     #[serde(default = "default_carry_affinity_bonus")]
     pub carry_affinity_bonus: f32,
+    /// 176: trailing-window length (in sim ticks) used to detect
+    /// chronic Stores-overflow pressure. The
+    /// `ColonyStoresChronicallyFull` marker is authored when the count
+    /// of `Feature::DepositRejected` events in this window divided by
+    /// colony cat-count exceeds `chronicity_threshold`. Default 1000
+    /// ticks ≈ 16 sim seconds at 60 ticks/sec — long enough to filter
+    /// transient overflow during deposit-then-cook cycles, short
+    /// enough that genuine chronic pressure registers within a few
+    /// tens of seconds.
+    #[serde(default = "default_chronicity_window_ticks")]
+    pub chronicity_window_ticks: u64,
+    /// 176: rejected-deposits-per-cat-per-window threshold above which
+    /// `ColonyStoresChronicallyFull` is authored. Default 0.10 — one
+    /// deposit-rejection per cat per 10 windows = ~10k ticks. Below
+    /// this rate the rejections look like noise and Build doesn't lift
+    /// toward "more Stores."
+    #[serde(default = "default_chronicity_threshold")]
+    pub chronicity_threshold: f32,
+    /// 176: weight on the `colony_stores_chronically_full` axis in
+    /// the Build DSE composition. Default 0.0 — the axis is wired but
+    /// dormant. Balance-tuning lifts to a positive value once the
+    /// stage 4 substrate's behavior is observed empirically.
+    #[serde(default = "default_build_chronic_full_weight")]
+    pub build_chronic_full_weight: f32,
     pub gate_timid_fight_threshold: f32,
     pub gate_shy_socialize_threshold: f32,
     pub gate_reckless_flee_threshold: f32,
@@ -1971,6 +1995,9 @@ impl Default for ScoringConstants {
             fox_softmax_temperature: default_fox_softmax_temperature(),
             intention_softmax_temperature: default_intention_softmax_temperature(),
             carry_affinity_bonus: default_carry_affinity_bonus(),
+            chronicity_window_ticks: default_chronicity_window_ticks(),
+            chronicity_threshold: default_chronicity_threshold(),
+            build_chronic_full_weight: default_build_chronic_full_weight(),
             gate_timid_fight_threshold: 0.1,
             gate_shy_socialize_threshold: 0.15,
             gate_reckless_flee_threshold: 0.9,
@@ -2911,6 +2938,25 @@ fn default_intention_softmax_temperature() -> f32 {
 /// behavioral shift without code changes.
 fn default_carry_affinity_bonus() -> f32 {
     1.0
+}
+
+/// 176: trailing-window length for chronic-overflow detection. See
+/// `ScoringConstants::chronicity_window_ticks`.
+fn default_chronicity_window_ticks() -> u64 {
+    1000
+}
+
+/// 176: rejected-deposits-per-cat-per-window threshold. See
+/// `ScoringConstants::chronicity_threshold`.
+fn default_chronicity_threshold() -> f32 {
+    0.10
+}
+
+/// 176: Build DSE bonus weight on the
+/// `colony_stores_chronically_full` axis. Ships dormant at 0.0 —
+/// balance-tuning lifts after the substrate stabilizes.
+fn default_build_chronic_full_weight() -> f32 {
+    0.0
 }
 
 fn default_scent_search_radius() -> i32 {

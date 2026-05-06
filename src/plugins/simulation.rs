@@ -169,6 +169,10 @@ impl Plugin for SimulationPlugin {
         // three-mirror burden flagged in CLAUDE.md.
         app.insert_resource(crate::ai::faction::FactionRelations::canonical());
         app.init_resource::<DseRegistry>();
+        // 176: chronicity tracker for `ColonyStoresChronicallyFull`.
+        // Updated by `update_colony_building_markers` once per
+        // `ScoringConstants::chronicity_window_ticks` ticks.
+        app.init_resource::<crate::resources::stores_pressure::StoresPressureTracker>();
         app.add_systems(
             Startup,
             register_dses_at_startup.after(crate::plugins::setup::setup_world_exclusive),

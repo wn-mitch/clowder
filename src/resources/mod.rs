@@ -26,6 +26,7 @@ pub mod relationships;
 pub mod rng;
 pub mod sim_constants;
 pub mod snapshot_config;
+pub mod stores_pressure;
 pub mod system_activation;
 pub mod time;
 pub mod time_units;

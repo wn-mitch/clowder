@@ -177,6 +177,7 @@ pub struct WorldStateQueries<'w, 's> {
             Has<markers::HasConstructionSite>,
             Has<markers::HasDamagedBuilding>,
             Has<markers::HasGarden>,
+            Has<markers::ColonyStoresChronicallyFull>,
         ),
         With<markers::ColonyState>,
     >,
@@ -945,6 +946,7 @@ pub fn evaluate_and_plan(
         has_construction_site,
         has_damaged_building,
         has_garden,
+        colony_stores_chronically_full,
     ) = world_state
         .colony_state_query
         .single()
@@ -996,6 +998,13 @@ pub fn evaluate_and_plan(
     markers.set_colony(markers::HasRawFoodInStores::KEY, has_raw_food_in_stores);
     markers.set_colony(markers::HasConstructionSite::KEY, has_construction_site);
     markers.set_colony(markers::HasDamagedBuilding::KEY, has_damaged_building);
+    // 176: ColonyStoresChronicallyFull — see
+    // `update_colony_building_markers` for the chronicity tracking
+    // that toggles the underlying ECS-level marker.
+    markers.set_colony(
+        markers::ColonyStoresChronicallyFull::KEY,
+        colony_stores_chronically_full,
+    );
 
     let herb_positions: Vec<(Entity, Position, HerbKind)> = world_state
         .herb_query

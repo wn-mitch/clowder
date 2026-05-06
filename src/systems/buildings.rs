@@ -439,6 +439,11 @@ pub fn update_construction_site_map(
 /// - `HasDamagedBuilding` — ≥1 `Structure` with condition <
 ///   `DispositionConstants::damaged_building_threshold` (ticket 169).
 /// - `HasGarden` — ≥1 `Garden` `Structure` (ticket 171).
+/// - `ColonyStoresChronicallyFull` — ticket 176; toggled when the
+///   per-window count of `Feature::DepositRejected` divided by colony
+///   cat-count exceeds `chronicity_threshold`. Drives the Build DSE
+///   "we need more Stores" lift (default-zero weight in stage 4).
+#[allow(clippy::too_many_arguments)]
 pub fn update_colony_building_markers(
     mut commands: Commands,
     colony: Single<Entity, With<crate::components::markers::ColonyState>>,
@@ -448,8 +453,12 @@ pub fn update_colony_building_markers(
         &crate::components::items::Item,
         bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
     >,
+    cats: Query<&crate::components::physical::Health, Without<Dead>>,
     food: Res<FoodStores>,
     constants: Res<SimConstants>,
+    activation: Option<Res<SystemActivation>>,
+    time: Res<TimeState>,
+    mut tracker: ResMut<crate::resources::stores_pressure::StoresPressureTracker>,
 ) {
     let d = &constants.disposition;
     let bldg_state = scan_colony_buildings(buildings.iter(), d.damaged_building_threshold);
@@ -461,6 +470,36 @@ pub fn update_colony_building_markers(
             .any(|e| items.get(e).is_ok_and(|it| it.kind.is_food() && !it.modifiers.cooked))
     });
     let has_stored_food = !food.is_empty();
+
+    // 176: chronicity tracking for `ColonyStoresChronicallyFull`. The
+    // `SystemActivation::counts` map carries cumulative counts per
+    // Feature; we periodically snapshot the `DepositRejected` total
+    // and compute the per-window delta. Discrete snapshot
+    // (every `chronicity_window_ticks` ticks) is simpler than a
+    // sliding ringbuffer and produces a marker that flips at most
+    // once per window, which is the right cadence for Build / Coordinator.
+    let scoring = &constants.scoring;
+    let cat_count = cats.iter().count().max(1) as f32;
+    let current_rejections = activation
+        .as_deref()
+        .and_then(|sa| sa.counts.get(&Feature::DepositRejected).copied())
+        .unwrap_or(0);
+    let stores_chronically_full = if time
+        .tick
+        .saturating_sub(tracker.last_window_tick)
+        >= scoring.chronicity_window_ticks
+    {
+        // Window boundary — compute the delta and flip the latched
+        // verdict for the next window.
+        let delta = current_rejections.saturating_sub(tracker.last_window_baseline);
+        let per_cat = (delta as f32) / cat_count;
+        tracker.last_window_baseline = current_rejections;
+        tracker.last_window_tick = time.tick;
+        tracker.latched_chronic = per_cat >= scoring.chronicity_threshold;
+        tracker.latched_chronic
+    } else {
+        tracker.latched_chronic
+    };
 
     let entity = *colony;
     let mut em = commands.entity(entity);
@@ -493,6 +532,11 @@ pub fn update_colony_building_markers(
         em.insert(crate::components::markers::HasGarden);
     } else {
         em.remove::<crate::components::markers::HasGarden>();
+    }
+    if stores_chronically_full {
+        em.insert(crate::components::markers::ColonyStoresChronicallyFull);
+    } else {
+        em.remove::<crate::components::markers::ColonyStoresChronicallyFull>();
     }
 }
 
@@ -808,6 +852,11 @@ mod tests {
     fn setup_colony_markers() -> (World, Schedule) {
         let mut world = test_world();
         world.spawn(markers::ColonyState);
+        // 176: chronicity tracker resource — default-zero so the
+        // marker stays cleared in tests that don't exercise it.
+        world.insert_resource(
+            crate::resources::stores_pressure::StoresPressureTracker::default(),
+        );
         let mut schedule = Schedule::default();
         schedule.add_systems(update_colony_building_markers);
         (world, schedule)

@@ -492,6 +492,7 @@ pub fn evaluate_dispositions(
             Has<markers::HasConstructionSite>,
             Has<markers::HasDamagedBuilding>,
             Has<markers::HasGarden>,
+            Has<markers::ColonyStoresChronicallyFull>,
         ),
         With<markers::ColonyState>,
     >,
@@ -546,11 +547,16 @@ pub fn evaluate_dispositions(
         has_construction_site,
         has_damaged_building,
         has_garden,
+        colony_stores_chronically_full,
     ) = colony_state_query
         .single()
         .expect("ColonyState singleton must exist (spawned by build_new_world / init_scenario_world_with)");
     markers.set_colony(markers::HasGarden::KEY, has_garden);
     markers.set_colony(markers::HasFunctionalKitchen::KEY, has_functional_kitchen);
+    markers.set_colony(
+        markers::ColonyStoresChronicallyFull::KEY,
+        colony_stores_chronically_full,
+    );
     let has_raw_food_in_stores = cooking.has_raw_food_in_stores();
     markers.set_colony(markers::HasRawFoodInStores::KEY, has_raw_food_in_stores);
 
