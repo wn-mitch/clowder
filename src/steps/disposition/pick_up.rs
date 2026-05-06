@@ -6,7 +6,7 @@
 
 use bevy_ecs::prelude::*;
 
-use crate::components::items::Item;
+use crate::components::items::{BuildMaterialItem, Item};
 use crate::components::magic::Inventory;
 use crate::steps::{StepOutcome, StepResult};
 
@@ -37,10 +37,13 @@ pub struct PickUpOutcome {
 /// entity and threads it as `target_entity`.
 ///
 /// **Runtime preconditions** — `target_entity` must resolve to an
-/// `Item` entity (not despawned, not picked up by another cat).
-/// The cat must be at the item's tile (the planner-side zone
-/// resolution provides this approximately; the resolver tolerates
-/// adjacent positions). The cat's inventory must have room.
+/// `Item` entity (not despawned, not picked up by another cat). The
+/// query filter excludes `BuildMaterialItem`s — those move through
+/// the haul-to-construction-site pipeline, not the disposal chain;
+/// a build-material target Fails the step. The cat must be at the
+/// item's tile (the planner-side zone resolution provides this
+/// approximately; the resolver tolerates adjacent positions). The
+/// cat's inventory must have room.
 ///
 /// **Witness** — `StepOutcome<Option<PickUpOutcome>>`. `Some(outcome)`
 /// on `Advance` carries the picked-up item entity. `None` on `Fail`
@@ -54,7 +57,7 @@ pub struct PickUpOutcome {
 pub fn resolve_pick_up_from_ground(
     inventory: &mut Inventory,
     target_entity: Option<Entity>,
-    items: &Query<&Item>,
+    items: &Query<&Item, bevy_ecs::query::Without<BuildMaterialItem>>,
     commands: &mut Commands,
 ) -> StepOutcome<Option<PickUpOutcome>> {
     let Some(item_entity) = target_entity else {

@@ -8,7 +8,7 @@
 
 use bevy_ecs::prelude::*;
 
-use crate::components::building::{StoredItems, Structure, StructureType};
+use crate::components::building::{StoredItems, StructureType};
 use crate::components::item_transfer::transfer_item_inventory_to_stored;
 use crate::components::magic::{Inventory, ItemSlot};
 use crate::components::physical::Position;
@@ -39,11 +39,11 @@ pub struct TrashOutcome {
 /// `target_entity` on the cat's `CurrentAction` /
 /// `Disposition::target_entity`.
 ///
-/// **Runtime preconditions** — `target_entity` must resolve to a
-/// `Structure` of `StructureType::Midden` with a `StoredItems`
-/// component. The cat must be at (or adjacent to) the Midden's
-/// `Position`. The cat's inventory must hold at least one
-/// `ItemSlot::Item(...)`. Failures Fail the step.
+/// **Runtime preconditions** — caller has already validated the
+/// target as a `StructureType::Midden` (177 wires this via the
+/// `snaps.midden_entities` snapshot) and threaded the resolved
+/// `&mut StoredItems` and midden `Position`. The cat's inventory
+/// must hold at least one `ItemSlot::Item(...)`; otherwise Fail.
 ///
 /// **Witness** — `StepOutcome<Option<TrashOutcome>>`. `Some(outcome)`
 /// on `Advance` carries midden + item entities. `None` on `Fail`.
@@ -52,27 +52,11 @@ pub struct TrashOutcome {
 /// (Neutral) to `record_if_witnessed`.
 pub fn resolve_trash_at_midden(
     inventory: &mut Inventory,
-    target_entity: Option<Entity>,
-    middens: &mut Query<(&Structure, &mut StoredItems, &Position)>,
+    midden_entity: Entity,
+    stored: &mut StoredItems,
+    midden_pos: Position,
     commands: &mut Commands,
 ) -> StepOutcome<Option<TrashOutcome>> {
-    let Some(midden_entity) = target_entity else {
-        return StepOutcome::unwitnessed(StepResult::Fail(
-            "trash: no target midden on disposition".to_string(),
-        ));
-    };
-
-    let Ok((structure, mut stored, midden_pos)) = middens.get_mut(midden_entity) else {
-        return StepOutcome::unwitnessed(StepResult::Fail(
-            "trash: target midden no longer exists".to_string(),
-        ));
-    };
-    if structure.kind != StructureType::Midden {
-        return StepOutcome::unwitnessed(StepResult::Fail(
-            "trash: target structure is not a midden".to_string(),
-        ));
-    }
-
     let Some(slot_idx) = inventory
         .slots
         .iter()
@@ -86,9 +70,9 @@ pub fn resolve_trash_at_midden(
     match transfer_item_inventory_to_stored(
         inventory,
         slot_idx,
-        &mut stored,
+        stored,
         StructureType::Midden,
-        *midden_pos,
+        midden_pos,
         commands,
     ) {
         Ok(item_entity) => StepOutcome::witnessed_with(

@@ -2039,6 +2039,12 @@ struct StepSnapshots {
     cat_tile_counts: HashMap<Position, u32>,
     stores_positions: Vec<Position>,
     stores_entities: Vec<(Entity, Position)>,
+    /// Ticket 177: per-tick snapshot of completed Midden buildings,
+    /// used by the `TrashItemAtMidden` dispatch arm to resolve the
+    /// target entity's `Position` without widening `stores_query`
+    /// (which would conflict with `BuildingResolverParams::buildings`
+    /// on the `Structure`/`Position` archetype).
+    midden_entities: Vec<(Entity, Position)>,
     kitchen_positions: Vec<Position>,
     construction_positions: Vec<(Entity, Position)>,
     farm_positions: Vec<Position>,
@@ -2073,6 +2079,21 @@ struct StepAccumulators {
     mentor_effects: Vec<MentorEffect>,
     grooming_restorations: Vec<crate::steps::disposition::GroomOutcome>,
     kitten_feedings: Vec<Entity>,
+    /// Ticket 177: actor-and-recipient pairs queued by the `HandoffItem`
+    /// dispatch arm. The actor's `&mut Inventory` is borrowed inside the
+    /// per-cat loop, so the actual transfer (which needs both inventories)
+    /// runs in the post-loop drain via `cats.get_many_mut([actor, recipient])`.
+    handoff_pending: Vec<HandoffPending>,
+}
+
+/// Ticket 177: the per-pair payload queued by a successful Handoff
+/// dispatch-arm pre-flight. The post-loop drain re-fetches both
+/// inventories via `cats.get_many_mut([actor, recipient])` and runs
+/// `resolve_handoff` to perform the actual slot transfer.
+#[derive(Debug, Clone, Copy)]
+struct HandoffPending {
+    actor: Entity,
+    recipient: Entity,
 }
 
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
@@ -2200,6 +2221,15 @@ pub fn resolve_goap_plans(
         .collect();
     let kitchen_positions: Vec<Position> = kitchen_entities.iter().map(|(_, p)| *p).collect();
 
+    // Ticket 177: completed Middens — used by the `TrashItemAtMidden`
+    // dispatch arm to resolve the target entity's `Position` without
+    // widening `stores_query` to overlap `Structure`/`Position`.
+    let midden_entities: Vec<(Entity, Position)> = building_snapshot
+        .iter()
+        .filter(|(_, kind, _, is_site, _)| *kind == StructureType::Midden && !*is_site)
+        .map(|(e, _, p, _, _)| (*e, *p))
+        .collect();
+
     let construction_positions: Vec<(Entity, Position)> = building_snapshot
         .iter()
         .filter(|(_, _, _, is_site, _)| *is_site)
@@ -2304,6 +2334,7 @@ pub fn resolve_goap_plans(
         },
         stores_positions,
         stores_entities,
+        midden_entities,
         kitchen_positions,
         construction_positions,
         farm_positions,
@@ -2374,6 +2405,7 @@ pub fn resolve_goap_plans(
         // owns &mut Needs over every non-dead cat (including kittens), so
         // updates are collected here and applied in a second pass.
         kitten_feedings: Vec::new(),
+        handoff_pending: Vec::new(),
     };
 
     for (
@@ -3037,6 +3069,37 @@ pub fn resolve_goap_plans(
                 f.social_warmth = (f.social_warmth + groom.social_warmth_delta).min(1.0);
             }
         }
+    }
+
+    // Ticket 177: deferred handoffs. The dispatch arm pre-validated the
+    // actor side and queued the (actor, recipient) pair; here we hold
+    // both `&mut Inventory` borrows simultaneously via
+    // `cats.get_many_mut`, which Bevy permits because the entity IDs
+    // are distinct. The actual transfer + Feature emission happen here.
+    // If `get_many_mut` Errs (recipient gone, same-entity self-handoff
+    // sneaks through, etc.), we silently drop — the actor's slot stays
+    // put per `transfer_item_inventory_to_inventory`'s items-are-real
+    // contract, and no Feature fires.
+    for pending in std::mem::take(&mut accum.handoff_pending) {
+        if pending.actor == pending.recipient {
+            continue;
+        }
+        let Ok([mut actor_row, mut recipient_row]) =
+            cats.get_many_mut([pending.actor, pending.recipient])
+        else {
+            continue;
+        };
+        let actor_inv: &mut Inventory = &mut actor_row.0 .6;
+        let recipient_inv: &mut Inventory = &mut recipient_row.0 .6;
+        let outcome = crate::steps::disposition::resolve_handoff(
+            actor_inv,
+            pending.recipient,
+            recipient_inv,
+        );
+        outcome.record_if_witnessed(
+            narr.activation.as_deref_mut(),
+            crate::resources::system_activation::Feature::ItemHandedOff,
+        );
     }
 
     // §Phase 4c.4: deferred kitten-feedings. +0.5 hunger per feed.
@@ -4644,24 +4707,36 @@ fn dispatch_step_action(
             .result
         }
 
-        // 176 stage 3: inventory-disposal resolver dispatch.
+        // 176 stage 3 wired Drop; ticket 177 wires the three siblings.
         //
-        // Drop is fully wired — needs only inventory + pos + commands,
-        // all of which are available on the dispatch surface. The
-        // resolver removes one item-slot from inventory and spawns an
-        // `Item` entity at the cat's position with `OnGround`. Feature
-        // emission goes through `record_if_witnessed` per the
-        // step-resolver contract.
+        // Drop — `inventory + pos + commands` only; resolver removes
+        // an item-slot and spawns an OnGround `Item`.
         //
-        // Trash/Handoff/PickUp need additional queries (Midden's
-        // `StoredItems`, target cat's `Inventory`, ground `Item`)
-        // that aren't currently threaded through this dispatch
-        // function's signature. The disposal DSEs ship default-zero
-        // (Linear slope=0, intercept=0) so these arms aren't reached
-        // at runtime; wiring them requires plumbing the queries in,
-        // tracked as the immediate-follow-on under ticket 176's stage
-        // 4 (alongside the saturation surfaces and chronic-full
-        // marker).
+        // Trash — uses the per-tick `snaps.midden_entities` snapshot to
+        // resolve the target's `Position` (widening `stores_query` to
+        // also borrow `&Structure`/`&Position` would conflict with
+        // `BuildingResolverParams::buildings` and refuse to compile).
+        //
+        // PickUp — calls the resolver directly with the existing
+        // `items_query`. The `Without<BuildMaterialItem>` filter on
+        // that query makes a build-material target Fail at the
+        // resolver, which is the correct semantics (build materials
+        // don't move through the disposal pipeline).
+        //
+        // Handoff — pre-validates the actor side (target set, actor
+        // has a transferable slot) and queues a `HandoffPending`. The
+        // actual transfer + feature emission happen in the post-loop
+        // drain because Bevy's borrow checker forbids holding two
+        // `&mut Inventory` borrows from the same cats query inside
+        // the per-cat loop. See `handoff_pending` on `StepAccumulators`.
+        //
+        // Disposal DSEs ship default-zero (Linear slope=0,
+        // intercept=0) so these arms remain unreachable at runtime
+        // until ticket 178 lifts the weights — at which point the
+        // Handoff "optimistic Advance + post-loop drain" caveat
+        // graduates from academic to live (the items-are-real contract
+        // on `transfer_item_inventory_to_inventory` keeps the source
+        // untouched on `DestinationFull`, so no item is destroyed).
         GoapActionKind::DropItem => {
             let outcome = crate::steps::disposition::resolve_drop_item(
                 inventory, *pos, commands,
@@ -4672,15 +4747,77 @@ fn dispatch_step_action(
             );
             outcome.result
         }
-        GoapActionKind::TrashItemAtMidden
-        | GoapActionKind::HandoffItem
-        | GoapActionKind::PickUpItemFromGround => {
-            crate::steps::StepResult::Fail(format!(
-                "176 stage 3: {action_kind:?} dispatch wiring deferred — \
-                resolver exists in src/steps/disposition/ but needs \
-                additional queries threaded through resolve_disposition_action_kind. \
-                Disposal DSEs are default-zero so unreachable at runtime."
-            ))
+        GoapActionKind::TrashItemAtMidden => {
+            let target = plan.step_state[step_idx].target_entity;
+            let Some(midden_entity) = target else {
+                return crate::steps::StepResult::Fail(
+                    "trash: no target midden on disposition".to_string(),
+                );
+            };
+            let Some(midden_pos) = snaps
+                .midden_entities
+                .iter()
+                .find(|(e, _)| *e == midden_entity)
+                .map(|(_, p)| *p)
+            else {
+                return crate::steps::StepResult::Fail(
+                    "trash: target midden not in snapshot (despawned, in-construction, \
+                     or not a Midden)"
+                        .to_string(),
+                );
+            };
+            let Ok(mut stored) = stores_query.get_mut(midden_entity) else {
+                return crate::steps::StepResult::Fail(
+                    "trash: target midden lacks StoredItems".to_string(),
+                );
+            };
+            let outcome = crate::steps::disposition::resolve_trash_at_midden(
+                inventory,
+                midden_entity,
+                &mut stored,
+                midden_pos,
+                commands,
+            );
+            outcome.record_if_witnessed(
+                narr.activation.as_deref_mut(),
+                crate::resources::system_activation::Feature::ItemTrashed,
+            );
+            outcome.result
+        }
+        GoapActionKind::PickUpItemFromGround => {
+            let target = plan.step_state[step_idx].target_entity;
+            let outcome = crate::steps::disposition::resolve_pick_up_from_ground(
+                inventory, target, items_query, commands,
+            );
+            outcome.record_if_witnessed(
+                narr.activation.as_deref_mut(),
+                crate::resources::system_activation::Feature::ItemRetrieved,
+            );
+            outcome.result
+        }
+        GoapActionKind::HandoffItem => {
+            let Some(recipient) = plan.step_state[step_idx].target_entity else {
+                return crate::steps::StepResult::Fail(
+                    "handoff: no recipient on disposition".to_string(),
+                );
+            };
+            let has_transferable = inventory.slots.iter().any(|s| {
+                matches!(
+                    s,
+                    crate::components::magic::ItemSlot::Item(_, _)
+                        | crate::components::magic::ItemSlot::Herb(_)
+                )
+            });
+            if !has_transferable {
+                return crate::steps::StepResult::Fail(
+                    "handoff: no transferable slot in actor inventory".to_string(),
+                );
+            }
+            accum.handoff_pending.push(HandoffPending {
+                actor: cat_entity,
+                recipient,
+            });
+            crate::steps::StepResult::Advance
         }
     }
 }

@@ -25,6 +25,7 @@
 //! scenario runs are byte-deterministic per seed. The runner asserts this
 //! invariant in tests via stdout-diff.
 
+pub mod disposal_dispatch;
 pub mod env;
 pub mod exploration_ranging;
 pub mod farming_cycle;
