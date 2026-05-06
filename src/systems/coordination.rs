@@ -1118,6 +1118,7 @@ fn structure_display_name(kind: StructureType) -> &'static str {
         StructureType::WardPost => "ward post",
         StructureType::Wall => "wall",
         StructureType::Gate => "gate",
+        StructureType::Midden => "midden",
     }
 }
 

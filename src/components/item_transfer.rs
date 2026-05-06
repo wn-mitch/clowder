@@ -110,6 +110,141 @@ pub fn transfer_item_stores_to_inventory(
 // `tickets/NNN-item-transfer-contract-migration.md` follow-on
 // (per the 175 closeout commit).
 
+// ---------------------------------------------------------------------------
+// 176: Inverse direction (Inventory → StoredItems)
+// ---------------------------------------------------------------------------
+
+/// 176: move one item from a cat's `Inventory` slot at `slot_idx`
+/// into a destination building's `StoredItems`. Used by the
+/// Trash-at-midden resolver and (potentially) by future
+/// deposit-side resolvers wishing the typed contract.
+///
+/// Ordering invariant: a fresh `Item` entity is spawned from the
+/// value-typed inventory slot, then `StoredItems::add` is attempted.
+/// On capacity-fail the spawned entity is despawned and the slot is
+/// left untouched. On success the slot is removed and the entity
+/// becomes the building's. The `kind` returned in `Err` lets the
+/// caller log the failed transfer's kind without re-reading the slot.
+///
+/// `dest_kind` is the destination building's `StructureType` —
+/// passed because `StoredItems::add` consults `Self::capacity(kind)`.
+/// For `StructureType::Midden` capacity is `usize::MAX`, so the
+/// `Err(DestinationFull)` branch is unreachable; for other building
+/// kinds it represents real overflow.
+///
+/// Skips `ItemSlot::Herb(_)` and `ItemSlot::Remedy(_)` entries —
+/// callers should resolve these via the existing herb/remedy
+/// pathways. Returns `Err(DestinationFull)` for non-item slots so
+/// the caller can pick a different slot.
+pub fn transfer_item_inventory_to_stored(
+    inventory: &mut Inventory,
+    slot_idx: usize,
+    dest_stored: &mut StoredItems,
+    dest_kind: crate::components::building::StructureType,
+    dest_position: crate::components::physical::Position,
+    commands: &mut Commands,
+) -> Result<Entity, TransferError> {
+    use crate::components::items::{Item, ItemLocation};
+    use crate::components::magic::ItemSlot;
+
+    let (kind, modifiers) = match inventory.slots.get(slot_idx) {
+        Some(ItemSlot::Item(k, m)) => (*k, *m),
+        _ => return Err(TransferError::DestinationFull),
+    };
+
+    // Spawn the item entity at the destination's location with
+    // `StoredIn(...)` location-tag — but we don't yet have the
+    // building entity here; the caller passes `dest_position` so
+    // the entity's `Position` component reads correctly for any
+    // ground-location fallback. The location is updated to
+    // `StoredIn(dest_entity)` by the caller after this returns,
+    // since transferring the entity into a specific building
+    // requires the building's `Entity`. (Stage-2 uses a thin
+    // helper signature; future cleanup can fold the building
+    // entity into this primitive.)
+    let item_entity = commands
+        .spawn((
+            Item::with_modifiers(kind, 1.0, ItemLocation::OnGround, modifiers),
+            dest_position,
+        ))
+        .id();
+
+    if !dest_stored.add(item_entity, dest_kind) {
+        commands.entity(item_entity).despawn();
+        return Err(TransferError::DestinationFull);
+    }
+
+    inventory.slots.swap_remove(slot_idx);
+    Ok(item_entity)
+}
+
+/// 176: drop one item from a cat's `Inventory` slot at `slot_idx`
+/// onto the ground at `position`. Spawns a real `Item` entity with
+/// `ItemLocation::OnGround`; the slot is removed only on successful
+/// spawn. This primitive cannot fail on capacity (the ground has
+/// none), but the signature returns `Result` for symmetry with
+/// `transfer_item_inventory_to_stored` and to leave room for future
+/// world-edge gates (e.g., out-of-map positions).
+///
+/// Used by the Drop resolver (`Action::Drop`) and as the fallback
+/// for `engage_prey` / `forage_item` when the cat's inventory has
+/// no room for a fresh catch (Stage 2 carcass-on-ground refactor).
+pub fn transfer_item_inventory_to_ground(
+    inventory: &mut Inventory,
+    slot_idx: usize,
+    position: crate::components::physical::Position,
+    commands: &mut Commands,
+) -> Result<Entity, TransferError> {
+    use crate::components::items::{Item, ItemLocation};
+    use crate::components::magic::ItemSlot;
+
+    let (kind, modifiers) = match inventory.slots.get(slot_idx) {
+        Some(ItemSlot::Item(k, m)) => (*k, *m),
+        _ => return Err(TransferError::DestinationFull),
+    };
+
+    let item_entity = commands
+        .spawn((
+            Item::with_modifiers(kind, 1.0, ItemLocation::OnGround, modifiers),
+            position,
+        ))
+        .id();
+
+    inventory.slots.swap_remove(slot_idx);
+    Ok(item_entity)
+}
+
+/// 176: hand one item from a source cat's `Inventory` slot to a
+/// target cat's `Inventory`. Slot-to-slot (no entity spawn churn —
+/// inventory slots are value-typed `(kind, modifiers)`).
+///
+/// Returns `Err(DestinationFull)` if the target inventory is at
+/// capacity; the source slot stays put so the donor can re-plan.
+pub fn transfer_item_inventory_to_inventory(
+    source: &mut Inventory,
+    slot_idx: usize,
+    target: &mut Inventory,
+) -> Result<(), TransferError> {
+    use crate::components::magic::ItemSlot;
+
+    if target.is_full() {
+        return Err(TransferError::DestinationFull);
+    }
+
+    let added = match source.slots.get(slot_idx) {
+        Some(ItemSlot::Item(kind, modifiers)) => {
+            target.add_item_with_modifiers(*kind, *modifiers)
+        }
+        Some(ItemSlot::Herb(kind)) => target.add_herb(*kind),
+        None => return Err(TransferError::DestinationFull),
+    };
+    if !added {
+        return Err(TransferError::DestinationFull);
+    }
+    source.slots.swap_remove(slot_idx);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

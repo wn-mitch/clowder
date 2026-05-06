@@ -3350,6 +3350,7 @@ fn dispatch_step_action(
             gender,
             needs,
             d,
+            commands,
         ),
 
         GoapActionKind::EatAtStores => {
@@ -5352,6 +5353,8 @@ fn resolve_engage_prey(
             // still fire — the catch is real either way; only the
             // disposition of the carcass changes.
             let consumed_in_place = needs.hunger < d.production_self_eat_threshold;
+            let modifiers =
+                crate::components::items::ItemModifiers::with_corruption(catch_corruption);
             if consumed_in_place {
                 let freshness =
                     (1.0 - catch_corruption * d.corruption_food_penalty).max(0.0);
@@ -5361,10 +5364,34 @@ fn resolve_engage_prey(
                     act.record(crate::resources::system_activation::Feature::FoodEaten);
                 }
             } else if !inventory.is_full() {
-                inventory.slots.push(ItemSlot::Item(
-                    item_kind,
-                    crate::components::items::ItemModifiers::with_corruption(catch_corruption),
+                // Inventory has room — slot-push directly. Inventory
+                // slots are value-typed `(kind, modifiers)` so no
+                // entity is needed when the catch goes straight in.
+                inventory.slots.push(ItemSlot::Item(item_kind, modifiers));
+            } else {
+                // 176: inventory full and not self-eating. Pre-fix,
+                // this arm silently dropped the catch (the prey
+                // entity was already despawned at line 5320 above
+                // and no replacement was created — items-are-real
+                // violation). Now spawn a real carcass `Item` entity
+                // at `prey_pos` so the catch persists in the world;
+                // a future cat can plan `Action::PickUp` to retrieve
+                // it (or wildlife can scavenge once the death-stamp
+                // surface lands).
+                commands.spawn((
+                    crate::components::items::Item::with_modifiers(
+                        item_kind,
+                        1.0,
+                        crate::components::items::ItemLocation::OnGround,
+                        modifiers,
+                    ),
+                    prey_pos,
                 ));
+                if let Some(act) = narr.activation.as_deref_mut() {
+                    act.record(
+                        crate::resources::system_activation::Feature::OverflowToGround,
+                    );
+                }
             }
             skills.hunting += skills.growth_rate() * d.hunt_catch_skill_growth;
 
@@ -5681,6 +5708,13 @@ fn resolve_forage_item(
     // the consume-on-spot branch this enables.
     needs: &mut Needs,
     d: &DispositionConstants,
+    // 176: spawn the foraged `Item` entity at the cat's position
+    // when inventory is full (instead of the silent-skip path that
+    // pre-176 dropped the item entirely). Items-are-real invariant
+    // says every successful forage produces a real entity even when
+    // the cat can't carry it — leaves a real `OnGround` item for a
+    // future `Action::PickUp` to retrieve.
+    commands: &mut Commands,
 ) -> crate::steps::StepResult {
     use crate::components::items::ItemKind;
     use crate::components::magic::ItemSlot;
@@ -5736,6 +5770,8 @@ fn resolve_forage_item(
             // it home. Mirror's `resolve_eat_at_stores` arithmetic;
             // foraged items are raw so no cooked multiplier applies.
             let consumed_in_place = needs.hunger < d.production_self_eat_threshold;
+            let modifiers =
+                crate::components::items::ItemModifiers::with_corruption(forage_corruption);
             if consumed_in_place {
                 let freshness =
                     (1.0 - forage_corruption * d.corruption_food_penalty).max(0.0);
@@ -5745,10 +5781,29 @@ fn resolve_forage_item(
                     act.record(crate::resources::system_activation::Feature::FoodEaten);
                 }
             } else if !inventory.is_full() {
-                inventory.slots.push(ItemSlot::Item(
-                    item_kind,
-                    crate::components::items::ItemModifiers::with_corruption(forage_corruption),
+                inventory.slots.push(ItemSlot::Item(item_kind, modifiers));
+            } else {
+                // 176: inventory full. Pre-fix, this arm silently
+                // skipped — no item was ever spawned, the foraged
+                // resource was lost. Now spawn a real `Item` entity
+                // at the forage location so the resource persists
+                // in the world; a future cat can plan `Action::PickUp`
+                // (or the existing forage path can revisit if the
+                // ground-item zone is plumbed in).
+                commands.spawn((
+                    crate::components::items::Item::with_modifiers(
+                        item_kind,
+                        1.0,
+                        crate::components::items::ItemLocation::OnGround,
+                        modifiers,
+                    ),
+                    *pos,
                 ));
+                if let Some(act) = narr.activation.as_deref_mut() {
+                    act.record(
+                        crate::resources::system_activation::Feature::OverflowToGround,
+                    );
+                }
             }
             skills.foraging += skills.growth_rate() * d.forage_skill_growth;
 

@@ -28,6 +28,14 @@ pub enum StructureType {
     WardPost,
     Wall,
     Gate,
+    /// 176: refuse pile. Cats carry inventory items they can't usefully
+    /// deposit here; the building's `StoredItems` has unlimited capacity
+    /// so deposits never fail on capacity grounds. Distinct from Stores
+    /// because retrievals are conceptually disallowed (no
+    /// `RetrieveFromMidden` chain — items go to die here, even if they
+    /// remain real entities). Future scope: items at the midden decay
+    /// faster via the existing rot ecology.
+    Midden,
 }
 
 impl StructureType {
@@ -48,6 +56,11 @@ impl StructureType {
             Self::WardPost => vec![(Material::Stone, 2), (Material::Herbs, 3)],
             Self::Wall => vec![(Material::Stone, 3)],
             Self::Gate => vec![(Material::Wood, 4), (Material::Stone, 2)],
+            // 176: Midden is a refuse pile, not a built-up structure;
+            // a single load of wood marks out the spot. Cheap so the
+            // colony-founding wagon-dismantle haul can fund it without
+            // blocking other infrastructure.
+            Self::Midden => vec![(Material::Wood, 1)],
         }
     }
 
@@ -60,6 +73,7 @@ impl StructureType {
             Self::Watchtower => (2, 3),
             Self::Gate => (2, 1),
             Self::WardPost | Self::Wall => (1, 1),
+            Self::Midden => (2, 2),
         }
     }
 
@@ -77,6 +91,13 @@ impl StructureType {
             Self::WardPost => Terrain::WardPost,
             Self::Wall => Terrain::Wall,
             Self::Gate => Terrain::Gate,
+            // 176: Midden visually reuses the Stores terrain for
+            // stage-1 atomicity — adding a dedicated Terrain variant
+            // requires also updating the autotile / palette pipeline,
+            // which is out of scope here. Worldgen places the Midden
+            // away from Stores so the rendering overlap is minimal.
+            // A future visual-polish ticket can add `Terrain::Midden`.
+            Self::Midden => Terrain::Stores,
         }
     }
 
@@ -325,11 +346,16 @@ pub struct StoredItems {
 
 impl StoredItems {
     /// Maximum number of items this building type can hold.
+    ///
+    /// 176: `Midden` is unlimited — refuse piles can grow indefinitely.
+    /// Cats trash overflow here; items at the midden are still real
+    /// entities (items-are-real invariant) but conceptually go to die.
     pub fn capacity(kind: StructureType) -> usize {
         match kind {
             StructureType::Stores => 50,
             StructureType::Den => 8,
             StructureType::Workshop => 15,
+            StructureType::Midden => usize::MAX,
             _ => 0,
         }
     }
@@ -519,6 +545,7 @@ mod tests {
             StructureType::WardPost,
             StructureType::Wall,
             StructureType::Gate,
+            StructureType::Midden,
         ];
         for kind in types {
             let cost = kind.material_cost();

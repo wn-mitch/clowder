@@ -651,6 +651,14 @@ fn building_sprite(
             let h = w / 80.0 * 96.0;
             (assets.gate_texture.clone(), Vec2::new(w, h))
         }
+        // 176: Midden visually reuses the Stores sprite (refuse pile
+        // looks "container-shaped"). A future visual-polish ticket
+        // can swap in a dedicated midden asset.
+        StructureType::Midden => {
+            let w = 2.0 * world_px;
+            let h = w / 62.0 * 57.0;
+            (assets.stores_texture.clone(), Vec2::new(w, h))
+        }
     }
 }
 

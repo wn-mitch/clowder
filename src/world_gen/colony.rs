@@ -2,7 +2,7 @@ use bevy_ecs::prelude::World;
 use rand::seq::SliceRandom;
 use rand::Rng;
 
-use crate::components::building::{ConstructionSite, Structure, StructureType};
+use crate::components::building::{ConstructionSite, StoredItems, Structure, StructureType};
 use crate::components::identity::Name;
 use crate::components::items::{BuildMaterialItem, Item, ItemKind, ItemLocation};
 use crate::components::identity::LifeStage;
@@ -414,6 +414,29 @@ pub fn spawn_starting_buildings(world: &mut World, colony_site: Position, map: &
         Name("The Den".to_string()),
         den_pos,
         Structure::new(StructureType::Den),
+    ));
+
+    // 176: spawn one Midden per colony at founding. Placed south of
+    // the den (away from the Hearth and the future-Stores eastern
+    // spot) so cats can carry refuse out of the active food loop
+    // without crossing the kitchen / storehouse path. The Midden has
+    // unlimited capacity (`StoredItems::capacity` returns `usize::MAX`
+    // for `StructureType::Midden`) so the Trash-at-midden resolver
+    // can never fail on capacity. Stage-2 ships dormant — the
+    // disposal DSEs aren't registered yet, so the building sits
+    // unused at runtime until balance-tuning lifts the saturation
+    // surfaces.
+    let midden_size = StructureType::Midden.default_size();
+    let midden_pos = Position::new(
+        den_pos.x,
+        (hearth_pos.y + hearth_size.1 + 2).min(map.height - midden_size.1),
+    );
+    stamp_footprint(map, midden_pos, StructureType::Midden.terrain(), midden_size);
+    world.spawn((
+        Name("The Midden".to_string()),
+        midden_pos,
+        Structure::new(StructureType::Midden),
+        StoredItems::default(),
     ));
 
     // Scatter starting food on the ground between den and hearth — the

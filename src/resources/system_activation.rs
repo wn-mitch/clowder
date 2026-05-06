@@ -290,6 +290,41 @@ pub enum Feature {
     /// stream. Defaults to `expected_to_fire_per_soak() => true`
     /// because any healthy colony attempts prey ≥1 per 15-min soak.
     HuntAttempted,
+
+    // --- 176: inventory-disposal Features ---
+    /// 176: a cat completed a `Discarding` plan — dropped a carried
+    /// item on the ground at their current position. Items remain
+    /// real entities (`ItemLocation::OnGround`) so the colony hasn't
+    /// lost the resource — another cat can plan a `PickingUp` to
+    /// retrieve it. Neutral category: a Discarding completion is
+    /// neither a colony win nor a loss, just a state transition.
+    /// Defaults to `expected_to_fire_per_soak() => false` — the
+    /// disposal DSEs ship dormant (default-zero scoring); once
+    /// balance-tuning lifts the saturation surfaces this should fire
+    /// in healthy colonies but the canary stays opt-in until then.
+    ItemDropped,
+    /// 176: a cat completed a `Trashing` plan — carried an item to
+    /// the nearest Midden building and deposited it. Midden capacity
+    /// is unlimited so the deposit never fails on capacity. The
+    /// item entity remains real (stored at the midden); future scope:
+    /// midden items decay faster via the existing rot ecology.
+    /// Neutral / `expected => false` until balance-tuning activates.
+    ItemTrashed,
+    /// 176: a cat completed a `Handing` plan — transferred a carried
+    /// item from their inventory to a target cat's inventory.
+    /// Neutral / `expected => false` until balance-tuning activates.
+    ItemHandedOff,
+    /// 176: an `engage_prey` or `forage_item` resolver couldn't fit
+    /// a fresh catch / forage into the cat's full inventory and
+    /// dropped it on the ground at the action's position instead.
+    /// Items remain real entities (no silent destruction); the
+    /// negative classification is the anomaly signal — chronic
+    /// `OverflowToGround` correlates with full-inventory cats whose
+    /// disposal DSEs aren't clearing the surplus.
+    /// `expected_to_fire_per_soak() => false`: in a healthy Maslow-
+    /// ascending colony this should be near-zero; non-zero counts
+    /// inform the post-soak `verdict` whether disposal is keeping up.
+    OverflowToGround,
 }
 
 impl Feature {
@@ -398,6 +433,13 @@ impl Feature {
         // Ticket 104 — Hide/Freeze DSE infrastructure (dormant in Phase 1).
         Feature::HideFreezeFired,
         Feature::HuntAttempted,
+        // 176: inventory-disposal Features. Stage 2 ships them
+        // dormant via default-zero scoring on the disposal DSEs;
+        // balance-tuning lifts the saturation surfaces in a follow-on.
+        Feature::ItemDropped,
+        Feature::ItemTrashed,
+        Feature::ItemHandedOff,
+        Feature::OverflowToGround,
     ];
 
     /// The valence of this feature.
@@ -468,6 +510,15 @@ impl Feature {
             // dead hunting pipeline.
             Feature::HuntAttempted => Positive,
 
+            // 176: inventory-disposal completions are state-transition
+            // signals — neither a colony win nor a loss, just "the cat
+            // moved an item." Neutral keeps them out of the
+            // positive/negative balance scoring while still surfacing
+            // them in the activation footer for the never-fired canary.
+            Feature::ItemDropped => Neutral,
+            Feature::ItemTrashed => Neutral,
+            Feature::ItemHandedOff => Neutral,
+
             // --- Negative: adverse events, colony loss signals ---
             Feature::DeathStarvation => Negative,
             Feature::DeathInjury => Negative,
@@ -485,6 +536,12 @@ impl Feature {
             Feature::DenRaided => Negative,
             Feature::PreyDenAbandoned => Negative,
             Feature::DepositRejected => Negative,
+            // 176: catches that overflow inventory and end up on the
+            // ground. Anomaly signal — chronic counts mean disposal
+            // DSEs aren't keeping up with intake. Item entities still
+            // exist (items-are-real); only the colony's inventory
+            // efficiency suffers.
+            Feature::OverflowToGround => Negative,
             Feature::DepositFailedNoStore => Negative,
             Feature::PosseCandidateExcludedStarving => Negative,
             Feature::KnowledgeForgotten => Negative,
@@ -688,6 +745,17 @@ impl Feature {
             // Promote when the activation system + lift land and
             // canonical seed-42 produces ≥1 freeze per soak.
             Feature::HideFreezeFired => false,
+            // 176: inventory-disposal Features ship dormant via
+            // default-zero scoring on the disposal DSEs. Promote to
+            // `true` only after balance-tuning lifts the saturation
+            // surfaces so seed-42 produces ≥1 of each per soak.
+            // OverflowToGround stays opt-in — chronic counts are an
+            // anomaly signal, but in a balanced colony it should be
+            // near-zero so the canary would false-fail.
+            Feature::ItemDropped => false,
+            Feature::ItemTrashed => false,
+            Feature::ItemHandedOff => false,
+            Feature::OverflowToGround => false,
             // Every other feature is expected to fire per soak.
             _ => true,
         }
@@ -801,6 +869,10 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::TargetCooldownApplied => "TargetCooldownApplied",
         Feature::HideFreezeFired => "HideFreezeFired",
         Feature::HuntAttempted => "HuntAttempted",
+        Feature::ItemDropped => "ItemDropped",
+        Feature::ItemTrashed => "ItemTrashed",
+        Feature::ItemHandedOff => "ItemHandedOff",
+        Feature::OverflowToGround => "OverflowToGround",
     }
 }
 
@@ -1028,9 +1100,13 @@ mod tests {
         // Ticket 149 added 1 Positive (HuntAttempted) for the
         // discrete-attempt instrumentation that disambiguates per-Hunt-
         // action rate from per-discrete-attempt rate.
+        // Ticket 176 added 1 Negative (OverflowToGround — anomaly
+        // signal when engage_prey/forage_item overflow inventory) +
+        // 3 Neutral (ItemDropped, ItemTrashed, ItemHandedOff) for the
+        // disposal-action surface (Drop / Trash / Handoff).
         assert_eq!(positive, 49);
-        assert_eq!(negative, 20);
-        assert_eq!(neutral, 28);
+        assert_eq!(negative, 21);
+        assert_eq!(neutral, 31);
     }
 
     #[test]
@@ -1100,11 +1176,11 @@ mod tests {
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),
-            20
+            21
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Neutral),
-            28
+            31
         );
     }
 
