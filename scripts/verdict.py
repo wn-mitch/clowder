@@ -49,7 +49,7 @@ SIGNIFICANT_PCT = 30.0
 @dataclass
 class Verdict:
     run: str
-    verdict: str  # pass | concern | fail
+    verdict: str  # pass | unprovable | concern | fail
     canaries: dict[str, Any] = field(default_factory=dict)
     constants_drift_vs_baseline: str = "no-baseline"
     seed_match_vs_baseline: str = "no-baseline"  # match | mismatch | no-baseline
@@ -66,6 +66,11 @@ class Verdict:
     baseline_duration_ticks: int | None = None
     observed_duration_ticks: int | None = None
     duration_drift_pct: float | None = None
+    # Ticket 196: per-Feature fire counts when the caller passed
+    # `--require-feature <name>`. A run that's otherwise pass but has a
+    # required Feature at 0 is "unprovable" — the run cannot evaluate the
+    # hypothesis the caller is asking about.
+    features_fired: dict[str, int] | None = None
     baseline: str | None = None
     commit: str | None = None
     seed: int | None = None
@@ -128,6 +133,81 @@ def run_duration_ticks(events_path: Path) -> int | None:
         return None
     delta = final - start
     return delta if delta > 0 else None
+
+
+def read_last_system_activation(events_path: Path) -> dict[str, Any] | None:
+    """Return the last `SystemActivation` event in `events_path`, or None.
+
+    SystemActivation events emit periodic cumulative counts of every
+    `Feature::*` variant (split into `positive` / `negative` / `neutral`).
+    The last one before the footer is the run-total — the cheapest
+    structured place to read per-Feature counts, since the footer only
+    surfaces aggregates and `never_fired_expected_positives`.
+
+    Reads the file in chunks from the end so we touch only ~16 KB
+    instead of the multi-MB whole file. (No `tac` on macOS.)
+    """
+    try:
+        size = events_path.stat().st_size
+    except OSError:
+        return None
+    if size == 0:
+        return None
+    needle = b'"type":"SystemActivation"'
+    chunk_size = 16 * 1024
+    try:
+        with events_path.open("rb") as f:
+            tail = b""
+            while size > 0:
+                read_at = max(0, size - chunk_size)
+                f.seek(read_at)
+                buf = f.read(size - read_at) + tail
+                size = read_at
+                idx = buf.rfind(needle)
+                if idx == -1:
+                    # Keep at most one full line of overlap so a needle
+                    # split across chunks still matches next iteration.
+                    nl = buf.find(b"\n")
+                    tail = buf[: nl + 1] if 0 <= nl < len(needle) else buf[: len(needle)]
+                    continue
+                line_start = buf.rfind(b"\n", 0, idx) + 1
+                line_end = buf.find(b"\n", idx)
+                if line_end == -1:
+                    line = buf[line_start:]
+                else:
+                    line = buf[line_start:line_end]
+                try:
+                    return json.loads(line.decode("utf-8"))
+                except (UnicodeDecodeError, json.JSONDecodeError):
+                    return None
+    except OSError:
+        return None
+    return None
+
+
+def feature_counts_for(activation: dict[str, Any], names: list[str]) -> dict[str, int]:
+    """Look up `names` in a SystemActivation event's count maps.
+
+    Each Feature lives in exactly one of `positive` / `negative` /
+    `neutral` — the maps don't overlap. A name that doesn't appear in
+    any map returns 0 (Feature might not be classified, or might be
+    legitimately rare and never fired).
+    """
+    out: dict[str, int] = {}
+    sources = (
+        activation.get("positive") or {},
+        activation.get("negative") or {},
+        activation.get("neutral") or {},
+    )
+    for name in names:
+        count = 0
+        for src in sources:
+            value = src.get(name)
+            if isinstance(value, (int, float)):
+                count = int(value)
+                break
+        out[name] = count
+    return out
 
 
 def read_header_field(events_path: Path, jq_expr: str) -> Any:
@@ -397,6 +477,18 @@ def colony_score_drift(baseline: dict[str, Any],
 
 def derive_next_steps(v: Verdict, run_dir: Path, footer: dict[str, Any]) -> list[str]:
     steps: list[str] = []
+    # Ticket 196: unprovable means the run is structurally incapable of
+    # evaluating the hypothesis the caller is asking about. Surface which
+    # required Features fired 0× so the caller knows what to fix
+    # (longer soak, different scenario, etc.).
+    if v.features_fired:
+        zero = [name for name, count in v.features_fired.items() if count == 0]
+        if zero:
+            steps.append(
+                "required Features fired 0×: "
+                + ", ".join(zero)
+                + " — increase soak duration or pick a scenario that exercises them"
+            )
     if v.canaries.get("survival") == "fail":
         causes = list((footer.get("deaths_by_cause") or {}).keys())
         if causes:
@@ -462,6 +554,14 @@ def main(argv: list[str]) -> int:
                          "logs/agent-call-history.jsonl alongside the verdict; lets "
                          "future review surface patterns of what callers were trying "
                          "to figure out. Always pass when invoked by an agent.")
+    ap.add_argument("--require-feature", dest="require_feature", action="append",
+                    default=[], metavar="NAME",
+                    help="Require that Feature::<NAME> fired ≥ 1× in the run. "
+                         "Repeatable. If any required Feature has count 0, the "
+                         "verdict becomes `unprovable` (exit 3) — the run is "
+                         "structurally incapable of evaluating the hypothesis "
+                         "the caller is asking about. The footer-vs-baseline "
+                         "drift readout still computes; it just isn't authoritative.")
     args = ap.parse_args(argv)
 
     run_dir = Path(args.run_dir)
@@ -521,6 +621,19 @@ def main(argv: list[str]) -> int:
     # `derive_next_steps` surface the re-run instruction.
     if seed_status == "mismatch" and overall == "pass":
         overall = "concern"
+
+    features_fired: dict[str, int] | None = None
+    if args.require_feature:
+        activation = read_last_system_activation(events_path)
+        if activation is None:
+            features_fired = {name: 0 for name in args.require_feature}
+        else:
+            features_fired = feature_counts_for(activation, args.require_feature)
+        # `unprovable` only displaces `pass` — fail / concern stay primary
+        # because canary failures and drift are about the run, not about
+        # the run's ability to evaluate a hypothesis.
+        if overall == "pass" and any(c == 0 for c in features_fired.values()):
+            overall = "unprovable"
     commit = read_header_field(events_path, ".commit_hash_short")
     observed_seed = read_header_field(events_path, ".seed")
     observed_seed = observed_seed if isinstance(observed_seed, int) else None
@@ -539,6 +652,7 @@ def main(argv: list[str]) -> int:
         baseline_duration_ticks=baseline_dur,
         observed_duration_ticks=observed_dur,
         duration_drift_pct=duration_drift_pct,
+        features_fired=features_fired,
         baseline=str(baseline_path) if baseline_path else None,
         commit=commit if isinstance(commit, str) else None,
         seed=observed_seed,
@@ -556,7 +670,7 @@ def main(argv: list[str]) -> int:
 
     _emit(v, args.text)
 
-    exit_code = {"pass": 0, "concern": 1, "fail": 2}[overall]
+    exit_code = {"pass": 0, "concern": 1, "fail": 2, "unprovable": 3}[overall]
     append_call_history(tool="verdict", subtool=None, args=args,
                         rationale=args.rationale, exit_code=exit_code,
                         commit=v.commit)
@@ -618,6 +732,11 @@ def _text(v: Verdict) -> str:
                 d = row["delta_pct"]
                 d_s = "  new" if d is None else f"{d:+5.1f}%"
                 lines.append(f"    {row['band']:8s} {d_s}  {axis} ({row['baseline']} → {row['observed']})")
+    if v.features_fired:
+        lines.append("  features required:")
+        for name, count in v.features_fired.items():
+            mark = "✓" if count > 0 else "✗"
+            lines.append(f"    {mark} {name}: {count}")
     if v.next_steps:
         lines.append("  next:")
         for s in v.next_steps:

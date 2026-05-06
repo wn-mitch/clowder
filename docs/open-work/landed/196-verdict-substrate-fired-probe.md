@@ -1,7 +1,7 @@
 ---
 id: 196
 title: verdict.py substrate-fired-≥1× probe (194 P7)
-status: ready
+status: done
 cluster: process-discipline
 added: 2026-05-06
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-06
 ---
 
 ## Why
@@ -76,3 +76,4 @@ the verdict suggests *"increase soak duration to ≥ N ticks"* or
 - 2026-05-06: opened from 194's closeout. Cluster
   `process-discipline`. Lightweight extension to verdict.py /
   sweep-stats.py — additive flag, no breaking changes.
+- 2026-05-06: Implemented as additive --require-feature flag on verdict.py + sweep_stats.py. Reads last SystemActivation event's per-Feature count via portable in-Python tail-chunk reader (no tac on macOS). New verdict band 'unprovable' (exit 3); per-seed rollup with unprovable_seeds count for sweeps. Integration test against logs/sweep-189-pre-178-mini correctly reports 5/5 unprovable for ItemDropped.

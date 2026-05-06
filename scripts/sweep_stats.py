@@ -45,6 +45,13 @@ from scipy import stats  # type: ignore[import-not-found]
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+# Reuse the verdict.py reader so the two scripts agree on what counts
+# as "the run-total Feature count."
+from verdict import (  # noqa: E402
+    feature_counts_for,
+    read_last_system_activation,
+)
 
 NOISE_PCT = 10.0
 SIGNIFICANT_PCT = 30.0
@@ -67,6 +74,13 @@ class SweepReport:
     seeds: list[int] = field(default_factory=list)
     baseline_seeds: list[int] | None = None
     seed_sets_match: bool | None = None
+    # Ticket 196: per-Feature firing across the sweep. Populated only
+    # when the caller passed `--require-feature`. Each row is one
+    # required Feature's per-seed fire count plus a roll-up. A Feature
+    # with `unprovable_seeds == n` (zero everywhere) flags the sweep as
+    # structurally incapable of evaluating any hypothesis on it.
+    features_fired: list[dict[str, Any]] | None = None
+    unprovable_seeds: int | None = None
 
 
 # ── reading ─────────────────────────────────────────────────────────────────
@@ -245,7 +259,49 @@ def emit_charts(sweep_name: str, columns: dict[str, list[float]]) -> Path | None
 
 # ── main ───────────────────────────────────────────────────────────────────
 
-def build_report(sweep_dir: Path, baseline_dir: Path | None) -> SweepReport:
+def build_feature_summary(
+    files: list[Path],
+    seeds: list[int],
+    required: list[str],
+) -> tuple[list[dict[str, Any]], int]:
+    """Per-Feature roll-up across a sweep.
+
+    Returns (rows, unprovable_seeds). `unprovable_seeds` is the count of
+    seeds where AT LEAST ONE required Feature fired 0× — the sweep size
+    that cannot evaluate the hypothesis.
+    """
+    if not required:
+        return ([], 0)
+    per_seed_counts: list[dict[str, int]] = []
+    for path in files:
+        activation = read_last_system_activation(path)
+        if activation is None:
+            per_seed_counts.append({name: 0 for name in required})
+            continue
+        per_seed_counts.append(feature_counts_for(activation, required))
+
+    rows: list[dict[str, Any]] = []
+    for name in required:
+        per_seed = [counts[name] for counts in per_seed_counts]
+        zero_seeds = sum(1 for c in per_seed if c == 0)
+        rows.append({
+            "feature": name,
+            "total": sum(per_seed),
+            "min": min(per_seed) if per_seed else 0,
+            "max": max(per_seed) if per_seed else 0,
+            "zero_seeds": zero_seeds,
+            "n": len(per_seed),
+        })
+
+    unprovable_seeds = sum(
+        1 for counts in per_seed_counts
+        if any(counts[name] == 0 for name in required)
+    )
+    return (rows, unprovable_seeds)
+
+
+def build_report(sweep_dir: Path, baseline_dir: Path | None,
+                 require_features: list[str] | None = None) -> SweepReport:
     files = find_events_files(sweep_dir)
     if not files:
         sys.stderr.write(f"sweep-stats: no events.jsonl found under {sweep_dir}\n")
@@ -301,6 +357,13 @@ def build_report(sweep_dir: Path, baseline_dir: Path | None) -> SweepReport:
     if baseline_columns is not None:
         rows.sort(key=lambda r: -abs(r["vs_baseline"]["delta_pct"] or 0))
 
+    feature_rows: list[dict[str, Any]] | None = None
+    unprovable_seeds: int | None = None
+    if require_features:
+        feature_rows, unprovable_seeds = build_feature_summary(
+            files, seeds, require_features
+        )
+
     return SweepReport(
         sweep=str(sweep_dir),
         n=len(footers),
@@ -310,6 +373,8 @@ def build_report(sweep_dir: Path, baseline_dir: Path | None) -> SweepReport:
         seeds=seeds,
         baseline_seeds=baseline_seeds,
         seed_sets_match=seed_sets_match,
+        features_fired=feature_rows,
+        unprovable_seeds=unprovable_seeds,
     )
 
 
@@ -321,6 +386,14 @@ def render_text(r: SweepReport) -> str:
         lines.append(f"  vs baseline: {r.vs_baseline}")
         if r.seed_sets_match is False:
             lines.append(f"  ⚠ seed mismatch — baseline={r.baseline_seeds}; deltas are confounded")
+    if r.features_fired:
+        lines.append(f"  features required ({r.unprovable_seeds}/{r.n} unprovable seeds):")
+        for row in r.features_fired:
+            mark = "✓" if row["zero_seeds"] == 0 else "✗"
+            lines.append(
+                f"    {mark} {row['feature']}: total={row['total']} "
+                f"min={row['min']} max={row['max']} zero_seeds={row['zero_seeds']}/{row['n']}"
+            )
     bands: dict[str, list[dict[str, Any]]] = {
         "significant": [], "drift": [], "noise": [], "inconclusive": [],
     }
@@ -361,11 +434,18 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--vs", default=None, help="Baseline sweep directory for two-sample comparison")
     ap.add_argument("--text", action="store_true", help="Human-readable output")
     ap.add_argument("--charts", action="store_true", help="Emit matplotlib boxplots under logs/charts/")
+    ap.add_argument("--require-feature", dest="require_feature", action="append",
+                    default=[], metavar="NAME",
+                    help="Per-seed Feature::<NAME> fire-count rollup. Repeatable. "
+                         "Reports `unprovable_seeds` — the count of seeds where any "
+                         "required Feature fired 0×. A sweep with `unprovable_seeds == n` "
+                         "is structurally incapable of evaluating the hypothesis.")
     args = ap.parse_args(argv)
 
     sweep_dir = Path(args.sweep_dir)
     baseline_dir = Path(args.vs) if args.vs else None
-    report = build_report(sweep_dir, baseline_dir)
+    report = build_report(sweep_dir, baseline_dir,
+                          require_features=args.require_feature)
 
     if args.charts:
         files = find_events_files(sweep_dir)
