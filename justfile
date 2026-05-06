@@ -427,6 +427,16 @@ open-work-index:
 land *ARGS:
     uv run scripts/land_ticket.py {{ARGS}}
 
+# Open a new ticket: pick the next id, instantiate _template.md (or
+# _template_bugfix.md with --bugfix), fill in id/title/added/cluster/
+# blocked-by, and regenerate the index.
+#
+#   just open-ticket "<title>"
+#   just open-ticket "<title>" --bugfix --cluster process-discipline
+#   just open-ticket "<title>" --blocked-by 195,196
+open-ticket *ARGS:
+    uv run scripts/create_ticket.py {{ARGS}}
+
 # Render ticket dependency tree (blocked-by edges). Pass flags through.
 #
 # Examples:
