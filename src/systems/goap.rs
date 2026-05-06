@@ -4635,21 +4635,42 @@ fn dispatch_step_action(
             .result
         }
 
-        // 176: inventory-disposal resolvers.
+        // 176 stage 3: inventory-disposal resolver dispatch.
         //
-        // Stage 1 substrate-stub: each arm returns Fail so the GOAP
-        // plan never advances through these steps until the real
-        // resolvers wire in stage 2. The disposal DSEs ship with
-        // default-zero scoring so these arms shouldn't be reached at
-        // runtime; the Fail() guards against an inadvertently-elected
-        // disposition completing without its real-world effect.
-        GoapActionKind::DropItem
-        | GoapActionKind::TrashItemAtMidden
+        // Drop is fully wired — needs only inventory + pos + commands,
+        // all of which are available on the dispatch surface. The
+        // resolver removes one item-slot from inventory and spawns an
+        // `Item` entity at the cat's position with `OnGround`. Feature
+        // emission goes through `record_if_witnessed` per the
+        // step-resolver contract.
+        //
+        // Trash/Handoff/PickUp need additional queries (Midden's
+        // `StoredItems`, target cat's `Inventory`, ground `Item`)
+        // that aren't currently threaded through this dispatch
+        // function's signature. The disposal DSEs ship default-zero
+        // (Linear slope=0, intercept=0) so these arms aren't reached
+        // at runtime; wiring them requires plumbing the queries in,
+        // tracked as the immediate-follow-on under ticket 176's stage
+        // 4 (alongside the saturation surfaces and chronic-full
+        // marker).
+        GoapActionKind::DropItem => {
+            let outcome = crate::steps::disposition::resolve_drop_item(
+                inventory, *pos, commands,
+            );
+            outcome.record_if_witnessed(
+                narr.activation.as_deref_mut(),
+                crate::resources::system_activation::Feature::ItemDropped,
+            );
+            outcome.result
+        }
+        GoapActionKind::TrashItemAtMidden
         | GoapActionKind::HandoffItem
         | GoapActionKind::PickUpItemFromGround => {
             crate::steps::StepResult::Fail(format!(
-                "176 stage-1 stub: {action_kind:?} has no resolver yet — \
-                disposal DSEs should be default-zero so this is unreachable"
+                "176 stage 3: {action_kind:?} dispatch wiring deferred — \
+                resolver exists in src/steps/disposition/ but needs \
+                additional queries threaded through resolve_disposition_action_kind. \
+                Disposal DSEs are default-zero so unreachable at runtime."
             ))
         }
     }

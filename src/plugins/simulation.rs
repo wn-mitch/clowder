@@ -70,6 +70,18 @@ pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConsta
     registry.cat_dses.push(dses::colony_cleanse_dse());
     registry.cat_dses.push(dses::harvest_dse());
     registry.cat_dses.push(dses::commune_dse());
+    // 176: inventory-disposal DSEs ship dormant via default-zero
+    // scoring (Linear slope=0, intercept=0). Registration plumbs
+    // them through L2 / L3 / planner so the substrate is exercised
+    // by the existing canaries (categorization, never-fired, etc.)
+    // while the elections stay zero. Balance-tuning replaces the
+    // zero curves with real overflow / colony-food considerations
+    // in a follow-on once `ColonyStoresChronicallyFull` and the
+    // saturation surfaces land.
+    registry.cat_dses.push(dses::discarding_dse());
+    registry.cat_dses.push(dses::trashing_dse());
+    registry.cat_dses.push(dses::handing_dse());
+    registry.cat_dses.push(dses::picking_up_dse());
     registry.fox_dses.push(dses::fox_patrolling_dse(scoring));
     registry.fox_dses.push(dses::fox_hunting_dse(scoring));
     registry.fox_dses.push(dses::fox_raiding_dse());
