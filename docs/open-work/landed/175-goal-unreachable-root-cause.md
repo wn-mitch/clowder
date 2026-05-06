@@ -1,7 +1,7 @@
 ---
 id: 175
 title: GoalUnreachable plan-failure root-cause investigation (172 follow-on)
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-05
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: da92888b
+landed-on: 2026-05-05
 ---
 
 ## Why
@@ -159,6 +159,48 @@ Phase 3 (code audit):
   `never_fired_expected_positives == []`; constants drift = none.
 - Continuity canaries unchanged or improved.
 
+## Resolution
+
+The investigation surfaced two coupled defects rather than the
+single PlannerState-vs-marker desync the ticket's audit table
+guessed at. Both lived at the planner-veto / inventory-projection
+boundary, and the fix took three coordinated changes (commit
+`da92888b`):
+
+1. **GoalUnreachable veto removal.** Six action chains
+   (Building.GatherMaterials, Herbalism.GatherHerb base + sub-
+   actions, Cooking.RetrieveRawFood) carried a planner-side
+   `CarryingIs(Carrying::Nothing)` veto. A cat carrying *any*
+   leftover item couldn't plan a Cook chain even when the kitchen
+   was functional and Stores held raw food. The vetoes are now
+   removed; the runtime gates inventory capacity via the typed
+   transfer primitive instead.
+
+2. **Items-are-real refactor at the deposit boundary.** The pre-
+   fix `resolve_deposit_at_stores` removed ALL food from inventory
+   up-front, then bailed on the first capacity miss — every item
+   past the miss was silently destroyed (3028 per soak on seed-42).
+   New `transfer_item_stores_to_inventory` primitive enforces the
+   ordering invariant: Inventory.add succeeds *before* Stores.remove
+   + entity.despawn. Three retrieve resolvers migrate to the typed
+   primitive. `scripts/check_item_transfers.sh` lints any code that
+   pairs `stored.remove` with `entity.despawn` outside the primitive
+   (allowlisted: `eat_at_stores`, `prey.rs` raids — both genuine
+   consumption events, not transfers).
+
+3. **L2 carry-affinity scaffolding** (default-off at 1.0). New
+   `Carrying::from_inventory()` centralizes the multi-slot →
+   coarse-`Carrying` projection used by both planner-side
+   `build_planner_state` and L2 scoring's `apply_carry_affinity`.
+   Default `carry_affinity_bonus = 1.0` disables the bias; balance-
+   tuning is deferred until 176's substrate stabilizes.
+
+The structural fix exposed a downstream Maslow-ladder defect (cats
+have no AI-side response to held overflow; hunt/forage L2 doesn't
+saturate on colony food security; no signal for "build more
+Stores"). That defect is the subject of follow-on ticket 176, which
+this ticket unblocks.
+
 ## Log
 
 - 2026-05-05: opened by ticket 172's closeout. The diagnostic
@@ -166,3 +208,7 @@ Phase 3 (code audit):
   showed every failure is `GoalUnreachable`; this ticket owns the
   root-cause. 173 was parked because the histogram rejected its
   capability-marker premise.
+- 2026-05-05: landed at `da92888b`. Investigation surfaced
+  planner-veto + items-are-real coupling; fix lands all three
+  coordinated changes. Opens follow-on 176 for the Maslow-
+  ladder defects the silent-loss path was hiding.
