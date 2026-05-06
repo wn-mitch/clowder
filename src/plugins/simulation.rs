@@ -16,9 +16,9 @@ use crate::systems;
 pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConstants) {
     use crate::ai::dses;
     registry.cat_dses.push(dses::eat_dse());
-    registry.cat_dses.push(dses::hunt_dse());
+    registry.cat_dses.push(dses::hunt_dse(scoring));
     registry.target_taking_dses.push(dses::hunt_target_dse());
-    registry.cat_dses.push(dses::forage_dse());
+    registry.cat_dses.push(dses::forage_dse(scoring));
     registry.cat_dses.push(dses::cook_dse());
     registry.cat_dses.push(dses::flee_dse(scoring));
     registry.cat_dses.push(dses::fight_dse(scoring));

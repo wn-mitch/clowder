@@ -1786,6 +1786,19 @@ pub struct ScoringConstants {
     /// stage 4 substrate's behavior is observed empirically.
     #[serde(default = "default_build_chronic_full_weight")]
     pub build_chronic_full_weight: f32,
+    /// 176: weight on the `colony_food_security` axis in the Hunt
+    /// DSE composition. Default 0.0 — the axis is wired but inert.
+    /// Balance-tuning lifts the weight so a well-fed colony
+    /// suppresses hunting (Maslow-tier-1 satisfied), letting L3
+    /// bandwidth flow to higher-tier DSEs (groom / mate / mentor).
+    #[serde(default = "default_hunt_food_security_weight")]
+    pub hunt_food_security_weight: f32,
+    /// 176: weight on the `colony_food_security` axis in the Forage
+    /// DSE composition. Default 0.0 — sibling to
+    /// `hunt_food_security_weight`. Forage suppresses by the same
+    /// signal because it's a Maslow-tier-1 acquisition peer.
+    #[serde(default = "default_forage_food_security_weight")]
+    pub forage_food_security_weight: f32,
     pub gate_timid_fight_threshold: f32,
     pub gate_shy_socialize_threshold: f32,
     pub gate_reckless_flee_threshold: f32,
@@ -1998,6 +2011,8 @@ impl Default for ScoringConstants {
             chronicity_window_ticks: default_chronicity_window_ticks(),
             chronicity_threshold: default_chronicity_threshold(),
             build_chronic_full_weight: default_build_chronic_full_weight(),
+            hunt_food_security_weight: default_hunt_food_security_weight(),
+            forage_food_security_weight: default_forage_food_security_weight(),
             gate_timid_fight_threshold: 0.1,
             gate_shy_socialize_threshold: 0.15,
             gate_reckless_flee_threshold: 0.9,
@@ -2956,6 +2971,20 @@ fn default_chronicity_threshold() -> f32 {
 /// `colony_stores_chronically_full` axis. Ships dormant at 0.0 —
 /// balance-tuning lifts after the substrate stabilizes.
 fn default_build_chronic_full_weight() -> f32 {
+    0.0
+}
+
+/// 176: Hunt DSE saturation weight on the `colony_food_security`
+/// axis. Ships dormant at 0.0 — see
+/// `ScoringConstants::hunt_food_security_weight`.
+fn default_hunt_food_security_weight() -> f32 {
+    0.0
+}
+
+/// 176: Forage DSE saturation weight on the `colony_food_security`
+/// axis. Ships dormant at 0.0 — see
+/// `ScoringConstants::forage_food_security_weight`.
+fn default_forage_food_security_weight() -> f32 {
     0.0
 }
 

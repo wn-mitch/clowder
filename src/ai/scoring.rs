@@ -525,6 +525,18 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
     m.insert("hunger_urgency", (1.0 - ctx.needs.hunger).clamp(0.0, 1.0));
     // Food-stores scarcity (deficit fraction in `[0, 1]`).
     m.insert("food_scarcity", (1.0 - ctx.food_fraction).clamp(0.0, 1.0));
+    // 176: colony food security — saturation form. High when the
+    // colony's stores are well-stocked AND the cat's own hunger is
+    // satisfied (Maslow-tier-1 secure). Stage 5 ships a simple
+    // `min(food_fraction, hunger_satisfaction)` formulation; balance-
+    // tuning can replace with starvation-recency-aware variants.
+    // Consumed by Hunt / Forage DSEs as a saturation axis when their
+    // weights are lifted from 0.0.
+    let hunger_satisfaction = ctx.needs.hunger.clamp(0.0, 1.0);
+    m.insert(
+        "colony_food_security",
+        ctx.food_fraction.clamp(0.0, 1.0).min(hunger_satisfaction),
+    );
     // Safety deficit — Flee axis. Safety is a satisfaction scalar; the
     // DSE wants urgency form so the Logistic midpoint semantics line
     // up with `flee_safety_threshold`.
@@ -2340,8 +2352,8 @@ mod tests {
             let scoring = crate::resources::sim_constants::ScoringConstants::default();
             let mut r = DseRegistry::new();
             r.cat_dses.push(crate::ai::dses::eat_dse());
-            r.cat_dses.push(crate::ai::dses::hunt_dse());
-            r.cat_dses.push(crate::ai::dses::forage_dse());
+            r.cat_dses.push(crate::ai::dses::hunt_dse(&scoring));
+            r.cat_dses.push(crate::ai::dses::forage_dse(&scoring));
             r.cat_dses.push(crate::ai::dses::cook_dse());
             r.cat_dses.push(crate::ai::dses::flee_dse(&scoring));
             r.cat_dses.push(crate::ai::dses::fight_dse(&scoring));
