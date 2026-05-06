@@ -9,7 +9,7 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: pending
+landed-at: 55b6e930
 landed-on: 2026-05-06
 ---
 
