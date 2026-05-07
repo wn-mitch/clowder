@@ -28,6 +28,45 @@ fn all_scenarios_smoke_run_one_tick() {
     }
 }
 
+/// Ticket 198 — substrate-fires landing gate. Every scenario whose
+/// `expected_features` is non-empty must actually emit each declared
+/// `Feature::*` at least once during its default-tick run. A scenario
+/// that lies about which Features it exercises masks the failure mode
+/// the gate exists to prevent (curve-lifted-without-resolver-wiring,
+/// the 185-shape regression).
+///
+/// Empty `expected_features: &[]` opts out — appropriate for L2/L3
+/// election-triage scenarios that don't reach Feature emission, and
+/// for scenarios exercising rare-tier outcomes whose absence is the
+/// contract.
+#[test]
+fn declared_expected_features_all_fire() {
+    let mut failures: Vec<String> = Vec::new();
+    for scenario in scenarios::ALL {
+        if scenario.expected_features.is_empty() {
+            continue;
+        }
+        let report = runner::run(scenario, None, None, 42);
+        for &feature in scenario.expected_features {
+            let count = report.feature_counts.get(feature).copied().unwrap_or(0);
+            if count == 0 {
+                failures.push(format!(
+                    "scenario `{}` declared Feature::{} but it fired 0× across {} ticks",
+                    scenario.name,
+                    feature,
+                    report.ticks.len(),
+                ));
+            }
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "{} scenario(s) failed the substrate-fires gate:\n  - {}",
+        failures.len(),
+        failures.join("\n  - "),
+    );
+}
+
 #[test]
 fn kitten_cry_basic_emits_focal_trace_with_caretake_in_ranked_list() {
     let report = runner::run(&kitten_cry::SCENARIO, None, None, 42);

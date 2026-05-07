@@ -17,8 +17,8 @@ _Last generated: 2026-05-06._
 | In progress | 8 |
 | Ready | 55 |
 | Parked | 7 |
-| Blocked | 18 |
-| **Open total** | **88** |
+| Blocked | 19 |
+| **Open total** | **89** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -90,8 +90,8 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[190](docs/open-work/tickets/190-build-chronic-full-weight-tune.md)** — Tune build_chronic_full_weight (179 follow-on) — _[balance] · added 2026-05-06_
 - **[191](docs/open-work/tickets/191-picking-up-scavenging-tune.md)** — Tune PickingUp scavenge_urgency curve + add scenario test (185 follow-on) — _[balance] · added 2026-05-06_
 - **[192](docs/open-work/tickets/192-handing-target-picker-l2.md)** — handing_target_dse — L2 multi-axis recipient picker (188 follow-on) — _[ai-substrate] · added 2026-05-06_
-- **[198](docs/open-work/tickets/198-substrate-fires-landing-gate.md)** — Substrate-fires landing gate — DSE curve-non-zero requires sibling scenario (194 P1) — _[process-discipline] · added 2026-05-06_
 - **[200](docs/open-work/tickets/200-land-plannerzonemidden-building-singleton-zone-for-trashing.md)** — Land PlannerZone::Midden — building-singleton zone for Trashing — _[process-discipline] · added 2026-05-06_
+- **[202](docs/open-work/tickets/202-static-cross-reference-dse-scenario-coverage-follow-on-to-198.md)** — Static cross-reference DSE → scenario coverage (follow-on to 198) — _[process-discipline] · added 2026-05-06_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _added 2026-04-28_
 
 ## Parked (7)
@@ -104,7 +104,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[173](docs/open-work/tickets/173-crafting-split-capability-markers.md)** — IsHerbalist / IsSpiritualist / HasCorruptionNearby capability markers (155 follow-on) — _[ai-substrate] · parked 2026-05-05 · added 2026-05-05_
 - **[199](docs/open-work/tickets/199-pipeline-walk-skill.md)** — Hunt / production / consumption pipeline-walk skill (194 P4) — _[process-discipline] · parked 2026-05-06 · added 2026-05-06_
 
-## Blocked (18)
+## Blocked (19)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _blocked-by 007, 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _blocked-by 016 · added 2026-04-22_
@@ -124,18 +124,20 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[142](docs/open-work/tickets/142-intraspecies-conflict-freeze.md)** — IntraspeciesConflictResponseFreeze — hold-position low-body-posture social valence — _[ai-substrate] · blocked-by 109 · added 2026-05-02_
 - **[143](docs/open-work/tickets/143-intraspecies-conflict-fight.md)** — IntraspeciesConflictResponseFight — territorial combat valence (same-species) — _[ai-substrate] · blocked-by 109 · added 2026-05-02_
 - **[144](docs/open-work/tickets/144-intraspecies-conflict-fawn.md)** — IntraspeciesConflictResponseFawn — appeasement valence (belly-up, slow blink) — _[ai-substrate] · blocked-by 109, 145 · added 2026-05-02_
+- **[203](docs/open-work/tickets/203-criticalhealth-hunt-to-starvation-reproducer.md)** — CriticalHealth interrupt drives hunt-to-starvation plan churn — concrete reproducer for ticket 119 — _[ai-substrate] · blocked-by 119 · added 2026-05-06_
 
 ## Pre-existing (2)
 
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (132)
+## Landed archive (133)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (67)
+### 2026-05 (68)
 
+- **[198](docs/open-work/landed/198-substrate-fires-landing-gate.md)** — Substrate-fires landing gate — DSE curve-non-zero requires sibling scenario (194 P1) _(2026-05-06)_
 - **[197](docs/open-work/landed/197-explore-agent-prompt-template.md)** — Explore-agent prompt template (194 P8, subsumes P6) _(2026-05-06)_
 - **[196](docs/open-work/landed/196-verdict-substrate-fired-probe.md)** — verdict.py substrate-fired-≥1× probe (194 P7) _(2026-05-06)_
 - **[195](docs/open-work/landed/195-plan-template-stub-lint.md)** — Plan-template stub-comment lint extension (194 P2) _(2026-05-06)_

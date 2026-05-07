@@ -1,0 +1,62 @@
+---
+id: 202
+title: Static cross-reference DSE → scenario coverage (follow-on to 198)
+status: ready
+cluster: process-discipline
+added: 2026-05-06
+parked: null
+blocked-by: []
+supersedes: []
+related-systems: []
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+198 landed the runtime substrate-fires gate — `cargo test
+declared_expected_features_all_fire` runs every scenario whose
+`expected_features` is non-empty and asserts each declared Feature
+actually fires ≥ 1×. That catches "scenario declares X but doesn't
+exercise it" but NOT "non-zero DSE has no scenario coverage at all."
+
+The static cross-reference fills the gap: for every non-zero DSE
+registered in `populate_dse_registry`, require at least one scenario
+in `clowder::scenarios::ALL` whose `expected_features` covers a
+Feature emitted by that DSE.
+
+## Scope
+
+- A registry mapping `DseId` → `&[Feature]` (the Features the DSE's
+  resolver writes through `record_if_witnessed`). Living somewhere
+  near `populate_dse_registry` so the data has one home.
+- A new test (or a `just check` step) that walks every non-default-zero
+  DSE, looks up its expected Features, and asserts the union covers
+  at least one scenario's `expected_features`.
+- Forward-looking scope per 198's design: the gate fires only on DSEs
+  whose curve was modified in the current diff (`git diff
+  src/ai/dses/`). Existing non-zero DSEs without coverage pass
+  silently.
+
+## Out of scope
+
+- Retro-adding scenarios for every existing non-zero DSE. Same scope
+  reduction 198 took.
+- DSE → Feature mapping for resolvers that emit Features by branch
+  (e.g. CombatResolver emits CombatResolved on hit, RemedyApplied on
+  herb cure). Capture only the *primary* Feature for each DSE.
+
+## Verification
+
+- `cargo test` passes with the new static cross-reference test.
+- Constructed test: in a scratch branch, change a non-zero DSE's
+  curve and modify the diff to drop its scenario coverage; assert the
+  lint fails.
+- No soak required.
+
+## Log
+
+- 2026-05-06: opened from 198's closeout. The runtime gate (198) and
+  the static cross-reference (this) are complementary — one catches
+  scenario lies, the other catches DSE coverage gaps.

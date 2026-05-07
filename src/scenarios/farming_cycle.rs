@@ -23,6 +23,7 @@ pub static SCENARIO: Scenario = Scenario {
     default_focal: "Furrow",
     default_ticks: 60,
     setup,
+    expected_features: &[],
 };
 
 fn setup(world: &mut World, seed: u64) {

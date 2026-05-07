@@ -101,6 +101,13 @@ pub static SCENARIO: Scenario = Scenario {
     // PickUp win across seed-42 noise.
     default_ticks: 16,
     setup: setup_picking_up_scavenging,
+    // Ticket 198 — substrate-fires gate. PickingUp's resolver writes
+    // `ItemRetrieved` on successful pickup; this scenario empirically
+    // produces 3 retrievals across seed-42's 16-tick budget. The gate
+    // catches a future regression where the curve / eligibility / plan
+    // path stays green at the L2/L3 layer but the resolver no longer
+    // hits `record_if_witnessed`.
+    expected_features: &["ItemRetrieved"],
 };
 
 #[cfg(test)]

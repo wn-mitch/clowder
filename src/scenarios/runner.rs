@@ -112,6 +112,12 @@ pub struct ScenarioReport {
     /// retrieved). Distinguishes "kill landed in stores" from "kill went
     /// to ground via the inventory-full overflow path".
     pub final_ground_item_count: usize,
+    /// Ticket 198 — `SystemActivation.counts` snapshot at end-of-run,
+    /// keyed by Feature name (not the enum, so the assertion path can
+    /// pattern-match on `Scenario.expected_features`'s string slice
+    /// without re-importing the enum). Empty map means SystemActivation
+    /// recorded nothing; missing key means the Feature didn't fire.
+    pub feature_counts: std::collections::BTreeMap<String, u64>,
 }
 
 impl ScenarioReport {
@@ -207,6 +213,20 @@ pub fn run(
         }
     }
 
+    // Ticket 198 — SystemActivation snapshot for the substrate-fires gate.
+    let feature_counts: std::collections::BTreeMap<String, u64> = {
+        use crate::resources::system_activation::{feature_name, SystemActivation};
+        let world = app.world();
+        match world.get_resource::<SystemActivation>() {
+            Some(activation) => activation
+                .counts
+                .iter()
+                .map(|(f, &c)| (feature_name(*f).to_string(), c))
+                .collect(),
+            None => std::collections::BTreeMap::new(),
+        }
+    };
+
     ScenarioReport {
         scenario_name: scenario.name,
         focal,
@@ -217,6 +237,7 @@ pub fn run(
         final_focal_inventory_count,
         final_prey_count,
         final_ground_item_count,
+        feature_counts,
     }
 }
 

@@ -34,6 +34,7 @@ pub static SCENARIO: Scenario = Scenario {
     default_focal: "Stoat",
     default_ticks: 200,
     setup,
+    expected_features: &[],
 };
 
 /// Sister scenario: same world as `hunt_deposit_chain` but the
@@ -49,6 +50,7 @@ pub static SCENARIO_INJURED: Scenario = Scenario {
     default_focal: "Stoat",
     default_ticks: 200,
     setup: setup_injured,
+    expected_features: &[],
 };
 
 fn setup_injured(world: &mut World, seed: u64) {

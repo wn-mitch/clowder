@@ -23,6 +23,7 @@ pub static SCENARIO: Scenario = Scenario {
     // hysteresis so we can see "Mallow locks Caretake while others pivot".
     default_ticks: 5,
     setup,
+    expected_features: &[],
 };
 
 fn setup(world: &mut World, seed: u64) {

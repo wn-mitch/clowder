@@ -118,6 +118,7 @@ static TRASH_SCENARIO: Scenario = Scenario {
     default_focal: "TrashFocal",
     default_ticks: 1,
     setup: setup_trash,
+    expected_features: &[],
 };
 
 #[test]
@@ -205,6 +206,7 @@ static PICK_UP_SCENARIO: Scenario = Scenario {
     default_focal: "PickUpFocal",
     default_ticks: 1,
     setup: setup_pick_up,
+    expected_features: &[],
 };
 
 #[test]
@@ -309,6 +311,7 @@ static HANDOFF_SCENARIO: Scenario = Scenario {
     default_focal: "HandoffFocal",
     default_ticks: 1,
     setup: setup_handoff,
+    expected_features: &[],
 };
 
 #[test]

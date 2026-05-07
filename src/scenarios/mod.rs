@@ -62,6 +62,16 @@ pub struct Scenario {
     /// Populate the world: terrain, resources, entities. Replaces
     /// `build_new_world` via the `WorldSetup` resource.
     pub setup: fn(&mut World, u64),
+    /// Ticket 198 — substrate-fires landing gate. `Feature::*` variants
+    /// (by name) the scenario expects to emit ≥ 1× during the run. The
+    /// `cargo test scenario_feature_assertions` integration test runs
+    /// every scenario with a non-empty `expected_features` and asserts
+    /// each declared Feature actually fired in `SystemActivation.counts`.
+    /// Empty `&[]` opts out — legitimate for scenarios whose only
+    /// purpose is L2/L3 election triage (no Feature emission expected).
+    /// Scenarios exercising rare-tier outcomes (legend events, etc.)
+    /// also opt out — the absence is the contract.
+    pub expected_features: &'static [&'static str],
 }
 
 /// All scenarios known to the binary and the test suite. Adding a new

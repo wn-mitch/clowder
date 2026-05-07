@@ -32,6 +32,7 @@ pub static SCENARIO: Scenario = Scenario {
     default_focal: "Sage",
     default_ticks: 40,
     setup,
+    expected_features: &[],
 };
 
 fn setup(world: &mut World, seed: u64) {

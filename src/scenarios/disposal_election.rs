@@ -128,6 +128,7 @@ pub static SCENARIO_TRASHING: Scenario = Scenario {
     default_focal: "Cinder",
     default_ticks: 5,
     setup: setup_trashing,
+    expected_features: &[],
 };
 
 // ----------------------------------------------------------------------
@@ -151,6 +152,7 @@ pub static SCENARIO_DISCARDING: Scenario = Scenario {
     default_focal: "Cinder",
     default_ticks: 5,
     setup: setup_discarding,
+    expected_features: &[],
 };
 
 // ----------------------------------------------------------------------
@@ -172,6 +174,7 @@ pub static SCENARIO_IDLE: Scenario = Scenario {
     default_focal: "Cinder",
     default_ticks: 5,
     setup: setup_idle,
+    expected_features: &[],
 };
 
 // ----------------------------------------------------------------------
@@ -195,6 +198,7 @@ pub static SCENARIO_DISCARDING_BLOCKED: Scenario = Scenario {
     default_focal: "Cinder",
     default_ticks: 5,
     setup: setup_discarding_blocked,
+    expected_features: &[],
 };
 
 #[cfg(test)]

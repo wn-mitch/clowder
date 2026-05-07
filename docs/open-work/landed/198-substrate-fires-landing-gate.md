@@ -1,7 +1,7 @@
 ---
 id: 198
 title: Substrate-fires landing gate — DSE curve-non-zero requires sibling scenario (194 P1)
-status: ready
+status: done
 cluster: process-discipline
 added: 2026-05-06
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-06
 ---
 
 ## Why
@@ -106,3 +106,4 @@ included) are necessary but insufficient.
   harness, scenario metadata. The 185 closeout cost a full
   wave's worth of follow-up; this ticket exists to make that
   failure mode hard to repeat.
+- 2026-05-06: Scenario.expected_features field + runner.rs SystemActivation capture + tests/scenarios.rs gate. picking_up_scavenging opted-in declaring ItemRetrieved. Static cross-reference (DSE→scenario coverage) deferred to ticket 202.
