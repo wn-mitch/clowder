@@ -9,7 +9,7 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
+landed-at: 747d2b37
 landed-on: 2026-05-07
 ---
 
@@ -84,4 +84,5 @@ This is a trace-surface fix, not a balance change. Scoring code is untouched. Th
 ## Log
 
 - 2026-05-07 — Opened. Discovered while diagnosing Mallow-trace silent-load symptom (plan `the-focal-cat-trace-steady-pond.md`); user reported missing L1 markers on a working `bced533` Clover trace. Five maps named explicitly above.
-- 2026-05-07 — Landed. Twelve `InfluenceMap` walks emitting via `L1Maps` `SystemParam` bundle + `emit_map!` macro. Phase 2D registry-walk refactor opened as ticket 207; trace_emit.rs in-source pointer retargeted at 207. Verification (`just soak-trace 42 Simba` + `/logq trace --layer L1` + `just verdict` + `just frame-diff`) deferred to a post-commit step so the trace header records the landed sha. `landed-at` sha to be backfilled in a follow-up `docs:` commit.
+- 2026-05-07 — Landed at `747d2b37`. Twelve `InfluenceMap` walks emitting via `L1Maps` `SystemParam` bundle + `emit_map!` macro. Phase 2D registry-walk refactor opened as ticket 207; trace_emit.rs in-source pointer retargeted at 207.
+- 2026-05-07 — Verified. `just soak-trace 42 Simba` produced `logs/tuned-42/trace-Simba.jsonl` (1.31M records) with header `commit_hash: 747d2b37`, `commit_dirty: false`. Direct count confirms 12 distinct L1 `map` values: `carcass_scent · congregation · construction_site · corruption · exploration · food_location · fox_scent · garden_location · herb_location · kitten_cry · prey_scent · ward_coverage`. (`congregation` is the `cat_presence` map's metadata name; `corruption` is the `TileMap`/`CorruptionLens` lens.) Hard survival gates pass — `deaths_starvation: 0`, `deaths_by_cause.ShadowFoxAmbush: 1` (≤ 10). `just verdict` returns `concern` due to `burial=0` continuity (inherited canary failure predating 206) and constants/footer drift versus the 2026-05-02 baseline — all attributable to co-mingled stack work, not 206, which is a trace-only change with no scoring touched. `frame-diff` skipped (no paired Simba sidecar at parent commit and the question is moot at 206-isolation given the co-mingled state).
