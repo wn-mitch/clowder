@@ -239,10 +239,9 @@ pub fn discarding_actions() -> Vec<GoapActionDef> {
 
 /// 176: plan template for `Trashing` — `[TravelTo(Wilds),
 /// TrashItemAtMidden]`. The Midden building is colony-singleton; the
-/// `Wilds` zone is a placeholder until a `PlannerZone::Midden`
-/// variant lands with the building-spawn wiring (default-zero scoring
-/// keeps the plan never-elected for now). Completion proxy is
-/// `IncrementTrips`.
+/// `Wilds` zone is a placeholder. Completion proxy is `IncrementTrips`.
+///
+// STUB(trashing): PlannerZone::Wilds until PlannerZone::Midden lands.
 pub fn trashing_actions() -> Vec<GoapActionDef> {
     vec![GoapActionDef {
         kind: GoapActionKind::TrashItemAtMidden,

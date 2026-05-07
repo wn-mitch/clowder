@@ -1,14 +1,19 @@
 # Allowlist for scripts/check_substrate_stubs.sh.
 #
-# Format:    <MarkerName-or-consideration-string> <ticket-id>
-# Comments:  everything after `#` is ignored.
+# Format:
+#   <MarkerName-or-consideration-string> <ticket-id>     # Audit 1 / 2
+#   STUB:<file>:<line>:<dse_name>        <ticket-id>     # Audit 3 — plan-template stub
 #
-# Each entry MUST cite the ticket that wires the marker (Audit 1) or
-# fixes the consideration reference (Audit 2). When the wiring lands,
-# drop the entry; the lint will then enforce that the marker stays
-# wired. Adding a new entry without a ticket id is a code-review
+# Comments: everything after `#` is ignored.
+#
+# Each entry MUST cite the ticket that wires the marker (Audit 1),
+# fixes the consideration reference (Audit 2), or lands the named
+# successor entity for a plan-template stub (Audit 3). When the work
+# lands, drop the entry; the lint will then enforce that the substrate
+# stays wired. Adding a new entry without a ticket id is a code-review
 # failure.
 #
 # Catalogue: docs/open-work/pre-existing/substrate-stub-catalogue.md
 
 HideEligible 170           # Hide-authoring system (extends ticket 104's Phase 1 dormancy)
+STUB:src/ai/planner/actions.rs:244:trashing 200    # Trashing routes through Wilds until PlannerZone::Midden lands (ticket 200)

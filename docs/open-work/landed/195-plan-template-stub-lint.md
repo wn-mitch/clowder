@@ -1,7 +1,7 @@
 ---
 id: 195
 title: Plan-template stub-comment lint extension (194 P2)
-status: ready
+status: done
 cluster: process-discipline
 added: 2026-05-06
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-06
 ---
 
 ## Why
@@ -93,3 +93,4 @@ update) in exchange for a hard gate.
   `process-discipline` (new). Three-stub corpus today; gate
   exists to keep it from growing into another 185-shape
   regression.
+- 2026-05-06: Audit 3 + structured STUB(<dse>) tag schema. Trashing comment rewritten. Allowlist STUB:src/ai/planner/actions.rs:244:trashing 200 cites the Midden zone follow-on (also opened with this commit, blocked-by 195).

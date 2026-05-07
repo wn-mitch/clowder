@@ -29,6 +29,20 @@
 #   literal. Verify each such name matches a real marker enumerated by
 #   Audit 1. Catches typos and rename-without-update drift.
 #
+# Audit 3 — Plan-template stub-vs-curve cross-check (ticket 195).
+#   Greps `src/ai/planner/{actions,goap_plan}.rs` for the structured tag
+#       STUB(<dse_name>): <successor> until <X> lands.
+#   For each match, opens `src/ai/dses/<dse_name>.rs` and detects whether
+#   the scoring curve is the default-zero shape `Linear { slope: 0.0,
+#   intercept: 0.0 }` (dormant, the stub's promise) or some non-zero
+#   shape (Logistic, non-zero Linear, Composite, ScoringConstants-sourced
+#   curve — "lifted"). When lifted, the comment's promise is broken and
+#   the lint fails unless an allowlist entry of the form
+#       STUB:<file>:<line>:<dse_name> <ticket-id>
+#   names the ticket that lands the successor entity. Failure mode this
+#   prevents: 185-shape regression where the curve is lifted without
+#   the prerequisite plan-template successor (zone, marker, DSE).
+#
 # Writer regex also matches `world.spawn(X)` / `world.spawn((X, …))` so
 # spawn-only markers (e.g. `ColonyState`, ticket 168) count as wired
 # without an additional `.insert()`. Markers spawned and never removed
@@ -73,6 +87,41 @@ is_allowlisted() {
         fi
     done
     return 1
+}
+
+# Detect whether `src/ai/dses/<dse_name>.rs` uses the default-zero curve
+# `Linear { slope: 0.0, intercept: 0.0 }` (dormant) or some other shape
+# (lifted). Returns "dormant" / "lifted" / "missing" via stdout.
+dse_curve_state() {
+    local dse_name="$1"
+    local file="src/ai/dses/${dse_name}.rs"
+    if [ ! -f "$file" ]; then
+        echo "missing"
+        return
+    fi
+    # Strip line/block comments so commented-out curves don't fool us.
+    # rg counts non-comment lines that contain a curve constructor.
+    local default_zero
+    default_zero="$(rg -c \
+        'Curve::Linear\s*\{\s*slope:\s*0\.0\s*,\s*intercept:\s*0\.0\s*\}' \
+        "$file" 2>/dev/null || echo 0)"
+    local any_curve
+    any_curve="$(rg -c \
+        -e 'Curve::(Linear|Logistic|Composite|Quadratic)' \
+        -e 'composition::(Composition|Curve)' \
+        -e 'ScoringConstants' \
+        "$file" 2>/dev/null || echo 0)"
+    if [ "$any_curve" -eq 0 ]; then
+        # No curve construction at all (DSE may use a different shape);
+        # treat as dormant for the purpose of this audit.
+        echo "dormant"
+        return
+    fi
+    if [ "$default_zero" -gt 0 ] && [ "$any_curve" -le "$default_zero" ]; then
+        echo "dormant"
+    else
+        echo "lifted"
+    fi
 }
 
 # Collect every marker name + declaration line.
@@ -213,11 +262,49 @@ if [ -f "$CONSIDERATIONS_FILE" ]; then
                 "$CONSIDERATIONS_FILE" --no-heading || true)
 fi
 
+# Audit 3 — Plan-template stub-vs-curve cross-check (ticket 195).
+stub_offenders=()
+allowlisted_stub_hits=0
+PLANNER_FILES=("src/ai/planner/actions.rs" "src/ai/planner/goap_plan.rs")
+for planner_file in "${PLANNER_FILES[@]}"; do
+    [ -f "$planner_file" ] || continue
+    while IFS= read -r match; do
+        lineno="${match%%:*}"
+        rest="${match#*:}"
+        # Capture: STUB(<dse_name>): ...
+        # Trim leading `// ` or `/// `.
+        rest="${rest#"${rest%%[![:space:]]*}"}"
+        # Extract dse_name between `STUB(` and `):`.
+        dse_name="${rest#*STUB(}"
+        dse_name="${dse_name%%):*}"
+        # Defensive trim.
+        dse_name="${dse_name#"${dse_name%%[![:space:]]*}"}"
+        dse_name="${dse_name%"${dse_name##*[![:space:]]}"}"
+
+        state="$(dse_curve_state "$dse_name")"
+        if [ "$state" = "dormant" ]; then
+            # Curve is default-zero — stub is honoring its promise.
+            continue
+        fi
+        if [ "$state" = "missing" ]; then
+            stub_offenders+=("$planner_file:$lineno  STUB($dse_name) names a DSE file that doesn't exist (src/ai/dses/${dse_name}.rs)")
+            continue
+        fi
+        # state == "lifted" — require an allowlist entry.
+        allowlist_key="STUB:${planner_file}:${lineno}:${dse_name}"
+        if is_allowlisted "$allowlist_key"; then
+            allowlisted_stub_hits=$((allowlisted_stub_hits + 1))
+        else
+            stub_offenders+=("$planner_file:$lineno  STUB($dse_name) lifted without successor — add allowlist entry \"$allowlist_key <ticket-id>\" or rewrite the comment")
+        fi
+    done < <(rg -n '\bSTUB\(' "$planner_file" --no-heading 2>/dev/null || true)
+done
+
 # Report.
 exit_code=0
-total_allowlisted=$((allowlisted_marker_hits + allowlisted_consideration_hits))
+total_allowlisted=$((allowlisted_marker_hits + allowlisted_consideration_hits + allowlisted_stub_hits))
 
-if [ "${#marker_offenders[@]}" -gt 0 ] || [ "${#consideration_offenders[@]}" -gt 0 ]; then
+if [ "${#marker_offenders[@]}" -gt 0 ] || [ "${#consideration_offenders[@]}" -gt 0 ] || [ "${#stub_offenders[@]}" -gt 0 ]; then
     exit_code=1
     if [ "${#marker_offenders[@]}" -gt 0 ]; then
         echo "substrate-stubs: orphan markers in $MARKERS_FILE" >&2
@@ -228,6 +315,12 @@ if [ "${#marker_offenders[@]}" -gt 0 ] || [ "${#consideration_offenders[@]}" -gt
     if [ "${#consideration_offenders[@]}" -gt 0 ]; then
         echo "substrate-stubs: invalid consideration string-name references" >&2
         for line in "${consideration_offenders[@]}"; do
+            echo "  $line" >&2
+        done
+    fi
+    if [ "${#stub_offenders[@]}" -gt 0 ]; then
+        echo "substrate-stubs: plan-template stubs out-of-sync with their DSE curves" >&2
+        for line in "${stub_offenders[@]}"; do
             echo "  $line" >&2
         done
     fi
