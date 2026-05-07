@@ -216,7 +216,12 @@ fn try_preempt_non_threat_matches_inline_body_resets_ticks_remaining() {
     old_current.ticks_remaining = 0;
 
     // New API:
-    let outcome = try_preempt(&mut new_plan, &mut new_current, PreemptKind::NonThreat, None);
+    let outcome = try_preempt(
+        &mut new_plan,
+        &mut new_current,
+        PreemptKind::NonThreat,
+        None,
+    );
 
     assert_eq!(outcome, PreemptOutcome::Preempted);
     assert_eq!(
@@ -262,14 +267,8 @@ fn carry_target_forward_matches_inline_body_when_unset() {
     let validity = target::InMemoryValidity::new();
 
     // Build two parallel step_state arrays.
-    let mut new_steps = [
-        StepExecutionState::default(),
-        StepExecutionState::default(),
-    ];
-    let mut old_steps = [
-        StepExecutionState::default(),
-        StepExecutionState::default(),
-    ];
+    let mut new_steps = [StepExecutionState::default(), StepExecutionState::default()];
+    let mut old_steps = [StepExecutionState::default(), StepExecutionState::default()];
 
     // Seed the prior step's target.
     let prior_target = Entity::from_raw_u32(7).unwrap();
@@ -299,10 +298,7 @@ fn carry_target_forward_preserves_existing_target() {
     let prior = Entity::from_raw_u32(1).unwrap();
     let already = Entity::from_raw_u32(99).unwrap();
 
-    let mut steps = [
-        StepExecutionState::default(),
-        StepExecutionState::default(),
-    ];
+    let mut steps = [StepExecutionState::default(), StepExecutionState::default()];
     steps[0].target_entity = Some(prior);
     steps[1].target_entity = Some(already);
 
@@ -388,10 +384,7 @@ fn carry_target_forward_drops_dead_prior_target() {
     let dead_target = Entity::from_raw_u32(7).unwrap();
     validity.mark(dead_target, target::TargetInvalidReason::Dead);
 
-    let mut steps = [
-        StepExecutionState::default(),
-        StepExecutionState::default(),
-    ];
+    let mut steps = [StepExecutionState::default(), StepExecutionState::default()];
     steps[0].target_entity = Some(dead_target);
 
     let result = carry_target_forward(&mut steps, 1, &validity, None);
@@ -552,7 +545,9 @@ fn require_unreserved_filter_gates_non_owner_to_zero() {
     use crate::ai::composition::Composition;
     use crate::ai::considerations::{Consideration, ScalarConsideration};
     use crate::ai::curves::Curve;
-    use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination};
+    use crate::ai::dse::{
+        ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination,
+    };
     use crate::ai::target_dse::{
         evaluate_target_taking_with_reservations, TargetAggregation, TargetTakingDse,
     };
@@ -593,8 +588,7 @@ fn require_unreserved_filter_gates_non_owner_to_zero() {
 
     let has_marker = |_: &str, _: Entity| false;
     let entity_pos = |_: Entity| -> Option<Position> { None };
-    let anchor_pos =
-        |_: crate::ai::considerations::LandmarkAnchor| -> Option<Position> { None };
+    let anchor_pos = |_: crate::ai::considerations::LandmarkAnchor| -> Option<Position> { None };
     let ctx = EvalCtx {
         cat,
         tick: 0,
@@ -654,7 +648,9 @@ fn require_unreserved_filter_passes_owner() {
     use crate::ai::composition::Composition;
     use crate::ai::considerations::{Consideration, ScalarConsideration};
     use crate::ai::curves::Curve;
-    use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination};
+    use crate::ai::dse::{
+        ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination,
+    };
     use crate::ai::target_dse::{
         evaluate_target_taking_with_reservations, TargetAggregation, TargetTakingDse,
     };
@@ -693,8 +689,7 @@ fn require_unreserved_filter_passes_owner() {
 
     let has_marker = |_: &str, _: Entity| false;
     let entity_pos = |_: Entity| -> Option<Position> { None };
-    let anchor_pos =
-        |_: crate::ai::considerations::LandmarkAnchor| -> Option<Position> { None };
+    let anchor_pos = |_: crate::ai::considerations::LandmarkAnchor| -> Option<Position> { None };
     let ctx = EvalCtx {
         cat,
         tick: 0,
@@ -737,7 +732,9 @@ fn require_unreserved_filter_inactive_when_dse_opts_out() {
     use crate::ai::composition::Composition;
     use crate::ai::considerations::{Consideration, ScalarConsideration};
     use crate::ai::curves::Curve;
-    use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination};
+    use crate::ai::dse::{
+        ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination,
+    };
     use crate::ai::target_dse::{
         evaluate_target_taking_with_reservations, TargetAggregation, TargetTakingDse,
     };
@@ -777,8 +774,7 @@ fn require_unreserved_filter_inactive_when_dse_opts_out() {
 
     let has_marker = |_: &str, _: Entity| false;
     let entity_pos = |_: Entity| -> Option<Position> { None };
-    let anchor_pos =
-        |_: crate::ai::considerations::LandmarkAnchor| -> Option<Position> { None };
+    let anchor_pos = |_: crate::ai::considerations::LandmarkAnchor| -> Option<Position> { None };
     let ctx = EvalCtx {
         cat,
         tick: 0,
@@ -818,9 +814,9 @@ fn expire_reservations_clears_past_due_markers() {
     // expires_tick in the past, one in the future. Run the
     // maintenance system; the past-due marker is removed, the
     // future-due marker survives.
-    use bevy::prelude::*;
     use crate::components::reserved::Reserved;
     use crate::resources::time::TimeState;
+    use bevy::prelude::*;
 
     let mut app = App::new();
     app.insert_resource(TimeState {
@@ -840,15 +836,11 @@ fn expire_reservations_clears_past_due_markers() {
     app.update();
 
     assert!(
-        !app.world()
-            .entity(stale_target)
-            .contains::<Reserved>(),
+        !app.world().entity(stale_target).contains::<Reserved>(),
         "stale reservation must be cleared"
     );
     assert!(
-        app.world()
-            .entity(fresh_target)
-            .contains::<Reserved>(),
+        app.world().entity(fresh_target).contains::<Reserved>(),
         "future reservation must survive"
     );
 }
@@ -861,7 +853,9 @@ fn require_unreserved_fires_contention_hook() {
     use crate::ai::composition::Composition;
     use crate::ai::considerations::{Consideration, ScalarConsideration};
     use crate::ai::curves::Curve;
-    use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination};
+    use crate::ai::dse::{
+        ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination,
+    };
     use crate::ai::target_dse::{
         evaluate_target_taking_with_reservations, TargetAggregation, TargetTakingDse,
     };
@@ -901,8 +895,7 @@ fn require_unreserved_fires_contention_hook() {
 
     let has_marker = |_: &str, _: Entity| false;
     let entity_pos = |_: Entity| -> Option<Position> { None };
-    let anchor_pos =
-        |_: crate::ai::considerations::LandmarkAnchor| -> Option<Position> { None };
+    let anchor_pos = |_: crate::ai::considerations::LandmarkAnchor| -> Option<Position> { None };
     let ctx = EvalCtx {
         cat,
         tick: 0,
@@ -919,8 +912,7 @@ fn require_unreserved_fires_contention_hook() {
     let is_reserved_by_other = |target: Entity| target == a; // only `a` is gated.
 
     let mut contended: Vec<Entity> = Vec::new();
-    let mut on_contention =
-        |target: Entity| contended.push(target);
+    let mut on_contention = |target: Entity| contended.push(target);
     let _ = evaluate_target_taking_with_reservations(
         &dse,
         cat,

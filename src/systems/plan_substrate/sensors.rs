@@ -30,10 +30,10 @@ use bevy_ecs::prelude::*;
 use crate::ai::curves::Curve;
 use crate::ai::planner::GoapActionKind;
 use crate::components::physical::Dead;
+use crate::components::physical::Needs;
 use crate::components::{
     DispositionKind, PrevSafetyDeficit, RecentDispositionFailures, RecentTargetFailures,
 };
-use crate::components::physical::Needs;
 use crate::resources::sim_constants::SimConstants;
 
 /// Compute the recently-failed-target signal for a given
@@ -113,7 +113,6 @@ pub fn prune_recent_target_failures(
     }
 }
 
-
 // ---------------------------------------------------------------------------
 // disposition_recent_failure_age_normalized — ticket 123
 // ---------------------------------------------------------------------------
@@ -172,7 +171,9 @@ pub fn prune_recent_disposition_failures(
     time: Res<crate::resources::time::TimeState>,
     mut query: Query<&mut RecentDispositionFailures, Without<Dead>>,
 ) {
-    let cooldown = constants.planning_substrate.disposition_failure_cooldown_ticks;
+    let cooldown = constants
+        .planning_substrate
+        .disposition_failure_cooldown_ticks;
     if cooldown == 0 {
         return;
     }
@@ -212,7 +213,9 @@ pub fn prune_recent_disposition_failures(
 ///
 /// Skipped on `Dead` cats (the snapshot is a per-tick visit; a freshly-
 /// dead cat's component will be cleaned up by `cleanup_dead`).
-pub fn update_prev_safety_deficit(mut query: Query<(&Needs, &mut PrevSafetyDeficit), Without<Dead>>) {
+pub fn update_prev_safety_deficit(
+    mut query: Query<(&Needs, &mut PrevSafetyDeficit), Without<Dead>>,
+) {
     for (needs, mut prev) in &mut query {
         let now = (1.0 - needs.safety).clamp(0.0, 1.0);
         prev.0 = now;
@@ -415,12 +418,8 @@ mod tests {
 
     #[test]
     fn disposition_sensor_no_component_returns_one() {
-        let s = disposition_recent_failure_age_normalized(
-            None,
-            DispositionKind::Hunting,
-            1000,
-            4000,
-        );
+        let s =
+            disposition_recent_failure_age_normalized(None, DispositionKind::Hunting, 1000, 4000);
         assert_eq!(s, 1.0);
     }
 
@@ -516,5 +515,4 @@ mod tests {
         );
         assert_eq!(s, 0.0);
     }
-
 }

@@ -67,10 +67,7 @@ pub fn update_store_awareness_markers(
         ),
         (With<WildAnimal>, With<FoxState>, Without<Dead>),
     >,
-    stores: Query<
-        &Position,
-        (With<Structure>, Without<WildAnimal>, Without<FoxState>),
-    >,
+    stores: Query<&Position, (With<Structure>, Without<WildAnimal>, Without<FoxState>)>,
     cats: Query<
         &Position,
         (
@@ -171,10 +168,7 @@ pub fn update_den_threat_markers(
 #[allow(clippy::type_complexity)]
 pub fn update_cub_marker(
     mut commands: Commands,
-    foxes: Query<
-        (Entity, &FoxState, Has<markers::HasCubs>),
-        (With<WildAnimal>, Without<Dead>),
-    >,
+    foxes: Query<(Entity, &FoxState, Has<markers::HasCubs>), (With<WildAnimal>, Without<Dead>)>,
     dens: Query<&FoxDen, Without<FoxState>>,
 ) {
     for (entity, fox_state, has_marker) in foxes.iter() {
@@ -236,8 +230,7 @@ pub fn update_juvenile_dispersal_markers(
 ) {
     use crate::components::wildlife::FoxLifeStage;
     for (entity, fox_state, has_marker) in foxes.iter() {
-        let want =
-            fox_state.life_stage == FoxLifeStage::Juvenile && fox_state.home_den.is_none();
+        let want = fox_state.life_stage == FoxLifeStage::Juvenile && fox_state.home_den.is_none();
         toggle(
             &mut commands,
             entity,
@@ -257,10 +250,7 @@ pub fn update_juvenile_dispersal_markers(
 #[allow(clippy::type_complexity)]
 pub fn update_den_marker(
     mut commands: Commands,
-    foxes: Query<
-        (Entity, &FoxState, Has<markers::HasDen>),
-        (With<WildAnimal>, Without<Dead>),
-    >,
+    foxes: Query<(Entity, &FoxState, Has<markers::HasDen>), (With<WildAnimal>, Without<Dead>)>,
 ) {
     for (entity, fox_state, has_marker) in foxes.iter() {
         let want = fox_state.home_den.is_some();
@@ -476,7 +466,11 @@ mod tests {
         schedule.run(&mut world);
         assert!(world.entity(fox).contains::<markers::CatThreateningDen>());
         // Cubs gone — marker drops.
-        world.entity_mut(den).get_mut::<FoxDen>().unwrap().cubs_present = 0;
+        world
+            .entity_mut(den)
+            .get_mut::<FoxDen>()
+            .unwrap()
+            .cubs_present = 0;
         schedule.run(&mut world);
         assert!(!world.entity(fox).contains::<markers::CatThreateningDen>());
     }
@@ -564,7 +558,11 @@ mod tests {
         let fox = spawn_fox_with_den(&mut world, 5, 5, den);
         schedule.run(&mut world);
         assert!(world.entity(fox).contains::<markers::HasCubs>());
-        world.entity_mut(den).get_mut::<FoxDen>().unwrap().cubs_present = 0;
+        world
+            .entity_mut(den)
+            .get_mut::<FoxDen>()
+            .unwrap()
+            .cubs_present = 0;
         schedule.run(&mut world);
         assert!(!world.entity(fox).contains::<markers::HasCubs>());
     }
@@ -633,7 +631,11 @@ mod tests {
         let mut state = FoxState::new_adult(FoxSex::Female, None);
         state.life_stage = FoxLifeStage::Juvenile;
         world
-            .spawn((WildAnimal::new(WildSpecies::Fox), state, Position::new(0, 0)))
+            .spawn((
+                WildAnimal::new(WildSpecies::Fox),
+                state,
+                Position::new(0, 0),
+            ))
             .id()
     }
 
@@ -641,7 +643,11 @@ mod tests {
         let mut state = FoxState::new_adult(FoxSex::Female, Some(den));
         state.life_stage = FoxLifeStage::Juvenile;
         world
-            .spawn((WildAnimal::new(WildSpecies::Fox), state, Position::new(0, 0)))
+            .spawn((
+                WildAnimal::new(WildSpecies::Fox),
+                state,
+                Position::new(0, 0),
+            ))
             .id()
     }
 

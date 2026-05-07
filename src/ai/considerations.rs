@@ -332,7 +332,7 @@ impl Consideration {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ai::curves::{Curve, hangry};
+    use crate::ai::curves::{hangry, Curve};
 
     fn quadratic_unit() -> Curve {
         Curve::Quadratic {

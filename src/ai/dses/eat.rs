@@ -203,8 +203,8 @@ pub fn eat_dse() -> Box<dyn Dse> {
 
 #[cfg(test)]
 mod tests {
-    use crate::ai::considerations::LandmarkAnchor;
     use super::*;
+    use crate::ai::considerations::LandmarkAnchor;
     use crate::ai::eval::{evaluate_single, ModifierPipeline};
     use crate::components::physical::Position;
 
@@ -283,7 +283,11 @@ mod tests {
         //   hunger=0.1 (sated)   → CP ≈ 0.26 (raw 0.098 · spatial 0.98)
         //   hunger=0.5 (midpoint) → CP ≈ 0.65
         //   hunger=0.9 (starving) → CP ≈ 0.93
-        assert!(score(0.5) > 0.6 && score(0.5) < 0.7, "midpoint: {}", score(0.5));
+        assert!(
+            score(0.5) > 0.6 && score(0.5) < 0.7,
+            "midpoint: {}",
+            score(0.5)
+        );
         assert!(score(0.9) > 0.9, "starving: {}", score(0.9));
         assert!(score(0.1) < 0.3, "sated: {}", score(0.1));
         // Monotonicity check — CP's compensation must not invert the

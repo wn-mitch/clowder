@@ -179,8 +179,12 @@ pub fn check_death(
                 c.grief_detection_range as f32,
             ) {
                 mood.modifiers.push_back(
-                    MoodModifier::new(c.grief_mood_penalty, c.grief_mood_ticks, format!("{dead_name} died"))
-                        .with_kind(MoodSource::Grief),
+                    MoodModifier::new(
+                        c.grief_mood_penalty,
+                        c.grief_mood_ticks,
+                        format!("{dead_name} died"),
+                    )
+                    .with_kind(MoodSource::Grief),
                 );
 
                 memory.remember(MemoryEntry {
@@ -203,20 +207,24 @@ pub fn check_death(
             };
             let (intensity, duration) = match bond {
                 BondType::Mates => (c.bereavement_mates_intensity, c.bereavement_mates_ticks),
-                BondType::Partners => (c.bereavement_partners_intensity, c.bereavement_partners_ticks),
+                BondType::Partners => (
+                    c.bereavement_partners_intensity,
+                    c.bereavement_partners_ticks,
+                ),
                 BondType::Friends => (c.bereavement_friends_intensity, c.bereavement_friends_ticks),
             };
             let grief_amount = -(intensity * rel.fondness.max(0.0));
             if grief_amount > -0.05 {
                 continue;
             }
-            let mut modifier = MoodModifier::new(
-                grief_amount,
-                duration,
-                format!("{dead_name} (bonded)"),
-            )
-            .with_kind(MoodSource::Grief);
-            crate::systems::mood::patience_extend(&mut modifier, personality.patience, &constants.mood);
+            let mut modifier =
+                MoodModifier::new(grief_amount, duration, format!("{dead_name} (bonded)"))
+                    .with_kind(MoodSource::Grief);
+            crate::systems::mood::patience_extend(
+                &mut modifier,
+                personality.patience,
+                &constants.mood,
+            );
             mood.modifiers.push_back(modifier);
         }
 
@@ -449,7 +457,14 @@ mod tests {
         assert_eq!(dead.cause, DeathCause::Starvation);
     }
 
-    fn spawn_cat_at(world: &mut World, name: &str, health: f32, hunger: f32, x: i32, y: i32) -> Entity {
+    fn spawn_cat_at(
+        world: &mut World,
+        name: &str,
+        health: f32,
+        hunger: f32,
+        x: i32,
+        y: i32,
+    ) -> Entity {
         let mut needs = Needs::default();
         needs.hunger = hunger;
         world
@@ -608,7 +623,8 @@ mod tests {
     #[test]
     fn in_sim_born_adult_death_decrements_kittens_surviving() {
         let (mut world, mut schedule) = setup_world_with_score();
-        world.resource_mut::<crate::resources::colony_score::ColonyScore>()
+        world
+            .resource_mut::<crate::resources::colony_score::ColonyScore>()
             .kittens_surviving = 3;
 
         spawn_gated_cat(&mut world, "Cinder", 0.0, true, false);
@@ -627,7 +643,8 @@ mod tests {
     #[test]
     fn founding_member_death_does_not_decrement() {
         let (mut world, mut schedule) = setup_world_with_score();
-        world.resource_mut::<crate::resources::colony_score::ColonyScore>()
+        world
+            .resource_mut::<crate::resources::colony_score::ColonyScore>()
             .kittens_surviving = 3;
 
         // Founding cat — no BornInSim marker.
@@ -649,7 +666,8 @@ mod tests {
         // Kitten died before maturation — the increment never happened,
         // so the decrement must not fire either.
         let (mut world, mut schedule) = setup_world_with_score();
-        world.resource_mut::<crate::resources::colony_score::ColonyScore>()
+        world
+            .resource_mut::<crate::resources::colony_score::ColonyScore>()
             .kittens_surviving = 3;
 
         spawn_gated_cat(&mut world, "Sprout", 0.0, true, true);

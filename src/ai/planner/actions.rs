@@ -688,7 +688,9 @@ pub fn actions_for_disposition(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ai::planner::{make_plan, Carrying, GoalState, PlanContext, PlannerState, PlannerZone};
+    use crate::ai::planner::{
+        make_plan, Carrying, GoalState, PlanContext, PlannerState, PlannerZone,
+    };
     use crate::ai::scoring::MarkerSnapshot;
     use bevy::prelude::Entity;
 
@@ -820,7 +822,8 @@ mod tests {
             predicates: vec![StatePredicate::TripsAtLeast(1)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Foraging, Action::Forage, &distances);
+        let actions =
+            actions_for_disposition(DispositionKind::Foraging, Action::Forage, &distances);
 
         let plan = plan!(start, &actions, &goal, 12, 1000).expect("plan found");
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
@@ -879,7 +882,8 @@ mod tests {
         let distances = basic_distances();
         let actions = actions_for_disposition(DispositionKind::Eating, Action::Eat, &distances);
 
-        let plan = plan!(start, &actions, &goal, 8, 500).expect("Eating must plan a chain when stores are stocked");
+        let plan = plan!(start, &actions, &goal, 8, 500)
+            .expect("Eating must plan a chain when stores are stocked");
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
         assert!(kinds.contains(&GoapActionKind::EatAtStores));
         assert!(kinds.contains(&GoapActionKind::TravelTo(PlannerZone::Stores)));
@@ -927,17 +931,30 @@ mod tests {
         let actions = actions_for_disposition(DispositionKind::Resting, Action::Sleep, &distances);
 
         // Empty stores: still plans.
-        let plan_empty = plan!(start.clone(), &actions, &goal, 12, 1000, markers = empty_markers())
-            .expect("Resting plans Sleep + SelfGroom even with empty stores");
+        let plan_empty = plan!(
+            start.clone(),
+            &actions,
+            &goal,
+            12,
+            1000,
+            markers = empty_markers()
+        )
+        .expect("Resting plans Sleep + SelfGroom even with empty stores");
         let kinds_empty: Vec<_> = plan_empty.iter().map(|s| s.action).collect();
         assert!(kinds_empty.contains(&GoapActionKind::Sleep));
         assert!(kinds_empty.contains(&GoapActionKind::SelfGroom));
         assert!(!kinds_empty.contains(&GoapActionKind::EatAtStores));
 
         // Stocked stores: same plan; stores marker irrelevant.
-        let plan_stocked =
-            plan!(start, &actions, &goal, 12, 1000, markers = food_stocked_markers())
-                .expect("plan found");
+        let plan_stocked = plan!(
+            start,
+            &actions,
+            &goal,
+            12,
+            1000,
+            markers = food_stocked_markers()
+        )
+        .expect("plan found");
         let kinds_stocked: Vec<_> = plan_stocked.iter().map(|s| s.action).collect();
         assert!(kinds_stocked.contains(&GoapActionKind::Sleep));
         assert!(kinds_stocked.contains(&GoapActionKind::SelfGroom));
@@ -966,7 +983,8 @@ mod tests {
             predicates: vec![StatePredicate::TripsAtLeast(1)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Foraging, Action::Forage, &distances);
+        let actions =
+            actions_for_disposition(DispositionKind::Foraging, Action::Forage, &distances);
         let plan = plan!(start, &actions, &goal, 12, 1000)
             .expect("Foraging must plan even when carrying non-food (091 fix)");
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
@@ -1071,11 +1089,8 @@ mod tests {
             markers: &stocked,
             entity: test_entity(),
         };
-        let goal_empty = crate::ai::planner::goals::goal_for_disposition(
-            DispositionKind::Resting,
-            0,
-            &cx_empty,
-        );
+        let goal_empty =
+            crate::ai::planner::goals::goal_for_disposition(DispositionKind::Resting, 0, &cx_empty);
         let goal_stocked = crate::ai::planner::goals::goal_for_disposition(
             DispositionKind::Resting,
             0,
@@ -1097,7 +1112,8 @@ mod tests {
             predicates: vec![StatePredicate::TripsAtLeast(1)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Guarding, Action::Patrol, &distances);
+        let actions =
+            actions_for_disposition(DispositionKind::Guarding, Action::Patrol, &distances);
 
         let plan = plan!(start, &actions, &goal, 12, 1000).expect("plan found");
         assert_eq!(plan.len(), 1);
@@ -1232,7 +1248,8 @@ mod tests {
             predicates: vec![StatePredicate::InteractionDone(true)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Mentoring, Action::Mentor, &distances);
+        let actions =
+            actions_for_disposition(DispositionKind::Mentoring, Action::Mentor, &distances);
 
         let plan = plan!(start, &actions, &goal, 12, 1000).expect("plan found");
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
@@ -1273,7 +1290,8 @@ mod tests {
         // next-state. Socializing's template is now single-action
         // `[SocializeWith]`.
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Socializing, Action::Socialize, &distances);
+        let actions =
+            actions_for_disposition(DispositionKind::Socializing, Action::Socialize, &distances);
         let kinds: Vec<_> = actions.iter().map(|a| a.kind).collect();
         assert!(
             !kinds.contains(&GoapActionKind::MentorCat),
@@ -1344,8 +1362,15 @@ mod tests {
             &distances,
         );
 
-        let plan = plan!(start, &actions, &goal, 12, 1000, markers = thornbriar_markers())
-            .expect("plan should succeed");
+        let plan = plan!(
+            start,
+            &actions,
+            &goal,
+            12,
+            1000,
+            markers = thornbriar_markers()
+        )
+        .expect("plan should succeed");
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
         assert!(kinds.contains(&GoapActionKind::GatherHerb));
         assert!(kinds.contains(&GoapActionKind::SetWard));
@@ -1367,7 +1392,8 @@ mod tests {
             predicates: vec![StatePredicate::TripsAtLeast(1)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Caretaking, Action::Caretake, &distances);
+        let actions =
+            actions_for_disposition(DispositionKind::Caretaking, Action::Caretake, &distances);
 
         let plan = plan!(start, &actions, &goal, 12, 1000)
             .expect("caretaking plan should succeed even when carrying herbs");
@@ -1389,10 +1415,10 @@ mod tests {
             predicates: vec![StatePredicate::TripsAtLeast(1)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(DispositionKind::Caretaking, Action::Caretake, &distances);
+        let actions =
+            actions_for_disposition(DispositionKind::Caretaking, Action::Caretake, &distances);
 
-        let plan =
-            plan!(start, &actions, &goal, 12, 1000).expect("caretaking plan should succeed");
+        let plan = plan!(start, &actions, &goal, 12, 1000).expect("caretaking plan should succeed");
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
         assert_eq!(
             kinds,
@@ -1411,11 +1437,7 @@ mod tests {
             predicates: vec![StatePredicate::TripsAtLeast(1)],
         };
         let distances = basic_distances();
-        let actions = actions_for_disposition(
-            DispositionKind::Cooking,
-            Action::Cook,
-            &distances,
-        );
+        let actions = actions_for_disposition(DispositionKind::Cooking, Action::Cook, &distances);
 
         let plan = plan!(start, &actions, &goal, 16, 5000).expect("cook plan should succeed");
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
@@ -1449,8 +1471,15 @@ mod tests {
         let distances = basic_distances();
         let actions = actions_for_disposition(DispositionKind::Eating, Action::Eat, &distances);
 
-        let plan = plan!(start, &actions, &goal, 8, 500, markers = food_stocked_markers())
-            .expect("EatAtStores must be reachable when HasStoredFood marker is set");
+        let plan = plan!(
+            start,
+            &actions,
+            &goal,
+            8,
+            500,
+            markers = food_stocked_markers()
+        )
+        .expect("EatAtStores must be reachable when HasStoredFood marker is set");
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
         assert!(kinds.contains(&GoapActionKind::EatAtStores));
     }
@@ -1471,8 +1500,14 @@ mod tests {
         let distances = basic_distances();
         let actions = actions_for_disposition(DispositionKind::Eating, Action::Eat, &distances);
 
-        let with_food =
-            plan!(start.clone(), &actions, &goal, 8, 500, markers = food_stocked_markers());
+        let with_food = plan!(
+            start.clone(),
+            &actions,
+            &goal,
+            8,
+            500,
+            markers = food_stocked_markers()
+        );
         assert!(with_food.is_ok(), "marker present → Eating reachable");
 
         let without_food = plan!(start, &actions, &goal, 8, 500, markers = empty_markers());

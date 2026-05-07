@@ -142,9 +142,8 @@ pub fn apply_building_effects(
                     if cat_pos.manhattan_distance(&center) <= b.hearth_effect_radius {
                         needs.social = (needs.social + hearth_social_bonus * eff).min(1.0);
                         if is_cold {
-                            needs.temperature = (needs.temperature
-                                + hearth_temperature_bonus_cold * eff)
-                                .min(1.0);
+                            needs.temperature =
+                                (needs.temperature + hearth_temperature_bonus_cold * eff).min(1.0);
                         }
                     }
                 }
@@ -350,7 +349,10 @@ pub fn update_food_location_map(
     let sense_range = constants.influence_maps.food_location_sense_range;
     map.clear();
     for (structure, anchor) in &buildings {
-        if !matches!(structure.kind, StructureType::Stores | StructureType::Kitchen) {
+        if !matches!(
+            structure.kind,
+            StructureType::Stores | StructureType::Kitchen
+        ) {
             continue;
         }
         let eff = structure.effectiveness();
@@ -480,13 +482,7 @@ pub fn update_colony_building_markers(
         &crate::components::items::Item,
         bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
     >,
-    kittens: Query<
-        (),
-        (
-            With<crate::components::markers::Kitten>,
-            Without<Dead>,
-        ),
-    >,
+    kittens: Query<(), (With<crate::components::markers::Kitten>, Without<Dead>)>,
     cats: Query<&crate::components::physical::Health, Without<Dead>>,
     food: Res<FoodStores>,
     constants: Res<SimConstants>,
@@ -497,11 +493,11 @@ pub fn update_colony_building_markers(
     let d = &constants.disposition;
     let bldg_state = scan_colony_buildings(buildings.iter(), d.damaged_building_threshold);
     let has_raw_food_in_stores = stored_items.iter().any(|stored| {
-        stored
-            .items
-            .iter()
-            .copied()
-            .any(|e| items.get(e).is_ok_and(|it| it.kind.is_food() && !it.modifiers.cooked))
+        stored.items.iter().copied().any(|e| {
+            items
+                .get(e)
+                .is_ok_and(|it| it.kind.is_food() && !it.modifiers.cooked)
+        })
     });
     let has_stored_food = !food.is_empty();
 
@@ -518,22 +514,19 @@ pub fn update_colony_building_markers(
         .as_deref()
         .and_then(|sa| sa.counts.get(&Feature::DepositRejected).copied())
         .unwrap_or(0);
-    let stores_chronically_full = if time
-        .tick
-        .saturating_sub(tracker.last_window_tick)
-        >= scoring.chronicity_window_ticks
-    {
-        // Window boundary — compute the delta and flip the latched
-        // verdict for the next window.
-        let delta = current_rejections.saturating_sub(tracker.last_window_baseline);
-        let per_cat = (delta as f32) / cat_count;
-        tracker.last_window_baseline = current_rejections;
-        tracker.last_window_tick = time.tick;
-        tracker.latched_chronic = per_cat >= scoring.chronicity_threshold;
-        tracker.latched_chronic
-    } else {
-        tracker.latched_chronic
-    };
+    let stores_chronically_full =
+        if time.tick.saturating_sub(tracker.last_window_tick) >= scoring.chronicity_window_ticks {
+            // Window boundary — compute the delta and flip the latched
+            // verdict for the next window.
+            let delta = current_rejections.saturating_sub(tracker.last_window_baseline);
+            let per_cat = (delta as f32) / cat_count;
+            tracker.last_window_baseline = current_rejections;
+            tracker.last_window_tick = time.tick;
+            tracker.latched_chronic = per_cat >= scoring.chronicity_threshold;
+            tracker.latched_chronic
+        } else {
+            tracker.latched_chronic
+        };
 
     let entity = *colony;
     let mut em = commands.entity(entity);
@@ -946,9 +939,7 @@ mod tests {
         world.spawn(markers::ColonyState);
         // 176: chronicity tracker resource — default-zero so the
         // marker stays cleared in tests that don't exercise it.
-        world.insert_resource(
-            crate::resources::stores_pressure::StoresPressureTracker::default(),
-        );
+        world.insert_resource(crate::resources::stores_pressure::StoresPressureTracker::default());
         let mut schedule = Schedule::default();
         schedule.add_systems(update_colony_building_markers);
         (world, schedule)
@@ -970,7 +961,9 @@ mod tests {
         ));
         schedule.run(&mut world);
         let colony = colony_entity(&mut world);
-        assert!(world.entity(colony).contains::<markers::HasConstructionSite>());
+        assert!(world
+            .entity(colony)
+            .contains::<markers::HasConstructionSite>());
     }
 
     #[test]
@@ -982,7 +975,9 @@ mod tests {
         world.spawn(structure);
         schedule.run(&mut world);
         let colony = colony_entity(&mut world);
-        assert!(!world.entity(colony).contains::<markers::HasConstructionSite>());
+        assert!(!world
+            .entity(colony)
+            .contains::<markers::HasConstructionSite>());
     }
 
     #[test]
@@ -993,7 +988,9 @@ mod tests {
         world.spawn(structure);
         schedule.run(&mut world);
         let colony = colony_entity(&mut world);
-        assert!(world.entity(colony).contains::<markers::HasDamagedBuilding>());
+        assert!(world
+            .entity(colony)
+            .contains::<markers::HasDamagedBuilding>());
     }
 
     #[test]
@@ -1004,7 +1001,9 @@ mod tests {
         world.spawn(structure);
         schedule.run(&mut world);
         let colony = colony_entity(&mut world);
-        assert!(!world.entity(colony).contains::<markers::HasDamagedBuilding>());
+        assert!(!world
+            .entity(colony)
+            .contains::<markers::HasDamagedBuilding>());
     }
 
     #[test]
@@ -1018,8 +1017,12 @@ mod tests {
         world.spawn((structure, ConstructionSite::new(StructureType::Den)));
         schedule.run(&mut world);
         let colony = colony_entity(&mut world);
-        assert!(world.entity(colony).contains::<markers::HasConstructionSite>());
-        assert!(!world.entity(colony).contains::<markers::HasDamagedBuilding>());
+        assert!(world
+            .entity(colony)
+            .contains::<markers::HasConstructionSite>());
+        assert!(!world
+            .entity(colony)
+            .contains::<markers::HasDamagedBuilding>());
     }
 
     #[test]

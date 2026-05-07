@@ -3,8 +3,8 @@ use std::collections::VecDeque;
 
 use bevy_ecs::prelude::Resource;
 
-use crate::ai::Action;
 use crate::ai::planner::PlanningFailureReason;
+use crate::ai::Action;
 use crate::components::personality::Personality;
 use crate::components::physical::Needs;
 use crate::components::skills::Skills;
@@ -663,7 +663,9 @@ impl EventLog {
                 *self.interrupts_by_reason.entry(reason.clone()).or_insert(0) += 1;
             }
             EventKind::PlanningFailed {
-                disposition, reason, ..
+                disposition,
+                reason,
+                ..
             } => {
                 *self
                     .planning_failures_by_disposition
@@ -839,10 +841,22 @@ mod tests {
                 },
             );
         };
-        push(&mut log, "Cooking", PlanningFailureReason::NoApplicableActions);
-        push(&mut log, "Cooking", PlanningFailureReason::NoApplicableActions);
+        push(
+            &mut log,
+            "Cooking",
+            PlanningFailureReason::NoApplicableActions,
+        );
+        push(
+            &mut log,
+            "Cooking",
+            PlanningFailureReason::NoApplicableActions,
+        );
         push(&mut log, "Cooking", PlanningFailureReason::GoalUnreachable);
-        push(&mut log, "Herbalism", PlanningFailureReason::NodeBudgetExhausted);
+        push(
+            &mut log,
+            "Herbalism",
+            PlanningFailureReason::NodeBudgetExhausted,
+        );
         assert_eq!(
             log.planning_failures_by_reason
                 .get("Cooking:NoApplicableActions")
@@ -863,9 +877,7 @@ mod tests {
         );
         // Per-disposition tally still aggregates across reasons.
         assert_eq!(
-            log.planning_failures_by_disposition
-                .get("Cooking")
-                .copied(),
+            log.planning_failures_by_disposition.get("Cooking").copied(),
             Some(3)
         );
     }

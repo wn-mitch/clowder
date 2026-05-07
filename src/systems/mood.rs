@@ -56,12 +56,13 @@ pub fn update_mood(
             .filter(|m| m.amount < 0.0)
             .map(|m| {
                 let amp_weight = match m.kind {
-                    MoodSource::Fear  => c.fear_anxiety_amp_weight,
+                    MoodSource::Fear => c.fear_anxiety_amp_weight,
                     MoodSource::Grief => c.grief_anxiety_amp_weight,
-                    _                 => 1.0,
+                    _ => 1.0,
                 };
                 m.amount
-                    * (1.0 + personality.anxiety * c.anxiety_amplification * amp_weight
+                    * (1.0
+                        + personality.anxiety * c.anxiety_amplification * amp_weight
                         + temper_amp)
             })
             .sum();
@@ -74,8 +75,12 @@ pub fn update_mood(
             && !mood.modifiers.iter().any(|m| m.source == "wounded pride")
         {
             mood.modifiers.push_back(
-                MoodModifier::new(-(personality.pride * c.wounded_pride_scale), 1, "wounded pride")
-                    .with_kind(MoodSource::Pride),
+                MoodModifier::new(
+                    -(personality.pride * c.wounded_pride_scale),
+                    1,
+                    "wounded pride",
+                )
+                .with_kind(MoodSource::Pride),
             );
         }
 
@@ -84,8 +89,12 @@ pub fn update_mood(
             && !mood.modifiers.iter().any(|m| m.source == "contentment")
         {
             mood.modifiers.push_back(
-                MoodModifier::new(c.contentment_mood_bonus, contentment_mood_ticks, "contentment")
-                    .with_kind(MoodSource::Physical),
+                MoodModifier::new(
+                    c.contentment_mood_bonus,
+                    contentment_mood_ticks,
+                    "contentment",
+                )
+                .with_kind(MoodSource::Physical),
             );
         }
     }
@@ -202,8 +211,12 @@ pub fn bond_proximity_mood(
 
         if has_nearby_bond {
             mood.modifiers.push_back(
-                MoodModifier::new(c.bond_proximity_mood, bond_proximity_mood_ticks, "social warmth")
-                    .with_kind(MoodSource::Social),
+                MoodModifier::new(
+                    c.bond_proximity_mood,
+                    bond_proximity_mood_ticks,
+                    "social warmth",
+                )
+                .with_kind(MoodSource::Social),
             );
         }
     }
@@ -402,7 +415,8 @@ mod tests {
         // Replace with extreme negative
         let mood = world.get_mut::<Mood>(entity).unwrap().into_inner();
         mood.modifiers.clear();
-        mood.modifiers.push_back(MoodModifier::new(-5.0, 10, "extreme"));
+        mood.modifiers
+            .push_back(MoodModifier::new(-5.0, 10, "extreme"));
 
         schedule.run(&mut world);
         let valence = world.get::<Mood>(entity).unwrap().valence;

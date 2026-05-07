@@ -524,8 +524,8 @@ pub fn commune_dse() -> Box<dyn Dse> {
 
 #[cfg(test)]
 mod tests {
-    use crate::ai::considerations::LandmarkAnchor;
     use super::*;
+    use crate::ai::considerations::LandmarkAnchor;
     use crate::ai::eval::{evaluate_single, ModifierPipeline};
     use crate::components::physical::Position;
 
@@ -641,9 +641,7 @@ mod tests {
             .considerations()
             .iter()
             .find_map(|c| match c {
-                Consideration::Spatial(s) if s.name == "durable_ward_hotspot_distance" => {
-                    Some(s)
-                }
+                Consideration::Spatial(s) if s.name == "durable_ward_hotspot_distance" => Some(s),
                 _ => None,
             })
             .expect("durable_ward_hotspot_distance axis must exist");
@@ -696,9 +694,7 @@ mod tests {
             .considerations()
             .iter()
             .find_map(|c| match c {
-                Consideration::Spatial(s)
-                    if s.name == "colony_cleanse_centroid_distance" =>
-                {
+                Consideration::Spatial(s) if s.name == "colony_cleanse_centroid_distance" => {
                     Some(s)
                 }
                 _ => None,

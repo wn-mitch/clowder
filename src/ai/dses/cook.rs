@@ -21,7 +21,9 @@
 use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration};
+use crate::ai::considerations::{
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
 use crate::ai::curves::{scarcity, Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
@@ -156,8 +158,8 @@ pub fn cook_dse() -> Box<dyn Dse> {
 
 #[cfg(test)]
 mod tests {
-    use crate::ai::considerations::LandmarkAnchor;
     use super::*;
+    use crate::ai::considerations::LandmarkAnchor;
     use crate::ai::eval::{evaluate_single, ModifierPipeline};
     use crate::components::physical::Position;
 

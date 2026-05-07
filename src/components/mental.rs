@@ -13,17 +13,15 @@ use std::collections::VecDeque;
 /// - **Grief** decays slower (loss lingers); anxiety amplifies it less.
 /// - **Triumph** decays slowly (identity-defining).
 /// - **Misc** (default) uses standard rates — unclassified push sites.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
 pub enum MoodSource {
-    Physical,  // physiological: contentment, hunger relief, warmth, remedy
-    Social,    // social: warmth, contagion, play, kitten proximity
-    Fear,      // acute threat: fled combat, predator encounter
-    Grief,     // loss: death of bonded cat, witnessed death
-    Triumph,   // shared victory: banishment, aspiration completion
-    Pride,     // esteem: wounded pride, built something, combat win
-    Magic,     // magical events: spirit communion, ward success, corruption
+    Physical, // physiological: contentment, hunger relief, warmth, remedy
+    Social,   // social: warmth, contagion, play, kitten proximity
+    Fear,     // acute threat: fled combat, predator encounter
+    Grief,    // loss: death of bonded cat, witnessed death
+    Triumph,  // shared victory: banishment, aspiration completion
+    Pride,    // esteem: wounded pride, built something, combat win
+    Magic,    // magical events: spirit communion, ward success, corruption
     #[default]
     Misc, // unclassified — uses standard rates
 }

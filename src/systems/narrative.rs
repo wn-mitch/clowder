@@ -307,9 +307,7 @@ pub fn generate_narrative(
             // 155: Herbcraft fanned to 3 sub-actions; each draws from
             // the same Herbalism prose pool. PracticeMagic fanned to 6
             // sub-actions; same Witchcraft pool.
-            Action::HerbcraftGather
-            | Action::HerbcraftRemedy
-            | Action::HerbcraftSetWard => {
+            Action::HerbcraftGather | Action::HerbcraftRemedy | Action::HerbcraftSetWard => {
                 let options = [
                     format!("{cat} carefully harvests herbs from the undergrowth."),
                     format!("{cat} grinds herbs into a poultice with practiced paws."),

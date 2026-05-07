@@ -130,10 +130,10 @@ fn simulation_is_deterministic() {
     drive_for_ticks(&mut app_b, ticks);
     drop(app_b);
 
-    let bytes_a = std::fs::read(dir_a.join("events.jsonl"))
-        .expect("events.jsonl missing for run A");
-    let bytes_b = std::fs::read(dir_b.join("events.jsonl"))
-        .expect("events.jsonl missing for run B");
+    let bytes_a =
+        std::fs::read(dir_a.join("events.jsonl")).expect("events.jsonl missing for run A");
+    let bytes_b =
+        std::fs::read(dir_b.join("events.jsonl")).expect("events.jsonl missing for run B");
 
     let identical = bytes_a == bytes_b;
 

@@ -150,9 +150,7 @@ mod tests {
             .considerations()
             .iter()
             .find_map(|c| match c {
-                Consideration::Spatial(sp) if sp.name == "fox_den_defense_den_distance" => {
-                    Some(sp)
-                }
+                Consideration::Spatial(sp) if sp.name == "fox_den_defense_den_distance" => Some(sp),
                 _ => None,
             })
             .expect("fox_den_defense_den_distance axis must exist");

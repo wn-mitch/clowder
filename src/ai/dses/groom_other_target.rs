@@ -64,7 +64,8 @@ use bevy::prelude::Entity;
 
 use crate::ai::composition::Composition;
 use crate::ai::considerations::{
-    Consideration, LandmarkSource, ScalarConsideration, SpatialConsideration, LandmarkAnchor};
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
 use crate::ai::curves::{Curve, PostOp};
 use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination};
 use crate::ai::eval::DseRegistry;
@@ -263,13 +264,7 @@ pub fn resolve_groom_other_target(
                 .get(&target)
                 .map(|t| (1.0 - t).clamp(0.0, 1.0))
                 .unwrap_or(0.0),
-            TARGET_KINSHIP_INPUT => {
-                if is_kin(cat, target) {
-                    1.0
-                } else {
-                    0.0
-                }
-            }
+            TARGET_KINSHIP_INPUT if is_kin(cat, target) => 1.0,
             TARGET_RECENT_FAILURE_INPUT => {
                 let signal = target_recent_failure_age_normalized(
                     recent,

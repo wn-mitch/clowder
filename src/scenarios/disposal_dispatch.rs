@@ -157,7 +157,11 @@ fn trash_dispatch_moves_item_into_midden() {
     );
 
     let activation = world.resource::<SystemActivation>();
-    let trashed = activation.counts.get(&Feature::ItemTrashed).copied().unwrap_or(0);
+    let trashed = activation
+        .counts
+        .get(&Feature::ItemTrashed)
+        .copied()
+        .unwrap_or(0);
     assert!(
         trashed > 0,
         "Feature::ItemTrashed must record on a successful trash; counts={:?}",

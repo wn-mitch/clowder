@@ -42,7 +42,7 @@ mod tests {
 
     use super::test_helpers::spawn_visitor_cat;
     use crate::ai::faction::{resolve_stance, FactionStance, StanceOverlays};
-    use crate::components::markers::{BefriendedAlly, Banished, HostileVisitor, Visitor};
+    use crate::components::markers::{Banished, BefriendedAlly, HostileVisitor, Visitor};
     use crate::components::physical::Position;
 
     #[test]

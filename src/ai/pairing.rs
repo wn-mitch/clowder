@@ -33,7 +33,7 @@ use crate::ai::mating::{MatingFitness, MatingFitnessParams};
 use crate::components::identity::{LifeStage, Orientation};
 use crate::components::markers::{Banished, Incapacitated};
 use crate::components::pairing::{
-    PairingActivity, PairingDropConfig, PairingProxies, should_drop_pairing,
+    should_drop_pairing, PairingActivity, PairingDropConfig, PairingProxies,
 };
 use crate::components::physical::{Dead, Position};
 use crate::components::pregnancy::Pregnant;
@@ -92,8 +92,7 @@ pub fn author_pairing_intentions(
         fondness_floor: pairing_constants.fondness_floor,
     };
 
-    let positions: Vec<(Entity, Position)> =
-        cats.iter().map(|(e, pos, _)| (e, *pos)).collect();
+    let positions: Vec<(Entity, Position)> = cats.iter().map(|(e, pos, _)| (e, *pos)).collect();
 
     for (entity, position, held) in cats.iter() {
         let Some(self_fit) = fitness.get(&entity).copied() else {
@@ -203,8 +202,8 @@ fn pick_partner(
         if *other == self_entity {
             continue;
         }
-        let manhattan = (self_position.x - other_pos.x).abs()
-            + (self_position.y - other_pos.y).abs();
+        let manhattan =
+            (self_position.x - other_pos.x).abs() + (self_position.y - other_pos.y).abs();
         if manhattan > range {
             continue;
         }
@@ -261,8 +260,8 @@ mod tests {
     use crate::components::identity::{Age, Gender, Name, Orientation};
     use crate::components::mental::Mood;
     use crate::components::physical::{Health, Needs};
-    use crate::resources::SimConstants;
     use crate::resources::time::SimConfig;
+    use crate::resources::SimConstants;
     use bevy_ecs::schedule::Schedule;
 
     /// Spawn an Adult cat with all per-cat fertility / sated-and-happy
@@ -357,7 +356,10 @@ mod tests {
 
         let activation = world.resource::<SystemActivation>();
         assert_eq!(
-            activation.counts.get(&Feature::PairingIntentionEmitted).copied(),
+            activation
+                .counts
+                .get(&Feature::PairingIntentionEmitted)
+                .copied(),
             Some(2),
             "the bond is symmetric -> both cats emit one Pairing each"
         );
@@ -495,7 +497,12 @@ mod tests {
         );
         let activation = world.resource::<SystemActivation>();
         assert!(
-            activation.counts.get(&Feature::PairingDropped).copied().unwrap_or(0) >= 1,
+            activation
+                .counts
+                .get(&Feature::PairingDropped)
+                .copied()
+                .unwrap_or(0)
+                >= 1,
             "PairingDropped activation must fire on the drop transition"
         );
     }

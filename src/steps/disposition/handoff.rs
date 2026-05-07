@@ -57,10 +57,7 @@ pub fn resolve_handoff(
     };
 
     match transfer_item_inventory_to_inventory(actor_inventory, slot_idx, recipient_inventory) {
-        Ok(()) => StepOutcome::witnessed_with(
-            StepResult::Advance,
-            HandoffOutcome { recipient },
-        ),
+        Ok(()) => StepOutcome::witnessed_with(StepResult::Advance, HandoffOutcome { recipient }),
         Err(_) => StepOutcome::unwitnessed(StepResult::Fail(
             "handoff: recipient inventory full".to_string(),
         )),

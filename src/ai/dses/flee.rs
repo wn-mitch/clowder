@@ -125,10 +125,7 @@ impl FleeDse {
                     FLEE_THREAT_RANGE,
                     threat_distance,
                 )),
-                Consideration::Scalar(ScalarConsideration::new(
-                    HEALTH_DEFICIT_INPUT,
-                    health_curve,
-                )),
+                Consideration::Scalar(ScalarConsideration::new(HEALTH_DEFICIT_INPUT, health_curve)),
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0, 1.0, 1.0]),
             // §9.3 DSE filter binding — Flee triggers on `Predator` stance.
@@ -182,8 +179,8 @@ pub fn flee_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
 
 #[cfg(test)]
 mod tests {
-    use crate::ai::considerations::LandmarkAnchor;
     use super::*;
+    use crate::ai::considerations::LandmarkAnchor;
 
     #[test]
     fn flee_dse_id_stable() {

@@ -15,8 +15,8 @@ use std::collections::HashMap;
 use bevy_ecs::prelude::Entity;
 use rand::Rng;
 
-use crate::ai::dse::EvalCtx;
 use crate::ai::considerations::LandmarkAnchor;
+use crate::ai::dse::EvalCtx;
 use crate::ai::eval::evaluate_single;
 use crate::ai::fox_planner::FoxDispositionKind;
 use crate::ai::scoring::EvalInputs;
@@ -591,8 +591,7 @@ mod tests {
             markers,
             colony_landmarks: COLONY_LANDMARKS
                 .get_or_init(crate::resources::ColonyLandmarks::default),
-            exploration_map: EXPLORATION_MAP
-                .get_or_init(crate::resources::ExplorationMap::default),
+            exploration_map: EXPLORATION_MAP.get_or_init(crate::resources::ExplorationMap::default),
             corruption_landmarks: CORRUPTION_LANDMARKS
                 .get_or_init(crate::resources::CorruptionLandmarks::default),
             focal_cat: None,

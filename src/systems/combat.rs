@@ -436,8 +436,12 @@ pub fn resolve_combat(
                     / (1.0 + prior_triumphs * c.banishment_skill_gain_diminish_factor);
                 skills.combat = (skills.combat + gain).min(5.0);
                 mood.modifiers.push_back(
-                    MoodModifier::new(c.banishment_valor_mood, valor_ticks, "valor from banishment")
-                        .with_kind(MoodSource::Triumph),
+                    MoodModifier::new(
+                        c.banishment_valor_mood,
+                        valor_ticks,
+                        "valor from banishment",
+                    )
+                    .with_kind(MoodSource::Triumph),
                 );
                 memory.remember(MemoryEntry {
                     event_type: MemoryType::Triumph,
@@ -1297,11 +1301,15 @@ mod tests {
             .entity(cat)
             .insert(crate::components::markers::Banished);
         world.flush();
-        assert!(world.get::<crate::components::markers::Banished>(cat).is_some());
+        assert!(world
+            .get::<crate::components::markers::Banished>(cat)
+            .is_some());
         // Marker is sticky — running a no-op schedule does not clear it.
         let mut schedule = Schedule::default();
         schedule.run(&mut world);
-        assert!(world.get::<crate::components::markers::Banished>(cat).is_some());
+        assert!(world
+            .get::<crate::components::markers::Banished>(cat)
+            .is_some());
     }
 
     /// Resolved stance with the `Banished` overlay set demotes

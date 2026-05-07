@@ -61,10 +61,7 @@ fn setup_injured(world: &mut World, seed: u64) {
     use crate::components::identity::Name;
     use crate::components::markers::Injured;
     let mut q = world.query::<(bevy_ecs::entity::Entity, &Name)>();
-    let stoat = q
-        .iter(world)
-        .find(|(_, n)| n.0 == "Stoat")
-        .map(|(e, _)| e);
+    let stoat = q.iter(world).find(|(_, n)| n.0 == "Stoat").map(|(e, _)| e);
     if let Some(e) = stoat {
         world.entity_mut(e).insert(Injured);
     }

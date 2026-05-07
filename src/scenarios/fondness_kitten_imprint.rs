@@ -50,13 +50,12 @@ fn setup(world: &mut World, seed: u64) {
             .with_marker(MarkerKind::Adult),
     );
 
-    let kitten =
-        spawn_kitten(
-            world,
-            CatPreset::kitten("Kit", Position::new(21, 20), current_tick),
-            mother,
-            father,
-        );
+    let kitten = spawn_kitten(
+        world,
+        CatPreset::kitten("Kit", Position::new(21, 20), current_tick),
+        mother,
+        father,
+    );
 
     // Mother + father don't know the kitten yet (just born). Initialize
     // pairs so the relationship resource has rows ready to mutate.

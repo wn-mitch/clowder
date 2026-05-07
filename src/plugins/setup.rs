@@ -166,7 +166,8 @@ pub fn setup_world_exclusive(world: &mut World) {
     // landed (defensive for the load_path case where saved SimConfig
     // may differ from defaults).
     {
-        let provisional = TimeScale::from_config(&SimConfig::default(), args_wall_seconds_per_game_day);
+        let provisional =
+            TimeScale::from_config(&SimConfig::default(), args_wall_seconds_per_game_day);
         world.insert_resource(provisional);
     }
 

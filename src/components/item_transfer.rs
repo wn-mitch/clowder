@@ -234,9 +234,7 @@ pub fn transfer_item_inventory_to_inventory(
     }
 
     let added = match source.slots.get(slot_idx) {
-        Some(ItemSlot::Item(kind, modifiers)) => {
-            target.add_item_with_modifiers(*kind, *modifiers)
-        }
+        Some(ItemSlot::Item(kind, modifiers)) => target.add_item_with_modifiers(*kind, *modifiers),
         Some(ItemSlot::Herb(kind)) => target.add_herb(*kind),
         None => return Err(TransferError::DestinationFull),
     };

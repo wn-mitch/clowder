@@ -136,8 +136,8 @@ pub fn herbcraft_ward_dse() -> Box<dyn Dse> {
 
 #[cfg(test)]
 mod tests {
-    use crate::ai::considerations::LandmarkAnchor;
     use super::*;
+    use crate::ai::considerations::LandmarkAnchor;
     use crate::ai::eval::{evaluate_single, ModifierPipeline};
     use crate::components::physical::Position;
 

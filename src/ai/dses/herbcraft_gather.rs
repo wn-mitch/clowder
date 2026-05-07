@@ -158,9 +158,7 @@ mod tests {
             .considerations()
             .iter()
             .find_map(|c| match c {
-                Consideration::Spatial(s) if s.name == "herbcraft_gather_patch_distance" => {
-                    Some(s)
-                }
+                Consideration::Spatial(s) if s.name == "herbcraft_gather_patch_distance" => Some(s),
                 _ => None,
             })
             .expect("herbcraft_gather_patch_distance axis must exist");

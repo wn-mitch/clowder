@@ -73,14 +73,9 @@ pub fn resolve_pick_up_from_ground(
     };
 
     if !inventory.add_item_with_modifiers(item.kind, item.modifiers) {
-        return StepOutcome::unwitnessed(StepResult::Fail(
-            "pick_up: inventory full".to_string(),
-        ));
+        return StepOutcome::unwitnessed(StepResult::Fail("pick_up: inventory full".to_string()));
     }
 
     commands.entity(item_entity).despawn();
-    StepOutcome::witnessed_with(
-        StepResult::Advance,
-        PickUpOutcome { item_entity },
-    )
+    StepOutcome::witnessed_with(StepResult::Advance, PickUpOutcome { item_entity })
 }

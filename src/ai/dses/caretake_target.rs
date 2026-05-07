@@ -76,7 +76,8 @@ use bevy::prelude::Entity;
 use crate::ai::caretake_targeting::{CaretakeResolution, KittenState};
 use crate::ai::composition::Composition;
 use crate::ai::considerations::{
-    Consideration, LandmarkSource, ScalarConsideration, SpatialConsideration, LandmarkAnchor};
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
 use crate::ai::curves::Curve;
 use crate::ai::dse::{CommitmentStrategy, DseId, EvalCtx, GoalState, Intention};
 use crate::ai::eval::DseRegistry;
@@ -482,8 +483,16 @@ mod tests {
     fn resolver_returns_default_with_no_registered_dse() {
         let registry = DseRegistry::new();
         let adult = Entity::from_raw_u32(1).unwrap();
-        let out =
-            resolve_caretake_target(&registry, adult, Position::new(0, 0), &[], &[], 0, None, false);
+        let out = resolve_caretake_target(
+            &registry,
+            adult,
+            Position::new(0, 0),
+            &[],
+            &[],
+            0,
+            None,
+            false,
+        );
         assert!(out.target.is_none());
         assert_eq!(out.urgency, 0.0);
         assert!(!out.is_parent);
@@ -494,8 +503,16 @@ mod tests {
         let mut registry = DseRegistry::new();
         registry.target_taking_dses.push(caretake_target_dse());
         let adult = Entity::from_raw_u32(1).unwrap();
-        let out =
-            resolve_caretake_target(&registry, adult, Position::new(0, 0), &[], &[], 0, None, false);
+        let out = resolve_caretake_target(
+            &registry,
+            adult,
+            Position::new(0, 0),
+            &[],
+            &[],
+            0,
+            None,
+            false,
+        );
         assert!(out.target.is_none());
     }
 

@@ -111,8 +111,7 @@ pub fn emit_colony_score(
 
     // --- Update season counter ---
     let tps = sim_config.ticks_per_season;
-    if tps > 0 {
-        let current_season = time.tick / tps;
+    if let Some(current_season) = time.tick.checked_div(tps) {
         if current_season > score.last_recorded_season {
             score.seasons_survived += current_season - score.last_recorded_season;
             score.last_recorded_season = current_season;

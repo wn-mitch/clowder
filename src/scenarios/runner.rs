@@ -150,9 +150,7 @@ pub fn run(
     ticks_override: Option<u32>,
     seed: u64,
 ) -> ScenarioReport {
-    let focal = focal_override
-        .unwrap_or(scenario.default_focal)
-        .to_string();
+    let focal = focal_override.unwrap_or(scenario.default_focal).to_string();
     let ticks = ticks_override.unwrap_or(scenario.default_ticks);
 
     let mut app = build_scenario_app(seed, scenario, &focal);
@@ -199,7 +197,8 @@ pub fn run(
         // Live prey entities.
         {
             use crate::components::prey::PreyAnimal;
-            let mut q = world.query_filtered::<bevy_ecs::entity::Entity, bevy_ecs::prelude::With<PreyAnimal>>();
+            let mut q = world
+                .query_filtered::<bevy_ecs::entity::Entity, bevy_ecs::prelude::With<PreyAnimal>>();
             final_prey_count = q.iter(world).count();
         }
         // Ground items (Item entities with ItemLocation::OnGround).
@@ -371,17 +370,23 @@ fn drain_tick_report(app: &mut App) -> TickReport {
                     final_score,
                     modifier_deltas: modifiers
                         .into_iter()
-                        .map(|ModifierApplication { name, delta, multiplier }| {
-                            // Additive modifiers carry `delta`; the few
-                            // multiplicative ones surface their multiplier
-                            // here so a future fox-territory suppression
-                            // (or similar) is visible without the caller
-                            // re-reading the trace. Drop rows where both
-                            // are absent (shouldn't happen — guard rather
-                            // than panic).
-                            let value = delta.or(multiplier).unwrap_or(0.0);
-                            (name, value)
-                        })
+                        .map(
+                            |ModifierApplication {
+                                 name,
+                                 delta,
+                                 multiplier,
+                             }| {
+                                // Additive modifiers carry `delta`; the few
+                                // multiplicative ones surface their multiplier
+                                // here so a future fox-territory suppression
+                                // (or similar) is visible without the caller
+                                // re-reading the trace. Drop rows where both
+                                // are absent (shouldn't happen — guard rather
+                                // than panic).
+                                let value = delta.or(multiplier).unwrap_or(0.0);
+                                (name, value)
+                            },
+                        )
                         .collect(),
                 });
             }

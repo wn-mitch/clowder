@@ -30,16 +30,7 @@ pub enum FeatureCategory {
 /// system running, but actual *work* being done (corruption spreading to a
 /// new tile, a bond forming, a ShadowFox spawning, etc.).
 #[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
 pub enum Feature {
     CorruptionSpread,

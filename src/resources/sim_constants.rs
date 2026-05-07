@@ -1977,28 +1977,24 @@ impl Default for ScoringConstants {
             hunger_urgency_forage_lift: default_hunger_urgency_forage_lift(),
             kitten_eat_boost_threshold: default_kitten_eat_boost_threshold(),
             kitten_eat_boost_multiplier: default_kitten_eat_boost_multiplier(),
-            kitten_cry_caretake_lift_threshold:
-                default_kitten_cry_caretake_lift_threshold(),
+            kitten_cry_caretake_lift_threshold: default_kitten_cry_caretake_lift_threshold(),
             kitten_cry_caretake_lift: default_kitten_cry_caretake_lift(),
             exhaustion_pressure_threshold: default_exhaustion_pressure_threshold(),
             exhaustion_pressure_sleep_lift: default_exhaustion_pressure_sleep_lift(),
             exhaustion_pressure_groom_lift: default_exhaustion_pressure_groom_lift(),
             thermal_distress_threshold: default_thermal_distress_threshold(),
             thermal_distress_sleep_lift: default_thermal_distress_sleep_lift(),
-            threat_proximity_adrenaline_threshold:
-                default_threat_proximity_adrenaline_threshold(),
-            threat_proximity_adrenaline_flee_lift:
-                default_threat_proximity_adrenaline_flee_lift(),
-            threat_proximity_adrenaline_sleep_lift:
-                default_threat_proximity_adrenaline_sleep_lift(),
+            threat_proximity_adrenaline_threshold: default_threat_proximity_adrenaline_threshold(),
+            threat_proximity_adrenaline_flee_lift: default_threat_proximity_adrenaline_flee_lift(),
+            threat_proximity_adrenaline_sleep_lift: default_threat_proximity_adrenaline_sleep_lift(
+            ),
             threat_proximity_adrenaline_viability_threshold:
                 default_threat_proximity_adrenaline_viability_threshold(),
-            intraspecies_conflict_flight_threshold:
-                default_intraspecies_conflict_flight_threshold(),
+            intraspecies_conflict_flight_threshold: default_intraspecies_conflict_flight_threshold(
+            ),
             intraspecies_conflict_flight_lift: default_intraspecies_conflict_flight_lift(),
             social_perception_radius: default_social_perception_radius(),
-            social_status_distress_respect_weight:
-                default_social_status_distress_respect_weight(),
+            social_status_distress_respect_weight: default_social_status_distress_respect_weight(),
             social_status_distress_age_weight: default_social_status_distress_age_weight(),
             social_status_distress_bond_weight: default_social_status_distress_bond_weight(),
             social_status_distress_age_normalization_ticks:

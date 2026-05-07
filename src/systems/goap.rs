@@ -15,9 +15,7 @@ use crate::components::building::{
     ConstructionSite, CropState, StoredItems, Structure, StructureType,
 };
 use crate::components::coordination::{ActiveDirective, Directive, DirectiveKind, DirectiveQueue};
-use crate::components::disposition::{
-    ActionHistory, ActionOutcome, ActionRecord, DispositionKind,
-};
+use crate::components::disposition::{ActionHistory, ActionOutcome, ActionRecord, DispositionKind};
 use crate::components::goap_plan::{
     GoapPlan, PendingUrgencies, PlanEvent, PlanNarrative, StepExecutionState, UrgencyKind,
     UrgentNeed,
@@ -480,11 +478,8 @@ pub struct ExecutorContext<'w, 's> {
     /// the FeedKitten step's target-rebinding inherits the
     /// own-kitten-anywhere fallback when the per-tick range gate
     /// excludes every candidate.
-    pub parent_hungry_kitten_q: bevy_ecs::prelude::Query<
-        'w,
-        's,
-        Has<crate::components::markers::IsParentOfHungryKitten>,
-    >,
+    pub parent_hungry_kitten_q:
+        bevy_ecs::prelude::Query<'w, 's, Has<crate::components::markers::IsParentOfHungryKitten>>,
     /// Ticket 027b §7.M — L2 PairingActivity Intention lookup. The
     /// `SocializeWith` step resolver reads this to pin the Intention
     /// partner at the top of `target_partner_bond` axis. Disjoint
@@ -621,7 +616,10 @@ pub fn check_modifier_preemption(
         // Recovery dispositions are already self-care — preempting
         // them just oscillates. Mirrors the legacy CriticalHealth
         // interrupt's exemption.
-        if matches!(plan.kind, DispositionKind::Resting | DispositionKind::Eating) {
+        if matches!(
+            plan.kind,
+            DispositionKind::Resting | DispositionKind::Eating
+        ) {
             continue;
         }
 
@@ -637,11 +635,10 @@ pub fn check_modifier_preemption(
         let safety_deficit_prev = prev_safety_deficit
             .map(|p| p.0)
             .unwrap_or(safety_deficit_now);
-        let threat_proximity_derivative =
-            crate::components::PrevSafetyDeficit::rising_derivative(
-                safety_deficit_now,
-                safety_deficit_prev,
-            );
+        let threat_proximity_derivative = crate::components::PrevSafetyDeficit::rising_derivative(
+            safety_deficit_now,
+            safety_deficit_prev,
+        );
         let fetch_scalar = move |scalar: &str, _: Entity| -> f32 {
             match scalar {
                 "health_deficit" => health_deficit,
@@ -1152,10 +1149,9 @@ pub fn evaluate_and_plan(
         has_midden,
         has_ground_carcass,
         has_handoff_recipient,
-    ) = world_state
-        .colony_state_query
-        .single()
-        .expect("ColonyState singleton must exist (spawned by build_new_world / init_scenario_world_with)");
+    ) = world_state.colony_state_query.single().expect(
+        "ColonyState singleton must exist (spawned by build_new_world / init_scenario_world_with)",
+    );
     let food_fraction = res.food.fraction();
 
     // §4 marker snapshot. Populated once at system start from the
@@ -1480,8 +1476,7 @@ pub fn evaluate_and_plan(
         }
         // Ticket 014 §4 sensing batch — broad-phase target-existence
         // markers authored by `sensing::update_target_existence_markers`.
-        if let Ok((threat, social, herbs, prey, carcass)) =
-            marker_qs.target_existence_q.get(entity)
+        if let Ok((threat, social, herbs, prey, carcass)) = marker_qs.target_existence_q.get(entity)
         {
             markers.set_entity(markers::HasThreatNearby::KEY, entity, threat);
             markers.set_entity(markers::HasSocialTarget::KEY, entity, social);
@@ -1699,13 +1694,7 @@ pub fn evaluate_and_plan(
                 focal_age,
                 needs.respect,
                 &cat_positions,
-                |e| {
-                    world_state
-                        .age_query
-                        .get(e)
-                        .ok()
-                        .map(|a| a.born_tick)
-                },
+                |e| world_state.age_query.get(e).ok().map(|a| a.born_tick),
                 |e| world_state.needs_query.get(e).ok().map(|n| n.respect),
                 &res.relationships,
                 res.time.tick,
@@ -1773,14 +1762,13 @@ pub fn evaluate_and_plan(
             social_warmth_deficit: fulfillment.map_or(0.4, |f| f.social_warmth_deficit()),
             cat_anchors: crate::ai::scoring::CatAnchorPositions {
                 nearest_corrupted_tile,
-                nearest_construction_site:
-                    crate::systems::buildings::nearest_construction_site(
-                        world_state
-                            .building_query
-                            .iter()
-                            .map(|(_, s, p, site, _)| (s, p, site)),
-                        *pos,
-                    ),
+                nearest_construction_site: crate::systems::buildings::nearest_construction_site(
+                    world_state
+                        .building_query
+                        .iter()
+                        .map(|(_, s, p, site, _)| (s, p, site)),
+                    *pos,
+                ),
                 // §L2.10.7 Sleep anchor: cats sleep where they are
                 // (no per-cat assigned sleeping spot exists today —
                 // future component could replace this fallback). The
@@ -1839,14 +1827,18 @@ pub fn evaluate_and_plan(
                     recent_disposition_failures.as_deref(),
                     crate::components::disposition::DispositionKind::Hunting,
                     res.time.tick,
-                    res.constants.planning_substrate.disposition_failure_cooldown_ticks,
+                    res.constants
+                        .planning_substrate
+                        .disposition_failure_cooldown_ticks,
                 ),
             disposition_failure_signal_foraging:
                 crate::systems::plan_substrate::disposition_recent_failure_age_normalized(
                     recent_disposition_failures.as_deref(),
                     crate::components::disposition::DispositionKind::Foraging,
                     res.time.tick,
-                    res.constants.planning_substrate.disposition_failure_cooldown_ticks,
+                    res.constants
+                        .planning_substrate
+                        .disposition_failure_cooldown_ticks,
                 ),
             // 155: `Crafting` retired into Herbalism / Witchcraft /
             // Cooking. The per-disposition recent-failure signal field
@@ -1861,35 +1853,45 @@ pub fn evaluate_and_plan(
                     recent_disposition_failures.as_deref(),
                     crate::components::disposition::DispositionKind::Herbalism,
                     res.time.tick,
-                    res.constants.planning_substrate.disposition_failure_cooldown_ticks,
+                    res.constants
+                        .planning_substrate
+                        .disposition_failure_cooldown_ticks,
                 ),
             disposition_failure_signal_caretaking:
                 crate::systems::plan_substrate::disposition_recent_failure_age_normalized(
                     recent_disposition_failures.as_deref(),
                     crate::components::disposition::DispositionKind::Caretaking,
                     res.time.tick,
-                    res.constants.planning_substrate.disposition_failure_cooldown_ticks,
+                    res.constants
+                        .planning_substrate
+                        .disposition_failure_cooldown_ticks,
                 ),
             disposition_failure_signal_building:
                 crate::systems::plan_substrate::disposition_recent_failure_age_normalized(
                     recent_disposition_failures.as_deref(),
                     crate::components::disposition::DispositionKind::Building,
                     res.time.tick,
-                    res.constants.planning_substrate.disposition_failure_cooldown_ticks,
+                    res.constants
+                        .planning_substrate
+                        .disposition_failure_cooldown_ticks,
                 ),
             disposition_failure_signal_mating:
                 crate::systems::plan_substrate::disposition_recent_failure_age_normalized(
                     recent_disposition_failures.as_deref(),
                     crate::components::disposition::DispositionKind::Mating,
                     res.time.tick,
-                    res.constants.planning_substrate.disposition_failure_cooldown_ticks,
+                    res.constants
+                        .planning_substrate
+                        .disposition_failure_cooldown_ticks,
                 ),
             disposition_failure_signal_mentoring:
                 crate::systems::plan_substrate::disposition_recent_failure_age_normalized(
                     recent_disposition_failures.as_deref(),
                     crate::components::disposition::DispositionKind::Mentoring,
                     res.time.tick,
-                    res.constants.planning_substrate.disposition_failure_cooldown_ticks,
+                    res.constants
+                        .planning_substrate
+                        .disposition_failure_cooldown_ticks,
                 ),
             memory_resource_found_proximity_sum: memory_sums.0,
             memory_death_proximity_sum: memory_sums.1,
@@ -2149,8 +2151,7 @@ pub fn evaluate_and_plan(
             if steps.is_empty() {
                 continue;
             }
-            let mut plan =
-                GoapPlan::new(chosen, chosen_action, res.time.tick, personality, steps);
+            let mut plan = GoapPlan::new(chosen, chosen_action, res.time.tick, personality, steps);
             // 150 R5a: Eating shares Resting's runaway-replan cap. Both
             // are physiological-completion dispositions; reusing the
             // existing `resting_max_replans` keeps the comparability
@@ -2581,7 +2582,11 @@ pub fn resolve_goap_plans(
         planner_markers.set_entity(
             markers::MaterialsAvailable::KEY,
             entity,
-            materials_available_for(pos, &construction_positions, &construction_materials_complete),
+            materials_available_for(
+                pos,
+                &construction_positions,
+                &construction_materials_complete,
+            ),
         );
     }
 
@@ -3135,9 +3140,7 @@ pub fn resolve_goap_plans(
                 // — body is verbatim today; 073 extends it to update
                 // `RecentTargetFailures` for cross-plan target memory.
                 let failed_action = plan.current().map(|s| s.action);
-                let failed_target = plan
-                    .current_state()
-                    .and_then(|s| s.target_entity);
+                let failed_target = plan.current_state().and_then(|s| s.target_entity);
                 if let Some(action) = failed_action {
                     // Ticket 073 — lazy-insert `RecentTargetFailures` on
                     // first failure for save-loaded cats that pre-date
@@ -3148,9 +3151,9 @@ pub fn resolve_goap_plans(
                     // gracefully (single-tick miss vs the 8000-tick
                     // cooldown window).
                     if recent_failures.is_none() && failed_target.is_some() {
-                        commands.entity(cat_entity).insert(
-                            crate::components::RecentTargetFailures::default(),
-                        );
+                        commands
+                            .entity(cat_entity)
+                            .insert(crate::components::RecentTargetFailures::default());
                     }
                     crate::systems::plan_substrate::record_step_failure(
                         &mut plan,
@@ -3296,9 +3299,9 @@ pub fn resolve_goap_plans(
                         let abandon_action = failed_action;
                         let abandon_target = failed_target;
                         if recent_failures.is_none() && abandon_target.is_some() {
-                            commands.entity(cat_entity).insert(
-                                crate::components::RecentTargetFailures::default(),
-                            );
+                            commands
+                                .entity(cat_entity)
+                                .insert(crate::components::RecentTargetFailures::default());
                         }
                         let _abandoned = crate::systems::plan_substrate::abandon_plan(
                             &mut current,
@@ -3332,9 +3335,9 @@ pub fn resolve_goap_plans(
                     let abandon_action = failed_action;
                     let abandon_target = failed_target;
                     if recent_failures.is_none() && abandon_target.is_some() {
-                        commands.entity(cat_entity).insert(
-                            crate::components::RecentTargetFailures::default(),
-                        );
+                        commands
+                            .entity(cat_entity)
+                            .insert(crate::components::RecentTargetFailures::default());
                     }
                     let _abandoned = crate::systems::plan_substrate::abandon_plan(
                         &mut current,
@@ -3393,11 +3396,8 @@ pub fn resolve_goap_plans(
         };
         let actor_inv: &mut Inventory = &mut actor_row.0 .6;
         let recipient_inv: &mut Inventory = &mut recipient_row.0 .6;
-        let outcome = crate::steps::disposition::resolve_handoff(
-            actor_inv,
-            pending.recipient,
-            recipient_inv,
-        );
+        let outcome =
+            crate::steps::disposition::resolve_handoff(actor_inv, pending.recipient, recipient_inv);
         outcome.record_if_witnessed(
             narr.activation.as_deref_mut(),
             crate::resources::system_activation::Feature::ItemHandedOff,
@@ -3564,10 +3564,9 @@ fn dispatch_step_action(
     // Resolver bodies remain unchanged — the contract is "step
     // resolvers run only with valid targets"; the gate enforces it.
     if let Some(target) = plan.step_state[step_idx].target_entity {
-        if let Err(reason) = crate::systems::plan_substrate::validate_target(
-            target,
-            &ec.target_validity,
-        ) {
+        if let Err(reason) =
+            crate::systems::plan_substrate::validate_target(target, &ec.target_validity)
+        {
             // Failure name encodes the invalidity flavor for the
             // narrative trace; the existing `PlanFailureReason::TargetDespawned`
             // path consumes the failure regardless of subkind.
@@ -3826,11 +3825,7 @@ fn dispatch_step_action(
                 // tier. Falls back to `None` for cats without an
                 // Intention (the steady-state for non-reproductive
                 // or partnerless cats).
-                let pairing_partner = ec
-                    .pairing_q
-                    .get(cat_entity)
-                    .ok()
-                    .map(|p| p.partner);
+                let pairing_partner = ec.pairing_q.get(cat_entity).ok().map(|p| p.partner);
                 plan.step_state[step_idx].target_entity =
                     crate::ai::dses::socialize_target::resolve_socialize_target(
                         &ec.dse_registry,
@@ -4324,10 +4319,8 @@ fn dispatch_step_action(
                 } else {
                     None
                 };
-                let parent_marker_active = ec
-                    .parent_hungry_kitten_q
-                    .get(cat_entity)
-                    .unwrap_or(false);
+                let parent_marker_active =
+                    ec.parent_hungry_kitten_q.get(cat_entity).unwrap_or(false);
                 plan.step_state[step_idx].target_entity =
                     crate::ai::dses::caretake_target::resolve_caretake_target(
                         &ec.dse_registry,
@@ -4758,7 +4751,13 @@ fn dispatch_step_action(
                         }
                     }
                     crate::steps::StepResult::Continue
-                } else if ticks >= ec.constants.magic.harvest_carcass_duration.ticks(&ec.time_scale) {
+                } else if ticks
+                    >= ec
+                        .constants
+                        .magic
+                        .harvest_carcass_duration
+                        .ticks(&ec.time_scale)
+                {
                     if let Ok((_, mut carcass, _)) =
                         magic_params.carcass_query.get_mut(carcass_entity)
                     {
@@ -5041,9 +5040,7 @@ fn dispatch_step_action(
         // on `transfer_item_inventory_to_inventory` keeps the source
         // untouched on `DestinationFull`, so no item is destroyed).
         GoapActionKind::DropItem => {
-            let outcome = crate::steps::disposition::resolve_drop_item(
-                inventory, *pos, commands,
-            );
+            let outcome = crate::steps::disposition::resolve_drop_item(inventory, *pos, commands);
             outcome.record_if_witnessed(
                 narr.activation.as_deref_mut(),
                 crate::resources::system_activation::Feature::ItemDropped,
@@ -5120,7 +5117,10 @@ fn dispatch_step_action(
             }
             let target = plan.step_state[step_idx].target_entity;
             let outcome = crate::steps::disposition::resolve_pick_up_from_ground(
-                inventory, target, items_query, commands,
+                inventory,
+                target,
+                items_query,
+                commands,
             );
             outcome.record_if_witnessed(
                 narr.activation.as_deref_mut(),
@@ -5884,10 +5884,8 @@ fn resolve_engage_prey(
             let modifiers =
                 crate::components::items::ItemModifiers::with_corruption(catch_corruption);
             if consumed_in_place {
-                let freshness =
-                    (1.0 - catch_corruption * d.corruption_food_penalty).max(0.0);
-                needs.hunger =
-                    (needs.hunger + item_kind.food_value() * freshness).min(1.0);
+                let freshness = (1.0 - catch_corruption * d.corruption_food_penalty).max(0.0);
+                needs.hunger = (needs.hunger + item_kind.food_value() * freshness).min(1.0);
                 if let Some(act) = narr.activation.as_deref_mut() {
                     act.record(crate::resources::system_activation::Feature::FoodEaten);
                 }
@@ -5916,9 +5914,7 @@ fn resolve_engage_prey(
                     prey_pos,
                 ));
                 if let Some(act) = narr.activation.as_deref_mut() {
-                    act.record(
-                        crate::resources::system_activation::Feature::OverflowToGround,
-                    );
+                    act.record(crate::resources::system_activation::Feature::OverflowToGround);
                 }
             }
             skills.hunting += skills.growth_rate() * d.hunt_catch_skill_growth;
@@ -5991,9 +5987,7 @@ fn resolve_engage_prey(
                     start_distance,
                     None,
                 );
-                return crate::steps::StepResult::Fail(
-                    "consumed catch in place".into(),
-                );
+                return crate::steps::StepResult::Fail("consumed catch in place".into());
             }
             if inventory.is_full() {
                 record_hunt_attempt(
@@ -6301,10 +6295,8 @@ fn resolve_forage_item(
             let modifiers =
                 crate::components::items::ItemModifiers::with_corruption(forage_corruption);
             if consumed_in_place {
-                let freshness =
-                    (1.0 - forage_corruption * d.corruption_food_penalty).max(0.0);
-                needs.hunger =
-                    (needs.hunger + item_kind.food_value() * freshness).min(1.0);
+                let freshness = (1.0 - forage_corruption * d.corruption_food_penalty).max(0.0);
+                needs.hunger = (needs.hunger + item_kind.food_value() * freshness).min(1.0);
                 if let Some(act) = narr.activation.as_deref_mut() {
                     act.record(crate::resources::system_activation::Feature::FoodEaten);
                 }
@@ -6328,9 +6320,7 @@ fn resolve_forage_item(
                     *pos,
                 ));
                 if let Some(act) = narr.activation.as_deref_mut() {
-                    act.record(
-                        crate::resources::system_activation::Feature::OverflowToGround,
-                    );
+                    act.record(crate::resources::system_activation::Feature::OverflowToGround);
                 }
             }
             skills.foraging += skills.growth_rate() * d.forage_skill_growth;
@@ -7183,9 +7173,8 @@ mod tests {
                 exploration.explore_tile(x, y);
             }
         }
-        exploration.recompute_frontier_centroid(
-            crate::resources::exploration_map::FRONTIER_THRESHOLD,
-        );
+        exploration
+            .recompute_frontier_centroid(crate::resources::exploration_map::FRONTIER_THRESHOLD);
         let centroid = exploration
             .frontier_centroid()
             .expect("right half is unexplored");
@@ -7214,9 +7203,8 @@ mod tests {
                 exploration.explore_tile(x, y);
             }
         }
-        exploration.recompute_frontier_centroid(
-            crate::resources::exploration_map::FRONTIER_THRESHOLD,
-        );
+        exploration
+            .recompute_frontier_centroid(crate::resources::exploration_map::FRONTIER_THRESHOLD);
         assert!(exploration.frontier_centroid().is_none());
 
         let cat = Position::new(10, 10);
@@ -7245,9 +7233,8 @@ mod tests {
                 exploration.explore_tile(x, y);
             }
         }
-        exploration.recompute_frontier_centroid(
-            crate::resources::exploration_map::FRONTIER_THRESHOLD,
-        );
+        exploration
+            .recompute_frontier_centroid(crate::resources::exploration_map::FRONTIER_THRESHOLD);
         assert!(exploration.frontier_centroid().is_none());
 
         let cat = Position::new(10, 10);

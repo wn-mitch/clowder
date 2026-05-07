@@ -129,7 +129,10 @@ mod tests {
         let mut map = ConstructionSiteMap::new(40, 40, 5);
         map.stamp(20, 20, 0.7, 15.0);
         let center = map.get(22, 22);
-        assert!(center < 0.7, "weak urgency should not max out, got {center}");
+        assert!(
+            center < 0.7,
+            "weak urgency should not max out, got {center}"
+        );
         assert!(center > 0.0);
     }
 

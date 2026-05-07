@@ -82,7 +82,10 @@ mod tests {
 
     #[test]
     fn deficit_inverse_of_level() {
-        let f = Fulfillment { social_warmth: 0.3, body_condition: 1.0 };
+        let f = Fulfillment {
+            social_warmth: 0.3,
+            body_condition: 1.0,
+        };
         assert!((f.social_warmth_deficit() - 0.7).abs() < f32::EPSILON);
     }
 
@@ -94,7 +97,10 @@ mod tests {
         };
         assert!((low.social_warmth_deficit() - 1.0).abs() < f32::EPSILON);
 
-        let high = Fulfillment { social_warmth: 1.5, body_condition: 1.0 };
+        let high = Fulfillment {
+            social_warmth: 1.5,
+            body_condition: 1.0,
+        };
         assert!((high.social_warmth_deficit() - 0.0).abs() < f32::EPSILON);
     }
 

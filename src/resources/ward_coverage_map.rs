@@ -149,7 +149,10 @@ mod tests {
         map.stamp_ward(20, 20, 1.0, 9.0);
         // Bucket center at the ward should read close to full strength.
         let center = map.get(22, 22);
-        assert!(center > 0.5, "expected strong coverage at ward, got {center}");
+        assert!(
+            center > 0.5,
+            "expected strong coverage at ward, got {center}"
+        );
         // Far outside radius should still be zero.
         assert_eq!(map.get(0, 0), 0.0);
     }

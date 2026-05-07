@@ -845,9 +845,9 @@ pub fn default_strategy_for_intention(is_goal: bool) -> CommitmentStrategy {
 
 #[cfg(test)]
 mod tests {
-    use crate::ai::considerations::LandmarkAnchor;
     use super::*;
     use crate::ai::composition::Composition;
+    use crate::ai::considerations::LandmarkAnchor;
     use crate::ai::considerations::{Consideration, ScalarConsideration};
     use crate::ai::curves::hangry;
     use crate::ai::dse::{ActivityKind, DseId, Termination};

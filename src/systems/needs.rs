@@ -124,7 +124,11 @@ pub fn decay_needs(
         // `HungerUrgency` modifier (ticket 106). 032 ships only the damage
         // half; matching the urgency-side ramp shape is a 106 follow-on.
         let cliff_factor = if c.starvation_cliff_use_legacy {
-            if needs.hunger == 0.0 { 1.0 } else { 0.0 }
+            if needs.hunger == 0.0 {
+                1.0
+            } else {
+                0.0
+            }
         } else if needs.hunger >= c.starvation_cliff_threshold {
             0.0
         } else {
@@ -158,8 +162,12 @@ pub fn decay_needs(
             if cliff_factor > c.starvation_mood_threshold {
                 if !mood.modifiers.iter().any(|m| m.source == "starvation") {
                     mood.modifiers.push_back(
-                        MoodModifier::new(c.starvation_mood_penalty, c.starvation_mood_ticks, "starvation")
-                            .with_kind(MoodSource::Physical),
+                        MoodModifier::new(
+                            c.starvation_mood_penalty,
+                            c.starvation_mood_ticks,
+                            "starvation",
+                        )
+                        .with_kind(MoodSource::Physical),
                     );
                 } else {
                     // Refresh the existing starvation modifier.
@@ -389,9 +397,7 @@ pub fn stamp_passive_exploration(
 /// Ordering — runs after `stamp_passive_exploration` (Chain 2a) so the
 /// centroid reflects this tick's exploration state, with at most one
 /// tick of lag for the AI consumer that reads it next frame.
-pub fn update_exploration_centroid(
-    mut exploration_map: ResMut<crate::resources::ExplorationMap>,
-) {
+pub fn update_exploration_centroid(mut exploration_map: ResMut<crate::resources::ExplorationMap>) {
     exploration_map
         .recompute_frontier_centroid(crate::resources::exploration_map::FRONTIER_THRESHOLD);
 }
@@ -878,10 +884,9 @@ mod tests {
         let ts = test_time_scale();
         let nc = &SimConstants::default().needs;
         // Safety normally recovers by safety_recovery_rate. With tradition bonus: +tradition_safety_boost extra.
-        let expected_min = 0.8
-            + nc.safety_recovery_rate.per_tick(&ts)
-            + nc.tradition_safety_boost.per_tick(&ts)
-            - 1e-6;
+        let expected_min =
+            0.8 + nc.safety_recovery_rate.per_tick(&ts) + nc.tradition_safety_boost.per_tick(&ts)
+                - 1e-6;
         assert!(
             safety > expected_min,
             "traditional cat near familiar territory should get safety boost; got {safety}"

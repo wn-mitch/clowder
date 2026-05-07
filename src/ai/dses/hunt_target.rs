@@ -52,7 +52,8 @@ use bevy::prelude::Entity;
 
 use crate::ai::composition::Composition;
 use crate::ai::considerations::{
-    Consideration, LandmarkSource, ScalarConsideration, SpatialConsideration, LandmarkAnchor};
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
 use crate::ai::curves::{Curve, PostOp};
 use crate::ai::dse::{CommitmentStrategy, DseId, EvalCtx, GoalState, Intention};
 use crate::ai::eval::DseRegistry;
@@ -241,20 +242,18 @@ pub fn resolve_hunt_target(
     // stance fails the requirement. `BefriendedAlly` upgrades a Prey
     // base to Ally, which Hunt's `Prey`-only requirement rejects.
     if let Some(req) = dse.required_stance() {
-        let species_lookup: std::collections::HashMap<
-            Entity,
-            crate::ai::faction::FactionSpecies,
-        > = candidates
-            .iter()
-            .map(|c| {
-                (
-                    c.entity,
-                    crate::ai::faction::FactionSpecies::from_sensory(
-                        crate::components::sensing::SensorySpecies::Prey(c.kind),
-                    ),
-                )
-            })
-            .collect();
+        let species_lookup: std::collections::HashMap<Entity, crate::ai::faction::FactionSpecies> =
+            candidates
+                .iter()
+                .map(|c| {
+                    (
+                        c.entity,
+                        crate::ai::faction::FactionSpecies::from_sensory(
+                            crate::components::sensing::SensorySpecies::Prey(c.kind),
+                        ),
+                    )
+                })
+                .collect();
         let species_of = |e: Entity| species_lookup.get(&e).copied();
         let (filtered, filtered_pos) = crate::ai::faction::filter_candidates_by_stance(
             relations,

@@ -90,6 +90,38 @@ export async function parseLogFile(file: File): Promise<LoadedFile> {
     })
   }
 
+  // Belt-and-braces console surface for the silent failure modes the
+  // UI also surfaces in TraceDashboard's load-status block. The parser
+  // is exception-free by design; these warns are the only way a dev
+  // opening the console without expanding the status block sees them.
+  if (parseErrors.length > 0) {
+    console.warn(
+      `narrative-editor: parsed ${file.name} with ${parseErrors.length} parse `
+      + `error${parseErrors.length === 1 ? '' : 's'} out of ${lineNumber} line`
+      + `${lineNumber === 1 ? '' : 's'} — first: line ${parseErrors[0].line}: `
+      + `${parseErrors[0].message}`,
+    )
+  }
+  if (header === null && lineNumber > 0) {
+    console.warn(
+      `narrative-editor: ${file.name} had no \`_header: true\` line — run `
+      + `metadata (seed, commit, focal_cat) is unavailable`,
+    )
+  }
+  if (traces.length > 0 && !header?.focal_cat) {
+    console.warn(
+      `narrative-editor: ${file.name} has ${traces.length} trace records but `
+      + `header is missing \`focal_cat\` — scrubber cannot key the focal cat`,
+    )
+  }
+  if (header !== null && traces.length === 0 && events.length === 0 && narrative.length === 0) {
+    console.warn(
+      `narrative-editor: ${file.name} parsed header but zero records — `
+      + `simulator emitted no rows for focal_cat=${header.focal_cat ?? '?'} `
+      + `(unresolved entity, dead pre-resolve, or empty run)`,
+    )
+  }
+
   return {
     name: file.name,
     size: file.size,

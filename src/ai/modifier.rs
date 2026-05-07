@@ -153,8 +153,7 @@ const ACTIVE_DISPOSITION_ORDINAL: &str = "active_disposition_ordinal";
 /// `&'static str` the substrate publishes) becomes a build-time error
 /// via the `const _: () = assert!(...)` below — see the
 /// `CommitmentTenure` doc-comment for the rationale.
-const COMMITMENT_TENURE_PROGRESS: &str =
-    crate::systems::plan_substrate::COMMITMENT_TENURE_INPUT;
+const COMMITMENT_TENURE_PROGRESS: &str = crate::systems::plan_substrate::COMMITMENT_TENURE_INPUT;
 
 // ---------------------------------------------------------------------------
 // DSE ids the modifiers target
@@ -1262,11 +1261,7 @@ impl ScoreModifier for AcuteHealthAdrenalineFlee {
         "acute_health_adrenaline_flee"
     }
 
-    fn preempts_in_flight(
-        &self,
-        ctx: &EvalCtx,
-        fetch: &dyn Fn(&str, Entity) -> f32,
-    ) -> bool {
+    fn preempts_in_flight(&self, ctx: &EvalCtx, fetch: &dyn Fn(&str, Entity) -> f32) -> bool {
         // Inert modifier (lifts 0.0) has nothing to redirect the cat
         // toward — preempting would just oscillate. Default magnitudes
         // ship at 0.0 per ticket 047 §spec until 119 promotes them
@@ -1410,11 +1405,7 @@ impl ScoreModifier for AcuteHealthAdrenalineFight {
         "acute_health_adrenaline_fight"
     }
 
-    fn preempts_in_flight(
-        &self,
-        ctx: &EvalCtx,
-        fetch: &dyn Fn(&str, Entity) -> f32,
-    ) -> bool {
+    fn preempts_in_flight(&self, ctx: &EvalCtx, fetch: &dyn Fn(&str, Entity) -> f32) -> bool {
         // Inert modifier guard — see 047's Flee preempts_in_flight.
         if self.fight_lift <= 0.0 {
             return false;
@@ -1550,11 +1541,7 @@ impl ScoreModifier for AcuteHealthAdrenalineFreeze {
         "acute_health_adrenaline_freeze"
     }
 
-    fn preempts_in_flight(
-        &self,
-        ctx: &EvalCtx,
-        fetch: &dyn Fn(&str, Entity) -> f32,
-    ) -> bool {
+    fn preempts_in_flight(&self, ctx: &EvalCtx, fetch: &dyn Fn(&str, Entity) -> f32) -> bool {
         // Inert modifier guard — see 047's Flee preempts_in_flight.
         if self.freeze_lift <= 0.0 {
             return false;
@@ -2160,11 +2147,7 @@ impl ScoreModifier for ThreatProximityAdrenalineFlee {
         "threat_proximity_adrenaline_flee"
     }
 
-    fn preempts_in_flight(
-        &self,
-        ctx: &EvalCtx,
-        fetch: &dyn Fn(&str, Entity) -> f32,
-    ) -> bool {
+    fn preempts_in_flight(&self, ctx: &EvalCtx, fetch: &dyn Fn(&str, Entity) -> f32) -> bool {
         // Inert modifier guard — see 047's Flee preempts_in_flight.
         if self.flee_lift <= 0.0 && self.sleep_lift <= 0.0 {
             return false;
@@ -2304,15 +2287,8 @@ impl DispositionFailureCooldown {
         match dse_id.0 {
             HUNT => Some(DISPOSITION_FAILURE_SIGNAL_HUNTING),
             FORAGE => Some(DISPOSITION_FAILURE_SIGNAL_FORAGING),
-            COOK
-            | HERBCRAFT_GATHER
-            | HERBCRAFT_PREPARE
-            | HERBCRAFT_WARD
-            | MAGIC_SCRY
-            | MAGIC_DURABLE_WARD
-            | MAGIC_CLEANSE
-            | MAGIC_COLONY_CLEANSE
-            | MAGIC_HARVEST
+            COOK | HERBCRAFT_GATHER | HERBCRAFT_PREPARE | HERBCRAFT_WARD | MAGIC_SCRY
+            | MAGIC_DURABLE_WARD | MAGIC_CLEANSE | MAGIC_COLONY_CLEANSE | MAGIC_HARVEST
             | MAGIC_COMMUNE => Some(DISPOSITION_FAILURE_SIGNAL_CRAFTING),
             CARETAKE => Some(DISPOSITION_FAILURE_SIGNAL_CARETAKING),
             BUILD => Some(DISPOSITION_FAILURE_SIGNAL_BUILDING),
@@ -2638,9 +2614,7 @@ impl NeighborActionCascade {
             PATROL => Some(CASCADE_COUNT_PATROL),
             BUILD => Some(CASCADE_COUNT_BUILD),
             FARM => Some(CASCADE_COUNT_FARM),
-            HERBCRAFT_GATHER | HERBCRAFT_PREPARE | HERBCRAFT_WARD => {
-                Some(CASCADE_COUNT_HERBCRAFT)
-            }
+            HERBCRAFT_GATHER | HERBCRAFT_PREPARE | HERBCRAFT_WARD => Some(CASCADE_COUNT_HERBCRAFT),
             MAGIC_SCRY | MAGIC_DURABLE_WARD | MAGIC_CLEANSE | MAGIC_COLONY_CLEANSE
             | MAGIC_HARVEST | MAGIC_COMMUNE => Some(CASCADE_COUNT_PRACTICEMAGIC),
             COORDINATE => Some(CASCADE_COUNT_COORDINATE),
@@ -3236,8 +3210,8 @@ pub fn default_modifier_pipeline(
 
 #[cfg(test)]
 mod tests {
-    use crate::ai::considerations::LandmarkAnchor;
     use super::*;
+    use crate::ai::considerations::LandmarkAnchor;
     use crate::components::physical::Position;
 
     fn test_ctx() -> (Entity, EvalCtx<'static>) {
@@ -3940,7 +3914,10 @@ mod tests {
         // food_fraction = 0.4 < threshold (0.5). Hunt and Forage pass
         // through unchanged. The desperation-hunting case: a starving
         // colony's food-acquisition DSEs MUST NOT be suppressed.
-        let modifier = StockpileSatiation { threshold: 0.5, scale: 0.85 };
+        let modifier = StockpileSatiation {
+            threshold: 0.5,
+            scale: 0.85,
+        };
         let (_, ctx) = test_ctx();
         // food_scarcity = 0.6 ⇒ food_fraction = 0.4
         let fetch = |name: &str, _: Entity| match name {
@@ -3949,8 +3926,14 @@ mod tests {
         };
         let hunt = modifier.apply(DseId(HUNT), 0.85, &ctx, &fetch);
         let forage = modifier.apply(DseId(FORAGE), 0.61, &ctx, &fetch);
-        assert!((hunt - 0.85).abs() < 1e-6, "below-threshold Hunt unchanged; got {hunt}");
-        assert!((forage - 0.61).abs() < 1e-6, "below-threshold Forage unchanged; got {forage}");
+        assert!(
+            (hunt - 0.85).abs() < 1e-6,
+            "below-threshold Hunt unchanged; got {hunt}"
+        );
+        assert!(
+            (forage - 0.61).abs() < 1e-6,
+            "below-threshold Forage unchanged; got {forage}"
+        );
     }
 
     #[test]
@@ -3958,7 +3941,10 @@ mod tests {
         // food_fraction = 0.96 (post-091 baseline level).
         // suppression = (0.96 - 0.5) / (1 - 0.5) * 0.85 = 0.782
         // Hunt 0.85 × (1 - 0.782) = ~0.185; Forage 0.61 × ~0.218 = ~0.133
-        let modifier = StockpileSatiation { threshold: 0.5, scale: 0.85 };
+        let modifier = StockpileSatiation {
+            threshold: 0.5,
+            scale: 0.85,
+        };
         let (_, ctx) = test_ctx();
         let fetch = |name: &str, _: Entity| match name {
             FOOD_SCARCITY => 0.04,
@@ -3968,13 +3954,19 @@ mod tests {
         let forage = modifier.apply(DseId(FORAGE), 0.61, &ctx, &fetch);
         // Hunt: 0.85 × 0.218 = 0.1853 (allow 1e-3 for f32 rounding).
         assert!((hunt - 0.1853).abs() < 1e-3, "Hunt damped; got {hunt}");
-        assert!((forage - 0.13298).abs() < 1e-3, "Forage damped; got {forage}");
+        assert!(
+            (forage - 0.13298).abs() < 1e-3,
+            "Forage damped; got {forage}"
+        );
     }
 
     #[test]
     fn stockpile_satiation_full_stores_collapses_acquisition_dses() {
         // food_fraction = 1.0 ⇒ suppression = 0.85 ⇒ score × 0.15.
-        let modifier = StockpileSatiation { threshold: 0.5, scale: 0.85 };
+        let modifier = StockpileSatiation {
+            threshold: 0.5,
+            scale: 0.85,
+        };
         let (_, ctx) = test_ctx();
         let fetch = |name: &str, _: Entity| match name {
             FOOD_SCARCITY => 0.0,
@@ -3982,7 +3974,10 @@ mod tests {
         };
         let hunt = modifier.apply(DseId(HUNT), 0.85, &ctx, &fetch);
         // 0.85 × (1 - 0.85) = 0.85 × 0.15 = 0.1275
-        assert!((hunt - 0.1275).abs() < 1e-3, "full-stores Hunt collapses; got {hunt}");
+        assert!(
+            (hunt - 0.1275).abs() < 1e-3,
+            "full-stores Hunt collapses; got {hunt}"
+        );
     }
 
     #[test]
@@ -3993,7 +3988,10 @@ mod tests {
         // is the point: damp the *acquisition* DSEs, leave the
         // *consumption* and self-care DSEs alone so the IAUS contest
         // tilts toward Eat at the existing food.
-        let modifier = StockpileSatiation { threshold: 0.5, scale: 0.85 };
+        let modifier = StockpileSatiation {
+            threshold: 0.5,
+            scale: 0.85,
+        };
         let (_, ctx) = test_ctx();
         let fetch = |name: &str, _: Entity| match name {
             FOOD_SCARCITY => 0.0, // food_fraction = 1.0
@@ -4012,14 +4010,20 @@ mod tests {
     fn stockpile_satiation_zero_score_stays_zero() {
         // Multiplicative damp on score == 0 is naturally safe (0 × x = 0).
         // No resurrection.
-        let modifier = StockpileSatiation { threshold: 0.5, scale: 0.85 };
+        let modifier = StockpileSatiation {
+            threshold: 0.5,
+            scale: 0.85,
+        };
         let (_, ctx) = test_ctx();
         let fetch = |name: &str, _: Entity| match name {
             FOOD_SCARCITY => 0.0,
             _ => 0.0,
         };
         let out = modifier.apply(DseId(HUNT), 0.0, &ctx, &fetch);
-        assert_eq!(out, 0.0, "zero score stays zero — multiplicative damp is safe");
+        assert_eq!(
+            out, 0.0,
+            "zero score stays zero — multiplicative damp is safe"
+        );
     }
 
     #[test]
@@ -4032,7 +4036,10 @@ mod tests {
         // collapses to ~0.19 and Eat (unchanged) wins the contest.
         use crate::ai::eval::ModifierPipeline;
         let mut pipeline = ModifierPipeline::new();
-        pipeline.push(Box::new(StockpileSatiation { threshold: 0.5, scale: 0.85 }));
+        pipeline.push(Box::new(StockpileSatiation {
+            threshold: 0.5,
+            scale: 0.85,
+        }));
         let (_, ctx) = test_ctx();
         let fetch = |name: &str, _: Entity| match name {
             FOOD_SCARCITY => 0.04, // food_fraction = 0.96
@@ -4045,8 +4052,14 @@ mod tests {
             "post-modifier: Eat ({eat_after}) wins over Hunt ({hunt_after}) under abundant stockpile"
         );
         // Concrete bounds — Hunt drops to ~0.185, Eat stays at 0.27.
-        assert!(hunt_after < 0.20, "Hunt sufficiently damped; got {hunt_after}");
-        assert!((eat_after - 0.27).abs() < 1e-6, "Eat unchanged by modifier; got {eat_after}");
+        assert!(
+            hunt_after < 0.20,
+            "Hunt sufficiently damped; got {hunt_after}"
+        );
+        assert!(
+            (eat_after - 0.27).abs() < 1e-6,
+            "Eat unchanged by modifier; got {eat_after}"
+        );
     }
 
     #[test]
@@ -4056,7 +4069,10 @@ mod tests {
         // food-acquisition response can fire at full strength. This
         // is the "this modifier never kicks in when acquisition is
         // urgent" property — the modifier is asymmetric by design.
-        let modifier = StockpileSatiation { threshold: 0.5, scale: 0.85 };
+        let modifier = StockpileSatiation {
+            threshold: 0.5,
+            scale: 0.85,
+        };
         let (_, ctx) = test_ctx();
         let fetch = |name: &str, _: Entity| match name {
             FOOD_SCARCITY => 1.0, // food_fraction = 0.0
@@ -4064,8 +4080,14 @@ mod tests {
         };
         let hunt = modifier.apply(DseId(HUNT), 0.85, &ctx, &fetch);
         let forage = modifier.apply(DseId(FORAGE), 0.61, &ctx, &fetch);
-        assert!((hunt - 0.85).abs() < 1e-6, "starving Hunt unchanged; got {hunt}");
-        assert!((forage - 0.61).abs() < 1e-6, "starving Forage unchanged; got {forage}");
+        assert!(
+            (hunt - 0.85).abs() < 1e-6,
+            "starving Hunt unchanged; got {hunt}"
+        );
+        assert!(
+            (forage - 0.61).abs() < 1e-6,
+            "starving Forage unchanged; got {forage}"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -4078,7 +4100,10 @@ mod tests {
         // through unchanged. The "modifier engages only at high distress"
         // property — below the threshold the cat's score landscape is
         // identical to the no-modifier case.
-        let modifier = BodyDistressPromotion { threshold: 0.7, lift_scale: 0.20 };
+        let modifier = BodyDistressPromotion {
+            threshold: 0.7,
+            lift_scale: 0.20,
+        };
         let (_, ctx) = test_ctx();
         let fetch = |name: &str, _: Entity| match name {
             BODY_DISTRESS_COMPOSITE => 0.5,
@@ -4098,7 +4123,10 @@ mod tests {
         // distress = 0.7 exactly. The `<= threshold` short-circuit
         // gives zero lift — boundary semantics matter so the modifier
         // doesn't quietly drift on the edge.
-        let modifier = BodyDistressPromotion { threshold: 0.7, lift_scale: 0.20 };
+        let modifier = BodyDistressPromotion {
+            threshold: 0.7,
+            lift_scale: 0.20,
+        };
         let (_, ctx) = test_ctx();
         let fetch = |name: &str, _: Entity| match name {
             BODY_DISTRESS_COMPOSITE => 0.7,
@@ -4117,7 +4145,10 @@ mod tests {
     fn body_distress_promotion_lifts_above_threshold() {
         // distress = 0.85, threshold = 0.7, lift_scale = 0.20.
         // expected lift = ((0.85 - 0.7) / 0.3) * 0.20 = 0.5 * 0.20 = 0.10
-        let modifier = BodyDistressPromotion { threshold: 0.7, lift_scale: 0.20 };
+        let modifier = BodyDistressPromotion {
+            threshold: 0.7,
+            lift_scale: 0.20,
+        };
         let (_, ctx) = test_ctx();
         let fetch = |name: &str, _: Entity| match name {
             BODY_DISTRESS_COMPOSITE => 0.85,
@@ -4136,7 +4167,10 @@ mod tests {
     fn body_distress_promotion_max_lift_at_full_distress() {
         // distress = 1.0 ⇒ full lift_scale (0.20) added to every
         // self-care DSE.
-        let modifier = BodyDistressPromotion { threshold: 0.7, lift_scale: 0.20 };
+        let modifier = BodyDistressPromotion {
+            threshold: 0.7,
+            lift_scale: 0.20,
+        };
         let (_, ctx) = test_ctx();
         let fetch = |name: &str, _: Entity| match name {
             BODY_DISTRESS_COMPOSITE => 1.0,
@@ -4159,7 +4193,10 @@ mod tests {
         // Patrol / Fight / Cook / Farm / Wander / Explore / Idle were
         // also lifted, the modifier wouldn't tilt the contest toward
         // self-care; it would just inflate every score equally.
-        let modifier = BodyDistressPromotion { threshold: 0.7, lift_scale: 0.20 };
+        let modifier = BodyDistressPromotion {
+            threshold: 0.7,
+            lift_scale: 0.20,
+        };
         let (_, ctx) = test_ctx();
         let fetch = |name: &str, _: Entity| match name {
             BODY_DISTRESS_COMPOSITE => 1.0,
@@ -4197,7 +4234,10 @@ mod tests {
         // MUST stay at 0; high body-distress doesn't conjure food into
         // existence or create a safe sleep spot. The modifier only
         // re-ranks already-accessible considerations.
-        let modifier = BodyDistressPromotion { threshold: 0.7, lift_scale: 0.20 };
+        let modifier = BodyDistressPromotion {
+            threshold: 0.7,
+            lift_scale: 0.20,
+        };
         let (_, ctx) = test_ctx();
         let fetch = |name: &str, _: Entity| match name {
             BODY_DISTRESS_COMPOSITE => 1.0,
@@ -4276,8 +4316,14 @@ mod tests {
         };
         let flee = modifier.apply(DseId(FLEE), 0.5, &ctx, &fetch);
         let sleep = modifier.apply(DseId(SLEEP), 0.5, &ctx, &fetch);
-        assert!((flee - 1.10).abs() < 1e-5, "Flee saturated lift; got {flee}");
-        assert!((sleep - 1.00).abs() < 1e-5, "Sleep saturated lift; got {sleep}");
+        assert!(
+            (flee - 1.10).abs() < 1e-5,
+            "Flee saturated lift; got {flee}"
+        );
+        assert!(
+            (sleep - 1.00).abs() < 1e-5,
+            "Sleep saturated lift; got {sleep}"
+        );
     }
 
     #[test]
@@ -4311,8 +4357,24 @@ mod tests {
             _ => 0.0,
         };
         for dse in [
-            EAT, HUNT, FORAGE, GROOM_SELF, MATE, COORDINATE, BUILD, MENTOR, CARETAKE, SOCIALIZE,
-            PATROL, FIGHT, COOK, FARM, WANDER, EXPLORE, IDLE, GROOM_OTHER,
+            EAT,
+            HUNT,
+            FORAGE,
+            GROOM_SELF,
+            MATE,
+            COORDINATE,
+            BUILD,
+            MENTOR,
+            CARETAKE,
+            SOCIALIZE,
+            PATROL,
+            FIGHT,
+            COOK,
+            FARM,
+            WANDER,
+            EXPLORE,
+            IDLE,
+            GROOM_OTHER,
         ] {
             let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
             assert!(
@@ -4520,8 +4582,14 @@ mod tests {
         };
         let fight = modifier.apply(DseId(FIGHT), 0.5, &ctx, &fetch);
         let flee = modifier.apply(DseId(FLEE), 0.5, &ctx, &fetch);
-        assert!((fight - 0.5).abs() < 1e-6, "Fight unchanged when deficit below threshold; got {fight}");
-        assert!((flee - 0.5).abs() < 1e-6, "Flee unchanged when deficit below threshold; got {flee}");
+        assert!(
+            (fight - 0.5).abs() < 1e-6,
+            "Fight unchanged when deficit below threshold; got {fight}"
+        );
+        assert!(
+            (flee - 0.5).abs() < 1e-6,
+            "Flee unchanged when deficit below threshold; got {flee}"
+        );
     }
 
     #[test]
@@ -4539,8 +4607,14 @@ mod tests {
         };
         let fight = modifier.apply(DseId(FIGHT), 0.5, &ctx, &fetch);
         let flee = modifier.apply(DseId(FLEE), 0.5, &ctx, &fetch);
-        assert!((fight - 0.5).abs() < 1e-6, "Fight unchanged when escape viable; got {fight}");
-        assert!((flee - 0.5).abs() < 1e-6, "Flee unchanged when escape viable; got {flee}");
+        assert!(
+            (fight - 0.5).abs() < 1e-6,
+            "Fight unchanged when escape viable; got {fight}"
+        );
+        assert!(
+            (flee - 0.5).abs() < 1e-6,
+            "Flee unchanged when escape viable; got {flee}"
+        );
     }
 
     #[test]
@@ -4556,8 +4630,14 @@ mod tests {
         };
         let fight = modifier.apply(DseId(FIGHT), 0.5, &ctx, &fetch);
         let flee = modifier.apply(DseId(FLEE), 0.5, &ctx, &fetch);
-        assert!((fight - 1.0).abs() < 1e-5, "Fight saturated lift; got {fight}");
-        assert!((flee - 0.0).abs() < 1e-5, "Flee suppressed to base − lift; got {flee}");
+        assert!(
+            (fight - 1.0).abs() < 1e-5,
+            "Fight saturated lift; got {fight}"
+        );
+        assert!(
+            (flee - 0.0).abs() < 1e-5,
+            "Flee suppressed to base − lift; got {flee}"
+        );
     }
 
     #[test]
@@ -4574,7 +4654,10 @@ mod tests {
         let fight = modifier.apply(DseId(FIGHT), 0.5, &ctx, &fetch);
         let flee = modifier.apply(DseId(FLEE), 0.5, &ctx, &fetch);
         assert!((fight - 0.75).abs() < 1e-5, "Fight half-lift; got {fight}");
-        assert!((flee - 0.25).abs() < 1e-5, "Flee half-suppression; got {flee}");
+        assert!(
+            (flee - 0.25).abs() < 1e-5,
+            "Flee half-suppression; got {flee}"
+        );
     }
 
     #[test]
@@ -4590,8 +4673,24 @@ mod tests {
             _ => 0.0,
         };
         for dse in [
-            EAT, SLEEP, HUNT, FORAGE, GROOM_SELF, MATE, COORDINATE, BUILD, MENTOR, CARETAKE,
-            SOCIALIZE, PATROL, COOK, FARM, WANDER, EXPLORE, IDLE, GROOM_OTHER,
+            EAT,
+            SLEEP,
+            HUNT,
+            FORAGE,
+            GROOM_SELF,
+            MATE,
+            COORDINATE,
+            BUILD,
+            MENTOR,
+            CARETAKE,
+            SOCIALIZE,
+            PATROL,
+            COOK,
+            FARM,
+            WANDER,
+            EXPLORE,
+            IDLE,
+            GROOM_OTHER,
         ] {
             let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
             assert!(
@@ -4695,12 +4794,18 @@ mod tests {
         // doc-comment that pre-described this composition.
         use crate::ai::eval::ModifierPipeline;
         let mut pipeline = ModifierPipeline::new();
-        pipeline.push(Box::new(BodyDistressPromotion { threshold: 0.7, lift_scale: 0.20 }));
-        pipeline.push(Box::new(StockpileSatiation { threshold: 0.5, scale: 0.85 }));
+        pipeline.push(Box::new(BodyDistressPromotion {
+            threshold: 0.7,
+            lift_scale: 0.20,
+        }));
+        pipeline.push(Box::new(StockpileSatiation {
+            threshold: 0.5,
+            scale: 0.85,
+        }));
         let (_, ctx) = test_ctx();
         let fetch = |name: &str, _: Entity| match name {
-            FOOD_SCARCITY => 0.04,           // food_fraction = 0.96 (full stockpile)
-            BODY_DISTRESS_COMPOSITE => 1.0,  // full body distress
+            FOOD_SCARCITY => 0.04,          // food_fraction = 0.96 (full stockpile)
+            BODY_DISTRESS_COMPOSITE => 1.0, // full body distress
             _ => 0.0,
         };
         // Hunt: lift +0.20 then damp × (1 - 0.782) = ~0.218 ⇒
@@ -4747,7 +4852,10 @@ mod tests {
             _ => 0.0,
         };
         let hide = modifier.apply(DseId(HIDE), 0.5, &ctx, &fetch);
-        assert!((hide - 0.5).abs() < 1e-6, "Hide unchanged below threshold; got {hide}");
+        assert!(
+            (hide - 0.5).abs() < 1e-6,
+            "Hide unchanged below threshold; got {hide}"
+        );
     }
 
     #[test]
@@ -4762,7 +4870,10 @@ mod tests {
             _ => 0.0,
         };
         let hide = modifier.apply(DseId(HIDE), 0.5, &ctx, &fetch);
-        assert!((hide - 0.5).abs() < 1e-6, "Hide unchanged when escape viable; got {hide}");
+        assert!(
+            (hide - 0.5).abs() < 1e-6,
+            "Hide unchanged when escape viable; got {hide}"
+        );
     }
 
     #[test]
@@ -4776,7 +4887,10 @@ mod tests {
         };
         let hide = modifier.apply(DseId(HIDE), 0.5, &ctx, &fetch);
         // 0.5 + 1.0 * 0.70 = 1.20
-        assert!((hide - 1.20).abs() < 1e-5, "Hide saturated lift; got {hide}");
+        assert!(
+            (hide - 1.20).abs() < 1e-5,
+            "Hide saturated lift; got {hide}"
+        );
     }
 
     #[test]
@@ -4803,8 +4917,26 @@ mod tests {
             _ => 0.0,
         };
         for dse in [
-            EAT, SLEEP, HUNT, FORAGE, GROOM_SELF, GROOM_OTHER, FLEE, FIGHT, MATE, COORDINATE,
-            BUILD, MENTOR, CARETAKE, SOCIALIZE, PATROL, COOK, FARM, WANDER, EXPLORE, IDLE,
+            EAT,
+            SLEEP,
+            HUNT,
+            FORAGE,
+            GROOM_SELF,
+            GROOM_OTHER,
+            FLEE,
+            FIGHT,
+            MATE,
+            COORDINATE,
+            BUILD,
+            MENTOR,
+            CARETAKE,
+            SOCIALIZE,
+            PATROL,
+            COOK,
+            FARM,
+            WANDER,
+            EXPLORE,
+            IDLE,
         ] {
             let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
             assert!(
@@ -4917,8 +5049,14 @@ mod tests {
         let hunt = modifier.apply(DseId(HUNT), 0.5, &ctx, &fetch);
         let forage = modifier.apply(DseId(FORAGE), 0.5, &ctx, &fetch);
         assert!((eat - 0.70).abs() < 1e-5, "Eat half-ramp lift; got {eat}");
-        assert!((hunt - 0.60).abs() < 1e-5, "Hunt half-ramp lift; got {hunt}");
-        assert!((forage - 0.60).abs() < 1e-5, "Forage half-ramp lift; got {forage}");
+        assert!(
+            (hunt - 0.60).abs() < 1e-5,
+            "Hunt half-ramp lift; got {hunt}"
+        );
+        assert!(
+            (forage - 0.60).abs() < 1e-5,
+            "Forage half-ramp lift; got {forage}"
+        );
     }
 
     #[test]
@@ -4934,8 +5072,14 @@ mod tests {
         let hunt = modifier.apply(DseId(HUNT), 0.5, &ctx, &fetch);
         let forage = modifier.apply(DseId(FORAGE), 0.5, &ctx, &fetch);
         assert!((eat - 0.90).abs() < 1e-5, "Eat full lift +0.40; got {eat}");
-        assert!((hunt - 0.70).abs() < 1e-5, "Hunt full lift +0.20; got {hunt}");
-        assert!((forage - 0.70).abs() < 1e-5, "Forage full lift +0.20; got {forage}");
+        assert!(
+            (hunt - 0.70).abs() < 1e-5,
+            "Hunt full lift +0.20; got {hunt}"
+        );
+        assert!(
+            (forage - 0.70).abs() < 1e-5,
+            "Forage full lift +0.20; got {forage}"
+        );
     }
 
     #[test]
@@ -4951,8 +5095,23 @@ mod tests {
             _ => 0.0,
         };
         for dse in [
-            SLEEP, GROOM_SELF, GROOM_OTHER, FLEE, FIGHT, MATE, COORDINATE, BUILD, MENTOR, CARETAKE,
-            SOCIALIZE, PATROL, COOK, FARM, WANDER, EXPLORE, IDLE,
+            SLEEP,
+            GROOM_SELF,
+            GROOM_OTHER,
+            FLEE,
+            FIGHT,
+            MATE,
+            COORDINATE,
+            BUILD,
+            MENTOR,
+            CARETAKE,
+            SOCIALIZE,
+            PATROL,
+            COOK,
+            FARM,
+            WANDER,
+            EXPLORE,
+            IDLE,
         ] {
             let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
             assert!(
@@ -5033,8 +5192,25 @@ mod tests {
             _ => 0.0,
         };
         for dse in [
-            EAT, HUNT, FORAGE, SLEEP, GROOM_SELF, GROOM_OTHER, FLEE, FIGHT, MATE, COORDINATE,
-            BUILD, MENTOR, SOCIALIZE, PATROL, COOK, FARM, WANDER, EXPLORE, IDLE,
+            EAT,
+            HUNT,
+            FORAGE,
+            SLEEP,
+            GROOM_SELF,
+            GROOM_OTHER,
+            FLEE,
+            FIGHT,
+            MATE,
+            COORDINATE,
+            BUILD,
+            MENTOR,
+            SOCIALIZE,
+            PATROL,
+            COOK,
+            FARM,
+            WANDER,
+            EXPLORE,
+            IDLE,
         ] {
             let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
             assert!(
@@ -5070,9 +5246,8 @@ mod tests {
     }
 
     fn test_ctx_with_kitten_marker() -> (Entity, EvalCtx<'static>) {
-        static KITTEN_MARKER: fn(&str, Entity) -> bool = |name, _| {
-            name == crate::components::markers::Kitten::KEY
-        };
+        static KITTEN_MARKER: fn(&str, Entity) -> bool =
+            |name, _| name == crate::components::markers::Kitten::KEY;
         static NO_ENTITY_POS: fn(Entity) -> Option<Position> = |_| None;
         static NO_ANCHOR_POS: fn(LandmarkAnchor) -> Option<Position> = |_| None;
         let entity = Entity::from_raw_u32(1).unwrap();
@@ -5173,8 +5348,25 @@ mod tests {
             _ => 0.0,
         };
         for dse in [
-            HUNT, FORAGE, SLEEP, GROOM_SELF, GROOM_OTHER, FLEE, FIGHT, MATE, COORDINATE, BUILD,
-            MENTOR, CARETAKE, SOCIALIZE, PATROL, COOK, FARM, WANDER, EXPLORE, IDLE,
+            HUNT,
+            FORAGE,
+            SLEEP,
+            GROOM_SELF,
+            GROOM_OTHER,
+            FLEE,
+            FIGHT,
+            MATE,
+            COORDINATE,
+            BUILD,
+            MENTOR,
+            CARETAKE,
+            SOCIALIZE,
+            PATROL,
+            COOK,
+            FARM,
+            WANDER,
+            EXPLORE,
+            IDLE,
         ] {
             let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
             assert!(
@@ -5209,7 +5401,10 @@ mod tests {
         };
         for dse in [EAT, HUNT, FORAGE] {
             let out = modifier.apply(DseId(dse), 0.0, &ctx, &fetch);
-            assert_eq!(out, 0.0, "zero-score dse {dse} stays zero — no resurrection");
+            assert_eq!(
+                out, 0.0,
+                "zero-score dse {dse} stays zero — no resurrection"
+            );
         }
     }
 
@@ -5222,7 +5417,10 @@ mod tests {
         use crate::ai::eval::ModifierPipeline;
         let mut pipeline = ModifierPipeline::new();
         pipeline.push(Box::new(test_hunger_urgency()));
-        pipeline.push(Box::new(StockpileSatiation { threshold: 0.5, scale: 0.85 }));
+        pipeline.push(Box::new(StockpileSatiation {
+            threshold: 0.5,
+            scale: 0.85,
+        }));
         let (_, ctx) = test_ctx();
         let fetch = |name: &str, _: Entity| match name {
             FOOD_SCARCITY => 0.04, // food_fraction = 0.96
@@ -5232,7 +5430,10 @@ mod tests {
         let eat_after = pipeline.apply(DseId(EAT), 0.27, &ctx, &fetch);
         let hunt_after = pipeline.apply(DseId(HUNT), 0.85, &ctx, &fetch);
         // Eat: 0.27 + 0.40 = 0.67 (no damp).
-        assert!((eat_after - 0.67).abs() < 1e-5, "Eat lifted by +0.40; got {eat_after}");
+        assert!(
+            (eat_after - 0.67).abs() < 1e-5,
+            "Eat lifted by +0.40; got {eat_after}"
+        );
         // Hunt: (0.85 + 0.20) × ~0.218 ≈ 0.229.
         assert!(
             eat_after > hunt_after,
@@ -5332,8 +5533,14 @@ mod tests {
         };
         let sleep = modifier.apply(DseId(SLEEP), 0.5, &ctx, &fetch);
         let groom = modifier.apply(DseId(GROOM_SELF), 0.5, &ctx, &fetch);
-        assert!((sleep - 0.90).abs() < 1e-5, "Sleep full lift +0.40; got {sleep}");
-        assert!((groom - 0.60).abs() < 1e-5, "Groom full lift +0.10; got {groom}");
+        assert!(
+            (sleep - 0.90).abs() < 1e-5,
+            "Sleep full lift +0.40; got {sleep}"
+        );
+        assert!(
+            (groom - 0.60).abs() < 1e-5,
+            "Groom full lift +0.10; got {groom}"
+        );
     }
 
     #[test]
@@ -5346,8 +5553,24 @@ mod tests {
             _ => 0.0,
         };
         for dse in [
-            EAT, HUNT, FORAGE, GROOM_OTHER, FLEE, FIGHT, MATE, COORDINATE, BUILD, MENTOR, CARETAKE,
-            SOCIALIZE, PATROL, COOK, FARM, WANDER, EXPLORE, IDLE,
+            EAT,
+            HUNT,
+            FORAGE,
+            GROOM_OTHER,
+            FLEE,
+            FIGHT,
+            MATE,
+            COORDINATE,
+            BUILD,
+            MENTOR,
+            CARETAKE,
+            SOCIALIZE,
+            PATROL,
+            COOK,
+            FARM,
+            WANDER,
+            EXPLORE,
+            IDLE,
         ] {
             let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
             assert!(
@@ -5367,7 +5590,10 @@ mod tests {
         };
         for dse in [SLEEP, GROOM_SELF] {
             let out = modifier.apply(DseId(dse), 0.0, &ctx, &fetch);
-            assert_eq!(out, 0.0, "zero-score dse {dse} stays zero — no resurrection");
+            assert_eq!(
+                out, 0.0,
+                "zero-score dse {dse} stays zero — no resurrection"
+            );
         }
     }
 
@@ -5417,7 +5643,10 @@ mod tests {
             _ => 0.0,
         };
         let sleep = modifier.apply(DseId(SLEEP), 0.5, &ctx, &fetch);
-        assert!((sleep - 0.5).abs() < 1e-6, "below-threshold Sleep unchanged; got {sleep}");
+        assert!(
+            (sleep - 0.5).abs() < 1e-6,
+            "below-threshold Sleep unchanged; got {sleep}"
+        );
     }
 
     #[test]
@@ -5429,7 +5658,10 @@ mod tests {
             _ => 0.0,
         };
         let sleep = modifier.apply(DseId(SLEEP), 0.5, &ctx, &fetch);
-        assert!((sleep - 0.5).abs() < 1e-6, "at-threshold Sleep unchanged; got {sleep}");
+        assert!(
+            (sleep - 0.5).abs() < 1e-6,
+            "at-threshold Sleep unchanged; got {sleep}"
+        );
     }
 
     #[test]
@@ -5455,7 +5687,10 @@ mod tests {
             _ => 0.0,
         };
         let sleep = modifier.apply(DseId(SLEEP), 0.5, &ctx, &fetch);
-        assert!((sleep - 0.80).abs() < 1e-5, "Sleep full lift +0.30; got {sleep}");
+        assert!(
+            (sleep - 0.80).abs() < 1e-5,
+            "Sleep full lift +0.30; got {sleep}"
+        );
     }
 
     #[test]
@@ -5470,8 +5705,25 @@ mod tests {
             _ => 0.0,
         };
         for dse in [
-            EAT, HUNT, FORAGE, GROOM_SELF, GROOM_OTHER, FLEE, FIGHT, MATE, COORDINATE, BUILD,
-            MENTOR, CARETAKE, SOCIALIZE, PATROL, COOK, FARM, WANDER, EXPLORE, IDLE,
+            EAT,
+            HUNT,
+            FORAGE,
+            GROOM_SELF,
+            GROOM_OTHER,
+            FLEE,
+            FIGHT,
+            MATE,
+            COORDINATE,
+            BUILD,
+            MENTOR,
+            CARETAKE,
+            SOCIALIZE,
+            PATROL,
+            COOK,
+            FARM,
+            WANDER,
+            EXPLORE,
+            IDLE,
         ] {
             let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
             assert!(
@@ -5560,8 +5812,14 @@ mod tests {
         };
         let flee = modifier.apply(DseId(FLEE), 0.5, &ctx, &fetch);
         let sleep = modifier.apply(DseId(SLEEP), 0.5, &ctx, &fetch);
-        assert!((flee - 1.10).abs() < 1e-5, "Flee saturated lift; got {flee}");
-        assert!((sleep - 1.00).abs() < 1e-5, "Sleep saturated lift; got {sleep}");
+        assert!(
+            (flee - 1.10).abs() < 1e-5,
+            "Flee saturated lift; got {flee}"
+        );
+        assert!(
+            (sleep - 1.00).abs() < 1e-5,
+            "Sleep saturated lift; got {sleep}"
+        );
     }
 
     #[test]
@@ -5591,8 +5849,24 @@ mod tests {
             _ => 0.0,
         };
         for dse in [
-            EAT, HUNT, FORAGE, GROOM_SELF, GROOM_OTHER, FIGHT, MATE, COORDINATE, BUILD, MENTOR,
-            CARETAKE, SOCIALIZE, PATROL, COOK, FARM, WANDER, EXPLORE, IDLE,
+            EAT,
+            HUNT,
+            FORAGE,
+            GROOM_SELF,
+            GROOM_OTHER,
+            FIGHT,
+            MATE,
+            COORDINATE,
+            BUILD,
+            MENTOR,
+            CARETAKE,
+            SOCIALIZE,
+            PATROL,
+            COOK,
+            FARM,
+            WANDER,
+            EXPLORE,
+            IDLE,
         ] {
             let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
             assert!(
@@ -5613,7 +5887,10 @@ mod tests {
         };
         for dse in [FLEE, SLEEP] {
             let out = modifier.apply(DseId(dse), 0.0, &ctx, &fetch);
-            assert_eq!(out, 0.0, "zero-score dse {dse} stays zero — no resurrection");
+            assert_eq!(
+                out, 0.0,
+                "zero-score dse {dse} stays zero — no resurrection"
+            );
         }
     }
 
@@ -5662,7 +5939,10 @@ mod tests {
             _ => 0.0,
         };
         let flee = modifier.apply(DseId(FLEE), 0.5, &ctx, &fetch);
-        assert!((flee - 0.5).abs() < 1e-6, "below-threshold Flee unchanged; got {flee}");
+        assert!(
+            (flee - 0.5).abs() < 1e-6,
+            "below-threshold Flee unchanged; got {flee}"
+        );
     }
 
     #[test]
@@ -5687,7 +5967,10 @@ mod tests {
             _ => 0.0,
         };
         let flee = modifier.apply(DseId(FLEE), 0.5, &ctx, &fetch);
-        assert!((flee - 0.80).abs() < 1e-5, "Flee full lift +0.30; got {flee}");
+        assert!(
+            (flee - 0.80).abs() < 1e-5,
+            "Flee full lift +0.30; got {flee}"
+        );
     }
 
     #[test]
@@ -5699,8 +5982,25 @@ mod tests {
             _ => 0.0,
         };
         for dse in [
-            EAT, HUNT, FORAGE, GROOM_SELF, SLEEP, GROOM_OTHER, FIGHT, MATE, COORDINATE, BUILD,
-            MENTOR, CARETAKE, SOCIALIZE, PATROL, COOK, FARM, WANDER, EXPLORE, IDLE,
+            EAT,
+            HUNT,
+            FORAGE,
+            GROOM_SELF,
+            SLEEP,
+            GROOM_OTHER,
+            FIGHT,
+            MATE,
+            COORDINATE,
+            BUILD,
+            MENTOR,
+            CARETAKE,
+            SOCIALIZE,
+            PATROL,
+            COOK,
+            FARM,
+            WANDER,
+            EXPLORE,
+            IDLE,
         ] {
             let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
             assert!(
@@ -5827,7 +6127,22 @@ mod tests {
         // Even with every signal pinned at full damp, exempt DSEs pass
         // through unchanged because `signal_key` returns None for them.
         let fetch = |_: &str, _: Entity| 0.0;
-        for dse in [SLEEP, EAT, PATROL, FIGHT, COORDINATE, EXPLORE, WANDER, FARM, SOCIALIZE, GROOM_SELF, GROOM_OTHER, FLEE, IDLE, HIDE] {
+        for dse in [
+            SLEEP,
+            EAT,
+            PATROL,
+            FIGHT,
+            COORDINATE,
+            EXPLORE,
+            WANDER,
+            FARM,
+            SOCIALIZE,
+            GROOM_SELF,
+            GROOM_OTHER,
+            FLEE,
+            IDLE,
+            HIDE,
+        ] {
             let out = m.apply(DseId(dse), 0.6, &ctx, &fetch);
             assert!((out - 0.6).abs() < 1e-6, "dse {dse} got {out}");
         }
@@ -5993,7 +6308,9 @@ mod tests {
 
     #[test]
     fn cascade_lifts_hunt_proportional_to_count() {
-        let m = NeighborActionCascade { bonus_per_cat: 0.08 };
+        let m = NeighborActionCascade {
+            bonus_per_cat: 0.08,
+        };
         let (_, ctx) = test_ctx();
         let fetch = |name: &str, _: Entity| match name {
             CASCADE_COUNT_HUNT => 3.0,
@@ -6005,7 +6322,9 @@ mod tests {
 
     #[test]
     fn cascade_collapses_groom_siblings_to_shared_count() {
-        let m = NeighborActionCascade { bonus_per_cat: 0.08 };
+        let m = NeighborActionCascade {
+            bonus_per_cat: 0.08,
+        };
         let (_, ctx) = test_ctx();
         let fetch = |name: &str, _: Entity| match name {
             CASCADE_COUNT_GROOM => 2.0,
@@ -6018,7 +6337,9 @@ mod tests {
 
     #[test]
     fn cascade_carves_out_fight() {
-        let m = NeighborActionCascade { bonus_per_cat: 0.08 };
+        let m = NeighborActionCascade {
+            bonus_per_cat: 0.08,
+        };
         let (_, ctx) = test_ctx();
         let fetch = |_: &str, _: Entity| 5.0;
         assert!((m.apply(DseId(FIGHT), 0.5, &ctx, &fetch) - 0.5).abs() < 1e-6);

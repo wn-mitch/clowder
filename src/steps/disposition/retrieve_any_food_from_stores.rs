@@ -1,9 +1,7 @@
 use bevy_ecs::prelude::*;
 
 use crate::components::building::StoredItems;
-use crate::components::item_transfer::{
-    transfer_item_stores_to_inventory, TransferError,
-};
+use crate::components::item_transfer::{transfer_item_stores_to_inventory, TransferError};
 use crate::components::items::Item;
 use crate::components::magic::Inventory;
 use crate::steps::{StepOutcome, StepResult};

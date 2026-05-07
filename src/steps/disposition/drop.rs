@@ -59,10 +59,9 @@ pub fn resolve_drop_item(
     };
 
     match transfer_item_inventory_to_ground(inventory, slot_idx, cat_pos, commands) {
-        Ok(item_entity) => StepOutcome::witnessed_with(
-            StepResult::Advance,
-            DropOutcome { item_entity },
-        ),
+        Ok(item_entity) => {
+            StepOutcome::witnessed_with(StepResult::Advance, DropOutcome { item_entity })
+        }
         // The ground primitive cannot fail on capacity; surface as
         // Fail so the caller sees a concrete reason if it ever does.
         Err(_) => StepOutcome::unwitnessed(StepResult::Fail(

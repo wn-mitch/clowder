@@ -795,10 +795,7 @@ pub fn update_target_existence_markers(
         (Entity, &Position),
         (With<crate::components::identity::Species>, Without<Dead>),
     >,
-    wildlife_q: Query<
-        &Position,
-        (With<crate::components::wildlife::WildAnimal>, Without<Dead>),
-    >,
+    wildlife_q: Query<&Position, (With<crate::components::wildlife::WildAnimal>, Without<Dead>)>,
     herb_q: Query<
         &Position,
         (
@@ -933,13 +930,7 @@ pub fn update_target_existence_markers(
             cur_social,
             HasSocialTarget,
         );
-        toggle_target_marker(
-            &mut commands,
-            entity,
-            want_herbs,
-            cur_herbs,
-            HasHerbsNearby,
-        );
+        toggle_target_marker(&mut commands, entity, want_herbs, cur_herbs, HasHerbsNearby);
         toggle_target_marker(&mut commands, entity, want_prey, cur_prey, PreyNearby);
         toggle_target_marker(
             &mut commands,
@@ -1696,11 +1687,21 @@ mod tests {
         let (mut world, mut schedule) = target_existence_setup();
         let cat = spawn_cat(&mut world, 0, 0);
         schedule.run(&mut world);
-        assert!(!world.entity(cat).contains::<crate::components::markers::HasThreatNearby>());
-        assert!(!world.entity(cat).contains::<crate::components::markers::HasSocialTarget>());
-        assert!(!world.entity(cat).contains::<crate::components::markers::HasHerbsNearby>());
-        assert!(!world.entity(cat).contains::<crate::components::markers::PreyNearby>());
-        assert!(!world.entity(cat).contains::<crate::components::markers::CarcassNearby>());
+        assert!(!world
+            .entity(cat)
+            .contains::<crate::components::markers::HasThreatNearby>());
+        assert!(!world
+            .entity(cat)
+            .contains::<crate::components::markers::HasSocialTarget>());
+        assert!(!world
+            .entity(cat)
+            .contains::<crate::components::markers::HasHerbsNearby>());
+        assert!(!world
+            .entity(cat)
+            .contains::<crate::components::markers::PreyNearby>());
+        assert!(!world
+            .entity(cat)
+            .contains::<crate::components::markers::CarcassNearby>());
     }
 
     #[test]
@@ -1830,8 +1831,12 @@ mod tests {
         let _fox = spawn_wildlife(&mut world, 5, 0);
         schedule.run(&mut world);
         // Dead cats don't get markers authored.
-        assert!(!world.entity(cat).contains::<crate::components::markers::HasThreatNearby>());
-        assert!(!world.entity(cat).contains::<crate::components::markers::HasSocialTarget>());
+        assert!(!world
+            .entity(cat)
+            .contains::<crate::components::markers::HasThreatNearby>());
+        assert!(!world
+            .entity(cat)
+            .contains::<crate::components::markers::HasSocialTarget>());
     }
 
     #[test]

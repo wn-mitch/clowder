@@ -295,9 +295,7 @@ pub fn proxies_for_plan(
         // Reusing `resting_complete_hunger` (default 0.65) so the
         // existing Resting tests still characterize the same satiation
         // band; Eating doesn't introduce a new balance knob.
-        DispositionKind::Eating => {
-            plan.trips_done > 0 && needs.hunger >= d.resting_complete_hunger
-        }
+        DispositionKind::Eating => plan.trips_done > 0 && needs.hunger >= d.resting_complete_hunger,
         DispositionKind::Mating => plan.trips_done >= 1,
         // 154: Mentoring mirrors Mating's single-interaction proxy.
         // The plan template has one MentorCat step with
@@ -778,7 +776,11 @@ mod tests {
         // chosen sub-action for tests; for Herbalism/Witchcraft this
         // gets a real sub-action even though tests don't drive sub-mode
         // selection.
-        let chosen = kind.constituent_actions().first().copied().unwrap_or(Action::Idle);
+        let chosen = kind
+            .constituent_actions()
+            .first()
+            .copied()
+            .unwrap_or(Action::Idle);
         GoapPlan::new(kind, chosen, tick, &p, vec![])
     }
 

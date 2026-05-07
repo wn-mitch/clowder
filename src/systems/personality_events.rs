@@ -297,8 +297,8 @@ fn on_play_initiated(
         }
         // Mood boost to all nearby.
         if let Ok(mut other_mood) = moods.get_mut(other) {
-            let mut modifier = MoodModifier::new(0.1, 15, "watched play nearby")
-                .with_kind(MoodSource::Social);
+            let mut modifier =
+                MoodModifier::new(0.1, 15, "watched play nearby").with_kind(MoodSource::Social);
             patience_extend(&mut modifier, other_pers.patience, &constants.mood);
             other_mood.modifiers.push_back(modifier);
         }

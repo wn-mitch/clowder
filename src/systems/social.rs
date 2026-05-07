@@ -83,10 +83,7 @@ pub fn befriend_wildlife(
             Entity,
             bevy::prelude::Has<crate::components::markers::BefriendedAlly>,
         ),
-        (
-            With<crate::components::wildlife::WildAnimal>,
-            Without<Dead>,
-        ),
+        (With<crate::components::wildlife::WildAnimal>, Without<Dead>),
     >,
     relationships: Res<Relationships>,
     constants: Res<SimConstants>,
@@ -123,7 +120,14 @@ pub fn befriend_wildlife(
 
     for (cat_entity, has_marker) in &cat_list {
         let fam = cat_max_fam.get(cat_entity).copied().unwrap_or(0.0);
-        toggle_marker(&mut commands, *cat_entity, *has_marker, fam, upgrade, downgrade);
+        toggle_marker(
+            &mut commands,
+            *cat_entity,
+            *has_marker,
+            fam,
+            upgrade,
+            downgrade,
+        );
     }
     for (wild_entity, has_marker) in &wildlife_list {
         let fam = wild_max_fam.get(wild_entity).copied().unwrap_or(0.0);
@@ -806,8 +810,7 @@ mod tests {
         let c = crate::resources::SimConstants::default().social;
         let ts = test_time_scale();
         let courtship_rate_per_tick = c.courtship_romantic_rate.per_tick(&ts);
-        let checks_needed =
-            (c.partners_romantic_threshold / courtship_rate_per_tick).ceil() as u64;
+        let checks_needed = (c.partners_romantic_threshold / courtship_rate_per_tick).ceil() as u64;
 
         let adult_tick = 50 + 20_000 * 12;
         let (mut world, mut schedule) = bond_test_world(adult_tick);
@@ -1093,10 +1096,8 @@ mod tests {
         let _fox = spawn_test_fox(&mut world);
         // Relationships unwritten — fam defaults to 0.0, no markers.
         schedule.run(&mut world);
-        let mut q = world.query_filtered::<
-            Entity,
-            With<crate::components::markers::BefriendedAlly>,
-        >();
+        let mut q =
+            world.query_filtered::<Entity, With<crate::components::markers::BefriendedAlly>>();
         assert_eq!(q.iter(&world).count(), 0);
     }
 

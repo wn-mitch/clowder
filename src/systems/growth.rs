@@ -152,10 +152,7 @@ pub fn kitten_mood_aura(
 pub fn update_kitten_cry_map(
     mut commands: Commands,
     kittens: Query<(&Position, &Needs, &KittenDependency), Without<Dead>>,
-    cats: Query<
-        (Entity, Has<markers::IsParentOfHungryKitten>),
-        (With<Species>, Without<Dead>),
-    >,
+    cats: Query<(Entity, Has<markers::IsParentOfHungryKitten>), (With<Species>, Without<Dead>)>,
     mut map: ResMut<crate::resources::KittenCryMap>,
     constants: Res<SimConstants>,
 ) {
@@ -297,10 +294,7 @@ pub fn update_life_stage_markers(
 pub fn update_parent_markers(
     mut commands: Commands,
     kittens: Query<&KittenDependency, Without<Dead>>,
-    cats: Query<
-        (Entity, Has<markers::Parent>),
-        (With<Species>, Without<Dead>),
-    >,
+    cats: Query<(Entity, Has<markers::Parent>), (With<Species>, Without<Dead>)>,
 ) {
     use std::collections::HashSet;
     let mut parents: HashSet<Entity> = HashSet::new();

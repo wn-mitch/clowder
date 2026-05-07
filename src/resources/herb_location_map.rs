@@ -281,9 +281,15 @@ mod tests {
 
     #[test]
     fn growth_stage_strength_monotone() {
-        assert!(growth_stage_strength(GrowthStage::Sprout) < growth_stage_strength(GrowthStage::Bud));
-        assert!(growth_stage_strength(GrowthStage::Bud) < growth_stage_strength(GrowthStage::Bloom));
-        assert!(growth_stage_strength(GrowthStage::Bloom) < growth_stage_strength(GrowthStage::Blossom));
+        assert!(
+            growth_stage_strength(GrowthStage::Sprout) < growth_stage_strength(GrowthStage::Bud)
+        );
+        assert!(
+            growth_stage_strength(GrowthStage::Bud) < growth_stage_strength(GrowthStage::Bloom)
+        );
+        assert!(
+            growth_stage_strength(GrowthStage::Bloom) < growth_stage_strength(GrowthStage::Blossom)
+        );
         assert_eq!(growth_stage_strength(GrowthStage::Blossom), 1.0);
     }
 }

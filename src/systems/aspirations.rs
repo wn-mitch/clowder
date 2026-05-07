@@ -608,8 +608,12 @@ pub fn track_milestones(
             }
 
             mood.modifiers.push_back(
-                MoodModifier::new(0.4, 200, format!("fulfilled aspiration: {}", asp.chain_name))
-                    .with_kind(MoodSource::Pride),
+                MoodModifier::new(
+                    0.4,
+                    200,
+                    format!("fulfilled aspiration: {}", asp.chain_name),
+                )
+                .with_kind(MoodSource::Pride),
             );
             needs.purpose = (needs.purpose + 0.1).min(1.0);
 
@@ -734,12 +738,7 @@ pub fn update_training_markers(
 pub fn update_mentoring_target_markers(
     mut commands: Commands,
     cats: Query<
-        (
-            Entity,
-            &Position,
-            &Skills,
-            Has<markers::HasMentoringTarget>,
-        ),
+        (Entity, &Position, &Skills, Has<markers::HasMentoringTarget>),
         (With<Species>, Without<Dead>),
     >,
     constants: Res<SimConstants>,
@@ -961,7 +960,11 @@ mod tests {
         schedule.run(&mut world);
         assert!(world.entity(cat).contains::<markers::Mentor>());
         // Clear apprentice slot.
-        world.entity_mut(cat).get_mut::<Training>().unwrap().apprentice = None;
+        world
+            .entity_mut(cat)
+            .get_mut::<Training>()
+            .unwrap()
+            .apprentice = None;
         schedule.run(&mut world);
         assert!(!world.entity(cat).contains::<markers::Mentor>());
     }
@@ -1070,7 +1073,9 @@ mod tests {
         let mentor = spawn_cat_with_skills(&mut world, 0, 0, high_hunting_skills());
         let _peer = spawn_cat_with_skills(&mut world, 3, 0, low_hunting_skills());
         schedule.run(&mut world);
-        assert!(world.entity(mentor).contains::<markers::HasMentoringTarget>());
+        assert!(world
+            .entity(mentor)
+            .contains::<markers::HasMentoringTarget>());
     }
 
     #[test]
@@ -1089,7 +1094,9 @@ mod tests {
         // Beyond mentoring_detection_range=10 + cat sight max — well outside.
         let _peer = spawn_cat_with_skills(&mut world, 50, 0, low_hunting_skills());
         schedule.run(&mut world);
-        assert!(!world.entity(mentor).contains::<markers::HasMentoringTarget>());
+        assert!(!world
+            .entity(mentor)
+            .contains::<markers::HasMentoringTarget>());
     }
 
     #[test]
@@ -1099,7 +1106,9 @@ mod tests {
         // Peer also has high hunting — no skill gap on any axis.
         let _peer = spawn_cat_with_skills(&mut world, 3, 0, high_hunting_skills());
         schedule.run(&mut world);
-        assert!(!world.entity(mentor).contains::<markers::HasMentoringTarget>());
+        assert!(!world
+            .entity(mentor)
+            .contains::<markers::HasMentoringTarget>());
     }
 
     #[test]
@@ -1119,7 +1128,9 @@ mod tests {
         schedule.run(&mut world);
         // Dead cats are filtered out (Without<Dead>), so the only living peer
         // is the mentor itself — no qualifying gap.
-        assert!(!world.entity(mentor).contains::<markers::HasMentoringTarget>());
+        assert!(!world
+            .entity(mentor)
+            .contains::<markers::HasMentoringTarget>());
     }
 
     #[test]
@@ -1128,11 +1139,15 @@ mod tests {
         let mentor = spawn_cat_with_skills(&mut world, 0, 0, high_hunting_skills());
         let peer = spawn_cat_with_skills(&mut world, 3, 0, low_hunting_skills());
         schedule.run(&mut world);
-        assert!(world.entity(mentor).contains::<markers::HasMentoringTarget>());
+        assert!(world
+            .entity(mentor)
+            .contains::<markers::HasMentoringTarget>());
         // Peer learns. Now they're both above 0.3 — no gap > threshold.
         world.entity_mut(peer).get_mut::<Skills>().unwrap().hunting = 0.5;
         schedule.run(&mut world);
-        assert!(!world.entity(mentor).contains::<markers::HasMentoringTarget>());
+        assert!(!world
+            .entity(mentor)
+            .contains::<markers::HasMentoringTarget>());
     }
 
     #[test]
@@ -1141,9 +1156,13 @@ mod tests {
         let mentor = spawn_cat_with_skills(&mut world, 0, 0, high_hunting_skills());
         let _peer = spawn_cat_with_skills(&mut world, 3, 0, low_hunting_skills());
         schedule.run(&mut world);
-        assert!(world.entity(mentor).contains::<markers::HasMentoringTarget>());
+        assert!(world
+            .entity(mentor)
+            .contains::<markers::HasMentoringTarget>());
         schedule.run(&mut world);
-        assert!(world.entity(mentor).contains::<markers::HasMentoringTarget>());
+        assert!(world
+            .entity(mentor)
+            .contains::<markers::HasMentoringTarget>());
     }
 
     #[test]
@@ -1162,6 +1181,8 @@ mod tests {
         // Peer is a herbcraft-novice (default herbcraft is 0.05 < 0.3).
         let _peer = spawn_cat_with_skills(&mut world, 3, 0, Skills::default());
         schedule.run(&mut world);
-        assert!(world.entity(mentor).contains::<markers::HasMentoringTarget>());
+        assert!(world
+            .entity(mentor)
+            .contains::<markers::HasMentoringTarget>());
     }
 }

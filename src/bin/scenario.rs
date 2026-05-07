@@ -111,9 +111,7 @@ fn print_report(report: &scenarios::runner::ScenarioReport, elapsed: std::time::
     );
     println!(
         "focal inv: {} slots used  |  prey alive: {}  |  ground items: {}",
-        report.final_focal_inventory_count,
-        report.final_prey_count,
-        report.final_ground_item_count
+        report.final_focal_inventory_count, report.final_prey_count, report.final_ground_item_count
     );
     println!("─────────────────────────────────────────────────");
 

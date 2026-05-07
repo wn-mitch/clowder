@@ -211,7 +211,7 @@ fn print_action_distribution(name: &str, actions: &[Value], snapshots: &[Value])
     println!("=== {name} — Action Distribution ({source}) ===");
     println!();
     let mut sorted: Vec<(String, usize)> = counts.into_iter().collect();
-    sorted.sort_by(|a, b| b.1.cmp(&a.1));
+    sorted.sort_by_key(|b| std::cmp::Reverse(b.1));
 
     let max_count = sorted.first().map_or(1, |(_, c)| *c);
     let bar_max = 30;

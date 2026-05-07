@@ -334,8 +334,7 @@ pub struct EvalCtx<'ctx> {
     pub has_marker: &'ctx dyn Fn(&str, Entity) -> bool,
     /// Closure for landmark entity position lookup (used by
     /// `SpatialConsideration` with `LandmarkSource::Entity`).
-    pub entity_position:
-        &'ctx dyn Fn(Entity) -> Option<crate::components::physical::Position>,
+    pub entity_position: &'ctx dyn Fn(Entity) -> Option<crate::components::physical::Position>,
     /// Closure for cat-relative anchor position lookup (used by
     /// `SpatialConsideration` with `LandmarkSource::Anchor`). The
     /// canonical self-state-DSE resolution path: per-cat-per-tick,

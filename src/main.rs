@@ -525,7 +525,7 @@ fn print_headless_summary(footer: &str) {
             }
             entries.sort_by_key(|(k, _)| idx.get(k.as_str()).copied().unwrap_or(usize::MAX));
         } else {
-            entries.sort_by(|a, b| b.1.as_u64().unwrap_or(0).cmp(&a.1.as_u64().unwrap_or(0)));
+            entries.sort_by_key(|b| std::cmp::Reverse(b.1.as_u64().unwrap_or(0)));
         }
         for (k, count) in entries.iter().take(10) {
             eprintln!("    {count}× {k}");

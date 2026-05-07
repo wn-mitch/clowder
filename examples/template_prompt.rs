@@ -143,9 +143,9 @@ fn main() {
             Action::Patrol => "patrol.ron",
             Action::Build => "build.ron",
             Action::Farm => "farm.ron",
-            Action::HerbcraftGather
-            | Action::HerbcraftRemedy
-            | Action::HerbcraftSetWard => "herbcraft.ron",
+            Action::HerbcraftGather | Action::HerbcraftRemedy | Action::HerbcraftSetWard => {
+                "herbcraft.ron"
+            }
             Action::MagicScry
             | Action::MagicDurableWard
             | Action::MagicCleanse

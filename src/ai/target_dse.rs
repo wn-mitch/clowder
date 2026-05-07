@@ -540,9 +540,9 @@ fn aggregate(per_target: &[(Entity, f32)], rule: TargetAggregation) -> (f32, Opt
 
 #[cfg(test)]
 mod tests {
-    use crate::ai::considerations::LandmarkAnchor;
     use super::*;
     use crate::ai::composition::Composition;
+    use crate::ai::considerations::LandmarkAnchor;
     use crate::ai::considerations::{LandmarkSource, ScalarConsideration, SpatialConsideration};
     use crate::ai::curves::Curve;
     use crate::ai::dse::{ActivityKind, CommitmentStrategy, Termination};

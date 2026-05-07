@@ -213,7 +213,12 @@ pub fn mark_tile_corrupted(world: &mut World, pos: Position, level: f32) {
 }
 
 /// Add `count` herbs of the given kind to the cat's inventory.
-pub fn give_herbs(world: &mut World, cat: Entity, herb: crate::components::magic::HerbKind, count: u32) {
+pub fn give_herbs(
+    world: &mut World,
+    cat: Entity,
+    herb: crate::components::magic::HerbKind,
+    count: u32,
+) {
     use crate::components::items::ItemKind;
     let item_kind = match herb {
         crate::components::magic::HerbKind::HealingMoss => ItemKind::HerbHealingMoss,

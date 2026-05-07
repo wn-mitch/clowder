@@ -827,10 +827,7 @@ pub fn accumulate_build_pressure(
         bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
     >,
     wards: Query<&crate::components::magic::Ward>,
-    herbs: Query<
-        &crate::components::magic::Herb,
-        With<crate::components::magic::Harvestable>,
-    >,
+    herbs: Query<&crate::components::magic::Herb, With<crate::components::magic::Harvestable>>,
     cat_inventories: Query<&crate::components::magic::Inventory, Without<Dead>>,
     mut unmet_demand: ResMut<crate::resources::UnmetDemand>,
     mut log: ResMut<NarrativeLog>,
@@ -882,8 +879,7 @@ pub fn accumulate_build_pressure(
         wards.iter(),
         cc.ward_avg_strength_low_threshold,
     );
-    let wild_thornbriar_available =
-        crate::systems::magic::is_thornbriar_available(herbs.iter());
+    let wild_thornbriar_available = crate::systems::magic::is_thornbriar_available(herbs.iter());
     let any_cat_carrying_thornbriar = cat_inventories
         .iter()
         .any(|inv| inv.has_herb(crate::components::magic::HerbKind::Thornbriar));
@@ -1552,13 +1548,7 @@ mod tests {
             tile_map: &tm,
         };
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
-        let pos = compute_ward_placement(
-            &structures,
-            &wards,
-            Position::new(0, 0),
-            &maps,
-            &mut rng,
-        );
+        let pos = compute_ward_placement(&structures, &wards, Position::new(0, 0), &maps, &mut rng);
         assert_eq!(pos, Position::new(12, 10));
     }
 
@@ -1580,13 +1570,8 @@ mod tests {
             tile_map: &tm,
         };
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(7);
-        let pos = compute_ward_placement(
-            &structures,
-            &wards,
-            Position::new(60, 45),
-            &maps,
-            &mut rng,
-        );
+        let pos =
+            compute_ward_placement(&structures, &wards, Position::new(60, 45), &maps, &mut rng);
         let dx = (pos.x - 67).abs();
         let dy = (pos.y - 45).abs();
         assert!(
@@ -1619,13 +1604,8 @@ mod tests {
             tile_map: &tm,
         };
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(99);
-        let pos = compute_ward_placement(
-            &structures,
-            &wards,
-            Position::new(60, 45),
-            &maps,
-            &mut rng,
-        );
+        let pos =
+            compute_ward_placement(&structures, &wards, Position::new(60, 45), &maps, &mut rng);
         assert!(
             pos.manhattan_distance(&Position::new(60, 45)) > 3,
             "placement {pos:?} violates Manhattan-3 hard-exclusion",
@@ -1649,13 +1629,8 @@ mod tests {
             tile_map: &tm,
         };
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(11);
-        let pos = compute_ward_placement(
-            &structures,
-            &wards,
-            Position::new(60, 45),
-            &maps,
-            &mut rng,
-        );
+        let pos =
+            compute_ward_placement(&structures, &wards, Position::new(60, 45), &maps, &mut rng);
         let dist_near = pos.manhattan_distance(&Position::new(67, 45));
         let dist_far = pos.manhattan_distance(&Position::new(67, 85));
         assert!(

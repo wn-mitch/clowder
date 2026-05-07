@@ -170,10 +170,7 @@ impl DispositionKind {
             // 176: inventory-disposal dispositions complete after one
             // act. Trashing/Handing/PickingUp involve travel + a single
             // transfer; Discarding is just the in-place drop.
-            Self::Discarding
-            | Self::Trashing
-            | Self::Handing
-            | Self::PickingUp => return 1,
+            Self::Discarding | Self::Trashing | Self::Handing | Self::PickingUp => return 1,
             // 150 R5a: Eating completes on need threshold, not count.
             // Like Resting, target_completions returns MAX so the count-
             // based completion check never fires; the actual
@@ -219,9 +216,9 @@ impl DispositionKind {
             // 155: Herbcraft / PracticeMagic / Cook split into 9 + 1 +
             // 0 sub-actions across three new dispositions. Each L3
             // sub-action routes to its parent Disposition directly.
-            Action::HerbcraftGather
-            | Action::HerbcraftRemedy
-            | Action::HerbcraftSetWard => Some(Self::Herbalism),
+            Action::HerbcraftGather | Action::HerbcraftRemedy | Action::HerbcraftSetWard => {
+                Some(Self::Herbalism)
+            }
             Action::MagicScry
             | Action::MagicDurableWard
             | Action::MagicCleanse
@@ -702,10 +699,7 @@ mod tests {
         // `disposition_complete` never fires for Eating; the need-based
         // arms are authoritative.
         let p = test_personality();
-        assert_eq!(
-            DispositionKind::Eating.target_completions(&p),
-            u32::MAX
-        );
+        assert_eq!(DispositionKind::Eating.target_completions(&p), u32::MAX);
     }
 
     #[test]

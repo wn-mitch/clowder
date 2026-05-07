@@ -139,7 +139,10 @@ mod tests {
         let mut map = FoodLocationMap::new(40, 40, 5);
         map.stamp(20, 20, 1.0, 15.0);
         let center = map.get(22, 22);
-        assert!(center > 0.5, "expected strong presence at source, got {center}");
+        assert!(
+            center > 0.5,
+            "expected strong presence at source, got {center}"
+        );
         assert_eq!(map.get(0, 0), 0.0);
     }
 

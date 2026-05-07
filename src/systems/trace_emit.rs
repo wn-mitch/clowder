@@ -36,6 +36,7 @@
 //! empty/None so downstream tools can skip the field without crashing.
 
 use bevy_ecs::prelude::*;
+use bevy_ecs::system::SystemParam;
 
 use crate::ai::CurrentAction;
 use crate::components::disposition::Disposition;
@@ -43,13 +44,17 @@ use crate::components::goap_plan::GoapPlan;
 use crate::components::identity::{Name, Species};
 use crate::components::physical::{Dead, Position};
 use crate::components::sensing::SensorySpecies;
-use crate::resources::cat_presence_map::CatPresenceMap;
-use crate::resources::exploration_map::ExplorationMap;
-use crate::resources::fox_scent_map::FoxScentMap;
-use crate::resources::map::TileMap;
 use crate::resources::carcass_scent_map::CarcassScentMap;
+use crate::resources::cat_presence_map::CatPresenceMap;
+use crate::resources::construction_site_map::ConstructionSiteMap;
+use crate::resources::exploration_map::ExplorationMap;
+use crate::resources::food_location_map::FoodLocationMap;
+use crate::resources::fox_scent_map::FoxScentMap;
+use crate::resources::garden_location_map::GardenLocationMap;
+use crate::resources::herb_location_map::HerbLocationMap;
+use crate::resources::kitten_cry_map::KittenCryMap;
+use crate::resources::map::TileMap;
 use crate::resources::prey_scent_map::PreyScentMap;
-use crate::resources::ward_coverage_map::WardCoverageMap;
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::time::TimeState;
 use crate::resources::trace_log::{
@@ -58,9 +63,36 @@ use crate::resources::trace_log::{
     IntentionSummary, ModifierApplication, MomentumSummary, PlanFailureCapture, PlanStateSummary,
     SoftmaxSummary, SpatialRef, TraceEntry, TraceLog, TraceRecord,
 };
+use crate::resources::ward_coverage_map::WardCoverageMap;
 use crate::systems::influence_map::{
     channel_label, Attenuation, CorruptionLens, Faction, InfluenceMap, MapMetadata,
 };
+
+/// Bundles the twelve `InfluenceMap`-implementing resources the L1 walk
+/// reads. Lives here to keep `emit_focal_trace` under Bevy's 16-param
+/// tuple limit per `CLAUDE.md` §ECS rules.
+///
+/// All twelve are `Option<Res<>>` so the system tolerates missing
+/// resources — useful in tests and in the resource-hot-swap edge case
+/// during plugin teardown. A true registry walk
+/// (`Vec<Box<dyn InfluenceMap>>` registered at plugin build time)
+/// remains the longer-arc Phase 2D refactor; this bundle closes the
+/// trace-coverage gap without rewriting registration. See ticket 206.
+#[derive(SystemParam)]
+pub struct L1Maps<'w> {
+    pub fox_scent: Option<Res<'w, FoxScentMap>>,
+    pub prey_scent: Option<Res<'w, PreyScentMap>>,
+    pub carcass_scent: Option<Res<'w, CarcassScentMap>>,
+    pub cat_presence: Option<Res<'w, CatPresenceMap>>,
+    pub exploration: Option<Res<'w, ExplorationMap>>,
+    pub ward_coverage: Option<Res<'w, WardCoverageMap>>,
+    pub food_location: Option<Res<'w, FoodLocationMap>>,
+    pub garden_location: Option<Res<'w, GardenLocationMap>>,
+    pub construction_site: Option<Res<'w, ConstructionSiteMap>>,
+    pub kitten_cry: Option<Res<'w, KittenCryMap>>,
+    pub herb_location: Option<Res<'w, HerbLocationMap>>,
+    pub tile_map: Option<Res<'w, TileMap>>,
+}
 
 /// Resolves the focal cat's entity and emits L1/L2/L3 records for the
 /// current tick. Gated on `FocalTraceTarget`; a no-op in every build
@@ -75,13 +107,7 @@ pub fn emit_focal_trace(
     mut target: ResMut<FocalTraceTarget>,
     time: Res<TimeState>,
     constants: Res<SimConstants>,
-    fox_scent_map: Option<Res<FoxScentMap>>,
-    prey_scent_map: Option<Res<PreyScentMap>>,
-    carcass_scent_map: Option<Res<CarcassScentMap>>,
-    cat_presence_map: Option<Res<CatPresenceMap>>,
-    exploration_map: Option<Res<ExplorationMap>>,
-    ward_coverage_map: Option<Res<WardCoverageMap>>,
-    tile_map: Option<Res<TileMap>>,
+    maps: L1Maps,
     mut trace_log: ResMut<TraceLog>,
     focal_capture: Res<FocalScoreCapture>,
     cats: Query<
@@ -119,34 +145,38 @@ pub fn emit_focal_trace(
     let cat_name = name.0.clone();
 
     // -----------------------------------------------------------------
-    // L1 — one record per registered InfluenceMap. The walk now covers
-    // seven maps: FoxScentMap, PreyScentMap, CarcassScentMap (Phase 2C),
-    // CatPresenceMap, ExplorationMap, WardCoverageMap, and the
-    // CorruptionLens borrow adapter for TileMap.corruption. Cat is the
-    // observer species, so species-sens is looked up against
-    // `SensorySpecies::Cat` on each channel via the §5.6.6 attenuation
-    // pipeline. Phase 2D will replace this hardcoded sequence with a
-    // registry walk.
+    // L1 — one record per registered InfluenceMap. The walk covers all
+    // twelve `InfluenceMap` impls: the seven scent / spatial maps below
+    // plus FoodLocationMap, GardenLocationMap, ConstructionSiteMap,
+    // KittenCryMap, HerbLocationMap, and the CorruptionLens borrow
+    // adapter for TileMap.corruption. Cat is the observer species, so
+    // species-sens is looked up against `SensorySpecies::Cat` on each
+    // channel via the §5.6.6 attenuation pipeline.
+    //
+    // Still deferred to Phase 2D: a true registry walk
+    // (`Vec<Box<dyn InfluenceMap>>` registered at plugin build time)
+    // that would let new maps appear in L1 without editing this file.
+    // See ticket 207.
     // -----------------------------------------------------------------
-    if let Some(ref m) = fox_scent_map {
-        emit_l1_for_map(&mut trace_log, tick, &cat_name, *pos, &**m, &constants);
+    macro_rules! emit_map {
+        ($field:expr) => {
+            if let Some(ref m) = $field {
+                emit_l1_for_map(&mut trace_log, tick, &cat_name, *pos, &**m, &constants);
+            }
+        };
     }
-    if let Some(ref m) = prey_scent_map {
-        emit_l1_for_map(&mut trace_log, tick, &cat_name, *pos, &**m, &constants);
-    }
-    if let Some(ref m) = carcass_scent_map {
-        emit_l1_for_map(&mut trace_log, tick, &cat_name, *pos, &**m, &constants);
-    }
-    if let Some(ref m) = cat_presence_map {
-        emit_l1_for_map(&mut trace_log, tick, &cat_name, *pos, &**m, &constants);
-    }
-    if let Some(ref m) = exploration_map {
-        emit_l1_for_map(&mut trace_log, tick, &cat_name, *pos, &**m, &constants);
-    }
-    if let Some(ref m) = ward_coverage_map {
-        emit_l1_for_map(&mut trace_log, tick, &cat_name, *pos, &**m, &constants);
-    }
-    if let Some(ref m) = tile_map {
+    emit_map!(maps.fox_scent);
+    emit_map!(maps.prey_scent);
+    emit_map!(maps.carcass_scent);
+    emit_map!(maps.cat_presence);
+    emit_map!(maps.exploration);
+    emit_map!(maps.ward_coverage);
+    emit_map!(maps.food_location);
+    emit_map!(maps.garden_location);
+    emit_map!(maps.construction_site);
+    emit_map!(maps.kitten_cry);
+    emit_map!(maps.herb_location);
+    if let Some(ref m) = maps.tile_map {
         let lens = CorruptionLens(m);
         emit_l1_for_map(&mut trace_log, tick, &cat_name, *pos, &lens, &constants);
     }
@@ -242,46 +272,45 @@ pub fn emit_focal_trace(
         })
         .unwrap_or_default();
 
-    let (ranked, softmax_summary, pre_bonus_pool, pre_penalty_pool) = if let Some(sm) =
-        &captured.softmax
-    {
-        let ranked: Vec<(String, f32)> = sm
-            .pool
-            .iter()
-            .map(|(a, s)| (format!("{a:?}"), *s))
-            .collect();
-        let summary = SoftmaxSummary {
-            temperature: sm.temperature,
-            probabilities: sm.probabilities.clone(),
+    let (ranked, softmax_summary, pre_bonus_pool, pre_penalty_pool) =
+        if let Some(sm) = &captured.softmax {
+            let ranked: Vec<(String, f32)> = sm
+                .pool
+                .iter()
+                .map(|(a, s)| (format!("{a:?}"), *s))
+                .collect();
+            let summary = SoftmaxSummary {
+                temperature: sm.temperature,
+                probabilities: sm.probabilities.clone(),
+            };
+            let pre_bonus: Vec<(String, f32)> = sm
+                .pre_bonus_pool
+                .iter()
+                .map(|(a, s)| (format!("{a:?}"), *s))
+                .collect();
+            let pre_penalty: Vec<(String, f32)> = sm
+                .pool_pre_penalty
+                .iter()
+                .map(|(a, s)| (format!("{a:?}"), *s))
+                .collect();
+            (ranked, summary, pre_bonus, pre_penalty)
+        } else {
+            // Edge case: L2 captured but softmax didn't (e.g. ineligible
+            // pool after filtering). Fall back to the pre-softmax ranking
+            // from `current.last_scores`; probabilities stay empty so
+            // replay tooling can distinguish "softmax ran" from "softmax
+            // fallthrough".
+            let ranked: Vec<(String, f32)> = current
+                .last_scores
+                .iter()
+                .map(|(a, s)| (format!("{a:?}"), *s))
+                .collect();
+            let summary = SoftmaxSummary {
+                temperature: constants.scoring.intention_softmax_temperature,
+                probabilities: Vec::new(),
+            };
+            (ranked, summary, Vec::new(), Vec::new())
         };
-        let pre_bonus: Vec<(String, f32)> = sm
-            .pre_bonus_pool
-            .iter()
-            .map(|(a, s)| (format!("{a:?}"), *s))
-            .collect();
-        let pre_penalty: Vec<(String, f32)> = sm
-            .pool_pre_penalty
-            .iter()
-            .map(|(a, s)| (format!("{a:?}"), *s))
-            .collect();
-        (ranked, summary, pre_bonus, pre_penalty)
-    } else {
-        // Edge case: L2 captured but softmax didn't (e.g. ineligible
-        // pool after filtering). Fall back to the pre-softmax ranking
-        // from `current.last_scores`; probabilities stay empty so
-        // replay tooling can distinguish "softmax ran" from "softmax
-        // fallthrough".
-        let ranked: Vec<(String, f32)> = current
-            .last_scores
-            .iter()
-            .map(|(a, s)| (format!("{a:?}"), *s))
-            .collect();
-        let summary = SoftmaxSummary {
-            temperature: constants.scoring.intention_softmax_temperature,
-            probabilities: Vec::new(),
-        };
-        (ranked, summary, Vec::new(), Vec::new())
-    };
 
     trace_log.push(TraceEntry {
         tick,

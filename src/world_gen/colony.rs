@@ -3,9 +3,9 @@ use rand::seq::SliceRandom;
 use rand::Rng;
 
 use crate::components::building::{ConstructionSite, StoredItems, Structure, StructureType};
+use crate::components::identity::LifeStage;
 use crate::components::identity::Name;
 use crate::components::items::{BuildMaterialItem, Item, ItemKind, ItemLocation};
-use crate::components::identity::LifeStage;
 use crate::components::{
     Appearance, Gender, Orientation, Personality, Position, Skills, ZodiacSign,
 };
@@ -431,7 +431,12 @@ pub fn spawn_starting_buildings(world: &mut World, colony_site: Position, map: &
         den_pos.x,
         (hearth_pos.y + hearth_size.1 + 2).min(map.height - midden_size.1),
     );
-    stamp_footprint(map, midden_pos, StructureType::Midden.terrain(), midden_size);
+    stamp_footprint(
+        map,
+        midden_pos,
+        StructureType::Midden.terrain(),
+        midden_size,
+    );
     world.spawn((
         Name("The Midden".to_string()),
         midden_pos,
@@ -728,7 +733,9 @@ mod tests {
             );
             assert_eq!(young + adult, 8, "seed {seed}: stages don't sum to total");
             assert!(
-                !stages.iter().any(|s| matches!(s, LifeStage::Elder | LifeStage::Kitten)),
+                !stages
+                    .iter()
+                    .any(|s| matches!(s, LifeStage::Elder | LifeStage::Kitten)),
                 "seed {seed}: founder pool contains a Kitten or Elder"
             );
         }

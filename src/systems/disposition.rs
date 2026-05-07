@@ -567,9 +567,9 @@ pub fn evaluate_dispositions(
         colony_stores_chronically_full,
         has_ground_carcass,
         has_handoff_recipient,
-    ) = colony_state_query
-        .single()
-        .expect("ColonyState singleton must exist (spawned by build_new_world / init_scenario_world_with)");
+    ) = colony_state_query.single().expect(
+        "ColonyState singleton must exist (spawned by build_new_world / init_scenario_world_with)",
+    );
     markers.set_colony(markers::HasGarden::KEY, has_garden);
     markers.set_colony(markers::HasFunctionalKitchen::KEY, has_functional_kitchen);
     markers.set_colony(
@@ -866,8 +866,7 @@ pub fn evaluate_dispositions(
         // `HasEligibleMate` ZST per tick, and `MateDse.eligibility()`
         // requires it. The marker is read via the snapshot below.
 
-        let presence_memory_sums =
-            crate::ai::scoring::memory_proximity_sums(memory, pos, sc);
+        let presence_memory_sums = crate::ai::scoring::memory_proximity_sums(memory, pos, sc);
         let presence_colony_knowledge_sums = colony
             .knowledge
             .as_ref()
@@ -988,13 +987,7 @@ pub fn evaluate_dispositions(
                 focal_age,
                 needs.respect,
                 &cat_positions,
-                |e| {
-                    side_effects
-                        .age_query
-                        .get(e)
-                        .ok()
-                        .map(|a| a.born_tick)
-                },
+                |e| side_effects.age_query.get(e).ok().map(|a| a.born_tick),
                 |e| side_effects.needs_query.get(e).ok().map(|n| n.respect),
                 &relationships,
                 side_effects.time.tick,
@@ -1009,8 +1002,7 @@ pub fn evaluate_dispositions(
             has_damaged_building,
             has_garden,
             food_fraction,
-            inventory_food_fraction: inventory.food_count() as f32
-                / Inventory::MAX_SLOTS as f32,
+            inventory_food_fraction: inventory.food_count() as f32 / Inventory::MAX_SLOTS as f32,
             magic_affinity: magic_aff.0,
             magic_skill: skills.magic,
             herbcraft_skill: skills.herbcraft,
@@ -1069,13 +1061,10 @@ pub fn evaluate_dispositions(
             social_warmth_deficit: fulfillment.map_or(0.4, |f| f.social_warmth_deficit()),
             cat_anchors: crate::ai::scoring::CatAnchorPositions {
                 nearest_corrupted_tile,
-                nearest_construction_site:
-                    crate::systems::buildings::nearest_construction_site(
-                        building_query
-                            .iter()
-                            .map(|(_, s, p, site, _)| (s, p, site)),
-                        *pos,
-                    ),
+                nearest_construction_site: crate::systems::buildings::nearest_construction_site(
+                    building_query.iter().map(|(_, s, p, site, _)| (s, p, site)),
+                    *pos,
+                ),
                 // §L2.10.7 Sleep anchor: cats sleep where they are
                 // (no per-cat sleeping-spot component yet).
                 own_sleeping_spot: Some(*pos),
@@ -1596,12 +1585,9 @@ pub fn disposition_to_chain(
             // Move→EatAtStores. The GOAP planner is the canonical
             // path; this arm exists so the dead-code path still type-
             // checks and historical tests don't break.
-            DispositionKind::Eating => build_eating_chain(
-                pos,
-                &building_query,
-                nearest_store,
-                res.food.is_empty(),
-            ),
+            DispositionKind::Eating => {
+                build_eating_chain(pos, &building_query, nearest_store, res.food.is_empty())
+            }
             DispositionKind::Hunting => {
                 build_hunting_chain(pos, memory, &res.map, nearest_store, &mut rng.rng)
             }
@@ -1632,9 +1618,7 @@ pub fn disposition_to_chain(
                 build_building_chain(entity, pos, &building_query, build_target, d, &mut commands)
             }
             DispositionKind::Farming => build_farming_chain(pos, &building_query),
-            DispositionKind::Herbalism
-            | DispositionKind::Witchcraft
-            | DispositionKind::Cooking => {
+            DispositionKind::Herbalism | DispositionKind::Witchcraft | DispositionKind::Cooking => {
                 // 155: legacy chain-building path for the retired
                 // `Crafting` umbrella. Dead arm — `disposition_to_chain`
                 // is unscheduled (ticket 027b); the live path is the
@@ -1692,9 +1676,7 @@ pub fn disposition_to_chain(
             // is the live path); the new `Grooming` disposition runs
             // its single-step `[GroomOther]` template through the
             // planner just like Mentoring's `[MentorCat]`.
-            DispositionKind::Grooming => {
-                build_grooming_chain(groom_other_target, &cat_pos_list)
-            }
+            DispositionKind::Grooming => build_grooming_chain(groom_other_target, &cat_pos_list),
             // 176: inventory-disposal dispositions don't have a legacy
             // chain-building path — they ship GOAP-only. The arm
             // returns None so this dead-code path defers cleanly to
@@ -2541,8 +2523,8 @@ fn try_crafting_sub_mode(
             // cat still committed to ward (e.g. directive-driven warding
             // ahead of the colony-side gate). Influence-map scoring is
             // skipped in that branch; map center is a safe-enough drop.
-            let ward_pos = ward_placement_pos
-                .unwrap_or_else(|| Position::new(map.width / 2, map.height / 2));
+            let ward_pos =
+                ward_placement_pos.unwrap_or_else(|| Position::new(map.width / 2, map.height / 2));
 
             let kind = if is_durable {
                 WardKind::DurableWard
@@ -2979,11 +2961,9 @@ pub fn resolve_disposition_chains(
         // Grooming condition for target lookups during social interactions.
         grooming: cats
             .iter()
-            .map(
-                |((e, _, _, _, _, _, _, _, _), (_, _, _, _, _, g, _, _))| {
-                    (e, g.map_or(0.8, |g| g.0))
-                },
-            )
+            .map(|((e, _, _, _, _, _, _, _, _), (_, _, _, _, _, g, _, _))| {
+                (e, g.map_or(0.8, |g| g.0))
+            })
             .collect(),
         // Gender snapshot — used by `MateWith` to look up the partner's
         // gender for §7.M.7.4's gestator-selection fix without double-
@@ -3327,8 +3307,7 @@ pub fn resolve_disposition_chains(
         if let Ok((
             (_, _, _, _, _, mut needs, _, _, _),
             (_, _, _, _, _, grooming, _, fulfillment),
-        )) =
-            cats.get_mut(groom.target)
+        )) = cats.get_mut(groom.target)
         {
             if let Some(mut g) = grooming {
                 g.0 = (g.0 + groom.grooming_delta).min(1.0);
@@ -4361,7 +4340,11 @@ mod tests {
     }
 
     fn default_disposition(kind: DispositionKind) -> Disposition {
-        let chosen = kind.constituent_actions().first().copied().unwrap_or(Action::Idle);
+        let chosen = kind
+            .constituent_actions()
+            .first()
+            .copied()
+            .unwrap_or(Action::Idle);
         Disposition {
             kind,
             adopted_tick: 0,

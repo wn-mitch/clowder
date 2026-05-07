@@ -422,7 +422,13 @@ mod tests {
     #[test]
     fn new_plan_sets_target_trips() {
         let p = test_personality();
-        let plan = GoapPlan::new(DispositionKind::Hunting, Action::Hunt, 100, &p, sample_steps());
+        let plan = GoapPlan::new(
+            DispositionKind::Hunting,
+            Action::Hunt,
+            100,
+            &p,
+            sample_steps(),
+        );
         assert_eq!(
             plan.target_trips,
             DispositionKind::Hunting.target_completions(&p)
@@ -435,7 +441,13 @@ mod tests {
     #[test]
     fn advance_increments_step() {
         let p = test_personality();
-        let mut plan = GoapPlan::new(DispositionKind::Hunting, Action::Hunt, 0, &p, sample_steps());
+        let mut plan = GoapPlan::new(
+            DispositionKind::Hunting,
+            Action::Hunt,
+            0,
+            &p,
+            sample_steps(),
+        );
         assert_eq!(plan.current_step, 0);
         assert!(!plan.is_exhausted());
 
@@ -451,7 +463,13 @@ mod tests {
     #[test]
     fn replan_replaces_steps() {
         let p = test_personality();
-        let mut plan = GoapPlan::new(DispositionKind::Hunting, Action::Hunt, 0, &p, sample_steps());
+        let mut plan = GoapPlan::new(
+            DispositionKind::Hunting,
+            Action::Hunt,
+            0,
+            &p,
+            sample_steps(),
+        );
         plan.advance(); // Move to step 1.
 
         let new_steps = vec![PlannedStep {
@@ -468,7 +486,13 @@ mod tests {
     #[test]
     fn replan_respects_max_replans() {
         let p = test_personality();
-        let mut plan = GoapPlan::new(DispositionKind::Hunting, Action::Hunt, 0, &p, sample_steps());
+        let mut plan = GoapPlan::new(
+            DispositionKind::Hunting,
+            Action::Hunt,
+            0,
+            &p,
+            sample_steps(),
+        );
         plan.max_replans = 2;
 
         assert!(plan.replan(sample_steps())); // replan_count = 1
@@ -479,14 +503,26 @@ mod tests {
     #[test]
     fn step_state_parallel_to_steps() {
         let p = test_personality();
-        let plan = GoapPlan::new(DispositionKind::Hunting, Action::Hunt, 0, &p, sample_steps());
+        let plan = GoapPlan::new(
+            DispositionKind::Hunting,
+            Action::Hunt,
+            0,
+            &p,
+            sample_steps(),
+        );
         assert_eq!(plan.steps.len(), plan.step_state.len());
     }
 
     #[test]
     fn failed_actions_persist_across_replans() {
         let p = test_personality();
-        let mut plan = GoapPlan::new(DispositionKind::Hunting, Action::Hunt, 0, &p, sample_steps());
+        let mut plan = GoapPlan::new(
+            DispositionKind::Hunting,
+            Action::Hunt,
+            0,
+            &p,
+            sample_steps(),
+        );
         assert!(plan.failed_actions.is_empty());
 
         plan.failed_actions.insert(GoapActionKind::SearchPrey);
@@ -496,7 +532,13 @@ mod tests {
         assert_eq!(plan.replan_count, 1);
 
         // A fresh plan starts with empty failed_actions.
-        let fresh = GoapPlan::new(DispositionKind::Hunting, Action::Hunt, 100, &p, sample_steps());
+        let fresh = GoapPlan::new(
+            DispositionKind::Hunting,
+            Action::Hunt,
+            100,
+            &p,
+            sample_steps(),
+        );
         assert!(fresh.failed_actions.is_empty());
     }
 

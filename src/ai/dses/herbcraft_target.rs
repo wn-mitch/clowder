@@ -314,15 +314,8 @@ mod tests {
         let cat = Entity::from_raw_u32(1).unwrap();
         // Beyond HERBCRAFT_TARGET_RANGE (20) Manhattan tiles.
         let far = herb(2, 50, 0, HerbKind::HealingMoss, GrowthStage::Blossom);
-        let out = resolve_herbcraft_target(
-            &registry,
-            cat,
-            Position::new(0, 0),
-            &[far],
-            &map,
-            0,
-            None,
-        );
+        let out =
+            resolve_herbcraft_target(&registry, cat, Position::new(0, 0), &[far], &map, 0, None);
         assert!(out.is_none());
     }
 

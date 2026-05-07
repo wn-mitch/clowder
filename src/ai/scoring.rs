@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use bevy::prelude::Entity;
 use rand::Rng;
 
-use crate::ai::dse::EvalCtx;
 use crate::ai::considerations::LandmarkAnchor;
+use crate::ai::dse::EvalCtx;
 use crate::ai::eval::{evaluate_single, DseRegistry, ModifierPipeline};
 use crate::ai::Action;
 use crate::components::mental::{Memory, MemoryType};
@@ -601,10 +601,7 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
     // Ticket 103 — threat-coupled escape viability. Pure physics
     // signal published for future Fight (102) / Freeze (105)
     // modifiers; no consumer at landing.
-    m.insert(
-        "escape_viability",
-        ctx.escape_viability.clamp(0.0, 1.0),
-    );
+    m.insert("escape_viability", ctx.escape_viability.clamp(0.0, 1.0));
     // Ticket 108 — `ThreatProximityAdrenalineFlee` Modifier trigger.
     // Rising-only derivative of `safety_deficit` over the last tick;
     // computed at `ScoringContext` construction by reading the cat's
@@ -630,10 +627,7 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
     // `purpose_clarity` is binary {0.0, 1.0}. All three are pre-computed
     // at `ScoringContext` construction by
     // `crate::systems::interoception` helpers.
-    m.insert(
-        "mastery_confidence",
-        ctx.mastery_confidence.clamp(0.0, 1.0),
-    );
+    m.insert("mastery_confidence", ctx.mastery_confidence.clamp(0.0, 1.0));
     m.insert("purpose_clarity", ctx.purpose_clarity.clamp(0.0, 1.0));
     m.insert("esteem_distress", ctx.esteem_distress.clamp(0.0, 1.0));
     // Fight: combat_effective is already a `[0, 1]` composite index
@@ -880,10 +874,7 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
         "memory_resource_found_proximity_sum",
         ctx.memory_resource_found_proximity_sum,
     );
-    m.insert(
-        "memory_death_proximity_sum",
-        ctx.memory_death_proximity_sum,
-    );
+    m.insert("memory_death_proximity_sum", ctx.memory_death_proximity_sum);
     m.insert(
         "memory_threat_seen_proximity_sum",
         ctx.memory_threat_seen_proximity_sum,
@@ -1360,7 +1351,11 @@ pub fn apply_carry_affinity(
         // no bias.
         _ => false,
     };
-    if matches { base * bonus } else { base }
+    if matches {
+        base * bonus
+    } else {
+        base
+    }
 }
 
 /// Score all available actions for a cat given its current state.
@@ -1446,7 +1441,10 @@ pub fn score_actions(
     }
     if ctx.has_social_target {
         let other_score = score_dse_by_id("groom_other", ctx, inputs);
-        scores.push((Action::GroomOther, other_score + jitter(rng, s.jitter_range)));
+        scores.push((
+            Action::GroomOther,
+            other_score + jitter(rng, s.jitter_range),
+        ));
     }
 
     // --- Explore (§2.3: CP of curiosity + unexplored_nearby) ---
@@ -1524,7 +1522,10 @@ pub fn score_actions(
             0.0
         };
         if gather > 0.0 {
-            scores.push((Action::HerbcraftGather, gather + jitter(rng, s.jitter_range)));
+            scores.push((
+                Action::HerbcraftGather,
+                gather + jitter(rng, s.jitter_range),
+            ));
         }
         let prepare = if ctx.has_remedy_herbs && ctx.colony_injury_count > 0 {
             score_dse_by_id("herbcraft_prepare", ctx, inputs)
@@ -1532,7 +1533,10 @@ pub fn score_actions(
             0.0
         };
         if prepare > 0.0 {
-            scores.push((Action::HerbcraftRemedy, prepare + jitter(rng, s.jitter_range)));
+            scores.push((
+                Action::HerbcraftRemedy,
+                prepare + jitter(rng, s.jitter_range),
+            ));
         }
         // §4 batch 2: inline `ctx.has_ward_herbs` gate retired —
         // HerbcraftWardDse carries `.require(CanWard::KEY)` which
@@ -1822,7 +1826,6 @@ pub fn compute_cascade_counts(
     counts
 }
 
-
 /// Aggregate `ColonyKnowledge` entries into the two proximity sums
 /// `ColonyKnowledgeLift` reads. Returns `(resource, threat)` where each
 /// is Σ `proximity × strength` over qualifying entries (ResourceFound
@@ -1950,7 +1953,6 @@ pub const ALL_ACTIONS: [Action; CASCADE_COUNTS_LEN] = [
     Action::Cook,
     Action::Hide,
 ];
-
 
 // ---------------------------------------------------------------------------
 // Selection
@@ -2083,9 +2085,7 @@ use crate::components::disposition::DispositionKind;
 /// disposition mapping (`Resting` and `Grooming` respectively). The
 /// `self_groom_won` resolver parameter retired with the split — the
 /// L3 softmax pick directly carries the self-vs-other distinction.
-pub fn aggregate_to_dispositions(
-    action_scores: &[(Action, f32)],
-) -> Vec<(DispositionKind, f32)> {
+pub fn aggregate_to_dispositions(action_scores: &[(Action, f32)]) -> Vec<(DispositionKind, f32)> {
     let mut disposition_scores: Vec<(DispositionKind, f32)> = DispositionKind::ALL
         .iter()
         .map(|kind| (*kind, 0.0f32))
@@ -2368,33 +2368,80 @@ mod tests {
         use crate::ai::planner::Carrying;
         let bonus = 1.5;
         // Boosted: carry maps to a chain-consuming DSE.
-        assert_eq!(apply_carry_affinity(10.0, "hunt", Carrying::Prey, bonus), 15.0);
-        assert_eq!(apply_carry_affinity(10.0, "forage", Carrying::ForagedFood, bonus), 15.0);
-        assert_eq!(apply_carry_affinity(10.0, "herbcraft_prepare", Carrying::Herbs, bonus), 15.0);
-        assert_eq!(apply_carry_affinity(10.0, "herbcraft_ward", Carrying::Herbs, bonus), 15.0);
-        assert_eq!(apply_carry_affinity(10.0, "apply_remedy_target", Carrying::Herbs, bonus), 15.0);
-        assert_eq!(apply_carry_affinity(10.0, "build", Carrying::BuildMaterials, bonus), 15.0);
+        assert_eq!(
+            apply_carry_affinity(10.0, "hunt", Carrying::Prey, bonus),
+            15.0
+        );
+        assert_eq!(
+            apply_carry_affinity(10.0, "forage", Carrying::ForagedFood, bonus),
+            15.0
+        );
+        assert_eq!(
+            apply_carry_affinity(10.0, "herbcraft_prepare", Carrying::Herbs, bonus),
+            15.0
+        );
+        assert_eq!(
+            apply_carry_affinity(10.0, "herbcraft_ward", Carrying::Herbs, bonus),
+            15.0
+        );
+        assert_eq!(
+            apply_carry_affinity(10.0, "apply_remedy_target", Carrying::Herbs, bonus),
+            15.0
+        );
+        assert_eq!(
+            apply_carry_affinity(10.0, "build", Carrying::BuildMaterials, bonus),
+            15.0
+        );
 
         // Not boosted: carry doesn't match the DSE's chain.
-        assert_eq!(apply_carry_affinity(10.0, "cook", Carrying::Prey, bonus), 10.0);
-        assert_eq!(apply_carry_affinity(10.0, "hunt", Carrying::Herbs, bonus), 10.0);
-        assert_eq!(apply_carry_affinity(10.0, "forage", Carrying::BuildMaterials, bonus), 10.0);
-        assert_eq!(apply_carry_affinity(10.0, "build", Carrying::Prey, bonus), 10.0);
+        assert_eq!(
+            apply_carry_affinity(10.0, "cook", Carrying::Prey, bonus),
+            10.0
+        );
+        assert_eq!(
+            apply_carry_affinity(10.0, "hunt", Carrying::Herbs, bonus),
+            10.0
+        );
+        assert_eq!(
+            apply_carry_affinity(10.0, "forage", Carrying::BuildMaterials, bonus),
+            10.0
+        );
+        assert_eq!(
+            apply_carry_affinity(10.0, "build", Carrying::Prey, bonus),
+            10.0
+        );
 
         // Carrying::Nothing — the orthogonality baseline. Bias
         // is zero across every DSE.
-        for dse_id in ["hunt", "forage", "cook", "herbcraft_prepare", "herbcraft_ward",
-                       "apply_remedy_target", "build", "eat", "sleep", "wander"] {
+        for dse_id in [
+            "hunt",
+            "forage",
+            "cook",
+            "herbcraft_prepare",
+            "herbcraft_ward",
+            "apply_remedy_target",
+            "build",
+            "eat",
+            "sleep",
+            "wander",
+        ] {
             assert_eq!(
                 apply_carry_affinity(10.0, dse_id, Carrying::Nothing, bonus),
                 10.0,
-                "Carrying::Nothing should never bias any DSE (saw bias on '{}')", dse_id
+                "Carrying::Nothing should never bias any DSE (saw bias on '{}')",
+                dse_id
             );
         }
 
         // bonus = 1.0 disables the bias entirely.
-        assert_eq!(apply_carry_affinity(10.0, "hunt", Carrying::Prey, 1.0), 10.0);
-        assert_eq!(apply_carry_affinity(10.0, "build", Carrying::BuildMaterials, 1.0), 10.0);
+        assert_eq!(
+            apply_carry_affinity(10.0, "hunt", Carrying::Prey, 1.0),
+            10.0
+        );
+        assert_eq!(
+            apply_carry_affinity(10.0, "build", Carrying::BuildMaterials, 1.0),
+            10.0
+        );
     }
 
     /// 155: helper for tests that need to ask "did any of the six
@@ -2573,7 +2620,8 @@ mod tests {
     /// each test without forcing every caller to construct one.
     /// Tests don't tune the disposition constants, so a single static
     /// default suffices for every per-test `ScoringContext`.
-    fn default_disposition_constants() -> &'static crate::resources::sim_constants::DispositionConstants {
+    fn default_disposition_constants(
+    ) -> &'static crate::resources::sim_constants::DispositionConstants {
         use std::sync::OnceLock;
         static DC: OnceLock<crate::resources::sim_constants::DispositionConstants> =
             OnceLock::new();
@@ -2648,7 +2696,19 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
-            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)), own_safe_rest_spot: Some(Position::new(0, 0)), own_injury_site: Some(Position::new(0, 0)) },
+            cat_anchors: crate::ai::scoring::CatAnchorPositions {
+                own_sleeping_spot: Some(Position::new(0, 0)),
+                nearest_forageable_cluster: Some(Position::new(0, 0)),
+                nearest_construction_site: Some(Position::new(0, 0)),
+                nearest_herb_patch: Some(Position::new(0, 0)),
+                nearest_perimeter_tile: Some(Position::new(0, 0)),
+                territory_perimeter_anchor: Some(Position::new(0, 0)),
+                nearest_corrupted_tile: Some(Position::new(0, 0)),
+                nearest_threat: Some(Position::new(0, 0)),
+                coordinator_perch: Some(Position::new(0, 0)),
+                own_safe_rest_spot: Some(Position::new(0, 0)),
+                own_injury_site: Some(Position::new(0, 0)),
+            },
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,
             disposition_failure_signal_crafting: 1.0,
@@ -2825,7 +2885,19 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
-            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)), own_safe_rest_spot: Some(Position::new(0, 0)), own_injury_site: Some(Position::new(0, 0)) },
+            cat_anchors: crate::ai::scoring::CatAnchorPositions {
+                own_sleeping_spot: Some(Position::new(0, 0)),
+                nearest_forageable_cluster: Some(Position::new(0, 0)),
+                nearest_construction_site: Some(Position::new(0, 0)),
+                nearest_herb_patch: Some(Position::new(0, 0)),
+                nearest_perimeter_tile: Some(Position::new(0, 0)),
+                territory_perimeter_anchor: Some(Position::new(0, 0)),
+                nearest_corrupted_tile: Some(Position::new(0, 0)),
+                nearest_threat: Some(Position::new(0, 0)),
+                coordinator_perch: Some(Position::new(0, 0)),
+                own_safe_rest_spot: Some(Position::new(0, 0)),
+                own_injury_site: Some(Position::new(0, 0)),
+            },
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,
             disposition_failure_signal_crafting: 1.0,
@@ -3025,7 +3097,19 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
-            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)), own_safe_rest_spot: Some(Position::new(0, 0)), own_injury_site: Some(Position::new(0, 0)) },
+            cat_anchors: crate::ai::scoring::CatAnchorPositions {
+                own_sleeping_spot: Some(Position::new(0, 0)),
+                nearest_forageable_cluster: Some(Position::new(0, 0)),
+                nearest_construction_site: Some(Position::new(0, 0)),
+                nearest_herb_patch: Some(Position::new(0, 0)),
+                nearest_perimeter_tile: Some(Position::new(0, 0)),
+                territory_perimeter_anchor: Some(Position::new(0, 0)),
+                nearest_corrupted_tile: Some(Position::new(0, 0)),
+                nearest_threat: Some(Position::new(0, 0)),
+                coordinator_perch: Some(Position::new(0, 0)),
+                own_safe_rest_spot: Some(Position::new(0, 0)),
+                own_injury_site: Some(Position::new(0, 0)),
+            },
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,
             disposition_failure_signal_crafting: 1.0,
@@ -3122,10 +3206,13 @@ mod tests {
             1.0,
         ));
         memory.remember(make_memory(MemoryType::Death, Position::new(6, 5), 1.0));
-        memory.remember(make_memory(MemoryType::ThreatSeen, Position::new(5, 6), 1.0));
+        memory.remember(make_memory(
+            MemoryType::ThreatSeen,
+            Position::new(5, 6),
+            1.0,
+        ));
 
-        let (resource, death, threat) =
-            memory_proximity_sums(&memory, &Position::new(5, 5), &sc);
+        let (resource, death, threat) = memory_proximity_sums(&memory, &Position::new(5, 5), &sc);
         assert!(resource > 0.0, "resource sum should fire on ResourceFound");
         assert!(death > 0.0, "death sum should fire on Death");
         assert!(threat > 0.0, "threat sum should fire on ThreatSeen");
@@ -3176,14 +3263,38 @@ mod tests {
         let self_entity = Entity::from_raw_u32(1).unwrap();
         let snapshot = vec![
             (self_entity, Position::new(5, 5), Action::Hunt),
-            (Entity::from_raw_u32(2).unwrap(), Position::new(5, 6), Action::Hunt),
-            (Entity::from_raw_u32(3).unwrap(), Position::new(6, 5), Action::Hunt),
-            (Entity::from_raw_u32(4).unwrap(), Position::new(5, 4), Action::Fight),
-            (Entity::from_raw_u32(5).unwrap(), Position::new(20, 20), Action::Hunt),
+            (
+                Entity::from_raw_u32(2).unwrap(),
+                Position::new(5, 6),
+                Action::Hunt,
+            ),
+            (
+                Entity::from_raw_u32(3).unwrap(),
+                Position::new(6, 5),
+                Action::Hunt,
+            ),
+            (
+                Entity::from_raw_u32(4).unwrap(),
+                Position::new(5, 4),
+                Action::Fight,
+            ),
+            (
+                Entity::from_raw_u32(5).unwrap(),
+                Position::new(20, 20),
+                Action::Hunt,
+            ),
         ];
         let counts = compute_cascade_counts(&snapshot, self_entity, &Position::new(5, 5), 5);
-        assert_eq!(counts[Action::Hunt as usize], 2.0, "self + far cat excluded");
-        assert_eq!(counts[Action::Fight as usize], 0.0, "Fight excluded by design");
+        assert_eq!(
+            counts[Action::Hunt as usize],
+            2.0,
+            "self + far cat excluded"
+        );
+        assert_eq!(
+            counts[Action::Fight as usize],
+            0.0,
+            "Fight excluded by design"
+        );
     }
 
     // --- Flee / Fight / Patrol scoring tests ---
@@ -3262,7 +3373,19 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
-            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)), own_safe_rest_spot: Some(Position::new(0, 0)), own_injury_site: Some(Position::new(0, 0)) },
+            cat_anchors: crate::ai::scoring::CatAnchorPositions {
+                own_sleeping_spot: Some(Position::new(0, 0)),
+                nearest_forageable_cluster: Some(Position::new(0, 0)),
+                nearest_construction_site: Some(Position::new(0, 0)),
+                nearest_herb_patch: Some(Position::new(0, 0)),
+                nearest_perimeter_tile: Some(Position::new(0, 0)),
+                territory_perimeter_anchor: Some(Position::new(0, 0)),
+                nearest_corrupted_tile: Some(Position::new(0, 0)),
+                nearest_threat: Some(Position::new(0, 0)),
+                coordinator_perch: Some(Position::new(0, 0)),
+                own_safe_rest_spot: Some(Position::new(0, 0)),
+                own_injury_site: Some(Position::new(0, 0)),
+            },
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,
             disposition_failure_signal_crafting: 1.0,
@@ -3368,7 +3491,19 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
-            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)), own_safe_rest_spot: Some(Position::new(0, 0)), own_injury_site: Some(Position::new(0, 0)) },
+            cat_anchors: crate::ai::scoring::CatAnchorPositions {
+                own_sleeping_spot: Some(Position::new(0, 0)),
+                nearest_forageable_cluster: Some(Position::new(0, 0)),
+                nearest_construction_site: Some(Position::new(0, 0)),
+                nearest_herb_patch: Some(Position::new(0, 0)),
+                nearest_perimeter_tile: Some(Position::new(0, 0)),
+                territory_perimeter_anchor: Some(Position::new(0, 0)),
+                nearest_corrupted_tile: Some(Position::new(0, 0)),
+                nearest_threat: Some(Position::new(0, 0)),
+                coordinator_perch: Some(Position::new(0, 0)),
+                own_safe_rest_spot: Some(Position::new(0, 0)),
+                own_injury_site: Some(Position::new(0, 0)),
+            },
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,
             disposition_failure_signal_crafting: 1.0,
@@ -3493,7 +3628,19 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
-            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)), own_safe_rest_spot: Some(Position::new(0, 0)), own_injury_site: Some(Position::new(0, 0)) },
+            cat_anchors: crate::ai::scoring::CatAnchorPositions {
+                own_sleeping_spot: Some(Position::new(0, 0)),
+                nearest_forageable_cluster: Some(Position::new(0, 0)),
+                nearest_construction_site: Some(Position::new(0, 0)),
+                nearest_herb_patch: Some(Position::new(0, 0)),
+                nearest_perimeter_tile: Some(Position::new(0, 0)),
+                territory_perimeter_anchor: Some(Position::new(0, 0)),
+                nearest_corrupted_tile: Some(Position::new(0, 0)),
+                nearest_threat: Some(Position::new(0, 0)),
+                coordinator_perch: Some(Position::new(0, 0)),
+                own_safe_rest_spot: Some(Position::new(0, 0)),
+                own_injury_site: Some(Position::new(0, 0)),
+            },
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,
             disposition_failure_signal_crafting: 1.0,
@@ -3586,7 +3733,6 @@ mod tests {
         );
     }
 
-
     // --- Herbcraft / PracticeMagic scoring tests ---
 
     #[test]
@@ -3636,9 +3782,7 @@ mod tests {
         let any_herb = scores.iter().any(|(a, _)| {
             matches!(
                 a,
-                Action::HerbcraftGather
-                    | Action::HerbcraftRemedy
-                    | Action::HerbcraftSetWard
+                Action::HerbcraftGather | Action::HerbcraftRemedy | Action::HerbcraftSetWard
             )
         });
         assert!(!any_herb, "no herbs → no Herbcraft; scores: {scores:?}");
@@ -3806,7 +3950,19 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
-            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)), own_safe_rest_spot: Some(Position::new(0, 0)), own_injury_site: Some(Position::new(0, 0)) },
+            cat_anchors: crate::ai::scoring::CatAnchorPositions {
+                own_sleeping_spot: Some(Position::new(0, 0)),
+                nearest_forageable_cluster: Some(Position::new(0, 0)),
+                nearest_construction_site: Some(Position::new(0, 0)),
+                nearest_herb_patch: Some(Position::new(0, 0)),
+                nearest_perimeter_tile: Some(Position::new(0, 0)),
+                territory_perimeter_anchor: Some(Position::new(0, 0)),
+                nearest_corrupted_tile: Some(Position::new(0, 0)),
+                nearest_threat: Some(Position::new(0, 0)),
+                coordinator_perch: Some(Position::new(0, 0)),
+                own_safe_rest_spot: Some(Position::new(0, 0)),
+                own_injury_site: Some(Position::new(0, 0)),
+            },
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,
             disposition_failure_signal_crafting: 1.0,
@@ -3913,7 +4069,19 @@ mod tests {
             has_functional_kitchen: false,
             has_raw_food_in_stores: false,
             social_warmth_deficit: 0.4,
-            cat_anchors: crate::ai::scoring::CatAnchorPositions { own_sleeping_spot: Some(Position::new(0, 0)), nearest_forageable_cluster: Some(Position::new(0, 0)), nearest_construction_site: Some(Position::new(0, 0)), nearest_herb_patch: Some(Position::new(0, 0)), nearest_perimeter_tile: Some(Position::new(0, 0)), territory_perimeter_anchor: Some(Position::new(0, 0)), nearest_corrupted_tile: Some(Position::new(0, 0)), nearest_threat: Some(Position::new(0, 0)), coordinator_perch: Some(Position::new(0, 0)), own_safe_rest_spot: Some(Position::new(0, 0)), own_injury_site: Some(Position::new(0, 0)) },
+            cat_anchors: crate::ai::scoring::CatAnchorPositions {
+                own_sleeping_spot: Some(Position::new(0, 0)),
+                nearest_forageable_cluster: Some(Position::new(0, 0)),
+                nearest_construction_site: Some(Position::new(0, 0)),
+                nearest_herb_patch: Some(Position::new(0, 0)),
+                nearest_perimeter_tile: Some(Position::new(0, 0)),
+                territory_perimeter_anchor: Some(Position::new(0, 0)),
+                nearest_corrupted_tile: Some(Position::new(0, 0)),
+                nearest_threat: Some(Position::new(0, 0)),
+                coordinator_perch: Some(Position::new(0, 0)),
+                own_safe_rest_spot: Some(Position::new(0, 0)),
+                own_injury_site: Some(Position::new(0, 0)),
+            },
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,
             disposition_failure_signal_crafting: 1.0,
@@ -4305,10 +4473,15 @@ mod tests {
         };
 
         let result = score_actions(&c, &inputs, &mut rng);
-        let gather = result.scores.iter().find(|(a, _)| *a == Action::HerbcraftGather);
-        assert!(gather.is_some() && gather.unwrap().1 > 0.0,
+        let gather = result
+            .scores
+            .iter()
+            .find(|(a, _)| *a == Action::HerbcraftGather);
+        assert!(
+            gather.is_some() && gather.unwrap().1 > 0.0,
             "with only herbs nearby, HerbcraftGather should score positive; scores: {:?}",
-            result.scores);
+            result.scores
+        );
     }
 
     #[test]
@@ -4332,7 +4505,10 @@ mod tests {
         // No herbs nearby, no remedy herbs — only ward is viable.
 
         let result = score_actions(&c, &test_eval_inputs(), &mut rng);
-        let ward = result.scores.iter().find(|(a, _)| *a == Action::HerbcraftSetWard);
+        let ward = result
+            .scores
+            .iter()
+            .find(|(a, _)| *a == Action::HerbcraftSetWard);
         assert!(ward.is_some() && ward.unwrap().1 > 0.0,
             "with ward herbs + low ward strength, HerbcraftSetWard should score positive; scores: {:?}",
             result.scores);
@@ -4433,13 +4609,8 @@ mod tests {
             (Action::Socialize, 0.5),
             (Action::Patrol, 0.4),
         ];
-        let plain = select_disposition_via_intention_softmax(
-            &scores,
-            0.0,
-            0.0,
-            &sc,
-            &mut seeded_rng(99),
-        );
+        let plain =
+            select_disposition_via_intention_softmax(&scores, 0.0, 0.0, &sc, &mut seeded_rng(99));
         let traced = select_disposition_via_intention_softmax_with_trace(
             &scores,
             0.0,
@@ -4473,9 +4644,8 @@ mod tests {
         let ctx_fresh = ctx(&needs, &personality, &sc);
 
         let mut exploration_with_frontier = crate::resources::ExplorationMap::default();
-        exploration_with_frontier.recompute_frontier_centroid(
-            crate::resources::exploration_map::FRONTIER_THRESHOLD,
-        );
+        exploration_with_frontier
+            .recompute_frontier_centroid(crate::resources::exploration_map::FRONTIER_THRESHOLD);
         // Default 120×90 map → centroid at (60, 45). Place the cat
         // there so the spatial axis evaluates near 1.0 instead of
         // saturating to zero at the 40-tile range edge.

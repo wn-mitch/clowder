@@ -11,9 +11,9 @@ use bevy_ecs::system::SystemParam;
 
 use crate::ai::dse::EligibilityFilter;
 use crate::components::goap_plan::StepExecutionState;
-use crate::components::reserved::Reserved;
 use crate::components::markers::{Banished, Incapacitated};
 use crate::components::physical::Dead;
+use crate::components::reserved::Reserved;
 use crate::components::RecentTargetFailures;
 
 // ---------------------------------------------------------------------------

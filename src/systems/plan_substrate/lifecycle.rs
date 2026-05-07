@@ -198,8 +198,8 @@ pub fn try_preempt(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::components::{AbandonReason, DispositionKind, Personality};
     use crate::ai::planner::PlannedStep;
+    use crate::components::{AbandonReason, DispositionKind, Personality};
 
     fn entity(id: u32) -> Entity {
         Entity::from_raw_u32(id).unwrap()

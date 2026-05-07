@@ -470,8 +470,7 @@ pub fn fox_evaluate_and_plan(
         }
     }
 
-    for (fox_entity, fox_state, fox_pos, needs, personality, hunting_beliefs, exploration) in
-        &foxes
+    for (fox_entity, fox_state, fox_pos, needs, personality, hunting_beliefs, exploration) in &foxes
     {
         let den_info = fox_state
             .home_den

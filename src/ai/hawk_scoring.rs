@@ -9,8 +9,8 @@ use std::collections::HashMap;
 use bevy_ecs::prelude::Entity;
 use rand::Rng;
 
-use crate::ai::dse::EvalCtx;
 use crate::ai::considerations::LandmarkAnchor;
+use crate::ai::dse::EvalCtx;
 use crate::ai::eval::evaluate_single;
 use crate::ai::hawk_planner::HawkDispositionKind;
 use crate::ai::scoring::EvalInputs;

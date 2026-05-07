@@ -91,6 +91,71 @@
     </div>
   {/if}
 
+  {#if $runs.length > 0}
+    <div class="flex flex-col gap-1.5 text-xs">
+      <div class="text-[10px] uppercase tracking-wider text-muted">Loaded files</div>
+      {#each $runs as run (run.id)}
+        {#each run.files as file (file.name)}
+          {@const empty = file.events.length === 0
+            && file.narrative.length === 0
+            && file.traces.length === 0}
+          {@const headerOnly = empty && file.header !== null}
+          {@const hasErrors = file.parseErrors.length > 0}
+          <div
+            class="rounded border px-2.5 py-1.5 font-mono
+              {hasErrors || empty
+                ? 'bg-negative/5 border-negative/40'
+                : 'bg-surface border-border'}"
+          >
+            <div class="flex items-baseline flex-wrap gap-x-3 gap-y-0.5">
+              <span class="font-semibold">{file.name}</span>
+              <span class="text-muted">{file.kind}</span>
+              <span class="ml-auto flex flex-wrap gap-x-3 text-[11px] text-muted">
+                <span>{file.events.length.toLocaleString()} events</span>
+                <span>{file.narrative.length.toLocaleString()} narrative</span>
+                <span>{file.traces.length.toLocaleString()} traces</span>
+                <span class={hasErrors ? 'text-negative' : ''}>
+                  {file.parseErrors.length.toLocaleString()} errors
+                </span>
+              </span>
+            </div>
+            {#if headerOnly}
+              <div class="mt-1 text-[11px] text-negative">
+                Header parsed but zero records — the simulator likely couldn't resolve the focal cat
+                <code>{file.header?.focal_cat ?? '?'}</code> as a live entity (typo'd name, died
+                pre-resolve, or never spawned). Try a different focal name with
+                <code>just soak-trace &lt;seed&gt; &lt;name&gt;</code>.
+              </div>
+            {:else if empty}
+              <div class="mt-1 text-[11px] text-negative">
+                Loaded zero rows — header missing or every line unrecognized.
+              </div>
+            {/if}
+            {#if hasErrors}
+              <details class="mt-1">
+                <summary class="text-[11px] text-negative cursor-pointer select-none">
+                  {file.parseErrors.length} parse error{file.parseErrors.length === 1 ? '' : 's'}
+                  (showing first {Math.min(20, file.parseErrors.length)})
+                </summary>
+                <ul class="mt-1 ml-2 flex flex-col gap-0.5 text-[11px] text-negative/90">
+                  {#each file.parseErrors.slice(0, 20) as e (e.line + ':' + e.message)}
+                    <li>line {e.line}: {e.message}</li>
+                  {/each}
+                </ul>
+              </details>
+            {/if}
+          </div>
+        {/each}
+        {#if run.traces.length > 0 && !run.focalCat}
+          <div class="rounded border bg-negative/5 border-negative/40 px-2.5 py-1.5 text-[11px] text-negative">
+            Trace records present but <code>_header.focal_cat</code> missing —
+            scrubber cannot key the focal cat.
+          </div>
+        {/if}
+      {/each}
+    </div>
+  {/if}
+
   {#if $runsWithTraces.length === 0}
     <div class="text-muted italic text-sm p-4">
       No focal-cat traces loaded yet. Run <code>just soak-trace 42 Simba</code>

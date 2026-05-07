@@ -67,7 +67,8 @@ use bevy::prelude::Entity;
 
 use crate::ai::composition::Composition;
 use crate::ai::considerations::{
-    Consideration, LandmarkSource, ScalarConsideration, SpatialConsideration, LandmarkAnchor};
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
 use crate::ai::curves::Curve;
 use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination};
 use crate::ai::eval::DseRegistry;
@@ -154,10 +155,7 @@ pub fn socialize_target_dse() -> TargetTakingDse {
                 TARGET_SPECIES_COMPAT_INPUT,
                 species_cliff,
             )),
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_PARTNER_BOND_INPUT,
-                linear,
-            )),
+            Consideration::Scalar(ScalarConsideration::new(TARGET_PARTNER_BOND_INPUT, linear)),
             // Ticket 073 — recently-failed target cooldown. `Piecewise`
             // 0.0 → 0.1, 1.0 → 1.0 multiplies a fresh-failure
             // candidate's contribution down to ~10% of no-failure value.
@@ -400,13 +398,7 @@ pub fn resolve_socialize_target(
             // partner; `0.0` otherwise. Backports 027b's `bond_score`
             // pin from a post-IAUS branch into a first-class IAUS
             // axis with a cliff curve.
-            PAIRING_INTENTION_INPUT => {
-                if pairing_partner == Some(target) {
-                    1.0
-                } else {
-                    0.0
-                }
-            }
+            PAIRING_INTENTION_INPUT if pairing_partner == Some(target) => 1.0,
             _ => 0.0,
         }
     };
@@ -694,13 +686,7 @@ mod tests {
                 // is tied at 0.5 across them.
                 TARGET_PARTNER_BOND_INPUT => 0.5,
                 // Only the Intention partner reads 1.0 on the new axis.
-                PAIRING_INTENTION_INPUT => {
-                    if target == intended {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }
+                PAIRING_INTENTION_INPUT if target == intended => 1.0,
                 _ => 0.0,
             }
         };
@@ -773,13 +759,7 @@ mod tests {
                 TARGET_NOVELTY_INPUT => 0.4,
                 TARGET_SPECIES_COMPAT_INPUT => 1.0,
                 TARGET_PARTNER_BOND_INPUT => 0.5,
-                PAIRING_INTENTION_INPUT => {
-                    if target == intended {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }
+                PAIRING_INTENTION_INPUT if target == intended => 1.0,
                 _ => 0.0,
             }
         };
@@ -815,16 +795,8 @@ mod tests {
             &fetch_without_intention,
         );
 
-        let with_score = with_out
-            .per_target
-            .first()
-            .expect("intended scored")
-            .1;
-        let without_score = without_out
-            .per_target
-            .first()
-            .expect("intended scored")
-            .1;
+        let with_score = with_out.per_target.first().expect("intended scored").1;
+        let without_score = without_out.per_target.first().expect("intended scored").1;
         let delta = with_score - without_score;
         // The pin's load-bearing lift on a Friends-bonded Intention
         // partner was exactly 0.10; the new axis must produce the
@@ -906,13 +878,7 @@ mod tests {
                 }
                 TARGET_NOVELTY_INPUT => 0.5,
                 TARGET_SPECIES_COMPAT_INPUT => 1.0,
-                TARGET_PARTNER_BOND_INPUT => {
-                    if target == friend {
-                        0.5
-                    } else {
-                        0.0
-                    }
-                }
+                TARGET_PARTNER_BOND_INPUT if target == friend => 0.5,
                 _ => 0.0,
             }
         };
@@ -992,13 +958,7 @@ mod tests {
                 }
                 TARGET_NOVELTY_INPUT => 0.5,
                 TARGET_SPECIES_COMPAT_INPUT => 1.0,
-                TARGET_PARTNER_BOND_INPUT => {
-                    if target == friend {
-                        0.5
-                    } else {
-                        0.0
-                    }
-                }
+                TARGET_PARTNER_BOND_INPUT if target == friend => 0.5,
                 _ => 0.0,
             }
         };
@@ -1192,9 +1152,7 @@ mod tests {
         let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = |name: &str, _: Entity, _: Entity| -> f32 {
             match name {
-                TARGET_FONDNESS_INPUT
-                | TARGET_NOVELTY_INPUT
-                | TARGET_SPECIES_COMPAT_INPUT => 1.0,
+                TARGET_FONDNESS_INPUT | TARGET_NOVELTY_INPUT | TARGET_SPECIES_COMPAT_INPUT => 1.0,
                 _ => 0.0,
             }
         };

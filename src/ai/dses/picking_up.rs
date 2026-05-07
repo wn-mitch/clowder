@@ -131,11 +131,20 @@ mod tests {
         let mid = c.evaluate(0.5);
         let high = c.evaluate(1.0);
         // High urgency at low food-security.
-        assert!(low > 0.9, "expected scavenge urgency >0.9 at food_security=0, got {low}");
+        assert!(
+            low > 0.9,
+            "expected scavenge urgency >0.9 at food_security=0, got {low}"
+        );
         // Symmetric around midpoint 0.5.
-        assert!((mid - 0.5).abs() < 1e-3, "expected scavenge urgency ≈0.5 at food_security=0.5, got {mid}");
+        assert!(
+            (mid - 0.5).abs() < 1e-3,
+            "expected scavenge urgency ≈0.5 at food_security=0.5, got {mid}"
+        );
         // Low urgency at high food-security.
-        assert!(high < 0.1, "expected scavenge urgency <0.1 at food_security=1, got {high}");
+        assert!(
+            high < 0.1,
+            "expected scavenge urgency <0.1 at food_security=1, got {high}"
+        );
     }
 
     #[test]

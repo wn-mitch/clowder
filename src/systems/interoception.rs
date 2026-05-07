@@ -409,9 +409,7 @@ pub fn social_status_distress(
 
     let weight_sum = respect_weight + age_weight + bond_weight;
     let composite = if weight_sum > 0.0 {
-        (respect_weight * respect_diff
-            + age_weight * age_diff
-            + bond_weight * bond_asymmetry)
+        (respect_weight * respect_diff + age_weight * age_diff + bond_weight * bond_asymmetry)
             / weight_sum
     } else {
         0.0
@@ -764,7 +762,9 @@ mod tests {
         };
         h.injuries.push(injury(InjuryKind::Moderate, false));
         h.injuries.push(injury(InjuryKind::Severe, true));
-        let cat = world.spawn((h, comfortable_needs(), Skills::default())).id();
+        let cat = world
+            .spawn((h, comfortable_needs(), Skills::default()))
+            .id();
         schedule.run(&mut world);
         // Moderate unhealed + Severe healed → no SevereInjury marker.
         assert!(world.get::<SevereInjury>(cat).is_none());
@@ -1022,9 +1022,7 @@ mod tests {
         let mut needs = comfortable_needs();
         needs.respect = 0.3; // distress = 0.7 > 0.55
         needs.mastery = 0.9;
-        let cat = world
-            .spawn((full_health(), needs, Skills::default()))
-            .id();
+        let cat = world.spawn((full_health(), needs, Skills::default())).id();
         schedule.run(&mut world);
         assert!(world.get::<EsteemDistressed>(cat).is_some());
     }
@@ -1035,9 +1033,7 @@ mod tests {
         let mut needs = comfortable_needs();
         needs.respect = 0.9;
         needs.mastery = 0.2; // distress = 0.8 > 0.55
-        let cat = world
-            .spawn((full_health(), needs, Skills::default()))
-            .id();
+        let cat = world.spawn((full_health(), needs, Skills::default())).id();
         schedule.run(&mut world);
         assert!(world.get::<EsteemDistressed>(cat).is_some());
     }
@@ -1048,9 +1044,7 @@ mod tests {
         let mut needs = comfortable_needs();
         needs.respect = 0.6; // distress = 0.4
         needs.mastery = 0.6;
-        let cat = world
-            .spawn((full_health(), needs, Skills::default()))
-            .id();
+        let cat = world.spawn((full_health(), needs, Skills::default())).id();
         schedule.run(&mut world);
         assert!(world.get::<EsteemDistressed>(cat).is_none());
     }
@@ -1439,12 +1433,11 @@ mod tests {
     fn social_status_distress_age_diff_arm() {
         let focal = entity(1);
         let elder = entity(2);
-        let cats = vec![
-            (focal, Position::new(5, 5)),
-            (elder, Position::new(5, 5)),
-        ];
+        let cats = vec![(focal, Position::new(5, 5)), (elder, Position::new(5, 5))];
         let rels = crate::resources::relationships::Relationships::default();
-        let focal_age = crate::components::identity::Age { born_tick: 1_200_000 };
+        let focal_age = crate::components::identity::Age {
+            born_tick: 1_200_000,
+        };
         let v = social_status_distress(
             focal,
             Position::new(5, 5),

@@ -141,12 +141,8 @@ impl ExplorationMap {
                 count += 1;
             }
         }
-        self.frontier_centroid = (count > 0).then(|| {
-            Position::new(
-                (sum_x / count as i64) as i32,
-                (sum_y / count as i64) as i32,
-            )
-        });
+        self.frontier_centroid = (count > 0)
+            .then(|| Position::new((sum_x / count as i64) as i32, (sum_y / count as i64) as i32));
     }
 
     /// Cached centroid of unexplored cells. Populated by

@@ -56,7 +56,8 @@ use bevy::prelude::Entity;
 
 use crate::ai::composition::Composition;
 use crate::ai::considerations::{
-    Consideration, LandmarkSource, ScalarConsideration, SpatialConsideration, LandmarkAnchor};
+    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+};
 use crate::ai::curves::Curve;
 use crate::ai::dse::{CommitmentStrategy, DseId, EvalCtx, GoalState, Intention};
 use crate::ai::eval::DseRegistry;
@@ -206,13 +207,7 @@ pub fn resolve_apply_remedy_target(
     let fetch_target = |name: &str, cat: Entity, target: Entity| -> f32 {
         match name {
             TARGET_INJURY_INPUT => injury_map.get(&target).copied().unwrap_or(0.0),
-            TARGET_KINSHIP_INPUT => {
-                if is_kin(cat, target) {
-                    1.0
-                } else {
-                    0.0
-                }
-            }
+            TARGET_KINSHIP_INPUT if is_kin(cat, target) => 1.0,
             _ => 0.0,
         }
     };

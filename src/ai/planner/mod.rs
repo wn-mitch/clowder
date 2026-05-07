@@ -36,16 +36,7 @@ pub struct PlanContext<'a> {
 /// runs pick `TravelTo(Kitchen)` vs `TravelTo(ForagingGround)` for the same
 /// cat-state).
 #[derive(
-    Debug,
-    Clone,
-    Copy,
-    Hash,
-    Eq,
-    PartialEq,
-    PartialOrd,
-    Ord,
-    serde::Serialize,
-    serde::Deserialize,
+    Debug, Clone, Copy, Hash, Eq, PartialEq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
 )]
 pub enum PlannerZone {
     Stores,
