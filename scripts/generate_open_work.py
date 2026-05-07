@@ -180,6 +180,11 @@ STATUS_LABEL = {
     "done": "Done (awaiting archive)",
 }
 
+# Open-status buckets used for the "open" rollup in epic progress and the
+# index summary. `done` is excluded — epic progress treats it as "shipped",
+# the index summary excludes it from `Open total`.
+OPEN_STATUSES = ("in-progress", "ready", "parked", "blocked")
+
 
 def _format_id(raw) -> str:
     if isinstance(raw, int):
@@ -188,6 +193,153 @@ def _format_id(raw) -> str:
         return f"{int(str(raw)):03d}"
     except (TypeError, ValueError):
         return str(raw)
+
+
+# ---------------------------------------------------------------------------
+# Epic progress
+# ---------------------------------------------------------------------------
+#
+# An "epic" is a ticket file whose name ends in `-epic.md`. Epics own a
+# roster of child tickets. We derive their progress by:
+#   1. Locating an `## Open child tickets` (or `### ...`) section in the
+#      epic body. If absent, scan the whole body — covers phased epics that
+#      reference children inline (e.g. 095).
+#   2. Extracting markdown-link references that point at sibling ticket
+#      files: `(NNN-slug.md)` or `(../landed/NNN-slug.md)`. The numeric
+#      prefix (with optional letter, e.g. `027b`) is the child id.
+#   3. Looking each child id up in the merged tickets+landed+pre-existing
+#      index (frontmatter id is source of truth). Unknown ids are dropped.
+
+
+_EPIC_FILENAME_SUFFIX = "-epic.md"
+
+# Match a markdown link target whose filename starts with NNN- (1-3 digits +
+# optional single letter) and ends in .md. Anchored to `(` or `/` so we
+# never grab the year prefix on date-named landed files (`2026-04-19-...`).
+_CHILD_LINK_RE = re.compile(
+    r"(?:\(|/)(\d{1,3}[a-z]?)-[A-Za-z0-9_-]+\.md(?=\))"
+)
+
+_ROSTER_HEADING_RE = re.compile(
+    r"^(#{2,6})\s+open child tickets\b", re.IGNORECASE
+)
+
+
+@dataclass
+class EpicProgress:
+    epic: Ticket
+    roster_kind: str  # "explicit" (Open child tickets section) or "inline"
+    children: list[Ticket] = field(default_factory=list)
+    missing_ids: list[str] = field(default_factory=list)
+
+    @property
+    def total(self) -> int:
+        return len(self.children)
+
+    @property
+    def done(self) -> int:
+        return sum(1 for c in self.children if c.status == "done")
+
+    @property
+    def open_count(self) -> int:
+        return sum(1 for c in self.children if c.status in OPEN_STATUSES)
+
+    @property
+    def status_counts(self) -> dict[str, int]:
+        out: dict[str, int] = {}
+        for c in self.children:
+            out[c.status] = out.get(c.status, 0) + 1
+        return out
+
+    @property
+    def percent_done(self) -> int:
+        if self.total == 0:
+            return 0
+        return round(100 * self.done / self.total)
+
+
+def _extract_roster_segment(body: str) -> tuple[str, str]:
+    """Return (segment, kind). Kind is `"explicit"` if an `Open child tickets`
+    heading is found, else `"inline"` and the segment is the whole body."""
+    lines = body.splitlines()
+    start: int | None = None
+    start_level = 0
+    for i, line in enumerate(lines):
+        m = _ROSTER_HEADING_RE.match(line)
+        if m:
+            start = i + 1
+            start_level = len(m.group(1))
+            break
+    if start is None:
+        return body, "inline"
+    end = len(lines)
+    for j in range(start, len(lines)):
+        m = re.match(r"^(#{1,6})\s", lines[j])
+        if m and len(m.group(1)) <= start_level:
+            end = j
+            break
+    return "\n".join(lines[start:end]), "explicit"
+
+
+def _normalize_child_id(raw: str) -> str:
+    """Pad numeric prefix to 3 digits, preserving any letter suffix
+    (`27b` -> `027b`)."""
+    m = re.match(r"^(\d+)([a-z]?)$", raw)
+    if not m:
+        return raw
+    num, suffix = m.group(1), m.group(2)
+    return f"{int(num):03d}{suffix}"
+
+
+def discover_epics(repo_root: Path) -> list[Ticket]:
+    """Return all epics across tickets/ and landed/, sorted by id."""
+    epics: list[Ticket] = []
+    for sub in ("tickets", "landed"):
+        d = repo_root / "docs" / "open-work" / sub
+        if not d.exists():
+            continue
+        for p in sorted(d.glob(f"*{_EPIC_FILENAME_SUFFIX}")):
+            text = p.read_text(encoding="utf-8")
+            fm = parse_frontmatter(text)
+            body = text.split("---", 2)[-1] if text.startswith("---") else text
+            epics.append(Ticket(path=p, frontmatter=fm, body=body))
+    epics.sort(key=lambda t: t.id)
+    return epics
+
+
+def compute_epic_progress(
+    epic: Ticket, ticket_index: dict[str, Ticket]
+) -> EpicProgress:
+    segment, kind = _extract_roster_segment(epic.body)
+    seen: set[str] = set()
+    children: list[Ticket] = []
+    missing: list[str] = []
+    self_id = epic.id
+    for m in _CHILD_LINK_RE.finditer(segment):
+        cid = _normalize_child_id(m.group(1))
+        if cid == self_id or cid in seen:
+            continue
+        seen.add(cid)
+        child = ticket_index.get(cid)
+        if child is None:
+            missing.append(cid)
+            continue
+        children.append(child)
+    children.sort(key=lambda t: t.id)
+    return EpicProgress(epic=epic, roster_kind=kind, children=children, missing_ids=missing)
+
+
+def build_ticket_index(repo_root: Path) -> dict[str, Ticket]:
+    """Merge tickets/ + landed/ + pre-existing/ into a single id → Ticket map."""
+    out: dict[str, Ticket] = {}
+    for sub in ("tickets", "landed", "pre-existing"):
+        d = repo_root / "docs" / "open-work" / sub
+        for t in load_tickets(d):
+            # First-write-wins: open tickets shadow landed if both exist
+            # (shouldn't happen in practice — land_ticket.py moves files —
+            # but `tickets/` order comes first so open wins by default).
+            out.setdefault(t.id, t)
+    return out
 
 
 def render_ticket_line(t: Ticket, repo_root: Path) -> str:
@@ -203,6 +355,58 @@ def render_ticket_line(t: Ticket, repo_root: Path) -> str:
         bits.append(f"added {t.added}")
     suffix = f" — _{' · '.join(bits)}_" if bits else ""
     return f"- **[{t.id}]({rel})** — {t.title}{suffix}"
+
+
+def render_epic_progress_section(
+    epics: list[EpicProgress], repo_root: Path
+) -> list[str]:
+    """Render the `## Epic progress` section as markdown lines."""
+    if not epics:
+        return []
+    lines: list[str] = []
+    lines.append(f"## Epic progress ({len(epics)})")
+    lines.append("")
+    lines.append(
+        "Per-epic completion derived from each epic's roster table "
+        "(or inline child references for phased epics)."
+    )
+    lines.append("")
+    lines.append("| Epic | Status | Children | Done | Open (in-progress / ready / blocked / parked) | Progress |")
+    lines.append("|---|---|---|---|---|---|")
+    for ep in epics:
+        rel = ep.epic.path.relative_to(repo_root)
+        title_short = ep.epic.title.split(" — ")[0]
+        if ep.total == 0:
+            progress_cell = "_no roster_" if ep.roster_kind == "inline" else "_empty roster_"
+            children_cell = "0"
+            done_cell = "—"
+            open_cell = "—"
+        else:
+            counts = ep.status_counts
+            ip = counts.get("in-progress", 0)
+            rd = counts.get("ready", 0)
+            bl = counts.get("blocked", 0)
+            pk = counts.get("parked", 0)
+            children_cell = str(ep.total)
+            done_cell = f"{ep.done}"
+            open_cell = f"{ep.open_count} ({ip} / {rd} / {bl} / {pk})"
+            filled = round(ep.percent_done / 10)
+            bar = "▰" * filled + "▱" * (10 - filled)
+            progress_cell = f"`{bar}` {ep.percent_done}%"
+        lines.append(
+            f"| **[{ep.epic.id}]({rel})** {title_short} | {ep.epic.status} | "
+            f"{children_cell} | {done_cell} | {open_cell} | {progress_cell} |"
+        )
+    lines.append("")
+    # Surface any missing-child references — usually a stale link in the
+    # epic body that didn't survive a rename. Easier to fix than to debug.
+    stale = [(ep.epic.id, mid) for ep in epics for mid in ep.missing_ids]
+    if stale:
+        lines.append("> **Missing child references** (link in epic body but no matching ticket file):")
+        for eid, mid in stale:
+            lines.append(f"> - epic {eid} → `{mid}`")
+        lines.append("")
+    return lines
 
 
 def render_index(
@@ -278,9 +482,18 @@ def render_index(
     lines.append("")
     lines.append(
         "Queue-view commands: `just open-work` · `just open-work-ready` · "
-        "`just open-work-wip` · `just open-work-index` (regenerate this file)."
+        "`just open-work-wip` · `just open-work-epics` · "
+        "`just open-work-index` (regenerate this file)."
     )
     lines.append("")
+
+    # Epic progress (between Summary and per-status sections)
+    ticket_index = build_ticket_index(repo_root)
+    epics = [
+        compute_epic_progress(e, ticket_index)
+        for e in discover_epics(repo_root)
+    ]
+    lines.extend(render_epic_progress_section(epics, repo_root))
 
     # Per-status sections
     for s in STATUS_ORDER:

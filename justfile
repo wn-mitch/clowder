@@ -415,6 +415,16 @@ open-work-wip:
 open-work-index:
     uv run scripts/generate_open_work.py
 
+# Per-epic progress (children done / open / blocked / parked, plus a bar).
+# Reads each `*-epic.md`'s roster table; child status comes from frontmatter.
+#
+#   just open-work-epics                 # rollup table
+#   just open-work-epics --epic 093      # one epic
+#   just open-work-epics --detailed      # every child listed under each epic
+#   just open-work-epics --json          # machine-readable
+open-work-epics *ARGS:
+    uv run scripts/epic_progress.py {{ARGS}}
+
 # Land a ticket. Three modes:
 #
 #   just land 197                                         # file-only: rewrite frontmatter,
