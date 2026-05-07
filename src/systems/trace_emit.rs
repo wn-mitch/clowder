@@ -293,7 +293,11 @@ pub fn emit_focal_trace(
                 active_intention,
                 commitment_strength: 0.0,
                 margin_threshold: 0.0,
-                preempted: false,
+                // Ticket 118 — flipped to `true` by `check_modifier_preemption`
+                // via `FocalScoreCapture::set_momentum_preempted` when an
+                // acute-class modifier preempted the focal cat's plan
+                // this tick.
+                preempted: captured.momentum_preempted,
             },
             chosen,
             intention: IntentionSummary {

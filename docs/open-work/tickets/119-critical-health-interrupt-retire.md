@@ -1,11 +1,11 @@
 ---
 id: 119
 title: Retire CriticalHealth interrupt — final substrate-over-override step for ticket 047
-status: blocked
+status: ready
 cluster: ai-substrate
 added: 2026-05-01
 parked: null
-blocked-by: [118]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [047-acute-health-adrenaline.md]

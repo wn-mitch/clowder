@@ -62,6 +62,45 @@ just sets a baseline score lift the contest has to beat to pick
 something else. See `docs/systems/ai-substrate-refactor.md`
 §3.5.1 for the modifier catalog and pipeline registration.
 
+## Behavioral expression — `preempts_in_flight()`
+
+Lurch shape on its own raises scores; without an additional gate,
+those lifts only express behaviorally when the cat next re-elects.
+Ticket 047 Phase 2 measured this gap on `AcuteHealthAdrenalineFlee`:
+Sleep won the L2 softmax in 99.3% of injured-window ticks but was
+the *chosen* action only 1.4% of them, because the cat was mid-plan
+in Hunt / Forage / Patrol and those plans completed naturally
+before the next softmax fired.
+
+Ticket 118 closes this gap with a `preempts_in_flight()` method on
+`ScoreModifier`. Default: `false` (pressure-class modifiers leave
+it alone). Lurch modifiers override to return `true` when their
+trigger scalar fires substantially — i.e., the smoothstep ramp is
+non-zero AND the modifier's lift constant is non-zero (an inert
+modifier with lift = 0 has nothing to redirect the softmax toward,
+so claiming "behavioral expression demanded" would just oscillate).
+
+The `check_modifier_preemption` system runs once per tick before
+`evaluate_and_plan`. For each cat with an in-flight `GoapPlan`
+(except Resting / Eating, which are already recovery
+dispositions), it walks the modifier pipeline and on the first
+`true` from `preempts_in_flight` drops the cat's plan and fires
+`Feature::ModifierPreemption`. The cat re-elects on the next tick,
+this time with the modifier's lift active in the score landscape,
+so the lurch's behavioral demand is actually expressed.
+
+| Modifier (ticket) | Class | preempts_in_flight |
+|-------------------|-------|--------------------|
+| 047 `AcuteHealthAdrenalineFlee` | lurch | yes (gated on `flee_lift > 0 \|\| sleep_lift > 0`) |
+| 102 `AcuteHealthAdrenalineFight` | lurch | yes (gated on `fight_lift > 0`) |
+| 105 `AcuteHealthAdrenalineFreeze` | lurch | yes (gated on `freeze_lift > 0`) |
+| 108 `ThreatProximityAdrenalineFlee` | lurch | yes (gated on lift > 0; scalar Phase-1-stub at 0.0) |
+| 088 `BodyDistressPromotion` | pressure | default `false` |
+| 106 `HungerUrgency` | pressure | default `false` |
+| 107 `ExhaustionPressure` | pressure | default `false` |
+| 110 `ThermalDistress` | pressure | default `false` |
+| 109 `IntraspeciesConflictResponseFlight` | pressure | default `false` |
+
 ## See also
 
 - `docs/systems/ai-substrate-refactor.md` §3.5.1 — modifier catalog and pipeline order.

@@ -529,6 +529,216 @@ fn ec_is_focal(ec: &ExecutorContext, cat_entity: Entity) -> bool {
 }
 
 // ===========================================================================
+// check_modifier_preemption — ticket 118
+// ===========================================================================
+
+/// Substrate-driven plan preemption for acute-class lurch modifiers.
+/// Closes the "modifier raises score but plan-completion momentum gates
+/// behavior" gap surfaced in ticket 047 Phase 2 verification: Sleep
+/// won the L2 softmax in 99.3% of injured-window ticks but was the
+/// chosen action only 1.4% of them, because the cat was mid-plan in
+/// Hunt/Forage/Patrol/Fight and those plans completed naturally before
+/// the next softmax fired.
+///
+/// **Mechanism.** For each cat with an in-flight `GoapPlan` (and not
+/// already in a recovery disposition), iterate the modifier pipeline
+/// and ask each modifier `preempts_in_flight(ctx, fetch)`. The default
+/// is `false`; lurch modifiers (047 / 102 / 105 / 108) override to
+/// query their trigger scalar against the lurch threshold. On the
+/// first `true`: drop the plan via `commands.remove::<GoapPlan>`,
+/// reset `current.ticks_remaining = 0` so `evaluate_and_plan` re-elects
+/// next tick, emit the abandoned narrative, record
+/// `Feature::ModifierPreemption`, and push the focal-trace
+/// `L3PlanFailure { reason: "modifier_preemption" }` row.
+///
+/// **Why a separate system, not just a modifier-pipeline tap inside
+/// `evaluate_and_plan`.** `evaluate_and_plan` only runs for cats
+/// without `GoapPlan` (or with `ticks_remaining == 0`); cats mid-plan
+/// don't re-score. To preempt mid-plan, the substrate's gating must
+/// run on the in-flight set per tick — exactly the schedule slot
+/// `check_anxiety_interrupts` occupies. This system mirrors that
+/// shape and is registered alongside it.
+///
+/// **Resting / Eating exemption.** Cats in those dispositions are
+/// already recovering; preempting them creates the oscillation we're
+/// fixing. Mirrors the legacy `check_anxiety_interrupts` exemption
+/// (goap.rs:592 in the pre-119 codebase).
+///
+/// **Cost shape.** Iterates registered modifiers (~25 today) for each
+/// cat with `GoapPlan` (~10–20 typical). Each `preempts_in_flight`
+/// call is one or two scalar reads + a smoothstep ramp evaluation.
+/// Pressure-class modifiers return on the default `false` immediately
+/// (no scalar reads). Total per-tick cost is a few hundred float ops
+/// — well below the existing `check_anxiety_interrupts` per-cat work.
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
+pub fn check_modifier_preemption(
+    mut query: Query<
+        (
+            Entity,
+            &Name,
+            &Needs,
+            &Health,
+            &mut CurrentAction,
+            Option<&mut ActionHistory>,
+        ),
+        (With<GoapPlan>, Without<Dead>),
+    >,
+    plans: Query<&GoapPlan, Without<Dead>>,
+    modifier_pipeline: Res<crate::ai::eval::ModifierPipeline>,
+    time: Res<TimeState>,
+    mut commands: Commands,
+    mut activation: ResMut<SystemActivation>,
+    mut plan_writer: MessageWriter<PlanNarrative>,
+    mut event_log: Option<ResMut<EventLog>>,
+    focal_target: Option<Res<crate::resources::FocalTraceTarget>>,
+    focal_capture: Option<Res<crate::resources::FocalScoreCapture>>,
+) {
+    // Static closures for the minimal `EvalCtx` the lurch modifiers'
+    // `preempts_in_flight` predicates need (they only read scalars,
+    // not markers / anchors / target). 'static lifetime so we don't
+    // borrow per-tick state.
+    static MARKER: fn(&str, Entity) -> bool = |_, _| false;
+    static NO_ENTITY_POS: fn(Entity) -> Option<Position> = |_| None;
+    static NO_ANCHOR_POS: fn(crate::ai::considerations::LandmarkAnchor) -> Option<Position> =
+        |_| None;
+
+    for (entity, name, needs, health, mut current, history) in &mut query {
+        let Ok(plan) = plans.get(entity) else {
+            continue;
+        };
+
+        // Recovery dispositions are already self-care — preempting
+        // them just oscillates. Mirrors the legacy CriticalHealth
+        // interrupt's exemption.
+        if matches!(plan.kind, DispositionKind::Resting | DispositionKind::Eating) {
+            continue;
+        }
+
+        // Minimal scalar fetch — only the trigger scalars the four
+        // acute-class lurch modifiers (047 / 102 / 105 / 108) consult
+        // in their `preempts_in_flight` predicates. Aligned with the
+        // canonical `scoring::ctx_scalars` keys (single source of
+        // truth). Phase 1 stub for `threat_proximity_derivative`
+        // matches `ctx_scalars`'s 0.0 publication; lift activation in
+        // ticket 108 will replace with the real derivative AND this
+        // system's fetch closure in the same commit.
+        let health_deficit = (1.0 - health.current / health.max).clamp(0.0, 1.0);
+        let fetch_scalar = move |scalar: &str, _: Entity| -> f32 {
+            match scalar {
+                "health_deficit" => health_deficit,
+                "threat_proximity_derivative" => 0.0,
+                _ => 0.0,
+            }
+        };
+
+        let eval_ctx = crate::ai::dse::EvalCtx {
+            cat: entity,
+            tick: time.tick,
+            entity_position: &NO_ENTITY_POS,
+            anchor_position: &NO_ANCHOR_POS,
+            has_marker: &MARKER,
+            self_position: Position::new(0, 0),
+            target: None,
+            target_position: None,
+            target_alive: None,
+        };
+
+        // Find the first acute modifier asking for behavioral
+        // expression. The pipeline's iteration order is the
+        // registration order set in `default_modifier_pipeline` —
+        // 047 (Flee) → 102 (Fight) → 105 (Freeze) → 108 (ThreatProx).
+        // Order doesn't load-bear here: the predicate is symmetric
+        // under permutation (any `true` triggers preemption), so the
+        // first `true` is sufficient.
+        let triggered = modifier_pipeline
+            .iter_passes()
+            .find(|m| m.preempts_in_flight(&eval_ctx, &fetch_scalar));
+
+        let Some(modifier) = triggered else { continue };
+
+        activation.record(Feature::ModifierPreemption);
+
+        // §11 focal-cat trace capture. Distinct from the §7.2
+        // commitment branches — this preempts the gate entirely
+        // (matching the legacy anxiety-interrupt path), so the row
+        // surfaces as `L3PlanFailure` with `reason: "modifier_preemption"`.
+        let is_focal = focal_target
+            .as_ref()
+            .and_then(|t| t.entity)
+            .map(|e| e == entity)
+            .unwrap_or(false);
+        if is_focal {
+            if let Some(capture) = focal_capture.as_deref() {
+                let current_step = plan
+                    .current()
+                    .map(|s| format!("{:?}", s.action))
+                    .unwrap_or_else(|| "none".into());
+                capture.push_plan_failure(
+                    crate::resources::trace_log::PlanFailureCapture {
+                        reason: "modifier_preemption",
+                        disposition: format!("{:?}", plan.kind),
+                        detail: serde_json::json!({
+                            "modifier": modifier.name(),
+                            "in_flight_step": current_step,
+                            "health_deficit": health_deficit,
+                        }),
+                    },
+                    time.tick,
+                );
+                // Flip the L3 momentum row's `preempted` bool so the
+                // compact L3 record reflects the preemption without
+                // requiring trace consumers to scan plan_failures.
+                capture.set_momentum_preempted(time.tick);
+            }
+        }
+
+        if let Some(ref mut log) = event_log {
+            let current_step = plan
+                .current()
+                .map(|s| format!("{:?}", s.action))
+                .unwrap_or_else(|| "none".into());
+            log.push(
+                time.tick,
+                EventKind::PlanInterrupted {
+                    cat: name.0.clone(),
+                    disposition: format!("{:?}", plan.kind),
+                    reason: format!("modifier_preemption({})", modifier.name()),
+                    current_step,
+                    hunger: needs.hunger,
+                    energy: needs.energy,
+                    temperature: needs.temperature,
+                },
+            );
+        }
+
+        if let Some(mut hist) = history {
+            hist.record(ActionRecord {
+                action: current.action,
+                disposition: Some(plan.kind),
+                tick: time.tick,
+                outcome: ActionOutcome::Interrupted,
+            });
+        }
+
+        plan_writer.write(PlanNarrative {
+            entity,
+            kind: plan.kind,
+            event: PlanEvent::Abandoned,
+            completions: plan.trips_done,
+        });
+
+        // Drop the plan and reset the action gate so
+        // `evaluate_and_plan` re-elects next tick. Mirrors the legacy
+        // `check_anxiety_interrupts` exit shape exactly — using
+        // commands.remove rather than the substrate's `try_preempt`
+        // primitive because we don't have `&mut GoapPlan` access in
+        // this read-only-plan query.
+        commands.entity(entity).remove::<GoapPlan>();
+        current.ticks_remaining = 0;
+    }
+}
+
+// ===========================================================================
 // check_anxiety_interrupts — hard interrupt for CriticalHealth only;
 // all other critical needs accumulate as pending urgencies evaluated at
 // step boundaries in resolve_goap_plans.

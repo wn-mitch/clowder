@@ -35,6 +35,7 @@ pub mod grooming_other;
 pub mod hunt_acquisition;
 pub mod hunt_deposit_chain;
 pub mod kitten_cry;
+pub mod modifier_preempts_hunt;
 pub mod picking_up_scavenging;
 pub mod preset;
 pub mod runner;
@@ -99,6 +100,11 @@ pub const ALL: &[&Scenario] = &[
     // 193 — election-side scenario for the rerouted PickingUp plan
     // template (PlannerZone::CarcassPile).
     &picking_up_scavenging::SCENARIO,
+    // 118 — substrate-driven plan preemption for acute-class lurch
+    // modifiers. Asserts Feature::ModifierPreemption fires when a
+    // wounded cat is mid-Hunt and the AcuteHealthAdrenaline lurch
+    // crosses its threshold.
+    &modifier_preempts_hunt::SCENARIO,
 ];
 
 /// Look up a scenario by its `name` field.

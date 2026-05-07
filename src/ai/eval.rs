@@ -245,6 +245,29 @@ pub trait ScoreModifier: Send + Sync + 'static {
     ) -> f32;
 
     fn name(&self) -> &'static str;
+
+    /// Ticket 118 — does this modifier's lift demand behavioral
+    /// expression on this tick? Acute-class (lurch-shaped) modifiers
+    /// override this to query their trigger scalar against the lurch
+    /// threshold; pressure-class (graded ramp) modifiers leave the
+    /// default `false`. See `docs/systems/distress-modifiers.md` for
+    /// the lurch-vs-pressure doctrine.
+    ///
+    /// Returning `true` enrolls the cat for substrate-driven plan
+    /// preemption: the next `check_modifier_preemption` pass calls
+    /// `plan_substrate::try_preempt`, dropping the in-flight plan so
+    /// the next softmax election expresses the lifted DSE behaviorally
+    /// rather than waiting for plan-completion momentum to clear.
+    /// Closes the gap surfaced in ticket 047 Phase 2 verification:
+    /// Sleep won the L2 softmax in 99.3% of injured-window ticks but
+    /// was the chosen action only 1.4% of them.
+    fn preempts_in_flight(
+        &self,
+        _ctx: &EvalCtx,
+        _fetch_scalar: &dyn Fn(&str, Entity) -> f32,
+    ) -> bool {
+        false
+    }
 }
 
 /// Ordered modifier pipeline. Phase 3b.1 ships the container shape;
@@ -363,6 +386,14 @@ impl ModifierPipeline {
 
     pub fn is_empty(&self) -> bool {
         self.passes.is_empty()
+    }
+
+    /// Ticket 118 — iterate the registered modifiers in pipeline order.
+    /// Used by `check_modifier_preemption` to query each modifier's
+    /// `preempts_in_flight()` predicate without going through the
+    /// score-application path.
+    pub fn iter_passes(&self) -> impl Iterator<Item = &dyn ScoreModifier> {
+        self.passes.iter().map(|b| b.as_ref())
     }
 }
 

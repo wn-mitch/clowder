@@ -4234,6 +4234,11 @@ interrupt catalog.
 one is personality-scaled, one is a computed-urgency signal.
 Exemptions are tracked per-DispositionKind at the category level.
 
+Ticket 118 added a sibling preemption surface — substrate-driven
+plan preemption — that lives alongside the legacy interrupt path
+rather than inside it. See **§7.5b Substrate-driven preemption**
+below.
+
 | Interrupt | Trigger | Replacement behavior | Exempt dispositions | Source |
 |---|---|---|---|---|
 | **CriticalHealth** | `health.current / health.max < critical_health_threshold` | Re-evaluate (anxiety-driven drop; no specific replacement Intention) | *None* — fires universally, including for Guarding. A cat below the health threshold must re-evaluate regardless of role. | `disposition.rs:202` |
@@ -4241,6 +4246,39 @@ Exemptions are tracked per-DispositionKind at the category level.
 | **Exhaustion** | `needs.energy < exhaustion_interrupt_threshold` | Re-evaluate | Resting, Hunting, Foraging (same reason as Starvation). | `disposition.rs:215` |
 | **ThreatDetected** | Sighted wildlife passing `cat_sees_threat_at`; `threat_urgency = 1 - (manhattan_dist / threat_urgency_divisor)` exceeds personality-scaled `flee_threshold_base + boldness · flee_threshold_boldness_scale` | `Flee` toward threat position, `Blind`-committed at install | Guarding — guards handle threats directly via the guard-threat detection range. | `disposition.rs:226` |
 | **CriticalSafety** | `needs.safety < critical_safety_threshold` | Re-evaluate | *None* — Guards are no longer exempt once safety is critical (recent change, see `disposition.rs:245` comment). | `disposition.rs:248` |
+
+### §7.5b Substrate-driven preemption (ticket 118)
+
+The legacy interrupt catalog above hardcodes its predicates
+(`health < critical_threshold`, `needs.safety < critical_threshold`,
+…). The substrate-over-override doctrine (epic 093) replaces those
+hardcoded predicates with **modifier-driven** preemption: any
+acute-class lurch modifier whose trigger scalar fires demands
+behavioral expression. Ticket 118 ships this alongside the legacy
+interrupts; ticket 119 retires the CriticalHealth row above once
+the substrate is verified to carry the load.
+
+**Mechanism.** A new `preempts_in_flight(&self, ctx, fetch) -> bool`
+method on `ScoreModifier` (default `false`). Lurch modifiers
+override to query their trigger scalar against the lurch
+threshold. The `check_modifier_preemption` system runs once per
+tick before `evaluate_and_plan`, walks the modifier pipeline for
+each in-flight cat, and on the first `true` drops the cat's
+`GoapPlan` and emits `Feature::ModifierPreemption` (Negative
+valence). Resting / Eating dispositions are exempt — they're
+already recovery dispositions; preempting them just oscillates.
+
+The trace surface uses the existing `L3PlanFailure` variant with
+`reason: "modifier_preemption"` plus `MomentumSummary.preempted = true`
+on the focal-cat L3 record. See `docs/systems/distress-modifiers.md`
+"Behavioral expression" section for the per-modifier classification.
+
+**Ship-state at 118 land.** Pipeline iteration runs but the only
+overrides today (047 / 102 / 105 / 108) all gate on `lift > 0`.
+047's lifts default to 0.0 in production; the `modifier_preempts_hunt`
+scenario activates them via in-test constants override to exercise
+the path. Ticket 119 promotes the lifts to swept-validated defaults
+in production alongside the legacy-interrupt retirement.
 
 **Boldness as interrupt modulator.** Bold cats have a higher
 `flee_threshold`, so threat detection must reach higher urgency

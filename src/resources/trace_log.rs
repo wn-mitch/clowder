@@ -458,6 +458,13 @@ pub struct FocalScoreCaptureInner {
     /// resolution calls aren't guaranteed to interleave in the same
     /// order.
     pub target_rankings: std::collections::HashMap<&'static str, TargetRanking>,
+    /// Ticket 118 — set to `true` when `check_modifier_preemption`
+    /// fired on the focal cat this tick. `emit_focal_trace` flows this
+    /// into `MomentumSummary.preempted` on the L3 record so trace
+    /// consumers (and `clowder-focal-cat` reports) can see the
+    /// substrate-driven preemption from the compact L3 row without
+    /// having to scan `plan_failures` for the same tick.
+    pub momentum_preempted: bool,
     /// Tick the capture was populated on. `emit_focal_trace` reads this
     /// to emit records with the correct `tick` field even when the
     /// capture is drained on a later tick (shouldn't happen under normal
@@ -530,6 +537,19 @@ impl FocalScoreCapture {
             .lock()
             .expect("focal score capture mutex poisoned");
         inner.plan_failures.push(row);
+        inner.captured_tick = Some(tick);
+    }
+
+    /// Ticket 118 — flag the L3 momentum row with a substrate-driven
+    /// preempt this tick. `emit_focal_trace` flows this into
+    /// `MomentumSummary.preempted`. Setting twice in the same tick is
+    /// idempotent (one preempt per cat per tick is the contract anyway).
+    pub fn set_momentum_preempted(&self, tick: u64) {
+        let mut inner = self
+            .inner
+            .lock()
+            .expect("focal score capture mutex poisoned");
+        inner.momentum_preempted = true;
         inner.captured_tick = Some(tick);
     }
 

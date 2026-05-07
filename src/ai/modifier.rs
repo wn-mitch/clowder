@@ -1272,6 +1272,22 @@ impl ScoreModifier for AcuteHealthAdrenalineFlee {
     fn name(&self) -> &'static str {
         "acute_health_adrenaline_flee"
     }
+
+    fn preempts_in_flight(
+        &self,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> bool {
+        // Inert modifier (lifts 0.0) has nothing to redirect the cat
+        // toward — preempting would just oscillate. Default magnitudes
+        // ship at 0.0 per ticket 047 §spec until 119 promotes them
+        // alongside the legacy-interrupt retirement.
+        if self.flee_lift <= 0.0 && self.sleep_lift <= 0.0 {
+            return false;
+        }
+        let deficit = fetch(HEALTH_DEFICIT, ctx.cat).clamp(0.0, 1.0);
+        self.ramp(deficit) > 0.0
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1404,6 +1420,24 @@ impl ScoreModifier for AcuteHealthAdrenalineFight {
     fn name(&self) -> &'static str {
         "acute_health_adrenaline_fight"
     }
+
+    fn preempts_in_flight(
+        &self,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> bool {
+        // Inert modifier guard — see 047's Flee preempts_in_flight.
+        if self.fight_lift <= 0.0 {
+            return false;
+        }
+        // Acute-class lurch on the same `health_deficit` scalar as 047's
+        // Flee branch. The viability gate decides *which* DSE the
+        // modifier lifts (Fight vs Flee) — both branches demand
+        // behavioral expression when the adrenaline scalar fires, so
+        // the preemption predicate ignores the gate. Ticket 118.
+        let deficit = fetch(HEALTH_DEFICIT, ctx.cat).clamp(0.0, 1.0);
+        self.ramp(deficit) > 0.0
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1525,6 +1559,23 @@ impl ScoreModifier for AcuteHealthAdrenalineFreeze {
 
     fn name(&self) -> &'static str {
         "acute_health_adrenaline_freeze"
+    }
+
+    fn preempts_in_flight(
+        &self,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> bool {
+        // Inert modifier guard — see 047's Flee preempts_in_flight.
+        if self.freeze_lift <= 0.0 {
+            return false;
+        }
+        // Adrenaline lurch shape shared with 047 / 102 — the three
+        // valences split on the viability gate but share the
+        // preemption demand whenever the underlying scalar fires.
+        // Ticket 118.
+        let deficit = fetch(HEALTH_DEFICIT, ctx.cat).clamp(0.0, 1.0);
+        self.ramp(deficit) > 0.0
     }
 }
 
@@ -2118,6 +2169,26 @@ impl ScoreModifier for ThreatProximityAdrenalineFlee {
 
     fn name(&self) -> &'static str {
         "threat_proximity_adrenaline_flee"
+    }
+
+    fn preempts_in_flight(
+        &self,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> bool {
+        // Inert modifier guard — see 047's Flee preempts_in_flight.
+        if self.flee_lift <= 0.0 && self.sleep_lift <= 0.0 {
+            return false;
+        }
+        // Lurch on rising threat-proximity derivative — adrenaline
+        // re-detection of approaching danger. Phase-1 stub: scalar is
+        // currently published as 0.0 from `scoring::ctx_scalars`, so
+        // this returns false until ticket 108 ships its scalar
+        // plumbing. Override is in place so 108 activation only needs
+        // to flip the scalar source, not re-touch this contract.
+        // Ticket 118.
+        let derivative = fetch(THREAT_PROXIMITY_DERIVATIVE, ctx.cat).clamp(0.0, 1.0);
+        self.ramp(derivative) > 0.0
     }
 }
 
@@ -4358,6 +4429,82 @@ mod tests {
         assert!(
             (sleep_post - 0.80).abs() < 1e-5,
             "deficit 0.55 saturates 0.50 lift; got {sleep_post}"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // ticket 118 — preempts_in_flight() doctrine
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn preempts_in_flight_acute_flee_fires_above_threshold() {
+        let modifier = test_adrenaline();
+        let (_, ctx) = test_ctx();
+        let fetch_above = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 0.55,
+            _ => 0.0,
+        };
+        assert!(
+            modifier.preempts_in_flight(&ctx, &fetch_above),
+            "lurch firing ⇒ preempts in-flight"
+        );
+    }
+
+    #[test]
+    fn preempts_in_flight_acute_flee_silent_below_threshold() {
+        let modifier = test_adrenaline();
+        let (_, ctx) = test_ctx();
+        let fetch_below = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 0.3,
+            _ => 0.0,
+        };
+        assert!(
+            !modifier.preempts_in_flight(&ctx, &fetch_below),
+            "below threshold ⇒ no preemption demand"
+        );
+    }
+
+    #[test]
+    fn preempts_in_flight_acute_flee_inert_modifier_does_not_preempt() {
+        // Inert modifier (lifts 0.0) — even at full health_deficit,
+        // preempts_in_flight returns false. Without this guard wounded
+        // cats would oscillate every tick (preempt → re-elect Hunt →
+        // preempt) when 047's lifts ship at default 0.0. Locks the
+        // safety contract.
+        let inert = AcuteHealthAdrenalineFlee {
+            threshold: 0.4,
+            flee_lift: 0.0,
+            sleep_lift: 0.0,
+        };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            HEALTH_DEFICIT => 1.0,
+            _ => 0.0,
+        };
+        assert!(
+            !inert.preempts_in_flight(&ctx, &fetch),
+            "inert modifier (no lift) must not preempt — would oscillate"
+        );
+    }
+
+    #[test]
+    fn preempts_in_flight_pressure_modifier_returns_default_false() {
+        // Pressure-class modifiers (graded ramp shape — 088 / 106 / 107
+        // / 110) leave the default `false`. Even at full-distress they
+        // do NOT preempt — pressure is supposed to ramp behavior, not
+        // yank it. Ticket 118 doctrine.
+        let modifier = BodyDistressPromotion {
+            threshold: 0.7,
+            lift_scale: 0.20,
+        };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            BODY_DISTRESS_COMPOSITE => 1.0,
+            _ => 0.0,
+        };
+        assert!(
+            !modifier.preempts_in_flight(&ctx, &fetch),
+            "pressure-class modifier never preempts"
         );
     }
 

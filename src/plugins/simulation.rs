@@ -496,14 +496,29 @@ impl Plugin for SimulationPlugin {
         );
 
         // GOAP systems — ordered pipeline replacing the old disposition systems.
-        // check_anxiety_interrupts → evaluate_and_plan → resolve_goap_plans → emit_plan_narrative.
+        // check_modifier_preemption → check_anxiety_interrupts →
+        // evaluate_and_plan → resolve_goap_plans → emit_plan_narrative.
         //
-        // Both check_anxiety_interrupts and evaluate_and_plan must run AFTER
+        // Both interrupt-shaped systems and evaluate_and_plan must run AFTER
         // sync_food_stores so that food_available reflects the current tick's
         // item state, not a stale default of 0.0.
+        //
+        // Ticket 118 — `check_modifier_preemption` runs before
+        // `check_anxiety_interrupts` so the substrate-driven preempt path
+        // gets first claim on cats whose acute-class modifiers are firing.
+        // For health < critical_threshold today, both fire on the same
+        // tick (substrate AND legacy override); ticket 119 retires the
+        // legacy override once 118's substrate is verified to carry the
+        // load.
         app.add_systems(
             FixedUpdate,
-            systems::goap::check_anxiety_interrupts.after(systems::items::sync_food_stores),
+            systems::goap::check_modifier_preemption.after(systems::items::sync_food_stores),
+        );
+        app.add_systems(
+            FixedUpdate,
+            systems::goap::check_anxiety_interrupts
+                .after(systems::items::sync_food_stores)
+                .after(systems::goap::check_modifier_preemption),
         );
         // §7.2 commitment gate (Phase 6a) is not a stand-alone system —
         // it's inlined into `resolve_goap_plans`'s per-cat loop
@@ -549,6 +564,7 @@ impl Plugin for SimulationPlugin {
             FixedUpdate,
             systems::goap::evaluate_and_plan
                 .after(systems::goap::check_anxiety_interrupts)
+                .after(systems::goap::check_modifier_preemption)
                 .after(systems::items::sync_food_stores),
         );
         // Flush commands so GoapPlan inserted by evaluate_and_plan is

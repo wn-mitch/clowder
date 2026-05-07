@@ -65,6 +65,17 @@ pub enum Feature {
     MoodContagion,
     PersonalityFriction,
     AnxietyInterrupt,
+    /// Ticket 118 — substrate-driven plan preemption fired. The
+    /// `check_modifier_preemption` system found at least one acute-class
+    /// modifier whose `preempts_in_flight()` predicate returned true
+    /// for an in-flight cat, dropped the cat's plan via
+    /// `plan_substrate::try_preempt`, and the cat will re-elect on the
+    /// next tick. Distinct from `AnxietyInterrupt` (the legacy Maslow
+    /// override that 118+119 are retiring): this fires whenever the
+    /// substrate is asking for behavioral expression, not only on the
+    /// hardcoded `health < critical_threshold` predicate. Negative
+    /// valence — interrupts are colony stress signals.
+    ModifierPreemption,
     PreyBred,
     PreyDenAbandoned,
     PreyDenFounded,
@@ -352,6 +363,7 @@ impl Feature {
         Feature::MoodContagion,
         Feature::PersonalityFriction,
         Feature::AnxietyInterrupt,
+        Feature::ModifierPreemption,
         Feature::PreyBred,
         Feature::PreyDenAbandoned,
         Feature::PreyDenFounded,
@@ -532,6 +544,7 @@ impl Feature {
             Feature::WardSiegeStarted => Negative,
             Feature::HerbSuppressed => Negative,
             Feature::AnxietyInterrupt => Negative,
+            Feature::ModifierPreemption => Negative,
             Feature::AspirationAbandoned => Negative,
             Feature::DenRaided => Negative,
             Feature::PreyDenAbandoned => Negative,
@@ -795,6 +808,7 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::MoodContagion => "MoodContagion",
         Feature::PersonalityFriction => "PersonalityFriction",
         Feature::AnxietyInterrupt => "AnxietyInterrupt",
+        Feature::ModifierPreemption => "ModifierPreemption",
         Feature::PreyBred => "PreyBred",
         Feature::PreyDenAbandoned => "PreyDenAbandoned",
         Feature::PreyDenFounded => "PreyDenFounded",
@@ -1104,8 +1118,10 @@ mod tests {
         // signal when engage_prey/forage_item overflow inventory) +
         // 3 Neutral (ItemDropped, ItemTrashed, ItemHandedOff) for the
         // disposal-action surface (Drop / Trash / Handoff).
+        // Ticket 118 added 1 Negative (ModifierPreemption — substrate-
+        // driven plan preemption from acute-class lurch modifiers).
         assert_eq!(positive, 49);
-        assert_eq!(negative, 21);
+        assert_eq!(negative, 22);
         assert_eq!(neutral, 31);
     }
 
@@ -1176,7 +1192,7 @@ mod tests {
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),
-            21
+            22
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Neutral),
