@@ -92,7 +92,6 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[159](docs/open-work/tickets/159-parent-grief-consumer.md)** — Parent grief consumer for kitten / dependent death — _[ai-substrate] · added 2026-05-04_
 - **[170](docs/open-work/tickets/170-hide-eligible-authoring-system.md)** — HideEligible authoring system (Hide DSE Phase 2) — _[ai-substrate] · added 2026-05-05_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[world-ecology] · added 2026-05-05_
-- **[181](docs/open-work/tickets/181-hunt-forage-saturation-balance-tune.md)** — Balance-tune Hunt/Forage colony_food_security saturation weights (176 follow-on) — _[balance] · added 2026-05-05_
 - **[186](docs/open-work/tickets/186-add-effective-bevy-command-buffer-race.md)** — add_effective Bevy command-buffer race silently drops capacity_bonus on just-spawned items — _added 2026-05-06_
 - **[187](docs/open-work/tickets/187-kitten-starvation-under-active-mating-pipeline.md)** — Kittens starve in the post-184 soak — RetrieveFoodForKitten plan-fails dominate — _[ai-substrate] · added 2026-05-06_
 - **[190](docs/open-work/tickets/190-build-chronic-full-weight-tune.md)** — Tune build_chronic_full_weight (179 follow-on) — _[balance] · added 2026-05-06_
@@ -104,6 +103,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[204](docs/open-work/tickets/204-kitten-starvation-cluster-post-119.md)** — Kitten-starvation cluster surfaced by 119 substrate activation — bonding/mating cascade vs adult-feeding bandwidth — _[ai-substrate] · added 2026-05-07_
 - **[205](docs/open-work/tickets/205-social-status-distress-perception-cost.md)** — social_status_distress perception cost — 25% per-tick slowdown from O(N) nearest-cat scan — _[ai-substrate] · added 2026-05-07_
 - **[208](docs/open-work/tickets/208-per-cat-action-overlay-for-the-windowed-ui.md)** — Per-cat Action overlay for the windowed UI — _added 2026-05-07_
+- **[209](docs/open-work/tickets/209-positive-colony-food-security-axis-on-higher-tier-dses.md)** — Positive colony_food_security axis on higher-tier DSEs — _[balance] · added 2026-05-07_
 
 ## Parked (7)
 
@@ -138,14 +138,15 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (141)
+## Landed archive (142)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (76)
+### 2026-05 (77)
 
 - **[207](docs/open-work/landed/207-influence-map-registry-walk.md)** — Phase 2D — InfluenceMap registry walk in emit_focal_trace _(2026-05-07)_
 - **[206](docs/open-work/landed/206-trace-emit-l1-map-coverage.md)** — trace_emit L1 walk skips five InfluenceMaps — Food / Garden / Construction / KittenCry / Herb _(2026-05-07)_
+- **[181](docs/open-work/landed/181-hunt-forage-saturation-balance-tune.md)** — Balance-tune Hunt/Forage colony_food_security saturation weights (176 follow-on) _(2026-05-07)_
 - **[117](docs/open-work/landed/117-social-warmth-vs-self-care-tradeoff.md)** — Characterize social-warmth max shift under 047 substrate (Phase 3 surfaced -96% on max) _(2026-05-07)_
 - **[109](docs/open-work/landed/109-intraspecies-conflict-response.md)** — IntraspeciesConflictResponse — full four-valence (fight/flight/freeze/fawn) social response _(2026-05-07)_
 - **[108](docs/open-work/landed/108-threat-proximity-adrenaline.md)** — ThreatProximityAdrenaline modifier — substrate axis for CriticalSafety interrupt retirement _(2026-05-07)_

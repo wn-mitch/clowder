@@ -1818,19 +1818,17 @@ pub struct ScoringConstants {
     /// balance-tuning is the follow-on ticket.
     #[serde(default = "default_build_chronic_full_weight")]
     pub build_chronic_full_weight: f32,
-    /// 176: weight on the `colony_food_security` axis in the Hunt
-    /// DSE composition. Default 0.0 — the axis is wired but inert.
-    /// 181 attempted to lift to 0.20; iteration 1 reverted after the
-    /// freed L3 bandwidth flowed to Patrol (not higher-tier DSEs)
-    /// and colony nourishment crashed to zero. See
-    /// `docs/balance/181-hunt-forage-saturation-tune.md`.
+    /// 176: weight on the `colony_food_security` saturation axis in
+    /// Hunt's DSE composition. Ships dormant at 0.0 — 181 closed
+    /// with a documented predator-exposure cascade that survives
+    /// recalibration; ticket 209 designs the paired-axis alternative.
+    /// See `docs/balance/181-hunt-forage-saturation-tune.md`.
     #[serde(default = "default_hunt_food_security_weight")]
     pub hunt_food_security_weight: f32,
-    /// 176: weight on the `colony_food_security` axis in the Forage
-    /// DSE composition. Default 0.0 — sibling to
-    /// `hunt_food_security_weight`. Forage suppresses by the same
-    /// signal because it's a Maslow-tier-1 acquisition peer.
-    /// 181 attempted to lift to 0.15 and reverted; see balance doc.
+    /// 176: weight on the `colony_food_security` saturation axis in
+    /// Forage's DSE composition. Ships dormant at 0.0 — sibling to
+    /// `hunt_food_security_weight`; same 181 disposition, same
+    /// follow-on (ticket 209).
     #[serde(default = "default_forage_food_security_weight")]
     pub forage_food_security_weight: f32,
     /// 178: Logistic slope on the `inventory_excess` axis used by the
@@ -3064,17 +3062,14 @@ fn default_build_chronic_full_weight() -> f32 {
 
 /// 176: Hunt DSE saturation weight on the `colony_food_security`
 /// axis. Ships dormant at 0.0 — see
-/// `ScoringConstants::hunt_food_security_weight`. 181 iteration 1
-/// reverted after the freed bandwidth flowed to Patrol (not higher-
-/// tier DSEs) and colony nourishment crashed.
+/// `ScoringConstants::hunt_food_security_weight`.
 fn default_hunt_food_security_weight() -> f32 {
     0.0
 }
 
 /// 176: Forage DSE saturation weight on the `colony_food_security`
 /// axis. Ships dormant at 0.0 — see
-/// `ScoringConstants::forage_food_security_weight`. 181 iteration 1
-/// reverted alongside the Hunt sibling.
+/// `ScoringConstants::forage_food_security_weight`.
 fn default_forage_food_security_weight() -> f32 {
     0.0
 }

@@ -1,7 +1,7 @@
 ---
 id: 181
 title: Balance-tune Hunt/Forage colony_food_security saturation weights (176 follow-on)
-status: ready
+status: done
 cluster: balance
 added: 2026-05-05
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [181-hunt-forage-saturation-tune.md]
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-07
 ---
 
 ## Why
@@ -103,3 +103,47 @@ Per CLAUDE.md balance-tuning discipline:
   already demonstrates 41% of ticks at stockpile ≥15, peak
   50/50, all canaries firing — but the four-artifact
   methodology still applies if weights move.
+- 2026-05-07: **iteration 2 ran and REVERTED.** Weights selected
+  from prior-soak data, not from `just hypothesize`: 0.10 / 0.07
+  (Hunt / Forage), recalibrated downward from iter-1's 0.20/0.15
+  because post-184 fs ≈ 0.985 makes the same numerical weight
+  ~49× more effective than iter-1's fs ≈ 0.008. `just verdict
+  logs/tuned-42` failed: 1 starvation death (Wren, tick 1,255,465),
+  6 ShadowFoxAmbush deaths (vs baseline 1), aggregate −33.3%,
+  courtship −98.5%, Patrol +6.86 pp (guard rail was ≤+1 pp).
+  Predicted Hunt down — observed +0.87 pp (wrong direction,
+  same as iter-1). Predicted Groom/Mentor/Coord up — all three
+  observed *down*.
+  **The 2026-05-06 reframe was falsified.** The structural
+  finding from iteration 1 survives recalibration; the 184 fix
+  removed the over-gating but did not change the L3 softmax
+  topology. **Mechanism (newly characterized in iter-2):** the
+  collapse is a second-order ecological cascade — Patrol absorbs
+  freed bandwidth → Patrol routes cats through ShadowFox
+  territory → ambush wave (5 deaths in 12,335 ticks early in
+  the run) thins labor pool → surviving cats live in chronic
+  adrenaline_flee preemption (15,614× modifier preemptions vs
+  baseline 0; Wren's plan-churn cadence 3.65 ticks) → stockpile
+  drain outpaces input → starvation 24,000 ticks after the
+  ambush wave. The iter-1 nourishment=0.000 was the same cascade
+  amplified by the 184 over-gating bug. Full mechanism in
+  `docs/balance/181-hunt-forage-saturation-tune.md` §Mechanism.
+  Constants reverted to 0.0/0.0. Soak archive:
+  `logs/tuned-42/` (iter-2, weights 0.10/0.07, do not promote;
+  Simba focal trace ends tick 1,221,820 — focal cat died).
+  Baseline preserved at `logs/tuned-42-pre-181-iter2/` (weights
+  0.0/0.0, post-184 healthy).
+  **Next session direction:** the recommended path is no longer
+  weight-tuning. Either (a) pair saturation suppression with a
+  positive-lift `colony_food_security` axis on higher-tier DSEs
+  (Groom / Mentor / Coordinate / Caretake) so freed bandwidth
+  has somewhere to flow that doesn't elevate Patrol; (b)
+  decouple Patrol from predator-exposure as a separate system;
+  or (c) price predator-exposure cost into Patrol's L2 so the
+  softmax doesn't naively elevate it. Path (a) opened as
+  ticket 209. Existing food-related scenarios
+  (`hunt_acquisition_to_kill`, `hunt_deposit_chain`,
+  `hunt_deposit_chain_injured`, `picking_up_scavenging`,
+  `modifier_preempts_hunt`, `farming_cycle`) all run cleanly
+  under reverted constants — no codebase regression to chase.
+- 2026-05-07: landed; iter-2 cascade documented in balance doc, ticket 209 opens path-1 paired-axis follow-on
