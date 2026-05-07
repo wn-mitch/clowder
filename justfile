@@ -415,15 +415,24 @@ open-work-wip:
 open-work-index:
     uv run scripts/generate_open_work.py
 
-# Land a ticket: flip status -> done, set landed-at: pending,
-# landed-on: today, append optional Log entry, move file from
-# `tickets/` to `landed/`, drop the id from every dependent's
-# blocked-by, and regenerate `docs/open-work.md`. After committing,
-# backfill the sha:
+# Land a ticket. Three modes:
 #
-#   just land 197                         # initial land
-#   just land 197 --sha 55b6e930          # backfill landed-at after commit
-#   just land 197 --log "shipped X y z"   # initial land with Log entry
+#   just land 197                                         # file-only: rewrite frontmatter,
+#                                                         # move tickets/ -> landed/, drop
+#                                                         # blocked-by from dependents,
+#                                                         # regen docs/open-work.md.
+#                                                         # User commits + backfills the sha
+#                                                         # themselves.
+#   just land 197 --sha 55b6e930                          # backfill landed-at: pending after
+#                                                         # the commit lands.
+#   just land 197 --commit "feat: 197 — short summary"    # full jj orchestration: bundles
+#                                                         # current working copy + landing
+#                                                         # diff into one feat commit, then
+#                                                         # creates a docs sha-backfill
+#                                                         # commit, then leaves @ empty.
+#
+# `--commit` saves ~7 jj commands per landing. Optionally pass `--log "..."` in
+# any mode to append a `- <today>: <entry>` line to the ticket's Log section.
 land *ARGS:
     uv run scripts/land_ticket.py {{ARGS}}
 

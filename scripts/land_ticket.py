@@ -6,26 +6,36 @@
 """
 Land or backfill a Clowder open-work ticket.
 
-Two modes:
+Three modes:
 
   uv run scripts/land_ticket.py <id> [--log "<entry>"]
-      Land a ticket: flip status -> done, set landed-at: pending,
+      File-only land: flip status -> done, set landed-at: pending,
       landed-on: <today>, append optional Log entry, move file from
       `docs/open-work/tickets/` to `docs/open-work/landed/`, drop the
-      ticket id from any other ticket's blocked-by list, and regenerate
-      `docs/open-work.md`.
+      ticket id from every dependent's blocked-by list, and regenerate
+      `docs/open-work.md`. Does NOT touch jj — the user commits and
+      backfills the sha themselves.
 
   uv run scripts/land_ticket.py <id> --sha <short-sha>
       Backfill: rewrite landed-at: pending -> landed-at: <sha> in the
       already-landed file. Idempotent if landed-at already matches.
 
+  uv run scripts/land_ticket.py <id> --commit "<feat-message>" [--log "<entry>"]
+      Full jj-orchestrated land. Treats the current working copy (@) as
+      the implementation, applies the file-mode landing on top, runs
+      `jj describe -m "<feat-message>"`, reads the new sha,
+      `jj new -m '(empty)'`, applies sha backfill, describes the
+      backfill commit, then runs one more `jj new` so @ is fresh for
+      the next ticket. End state: 2 stable commits + empty @.
+
 Per CLAUDE.md "Long-horizon coordination" + memory
-`feedback_landing_unblock_routine.md`, both modes regenerate the index
-in the same call so it doesn't drift.
+`feedback_landing_unblock_routine.md`, every mode regenerates the
+index so it doesn't drift.
 
 Usage:
     just land <id> [--log "<entry>"]
     just land <id> --sha <short-sha>
+    just land <id> --commit "feat: <id> — <summary>" [--log "<entry>"]
 """
 
 from __future__ import annotations
@@ -218,29 +228,54 @@ def regenerate_index() -> None:
     )
 
 
-def cmd_land(ticket_id: str, log_entry: str | None) -> int:
+def jj(*args: str, capture: bool = False) -> str:
+    """Run a `jj` subcommand. Returns stdout (stripped) when capture=True."""
+    proc = subprocess.run(
+        ["jj", *args],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=capture,
+        text=True,
+    )
+    return proc.stdout.strip() if capture else ""
+
+
+def jj_head_sha(short: bool = True) -> str:
+    """Return @-'s commit sha (short by default).
+
+    `@-` is the parent of the current working copy — i.e. the most
+    recent committed change. Used to read the sha of a commit we just
+    described so we can backfill landed-at.
+    """
+    template = "commit_id.short()" if short else "commit_id"
+    return jj("log", "-r", "@-", "--no-graph", "-T", template + r' ++ "\n"', capture=True).strip()
+
+
+def apply_landing(ticket_id: str, log_entry: str | None) -> tuple[Path, list[Path]]:
+    """File-only landing: rewrite frontmatter, move ticket, drop blocked-by.
+
+    Returns (landed_path, unblocked_paths). Caller is responsible for
+    regenerating the index — this function leaves it alone so callers
+    that orchestrate further changes (the --commit path) can regen
+    once at the end.
+    """
     src = find_ticket_file(ticket_id, TICKETS_DIR)
     if src is None:
         existing = find_ticket_file(ticket_id, LANDED_DIR)
         if existing is not None:
-            print(
+            raise SystemExit(
                 f"land_ticket: ticket {ticket_id} is already landed at {existing}. "
-                f"Use `--sha` to backfill if landed-at is still pending.",
-                file=sys.stderr,
+                f"Use `--sha` to backfill if landed-at is still pending."
             )
-            return 1
-        print(
-            f"land_ticket: no ticket file found for id={ticket_id} in {TICKETS_DIR}",
-            file=sys.stderr,
+        raise SystemExit(
+            f"land_ticket: no ticket file found for id={ticket_id} in {TICKETS_DIR}"
         )
-        return 1
 
     today = dt.date.today().isoformat()
     text = src.read_text(encoding="utf-8")
     fm_lines, body_lines = split_frontmatter(text)
     if not fm_lines:
-        print(f"land_ticket: {src} has no frontmatter", file=sys.stderr)
-        return 1
+        raise SystemExit(f"land_ticket: {src} has no frontmatter")
     fm_lines = rewrite_frontmatter_field(fm_lines, "status", "done")
     fm_lines = rewrite_frontmatter_field(fm_lines, "landed-at", "pending")
     fm_lines = rewrite_frontmatter_field(fm_lines, "landed-on", today)
@@ -251,14 +286,36 @@ def cmd_land(ticket_id: str, log_entry: str | None) -> int:
     LANDED_DIR.mkdir(parents=True, exist_ok=True)
     dst = LANDED_DIR / src.name
     if dst.exists():
-        print(
-            f"land_ticket: refusing to overwrite existing {dst}",
-            file=sys.stderr,
-        )
-        return 1
+        raise SystemExit(f"land_ticket: refusing to overwrite existing {dst}")
     src.rename(dst)
 
     unblocked = drop_blocked_by(ticket_id)
+    return (dst, unblocked)
+
+
+def apply_sha_backfill(ticket_id: str, sha: str) -> Path:
+    """Rewrite landed-at: pending -> landed-at: <sha> in the landed file."""
+    target = find_ticket_file(ticket_id, LANDED_DIR)
+    if target is None:
+        raise SystemExit(
+            f"land_ticket: no landed file found for id={ticket_id} in {LANDED_DIR}"
+        )
+    text = target.read_text(encoding="utf-8")
+    fm_lines, body_lines = split_frontmatter(text)
+    if not fm_lines:
+        raise SystemExit(f"land_ticket: {target} has no frontmatter")
+    fm_lines = rewrite_frontmatter_field(fm_lines, "landed-at", sha)
+    target.write_text(assemble(fm_lines, body_lines), encoding="utf-8")
+    return target
+
+
+def cmd_land(ticket_id: str, log_entry: str | None) -> int:
+    try:
+        dst, unblocked = apply_landing(ticket_id, log_entry)
+    except SystemExit as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
     regenerate_index()
 
     print(f"landed: {dst.relative_to(REPO_ROOT)}")
@@ -268,6 +325,62 @@ def cmd_land(ticket_id: str, log_entry: str | None) -> int:
             print(f"    - {path.relative_to(REPO_ROOT)}")
     print(f"  landed-at: pending — run `just land {ticket_id} --sha <sha>` after committing")
     return 0
+
+
+def cmd_commit_land(ticket_id: str, message: str, log_entry: str | None) -> int:
+    """Full jj-orchestrated landing.
+
+    Sequence:
+      1. Apply file-mode landing on top of current @ (which may already
+         carry the implementation diff).
+      2. Regenerate the index.
+      3. `jj describe -m "<message>"` to name @.
+      4. Read the new commit's sha.
+      5. `jj new -m '(empty)'` so @ is fresh.
+      6. Apply sha backfill in @.
+      7. `jj describe -m "docs: backfill <id> landed-at sha to <sha>"`.
+      8. `jj new -m '(empty)'` so the user has a clean working copy
+         for the next task.
+
+    End state: two committed revisions (feat + docs) + empty @.
+    """
+    try:
+        dst, unblocked = apply_landing(ticket_id, log_entry)
+    except SystemExit as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    regenerate_index()
+
+    jj("describe", "-m", message)
+    sha = jj_head_sha_from_at()
+    jj("new", "-m", "(empty)")
+
+    apply_sha_backfill(ticket_id, sha)
+    regenerate_index()
+
+    backfill_msg = f"docs: backfill {ticket_id} landed-at sha to {sha}"
+    jj("describe", "-m", backfill_msg)
+    jj("new", "-m", "(empty)")
+
+    print(f"landed: {dst.relative_to(REPO_ROOT)}")
+    print(f"  feat sha: {sha}")
+    print(f"  feat msg: {message}")
+    print(f"  docs msg: {backfill_msg}")
+    if unblocked:
+        print(f"  unblocked from {len(unblocked)} dependent(s):")
+        for path in unblocked:
+            print(f"    - {path.relative_to(REPO_ROOT)}")
+    print("  working copy is empty — ready for the next ticket")
+    return 0
+
+
+def jj_head_sha_from_at() -> str:
+    """Return @'s commit sha (short). Used after `jj describe` to read
+    the sha of the just-named commit before we move past it with
+    `jj new`."""
+    return jj("log", "-r", "@", "--no-graph", "-T", r'commit_id.short() ++ "\n"',
+              capture=True).strip()
 
 
 def cmd_backfill(ticket_id: str, sha: str) -> int:
@@ -288,11 +401,7 @@ def cmd_backfill(ticket_id: str, sha: str) -> int:
         return 1
 
     text = target.read_text(encoding="utf-8")
-    fm_lines, body_lines = split_frontmatter(text)
-    if not fm_lines:
-        print(f"land_ticket: {target} has no frontmatter", file=sys.stderr)
-        return 1
-
+    fm_lines, _ = split_frontmatter(text)
     current = next(
         (l for l in fm_lines if l.startswith("landed-at:")),
         None,
@@ -301,9 +410,7 @@ def cmd_backfill(ticket_id: str, sha: str) -> int:
         print(f"land_ticket: landed-at already {sha} (idempotent no-op)")
         return 0
 
-    fm_lines = rewrite_frontmatter_field(fm_lines, "landed-at", sha)
-    target.write_text(assemble(fm_lines, body_lines), encoding="utf-8")
-
+    apply_sha_backfill(ticket_id, sha)
     regenerate_index()
     print(f"backfilled: {target.relative_to(REPO_ROOT)} landed-at={sha}")
     return 0
@@ -323,9 +430,21 @@ def main(argv: list[str]) -> int:
         "--sha", default=None,
         help="Backfill landed-at with the given short sha (skip the move)",
     )
+    ap.add_argument(
+        "--commit", default=None, metavar="MESSAGE",
+        help="Full jj-orchestrated land: bundle the current working copy "
+             "with the landing diff, describe it with MESSAGE, then create "
+             "a sha-backfill commit. End state: 2 committed revisions + "
+             "empty @. Saves ~7 jj commands per landing.",
+    )
     args = ap.parse_args(argv)
 
     ticket_id = args.ticket_id.lstrip("0") or "0"
+
+    if args.sha is not None and args.commit is not None:
+        print("land_ticket: --sha and --commit are mutually exclusive",
+              file=sys.stderr)
+        return 2
 
     if args.sha is not None:
         if args.log is not None:
@@ -335,6 +454,9 @@ def main(argv: list[str]) -> int:
             )
             return 2
         return cmd_backfill(ticket_id, args.sha)
+
+    if args.commit is not None:
+        return cmd_commit_land(ticket_id, args.commit, args.log)
 
     return cmd_land(ticket_id, args.log)
 
