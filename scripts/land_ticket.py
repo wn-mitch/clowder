@@ -138,6 +138,12 @@ def append_log_entry(body_lines: list[str], entry: str, today: str) -> list[str]
 def drop_blocked_by(ticket_id: str) -> list[Path]:
     """Drop `ticket_id` from every blocked-by list across tickets/ + landed/.
 
+    When a dependent's `blocked-by` list empties as a result of this
+    drop AND its current status is `blocked`, flip status to `ready` so
+    the dependent surfaces in `just open-work-ready`. Per memory
+    `feedback_landing_unblock_routine.md`: this MUST land in the same
+    commit as the dropping ticket; "don't make the user ask."
+
     Returns the paths that were modified.
     """
     modified: list[Path] = []
@@ -153,10 +159,32 @@ def drop_blocked_by(ticket_id: str) -> list[Path]:
             if not fm_lines:
                 continue
             new_fm, changed = _strip_id_from_blocked_by(fm_lines, target_int)
-            if changed:
-                path.write_text(assemble(new_fm, body_lines), encoding="utf-8")
-                modified.append(path)
+            if not changed:
+                continue
+            # If the list is now empty AND the ticket is currently
+            # blocked, promote it to ready. We don't promote tickets in
+            # other states (parked / done / dropped); only `blocked`
+            # depends on the blocked-by list as its gating condition.
+            if _blocked_by_is_empty(new_fm) and _status_is(new_fm, "blocked"):
+                new_fm = rewrite_frontmatter_field(new_fm, "status", "ready")
+            path.write_text(assemble(new_fm, body_lines), encoding="utf-8")
+            modified.append(path)
     return modified
+
+
+def _blocked_by_is_empty(fm_lines: list[str]) -> bool:
+    for line in fm_lines:
+        if line.startswith("blocked-by:"):
+            value = line.split(":", 1)[1].strip()
+            return value in ("[]", "", "null")
+    return True
+
+
+def _status_is(fm_lines: list[str], status: str) -> bool:
+    for line in fm_lines:
+        if line.startswith("status:"):
+            return line.split(":", 1)[1].strip() == status
+    return False
 
 
 def _strip_id_from_blocked_by(fm_lines: list[str], target_int: int) -> tuple[list[str], bool]:
