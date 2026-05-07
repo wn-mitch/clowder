@@ -1,0 +1,57 @@
+---
+id: 214
+title: tune patrol_fox_scent_weight
+status: blocked
+cluster: balance
+added: 2026-05-07
+parked: null
+blocked-by: [209]
+supersedes: []
+related-systems: [ai-substrate-refactor.md]
+related-balance: [181-hunt-forage-saturation-tune.md]
+landed-at: null
+landed-on: null
+---
+
+## Why
+209 wired the `fox_scent_level` cost axis on `patrol_dse`'s
+CompensatedProduct composition, conditionally-added when weight >
+0 (CP semantics make a weight-0 axis multiplicatively zero the
+product, so the axis is only registered when balance-tuning lifts
+the weight). This is path-c from 181's closeout — pricing
+predator-exposure into Patrol's L2 score so cats avoid routing
+through ShadowFox territory.
+
+## Scope
+- Single-seed iteration with hypothesis under
+  `docs/balance/214-patrol-fox-scent.md`.
+- Predict ShadowFoxAmbush deaths drop further when Patrol is
+  suppressed in fox-scent-heavy zones; Patrol share decreases
+  modestly; cats route around fox territory rather than through.
+
+## Out of scope
+- Multi-seed sweep; single-seed first.
+- Replacing existing `FoxTerritorySuppression` modifier — that
+  still applies to Hunt/Forage/Patrol/Wander multiplicatively as a
+  separate damp. The new axis is L2-internal to Patrol.
+
+## Current state
+209 substrate landed at SHA c970ad442163 with weight 0.0 (axis not
+registered at default). Post-209 baseline: ShadowFoxAmbush 3 (vs
+older baseline 8); Patrol share 13.14%.
+
+## Approach
+Lift `patrol_fox_scent_weight` from 0.0 → small positive value
+(suggest 0.20 first iteration; the axis is a CP gate, so even
+modest weight has multiplicative impact). Single-seed
+`just soak-trace 42 Wren` + `just verdict` + `just frame-diff`.
+
+## Verification
+- `just verdict` exit 0 or 1.
+- ShadowFoxAmbush count <= 3 (post-209 baseline) or lower.
+- Patrol action share decreases by 1–3pp; Hunt/Forage absorb the
+  freed bandwidth (the *intended* path for path-c).
+- Survival gates pass.
+
+## Log
+- 2026-05-07: opened from 209 closeout.

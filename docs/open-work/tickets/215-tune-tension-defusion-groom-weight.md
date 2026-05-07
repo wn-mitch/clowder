@@ -1,0 +1,61 @@
+---
+id: 215
+title: tune tension_defusion_groom_weight
+status: blocked
+cluster: balance
+added: 2026-05-07
+parked: null
+blocked-by: [209]
+supersedes: []
+related-systems: [ai-substrate-refactor.md]
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+209 wired the `TensionDefusionGroomLift` modifier — multiplicative
+lift on GroomOther when `colony_tension_recent >= 0.4` AND
+`HasSocialTarget` is set. Captures real-cat allogrooming's
+tension-defusion role (van den Bos 1998 — allogrooming is one of
+three colony cohesion behaviors, fired prophylactically during
+stress). Dormant at weight 0.0. Tune to verify the lift fires
+correctly during stressed phases without misfiring during calm
+ones.
+
+## Scope
+- Single-seed iteration with hypothesis under
+  `docs/balance/215-tension-defusion-groom.md`.
+- Predict GroomOther share lifts during high-tension phases
+  (post-ambush waves, fox-pressure spikes); calm-phase GroomOther
+  share unchanged.
+- Continuity canary `grooming` rises slightly; survival gates pass.
+
+## Out of scope
+- Multi-seed sweep; single-seed first.
+- `colony_tension_recent` scalar refactor — currently a per-cat
+  proxy `(1 - safety)`; a cross-cat aggregate would be a separate
+  ticket if soak shows the per-cat proxy is too noisy.
+
+## Current state
+209 substrate landed at SHA c970ad442163 with weight 0.0 (dormant).
+Post-209 baseline shows 0 anxiety_interrupt_total — the GroomOther
+rewrite already reduced chronic-flee state significantly. The
+TensionDefusionGroomLift may have less to do post-209 than the
+181 cascade run suggested; verify the lift is non-redundant before
+shipping at non-zero.
+
+## Approach
+Lift `tension_defusion_groom_weight` from 0.0 → small positive
+value (suggest 0.30; the modifier only fires when both gates trip,
+so a slightly larger weight is safer).
+
+## Verification
+- `just verdict` exit 0 or 1.
+- Trace inspection: `tension_defusion_groom_lift` shows non-zero
+  `multiplier` in some L2 records during high-tension phases.
+- `grooming` canary in healthy band.
+- Survival gates pass.
+
+## Log
+- 2026-05-07: opened from 209 closeout.

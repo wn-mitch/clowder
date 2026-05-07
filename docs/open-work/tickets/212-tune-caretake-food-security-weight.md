@@ -1,0 +1,43 @@
+---
+id: 212
+title: tune caretake_food_security_weight
+status: blocked
+cluster: balance
+added: 2026-05-07
+parked: null
+blocked-by: [209]
+supersedes: []
+related-systems: [ai-substrate-refactor.md]
+related-balance: [181-hunt-forage-saturation-tune.md]
+landed-at: null
+landed-on: null
+---
+
+## Why
+Sibling to ticket 210. 209 wired a positive `colony_food_security`
+axis on `caretake_dse` with `(1-w)` rebalance, dormant at weight
+0.0. Tune to predict and verify Caretake share lifts in food-secure
+phases (when not actively responding to a kitten cry).
+
+## Scope
+- Single-seed iteration with hypothesis under
+  `docs/balance/212-caretake-food-security.md`.
+
+## Out of scope
+- Multi-seed sweep; single-seed first.
+- Sibling weight coordination.
+
+## Current state
+209 substrate landed at SHA c970ad442163 with weight 0.0 (dormant).
+
+## Approach
+Lift `caretake_food_security_weight` from 0.0 → small positive
+value. Single-seed soak + `just verdict`.
+
+## Verification
+- `just verdict` exit 0 or 1.
+- `just frame-diff` shows Caretake's per-cat |Δ mean| score lifts.
+- Survival gates pass; six continuity canaries non-zero.
+
+## Log
+- 2026-05-07: opened from 209 closeout.

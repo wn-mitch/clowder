@@ -1,0 +1,82 @@
+---
+id: 217
+title: scenario marker-snapshot wiring as a discipline requirement
+status: ready
+cluster: process-discipline
+added: 2026-05-07
+parked: null
+blocked-by: []
+supersedes: []
+related-systems: [ai-substrate-refactor.md]
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+209 spent ~25 minutes (one full soak round-trip) chasing a marker
+that was authored on the ECS but never copied into `MarkerSnapshot`,
+silently failing 14,784/14,784 GroomOther eligibility checks. The
+substrate-stub lint (`scripts/check_substrate_stubs.sh`) caught the
+marker had a writer + reader in the same commit, but it has no
+visibility into the snapshot-population layer that the eligibility
+filter actually reads. Same shape would re-occur on any future
+marker-required eligibility filter.
+
+The user surfaced a simpler discipline ask: "scenario marker
+testing should be a requirement rather than a guide." That makes
+the marker→snapshot→eligibility chain failure caught at unit-test
+speed (3s) rather than soak-loop speed (25m).
+
+## Scope
+- Add a lint/test that catches the failure mode end-to-end:
+  for every `EligibilityFilter::require(MarkerKey)` declared on a
+  registered DSE, assert at lib-test time that there is a code
+  path in `goap.rs::eligible_dispositions` AND
+  `disposition.rs::evaluate_dispositions` that calls
+  `markers.set_entity(MarkerKey, ...)`. This catches the silent
+  no-op the 209 iter-1 hit.
+- Optionally: extend `scripts/check_substrate_stubs.sh` with a
+  third clause beyond reader+writer: "marker required by a DSE
+  eligibility filter MUST have a `set_entity` call in both
+  scoring-context populators." This is a static-analysis check
+  rather than a runtime assertion.
+- Update CLAUDE.md "Substrate stubs are forbidden" section with
+  the third clause.
+
+## Out of scope
+- Refactoring `MarkerSnapshot` away — the population shim is
+  documented as MVP shape (`scoring.rs:88-95`); replacing it with
+  a `ColonyState`-singleton query is a different ticket.
+- General "test all the things" expansion beyond the specific
+  marker-snapshot-eligibility chain.
+
+## Current state
+The lint catches reader+writer presence (substrate-stub-allowlist
+flow). The snapshot population layer is invisible to it; that's the
+gap.
+
+## Approach
+Two paths:
+1. **Static check** in a new `scripts/check_marker_snapshot_wiring.sh`
+   — grep for `EligibilityFilter::new()` patterns with `.require(M::KEY)`,
+   collect M, then grep for `set_entity(M::KEY` in `goap.rs` AND
+   `disposition.rs`. Fail loudly with the specific marker name on
+   any mismatch.
+2. **Runtime check** as a lib test that builds a `ScoringContext`
+   for each registered DSE and asserts the snapshot has a path to
+   each required marker.
+
+Static check (path 1) is the faster, lower-friction option.
+Path 2 is more thorough but requires more harness scaffolding.
+
+## Verification
+- The new check fails on a synthetic regression: temporarily
+  re-add `HasGroomingCandidate::require()` to GroomOther's
+  eligibility filter without re-adding the snapshot-set call. The
+  check must error with the specific marker name.
+- `just check` passes on current main once 217 lands (it's the
+  steady state).
+
+## Log
+- 2026-05-07: opened from 209 iter-1 diagnosis.

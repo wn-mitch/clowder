@@ -1,0 +1,73 @@
+---
+id: 216
+title: Mentor / Coordinate / Caretake axis ethology audit
+status: blocked
+cluster: ai-substrate
+added: 2026-05-07
+parked: null
+blocked-by: [209]
+supersedes: []
+related-systems: [ai-substrate-refactor.md]
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+209 applied the IRL-frame ethology lens to GroomOther's axes (drop
+the wrong-direction `social_deficit` primary axis; demote
+`phys_satisfaction` from hard gate to soft factor). The same lens
+should run over Mentor / Coordinate / Caretake to catch parallel
+defects.
+
+Current observations that motivate the audit:
+- Mentor's three axes are `warmth + diligence + ambition` Linear,
+  weighted `[0.4, 0.4, 0.2]`. Real-cat mentoring of kittens is
+  observed in the wild as fairly direct; ambition as a co-driver
+  may be a status-coding artifact.
+- Caretake mostly hits the right notes (kitten_urgency drives,
+  parent-axis carries bloodline). Less likely to need correction.
+- Coordinate already takes a spatial axis (perch distance); the
+  scalar inputs are diligence + pending_directive_count + ambition.
+  The question is whether Coordinate models real coordinator-cat
+  behavior or is overfit to a status-game framing.
+
+## Scope
+- Read each DSE's composition + axis selection through the IRL
+  frame: "if a real cat did X, would I be concerned?"
+- For each suspected wrong-direction axis: name a structural
+  alternative (split / extend / rebind / retire) per CLAUDE.md
+  Bugfix-discipline §Structural-option menu.
+- Draft (not ship) the rewrites; bundle each into its own
+  follow-on ticket so concordance is attributable.
+
+## Out of scope
+- Tuning the axis WEIGHTS — that's 210 / 211 / 212. This audit is
+  about which axes belong, not how heavily to lean on them.
+- GroomOther — already done in 209.
+
+## Current state
+209 landed; 210 / 211 / 212 are tuning tickets that assume the
+existing axis SHAPES. If this audit surfaces a structural defect,
+those tuning tickets may need to wait for the rewrite.
+
+## Approach
+Walk each DSE per the layer-walk discipline (L1 markers → L2 DSE
+scores → L3 mapping → plan template → completion proxy). For each
+axis, mark it `[verified-correct]` or `[suspect]`. For `[suspect]`
+rows, draft a structural-revision candidate.
+
+Pull ethology references for cat mentoring + alloparenting +
+coordinator-cat behavior (the latter is sparse in literature
+because in-fiction coordinators are a sim conceit; defer to
+elder-cat / lead-cat observations from clowder studies).
+
+## Verification
+- Audit table written to a single markdown doc under
+  `docs/balance/216-axis-ethology-audit.md`.
+- Each DSE has its row with verified/suspect ratings + at least
+  one structural candidate where suspect.
+- Follow-on tickets opened for any rewrites that should ship.
+
+## Log
+- 2026-05-07: opened from 209 closeout.
