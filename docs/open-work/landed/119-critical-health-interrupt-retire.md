@@ -1,7 +1,7 @@
 ---
 id: 119
 title: Retire CriticalHealth interrupt — final substrate-over-override step for ticket 047
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-01
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [047-acute-health-adrenaline.md]
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-06
 ---
 
 ## Why
@@ -43,3 +43,4 @@ Ticket 114 fixes the momentum gap by enabling acute-class modifiers to preempt i
 ## Log
 
 - 2026-05-01: Opened as the explicit retirement of the legacy interrupt, blocked on ticket 114 (momentum gap fix). Originally Phase 4 of ticket 047 but deferred when verification revealed the substrate's behavioral expression was gated by plan-completion momentum.
+- 2026-05-06: Retired the legacy CriticalHealth interrupt and activated 047 lifts in one commit. Removed the InterruptReason::CriticalHealth variant + the health-deficit predicate in check_interrupt; stripped check_anxiety_interrupts down to its remaining accumulate_urgencies role (Health/event_log/focal_capture/plan_writer/activation/commands params dropped along with CriticalHealth body); deleted critical_health_interrupts_guarding/_resting unit tests. Kept Feature::AnxietyInterrupt (still emitted by ThreatDetected/CriticalSafety branches; ticket 099 retires the variant). Promoted default_acute_health_adrenaline_flee_lift 0.0 to 0.60 and _sleep_lift 0.0 to 0.50, the spec-proposed magnitudes. Verification: just verdict on the seed-42 soak shows interrupts_by_reason.CriticalHealth = 0 (structural — variant gone), modifier_preemption(acute_health_adrenaline_flee) firing 76587 times, anxiety_interrupt_total = 0, deaths down 62% (3 vs prior 8), ShadowFoxAmbush -80% (1 vs 5), continuity holds (courtship 4778, grooming 1102, mentoring 353). Pre-existing Starvation=2 (ticket 187) and burial=0 (ticket 157) unchanged. Doctrine: ai-substrate-refactor.md interrupt catalog reduced to 2 rows (ThreatDetected, CriticalSafety); §7.5b Substrate-driven preemption updated; distress-modifiers.md "Why this replaces interrupts" gets the 119 closure note. Unblocks 099 (Modifier feature emission) and 203 (CriticalHealth Hunt-to-Starvation reproducer). Closes the substrate-over-override arc that 047 opened.

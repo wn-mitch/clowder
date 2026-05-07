@@ -1,11 +1,11 @@
 ---
 id: 203
 title: CriticalHealth interrupt drives hunt-to-starvation plan churn — concrete reproducer for ticket 119
-status: blocked
+status: ready
 cluster: ai-substrate
 added: 2026-05-06
 parked: null
-blocked-by: [119]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, needs.md]
 related-balance: [047-acute-health-adrenaline.md]

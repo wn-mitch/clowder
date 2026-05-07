@@ -1,26 +1,19 @@
-//! Substrate-driven plan preemption scenario — ticket 118.
+//! Substrate-driven plan preemption scenario — tickets 118 + 119.
 //!
 //! A wounded cat already engaged in a Hunt plan should re-elect under
 //! the substrate-driven preempt path (not the legacy CriticalHealth
-//! interrupt) when the `AcuteHealthAdrenalineFlee` modifier's lurch
-//! threshold is crossed. Closes the gap surfaced in ticket 047 Phase 2:
-//! Sleep won the L2 softmax in 99.3% of injured-window ticks but was
-//! the chosen action only 1.4% of them, because plan-completion
-//! momentum gated behavior.
+//! interrupt — retired in 119) when the `AcuteHealthAdrenalineFlee`
+//! modifier's lurch threshold is crossed. Closes the gap surfaced in
+//! ticket 047 Phase 2: Sleep won the L2 softmax in 99.3% of injured-
+//! window ticks but was the chosen action only 1.4% of them, because
+//! plan-completion momentum gated behavior.
 //!
 //! Default expectation: `Feature::ModifierPreemption` fires ≥ 1 time
-//! within 80 ticks. Per the substrate-fires landing gate (ticket 198),
-//! this scenario is a sibling assertion that the new system is reachable
-//! end-to-end — a structural check, not a balance verdict.
-//!
-//! **Constants override.** The `AcuteHealthAdrenalineFlee` modifier
-//! ships inert by default (lifts 0.0 — see `default_acute_health_adrenaline_flee_lift`).
-//! `preempts_in_flight` returns false for inert modifiers (would
-//! otherwise oscillate every tick without redirecting the softmax).
-//! This scenario activates the lifts in setup so the substrate is live
-//! end-to-end during the test. Ticket 119 promotes the lifts to
-//! swept-validated defaults in production alongside the
-//! legacy-interrupt retirement.
+//! within 80 ticks under production-default constants — ticket 119
+//! promoted 047's lifts from 0.0 to 0.60 (Flee) / 0.50 (Sleep), so
+//! no in-test override is needed. Per the substrate-fires landing
+//! gate (ticket 198), this scenario is a sibling assertion that the
+//! preempt path is reachable end-to-end on stock config.
 
 use bevy_ecs::world::World;
 
@@ -41,18 +34,6 @@ pub static SCENARIO: Scenario = Scenario {
 
 fn setup(world: &mut World, seed: u64) {
     init_scenario_world(world, seed);
-
-    // Activate the AcuteHealthAdrenalineFlee modifier — production
-    // defaults ship at 0.0 (inert) per ticket 047 phase-1 doctrine.
-    // The preempt mechanism only fires when the modifier has a non-
-    // zero lift (otherwise wounded cats would oscillate every tick
-    // with no behavioral redirect). Activate to the spec-proposed
-    // magnitudes so the scenario exercises the live substrate.
-    {
-        let mut constants = world.resource_mut::<crate::resources::SimConstants>();
-        constants.scoring.acute_health_adrenaline_flee_lift = 0.60;
-        constants.scoring.acute_health_adrenaline_sleep_lift = 0.50;
-    }
 
     // Forest tile near the cat — the per-tick `update_capability_markers`
     // author gates `CanHunt` on forest-nearby. Default scenario

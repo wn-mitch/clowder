@@ -4230,22 +4230,22 @@ interrupt catalog.
 
 **Interrupt catalog.** Sourced from
 `src/systems/disposition.rs:180–253` (`InterruptReason` enum +
-`check_interrupt`). Five interrupts; three are flat-thresholded,
-one is personality-scaled, one is a computed-urgency signal.
-Exemptions are tracked per-DispositionKind at the category level.
+`check_interrupt`). Two surviving interrupts; both have personality-
+or threshold-scaled triggers. Exemptions are tracked per-DispositionKind
+at the category level.
 
 Ticket 118 added a sibling preemption surface — substrate-driven
-plan preemption — that lives alongside the legacy interrupt path
-rather than inside it. See **§7.5b Substrate-driven preemption**
-below.
+plan preemption — that runs alongside the legacy interrupt path.
+Ticket 119 retired the flat `CriticalHealth` interrupt in favor of
+the substrate's `AcuteHealthAdrenalineFlee` modifier; the legacy
+`Starvation` and `Exhaustion` arms had already been retired by
+106/107 (see comment in `check_interrupt`). See **§7.5b Substrate-
+driven preemption** below.
 
 | Interrupt | Trigger | Replacement behavior | Exempt dispositions | Source |
 |---|---|---|---|---|
-| **CriticalHealth** | `health.current / health.max < critical_health_threshold` | Re-evaluate (anxiety-driven drop; no specific replacement Intention) | *None* — fires universally, including for Guarding. A cat below the health threshold must re-evaluate regardless of role. | `disposition.rs:202` |
-| **Starvation** | `needs.hunger < starvation_interrupt_threshold` | Re-evaluate | Resting, Hunting, Foraging — these *are* the solution path. | `disposition.rs:212` |
-| **Exhaustion** | `needs.energy < exhaustion_interrupt_threshold` | Re-evaluate | Resting, Hunting, Foraging (same reason as Starvation). | `disposition.rs:215` |
 | **ThreatDetected** | Sighted wildlife passing `cat_sees_threat_at`; `threat_urgency = 1 - (manhattan_dist / threat_urgency_divisor)` exceeds personality-scaled `flee_threshold_base + boldness · flee_threshold_boldness_scale` | `Flee` toward threat position, `Blind`-committed at install | Guarding — guards handle threats directly via the guard-threat detection range. | `disposition.rs:226` |
-| **CriticalSafety** | `needs.safety < critical_safety_threshold` | Re-evaluate | *None* — Guards are no longer exempt once safety is critical (recent change, see `disposition.rs:245` comment). | `disposition.rs:248` |
+| **CriticalSafety** | `needs.safety < critical_safety_threshold` | Re-evaluate | *None* — Guards are no longer exempt once safety is critical (recent change, see `disposition.rs:245` comment). Ticket 108's `ThreatProximityAdrenaline` modifier will eventually retire this. | `disposition.rs:248` |
 
 ### §7.5b Substrate-driven preemption (ticket 118)
 
@@ -4273,12 +4273,15 @@ The trace surface uses the existing `L3PlanFailure` variant with
 on the focal-cat L3 record. See `docs/systems/distress-modifiers.md`
 "Behavioral expression" section for the per-modifier classification.
 
-**Ship-state at 118 land.** Pipeline iteration runs but the only
-overrides today (047 / 102 / 105 / 108) all gate on `lift > 0`.
-047's lifts default to 0.0 in production; the `modifier_preempts_hunt`
-scenario activates them via in-test constants override to exercise
-the path. Ticket 119 promotes the lifts to swept-validated defaults
-in production alongside the legacy-interrupt retirement.
+**Ship-state at 119 land.** Pipeline iteration runs and 047's
+`AcuteHealthAdrenalineFlee` lifts now default to the spec-proposed
+0.60 (Flee) / 0.50 (Sleep) magnitudes. The lurch fires on `health_deficit
+> 0.4` (HP below 60%), broader than the legacy `CriticalHealth`'s 40%
+threshold by design — adrenaline is a phase transition starting at
+moderate injury, not a death-threshold check. 102 / 105 / 108 lifts
+remain at 0.0 (their dependent substrate scalars are still Phase-1
+stubs); their preempt overrides are wired but inert until activation
+in their own tickets.
 
 **Boldness as interrupt modulator.** Bold cats have a higher
 `flee_threshold`, so threat detection must reach higher urgency

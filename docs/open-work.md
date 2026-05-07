@@ -15,15 +15,25 @@ _Last generated: 2026-05-06._
 | Status | Count |
 |---|---|
 | In progress | 8 |
-| Ready | 56 |
+| Ready | 55 |
 | Parked | 7 |
-| Blocked | 18 |
-| **Open total** | **89** |
+| Blocked | 17 |
+| **Open total** | **87** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
-Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-index` (regenerate this file).
+Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-epics` · `just open-work-index` (regenerate this file).
+
+## Epic progress (3)
+
+Per-epic completion derived from each epic's roster table (or inline child references for phased epics).
+
+| Epic | Status | Children | Done | Open (in-progress / ready / blocked / parked) | Progress |
+|---|---|---|---|---|---|
+| **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 16 | 4 | 12 (0 / 7 / 3 / 2) | `▰▰▱▱▱▱▱▱▱▱` 25% |
+| **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** Substrate-over-override | in-progress | 31 | 25 | 6 (2 / 2 / 0 / 2) | `▰▰▰▰▰▰▰▰▱▱` 81% |
+| **[095](docs/open-work/tickets/095-body-zones-epic.md)** Body zones | ready | 0 | — | — | _no roster_ |
 
 ## In progress (8)
 
@@ -36,7 +46,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[109](docs/open-work/tickets/109-intraspecies-conflict-response.md)** — IntraspeciesConflictResponse — full four-valence (fight/flight/freeze/fawn) social response — _[ai-substrate] · added 2026-05-01_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 
-## Ready (56)
+## Ready (55)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -67,8 +77,6 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _blocked-by 100 · added 2026-05-01_
 - **[115](docs/open-work/tickets/115-bond-weighted-social-recovery.md)** — Bond-weighted social recovery — fondness scales Needs.social inflow — _[emotional-fidelity] · added 2026-05-01_
 - **[117](docs/open-work/tickets/117-social-warmth-vs-self-care-tradeoff.md)** — Characterize social-warmth max shift under 047 substrate (Phase 3 surfaced -96% on max) — _[ai-substrate] · added 2026-05-01_
-- **[118](docs/open-work/tickets/118-modifier-lift-vs-plan-completion-momentum.md)** — Modifier lifts gated by plan-completion momentum — substrate raises score but cat completes mid-plan first — _[ai-substrate] · added 2026-05-01_
-- **[119](docs/open-work/tickets/119-critical-health-interrupt-retire.md)** — Retire CriticalHealth interrupt — final substrate-over-override step for ticket 047 — _[ai-substrate] · added 2026-05-01_
 - **[120](docs/open-work/tickets/120-shadow-fox-spawn-vs-cat-presence-coupling.md)** — Characterize shadow-fox spawn-rate coupling to cat-presence (047 Phase 3 surfaced +93%) — _[ai-substrate] · added 2026-05-01_
 - **[124](docs/open-work/tickets/124-own-territory-center-anchor.md)** — `LandmarkAnchor::OwnTerritoryCenter` — third interoceptive self-anchor (territory bias) — _[ai-substrate] · added 2026-05-01_
 - **[126](docs/open-work/tickets/126-bdi-intention-substrate.md)** — BDI intention substrate — perceivable per-cat commitment with momentum — _[C] · added 2026-05-02_
@@ -93,6 +101,7 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[192](docs/open-work/tickets/192-handing-target-picker-l2.md)** — handing_target_dse — L2 multi-axis recipient picker (188 follow-on) — _[ai-substrate] · added 2026-05-06_
 - **[200](docs/open-work/tickets/200-land-plannerzonemidden-building-singleton-zone-for-trashing.md)** — Land PlannerZone::Midden — building-singleton zone for Trashing — _[process-discipline] · added 2026-05-06_
 - **[202](docs/open-work/tickets/202-static-cross-reference-dse-scenario-coverage-follow-on-to-198.md)** — Static cross-reference DSE → scenario coverage (follow-on to 198) — _[process-discipline] · added 2026-05-06_
+- **[203](docs/open-work/tickets/203-criticalhealth-hunt-to-starvation-reproducer.md)** — CriticalHealth interrupt drives hunt-to-starvation plan churn — concrete reproducer for ticket 119 — _[ai-substrate] · added 2026-05-06_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _added 2026-04-28_
 
 ## Parked (7)
@@ -101,11 +110,11 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[058](docs/open-work/tickets/058-tradition-unfiltered-loop-fix.md)** — §3.5.3 item 1 Tradition modifier — fix unfiltered-loop port — _parked 2026-04-30 · added 2026-04-27_
 - **[059](docs/open-work/tickets/059-phase-7-substrate-cleanup.md)** — Phase 7 substrate cleanup — `ScoringContext` removal, §10 unblock map sweep, spec drift reconcile — _parked 2026-04-27 · added 2026-04-27_
 - **[084](docs/open-work/tickets/084-farm-herb-ward-demand-axis.md)** — Farm DSE — tie scoring to herb/ward stockpile demand so gardens stay productive under abundant food — _[balance] · parked 2026-04-30 · blocked-by 086 · added 2026-04-29_
-- **[099](docs/open-work/tickets/099-modifier-feature-emission.md)** — Feature emission for §3.5.1 Modifiers — colony-wide canary surface for substrate-lift signals — _[ai-substrate] · parked 2026-05-01 · blocked-by 119 · added 2026-05-01_
+- **[099](docs/open-work/tickets/099-modifier-feature-emission.md)** — Feature emission for §3.5.1 Modifiers — colony-wide canary surface for substrate-lift signals — _[ai-substrate] · parked 2026-05-01 · added 2026-05-01_
 - **[173](docs/open-work/tickets/173-crafting-split-capability-markers.md)** — IsHerbalist / IsSpiritualist / HasCorruptionNearby capability markers (155 follow-on) — _[ai-substrate] · parked 2026-05-05 · added 2026-05-05_
 - **[199](docs/open-work/tickets/199-pipeline-walk-skill.md)** — Hunt / production / consumption pipeline-walk skill (194 P4) — _[process-discipline] · parked 2026-05-06 · added 2026-05-06_
 
-## Blocked (18)
+## Blocked (17)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _blocked-by 007, 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _blocked-by 016 · added 2026-04-22_
@@ -124,18 +133,17 @@ Queue-view commands: `just open-work` · `just open-work-ready` · `just open-wo
 - **[142](docs/open-work/tickets/142-intraspecies-conflict-freeze.md)** — IntraspeciesConflictResponseFreeze — hold-position low-body-posture social valence — _[ai-substrate] · blocked-by 109 · added 2026-05-02_
 - **[143](docs/open-work/tickets/143-intraspecies-conflict-fight.md)** — IntraspeciesConflictResponseFight — territorial combat valence (same-species) — _[ai-substrate] · blocked-by 109 · added 2026-05-02_
 - **[144](docs/open-work/tickets/144-intraspecies-conflict-fawn.md)** — IntraspeciesConflictResponseFawn — appeasement valence (belly-up, slow blink) — _[ai-substrate] · blocked-by 109, 145 · added 2026-05-02_
-- **[203](docs/open-work/tickets/203-criticalhealth-hunt-to-starvation-reproducer.md)** — CriticalHealth interrupt drives hunt-to-starvation plan churn — concrete reproducer for ticket 119 — _[ai-substrate] · blocked-by 119 · added 2026-05-06_
 
 ## Pre-existing (2)
 
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (134)
+## Landed archive (135)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (69)
+### 2026-05 (70)
 
 - **[198](docs/open-work/landed/198-substrate-fires-landing-gate.md)** — Substrate-fires landing gate — DSE curve-non-zero requires sibling scenario (194 P1) _(2026-05-06)_
 - **[197](docs/open-work/landed/197-explore-agent-prompt-template.md)** — Explore-agent prompt template (194 P8, subsumes P6) _(2026-05-06)_
@@ -152,6 +160,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[179](docs/open-work/landed/179-build-stores-demand-wiring.md)** — ColonyStoresChronicallyFull → Build DSE consumer + Coordinator BuildStores directive (176 follow-on) _(2026-05-06)_
 - **[178](docs/open-work/landed/178-disposal-dses-balance-tune.md)** — Balance-tune disposal DSEs from default-zero (176 follow-on) _(2026-05-06)_
 - **[177](docs/open-work/landed/177-disposal-resolver-dispatch-wiring.md)** — Wire Trash/Handoff/PickUp resolvers into GOAP dispatch (176 follow-on) _(2026-05-06)_
+- **[119](docs/open-work/landed/119-critical-health-interrupt-retire.md)** — Retire CriticalHealth interrupt — final substrate-over-override step for ticket 047 _(2026-05-06)_
 - **[118](docs/open-work/landed/118-modifier-lift-vs-plan-completion-momentum.md)** — Modifier lifts gated by plan-completion momentum — substrate raises score but cat completes mid-plan first _(2026-05-06)_
 - **[176](docs/open-work/landed/176-deposit-overflow-load-bearing-rot.md)** — cats need real inventory reasoning — trash, build-more-stores, satiation-aware hunting _(2026-05-05)_
 - **[175](docs/open-work/landed/175-goal-unreachable-root-cause.md)** — GoalUnreachable plan-failure root-cause investigation (172 follow-on) _(2026-05-05)_

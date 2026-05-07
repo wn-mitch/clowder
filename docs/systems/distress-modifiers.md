@@ -30,7 +30,7 @@ phase-transition (ramp on an acute scalar).
 
 | Ticket | Modifier | Shape | Scalar | DSEs lifted | Status |
 |--------|----------|-------|--------|-------------|--------|
-| 047 | `AcuteHealthAdrenalineFlee` | lurch (smoothstep) | `health_deficit` | Flee, Sleep | Landed inert |
+| 047 | `AcuteHealthAdrenalineFlee` | lurch (smoothstep) | `health_deficit` | Flee, Sleep | Landed; lifts active under 119 |
 | 088 | `BodyDistressPromotion` | pressure (linear ramp) | `body_distress_composite` (`max(deficits)`) | Eat, Sleep, Hunt, Forage, Flee, GroomSelf | Landed |
 | 106 | `HungerUrgency` | pressure | `hunger_urgency` (`1 - needs.hunger`) | Eat, Hunt, Forage | Ready |
 | 107 | `ExhaustionPressure` | pressure | `energy_deficit` | Sleep, GroomSelf | Ready |
@@ -61,6 +61,16 @@ that fires on every tick at the same magnitude is not a bug — it
 just sets a baseline score lift the contest has to beat to pick
 something else. See `docs/systems/ai-substrate-refactor.md`
 §3.5.1 for the modifier catalog and pipeline registration.
+
+Ticket 119 closed the substrate-over-override arc that 047 opened:
+the legacy `CriticalHealth` interrupt was removed, 047's
+`AcuteHealthAdrenalineFlee` lifts were promoted from 0.0 to the
+spec-proposed 0.60 (Flee) / 0.50 (Sleep), and the substrate-driven
+preempt path (ticket 118) replaced the interrupt's force-Flee
+behavior. The modifier triggers on `health_deficit > 0.4` (HP < 60%)
+— a wider trigger than the legacy 40% gate by design, since
+adrenaline is a phase transition starting at moderate injury, not
+a death-threshold check.
 
 ## Behavioral expression — `preempts_in_flight()`
 

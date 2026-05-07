@@ -294,7 +294,6 @@ pub fn check_anxiety_interrupts(
 enum InterruptReason {
     ThreatDetected { threat_pos: Position },
     CriticalSafety,
-    CriticalHealth,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -302,18 +301,12 @@ fn check_interrupt(
     needs: &Needs,
     personality: &Personality,
     pos: &Position,
-    health: &Health,
+    _health: &Health,
     disposition: &Disposition,
     wildlife: &Query<&Position, With<WildAnimal>>,
     d: &DispositionConstants,
     cat_profile: &crate::systems::sensing::SensoryProfile,
 ) -> Option<InterruptReason> {
-    // Critical health check — fires for ALL dispositions, including Guarding.
-    // A cat below the health threshold must re-evaluate immediately.
-    if health.current / health.max < d.critical_health_threshold {
-        return Some(InterruptReason::CriticalHealth);
-    }
-
     // Tickets 106 + 107: the Starvation and Exhaustion arms used to live here,
     // each gated by a Resting/Hunting/Foraging exemption wrapper. Both arms
     // were vestigial in the post-091 regime — Phase 2 focal-trace soaks
@@ -324,6 +317,20 @@ fn check_interrupt(
     // modifiers in `src/ai/modifier.rs`. The GOAP urgency arms at
     // `goap.rs:615-637` are the actual food/sleep-routing drivers and
     // remain in place.
+    //
+    // Ticket 119: the CriticalHealth arm used to live here too — a flat
+    // `health.current / health.max < critical_health_threshold` (0.4 by
+    // default; HP below 40%) that fired for every cat unconditionally.
+    // Retired in favor of the substrate-driven preempt path (ticket
+    // 118): `AcuteHealthAdrenalineFlee::preempts_in_flight` fires
+    // `check_modifier_preemption`, which drops the plan via the same
+    // Commands removal pattern. Trigger shape differs intentionally:
+    // the lurch fires on `health_deficit > 0.4` ⇒ HP below 60%, a
+    // **broader** range than the legacy 40% gate. That's by 047's
+    // design: adrenaline is a phase transition starting at moderate
+    // injury, not a death-threshold check. The substrate also gates
+    // on `lift > 0`, so cats actually get a behavioral redirect (Sleep
+    // lift +0.50) rather than just being yanked into a re-eval loop.
 
     // Guards are exempt from threat interrupts — they handle threats directly
     // via guard_threat_detection_range.
@@ -4344,40 +4351,11 @@ mod tests {
         }
     }
 
-    #[test]
-    fn critical_health_interrupts_guarding() {
-        let mut world = make_world_with_no_wildlife();
-        let mut state: SystemState<Query<&Position, With<WildAnimal>>> =
-            SystemState::new(&mut world);
-        let wildlife = state.get(&world);
-
-        let needs = Needs::default();
-        let personality = mid_personality();
-        let pos = Position { x: 5, y: 5 };
-        let health = Health {
-            current: 0.3,
-            max: 1.0,
-            injuries: Vec::new(),
-            total_starvation_damage: 0.0,
-        };
-        let disposition = default_disposition(DispositionKind::Guarding);
-        let d = SimConstants::default().disposition;
-
-        let result = check_interrupt(
-            &needs,
-            &personality,
-            &pos,
-            &health,
-            &disposition,
-            &wildlife,
-            &d,
-            &SimConstants::default().sensory.cat,
-        );
-        assert!(
-            matches!(result, Some(InterruptReason::CriticalHealth)),
-            "guarding cat at 30% HP should get CriticalHealth interrupt, got {result:?}"
-        );
-    }
+    // Ticket 119 retired `critical_health_interrupts_guarding` and
+    // `critical_health_interrupts_resting` — the legacy CriticalHealth
+    // arm of `check_interrupt` is gone. Coverage moved to the
+    // substrate-driven preempt path: `tests::preempts_in_flight_*` in
+    // `src/ai/modifier.rs` and the `modifier_preempts_hunt` scenario.
 
     #[test]
     fn healthy_guarding_cat_not_interrupted() {
@@ -4406,41 +4384,6 @@ mod tests {
         assert!(
             result.is_none(),
             "healthy guarding cat should not be interrupted, got {result:?}"
-        );
-    }
-
-    #[test]
-    fn critical_health_interrupts_resting() {
-        let mut world = make_world_with_no_wildlife();
-        let mut state: SystemState<Query<&Position, With<WildAnimal>>> =
-            SystemState::new(&mut world);
-        let wildlife = state.get(&world);
-
-        let needs = Needs::default();
-        let personality = mid_personality();
-        let pos = Position { x: 5, y: 5 };
-        let health = Health {
-            current: 0.2,
-            max: 1.0,
-            injuries: Vec::new(),
-            total_starvation_damage: 0.0,
-        };
-        let disposition = default_disposition(DispositionKind::Resting);
-        let d = SimConstants::default().disposition;
-
-        let result = check_interrupt(
-            &needs,
-            &personality,
-            &pos,
-            &health,
-            &disposition,
-            &wildlife,
-            &d,
-            &SimConstants::default().sensory.cat,
-        );
-        assert!(
-            matches!(result, Some(InterruptReason::CriticalHealth)),
-            "CriticalHealth should fire for any disposition, got {result:?}"
         );
     }
 

@@ -739,9 +739,13 @@ pub fn check_modifier_preemption(
 }
 
 // ===========================================================================
-// check_anxiety_interrupts — hard interrupt for CriticalHealth only;
-// all other critical needs accumulate as pending urgencies evaluated at
-// step boundaries in resolve_goap_plans.
+// check_anxiety_interrupts — soft-urgency accumulation for step-boundary
+// preemption (ThreatNearby, CriticalSafety, hunger/exhaustion/thermal).
+// Ticket 119 retired the function's namesake CriticalHealth hard-interrupt
+// branch; the substrate-driven path (`check_modifier_preemption`, ticket
+// 118) now drives behavioral re-election under acute health distress.
+// The function name is preserved for schedule-stability; `accumulate_urgencies`
+// is its remaining job.
 // ===========================================================================
 
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
@@ -749,14 +753,10 @@ pub fn check_anxiety_interrupts(
     mut query: Query<
         (
             Entity,
-            &Name,
             &Needs,
             &Personality,
             &Position,
-            &Health,
-            &mut CurrentAction,
             &mut PendingUrgencies,
-            Option<&mut ActionHistory>,
         ),
         (With<GoapPlan>, Without<Dead>),
     >,
@@ -765,15 +765,8 @@ pub fn check_anxiety_interrupts(
     ward_query: Query<(&Ward, &Position)>,
     all_cats: Query<(Entity, &Position), (Without<Dead>, Without<WildAnimal>)>,
     building_query: Query<&Position, (With<Structure>, Without<ConstructionSite>)>,
-    time: Res<TimeState>,
     constants: Res<SimConstants>,
     colony_center: Res<crate::resources::ColonyCenter>,
-    mut commands: Commands,
-    mut activation: ResMut<SystemActivation>,
-    mut plan_writer: MessageWriter<PlanNarrative>,
-    mut event_log: Option<ResMut<EventLog>>,
-    focal_target: Option<Res<crate::resources::FocalTraceTarget>>,
-    focal_capture: Option<Res<crate::resources::FocalScoreCapture>>,
 ) {
     let d = &constants.disposition;
 
@@ -788,93 +781,10 @@ pub fn check_anxiety_interrupts(
     let cat_positions: Vec<(Entity, Position)> = all_cats.iter().map(|(e, p)| (e, *p)).collect();
     let building_positions: Vec<Position> = building_query.iter().copied().collect();
 
-    for (entity, name, needs, personality, pos, health, mut current, mut urgencies, history) in
-        &mut query
-    {
+    for (entity, needs, personality, pos, mut urgencies) in &mut query {
         let Ok(plan) = plans.get(entity) else {
             continue;
         };
-
-        // --- Hard interrupt: CriticalHealth only ---
-        // A critically injured cat that chose Resting (or, post-150,
-        // Eating) is already recovering; interrupting it creates the
-        // same oscillation we're fixing.
-        if !matches!(plan.kind, DispositionKind::Resting | DispositionKind::Eating)
-            && health.current / health.max < d.critical_health_threshold
-        {
-            activation.record(Feature::AnxietyInterrupt);
-
-            // §11 focal-cat trace capture for the §7.5 Maslow
-            // preemption path. Distinct from the §7.2 commitment
-            // branches — this preempts the gate entirely per spec,
-            // so the record surfaces as `L3PlanFailure` with
-            // `reason: "anxiety_interrupt"` rather than an
-            // `L3Commitment` row.
-            let is_focal = focal_target
-                .as_ref()
-                .and_then(|t| t.entity)
-                .map(|e| e == entity)
-                .unwrap_or(false);
-            if is_focal {
-                if let Some(capture) = focal_capture.as_deref() {
-                    let current_step = plan
-                        .current()
-                        .map(|s| format!("{:?}", s.action))
-                        .unwrap_or_else(|| "none".into());
-                    capture.push_plan_failure(
-                        crate::resources::trace_log::PlanFailureCapture {
-                            reason: "anxiety_interrupt",
-                            disposition: format!("{:?}", plan.kind),
-                            detail: serde_json::json!({
-                                "health_ratio": health.current / health.max,
-                                "critical_threshold": d.critical_health_threshold,
-                                "preempted_step": current_step,
-                            }),
-                        },
-                        time.tick,
-                    );
-                }
-            }
-
-            if let Some(ref mut log) = event_log {
-                let current_step = plan
-                    .current()
-                    .map(|s| format!("{:?}", s.action))
-                    .unwrap_or_else(|| "none".into());
-                log.push(
-                    time.tick,
-                    EventKind::PlanInterrupted {
-                        cat: name.0.clone(),
-                        disposition: format!("{:?}", plan.kind),
-                        reason: "CriticalHealth".into(),
-                        current_step,
-                        hunger: needs.hunger,
-                        energy: needs.energy,
-                        temperature: needs.temperature,
-                    },
-                );
-            }
-
-            if let Some(mut hist) = history {
-                hist.record(ActionRecord {
-                    action: current.action,
-                    disposition: Some(plan.kind),
-                    tick: time.tick,
-                    outcome: ActionOutcome::Interrupted,
-                });
-            }
-
-            plan_writer.write(PlanNarrative {
-                entity,
-                kind: plan.kind,
-                event: PlanEvent::Abandoned,
-                completions: plan.trips_done,
-            });
-
-            commands.entity(entity).remove::<GoapPlan>();
-            current.ticks_remaining = 0;
-            continue;
-        }
 
         // --- Accumulate soft urgencies for step-boundary evaluation ---
         accumulate_urgencies(

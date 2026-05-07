@@ -2673,26 +2673,23 @@ fn default_acute_health_adrenaline_threshold() -> f32 {
 }
 
 /// Ticket 047 — `AcuteHealthAdrenalineFlee` Flee-DSE lurch magnitude.
-/// **Defaults to 0.0** so the modifier ships inert; the proposed
-/// magnitude (0.60) is enabled via `CLOWDER_OVERRIDES` for the Phase 3
-/// hypothesis sweep. The hypothesize harness compares baseline (no
-/// patch) against treatment (lift active), measuring the substrate's
-/// behavioral effect before Phase 4 retires the legacy CriticalHealth
-/// interrupt and promotes 0.60 (or the swept-validated value) to the
-/// shipped default.
+/// Promoted from 0.0 to 0.60 in ticket 119 alongside the legacy
+/// `CriticalHealth` interrupt retirement. With the substrate-driven
+/// preempt path live (ticket 118 `check_modifier_preemption`), the
+/// modifier is now the sole behavioral redirect for cats below the
+/// adrenaline threshold — an inert lift would leave wounded cats with
+/// no replacement for the legacy interrupt's force-Flee path.
 fn default_acute_health_adrenaline_flee_lift() -> f32 {
-    0.0
+    0.60
 }
 
 /// Ticket 047 — `AcuteHealthAdrenalineFlee` Sleep-DSE lurch magnitude.
-/// **Defaults to 0.0** so the modifier ships inert; the proposed
-/// magnitude (0.50) is enabled via `CLOWDER_OVERRIDES` for the Phase 3
-/// hypothesis sweep. Sleep is the in-pool partner to Flee (Flee is
-/// filtered from the disposition softmax) — the Sleep lift is what
-/// actually flips the contest away from Guarding/Crafting under
-/// injury, since Sleep routes the cat to a den.
+/// Promoted from 0.0 to 0.50 in ticket 119 (see Flee lift above).
+/// Sleep is the in-pool partner to Flee (Flee is filtered from the
+/// disposition softmax) — the Sleep lift flips the contest away from
+/// Guarding/Crafting under injury, routing the cat to a den.
 fn default_acute_health_adrenaline_sleep_lift() -> f32 {
-    0.0
+    0.50
 }
 
 /// Ticket 102 — `AcuteHealthAdrenalineFight` Fight-DSE lurch magnitude.
