@@ -5,6 +5,7 @@ use crate::ai::modifier::default_modifier_pipeline;
 use crate::resources::sim_constants::ScoringConstants;
 use crate::resources::SimConstants;
 use crate::systems;
+use crate::systems::influence_map::{CorruptionLens, InfluenceMap, InfluenceMapRegistry};
 
 /// Populates a [`DseRegistry`] with the canonical 30 cat-DSE + 9
 /// fox-DSE catalog plus all target-taking DSEs, using the supplied
@@ -109,6 +110,60 @@ pub fn register_dses_at_startup(
     commands.insert_resource(default_modifier_pipeline(&constants));
 }
 
+/// Single source of truth for L1 trace coverage (ticket 207).
+///
+/// Every `impl InfluenceMap for X` in `src/` registers here; the
+/// `emit_focal_trace` exclusive system walks `InfluenceMapRegistry`
+/// blindly, so a missing entry silently drops a map from the focal
+/// scrubber's L1 surface. `scripts/check_influence_map_registry.sh`
+/// pairs this site against the trait-impl set at `just check` time
+/// to catch the regression.
+///
+/// Resource-backed maps register via `register::<M>()`. Borrow-adapter
+/// maps (`CorruptionLens` over `&TileMap`) register via
+/// `register_with`; the closure constructs the adapter inline at
+/// walk time so no wrapper Resource is needed. Per-species
+/// adapters (ticket 062's `PerSpeciesScentRef`) follow the same
+/// pattern — one `register_with` per species.
+pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
+    use crate::resources::{
+        CarcassScentMap, CatPresenceMap, ConstructionSiteMap, ExplorationMap, FoodLocationMap,
+        FoxScentMap, GardenLocationMap, HerbLocationMap, KittenCryMap, PreyScentMap, TileMap,
+        WardCoverageMap,
+    };
+
+    registry.register::<FoxScentMap>();
+    registry.register::<PreyScentMap>();
+    registry.register::<CarcassScentMap>();
+    registry.register::<CatPresenceMap>();
+    registry.register::<ExplorationMap>();
+    registry.register::<WardCoverageMap>();
+    registry.register::<FoodLocationMap>();
+    registry.register::<GardenLocationMap>();
+    registry.register::<ConstructionSiteMap>();
+    registry.register::<KittenCryMap>();
+    registry.register::<HerbLocationMap>();
+
+    // CorruptionLens is a borrow adapter over TileMap.corruption — not
+    // a Resource itself, so it can't go through the generic
+    // `register::<M>()`. The closure builds the lens inline.
+    registry.register_with(|world, pos| {
+        world.get_resource::<TileMap>().map(|t| {
+            let lens = CorruptionLens(t);
+            (lens.metadata(), lens.base_sample(pos))
+        })
+    });
+}
+
+/// Startup system that populates [`InfluenceMapRegistry`]. Independent
+/// of `register_dses_at_startup` — registration only touches the
+/// registry, not other Resources, so it can run any time after
+/// `setup_world_exclusive` inserts the resources the walkers will
+/// later look up.
+pub fn register_influence_maps_at_startup(mut registry: ResMut<InfluenceMapRegistry>) {
+    populate_influence_map_registry(&mut registry);
+}
+
 /// Registers all simulation systems on `FixedUpdate` in the same order as the
 /// original `build_schedule()`.
 ///
@@ -169,6 +224,10 @@ impl Plugin for SimulationPlugin {
         // three-mirror burden flagged in CLAUDE.md.
         app.insert_resource(crate::ai::faction::FactionRelations::canonical());
         app.init_resource::<DseRegistry>();
+        // Ticket 207 — InfluenceMapRegistry replaces the hand-bundled
+        // `L1Maps` SystemParam in `trace_emit.rs`. Empty at build time;
+        // populated by `register_influence_maps_at_startup` below.
+        app.init_resource::<InfluenceMapRegistry>();
         // 176: chronicity tracker for `ColonyStoresChronicallyFull`.
         // Updated by `update_colony_building_markers` once per
         // `ScoringConstants::chronicity_window_ticks` ticks.
@@ -177,6 +236,11 @@ impl Plugin for SimulationPlugin {
             Startup,
             register_dses_at_startup.after(crate::plugins::setup::setup_world_exclusive),
         );
+        // Registry registration is independent of resource setup —
+        // walkers look up resources at *call* time, not at registration
+        // time — so this can run alongside DSE registration without an
+        // ordering constraint on `setup_world_exclusive`.
+        app.add_systems(Startup, register_influence_maps_at_startup);
 
         // Snapshot positions before any simulation system moves entities.
         // The rendering layer interpolates between PreviousPosition and Position.

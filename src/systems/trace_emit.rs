@@ -36,7 +36,7 @@
 //! empty/None so downstream tools can skip the field without crashing.
 
 use bevy_ecs::prelude::*;
-use bevy_ecs::system::SystemParam;
+use bevy_ecs::system::SystemState;
 
 use crate::ai::CurrentAction;
 use crate::components::disposition::Disposition;
@@ -44,17 +44,6 @@ use crate::components::goap_plan::GoapPlan;
 use crate::components::identity::{Name, Species};
 use crate::components::physical::{Dead, Position};
 use crate::components::sensing::SensorySpecies;
-use crate::resources::carcass_scent_map::CarcassScentMap;
-use crate::resources::cat_presence_map::CatPresenceMap;
-use crate::resources::construction_site_map::ConstructionSiteMap;
-use crate::resources::exploration_map::ExplorationMap;
-use crate::resources::food_location_map::FoodLocationMap;
-use crate::resources::fox_scent_map::FoxScentMap;
-use crate::resources::garden_location_map::GardenLocationMap;
-use crate::resources::herb_location_map::HerbLocationMap;
-use crate::resources::kitten_cry_map::KittenCryMap;
-use crate::resources::map::TileMap;
-use crate::resources::prey_scent_map::PreyScentMap;
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::time::TimeState;
 use crate::resources::trace_log::{
@@ -63,36 +52,9 @@ use crate::resources::trace_log::{
     IntentionSummary, ModifierApplication, MomentumSummary, PlanFailureCapture, PlanStateSummary,
     SoftmaxSummary, SpatialRef, TraceEntry, TraceLog, TraceRecord,
 };
-use crate::resources::ward_coverage_map::WardCoverageMap;
 use crate::systems::influence_map::{
-    channel_label, Attenuation, CorruptionLens, Faction, InfluenceMap, MapMetadata,
+    channel_label, Attenuation, Faction, InfluenceMapRegistry, MapMetadata,
 };
-
-/// Bundles the twelve `InfluenceMap`-implementing resources the L1 walk
-/// reads. Lives here to keep `emit_focal_trace` under Bevy's 16-param
-/// tuple limit per `CLAUDE.md` §ECS rules.
-///
-/// All twelve are `Option<Res<>>` so the system tolerates missing
-/// resources — useful in tests and in the resource-hot-swap edge case
-/// during plugin teardown. A true registry walk
-/// (`Vec<Box<dyn InfluenceMap>>` registered at plugin build time)
-/// remains the longer-arc Phase 2D refactor; this bundle closes the
-/// trace-coverage gap without rewriting registration. See ticket 206.
-#[derive(SystemParam)]
-pub struct L1Maps<'w> {
-    pub fox_scent: Option<Res<'w, FoxScentMap>>,
-    pub prey_scent: Option<Res<'w, PreyScentMap>>,
-    pub carcass_scent: Option<Res<'w, CarcassScentMap>>,
-    pub cat_presence: Option<Res<'w, CatPresenceMap>>,
-    pub exploration: Option<Res<'w, ExplorationMap>>,
-    pub ward_coverage: Option<Res<'w, WardCoverageMap>>,
-    pub food_location: Option<Res<'w, FoodLocationMap>>,
-    pub garden_location: Option<Res<'w, GardenLocationMap>>,
-    pub construction_site: Option<Res<'w, ConstructionSiteMap>>,
-    pub kitten_cry: Option<Res<'w, KittenCryMap>>,
-    pub herb_location: Option<Res<'w, HerbLocationMap>>,
-    pub tile_map: Option<Res<'w, TileMap>>,
-}
 
 /// Resolves the focal cat's entity and emits L1/L2/L3 records for the
 /// current tick. Gated on `FocalTraceTarget`; a no-op in every build
@@ -102,111 +64,166 @@ pub struct L1Maps<'w> {
 /// Runs after `goap::resolve_goap_plans` so `last_scores` reflects the
 /// current tick's evaluation and `GoapPlan` is the plan the cat just
 /// adopted.
-#[allow(clippy::too_many_arguments, clippy::type_complexity)]
-pub fn emit_focal_trace(
-    mut target: ResMut<FocalTraceTarget>,
-    time: Res<TimeState>,
-    constants: Res<SimConstants>,
-    maps: L1Maps,
-    mut trace_log: ResMut<TraceLog>,
-    focal_capture: Res<FocalScoreCapture>,
-    cats: Query<
-        (
-            Entity,
-            &Name,
-            &Position,
-            &CurrentAction,
-            Option<&Disposition>,
-            Option<&GoapPlan>,
-        ),
-        (With<Species>, Without<Dead>),
-    >,
-) {
-    // Resolve focal entity by name if not already known, or re-resolve
-    // if the cached entity no longer matches (covers spawn-after-start
-    // and respawn-under-same-name edge cases).
-    let focal = if let Some(e) = target.entity {
-        cats.get(e).ok().map(|row| (e, row))
-    } else {
-        cats.iter()
-            .find(|(_, name, _, _, _, _)| name.0 == target.name)
-            .map(|row| (row.0, row))
+///
+/// **Exclusive system** (ticket 207). Walks `InfluenceMapRegistry`
+/// for L1 emission instead of bundling each map as a `SystemParam`
+/// field. The exclusive form is necessary because the registry's
+/// walkers take `&World` — they fetch their target `Resource` by
+/// type at call time. The system is gated on three `resource_exists`
+/// `run_if`s and never fires in interactive builds, so the
+/// single-threaded scheduling cost is paid only on focal-cat soaks.
+pub fn emit_focal_trace(world: &mut World) {
+    // SystemState bundles the per-tick params that the L2/L3 paths
+    // still need. The block scope releases the world borrow before
+    // we walk the registry below — `register::<M>` walkers fetch
+    // their target resource via `world.get_resource::<M>()`, which
+    // requires `&World` access that conflicts with SystemState's
+    // `&mut World`.
+    type FocalParams<'w, 's> = (
+        ResMut<'w, FocalTraceTarget>,
+        Res<'w, TimeState>,
+        Res<'w, FocalScoreCapture>,
+        Query<
+            'w,
+            's,
+            (
+                Entity,
+                &'static Name,
+                &'static Position,
+                &'static CurrentAction,
+                Option<&'static Disposition>,
+                Option<&'static GoapPlan>,
+            ),
+            (With<Species>, Without<Dead>),
+        >,
+    );
+
+    let mut state: SystemState<FocalParams> = SystemState::new(world);
+
+    // Phase 1 — extract focal data + drain capture inside the
+    // SystemState scope; everything we need post-walk gets cloned
+    // into owned values so the World borrow can be released.
+    struct FocalSnapshot {
+        tick: u64,
+        cat_name: String,
+        pos: Position,
+        chosen: String,
+        active_intention: Option<String>,
+        last_scores: Vec<(crate::ai::Action, f32)>,
+        goap_plan_steps: Vec<String>,
+        momentum_preempted: bool,
+    }
+    let snapshot_and_capture: Option<(
+        FocalSnapshot,
+        crate::resources::trace_log::FocalScoreCaptureInner,
+    )> = {
+        let (mut target, time, focal_capture, cats) = state.get_mut(world);
+
+        // Resolve focal entity by name if not already known, or
+        // re-resolve if the cached entity no longer matches (covers
+        // spawn-after-start and respawn-under-same-name edge cases).
+        let focal = if let Some(e) = target.entity {
+            cats.get(e).ok().map(|row| (e, row))
+        } else {
+            cats.iter()
+                .find(|(_, name, _, _, _, _)| name.0 == target.name)
+                .map(|row| (row.0, row))
+        };
+
+        let Some((entity, (_, name, pos, current, disposition, goap_plan))) = focal else {
+            return;
+        };
+
+        if target.entity != Some(entity) {
+            target.entity = Some(entity);
+        }
+
+        let captured = focal_capture.drain();
+        let snapshot = FocalSnapshot {
+            tick: time.tick,
+            cat_name: name.0.clone(),
+            pos: *pos,
+            chosen: format!("{:?}", current.action),
+            active_intention: disposition.map(|d| format!("{:?}", d.kind)),
+            last_scores: current.last_scores.clone(),
+            goap_plan_steps: goap_plan
+                .map(|p| {
+                    p.steps
+                        .iter()
+                        .map(|s| format!("{:?}", s.action))
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default(),
+            momentum_preempted: captured.momentum_preempted,
+        };
+        Some((snapshot, captured))
     };
 
-    let Some((entity, (_, name, pos, current, disposition, goap_plan))) = focal else {
+    let Some((snapshot, captured)) = snapshot_and_capture else {
         return;
     };
 
-    if target.entity != Some(entity) {
-        target.entity = Some(entity);
-    }
-
-    let tick = time.tick;
-    let cat_name = name.0.clone();
-
     // -----------------------------------------------------------------
-    // L1 — one record per registered InfluenceMap. The walk covers all
-    // twelve `InfluenceMap` impls: the seven scent / spatial maps below
-    // plus FoodLocationMap, GardenLocationMap, ConstructionSiteMap,
-    // KittenCryMap, HerbLocationMap, and the CorruptionLens borrow
-    // adapter for TileMap.corruption. Cat is the observer species, so
-    // species-sens is looked up against `SensorySpecies::Cat` on each
-    // channel via the §5.6.6 attenuation pipeline.
+    // L1 — one record per registered InfluenceMap. The trace emitter
+    // owns no static knowledge of which maps exist; it walks
+    // `InfluenceMapRegistry` (populated at startup by
+    // `populate_influence_map_registry` in `simulation.rs`). New
+    // `impl InfluenceMap` blocks register themselves there, with
+    // zero edits to this file.
     //
-    // Still deferred to Phase 2D: a true registry walk
-    // (`Vec<Box<dyn InfluenceMap>>` registered at plugin build time)
-    // that would let new maps appear in L1 without editing this file.
-    // See ticket 207.
+    // Cat is the observer species — species-sens is looked up against
+    // `SensorySpecies::Cat` on each map's channel via §5.6.6.
     // -----------------------------------------------------------------
-    macro_rules! emit_map {
-        ($field:expr) => {
-            if let Some(ref m) = $field {
-                emit_l1_for_map(&mut trace_log, tick, &cat_name, *pos, &**m, &constants);
+    let samples: Vec<(MapMetadata, f32)> = {
+        let registry = world.resource::<InfluenceMapRegistry>();
+        let mut out = Vec::with_capacity(registry.len());
+        for walker in registry.walkers() {
+            if let Some(sample) = walker(world, snapshot.pos) {
+                out.push(sample);
             }
-        };
-    }
-    emit_map!(maps.fox_scent);
-    emit_map!(maps.prey_scent);
-    emit_map!(maps.carcass_scent);
-    emit_map!(maps.cat_presence);
-    emit_map!(maps.exploration);
-    emit_map!(maps.ward_coverage);
-    emit_map!(maps.food_location);
-    emit_map!(maps.garden_location);
-    emit_map!(maps.construction_site);
-    emit_map!(maps.kitten_cry);
-    emit_map!(maps.herb_location);
-    if let Some(ref m) = maps.tile_map {
-        let lens = CorruptionLens(m);
-        emit_l1_for_map(&mut trace_log, tick, &cat_name, *pos, &lens, &constants);
+        }
+        out
+    };
+
+    // Snapshot the SimConstants references we need for attenuation +
+    // softmax-fallback temperature so we can release the world borrow
+    // before grabbing `&mut TraceLog`.
+    let constants = world.resource::<SimConstants>();
+    let intention_softmax_temperature = constants.scoring.intention_softmax_temperature;
+    let attenuations: Vec<(MapMetadata, f32, Attenuation)> = samples
+        .into_iter()
+        .map(|(metadata, base)| {
+            let att = Attenuation::for_species_channel(
+                &constants.sensory,
+                SensorySpecies::Cat,
+                metadata.channel,
+            );
+            (metadata, base, att)
+        })
+        .collect();
+
+    // Phase 2 — emit records. Drop all immutable world borrows by
+    // re-grabbing &mut TraceLog directly.
+    let mut trace_log = world.resource_mut::<TraceLog>();
+
+    for (metadata, base_sample, attenuation) in attenuations {
+        emit_l1_record(
+            &mut trace_log,
+            snapshot.tick,
+            &snapshot.cat_name,
+            snapshot.pos,
+            metadata,
+            base_sample,
+            attenuation,
+        );
     }
 
-    // -----------------------------------------------------------------
-    // Drain the tick's rich L2 + L3 capture. `score_dse_by_id` and
-    // `select_disposition_via_intention_softmax_with_trace` populated
-    // this during the scoring pass; we read it back post-`resolve_goap_plans`
-    // so everything emits in one coherent frame. `drain()` clears the
-    // capture for the next tick — the mutex is uncontested here since
-    // scoring has already finished for this tick.
-    //
-    // `evaluate_and_plan` only fires when a cat's plan expires or needs
-    // replanning (not every tick), so the capture is empty on ticks
-    // where the focal cat is mid-plan. On those ticks we skip L2/L3
-    // emission entirely — spec §11.4's "one record per tick-selection"
-    // means every *selection*, not every tick wall-clock. L1 emission
-    // (senses + influence maps) continues every tick and is the only
-    // trace surface that samples at full cadence.
-    // -----------------------------------------------------------------
-    let captured = focal_capture.drain();
-    // A "planning tick" used to mean scoring ran; with commitment /
-    // plan-failure capture we also need to emit on ticks where the
-    // gate fired but no re-score happened. Any captured data keeps
-    // the emitter active.
+    // L2/L3 paths only fire when the scoring pass produced capture
+    // data (planning ticks); mid-plan ticks emit only L1.
     let has_capture = !captured.dses.is_empty()
         || captured.softmax.is_some()
         || !captured.commitment.is_empty()
         || !captured.plan_failures.is_empty();
-
     if !has_capture {
         return;
     }
@@ -214,21 +231,21 @@ pub fn emit_focal_trace(
     // -----------------------------------------------------------------
     // L3Commitment + L3PlanFailure — decision-point records captured
     // by the de-facto commitment branches (§7.2) and plan-failure
-    // paths (§7.5 anxiety, replan-cap). Emitted first so a reader
+    // paths (§7.5 anxiety, replan-cap). Emitted before L2 so a reader
     // scanning by tick sees the gate decision before the resulting
     // re-score, which matches the runtime order in `resolve_goap_plans`.
     // -----------------------------------------------------------------
     for row in &captured.commitment {
         trace_log.push(TraceEntry {
-            tick,
-            cat: cat_name.clone(),
+            tick: snapshot.tick,
+            cat: snapshot.cat_name.clone(),
             record: l3_commitment_record(row),
         });
     }
     for row in &captured.plan_failures {
         trace_log.push(TraceEntry {
-            tick,
-            cat: cat_name.clone(),
+            tick: snapshot.tick,
+            cat: snapshot.cat_name.clone(),
             record: l3_plan_failure_record(row),
         });
     }
@@ -243,8 +260,8 @@ pub fn emit_focal_trace(
     // -----------------------------------------------------------------
     for dse in &captured.dses {
         trace_log.push(TraceEntry {
-            tick,
-            cat: cat_name.clone(),
+            tick: snapshot.tick,
+            cat: snapshot.cat_name.clone(),
             record: l2_record_for(dse, &captured.target_rankings),
         });
     }
@@ -261,17 +278,6 @@ pub fn emit_focal_trace(
     // softmax actually saw), probabilities from the captured
     // distribution, roll from the RNG draw.
     // -----------------------------------------------------------------
-    let chosen = format!("{:?}", current.action);
-    let active_intention = disposition.map(|d| format!("{:?}", d.kind));
-    let goap_plan_steps: Vec<String> = goap_plan
-        .map(|p| {
-            p.steps
-                .iter()
-                .map(|s| format!("{:?}", s.action))
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-
     let (ranked, softmax_summary, pre_bonus_pool, pre_penalty_pool) =
         if let Some(sm) = &captured.softmax {
             let ranked: Vec<(String, f32)> = sm
@@ -295,46 +301,47 @@ pub fn emit_focal_trace(
                 .collect();
             (ranked, summary, pre_bonus, pre_penalty)
         } else {
-            // Edge case: L2 captured but softmax didn't (e.g. ineligible
-            // pool after filtering). Fall back to the pre-softmax ranking
-            // from `current.last_scores`; probabilities stay empty so
-            // replay tooling can distinguish "softmax ran" from "softmax
-            // fallthrough".
-            let ranked: Vec<(String, f32)> = current
+            // Edge case: L2 captured but softmax didn't (e.g.
+            // ineligible pool after filtering). Fall back to the
+            // pre-softmax ranking from the snapshot's last_scores;
+            // probabilities stay empty so replay tooling can
+            // distinguish "softmax ran" from "softmax fallthrough".
+            let ranked: Vec<(String, f32)> = snapshot
                 .last_scores
                 .iter()
                 .map(|(a, s)| (format!("{a:?}"), *s))
                 .collect();
             let summary = SoftmaxSummary {
-                temperature: constants.scoring.intention_softmax_temperature,
+                temperature: intention_softmax_temperature,
                 probabilities: Vec::new(),
             };
             (ranked, summary, Vec::new(), Vec::new())
         };
 
     trace_log.push(TraceEntry {
-        tick,
-        cat: cat_name,
+        tick: snapshot.tick,
+        cat: snapshot.cat_name,
         record: TraceRecord::L3 {
             ranked,
             softmax: softmax_summary,
             momentum: MomentumSummary {
-                active_intention,
+                active_intention: snapshot.active_intention,
                 commitment_strength: 0.0,
                 margin_threshold: 0.0,
-                // Ticket 118 — flipped to `true` by `check_modifier_preemption`
-                // via `FocalScoreCapture::set_momentum_preempted` when an
+                // Ticket 118 — flipped to `true` by
+                // `check_modifier_preemption` via
+                // `FocalScoreCapture::set_momentum_preempted` when an
                 // acute-class modifier preempted the focal cat's plan
                 // this tick.
-                preempted: captured.momentum_preempted,
+                preempted: snapshot.momentum_preempted,
             },
-            chosen,
+            chosen: snapshot.chosen,
             intention: IntentionSummary {
                 kind: "Activity".into(),
                 target: None,
                 goal_state: None,
             },
-            goap_plan: goap_plan_steps,
+            goap_plan: snapshot.goap_plan_steps,
             pre_bonus_pool,
             pre_penalty_pool,
             apophenia: None,
@@ -470,31 +477,27 @@ fn intention_summary(intention: &crate::ai::dse::Intention) -> IntentionSummary 
 }
 
 /// Emit one L1 record for a focal-cat read of an `InfluenceMap` —
-/// base sample at the cat's position + attenuation breakdown per
-/// §5.6.6 (species-sensitivity on the map's channel; role / injury /
-/// env at Phase 2A identity).
+/// `(metadata, base_sample, attenuation)` is supplied by the
+/// `InfluenceMapRegistry` walk; this helper only formats the record
+/// shape.
 ///
-/// Kept generic over `M: InfluenceMap` so new map impls in Phase 2B/2C
-/// plug in without touching the caller. `top_contributors` stays
-/// empty at Phase 2A — populating it requires per-emitter reverse
-/// lookup (§5.1's "which fox drove this scent reading"), which is
-/// Phase 2B work.
-fn emit_l1_for_map<M: InfluenceMap + ?Sized>(
+/// `top_contributors` stays empty at Phase 2A — populating it
+/// requires per-emitter reverse lookup (§5.1's "which fox drove this
+/// scent reading"), which is Phase 2B work.
+fn emit_l1_record(
     trace_log: &mut TraceLog,
     tick: u64,
     cat_name: &str,
     pos: Position,
-    map: &M,
-    constants: &SimConstants,
+    metadata: MapMetadata,
+    base_sample: f32,
+    attenuation: Attenuation,
 ) {
     let MapMetadata {
         name,
         channel,
         faction,
-    } = map.metadata();
-    let base_sample = map.base_sample(pos);
-    let attenuation =
-        Attenuation::for_species_channel(&constants.sensory, SensorySpecies::Cat, channel);
+    } = metadata;
     let perceived = attenuation.apply(base_sample);
 
     trace_log.push(TraceEntry {

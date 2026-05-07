@@ -37,6 +37,8 @@
 //! - Environment multiplier: `1.0` (activation is Phase 2 balance
 //!   work, separate from the structural scaffolding).
 
+use bevy_ecs::prelude::{Resource, World};
+
 use crate::components::physical::Position;
 use crate::components::sensing::SensorySpecies;
 use crate::resources::sim_constants::SensoryConstants;
@@ -135,6 +137,97 @@ pub trait InfluenceMap {
     /// Pre-attenuation base-sample value at a world position. Return
     /// `0.0` for out-of-bounds / unsupported coordinates.
     fn base_sample(&self, pos: Position) -> f32;
+}
+
+// ---------------------------------------------------------------------------
+// InfluenceMapRegistry — Phase 2D registry walk (ticket 207)
+// ---------------------------------------------------------------------------
+
+/// Closure that fetches a single L1 sample for the focal cat: looks up
+/// the target `Resource` in the world, calls `metadata()` and
+/// `base_sample(pos)`, and returns the pair. `None` if the resource
+/// isn't present (covers tests and resource-hot-swap edge cases —
+/// matches the prior `Option<Res<>>` tolerance in the bundled
+/// `L1Maps` SystemParam).
+///
+/// `Send + Sync + 'static` so the registry can live in a `Resource`.
+/// The closures capture nothing — `register::<M>` monomorphizes
+/// against the resource type, and `register_with` accepts a free
+/// closure that owns no references.
+pub type L1Walker =
+    Box<dyn Fn(&World, Position) -> Option<(MapMetadata, f32)> + Send + Sync + 'static>;
+
+/// Registry of every `InfluenceMap` whose L1 contributions the trace
+/// emitter walks. Replaces the hand-bundled `L1Maps` SystemParam +
+/// 12-call `emit_map!` walk in `src/systems/trace_emit.rs`.
+///
+/// Single source of truth: adding a 13th map is one
+/// `registry.register::<M>()` call in
+/// `populate_influence_map_registry` (`src/plugins/simulation.rs`),
+/// with zero edits to `trace_emit.rs`. The
+/// `scripts/check_influence_map_registry.sh` lint enforces that every
+/// `impl InfluenceMap for X` in `src/` has a paired registration —
+/// catches the 048 → 206 regression shape (impl lands but trace walk
+/// not updated) at `just check` time instead of after a focal-cat
+/// soak.
+///
+/// Borrow-adapter maps (e.g., `CorruptionLens` over `&TileMap`) can't
+/// be registered via the generic `register::<M>` because they aren't
+/// `Resource`s. Use `register_with` with a closure that constructs
+/// the adapter inline.
+#[derive(Resource, Default)]
+pub struct InfluenceMapRegistry {
+    walkers: Vec<L1Walker>,
+}
+
+impl InfluenceMapRegistry {
+    /// Register a `Resource`-backed `InfluenceMap` impl. The walker
+    /// monomorphizes to a direct `world.get_resource::<M>()` lookup;
+    /// returns `None` if the resource isn't present (the trace
+    /// emitter then skips that map for this tick).
+    pub fn register<M>(&mut self)
+    where
+        M: InfluenceMap + Resource,
+    {
+        self.walkers.push(Box::new(|world, pos| {
+            world
+                .get_resource::<M>()
+                .map(|m| (m.metadata(), m.base_sample(pos)))
+        }));
+    }
+
+    /// Register a free closure walker. Use for borrow-adapter maps
+    /// like `CorruptionLens` whose `InfluenceMap` impl borrows a
+    /// `Resource` rather than being one (the lens borrows
+    /// `&TileMap.corruption`), or for iterated registrations like
+    /// per-species `PreyScentMaps` adapters in ticket 062.
+    pub fn register_with<F>(&mut self, walker: F)
+    where
+        F: Fn(&World, Position) -> Option<(MapMetadata, f32)> + Send + Sync + 'static,
+    {
+        self.walkers.push(Box::new(walker));
+    }
+
+    /// Read-only iterator over registered walkers, for the trace
+    /// emitter's L1 walk. Returns the slice rather than an iterator
+    /// so callers can index it in tests; production callers iterate.
+    pub fn walkers(&self) -> &[L1Walker] {
+        &self.walkers
+    }
+
+    /// Number of registered walkers — convenience for tests and the
+    /// one-shot startup audit (`just check` lint counts impls and
+    /// compares).
+    pub fn len(&self) -> usize {
+        self.walkers.len()
+    }
+
+    /// `true` if no walkers have been registered. Default-constructed
+    /// registries are empty until `populate_influence_map_registry`
+    /// runs at startup.
+    pub fn is_empty(&self) -> bool {
+        self.walkers.is_empty()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -692,6 +785,58 @@ mod tests {
         let sampled = map.base_sample(Position::new(22, 22));
         assert_eq!(sampled, map.get(22, 22));
         assert!(sampled > 0.0);
+    }
+
+    #[test]
+    fn registry_register_walks_resource_maps() {
+        use crate::resources::FoxScentMap;
+        use bevy_ecs::prelude::World;
+
+        let mut world = World::new();
+        let mut map = FoxScentMap::default_map();
+        if let Some(i) = map.bucket_index(5, 5) {
+            map.marks[i] = 0.7;
+        }
+        world.insert_resource(map);
+
+        let mut registry = InfluenceMapRegistry::default();
+        registry.register::<FoxScentMap>();
+        assert_eq!(registry.len(), 1);
+
+        // Walker fetches the resource and surfaces metadata + sample.
+        let walker = &registry.walkers()[0];
+        let (md, sample) = walker(&world, Position::new(5, 5)).expect("resource present");
+        assert_eq!(md.name, "fox_scent");
+        assert!((sample - 0.7).abs() < 1e-6);
+
+        // Walker returns None when the resource is absent.
+        let empty = World::new();
+        assert!(walker(&empty, Position::new(0, 0)).is_none());
+    }
+
+    #[test]
+    fn registry_register_with_handles_borrow_adapter() {
+        use crate::resources::map::{Terrain, TileMap};
+        use bevy_ecs::prelude::World;
+
+        let mut world = World::new();
+        let mut tiles = TileMap::new(10, 10, Terrain::Grass);
+        tiles.get_mut(3, 4).corruption = 0.42;
+        world.insert_resource(tiles);
+
+        let mut registry = InfluenceMapRegistry::default();
+        registry.register_with(|world, pos| {
+            world.get_resource::<TileMap>().map(|t| {
+                let lens = CorruptionLens(t);
+                (lens.metadata(), lens.base_sample(pos))
+            })
+        });
+        assert_eq!(registry.len(), 1);
+
+        let walker = &registry.walkers()[0];
+        let (md, sample) = walker(&world, Position::new(3, 4)).expect("tilemap present");
+        assert_eq!(md.name, "corruption");
+        assert!((sample - 0.42).abs() < 1e-6);
     }
 
     #[test]

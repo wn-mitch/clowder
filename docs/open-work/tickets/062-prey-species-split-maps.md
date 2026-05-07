@@ -226,27 +226,49 @@ per-prey-species split deferred" log entry.
     `prey_params.prey_scent_maps.get_any(sx, sy)`.
 - Grep for remaining `prey_scent_map` references in this file.
 
-### Step 8 — `src/systems/trace_emit.rs`
+### Step 8 — `src/plugins/simulation.rs` (registry registration)
 
-- Change parameter: `prey_scent_map: Option<Res<PreyScentMap>>` →
-  `prey_scent_maps: Option<Res<PreyScentMaps>>`.
-- Replace the single `emit_l1_for_map` call block with a loop:
-  ```
-  if let Some(ref maps) = prey_scent_maps {
-      for kind in [Mouse, Rat, Rabbit, Fish, Bird] {
-          let adapter = PerSpeciesScentRef(maps.for_kind(kind), kind);
-          emit_l1_for_map(&mut trace_log, tick, &cat_name, *pos,
-                          &adapter, &constants);
-      }
+Ticket 207 (`status: done` per blocked-by) replaced the hand-bundled
+`L1Maps` SystemParam in `trace_emit.rs` with a `Vec<L1Walker>`-backed
+`InfluenceMapRegistry` populated at startup by
+`populate_influence_map_registry`. New maps register themselves
+there with **zero** edits to `trace_emit.rs`. The per-species split
+takes that path:
+
+- Inside `populate_influence_map_registry`, **delete** any
+  `registry.register::<PreyScentMap>()` line that 207 left in place
+  for the aggregate map (which this ticket retires).
+- Add five `register_with` calls — one per `PreyKind` variant —
+  each constructing a `PerSpeciesScentRef` adapter inline:
+  ```rust
+  for kind in [
+      PreyKind::Mouse, PreyKind::Rat, PreyKind::Rabbit,
+      PreyKind::Fish, PreyKind::Bird,
+  ] {
+      registry.register_with(move |world, pos| {
+          world.get_resource::<PreyScentMaps>().map(|maps| {
+              let adapter = PerSpeciesScentRef(maps.for_kind(kind), kind);
+              (adapter.metadata(), adapter.base_sample(pos))
+          })
+      });
   }
   ```
-- Add imports: `use crate::systems::influence_map::PerSpeciesScentRef;`
-  and `use crate::components::PreyKind::{Mouse, Rat, Rabbit, Fish,
-  Bird};` (or the fully-qualified form matching existing import style
-  in the file).
-- The `emit_l1_for_map` signature is unchanged — it is already generic
-  over `impl InfluenceMap`, so `PerSpeciesScentRef` satisfies it
-  without modification.
+  The `move` closure captures `kind` by value (it is `Copy`), so
+  each closure is independent — the registry holds five distinct
+  walkers, one per species.
+- The aggregate `register::<PreyScentMaps>()` is **not** registered.
+  After this ticket there is no aggregate `impl InfluenceMap for
+  PreyScentMaps`; only the five `PerSpeciesScentRef` adapters carry
+  L1 surface.
+- `scripts/check_influence_map_registry.sh` (the 207 lint) catches
+  the case where the impl on `PerSpeciesScentRef` lands without the
+  five `register_with` calls. The lint's borrow-adapter detection
+  matches `\bPerSpeciesScentRef\s*\(` against the file, so a stray
+  comment-out of all five closures would fail `just check`.
+
+`trace_emit.rs` is **not edited** in this ticket. The L1 surface
+contract (record per registered walker per tick) means the five new
+walkers automatically appear in `/logq trace --layer L1` output.
 
 ### Step 9 — Tests
 
@@ -361,3 +383,10 @@ All tests are inline (`#[cfg(test)]` mod) in the file under test.
 
 - 2026-04-27: opened from ticket 006 closeout. Inherits the deferral
   ticket 048 logged when carcass-scent landed.
+- 2026-05-07: blocked on 207 (InfluenceMap registry walk). Step 8
+  rewritten — per-species adapters now register five walkers in
+  `populate_influence_map_registry` instead of editing `trace_emit.rs`
+  directly. `status: ready` → `status: blocked` until 207 lands.
+- 2026-05-07: 207 landed; `status: blocked` → `status: ready`,
+  `blocked-by: [207]` → `blocked-by: []`. Step 8's registry path
+  now exists.

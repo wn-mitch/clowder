@@ -1,0 +1,18 @@
+# Allowlist for scripts/check_influence_map_registry.sh.
+#
+# Format:
+#   <TypeName> <ticket-id>     # rationale
+#
+# Comments: everything after `#` is ignored.
+#
+# Each entry MUST cite the ticket that wires the impl into
+# `populate_influence_map_registry` (src/plugins/simulation.rs).
+# When the work lands, drop the entry; the lint will then enforce
+# that the L1 trace surface stays wired. Adding a new entry without
+# a ticket id is a code-review failure.
+#
+# Empty at landing of ticket 207 — every existing `impl InfluenceMap`
+# has its registration in `populate_influence_map_registry`.
+#
+# Parallel precedent: scripts/substrate_stubs.allowlist (mirrors the
+# substrate-stub discipline from ticket 160).

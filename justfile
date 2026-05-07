@@ -313,9 +313,9 @@ build:
 test:
     cargo test
 
-# Check + clippy + step-resolver contract lint + time-unit lint + IAUS-coherence lint + substrate-stub lint + items-are-real lint
+# Check + clippy + step-resolver contract lint + time-unit lint + IAUS-coherence lint + substrate-stub lint + items-are-real lint + influence-map-registry lint
 check:
-    cargo check --all-targets && cargo clippy --all-targets --all-features -- -D warnings && bash scripts/check_step_contracts.sh && bash scripts/check_time_units.sh && bash scripts/check_iaus_coherence.sh && bash scripts/check_substrate_stubs.sh && bash scripts/check_item_transfers.sh
+    cargo check --all-targets && cargo clippy --all-targets --all-features -- -D warnings && bash scripts/check_step_contracts.sh && bash scripts/check_time_units.sh && bash scripts/check_iaus_coherence.sh && bash scripts/check_substrate_stubs.sh && bash scripts/check_item_transfers.sh && bash scripts/check_influence_map_registry.sh
 
 # Generate a random template authoring prompt
 template-prompt:
