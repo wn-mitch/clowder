@@ -1,8 +1,8 @@
 //! Snake utility scoring — Maslow-weighted action evaluation.
 //!
-//! Snakes have a 2-level Maslow hierarchy: Level 1 (survival — hunger,
-//! safety) and Level 2 (thermoregulation). Four DSEs: Ambushing,
-//! Foraging, Fleeing (L1), Basking (L2).
+//! Snakes have a 2-tier Maslow hierarchy: Tier 1 (survival — hunger,
+//! safety) and Tier 2 (thermoregulation). Four DSEs: Ambushing,
+//! Foraging, Fleeing (T1), Basking (T2).
 
 use std::collections::HashMap;
 
@@ -17,10 +17,10 @@ use crate::ai::snake_planner::SnakeDispositionKind;
 use crate::components::physical::Position;
 
 // ---------------------------------------------------------------------------
-// SnakeNeeds — 2-level Maslow hierarchy
+// SnakeNeeds — 2-tier Maslow hierarchy
 // ---------------------------------------------------------------------------
 
-/// Level 1: survival (hunger, health). Level 2: thermoregulation (warmth).
+/// Tier 1: survival (hunger, health). Tier 2: thermoregulation (warmth).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SnakeNeeds {
     /// 1.0 = recently fed, 0.0 = starving.
@@ -42,15 +42,15 @@ impl Default for SnakeNeeds {
 }
 
 impl SnakeNeeds {
-    /// Level 1 is never suppressed. Level 2 (basking) is suppressed when
+    /// Tier 1 is never suppressed. Tier 2 (basking) is suppressed when
     /// survival needs are critical.
-    pub fn level_suppression(&self, tier: u8) -> f32 {
+    pub fn tier_suppression(&self, tier: u8) -> f32 {
         match tier {
             1 => 1.0,
             _ => {
-                // L2 suppressed when L1 satisfaction is low.
-                let l1_satisfaction = (self.hunger + self.health_fraction) / 2.0;
-                l1_satisfaction.clamp(0.0, 1.0)
+                // T2 suppressed when T1 satisfaction is low.
+                let t1_satisfaction = (self.hunger + self.health_fraction) / 2.0;
+                t1_satisfaction.clamp(0.0, 1.0)
             }
         }
     }
@@ -155,7 +155,7 @@ pub fn score_snake_dse_by_id(dse_id: &str, ctx: &SnakeScoringContext, inputs: &E
     let entity_position = |_: Entity| -> Option<Position> { None };
     let anchor_position = |_: LandmarkAnchor| -> Option<Position> { None };
     let needs_ref = ctx.needs;
-    let maslow = |tier: u8| needs_ref.level_suppression(tier);
+    let maslow = |tier: u8| needs_ref.tier_suppression(tier);
 
     let eval_ctx = EvalCtx {
         cat: inputs.cat,
@@ -292,12 +292,12 @@ mod tests {
     }
 
     #[test]
-    fn snake_l2_suppressed_when_starving() {
+    fn snake_t2_suppressed_when_starving() {
         let mut needs = SnakeNeeds::default();
         needs.hunger = 0.0; // starving
         needs.health_fraction = 0.5;
-        // L2 suppression = mean of hunger + health = 0.25
-        let suppression = needs.level_suppression(2);
+        // T2 suppression = mean of hunger + health = 0.25
+        let suppression = needs.tier_suppression(2);
         assert!(suppression < 0.5);
     }
 

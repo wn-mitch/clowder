@@ -56,13 +56,13 @@ pub fn sync_fox_needs(
     dens: Query<&FoxDen>,
 ) {
     for (fox_state, health, mut needs) in &mut foxes {
-        // Level 1: Survival.
+        // Tier 1: Survival.
         // FoxState::hunger is "0.0 = full, 1.0 = starving". FoxNeeds::hunger uses
         // inverted semantics (1.0 = satisfied). Map accordingly.
         needs.hunger = (1.0 - fox_state.hunger).clamp(0.0, 1.0);
         needs.health_fraction = (health.current / health.max).clamp(0.0, 1.0);
 
-        // Level 2: Territory.
+        // Tier 2: Territory.
         if let Some(den_entity) = fox_state.home_den {
             if let Ok(den) = dens.get(den_entity) {
                 needs.territory_scent = den.scent_strength.clamp(0.0, 1.0);
@@ -78,7 +78,7 @@ pub fn sync_fox_needs(
             needs.den_security = 1.0; // reset each tick; interrupts override
         }
 
-        // Level 3: Offspring.
+        // Tier 3: Offspring.
         // Foxes without cubs have these satisfied by default (nothing to worry about).
         if let Some(den_entity) = fox_state.home_den {
             if let Ok(den) = dens.get(den_entity) {

@@ -2,7 +2,7 @@
 
 # Resources
 
-35 resource types derived from `#[derive(Resource)]`.
+44 resource types derived from `#[derive(Resource)]`.
 
 ## `src/components/coordination.rs`
 
@@ -75,6 +75,18 @@
 | `entries` | `Vec<KnowledgeEntry>` |
 | `recently_forgotten` | `HashMap<String, u64>` |
 
+## `src/resources/colony_landmarks.rs`
+
+### ColonyLandmarks (struct)
+
+> Per-tick cached positions of single-instance colony buildings. Each field is `None` when no instance of that building exists.
+
+| Field | Type |
+|-------|------|
+| `kitchen` | `Option<Position>` |
+| `stores` | `Option<Position>` |
+| `garden` | `Option<Position>` |
+
 ## `src/resources/colony_priority.rs`
 
 ### ColonyPriority (struct)
@@ -89,7 +101,7 @@
 
 ### ColonyScore (struct)
 
-> Cumulative ledger of colony-wide achievements and milestones.  Point-in-time welfare axes are computed fresh each emission by the `emit_colony_score` system — they don't live here. This resource only tracks counters that accumulate over the life of a simulation run.
+> Cumulative ledger of colony-wide achievements and milestones.  Cumulative counters live here; the per-tick welfare axes + aggregate are computed fresh each emission and cached on `last_snapshot` so post-loop consumers (footer writer, verdict tooling) can read the run's final point-in-time score without re-tailing events.jsonl.
 
 | Field | Type |
 |-------|------|
@@ -106,6 +118,26 @@
 | `prey_dens_discovered` | `u64` |
 | `banishments` | `u64` |
 | `last_recorded_season` | `u64` |
+| `last_snapshot` | `Option<ColonyScoreSnapshot>` |
+
+## `src/resources/construction_site_map.rs`
+
+### ConstructionSiteMap (struct)
+
+> Spatial influence map of buildings that need attention — both in-progress `ConstructionSite` entities and damaged `Structure` entities whose condition has fallen below the damaged threshold.  §5.6.3 row #9 of `docs/systems/ai-substrate-refactor.md` — sight × colony. Re-stamped each tick. Each site or damaged building paints a linear-falloff disc of `construction_site_sense_range` tiles weighted by *urgency*: `1 - progress` for in-progress sites and `1 - condition` for damaged structures. Overlapping sources sum (clamped to 1.0).  Producer-only landing per ticket 006. Consumer cutover (Build / Repair target ranking via `SpatialConsideration`) is owned by ticket 052.
+
+| Field | Type |
+|-------|------|
+| `marks` | `Vec<f32>` |
+| `grid_w` | `usize` |
+| `grid_h` | `usize` |
+| `bucket_size` | `i32` |
+
+## `src/resources/corruption_landmarks.rs`
+
+### CorruptionLandmarks (struct)
+
+> Per-tick cached centroid of the colony's corruption field. `None` when no tile has corruption above the floor (clean colony).
 
 ## `src/resources/event_log.rs`
 
@@ -118,16 +150,18 @@
 | `entries` | `VecDeque<EventEntry>` |
 | `capacity` | `usize` |
 | `total_pushed` | `u64` |
-| `deaths_by_cause` | `HashMap<String, u64>` |
-| `plan_failures_by_reason` | `HashMap<String, u64>` |
-| `interrupts_by_reason` | `HashMap<String, u64>` |
-| `continuity_tallies` | `HashMap<String, u64>` |
+| `deaths_by_cause` | `BTreeMap<String, u64>` |
+| `plan_failures_by_reason` | `BTreeMap<String, u64>` |
+| `planning_failures_by_disposition` | `BTreeMap<String, u64>` |
+| `planning_failures_by_reason` | `BTreeMap<String, u64>` |
+| `interrupts_by_reason` | `BTreeMap<String, u64>` |
+| `continuity_tallies` | `BTreeMap<String, u64>` |
 
 ## `src/resources/exploration_map.rs`
 
 ### ExplorationMap (struct)
 
-> Colony-wide fog-of-war exploration map. Tracks which tiles have been discovered by any cat. Tiles start at 0.0 (unknown) and are set to 1.0 when explored. They decay slowly over time so distant/old discoveries become worth re-visiting.
+> Colony-wide fog-of-war exploration map. Tracks which tiles have been discovered by any cat. Tiles start at 0.0 (unknown) and are set to 1.0 when explored. They decay slowly over time so distant/old discoveries become worth re-visiting.  `frontier_centroid` caches the centroid of unexplored cells (those below `FRONTIER_THRESHOLD`) — populated once per tick by `update_exploration_centroid` in `systems/needs.rs`. Read by the `Explore` self-state DSE through `LandmarkAnchor::UnexploredFrontierCentroid` and by fox `Dispersing` through the same anchor; the cache avoids rescanning a 120×90 grid 50× per scoring tick.
 
 | Field | Type |
 |-------|------|
@@ -147,6 +181,19 @@
 | `spoilage_rate` | `f32` |
 | `spoilage_multiplier` | `f32` |
 
+## `src/resources/food_location_map.rs`
+
+### FoodLocationMap (struct)
+
+> Spatial influence map of colony food infrastructure (Stores + Kitchen).  §5.6.3 row #7 of `docs/systems/ai-substrate-refactor.md` — sight × colony. Re-stamped each tick from live `Structure` entities whose `kind` is `Stores` or `Kitchen`. Each functional building paints a linear-falloff disc of radius `food_location_sense_range` so a `SpatialConsideration` consumer reads a continuous "near food infrastructure" gradient rather than a binary in-bucket flag.  Producer-only landing per ticket 006. Consumer cutover (Eat / Forage `SpatialConsideration` integration) is owned by ticket 052.
+
+| Field | Type |
+|-------|------|
+| `marks` | `Vec<f32>` |
+| `grid_w` | `usize` |
+| `grid_h` | `usize` |
+| `bucket_size` | `i32` |
+
 ## `src/resources/forced_conditions.rs`
 
 ### ForcedConditions (struct)
@@ -162,6 +209,45 @@
 ### FoxScentMap (struct)
 
 > Spatial grid tracking fox territorial scent marks.  Follows the same bucketed overlay pattern as `HuntingPriors` and `ColonyHuntingMap`. Foxes deposit scent during patrol and marking phases; all buckets decay globally each tick. Cats can detect high-scent areas to increase vigilance, and rival foxes use scent to recognise claimed territory.
+
+| Field | Type |
+|-------|------|
+| `marks` | `Vec<f32>` |
+| `grid_w` | `usize` |
+| `grid_h` | `usize` |
+| `bucket_size` | `i32` |
+
+## `src/resources/garden_location_map.rs`
+
+### GardenLocationMap (struct)
+
+> Spatial influence map of colony garden buildings.  §5.6.3 row #10 of `docs/systems/ai-substrate-refactor.md` — sight × colony. Re-stamped each tick from live `Structure` entities whose `kind` is `Garden`. Each functional garden paints a linear-falloff disc of radius `garden_location_sense_range` weighted by effectiveness so a `SpatialConsideration` consumer reads a continuous "near garden infrastructure" gradient.  Producer-only landing per ticket 006. Consumer cutover (Tend / Harvest target ranking via `SpatialConsideration`) is owned by ticket 052.
+
+| Field | Type |
+|-------|------|
+| `marks` | `Vec<f32>` |
+| `grid_w` | `usize` |
+| `grid_h` | `usize` |
+| `bucket_size` | `i32` |
+
+## `src/resources/herb_location_map.rs`
+
+### HerbLocationMap (struct)
+
+> Spatial influence map of harvestable herb density, keyed by [`HerbKind`].  §5.6.3 row #8 of `docs/systems/ai-substrate-refactor.md` — sight × neutral. Re-stamped each tick from live `Herb` entities carrying the `Harvestable` marker. Each plant paints a linear-falloff disc of radius `herb_location_sense_range` weighted by its growth stage (`Sprout` → `Blossom` = 0.25 → 1.0); the per-kind grid lets consumers sample "thornbriar density at this tile" vs. "any-herb density" without re-walking the herb entity set.  Producer + initial consumer landed by ticket 061. The initial consumer is the herbcraft target-taking DSE (`herbcraft_target_dse`) and the `HasHerbsNearby` marker authoring in `update_target_existence_markers` — both read `total()` (sum across kinds, clamped to 1.0).
+
+| Field | Type |
+|-------|------|
+| `per_kind` | `[Vec<f32>; HERB_KIND_COUNT]` |
+| `grid_w` | `usize` |
+| `grid_h` | `usize` |
+| `bucket_size` | `i32` |
+
+## `src/resources/kitten_cry_map.rs`
+
+### KittenCryMap (struct)
+
+> Spatial influence map of kitten distress cries, gated by hunger and broadcast on the `Hearing` channel.  §5.6.3 row #13 of `docs/systems/ai-substrate-refactor.md` — originally landed by ticket 006 as a sight-channel "kitten urgency" map producer-only awaiting ticket 052's `SpatialConsideration` cutover. 052 retired the `sample_map` consideration shape ("zero production callers") and the substrate sat dead until ticket 156 repurposed it as a Hearing-channel cry broadcast: kittens cry, adults hear.  Each `KittenDependency` cat with `hunger < kitten_cry_hunger_threshold` paints a linear-falloff disc of `kitten_cry_sense_range` tiles, strength `(threshold - hunger) / threshold` so quiet kittens don't paint and starving kittens paint loudly. Adults near multiple crying kittens see the contributions sum (clamped to 1.0). Re-stamped per tick rather than decayed because kittens move and hunger changes fast.  Consumer: `update_kitten_cry_perceived` reads the map at each adult's position and writes a per-cat `kitten_cry_perceived` scalar; `CaretakeDse` (`src/ai/dses/caretake.rs`) reads the scalar via `ScalarConsideration`.
 
 | Field | Type |
 |-------|------|
@@ -214,7 +300,7 @@
 
 ### Relationships (struct)
 
-> Colony-wide relationship graph. Symmetric: `get(a, b)` and `get(b, a)` always return the same entry.
+> Colony-wide relationship graph. Symmetric: `get(a, b)` and `get(b, a)` always return the same entry.  Stored as a `BTreeMap` (not `HashMap`) so `all_for` and `iter` yield a stable, process-independent order. Coordinator election sums f32 fondness/familiarity over `all_for(entity)`, and float addition is non-associative, so a `HashMap` produced 1-ULP drift in `social_weight` across same-seed runs of the same binary — enough to flip tiebreaks in downstream sorts.
 
 ## `src/resources/rng.rs`
 
@@ -256,6 +342,10 @@
 | `sensory` | `SensoryConstants` |
 | `fertility` | `FertilityConstants` |
 | `fulfillment` | `FulfillmentConstants` |
+| `influence_maps` | `InfluenceMapConstants` |
+| `pairing` | `PairingConstants` |
+| `planning_substrate` | `PlanningSubstrateConstants` |
+| `escape_viability` | `EscapeViabilityConstants` |
 
 ## `src/resources/snapshot_config.rs`
 
@@ -272,6 +362,16 @@
 | `den_snapshot_interval` | `u64` |
 | `hunting_belief_interval` | `u64` |
 
+## `src/resources/stores_pressure.rs`
+
+### StoresPressureTracker (struct)
+
+| Field | Type |
+|-------|------|
+| `last_window_baseline` | `u64` |
+| `last_window_tick` | `u64` |
+| `latched_chronic` | `bool` |
+
 ## `src/resources/system_activation.rs`
 
 ### SystemActivation (struct)
@@ -280,9 +380,13 @@
 
 | Field | Type |
 |-------|------|
-| `counts` | `HashMap<Feature, u64>` |
+| `counts` | `BTreeMap<Feature, u64>` |
 
 ## `src/resources/time.rs`
+
+### RenderTickProgress (struct)
+
+> Ticket 129 — Phase 0 of the continuous-position migration epic (#135). Per-frame interpolation parameter `[0.0, 1.0]` between the previous and current sim ticks, computed from `Time<Fixed>::overstep_fraction()` once per render frame and read by the `RenderPosition` interpolation system. Headless runs don't register the resource (no rendering); the windowed app inits it in `RenderingPlugin`.
 
 ### TransitionTracker (struct)
 

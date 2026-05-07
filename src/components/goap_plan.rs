@@ -239,8 +239,8 @@ pub enum UrgencyKind {
 #[derive(Debug, Clone)]
 pub struct UrgentNeed {
     pub kind: UrgencyKind,
-    /// Maslow level: 1 = physiological, 2 = safety.
-    pub maslow_level: u8,
+    /// Maslow tier: 1 = physiological, 2 = safety.
+    pub maslow_tier: u8,
     /// How severe this urgency is (0.0–1.0).
     pub intensity: f32,
     /// For ThreatNearby: position to flee away from.
@@ -255,11 +255,11 @@ pub struct PendingUrgencies {
 }
 
 impl PendingUrgencies {
-    /// Returns the highest-priority urgency (lowest maslow_level, then highest
+    /// Returns the highest-priority urgency (lowest maslow_tier, then highest
     /// intensity). Returns None if empty.
     pub fn highest(&self) -> Option<&UrgentNeed> {
         self.needs.iter().min_by(|a, b| {
-            a.maslow_level.cmp(&b.maslow_level).then_with(|| {
+            a.maslow_tier.cmp(&b.maslow_tier).then_with(|| {
                 b.intensity
                     .partial_cmp(&a.intensity)
                     .unwrap_or(std::cmp::Ordering::Equal)

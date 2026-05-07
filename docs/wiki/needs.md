@@ -2,23 +2,23 @@
 
 # Maslow Hierarchy of Needs
 
-10 needs across 5 Maslow levels. All values `f32` in `[0.0, 1.0]`.
+10 needs across 5 Maslow tiers. All values `f32` in `[0.0, 1.0]`.
 
-Higher levels are multiplicatively suppressed when lower levels are unmet.
+Higher tiers are multiplicatively suppressed when lower tiers are unmet.
 
 ## Suppression Formula
 
 ```
-Level 1: always 1.0 (no suppression)
-Level 2: physiological_satisfaction
-Level 3: phys × safety_satisfaction
-Level 4: phys × safety × belonging_satisfaction
-Level 5: phys × safety × belonging × esteem_satisfaction
+Tier 1: always 1.0 (no suppression)
+Tier 2: physiological_satisfaction
+Tier 3: phys × safety_satisfaction
+Tier 4: phys × safety × belonging_satisfaction
+Tier 5: phys × safety × belonging × esteem_satisfaction
 ```
 
 Each satisfaction uses `smoothstep` (Hermite curve) for gradual transitions.
 
-## Level 1: Physiological
+## Tier 1: Physiological
 
 | Need | Default |
 |------|---------|
@@ -26,13 +26,13 @@ Each satisfaction uses `smoothstep` (Hermite curve) for gradual transitions.
 | `energy` | 0.8 |
 | `temperature` | 0.9 |
 
-## Level 2: Safety
+## Tier 2: Safety
 
 | Need | Default |
 |------|---------|
 | `safety` | 1.0 |
 
-## Level 3: Belonging
+## Tier 3: Belonging
 
 | Need | Default |
 |------|---------|
@@ -40,14 +40,14 @@ Each satisfaction uses `smoothstep` (Hermite curve) for gradual transitions.
 | `acceptance` | 0.5 |
 | `mating` | 1.0 |
 
-## Level 4: Esteem
+## Tier 4: Esteem
 
 | Need | Default |
 |------|---------|
 | `respect` | 0.5 |
 | `mastery` | 0.4 |
 
-## Level 5: Self-actualisation
+## Tier 5: Self-actualisation
 
 | Need | Default |
 |------|---------|

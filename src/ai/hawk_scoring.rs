@@ -40,7 +40,7 @@ impl Default for HawkNeeds {
 
 impl HawkNeeds {
     /// Hawks have no Maslow suppression — all dispositions are survival tier.
-    pub fn level_suppression(&self, _tier: u8) -> f32 {
+    pub fn tier_suppression(&self, _tier: u8) -> f32 {
         1.0
     }
 }
@@ -136,7 +136,7 @@ pub fn score_hawk_dse_by_id(dse_id: &str, ctx: &HawkScoringContext, inputs: &Eva
     let entity_position = |_: Entity| -> Option<Position> { None };
     let anchor_position = |_: LandmarkAnchor| -> Option<Position> { None };
     let needs_ref = ctx.needs;
-    let maslow = |tier: u8| needs_ref.level_suppression(tier);
+    let maslow = |tier: u8| needs_ref.tier_suppression(tier);
 
     let eval_ctx = EvalCtx {
         cat: inputs.cat,

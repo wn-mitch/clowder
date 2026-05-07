@@ -145,12 +145,13 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (143)
+## Landed archive (144)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (78)
+### 2026-05 (79)
 
+- **[218](docs/open-work/landed/218-maslow-tier-rename.md)** — Rename Maslow `Level N` → `Tier N` to disambiguate from substrate `L1/L2/L3` _(2026-05-07)_
 - **[209](docs/open-work/landed/209-positive-colony-food-security-axis-on-higher-tier-dses.md)** — Positive colony_food_security axis on higher-tier DSEs _(2026-05-07)_
 - **[207](docs/open-work/landed/207-influence-map-registry-walk.md)** — Phase 2D — InfluenceMap registry walk in emit_focal_trace _(2026-05-07)_
 - **[206](docs/open-work/landed/206-trace-emit-l1-map-coverage.md)** — trace_emit L1 walk skips five InfluenceMaps — Food / Garden / Construction / KittenCry / Herb _(2026-05-07)_

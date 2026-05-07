@@ -1197,7 +1197,7 @@ fn score_dse_by_id(dse_id: &str, ctx: &ScoringContext, inputs: &EvalInputs) -> f
         }
     };
     let needs_ref = ctx.needs;
-    let maslow = |tier: u8| needs_ref.level_suppression(tier);
+    let maslow = |tier: u8| needs_ref.tier_suppression(tier);
 
     let eval_ctx = EvalCtx {
         cat: inputs.cat,
@@ -1555,7 +1555,7 @@ pub fn score_actions(
         // subsumes Adult ∧ ¬Injured ∧ HasWardHerbs.
         let mut ward = score_dse_by_id("herbcraft_ward", ctx, inputs);
         if ward > 0.0 && ctx.wards_under_siege {
-            ward += s.herbcraft_ward_siege_bonus * ctx.needs.level_suppression(2);
+            ward += s.herbcraft_ward_siege_bonus * ctx.needs.tier_suppression(2);
         }
         if ward > 0.0 {
             scores.push((Action::HerbcraftSetWard, ward + jitter(rng, s.jitter_range)));
@@ -1661,7 +1661,7 @@ pub fn score_actions(
     // --- Cook (food-production tier; requires a Kitchen, raw food, and the
     //     cat not to be on the verge of starvation). Diligent cats cook more,
     //     and urgency scales with food scarcity — cooking is the colony's
-    //     food-buffer multiplier, analogous to Farm. Level 2 suppression
+    //     food-buffer multiplier, analogous to Farm. Tier 2 suppression
     //     (phys only) matches Hunt/Forage: a fed cat will cook; an exhausted
     //     cat will still sleep first, but safety doesn't gate the action.
     //     Receives a directive bonus if a `DirectiveKind::Cook` is active.
@@ -4507,7 +4507,7 @@ mod tests {
     #[test]
     fn herbcraft_setward_appears_when_ward_substrate_present() {
         let sc = default_scoring();
-        // Ward is Level 2 (Safety) — only physiological needs matter.
+        // Ward is tier 2 (Safety) — only physiological needs matter.
         let mut needs = Needs::default();
         needs.hunger = 0.8;
         needs.energy = 0.8;

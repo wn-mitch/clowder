@@ -859,7 +859,7 @@ fn accumulate_urgencies(
     {
         urgencies.needs.push(UrgentNeed {
             kind: UrgencyKind::Starvation,
-            maslow_level: 1,
+            maslow_tier: 1,
             intensity: 1.0 - (needs.hunger / d.starvation_interrupt_threshold).max(0.001),
             threat_pos: None,
         });
@@ -876,7 +876,7 @@ fn accumulate_urgencies(
     {
         urgencies.needs.push(UrgentNeed {
             kind: UrgencyKind::Starvation,
-            maslow_level: 1,
+            maslow_tier: 1,
             intensity: 1.0 - (needs.hunger / d.critical_hunger_interrupt_threshold).max(0.001),
             threat_pos: None,
         });
@@ -890,7 +890,7 @@ fn accumulate_urgencies(
     {
         urgencies.needs.push(UrgentNeed {
             kind: UrgencyKind::Exhaustion,
-            maslow_level: 1,
+            maslow_tier: 1,
             intensity: 1.0 - (needs.energy / d.exhaustion_interrupt_threshold).max(0.001),
             threat_pos: None,
         });
@@ -900,7 +900,7 @@ fn accumulate_urgencies(
     if needs.safety < d.critical_safety_threshold {
         urgencies.needs.push(UrgentNeed {
             kind: UrgencyKind::CriticalSafety,
-            maslow_level: 2,
+            maslow_tier: 2,
             intensity: 1.0 - (needs.safety / d.critical_safety_threshold).max(0.001),
             threat_pos: None,
         });
@@ -999,7 +999,7 @@ fn evaluate_threat_context(
     if intensity > d.flee_threshold_base {
         Some(UrgentNeed {
             kind: UrgencyKind::ThreatNearby,
-            maslow_level: 2,
+            maslow_tier: 2,
             intensity,
             threat_pos: Some(*threat_pos),
         })
@@ -2999,10 +2999,10 @@ pub fn resolve_goap_plans(
                 // --- Step boundary: evaluate pending urgencies ---
                 let mut preempted = false;
                 if let Some(urgent) = urgencies.highest() {
-                    let current_maslow = plan.kind.maslow_level();
-                    // An urgency preempts only if its maslow level is strictly
+                    let current_maslow = plan.kind.maslow_tier();
+                    // An urgency preempts only if its maslow tier is strictly
                     // lower (more fundamental) than the current plan's.
-                    if urgent.maslow_level < current_maslow {
+                    if urgent.maslow_tier < current_maslow {
                         // Preserve Hunt/Herbcraft guard for threats.
                         // 155: `Action::Herbcraft` retired; the three
                         // sub-actions (Gather/Remedy/SetWard) all carry
@@ -3028,8 +3028,8 @@ pub fn resolve_goap_plans(
                                         cat: name.0.clone(),
                                         disposition: format!("{:?}", plan.kind),
                                         reason: format!(
-                                            "urgency {:?} (level {}) preempted level {} plan",
-                                            urgent.kind, urgent.maslow_level, current_maslow
+                                            "urgency {:?} (tier {}) preempted tier {} plan",
+                                            urgent.kind, urgent.maslow_tier, current_maslow
                                         ),
                                         current_step,
                                         hunger: needs.hunger,

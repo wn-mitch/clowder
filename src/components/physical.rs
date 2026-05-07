@@ -172,27 +172,27 @@ pub fn smoothstep(edge0: f32, edge1: f32, x: f32) -> f32 {
 /// Default values reflect a moderately well-off cat at rest.
 #[derive(Component, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Needs {
-    // Level 1 — Physiological
+    // Tier 1 — Physiological
     pub hunger: f32,
     pub energy: f32,
     pub temperature: f32,
 
-    // Level 2 — Safety
+    // Tier 2 — Safety
     pub safety: f32,
 
-    // Level 3 — Belonging
+    // Tier 3 — Belonging
     pub social: f32,
     pub acceptance: f32,
-    /// Mating drive. L3 but NOT averaged into belonging_satisfaction — only
+    /// Mating drive. Tier 3 but NOT averaged into belonging_satisfaction — only
     /// used as a scoring input for the Mate action.
     #[serde(default = "default_mating")]
     pub mating: f32,
 
-    // Level 4 — Esteem
+    // Tier 4 — Esteem
     pub respect: f32,
     pub mastery: f32,
 
-    // Level 5 — Self-actualisation
+    // Tier 5 — Self-actualisation
     pub purpose: f32,
 }
 
@@ -263,26 +263,26 @@ impl Needs {
     }
 
     // -----------------------------------------------------------------------
-    // Level suppression
+    // Tier suppression
     // -----------------------------------------------------------------------
 
-    /// Returns how freely a given Maslow level can be pursued, as a value in
+    /// Returns how freely a given Maslow tier can be pursued, as a value in
     /// `[0.0, 1.0]`.
     ///
-    /// Level 1 is never suppressed (returns 1.0). Each higher level is the
-    /// product of all lower-level satisfactions so that unmet basics starve
+    /// Tier 1 is never suppressed (returns 1.0). Each higher tier is the
+    /// product of all lower-tier satisfactions so that unmet basics starve
     /// higher motivations.
     ///
-    /// | level | suppression value |
+    /// | tier  | suppression value |
     /// |-------|-------------------|
     /// | 1     | 1.0 (always)      |
     /// | 2     | physiological satisfaction |
     /// | 3     | phys × safety     |
     /// | 4     | phys × safety × belonging |
     /// | 5     | phys × safety × belonging × esteem |
-    pub fn level_suppression(&self, level: u8) -> f32 {
+    pub fn tier_suppression(&self, tier: u8) -> f32 {
         let phys = self.physiological_satisfaction();
-        match level {
+        match tier {
             1 => 1.0,
             2 => phys,
             3 => phys * self.safety_satisfaction(),
@@ -377,23 +377,23 @@ mod tests {
         n.hunger = 0.05;
         n.energy = 0.05;
 
-        let l1 = n.level_suppression(1);
-        let l2 = n.level_suppression(2);
-        let l3 = n.level_suppression(3);
-        let l4 = n.level_suppression(4);
-        let l5 = n.level_suppression(5);
+        let t1 = n.tier_suppression(1);
+        let t2 = n.tier_suppression(2);
+        let t3 = n.tier_suppression(3);
+        let t4 = n.tier_suppression(4);
+        let t5 = n.tier_suppression(5);
 
-        assert_eq!(l1, 1.0, "level 1 should always be 1.0");
-        // Physiological satisfaction near-zero → levels 2+ heavily suppressed
-        assert!(l2 < 0.1, "level 2 should be heavily suppressed, got {l2}");
-        assert!(l3 < 0.1, "level 3 should be heavily suppressed, got {l3}");
-        assert!(l4 < 0.1, "level 4 should be heavily suppressed, got {l4}");
-        assert!(l5 < 0.1, "level 5 should be heavily suppressed, got {l5}");
+        assert_eq!(t1, 1.0, "tier 1 should always be 1.0");
+        // Physiological satisfaction near-zero → tiers 2+ heavily suppressed
+        assert!(t2 < 0.1, "tier 2 should be heavily suppressed, got {t2}");
+        assert!(t3 < 0.1, "tier 3 should be heavily suppressed, got {t3}");
+        assert!(t4 < 0.1, "tier 4 should be heavily suppressed, got {t4}");
+        assert!(t5 < 0.1, "tier 5 should be heavily suppressed, got {t5}");
 
-        // Each higher level ≤ the one below (monotone)
-        assert!(l2 >= l3);
-        assert!(l3 >= l4);
-        assert!(l4 >= l5);
+        // Each higher tier ≤ the one below (monotone)
+        assert!(t2 >= t3);
+        assert!(t3 >= t4);
+        assert!(t4 >= t5);
     }
 
     // --- Suppression: well-fed cat ---
@@ -411,10 +411,10 @@ mod tests {
         n.respect = 0.9;
         n.mastery = 0.9;
 
-        let l5 = n.level_suppression(5);
+        let t5 = n.tier_suppression(5);
         assert!(
-            l5 > 0.7,
-            "well-fed cat's level 5 should be mostly unsuppressed, got {l5}"
+            t5 > 0.7,
+            "well-fed cat's tier 5 should be mostly unsuppressed, got {t5}"
         );
     }
 }

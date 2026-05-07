@@ -138,7 +138,7 @@ pub struct NeedsConstants {
     /// (`planner_hunger_ok_threshold`); at hunger=0.15 the planner
     /// interrupts whatever she's doing to eat *now*. Health damage
     /// engaging at the same boundary models the real-cat ladder: brief
-    /// mid-hunger excursions are normal (Maslow Level 1 driving
+    /// mid-hunger excursions are normal (Maslow tier 1 driving
     /// behavior), only sustained sub-critical hunger (the cat has
     /// **failed** to recover despite the planner trying) constitutes
     /// starvation.
@@ -1370,7 +1370,7 @@ pub struct ScoringConstants {
     pub socialize_playfulness_bonus: f32,
     // 158: `self_groom_temperature_scale` retired with the
     // `self_groom_won` resolver. The field weighted a side-channel
-    // computation (raw thermal-deficit × scale × level_suppression(1))
+    // computation (raw thermal-deficit × scale × tier_suppression(1))
     // used only to derive the routing boolean — never the actual L2
     // score the L3 softmax saw. Splitting `Action::Groom` made the L3
     // pick directly determinative, so the side-channel went away.

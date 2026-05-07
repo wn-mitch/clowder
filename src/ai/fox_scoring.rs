@@ -251,7 +251,7 @@ pub fn score_fox_dse_by_id(dse_id: &str, ctx: &FoxScoringContext, inputs: &EvalI
         }
     };
     let needs_ref = ctx.needs;
-    let maslow = |tier: u8| needs_ref.level_suppression(tier);
+    let maslow = |tier: u8| needs_ref.tier_suppression(tier);
 
     let eval_ctx = EvalCtx {
         cat: inputs.cat,
@@ -283,10 +283,10 @@ pub fn score_fox_dse_by_id(dse_id: &str, ctx: &FoxScoringContext, inputs: &EvalI
 
 /// Score all available dispositions for a fox given its current state.
 ///
-/// Uses the truncated 3-level Maslow hierarchy:
-/// - Level 1 (Survival): Hunting, Raiding, Resting, Fleeing
-/// - Level 2 (Territory): Patrolling, Dispersing
-/// - Level 3 (Offspring): Feeding, DenDefense
+/// Uses the truncated 3-tier Maslow hierarchy:
+/// - Tier 1 (Survival): Hunting, Raiding, Resting, Fleeing
+/// - Tier 2 (Territory): Patrolling, Dispersing
+/// - Tier 3 (Offspring): Feeding, DenDefense
 pub fn score_fox_dispositions(
     ctx: &FoxScoringContext,
     inputs: &EvalInputs,
@@ -325,12 +325,12 @@ pub fn score_fox_dispositions(
     }
 
     // -----------------------------------------------------------------------
-    // Level 1: Survival (never suppressed)
+    // Tier 1: Survival (never suppressed)
     // -----------------------------------------------------------------------
-    // Every L1 DSE now routes through `score_fox_dse_by_id`, which
-    // applies `needs.level_suppression(tier)` inside `evaluate_single`.
-    // The old explicit `let l1 = needs.level_suppression(1)` binding
-    // retired with the last inline L1 branch in Phase 3c.3.
+    // Every T1 DSE now routes through `score_fox_dse_by_id`, which
+    // applies `needs.tier_suppression(tier)` inside `evaluate_single`.
+    // The old explicit `let l1 = needs.tier_suppression(1)` binding
+    // retired with the last inline T1 branch in Phase 3c.3.
 
     // Hunting: §2.3 fox row — WS of 5 axes (hunger_urgency, prey_nearby,
     // prey_belief, day_phase, boldness) via `FoxHuntingDse`. Maslow
@@ -377,13 +377,13 @@ pub fn score_fox_dispositions(
     }
 
     // -----------------------------------------------------------------------
-    // Level 2: Territory (suppressed by survival)
+    // Tier 2: Territory (suppressed by survival)
     // -----------------------------------------------------------------------
     // Patrolling: §2.3 WS of territory_scent_deficit (Logistic(5,
     // 0.5)) + ticks_since_patrol (saturating) + day_phase
     // (Piecewise on fox_patrol_*_bonus) + territoriality. Maslow
     // tier 2 pre-gate applied inside `evaluate_single` — the old
-    // `let l2 = needs.level_suppression(2)` binding retires.
+    // `let l2 = needs.tier_suppression(2)` binding retires.
     if ctx.has_den {
         let score = score_fox_dse_by_id("fox_patrolling", ctx, inputs);
         if score > 0.0 {
@@ -404,12 +404,12 @@ pub fn score_fox_dispositions(
     }
 
     // -----------------------------------------------------------------------
-    // Level 3: Offspring (suppressed by survival × territory)
+    // Tier 3: Offspring (suppressed by survival × territory)
     // -----------------------------------------------------------------------
     // Maslow tier 3 pre-gate applied inside `evaluate_single` for
     // Feeding + DenDefense — the explicit `let l3 =
-    // needs.level_suppression(3)` binding retires with the last
-    // inline L3 branch in Phase 3c.8.
+    // needs.tier_suppression(3)` binding retires with the last
+    // inline T3 branch in Phase 3c.8.
 
     // Feeding: §2.3 CP of cub_satiation_deficit (Logistic(7, 0.6))
     // + protectiveness (Linear). Maslow tier 3 pre-gate applied

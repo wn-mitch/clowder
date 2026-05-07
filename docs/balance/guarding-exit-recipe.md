@@ -21,14 +21,14 @@ seed-conditional but reveals a structural gap in the §7.2 gate.
 
 1. Safety falls below `critical_safety_threshold` (default 0.2).
 2. `src/systems/goap.rs:~515` emits `UrgencyKind::CriticalSafety`
-   at Maslow level 2.
+   at Maslow tier 2.
 3. The Patrol DSE (`src/ai/dses/patrol.rs`) scores highest within
    the Guarding chain: `safety_deficit` via `Logistic(6, 0.8)` ≈ 1.0
    at low safety.
-4. Guarding disposition itself is Maslow level 2
+4. Guarding disposition itself is Maslow tier 2
    (`src/components/disposition.rs:~169`).
 5. The preempt gate at `src/systems/goap.rs:~1982` compares
-   `urgent.maslow_level < current_maslow` — `2 < 2` is false.
+   `urgent.maslow_tier < current_maslow` — `2 < 2` is false.
    **CriticalSafety cannot abandon a running Guarding plan.** This
    is semantically correct: Guarding *is* the response to low
    safety, and preempting it with CriticalSafety would be Maslow

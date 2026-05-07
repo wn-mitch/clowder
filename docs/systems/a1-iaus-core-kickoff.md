@@ -54,7 +54,7 @@ that's been blocking the rest of the refactor. Read these first, in order:
      Contract" sections
   4. src/ai/scoring.rs (2.8k lines; the thing you are NOT touching this
      commit but must understand)
-  5. src/components/physical.rs Needs::level_suppression — the Maslow
+  5. src/components/physical.rs Needs::tier_suppression — the Maslow
      pre-gate that must be preserved bit-for-bit
   6. src/resources/sim_constants.rs ScoringConstants (~57 fields; stays
      put this commit, reshape happens in A1.1)
@@ -73,7 +73,7 @@ SCOPE FOR THIS COMMIT — substrate trunk only:
     absolute-anchor peer groups); the per-DSE assignments are already
     enumerated in the spec — you consume that table, don't redesign it
   - §3.4 Maslow pre-gate: wraps the composed score, preserves
-    level_suppression semantics exactly
+    tier_suppression semantics exactly
   - §3.6 granularity: [0,1] pain-scale discipline in the trait surface
 
 Land it as a new module — `src/ai/iaus/` feels right (or
@@ -100,7 +100,7 @@ DELIVERABLES:
     (1 - (1 - score) * (1 - 1/n)) formula Mark specifies; with one
     axis ~= 0 the product ~= 0
   - Unit tests: Maslow pre-gate on the trunk's composition produces
-    identical output to the current level_suppression cascade on
+    identical output to the current tier_suppression cascade on
     matching inputs
   - Rustdoc on the trait + composition functions citing the spec
     sections
@@ -147,7 +147,7 @@ spec is load-bearing and alternatives will need to be redone.
 Once the trunk is in place with a stable published API:
 
 - **Fan out per-DSE ports (A1.1).** Assign groups of DSEs across agents
-  — e.g. Maslow-layer-1 actions (Eat, Sleep, Drink) to one session,
+  — e.g. Maslow-tier-1 actions (Eat, Sleep, Drink) to one session,
   social (Socialize, Mate, Mentor, Caretake, Groom) to another,
   magic/herb (Herbcraft, PracticeMagic, Ward, Cleanse, Harvest,
   Commune) to a third, fox dispositions to a fourth. Each agent writes

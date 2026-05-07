@@ -58,7 +58,7 @@ src/ai/
 ├── scoring/
 │   ├── cat.rs, fox.rs, shadowfox.rs, mouse.rs, rat.rs,
 │   ├── rabbit.rs, fish.rs, bird.rs
-│   └── shared.rs     <-- day_phase bonus tables, level_suppression, jitter
+│   └── shared.rs     <-- day_phase bonus tables, tier_suppression, jitter
 ├── actions/
 │   ├── cat.rs (existing Action enum)
 │   ├── prey.rs (Forage, Den, Flee, Breed, Explore)
@@ -85,7 +85,7 @@ let day_phase_offset = match ctx.day_phase {
     DayPhase::Night => s.sleep_night_bonus,
 };
 let urgency = ((1.0 - ctx.needs.energy) * s.sleep_urgency_scale + day_phase_offset)
-    * ctx.needs.level_suppression(1);
+    * ctx.needs.tier_suppression(1);
 ```
 
 **Proposed defaults (protagonist-weighted):**

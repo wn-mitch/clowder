@@ -2,7 +2,7 @@
 
 # Components
 
-129 component types derived from `#[derive(Component)]`.
+148 component types derived from `#[derive(Component)]`.
 
 ## `src/components/aspirations.rs`
 
@@ -137,9 +137,10 @@
 |-------|------|
 | `kind` | `DispositionKind` |
 | `adopted_tick` | `u64` |
+| `disposition_started_tick` | `u64` |
 | `completions` | `u32` |
 | `target_completions` | `u32` |
-| `crafting_hint` | `Option<CraftingHint>` |
+| `chosen_action` | `Action` |
 
 ### ActionHistory (struct)
 
@@ -224,7 +225,7 @@
 
 ### FoxNeeds (struct)
 
-> Truncated Maslow hierarchy for foxes.  | Level | Name       | Fields                        | |-------|------------|-------------------------------| | 1     | Survival   | hunger, health_fraction        | | 2     | Territory  | territory_scent, den_security  | | 3     | Offspring  | cub_satiation, cub_safety      |  Lower levels suppress higher levels when critical, just like cat needs. All values in `[0.0, 1.0]` where 1.0 = fully satisfied.
+> Truncated Maslow hierarchy for foxes.  | Level | Name       | Fields                        | |-------|------------|-------------------------------| | 1     | Survival   | hunger, health_fraction        | | 2     | Territory  | territory_scent, den_security  | | 3     | Offspring  | cub_satiation, cub_safety      |  Lower tiers suppress higher tiers when critical, just like cat needs. All values in `[0.0, 1.0]` where 1.0 = fully satisfied.
 
 | Field | Type |
 |-------|------|
@@ -279,6 +280,7 @@
 | Field | Type |
 |-------|------|
 | `social_warmth` | `f32` |
+| `body_condition` | `f32` |
 
 ## `src/components/goap_plan.rs`
 
@@ -294,7 +296,7 @@
 | `target_trips` | `u32` |
 | `replan_count` | `u32` |
 | `max_replans` | `u32` |
-| `crafting_hint` | `Option<CraftingHint>` |
+| `chosen_action` | `Action` |
 | `step_state` | `Vec<StepExecutionState>` |
 | `ward_placement_pos` | `Option<Position>` |
 | `failed_actions` | `HashSet<GoapActionKind>` |
@@ -488,6 +490,30 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 > Any injury present — weaker than `Incapacitated`. `needs.rs::update_injury_marker`.
 
+### LowHealth (struct)
+
+> HP ratio at or below `DispositionConstants::critical_health_threshold`. Authoring: `interoception::author_self_markers` — fires *before* the disposition-layer critical-health interrupt at the same threshold so DSE scoring can elect Flee or Rest before the interrupt's panic-fallback. Ticket 087.
+
+### SevereInjury (struct)
+
+> At least one unhealed `InjuryKind::Severe` injury. Authoring: `interoception::author_self_markers`. Ticket 087.
+
+### BodyDistressed (struct)
+
+> Composite body-distress: hunger, energy, thermal, or health deficit above `DispositionConstants::body_distress_threshold`. The unified "I am unwell" perception — analog of how external perception's `HasThreatNearby` is a unified "I am in danger" signal across many possible threats. Authoring: `interoception::author_self_markers`. Ticket 087.
+
+### LowMastery (struct)
+
+> Mean skill level across all six `Skills` fields below `DispositionConstants::low_mastery_threshold`. The cat's felt-competence is meaningfully low — drives future "seek-mastery" / "pursue-practice" DSEs. Note: fires for all freshly spawned cats (default mean ~0.07) and clears as skills grow past the threshold. Authoring: `interoception::author_self_markers`. Ticket 090.
+
+### LackingPurpose (struct)
+
+> No active aspiration (`Aspirations::active.is_empty()` or no `Aspirations` component). The cat has no directed striving — drives future "adopt-aspiration" / "pursue-purpose" DSEs. Authoring: `interoception::author_self_markers`. Ticket 090.
+
+### EsteemDistressed (struct)
+
+> Max of L4 deficits — `max(1 - respect, 1 - mastery)` exceeds `DispositionConstants::esteem_distressed_threshold`. Parallels `BodyDistressed` for the esteem tier: the unified "I feel undervalued or incompetent" signal. Authoring: `interoception::author_self_markers`. Ticket 090.
+
 ### InCombat (struct)
 
 > Cat is in an active combat step or hostile-adjacent. `combat.rs::update_combat_marker`.
@@ -503,6 +529,10 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 ### HasThreatNearby (struct)
 
 > ≥1 wildlife hostile within species-attenuated detection range. `sensing.rs::update_threat_proximity_markers`.
+
+### HideEligible (struct)
+
+> Ticket 104 — Hide/Freeze DSE eligibility gate. Authored when the cat has a threat in sight AND a low-cover tile within sprint range (the "remain still and hope" predator-response valence is viable here — fleeing is too risky, fighting unwinnable). **Phase 1: no authoring system exists** — the marker is defined so the DSE can gate against it, but never fires until a Phase-2/3 authoring system lands alongside the 105 modifier's lift activation. With the marker never authored, Hide is never eligible, so the DSE is dormant and score-bit-identical to baseline.
 
 ### CanHunt (struct)
 
@@ -524,7 +554,7 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 ### ColonyState (struct)
 
-> Marker for the single colony-state entity. Phase 3a introduces the type; the spawn path attaches exactly one entity with this marker in Phase 3d. Colony-scoped markers below (ThornbriarAvailable, HasFunctionalKitchen, …) attach to this entity so DSE queries joining cat + colony state use `(cat_q, colony_q.single())`.
+> Marker for the single colony-state entity. Spawned exactly once per simulation by `setup.rs::build_new_world` (production) and `scenarios/env.rs::init_scenario_world_with` (scenario harness). Colony-scoped markers below (ThornbriarAvailable, HasFunctionalKitchen, …) attach to this entity. Authored each FixedUpdate tick by the colony-marker chain (`buildings::update_colony_building_markers`, `magic::update_{herb_availability,ward_coverage,ward_siege}_markers`) and read by `goap::evaluate_and_plan` via `WorldStateQueries::colony_state_query` to populate `MarkerSnapshot`. Ticket 168.
 
 ### HasFunctionalKitchen (struct)
 
@@ -539,6 +569,10 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 ### ThornbriarAvailable (struct)
 
 > ≥1 harvestable Thornbriar exists in the world. `magic.rs::update_herb_availability_markers`.
+
+### MaterialsAvailable (struct)
+
+> Per-cat: the nearest reachable construction site has `materials_complete()` true. Gates the substrate branch of the `Construct` GOAP action — when set, the planner can plan `[TravelTo(ConstructionSite), Construct]` directly without a haul leg. Authored each tick from `goap.rs::build_planner_markers` against `ConstructionSite::materials_complete()`. Ticket 096.
 
 ### HasSocialTarget (struct)
 
@@ -558,6 +592,22 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 ### HasGarden (struct)
 
+### ColonyStoresChronicallyFull (struct)
+
+> 176: colony Stores have been refusing deposits at a chronic rate over the trailing window. Author: `update_colony_storage_pressure` in `src/systems/buildings.rs`. Read: Build DSE's score-bonus consideration (lifts the colony toward "build another Stores") and Coordinator's `assess_colony_needs` (queues a `Build` directive of `StructureType::Stores` when set). Computed from a per-colony sliding-window count of `Feature::DepositRejected` events scaled by colony cat-count: when `rejected_per_cat_per_window` exceeds `chronicity_threshold` the marker is inserted; otherwise removed.
+
+### HasMidden (struct)
+
+> 178: colony has at least one `StructureType::Midden` building. Authored by `update_colony_building_markers` in `src/systems/buildings.rs` (single pass: any Midden structure exists ⇒ insert; else remove). Read by the Trashing DSE's `EligibilityFilter::require(HasMidden::KEY)` — without it, the disposition is dormant and the cat falls back to Discarding (which gates on `ColonyStoresChronicallyFull`).
+
+### HasHandoffRecipient (struct)
+
+> 188: colony-scoped marker indicating ≥1 cat in the colony is a plausible handoff recipient — i.e., at least one `Kitten` exists. Read by the Handing DSE's `EligibilityFilter::require(HasHandoffRecipient::KEY)`. Authored by `update_colony_building_markers` (ticket 188 wave-closeout).  Colony-scope rather than per-cat: adults give to kittens; the existence of *any* kitten in the colony enables Handing for *any* adult holding food. The actual recipient resolution happens at dispatch time (`goap.rs::HandoffItem` fallback resolves the nearest hungry kitten via `caretake_resolution`-style proximity search) — the per-cat target picker is a balance follow-on, not load-bearing for the structural plumbing.
+
+### HasGroundCarcass (struct)
+
+> Colony-scoped marker indicating ≥1 ground carcass (an `Item` with `kind.is_food()` and `location == ItemLocation::OnGround`) exists somewhere in the colony. Read by the PickingUp DSE's `EligibilityFilter::require(HasGroundCarcass::KEY)`; authored by `update_colony_building_markers`.  Today's source: engage_prey overflow at the kill tile when a cat's inventory is full and it isn't self-eating (`goap.rs::resolve_engage_prey`). Forward-compatible with future carcass-as-container loot tables — child `Item` entities spawned at a `Carcass` entity's tile will appear in the same query without any further changes here.  **History.** Spec'd by 178 with the OnGround food-Item semantic; 185 wired it incorrectly to `Carcass` *component* entities (which `resolve_pick_up_from_ground` cannot consume — only `Item` entities move through PickUp). Ticket 193 restored the spec'd semantic after diagnosing 1367/10kt `PickingUp:GoalUnreachable` replans driven by the marker/resolver mismatch in the post-185 canonical soak.
+
 ### HasMentoringTarget (struct)
 
 > ≥1 other cat has a skill below 0.3 where this cat has the same skill above 0.6 (per-cat relative predicate). `aspirations.rs::update_mentoring_target_markers`.
@@ -568,7 +618,7 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 ### IsParentOfHungryKitten (struct)
 
-> Cat is the parent side of a `KittenDependency` whose kitten's hunger exceeds threshold. `growth.rs::update_parent_hungry_kitten_markers`.
+> Cat has at least one living dependent kitten whose hunger has dropped below `kitten_cry_hunger_threshold`. Authored each tick; removed when no own kitten is hungry. The 0/1 substrate signal that lets parents score Caretake even when their kitten is outside the per-tick `CaretakeTargetDse` candidate pool (range gate or hunger-cycle gate). Pairs with the `KittenCryMap` cell sample at the cat's tile — the cry-map is the spatial-perception channel; this marker is the kinship-channel substrate fact.  Author: `growth.rs::update_kitten_cry_map` (ticket 161 merged the authoring here from a separate Chain 2a system; the cry-map and the marker share the same `&Needs` access and the same hunger predicate, so co-locating them avoids adding a new schedule conflict edge to Bevy's parallel scheduler). Read: `MarkerSnapshot.has(IsParentOfHungryKitten::KEY, entity)` in `disposition.rs` / `goap.rs` populate sites; passed into `caretake_target::resolve_caretake_target` as `parent_marker_active` to enable the own-kitten-anywhere fallback (ticket 158).
 
 ### IsCoordinatorWithDirectives (struct)
 
@@ -585,6 +635,10 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 ### Parent (struct)
 
 > **Active parenthood** (not lifetime identity) — cat has ≥1 living entity with `KittenDependency.mother == self` or `…father == self`. Removed when the last dependent kitten matures or dies. See §4.3 prose on the ordering hazard: grief consumers MUST NOT infer grief-parent status from `With<Parent>` on survivors post-death. The canonical parent-at-time-of-death channel is the future `CatDied.survivors_by_relationship` event payload.  Authoring: `growth.rs::update_parent_markers` (new). Insert/remove in a single tick pass over `Query<&KittenDependency>`.
+
+### BornInSim (struct)
+
+> Cat was born during this simulation run (not a founding member). Inserted once at the kitten-spawn site in `pregnancy.rs` alongside `KittenDependency::new(...)`; never removed. Survives maturation and persists until `cleanup_dead` despawns the entity.  **Why a born-once marker, not derived from `Age::born_tick`** — founding cats also carry `born_tick` (set to `start_tick - age_ticks` in `world_gen/colony.rs::generate_starting_cats`), and at the canonical `start_tick = 0` they collapse to `born_tick = 0` indistinguishably from in-sim-born cats. `KittenDependency` is removed at maturation so it can't serve either. The marker is the canonical "born in this run" substrate.  **Consumer:** `colony_score.kittens_surviving` increments on maturation (`growth.rs::tick_kitten_growth`) and decrements on the death of a matured in-sim-born cat (`death.rs::check_death`, gate `With<BornInSim> + Without<KittenDependency>`). Ticket 166.
 
 ### StoreVisible (struct)
 
@@ -664,6 +718,18 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 |-------|------|
 | `last_pride_crisis_tick` | `Option<u64>` |
 
+## `src/components/pairing.rs`
+
+### PairingActivity (struct)
+
+> L2 PairingActivity Intention persisted on the cat. §7.M.1.  Inserted by `crate::ai::pairing::author_pairing_intentions` on a matched candidate; removed by the same system on any `PairingDropBranch` trigger. The component is the source of truth — there is no parallel ZST marker. Bias readers query `Option<&PairingActivity>` directly.  Only `Serialize` is derived (not `Deserialize`) because `partner: Entity` has no `Default` and the component is pure runtime state — no save/load path round-trips it. The trace pipeline at `trace_log.rs` (Commit C) reads it via `Serialize` only.
+
+| Field | Type |
+|-------|------|
+| `partner` | `Entity` |
+| `adopted_tick` | `u64` |
+| `last_interaction_tick` | `u64` |
+
 ## `src/components/personality.rs`
 
 ### Personality (struct)
@@ -709,6 +775,10 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 | `x` | `i32` |
 | `y` | `i32` |
 
+### RenderPosition (struct)
+
+> Ticket 129 — Phase 0 of the continuous-position migration epic (#135). World-space smooth position in pixels, computed each render frame from `Position` + `PreviousPosition` + `RenderTickProgress` using a smoothstep ease-in/out curve. Sim state (containing tile, pathfinding, perception) still reads `Position` (i32 grid); only the render path consumes this. By Phase 2 (#139), `Position` itself becomes `Vec2<f32>` and this component remains as the per-frame interpolation target without changing its public shape.
+
 ### Health (struct)
 
 > Health component. `current` and `max` are normalised to `[0.0, 1.0]`.
@@ -718,6 +788,7 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 | `current` | `f32` |
 | `max` | `f32` |
 | `injuries` | `Vec<Injury>` |
+| `total_starvation_damage` | `f32` |
 
 ### Dead (struct)
 
@@ -759,6 +830,12 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 | `stage` | `GestationStage` |
 | `nutrition_sum` | `f32` |
 | `nutrition_samples` | `u32` |
+
+## `src/components/prev_safety_deficit.rs`
+
+### PrevSafetyDeficit (struct)
+
+> Per-cat snapshot of last tick's `safety_deficit = 1 - needs.safety` in `[0, 1]`. See the module docs for placement and lifecycle.
 
 ## `src/components/prey.rs`
 
@@ -809,6 +886,37 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 | `item_kind` | `ItemKind` |
 | `den_name` | `&'static str` |
 | `raid_drop` | `u32` |
+
+## `src/components/recent_disposition_failures.rs`
+
+### RecentDispositionFailures (struct)
+
+> Per-cat memory of recently-failed dispositions. See the module docs for placement, lifecycle, and contract notes.  `failures.get(&kind)` returns the **tick** at which the disposition last hit `make_plan → None`. Cooldown age is `now - failed_tick`. Higher-level code never reads the raw map; the `disposition_recent_failure_age_normalized` sensor in `plan_substrate` is the only sanctioned read.
+
+| Field | Type |
+|-------|------|
+| `failures` | `HashMap<DispositionKind, u64>` |
+
+## `src/components/recent_target_failures.rs`
+
+### RecentTargetFailures (struct)
+
+> Per-cat memory of recently-failed `(action, target)` pairs. See the module docs for placement, lifecycle, and contract notes.  `failures.get(&(action, target))` returns the **tick** at which the pair last failed. Cooldown age is `now - failed_tick`. Higher-level code never reads the raw map; the `target_recent_failure_age_normalized` sensor in `plan_substrate` is the only sanctioned read.
+
+| Field | Type |
+|-------|------|
+| `failures` | `HashMap<(GoapActionKind, Entity), u64>` |
+
+## `src/components/reserved.rs`
+
+### Reserved (struct)
+
+> Per-entity reservation. `owner` is the cat that committed to the target; `expires_tick` is the absolute simulation tick after which the maintenance system removes the marker.
+
+| Field | Type |
+|-------|------|
+| `owner` | `Entity` |
+| `expires_tick` | `u64` |
 
 ## `src/components/sensing.rs`
 

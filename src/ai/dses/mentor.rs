@@ -114,9 +114,9 @@ impl Dse for MentorDse {
         }
     }
     fn maslow_tier(&self) -> u8 {
-        // Self-actualization tier per inline (uses level_suppression(5)
+        // Self-actualization tier per inline (uses tier_suppression(5)
         // implicitly — actually inline at scoring.rs:722 uses tier 2
-        // `level_suppression(2)`; keep tier 2 for parity).
+        // `tier_suppression(2)`; keep tier 2 for parity).
         2
     }
 }

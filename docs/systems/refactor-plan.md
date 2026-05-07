@@ -497,7 +497,7 @@ Sub-structured 3a → 3b → 3c → 3d. All four land before phase exit.
   6. Work-urgency anchor (3: Build, Farm, Coordinate)
   7. Exploration-urgency anchor (2: Explore, Wander)
   8. Lifecycle-override anchor (1: Fox_dispersing)
-- **Maslow pre-gate wrapper** (§3.4) — wraps `level_suppression` from
+- **Maslow pre-gate wrapper** (§3.4) — wraps `tier_suppression` from
   `src/components/physical.rs:249–263`; no new path.
 - **Post-scoring modifier pipeline** (§3.5.1 / §3.5.2, 7 modifiers as
   passes):

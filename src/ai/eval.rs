@@ -19,7 +19,7 @@
 //! 3. **Composition** (§3.1 — one of 3 modes) reduces N considerations
 //!    to one `raw_score`.
 //! 4. **Maslow pre-gate** (§3.4). `gated = maslow_suppression(tier) *
-//!    raw_score`. Wraps the existing `Needs::level_suppression` — not
+//!    raw_score`. Wraps the existing `Needs::tier_suppression` — not
 //!    a new path.
 //! 5. **Post-scoring modifier pipeline** (§3.5). 7 modifiers apply in
 //!    registered order; each is a pure function of (dse_id, score,
@@ -228,7 +228,7 @@ impl DseRegistryAppExt for App {
 ///
 /// `fetch_scalar` is the same closure the evaluator uses for
 /// `ScalarConsideration` inputs — modifiers read their trigger inputs
-/// (e.g. corruption level, ward deficit, Maslow level-2 suppression)
+/// (e.g. corruption level, ward deficit, Maslow tier-2 suppression)
 /// via named scalar lookups rather than carrying per-field context
 /// accessors. Each modifier names the scalars it depends on in its
 /// doc comment so the contract is auditable.

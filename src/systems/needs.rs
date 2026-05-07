@@ -101,7 +101,7 @@ pub fn decay_needs(
         pregnant,
     ) in &mut query
     {
-        // --- Level 1: Physiological ---
+        // --- Tier 1: Physiological ---
         needs.hunger = (needs.hunger - hunger_decay).max(0.0);
         needs.energy = (needs.energy - energy_decay).max(0.0);
         needs.temperature = (needs.temperature - temperature_drain).max(0.0);
@@ -180,12 +180,12 @@ pub fn decay_needs(
             }
         }
 
-        // --- Level 2: Safety — recovers passively (unless starving) ---
+        // --- Tier 2: Safety — recovers passively (unless starving) ---
         if !starving {
             needs.safety = (needs.safety + safety_recovery_rate).min(1.0);
         }
 
-        // --- Level 3: Belonging ---
+        // --- Tier 3: Belonging ---
         // Under graded mode, the social multiplier lerps between 1.0 (sated)
         // and `starvation_social_multiplier` (full cliff) by `cliff_factor`.
         // Legacy `cliff_factor == 1.0` collapses this back to the original
@@ -223,7 +223,7 @@ pub fn decay_needs(
             needs.mating = (needs.mating - mating_drain).max(0.0);
         }
 
-        // --- Level 4: Esteem ---
+        // --- Tier 4: Esteem ---
         // Pride amplifies respect decay when respect is already low.
         let pride_amplifier = if needs.respect < c.respect_low_threshold {
             1.0 + personality.pride
@@ -248,7 +248,7 @@ pub fn decay_needs(
             mastery_base_drain * (1.0 + personality.diligence * c.mastery_diligence_scale);
         needs.mastery = (needs.mastery - mastery_drain).max(0.0);
 
-        // --- Level 5: Self-actualisation ---
+        // --- Tier 5: Self-actualisation ---
         // Patience slows purpose drain; independence speeds it up.
         let purpose_drain = purpose_base_drain
             * (1.0 + personality.curiosity * c.purpose_curiosity_scale)

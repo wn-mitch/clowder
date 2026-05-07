@@ -196,8 +196,8 @@ pub enum FoxDispositionKind {
 }
 
 impl FoxDispositionKind {
-    /// Maslow level this disposition primarily serves.
-    pub fn maslow_level(self) -> u8 {
+    /// Maslow tier this disposition primarily serves.
+    pub fn maslow_tier(self) -> u8 {
         match self {
             Self::Hunting | Self::Raiding | Self::Resting | Self::Fleeing | Self::Avoiding => 1, // Survival
             Self::Patrolling | Self::Dispersing => 2, // Territory

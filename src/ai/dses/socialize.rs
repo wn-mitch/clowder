@@ -12,7 +12,7 @@
 //! well-bonded cats elected Socialize and the gate dropped the plan
 //! same-tick (588× in seed-42's cold-start window).
 //!
-//! Maslow tier 2 — matches the old inline `level_suppression(2)`.
+//! Maslow tier 2 — matches the old inline `tier_suppression(2)`.
 
 use bevy::prelude::*;
 

@@ -516,7 +516,7 @@ Facts captured 2026-04-20 (seed-42 soak at commit `039c6fb`):
   independence, patience, tradition, fox-territory-suppression,
   corruption-suppression). Each action is hand-authored with an
   always-linear response applied to its inputs. Action composition
-  is additive with one `Needs::level_suppression` multiplier.
+  is additive with one `Needs::tier_suppression` multiplier.
 - **`ScoringContext`** (`src/ai/scoring.rs:27–144`) — 27 boolean
   eligibility gates + 19 scalar floats + 4 counts + 6 refs/enums.
   The boolean:scalar ratio (27:19) tells the story: eligibility is
@@ -526,7 +526,7 @@ Facts captured 2026-04-20 (seed-42 soak at commit `039c6fb`):
   57 flat `_scale` / `_threshold` / `_weight` fields. `SimConstants`
   as a whole is 196 tuning knobs. Curve shape is implicit in scalar
   multipliers; there is no named curve primitive.
-- **`Needs::level_suppression`** (`src/components/physical.rs:249`) —
+- **`Needs::tier_suppression`** (`src/components/physical.rs:249`) —
   a Maslow-ordered multiplicative cascade where higher tiers gate on
   all lower tiers' satisfaction. This is already non-linear
   composition and generalizes cleanly as a hierarchical pre-gate
@@ -1337,7 +1337,7 @@ modulators. Treat as WS-compatible axes, not as CP gates.
 and the §4 eligibility-filter pattern; no table row. See Enumeration
 Debt line 75–83.
 
-#### Fox dispositions — Level 1 (survival)
+#### Fox dispositions — Tier 1 (survival)
 
 | Disposition | Today's shape (file:lines) | L2 mode | Axes | Note (why this mode) |
 |---|---|---|---|---|
@@ -1346,14 +1346,14 @@ Debt line 75–83.
 | `Resting` | `((hunger × health_frac) × 0.6 + phase_bonus) × sup` (`fox_scoring.rs:161–177`) | `WeightedSum` | hunger, health_fraction, day_phase | Day-phase drives rest even when comfort (bilinear hunger × health) is low — diurnal foxes rest by day regardless of comfort state. |
 | `Fleeing` | `((1-health_frac) + cats_nearby_bonus) × (1-boldness×0.8) × sup` (`fox_scoring.rs:179–186`) | `WeightedSum` | health_deficit, cats_nearby, boldness | Health-deficit and cat-proximity are additive trade-off drivers; damped boldness inverse is a modulator, not a gate. |
 
-#### Fox dispositions — Level 2 (territory)
+#### Fox dispositions — Tier 2 (territory)
 
 | Disposition | Today's shape (file:lines) | L2 mode | Axes | Note (why this mode) |
 |---|---|---|---|---|
 | `Patrolling` | `(scent + time_since + phase) × territoriality × sup` (`fox_scoring.rs:193–210`) | `WeightedSum` | scent_deficit, time_since_patrol, day_phase, territoriality | Three additive urgency drivers; design intent is that a *mostly*-territorial fox with faded scent still patrols. Flattens today's nested mult-over-add — implementation PR restructures. |
 | `Avoiding` | `cats_nearby × (1-boldness×0.8) × sup` (`fox_scoring.rs:212–222`) | `CompensatedProduct` | cats_nearby, boldness_inverse | Both gate (damped-boldness as the gate): no cats ⇒ nothing to avoid; max boldness ⇒ never avoids. |
 
-#### Fox dispositions — Level 3 (offspring)
+#### Fox dispositions — Tier 3 (offspring)
 
 | Disposition | Today's shape (file:lines) | L2 mode | Axes | Note (why this mode) |
 |---|---|---|---|---|
@@ -1510,7 +1510,7 @@ enumerated in §3.3.2.
 | `Caretake` | WeightedSum | RtEO | 3 (`kitten_urgency`, `compassion`, `is_parent`) | `is_parent` is a 0/1 axis with a non-trivial RtEO weight — encodes the bloodline-override signal numerically. |
 | `Idle` | WeightedSum | RtEO | 3 (`base_rate`, `incuriosity`, `playfulness`) | Floor is a post-composition `Clamp(min)` (§2.3), not an axis. |
 
-##### Fox dispositions — Level 1 (survival)
+##### Fox dispositions — Tier 1 (survival)
 
 | Disposition | Composition (§3.1.1) | Weight mode | Axis count | Notes |
 |---|---|---|---|---|
@@ -1519,14 +1519,14 @@ enumerated in §3.3.2.
 | `Resting` | WeightedSum | RtEO | 3 (`hunger`, `health_fraction`, `day_phase`) | Diurnal rest even when comfort is low — RtEO preserves the day-phase independent drive. |
 | `Fleeing` | WeightedSum | RtEO | 3 (`health_deficit`, `cats_nearby`, `boldness`) | `boldness` damp (`(1 - boldness × 0.5)`) is a modulator; RtEO composes with the two additive urgency drivers. |
 
-##### Fox dispositions — Level 2 (territory)
+##### Fox dispositions — Tier 2 (territory)
 
 | Disposition | Composition (§3.1.1) | Weight mode | Axis count | Notes |
 |---|---|---|---|---|
 | `Patrolling` | WeightedSum | RtEO | 4 (`scent_deficit`, `time_since_patrol`, `day_phase`, `territoriality`) | |
 | `Avoiding` | CompensatedProduct | RtM | 2 (`cats_nearby`, `boldness_inverse`) | Damped-boldness is the gate (`(1 - boldness × 0.8)`). |
 
-##### Fox dispositions — Level 3 (offspring)
+##### Fox dispositions — Tier 3 (offspring)
 
 | Disposition | Composition (§3.1.1) | Weight mode | Axis count | Notes |
 |---|---|---|---|---|
@@ -1595,9 +1595,9 @@ raw_score    = composition_mode.reduce(considerations)
 gated_score  = maslow_suppression(dse.tier) * raw_score
 ```
 
-`Needs::level_suppression` already implements this hierarchically:
-Level 1 (physiological survival) always fires at full strength;
-Level 5 (self-actualization) gates on all four lower tiers being
+`Needs::tier_suppression` already implements this hierarchically:
+Tier 1 (physiological survival) always fires at full strength;
+Tier 5 (self-actualization) gates on all four lower tiers being
 satisfied. **This is Clowder-specific, not from Mark** — BDI-style
 Maslow wrapping isn't in *Behavioral Mathematics*, but it composes
 cleanly with the IAUS layer. Don't refactor it.
@@ -4709,7 +4709,7 @@ by the first shelter the cat finds.
 
 The split, specified in full in `docs/systems/warmth-split.md`:
 
-- `needs.temperature` — physiological, stays in Maslow L1 (§3.4),
+- `needs.temperature` — physiological, stays in Maslow tier 1 (§3.4),
   drained by weather/season, restored by hearth/den/sleep/self-groom.
 - `social_warmth` — fulfillment-layer axis (§7.W.1), drained by
   isolation/bond-loss, restored by grooming-others, huddling,
@@ -6502,7 +6502,7 @@ doc:
    to influence maps (§5.5). Treating it as a base map would explode
    storage and still wouldn't capture asymmetry. This is explicit
    scope discipline for this substrate.
-6. **`Needs::level_suppression` generalizes cleanly as a
+6. **`Needs::tier_suppression` generalizes cleanly as a
    hierarchical pre-gate** above the IAUS layer (§3). Maslow is not
    folded into the axis product — it wraps the product.
 7. **big-brain is out** on Bevy-version grounds (A2 note). In-house

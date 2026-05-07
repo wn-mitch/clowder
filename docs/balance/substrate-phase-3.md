@@ -449,7 +449,7 @@ day-phase knots / `idle_base` / `idle_minimum_floor` /
   idle_incuriosity_scale)`, `playfulness_invert` (pre-inverted) via
   `Linear(slope=idle_playfulness_penalty)`. RtEO weights `[0.4,
   0.35, 0.25]`. Maslow tier = `u8::MAX` (opt out of pre-gate — Idle
-  is always available regardless of Maslow level).
+  is always available regardless of Maslow tier).
 - `FoxRestingDse` (WS, 3 axes, `&ScoringConstants`): `hunger`
   (raw satiation) via `Linear`, `health_fraction` via `Linear`,
   `day_phase` via `Piecewise` on `fox_rest_{…}_bonus`. RtEO

@@ -363,10 +363,10 @@ impl DispositionKind {
         }
     }
 
-    /// Maslow hierarchy level. Lower = more fundamental = higher priority.
-    /// An urgency can only preempt a plan whose maslow_level is numerically
+    /// Maslow hierarchy tier. Lower = more fundamental = higher priority.
+    /// An urgency can only preempt a plan whose maslow_tier is numerically
     /// higher (less fundamental).
-    pub fn maslow_level(&self) -> u8 {
+    pub fn maslow_tier(&self) -> u8 {
         match self {
             // 150 R5a: Eating shares Resting's tier 1 — both physiological.
             // 155: Cooking sits at tier 1 too — colony-feeding behavior
@@ -705,8 +705,8 @@ mod tests {
     #[test]
     fn eating_shares_resting_maslow_tier() {
         // 150 R5a: both physiological — Maslow tier 1.
-        assert_eq!(DispositionKind::Eating.maslow_level(), 1);
-        assert_eq!(DispositionKind::Resting.maslow_level(), 1);
+        assert_eq!(DispositionKind::Eating.maslow_tier(), 1);
+        assert_eq!(DispositionKind::Resting.maslow_tier(), 1);
     }
 
     #[test]
@@ -825,9 +825,9 @@ mod tests {
         // esteem-tier craft. Tier 4 reproduces the suppression that
         // left `FoodCooked` on `never_fired_expected_positives`
         // pre-155.
-        assert_eq!(DispositionKind::Cooking.maslow_level(), 1);
-        assert_eq!(DispositionKind::Hunting.maslow_level(), 1);
-        assert_eq!(DispositionKind::Foraging.maslow_level(), 1);
+        assert_eq!(DispositionKind::Cooking.maslow_tier(), 1);
+        assert_eq!(DispositionKind::Hunting.maslow_tier(), 1);
+        assert_eq!(DispositionKind::Foraging.maslow_tier(), 1);
     }
 
     #[test]
@@ -908,7 +908,7 @@ mod tests {
         // self-care (GroomSelf rides Resting at tier 1), one step
         // below Socializing (tier 3) — keeps the affiliative ladder
         // monotone in need-priority.
-        assert_eq!(DispositionKind::Grooming.maslow_level(), 2);
+        assert_eq!(DispositionKind::Grooming.maslow_tier(), 2);
     }
 
     #[test]
@@ -929,8 +929,8 @@ mod tests {
         // 154: Mentoring is tier 3 (matches Mating / Socializing /
         // Caretaking). Skill transfer is social-coordination work,
         // not physiological.
-        assert_eq!(DispositionKind::Mentoring.maslow_level(), 3);
-        assert_eq!(DispositionKind::Socializing.maslow_level(), 3);
+        assert_eq!(DispositionKind::Mentoring.maslow_tier(), 3);
+        assert_eq!(DispositionKind::Socializing.maslow_tier(), 3);
     }
 
     #[test]

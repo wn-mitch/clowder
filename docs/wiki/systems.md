@@ -10,7 +10,7 @@ Status of each design document cross-referenced against `SimulationPlugin::build
 |--------|--------|---------------------|------------|
 | Collective Memory | **[Built]** | `memory::decay_memories`, `colony_knowledge::update_colony_knowledge` | [doc](../systems/collective-memory.md) |
 | Corpse Handling | **[Built]** | `death::check_death`, `death::cleanup_dead` | [doc](../systems/corpse-handling.md) |
-| Magic | **[Built]** | `magic::CorruptionPushback`, `magic::corruption_spread`, `magic::ward_decay`, `magic::update_ward_coverage_map`, `magic::herb_seasonal_check` (+10 more) | [doc](../systems/magic.md) |
+| Magic | **[Built]** | `magic::CorruptionPushback`, `magic::corruption_spread`, `magic::ward_decay`, `magic::update_ward_coverage_map`, `magic::herb_seasonal_check` (+14 more) | [doc](../systems/magic.md) |
 | Weather — Living Climate System | **[Built]** | `weather::update_weather`, `wind::update_wind` | [doc](../systems/weather.md) |
 
 ## Partial
@@ -29,6 +29,7 @@ Status of each design document cross-referenced against `SimulationPlugin::build
 | AI Substrate Refactor — Design Specification | *[Aspirational]* | — | [doc](../systems/ai-substrate-refactor.md) |
 | Crafted Items & Recipes | *[Aspirational]* | — | [doc](../systems/crafting.md) |
 | Disease | *[Aspirational]* | — | [doc](../systems/disease.md) |
+| Distress modifiers — lurch vs. pressure | *[Aspirational]* | — | [doc](../systems/distress-modifiers.md) |
 | Environmental Quality | *[Aspirational]* | — | [doc](../systems/environmental-quality.md) |
 | Log Analytics Dashboard | *[Aspirational]* | — | [doc](../systems/log-analytics-dashboard.md) |
 | Mental Breaks | *[Aspirational]* | — | [doc](../systems/mental-breaks.md) |
@@ -61,10 +62,12 @@ System modules with registered functions but no design doc:
 - **fertility**: handle_post_partum_reinsert, update_fertility_phase
 - **fox_goap**: sync_fox_needs, fox_evaluate_and_plan, fox_resolve_goap_plans, feed_cubs_at_dens, resolve_paired_confrontations
 - **fox_spatial**: update_store_awareness_markers, update_den_threat_markers, update_ward_detection_markers, update_cub_marker, update_cub_hunger_markers, update_juvenile_dispersal_markers, update_den_marker
-- **fulfillment**: decay_fulfillment, bond_proximity_social_warmth
-- **goap**: check_anxiety_interrupts, evaluate_and_plan, resolve_goap_plans, emit_plan_narrative
-- **growth**: update_life_stage_markers, update_parent_markers, tick_kitten_growth, kitten_mood_aura
+- **fulfillment**: decay_fulfillment, bond_proximity_social_warmth, update_body_condition
+- **goap**: check_modifier_preemption, check_anxiety_interrupts, evaluate_and_plan, resolve_goap_plans, emit_plan_narrative
+- **growth**: update_life_stage_markers, update_parent_markers, tick_kitten_growth, kitten_mood_aura, update_kitten_cry_map
 - **incapacitation**: update_incapacitation
+- **interoception**: author_self_markers
+- **plan_substrate**: expire_reservations, sensors, update_prev_safety_deficit
 - **pregnancy**: tick_pregnancy
 - **prey**: prey_population, prey_hunger, prey_ai, prey_scent_tick, prey_den_lifecycle, update_den_pressure, apply_den_raids, orphan_prey_adopt_or_found
 - **sensing**: update_terrain_markers, update_target_existence_markers

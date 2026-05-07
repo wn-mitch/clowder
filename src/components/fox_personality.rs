@@ -67,23 +67,23 @@ impl FoxPersonality {
 /// | 2     | Territory  | territory_scent, den_security  |
 /// | 3     | Offspring  | cub_satiation, cub_safety      |
 ///
-/// Lower levels suppress higher levels when critical, just like cat needs.
+/// Lower tiers suppress higher tiers when critical, just like cat needs.
 /// All values in `[0.0, 1.0]` where 1.0 = fully satisfied.
 #[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FoxNeeds {
-    // Level 1: Survival
+    // Tier 1: Survival
     /// How fed the fox is. 1.0 = full, 0.0 = starving. Decays over time.
     pub hunger: f32,
     /// Current health as fraction of max. Derived from Health component.
     pub health_fraction: f32,
 
-    // Level 2: Territory
+    // Tier 2: Territory
     /// Average scent strength across territory. 1.0 = fully marked.
     pub territory_scent: f32,
     /// Security of the den. 1.0 = no threats nearby, 0.0 = under attack.
     pub den_security: f32,
 
-    // Level 3: Offspring
+    // Tier 3: Offspring
     /// How recently cubs have been fed. 1.0 = well fed, 0.0 = starving.
     /// Stays at 1.0 if no cubs exist (satisfied by default).
     pub cub_satiation: f32,
@@ -106,36 +106,36 @@ impl Default for FoxNeeds {
 }
 
 impl FoxNeeds {
-    /// Satisfaction of the survival level (minimum of hunger and health).
+    /// Satisfaction of the survival tier (minimum of hunger and health).
     pub fn survival_satisfaction(&self) -> f32 {
         let min = self.hunger.min(self.health_fraction);
         smoothstep(0.15, 0.65, min)
     }
 
-    /// Satisfaction of the territory level (minimum of scent and den security).
+    /// Satisfaction of the territory tier (minimum of scent and den security).
     pub fn territory_satisfaction(&self) -> f32 {
         let min = self.territory_scent.min(self.den_security);
         smoothstep(0.1, 0.5, min)
     }
 
-    /// Satisfaction of the offspring level (minimum of cub satiation and safety).
+    /// Satisfaction of the offspring tier (minimum of cub satiation and safety).
     pub fn offspring_satisfaction(&self) -> f32 {
         let min = self.cub_satiation.min(self.cub_safety);
         smoothstep(0.15, 0.6, min)
     }
 
-    /// How freely a given Maslow level can be pursued.
+    /// How freely a given Maslow tier can be pursued.
     ///
-    /// Level 1 is never suppressed. Each higher level is the product of
-    /// all lower-level satisfactions.
+    /// Tier 1 is never suppressed. Each higher tier is the product of
+    /// all lower-tier satisfactions.
     ///
-    /// | level | suppression value                |
+    /// | tier  | suppression value                |
     /// |-------|----------------------------------|
     /// | 1     | 1.0 (always)                     |
     /// | 2     | survival satisfaction             |
     /// | 3     | survival × territory satisfaction |
-    pub fn level_suppression(&self, level: u8) -> f32 {
-        match level {
+    pub fn tier_suppression(&self, tier: u8) -> f32 {
+        match tier {
             1 => 1.0,
             2 => self.survival_satisfaction(),
             3 => self.survival_satisfaction() * self.territory_satisfaction(),
@@ -160,13 +160,13 @@ mod tests {
     }
 
     #[test]
-    fn level_1_never_suppressed() {
+    fn tier_1_never_suppressed() {
         let n = FoxNeeds {
             hunger: 0.0,
             health_fraction: 0.0,
             ..FoxNeeds::default()
         };
-        assert_eq!(n.level_suppression(1), 1.0);
+        assert_eq!(n.tier_suppression(1), 1.0);
     }
 
     #[test]
@@ -179,7 +179,7 @@ mod tests {
             ..FoxNeeds::default()
         };
         // Survival satisfaction is 0 → territory suppressed
-        assert_eq!(n.level_suppression(2), 0.0);
+        assert_eq!(n.tier_suppression(2), 0.0);
     }
 
     #[test]
@@ -191,11 +191,11 @@ mod tests {
             den_security: 0.8,
             ..FoxNeeds::default()
         };
-        assert!(n.level_suppression(2) > 0.5);
+        assert!(n.tier_suppression(2) > 0.5);
     }
 
     #[test]
-    fn offspring_suppressed_by_both_lower_levels() {
+    fn offspring_suppressed_by_both_lower_tiers() {
         // Survival ok but territory failing
         let n = FoxNeeds {
             hunger: 0.8,
@@ -205,7 +205,7 @@ mod tests {
             cub_satiation: 0.0,
             cub_safety: 0.0,
         };
-        assert!(n.level_suppression(3) < 0.1);
+        assert!(n.tier_suppression(3) < 0.1);
     }
 
     #[test]

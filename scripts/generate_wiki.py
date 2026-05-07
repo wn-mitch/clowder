@@ -505,14 +505,14 @@ class NeedsLevel:
 
 
 def parse_needs(physical_rs: Path) -> tuple[list[NeedsLevel], dict[str, str]]:
-    """Extract Maslow levels, their needs, and default values from physical.rs."""
+    """Extract Maslow tiers, their needs, and default values from physical.rs."""
     levels: list[NeedsLevel] = []
     defaults: dict[str, str] = {}
     if not physical_rs.exists():
         return levels, defaults
     text = physical_rs.read_text()
 
-    # Parse struct fields and level comments
+    # Parse struct fields and tier comments
     m = re.search(r'pub struct Needs\s*\{(.*?)\}', text, re.DOTALL)
     if m:
         body = m.group(1)
@@ -520,11 +520,11 @@ def parse_needs(physical_rs: Path) -> tuple[list[NeedsLevel], dict[str, str]]:
         current_fields: list[str] = []
         for line in body.splitlines():
             line = line.strip()
-            level_m = re.match(r'//\s*Level\s+(\d+)\s*[—–-]\s*(.+)', line)
+            level_m = re.match(r'//\s*Tier\s+(\d+)\s*[—–-]\s*(.+)', line)
             if level_m:
                 if current_level:
                     levels.append(NeedsLevel(current_level, current_fields))
-                current_level = f"Level {level_m.group(1)}: {level_m.group(2).strip()}"
+                current_level = f"Tier {level_m.group(1)}: {level_m.group(2).strip()}"
                 current_fields = []
                 continue
             field_m = re.match(r'pub\s+(\w+)\s*:', line)
@@ -905,16 +905,16 @@ def generate_needs(physical_rs: Path) -> str:
     out = HEADER
     out += "# Maslow Hierarchy of Needs\n\n"
     total = sum(len(lv.needs) for lv in levels)
-    out += f"{total} needs across {len(levels)} Maslow levels. All values `f32` in `[0.0, 1.0]`.\n\n"
-    out += "Higher levels are multiplicatively suppressed when lower levels are unmet.\n\n"
+    out += f"{total} needs across {len(levels)} Maslow tiers. All values `f32` in `[0.0, 1.0]`.\n\n"
+    out += "Higher tiers are multiplicatively suppressed when lower tiers are unmet.\n\n"
 
     out += "## Suppression Formula\n\n"
     out += "```\n"
-    out += "Level 1: always 1.0 (no suppression)\n"
-    out += "Level 2: physiological_satisfaction\n"
-    out += "Level 3: phys × safety_satisfaction\n"
-    out += "Level 4: phys × safety × belonging_satisfaction\n"
-    out += "Level 5: phys × safety × belonging × esteem_satisfaction\n"
+    out += "Tier 1: always 1.0 (no suppression)\n"
+    out += "Tier 2: physiological_satisfaction\n"
+    out += "Tier 3: phys × safety_satisfaction\n"
+    out += "Tier 4: phys × safety × belonging_satisfaction\n"
+    out += "Tier 5: phys × safety × belonging × esteem_satisfaction\n"
     out += "```\n\n"
     out += "Each satisfaction uses `smoothstep` (Hermite curve) for gradual transitions.\n\n"
 

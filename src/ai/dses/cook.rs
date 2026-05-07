@@ -5,7 +5,7 @@
 //! either." WeightedSum of `base_rate + food_scarcity + diligence`.
 //!
 //! Maslow tier 2 — comment at `scoring.rs:738` names Cook as a
-//! food-buffer multiplier analogous to Farm, "Level 2 suppression
+//! food-buffer multiplier analogous to Farm, "tier 2 suppression
 //! (phys only)."
 //!
 //! **Cook-specific eligibility** — §4 port (Phase 4b.5) carries two

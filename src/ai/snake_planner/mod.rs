@@ -4,8 +4,8 @@
 //! species-specific state, action, predicate, and effect types that the
 //! generic A* planner operates on.
 //!
-//! Snakes are ambush predators with a 2-level Maslow hierarchy:
-//! Level 1 (survival — hunger, safety) and Level 2 (thermoregulation).
+//! Snakes are ambush predators with a 2-tier Maslow hierarchy:
+//! Tier 1 (survival — hunger, safety) and Tier 2 (thermoregulation).
 //! Four dispositions: Ambushing, Foraging, Basking, Fleeing.
 
 pub mod actions;
@@ -151,9 +151,9 @@ pub enum SnakeDispositionKind {
 }
 
 impl SnakeDispositionKind {
-    /// Maslow level this disposition serves.
-    /// Level 1: survival (hunger, safety). Level 2: thermoregulation.
-    pub fn maslow_level(self) -> u8 {
+    /// Maslow tier this disposition serves.
+    /// Tier 1: survival (hunger, safety). Tier 2: thermoregulation.
+    pub fn maslow_tier(self) -> u8 {
         match self {
             Self::Ambushing | Self::Foraging | Self::Fleeing => 1,
             Self::Basking => 2,

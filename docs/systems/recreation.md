@@ -7,7 +7,7 @@ Models the need for varied leisure activity and physical self-maintenance. Cats 
 | Parameter | Initial Value | Rationale |
 |-----------|--------------|-----------|
 | Recreation need decay rate | 0.001/tick | Same tier as social need; builds slowly |
-| Recreation need Maslow level | 3 (Belonging) | Alongside social; suppressed when survival is threatened |
+| Recreation need Maslow tier | 3 (Belonging) | Alongside social; suppressed when survival is threatened |
 | Variety bonus threshold | 3+ distinct types in last 200 ticks | Rewards behavioral diversity |
 | Variety mood bonus | +0.1 ("stimulated") | Noticeable but not dominant |
 | Repetition penalty | -50% recreation gain per consecutive same-type | Diminishing returns from monotony |

@@ -46,7 +46,7 @@ Also: `just logs` · `just trace` · `just narrative-editor` (Writer's Toolkit �
 ## Architecture
 
 - **Utility AI + GOAP.** Cats score per-tick (`src/ai/scoring.rs`); winning disposition drives the GOAP planner (`src/systems/goap.rs`) that sequences `resolve_*` steps under `src/steps/`. No behavior trees, no LLMs.
-- **Maslow needs.** 5 levels (physiological → self-actualization); lower levels suppress higher when critical.
+- **Maslow needs.** 5 tiers (physiological → self-actualization); lower tiers suppress higher when critical. ("Tier 1..5" refers to Maslow rank — distinct from the AI substrate's `L1/L2/L3` shorthand at [`docs/systems/ai-substrate-refactor.md:551`](docs/systems/ai-substrate-refactor.md), which names markers / DSE scoring / softmax layers.)
 - **Ecological-magical-realist world.** Magic, fate, the Calling, wards, corruption are *ecological phenomena with metaphysical weight* — tune as part of the ecosystem, not as an unlockable layer.
 - **No director.** No difficulty scaling, no out-of-fiction storyteller. (In-fiction coordinator cats *can* issue directives; those are perceivable substrate that recipients score and may refuse — not a thumb on the scale.) Seasons / weather / corruption *are* the event generator.
 

@@ -6,7 +6,7 @@
 //! and `boldness` via `Composite { Linear, Invert }`. Both gate:
 //! bold cats never flee; fully safe cats have nothing to flee from.
 //!
-//! Maslow tier 2 — matches the inline `level_suppression(2)` factor
+//! Maslow tier 2 — matches the inline `tier_suppression(2)` factor
 //! in `scoring.rs`. Fleeing is a safety-layer response that a
 //! starving cat should not pursue over eating.
 //!

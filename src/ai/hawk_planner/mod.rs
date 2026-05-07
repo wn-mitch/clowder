@@ -146,9 +146,9 @@ pub enum HawkDispositionKind {
 }
 
 impl HawkDispositionKind {
-    /// Maslow level this disposition serves.
-    /// Hawks have a flat survival-only hierarchy (all level 1).
-    pub fn maslow_level(self) -> u8 {
+    /// Maslow tier this disposition serves.
+    /// Hawks have a flat survival-only hierarchy (all tier 1).
+    pub fn maslow_tier(self) -> u8 {
         1 // All hawk dispositions are survival-tier
     }
 

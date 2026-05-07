@@ -27,8 +27,10 @@ graph TD
         incapacitation_update_incapacitation --> growth_update_life_stage_markers
         needs_update_injury_marker["needs::update_injury_marker"]
         growth_update_life_stage_markers --> needs_update_injury_marker
+        interoception_author_self_markers["interoception::author_self_markers"]
+        needs_update_injury_marker --> interoception_author_self_markers
         items_update_inventory_markers["items::update_inventory_markers"]
-        needs_update_injury_marker --> items_update_inventory_markers
+        interoception_author_self_markers --> items_update_inventory_markers
         coordination_update_directive_markers["coordination::update_directive_markers"]
         items_update_inventory_markers --> coordination_update_directive_markers
         combat_update_combat_marker["combat::update_combat_marker"]
@@ -63,20 +65,28 @@ graph TD
         fox_spatial_update_den_marker --> social_befriend_wildlife
         needs_decay_grooming["needs::decay_grooming"]
         social_befriend_wildlife --> needs_decay_grooming
+        plan_substrate_expire_reservations["plan_substrate::expire_reservations"]
+        needs_decay_grooming --> plan_substrate_expire_reservations
+        plan_substrate_sensors["plan_substrate::sensors"]
+        plan_substrate_expire_reservations --> plan_substrate_sensors
         needs_eat_from_inventory["needs::eat_from_inventory"]
-        needs_decay_grooming --> needs_eat_from_inventory
+        plan_substrate_sensors --> needs_eat_from_inventory
         needs_decay_exploration["needs::decay_exploration"]
         needs_eat_from_inventory --> needs_decay_exploration
         needs_stamp_passive_exploration["needs::stamp_passive_exploration"]
         needs_decay_exploration --> needs_stamp_passive_exploration
+        needs_update_exploration_centroid["needs::update_exploration_centroid"]
+        needs_stamp_passive_exploration --> needs_update_exploration_centroid
         needs_bond_proximity_social["needs::bond_proximity_social"]
-        needs_stamp_passive_exploration --> needs_bond_proximity_social
+        needs_update_exploration_centroid --> needs_bond_proximity_social
         fulfillment_decay_fulfillment["fulfillment::decay_fulfillment"]
         needs_bond_proximity_social --> fulfillment_decay_fulfillment
         fulfillment_bond_proximity_social_warmth["fulfillment::bond_proximity_social_warmth"]
         fulfillment_decay_fulfillment --> fulfillment_bond_proximity_social_warmth
+        fulfillment_update_body_condition["fulfillment::update_body_condition"]
+        fulfillment_bond_proximity_social_warmth --> fulfillment_update_body_condition
         pregnancy_tick_pregnancy["pregnancy::tick_pregnancy"]
-        fulfillment_bond_proximity_social_warmth --> pregnancy_tick_pregnancy
+        fulfillment_update_body_condition --> pregnancy_tick_pregnancy
         fertility_handle_post_partum_reinsert["fertility::handle_post_partum_reinsert"]
         pregnancy_tick_pregnancy --> fertility_handle_post_partum_reinsert
         fertility_update_fertility_phase["fertility::update_fertility_phase"]
@@ -85,8 +95,10 @@ graph TD
         fertility_update_fertility_phase --> growth_tick_kitten_growth
         growth_kitten_mood_aura["growth::kitten_mood_aura"]
         growth_tick_kitten_growth --> growth_kitten_mood_aura
+        growth_update_kitten_cry_map["growth::update_kitten_cry_map"]
+        growth_kitten_mood_aura --> growth_update_kitten_cry_map
         mood_update_mood["mood::update_mood"]
-        growth_kitten_mood_aura --> mood_update_mood
+        growth_update_kitten_cry_map --> mood_update_mood
         mood_mood_contagion["mood::mood_contagion"]
         mood_update_mood --> mood_mood_contagion
         mood_bond_proximity_mood["mood::bond_proximity_mood"]
@@ -147,14 +159,26 @@ graph TD
         death_cleanup_dead --> wildlife_cleanup_wildlife
         narrative_generate_narrative["narrative::generate_narrative"]
         wildlife_cleanup_wildlife --> narrative_generate_narrative
+        goap_check_modifier_preemption["goap::check_modifier_preemption"]
+        narrative_generate_narrative --> goap_check_modifier_preemption
         goap_check_anxiety_interrupts["goap::check_anxiety_interrupts"]
-        narrative_generate_narrative --> goap_check_anxiety_interrupts
+        goap_check_modifier_preemption --> goap_check_anxiety_interrupts
+        buildings_update_colony_building_markers["buildings::update_colony_building_markers"]
+        goap_check_anxiety_interrupts --> buildings_update_colony_building_markers
+        magic_update_herb_availability_markers["magic::update_herb_availability_markers"]
+        buildings_update_colony_building_markers --> magic_update_herb_availability_markers
+        magic_update_ward_coverage_markers["magic::update_ward_coverage_markers"]
+        magic_update_herb_availability_markers --> magic_update_ward_coverage_markers
+        magic_update_ward_siege_marker["magic::update_ward_siege_marker"]
+        magic_update_ward_coverage_markers --> magic_update_ward_siege_marker
         goap_evaluate_and_plan["goap::evaluate_and_plan"]
-        goap_check_anxiety_interrupts --> goap_evaluate_and_plan
+        magic_update_ward_siege_marker --> goap_evaluate_and_plan
         goap_resolve_goap_plans["goap::resolve_goap_plans"]
         goap_evaluate_and_plan --> goap_resolve_goap_plans
         goap_emit_plan_narrative["goap::emit_plan_narrative"]
         goap_resolve_goap_plans --> goap_emit_plan_narrative
+        plan_substrate_update_prev_safety_deficit["plan_substrate::update_prev_safety_deficit"]
+        goap_emit_plan_narrative --> plan_substrate_update_prev_safety_deficit
     end
     subgraph standalone["Standalone Systems"]
         magic_CorruptionPushback["magic::CorruptionPushback"]
@@ -171,6 +195,7 @@ graph TD
         magic_herb_regrowth["magic::herb_regrowth"]
         magic_corruption_tile_effects["magic::corruption_tile_effects"]
         magic_apply_corruption_pushback["magic::apply_corruption_pushback"]
+        magic_update_corruption_landmarks["magic::update_corruption_landmarks"]
         magic_spawn_shadow_fox_from_corruption["magic::spawn_shadow_fox_from_corruption"]
         wildlife_spawn_wildlife["wildlife::spawn_wildlife"]
         wildlife_wildlife_ai["wildlife::wildlife_ai"]
@@ -195,6 +220,10 @@ graph TD
         wildlife_detect_threats["wildlife::detect_threats"]
         buildings_apply_building_effects["buildings::apply_building_effects"]
         buildings_decay_building_condition["buildings::decay_building_condition"]
+        buildings_update_colony_landmarks["buildings::update_colony_landmarks"]
+        buildings_update_food_location_map["buildings::update_food_location_map"]
+        buildings_update_garden_location_map["buildings::update_garden_location_map"]
+        buildings_update_construction_site_map["buildings::update_construction_site_map"]
         items_decay_items["items::decay_items"]
         disposition_cat_presence_tick["disposition::cat_presence_tick"]
         personality_events_emit_personality_events["personality_events::emit_personality_events"]

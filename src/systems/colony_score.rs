@@ -63,10 +63,10 @@ fn compute_happiness(moods: &[f32]) -> f32 {
     ((avg + 1.0) / 2.0).clamp(0.0, 1.0)
 }
 
-/// Average of level 3-5 Maslow needs weighted by suppression.
+/// Average of tier 3-5 Maslow needs weighted by suppression.
 ///
 /// For each cat, we take their belonging, esteem, and self-actualisation
-/// satisfaction levels, each scaled by the cat's level suppression. This
+/// satisfaction values, each scaled by the cat's tier suppression. This
 /// captures whether cats are actually *able to pursue* higher needs, not
 /// just whether the raw values are high.
 fn compute_fulfillment(needs: &[&Needs]) -> f32 {
@@ -76,9 +76,9 @@ fn compute_fulfillment(needs: &[&Needs]) -> f32 {
     let sum: f32 = needs
         .iter()
         .map(|n| {
-            let belonging = ((n.social + n.acceptance) / 2.0) * n.level_suppression(3);
-            let esteem = ((n.respect + n.mastery) / 2.0) * n.level_suppression(4);
-            let purpose = n.purpose * n.level_suppression(5);
+            let belonging = ((n.social + n.acceptance) / 2.0) * n.tier_suppression(3);
+            let esteem = ((n.respect + n.mastery) / 2.0) * n.tier_suppression(4);
+            let purpose = n.purpose * n.tier_suppression(5);
             (belonging + esteem + purpose) / 3.0
         })
         .sum();

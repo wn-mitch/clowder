@@ -15,11 +15,11 @@ Acceptance is a structural one-way drain.
 
 This matters beyond the chart: `src/systems/colony_score.rs:148-156`
 computes colony welfare as an average of five axes, one of which
-(`fulfillment`) applies Maslow level-suppression via
-`belonging = (social + acceptance) / 2` cascading into level-5
+(`fulfillment`) applies Maslow tier-suppression via
+`belonging = (social + acceptance) / 2` cascading into tier-5
 suppression. Pinned-at-0 acceptance halves the belonging term, which
-cascade-multiplies through esteem (level 4) into self-actualization
-(level 5), dragging welfare down regardless of actual colony health.
+cascade-multiplies through esteem (tier 4) into self-actualization
+(tier 5), dragging welfare down regardless of actual colony health.
 
 ## Hypothesis
 

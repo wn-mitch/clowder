@@ -9,10 +9,10 @@
 | Enum | Variants | Source |
 |------|----------|--------|
 | [ItemKind](#itemkind) | 30 | `src/components/items.rs` |
-| [DispositionKind](#dispositionkind) | 12 | `src/components/disposition.rs` |
+| [DispositionKind](#dispositionkind) | 21 | `src/components/disposition.rs` |
 | [Weather](#weather) | 8 | `src/resources/weather.rs` |
 | [Terrain](#terrain) | 21 | `src/resources/map.rs` |
-| [StructureType](#structuretype) | 10 | `src/components/building.rs` |
+| [StructureType](#structuretype) | 11 | `src/components/building.rs` |
 | [HerbKind](#herbkind) | 8 | `src/components/magic.rs` |
 | [WardKind](#wardkind) | 2 | `src/components/magic.rs` |
 | [ZodiacSign](#zodiacsign) | 8 | `src/components/zodiac.rs` |
@@ -25,7 +25,7 @@
 | [PreyKind](#preykind) | 5 | `src/components/prey.rs` |
 | [FleeStrategy](#fleestrategy) | 4 | `src/components/prey.rs` |
 | [WildSpecies](#wildspecies) | 4 | `src/components/wildlife.rs` |
-| [EventKind](#eventkind) | 199 | `src/resources/event_log.rs` |
+| [EventKind](#eventkind) | 217 | `src/resources/event_log.rs` |
 | [NarrativeTier](#narrativetier) | 6 | `src/resources/narrative.rs` |
 | [PriorityKind](#prioritykind) | 4 | `src/resources/colony_priority.rs` |
 | [DirectiveKind](#directivekind) | 10 | `src/components/coordination.rs` |
@@ -84,17 +84,26 @@
 | Variant |
 |---------|
 | `Resting` |
+| `Eating` |
 | `Hunting` |
 | `Foraging` |
 | `Guarding` |
 | `Socializing` |
 | `Building` |
 | `Farming` |
-| `Crafting` |
+| `Herbalism` |
 | `Coordinating` |
 | `Exploring` |
 | `Mating` |
 | `Caretaking` |
+| `Mentoring` |
+| `Grooming` |
+| `Witchcraft` |
+| `Cooking` |
+| `Discarding` |
+| `Trashing` |
+| `Handing` |
+| `PickingUp` |
 
 ## Weather
 
@@ -155,6 +164,7 @@
 | `WardPost` |
 | `Wall` |
 | `Gate` |
+| `Midden` |
 
 ## HerbKind
 
@@ -387,6 +397,15 @@
 | `cat` |
 | `species` |
 | `location` |
+| `HuntAttempt` |
+| `cat` |
+| `prey_species` |
+| `location` |
+| `outcome` |
+| `start_tick` |
+| `end_tick` |
+| `start_distance` |
+| `failure_reason` |
 | `KittenBorn` |
 | `mother` |
 | `kitten` |
@@ -497,6 +516,15 @@
 | `hunger` |
 | `energy` |
 | `temperature` |
+| `PlanningFailed` |
+| `cat` |
+| `disposition` |
+| `reason` |
+| `hunger` |
+| `energy` |
+| `temperature` |
+| `food_available` |
+| `has_stored_food` |
 
 ## NarrativeTier
 
