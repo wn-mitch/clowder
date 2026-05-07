@@ -411,6 +411,14 @@ pub struct ScoringContext<'a> {
     /// Fox scent intensity at the cat's current position (0.0–1.0).
     /// High values indicate deep fox territory.
     pub fox_scent_level: f32,
+    /// 209: Colony-tension proxy — currently `(1 - needs.safety)` of
+    /// the cat being scored. Consumed by `TensionDefusionGroomLift`
+    /// modifier as the "is the colony stressed enough that
+    /// allogrooming serves a defusion role?" signal. Per-cat proxy
+    /// stands in for a true colony-aggregate signal until a follow-on
+    /// ticket adds proper cross-cat aggregation (e.g., from
+    /// `SystemActivation::interrupts_by_reason` flee-preemption count).
+    pub colony_tension_recent: f32,
     // --- Corruption/carcass/siege context ---
     /// Whether uncleansed/unharvested carcasses are within detection range.
     pub carcass_nearby: bool,
@@ -796,6 +804,10 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
         ctx.tradition_location_bonus.max(0.0),
     );
     m.insert("fox_scent_level", ctx.fox_scent_level.clamp(0.0, 1.0));
+    m.insert(
+        "colony_tension_recent",
+        ctx.colony_tension_recent.clamp(0.0, 1.0),
+    );
     // Active-disposition ordinal drives the Patience modifier's
     // constituent-DSE membership check. 0.0 encodes `None`; 1.0..=12.0
     // encode each `DispositionKind` variant. The Patience modifier owns
@@ -2486,8 +2498,8 @@ mod tests {
             r.cat_dses.push(crate::ai::dses::socialize_dse());
             r.cat_dses.push(crate::ai::dses::groom_self_dse());
             r.cat_dses.push(crate::ai::dses::groom_other_dse());
-            r.cat_dses.push(crate::ai::dses::mentor_dse());
-            r.cat_dses.push(crate::ai::dses::caretake_dse());
+            r.cat_dses.push(crate::ai::dses::mentor_dse(&scoring));
+            r.cat_dses.push(crate::ai::dses::caretake_dse(&scoring));
             r.cat_dses.push(crate::ai::dses::mate_dse());
             r.cat_dses.push(crate::ai::dses::patrol_dse(&scoring));
             r.cat_dses.push(crate::ai::dses::build_dse(&scoring));
@@ -2688,6 +2700,7 @@ mod tests {
             threat_proximity_derivative: 0.0,
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
+            colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
@@ -2877,6 +2890,7 @@ mod tests {
             threat_proximity_derivative: 0.0,
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
+            colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
@@ -3089,6 +3103,7 @@ mod tests {
             threat_proximity_derivative: 0.0,
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
+            colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
@@ -3365,6 +3380,7 @@ mod tests {
             threat_proximity_derivative: 0.0,
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
+            colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
@@ -3483,6 +3499,7 @@ mod tests {
             threat_proximity_derivative: 0.0,
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
+            colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
@@ -3620,6 +3637,7 @@ mod tests {
             threat_proximity_derivative: 0.0,
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
+            colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
@@ -3942,6 +3960,7 @@ mod tests {
             threat_proximity_derivative: 0.0,
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
+            colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
@@ -4061,6 +4080,7 @@ mod tests {
             threat_proximity_derivative: 0.0,
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
+            colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
             territory_max_corruption: 0.0,

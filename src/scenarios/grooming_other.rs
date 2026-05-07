@@ -94,3 +94,4 @@ fn setup(world: &mut World, seed: u64) {
     }
     world.insert_resource(rels);
 }
+

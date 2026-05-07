@@ -1831,6 +1831,46 @@ pub struct ScoringConstants {
     /// follow-on (ticket 209).
     #[serde(default = "default_forage_food_security_weight")]
     pub forage_food_security_weight: f32,
+    /// 209: weight on the positive `colony_food_security` axis in
+    /// Mentor's WS composition. Ships dormant at 0.0; tuning is a
+    /// follow-on ticket. Mirrors Hunt/Forage's saturation pattern but
+    /// without `Invert` so high food security adds positive lift to
+    /// the higher-tier DSE rather than suppressing it. `(1-w)`
+    /// rebalance on the existing three axes preserves RtEO sum=1.0.
+    #[serde(default = "default_mentor_food_security_weight")]
+    pub mentor_food_security_weight: f32,
+    /// 209: weight on the positive `colony_food_security` axis in
+    /// Coordinate's WS composition. Sibling to
+    /// `mentor_food_security_weight`. Ships dormant at 0.0.
+    #[serde(default = "default_coordinate_food_security_weight")]
+    pub coordinate_food_security_weight: f32,
+    /// 209: weight on the positive `colony_food_security` axis in
+    /// Caretake's WS composition. Sibling to
+    /// `mentor_food_security_weight`. Ships dormant at 0.0.
+    #[serde(default = "default_caretake_food_security_weight")]
+    pub caretake_food_security_weight: f32,
+    /// 209: weight on the `FoodSecurityGroomLift` modifier targeting
+    /// GroomOther. Multiplicative shape `(1 + w · colony_food_security)`
+    /// preserves CompensatedProduct gates in the underlying DSE. Ships
+    /// dormant at 0.0; tuning is a follow-on ticket.
+    #[serde(default = "default_groom_food_security_weight")]
+    pub groom_food_security_weight: f32,
+    /// 209: weight on the `fox_scent_at_position` cost axis in
+    /// Patrol's CompensatedProduct composition. Reads
+    /// `FoxScentMap::base_sample(cat_position)` (sensing-mediated, not
+    /// omniscient). Curve `Composite{Logistic(6.0, 0.4), Invert}` —
+    /// high scent → low axis → CP gate suppresses Patrol. Ships
+    /// dormant at 0.0; tuning is a follow-on ticket. Addresses the 181
+    /// cascade by pricing predator-exposure into Patrol's L2 score.
+    #[serde(default = "default_patrol_fox_scent_weight")]
+    pub patrol_fox_scent_weight: f32,
+    /// 209: weight on the `TensionDefusionGroomLift` modifier
+    /// targeting GroomOther. Multiplicative lift when
+    /// `colony_tension_recent` is elevated AND `HasGroomingCandidate`
+    /// is set. Captures real-cat allogrooming's tension-defusion role
+    /// (van den Bos 1998). Ships dormant at 0.0.
+    #[serde(default = "default_tension_defusion_groom_weight")]
+    pub tension_defusion_groom_weight: f32,
     /// 178: Logistic slope on the `inventory_excess` axis used by the
     /// Discarding and Trashing DSEs. Higher slope → sharper lift past
     /// the midpoint (cats with full inventory react harder once they
@@ -2063,6 +2103,12 @@ impl Default for ScoringConstants {
             build_chronic_full_weight: default_build_chronic_full_weight(),
             hunt_food_security_weight: default_hunt_food_security_weight(),
             forage_food_security_weight: default_forage_food_security_weight(),
+            mentor_food_security_weight: default_mentor_food_security_weight(),
+            coordinate_food_security_weight: default_coordinate_food_security_weight(),
+            caretake_food_security_weight: default_caretake_food_security_weight(),
+            groom_food_security_weight: default_groom_food_security_weight(),
+            patrol_fox_scent_weight: default_patrol_fox_scent_weight(),
+            tension_defusion_groom_weight: default_tension_defusion_groom_weight(),
             disposal_inventory_excess_slope: default_disposal_inventory_excess_slope(),
             disposal_inventory_excess_midpoint: default_disposal_inventory_excess_midpoint(),
             gate_timid_fight_threshold: 0.1,
@@ -3071,6 +3117,43 @@ fn default_hunt_food_security_weight() -> f32 {
 /// axis. Ships dormant at 0.0 — see
 /// `ScoringConstants::forage_food_security_weight`.
 fn default_forage_food_security_weight() -> f32 {
+    0.0
+}
+
+/// 209: Mentor DSE positive-lift weight on the `colony_food_security`
+/// axis. Ships dormant at 0.0 — see
+/// `ScoringConstants::mentor_food_security_weight`.
+fn default_mentor_food_security_weight() -> f32 {
+    0.0
+}
+
+/// 209: Coordinate DSE positive-lift weight on the
+/// `colony_food_security` axis. Ships dormant at 0.0.
+fn default_coordinate_food_security_weight() -> f32 {
+    0.0
+}
+
+/// 209: Caretake DSE positive-lift weight on the
+/// `colony_food_security` axis. Ships dormant at 0.0.
+fn default_caretake_food_security_weight() -> f32 {
+    0.0
+}
+
+/// 209: GroomOther `FoodSecurityGroomLift` modifier weight. Ships
+/// dormant at 0.0.
+fn default_groom_food_security_weight() -> f32 {
+    0.0
+}
+
+/// 209: Patrol `fox_scent_at_position` cost-axis weight. Ships
+/// dormant at 0.0.
+fn default_patrol_fox_scent_weight() -> f32 {
+    0.0
+}
+
+/// 209: GroomOther `TensionDefusionGroomLift` modifier weight. Ships
+/// dormant at 0.0.
+fn default_tension_defusion_groom_weight() -> f32 {
     0.0
 }
 

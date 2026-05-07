@@ -64,6 +64,15 @@ impl CoordinateDse {
             }),
             post: PostOp::Invert,
         };
+        // 209: positive `colony_food_security` axis. Plain Logistic
+        // (no Invert) — output rises with food security. Default
+        // weight 0.0 ships dormant.
+        let lift_curve = Curve::Logistic {
+            steepness: 8.0,
+            midpoint: 0.5,
+        };
+        let lift_weight = scoring.coordinate_food_security_weight.clamp(0.0, 1.0);
+        let remainder = 1.0 - lift_weight;
         Self {
             id: DseId("coordinate"),
             considerations: vec![
@@ -79,12 +88,24 @@ impl CoordinateDse {
                     COORDINATE_PERCH_RANGE,
                     perch_distance,
                 )),
+                Consideration::Scalar(ScalarConsideration::new(
+                    "colony_food_security",
+                    lift_curve,
+                )),
             ],
             // RtEO sum = 1.0. Directive count drives, diligence +
             // ambition modulate, perch proximity pulls toward the
-            // coordination location. Original three weights renormalized
-            // ×0.80 to make room for the spatial axis at 0.20.
-            composition: Composition::weighted_sum(vec![0.24, 0.32, 0.24, 0.20]),
+            // coordination location. The fifth axis
+            // (colony_food_security) ships at default-zero weight; the
+            // other four scale by `remainder` so the weight sum stays
+            // 1.0 even when balance-tuning lifts the lift knob.
+            composition: Composition::weighted_sum(vec![
+                0.24 * remainder,
+                0.32 * remainder,
+                0.24 * remainder,
+                0.20 * remainder,
+                lift_weight,
+            ]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
             // §4: only coordinators with pending directives are eligible.
             eligibility: EligibilityFilter::new()
@@ -143,5 +164,18 @@ mod tests {
         let s = ScoringConstants::default();
         let sum: f32 = CoordinateDse::new(&s).composition().weights.iter().sum();
         assert!((sum - 1.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn coordinate_food_security_dormant_at_default_zero() {
+        let s = ScoringConstants::default();
+        assert_eq!(s.coordinate_food_security_weight, 0.0);
+        let weights = CoordinateDse::new(&s).composition().weights.clone();
+        assert_eq!(weights.len(), 5);
+        assert!((weights[0] - 0.24).abs() < 1e-4);
+        assert!((weights[1] - 0.32).abs() < 1e-4);
+        assert!((weights[2] - 0.24).abs() < 1e-4);
+        assert!((weights[3] - 0.20).abs() < 1e-4);
+        assert!((weights[4] - 0.0).abs() < 1e-4);
     }
 }

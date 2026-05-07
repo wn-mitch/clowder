@@ -21,6 +21,7 @@ use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
 use crate::components::markers;
+use crate::resources::sim_constants::ScoringConstants;
 
 pub const WARMTH_INPUT: &str = "warmth";
 pub const DILIGENCE_INPUT: &str = "diligence";
@@ -34,21 +35,45 @@ pub struct MentorDse {
 }
 
 impl MentorDse {
-    pub fn new() -> Self {
+    pub fn new(scoring: &ScoringConstants) -> Self {
         let linear = Curve::Linear {
             slope: 1.0,
             intercept: 0.0,
         };
+        // 209: positive `colony_food_security` axis. Plain Logistic
+        // (no Invert post-op) — output rises with food security,
+        // providing positive lift when the colony is well-fed (the
+        // path-1 alternative from 181's closeout). Default weight 0.0
+        // ships dormant; tuning iteration lifts it.
+        let lift_curve = Curve::Logistic {
+            steepness: 8.0,
+            midpoint: 0.5,
+        };
+        let lift_weight = scoring.mentor_food_security_weight.clamp(0.0, 1.0);
+        let remainder = 1.0 - lift_weight;
         Self {
             id: DseId("mentor"),
             considerations: vec![
                 Consideration::Scalar(ScalarConsideration::new(WARMTH_INPUT, linear.clone())),
                 Consideration::Scalar(ScalarConsideration::new(DILIGENCE_INPUT, linear.clone())),
                 Consideration::Scalar(ScalarConsideration::new(AMBITION_INPUT, linear)),
+                Consideration::Scalar(ScalarConsideration::new(
+                    "colony_food_security",
+                    lift_curve,
+                )),
             ],
             // RtEO weights sum to 1.0. Warmth + diligence co-drive;
-            // ambition is the status-seeking secondary driver.
-            composition: Composition::weighted_sum(vec![0.4, 0.4, 0.2]),
+            // ambition is the status-seeking secondary driver. The
+            // fourth axis (colony_food_security) ships at default-
+            // zero weight; the other three scale by `remainder` so
+            // the weight sum stays 1.0 even when balance-tuning
+            // lifts the lift knob.
+            composition: Composition::weighted_sum(vec![
+                0.4 * remainder,
+                0.4 * remainder,
+                0.2 * remainder,
+                lift_weight,
+            ]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
             // Ticket 014 Mentoring batch: also requires
             // `HasMentoringTarget` (cat sees a peer with a learnable
@@ -58,12 +83,6 @@ impl MentorDse {
                 .forbid(markers::Incapacitated::KEY)
                 .require(markers::HasMentoringTarget::KEY),
         }
-    }
-}
-
-impl Default for MentorDse {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -102,22 +121,30 @@ impl Dse for MentorDse {
     }
 }
 
-pub fn mentor_dse() -> Box<dyn Dse> {
-    Box::new(MentorDse::new())
+pub fn mentor_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+    Box::new(MentorDse::new(scoring))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn default_scoring() -> ScoringConstants {
+        ScoringConstants::default()
+    }
+
     #[test]
     fn mentor_dse_id_stable() {
-        assert_eq!(MentorDse::new().id().0, "mentor");
+        assert_eq!(MentorDse::new(&default_scoring()).id().0, "mentor");
     }
 
     #[test]
     fn mentor_weights_sum_to_one() {
-        let sum: f32 = MentorDse::new().composition().weights.iter().sum();
+        let sum: f32 = MentorDse::new(&default_scoring())
+            .composition()
+            .weights
+            .iter()
+            .sum();
         assert!((sum - 1.0).abs() < 1e-4);
     }
 
@@ -125,8 +152,23 @@ mod tests {
     fn mentor_is_weighted_sum() {
         use crate::ai::composition::CompositionMode;
         assert_eq!(
-            MentorDse::new().composition().mode,
+            MentorDse::new(&default_scoring()).composition().mode,
             CompositionMode::WeightedSum
         );
+    }
+
+    #[test]
+    fn mentor_food_security_dormant_at_default_zero() {
+        // 209: at default weight 0.0, the (1-w) rebalance is identity:
+        // existing three weights stay at 0.4/0.4/0.2 and the new fifth
+        // axis carries 0.0. This test guards that invariant.
+        let scoring = default_scoring();
+        assert_eq!(scoring.mentor_food_security_weight, 0.0);
+        let weights = MentorDse::new(&scoring).composition().weights.clone();
+        assert_eq!(weights.len(), 4);
+        assert!((weights[0] - 0.4).abs() < 1e-4);
+        assert!((weights[1] - 0.4).abs() < 1e-4);
+        assert!((weights[2] - 0.2).abs() < 1e-4);
+        assert!((weights[3] - 0.0).abs() < 1e-4);
     }
 }

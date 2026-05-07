@@ -41,9 +41,9 @@ pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConsta
     registry
         .target_taking_dses
         .push(dses::groom_other_target_dse());
-    registry.cat_dses.push(dses::mentor_dse());
+    registry.cat_dses.push(dses::mentor_dse(scoring));
     registry.target_taking_dses.push(dses::mentor_target_dse());
-    registry.cat_dses.push(dses::caretake_dse());
+    registry.cat_dses.push(dses::caretake_dse(scoring));
     registry
         .target_taking_dses
         .push(dses::caretake_target_dse());

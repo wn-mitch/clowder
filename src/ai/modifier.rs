@@ -116,6 +116,16 @@ const HUNGER_URGENCY: &str = "hunger_urgency";
 /// cat's own `kitten_urgency` axis (which is a non-spatial in-engine
 /// urgency, not a spatial perception).
 const KITTEN_CRY_PERCEIVED: &str = "kitten_cry_perceived";
+/// 209 — `FoodSecurityGroomLift` Modifier trigger input. Published
+/// by `scoring::ctx_scalars` as `min(food_fraction, hunger_satisfaction)`
+/// (the colony food-security scalar). High when the colony is
+/// well-fed AND the groomer's hunger is satisfied.
+const COLONY_FOOD_SECURITY: &str = "colony_food_security";
+/// 209 — `TensionDefusionGroomLift` Modifier trigger input. Published
+/// by `scoring::ctx_scalars` as `1 - safety` of the cat being scored
+/// (per-cat proxy for colony tension, pending follow-on cross-cat
+/// aggregation). High when the cat is in a stressed state.
+const COLONY_TENSION_RECENT: &str = "colony_tension_recent";
 /// Ticket 107 — `ExhaustionPressure` Modifier trigger input. Already
 /// published by `scoring::ctx_scalars` as `(1 - needs.energy).clamp(0,1)`.
 /// Read directly so exhaustion alone fires the Sleep / GroomSelf lift
@@ -1768,6 +1778,165 @@ impl ScoreModifier for KittenCryCaretakeLift {
 }
 
 // ---------------------------------------------------------------------------
+// FoodSecurityGroomLift — ticket 209
+// ---------------------------------------------------------------------------
+
+/// 209 — multiplicative lift on the `groom_other` DSE when colony
+/// food security is high. Captures the path-1 alternative from
+/// 181's closeout: when the colony is well-fed, higher-tier social
+/// behavior gets a positive boost rather than passively absorbing
+/// freed bandwidth from Hunt/Forage suppression.
+///
+/// **Why a modifier vs an axis on `groom_other_dse`.** GroomOther
+/// uses `CompensatedProduct` semantics — a fifth axis at weight 0
+/// would zero the entire score (CP's `(c · w)` factor). Adding the
+/// lift outside the CP preserves the bond-and-opportunity gates
+/// that real-cat allogrooming requires (van den Bos 1998). Same
+/// design rationale as `FoxTerritorySuppression`'s multiplicative
+/// shape on Hunt / Patrol / etc.
+///
+/// **Trigger:** `groom_other` DSE, `colony_food_security >= threshold`,
+/// `groom_food_security_weight > 0`. The threshold is fixed at the
+/// curve midpoint (0.5) so the lift fires once food security crosses
+/// the same point Hunt / Forage's saturation curves cross — keeping
+/// the food-security mechanics aligned across the cluster.
+///
+/// **Transform:** `score *= (1 + ramp · weight)` where
+/// `ramp = (fs - 0.5) / 0.5` ∈ [0, 1] over fs ∈ [0.5, 1.0]. At
+/// `groom_food_security_weight = 0` (default) the multiplier is 1.0
+/// (identity; no behavior change). At weight 0.2, fs = 1.0: 20%
+/// boost.
+///
+/// **Gated-boost contract:** returns `score` unchanged on `score <=
+/// 0` — food security doesn't conjure groom-eligibility into
+/// existence (mirrors `KittenCryCaretakeLift`'s convention).
+pub struct FoodSecurityGroomLift {
+    weight: f32,
+}
+
+impl FoodSecurityGroomLift {
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            weight: sc.groom_food_security_weight,
+        }
+    }
+}
+
+impl ScoreModifier for FoodSecurityGroomLift {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        _ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        if dse_id.0 != GROOM_OTHER {
+            return score;
+        }
+        if score <= 0.0 {
+            return score;
+        }
+        if self.weight <= 0.0 {
+            return score;
+        }
+        let fs = fetch(COLONY_FOOD_SECURITY, _ctx.cat).clamp(0.0, 1.0);
+        if fs <= 0.5 {
+            return score;
+        }
+        let ramp = ((fs - 0.5) / 0.5).clamp(0.0, 1.0);
+        score * (1.0 + ramp * self.weight)
+    }
+
+    fn name(&self) -> &'static str {
+        "food_security_groom_lift"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TensionDefusionGroomLift — ticket 209
+// ---------------------------------------------------------------------------
+
+/// 209 — multiplicative lift on the `groom_other` DSE when colony
+/// tension is elevated AND the cat has a social target nearby.
+/// Captures the real-cat allogrooming tension-defusion role (van den
+/// Bos 1998 — allogrooming is one of three colony cohesion behaviors,
+/// fired prophylactically during stress to defuse before conflict
+/// escalates).
+///
+/// **Trigger:** `groom_other` DSE, `colony_tension_recent >=
+/// threshold` (fixed at 0.4), `HasSocialTarget` marker present
+/// (gates the lift to cats with someone to groom — without that, the
+/// stress doesn't translate into allogrooming opportunity. Same
+/// broad-phase marker `score_actions` already gates groom_other
+/// scoring on, so the modifier never fires when the underlying DSE
+/// would have been zero-scored anyway),
+/// `tension_defusion_groom_weight > 0`.
+///
+/// **Transform:** `score *= (1 + ramp · weight)` where
+/// `ramp = (tension - 0.4) / 0.6` ∈ [0, 1] over tension ∈ [0.4, 1.0].
+/// At weight 0 (default), multiplier is 1.0 (identity).
+///
+/// **Composition:** Composes multiplicatively with
+/// `FoodSecurityGroomLift` — well-fed AND stressed cats get both
+/// boosts, matching the ethological intuition that secure-but-anxious
+/// colonies engage in the most cohesion behavior.
+///
+/// **Gated-boost contract:** returns `score` unchanged on `score <=
+/// 0` — perceived tension doesn't conjure groom-eligibility into
+/// existence (mirrors `KittenCryCaretakeLift`).
+pub struct TensionDefusionGroomLift {
+    weight: f32,
+}
+
+impl TensionDefusionGroomLift {
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            weight: sc.tension_defusion_groom_weight,
+        }
+    }
+}
+
+impl ScoreModifier for TensionDefusionGroomLift {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        if dse_id.0 != GROOM_OTHER {
+            return score;
+        }
+        if score <= 0.0 {
+            return score;
+        }
+        if self.weight <= 0.0 {
+            return score;
+        }
+        // Use the existing `HasSocialTarget` marker (authored by
+        // `sensing::update_target_existence_markers`) as the
+        // broad-phase "is there someone nearby to groom?" gate.
+        // 209 originally introduced a parallel `HasGroomingCandidate`,
+        // but `HasSocialTarget` already encodes the same predicate
+        // (resolve_socialize_target returning Some) — duplicating it
+        // costs a system + ECS component for zero added information.
+        if !(ctx.has_marker)(crate::components::markers::HasSocialTarget::KEY, ctx.cat) {
+            return score;
+        }
+        let tension = fetch(COLONY_TENSION_RECENT, ctx.cat).clamp(0.0, 1.0);
+        if tension <= 0.4 {
+            return score;
+        }
+        let ramp = ((tension - 0.4) / 0.6).clamp(0.0, 1.0);
+        score * (1.0 + ramp * self.weight)
+    }
+
+    fn name(&self) -> &'static str {
+        "tension_defusion_groom_lift"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // KittenEatBoost — ticket 156
 // ---------------------------------------------------------------------------
 
@@ -3152,6 +3321,14 @@ pub fn default_modifier_pipeline(
     // the Phase-4 weight-rebalance regression (verified empirically
     // — see KittenCryCaretakeLift doc-comment).
     pipeline.push(Box::new(KittenCryCaretakeLift::new(sc)));
+    // 209 — `FoodSecurityGroomLift` and `TensionDefusionGroomLift`
+    // both target GroomOther multiplicatively. Registered after
+    // `KittenCryCaretakeLift` so the lifts compose with each other
+    // and with downstream multiplicative damps. Both ship dormant at
+    // 0.0 weight (identity transform); tuning lives in follow-on
+    // tickets.
+    pipeline.push(Box::new(FoodSecurityGroomLift::new(sc)));
+    pipeline.push(Box::new(TensionDefusionGroomLift::new(sc)));
     pipeline.push(Box::new(ExhaustionPressure::new(sc)));
     pipeline.push(Box::new(ThermalDistress::new(sc)));
     // Ticket 108 — `ThreatProximityAdrenalineFlee` registers after the
@@ -3902,7 +4079,9 @@ mod tests {
     fn default_pipeline_registers_expected_modifier_count() {
         let constants = crate::resources::sim_constants::SimConstants::default();
         let pipeline = default_modifier_pipeline(&constants);
-        assert_eq!(pipeline.len(), 33, "expected 33 registered modifiers");
+        // 209: bumped 33 → 35 with `FoodSecurityGroomLift` +
+        // `TensionDefusionGroomLift`.
+        assert_eq!(pipeline.len(), 35, "expected 35 registered modifiers");
     }
 
     // -----------------------------------------------------------------------
@@ -5232,6 +5411,175 @@ mod tests {
         };
         let out = modifier.apply(DseId(CARETAKE), 0.0, &ctx, &fetch);
         assert_eq!(out, 0.0, "zero-score Caretake stays zero — no resurrection");
+    }
+
+    // -----------------------------------------------------------------------
+    // ticket 209 FoodSecurityGroomLift
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn food_security_groom_lift_dormant_at_default_zero() {
+        // 209: at default `groom_food_security_weight = 0.0` the
+        // modifier returns score unchanged regardless of fs value.
+        let modifier = FoodSecurityGroomLift { weight: 0.0 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            COLONY_FOOD_SECURITY => 1.0, // maximum food security
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(GROOM_OTHER), 0.5, &ctx, &fetch);
+        assert!(
+            (out - 0.5).abs() < 1e-6,
+            "weight=0 → identity transform; got {out}"
+        );
+    }
+
+    #[test]
+    fn food_security_groom_lift_lifts_when_secure() {
+        // weight = 0.2, fs = 1.0 → ramp = 1.0 → score *= (1 + 0.2)
+        // = 0.5 * 1.2 = 0.6.
+        let modifier = FoodSecurityGroomLift { weight: 0.2 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            COLONY_FOOD_SECURITY => 1.0,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(GROOM_OTHER), 0.5, &ctx, &fetch);
+        assert!((out - 0.6).abs() < 1e-5, "got {out}");
+    }
+
+    #[test]
+    fn food_security_groom_lift_no_lift_below_midpoint() {
+        // fs=0.4 < 0.5 threshold → no lift.
+        let modifier = FoodSecurityGroomLift { weight: 0.5 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            COLONY_FOOD_SECURITY => 0.4,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(GROOM_OTHER), 0.5, &ctx, &fetch);
+        assert!((out - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn food_security_groom_lift_targets_only_groom_other() {
+        let modifier = FoodSecurityGroomLift { weight: 0.5 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            COLONY_FOOD_SECURITY => 1.0,
+            _ => 0.0,
+        };
+        for dse in [
+            EAT, HUNT, FORAGE, SLEEP, GROOM_SELF, FLEE, FIGHT, MATE, COORDINATE, BUILD, MENTOR,
+            SOCIALIZE, PATROL, COOK, CARETAKE,
+        ] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "non-GroomOther dse {dse} should pass through unchanged; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn food_security_groom_lift_does_not_resurrect_zero_score() {
+        let modifier = FoodSecurityGroomLift { weight: 0.5 };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            COLONY_FOOD_SECURITY => 1.0,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(GROOM_OTHER), 0.0, &ctx, &fetch);
+        assert_eq!(out, 0.0);
+    }
+
+    // -----------------------------------------------------------------------
+    // ticket 209 TensionDefusionGroomLift
+    // -----------------------------------------------------------------------
+
+    fn test_ctx_with_grooming_candidate() -> (Entity, EvalCtx<'static>) {
+        static MARKER: fn(&str, Entity) -> bool =
+            |name, _| name == crate::components::markers::HasSocialTarget::KEY;
+        static NO_ENTITY_POS: fn(Entity) -> Option<Position> = |_| None;
+        static NO_ANCHOR_POS: fn(LandmarkAnchor) -> Option<Position> = |_| None;
+        let entity = Entity::from_raw_u32(1).unwrap();
+        let ctx = EvalCtx {
+            cat: entity,
+            tick: 0,
+            entity_position: &NO_ENTITY_POS,
+            anchor_position: &NO_ANCHOR_POS,
+            has_marker: &MARKER,
+            self_position: Position::new(0, 0),
+            target: None,
+            target_position: None,
+            target_alive: None,
+        };
+        (entity, ctx)
+    }
+
+    #[test]
+    fn tension_defusion_groom_lift_dormant_at_default_zero() {
+        let modifier = TensionDefusionGroomLift { weight: 0.0 };
+        let (_, ctx) = test_ctx_with_grooming_candidate();
+        let fetch = |name: &str, _: Entity| match name {
+            COLONY_TENSION_RECENT => 1.0,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(GROOM_OTHER), 0.5, &ctx, &fetch);
+        assert!((out - 0.5).abs() < 1e-6, "weight=0 → identity; got {out}");
+    }
+
+    #[test]
+    fn tension_defusion_groom_lift_requires_social_target() {
+        // Without HasSocialTarget marker, lift doesn't fire even
+        // at high tension — the cat has no one to groom.
+        let modifier = TensionDefusionGroomLift { weight: 0.5 };
+        let (_, ctx) = test_ctx(); // no markers
+        let fetch = |name: &str, _: Entity| match name {
+            COLONY_TENSION_RECENT => 1.0,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(GROOM_OTHER), 0.5, &ctx, &fetch);
+        assert!((out - 0.5).abs() < 1e-6, "no target → no lift; got {out}");
+    }
+
+    #[test]
+    fn tension_defusion_groom_lift_lifts_when_stressed() {
+        // weight = 0.5, tension = 1.0 → ramp = 1.0 → score *= (1+0.5)
+        // = 0.5 * 1.5 = 0.75.
+        let modifier = TensionDefusionGroomLift { weight: 0.5 };
+        let (_, ctx) = test_ctx_with_grooming_candidate();
+        let fetch = |name: &str, _: Entity| match name {
+            COLONY_TENSION_RECENT => 1.0,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(GROOM_OTHER), 0.5, &ctx, &fetch);
+        assert!((out - 0.75).abs() < 1e-5, "got {out}");
+    }
+
+    #[test]
+    fn tension_defusion_groom_lift_no_lift_below_threshold() {
+        // tension = 0.3 < 0.4 threshold → no lift.
+        let modifier = TensionDefusionGroomLift { weight: 0.5 };
+        let (_, ctx) = test_ctx_with_grooming_candidate();
+        let fetch = |name: &str, _: Entity| match name {
+            COLONY_TENSION_RECENT => 0.3,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(GROOM_OTHER), 0.5, &ctx, &fetch);
+        assert!((out - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn tension_defusion_groom_lift_does_not_resurrect_zero_score() {
+        let modifier = TensionDefusionGroomLift { weight: 0.5 };
+        let (_, ctx) = test_ctx_with_grooming_candidate();
+        let fetch = |name: &str, _: Entity| match name {
+            COLONY_TENSION_RECENT => 1.0,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(GROOM_OTHER), 0.0, &ctx, &fetch);
+        assert_eq!(out, 0.0);
     }
 
     // -----------------------------------------------------------------------

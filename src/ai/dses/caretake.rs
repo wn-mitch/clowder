@@ -27,6 +27,7 @@ use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
 use crate::components::markers;
+use crate::resources::sim_constants::ScoringConstants;
 
 pub const KITTEN_URGENCY_INPUT: &str = "kitten_urgency";
 /// Caretake-local compassion axis (Phase 4c.4 alloparenting Reframe A).
@@ -46,11 +47,20 @@ pub struct CaretakeDse {
 }
 
 impl CaretakeDse {
-    pub fn new() -> Self {
+    pub fn new(scoring: &ScoringConstants) -> Self {
         let linear = Curve::Linear {
             slope: 1.0,
             intercept: 0.0,
         };
+        // 209: positive `colony_food_security` axis. Plain Logistic
+        // (no Invert) — output rises with food security. Default
+        // weight 0.0 ships dormant.
+        let lift_curve = Curve::Logistic {
+            steepness: 8.0,
+            midpoint: 0.5,
+        };
+        let lift_weight = scoring.caretake_food_security_weight.clamp(0.0, 1.0);
+        let remainder = 1.0 - lift_weight;
         Self {
             id: DseId("caretake"),
             considerations: vec![
@@ -60,22 +70,29 @@ impl CaretakeDse {
                 )),
                 Consideration::Scalar(ScalarConsideration::new(COMPASSION_INPUT, linear.clone())),
                 Consideration::Scalar(ScalarConsideration::new(IS_PARENT_INPUT, linear)),
+                Consideration::Scalar(ScalarConsideration::new(
+                    "colony_food_security",
+                    lift_curve,
+                )),
             ],
             // RtEO sum = 1.0. Urgency dominates (hungry kitten is
             // time-sensitive); compassion is the non-parent driver;
             // parent-axis 0/1 carries the bloodline-override signal.
+            // The fourth axis (colony_food_security) ships at default-
+            // zero weight; the other three scale by `remainder` so
+            // the weight sum stays 1.0 even when balance-tuning
+            // lifts the lift knob.
             // Cry-perception (ticket 156) lives at the modifier
             // layer — see KittenCryCaretakeLift in src/ai/modifier.rs.
-            composition: Composition::weighted_sum(vec![0.45, 0.30, 0.25]),
+            composition: Composition::weighted_sum(vec![
+                0.45 * remainder,
+                0.30 * remainder,
+                0.25 * remainder,
+                lift_weight,
+            ]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
             eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
         }
-    }
-}
-
-impl Default for CaretakeDse {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -110,22 +127,42 @@ impl Dse for CaretakeDse {
     }
 }
 
-pub fn caretake_dse() -> Box<dyn Dse> {
-    Box::new(CaretakeDse::new())
+pub fn caretake_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+    Box::new(CaretakeDse::new(scoring))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn default_scoring() -> ScoringConstants {
+        ScoringConstants::default()
+    }
+
     #[test]
     fn caretake_dse_id_stable() {
-        assert_eq!(CaretakeDse::new().id().0, "caretake");
+        assert_eq!(CaretakeDse::new(&default_scoring()).id().0, "caretake");
     }
 
     #[test]
     fn caretake_weights_sum_to_one() {
-        let sum: f32 = CaretakeDse::new().composition().weights.iter().sum();
+        let sum: f32 = CaretakeDse::new(&default_scoring())
+            .composition()
+            .weights
+            .iter()
+            .sum();
         assert!((sum - 1.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn caretake_food_security_dormant_at_default_zero() {
+        let s = default_scoring();
+        assert_eq!(s.caretake_food_security_weight, 0.0);
+        let weights = CaretakeDse::new(&s).composition().weights.clone();
+        assert_eq!(weights.len(), 4);
+        assert!((weights[0] - 0.45).abs() < 1e-4);
+        assert!((weights[1] - 0.30).abs() < 1e-4);
+        assert!((weights[2] - 0.25).abs() < 1e-4);
+        assert!((weights[3] - 0.0).abs() < 1e-4);
     }
 }

@@ -47,55 +47,85 @@ pub struct PatrolDse {
 
 impl PatrolDse {
     pub fn new(scoring: &ScoringConstants) -> Self {
+        let mut considerations: Vec<Consideration> = vec![
+            Consideration::Scalar(ScalarConsideration::new(
+                SAFETY_DEFICIT_INPUT,
+                Curve::Logistic {
+                    steepness: 6.0,
+                    midpoint: scoring.patrol_safety_threshold,
+                },
+            )),
+            Consideration::Scalar(ScalarConsideration::new(
+                BOLDNESS_INPUT,
+                Curve::Linear {
+                    slope: 1.0,
+                    intercept: 0.0,
+                },
+            )),
+            // Upper-bound gate: reads `safety` (not deficit) with
+            // a sharp Logistic inverted — outputs ~1 when safety
+            // is below `patrol_exit_threshold` and ~0 above.
+            // Multiplied into the CompensatedProduct, this zeros
+            // Patrol's score when safety has recovered. See
+            // `docs/balance/guarding-exit-recipe.md` iter 2.
+            Consideration::Scalar(ScalarConsideration::new(
+                SAFETY_UPPER_BOUND_INPUT,
+                Curve::Composite {
+                    inner: Box::new(Curve::Logistic {
+                        steepness: 20.0,
+                        midpoint: scoring.patrol_exit_threshold,
+                    }),
+                    post: PostOp::Invert,
+                },
+            )),
+            // §L2.10.7 row Patrol: Linear over normalized distance
+            // to the territory perimeter anchor. Spec line 5632:
+            // 'Walking-the-beat pattern; even spacing along
+            // perimeter.' Linear gradient pulls the cat along the
+            // patrol arc.
+            Consideration::Spatial(SpatialConsideration::new(
+                "patrol_perimeter_distance",
+                LandmarkSource::Anchor(LandmarkAnchor::TerritoryPerimeterAnchor),
+                PATROL_PERIMETER_RANGE,
+                Curve::Linear {
+                    slope: -1.0,
+                    intercept: 1.0,
+                },
+            )),
+        ];
+        let mut weights = vec![1.0_f32, 1.0, 1.0, 1.0];
+
+        // 209: predator-exposure cost axis (path-c from 181). Reads
+        // `fox_scent_level` (already published by ctx_scalars from
+        // FoxScentMap::base_sample(cat_pos)). Curve `Composite{
+        // Logistic(6.0, 0.4), Invert}` — high scent → low axis →
+        // CP gate suppresses Patrol when the cat is in fox territory.
+        // Conditionally added at non-zero weight: CP semantics
+        // `(c · 0) = 0` would zero the product if added at weight 0,
+        // so the axis is only present when balance-tuning lifts the
+        // weight. The existing `FoxTerritorySuppression` modifier
+        // (`src/ai/modifier.rs`) prices cat-position fox-scent
+        // separately; this axis is reserved for a destination-aware
+        // refinement once the SpatialConsideration variant lands.
+        let fox_scent_weight = scoring.patrol_fox_scent_weight.clamp(0.0, 1.0);
+        if fox_scent_weight > 0.0 {
+            considerations.push(Consideration::Scalar(ScalarConsideration::new(
+                "fox_scent_level",
+                Curve::Composite {
+                    inner: Box::new(Curve::Logistic {
+                        steepness: 6.0,
+                        midpoint: 0.4,
+                    }),
+                    post: PostOp::Invert,
+                },
+            )));
+            weights.push(fox_scent_weight);
+        }
+
         Self {
             id: DseId("patrol"),
-            considerations: vec![
-                Consideration::Scalar(ScalarConsideration::new(
-                    SAFETY_DEFICIT_INPUT,
-                    Curve::Logistic {
-                        steepness: 6.0,
-                        midpoint: scoring.patrol_safety_threshold,
-                    },
-                )),
-                Consideration::Scalar(ScalarConsideration::new(
-                    BOLDNESS_INPUT,
-                    Curve::Linear {
-                        slope: 1.0,
-                        intercept: 0.0,
-                    },
-                )),
-                // Upper-bound gate: reads `safety` (not deficit) with
-                // a sharp Logistic inverted — outputs ~1 when safety
-                // is below `patrol_exit_threshold` and ~0 above.
-                // Multiplied into the CompensatedProduct, this zeros
-                // Patrol's score when safety has recovered. See
-                // `docs/balance/guarding-exit-recipe.md` iter 2.
-                Consideration::Scalar(ScalarConsideration::new(
-                    SAFETY_UPPER_BOUND_INPUT,
-                    Curve::Composite {
-                        inner: Box::new(Curve::Logistic {
-                            steepness: 20.0,
-                            midpoint: scoring.patrol_exit_threshold,
-                        }),
-                        post: PostOp::Invert,
-                    },
-                )),
-                // §L2.10.7 row Patrol: Linear over normalized distance
-                // to the territory perimeter anchor. Spec line 5632:
-                // 'Walking-the-beat pattern; even spacing along
-                // perimeter.' Linear gradient pulls the cat along the
-                // patrol arc.
-                Consideration::Spatial(SpatialConsideration::new(
-                    "patrol_perimeter_distance",
-                    LandmarkSource::Anchor(LandmarkAnchor::TerritoryPerimeterAnchor),
-                    PATROL_PERIMETER_RANGE,
-                    Curve::Linear {
-                        slope: -1.0,
-                        intercept: 1.0,
-                    },
-                )),
-            ],
-            composition: Composition::compensated_product(vec![1.0, 1.0, 1.0, 1.0]),
+            considerations,
+            composition: Composition::compensated_product(weights),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
             eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
         }
@@ -164,6 +194,43 @@ mod tests {
         // perimeter_distance.
         let s = ScoringConstants::default();
         assert_eq!(PatrolDse::new(&s).considerations().len(), 4);
+    }
+
+    #[test]
+    fn patrol_fox_scent_dormant_at_default_zero() {
+        // 209: at default `patrol_fox_scent_weight = 0.0`, the
+        // conditional-add path skips the fifth axis. CP semantics
+        // make a weight-0 axis multiplicatively zero the product,
+        // so dormancy requires axis omission, not just zero weight.
+        let s = ScoringConstants::default();
+        assert_eq!(s.patrol_fox_scent_weight, 0.0);
+        let dse = PatrolDse::new(&s);
+        assert_eq!(dse.considerations().len(), 4);
+        assert_eq!(dse.composition().weights.len(), 4);
+        // No `fox_scent_level` consideration at default weight.
+        assert!(!dse.considerations().iter().any(|c| match c {
+            Consideration::Scalar(s) => s.name == "fox_scent_level",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn patrol_fox_scent_axis_added_when_weight_nonzero() {
+        // Symmetric: when balance-tuning lifts the weight, the axis
+        // appears as the fifth consideration with the configured
+        // weight. This is the substrate that 209 ships; tuning is
+        // a follow-on ticket.
+        let mut s = ScoringConstants::default();
+        s.patrol_fox_scent_weight = 0.3;
+        let dse = PatrolDse::new(&s);
+        assert_eq!(dse.considerations().len(), 5);
+        assert_eq!(dse.composition().weights.len(), 5);
+        assert!((dse.composition().weights[4] - 0.3).abs() < 1e-4);
+        let has_axis = dse.considerations().iter().any(|c| match c {
+            Consideration::Scalar(s) => s.name == "fox_scent_level",
+            _ => false,
+        });
+        assert!(has_axis);
     }
 
     #[test]

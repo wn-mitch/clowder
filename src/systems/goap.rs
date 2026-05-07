@@ -1747,6 +1747,11 @@ pub fn evaluate_and_plan(
                 0.5,
             ),
             fox_scent_level: colony.fox_scent_map.get(pos.x, pos.y),
+            // 209: per-cat proxy for colony-tension. `(1 - safety)` is
+            // the cat's current threat-deficit; consumed by the
+            // `TensionDefusionGroomLift` modifier (dormant at 0.0).
+            // Follow-on: aggregate across colony.
+            colony_tension_recent: (1.0 - needs.safety).clamp(0.0, 1.0),
             // Ticket 014 §4 sensing batch — read via marker. The
             // marker's predicate is "any uncleansed-or-unharvested
             // carcass within carcass_detection_range" (matches the
