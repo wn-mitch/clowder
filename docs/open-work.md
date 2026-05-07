@@ -15,10 +15,10 @@ _Last generated: 2026-05-07._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 59 |
+| Ready | 58 |
 | Parked | 7 |
 | Blocked | 15 |
-| **Open total** | **87** |
+| **Open total** | **86** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -32,7 +32,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 | Epic | Status | Children | Done | Open (in-progress / ready / blocked / parked) | Progress |
 |---|---|---|---|---|---|
 | **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 16 | 4 | 12 (0 / 7 / 3 / 2) | `▰▰▱▱▱▱▱▱▱▱` 25% |
-| **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** Substrate-over-override | in-progress | 32 | 28 | 4 (0 / 2 / 0 / 2) | `▰▰▰▰▰▰▰▰▰▱` 88% |
+| **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** Substrate-over-override | in-progress | 32 | 29 | 3 (0 / 1 / 0 / 2) | `▰▰▰▰▰▰▰▰▰▱` 91% |
 | **[095](docs/open-work/tickets/095-body-zones-epic.md)** Body zones | ready | 0 | — | — | _no roster_ |
 
 ## In progress (6)
@@ -44,7 +44,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** — Substrate-over-override — retire control-yanking hacks in favor of IAUS levers — _[substrate-over-override] · added 2026-04-30_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 
-## Ready (59)
+## Ready (58)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -104,7 +104,6 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[204](docs/open-work/tickets/204-kitten-starvation-cluster-post-119.md)** — Kitten-starvation cluster surfaced by 119 substrate activation — bonding/mating cascade vs adult-feeding bandwidth — _[ai-substrate] · added 2026-05-07_
 - **[205](docs/open-work/tickets/205-social-status-distress-perception-cost.md)** — social_status_distress perception cost — 25% per-tick slowdown from O(N) nearest-cat scan — _[ai-substrate] · added 2026-05-07_
 - **[208](docs/open-work/tickets/208-per-cat-action-overlay-for-the-windowed-ui.md)** — Per-cat Action overlay for the windowed UI — _added 2026-05-07_
-- **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _added 2026-04-28_
 
 ## Parked (7)
 
@@ -139,17 +138,18 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (140)
+## Landed archive (141)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (75)
+### 2026-05 (76)
 
 - **[207](docs/open-work/landed/207-influence-map-registry-walk.md)** — Phase 2D — InfluenceMap registry walk in emit_focal_trace _(2026-05-07)_
 - **[206](docs/open-work/landed/206-trace-emit-l1-map-coverage.md)** — trace_emit L1 walk skips five InfluenceMaps — Food / Garden / Construction / KittenCry / Herb _(2026-05-07)_
 - **[117](docs/open-work/landed/117-social-warmth-vs-self-care-tradeoff.md)** — Characterize social-warmth max shift under 047 substrate (Phase 3 surfaced -96% on max) _(2026-05-07)_
 - **[109](docs/open-work/landed/109-intraspecies-conflict-response.md)** — IntraspeciesConflictResponse — full four-valence (fight/flight/freeze/fawn) social response _(2026-05-07)_
 - **[108](docs/open-work/landed/108-threat-proximity-adrenaline.md)** — ThreatProximityAdrenaline modifier — substrate axis for CriticalSafety interrupt retirement _(2026-05-07)_
+- **[027b](docs/open-work/landed/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) _(2026-05-07)_
 - **[198](docs/open-work/landed/198-substrate-fires-landing-gate.md)** — Substrate-fires landing gate — DSE curve-non-zero requires sibling scenario (194 P1) _(2026-05-06)_
 - **[197](docs/open-work/landed/197-explore-agent-prompt-template.md)** — Explore-agent prompt template (194 P8, subsumes P6) _(2026-05-06)_
 - **[196](docs/open-work/landed/196-verdict-substrate-fired-probe.md)** — verdict.py substrate-fired-≥1× probe (194 P7) _(2026-05-06)_

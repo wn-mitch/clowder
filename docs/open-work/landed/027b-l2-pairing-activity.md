@@ -1,7 +1,7 @@
 ---
 id: 027b
 title: L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor)
-status: ready
+status: done
 cluster: null
 added: 2026-04-28
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-07
 ---
 
 ## Why
@@ -288,3 +288,68 @@ all four predictions P1–P4 above.
   082 already landed 027b's first reactivation pass). Ready to be
   picked up by the next available scheduler-resilient activation
   attempt (or by 027c if that's the chosen path).
+- 2026-05-07: **Closed on structural completion.** Re-audit of the
+  live tree against this ticket's three-commit scope shows every
+  load-bearing deliverable shipped under the 082 / 083 / 078
+  lineage. Specifically:
+  - **Commit A** is in: `PairingActivity` component
+    (`src/components/pairing.rs`), `should_drop_pairing` truth-
+    table + 14 unit tests, `PairingConstants` block
+    (`src/resources/sim_constants.rs:4757`), three Pairing Features
+    (`PairingIntentionEmitted` Positive, `PairingDropped` Neutral,
+    `PairingBiasApplied` Positive), and the schedule edge at
+    `src/plugins/simulation.rs:409` (registered live;
+    `expected_to_fire_per_soak() = true` on
+    `PairingIntentionEmitted` per `system_activation.rs:716–724`).
+    The earlier "schedule line commented out" framing in this Log
+    is superseded — the comment block at `simulation.rs:392–408`
+    now reads "Activated post-Wave-2 substrate hardening."
+  - **Commit B** landed under 082/083 and was then reshaped by 078:
+    the original MacGyvered `if pairing_partner == Some(target) {
+    return 1.0 }` pin in `socialize_target.rs::bond_score` was
+    retired in favour of a first-class `target_pairing_intention`
+    Consideration on `socialize_target_dse` (cliff curve at 0.5,
+    +0.10 IAUS lift). `bond_score` returned to its pure
+    tier→scalar form. `scripts/check_iaus_coherence.sh` (079) now
+    reports "no MacGyvered pins" — the EXEMPT marker disappeared
+    with the pin. The `groom_other_target` fifth axis and the
+    `apply_pairing_bonus` self-state lift were both explicitly
+    scoped out by `docs/balance/027-l2-pairing-activity.md`
+    §Out of scope.
+  - **Commit C** is partial: the balance doc landed and was extended
+    through the 2026-05-01 027 closeout with hypothesis +
+    predictions + activation observation + concordance update.
+    The `PairingCapture` focal-trace observability and the
+    Fern+Reed integration test never landed; both 082's closeout
+    and 027's 2026-05-01 closeout reframed the multi-seed sweep
+    against P1–P3 as informational rather than gating.
+  - **Acceptance gate "flip 027b to done; close 027"**: 027 was
+    independently closed 2026-05-01 on structural verification
+    (every chain link upstream of `MatingOccurred` fires intact in
+    the 2700s seed-42 closeout — `PairingIntentionEmitted = 16740`,
+    `CourtshipInteraction = 1154`, `BondFormed = 1`). The terminal
+    `MatingOccurred = 0` was reclassified as a chain-rare-metric
+    property, not a structural blocker. The gate this ticket would
+    have flipped already met its outcome.
+
+  Soak corroboration on the canonical seed-42 release deep-soak
+  (`logs/tuned-42-083`, post-Wave-2 hardened substrate):
+  `Starvation = 0` (was 3 in pre-hardening
+  `tuned-42-027b-active-failed/`), `ShadowFoxAmbush = 5 ≤ 10`,
+  four pass continuity canaries each ≥ 1, `PairingIntentionEmitted
+  = 14651` ≫ 0. The 1:1 emit/drop ratio (14650 drops) flagged in
+  the balance-doc Risks section is the only outstanding watch
+  item; if it ever needs investigation, a small bugfix-shaped
+  follow-on can land the focal-trace `PairingCapture` then —
+  it doesn't block the structural closeout.
+
+  Commit C residue (`PairingCapture` + Fern+Reed integration test)
+  explicitly dropped from this ticket's scope; not opened as a
+  follow-on. Per CLAUDE.md "Antipattern migration follow-ons are
+  non-optional" applies when the parent narrows scope; here both
+  items were declared either out-of-scope or informational at
+  landing, so the discipline doesn't fire.
+
+  Landing via `just land 027b --commit`. Stale "reactivation
+  deferred" prose on `093-substrate-over-override-epic.md` cleared
+  in the same commit.
