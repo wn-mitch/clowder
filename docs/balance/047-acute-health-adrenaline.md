@@ -144,3 +144,40 @@ geometry.
 
 Freeze (ticket 105) and intraspecies fawn (ticket 109) round out the
 N-valence framework when the Hide DSE (ticket 104) lands.
+
+---
+
+## Iteration 2026-05-07 — Ticket 117 closure (social_warmth recovered)
+
+Phase 3's most striking cross-metric finding was
+`welfare_axes.social_warmth.max` collapsing 0.225 → 0.009 (-96%) when
+the modifier shipped at the proposed magnitudes. Ticket 117 tracked
+the signal pending ticket 118's momentum-gap fix; both 118 and 119
+(legacy `CriticalHealth` interrupt retirement + magnitude promotion to
+defaults) landed 2026-05-06.
+
+Re-measurement on the post-118+119 seed-42 deep-soak
+(`logs/tuned-42`, commit `9573dc8d`):
+
+| `welfare_axes.social_warmth` | 047 baseline (lifts 0.0/0.0) | 047 Phase 3 treatment (lifts 0.6/0.5, pre-118) | Post-118+119 (current defaults) |
+|---|---:|---:|---:|
+| max   | 0.225 | 0.009 | **0.998** |
+| mean  | —     | —     | 0.828 |
+| min   | —     | —     | 0.553 |
+| stdev | 0.079 | 0.004 | 0.191 |
+
+The metric is not just recovered, it has substantially overshot the
+pre-substrate baseline. Continuity holds (courtship 2383, grooming
+945, mentoring 310, bonds_formed 32; `negative_events_total`
+35443 vs 53116 baseline = -33%). Survival canaries pass
+(Starvation = 0, ShadowFoxAmbush = 1, `never_fired_expected_positives`
+empty). Verifies candidate explanation (a) from 117's "Why" section:
+the -96% gap was a downstream symptom of plan-completion momentum
+gating Sleep, not a property of the modifier itself.
+
+Single-seed measurement is sufficient for closure here because the
+gap was 96% — going from -96% to +344% over baseline in one of the
+welfare axes is not a tuning question, it's evidence the substrate
+expresses behaviorally now that the preempt path is live. Closes
+ticket 117. No further action on `acute_health_adrenaline_sleep_lift`;
+the 0.50 default promoted by 119 stands.

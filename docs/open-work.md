@@ -32,7 +32,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 | Epic | Status | Children | Done | Open (in-progress / ready / blocked / parked) | Progress |
 |---|---|---|---|---|---|
 | **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 16 | 4 | 12 (0 / 7 / 3 / 2) | `▰▰▱▱▱▱▱▱▱▱` 25% |
-| **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** Substrate-over-override | in-progress | 32 | 27 | 5 (0 / 3 / 0 / 2) | `▰▰▰▰▰▰▰▰▱▱` 84% |
+| **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** Substrate-over-override | in-progress | 32 | 28 | 4 (0 / 2 / 0 / 2) | `▰▰▰▰▰▰▰▰▰▱` 88% |
 | **[095](docs/open-work/tickets/095-body-zones-epic.md)** Body zones | ready | 0 | — | — | _no roster_ |
 
 ## In progress (6)
@@ -74,7 +74,6 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[100](docs/open-work/tickets/100-tremor-action-multiplier-wiring.md)** — Tremor map, Action::Stalk, and personality-driven hunt approach — _blocked-by 062 · added 2026-05-01_
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _blocked-by 100 · added 2026-05-01_
 - **[115](docs/open-work/tickets/115-bond-weighted-social-recovery.md)** — Bond-weighted social recovery — fondness scales Needs.social inflow — _[emotional-fidelity] · added 2026-05-01_
-- **[117](docs/open-work/tickets/117-social-warmth-vs-self-care-tradeoff.md)** — Characterize social-warmth max shift under 047 substrate (Phase 3 surfaced -96% on max) — _[ai-substrate] · added 2026-05-01_
 - **[120](docs/open-work/tickets/120-shadow-fox-spawn-vs-cat-presence-coupling.md)** — Characterize shadow-fox spawn-rate coupling to cat-presence (047 Phase 3 surfaced +93%) — _[ai-substrate] · added 2026-05-01_
 - **[124](docs/open-work/tickets/124-own-territory-center-anchor.md)** — `LandmarkAnchor::OwnTerritoryCenter` — third interoceptive self-anchor (territory bias) — _[ai-substrate] · added 2026-05-01_
 - **[126](docs/open-work/tickets/126-bdi-intention-substrate.md)** — BDI intention substrate — perceivable per-cat commitment with momentum — _[C] · added 2026-05-02_
@@ -104,6 +103,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[203](docs/open-work/tickets/203-criticalhealth-hunt-to-starvation-reproducer.md)** — CriticalHealth interrupt drives hunt-to-starvation plan churn — concrete reproducer for ticket 119 — _[ai-substrate] · added 2026-05-06_
 - **[204](docs/open-work/tickets/204-kitten-starvation-cluster-post-119.md)** — Kitten-starvation cluster surfaced by 119 substrate activation — bonding/mating cascade vs adult-feeding bandwidth — _[ai-substrate] · added 2026-05-07_
 - **[205](docs/open-work/tickets/205-social-status-distress-perception-cost.md)** — social_status_distress perception cost — 25% per-tick slowdown from O(N) nearest-cat scan — _[ai-substrate] · added 2026-05-07_
+- **[208](docs/open-work/tickets/208-per-cat-action-overlay-for-the-windowed-ui.md)** — Per-cat Action overlay for the windowed UI — _added 2026-05-07_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _added 2026-04-28_
 
 ## Parked (7)
@@ -139,14 +139,15 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (139)
+## Landed archive (140)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (74)
+### 2026-05 (75)
 
 - **[207](docs/open-work/landed/207-influence-map-registry-walk.md)** — Phase 2D — InfluenceMap registry walk in emit_focal_trace _(2026-05-07)_
 - **[206](docs/open-work/landed/206-trace-emit-l1-map-coverage.md)** — trace_emit L1 walk skips five InfluenceMaps — Food / Garden / Construction / KittenCry / Herb _(2026-05-07)_
+- **[117](docs/open-work/landed/117-social-warmth-vs-self-care-tradeoff.md)** — Characterize social-warmth max shift under 047 substrate (Phase 3 surfaced -96% on max) _(2026-05-07)_
 - **[109](docs/open-work/landed/109-intraspecies-conflict-response.md)** — IntraspeciesConflictResponse — full four-valence (fight/flight/freeze/fawn) social response _(2026-05-07)_
 - **[108](docs/open-work/landed/108-threat-proximity-adrenaline.md)** — ThreatProximityAdrenaline modifier — substrate axis for CriticalSafety interrupt retirement _(2026-05-07)_
 - **[198](docs/open-work/landed/198-substrate-fires-landing-gate.md)** — Substrate-fires landing gate — DSE curve-non-zero requires sibling scenario (194 P1) _(2026-05-06)_

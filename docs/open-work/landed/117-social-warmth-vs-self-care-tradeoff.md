@@ -1,7 +1,7 @@
 ---
 id: 117
 title: Characterize social-warmth max shift under 047 substrate (Phase 3 surfaced -96% on max)
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-01
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, recreation.md]
 related-balance: [047-acute-health-adrenaline.md]
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-07
 ---
 
 ## Why
@@ -46,3 +46,4 @@ The ticket tracks the signal so it isn't lost across iterations, not as an actio
 ## Log
 
 - 2026-05-01: Opened from ticket 047 Phase 3 sweep findings. Likely a downstream symptom of ticket 118's momentum gap, but tracked separately so the social-warmth signal isn't lost if 118 doesn't fully resolve it.
+- 2026-05-07: 2026-05-07: Re-measured on post-118+119 seed-42 deep-soak (logs/tuned-42, commit 9573dc8d). welfare_axes.social_warmth.max = 0.998 (mean 0.828, min 0.553) vs 047 baseline 0.225 and 047-treatment 0.009 — gap not just closed but substantially overshot. Continuity holds (courtship 2383, grooming 945, mentoring 310, bonds_formed 32). Survival canaries pass (Starvation=0, ShadowFoxAmbush=1, never_fired_expected_positives empty). Verifies candidate explanation (a) from the Why section — the -96% drop was downstream of plan-completion momentum gating Sleep, not a property of the modifier. Closes as 118-side-effect. No tuning of acute_health_adrenaline_sleep_lift; the 0.50 default promoted by 119 stands. Closure section appended to docs/balance/047-acute-health-adrenaline.md.
