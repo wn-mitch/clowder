@@ -259,6 +259,25 @@ pub struct ScoringContext<'a> {
     /// Computed at construction via
     /// `crate::systems::interoception::escape_viability`.
     pub escape_viability: f32,
+    /// Ticket 108 — rising-only derivative of `safety_deficit` over
+    /// the last tick: `max(0, safety_deficit_now -
+    /// PrevSafetyDeficit)`. Trigger scalar for the
+    /// `ThreatProximityAdrenalineFlee` Modifier — adrenaline lurches
+    /// on **rising** threat proximity (change-detection), not on a
+    /// steady-state level. Computed at `ScoringContext` construction
+    /// from `needs.safety` + the cat's `PrevSafetyDeficit`
+    /// component; first-tick / lazy-insert cats see `0.0`.
+    pub threat_proximity_derivative: f32,
+    /// Ticket 109 (Phase A) — social-status pressure between the focal
+    /// cat and its nearest same-species neighbor in `[0, 1]`. Composite
+    /// over three arms: `(respect_diff + age_diff + bond_asymmetry) / 3
+    /// × proximity_factor` weighted by `social_status_distress_*_weight`
+    /// constants. Trigger scalar for the
+    /// `IntraspeciesConflictResponseFlight` Modifier (Flee subordinate-
+    /// retreat valence). Computed at `ScoringContext` construction by
+    /// `crate::systems::interoception::social_status_distress`; cats
+    /// alone in their perception radius see `0.0`.
+    pub social_status_distress: f32,
     /// Whether the cat is incapacitated by a severe injury.
     pub is_incapacitated: bool,
     /// Whether a construction site exists that needs work.
@@ -587,26 +606,25 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
         ctx.escape_viability.clamp(0.0, 1.0),
     );
     // Ticket 108 — `ThreatProximityAdrenalineFlee` Modifier trigger.
-    // **Phase 1 stub**: published as 0.0 always. The actual derivative
-    // is `max(0, safety_deficit_now - safety_deficit_prev_tick)` —
-    // computing it requires a `PrevSafetyDeficit(f32)` per-cat
-    // Component plus a per-tick update system that snapshots the
-    // current value after the scoring pass runs. That ECS plumbing
-    // lands in the same Phase-3-or-Phase-4 commit that promotes 108's
-    // lift from 0.0 to the swept-validated magnitude. With the lift
-    // at 0.0 (Phase 1), this stub is bit-identical to baseline
-    // regardless of value.
-    m.insert("threat_proximity_derivative", 0.0);
+    // Rising-only derivative of `safety_deficit` over the last tick;
+    // computed at `ScoringContext` construction by reading the cat's
+    // `PrevSafetyDeficit` component and `needs.safety`. The `update_
+    // prev_safety_deficit` system writes back current
+    // `safety_deficit_now` after this pass so next tick's derivative
+    // uses the correct prev-value.
+    m.insert(
+        "threat_proximity_derivative",
+        ctx.threat_proximity_derivative.clamp(0.0, 1.0),
+    );
     // Ticket 109 (Phase A) — `IntraspeciesConflictResponseFlight`
-    // Modifier trigger. **Phase 1 stub**: published as 0.0 always.
-    // The v1 composition `(status_diff_to_nearest_cat ×
-    // proximity_factor)` requires a defensible status-differential
-    // signal (no explicit dominance hierarchy exists yet —
-    // `needs.respect` and bond strength are candidate proxies) plus
-    // per-cat nearest-cat resolution. Both land alongside the lift's
-    // promotion in the same Phase-3 commit; with the lift at 0.0
-    // here, this stub is bit-identical to baseline.
-    m.insert("social_status_distress", 0.0);
+    // Modifier trigger. Composite scalar
+    // `(respect_diff + age_diff + bond_asymmetry) × proximity_factor`
+    // computed at `ScoringContext` construction by
+    // `crate::systems::interoception::social_status_distress`.
+    m.insert(
+        "social_status_distress",
+        ctx.social_status_distress.clamp(0.0, 1.0),
+    );
     // Ticket 090 — interoceptive perception. L4/L5 Maslow scalars.
     // `mastery_confidence` and `esteem_distress` are continuous [0, 1];
     // `purpose_clarity` is binary {0.0, 1.0}. All three are pre-computed
@@ -2619,6 +2637,8 @@ mod tests {
             purpose_clarity: 0.0,
             esteem_distress: 0.0,
             escape_viability: 1.0,
+            threat_proximity_derivative: 0.0,
+            social_status_distress: 0.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -2794,6 +2814,8 @@ mod tests {
             purpose_clarity: 0.0,
             esteem_distress: 0.0,
             escape_viability: 1.0,
+            threat_proximity_derivative: 0.0,
+            social_status_distress: 0.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -2992,6 +3014,8 @@ mod tests {
             purpose_clarity: 0.0,
             esteem_distress: 0.0,
             escape_viability: 1.0,
+            threat_proximity_derivative: 0.0,
+            social_status_distress: 0.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3227,6 +3251,8 @@ mod tests {
             purpose_clarity: 0.0,
             esteem_distress: 0.0,
             escape_viability: 1.0,
+            threat_proximity_derivative: 0.0,
+            social_status_distress: 0.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3331,6 +3357,8 @@ mod tests {
             purpose_clarity: 0.0,
             esteem_distress: 0.0,
             escape_viability: 1.0,
+            threat_proximity_derivative: 0.0,
+            social_status_distress: 0.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3454,6 +3482,8 @@ mod tests {
             purpose_clarity: 0.0,
             esteem_distress: 0.0,
             escape_viability: 1.0,
+            threat_proximity_derivative: 0.0,
+            social_status_distress: 0.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3765,6 +3795,8 @@ mod tests {
             purpose_clarity: 0.0,
             esteem_distress: 0.0,
             escape_viability: 1.0,
+            threat_proximity_derivative: 0.0,
+            social_status_distress: 0.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3870,6 +3902,8 @@ mod tests {
             purpose_clarity: 0.0,
             esteem_distress: 0.0,
             escape_viability: 1.0,
+            threat_proximity_derivative: 0.0,
+            social_status_distress: 0.0,
             fox_scent_level: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,

@@ -23,6 +23,7 @@ pub mod personality;
 pub mod physical;
 pub mod pregnancy;
 pub mod prey;
+pub mod prev_safety_deficit;
 pub mod recent_disposition_failures;
 pub mod recent_target_failures;
 pub mod reserved;
@@ -70,6 +71,7 @@ pub use prey::{
     DenRaided, FleeStrategy, PreyAiState, PreyAnimal, PreyConfig, PreyDen, PreyDensity, PreyKilled,
     PreyKind, PreyState,
 };
+pub use prev_safety_deficit::PrevSafetyDeficit;
 pub use recent_disposition_failures::RecentDispositionFailures;
 pub use recent_target_failures::RecentTargetFailures;
 pub use reserved::Reserved;

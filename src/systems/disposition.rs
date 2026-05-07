@@ -265,40 +265,35 @@ pub fn check_anxiety_interrupts(
         commands.entity(entity).remove::<Disposition>();
         commands.entity(entity).remove::<TaskChain>();
 
-        match reason {
-            InterruptReason::ThreatDetected { threat_pos } => {
-                // Immediate flee — don't wait for re-evaluation.
-                let dx = pos.x - threat_pos.x;
-                let dy = pos.y - threat_pos.y;
-                let len = ((dx * dx + dy * dy) as f32).sqrt().max(1.0);
-                let mut target = Position::new(
-                    pos.x + (dx as f32 / len * d.flee_distance) as i32,
-                    pos.y + (dy as f32 / len * d.flee_distance) as i32,
-                );
-                target.x = target.x.clamp(0, map.width - 1);
-                target.y = target.y.clamp(0, map.height - 1);
-                current.action = Action::Flee;
-                current.ticks_remaining = 0;
-                current.target_position = Some(target);
-                current.target_entity = None;
-            }
-            _ => {
-                // Let the cat re-evaluate next tick.
-                current.ticks_remaining = 0;
-            }
-        }
+        // Ticket 108 — CriticalSafety arm retired; only ThreatDetected
+        // remains. Future interrupt variants would re-introduce a
+        // match here.
+        let InterruptReason::ThreatDetected { threat_pos } = reason;
+        // Immediate flee — don't wait for re-evaluation.
+        let dx = pos.x - threat_pos.x;
+        let dy = pos.y - threat_pos.y;
+        let len = ((dx * dx + dy * dy) as f32).sqrt().max(1.0);
+        let mut target = Position::new(
+            pos.x + (dx as f32 / len * d.flee_distance) as i32,
+            pos.y + (dy as f32 / len * d.flee_distance) as i32,
+        );
+        target.x = target.x.clamp(0, map.width - 1);
+        target.y = target.y.clamp(0, map.height - 1);
+        current.action = Action::Flee;
+        current.ticks_remaining = 0;
+        current.target_position = Some(target);
+        current.target_entity = None;
     }
 }
 
 #[derive(Debug)]
 enum InterruptReason {
     ThreatDetected { threat_pos: Position },
-    CriticalSafety,
 }
 
 #[allow(clippy::too_many_arguments)]
 fn check_interrupt(
-    needs: &Needs,
+    _needs: &Needs,
     personality: &Personality,
     pos: &Position,
     _health: &Health,
@@ -318,19 +313,24 @@ fn check_interrupt(
     // `goap.rs:615-637` are the actual food/sleep-routing drivers and
     // remain in place.
     //
-    // Ticket 119: the CriticalHealth arm used to live here too — a flat
-    // `health.current / health.max < critical_health_threshold` (0.4 by
-    // default; HP below 40%) that fired for every cat unconditionally.
-    // Retired in favor of the substrate-driven preempt path (ticket
-    // 118): `AcuteHealthAdrenalineFlee::preempts_in_flight` fires
-    // `check_modifier_preemption`, which drops the plan via the same
-    // Commands removal pattern. Trigger shape differs intentionally:
-    // the lurch fires on `health_deficit > 0.4` ⇒ HP below 60%, a
-    // **broader** range than the legacy 40% gate. That's by 047's
-    // design: adrenaline is a phase transition starting at moderate
-    // injury, not a death-threshold check. The substrate also gates
-    // on `lift > 0`, so cats actually get a behavioral redirect (Sleep
-    // lift +0.50) rather than just being yanked into a re-eval loop.
+    // Ticket 119: the CriticalHealth arm used to live here — a flat
+    // `health.current / health.max < critical_health_threshold` (0.4
+    // by default) that fired unconditionally. Retired in favor of
+    // ticket 118's substrate-driven preempt path
+    // (`AcuteHealthAdrenalineFlee::preempts_in_flight`), which lifts
+    // Flee/Sleep on `health_deficit > 0.4` and drops the in-flight
+    // plan when the lift > 0.
+    //
+    // Ticket 108: the CriticalSafety arm used to live here — a flat
+    // `needs.safety < critical_safety_threshold` (0.15) gate. Retired
+    // in favor of the substrate-driven `ThreatProximityAdrenalineFlee`
+    // Modifier (`src/ai/modifier.rs`) reading the
+    // `threat_proximity_derivative` scalar — adrenaline lurches on
+    // **rising** threat proximity (change-detection), not on a
+    // steady-state low-safety level. The 118 preempt path drops
+    // in-flight plans when the modifier's lurch fires, replacing the
+    // `commands.entity(entity).remove::<Disposition>()` yank that the
+    // legacy interrupt performed.
 
     // Guards are exempt from threat interrupts — they handle threats directly
     // via guard_threat_detection_range.
@@ -357,13 +357,6 @@ fn check_interrupt(
         }
     }
 
-    // Critical safety check — guards are no longer exempt. A guard with
-    // critically low safety should re-evaluate rather than standing in a
-    // fight that's draining them.
-    if needs.safety < d.critical_safety_threshold {
-        return Some(InterruptReason::CriticalSafety);
-    }
-
     None
 }
 
@@ -388,6 +381,15 @@ pub struct EvalDispositionSideEffects<'w, 's> {
     /// §4.3 marker queries for snapshot population. Future marker
     /// batches add their queries here.
     pub marker_queries: MarkerQueries<'w, 's>,
+    /// Ticket 109 (Phase A) — read-only Age lookup for cross-cat
+    /// `nearest_other.age` reads inside `social_status_distress`'s
+    /// age_diff arm. Read-only alias of the per-cat iteration
+    /// query's `Option<&Age>` borrow.
+    pub age_query: Query<'w, 's, &'static crate::components::identity::Age, Without<Dead>>,
+    /// Ticket 109 (Phase A) — read-only Needs lookup for cross-cat
+    /// `nearest_other.respect` reads. Read-only alias of the per-cat
+    /// iteration query's `&Needs` borrow.
+    pub needs_query: Query<'w, 's, &'static Needs, Without<Dead>>,
 }
 
 /// Read-only queries over stored-item state + kitten state. Bundled
@@ -455,6 +457,12 @@ pub fn evaluate_dispositions(
                 Option<&crate::components::fate::FatedLove>,
                 Option<&crate::components::fate::FatedRival>,
                 Option<&crate::components::fulfillment::Fulfillment>,
+                // Ticket 108 — last tick's `safety_deficit` snapshot
+                // for the rising-only `threat_proximity_derivative`.
+                Option<&crate::components::PrevSafetyDeficit>,
+                // Ticket 109 (Phase A) — focal cat's birth tick for
+                // the `social_status_distress` age_diff arm.
+                Option<&crate::components::identity::Age>,
             ),
         ),
         (
@@ -613,7 +621,7 @@ pub fn evaluate_dispositions(
     let action_snapshot: Vec<(Entity, Position, Action)> = query
         .iter()
         .map(
-            |((entity, _, _, _, pos, _, _, _), (_, _, current, _, _, _, _, _))| {
+            |((entity, _, _, _, pos, _, _, _), (_, _, current, _, _, _, _, _, _, _))| {
                 (entity, *pos, current.action)
             },
         )
@@ -636,6 +644,8 @@ pub fn evaluate_dispositions(
             fated_love,
             fated_rival,
             fulfillment,
+            prev_safety_deficit,
+            focal_age,
         ),
     ) in &mut query
     {
@@ -959,6 +969,40 @@ pub fn evaluate_dispositions(
                 &map,
                 markers.has(markers::Parent::KEY, entity) || has_pair_bond,
                 &constants.escape_viability,
+            ),
+            // Ticket 108 — companion site to goap.rs's
+            // `threat_proximity_derivative` field. Same compute shape
+            // (`max(0, safety_deficit_now - prev)` with prev defaulting
+            // to current for first-tick / lazy-insert cats).
+            threat_proximity_derivative: {
+                let now = (1.0 - needs.safety).clamp(0.0, 1.0);
+                let prev = prev_safety_deficit.map(|p| p.0).unwrap_or(now);
+                crate::components::PrevSafetyDeficit::rising_derivative(now, prev)
+            },
+            // Ticket 109 (Phase A) — companion site to goap.rs's
+            // `social_status_distress` field. Same compute shape but
+            // sources Age / Needs lookups from the local SystemParam.
+            social_status_distress: crate::systems::interoception::social_status_distress(
+                entity,
+                *pos,
+                focal_age,
+                needs.respect,
+                &cat_positions,
+                |e| {
+                    side_effects
+                        .age_query
+                        .get(e)
+                        .ok()
+                        .map(|a| a.born_tick)
+                },
+                |e| side_effects.needs_query.get(e).ok().map(|n| n.respect),
+                &relationships,
+                side_effects.time.tick,
+                sc.social_perception_radius,
+                sc.social_status_distress_age_normalization_ticks,
+                sc.social_status_distress_respect_weight,
+                sc.social_status_distress_age_weight,
+                sc.social_status_distress_bond_weight,
             ),
             is_incapacitated,
             has_construction_site,

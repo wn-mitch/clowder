@@ -34,7 +34,7 @@ phase-transition (ramp on an acute scalar).
 | 088 | `BodyDistressPromotion` | pressure (linear ramp) | `body_distress_composite` (`max(deficits)`) | Eat, Sleep, Hunt, Forage, Flee, GroomSelf | Landed |
 | 106 | `HungerUrgency` | pressure | `hunger_urgency` (`1 - needs.hunger`) | Eat, Hunt, Forage | Ready |
 | 107 | `ExhaustionPressure` | pressure | `energy_deficit` | Sleep, GroomSelf | Ready |
-| 108 | `ThreatProximityAdrenalineFlee` | lurch | `threat_proximity_derivative` (rising change) | Flee, Sleep | Ready (blocked-by 103) |
+| 108 | `ThreatProximityAdrenalineFlee` | lurch | `threat_proximity_derivative` (rising change) | Flee, Sleep | Landed; lifts active under 108 Phase 3, `InterruptReason::CriticalSafety` retired in Phase 4 |
 | 110 | `ThermalDistress` | pressure | `thermal_deficit` | Sleep | Landed inert |
 
 ## Perception-richness pattern
@@ -104,7 +104,7 @@ so the lurch's behavioral demand is actually expressed.
 | 047 `AcuteHealthAdrenalineFlee` | lurch | yes (gated on `flee_lift > 0 \|\| sleep_lift > 0`) |
 | 102 `AcuteHealthAdrenalineFight` | lurch | yes (gated on `fight_lift > 0`) |
 | 105 `AcuteHealthAdrenalineFreeze` | lurch | yes (gated on `freeze_lift > 0`) |
-| 108 `ThreatProximityAdrenalineFlee` | lurch | yes (gated on lift > 0; scalar Phase-1-stub at 0.0) |
+| 108 `ThreatProximityAdrenalineFlee` | lurch | yes (gated on lift > 0; scalar live as `max(0, safety_deficit_now - PrevSafetyDeficit)`) |
 | 088 `BodyDistressPromotion` | pressure | default `false` |
 | 106 `HungerUrgency` | pressure | default `false` |
 | 107 `ExhaustionPressure` | pressure | default `false` |

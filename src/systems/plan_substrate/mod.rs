@@ -52,7 +52,7 @@ pub use lifecycle::{
 pub use sensors::{
     cooldown_curve, disposition_recent_failure_age_normalized,
     prune_recent_disposition_failures, prune_recent_target_failures,
-    target_recent_failure_age_normalized,
+    target_recent_failure_age_normalized, update_prev_safety_deficit,
 };
 pub use target::{
     carry_target_forward, expire_reservations, release_target, require_alive_and_unreserved_filter,

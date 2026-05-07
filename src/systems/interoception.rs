@@ -291,6 +291,135 @@ pub fn own_injury_site(health: &Health) -> Option<Position> {
         .map(|i| i.at)
 }
 
+/// Ticket 109 (Phase A) — composite social-status pressure scalar
+/// `(respect_diff + age_diff + bond_asymmetry) × proximity_factor`,
+/// clamped to `[0, 1]`. Trigger input for the
+/// `IntraspeciesConflictResponseFlight` Modifier.
+///
+/// **Composition.**
+/// - `respect_diff` = `clamp(other.respect - focal.respect, 0, 1)` —
+///   positive only (focal is the subordinate).
+/// - `age_diff` = `clamp((other.age_ticks - focal.age_ticks) /
+///   age_normalization_ticks, 0, 1)` — older cats are social
+///   superiors. Falls to `0.0` when no Age component exists.
+/// - `bond_asymmetry` = `clamp(colony_avg_bond_to_other -
+///   focal.bond_to_other, 0, 1)` — distress lifts when focal has a
+///   weaker bond than the colony average. `colony_avg_bond_to_other`
+///   averages `Relationship.fondness` across all colony cats with a
+///   recorded relationship to `nearest_other` (excluding the focal
+///   itself), clamped to `[0, 1]`. Returns 0 when no colony averages
+///   exist.
+/// - `proximity_factor` = `clamp(1 - distance / radius, 0, 1)` —
+///   far-and-dominant doesn't fire.
+///
+/// Three arms are combined as a weighted mean using
+/// `social_status_distress_*_weight` constants (default
+/// equal-weighted at 1/3 each), then multiplied by
+/// `proximity_factor`.
+///
+/// **Returns 0** when:
+/// - no other cat exists within `social_perception_radius`
+/// - the nearest other cat is the focal itself (defensive)
+///
+/// **Cost shape.** O(N) over `cat_positions` to find nearest_other;
+/// O(K) where K is the number of relationships involving
+/// nearest_other (via `Relationships::all_for`). Acceptable at
+/// canonical colony sizes (~30 cats). Per-cat call from the
+/// `ScoringContext` builder yields O(N²) total per tick.
+///
+/// **Single-axis discipline.** Each input arm is one orthogonal
+/// social signal; personality / phobia / situational nuance compose
+/// at the modifier layer (or future modifier siblings), not folded
+/// inside this scalar. Per `feedback_single_axis_perception_scalars`
+/// auto-memory.
+#[allow(clippy::too_many_arguments)]
+pub fn social_status_distress(
+    focal_entity: Entity,
+    focal_pos: Position,
+    focal_age: Option<&crate::components::identity::Age>,
+    focal_respect: f32,
+    cat_positions: &[(Entity, Position)],
+    age_lookup: impl Fn(Entity) -> Option<u64>,
+    respect_lookup: impl Fn(Entity) -> Option<f32>,
+    relationships: &crate::resources::relationships::Relationships,
+    current_tick: u64,
+    perception_radius: i32,
+    age_normalization_ticks: u64,
+    respect_weight: f32,
+    age_weight: f32,
+    bond_weight: f32,
+) -> f32 {
+    if perception_radius <= 0 {
+        return 0.0;
+    }
+
+    let Some((other_entity, other_pos, distance)) = cat_positions
+        .iter()
+        .filter(|(e, _)| *e != focal_entity)
+        .map(|(e, p)| (*e, *p, focal_pos.manhattan_distance(p)))
+        .filter(|(_, _, d)| *d <= perception_radius)
+        .min_by_key(|(_, _, d)| *d)
+    else {
+        return 0.0;
+    };
+
+    let _ = other_pos; // proximity uses distance; pos kept for future caller debug.
+
+    let radius = perception_radius as f32;
+    let proximity_factor = (1.0 - distance as f32 / radius).clamp(0.0, 1.0);
+    if proximity_factor == 0.0 {
+        return 0.0;
+    }
+
+    let respect_diff = respect_lookup(other_entity)
+        .map(|other_respect| (other_respect - focal_respect).clamp(0.0, 1.0))
+        .unwrap_or(0.0);
+
+    let age_diff = match (focal_age, age_lookup(other_entity)) {
+        (Some(focal), Some(other_born)) if age_normalization_ticks > 0 => {
+            let focal_age_ticks = current_tick.saturating_sub(focal.born_tick);
+            let other_age_ticks = current_tick.saturating_sub(other_born);
+            // Older = larger age_ticks. Subordinate (focal) is
+            // younger ⇒ other_age_ticks > focal_age_ticks.
+            let raw_diff = other_age_ticks.saturating_sub(focal_age_ticks) as f32
+                / age_normalization_ticks as f32;
+            raw_diff.clamp(0.0, 1.0)
+        }
+        _ => 0.0,
+    };
+
+    let bond_asymmetry = {
+        let focal_bond = relationships
+            .get(focal_entity, other_entity)
+            .map(|r| r.fondness.clamp(0.0, 1.0))
+            .unwrap_or(0.0);
+        let bonds: Vec<f32> = relationships
+            .all_for(other_entity)
+            .into_iter()
+            .filter(|(e, _)| *e != focal_entity)
+            .map(|(_, r)| r.fondness.clamp(0.0, 1.0))
+            .collect();
+        if bonds.is_empty() {
+            0.0
+        } else {
+            let avg = bonds.iter().sum::<f32>() / bonds.len() as f32;
+            (avg - focal_bond).clamp(0.0, 1.0)
+        }
+    };
+
+    let weight_sum = respect_weight + age_weight + bond_weight;
+    let composite = if weight_sum > 0.0 {
+        (respect_weight * respect_diff
+            + age_weight * age_diff
+            + bond_weight * bond_asymmetry)
+            / weight_sum
+    } else {
+        0.0
+    };
+
+    (composite * proximity_factor).clamp(0.0, 1.0)
+}
+
 /// Per-tick author system for interoceptive ZST markers.
 ///
 /// Reads each living cat's `Health` and `Needs`; computes the three
@@ -1200,5 +1329,175 @@ mod tests {
         // Center at (0, 0), radius 1 → 3×3 box from (-1,-1) to (1,1).
         // Only (0,0), (1,0), (0,1), (1,1) are in-bounds → 4 walkable.
         assert_eq!(count_walkable_tiles_in_box(Position::new(0, 0), 1, &map), 4);
+    }
+
+    // -----------------------------------------------------------------
+    // social_status_distress — ticket 109 Phase A
+    // -----------------------------------------------------------------
+
+    fn entity(id: u32) -> Entity {
+        Entity::from_raw_u32(id).unwrap()
+    }
+
+    #[test]
+    fn social_status_distress_zero_when_alone() {
+        let focal = entity(1);
+        let cats = vec![(focal, Position::new(5, 5))];
+        let rels = crate::resources::relationships::Relationships::default();
+        let v = social_status_distress(
+            focal,
+            Position::new(5, 5),
+            None,
+            0.5,
+            &cats,
+            |_| None,
+            |_| None,
+            &rels,
+            1_200_000,
+            8,
+            1_200_000,
+            1.0 / 3.0,
+            1.0 / 3.0,
+            1.0 / 3.0,
+        );
+        assert_eq!(v, 0.0, "no other cats in range -> zero distress");
+    }
+
+    #[test]
+    fn social_status_distress_zero_when_other_far_away() {
+        let focal = entity(1);
+        let dominant = entity(2);
+        let cats = vec![
+            (focal, Position::new(5, 5)),
+            (dominant, Position::new(50, 50)),
+        ];
+        let rels = crate::resources::relationships::Relationships::default();
+        let v = social_status_distress(
+            focal,
+            Position::new(5, 5),
+            None,
+            0.2,
+            &cats,
+            |_| None,
+            |e| {
+                if e == dominant {
+                    Some(0.9)
+                } else {
+                    None
+                }
+            },
+            &rels,
+            1_200_000,
+            8,
+            1_200_000,
+            1.0 / 3.0,
+            1.0 / 3.0,
+            1.0 / 3.0,
+        );
+        assert_eq!(v, 0.0, "dominant outside perception radius -> zero");
+    }
+
+    #[test]
+    fn social_status_distress_lifts_on_respect_diff_when_close() {
+        let focal = entity(1);
+        let dominant = entity(2);
+        // Adjacent tiles -> distance 1, radius 8 -> proximity_factor = 7/8.
+        let cats = vec![
+            (focal, Position::new(5, 5)),
+            (dominant, Position::new(6, 5)),
+        ];
+        let rels = crate::resources::relationships::Relationships::default();
+        let v = social_status_distress(
+            focal,
+            Position::new(5, 5),
+            None,
+            0.2,
+            &cats,
+            |_| None,
+            |e| {
+                if e == dominant {
+                    Some(0.8)
+                } else {
+                    None
+                }
+            },
+            &rels,
+            1_200_000,
+            8,
+            1_200_000,
+            1.0,
+            0.0,
+            0.0,
+        );
+        // respect_diff = 0.6, weights all on respect arm.
+        // composite = 0.6, proximity_factor = 7/8 = 0.875.
+        // distress = 0.6 * 0.875 = 0.525.
+        assert!((v - 0.525).abs() < 1e-5, "expected 0.525, got {v}");
+    }
+
+    #[test]
+    fn social_status_distress_age_diff_arm() {
+        let focal = entity(1);
+        let elder = entity(2);
+        let cats = vec![
+            (focal, Position::new(5, 5)),
+            (elder, Position::new(5, 5)),
+        ];
+        let rels = crate::resources::relationships::Relationships::default();
+        let focal_age = crate::components::identity::Age { born_tick: 1_200_000 };
+        let v = social_status_distress(
+            focal,
+            Position::new(5, 5),
+            Some(&focal_age),
+            0.0,
+            &cats,
+            |e| {
+                if e == elder {
+                    Some(0)
+                } else {
+                    None
+                }
+            },
+            |_| Some(0.0),
+            &rels,
+            // tick = focal's age + 1 year. Elder is 2 years old.
+            // age_diff = (2yr - 1yr) / 1yr = 1.0.
+            2_400_000,
+            8,
+            1_200_000,
+            0.0,
+            1.0,
+            0.0,
+        );
+        // Same position -> proximity_factor = 1.0. age arm saturated.
+        assert!((v - 1.0).abs() < 1e-5, "saturated age arm; got {v}");
+    }
+
+    #[test]
+    fn social_status_distress_clamps_to_one() {
+        let focal = entity(1);
+        let dominant = entity(2);
+        let cats = vec![
+            (focal, Position::new(5, 5)),
+            (dominant, Position::new(5, 5)),
+        ];
+        let rels = crate::resources::relationships::Relationships::default();
+        let v = social_status_distress(
+            focal,
+            Position::new(5, 5),
+            None,
+            -10.0, // pathological negative respect
+            &cats,
+            |_| None,
+            |_| Some(10.0), // pathological large positive respect
+            &rels,
+            0,
+            8,
+            1_200_000,
+            1.0 / 3.0,
+            1.0 / 3.0,
+            1.0 / 3.0,
+        );
+        assert!((0.0..=1.0).contains(&v), "out of range: {v}");
     }
 }

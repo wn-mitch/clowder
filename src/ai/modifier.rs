@@ -133,30 +133,19 @@ const THERMAL_DEFICIT: &str = "thermal_deficit";
 /// input. Adrenaline lurch on **rising** threat proximity (the cat
 /// noticed danger getting worse this tick), not on a steady-state
 /// scalar — adrenaline is about change-detection, not absolute level.
-///
-/// **Phase 1 stub:** this scalar is currently published as 0.0 from
-/// `scoring::ctx_scalars`. Computing the actual derivative requires a
-/// `PrevSafetyDeficit(f32)` per-cat Component plus a per-tick update
-/// system (snapshot `safety_deficit_now → prev` after the scoring
-/// pass runs). That ECS plumbing lands in the same commit that
-/// activates 108's lift (default 0.0 → swept-validated value), per
-/// the "ship inert until verified sufficient" 047 playbook. With
-/// the lift at 0.0 (this commit), the modifier never fires
-/// regardless of scalar value, so the stub is bit-identical to the
-/// pre-Wave-1 baseline.
+/// Computed at `ScoringContext` construction as
+/// `max(0, (1 - needs.safety) - PrevSafetyDeficit)`, with
+/// `update_prev_safety_deficit` snapshotting the previous-tick value
+/// after the scoring pass.
 const THREAT_PROXIMITY_DERIVATIVE: &str = "threat_proximity_derivative";
 /// Ticket 109 — `IntraspeciesConflictResponseFlight` Modifier trigger
 /// input. The social-status pressure scalar — distinct from physical
-/// body distress and from predator threat. Composes status differential
-/// vs the nearest cat with a proximity / intrusion factor.
-///
-/// **Phase 1 stub:** published as 0.0 from `scoring::ctx_scalars`. The
-/// v1 composition `(status_diff_to_nearest_cat × proximity_factor)`
-/// requires (a) a defensible status-differential signal — no explicit
-/// dominance hierarchy exists yet; `needs.respect` and bond strength
-/// are candidate proxies — and (b) per-cat nearest-cat resolution
-/// during scoring. Both land with the lift activation (Phase 3 spec).
-/// With the lift at 0.0, the stub is bit-identical to baseline.
+/// body distress and from predator threat. Computed at
+/// `ScoringContext` construction by
+/// `crate::systems::interoception::social_status_distress` as
+/// `(respect_diff + age_diff + bond_asymmetry) × proximity_factor`,
+/// each arm weighted by `social_status_distress_*_weight` constants
+/// (default equal-weighted).
 const SOCIAL_STATUS_DISTRESS: &str = "social_status_distress";
 const ACTIVE_DISPOSITION_ORDINAL: &str = "active_disposition_ordinal";
 /// §075 — `CommitmentTenure` Modifier. Drift between this name and
@@ -2072,28 +2061,28 @@ impl ScoreModifier for ThermalDistress {
 /// magnitudes. Same lurch shape as 047 — adrenaline is a phase
 /// transition, not a graded preference.
 ///
-/// **Applies to:** Flee (lift `threat_proximity_adrenaline_flee_lift`)
-/// and Sleep (lift `threat_proximity_adrenaline_sleep_lift`, the
-/// in-pool partner — Flee is filtered from the disposition softmax,
-/// Sleep routes the cat to a den). Both default to 0.0 (inert).
+/// **Applies to:** Flee (lift `threat_proximity_adrenaline_flee_lift`,
+/// default 0.60) and Sleep (lift
+/// `threat_proximity_adrenaline_sleep_lift`, default 0.50; the in-pool
+/// partner — Flee is filtered from the disposition softmax, Sleep
+/// routes the cat to a den).
 ///
 /// **Composition:** Registered after `ThermalDistress` (110) and
 /// before `FoxTerritorySuppression`. Composes additively with 047's
 /// AcuteHealthAdrenalineFlee on Flee and with 088 / 107 / 110 on
 /// Sleep when multiple axes fire simultaneously.
 ///
-/// **Substrate role:** Phase 4 (gated on Phase 3 sufficiency) retires
-/// `disposition.rs::check_interrupt` `CriticalSafety` arm.
+/// **Substrate role:** Activated in the same commit that retires
+/// `disposition.rs::check_interrupt` `CriticalSafety` arm — the
+/// substrate replacement for the override the legacy interrupt
+/// implemented.
 ///
-/// **Phase 1 perception coupling:** the input scalar
-/// `threat_proximity_derivative` is currently published as 0.0
-/// (stub). The actual derivative requires a `PrevSafetyDeficit`
-/// per-cat Component + per-tick update system; that plumbing lands
-/// alongside the lift's promotion from 0.0 to the swept-validated
-/// magnitude in the same Phase-3-or-Phase-4 commit. With the lift at
-/// 0.0 here, the modifier never fires regardless of the scalar's
-/// value, so this commit is score-bit-identical to the pre-Wave-1
-/// baseline.
+/// **Perception coupling:** the input scalar
+/// `threat_proximity_derivative` is computed at `ScoringContext`
+/// construction as `max(0, (1 - needs.safety) - PrevSafetyDeficit)`.
+/// The companion `update_prev_safety_deficit` system runs after
+/// `evaluate_and_plan` to snapshot current safety deficit each tick
+/// so next tick's derivative reflects rising-only change.
 ///
 /// **Gated-boost contract:** returns `score` unchanged on score `<= 0`
 /// — adrenaline doesn't conjure a Flee path or a safe sleep spot
@@ -2181,12 +2170,7 @@ impl ScoreModifier for ThreatProximityAdrenalineFlee {
             return false;
         }
         // Lurch on rising threat-proximity derivative — adrenaline
-        // re-detection of approaching danger. Phase-1 stub: scalar is
-        // currently published as 0.0 from `scoring::ctx_scalars`, so
-        // this returns false until ticket 108 ships its scalar
-        // plumbing. Override is in place so 108 activation only needs
-        // to flip the scalar source, not re-touch this contract.
-        // Ticket 118.
+        // re-detection of approaching danger. Ticket 118.
         let derivative = fetch(THREAT_PROXIMITY_DERIVATIVE, ctx.cat).clamp(0.0, 1.0);
         self.ramp(derivative) > 0.0
     }
@@ -2211,18 +2195,20 @@ impl ScoreModifier for ThreatProximityAdrenalineFlee {
 /// curve as the 088 / 106 / 107 / 110 family.
 ///
 /// **Applies to:** Flee (subordinate-retreat valence — the cat
-/// withdraws from the dominant). Default 0.0 (inert).
+/// withdraws from the dominant). Default 0.30 (active).
 ///
 /// **Composition:** Registered after `ThreatProximityAdrenalineFlee`
 /// (108) and before `FoxTerritorySuppression`. Composes additively
 /// with 047's Flee adrenaline lift if both fire — physically wounded
 /// AND socially subordinate cat sees both lifts.
 ///
-/// **Phase 1 perception coupling:** the input scalar
-/// `social_status_distress` is published as 0.0 (stub). The actual
-/// composition `(status_diff_to_nearest_cat × proximity_factor)`
-/// requires a defensible status-differential signal and per-cat
-/// nearest-cat resolution; both land with lift activation.
+/// **Perception coupling:** the input scalar `social_status_distress`
+/// is computed at `ScoringContext` construction by
+/// `crate::systems::interoception::social_status_distress` as the
+/// composite of three orthogonal arms (`respect_diff`, `age_diff`,
+/// `bond_asymmetry`) gated by a `proximity_factor` envelope. Each arm
+/// has its own configurable weight in `ScoringConstants` so balance
+/// ticks can re-tune without re-touching the perception layer.
 ///
 /// **Gated-boost contract:** returns `score` unchanged on score `<= 0`.
 pub struct IntraspeciesConflictResponseFlight {
@@ -5632,10 +5618,10 @@ mod tests {
     }
 
     #[test]
-    fn threat_proximity_adrenaline_default_inert() {
-        // Phase 1 substrate contract: with the shipped 0.0 lift defaults,
-        // 108 MUST be score-bit-identical to baseline regardless of
-        // derivative or viability inputs.
+    fn threat_proximity_adrenaline_default_active_lifts() {
+        // Phase 3 activation contract: with the shipped 0.60 / 0.50
+        // lift defaults, 108 MUST produce the spec-proposed lift on
+        // saturated derivative + viable escape.
         let constants = crate::resources::sim_constants::SimConstants::default();
         let modifier = ThreatProximityAdrenalineFlee::new(&constants.scoring);
         let (_, ctx) = test_ctx();
@@ -5644,13 +5630,16 @@ mod tests {
             ESCAPE_VIABILITY => 1.0,
             _ => 0.0,
         };
-        for dse in [FLEE, SLEEP] {
-            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
-            assert!(
-                (out - 0.5).abs() < 1e-6,
-                "Phase-1 inert: dse {dse} unchanged at default 0.0 lifts; got {out}"
-            );
-        }
+        let flee = modifier.apply(DseId(FLEE), 0.5, &ctx, &fetch);
+        let sleep = modifier.apply(DseId(SLEEP), 0.5, &ctx, &fetch);
+        assert!(
+            (flee - 1.10).abs() < 1e-5,
+            "default-constants Flee saturated lift = 0.50 + 0.60 = 1.10; got {flee}"
+        );
+        assert!(
+            (sleep - 1.00).abs() < 1e-5,
+            "default-constants Sleep saturated lift = 0.50 + 0.50 = 1.00; got {sleep}"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -5734,7 +5723,10 @@ mod tests {
     }
 
     #[test]
-    fn intraspecies_conflict_flight_default_inert() {
+    fn intraspecies_conflict_flight_default_active_lift() {
+        // Phase A activation contract: with the shipped 0.30 lift
+        // default, 109 MUST produce the spec-proposed lift on
+        // saturated distress.
         let constants = crate::resources::sim_constants::SimConstants::default();
         let modifier = IntraspeciesConflictResponseFlight::new(&constants.scoring);
         let (_, ctx) = test_ctx();
@@ -5744,8 +5736,8 @@ mod tests {
         };
         let flee = modifier.apply(DseId(FLEE), 0.5, &ctx, &fetch);
         assert!(
-            (flee - 0.5).abs() < 1e-6,
-            "Phase-1 inert: Flee unchanged at default 0.0 lift; got {flee}"
+            (flee - 0.80).abs() < 1e-5,
+            "default-constants Flee saturated lift = 0.50 + 0.30 = 0.80; got {flee}"
         );
     }
 

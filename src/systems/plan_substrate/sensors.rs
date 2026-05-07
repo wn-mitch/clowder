@@ -30,7 +30,10 @@ use bevy_ecs::prelude::*;
 use crate::ai::curves::Curve;
 use crate::ai::planner::GoapActionKind;
 use crate::components::physical::Dead;
-use crate::components::{DispositionKind, RecentDispositionFailures, RecentTargetFailures};
+use crate::components::{
+    DispositionKind, PrevSafetyDeficit, RecentDispositionFailures, RecentTargetFailures,
+};
+use crate::components::physical::Needs;
 use crate::resources::sim_constants::SimConstants;
 
 /// Compute the recently-failed-target signal for a given
@@ -179,6 +182,40 @@ pub fn prune_recent_disposition_failures(
             continue;
         }
         let _removed = recent.prune_expired(now, cooldown);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// update_prev_safety_deficit — ticket 108 maintenance system
+// ---------------------------------------------------------------------------
+
+/// Snapshot the cat's current `safety_deficit = 1 - needs.safety` into
+/// `PrevSafetyDeficit` so next tick's `evaluate_and_plan` /
+/// `evaluate_dispositions` ScoringContext builders can compute
+/// `threat_proximity_derivative = max(0, now - prev)` against last
+/// tick's value.
+///
+/// **Schedule placement matters:** registered `.after(evaluate_and_plan)`
+/// in `SimulationPlugin::build` so the writeback runs once the scoring
+/// pass has read the prev-value. If this ran before scoring, the
+/// derivative would always be `now - now = 0`.
+///
+/// **Lazy-insert path** for save-loaded cats (pre-108 saves) and any
+/// other case where the bundle insert at `spawn_cat_from_blueprint`
+/// didn't fire: when `Option<&mut PrevSafetyDeficit>` resolves to
+/// `None`, we'd need a `Commands` write to insert. Phase 2 keeps the
+/// system pure (no `Commands`) — save-loaded cats see one tick of
+/// derivative = 0 (the ScoringContext's `prev = now` fallback) and
+/// then get the component via the cat-spawn path on subsequent saves.
+/// If the lazy-insert latency causes a measurable miss-window in
+/// production, follow-up adds `Commands` here.
+///
+/// Skipped on `Dead` cats (the snapshot is a per-tick visit; a freshly-
+/// dead cat's component will be cleaned up by `cleanup_dead`).
+pub fn update_prev_safety_deficit(mut query: Query<(&Needs, &mut PrevSafetyDeficit), Without<Dead>>) {
+    for (needs, mut prev) in &mut query {
+        let now = (1.0 - needs.safety).clamp(0.0, 1.0);
+        prev.0 = now;
     }
 }
 

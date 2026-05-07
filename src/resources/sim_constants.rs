@@ -1621,17 +1621,15 @@ pub struct ScoringConstants {
     #[serde(default = "default_threat_proximity_adrenaline_threshold")]
     pub threat_proximity_adrenaline_threshold: f32,
     /// Ticket 108 — `ThreatProximityAdrenalineFlee` lift on Flee.
-    /// **Default 0.0** (ships inert); proposed magnitude 0.60 mirrors
-    /// 047's Flee lift. Promotion happens in the same Phase-3-or-Phase-4
-    /// commit that lands the `PrevSafetyDeficit` Component + per-tick
-    /// derivative-update system (the actual perception coupling — Phase
-    /// 1 ships with a stub scalar at 0.0).
+    /// Default 0.60 (active) mirrors 047's Flee lift so the two
+    /// adrenaline branches (health-deficit lurch and threat-proximity
+    /// lurch) compose at sibling magnitudes when both fire.
     #[serde(default = "default_threat_proximity_adrenaline_flee_lift")]
     pub threat_proximity_adrenaline_flee_lift: f32,
     /// Ticket 108 — `ThreatProximityAdrenalineFlee` lift on Sleep
     /// (in-pool partner since Flee is filtered from disposition
-    /// softmax; Sleep routes the cat to a den). Default 0.0 (inert);
-    /// proposed magnitude 0.50 mirrors 047's Sleep lift.
+    /// softmax; Sleep routes the cat to a den). Default 0.50 (active)
+    /// mirrors 047's Sleep lift.
     #[serde(default = "default_threat_proximity_adrenaline_sleep_lift")]
     pub threat_proximity_adrenaline_sleep_lift: f32,
     /// Ticket 108 — `escape_viability` gate threshold for the Flee
@@ -1651,12 +1649,45 @@ pub struct ScoringConstants {
     pub intraspecies_conflict_flight_threshold: f32,
     /// Ticket 109 (Phase A) — `IntraspeciesConflictResponseFlight`
     /// lift on Flee (subordinate-retreat valence — the cat withdraws
-    /// from the dominant). **Default 0.0** (ships inert); proposed
-    /// magnitude 0.30. Promotion lands alongside the
-    /// `social_status_distress` composition + per-tick computation in
-    /// the same Phase-3 commit.
+    /// from the dominant). Default 0.30 (active) — pressure-shape
+    /// magnitude mirroring 106's hunger-urgency lift.
     #[serde(default = "default_intraspecies_conflict_flight_lift")]
     pub intraspecies_conflict_flight_lift: f32,
+    /// Ticket 109 (Phase A) — perception radius (Manhattan tiles) for
+    /// "nearest other cat" resolution feeding `social_status_distress`.
+    /// Cats further than this don't contribute to the social-status
+    /// pressure axis. Default 8 — close enough that the dominant is
+    /// in everyday-interaction range, far enough that random
+    /// territorial overlap doesn't trip the pressure lift.
+    #[serde(default = "default_social_perception_radius")]
+    pub social_perception_radius: i32,
+    /// Ticket 109 (Phase A) — weight on the `respect_diff` arm of the
+    /// composite `social_status_distress` scalar:
+    /// `clamp((nearest_other.respect - focal.respect), 0, 1)`. Default
+    /// 0.333 (equal-weighted with age_diff and bond_asymmetry); raise
+    /// this in balance ticks if status hierarchy should dominate the
+    /// signal.
+    #[serde(default = "default_social_status_distress_respect_weight")]
+    pub social_status_distress_respect_weight: f32,
+    /// Ticket 109 (Phase A) — weight on the `age_diff` arm of the
+    /// composite. Older cats are social superiors;
+    /// `age_diff = clamp((nearest_other.age - focal.age) /
+    /// age_normalization_ticks, 0, 1)`. Default 0.333.
+    #[serde(default = "default_social_status_distress_age_weight")]
+    pub social_status_distress_age_weight: f32,
+    /// Ticket 109 (Phase A) — weight on the `bond_asymmetry` arm.
+    /// Distress lifts when the focal cat has a weaker bond to
+    /// `nearest_other` than the colony average:
+    /// `clamp(colony_avg_bond_to_other - focal.bond_to_other, 0, 1)`.
+    /// Default 0.333.
+    #[serde(default = "default_social_status_distress_bond_weight")]
+    pub social_status_distress_bond_weight: f32,
+    /// Ticket 109 (Phase A) — normalization horizon for `age_diff`.
+    /// `age_diff = (other_age_ticks - focal_age_ticks) /
+    /// age_normalization_ticks`. Default `ticks_per_season * 12 = 1
+    /// sim-year` so a one-year age gap saturates the arm.
+    #[serde(default = "default_social_status_distress_age_normalization_ticks")]
+    pub social_status_distress_age_normalization_ticks: u64,
     pub wander_curiosity_scale: f32,
     pub wander_base: f32,
     pub wander_playfulness_bonus: f32,
@@ -1965,6 +1996,13 @@ impl Default for ScoringConstants {
             intraspecies_conflict_flight_threshold:
                 default_intraspecies_conflict_flight_threshold(),
             intraspecies_conflict_flight_lift: default_intraspecies_conflict_flight_lift(),
+            social_perception_radius: default_social_perception_radius(),
+            social_status_distress_respect_weight:
+                default_social_status_distress_respect_weight(),
+            social_status_distress_age_weight: default_social_status_distress_age_weight(),
+            social_status_distress_bond_weight: default_social_status_distress_bond_weight(),
+            social_status_distress_age_normalization_ticks:
+                default_social_status_distress_age_normalization_ticks(),
             wander_curiosity_scale: 0.4,
             wander_base: 0.08,
             wander_playfulness_bonus: 0.2,
@@ -2852,20 +2890,21 @@ fn default_threat_proximity_adrenaline_threshold() -> f32 {
 }
 
 /// Ticket 108 — `ThreatProximityAdrenalineFlee` Flee-DSE lurch
-/// magnitude. **Defaults to 0.0** (ships inert); proposed magnitude
-/// 0.60 mirrors 047. Promotion lands alongside the
-/// `PrevSafetyDeficit` Component + derivative-update system in the
-/// same Phase-3-or-Phase-4 commit.
+/// magnitude. Promoted from 0.0 → 0.60 in the Phase-2/3/4 activation
+/// commit alongside the `PrevSafetyDeficit` Component + derivative-
+/// update system. Mirrors 047's Flee lift so the two adrenaline
+/// branches (health-deficit lurch and threat-proximity lurch) compose
+/// at sibling magnitudes when both fire.
 fn default_threat_proximity_adrenaline_flee_lift() -> f32 {
-    0.0
+    0.60
 }
 
 /// Ticket 108 — `ThreatProximityAdrenalineFlee` Sleep-DSE lurch
-/// magnitude (in-pool partner — Flee filtered from disposition
-/// softmax). Defaults to 0.0 (inert); proposed magnitude 0.50 mirrors
-/// 047.
+/// magnitude (in-pool partner — Flee is filtered from disposition
+/// softmax; Sleep routes the cat to a den). Promoted from 0.0 → 0.50
+/// at activation, mirroring 047's Sleep lift.
 fn default_threat_proximity_adrenaline_sleep_lift() -> f32 {
-    0.0
+    0.50
 }
 
 /// Ticket 108 — `escape_viability` gate threshold for the Flee branch.
@@ -2884,11 +2923,45 @@ fn default_intraspecies_conflict_flight_threshold() -> f32 {
 }
 
 /// Ticket 109 (Phase A) — `IntraspeciesConflictResponseFlight` lift on
-/// Flee. **Defaults to 0.0** (ships inert); proposed magnitude 0.30.
-/// Promotion lands alongside the social_status_distress composition
-/// + per-tick computation in the same Phase-3 commit.
+/// Flee. Default 0.30 (active) — pressure-shape magnitude mirroring
+/// 106's hunger-urgency lift. Promoted alongside the
+/// `social_status_distress` composition + nearest-cat resolution in
+/// 109's Phase A activation commit.
 fn default_intraspecies_conflict_flight_lift() -> f32 {
-    0.0
+    0.30
+}
+
+/// Ticket 109 (Phase A) — perception radius (Manhattan tiles) for
+/// nearest-other-cat resolution. Mirrors a typical "in the same
+/// camp / next room" distance — close enough to be socially salient,
+/// far enough that random territorial overlap doesn't trigger.
+fn default_social_perception_radius() -> i32 {
+    8
+}
+
+/// Ticket 109 (Phase A) — equal weight on `respect_diff` arm of the
+/// composite scalar (1/3 each across respect / age / bond).
+fn default_social_status_distress_respect_weight() -> f32 {
+    1.0 / 3.0
+}
+
+/// Ticket 109 (Phase A) — equal weight on `age_diff` arm.
+fn default_social_status_distress_age_weight() -> f32 {
+    1.0 / 3.0
+}
+
+/// Ticket 109 (Phase A) — equal weight on `bond_asymmetry` arm.
+fn default_social_status_distress_bond_weight() -> f32 {
+    1.0 / 3.0
+}
+
+/// Ticket 109 (Phase A) — age normalization horizon. 1 sim-year
+/// (default `ticks_per_season * 12 = 1_200_000`) so a one-year age
+/// gap saturates the age_diff arm. Read at constant-init time as a
+/// literal because `ticks_per_season` lives in `TimeConstants` and
+/// the constant tables don't cross-reference at build time.
+fn default_social_status_distress_age_normalization_ticks() -> u64 {
+    1_200_000
 }
 
 fn default_build_pressure_cooking_min_raw_food() -> usize {

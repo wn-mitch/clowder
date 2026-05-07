@@ -106,6 +106,12 @@ pub fn spawn_cat_from_blueprint(
                 // (pre-073 saves) get the lazy-insert path on first
                 // failure.
                 crate::components::RecentTargetFailures::default(),
+                // Ticket 108 — per-cat snapshot of last tick's
+                // `safety_deficit` for the `ThreatProximityAdrenaline`
+                // derivative. Default 0.0 matches a freshly-spawned cat
+                // at full safety. Save-loaded cats fall through the
+                // lazy-insert path in `update_prev_safety_deficit`.
+                crate::components::PrevSafetyDeficit::default(),
             ),
         ))
         .id()

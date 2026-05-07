@@ -585,6 +585,18 @@ impl Plugin for SimulationPlugin {
             FixedUpdate,
             systems::goap::emit_plan_narrative.after(systems::goap::resolve_goap_plans),
         );
+        // Ticket 108 — write back current `safety_deficit` to
+        // `PrevSafetyDeficit` *after* the scoring pass so next tick's
+        // `evaluate_and_plan` / `evaluate_dispositions` see last tick's
+        // value as `prev` and compute a non-zero rising-derivative
+        // when safety drops over the tick boundary. If this ran
+        // before scoring, the derivative would always be zero.
+        app.add_systems(
+            FixedUpdate,
+            systems::plan_substrate::update_prev_safety_deficit
+                .after(systems::goap::evaluate_and_plan)
+                .after(systems::goap::resolve_goap_plans),
+        );
 
         // Standalone systems — registered after the chains but unordered
         // relative to each other. These exceed Bevy's chain param limit.

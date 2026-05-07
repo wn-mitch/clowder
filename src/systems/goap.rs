@@ -209,6 +209,16 @@ pub struct WorldStateQueries<'w, 's> {
         ),
         With<markers::ColonyState>,
     >,
+    /// Ticket 109 (Phase A) — read-only Age lookup for the focal cat's
+    /// `nearest_other` to feed `social_status_distress`'s `age_diff`
+    /// arm. Disjoint from the per-cat iteration query because both
+    /// access `Age` immutably (Bevy allows aliased read-only borrows).
+    pub age_query: Query<'w, 's, &'static crate::components::identity::Age, Without<Dead>>,
+    /// Ticket 109 (Phase A) — read-only Needs lookup for cross-cat
+    /// `respect` reads in `social_status_distress`'s `respect_diff`
+    /// arm. Read-only alias of the per-cat iteration query's `&Needs`
+    /// borrow.
+    pub needs_query: Query<'w, 's, &'static Needs, Without<Dead>>,
 }
 
 /// Bundles resources for evaluate_and_plan.
@@ -580,6 +590,7 @@ pub fn check_modifier_preemption(
             &Health,
             &mut CurrentAction,
             Option<&mut ActionHistory>,
+            Option<&crate::components::PrevSafetyDeficit>,
         ),
         (With<GoapPlan>, Without<Dead>),
     >,
@@ -602,7 +613,7 @@ pub fn check_modifier_preemption(
     static NO_ANCHOR_POS: fn(crate::ai::considerations::LandmarkAnchor) -> Option<Position> =
         |_| None;
 
-    for (entity, name, needs, health, mut current, history) in &mut query {
+    for (entity, name, needs, health, mut current, history, prev_safety_deficit) in &mut query {
         let Ok(plan) = plans.get(entity) else {
             continue;
         };
@@ -618,15 +629,23 @@ pub fn check_modifier_preemption(
         // acute-class lurch modifiers (047 / 102 / 105 / 108) consult
         // in their `preempts_in_flight` predicates. Aligned with the
         // canonical `scoring::ctx_scalars` keys (single source of
-        // truth). Phase 1 stub for `threat_proximity_derivative`
-        // matches `ctx_scalars`'s 0.0 publication; lift activation in
-        // ticket 108 will replace with the real derivative AND this
-        // system's fetch closure in the same commit.
+        // truth). Ticket 108 — the `threat_proximity_derivative`
+        // computation here mirrors the ScoringContext builder's
+        // (`(1 - safety) - prev`, prev = current for lazy-insert).
         let health_deficit = (1.0 - health.current / health.max).clamp(0.0, 1.0);
+        let safety_deficit_now = (1.0 - needs.safety).clamp(0.0, 1.0);
+        let safety_deficit_prev = prev_safety_deficit
+            .map(|p| p.0)
+            .unwrap_or(safety_deficit_now);
+        let threat_proximity_derivative =
+            crate::components::PrevSafetyDeficit::rising_derivative(
+                safety_deficit_now,
+                safety_deficit_prev,
+            );
         let fetch_scalar = move |scalar: &str, _: Entity| -> f32 {
             match scalar {
                 "health_deficit" => health_deficit,
-                "threat_proximity_derivative" => 0.0,
+                "threat_proximity_derivative" => threat_proximity_derivative,
                 _ => 0.0,
             }
         };
@@ -1025,6 +1044,17 @@ pub fn evaluate_and_plan(
                 // a disposition and the consideration scores 1.0
                 // (no penalty).
                 Option<&mut crate::components::RecentDispositionFailures>,
+                // Ticket 108 — last tick's `safety_deficit` snapshot
+                // for the `ThreatProximityAdrenaline` rising-only
+                // derivative. Optional because save-loaded cats
+                // (pre-108 saves) get the lazy-insert path in
+                // `update_prev_safety_deficit`.
+                Option<&crate::components::PrevSafetyDeficit>,
+                // Ticket 109 (Phase A) — focal cat's birth tick for
+                // the `social_status_distress` age_diff arm. Optional
+                // because some test paths spawn cats without `Age`;
+                // `None` falls through to the 0.0 age_diff branch.
+                Option<&crate::components::identity::Age>,
             ),
         ),
         (
@@ -1248,7 +1278,7 @@ pub fn evaluate_and_plan(
     let action_snapshot: Vec<(Entity, Position, Action)> = query
         .iter()
         .map(
-            |((entity, _, _, _, pos, _, _, _), (_, _, current, _, _, _, _, _, _))| {
+            |((entity, _, _, _, pos, _, _, _), (_, _, current, _, _, _, _, _, _, _, _))| {
                 (entity, *pos, current.action)
             },
         )
@@ -1291,6 +1321,8 @@ pub fn evaluate_and_plan(
             fated_rival,
             fulfillment,
             mut recent_disposition_failures,
+            prev_safety_deficit,
+            focal_age,
         ),
     ) in &mut query
     {
@@ -1648,6 +1680,40 @@ pub fn evaluate_and_plan(
                 &res.map,
                 markers.has(markers::Parent::KEY, entity) || has_pair_bond,
                 &res.constants.escape_viability,
+            ),
+            // Ticket 108 — `safety_deficit_now - prev` rising-only.
+            // First-tick / lazy-insert cats see prev = now (derivative
+            // = 0). The companion `update_prev_safety_deficit` system
+            // writes the snapshot back after this scoring pass.
+            threat_proximity_derivative: {
+                let now = (1.0 - needs.safety).clamp(0.0, 1.0);
+                let prev = prev_safety_deficit.map(|p| p.0).unwrap_or(now);
+                crate::components::PrevSafetyDeficit::rising_derivative(now, prev)
+            },
+            // Ticket 109 (Phase A) — composite social-status pressure.
+            // Reads cross-cat Age + Needs via WorldStateQueries
+            // lookups; `Relationships` resource gives bond data.
+            social_status_distress: crate::systems::interoception::social_status_distress(
+                entity,
+                *pos,
+                focal_age,
+                needs.respect,
+                &cat_positions,
+                |e| {
+                    world_state
+                        .age_query
+                        .get(e)
+                        .ok()
+                        .map(|a| a.born_tick)
+                },
+                |e| world_state.needs_query.get(e).ok().map(|n| n.respect),
+                &res.relationships,
+                res.time.tick,
+                sc.social_perception_radius,
+                sc.social_status_distress_age_normalization_ticks,
+                sc.social_status_distress_respect_weight,
+                sc.social_status_distress_age_weight,
+                sc.social_status_distress_bond_weight,
             ),
             is_incapacitated,
             has_construction_site,
