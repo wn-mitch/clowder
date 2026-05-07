@@ -1,0 +1,54 @@
+---
+id: 205
+title: social_status_distress perception cost — 25% per-tick slowdown from O(N) nearest-cat scan
+status: ready
+cluster: ai-substrate
+added: 2026-05-07
+parked: null
+blocked-by: []
+supersedes: []
+related-systems: [ai-substrate-refactor.md]
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+109 Phase A's verification soak (`logs/tuned-42` at HEAD `94b99910` vs `logs/tuned-42-pre-108-109` at `ee0dfb05`) exhibited `duration_drift_pct: 25.0%`: the post-109A binary processes 108127 ticks in the canonical 15-min wallclock window, while the pre-109A binary at the same wallclock processes 144258 ticks. That's a 25% per-tick perf regression introduced by 108 + 109 Phase A together. Most of the cost is structurally attributable to 109A's `social_status_distress` perception scalar (108's modifier work and rising-derivative perception scalar are bounded O(1) per cat).
+
+`social_status_distress` (in `src/systems/interoception.rs:316-405`) does, per cat per tick:
+
+1. Iterate every cat in the colony to find ones within `social_perception_radius` (default 8 Manhattan tiles) — naively O(N) per cat → O(N²) total per tick.
+2. For the nearest qualifying cat, compute three orthogonal arms: `respect_diff`, `age_diff`, `bond_asymmetry`. The `bond_asymmetry` arm scans `relationships.all_for(other)` to compute a colony-average — another O(N) lookup nested inside the per-cat outer loop.
+
+Net asymptotic: **O(N²) per tick on the perception layer alone**, where N is the colony population. On seed-42's ~30-cat colony this is ~900 outer iterations × ~10–30 inner relationship reads ≈ 9k–27k operations per tick *before* any DSE scoring fires. The composite makes Phase A behaviorally rich (per `feedback_single_axis_perception_scalars` discipline) at meaningful per-tick cost.
+
+**Why this matters now:** Phase B sub-tickets 142 (Freeze), 143 (Fight), 144 (Fawn) all *consume* the same scalar without adding new perception cost — they're additional `ScoreModifier` readers at the L2 layer. So the 25% baseline is what every future Phase B activation inherits. Optimizing `social_status_distress` once amortizes across the whole 109 family.
+
+## Scope
+
+**Investigation phase first.** Confirm the per-tick cost attribution before committing to a structural change. The structural-revision candidates worth drafting (per CLAUDE.md §Bugfix discipline):
+
+- **split** — break `social_status_distress` computation into a separate ECS system that runs once per tick and writes a per-cat `SocialDistressSnapshot` component, instead of computing it inside `ScoringContext` construction. Lets the system run with a coarser cadence (every 4 ticks?) since social pressure is steady-state.
+- **extend** — keep the in-context computation but cache the colony's spatial index (KD-tree or hash-grid keyed by tile) so the nearest-cat lookup is O(log N) or O(1) instead of O(N). Bevy 0.18 doesn't ship a spatial index for entities; this means writing one or pulling in `bevy_spatial`.
+- **rebind** — change the perception layer to read from an existing nearest-neighbour structure if one already lives in the codebase (check `src/spatial/*` and any `ColonyMap`-like resource).
+- **retire** — drop the `bond_asymmetry` arm (the most expensive of the three) and re-tune the modifier with `respect_diff + age_diff` only. The composite was chosen for richness; if perception cost forces a tradeoff, this arm is the most replaceable.
+
+**Profile first** — `cargo flamegraph --release` on the canonical seed-42 soak to confirm `social_status_distress` is the dominant attribution before structural changes. The 25% delta could also include 108's modifier or 119's interrupt-retirement-induced pipeline reshuffling; profile data resolves the attribution question.
+
+## Verification
+
+- `cargo flamegraph --release -- headless --seed 42 --duration-sec 60` — confirm `social_status_distress` percentage of CPU time. If it's <10%, this ticket is the wrong target and the 25% regression has another cause.
+- Layer-walk audit per `_template_bugfix.md`: walk `interoception::social_status_distress → ScoringContext field → ScoreModifier::apply (109A) → DSE softmax`. Mark each row's perf attribution `[verified-correct]` or `[suspect]`.
+- After fix: re-soak seed-42 and confirm `duration_drift_pct` returns to ≤ 5% vs pre-108-109 (i.e. the perf regression is recovered).
+- Ensure the pass-bar from 109's Log entry still holds: `Starvation == 0`, continuity canaries unchanged, `bonds_formed` ≥ 30.
+
+## Out of scope
+
+- 108's `ThreatProximityAdrenaline` perception cost — different scalar, different ticket if profile attributes any cost there.
+- Re-architecting the broader `ScoringContext` construction pipeline — only the `social_status_distress` field needs to move.
+
+## Log
+
+- 2026-05-07: Opened in the same commit that lands 109 Phase A's verification. Surfaced via `just verdict` reporting `duration_drift_pct: 25.0%` against `logs/tuned-42-pre-108-109`. Phase B sub-tickets (142/143/144) inherit this cost; optimizing once amortizes across the family.

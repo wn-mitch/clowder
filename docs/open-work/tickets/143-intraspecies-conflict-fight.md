@@ -1,11 +1,11 @@
 ---
 id: 143
 title: IntraspeciesConflictResponseFight — territorial combat valence (same-species)
-status: blocked
+status: ready
 cluster: ai-substrate
 added: 2026-05-02
 parked: null
-blocked-by: [109]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []

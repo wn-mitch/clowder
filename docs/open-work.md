@@ -14,10 +14,10 @@ _Last generated: 2026-05-07._
 
 | Status | Count |
 |---|---|
-| In progress | 7 |
-| Ready | 56 |
+| In progress | 6 |
+| Ready | 59 |
 | Parked | 7 |
-| Blocked | 17 |
+| Blocked | 15 |
 | **Open total** | **87** |
 | Pre-existing | 2 |
 
@@ -32,20 +32,19 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 | Epic | Status | Children | Done | Open (in-progress / ready / blocked / parked) | Progress |
 |---|---|---|---|---|---|
 | **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 16 | 4 | 12 (0 / 7 / 3 / 2) | `▰▰▱▱▱▱▱▱▱▱` 25% |
-| **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** Substrate-over-override | in-progress | 32 | 26 | 6 (1 / 3 / 0 / 2) | `▰▰▰▰▰▰▰▰▱▱` 81% |
+| **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** Substrate-over-override | in-progress | 32 | 27 | 5 (0 / 3 / 0 / 2) | `▰▰▰▰▰▰▰▰▱▱` 84% |
 | **[095](docs/open-work/tickets/095-body-zones-epic.md)** Body zones | ready | 0 | — | — | _no roster_ |
 
-## In progress (7)
+## In progress (6)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
 - **[032](docs/open-work/tickets/032-starvation-cat-biology-realignment.md)** — Starvation rebalance — align with IRL cat biology, interesting not cutthroat — _added 2026-04-26_
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _added 2026-04-27_
 - **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** — Substrate-over-override — retire control-yanking hacks in favor of IAUS levers — _[substrate-over-override] · added 2026-04-30_
-- **[109](docs/open-work/tickets/109-intraspecies-conflict-response.md)** — IntraspeciesConflictResponse — full four-valence (fight/flight/freeze/fawn) social response — _[ai-substrate] · added 2026-05-01_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 
-## Ready (56)
+## Ready (59)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -85,6 +84,8 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[138](docs/open-work/tickets/138-movement-budget-and-mobility-term.md)** — Phase 1 — MovementBudget per entity + escape_viability mobility term — _[substrate-migration] · blocked-by 135 · added 2026-05-02_
 - **[139](docs/open-work/tickets/139-position-vec2-substrate.md)** — Phase 2 — Position becomes Vec2<f32> (continuous-position substrate migration) — _[substrate-migration] · blocked-by 135 · added 2026-05-02_
 - **[141](docs/open-work/tickets/141-combat-winnability-scalar.md)** — combat_winnability perception scalar — sibling to escape_viability — _[ai-substrate] · added 2026-05-02_
+- **[142](docs/open-work/tickets/142-intraspecies-conflict-freeze.md)** — IntraspeciesConflictResponseFreeze — hold-position low-body-posture social valence — _[ai-substrate] · added 2026-05-02_
+- **[143](docs/open-work/tickets/143-intraspecies-conflict-fight.md)** — IntraspeciesConflictResponseFight — territorial combat valence (same-species) — _[ai-substrate] · added 2026-05-02_
 - **[145](docs/open-work/tickets/145-submit-gesture-dse.md)** — Submit gesture DSE — appeasement infrastructure for IntraspeciesConflict.Fawn — _[ai-substrate] · added 2026-05-02_
 - **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · added 2026-05-02_
 - **[153](docs/open-work/tickets/153-150-r5a-balance-follow-on.md)** — 150 R5a balance follow-on — Resting score-mass and courtship recovery — _[balance] · added 2026-05-03_
@@ -102,6 +103,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[202](docs/open-work/tickets/202-static-cross-reference-dse-scenario-coverage-follow-on-to-198.md)** — Static cross-reference DSE → scenario coverage (follow-on to 198) — _[process-discipline] · added 2026-05-06_
 - **[203](docs/open-work/tickets/203-criticalhealth-hunt-to-starvation-reproducer.md)** — CriticalHealth interrupt drives hunt-to-starvation plan churn — concrete reproducer for ticket 119 — _[ai-substrate] · added 2026-05-06_
 - **[204](docs/open-work/tickets/204-kitten-starvation-cluster-post-119.md)** — Kitten-starvation cluster surfaced by 119 substrate activation — bonding/mating cascade vs adult-feeding bandwidth — _[ai-substrate] · added 2026-05-07_
+- **[205](docs/open-work/tickets/205-social-status-distress-perception-cost.md)** — social_status_distress perception cost — 25% per-tick slowdown from O(N) nearest-cat scan — _[ai-substrate] · added 2026-05-07_
 - **[027b](docs/open-work/tickets/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) — _added 2026-04-28_
 
 ## Parked (7)
@@ -114,7 +116,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[173](docs/open-work/tickets/173-crafting-split-capability-markers.md)** — IsHerbalist / IsSpiritualist / HasCorruptionNearby capability markers (155 follow-on) — _[ai-substrate] · parked 2026-05-05 · added 2026-05-05_
 - **[199](docs/open-work/tickets/199-pipeline-walk-skill.md)** — Hunt / production / consumption pipeline-walk skill (194 P4) — _[process-discipline] · parked 2026-05-06 · added 2026-05-06_
 
-## Blocked (17)
+## Blocked (15)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _blocked-by 007, 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _blocked-by 016 · added 2026-04-22_
@@ -130,21 +132,20 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[129](docs/open-work/tickets/129-care-dses-perceivable-intentions.md)** — Care DSEs over perceivable intentions — _[C] · blocked-by 126 · added 2026-05-02_
 - **[130](docs/open-work/tickets/130-trust-weighted-coordinator-momentum.md)** — Trust-weighted coordinator directive momentum — _[C] · blocked-by 126, 057 · added 2026-05-02_
 - **[140](docs/open-work/tickets/140-steering-and-pursuit-polish.md)** — Phase 3 — Steering, smooth pursuit / flee, pathfinder polish — _[substrate-migration] · blocked-by 139 · added 2026-05-02_
-- **[142](docs/open-work/tickets/142-intraspecies-conflict-freeze.md)** — IntraspeciesConflictResponseFreeze — hold-position low-body-posture social valence — _[ai-substrate] · blocked-by 109 · added 2026-05-02_
-- **[143](docs/open-work/tickets/143-intraspecies-conflict-fight.md)** — IntraspeciesConflictResponseFight — territorial combat valence (same-species) — _[ai-substrate] · blocked-by 109 · added 2026-05-02_
-- **[144](docs/open-work/tickets/144-intraspecies-conflict-fawn.md)** — IntraspeciesConflictResponseFawn — appeasement valence (belly-up, slow blink) — _[ai-substrate] · blocked-by 109, 145 · added 2026-05-02_
+- **[144](docs/open-work/tickets/144-intraspecies-conflict-fawn.md)** — IntraspeciesConflictResponseFawn — appeasement valence (belly-up, slow blink) — _[ai-substrate] · blocked-by 145 · added 2026-05-02_
 
 ## Pre-existing (2)
 
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (136)
+## Landed archive (137)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (71)
+### 2026-05 (72)
 
+- **[109](docs/open-work/landed/109-intraspecies-conflict-response.md)** — IntraspeciesConflictResponse — full four-valence (fight/flight/freeze/fawn) social response _(2026-05-07)_
 - **[108](docs/open-work/landed/108-threat-proximity-adrenaline.md)** — ThreatProximityAdrenaline modifier — substrate axis for CriticalSafety interrupt retirement _(2026-05-07)_
 - **[198](docs/open-work/landed/198-substrate-fires-landing-gate.md)** — Substrate-fires landing gate — DSE curve-non-zero requires sibling scenario (194 P1) _(2026-05-06)_
 - **[197](docs/open-work/landed/197-explore-agent-prompt-template.md)** — Explore-agent prompt template (194 P8, subsumes P6) _(2026-05-06)_
