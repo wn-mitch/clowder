@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use bevy_ecs::prelude::*;
 use rand::Rng;
 
-use crate::ai::pathfinding::{find_free_adjacent, find_path, step_toward};
+use crate::ai::pathfinding::{find_free_adjacent, step_toward};
 use crate::ai::planner::actions::actions_for_disposition;
 use crate::ai::planner::goals::goal_for_disposition;
 use crate::ai::planner::{
@@ -2481,6 +2481,12 @@ pub fn resolve_goap_plans(
                 // first failure (cats that never fail a target don't
                 // pay for the HashMap allocation).
                 Option<&mut crate::components::RecentTargetFailures>,
+                // Ticket 228 — per-cat route-cost field, inserted at
+                // replan in `evaluate_and_plan`. Optional because cats
+                // that haven't replanned yet (or whose component was
+                // recently removed) won't have it; `dispatch_step_action`
+                // falls back to A* via `CatPathPlan::AStarFallback`.
+                Option<&crate::components::RouteCostField>,
             ),
         ),
         (
@@ -2687,7 +2693,7 @@ pub fn resolve_goap_plans(
         grooming: cats
             .iter()
             .map(
-                |((e, _, _, _, _, _, _, _, _), (_, _, _, g, _, _, _, _, _, _, _, _))| {
+                |((e, _, _, _, _, _, _, _, _), (_, _, _, g, _, _, _, _, _, _, _, _, _))| {
                     (e, g.as_ref().map_or(0.8, |g| g.0))
                 },
             )
@@ -2697,7 +2703,7 @@ pub fn resolve_goap_plans(
         // double-borrowing the mutable `cats` query.
         gender: cats
             .iter()
-            .map(|((e, _, _, _, _, _, _, _, _), (g, _, _, _, _, _, _, _, _, _, _, _))| (e, *g))
+            .map(|((e, _, _, _, _, _, _, _, _), (g, _, _, _, _, _, _, _, _, _, _, _, _))| (e, *g))
             .collect(),
         cat_tile_counts: {
             let mut counts = HashMap::new();
@@ -2734,7 +2740,7 @@ pub fn resolve_goap_plans(
             .collect(),
         injured_cat_positions: cats
             .iter()
-            .filter(|(_, (_, _, _, _, _, health, _, _, _, _, _, _))| health.current < health.max)
+            .filter(|(_, (_, _, _, _, _, health, _, _, _, _, _, _, _))| health.current < health.max)
             .map(|((e, _, _, pos, _, _, _, _, _), _)| (e, *pos))
             .collect(),
         // §6.5.3 mentor-target DSE snapshot: candidate-side Skills lookup
@@ -2808,6 +2814,7 @@ pub fn resolve_goap_plans(
             mut urgencies,
             mut fulfillment_opt,
             mut recent_failures,
+            route_cost_field,
         ),
     ) in &mut cats
     {
@@ -3044,6 +3051,7 @@ pub fn resolve_goap_plans(
             &snaps,
             &mut accum,
             recent_failures.as_deref(),
+            route_cost_field,
         );
 
         // Re-derive `d` after the dispatch call so the immutable borrow
@@ -3436,7 +3444,7 @@ pub fn resolve_goap_plans(
     // Deferred grooming restorations — apply grooming condition delta and
     // §7.W social_warmth delta to the groomed target.
     for groom in accum.grooming_restorations {
-        if let Ok((_, (_, _, _, grooming, _, _, _, _, _, _, fulfillment, _))) =
+        if let Ok((_, (_, _, _, grooming, _, _, _, _, _, _, fulfillment, _, _))) =
             cats.get_mut(groom.target)
         {
             if let Some(mut g) = grooming {
@@ -3620,15 +3628,20 @@ fn dispatch_step_action(
     // through `dispatch_step_action` so the six target-DSE branches
     // can pass the cooldown sensor input into their resolvers.
     recent_failures: Option<&crate::components::RecentTargetFailures>,
+    // Ticket 228 — per-cat route-cost field component (inserted at
+    // replan by `evaluate_and_plan`). Threaded so the `cat_path_plan!`
+    // macro can construct `CatPathPlan::Field` when fresh, falling
+    // back to A* via `CatPathPlan::AStarFallback` (and emitting
+    // `Feature::RouteCostFieldFallback`) when stale or out-of-budget.
+    route_cost_field: Option<&crate::components::RouteCostField>,
 ) -> crate::steps::StepResult {
     let d = &ec.constants.disposition;
 
-    // Ticket 223 — cat-side path-cost overlay constructor. Each match
-    // arm that calls `find_path` / a step resolver builds its own
-    // overlays at arm-scope so the immutable borrow on
-    // `prey_params.fox_scent_map` doesn't conflict with the
-    // `&mut prey_params` borrows in the SearchPrey / EngagePrey arms.
-    // Substrate, not search state (§4.7).
+    // Ticket 223 — legacy raw-overlay constructor. Kept as a
+    // backwards-compat shim during the 228 step-resolver migration:
+    // call sites that haven't yet rebuilt around `CatPathPlan` still
+    // reach for it. Will be deleted once every cat-side `find_path` /
+    // step resolver consumes `cat_path_plan!` directly.
     macro_rules! cat_overlays_pair {
         () => {{
             (
@@ -3638,6 +3651,56 @@ fn dispatch_step_action(
                 ),
                 crate::ai::pathfinding::CorruptionOverlay::new(&ec.map, &ec.constants.scoring),
             )
+        }};
+    }
+
+    // Ticket 228 — cat-side path-plan constructor. Returns a
+    // `CatPathPlan` per call: `Field(&route_cost_field)` when the
+    // per-cat replan-time flood is fresh and reaches `$to`, otherwise
+    // `AStarFallback { fox, corr, weight }` (which emits
+    // `Feature::RouteCostFieldFallback` for the canary). The
+    // arm-scope construction is what unblocks the immutable borrow on
+    // `prey_params.fox_scent_map` from conflicting with `&mut
+    // prey_params` borrows in the SearchPrey / EngagePrey arms.
+    // Substrate, not search state (§4.7). Replaces the ticket-223
+    // `cat_overlays_pair!` macro that returned the raw overlays.
+    macro_rules! cat_path_plan {
+        ($to:expr) => {{
+            let __fox = crate::ai::pathfinding::FoxScentOverlay::new(
+                &prey_params.fox_scent_map,
+                &ec.constants.scoring,
+            );
+            let __corr =
+                crate::ai::pathfinding::CorruptionOverlay::new(&ec.map, &ec.constants.scoring);
+            let __weight = crate::ai::pathfinding::cat_path_weight_from_boldness(
+                personality.boldness,
+            );
+            let __current_tick = ec.time.tick;
+            let __window = ec.constants.scoring.route_cost_replan_window_ticks;
+            match route_cost_field {
+                Some(__field)
+                    if !crate::ai::route_cost::CatPathPlan::should_fall_back_at(
+                        __field,
+                        $to,
+                        __current_tick,
+                        __window,
+                    ) =>
+                {
+                    crate::ai::route_cost::CatPathPlan::Field(__field)
+                }
+                _ => {
+                    if let Some(__act) = narr.activation.as_deref_mut() {
+                        __act.record(
+                            crate::resources::system_activation::Feature::RouteCostFieldFallback,
+                        );
+                    }
+                    crate::ai::route_cost::CatPathPlan::AStarFallback {
+                        fox: __fox,
+                        corr: __corr,
+                        weight: __weight,
+                    }
+                }
+            }
         }};
     }
 
@@ -3668,18 +3731,23 @@ fn dispatch_step_action(
 
     match action_kind {
         GoapActionKind::TravelTo(zone) => {
-            let (fox_overlay, corr_overlay) = cat_overlays_pair!();
-            let w = crate::ai::pathfinding::cat_path_weight_from_boldness(personality.boldness);
-            let cat_overlays: [crate::ai::pathfinding::WeightedOverlay; 2] = [
-                crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
-                crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
-            ];
+            // Ticket 228 — `cat_path_plan!` resolves to `Field` (gradient-
+            // walk) when the per-cat RouteCostField reaches the resolved
+            // zone target, otherwise `AStarFallback` (which records
+            // `Feature::RouteCostFieldFallback` for the staleness canary).
+            // The destination passed to the macro is the zone-resolved
+            // target where known; on the first dispatch tick the target
+            // is `None`, so we fall back to A* via the cat's current
+            // position as the staleness probe (a position the field
+            // always reaches at cost 0).
+            let target_for_plan = plan.step_state[step_idx].target_position.unwrap_or(*pos);
+            let path_plan = cat_path_plan!(target_for_plan);
             resolve_travel_to(
                 zone,
                 &mut plan.step_state[step_idx],
                 pos,
                 &ec.map,
-                &cat_overlays,
+                &path_plan,
                 &prey_params.exploration_map,
                 &snaps.cat_tile_counts,
                 &snaps.stores_positions,
@@ -5480,7 +5548,7 @@ fn resolve_travel_to(
     state: &mut StepExecutionState,
     pos: &mut Position,
     map: &TileMap,
-    overlays: &[crate::ai::pathfinding::WeightedOverlay<'_>],
+    path_plan: &crate::ai::route_cost::CatPathPlan<'_>,
     exploration_map: &ExplorationMap,
     cat_tile_counts: &HashMap<Position, u32>,
     stores_positions: &[Position],
@@ -5516,9 +5584,10 @@ fn resolve_travel_to(
         return crate::steps::StepResult::Fail("no reachable zone target".into());
     };
 
-    // Use cached A* path.
+    // Cached path via `CatPathPlan` — gradient-walk over the cat's
+    // RouteCostField when fresh, A* fallback otherwise (228).
     if state.cached_path.is_none() {
-        state.cached_path = find_path(*pos, target, map, overlays);
+        state.cached_path = path_plan.find_full_path(*pos, target, map);
     }
 
     if let Some(ref mut path) = state.cached_path {
@@ -5543,15 +5612,18 @@ fn resolve_travel_to(
             return crate::steps::StepResult::Advance;
         }
     } else {
-        // No path found — step toward target directly.
+        // No path found — step toward target directly via the same
+        // `CatPathPlan` (gradient-walk's `next_step` falls back to
+        // greedy `step_toward` under the AStarFallback / NoOverlay
+        // arms; 228).
         let before = *pos;
-        if let Some(next) = step_toward(pos, &target, map, overlays) {
+        if let Some(next) = path_plan.next_step(*pos, target, map) {
             *pos = next;
         }
         if pos.manhattan_distance(&target) <= 1 {
             return crate::steps::StepResult::Advance;
         }
-        // Early exit: A* found no path and greedy movement made no progress.
+        // Early exit: pathfinding found no path and greedy step made no progress.
         if *pos == before {
             state.no_move_ticks += 1;
         } else {

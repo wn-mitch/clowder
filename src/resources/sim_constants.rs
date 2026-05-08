@@ -1954,6 +1954,17 @@ pub struct ScoringConstants {
     /// cats don't pin to a single seed forever.
     #[serde(default = "default_wander_recandidate_ticks")]
     pub wander_recandidate_ticks: u64,
+    /// 228: Staleness window for `CatPathPlan::should_fall_back_at`.
+    /// A cached `RouteCostField` whose `origin_tick` is older than
+    /// `current_tick - route_cost_replan_window_ticks` forces an A*
+    /// fallback (and emits `Feature::RouteCostFieldFallback`). Default
+    /// `120` — ~2 sim-minutes; tight enough to catch a stuck cat
+    /// drifting on an old field, loose enough that mid-plan walks
+    /// rarely hit the cliff. Independent of the per-replan field
+    /// rebuild cadence in `evaluate_and_plan` (which is governed by
+    /// `Without<GoapPlan>`-driven replanning, not a tick window).
+    #[serde(default = "default_route_cost_replan_window_ticks")]
+    pub route_cost_replan_window_ticks: u64,
     /// 209: weight on the `TensionDefusionGroomLift` modifier
     /// targeting GroomOther. Multiplicative lift when
     /// `colony_tension_recent` is elevated AND `HasGroomingCandidate`
@@ -2208,6 +2219,7 @@ impl Default for ScoringConstants {
             corruption_path_cost_max: default_corruption_path_cost_max(),
             route_cost_flood_budget: default_route_cost_flood_budget(),
             wander_recandidate_ticks: default_wander_recandidate_ticks(),
+            route_cost_replan_window_ticks: default_route_cost_replan_window_ticks(),
             tension_defusion_groom_weight: default_tension_defusion_groom_weight(),
             disposal_inventory_excess_slope: default_disposal_inventory_excess_slope(),
             disposal_inventory_excess_midpoint: default_disposal_inventory_excess_midpoint(),
@@ -3305,6 +3317,12 @@ fn default_route_cost_flood_budget() -> u32 {
 /// `ScoringConstants::wander_recandidate_ticks`.
 fn default_wander_recandidate_ticks() -> u64 {
     30
+}
+
+/// 228: Staleness window for `CatPathPlan::should_fall_back_at`. See
+/// `ScoringConstants::route_cost_replan_window_ticks`.
+fn default_route_cost_replan_window_ticks() -> u64 {
+    120
 }
 
 /// 209: GroomOther `TensionDefusionGroomLift` modifier weight. Ships

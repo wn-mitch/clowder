@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::ai::pathfinding::{find_free_adjacent, find_path};
+use crate::ai::pathfinding::find_free_adjacent;
+use crate::ai::route_cost::CatPathPlan;
 use crate::components::physical::Position;
 use crate::resources::map::TileMap;
 use crate::steps::{StepOutcome, StepResult};
@@ -8,8 +9,10 @@ use crate::steps::{StepOutcome, StepResult};
 /// # GOAP step resolver: `MoveTo`
 ///
 /// **Real-world effect** — paths the actor toward `target_position`
-/// one tile per tick; on arrival (and when stacked), jitters to a
-/// free neighbor so cats don't pile on destination tiles.
+/// one tile per tick via `CatPathPlan` (gradient-walk over the cat's
+/// `RouteCostField` with A\* fallback when stale or absent); on
+/// arrival (and when stacked), jitters to a free neighbor so cats
+/// don't pile on destination tiles.
 ///
 /// **Plan-level preconditions** — emitted by the builder /
 /// task-chain planners as a pathfinding primitive; GOAP `TravelTo`
@@ -30,7 +33,7 @@ pub fn resolve_move_to(
     target_position: Option<Position>,
     cached_path: &mut Option<Vec<Position>>,
     map: &TileMap,
-    overlays: &[crate::ai::pathfinding::WeightedOverlay<'_>],
+    path_plan: &CatPathPlan<'_>,
     cat_tile_counts: &HashMap<Position, u32>,
 ) -> StepOutcome<()> {
     let Some(target) = target_position else {
@@ -52,7 +55,7 @@ pub fn resolve_move_to(
         return StepOutcome::bare(StepResult::Advance);
     }
     if cached_path.is_none() {
-        match find_path(*pos, target, map, overlays) {
+        match path_plan.find_full_path(*pos, target, map) {
             Some(path) => *cached_path = Some(path),
             None => return StepOutcome::bare(StepResult::Fail("no path to target".into())),
         }

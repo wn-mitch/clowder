@@ -202,6 +202,15 @@ pub enum CatPathPlan<'a> {
         corr: CorruptionOverlay<'a>,
         weight: f32,
     },
+    /// Plain A\* without overlays. Used by legacy disposition-chain
+    /// paths in `systems/task_chains.rs` that historically passed
+    /// `find_path(.., &[])` and don't yet plumb FoxScentMap. Behavior
+    /// is byte-identical to `AStarFallback { weight: 0.0, .. }` (the
+    /// `WeightedOverlay::cost_at` of a zero-weight overlay is always
+    /// 0), but skipping overlay construction avoids the FoxScentMap
+    /// dependency in those callers. Foxes also use this shape via
+    /// their own `find_path` path; this variant is cat-side legacy.
+    NoOverlay,
 }
 
 impl<'a> CatPathPlan<'a> {
@@ -236,6 +245,7 @@ impl<'a> CatPathPlan<'a> {
                 ];
                 step_toward(&from, &to, map, &overlays)
             }
+            CatPathPlan::NoOverlay => step_toward(&from, &to, map, &[]),
         }
     }
 
@@ -277,6 +287,7 @@ impl<'a> CatPathPlan<'a> {
                 ];
                 find_path(from, to, map, &overlays)
             }
+            CatPathPlan::NoOverlay => find_path(from, to, map, &[]),
         }
     }
 }

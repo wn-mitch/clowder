@@ -155,18 +155,20 @@ pub fn resolve_task_chains(
         match &step.kind {
             StepKind::MoveTo => {
                 let cached = &mut step.cached_path;
-                // Legacy disposition-chain path. Passes empty overlays —
-                // ticket 223 wires cat-side fox-scent / corruption
-                // routing on the active GOAP path; if this legacy path
-                // is reinstated, plumb FoxScentMap + ScoringConstants
-                // through `resolve_task_chains` and build cat_overlays
-                // here.
+                // Legacy disposition-chain path. Uses `CatPathPlan::NoOverlay`
+                // (plain A* with no fox-scent / corruption routing) —
+                // ticket 223 wires cat-side path-cost on the active GOAP
+                // path; ticket 228 collapsed those into `CatPathPlan`.
+                // If this legacy path is reinstated, plumb FoxScentMap +
+                // ScoringConstants + RouteCostField through
+                // `resolve_task_chains` and build a `Field` /
+                // `AStarFallback` plan here.
                 let outcome = crate::steps::building::resolve_move_to(
                     &mut pos,
                     step_target_position,
                     cached,
                     &map,
-                    &[],
+                    &crate::ai::route_cost::CatPathPlan::NoOverlay,
                     &cat_tile_counts,
                 );
                 apply(outcome.result, &mut chain);
