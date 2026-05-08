@@ -1,0 +1,62 @@
+---
+id: 236
+title: Body preparation tiers — drag/shroud/mummify gated by tech markers
+status: ready
+cluster: null
+added: 2026-05-08
+parked: null
+blocked-by: []
+supersedes: []
+related-systems: []
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+035 ships the burial foundation: corpse → despawn → spawn `Grave`. The user's
+vision for the monument-system places **body preparation** before the bury
+step itself: low-tech *drag* (no marker), mid-tech *wrap-in-shroud* (gated by
+some `HasShroudCloth` marker on the colony or actor), high-tech *mummify or
+embalm* (gated by `HasEmbalmingHerb`). Each tier should emit richer
+mythic-texture lines and feed the gravesite picker (237) with a "preparation
+quality" axis.
+
+## Scope
+
+- New `BuryAction` plan template with prep-tier branching: `[GatherCorpse,
+  Prepare(tier), TransportToSite, BuryAtSite]`. Tier picked from cat
+  inventory + colony markers at plan-build time.
+- Tech markers: `HasShroudCloth` (colony, authored when at least one shroud
+  item exists in stores), `HasEmbalmingHerb` (colony, authored when an
+  embalming herb is harvestable). Reuse the existing inventory-marker
+  authoring pattern.
+- Per-tier narrative-tier event richness: `BurialFired` carries a
+  `preparation: PreparationTier` enum field; the narrative templates
+  branch on tier.
+
+## Out of scope
+
+- Gravesite selection (lives in 237).
+- Ceremony richness from spirituality (lives in 238).
+- New item types (shroud cloth, embalming herb) — those land with the
+  herb / craft tickets that introduce the materials, not here.
+
+## Approach
+
+Mirror 154's Mentoring split for the prep-tier branch. The plan template
+stays Pattern B (single-completion proxy), but the chain length grows from
+1 step to 3-4 depending on tier. Each prep step is its own `StepKind` so
+the resolver contract surfaces cleanly.
+
+## Verification
+
+- Scenario: `lone_burial_with_shroud` — Mira has a shroud in inventory,
+  picks Bury, plan template extends to `[Prepare(Shroud), Bury]`, witness
+  emits with `preparation = Shroud`.
+- Continuity tally `burial >= 1` still satisfied.
+
+## Log
+
+- 2026-05-08: opened as 035 follow-on per the user's monument-system vision.

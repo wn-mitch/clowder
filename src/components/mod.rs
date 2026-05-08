@@ -9,6 +9,7 @@ pub mod fox_personality;
 pub mod fox_spatial;
 pub mod fulfillment;
 pub mod goap_plan;
+pub mod grave;
 pub mod grooming;
 pub mod hunting_priors;
 pub mod identity;
@@ -52,6 +53,7 @@ pub use goap_plan::{
     AbandonReason, AbandonedPlanState, GoapPlan, PlanEvent, PlanFailureReason, PlanNarrative,
     StepPhase,
 };
+pub use grave::Grave;
 pub use grooming::GroomingCondition;
 pub use identity::{Age, Appearance, Gender, LifeStage, Name, Orientation, Species};
 pub use items::{Item, ItemKind, ItemLocation};

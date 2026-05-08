@@ -1,0 +1,54 @@
+---
+id: 240
+title: Anti-corruption-from-graves balance pass — tune grave_aura strength and radius
+status: ready
+cluster: null
+added: 2026-05-08
+parked: null
+blocked-by: []
+supersedes: []
+related-systems: []
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+035 ships `GraveAuraMap` as a registered InfluenceMap with conservative
+foundation defaults (`grave_anti_corruption_strength: 0.05`,
+`grave_anti_corruption_radius: 4`). The aura is *populated* but not
+yet *consumed* by any DSE. Once 239 lands the rest-at-grave chain
+and any corruption-pushback consumer reads the aura, balance-tune
+the strength + radius against the existing corruption dynamics.
+
+## Scope
+
+- Hypothesis-driven sweep on `grave_anti_corruption_strength` × `radius`.
+- Wire one concrete consumer (likely the corruption-pushback system)
+  to read the aura.
+- Per the four-artifact discipline: hypothesis · prediction ·
+  observation · concordance documented in
+  `docs/balance/035-graves-anti-corruption.md`.
+
+## Out of scope
+
+- Authoring the producer side (035 ships it).
+- Rest-at-grave consumer (239).
+
+## Approach
+
+Use `just hypothesize` with a spec varying the two knobs across a 3×3
+grid against a baseline with corruption pressure deliberately raised.
+Concordance check: graves should reduce ambient corruption around
+cemeteries by a predictable margin without dominating the
+corruption-pushback system entirely.
+
+## Verification
+
+- `just hypothesize` artifacts in `docs/balance/035-graves-anti-corruption.md`.
+- Sweep stats show predictable corruption reduction in graves' radius.
+
+## Log
+
+- 2026-05-08: opened as 035 follow-on.

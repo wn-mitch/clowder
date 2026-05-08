@@ -150,6 +150,12 @@ pub enum StepKind {
     /// kitten without committing to a specific food variant (rabbit
     /// vs. mouse vs. berries — any food will do). ~5 ticks.
     RetrieveAnyFoodFromStores,
+    /// 035: bury an unburied colony-mate corpse at the cat's current
+    /// position (executor steers the cat to the corpse via the
+    /// `CorpseTarget` zone resolver). On completion the corpse is
+    /// despawned and a `Grave` entity is spawned at the same
+    /// position; emits `EventKind::BurialFired`.
+    Bury,
 }
 
 impl StepKind {
@@ -176,6 +182,7 @@ impl StepKind {
                 | StepKind::FeedKitten
                 | StepKind::RetrieveFromStores { .. }
                 | StepKind::RetrieveAnyFoodFromStores
+                | StepKind::Bury
                 // Magic system (resolve_magic_task_chains)
                 | StepKind::GatherHerb
                 | StepKind::PrepareRemedy { .. }

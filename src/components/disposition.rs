@@ -154,6 +154,17 @@ pub enum DispositionKind {
     /// the modifier preempt guard now composes with the disposition's
     /// commitment instead of firing every tick.
     Fleeing,
+    /// 035: bury a deceased colony-mate. Single-action plan template
+    /// `[Bury]` over `ZoneIs(CorpseTarget)` (Pattern B, mirrors
+    /// Mentoring / Mating / Grooming). Maslow tier 3 (Belonging) —
+    /// caring for the dead is a community-belonging act. The
+    /// `Burying` disposition is gated by the `HasUnburiedCorpse`
+    /// substrate marker (sensing-pre-pass author per §4.7) so its
+    /// score is zero whenever no Dead-and-not-Buried entity is in
+    /// range. Witness despawns the corpse and spawns a `Grave`
+    /// entity at the same position; emits `EventKind::BurialFired`
+    /// (continuity canary).
+    Burying,
 }
 
 impl DispositionKind {
@@ -200,6 +211,10 @@ impl DispositionKind {
             // (`flee_hold_ticks`) lives inside `resolve_hold_until_safe`,
             // not in the trip count.
             Self::Fleeing => return 1,
+            // 035: Burying is Pattern B (single-interaction). One bury
+            // session per commitment; completion proxy is
+            // `InteractionDone(true)` at the planner layer.
+            Self::Burying => return 1,
             // 150 R5a: Eating completes on need threshold, not count.
             // Like Resting, target_completions returns MAX so the count-
             // based completion check never fires; the actual
@@ -277,6 +292,9 @@ impl DispositionKind {
             // 280-291 in `src/systems/disposition.rs`) is replaced by
             // a substrate-aware target picker + commitment proxy.
             Action::Flee => Some(Self::Fleeing),
+            // 035: Bury routes directly to its single-action Burying
+            // disposition (Pattern B — mirrors Mentoring / Grooming).
+            Action::Bury => Some(Self::Burying),
             // Anxiety-interrupt class — `Hide` (104) is the
             // "remain still and hope" sibling valence; `Idle` is
             // the no-op fallback. Both stay headless until evidence
@@ -341,6 +359,8 @@ impl DispositionKind {
             // they're internal chain steps emitted by
             // `fleeing_actions()` and dispatched by the GOAP executor.
             Self::Fleeing => &[Action::Flee],
+            // 035: Burying owns the single `Action::Bury` constituent.
+            Self::Burying => &[Action::Bury],
         }
     }
 
@@ -387,6 +407,8 @@ impl DispositionKind {
         Self::Handing,
         Self::PickingUp,
         Self::Fleeing,
+        // 035: Burying appended at ordinal 23 (zero-indexed: 22).
+        Self::Burying,
     ];
 
     /// Human-readable label for the inspect panel.
@@ -414,6 +436,7 @@ impl DispositionKind {
             Self::Handing => "Handing",
             Self::PickingUp => "PickingUp",
             Self::Fleeing => "Fleeing",
+            Self::Burying => "Burying",
         }
     }
 
@@ -449,6 +472,10 @@ impl DispositionKind {
             // peer group anchors. Matches `groom_other_dse.maslow_tier()`.
             Self::Guarding | Self::Grooming => 2,
             Self::Socializing | Self::Caretaking | Self::Mating | Self::Mentoring => 3,
+            // 035: Burying is Belonging (caring for the dead is a
+            // community-belonging act). Same tier as the affiliative
+            // peer dispositions.
+            Self::Burying => 3,
             // 155: Herbalism / Witchcraft inherit Crafting's tier 4
             // (esteem / craft).
             Self::Herbalism
@@ -485,6 +512,7 @@ impl DispositionKind {
             Self::Handing => "hand a surplus item to a colony-mate",
             Self::PickingUp => "pick up a ground item",
             Self::Fleeing => "flee to safer ground",
+            Self::Burying => "bury the fallen",
         }
     }
 }
@@ -791,13 +819,18 @@ mod tests {
         // 176: inventory-disposal dispositions append at ordinals
         // 18-21 (Discarding, Trashing, Handing, PickingUp).
         // 230: `Fleeing` appends at ordinal 22 (closing the
-        // anxiety-interrupt-class migration). PickingUp is no longer
-        // last; assert its ordinal-21 position separately and pin
-        // Fleeing to the new tail.
-        assert_eq!(DispositionKind::ALL.len(), 22);
+        // anxiety-interrupt-class migration).
+        // 035: `Burying` appends at ordinal 23. Fleeing slides from
+        // tail to ordinal-22; Burying becomes the new tail.
+        assert_eq!(DispositionKind::ALL.len(), 23);
         assert_eq!(
             DispositionKind::ALL.last(),
-            Some(&DispositionKind::Fleeing),
+            Some(&DispositionKind::Burying),
+            "Burying must remain at ordinal-23 (tail) position"
+        );
+        assert_eq!(
+            DispositionKind::ALL[21],
+            DispositionKind::Fleeing,
             "Fleeing must remain at ordinal-22 position"
         );
         assert_eq!(
@@ -1006,6 +1039,42 @@ mod tests {
         // not physiological.
         assert_eq!(DispositionKind::Mentoring.maslow_tier(), 3);
         assert_eq!(DispositionKind::Socializing.maslow_tier(), 3);
+    }
+
+    #[test]
+    fn action_bury_maps_to_burying() {
+        // 035 regression-pin: picking `Action::Bury` at the L3 softmax
+        // must commit to the new `Burying` disposition (Pattern B,
+        // tier 3 Belonging).
+        assert_eq!(
+            DispositionKind::from_action(Action::Bury),
+            Some(DispositionKind::Burying)
+        );
+    }
+
+    #[test]
+    fn burying_is_pattern_b_single_interaction() {
+        // 035: Burying is single-interaction (Pattern B). Mirrors
+        // Mentoring / Grooming / Mating. One bury session per
+        // commitment.
+        let p = test_personality();
+        assert_eq!(DispositionKind::Burying.target_completions(&p), 1);
+    }
+
+    #[test]
+    fn burying_maslow_tier_is_three() {
+        // 035: Belonging (caring for the dead is a community-belonging
+        // act). Same tier as Socializing / Caretaking / Mating /
+        // Mentoring.
+        assert_eq!(DispositionKind::Burying.maslow_tier(), 3);
+    }
+
+    #[test]
+    fn burying_constituent_action_is_just_bury() {
+        assert_eq!(
+            DispositionKind::Burying.constituent_actions(),
+            &[Action::Bury]
+        );
     }
 
     #[test]

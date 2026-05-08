@@ -233,6 +233,20 @@ impl HideEligible {
     pub const KEY: &str = "HideEligible";
 }
 
+/// 035: corpse has been buried. Inserted on the deceased entity by
+/// `goap.rs::resolve_goap_plans`'s post-loop drain immediately before
+/// `commands.entity(...).despawn()`, so a freshly-buried corpse is
+/// invisible to `update_target_existence_markers`'s
+/// `HasUnburiedCorpse` author scan within the same tick. Defensive
+/// against double-fire when two cats path-equally to the same corpse.
+/// Read: `sensing.rs::update_target_existence_markers` filters dead
+/// cats via `Without<Buried>`.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct Buried;
+impl Buried {
+    pub const KEY: &str = "Buried";
+}
+
 // ---------------------------------------------------------------------------
 // Capability markers (§4.3 Capability — derived per-tick from parent tags)
 // ---------------------------------------------------------------------------
@@ -496,6 +510,20 @@ impl HasGroundCarcass {
 pub struct HasMentoringTarget;
 impl HasMentoringTarget {
     pub const KEY: &str = "HasMentoringTarget";
+}
+
+/// 035: ≥1 unburied colony-mate corpse (entity with `Dead`, without
+/// `Buried`) within `disposition.burial_sense_range` Manhattan tiles
+/// of this cat. Authored by
+/// `sensing.rs::update_target_existence_markers` in the same per-cat
+/// pass that authors `HasSocialTarget` and `CarcassNearby`. Read by
+/// `bury_dse`'s `EligibilityFilter::require(HasUnburiedCorpse::KEY)`
+/// — when absent, the burial DSE is skipped and the corpse-target
+/// picker is never called.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasUnburiedCorpse;
+impl HasUnburiedCorpse {
+    pub const KEY: &str = "HasUnburiedCorpse";
 }
 
 /// Orientation-compatible partner with Partners+ bond exists.
@@ -773,6 +801,7 @@ mod tests {
         assert_marker_queryable(OnCorruptedTile);
         assert_marker_queryable(OnSpecialTerrain);
         assert_marker_queryable(HasThreatNearby);
+        assert_marker_queryable(Buried);
     }
 
     #[test]
@@ -807,6 +836,7 @@ mod tests {
         assert_marker_queryable(HasMentoringTarget);
         assert_marker_queryable(HasEligibleMate);
         assert_marker_queryable(IsParentOfHungryKitten);
+        assert_marker_queryable(HasUnburiedCorpse);
     }
 
     #[test]

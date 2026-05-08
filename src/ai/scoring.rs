@@ -952,6 +952,35 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
     m
 }
 
+/// Ticket 232 — body-state-coupled L3 softmax temperature.
+///
+/// Returns the per-tick temperature for §L2.10.6 softmax-over-Intentions
+/// based on the cat's body-state perception. A calm, secure cat gets
+/// the ceiling (broad exploration → narratively-diverse pick
+/// distribution). A wounded or rising-threat cat gets the floor (a 5%
+/// L2 score margin picks the winner deterministically). The cat's
+/// homeostasis tunes the breadth of its own consideration.
+///
+/// Curve:
+/// `T = ceiling - (ceiling - floor) × max(body_distress_composite,
+/// threat_proximity_derivative)`.
+///
+/// Both inputs are clamped `[0, 1]` upstream (`interoception.rs` and
+/// `ScoringContext` construction). `body_distress_composite` already
+/// folds health / hunger / energy / thermal deficits;
+/// `threat_proximity_derivative` is orthogonal (rising-only safety
+/// derivative). `pain_level` is deliberately not folded in — it
+/// overlaps with `health_deficit` already inside body distress.
+pub fn softmax_temperature(ctx: &ScoringContext, sc: &ScoringConstants) -> f32 {
+    let focus = ctx
+        .body_distress_composite
+        .max(ctx.threat_proximity_derivative)
+        .clamp(0.0, 1.0);
+    let floor = sc.softmax_temperature_floor;
+    let ceiling = sc.softmax_temperature_ceiling;
+    ceiling - (ceiling - floor) * focus
+}
+
 /// Per-action ctx-scalar keys for cascade counts, indexed parallel to
 /// `Action as usize` (entry `i` corresponds to the i-th `Action`
 /// variant). Source of truth for both the scalar producer and the
@@ -1113,6 +1142,8 @@ fn active_disposition_ordinal(
         // discipline; promoting Flee out of the anxiety-interrupt
         // class doesn't renumber upstream ordinals.
         Some(DispositionKind::Fleeing) => 22.0,
+        // 035: Burying appends at ordinal 23.
+        Some(DispositionKind::Burying) => 23.0,
     }
 }
 
@@ -1514,6 +1545,21 @@ pub fn score_actions(
             Action::GroomOther,
             other_score + jitter(rng, s.jitter_range),
         ));
+    }
+
+    // 035: Bury — gate on the HasUnburiedCorpse substrate marker so
+    // the action is only added to the L3 pool when there's an
+    // unburied colony-mate corpse in range. The DSE's own
+    // EligibilityFilter requires the same marker, so the score would
+    // be 0 anyway, but gating here keeps the L3 softmax pool size
+    // stable for cats with no nearby corpses (preserves seed-42
+    // softmax-mass distributions).
+    if inputs
+        .markers
+        .has(crate::components::markers::HasUnburiedCorpse::KEY, inputs.cat)
+    {
+        let score = score_dse_by_id("bury", ctx, inputs);
+        scores.push((Action::Bury, score + jitter(rng, s.jitter_range)));
     }
 
     // --- Explore (§2.3: CP of curiosity + unexplored_nearby) ---
@@ -2242,21 +2288,23 @@ pub fn select_disposition_softmax(
 /// with a 1:1 disposition mapping. The L3 softmax pick directly carries
 /// the self-vs-other distinction; no resolver in between.
 ///
-/// `independence` is the cat's personality score; `sc` carries the
-/// `intention_softmax_temperature` and `disposition_independence_penalty`
-/// constants.
+/// `independence` is the cat's personality score;
+/// `disposition_independence_penalty` and `temperature` are caller-
+/// supplied. Per ticket 232, callers compute `temperature` for the
+/// current tick via [`softmax_temperature`] so the L3 draw sharpens
+/// when body distress or rising-threat is high.
 pub fn select_disposition_via_intention_softmax(
     scores: &[(Action, f32)],
     independence: f32,
     disposition_independence_penalty: f32,
-    sc: &ScoringConstants,
+    temperature: f32,
     rng: &mut impl Rng,
 ) -> DispositionKind {
     select_disposition_via_intention_softmax_with_trace(
         scores,
         independence,
         disposition_independence_penalty,
-        sc,
+        temperature,
         rng,
         None,
     )
@@ -2274,7 +2322,7 @@ pub fn select_disposition_via_intention_softmax_with_trace(
     scores: &[(Action, f32)],
     independence: f32,
     disposition_independence_penalty: f32,
-    sc: &ScoringConstants,
+    temperature: f32,
     rng: &mut impl Rng,
     mut sink: Option<&mut SoftmaxCapture>,
 ) -> DispositionKind {
@@ -2322,7 +2370,7 @@ pub fn select_disposition_via_intention_softmax_with_trace(
 
     if pool.is_empty() {
         if let Some(sink) = sink.as_mut() {
-            sink.temperature = sc.intention_softmax_temperature;
+            sink.temperature = temperature;
             sink.empty_pool = true;
             sink.pool_pre_penalty = pool_pre_penalty_snapshot;
         }
@@ -2330,8 +2378,8 @@ pub fn select_disposition_via_intention_softmax_with_trace(
     }
 
     // Softmax over the flat Intention pool. Runs the standard max-shift
-    // Boltzmann sampler at `intention_softmax_temperature`.
-    let temperature = sc.intention_softmax_temperature;
+    // Boltzmann sampler at the caller-supplied per-tick temperature
+    // (ticket 232 — body-state-coupled L3 sharpness).
     let max_score = pool
         .iter()
         .map(|(_, s)| *s)
@@ -4650,7 +4698,7 @@ mod tests {
             &scores,
             0.0,
             0.0,
-            &sc,
+            sc.softmax_temperature_ceiling,
             &mut rng,
             Some(&mut capture),
         );
@@ -4684,7 +4732,7 @@ mod tests {
             &scores,
             0.0,
             0.0,
-            &sc,
+            sc.softmax_temperature_ceiling,
             &mut rng,
             Some(&mut capture),
         );
@@ -4710,17 +4758,232 @@ mod tests {
             (Action::Socialize, 0.5),
             (Action::Patrol, 0.4),
         ];
-        let plain =
-            select_disposition_via_intention_softmax(&scores, 0.0, 0.0, &sc, &mut seeded_rng(99));
+        let plain = select_disposition_via_intention_softmax(
+            &scores,
+            0.0,
+            0.0,
+            sc.softmax_temperature_ceiling,
+            &mut seeded_rng(99),
+        );
         let traced = select_disposition_via_intention_softmax_with_trace(
             &scores,
             0.0,
             0.0,
-            &sc,
+            sc.softmax_temperature_ceiling,
             &mut seeded_rng(99),
             None,
         );
         assert_eq!(plain, traced);
+    }
+
+    // -------------------------------------------------------------------
+    // Ticket 232 — body-state-coupled L3 softmax temperature
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn softmax_temperature_at_ceiling_when_calm() {
+        // A calm cat with no body distress and no rising threat should
+        // sit at the ceiling: broad temperature, narratively-diverse
+        // pick distribution.
+        let needs = Needs::default();
+        let personality = default_personality();
+        let sc = ScoringConstants::default();
+        let mut c = ctx(&needs, &personality, &sc);
+        c.body_distress_composite = 0.0;
+        c.threat_proximity_derivative = 0.0;
+        let t = softmax_temperature(&c, &sc);
+        assert!(
+            (t - sc.softmax_temperature_ceiling).abs() < 1e-6,
+            "expected ceiling {}, got {t}",
+            sc.softmax_temperature_ceiling
+        );
+    }
+
+    #[test]
+    fn softmax_temperature_at_floor_under_dying_arc() {
+        // The dying-arc state: high body distress and high rising
+        // threat. Either alone saturates `focus = 1.0`; the `max()`
+        // composition means both being high doesn't push past the
+        // floor. Decisions sharpen — a 5% L2 margin picks the winner
+        // deterministically.
+        let needs = Needs::default();
+        let personality = default_personality();
+        let sc = ScoringConstants::default();
+        let mut c = ctx(&needs, &personality, &sc);
+        c.body_distress_composite = 0.9;
+        c.threat_proximity_derivative = 0.8;
+        let t = softmax_temperature(&c, &sc);
+        let expected = sc.softmax_temperature_ceiling
+            - (sc.softmax_temperature_ceiling - sc.softmax_temperature_floor) * 0.9;
+        assert!(
+            (t - expected).abs() < 1e-6,
+            "expected {expected}, got {t}"
+        );
+
+        // Saturated case: focus = 1.0 → exactly the floor.
+        c.body_distress_composite = 1.0;
+        c.threat_proximity_derivative = 0.0;
+        let t_sat = softmax_temperature(&c, &sc);
+        assert!(
+            (t_sat - sc.softmax_temperature_floor).abs() < 1e-6,
+            "expected floor {}, got {t_sat}",
+            sc.softmax_temperature_floor
+        );
+    }
+
+    #[test]
+    fn softmax_temperature_blends_linearly() {
+        // Midpoint focus → midpoint temperature.
+        let needs = Needs::default();
+        let personality = default_personality();
+        let sc = ScoringConstants::default();
+        let mut c = ctx(&needs, &personality, &sc);
+        c.body_distress_composite = 0.5;
+        c.threat_proximity_derivative = 0.0;
+        let t = softmax_temperature(&c, &sc);
+        let expected =
+            (sc.softmax_temperature_ceiling + sc.softmax_temperature_floor) * 0.5;
+        assert!(
+            (t - expected).abs() < 1e-6,
+            "midpoint expected {expected}, got {t}"
+        );
+    }
+
+    #[test]
+    fn softmax_temperature_takes_max_of_two_axes() {
+        // The two scalars are orthogonal (internal vs external
+        // pressure). Composition is `max(.,.)`, not sum — wounded but
+        // not threatened gets the same focus as threatened but not
+        // wounded.
+        let needs = Needs::default();
+        let personality = default_personality();
+        let sc = ScoringConstants::default();
+        let mut c = ctx(&needs, &personality, &sc);
+        c.body_distress_composite = 0.7;
+        c.threat_proximity_derivative = 0.3;
+        let t_distress_dominant = softmax_temperature(&c, &sc);
+        c.body_distress_composite = 0.3;
+        c.threat_proximity_derivative = 0.7;
+        let t_threat_dominant = softmax_temperature(&c, &sc);
+        assert!(
+            (t_distress_dominant - t_threat_dominant).abs() < 1e-6,
+            "max-symmetric: {t_distress_dominant} vs {t_threat_dominant}"
+        );
+    }
+
+    #[test]
+    fn floor_temperature_sharpens_against_one_percent_margin() {
+        // Calcifer's fatal-tick canary: at T = 0.15 a 1% L2 margin
+        // produced a 52/48 split. At the floor T = 0.05, Boltzmann
+        // math gives ~55% — a 3.7pp lift. The floor is the
+        // sharpening, not full determinism: full determinism requires
+        // the L2 widening that ticket 231 delivers (see the next
+        // test).
+        let sc = ScoringConstants::default();
+        let scores = vec![(Action::PickUp, 0.958), (Action::Eat, 0.948)];
+        let target_pickup =
+            DispositionKind::from_action(Action::PickUp).expect("pickup mapping");
+        let mut wins_pickup_floor = 0;
+        let mut wins_pickup_ceiling = 0;
+        const N: u64 = 2000;
+        for seed in 0..N {
+            let mut rng_floor = seeded_rng(seed);
+            if select_disposition_via_intention_softmax(
+                &scores,
+                0.0,
+                0.0,
+                sc.softmax_temperature_floor,
+                &mut rng_floor,
+            ) == target_pickup
+            {
+                wins_pickup_floor += 1;
+            }
+            let mut rng_ceil = seeded_rng(seed);
+            if select_disposition_via_intention_softmax(
+                &scores,
+                0.0,
+                0.0,
+                sc.softmax_temperature_ceiling,
+                &mut rng_ceil,
+            ) == target_pickup
+            {
+                wins_pickup_ceiling += 1;
+            }
+        }
+        // Expected lift ≈ 75 (3.7% of 2000); std ≈ 8.5. Threshold
+        // 30 sits ~5σ below the mean — robust to RNG fluctuation.
+        let lift = wins_pickup_floor - wins_pickup_ceiling;
+        assert!(
+            lift >= 30,
+            "floor must outpick ceiling on 1% margin; floor={wins_pickup_floor}/{N} ceiling={wins_pickup_ceiling}/{N} lift={lift}"
+        );
+    }
+
+    #[test]
+    fn floor_temperature_is_decisive_against_widened_margin() {
+        // The combined 231+232 fix: at full body distress, 231
+        // widens the L2 gap so Sleep scores well above PickUp. At a
+        // 20% margin, T = floor delivers ~98% determinism by
+        // Boltzmann math — the dying-arc resolution in its
+        // load-bearing form (PickUp loses to Sleep almost every
+        // tick).
+        let sc = ScoringConstants::default();
+        let scores = vec![(Action::PickUp, 1.00), (Action::Eat, 0.80)];
+        let target_pickup =
+            DispositionKind::from_action(Action::PickUp).expect("pickup mapping");
+        let mut wins = 0;
+        for seed in 0..200u64 {
+            let mut rng = seeded_rng(seed);
+            if select_disposition_via_intention_softmax(
+                &scores,
+                0.0,
+                0.0,
+                sc.softmax_temperature_floor,
+                &mut rng,
+            ) == target_pickup
+            {
+                wins += 1;
+            }
+        }
+        assert!(
+            wins >= 190,
+            "at floor T={}, 20% margin must be near-deterministic; got {wins}/200",
+            sc.softmax_temperature_floor
+        );
+    }
+
+    #[test]
+    fn ceiling_temperature_keeps_one_percent_margin_stochastic() {
+        // Calm-cat parity: at the ceiling, the same 1% margin must
+        // remain stochastic so routine decisions stay narratively
+        // diverse. Both winners should appear across an RNG sweep.
+        let sc = ScoringConstants::default();
+        let scores = vec![(Action::PickUp, 0.958), (Action::Eat, 0.948)];
+        let mut seen_pickup = 0;
+        let mut seen_eat = 0;
+        let target_pickup =
+            DispositionKind::from_action(Action::PickUp).expect("pickup mapping");
+        let target_eat = DispositionKind::from_action(Action::Eat).expect("eat mapping");
+        for seed in 0..200u64 {
+            let mut rng = seeded_rng(seed);
+            let chosen = select_disposition_via_intention_softmax(
+                &scores,
+                0.0,
+                0.0,
+                sc.softmax_temperature_ceiling,
+                &mut rng,
+            );
+            if chosen == target_pickup {
+                seen_pickup += 1;
+            } else if chosen == target_eat {
+                seen_eat += 1;
+            }
+        }
+        assert!(
+            seen_pickup > 0 && seen_eat > 0,
+            "at ceiling T={}, both winners must appear; got pickup={seen_pickup} eat={seen_eat}",
+            sc.softmax_temperature_ceiling
+        );
     }
 
     #[test]

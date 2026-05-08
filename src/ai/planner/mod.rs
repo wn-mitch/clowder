@@ -67,6 +67,16 @@ pub enum PlannerZone {
     /// reshape. Replaces the 176 `MaterialPile` stub that
     /// `picking_up_actions` previously routed through.
     CarcassPile,
+    /// 035: position of an unburied colony-mate corpse (entity with
+    /// `Dead` and without `Buried`). Distinct from `SocialTarget`
+    /// because the canonical `cat_positions` snapshot is built
+    /// `Without<Dead>` for the social-family DSEs; reusing
+    /// `SocialTarget` for burial would silently drop dead-cat
+    /// candidates from the zone resolver. The dead-cat positions
+    /// snapshot lives in `goap.rs::ScoringSnapshots::dead_cat_positions`
+    /// and is consumed by `resolve_zone_position`'s `CorpseTarget`
+    /// arm.
+    CorpseTarget,
 }
 
 /// What the cat is carrying.
@@ -273,6 +283,11 @@ pub enum GoapActionKind {
     /// cat is unsafe when the counter expires, `Fail` so the planner
     /// re-picks against the now-refreshed `RouteCostField`.
     HoldUntilSafe,
+    /// 035: bury an unburied colony-mate corpse. Pattern B
+    /// single-action plan template `[Bury]` with
+    /// `ZoneIs(CorpseTarget)` precondition + `SetInteractionDone(true)`
+    /// effect. Mirrors `MentorCat` / `GroomOther` shape.
+    Bury,
 }
 
 // ---------------------------------------------------------------------------

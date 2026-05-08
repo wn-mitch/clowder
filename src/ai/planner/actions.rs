@@ -259,6 +259,21 @@ pub fn grooming_actions() -> Vec<GoapActionDef> {
     }]
 }
 
+/// 035: single-action template for the new `Burying` disposition.
+/// Pattern-B (interaction-based, single-trip) — mirrors
+/// `mentoring_actions()` / `grooming_actions()`. Routes through
+/// `PlannerZone::CorpseTarget` (the dead-cat snapshot zone), distinct
+/// from `SocialTarget` because the canonical `cat_positions` snapshot
+/// is built `Without<Dead>` for social-family DSEs.
+pub fn burying_actions() -> Vec<GoapActionDef> {
+    vec![GoapActionDef {
+        kind: GoapActionKind::Bury,
+        cost: 2,
+        preconditions: vec![StatePredicate::ZoneIs(PlannerZone::CorpseTarget)],
+        effects: vec![StateEffect::SetInteractionDone(true)],
+    }]
+}
+
 /// 176: single-action template for `Discarding`. No travel — the cat
 /// drops one item where they stand. The plan is `[DropItem]`; the
 /// resolver removes one slot and spawns an `Item` entity with
@@ -902,6 +917,8 @@ pub fn actions_for_disposition(
         DispositionKind::Caretaking => caretaking_actions(),
         DispositionKind::Mentoring => mentoring_actions(),
         DispositionKind::Grooming => grooming_actions(),
+        // 035: burial plan template.
+        DispositionKind::Burying => burying_actions(),
         // 176: inventory-disposal plan templates.
         DispositionKind::Discarding => discarding_actions(),
         DispositionKind::Trashing => trashing_actions(),

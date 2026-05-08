@@ -922,6 +922,17 @@ pub struct DeathConstants {
     pub bereavement_mates_ticks: u64,
     pub bereavement_partners_ticks: u64,
     pub bereavement_friends_ticks: u64,
+
+    // --- Grave aura (035) ---
+    /// Per-grave anti-corruption aura strength. Stamped into
+    /// `GraveAuraMap` each tick alongside a linear falloff over
+    /// `grave_anti_corruption_radius`. Foundation default; balance-
+    /// tuning lives in follow-on ticket #5.
+    #[serde(default = "default_grave_anti_corruption_strength")]
+    pub grave_anti_corruption_strength: f32,
+    /// Per-grave aura radius in tiles.
+    #[serde(default = "default_grave_anti_corruption_radius")]
+    pub grave_anti_corruption_radius: i32,
 }
 
 impl Default for DeathConstants {
@@ -951,6 +962,11 @@ impl Default for DeathConstants {
             bereavement_mates_ticks: 3000,
             bereavement_partners_ticks: 1500,
             bereavement_friends_ticks: 500,
+
+            // 035: grave-aura constants. Foundation defaults; tuning
+            // lives in follow-on ticket #5.
+            grave_anti_corruption_strength: default_grave_anti_corruption_strength(),
+            grave_anti_corruption_radius: default_grave_anti_corruption_radius(),
         }
     }
 }
@@ -1767,16 +1783,24 @@ pub struct ScoringConstants {
     /// (§8.5 in `docs/systems/ai-substrate-refactor.md`).
     #[serde(default = "default_fox_softmax_temperature")]
     pub fox_softmax_temperature: f32,
-    /// Softmax temperature for §L2.10.6 softmax-over-Intentions selection.
-    /// Used by `select_intention_softmax` (eval.rs) and the flat-action softmax
-    /// path that replaces the legacy `aggregate_to_dispositions →
-    /// select_disposition_softmax` pipeline in goap.rs / disposition.rs.
-    /// Kept separate from `action_softmax_temperature` /
-    /// `disposition_softmax_temperature` so the Intention-layer temperature
-    /// can be tuned independently of the legacy per-Action / per-Disposition
-    /// softmaxes retained for diagnostics.
-    #[serde(default = "default_intention_softmax_temperature")]
-    pub intention_softmax_temperature: f32,
+    /// Ticket 232 — body-state-coupled L3 softmax temperature floor.
+    /// `softmax_temperature_floor` and `softmax_temperature_ceiling`
+    /// bracket the per-tick L3 softmax temperature used by §L2.10.6
+    /// softmax-over-Intentions. The floor is hit at full body distress
+    /// or rising-threat saturation: a 5% L2 score margin then picks
+    /// the winner deterministically, so a wounded cat next to a fox
+    /// does not coin-flip between work and survival. Curve:
+    /// `T = ceiling - (ceiling - floor) × max(body_distress_composite,
+    /// threat_proximity_derivative)`. Replaces the pre-232 fixed
+    /// `intention_softmax_temperature = 0.15`.
+    #[serde(default = "default_softmax_temperature_floor")]
+    pub softmax_temperature_floor: f32,
+    /// Ticket 232 — body-state-coupled L3 softmax temperature ceiling.
+    /// Hit when body distress and threat-proximity derivative are both
+    /// zero (calm, secure cat). Slightly broader than the pre-232
+    /// fixed 0.15 so healthy-cat decisions stay narratively diverse.
+    #[serde(default = "default_softmax_temperature_ceiling")]
+    pub softmax_temperature_ceiling: f32,
     /// Ticket 175 — L2 carry-affinity bias. Multiplicative bonus
     /// applied to a DSE's pre-softmax score when the cat's current
     /// `Carrying` projection (computed by
@@ -2198,7 +2222,8 @@ impl Default for ScoringConstants {
             action_softmax_temperature: 0.15,
             disposition_softmax_temperature: 0.15,
             fox_softmax_temperature: default_fox_softmax_temperature(),
-            intention_softmax_temperature: default_intention_softmax_temperature(),
+            softmax_temperature_floor: default_softmax_temperature_floor(),
+            softmax_temperature_ceiling: default_softmax_temperature_ceiling(),
             carry_affinity_bonus: default_carry_affinity_bonus(),
             chronicity_window_ticks: default_chronicity_window_ticks(),
             chronicity_threshold: default_chronicity_threshold(),
@@ -2462,6 +2487,20 @@ pub struct DispositionConstants {
     pub groom_other_personal_learn_rate: f32,
     pub groom_other_duration: u64,
     pub groom_other_temperature_gain: f32,
+    /// 035: bury action duration in ticks. Brief — burial is a
+    /// witnessed completion, not a sustained interaction.
+    #[serde(default = "default_bury_ticks")]
+    pub bury_ticks: u64,
+    /// 035: Manhattan radius within which a cat senses an unburied
+    /// colony-mate corpse and authors `HasUnburiedCorpse`. Smaller
+    /// than the social-family ranges (10) so cats must encounter the
+    /// corpse to react.
+    #[serde(default = "default_burial_sense_range")]
+    pub burial_sense_range: i32,
+    /// 035: Belonging-tier fulfillment lift on burial completion.
+    /// Mirrors the small social_warmth gain from grooming.
+    #[serde(default = "default_bury_belonging_gain")]
+    pub bury_belonging_gain: f32,
     /// Recipient-side acceptance bump when a cat is groomed to completion.
     /// Fires once per `groom_other_duration` session, on the same witness
     /// that applies the grooming restoration. Models the felt sense of
@@ -3194,8 +3233,12 @@ fn default_fox_softmax_temperature() -> f32 {
     0.15
 }
 
-fn default_intention_softmax_temperature() -> f32 {
-    0.15
+fn default_softmax_temperature_floor() -> f32 {
+    0.05
+}
+
+fn default_softmax_temperature_ceiling() -> f32 {
+    0.20
 }
 
 /// Ticket 175 — see `ScoringConstants::carry_affinity_bonus`.
@@ -3619,6 +3662,10 @@ impl Default for DispositionConstants {
             groom_other_personal_learn_rate: 0.012,
             groom_other_duration: 80,
             groom_other_temperature_gain: 0.005,
+            // 035: bury action constants.
+            bury_ticks: default_bury_ticks(),
+            burial_sense_range: default_burial_sense_range(),
+            bury_belonging_gain: default_bury_belonging_gain(),
             acceptance_per_groomed: 0.08,
             acceptance_per_kitten_fed: 0.10,
             mentor_mastery_per_tick: 0.02,
@@ -4330,6 +4377,43 @@ fn default_acceptance_per_groom_other_per_tick() -> f32 {
     // 0.0008 × 80-tick groom_other_duration ≈ 0.064 if uninterrupted —
     // close to iter-1's 0.08, but partial credit if preempted.
     0.0008
+}
+
+fn default_bury_ticks() -> u64 {
+    // 035: brief — burial is a witnessed completion, not sustained
+    // interaction. Mirrors mentor_duration (~12) more than
+    // groom_other_duration (80).
+    60
+}
+
+fn default_burial_sense_range() -> i32 {
+    // 035: smaller than the 10-tile social-family ranges. Cats must
+    // encounter the corpse to react; design intent is "burial is a
+    // local response to a local death."
+    8
+}
+
+fn default_bury_belonging_gain() -> f32 {
+    // 035: small Belonging-tier lift. Mirrors the small social_warmth
+    // gain from grooming completion.
+    0.05
+}
+
+fn default_grave_anti_corruption_strength() -> f32 {
+    // 035: foundation-only aura strength. Tuning lives in follow-on
+    // ticket #5 (anti-corruption balance pass) once the kitten-rest-at-
+    // grave chain (follow-on #4) lands and there's a consumer that
+    // exercises this map. 0.05 is small enough that the
+    // `WardCoverageMap`-shaped `[0, 1]` clamp won't saturate from a
+    // few graves.
+    0.05
+}
+
+fn default_grave_anti_corruption_radius() -> i32 {
+    // 035: foundation-only aura radius. Smaller than ward radii so a
+    // cluster of graves doesn't accidentally re-paper a corruption
+    // hotspot before the balance-tuning pass.
+    4
 }
 
 fn default_acceptance_per_feed_kitten_per_tick() -> f32 {

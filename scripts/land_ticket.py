@@ -54,10 +54,34 @@ GENERATE_INDEX = REPO_ROOT / "scripts" / "generate_open_work.py"
 
 
 def find_ticket_file(ticket_id: str, in_dir: Path) -> Path | None:
-    """Return the unique `<id>-*.md` under `in_dir`, or None."""
+    """Return the unique `<id>-*.md` under `in_dir`, or None.
+
+    The caller normalizes `ticket_id` by stripping leading zeros (35
+    instead of 035), but ticket files convention-name with leading-zero
+    padding for ids 1-99 (`001-…`, `035-…`). Try both shapes so the
+    script accepts either CLI form.
+    """
     if not in_dir.exists():
         return None
-    matches = sorted(in_dir.glob(f"{ticket_id}-*.md"))
+    candidates: list[Path] = sorted(in_dir.glob(f"{ticket_id}-*.md"))
+    # Also try zero-padded-to-3 (`001-`, `035-`, …) when the CLI
+    # passed a non-padded id.
+    try:
+        n = int(ticket_id)
+        if 0 < n < 1000:
+            padded = f"{n:03d}"
+            if padded != ticket_id:
+                candidates += sorted(in_dir.glob(f"{padded}-*.md"))
+    except ValueError:
+        pass
+    # De-dup while preserving order (a single file matches both
+    # globs only when ticket_id was already padded).
+    seen: set[Path] = set()
+    matches: list[Path] = []
+    for p in candidates:
+        if p not in seen:
+            seen.add(p)
+            matches.append(p)
     if not matches:
         return None
     if len(matches) > 1:

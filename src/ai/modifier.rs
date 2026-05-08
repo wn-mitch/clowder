@@ -216,6 +216,9 @@ const DISCARD: &str = "discard";
 const TRASH: &str = "trash";
 const HANDOFF: &str = "handoff";
 const PICK_UP: &str = "pick_up";
+// 035: bury DSE id. Single-action disposition (Burying); same
+// pattern as Mentor / GroomOther.
+const BURY: &str = "bury";
 
 // Disposition-failure cooldown scalar keys, one per failure-prone
 // DispositionKind. 1.0 = no recent failure (no damp);
@@ -600,6 +603,8 @@ fn constituent_dses_for_ordinal(ordinal: f32) -> Option<&'static [&'static str]>
         // arms, so the Patience / CommitmentTenure lifts continue to
         // apply to Flee while the cat is committed.
         22 => Some(&[FLEE]),
+        // 035: Burying → Bury. Single-action disposition.
+        23 => Some(&[BURY]),
         _ => None,
     }
 }
@@ -3843,6 +3848,9 @@ mod tests {
                 Action::Trash => &[TRASH],
                 Action::Handoff => &[HANDOFF],
                 Action::PickUp => &[PICK_UP],
+                // 035: Bury single-action mapping for the Patience
+                // modifier's ordinal table.
+                Action::Bury => &[BURY],
             }
         }
 

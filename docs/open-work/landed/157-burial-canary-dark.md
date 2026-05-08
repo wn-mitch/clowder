@@ -1,16 +1,17 @@
 ---
 id: 157
 title: Burial continuity canary dark on post-154 soak — verify eligibility against new death distribution
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-03
 parked: null
 blocked-by: []
 supersedes: []
+superseded-by: [35]
 related-systems: []
 related-balance: [mentoring-extraction.md]
-landed-at: null
-landed-on: null
+landed-at: 0890ba4d
+landed-on: 2026-05-08
 ---
 
 ## Why
@@ -111,3 +112,15 @@ state).
 ## Log
 
 - 2026-05-03: opened by ticket 154's land-day verdict.
+- 2026-05-08: **retired — premise was empirically wrong.** 035's
+  exploration confirmed `EventKind::BurialFired` had **zero
+  producers** in the codebase before 035 — the event variant was
+  defined and the tally was wired, but no system constructed it.
+  This ticket assumed the burial system worked pre-154 and just
+  needed eligibility tuning; in fact burial had never fired at all.
+  The "pre-154 baselines lit burial" assertion in the original
+  Why was unverified and turned out to be wrong (a confused read
+  of the canary set's expectation vs. an actual baseline).
+  Superseded by 035's foundation. The canary's structural shift
+  in healthy soaks (post-230 zero-deaths regime) is tracked
+  separately in ticket 241.

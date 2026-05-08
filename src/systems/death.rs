@@ -291,6 +291,29 @@ pub fn cleanup_dead(
 }
 
 // ---------------------------------------------------------------------------
+// update_grave_aura_map system (035)
+// ---------------------------------------------------------------------------
+
+/// Recompute the `GraveAuraMap` from live `Grave` entities each tick.
+/// Mirrors `magic.rs::update_ward_coverage_map`'s shape: clear, then
+/// stamp each grave's linear-falloff aura into the bucket grid.
+pub fn update_grave_aura_map(
+    graves: Query<&Position, With<crate::components::grave::Grave>>,
+    mut aura: ResMut<crate::resources::GraveAuraMap>,
+    constants: Res<SimConstants>,
+) {
+    aura.clear();
+    let strength = constants.death.grave_anti_corruption_strength;
+    let radius = constants.death.grave_anti_corruption_radius as f32;
+    if strength <= 0.0 || radius <= 0.0 {
+        return;
+    }
+    for pos in &graves {
+        aura.stamp_grave(pos.x, pos.y, strength, radius);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 

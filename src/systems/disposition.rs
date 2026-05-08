@@ -146,6 +146,7 @@ pub struct MarkerQueries<'w, 's> {
             Has<markers::HasHerbsNearby>,
             Has<markers::PreyNearby>,
             Has<markers::CarcassNearby>,
+            Has<markers::HasUnburiedCorpse>,
         ),
     >,
     /// Ticket 158 — kinship-channel substrate. Authored each tick by
@@ -678,7 +679,7 @@ pub fn evaluate_dispositions(
         }
         // Ticket 014 §4 sensing batch — broad-phase target-existence
         // markers authored by `sensing::update_target_existence_markers`.
-        if let Ok((threat, social, herbs, prey, carcass)) =
+        if let Ok((threat, social, herbs, prey, carcass, unburied)) =
             side_effects.marker_queries.target_existence.get(entity)
         {
             markers.set_entity(markers::HasThreatNearby::KEY, entity, threat);
@@ -686,6 +687,7 @@ pub fn evaluate_dispositions(
             markers.set_entity(markers::HasHerbsNearby::KEY, entity, herbs);
             markers.set_entity(markers::PreyNearby::KEY, entity, prey);
             markers.set_entity(markers::CarcassNearby::KEY, entity, carcass);
+            markers.set_entity(markers::HasUnburiedCorpse::KEY, entity, unburied);
         }
 
         // Ticket 014 §4 sensing batch — `has_herbs_nearby` /
@@ -1061,11 +1063,17 @@ pub fn evaluate_dispositions(
         // systems share `FocalScoreCapture` via the interior mutex.
         let capture_this_cat = focal_capture.is_some() && focal_cat == Some(entity);
         let mut softmax_trace = capture_this_cat.then(crate::ai::scoring::SoftmaxCapture::default);
+        // Ticket 232 — body-state-coupled L3 softmax temperature
+        // (mirror of the `evaluate_and_plan` site in goap.rs). Per-tick
+        // temperature derived from `ScoringContext` so wounded /
+        // rising-threat cats hit the floor and calm cats hit the
+        // ceiling.
+        let softmax_temperature = crate::ai::scoring::softmax_temperature(&ctx, sc);
         let chosen = crate::ai::scoring::select_disposition_via_intention_softmax_with_trace(
             &scores,
             personality.independence,
             d.disposition_independence_penalty,
-            sc,
+            softmax_temperature,
             &mut rng.rng,
             softmax_trace.as_mut(),
         );
@@ -1579,7 +1587,12 @@ pub fn disposition_to_chain(
             // 230 retires. Returning None defers cleanly to the
             // planner's `[PickFleeTarget, Flee, HoldUntilSafe]`
             // template.
-            | DispositionKind::Fleeing => None,
+            | DispositionKind::Fleeing
+            // 035: Burying ships GOAP-only — the legacy disposition-
+            // chain path is dormant and we don't need a chain
+            // builder for the single-action `[Bury]` template.
+            // Returning None defers to the planner.
+            | DispositionKind::Burying => None,
         };
 
         if let Some((mut chain, action)) = chain {
@@ -4053,6 +4066,37 @@ fn dispatch_chain_step(
                 });
             }
             apply_step_result(result, chain, current);
+        }
+
+        StepKind::Bury => {
+            // 035: contract completeness — the disposition path is
+            // dormant (per the file-level note), but the StepKind
+            // dispatch is exhaustive so the arm must compile. The
+            // resolver runs in dry-run shape (no target details
+            // resolvable from the disposition chain's StepKind itself,
+            // since it doesn't carry the dead cat's name/cause). The
+            // canary path is goap.rs's dispatch arm; this arm is here
+            // to satisfy the match-exhaustiveness lint.
+            let step = chain.current_mut().unwrap();
+            let target = step.target_entity;
+            let target_position = step.target_position;
+            let mut fallback_fulfillment = crate::components::fulfillment::Fulfillment::default();
+            let fulfillment_ref = match fulfillment_opt.as_mut() {
+                Some(f) => &mut **f,
+                None => &mut fallback_fulfillment,
+            };
+            let outcome = crate::steps::disposition::resolve_bury(
+                ticks,
+                target,
+                target_position,
+                None,
+                None,
+                fulfillment_ref,
+                time.tick,
+                d,
+            );
+            outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::BurialPerformed);
+            apply_step_result(outcome.result, chain, current);
         }
 
         StepKind::PatrolTo => {

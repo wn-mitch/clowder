@@ -240,7 +240,7 @@ pub fn run(
     }
 }
 
-pub(crate) fn build_scenario_app(seed: u64, scenario: &Scenario, focal: &str) -> App {
+pub fn build_scenario_app(seed: u64, scenario: &Scenario, focal: &str) -> App {
     let preview_scale = TimeScale::from_config(&SimConfig::default(), TEST_GAME_DAY_SECONDS);
     let hz = preview_scale.tick_rate_hz() as f64;
     let fixed_timestep = Duration::from_secs_f64(1.0 / hz);

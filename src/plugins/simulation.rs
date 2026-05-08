@@ -41,6 +41,11 @@ pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConsta
     registry
         .target_taking_dses
         .push(dses::groom_other_target_dse());
+    // 035: Bury (self-state + target-taking pair). Gated by the
+    // `HasUnburiedCorpse` substrate marker, so the DSE pair is
+    // dormant for cats with no nearby unburied corpse.
+    registry.cat_dses.push(dses::bury_dse());
+    registry.target_taking_dses.push(dses::bury_target_dse());
     registry.cat_dses.push(dses::mentor_dse(scoring));
     registry.target_taking_dses.push(dses::mentor_target_dse());
     registry.cat_dses.push(dses::caretake_dse(scoring));
@@ -135,8 +140,8 @@ pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
     // substrate-vs-search-state boundary.
     use crate::resources::{
         CarcassScentMap, CatPresenceMap, ConstructionSiteMap, ExplorationMap, FoodLocationMap,
-        FoxScentMap, GardenLocationMap, HerbLocationMap, KittenCryMap, PreyScentMap, TileMap,
-        WardCoverageMap,
+        FoxScentMap, GardenLocationMap, GraveAuraMap, HerbLocationMap, KittenCryMap, PreyScentMap,
+        TileMap, WardCoverageMap,
     };
 
     registry.register::<FoxScentMap>();
@@ -150,6 +155,8 @@ pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
     registry.register::<ConstructionSiteMap>();
     registry.register::<KittenCryMap>();
     registry.register::<HerbLocationMap>();
+    // 035: anti-corruption aura around buried graves.
+    registry.register::<GraveAuraMap>();
 
     // CorruptionLens is a borrow adapter over TileMap.corruption — not
     // a Resource itself, so it can't go through the generic
@@ -558,6 +565,15 @@ impl Plugin for SimulationPlugin {
                     systems::coordination::flag_coordinator_death,
                     systems::coordination::expire_directives,
                     systems::death::cleanup_dead,
+                    // 035: rebuild the grave-aura InfluenceMap from
+                    // live `Grave` entities each tick. Lives in the
+                    // late-tick batch alongside `cleanup_dead` and
+                    // `cleanup_wildlife` because graves are spawned
+                    // by `resolve_goap_plans`'s post-loop drain
+                    // earlier in the tick — the rebuild must run
+                    // after all spawns so the next tick's L1 trace
+                    // sees the freshly-spawned aura.
+                    systems::death::update_grave_aura_map,
                     systems::wildlife::cleanup_wildlife,
                     systems::narrative::generate_narrative,
                 )

@@ -1,7 +1,7 @@
 ---
 id: 037
 title: GroomingFired event masks silent-advance — continuity canary lies when target picker returns None
-status: ready
+status: done
 cluster: null
 added: 2026-04-26
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [social.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 0890ba4d
+landed-on: 2026-05-08
 ---
 
 ## Why
@@ -73,3 +73,7 @@ The relationship/fondness mutations and the `colony_map.absorb` exchange (lines 
 - · ** 40** (ready, —, score 0.85) — Disposition shift after 036 collapsed Courtship / Grooming / Mythic-texture con…
 
 <!-- linkages:end -->
+
+## Log
+
+- 2026-05-08: Closed via 035's post-soak audit (May 8, commit 5d98bea4): GroomingFired emits 1464× per seed-42 15-min soak (vs 0 in the May-2 baseline). GroomedOther dropped from never_fired_expected_positives. The silent-advance via GroomingFired was resolved by ticket 158's structural extraction of GroomOther into its own DispositionKind::Grooming with a single-action plan template that breaks the equivalent-effect pre-pruning at planner/mod.rs:437.

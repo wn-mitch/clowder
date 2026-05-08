@@ -337,6 +337,23 @@ impl InfluenceMap for crate::resources::WardCoverageMap {
     }
 }
 
+impl InfluenceMap for crate::resources::GraveAuraMap {
+    fn metadata(&self) -> MapMetadata {
+        MapMetadata {
+            // 035: small anti-corruption aura around buried graves.
+            // Tagged Sight × Colony following the WardCoverageMap
+            // convention (no spatial-independent channel).
+            name: "grave_aura",
+            channel: ChannelKind::Sight,
+            faction: Faction::Colony,
+        }
+    }
+
+    fn base_sample(&self, pos: Position) -> f32 {
+        self.get(pos.x, pos.y)
+    }
+}
+
 impl InfluenceMap for crate::resources::FoodLocationMap {
     fn metadata(&self) -> MapMetadata {
         MapMetadata {

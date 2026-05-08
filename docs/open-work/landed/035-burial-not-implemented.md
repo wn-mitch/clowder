@@ -1,7 +1,7 @@
 ---
 id: 035
 title: Burial — implement the §5 broaden-sideways capability so the continuity canary can pass
-status: ready
+status: done
 cluster: null
 added: 2026-04-26
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [death.md, project-vision.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 0890ba4d
+landed-on: 2026-05-08
 ---
 
 ## Why
@@ -50,3 +50,7 @@ A single `BurialFired` per death (or per accessible corpse, capped) ⇒ `continu
 - · ** 37** (ready, —, score 0.83) — GroomingFired event masks silent-advance — continuity canary lies when target p…
 
 <!-- linkages:end -->
+
+## Log
+
+- 2026-05-08: Foundation landed: lone_burial scenario verifies BurialFired fires end-to-end (tick 62, 60-tick bury_ticks + 2-tick travel). Soak-side canary structurally gated on death-rate (post-230 healthy regime — tracked in 241).

@@ -9,6 +9,8 @@
 pub mod apply_remedy_target;
 pub mod build;
 pub mod build_target;
+pub mod bury;
+pub mod bury_target;
 pub mod caretake;
 pub mod caretake_target;
 pub mod cook;
@@ -65,6 +67,8 @@ pub mod wander;
 pub use apply_remedy_target::apply_remedy_target_dse;
 pub use build::build_dse;
 pub use build_target::build_target_dse;
+pub use bury::bury_dse;
+pub use bury_target::{bury_target_dse, resolve_bury_target};
 pub use caretake::caretake_dse;
 pub use caretake_target::caretake_target_dse;
 pub use cook::cook_dse;

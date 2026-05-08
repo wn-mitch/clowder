@@ -243,6 +243,10 @@ pub fn strategy_for_disposition(kind: DispositionKind) -> CommitmentStrategy {
         // ticks instead of thrashing every tick the way the legacy
         // anxiety-interrupt path did pre-230.
         DispositionKind::Fleeing => SingleMinded,
+        // 035: Burying mirrors Mentoring/Grooming — single-interaction
+        // Pattern B. SingleMinded prevents a partner-bond wobble from
+        // dropping the act mid-execution.
+        DispositionKind::Burying => SingleMinded,
     }
 }
 
@@ -319,6 +323,9 @@ pub fn proxies_for_plan(
         // Pattern B with the same `[GroomOther]` / `InteractionDone(true)`
         // shape. One groom session per commitment.
         DispositionKind::Grooming => plan.trips_done >= 1,
+        // 035: Burying mirrors Grooming/Mentoring — single-
+        // interaction Pattern B. One bury session per commitment.
+        DispositionKind::Burying => plan.trips_done >= 1,
         // Guarding is triggered by low safety (`CriticalSafety` urgency
         // fires when `needs.safety < critical_safety_threshold`; the
         // Patrol DSE's `safety_deficit` consideration gates on the same
@@ -758,6 +765,8 @@ mod tests {
             PickingUp,
             // 230: Fleeing — substrate-aware retreat (SingleMinded).
             Fleeing,
+            // 035: Burying — Pattern B single-interaction (SingleMinded).
+            Burying,
         ];
         assert_eq!(
             covered.len(),

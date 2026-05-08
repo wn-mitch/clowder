@@ -127,6 +127,14 @@ pub enum Action {
     /// `engage_prey` always spawns a real carcass entity, and the cat
     /// must elect `PickingUp` to retrieve it.
     PickUp,
+    /// 035: bury a deceased colony-mate. Single-action plan template
+    /// `[Bury]` with `ZoneIs(CorpseTarget)` precondition; rides
+    /// `DispositionKind::Burying` at Maslow tier 3 (Belonging). On
+    /// completion the corpse entity is despawned and a `Grave` entity
+    /// is spawned at the same position. Witness fires
+    /// `Feature::BurialPerformed` and `EventKind::BurialFired`, which
+    /// tallies the `burial` continuity canary.
+    Bury,
 }
 
 // ---------------------------------------------------------------------------

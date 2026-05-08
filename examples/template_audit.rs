@@ -94,7 +94,8 @@ fn assert_all_actions_covers_action(a: Action) {
         | Action::Drop
         | Action::Trash
         | Action::Handoff
-        | Action::PickUp => {}
+        | Action::PickUp
+        | Action::Bury => {}
     }
 }
 

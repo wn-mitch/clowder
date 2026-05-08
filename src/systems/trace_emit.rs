@@ -188,8 +188,14 @@ pub fn emit_focal_trace(world: &mut World) {
     // Snapshot the SimConstants references we need for attenuation +
     // softmax-fallback temperature so we can release the world borrow
     // before grabbing `&mut TraceLog`.
+    //
+    // Ticket 232 — when the softmax didn't actually run this tick (the
+    // ineligible-pool fallback path), the L3 record reports the
+    // ceiling as a placeholder. The empty `probabilities` vector is
+    // the load-bearing "softmax fallthrough" signal for replay tools;
+    // this temperature is informational only.
     let constants = world.resource::<SimConstants>();
-    let intention_softmax_temperature = constants.scoring.intention_softmax_temperature;
+    let softmax_fallback_temperature = constants.scoring.softmax_temperature_ceiling;
     let attenuations: Vec<(MapMetadata, f32, Attenuation)> = samples
         .into_iter()
         .map(|(metadata, base)| {
@@ -312,7 +318,7 @@ pub fn emit_focal_trace(world: &mut World) {
                 .map(|(a, s)| (format!("{a:?}"), *s))
                 .collect();
             let summary = SoftmaxSummary {
-                temperature: intention_softmax_temperature,
+                temperature: softmax_fallback_temperature,
                 probabilities: Vec::new(),
             };
             (ranked, summary, Vec::new(), Vec::new())

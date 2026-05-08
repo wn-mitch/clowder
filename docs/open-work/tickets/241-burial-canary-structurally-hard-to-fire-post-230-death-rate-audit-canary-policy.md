@@ -1,0 +1,75 @@
+---
+id: 241
+title: Burial canary structurally hard to fire post-230 — death-rate audit + canary policy
+status: ready
+cluster: null
+added: 2026-05-08
+parked: null
+blocked-by: []
+supersedes: []
+related-systems: []
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+035 ships the burial mechanism end-to-end (verified by the
+`lone_burial` scenario: chain commits, `Bury` resolves at tick 62,
+`Feature::BurialPerformed` fires, `Grave` entity spawns). But the
+**soak-side canary** (`continuity_tallies.burial > 0` in a 15-min
+seed-42 run) stays dark for a structural reason: post-230 healthy
+colonies don't die.
+
+Pre-230 baseline (May 2): 8 ShadowFoxAmbush deaths per 15-min soak.
+Post-230 (May 8): **0 deaths**. The Fleeing chain (230) +
+substrate-aware preempts (231/232) drove ambush deaths to zero.
+Old-age deaths require ~30 sim seasons (Elder entry at 60, founders
+born at 12-30); a 15-min soak runs ~5 seasons. Starvation is gated
+to zero by hard-survival canary.
+
+So the burial canary now fails *because the colony succeeded*. The
+fix-direction question: do we (a) accept the canary as dormant in
+healthy soaks (toggle `expected_to_fire_per_soak()` to false with a
+load-bearing comment), (b) audit whether some non-zero injury/illness
+mortality should remain even in healthy regimes (separate balance
+question), or (c) something else.
+
+## Scope
+
+- Audit the death-rate dynamics in current healthy soaks: under what
+  conditions (if any) should naturalistic injury mortality occur?
+- Decide canary policy: keep `BurialPerformed` in `expected_to_fire_per_soak`
+  with a load-bearing comment (matches `GroomedOther` / `MentoredCat`
+  precedent at `system_activation.rs:721-728`), or demote.
+- If retained as expected-to-fire, document the unblocking dependency
+  (mortality-rate audit, longer baseline, or 239 rest-at-grave
+  paired with deaths-from-distress).
+
+## Out of scope
+
+- Lowering threat-evasion effectiveness to "force" deaths — that's
+  intentional regression, not a fix.
+- Multi-day soak runs as a workaround — soak duration stays at the
+  canonical 15 min.
+
+## Approach
+
+Audit the post-230 soak's `health` / `injury_count` per-cat trajectory.
+If chronic injury accumulation can plausibly produce mortality given
+enough sim time, the canary is rate-limited rather than structurally
+broken. If healthy colonies are now genuinely deathless within reach
+of the canonical soak, the policy choice is real.
+
+## Verification
+
+- A balance doc `docs/balance/burial-canary-policy.md` with the
+  audit + policy decision.
+
+## Log
+
+- 2026-05-08: opened as 035 follow-on. Surfaced when 035's
+  end-to-end test passed (lone_burial scenario fires
+  `BurialPerformed = 1`) but the seed-42 soak's burial tally
+  remained 0 because deaths_by_cause was empty.

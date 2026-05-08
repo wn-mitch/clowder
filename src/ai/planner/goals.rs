@@ -49,15 +49,14 @@ pub fn goal_for_disposition(
             predicates: vec![StatePredicate::ConstructionDone(true)],
         },
 
-        // Mating, Coordinating, Mentoring, and Grooming complete on
-        // interaction. 154 added Mentoring to Pattern B; 158 added
-        // Grooming for the same reason — equivalent-effect sibling
-        // pre-pruning under Socializing's count-based goal hid
-        // GroomOther entirely.
+        // Mating, Coordinating, Mentoring, Grooming, and Burying
+        // complete on interaction. 154 added Mentoring to Pattern B;
+        // 158 added Grooming for the same reason; 035 adds Burying.
         DispositionKind::Mating
         | DispositionKind::Coordinating
         | DispositionKind::Mentoring
-        | DispositionKind::Grooming => GoalState {
+        | DispositionKind::Grooming
+        | DispositionKind::Burying => GoalState {
             predicates: vec![StatePredicate::InteractionDone(true)],
         },
 

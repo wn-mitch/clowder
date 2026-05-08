@@ -1,7 +1,7 @@
 ---
 id: 204
 title: Kitten-starvation cluster surfaced by 119 substrate activation — bonding/mating cascade vs adult-feeding bandwidth
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-07
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 0890ba4d
+landed-on: 2026-05-08
 ---
 
 ## Why
@@ -64,3 +64,4 @@ This is a *new* behavioral surface: the colony is now actively reproducing where
 ## Log
 
 - 2026-05-07: Opened in the same commit that lands 108 (Phase A activation). 108 itself is bit-identical to 119 on this seed; the cluster is 119's surfacing, observed in two independent soaks.
+- 2026-05-08: Closed via 035's post-soak audit (May 8, commit 5d98bea4): seed-42 15-min soak shows deaths_starvation=0 with 4 kittens born and surviving. The 119 substrate cluster + post-230 healthy-colony regime resolved the kitten-starvation cluster — no kittens died in the run. The Wrenkit-85 / Wispkit-78 cluster from the 119/108 soaks no longer reproduces.

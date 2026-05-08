@@ -1,7 +1,7 @@
 ---
 id: 232
 title: Body-state-coupled L3 softmax temperature for stake-aware decision sharpness
-status: ready
+status: done
 cluster: null
 added: 2026-05-08
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-08
 ---
 
 ## Why
@@ -137,3 +137,4 @@ draw).
   follow-on alongside 231's body-state Considerations on pickup-class
   DSEs (R3b) — 231 makes the L2 ranking honest under body state, 232
   makes the L3 softmax draw decisive when the ranking matters.
+- 2026-05-08: 2026-05-08: landed. Soak verdict 'concern' (survival-pass). Hard gates clean (deaths_starvation=0, ShadowFoxAmbush=0, never_fired=0). modifier_preemption(acute_health_adrenaline_flee) 15,604 → 6,736 (-57% vs pre-232 9b302638), the headline substrate effect. Aggregate colony score +118%, health +230%, peak_population +50%. Calibration finding: floor T=0.05 alone gives only ~55% probability on Calcifer's 1% L2 margin (vs ~52% at T=0.15) — full decisiveness on the dying arc requires 231's L2 widening + 232's L3 sharpening together. Burial canary fails as deaths=0; structures_built -25% and seasons_survived -28.6% flagged for follow-on attention. anxiety_interrupt_total → 0 confirmed retired metric, not a regression.

@@ -1,0 +1,60 @@
+---
+id: 238
+title: Ceremony richness from spirituality — Spirituality personality axis drives narrative + length
+status: ready
+cluster: null
+added: 2026-05-08
+parked: null
+blocked-by: []
+supersedes: []
+related-systems: []
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+The user's monument-system vision: cats with a `Spirituality` personality
+trait should perform **richer ceremonies** at burial — longer chain,
+richer narrative tier (ascend from `Action` to `Significant` /
+`Mythic`), occasional named mythic-texture events ("Mira spoke the
+Calling for Hazel"). This couples burial to the magic / Calling
+systems and gives the colony a felt religious life.
+
+`Personality` already has a `spirituality` field (verified — used by
+herbcraft / magic DSEs).
+
+## Scope
+
+- `bury_ticks` becomes spirituality-scaled: a high-spirituality cat
+  takes longer to bury (richer ceremony). Mid-tier: ~60 ticks (035
+  default). High-tier: ~120 ticks. Low-tier: ~30 ticks (perfunctory).
+- Per-tier narrative outcomes: `BurialFired` event tier varies
+  (Action / Significant / Mythic) based on officiant spirituality.
+- High-spirituality burials emit a paired `MythicTexture` event with
+  subclass="calling" or "burial-rite", giving the colony's mythic-
+  texture continuity tally a burial-driven contribution.
+
+## Out of scope
+
+- New `Spirituality` axis (already exists on `Personality`).
+- Calling system rework.
+- Body preparation tiers (236) — independent axis.
+
+## Approach
+
+Three-zone Linear curve on `bury_ticks` against `personality.spirituality`,
+floored at 30 and capped at 120. Narrative tier branches in
+`narrative.rs::Action::Bury` based on the officiant's spirituality
+read from a `BurialFired.spirituality` payload field.
+
+## Verification
+
+- Scenario: `lone_burial_high_spirit` — Mira with `spirituality = 0.95`
+  takes ~120 ticks instead of 60, and emits a `MythicTexture` event
+  alongside `BurialFired`.
+
+## Log
+
+- 2026-05-08: opened as 035 follow-on.

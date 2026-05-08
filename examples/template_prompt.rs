@@ -107,7 +107,8 @@ fn assert_pick_pool_covers_action(a: Action) {
         | Action::Drop
         | Action::Trash
         | Action::Handoff
-        | Action::PickUp => {}
+        | Action::PickUp
+        | Action::Bury => {}
     }
 }
 
@@ -169,6 +170,10 @@ fn main() {
             Action::Trash => "forage.ron",
             Action::Handoff => "socialize.ron",
             Action::PickUp => "forage.ron",
+            // 035: Bury template not authored yet; reuse the closest
+            // existing template (mentor — solemn one-on-one prose
+            // shape) so the template_prompt smoke run still renders.
+            Action::Bury => "mentor.ron",
         };
 
         let tier = match action {

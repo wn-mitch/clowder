@@ -321,9 +321,11 @@ pub enum EventKind {
         mentor: String,
         apprentice: String,
     },
-    /// A cat buried a deceased companion. Reserved; no emitting system
-    /// exists today — a burial action lands with the "broaden sideways"
-    /// epic (`docs/systems/project-vision.md` §5).
+    /// A cat buried a deceased companion. Authored by 035 — emitted
+    /// from `goap.rs::resolve_goap_plans`'s `Bury` dispatch arm and
+    /// the disposition-chain `StepKind::Bury` arm on completion.
+    /// `cat` is the burier's name; `deceased` is the buried cat's
+    /// name (resolved from the dead-cat snapshot at dispatch time).
     BurialFired {
         cat: String,
         deceased: String,

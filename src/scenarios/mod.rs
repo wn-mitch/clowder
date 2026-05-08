@@ -27,6 +27,7 @@
 
 pub mod disposal_dispatch;
 pub mod disposal_election;
+pub mod dying_arc_softmax;
 pub mod env;
 pub mod exploration_ranging;
 pub mod farming_cycle;
@@ -37,6 +38,7 @@ pub mod hunt_acquisition;
 pub mod hunt_deposit_chain;
 pub mod inventory_full_no_pickup;
 pub mod kitten_cry;
+pub mod lone_burial;
 pub mod modifier_preempts_hunt;
 pub mod picking_up_scavenging;
 pub mod preset;
@@ -131,6 +133,18 @@ pub const ALL: &[&Scenario] = &[
     // final_score is multiplicatively damped by `health_deficit`
     // (post-R3b) instead of scoring near 1.0 (pre-R3b).
     &wounded_cat_no_pickup::SCENARIO,
+    // 232 — body-state-coupled L3 softmax temperature triage harness.
+    // Wounded cat (HP=0.49) + adjacent fox saturates body_distress
+    // and threat_proximity, driving softmax_temperature to the floor.
+    // Fix-lock requires 231 + 232 together; load-bearing assertions
+    // live in src/ai/scoring.rs unit tests.
+    &dying_arc_softmax::SCENARIO,
+    // 035 — lone-burial foundation gate. One adult adjacent to a
+    // freshly-tagged `Dead` colony-mate; the chain must run end-to-end
+    // and emit `Feature::BurialPerformed` so the burial canary's
+    // mechanism is independently verified from the soak-side death-
+    // rate dynamics.
+    &lone_burial::SCENARIO,
 ];
 
 /// Look up a scenario by its `name` field.

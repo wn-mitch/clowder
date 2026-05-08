@@ -150,6 +150,9 @@ pub enum ActivityKind {
     Scry,
     Commune,
     Avoid,
+    /// 035: bury a deceased colony-mate. Bound to
+    /// `DispositionKind::Burying` and `Action::Bury`.
+    Bury,
 }
 
 // ---------------------------------------------------------------------------

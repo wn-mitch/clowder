@@ -163,6 +163,11 @@ pub enum Feature {
     /// A mentor-apprentice interaction occurred: skill/knowledge
     /// transfer + relationship shift.
     MentoredCat,
+    /// 035: a cat completed a Bury chain — corpse received `Buried`
+    /// marker, was despawned, and a `Grave` entity was spawned at
+    /// the same tile. Tally: drives the `burial` continuity canary
+    /// via the paired `EventKind::BurialFired` event.
+    BurialPerformed,
     /// A cat engaged wildlife in combat-posture: safety-need swing +
     /// combat-skill growth. Paired with the existing
     /// `CombatResolved` (emitted from `src/systems/combat.rs` when a
@@ -442,6 +447,8 @@ impl Feature {
         Feature::Socialized,
         Feature::GroomedOther,
         Feature::MentoredCat,
+        // 035: burial canary.
+        Feature::BurialPerformed,
         Feature::ThreatEngaged,
         Feature::MaterialsDelivered,
         Feature::MaterialPickedUp,
@@ -529,6 +536,10 @@ impl Feature {
             Feature::Socialized => Positive,
             Feature::GroomedOther => Positive,
             Feature::MentoredCat => Positive,
+            // 035: caring for the dead is a colony-positive continuity
+            // signal — same valence as the affiliative §Phase 5a peer
+            // features.
+            Feature::BurialPerformed => Positive,
             Feature::ThreatEngaged => Positive,
             Feature::MaterialsDelivered => Positive,
             Feature::MaterialPickedUp => Positive,
@@ -909,6 +920,7 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::Socialized => "Socialized",
         Feature::GroomedOther => "GroomedOther",
         Feature::MentoredCat => "MentoredCat",
+        Feature::BurialPerformed => "BurialPerformed",
         Feature::ThreatEngaged => "ThreatEngaged",
         Feature::MaterialsDelivered => "MaterialsDelivered",
         Feature::MaterialPickedUp => "MaterialPickedUp",
@@ -1170,7 +1182,9 @@ mod tests {
         // fallback observability for the per-cat route-cost field).
         // Ticket 230 added 2 Positive (FleeTargetPicked,
         // FleeRecovered — Fleeing chain end-to-end signals).
-        assert_eq!(positive, 51);
+        // Ticket 035 added 1 Positive (BurialPerformed — burial
+        // continuity-canary signal).
+        assert_eq!(positive, 52);
         assert_eq!(negative, 23);
         assert_eq!(neutral, 31);
     }
@@ -1238,7 +1252,7 @@ mod tests {
     fn features_total_in_matches_category_counts() {
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            51
+            52
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),

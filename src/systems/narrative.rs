@@ -432,6 +432,16 @@ pub fn generate_narrative(
                 let idx = rng.rng.random_range(0..options.len());
                 (options[idx].clone(), NarrativeTier::Action)
             }
+
+            Action::Bury => {
+                let options = [
+                    format!("{cat} buries a fallen colony-mate."),
+                    format!("{cat} digs a quiet hollow and lays a deceased companion to rest."),
+                    format!("{cat} marks a grave for one of their own."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Significant)
+            }
         };
 
         log.push(tick, text, tier);

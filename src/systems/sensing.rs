@@ -12,6 +12,7 @@ use std::sync::{Mutex, OnceLock};
 
 use bevy_ecs::prelude::*;
 
+use crate::components::markers;
 use crate::components::physical::{Dead, Position};
 use crate::components::sensing::{SensoryModifier, SensorySignature, SensorySpecies};
 use crate::resources::map::{Terrain, TileMap};
@@ -788,12 +789,25 @@ pub fn update_target_existence_markers(
             Has<crate::components::markers::HasHerbsNearby>,
             Has<crate::components::markers::PreyNearby>,
             Has<crate::components::markers::CarcassNearby>,
+            Has<crate::components::markers::HasUnburiedCorpse>,
         ),
         (With<crate::components::identity::Species>, Without<Dead>),
     >,
     cat_positions_q: Query<
         (Entity, &Position),
         (With<crate::components::identity::Species>, Without<Dead>),
+    >,
+    // 035: Dead-and-not-Buried colony cats — feeds the
+    // HasUnburiedCorpse author scan. `With<Species>` keeps the snapshot
+    // restricted to cats (wildlife also uses `Dead` post-death but
+    // doesn't qualify for burial).
+    dead_cats_q: Query<
+        &Position,
+        (
+            With<crate::components::identity::Species>,
+            With<Dead>,
+            Without<markers::Buried>,
+        ),
     >,
     wildlife_q: Query<&Position, (With<crate::components::wildlife::WildAnimal>, Without<Dead>)>,
     herb_q: Query<
@@ -812,7 +826,8 @@ pub fn update_target_existence_markers(
     constants: Res<crate::resources::sim_constants::SimConstants>,
 ) {
     use crate::components::markers::{
-        CarcassNearby, HasHerbsNearby, HasSocialTarget, HasThreatNearby, PreyNearby,
+        CarcassNearby, HasHerbsNearby, HasSocialTarget, HasThreatNearby, HasUnburiedCorpse,
+        PreyNearby,
     };
     let d = &constants.disposition;
     let sc = &constants.scoring;
@@ -828,13 +843,18 @@ pub fn update_target_existence_markers(
         .filter(|(c, _)| !c.cleansed || !c.harvested)
         .map(|(_, p)| *p)
         .collect();
+    // 035: dead-cat positions for HasUnburiedCorpse marker authoring.
+    let dead_cat_positions: Vec<Position> = dead_cats_q.iter().copied().collect();
 
     let threat_range = d.wildlife_threat_range;
     let herb_range = d.herb_detection_range as f32;
     let prey_range = d.prey_detection_range as f32;
     let carcass_range = sc.carcass_detection_range as f32;
+    let burial_range = d.burial_sense_range;
 
-    for (entity, pos, cur_threat, cur_social, cur_herbs, cur_prey, cur_carcass) in cats.iter() {
+    for (entity, pos, cur_threat, cur_social, cur_herbs, cur_prey, cur_carcass, cur_unburied) in
+        cats.iter()
+    {
         let want_threat = wildlife_positions
             .iter()
             .any(|wp| pos.manhattan_distance(wp) <= threat_range);
@@ -916,6 +936,15 @@ pub fn update_target_existence_markers(
             )
         });
 
+        // 035: HasUnburiedCorpse — any unburied dead colony cat within
+        // burial_sense_range Manhattan tiles. Plain Manhattan rather
+        // than `observer_smells_at` keeps the predicate cheap and
+        // matches design-intent that all cats sense colony-mate death
+        // within range; no sensory-channel attenuation.
+        let want_unburied = dead_cat_positions
+            .iter()
+            .any(|dp| pos.manhattan_distance(dp) <= burial_range);
+
         toggle_target_marker(
             &mut commands,
             entity,
@@ -938,6 +967,15 @@ pub fn update_target_existence_markers(
             want_carcass,
             cur_carcass,
             CarcassNearby,
+        );
+        // 035: append at tail of the per-cat block so existing toggle
+        // command-buffer ordinals stay stable (preserves seed-42).
+        toggle_target_marker(
+            &mut commands,
+            entity,
+            want_unburied,
+            cur_unburied,
+            HasUnburiedCorpse,
         );
     }
 }

@@ -378,6 +378,8 @@ impl GoapActionKind {
             // (mirrors how Hunting's `SearchPrey`/`EngagePrey`/
             // `DepositPrey` all map to `Action::Hunt`).
             Self::PickFleeTarget | Self::Flee | Self::HoldUntilSafe => Action::Flee,
+            // 035: Bury — single-action burial step.
+            Self::Bury => Action::Bury,
         }
     }
 }

@@ -224,6 +224,19 @@ pub struct WorldStateQueries<'w, 's> {
     /// arm. Read-only alias of the per-cat iteration query's `&Needs`
     /// borrow.
     pub needs_query: Query<'w, 's, &'static Needs, Without<Dead>>,
+    /// 035 — Dead-and-not-Buried colony cat positions for the
+    /// `PlannerZone::CorpseTarget` zone in `build_zone_distances`.
+    /// Disjoint from `all_positions` (which filters `Without<Dead>`).
+    pub dead_cat_query: Query<
+        'w,
+        's,
+        (Entity, &'static Position),
+        (
+            With<crate::components::identity::Species>,
+            With<Dead>,
+            Without<markers::Buried>,
+        ),
+    >,
 }
 
 /// Bundles resources for evaluate_and_plan.
@@ -363,6 +376,7 @@ pub struct TargetMarkerQueries<'w, 's> {
             Has<markers::HasHerbsNearby>,
             Has<markers::PreyNearby>,
             Has<markers::CarcassNearby>,
+            Has<markers::HasUnburiedCorpse>,
         ),
     >,
     pub faction_overlay_q: Query<
@@ -497,6 +511,27 @@ pub struct ExecutorContext<'w, 's> {
         's,
         &'static crate::components::PairingActivity,
         Without<Dead>,
+    >,
+    /// 035 — Dead-and-not-Buried colony cat snapshot (Entity, Position,
+    /// Name, cause). Disjoint from the `cats` mut query (which filters
+    /// `Without<Dead>`). Feeds `dead_cat_positions` /
+    /// `dead_cat_names` in `ScoringSnapshots` so the `Bury` dispatch
+    /// arm can pick a target and the post-loop drain can resolve a
+    /// real name + cause for the `BurialFired` event and spawned
+    /// `Grave` entity.
+    pub dead_cats_q: bevy_ecs::prelude::Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static Position,
+            &'static Name,
+            &'static Dead,
+        ),
+        (
+            With<crate::components::identity::Species>,
+            Without<markers::Buried>,
+        ),
     >,
     /// Ticket 074 — read-only target-validity surface (Dead /
     /// Banished / Incapacitated / despawned). Bundled here so step
@@ -1321,6 +1356,16 @@ pub fn evaluate_and_plan(
         .map(|(_, _, p, _, _)| *p)
         .collect();
 
+    // 035: Pre-compute dead-cat positions for the `CorpseTarget`
+    // zone in `build_zone_distances`. Disjoint from the other
+    // position snapshots — the dead cats are filtered `With<Dead>`
+    // upstream in `WorldStateQueries::dead_cat_query`.
+    let dead_cat_positions: Vec<(Entity, Position)> = world_state
+        .dead_cat_query
+        .iter()
+        .map(|(e, p)| (e, *p))
+        .collect();
+
     // Snapshot per-cat fields needed by the mating eligibility gate.
     let current_day_phase = mating_fitness_params.current_day_phase();
 
@@ -1495,13 +1540,19 @@ pub fn evaluate_and_plan(
         }
         // Ticket 014 §4 sensing batch — broad-phase target-existence
         // markers authored by `sensing::update_target_existence_markers`.
-        if let Ok((threat, social, herbs, prey, carcass)) = marker_qs.target_existence_q.get(entity)
+        if let Ok((threat, social, herbs, prey, carcass, unburied)) =
+            marker_qs.target_existence_q.get(entity)
         {
             markers.set_entity(markers::HasThreatNearby::KEY, entity, threat);
             markers.set_entity(markers::HasSocialTarget::KEY, entity, social);
             markers.set_entity(markers::HasHerbsNearby::KEY, entity, herbs);
             markers.set_entity(markers::PreyNearby::KEY, entity, prey);
             markers.set_entity(markers::CarcassNearby::KEY, entity, carcass);
+            // 035: HasUnburiedCorpse populates the snapshot so the L3
+            // scoring gate (`score_actions::if inputs.markers.has(...)`)
+            // and the Bury DSE's eligibility filter both read from
+            // the same source of truth.
+            markers.set_entity(markers::HasUnburiedCorpse::KEY, entity, unburied);
         }
         // Ticket 049 §9.2 — faction overlay markers (Visitor /
         // HostileVisitor / Banished / BefriendedAlly). The runtime §9.3
@@ -2045,11 +2096,17 @@ pub fn evaluate_and_plan(
         // `emit_focal_trace` can reconstruct the full selection record.
         let capture_this_cat = focal_capture.is_some() && focal_cat == Some(entity);
         let mut softmax_trace = capture_this_cat.then(crate::ai::scoring::SoftmaxCapture::default);
+        // Ticket 232 — body-state-coupled L3 softmax temperature.
+        // Computed per tick from the cat's `ScoringContext` so the L3
+        // draw sharpens to the floor when body distress or rising-
+        // threat is high, and broadens to the ceiling when the cat is
+        // calm.
+        let softmax_temperature = crate::ai::scoring::softmax_temperature(&ctx, sc);
         let chosen = crate::ai::scoring::select_disposition_via_intention_softmax_with_trace(
             &scores,
             personality.independence,
             d.disposition_independence_penalty,
-            sc,
+            softmax_temperature,
             &mut rng.rng,
             softmax_trace.as_mut(),
         );
@@ -2180,6 +2237,7 @@ pub fn evaluate_and_plan(
             &cat_positions,
             &material_pile_positions,
             &food_pile_positions,
+            &dead_cat_positions,
             entity,
             d,
         );
@@ -2445,6 +2503,14 @@ struct StepSnapshots {
     kitten_parents: HashMap<Entity, (Option<Entity>, Option<Entity>)>,
     kitten_snapshot: Vec<crate::ai::caretake_targeting::KittenState>,
     building_snapshot: Vec<(Entity, StructureType, Position, bool, bool)>,
+    /// 035: Dead-and-not-Buried colony cat positions. Built once per
+    /// `evaluate_and_plan` tick and consumed by both
+    /// `resolve_zone_position`'s `CorpseTarget` arm and
+    /// `resolve_bury_target`'s candidate scan.
+    dead_cat_positions: Vec<(Entity, Position)>,
+    /// 035: name lookup for dead cats so `EventKind::BurialFired`'s
+    /// `deceased` field is a real name rather than `entity:N`.
+    dead_cat_names: HashMap<Entity, String>,
 }
 
 /// Mutable accumulators written by `dispatch_step_action`, consumed by the
@@ -2458,6 +2524,10 @@ struct StepAccumulators {
     /// per-cat loop, so the actual transfer (which needs both inventories)
     /// runs in the post-loop drain via `cats.get_many_mut([actor, recipient])`.
     handoff_pending: Vec<HandoffPending>,
+    /// 035: completed burials queued for post-loop drain. Each
+    /// `BuryOutcome` triggers (1) `commands.entity(deceased).insert(Buried)`,
+    /// (2) `commands.entity(deceased).despawn()`, (3) `commands.spawn((Grave { ... }, Position { ... }))`.
+    bury_completions: Vec<crate::steps::disposition::BuryOutcome>,
 }
 
 /// Ticket 177: the per-pair payload queued by a successful Handoff
@@ -2798,6 +2868,14 @@ pub fn resolve_goap_plans(
             .iter()
             .map(|(e, dep)| (e, (dep.mother, dep.father)))
             .collect(),
+        // 035: dead-cat snapshot for burial target picking + post-loop
+        // drain. The `cats` query is `Without<Dead>` so this is disjoint.
+        dead_cat_positions: ec.dead_cats_q.iter().map(|(e, p, _, _)| (e, *p)).collect(),
+        dead_cat_names: ec
+            .dead_cats_q
+            .iter()
+            .map(|(e, _, name, _)| (e, name.0.clone()))
+            .collect(),
         // §Phase 4c.3: kitten snapshot for goap-path Caretake / FeedKitten.
         // Built from the main cats query itself (immutable pre-loop
         // iteration) to avoid a separate kitten query that would conflict
@@ -2816,6 +2894,7 @@ pub fn resolve_goap_plans(
         // updates are collected here and applied in a second pass.
         kitten_feedings: Vec::new(),
         handoff_pending: Vec::new(),
+        bury_completions: Vec::new(),
     };
 
     for (
@@ -2993,6 +3072,7 @@ pub fn resolve_goap_plans(
                     &snaps.cat_positions,
                     &snaps.material_pile_positions,
                     &snaps.food_pile_positions,
+                    &snaps.dead_cat_positions,
                     cat_entity,
                     d,
                 );
@@ -3300,6 +3380,7 @@ pub fn resolve_goap_plans(
                     &snaps.cat_positions,
                     &snaps.material_pile_positions,
                     &snaps.food_pile_positions,
+                    &snaps.dead_cat_positions,
                     cat_entity,
                     d,
                 );
@@ -3527,6 +3608,34 @@ pub fn resolve_goap_plans(
         }
     }
 
+    // 035: deferred burials. For each completed BuryOutcome:
+    //   1. Insert `Buried` on the corpse (defensive against same-tick
+    //      double-fire; sensing's `update_target_existence_markers`
+    //      filters `(With<Dead>, Without<Buried>)`).
+    //   2. Despawn the corpse entity (its grace period collapses to
+    //      now — burial is the deliberate, witnessed end of the
+    //      grace).
+    //   3. Spawn a fresh entity carrying `Grave + Position` at the
+    //      corpse's tile. The new entity has no other components, so
+    //      it's invisible to every existing per-cat query — it shows
+    //      up only via the `GraveAuraMap` rebuild and any future
+    //      Grave-aware system (kitten-rest-at-grave, monument
+    //      landmarks, etc.).
+    for outcome in std::mem::take(&mut accum.bury_completions) {
+        commands
+            .entity(outcome.deceased)
+            .insert(markers::Buried);
+        commands.entity(outcome.deceased).despawn();
+        commands.spawn((
+            crate::components::grave::Grave {
+                deceased_name: outcome.deceased_name,
+                tick_buried: outcome.tick,
+                cause: outcome.cause,
+            },
+            outcome.position,
+        ));
+    }
+
     // Deferred mentor effects.
     for effect in &accum.mentor_effects {
         let app_skills_result = if let Ok(s) = unchained_skills.get(effect.apprentice) {
@@ -3728,16 +3837,34 @@ fn dispatch_step_action(
     //
     // Resolver bodies remain unchanged — the contract is "step
     // resolvers run only with valid targets"; the gate enforces it.
-    if let Some(target) = plan.step_state[step_idx].target_entity {
-        if let Err(reason) =
-            crate::systems::plan_substrate::validate_target(target, &ec.target_validity)
-        {
-            // Failure name encodes the invalidity flavor for the
-            // narrative trace; the existing `PlanFailureReason::TargetDespawned`
-            // path consumes the failure regardless of subkind.
-            return crate::steps::StepResult::Fail(format!(
-                "target invalid at step entry: {reason:?}"
-            ));
+    //
+    // 035 carve-out: `Bury` is the inverted case — its target *must*
+    // be Dead. Skipping the alive-gate for Bury (and the prefix
+    // `TravelTo(CorpseTarget)` which carries the same target_entity
+    // forward via `carry_target_forward`) lets the burial chain run
+    // against the dead colony-mate without the gate rejecting it.
+    // The Bury dispatch arm has its own validity check via the
+    // `dead_cat_positions` snapshot lookup — a target that's been
+    // despawned (cleanup_dead) or buried since the plan committed
+    // returns None for `target_position`/`target_name`/`target_cause`
+    // and the resolver Advances unwitnessed, mirroring grooming's
+    // missing-target degradation.
+    let skip_alive_gate = matches!(
+        action_kind,
+        GoapActionKind::Bury | GoapActionKind::TravelTo(PlannerZone::CorpseTarget)
+    );
+    if !skip_alive_gate {
+        if let Some(target) = plan.step_state[step_idx].target_entity {
+            if let Err(reason) =
+                crate::systems::plan_substrate::validate_target(target, &ec.target_validity)
+            {
+                // Failure name encodes the invalidity flavor for the
+                // narrative trace; the existing `PlanFailureReason::TargetDespawned`
+                // path consumes the failure regardless of subkind.
+                return crate::steps::StepResult::Fail(format!(
+                    "target invalid at step entry: {reason:?}"
+                ));
+            }
         }
     }
 
@@ -3770,6 +3897,7 @@ fn dispatch_step_action(
                 &snaps.cat_positions,
                 &snaps.material_pile_positions,
                 &snaps.food_pile_positions,
+                &snaps.dead_cat_positions,
                 cat_entity,
                 d,
             )
@@ -4219,6 +4347,105 @@ fn dispatch_step_action(
                 }
             }
             result
+        }
+
+        GoapActionKind::Bury => {
+            // 035: pick the corpse via the bury target DSE if not yet
+            // selected, then run the bury resolver. On completion the
+            // post-loop drain inserts `Buried` on the corpse, despawns
+            // it, and spawns a `Grave` entity at the same position.
+            if plan.step_state[step_idx].target_entity.is_none() {
+                let is_kin = |a: Entity, b: Entity| -> bool {
+                    let a_parents = snaps.kitten_parents.get(&a);
+                    let b_parents = snaps.kitten_parents.get(&b);
+                    a_parents.is_some_and(|(m, f)| *m == Some(b) || *f == Some(b))
+                        || b_parents.is_some_and(|(m, f)| *m == Some(a) || *f == Some(a))
+                };
+                let focal_hook = if ec_is_focal(ec, cat_entity) {
+                    ec.focal_capture
+                        .as_deref()
+                        .map(|cap| crate::ai::target_dse::FocalTargetHook {
+                            capture: cap,
+                            name_lookup: &|e: Entity| format!("{e:?}"),
+                        })
+                } else {
+                    None
+                };
+                plan.step_state[step_idx].target_entity =
+                    crate::ai::dses::bury_target::resolve_bury_target(
+                        &ec.dse_registry,
+                        cat_entity,
+                        *pos,
+                        &snaps.dead_cat_positions,
+                        &is_kin,
+                        relationships,
+                        ec.time.tick,
+                        focal_hook,
+                        recent_failures,
+                        ec.constants
+                            .planning_substrate
+                            .target_failure_cooldown_ticks,
+                        narr.activation.as_deref_mut(),
+                    );
+            }
+            // Stash the deceased's position + name + cause so the
+            // post-loop drain can spawn the Grave even after the corpse
+            // entity is despawned.
+            let target = plan.step_state[step_idx].target_entity;
+            let (target_position, target_name, target_cause) = match target {
+                Some(t) => {
+                    let pos_opt = snaps
+                        .dead_cat_positions
+                        .iter()
+                        .find(|(e, _)| *e == t)
+                        .map(|(_, p)| *p);
+                    let name_opt = snaps.dead_cat_names.get(&t).cloned();
+                    let cause_opt = ec
+                        .dead_cats_q
+                        .get(t)
+                        .ok()
+                        .map(|(_, _, _, dead)| dead.cause);
+                    (pos_opt, name_opt, cause_opt)
+                }
+                None => (None, None, None),
+            };
+            // §7.W: construct a temporary Fulfillment for cats without
+            // the component (mirrors GroomOther dispatch).
+            let mut fallback_fulfillment = crate::components::fulfillment::Fulfillment::default();
+            let fulfillment_ref = match fulfillment_opt.as_mut() {
+                Some(f) => &mut **f,
+                None => &mut fallback_fulfillment,
+            };
+            let outcome = crate::steps::disposition::resolve_bury(
+                ticks,
+                target,
+                target_position,
+                target_name.clone(),
+                target_cause,
+                fulfillment_ref,
+                ec.time.tick,
+                d,
+            );
+            outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::BurialPerformed);
+            if matches!(outcome.result, crate::steps::StepResult::Advance) {
+                if let Some(ref mut log) = ec.event_log {
+                    let deceased_label = target_name
+                        .clone()
+                        .or_else(|| target.map(|e| format!("entity:{}", e.index())))
+                        .unwrap_or_else(|| "unknown".into());
+                    log.push(
+                        ec.time.tick,
+                        EventKind::BurialFired {
+                            cat: name.0.clone(),
+                            deceased: deceased_label,
+                        },
+                    );
+                }
+            }
+            if let Some(o) = outcome.witness {
+                accum.bury_completions.push(o);
+            }
+            outcome.result
         }
 
         GoapActionKind::PatrolArea => {
@@ -5631,6 +5858,7 @@ fn resolve_travel_to(
     cat_positions: &[(Entity, Position)],
     material_pile_positions: &[(Entity, Position, ItemKind)],
     food_pile_positions: &[(Entity, Position, ItemKind)],
+    dead_cat_positions: &[(Entity, Position)],
     cat_entity: Entity,
     d: &DispositionConstants,
 ) -> crate::steps::StepResult {
@@ -5648,6 +5876,7 @@ fn resolve_travel_to(
             cat_positions,
             material_pile_positions,
             food_pile_positions,
+            dead_cat_positions,
             cat_entity,
             d,
         );
@@ -6963,6 +7192,9 @@ fn resolve_zone_position(
     cat_positions: &[(Entity, Position)],
     material_pile_positions: &[(Entity, Position, ItemKind)],
     food_pile_positions: &[(Entity, Position, ItemKind)],
+    // 035: Dead-and-not-Buried cat positions for the `CorpseTarget`
+    // zone. Disjoint from `cat_positions` (which is `Without<Dead>`).
+    dead_cat_positions: &[(Entity, Position)],
     cat_entity: Entity,
     d: &DispositionConstants,
 ) -> Option<Position> {
@@ -7024,6 +7256,14 @@ fn resolve_zone_position(
             .iter()
             .min_by_key(|(_, fp, _)| pos.manhattan_distance(fp))
             .map(|(_, p, _)| *p),
+        // 035: nearest unburied colony-mate corpse. The dead-cat
+        // snapshot is built upstream in `ScoringSnapshots`. Excludes
+        // self defensively (dead self can't be the cat planning).
+        PlannerZone::CorpseTarget => dead_cat_positions
+            .iter()
+            .filter(|(other, _)| *other != cat_entity)
+            .min_by_key(|(_, dp)| pos.manhattan_distance(dp))
+            .map(|(_, p)| *p),
     }
 }
 
@@ -7224,6 +7464,7 @@ fn build_zone_distances(
     cat_positions: &[(Entity, Position)],
     material_pile_positions: &[(Entity, Position, ItemKind)],
     food_pile_positions: &[(Entity, Position, ItemKind)],
+    dead_cat_positions: &[(Entity, Position)],
     cat_entity: Entity,
     d: &DispositionConstants,
 ) -> ZoneDistances {
@@ -7313,6 +7554,19 @@ fn build_zone_distances(
                 .iter()
                 .min_by_key(|(_, fp, _)| pos.manhattan_distance(fp))
                 .map(|(_, p, _)| *p),
+        ),
+        // 035: nearest unburied colony-mate corpse, excluding self.
+        // Resolves to None when no Dead-and-not-Buried cat exists in
+        // the snapshot — the burial plan template's `ZoneIs(CorpseTarget)`
+        // precondition then has no `TravelTo` action that reaches the
+        // zone, and the planner returns `GoalUnreachable`.
+        (
+            PlannerZone::CorpseTarget,
+            dead_cat_positions
+                .iter()
+                .filter(|(other, _)| *other != cat_entity)
+                .min_by_key(|(_, dp)| pos.manhattan_distance(dp))
+                .map(|(_, p)| *p),
         ),
     ];
 
@@ -7485,6 +7739,7 @@ mod tests {
             &cat,
             map,
             exploration,
+            &[],
             &[],
             &[],
             &[],
