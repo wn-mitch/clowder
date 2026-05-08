@@ -315,13 +315,54 @@ pub fn handing_actions() -> Vec<GoapActionDef> {
 /// Routes through `PlannerZone::CarcassPile` (193); previously
 /// stubbed against `MaterialPile`, which filtered to build
 /// materials only and starved the resolver of valid targets.
+///
+/// Ticket 231: dual-branch composition mirrors the ticket-096
+/// Construct precedent. `DropItem` is available as a means-to-end
+/// prefix (cost 1, sets `HasFreeSlotThisPlan(true)`); the substrate
+/// path of `PickUpItemFromGround` reads `HasMarker(HasFreeSlot::KEY)`
+/// and the plan path reads `HasFreeSlotThisPlan(true)`. A* picks the
+/// cheaper — substrate-path (cost 1) when the cat already has a free
+/// slot, plan-path (cost 1+1=2) when full so the cat drops something
+/// to make room.
 pub fn picking_up_actions() -> Vec<GoapActionDef> {
-    vec![GoapActionDef {
-        kind: GoapActionKind::PickUpItemFromGround,
-        cost: 1,
-        preconditions: vec![StatePredicate::ZoneIs(PlannerZone::CarcassPile)],
-        effects: vec![StateEffect::IncrementTrips],
-    }]
+    vec![
+        // 231: DropItem-as-prefix means-to-end action. No
+        // IncrementTrips — this is not the disposition's goal, just
+        // a step that frees the inventory slot the substrate-path
+        // pickup needs. The runtime resolver picks the lowest-priority
+        // slot via `drop_priority` (231 H, goal-aware).
+        GoapActionDef {
+            kind: GoapActionKind::DropItem,
+            cost: 1,
+            preconditions: vec![],
+            effects: vec![
+                StateEffect::SetHasFreeSlotThisPlan(true),
+                StateEffect::SetCarrying(Carrying::Nothing),
+            ],
+        },
+        // 231: substrate-path pickup. Fires when the cat already has a
+        // free slot.
+        GoapActionDef {
+            kind: GoapActionKind::PickUpItemFromGround,
+            cost: 1,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::CarcassPile),
+                StatePredicate::HasMarker(crate::components::markers::HasFreeSlot::KEY),
+            ],
+            effects: vec![StateEffect::IncrementTrips],
+        },
+        // 231: plan-path pickup. Fires after a DropItem prefix step
+        // sets `HasFreeSlotThisPlan(true)` in this plan's search state.
+        GoapActionDef {
+            kind: GoapActionKind::PickUpItemFromGround,
+            cost: 1,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::CarcassPile),
+                StatePredicate::HasFreeSlotThisPlan(true),
+            ],
+            effects: vec![StateEffect::IncrementTrips],
+        },
+    ]
 }
 
 /// Building plans a haul→deliver→construct sequence. The planner emits
@@ -429,18 +470,45 @@ pub fn farming_actions() -> Vec<GoapActionDef> {
 /// `actions_for_disposition`.
 pub fn herbalism_actions(chosen_action: Action) -> Vec<GoapActionDef> {
     match chosen_action {
-        Action::HerbcraftGather => vec![GoapActionDef {
-            // 175: dropped `CarryingIs(Carrying::Nothing)` veto
-            // (mirrors hunting/foraging post-091; runtime gates
-            // on inventory capacity).
-            kind: GoapActionKind::GatherHerb,
-            cost: 3,
-            preconditions: vec![StatePredicate::ZoneIs(PlannerZone::HerbPatch)],
-            effects: vec![
-                StateEffect::SetCarrying(Carrying::Herbs),
-                StateEffect::IncrementTrips,
-            ],
-        }],
+        Action::HerbcraftGather => vec![
+            // 231: DropItem-as-prefix means-to-end. Cat with full
+            // inventory drops a slot, then gathers the herb.
+            GoapActionDef {
+                kind: GoapActionKind::DropItem,
+                cost: 1,
+                preconditions: vec![],
+                effects: vec![
+                    StateEffect::SetHasFreeSlotThisPlan(true),
+                    StateEffect::SetCarrying(Carrying::Nothing),
+                ],
+            },
+            // 231: substrate-path GatherHerb — cat already has space.
+            GoapActionDef {
+                kind: GoapActionKind::GatherHerb,
+                cost: 3,
+                preconditions: vec![
+                    StatePredicate::ZoneIs(PlannerZone::HerbPatch),
+                    StatePredicate::HasMarker(crate::components::markers::HasFreeSlot::KEY),
+                ],
+                effects: vec![
+                    StateEffect::SetCarrying(Carrying::Herbs),
+                    StateEffect::IncrementTrips,
+                ],
+            },
+            // 231: plan-path GatherHerb — composes after DropItem.
+            GoapActionDef {
+                kind: GoapActionKind::GatherHerb,
+                cost: 3,
+                preconditions: vec![
+                    StatePredicate::ZoneIs(PlannerZone::HerbPatch),
+                    StatePredicate::HasFreeSlotThisPlan(true),
+                ],
+                effects: vec![
+                    StateEffect::SetCarrying(Carrying::Herbs),
+                    StateEffect::IncrementTrips,
+                ],
+            },
+        ],
         Action::HerbcraftRemedy => vec![
             // Gather herbs first if not carrying any.
             GoapActionDef {
@@ -449,11 +517,34 @@ pub fn herbalism_actions(chosen_action: Action) -> Vec<GoapActionDef> {
                 preconditions: vec![StatePredicate::ZoneIsNot(PlannerZone::HerbPatch)],
                 effects: vec![StateEffect::SetZone(PlannerZone::HerbPatch)],
             },
+            // 231: DropItem-as-prefix means-to-end.
             GoapActionDef {
-                // 175: dropped `CarryingIs(Nothing)` veto.
+                kind: GoapActionKind::DropItem,
+                cost: 1,
+                preconditions: vec![],
+                effects: vec![
+                    StateEffect::SetHasFreeSlotThisPlan(true),
+                    StateEffect::SetCarrying(Carrying::Nothing),
+                ],
+            },
+            // 231: substrate-path GatherHerb.
+            GoapActionDef {
                 kind: GoapActionKind::GatherHerb,
                 cost: 3,
-                preconditions: vec![StatePredicate::ZoneIs(PlannerZone::HerbPatch)],
+                preconditions: vec![
+                    StatePredicate::ZoneIs(PlannerZone::HerbPatch),
+                    StatePredicate::HasMarker(crate::components::markers::HasFreeSlot::KEY),
+                ],
+                effects: vec![StateEffect::SetCarrying(Carrying::Herbs)],
+            },
+            // 231: plan-path GatherHerb (after DropItem).
+            GoapActionDef {
+                kind: GoapActionKind::GatherHerb,
+                cost: 3,
+                preconditions: vec![
+                    StatePredicate::ZoneIs(PlannerZone::HerbPatch),
+                    StatePredicate::HasFreeSlotThisPlan(true),
+                ],
                 effects: vec![StateEffect::SetCarrying(Carrying::Herbs)],
             },
             GoapActionDef {
@@ -489,16 +580,36 @@ pub fn herbalism_actions(chosen_action: Action) -> Vec<GoapActionDef> {
                 preconditions: vec![StatePredicate::ZoneIsNot(PlannerZone::HerbPatch)],
                 effects: vec![StateEffect::SetZone(PlannerZone::HerbPatch)],
             },
+            // 231: DropItem-as-prefix means-to-end.
             GoapActionDef {
-                // 175: dropped `CarryingIs(Nothing)` veto.
-                // `HasMarker(ThornbriarAvailable)` retained — that's
-                // real ecological gating (thornbriar must exist to
-                // gather), not a coarse-Carrying veto.
+                kind: GoapActionKind::DropItem,
+                cost: 1,
+                preconditions: vec![],
+                effects: vec![
+                    StateEffect::SetHasFreeSlotThisPlan(true),
+                    StateEffect::SetCarrying(Carrying::Nothing),
+                ],
+            },
+            // 231: substrate-path GatherHerb (with ThornbriarAvailable
+            // ecological gate retained from 175).
+            GoapActionDef {
                 kind: GoapActionKind::GatherHerb,
                 cost: 3,
                 preconditions: vec![
                     StatePredicate::ZoneIs(PlannerZone::HerbPatch),
                     StatePredicate::HasMarker(markers::ThornbriarAvailable::KEY),
+                    StatePredicate::HasMarker(crate::components::markers::HasFreeSlot::KEY),
+                ],
+                effects: vec![StateEffect::SetCarrying(Carrying::Herbs)],
+            },
+            // 231: plan-path GatherHerb (after DropItem).
+            GoapActionDef {
+                kind: GoapActionKind::GatherHerb,
+                cost: 3,
+                preconditions: vec![
+                    StatePredicate::ZoneIs(PlannerZone::HerbPatch),
+                    StatePredicate::HasMarker(markers::ThornbriarAvailable::KEY),
+                    StatePredicate::HasFreeSlotThisPlan(true),
                 ],
                 effects: vec![StateEffect::SetCarrying(Carrying::Herbs)],
             },
@@ -515,15 +626,42 @@ pub fn herbalism_actions(chosen_action: Action) -> Vec<GoapActionDef> {
         // Defensive: if a non-Herbalism Action somehow reaches here, return
         // the cheap single-action gather plan rather than panic.
         // 175: dropped `CarryingIs(Nothing)` veto for symmetry.
-        _ => vec![GoapActionDef {
-            kind: GoapActionKind::GatherHerb,
-            cost: 3,
-            preconditions: vec![StatePredicate::ZoneIs(PlannerZone::HerbPatch)],
-            effects: vec![
-                StateEffect::SetCarrying(Carrying::Herbs),
-                StateEffect::IncrementTrips,
-            ],
-        }],
+        // 231: dual-branch substrate/plan-path mirroring HerbcraftGather.
+        _ => vec![
+            GoapActionDef {
+                kind: GoapActionKind::DropItem,
+                cost: 1,
+                preconditions: vec![],
+                effects: vec![
+                    StateEffect::SetHasFreeSlotThisPlan(true),
+                    StateEffect::SetCarrying(Carrying::Nothing),
+                ],
+            },
+            GoapActionDef {
+                kind: GoapActionKind::GatherHerb,
+                cost: 3,
+                preconditions: vec![
+                    StatePredicate::ZoneIs(PlannerZone::HerbPatch),
+                    StatePredicate::HasMarker(crate::components::markers::HasFreeSlot::KEY),
+                ],
+                effects: vec![
+                    StateEffect::SetCarrying(Carrying::Herbs),
+                    StateEffect::IncrementTrips,
+                ],
+            },
+            GoapActionDef {
+                kind: GoapActionKind::GatherHerb,
+                cost: 3,
+                preconditions: vec![
+                    StatePredicate::ZoneIs(PlannerZone::HerbPatch),
+                    StatePredicate::HasFreeSlotThisPlan(true),
+                ],
+                effects: vec![
+                    StateEffect::SetCarrying(Carrying::Herbs),
+                    StateEffect::IncrementTrips,
+                ],
+            },
+        ],
     }
 }
 
@@ -570,10 +708,38 @@ pub fn cooking_actions() -> Vec<GoapActionDef> {
         // multi-slot inventory. Cats with leftover items can
         // enter the chain; A* still skips this step when the cat
         // already has `RawFood` and enters at `Cook`.
+        //
+        // 231: dual-branch substrate-vs-plan-path on `RetrieveRawFood`.
+        // The substrate branch reads `HasMarker(HasFreeSlot::KEY)`; the
+        // plan branch reads `HasFreeSlotThisPlan(true)`, set by the
+        // DropItem-as-prefix step. A* picks substrate (cost 2) when a
+        // free slot exists, plan (cost 1+2=3) when full so the cat
+        // drops something before retrieving.
+        GoapActionDef {
+            kind: GoapActionKind::DropItem,
+            cost: 1,
+            preconditions: vec![],
+            effects: vec![
+                StateEffect::SetHasFreeSlotThisPlan(true),
+                StateEffect::SetCarrying(Carrying::Nothing),
+            ],
+        },
         GoapActionDef {
             kind: GoapActionKind::RetrieveRawFood,
             cost: 2,
-            preconditions: vec![StatePredicate::ZoneIs(PlannerZone::Stores)],
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::Stores),
+                StatePredicate::HasMarker(crate::components::markers::HasFreeSlot::KEY),
+            ],
+            effects: vec![StateEffect::SetCarrying(Carrying::RawFood)],
+        },
+        GoapActionDef {
+            kind: GoapActionKind::RetrieveRawFood,
+            cost: 2,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::Stores),
+                StatePredicate::HasFreeSlotThisPlan(true),
+            ],
             effects: vec![StateEffect::SetCarrying(Carrying::RawFood)],
         },
         GoapActionDef {
@@ -651,10 +817,36 @@ pub fn caretaking_actions() -> Vec<GoapActionDef> {
     // real inventory was non-empty the planner couldn't satisfy
     // `CarryingIs(Nothing)` and bailed out entirely.
     vec![
+        // 231: DropItem-as-prefix + dual-branch RetrieveFoodForKitten.
+        // Adult cats with full inventory drop a slot first (resolver
+        // picks the lowest-priority slot), then retrieve food for the
+        // kitten. Mirrors the cooking_actions / picking_up_actions
+        // composition.
+        GoapActionDef {
+            kind: GoapActionKind::DropItem,
+            cost: 1,
+            preconditions: vec![],
+            effects: vec![
+                StateEffect::SetHasFreeSlotThisPlan(true),
+                StateEffect::SetCarrying(Carrying::Nothing),
+            ],
+        },
         GoapActionDef {
             kind: GoapActionKind::RetrieveFoodForKitten,
             cost: 2,
-            preconditions: vec![StatePredicate::ZoneIs(PlannerZone::Stores)],
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::Stores),
+                StatePredicate::HasMarker(crate::components::markers::HasFreeSlot::KEY),
+            ],
+            effects: vec![StateEffect::SetCarrying(Carrying::RawFood)],
+        },
+        GoapActionDef {
+            kind: GoapActionKind::RetrieveFoodForKitten,
+            cost: 2,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::Stores),
+                StatePredicate::HasFreeSlotThisPlan(true),
+            ],
             effects: vec![StateEffect::SetCarrying(Carrying::RawFood)],
         },
         GoapActionDef {
@@ -749,6 +941,7 @@ mod tests {
             farm_tended: false,
             materials_delivered_this_plan: false,
             flee_target_picked: false,
+            has_free_slot_this_plan: false,
         }
     }
 
@@ -764,13 +957,17 @@ mod tests {
         m
     }
 
-    /// Default test context: stores have food. Most tests assume the
-    /// colony is provisioned so `EatAtStores` is reachable; tests that
-    /// explicitly probe empty-stores behavior pass `empty_markers()`
-    /// instead.
+    /// Default test context: stores have food and the cat has at least
+    /// one free inventory slot. Most tests assume the colony is
+    /// provisioned so `EatAtStores` is reachable, and that the cat
+    /// isn't clogged so the substrate-path of pickup-class actions
+    /// (231) fires (vs the plan-path which prepends DropItem). Tests
+    /// that explicitly probe empty-stores or full-inventory behavior
+    /// pass `empty_markers()` or build their own snapshot.
     fn food_stocked_markers() -> MarkerSnapshot {
         let mut m = MarkerSnapshot::new();
         m.set_colony(markers::HasStoredFood::KEY, true);
+        m.set_entity(markers::HasFreeSlot::KEY, test_entity(), true);
         m
     }
 

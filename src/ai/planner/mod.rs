@@ -168,6 +168,14 @@ pub struct PlannerState {
     /// Cleared by `HoldUntilSafe`'s `IncrementTrips` so the cat can
     /// re-pick on a subsequent re-plan if a fresh threat appears.
     pub flee_target_picked: bool,
+    /// Search-state only (ticket 231): `true` iff a `DropItem` step
+    /// has been simulated earlier in *this* A* expansion. Pair with
+    /// `HasMarker(HasFreeSlot::KEY)` as alternate preconditions on the
+    /// four pickup-class actions — substrate branch covers cats with a
+    /// free slot; this branch covers in-plan clutter clearance via
+    /// DropItem-as-prefix. Mirrors `materials_delivered_this_plan`'s
+    /// pattern (ticket 096).
+    pub has_free_slot_this_plan: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -304,6 +312,13 @@ pub enum StatePredicate {
     /// simulated a `PickFleeTarget` step earlier in this A* expansion.
     /// Used by `Flee` and `HoldUntilSafe` to enforce chain ordering.
     FleeTargetPicked(bool),
+    /// Ticket 231: search-state predicate. True iff the planner has
+    /// simulated a `DropItem` step earlier in this A* expansion.
+    /// Pair with `HasMarker(HasFreeSlot::KEY)` as alternate
+    /// preconditions on the four pickup-class actions — substrate
+    /// branch covers cats with a free slot; this branch covers in-plan
+    /// clutter clearance via DropItem-as-prefix.
+    HasFreeSlotThisPlan(bool),
 }
 
 impl StatePredicate {
@@ -324,6 +339,7 @@ impl StatePredicate {
             Self::MaterialsDeliveredThisPlan(v) => state.materials_delivered_this_plan == *v,
             Self::HasMarker(name) => ctx.markers.has(name, ctx.entity),
             Self::FleeTargetPicked(v) => state.flee_target_picked == *v,
+            Self::HasFreeSlotThisPlan(v) => state.has_free_slot_this_plan == *v,
         }
     }
 }
@@ -346,6 +362,12 @@ pub enum StateEffect {
     /// the chain ordering predicate `FleeTargetPicked(true)` evaluates
     /// in subsequent A* expansions.
     SetFleeTargetPicked(bool),
+    /// Ticket 231: set the search-state `has_free_slot_this_plan`
+    /// flag, applied by the DropItem-as-prefix action in pickup-class
+    /// plans so the substrate-vs-plan-path Construct precedent
+    /// composition lets pickup actions fire after a planned DropItem
+    /// step.
+    SetHasFreeSlotThisPlan(bool),
 }
 
 impl StateEffect {
@@ -363,6 +385,7 @@ impl StateEffect {
             Self::IncrementTrips => state.trips_done += 1,
             Self::SetMaterialsDeliveredThisPlan(v) => state.materials_delivered_this_plan = *v,
             Self::SetFleeTargetPicked(v) => state.flee_target_picked = *v,
+            Self::SetHasFreeSlotThisPlan(v) => state.has_free_slot_this_plan = *v,
         }
     }
 }
@@ -671,6 +694,7 @@ mod tests {
             farm_tended: false,
             materials_delivered_this_plan: false,
             flee_target_picked: false,
+            has_free_slot_this_plan: false,
         }
     }
 

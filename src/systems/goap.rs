@@ -7111,6 +7111,11 @@ fn build_planner_state(
         // `PickFleeTarget` is the first step in `fleeing_actions()`,
         // and `Flee` / `HoldUntilSafe` are gated on it.
         flee_target_picked: false,
+        // 231: pickup-class plans always start without a planned drop;
+        // the substrate-path variant of pickup actions reads
+        // `HasFreeSlot` (the marker) and the plan-path variant reads
+        // this search-state flag, set by DropItem-as-prefix.
+        has_free_slot_this_plan: false,
     }
 }
 
