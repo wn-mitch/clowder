@@ -62,6 +62,12 @@ def main() -> int:
         action="store_true",
         help="Suppress progress output.",
     )
+    parser.add_argument(
+        "--checkpoint-every",
+        type=int, default=10,
+        help="Flush the index after every N files. Lower = safer "
+             "(less re-work on crash) but more disk I/O.",
+    )
     args = parser.parse_args()
 
     log = (lambda *a, **kw: None) if args.quiet else _log
@@ -125,47 +131,68 @@ def main() -> int:
             log(f"  ... and {len(changed_paths) - 20} more")
         return 0
 
-    # Chunk the changed files.
-    new_chunks: list[Chunk] = []
-    for p in changed_paths:
-        new_chunks.extend(chunk_path(p, REPO_ROOT))
-    log(f"chunked {len(new_chunks)} new chunks across {len(changed_paths)} files")
-
-    # Embed.
-    if new_chunks:
-        log(f"embedding {len(new_chunks)} chunks via {EMBEDDER_NAME}...")
-        t0 = time.monotonic()
-        new_vectors = embed_batch([c.text for c in new_chunks])
-        log(f"  embedded in {time.monotonic() - t0:.1f}s")
-    else:
-        new_vectors = np.zeros((0, embedding_dim()), dtype=np.float32)
-
-    # Stitch the kept rows + new rows together.
+    # Build the seed in-memory state from the kept (unchanged-file) rows.
+    # We will append new files' chunks + vectors to these as each file
+    # finishes embedding, and flush the index every CHECKPOINT_EVERY files.
+    # That makes the build resumable: a kill mid-run leaves a valid
+    # partial index whose source_mtimes only includes completed files,
+    # so the next invocation re-embeds only the remainder.
     if existing is not None and keep_vectors_rows:
-        kept_vectors = existing.vectors[np.array(keep_vectors_rows, dtype=np.int64)]
-        all_vectors = np.vstack([kept_vectors, new_vectors]) if new_vectors.size else kept_vectors
+        all_vectors = existing.vectors[np.array(keep_vectors_rows, dtype=np.int64)]
     else:
-        all_vectors = new_vectors
+        all_vectors = np.zeros((0, embedding_dim()), dtype=np.float32)
+    all_chunks: list[dict] = list(keep_chunks)
+    source_mtimes: dict[str, float] = {
+        c["source_path"]: existing.source_mtimes.get(c["source_path"], 0.0)
+        for c in all_chunks
+    } if existing is not None else {}
 
-    all_chunks = list(keep_chunks) + [c.to_dict() for c in new_chunks]
+    log(f"embedding {len(changed_paths)} files via {EMBEDDER_NAME} "
+        f"(checkpoint every {args.checkpoint_every} files)...")
+    t0 = time.monotonic()
+    files_done_since_flush = 0
+    chunks_emitted = 0
 
-    # Build source_mtimes from the *current* paths (drops vanished entries
-    # automatically — we only record what's still on disk).
-    source_mtimes = {
-        str(p.relative_to(REPO_ROOT)): p.stat().st_mtime for p in paths
-    }
+    for i, path in enumerate(changed_paths, start=1):
+        rel = str(path.relative_to(REPO_ROOT))
+        file_chunks = chunk_path(path, REPO_ROOT)
+        if not file_chunks:
+            # File is in the corpus but produced no chunks (e.g. empty
+            # frontmatter-only ticket). Still record its mtime so the
+            # next invocation skips it instead of re-trying every time.
+            source_mtimes[rel] = path.stat().st_mtime
+        else:
+            file_vectors = embed_batch(
+                [c.text for c in file_chunks],
+                progress=not args.quiet,
+            )
+            if all_vectors.size == 0:
+                all_vectors = file_vectors
+            else:
+                all_vectors = np.vstack([all_vectors, file_vectors])
+            all_chunks.extend(c.to_dict() for c in file_chunks)
+            source_mtimes[rel] = path.stat().st_mtime
+            chunks_emitted += len(file_chunks)
 
-    idx = Index(
-        vectors=all_vectors,
-        chunks=all_chunks,
-        embedder=EMBEDDER_NAME,
-        dim=embedding_dim(),
-        source_mtimes=source_mtimes,
-        built_at=time.time(),
-    )
+        files_done_since_flush += 1
+        # Flush periodically so a crash leaves a valid resume point.
+        if files_done_since_flush >= args.checkpoint_every or i == len(changed_paths):
+            idx = Index(
+                vectors=all_vectors,
+                chunks=all_chunks,
+                embedder=EMBEDDER_NAME,
+                dim=embedding_dim(),
+                source_mtimes=source_mtimes,
+                built_at=time.time(),
+            )
+            save_index(REPO_ROOT, idx)
+            log(f"  checkpointed: {i}/{len(changed_paths)} files, "
+                f"{len(all_chunks)} chunks total "
+                f"({time.monotonic() - t0:.1f}s elapsed)")
+            files_done_since_flush = 0
 
-    save_index(REPO_ROOT, idx)
     log(f"wrote {len(all_chunks)} chunks ({all_vectors.shape}) to {INDEX_DIR}/")
+    log(f"total embedding time: {time.monotonic() - t0:.1f}s")
     return 0
 
 

@@ -126,6 +126,13 @@ pub fn register_dses_at_startup(
 /// adapters (ticket 062's `PerSpeciesScentRef`) follow the same
 /// pattern — one `register_with` per species.
 pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
+    // Note (228): per-cat substrate (`RouteCostField`,
+    // `escape_viability`, `fox_scent_level` at cat position) is
+    // **not** registered here — this registry is world-keyed only.
+    // Cat-keyed perception lives outside the registry; see
+    // `src/components/route_cost_field.rs` for the cat-keyed family
+    // and §4.7 of `docs/systems/ai-substrate-refactor.md` for the
+    // substrate-vs-search-state boundary.
     use crate::resources::{
         CarcassScentMap, CatPresenceMap, ConstructionSiteMap, ExplorationMap, FoodLocationMap,
         FoxScentMap, GardenLocationMap, HerbLocationMap, KittenCryMap, PreyScentMap, TileMap,

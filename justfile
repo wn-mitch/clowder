@@ -106,6 +106,17 @@ similar *ARGS:
 similar-build *ARGS:
     @uv run scripts/similar/index.py {{ARGS}}
 
+# Surface ticket pairs that are conceptually adjacent but not formally
+# linked — embedding-based discovery of cross-epic ticket relationships
+# the `cluster:` field can't catch. Excludes pairs that already
+# cross-reference each other in body / blocked-by / supersedes.
+#   just similar-linkages                        # top 30 pairs, threshold 0.75
+#   just similar-linkages --cross-cluster        # only cluster-A ↔ cluster-B
+#   just similar-linkages --ticket 189           # all unlinked neighbors of 189
+#   just similar-linkages --threshold 0.7        # lower bar, more candidates
+similar-linkages *ARGS:
+    @uv run scripts/similar/linkages.py {{ARGS}}
+
 # Deep-soak with a focal-cat trace sidecar. Writes to
 # logs/tuned-<seed>/{events,narrative,trace-<focal>}.jsonl. Trace
 # records decompose per-tick L1/L2/L3 state for one focal cat per §11

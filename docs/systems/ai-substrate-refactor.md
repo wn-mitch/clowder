@@ -2255,6 +2255,20 @@ signatures).
 
 ### §4.7 Substrate vs search-state
 
+<!-- FIXME(228 follow-on): expand this section to name **cat-keyed
+substrate** as a third leg alongside world-keyed substrate and
+search state. Ticket 228 introduced `RouteCostField` (per-cat
+Dijkstra cost-field) as L1 perception, in the same family as
+`escape_viability` and `fox_scent_level` at cat position — distinct
+from world-keyed `InfluenceMap` resources but still substrate (not
+search state). The current §4.7.1 definitions implicitly assume
+world-keyed; the addition is non-breaking but worth naming
+explicitly so the next substrate-migration ticket doesn't repeat
+the audit error this section was written to prevent. See
+`src/components/route_cost_field.rs` and the doctrinal references
+to Walker (Brogue 2010), Mark/Dill (GDC AI Summit), Khatib (1986
+potential fields). -->
+
 The substrate-over-override pattern (§4 generally, and the [093
 epic](../open-work/landed/093-substrate-over-override-epic.md)
 specifically) gives every "world fact" a single authoritative

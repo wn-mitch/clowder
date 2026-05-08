@@ -68,12 +68,23 @@ def load_index(repo_root: Path) -> Index:
 
 
 def save_index(repo_root: Path, idx: Index) -> None:
-    """Persist the index to disk. Caller is responsible for ensuring
-    the directory exists."""
+    """Persist the index to disk atomically.
+
+    Writes to `.tmp` siblings and renames into place so a crash
+    mid-write leaves either the previous valid index or the new
+    valid index — never a torn pair where vectors and chunks
+    disagree on row count. Caller is responsible for ensuring the
+    directory exists."""
     npz_path = repo_root / INDEX_NPZ
     meta_path = repo_root / INDEX_META
     npz_path.parent.mkdir(parents=True, exist_ok=True)
-    np.savez(npz_path, vectors=idx.vectors)
+    # `np.savez` auto-appends `.npz` to a filename that doesn't end
+    # with it, so use an open file handle to bypass that heuristic
+    # and keep our atomic-rename semantics intact.
+    npz_tmp = npz_path.with_suffix(npz_path.suffix + ".tmp")
+    meta_tmp = meta_path.with_suffix(meta_path.suffix + ".tmp")
+    with open(npz_tmp, "wb") as f:
+        np.savez(f, vectors=idx.vectors)
     meta = {
         "embedder": idx.embedder,
         "dim": idx.dim,
@@ -81,7 +92,13 @@ def save_index(repo_root: Path, idx: Index) -> None:
         "source_mtimes": idx.source_mtimes,
         "chunks": idx.chunks,
     }
-    meta_path.write_text(json.dumps(meta, indent=1) + "\n", encoding="utf-8")
+    meta_tmp.write_text(json.dumps(meta, indent=1) + "\n", encoding="utf-8")
+    # Rename is atomic on POSIX. If we crash between these two renames,
+    # the npz and meta would briefly disagree — but the next load_index
+    # call would catch the row-count mismatch and surface a clear error
+    # rather than silently using stale data.
+    npz_tmp.replace(npz_path)
+    meta_tmp.replace(meta_path)
 
 
 def stale_files(repo_root: Path, idx: Index, current_paths: list[Path]) -> list[str]:
