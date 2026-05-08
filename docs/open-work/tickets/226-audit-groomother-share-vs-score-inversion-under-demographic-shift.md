@@ -1,0 +1,64 @@
+---
+id: 226
+title: audit GroomOther share-vs-score inversion under demographic shift
+status: ready
+cluster: ai-substrate
+added: 2026-05-07
+parked: null
+blocked-by: []
+supersedes: []
+related-systems: [ai-substrate-refactor.md]
+related-balance: [211-coordinate-food-security.md]
+landed-at: null
+landed-on: null
+---
+
+## Why
+211 closeout surfaced GroomOther L3 share dropping -5.05pp
+(13.98% → 8.93%) post-210 → post-211 **while** per-cat GroomOther
+L2 mean rose +56.9% in the Wren focal frame-diff. Per-cat scoring
+went up; share went down. The leading hypothesis is demographic /
+sample-size: the treatment soak observed 6707 CatSnapshot rows vs
+baseline 9390, with peak_population 8 vs 10, so fewer cat-tick
+moments overall and a different cohort mix. This inversion is the
+mirror image of the Patrol case in ticket 225 — same softmax-mass
+redistribution mechanism viewed from the other side. The GroomOther
+share drop *looks* like a 209-rescue regression but the per-cat
+substrate is healthy; we need to confirm before 213
+(`groom_food_security_weight`) ships.
+
+## Scope
+- Reproduce the inversion under sweep conditions (multi-seed × multi-
+  rep) to separate signal from single-seed cohort noise.
+- Per-cat decomposition: identify which subgroup of cats lost
+  GroomOther moments (kittens, adults, founders, coordinator-vs-non).
+- Confirm whether the smaller treatment cohort (peak_pop 8 vs 10)
+  fully accounts for the share drop, or whether there is a residual
+  mechanism beyond demographic shift.
+
+## Out of scope
+- Reverting 211 or any other tuning ticket.
+- Tuning `groom_food_security_weight` (that is ticket 213; this
+  diagnostic informs whether 213 needs to gate on this analysis).
+
+## Current state
+211 landed iter-1 weight 0.10 with this inversion documented in
+`docs/balance/211-coordinate-food-security.md`. 213 (GroomOther
+food-security lift) remains blocked-by 209.
+
+## Approach
+Run a multi-seed sweep at the post-211 commit (e.g. 5 seeds × 2
+reps via `just sweep`) and aggregate GroomOther share per seed-rep.
+If the share drop persists across seeds, the demographic-shift
+hypothesis is wrong and a substrate audit is needed. If it doesn't
+persist, the 211 single-seed observation was cohort-noise and 213
+can proceed without gating.
+
+## Verification
+A short note appended to `docs/balance/211-coordinate-food-security.md`
+or a fresh balance-doc entry that classifies GroomOther's
+share-vs-score behavior across seeds.
+
+## Log
+- 2026-05-07: opened from 211 closeout — share inversion needs
+  multi-seed confirmation before 213 ships.

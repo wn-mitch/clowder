@@ -1,10 +1,10 @@
 ---
 id: 214
 title: tune patrol_fox_scent_weight
-status: blocked
+status: parked
 cluster: balance
 added: 2026-05-07
-parked: null
+parked: 2026-05-07
 blocked-by: [209]
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
@@ -55,3 +55,21 @@ modest weight has multiplicative impact). Single-seed
 
 ## Log
 - 2026-05-07: opened from 209 closeout.
+- 2026-05-07: parked. Investigation surfaced two structural problems
+  with shipping the tune as written. (1) Double-pricing — the new L2
+  axis reads `fox_scent_level` (cat-position scent), the same scalar
+  `FoxTerritorySuppression` already prices multiplicatively post-CP;
+  lifting the weight stacks on the same signal. (2) Destination-
+  awareness gap — the ticket prediction "cats route around fox
+  territory rather than through" implies destination-aware pricing,
+  but the current axis is a `ScalarConsideration` reading cat-position
+  only; the patrol.rs comment (lines 107-109) reserves the slot for
+  "a destination-aware refinement once the SpatialConsideration variant
+  lands" and that variant never landed. The structural fix lives at
+  the pathfinder layer, not the DSE-score layer: A* needs to be
+  scent-aware so cats route around fox territory rather than damp
+  their Patrol score after-the-fact. See the new
+  `pathfinder-risk-awareness` cluster (tickets 222 / 223 / 224) for
+  the substrate refactor. Once 223 lands, both this axis and
+  `FoxTerritorySuppression`'s damping branch are subsumed by A*-level
+  path-cost; 214 likely retires entirely. Re-evaluate after 224 lands.

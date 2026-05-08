@@ -1,0 +1,69 @@
+---
+id: 225
+title: audit Patrol L3 share rise under additive coordinator-DSE lift
+status: ready
+cluster: ai-substrate
+added: 2026-05-07
+parked: null
+blocked-by: []
+supersedes: []
+related-systems: [ai-substrate-refactor.md]
+related-balance: [211-coordinate-food-security.md, 181-hunt-forage-saturation-tune.md]
+landed-at: null
+landed-on: null
+---
+
+## Why
+211 (Coordinate `colony_food_security` lift, weight 0.10) shipped at
+`a24f7eb4` showing Patrol L3 share rise +1.45pp (12.4% → 13.85%)
+**despite** Patrol's per-cat L2 mean dropping -22.4% in the post-210
+→ post-211 frame-diff. This inversion (share up, score down) means
+Patrol's share gain comes from softmax-mass redistribution among
+non-coordinator cats whose action pool changed shape (Coordinate
+took mass from coordinator cats, leaving non-coordinator cats facing
+a different DSE landscape on average). It is **not** the 181 cascade
+pattern (Hunt/Forage suppression freeing bandwidth to Patrol). The
+mechanism needs to be characterized so future additive lifts on
+sibling DSEs (212 Caretake, 213 GroomOther) don't compound the
+share-mass shift unmodeled.
+
+## Scope
+- Per-cat eligibility breakdown: how many cats are coordinator-marked
+  vs non-coordinator-marked across the 211 treatment soak, and what
+  is each subgroup's Patrol share?
+- L3 softmax decomposition: per-tick, what is Patrol's softmax
+  probability for non-coordinator cats in baseline vs treatment? If
+  Patrol probability rose for non-coordinator cats while their L2
+  scores didn't, the redistribution mechanism is the softmax
+  temperature / mass-shift dynamic.
+- Document findings in a short note under `docs/systems/` or as an
+  appendix to `docs/balance/211-coordinate-food-security.md`.
+
+## Out of scope
+- Reverting 211's weight or any other tuning ticket's weight.
+- Implementing a fix; this is diagnostic only. Subsequent ticket
+  drafts the fix if one is warranted.
+
+## Current state
+211 landed at iter-1 weight 0.10 with the share-mass shift surfaced
+but unexplained. 212 (Caretake), 213 (GroomOther) are siblings still
+blocked-by 209 and could compound the effect.
+
+## Approach
+Use `just q trace logs/tuned-42 <coordinator-cat> --layer=L3` and
+`--layer=L2` against ticks where Patrol is selected. Compare the
+softmax-mass distribution across DSEs for coordinator vs
+non-coordinator cats. The L3 trace already records `softmax_top1`
+and `top2` margin via the close-call surface; cross-tabulate those
+against `IsCoordinatorWithDirectives` marker presence.
+
+## Verification
+A documented mechanism explanation in `docs/systems/` or appended to
+the 211 balance doc, with the per-cohort softmax decomposition and
+a hypothesis-or-rule for predicting the share-mass shift on future
+sibling lifts.
+
+## Log
+- 2026-05-07: opened from 211 closeout — Patrol +1.45pp share rise
+  with per-cat L2 score dropping -22.4% needs mechanism analysis
+  before 212/213 land.

@@ -3132,9 +3132,10 @@ fn default_mentor_food_security_weight() -> f32 {
 }
 
 /// 209: Coordinate DSE positive-lift weight on the
-/// `colony_food_security` axis. Ships dormant at 0.0.
+/// `colony_food_security` axis. Tuned to 0.10 in ticket 211 — see
+/// `docs/balance/211-coordinate-food-security.md`.
 fn default_coordinate_food_security_weight() -> f32 {
-    0.0
+    0.10
 }
 
 /// 209: Caretake DSE positive-lift weight on the

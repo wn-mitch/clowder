@@ -1,0 +1,71 @@
+---
+id: 227
+title: coordinator-eligible focal-cat for Coordinate frame-diff parity
+status: ready
+cluster: process-discipline
+added: 2026-05-07
+parked: null
+blocked-by: []
+supersedes: []
+related-systems: [ai-substrate-refactor.md]
+related-balance: [211-coordinate-food-security.md]
+landed-at: null
+landed-on: null
+---
+
+## Why
+211's `frame-diff logs/tuned-42-post-210/trace-Wren.jsonl
+logs/tuned-42/trace-Wren.jsonl docs/balance/211-coordinate-food-security.md`
+returned **no `coordinate` row** in the per-DSE delta table because
+Wren never satisfies the `IsCoordinatorWithDirectives` eligibility
+gate, so `coordinate_dse` never scores in her trace. The ticket's
+verification line "frame-diff shows Coordinate's per-cat |Δ mean|
+score lifts" was structurally unobservable on the chosen focal cat.
+The substrate's effect was only confirmed via colony-wide
+`q actions` share aggregation. To make future coordinator-DSE
+tuning verifiable per-cat, the focal-cat selection convention should
+ensure at least one focal trace covers a cat that holds
+`IsCoordinatorWithDirectives` for a non-trivial share of the soak.
+
+## Scope
+- Identify the conventional focal-cat name(s) used for soak-trace
+  baselines (currently Wren, Simba per `just soak-trace` defaults).
+- Determine whether the seed-42 colony reliably produces a
+  coordinator-marked cat in the first season, and which name(s) that
+  is for the canonical balance baseline.
+- Either (a) update the convention so coordinator tuning tickets
+  request a coordinator focal, or (b) document the multi-focal soak-
+  trace shape that captures both a generalist (Wren) and a
+  coordinator focal.
+
+## Out of scope
+- Changing `IsCoordinatorWithDirectives` eligibility logic or the
+  coordinator-assignment system. This is process-discipline only.
+- Backporting the 211 verification with a re-soak; 211 landed via
+  the colony-wide share signal as a substitute structural check.
+
+## Current state
+Discipline gap surfaced by 211 closeout. 212 (Caretake) and 213
+(GroomOther) sibling tuning tickets will face the same issue if
+their focal cats don't satisfy the relevant eligibility gates
+(`HasKittenInDistress` for Caretake, `HasGroomingTarget` for
+GroomOther historically — though the latter was retired in 209's
+ethology rewrite).
+
+## Approach
+Inspect a recent seed-42 soak's `events.jsonl` to find which cats
+hold the relevant marker for a coordinator-DSE focal trace. Update
+either `CLAUDE.md` ("Bugfix discipline" section's focal-trace note)
+or the `just soak-trace` default to include a multi-focal sweep
+when the tuning ticket targets a marker-gated DSE.
+
+## Verification
+A documented convention update in `CLAUDE.md` or `justfile` that
+makes coordinator-DSE per-cat verification reproducible. Sibling
+tickets 212 / 213 / 215 reference this convention in their
+verification sections.
+
+## Log
+- 2026-05-07: opened from 211 closeout — Wren focal trace had no
+  `coordinate` row because she's never a coordinator; verification
+  fell back to colony-wide share aggregation.

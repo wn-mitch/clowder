@@ -167,15 +167,18 @@ mod tests {
     }
 
     #[test]
-    fn coordinate_food_security_dormant_at_default_zero() {
+    fn coordinate_food_security_tuned_to_iter1_weight() {
+        // 211 iter-1: weight 0.10. The (1-w) rebalance scales the
+        // existing four weights to 0.216/0.288/0.216/0.180 and the new
+        // fifth axis carries 0.10, summing to 1.0.
         let s = ScoringConstants::default();
-        assert_eq!(s.coordinate_food_security_weight, 0.0);
+        assert!((s.coordinate_food_security_weight - 0.10).abs() < 1e-4);
         let weights = CoordinateDse::new(&s).composition().weights.clone();
         assert_eq!(weights.len(), 5);
-        assert!((weights[0] - 0.24).abs() < 1e-4);
-        assert!((weights[1] - 0.32).abs() < 1e-4);
-        assert!((weights[2] - 0.24).abs() < 1e-4);
-        assert!((weights[3] - 0.20).abs() < 1e-4);
-        assert!((weights[4] - 0.0).abs() < 1e-4);
+        assert!((weights[0] - 0.216).abs() < 1e-4);
+        assert!((weights[1] - 0.288).abs() < 1e-4);
+        assert!((weights[2] - 0.216).abs() < 1e-4);
+        assert!((weights[3] - 0.180).abs() < 1e-4);
+        assert!((weights[4] - 0.10).abs() < 1e-4);
     }
 }
