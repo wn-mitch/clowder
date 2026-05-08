@@ -24,13 +24,24 @@ decision tree — the slots below force that to be drafted, named, and considere
 One paragraph: the observed defect, the canary or hard-gate it violates, and
 the cat / tick / run-dir that surfaced it.
 
+## Hot context (auto-prefilled from /ticket-from-session; remove once picked up)
+<!-- Failing run dir, footer gate violations, commit hash, recent edits, and
+     any conflicting signals. Preserves open-time signal so a fresh session
+     doesn't re-discover. Section is optional — present only when the ticket
+     was opened via `/ticket-from-session`. Delete this whole section once
+     the layer-walk rows have been promoted to [verified-*] and the fix
+     direction is settled. -->
+
 ## Current architecture (layer-walk audit)
 
 Walk every layer of the AI pipeline relevant to the defect. Tag each
 load-bearing fact `[verified-correct]` (you read the code or a recent run
-and it matches the assumption) or `[suspect]` (you haven't verified, or it
-looks wrong). A row tagged `[suspect]` MUST be addressed by at least one of
-the fix candidates below.
+and it matches the assumption), `[suspect]` (you haven't verified, or it
+looks wrong), or `[needs-promote]` (auto-prefilled by `/ticket-from-session`
+from a hypothesis the Plan agent couldn't promote — the next session
+promotes via a fresh query before any candidate that depends on the row).
+A row tagged `[suspect]` or `[needs-promote]` MUST be addressed by at
+least one of the fix candidates below.
 
 | Layer | Component / file | Load-bearing fact | Status |
 |---|---|---|---|
