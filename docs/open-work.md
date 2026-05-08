@@ -14,8 +14,8 @@ _Last generated: 2026-05-08._
 
 | Status | Count |
 |---|---|
-| In progress | 8 |
-| Ready | 66 |
+| In progress | 7 |
+| Ready | 67 |
 | Parked | 8 |
 | Blocked | 21 |
 | **Open total** | **103** |
@@ -35,7 +35,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 | **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** Substrate-over-override | in-progress | 32 | 29 | 3 (0 / 1 / 0 / 2) | `▰▰▰▰▰▰▰▰▰▱` 91% |
 | **[095](docs/open-work/tickets/095-body-zones-epic.md)** Body zones | ready | 0 | — | — | _no roster_ |
 
-## In progress (8)
+## In progress (7)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
@@ -44,9 +44,8 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** — Substrate-over-override — retire control-yanking hacks in favor of IAUS levers — _[substrate-over-override] · added 2026-04-30_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[229](docs/open-work/tickets/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose — _[tooling] · added 2026-05-08_
-- **[231](docs/open-work/tickets/231-gate-pickupitem-retrieverawfood-retrievefoodforkitten-plans-on-inventory-capacity.md)** — Strengthen pickup-class substrate — capacity markers + body-state subscription — _added 2026-05-08_
 
-## Ready (66)
+## Ready (67)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -114,6 +113,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[232](docs/open-work/tickets/232-body-state-coupled-l3-softmax-temperature-for-stake-aware-decision-sharpness.md)** — Body-state-coupled L3 softmax temperature for stake-aware decision sharpness — _added 2026-05-08_
 - **[233](docs/open-work/tickets/233-subscribe-non-pickup-work-dses-hunt-forage-cook-wander-explore-to-body-state-perception.md)** — Subscribe non-pickup work DSEs (Hunt Forage Cook Wander Explore) to body-state perception — _added 2026-05-08_
 - **[234](docs/open-work/tickets/234-damage-recency-perception-scalar-couple-acutehealthadrenalineflee-to-felt-danger.md)** — Damage-recency perception scalar — couple AcuteHealthAdrenalineFlee to felt danger — _added 2026-05-08_
+- **[235](docs/open-work/tickets/235-smart-deposit-routing-for-clutter-clearance.md)** — Smart deposit routing for clutter clearance — _added 2026-05-08_
 
 ## Parked (8)
 
@@ -155,12 +155,13 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (150)
+## Landed archive (151)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (85)
+### 2026-05 (86)
 
+- **[231](docs/open-work/landed/231-gate-pickupitem-retrieverawfood-retrievefoodforkitten-plans-on-inventory-capacity.md)** — Strengthen pickup-class substrate — capacity markers + body-state subscription _(2026-05-08)_
 - **[228](docs/open-work/landed/228-fox-territory-huntforagepatrol-decision-time-suppression.md)** — cat route-cost field as L1 perception + Field Consideration variant _(2026-05-08)_
 - **[224](docs/open-work/landed/224-boldness-conditioned-path-risk.md)** — boldness-conditioned path risk _(2026-05-07)_
 - **[223](docs/open-work/landed/223-cat-paths-respect-fox-scent-corruption.md)** — cat paths respect fox-scent + corruption _(2026-05-07)_

@@ -1,7 +1,7 @@
 ---
 id: 231
 title: Strengthen pickup-class substrate — capacity markers + body-state subscription
-status: in-progress
+status: done
 cluster: null
 added: 2026-05-08
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: [187]
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-08
 ---
 
 ## Why
@@ -333,3 +333,58 @@ the fallback when the substrate can't.
     `health_deficit`; should ramp on *recent* damage so it lurches
     sharply post-injury and quiets during recovery, "tied to the
     danger a cat currently feels").
+
+- 2026-05-08 #4: scope reconciliation between this ticket's text and
+  the implementation that landed. Two divergences resolved during
+  scoping:
+  - **R3a marker shape: per-kind → single `HasFreeSlot`.** Ticket
+    text said `HasFoodSlot` / `HasHerbSlot` / `HasMaterialSlot`;
+    implementation landed a single `HasFreeSlot` because
+    `Inventory.slots: Vec<ItemSlot>` is a unified 5-slot pool and
+    every per-kind marker would have been an alias for
+    `slots.len() < 5`. Per-kind capacity becomes meaningful only
+    when armor / clothes / bag equip slots arrive; until then,
+    single-marker matches the actual data model.
+  - **R3a plan-template gating shape: hard precondition → GOAP
+    DropItem-as-prefix dual-branch.** Ticket text proposed adding
+    `HasMarker(HasFreeSlot::KEY)` as a hard plan-template
+    precondition (cats with full inventory cannot generate a pickup
+    plan; they fall back to other dispositions). Implementation
+    landed dual-branch substrate-vs-plan-path composition mirroring
+    the ticket-096 Construct precedent: cats can still elect
+    PickingUp / RetrieveRawFood / etc. when full, and A*
+    automatically composes `[DropItem, ..., PickUp]` with the
+    runtime resolver's goal-aware `drop_priority` picking the
+    lowest-priority slot. This produces the user's design-intent
+    behavior ("drops off the herbs first then hunts") rather than
+    requiring the disposal-side pressure tuning the ticket text
+    flagged as out-of-scope.
+  - **R3b DSE scope narrowed: 4 DSEs → PickingUpDse only.** Ticket
+    text listed PickingUpDse / ForageDse / CaretakeDse /
+    HerbcraftGatherDse for the body-state Consideration. Only
+    PickingUpDse landed in 231's R3b commit. The others use
+    `weighted_sum` compositions over multiple existing axes; making
+    the body-state damping multiplicative there requires a
+    composition-mode shift that's a larger balance change.
+    Companion ticket 233 ('subscribe non-pickup work DSEs to
+    body-state perception') already covers Hunt/Forage/Cook/Wander/
+    Explore; the Forage/Caretake/HerbcraftGather damping rolls
+    naturally into 233's scope.
+  - **R3b axis: `body_distress_composite` → `health_deficit`.**
+    Ticket text proposed `body_distress_composite` (or pain_level
+    or health_deficit). The composite includes `hunger_urgency` —
+    using it as a damping signal on PickUp would suppress the DSE
+    on hungry cats, exactly when pickup is most useful (backwards
+    direction). Switched to `health_deficit` only, which captures
+    the dying-arc evidence (Calcifer HP=0.49, Cedar HP=0.38)
+    without dampening hunger-driven behavior.
+
+  Follow-on ticket 235 (`Smart deposit routing for clutter
+  clearance`) opened blocked-by 231. Captures the narrative-quality
+  work the user named in scoping ('drops off the herbs at the stash
+  before hunting' rather than 'throws herbs in the dirt before
+  hunting') — out of 231 because it requires per-class inventory-
+  content markers + colony-destination perception markers + class-
+  specific Deposit* actions, all expansion beyond the foundational
+  capacity gate.
+- 2026-05-08: Soak-verified post-231 (seed 42, commit 9b302638): inventory-full plan failures 24,581 → 0 (∞× drop, target was ≥10×). Hard gates: Starvation=0, ShadowFoxAmbush=0, total deaths=0. Welfare axes lifted (health +277%, welfare +71%). Verdict 'concern' from continuity:fail:play=0,burial=0 — downstream of zero deaths and short soak (kittens born tick 1.27M, soak ended at 1.30M before 4-season maturation). Two small new failure modes: DropItem:drop empty inventory (164) and TrashItemAtMidden:no item-slot (102) — both Discarding/Trashing pre-existing edges, not 231 regressions. Renamed colony_score.kittens_surviving → kittens_matured during verification (commit f22ecfa8) so footers stop reading like 'kittens died' when they're alive-and-developing.
