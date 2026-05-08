@@ -155,7 +155,7 @@ pub fn tick_pregnancy(
                         // Ticket 073 — per-cat recently-failed target memory.
                         crate::components::RecentTargetFailures::default(),
                         // Ticket 166 — born-once identity marker; consumed by
-                        // `colony_score.kittens_surviving` increment/decrement
+                        // `colony_score.kittens_matured` increment/decrement
                         // in `growth.rs::tick_kitten_growth` and `death.rs::check_death`.
                         markers::BornInSim,
                     ),

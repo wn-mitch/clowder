@@ -22,7 +22,7 @@ use crate::resources::time::{SimConfig, TimeState};
 /// after exactly 4 seasons.
 ///
 /// **Ticket 166** — at the maturation transition, increments
-/// `ColonyScore.kittens_surviving`. The `BornInSim` marker added at the
+/// `ColonyScore.kittens_matured`. The `BornInSim` marker added at the
 /// kitten-spawn site (see `pregnancy.rs`) survives maturation, so the
 /// matching decrement in `death.rs::check_death` can identify
 /// in-sim-born matured adults at death-time.
@@ -46,7 +46,7 @@ pub fn tick_kitten_growth(
                 act.record(Feature::KittenMatured);
             }
             if let Some(ref mut score) = colony_score {
-                score.kittens_surviving += 1;
+                score.kittens_matured += 1;
             }
         }
     }
@@ -767,7 +767,7 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // Ticket 166 — kittens_surviving increment on maturation
+    // Ticket 166 — kittens_matured increment on maturation
     // -----------------------------------------------------------------------
 
     fn setup_growth() -> (World, Schedule) {
@@ -786,7 +786,7 @@ mod tests {
     }
 
     #[test]
-    fn maturation_increments_kittens_surviving() {
+    fn maturation_increments_kittens_matured() {
         let (mut world, mut schedule) = setup_growth();
         // Spawn a kitten one tick away from maturation. ticks_per_season
         // default = 20_000, so rate = 1.0 / 80_000. Setting maturity to
@@ -803,9 +803,9 @@ mod tests {
         schedule.run(&mut world);
 
         assert_eq!(
-            world.resource::<ColonyScore>().kittens_surviving,
+            world.resource::<ColonyScore>().kittens_matured,
             1,
-            "maturation should increment kittens_surviving"
+            "maturation should increment kittens_matured"
         );
         assert!(
             !world.entity(kitten).contains::<KittenDependency>(),
@@ -828,7 +828,7 @@ mod tests {
         schedule.run(&mut world);
 
         assert_eq!(
-            world.resource::<ColonyScore>().kittens_surviving,
+            world.resource::<ColonyScore>().kittens_matured,
             0,
             "non-maturing tick must not increment"
         );
@@ -853,7 +853,7 @@ mod tests {
         schedule.run(&mut world);
 
         assert_eq!(
-            world.resource::<ColonyScore>().kittens_surviving,
+            world.resource::<ColonyScore>().kittens_matured,
             1,
             "maturation should increment exactly once per kitten"
         );

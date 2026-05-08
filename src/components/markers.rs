@@ -592,7 +592,7 @@ impl Parent {
 /// in-sim-born cats. `KittenDependency` is removed at maturation so it can't
 /// serve either. The marker is the canonical "born in this run" substrate.
 ///
-/// **Consumer:** `colony_score.kittens_surviving` increments on maturation
+/// **Consumer:** `colony_score.kittens_matured` increments on maturation
 /// (`growth.rs::tick_kitten_growth`) and decrements on the death of a
 /// matured in-sim-born cat (`death.rs::check_death`, gate
 /// `With<BornInSim> + Without<KittenDependency>`). Ticket 166.

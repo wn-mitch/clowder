@@ -586,7 +586,7 @@ pub fn emit_headless_footer(world: &mut World) -> String {
                 "seasons_survived": score.seasons_survived,
                 "peak_population": score.peak_population,
                 "kittens_born": score.kittens_born,
-                "kittens_surviving": score.kittens_surviving,
+                "kittens_matured": score.kittens_matured,
                 "structures_built": score.structures_built,
                 "bonds_formed": score.bonds_formed,
                 "deaths_starvation": score.deaths_starvation,

@@ -30,7 +30,7 @@ def make_block(aggregate=1000.0, welfare=0.5, **overrides):
         "seasons_survived": 5,
         "peak_population": 8,
         "kittens_born": 0,
-        "kittens_surviving": 0,
+        "kittens_matured": 0,
         "structures_built": 8,
         "bonds_formed": 3,
         "deaths_starvation": 0,

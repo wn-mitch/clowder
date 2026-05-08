@@ -97,7 +97,14 @@ def read_footer(events_path: Path) -> dict[str, Any]:
     line = next((l for l in proc.stdout.splitlines() if l.strip()), "")
     if not line:
         return {}
-    return json.loads(line)
+    footer = json.loads(line)
+    # Footer back-compat: legacy footers serialized `kittens_surviving`;
+    # current ones emit `kittens_matured`. Normalize so drift logic + any
+    # other consumer sees the new name regardless of vintage.
+    cs = footer.get("colony_score")
+    if isinstance(cs, dict) and "kittens_matured" not in cs and "kittens_surviving" in cs:
+        cs["kittens_matured"] = cs["kittens_surviving"]
+    return footer
 
 
 def read_final_tick(events_path: Path) -> int | None:
@@ -422,7 +429,7 @@ COLONY_SCORE_FIELDS: tuple[str, ...] = (
     "aggregate", "welfare",
     "shelter", "nourishment", "health", "happiness", "fulfillment",
     "seasons_survived", "peak_population",
-    "kittens_born", "kittens_surviving",
+    "kittens_born", "kittens_matured",
     "structures_built", "bonds_formed",
     "deaths_starvation", "deaths_old_age", "deaths_injury",
 )

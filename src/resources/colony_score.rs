@@ -51,9 +51,16 @@ pub struct ColonyScore {
     pub structures_built: u64,
     /// Number of kittens born in this simulation run.
     pub kittens_born: u64,
-    /// Living cats that were born in-sim (not founding members).
-    #[serde(default)]
-    pub kittens_surviving: u64,
+    /// In-sim-born cats that have reached adulthood (KittenDependency
+    /// removed at maturity≥1.0 in `growth.rs::tick_kitten_growth`).
+    /// Decrements when a matured in-sim-born adult dies. Does NOT count
+    /// alive-but-still-juvenile kittens — for that, take
+    /// `kittens_born - kittens_matured - in-sim-born deaths`. Renamed
+    /// from `kittens_matured` (footer + ColonyScore field) so soak
+    /// reports stop reading like "kittens died" when they're actually
+    /// still developing.
+    #[serde(default, alias = "kittens_matured")]
+    pub kittens_matured: u64,
     /// Placeholder — incremented when prey den discovery ships.
     pub prey_dens_discovered: u64,
     /// Shadow-foxes banished by the colony. Each one is a Legend-tier event.
@@ -117,7 +124,7 @@ mod tests {
         assert_eq!(score.aspirations_completed, 0);
         assert_eq!(score.structures_built, 0);
         assert_eq!(score.kittens_born, 0);
-        assert_eq!(score.kittens_surviving, 0);
+        assert_eq!(score.kittens_matured, 0);
         assert_eq!(score.prey_dens_discovered, 0);
         assert_eq!(score.banishments, 0);
     }

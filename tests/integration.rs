@@ -245,7 +245,7 @@ fn footer_carries_colony_score_block() {
         "seasons_survived",
         "peak_population",
         "kittens_born",
-        "kittens_surviving",
+        "kittens_matured",
         "structures_built",
         "bonds_formed",
         "deaths_starvation",

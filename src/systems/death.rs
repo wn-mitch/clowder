@@ -122,7 +122,7 @@ pub fn check_death(
                     DeathCause::OldAge => score.deaths_old_age += 1,
                     DeathCause::Injury => score.deaths_injury += 1,
                 }
-                // Ticket 166 — `kittens_surviving` counts living
+                // Ticket 166 — `kittens_matured` counts living
                 // matured-from-in-sim adults. Only decrement when a
                 // cat both carries the `BornInSim` identity marker AND
                 // is past maturation (no `KittenDependency`). Kittens
@@ -132,7 +132,7 @@ pub fn check_death(
                 // resource-not-yet-loaded edge cases (the increment
                 // path uses the same optional-resource pattern).
                 if born_in_sim && !has_kitten_dep {
-                    score.kittens_surviving = score.kittens_surviving.saturating_sub(1);
+                    score.kittens_matured = score.kittens_matured.saturating_sub(1);
                 }
             }
         }
@@ -588,7 +588,7 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // Ticket 166 — kittens_surviving decrement on in-sim-born adult death
+    // Ticket 166 — kittens_matured decrement on in-sim-born adult death
     // -----------------------------------------------------------------------
 
     fn setup_world_with_score() -> (World, Schedule) {
@@ -597,7 +597,7 @@ mod tests {
         (world, schedule)
     }
 
-    /// Spawn a cat with the controllable bits the kittens_surviving
+    /// Spawn a cat with the controllable bits the kittens_matured
     /// decrement gate depends on: `BornInSim` ZST and an optional
     /// `KittenDependency` (presence = still a kitten, pre-maturation).
     fn spawn_gated_cat(
@@ -621,11 +621,11 @@ mod tests {
     }
 
     #[test]
-    fn in_sim_born_adult_death_decrements_kittens_surviving() {
+    fn in_sim_born_adult_death_decrements_kittens_matured() {
         let (mut world, mut schedule) = setup_world_with_score();
         world
             .resource_mut::<crate::resources::colony_score::ColonyScore>()
-            .kittens_surviving = 3;
+            .kittens_matured = 3;
 
         spawn_gated_cat(&mut world, "Cinder", 0.0, true, false);
 
@@ -634,9 +634,9 @@ mod tests {
         assert_eq!(
             world
                 .resource::<crate::resources::colony_score::ColonyScore>()
-                .kittens_surviving,
+                .kittens_matured,
             2,
-            "in-sim-born matured adult death should decrement kittens_surviving"
+            "in-sim-born matured adult death should decrement kittens_matured"
         );
     }
 
@@ -645,7 +645,7 @@ mod tests {
         let (mut world, mut schedule) = setup_world_with_score();
         world
             .resource_mut::<crate::resources::colony_score::ColonyScore>()
-            .kittens_surviving = 3;
+            .kittens_matured = 3;
 
         // Founding cat — no BornInSim marker.
         spawn_gated_cat(&mut world, "Elder", 0.0, false, false);
@@ -655,9 +655,9 @@ mod tests {
         assert_eq!(
             world
                 .resource::<crate::resources::colony_score::ColonyScore>()
-                .kittens_surviving,
+                .kittens_matured,
             3,
-            "founding-member death must not decrement kittens_surviving"
+            "founding-member death must not decrement kittens_matured"
         );
     }
 
@@ -668,7 +668,7 @@ mod tests {
         let (mut world, mut schedule) = setup_world_with_score();
         world
             .resource_mut::<crate::resources::colony_score::ColonyScore>()
-            .kittens_surviving = 3;
+            .kittens_matured = 3;
 
         spawn_gated_cat(&mut world, "Sprout", 0.0, true, true);
 
@@ -677,7 +677,7 @@ mod tests {
         assert_eq!(
             world
                 .resource::<crate::resources::colony_score::ColonyScore>()
-                .kittens_surviving,
+                .kittens_matured,
             3,
             "pre-maturation kitten death must not decrement"
         );
@@ -697,7 +697,7 @@ mod tests {
         assert_eq!(
             world
                 .resource::<crate::resources::colony_score::ColonyScore>()
-                .kittens_surviving,
+                .kittens_matured,
             0,
             "decrement must saturate at zero, not underflow"
         );
