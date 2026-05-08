@@ -1,3 +1,5 @@
+set positional-arguments := true
+
 # Run the simulation
 run *ARGS:
     cargo run -- {{ARGS}}
@@ -444,7 +446,9 @@ open-work-epics *ARGS:
 # `--commit` saves ~7 jj commands per landing. Optionally pass `--log "..."` in
 # any mode to append a `- <today>: <entry>` line to the ticket's Log section.
 land *ARGS:
-    uv run scripts/land_ticket.py {{ARGS}}
+    #!/usr/bin/env bash
+    set -euo pipefail
+    uv run scripts/land_ticket.py "$@"
 
 # Open a new ticket: pick the next id, instantiate _template.md (or
 # _template_bugfix.md with --bugfix), fill in id/title/added/cluster/
@@ -454,7 +458,9 @@ land *ARGS:
 #   just open-ticket "<title>" --bugfix --cluster process-discipline
 #   just open-ticket "<title>" --blocked-by 195,196
 open-ticket *ARGS:
-    uv run scripts/create_ticket.py {{ARGS}}
+    #!/usr/bin/env bash
+    set -euo pipefail
+    uv run scripts/create_ticket.py "$@"
 
 # Render ticket dependency tree (blocked-by edges). Pass flags through.
 #
