@@ -1115,6 +1115,13 @@ pub fn evaluate_dispositions(
                     d.safe_rest_threat_suppression_radius,
                 ),
                 own_injury_site: crate::systems::interoception::own_injury_site(health),
+                // Ticket 228 — populated at replan-time alongside the
+                // RouteCostField build (commit 4). Resolves to None
+                // here in the modifier-pipeline path; Hunt/Wander
+                // route-cost axes are dormant in this disposition
+                // pipeline anyway (it's a non-replan scoring path).
+                nearest_prey: None,
+                wander_target: None,
             },
             // No-damp signals: this path doesn't query
             // `RecentDispositionFailures`, so the modifier sees a

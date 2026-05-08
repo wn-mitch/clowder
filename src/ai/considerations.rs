@@ -190,6 +190,25 @@ pub enum LandmarkAnchor {
     /// Nearest corrupted tile. Cleanse + DurableWard.
     NearestCorruptedTile,
 
+    /// Ticket 228: nearest prey position from this cat's POV.
+    /// Resolver reads `PreyScentMap::highest_nearby` at the cat's
+    /// position with `hunt_scent_search_radius`. Returns `None` when
+    /// no scent peak is in range. Hunt's `Consideration::Field`
+    /// route-cost axis samples there; resolves to the prey-tile the
+    /// cat would aim for if Hunt won.
+    NearestPreyAnchor,
+    /// Ticket 228: pre-picked candidate wander destination. Resolver
+    /// is a deterministic seeded offset from the cat's position
+    /// (rotates every `wander_recandidate_ticks`); cat-curiosity
+    /// scales the offset radius. Wander's `Consideration::Field`
+    /// route-cost axis samples there. Returns `None` when the
+    /// candidate is out-of-bounds. Without this anchor, Wander has
+    /// no destination at score time — the step layer chooses the
+    /// tile only after L3 commits, so route-cost can't be priced
+    /// in. The pre-pick is the cost of making Wander destination-
+    /// aware.
+    WanderTargetAnchor,
+
     // ---- Centroids (per-tick precomputed snapshots).
     /// Centroid of the unexplored-territory frontier. Explore + fox
     /// Dispersing.

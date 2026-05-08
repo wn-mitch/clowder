@@ -1898,6 +1898,14 @@ pub struct ScoringConstants {
     /// `route_cost_field::MAX_COST_BUDGET`.
     #[serde(default = "default_route_cost_flood_budget")]
     pub route_cost_flood_budget: u32,
+    /// 228: Tick window over which `WanderTargetAnchor` rotates its
+    /// seeded offset. Default `30` — at 1 Hz sim cadence ≈ 30 s wall
+    /// time. Plans typically commit before the candidate moves, so
+    /// L3 doesn't thrash on a destination that walks out from under
+    /// it; over a longer horizon the wander destination drifts so
+    /// cats don't pin to a single seed forever.
+    #[serde(default = "default_wander_recandidate_ticks")]
+    pub wander_recandidate_ticks: u64,
     /// 209: weight on the `TensionDefusionGroomLift` modifier
     /// targeting GroomOther. Multiplicative lift when
     /// `colony_tension_recent` is elevated AND `HasGroomingCandidate`
@@ -2145,6 +2153,7 @@ impl Default for ScoringConstants {
             fox_scent_path_cost_max: default_fox_scent_path_cost_max(),
             corruption_path_cost_max: default_corruption_path_cost_max(),
             route_cost_flood_budget: default_route_cost_flood_budget(),
+            wander_recandidate_ticks: default_wander_recandidate_ticks(),
             tension_defusion_groom_weight: default_tension_defusion_groom_weight(),
             disposal_inventory_excess_slope: default_disposal_inventory_excess_slope(),
             disposal_inventory_excess_midpoint: default_disposal_inventory_excess_midpoint(),
@@ -3206,6 +3215,12 @@ fn default_corruption_path_cost_max() -> u32 {
 /// `ScoringConstants::route_cost_flood_budget`.
 fn default_route_cost_flood_budget() -> u32 {
     600
+}
+
+/// 228: Tick window for `WanderTargetAnchor` seed rotation. See
+/// `ScoringConstants::wander_recandidate_ticks`.
+fn default_wander_recandidate_ticks() -> u64 {
+    30
 }
 
 /// 209: GroomOther `TensionDefusionGroomLift` modifier weight. Ships

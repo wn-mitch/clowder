@@ -193,6 +193,17 @@ pub struct CatAnchorPositions {
     /// `LandmarkAnchor::NearestCorruptedTile` — Cleanse (B1) +
     /// DurableWard (B11).
     pub nearest_corrupted_tile: Option<Position>,
+    /// Ticket 228 — `LandmarkAnchor::NearestPreyAnchor`. Hunt's
+    /// route-cost axis samples here. Resolver writes `Some(pos)` when
+    /// `PreyScentMap::highest_nearby(cat_pos,
+    /// hunt_scent_search_radius)` returns a peak; `None` otherwise.
+    /// Built at replan time alongside the RouteCostField (commit 4).
+    pub nearest_prey: Option<Position>,
+    /// Ticket 228 — `LandmarkAnchor::WanderTargetAnchor`.
+    /// Deterministic seeded offset from cat position (rotates every
+    /// `wander_recandidate_ticks`; curiosity scales offset radius).
+    /// Built at replan time alongside the RouteCostField (commit 4).
+    pub wander_target: Option<Position>,
 }
 
 pub struct ScoringContext<'a> {
@@ -1192,6 +1203,14 @@ fn score_dse_by_id(dse_id: &str, ctx: &ScoringContext, inputs: &EvalInputs) -> f
             LandmarkAnchor::OwnInjurySite => ctx.cat_anchors.own_injury_site,
             LandmarkAnchor::NearestThreat => ctx.cat_anchors.nearest_threat,
             LandmarkAnchor::NearestCorruptedTile => ctx.cat_anchors.nearest_corrupted_tile,
+            // Ticket 228: cat-side route-cost anchors. Variants
+            // are committed here; the per-cat resolver lands in
+            // commit 4 alongside the replan-time RouteCostField
+            // build (also populates the corresponding
+            // `cat_anchors.nearest_prey` / `cat_anchors.wander_target`
+            // fields once the builder is updated).
+            LandmarkAnchor::NearestPreyAnchor => ctx.cat_anchors.nearest_prey,
+            LandmarkAnchor::WanderTargetAnchor => ctx.cat_anchors.wander_target,
             // Fox-side & centroid-only anchors aren't relevant to cat
             // scoring. Listed explicitly (no `_ => None`) so adding a
             // new anchor variant is a compilation gate, not a silent
@@ -2729,6 +2748,8 @@ mod tests {
                 coordinator_perch: Some(Position::new(0, 0)),
                 own_safe_rest_spot: Some(Position::new(0, 0)),
                 own_injury_site: Some(Position::new(0, 0)),
+            nearest_prey: None,
+            wander_target: None,
             },
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,
@@ -2919,6 +2940,8 @@ mod tests {
                 coordinator_perch: Some(Position::new(0, 0)),
                 own_safe_rest_spot: Some(Position::new(0, 0)),
                 own_injury_site: Some(Position::new(0, 0)),
+            nearest_prey: None,
+            wander_target: None,
             },
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,
@@ -3132,6 +3155,8 @@ mod tests {
                 coordinator_perch: Some(Position::new(0, 0)),
                 own_safe_rest_spot: Some(Position::new(0, 0)),
                 own_injury_site: Some(Position::new(0, 0)),
+            nearest_prey: None,
+            wander_target: None,
             },
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,
@@ -3409,6 +3434,8 @@ mod tests {
                 coordinator_perch: Some(Position::new(0, 0)),
                 own_safe_rest_spot: Some(Position::new(0, 0)),
                 own_injury_site: Some(Position::new(0, 0)),
+            nearest_prey: None,
+            wander_target: None,
             },
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,
@@ -3528,6 +3555,8 @@ mod tests {
                 coordinator_perch: Some(Position::new(0, 0)),
                 own_safe_rest_spot: Some(Position::new(0, 0)),
                 own_injury_site: Some(Position::new(0, 0)),
+            nearest_prey: None,
+            wander_target: None,
             },
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,
@@ -3666,6 +3695,8 @@ mod tests {
                 coordinator_perch: Some(Position::new(0, 0)),
                 own_safe_rest_spot: Some(Position::new(0, 0)),
                 own_injury_site: Some(Position::new(0, 0)),
+            nearest_prey: None,
+            wander_target: None,
             },
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,
@@ -3989,6 +4020,8 @@ mod tests {
                 coordinator_perch: Some(Position::new(0, 0)),
                 own_safe_rest_spot: Some(Position::new(0, 0)),
                 own_injury_site: Some(Position::new(0, 0)),
+            nearest_prey: None,
+            wander_target: None,
             },
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,
@@ -4109,6 +4142,8 @@ mod tests {
                 coordinator_perch: Some(Position::new(0, 0)),
                 own_safe_rest_spot: Some(Position::new(0, 0)),
                 own_injury_site: Some(Position::new(0, 0)),
+            nearest_prey: None,
+            wander_target: None,
             },
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,

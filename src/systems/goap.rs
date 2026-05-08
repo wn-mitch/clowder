@@ -1834,6 +1834,12 @@ pub fn evaluate_and_plan(
                     d.safe_rest_threat_suppression_radius,
                 ),
                 own_injury_site: crate::systems::interoception::own_injury_site(health),
+                // Ticket 228 — populated at replan-time alongside the
+                // RouteCostField build (commit 4). None here keeps
+                // Hunt/Wander route-cost axes dormant until the
+                // replan-time builder lands.
+                nearest_prey: None,
+                wander_target: None,
             },
             disposition_failure_signal_hunting:
                 crate::systems::plan_substrate::disposition_recent_failure_age_normalized(
