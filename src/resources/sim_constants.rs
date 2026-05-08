@@ -1871,6 +1871,14 @@ pub struct ScoringConstants {
         note = "228: replaced by `patrol_route_cost_weight` (destination-aware Field axis). Kept dormant for one cycle for header schema compat; remove in the tuning follow-on."
     )]
     pub patrol_fox_scent_weight: f32,
+    /// 228: weight on Wander's `Consideration::Field` route-cost
+    /// axis. Reads `OwnRouteCost` at `WanderTargetAnchor` — a
+    /// deterministic seeded offset pre-picked at score time so
+    /// Wander has a destination to price. Curve
+    /// `Composite{Logistic(8.0, 0.5), Invert}`. Ships dormant at
+    /// 0.0; tuning is a follow-on.
+    #[serde(default = "default_wander_route_cost_weight")]
+    pub wander_route_cost_weight: f32,
     /// 228: weight on Hunt's `Consideration::Field` route-cost axis.
     /// Reads `OwnRouteCost` at `NearestPreyAnchor` — the cat's
     /// flooded path-cost to the nearest prey-scent peak. Curve
@@ -2194,6 +2202,7 @@ impl Default for ScoringConstants {
             patrol_route_cost_weight: default_patrol_route_cost_weight(),
             forage_route_cost_weight: default_forage_route_cost_weight(),
             hunt_route_cost_weight: default_hunt_route_cost_weight(),
+            wander_route_cost_weight: default_wander_route_cost_weight(),
             explore_route_cost_weight: default_explore_route_cost_weight(),
             fox_scent_path_cost_max: default_fox_scent_path_cost_max(),
             corruption_path_cost_max: default_corruption_path_cost_max(),
@@ -3258,6 +3267,12 @@ fn default_forage_route_cost_weight() -> f32 {
 /// 228: Hunt `Consideration::Field` route-cost axis weight. Ships
 /// dormant at 0.0.
 fn default_hunt_route_cost_weight() -> f32 {
+    0.0
+}
+
+/// 228: Wander `Consideration::Field` route-cost axis weight. Ships
+/// dormant at 0.0.
+fn default_wander_route_cost_weight() -> f32 {
     0.0
 }
 
