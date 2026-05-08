@@ -148,6 +148,7 @@ pub fn score_hawk_dse_by_id(dse_id: &str, ctx: &HawkScoringContext, inputs: &Eva
         target: None,
         target_position: None,
         target_alive: None,
+        field_cost: None,
     };
 
     evaluate_single(

@@ -437,6 +437,11 @@ pub enum ConsiderationKind {
     Scalar,
     Spatial,
     Marker,
+    /// Ticket 228: destination-aware route-cost axis. The trace row's
+    /// `input` field carries the normalized cost (`route_cost / range`);
+    /// `spatial_map_key` reuses the landmark-flavor string
+    /// (`"target_position"` / `"anchor"` / etc.).
+    Field,
 }
 
 /// Full L2 decomposition captured during `evaluate_single_with_trace`. This
@@ -632,18 +637,40 @@ fn composition_mode_label(c: &super::composition::Composition) -> &'static str {
     }
 }
 
+/// Resolve a `LandmarkSource` to a concrete `Position` via the
+/// closures on `EvalCtx`. Returns `None` when the landmark has no
+/// resolvable position (target-taking DSE without a candidate;
+/// entity despawned; anchor unresolvable — e.g. no kitchen built,
+/// no threat in range). Shared by the `Spatial` and `Field`
+/// (ticket 228) consideration evaluators so both flavors handle
+/// landmark-absence identically.
+fn resolve_landmark(
+    landmark: super::considerations::LandmarkSource,
+    ctx: &EvalCtx,
+) -> Option<crate::components::physical::Position> {
+    use super::considerations::LandmarkSource;
+    match landmark {
+        LandmarkSource::TargetPosition => ctx.target_position,
+        LandmarkSource::Tile(p) => Some(p),
+        LandmarkSource::Entity(e) => (ctx.entity_position)(e),
+        LandmarkSource::Anchor(a) => (ctx.anchor_position)(a),
+    }
+}
+
 /// Score one consideration by dispatching on its flavor. Scalar
 /// considerations pull from `fetch_scalar`; spatial considerations
 /// resolve a landmark `Position` and compute Manhattan distance from
-/// `ctx.self_position`; marker considerations consult `ctx.has_marker`.
-/// Returns a tuple `(score, trace_row)` where `trace_row` is populated
-/// when `capture` is true; callers that don't need the trace pass
-/// `false` and discard the second element.
+/// `ctx.self_position`; marker considerations consult `ctx.has_marker`;
+/// field considerations (ticket 228) sample `ctx.field_cost` at a
+/// landmark position. Returns a tuple `(score, trace_row)` where
+/// `trace_row` is populated when `capture` is true; callers that
+/// don't need the trace pass `false` and discard the second element.
 ///
 /// `trace_row` carries the input fed to the curve, a human-readable
-/// curve label, the consideration kind, and (for `Spatial`) a stable
-/// `landmark_label` so §11.3 trace consumers can distinguish landmark
-/// flavors. When `capture` is false the second slot is always `None`.
+/// curve label, the consideration kind, and (for `Spatial` / `Field`)
+/// a stable `landmark_label` so §11.3 trace consumers can distinguish
+/// landmark flavors. When `capture` is false the second slot is
+/// always `None`.
 #[allow(clippy::type_complexity)]
 fn score_consideration_with_trace(
     consideration: &Consideration,
@@ -739,6 +766,44 @@ fn score_consideration_with_trace(
                     format!("Marker(present_score={:.3})", m.present_score),
                     ConsiderationKind::Marker,
                     None,
+                )
+            });
+            (score, row)
+        }
+        Consideration::Field(f) => {
+            // Resolve landmark — same surface as Spatial. When
+            // unresolved (target-taking DSE without candidate;
+            // anchor empty), score 0.0 and emit a "no landmark"
+            // trace row so §11.3 records distinguish the landmark-
+            // missing case from the high-cost case.
+            let Some(landmark_pos) = resolve_landmark(f.landmark, ctx) else {
+                let row = capture.then(|| {
+                    (
+                        0.0,
+                        format!("{:?}", f.curve),
+                        ConsiderationKind::Field,
+                        Some(f.landmark_label()),
+                    )
+                });
+                return (0.0, row);
+            };
+            // Sample the field. `None` (no field built — caller
+            // didn't supply `field_cost`) collapses to
+            // `MAX_COST_BUDGET`; under closer-is-better curves
+            // this lands ~0.0, the same convention Spatial uses
+            // for "out of range" landmarks.
+            let cost = ctx
+                .field_cost
+                .and_then(|cb| cb(f.source, landmark_pos))
+                .unwrap_or(crate::components::route_cost_field::MAX_COST_BUDGET);
+            let normalized = (cost as f32) / f.range;
+            let score = f.score(normalized);
+            let row = capture.then(|| {
+                (
+                    normalized,
+                    format!("{:?}", f.curve),
+                    ConsiderationKind::Field,
+                    Some(f.landmark_label()),
                 )
             });
             (score, row)
@@ -934,6 +999,7 @@ mod tests {
             target: None,
             target_position: None,
             target_alive: None,
+            field_cost: None,
         };
         assert!(!passes_eligibility(&filter, entity, &ctx));
 
@@ -949,6 +1015,7 @@ mod tests {
             target: None,
             target_position: None,
             target_alive: None,
+            field_cost: None,
         };
         assert!(passes_eligibility(&filter, entity, &ctx));
     }
@@ -970,6 +1037,7 @@ mod tests {
             target: None,
             target_position: None,
             target_alive: None,
+            field_cost: None,
         };
         assert!(!passes_eligibility(&filter, entity, &ctx));
 
@@ -984,6 +1052,7 @@ mod tests {
             target: None,
             target_position: None,
             target_alive: None,
+            field_cost: None,
         };
         assert!(passes_eligibility(&filter, entity, &ctx));
     }
@@ -1007,6 +1076,7 @@ mod tests {
             target: None,
             target_position: None,
             target_alive: None,
+            field_cost: None,
         };
         let maslow = |_: u8| 1.0;
         let modifiers = ModifierPipeline::new();
@@ -1034,6 +1104,7 @@ mod tests {
             target: None,
             target_position: None,
             target_alive: None,
+            field_cost: None,
         };
 
         // Maslow pre-gate: tier 1 suppression = 0.5 (simulating phys
@@ -1078,6 +1149,7 @@ mod tests {
             target: None,
             target_position: None,
             target_alive: None,
+            field_cost: None,
         };
         // Maslow returns 0 for tier MAX, but the evaluator should
         // skip the gate entirely.
@@ -1141,6 +1213,7 @@ mod tests {
             target: None,
             target_position: None,
             target_alive: None,
+            field_cost: None,
         };
         let fetch = |_: &str, _: Entity| 0.0;
         // 0.5 → 0.6 → 1.2
@@ -1170,6 +1243,7 @@ mod tests {
             target: None,
             target_position: None,
             target_alive: None,
+            field_cost: None,
         };
         let maslow = |_: u8| 1.0;
         let modifiers = ModifierPipeline::new();
@@ -1294,6 +1368,7 @@ mod tests {
             target: None,
             target_position: None,
             target_alive: None,
+            field_cost: None,
         };
         let maslow = |_: u8| 1.0;
         let modifiers = ModifierPipeline::new();
@@ -1351,6 +1426,7 @@ mod tests {
             target: None,
             target_position: None,
             target_alive: None,
+            field_cost: None,
         };
         let maslow = |_: u8| 1.0;
         let modifiers = ModifierPipeline::new();
@@ -1430,6 +1506,7 @@ mod tests {
             target: None,
             target_position: None,
             target_alive: None,
+            field_cost: None,
         };
         let fetch = |_: &str, _: Entity| 0.0;
 

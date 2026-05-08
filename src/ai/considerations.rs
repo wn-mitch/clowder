@@ -250,6 +250,120 @@ impl SpatialConsideration {
 }
 
 // ---------------------------------------------------------------------------
+// Field consideration — destination-aware route-cost (ticket 228)
+// ---------------------------------------------------------------------------
+
+/// Source identifier for a per-cat scalar field sampled at a landmark
+/// position. Unit-only for `Copy` (mirrors `LandmarkAnchor`'s design
+/// note at `LandmarkAnchor` above) — adding a payload would push field
+/// resolution into the DSE definition; keeping it unit-only keeps DSEs
+/// declarative and the closure-side dispatch a flat match.
+///
+/// Initial variant `OwnRouteCost` reads the cat's own
+/// `RouteCostField` component, populated at replan-time by
+/// `flood_dijkstra` (`src/ai/route_cost.rs`). Future variants could
+/// surface other cat-keyed scalars (heat map, pheromone gradient).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FieldSource {
+    /// This cat's own `RouteCostField` — cost to reach a tile under
+    /// overlay-aware edge weights. Returns `None` when the cat has
+    /// no field component (fox-side scoring; pre-flood test setups).
+    OwnRouteCost,
+}
+
+/// Field consideration — samples a per-cat scalar field at a
+/// landmark position, normalizes by `range`, then runs through a
+/// `Curve`. Mirrors `SpatialConsideration`'s shape but reads field
+/// cost (substrate, ticket 228) instead of computing Manhattan
+/// distance.
+///
+/// Closer-is-better axes wrap the curve in `Composite { ..., Invert }`
+/// — a high route cost normalizes large, the curve's inverse pushes
+/// the score low, and the CompensatedProduct gate suppresses the DSE
+/// in proportion to the *real* path cost (terrain + danger + per-cat
+/// caution). This is the destination-aware refinement reserved at
+/// `src/ai/dses/patrol.rs:108`.
+///
+/// **Unreachable handling.** When the source returns `None` (cat has
+/// no field) or the cost meets/exceeds `MAX_COST_BUDGET` (landmark
+/// out-of-budget), the evaluator collapses input to `MAX_COST_BUDGET
+/// / range`. Under closer-is-better curve shapes the score lands at
+/// ~0.0 — the same convention `SpatialConsideration` uses for "out
+/// of range" landmarks. Score 0.0 multiplicatively zeros a
+/// CompensatedProduct DSE; in WeightedSum it just contributes zero
+/// to the sum.
+#[derive(Debug, Clone)]
+pub struct FieldConsideration {
+    pub name: &'static str,
+    pub source: FieldSource,
+    /// Where on the map to sample the field. Reuses
+    /// `SpatialConsideration`'s landmark surface so per-DSE anchors
+    /// (e.g. `NearestForageableCluster`) and per-target sampling
+    /// (`TargetPosition`) work identically across the two
+    /// consideration flavors.
+    pub landmark: LandmarkSource,
+    /// Cost-units used to normalize the raw field cost before the
+    /// curve runs. With `range = 25` and an in-range landmark at
+    /// `route_cost = 12`, the curve sees `0.48`. Curves are written
+    /// in `[0, 1+]` units (same as `SpatialConsideration`), so
+    /// per-DSE range factors out of curve parameters.
+    pub range: f32,
+    pub curve: Curve,
+}
+
+impl FieldConsideration {
+    pub fn new(
+        name: &'static str,
+        source: FieldSource,
+        landmark: LandmarkSource,
+        range: f32,
+        curve: Curve,
+    ) -> Self {
+        debug_assert!(range > 0.0, "FieldConsideration::range must be positive");
+        Self {
+            name,
+            source,
+            landmark,
+            range,
+            curve,
+        }
+    }
+
+    /// Evaluate the curve at the normalized cost `field_cost / range`.
+    /// Callers normalize before invoking; same convention as
+    /// `SpatialConsideration::score` so curve labels read identically
+    /// in §11.3 trace records.
+    pub fn score(&self, normalized_cost: f32) -> f32 {
+        self.curve.evaluate(normalized_cost)
+    }
+
+    /// Stable label for the §11.3 trace's `spatial_map_key` slot.
+    /// Reuses the existing landmark-flavor strings ("target_position"
+    /// / "tile" / "entity" / "anchor") so trace consumers (e.g.
+    /// `scripts/replay_frame.py`) need no schema bump — `kind` ==
+    /// `Field` distinguishes the row, the label distinguishes the
+    /// landmark flavor exactly as it does for `Spatial`.
+    pub fn landmark_label(&self) -> &'static str {
+        match self.landmark {
+            LandmarkSource::TargetPosition => "target_position",
+            LandmarkSource::Tile(_) => "tile",
+            LandmarkSource::Entity(_) => "entity",
+            LandmarkSource::Anchor(_) => "anchor",
+        }
+    }
+
+    /// Stable label for the field source. Surfaced through the trace
+    /// row via the consideration's `name` (callers typically encode
+    /// the source in the name, e.g. `"patrol_route_cost"`); this
+    /// helper exists for diagnostic strings outside the trace.
+    pub fn source_label(&self) -> &'static str {
+        match self.source {
+            FieldSource::OwnRouteCost => "own_route_cost",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Marker consideration
 // ---------------------------------------------------------------------------
 
@@ -313,6 +427,12 @@ pub enum Consideration {
     Scalar(ScalarConsideration),
     Spatial(SpatialConsideration),
     Marker(MarkerConsideration),
+    /// Ticket 228: destination-aware route-cost axis. Reads a
+    /// per-cat scalar field (initially `OwnRouteCost`, the cat's own
+    /// `RouteCostField` flooded at replan-time) at a landmark
+    /// position. The destination-aware refinement of 209's
+    /// cat-position scalar pattern.
+    Field(FieldConsideration),
 }
 
 impl Consideration {
@@ -321,6 +441,7 @@ impl Consideration {
             Self::Scalar(s) => s.name,
             Self::Spatial(s) => s.name,
             Self::Marker(m) => m.name,
+            Self::Field(f) => f.name,
         }
     }
 }
@@ -429,5 +550,67 @@ mod tests {
     fn consideration_enum_name_dispatch() {
         let s = Consideration::Scalar(ScalarConsideration::new("hunger", hangry()));
         assert_eq!(s.name(), "hunger");
+    }
+
+    #[test]
+    fn field_consideration_normalizes_cost_by_range() {
+        // Quadratic(2) with range 25: cost=12 → input 0.48 → 0.2304.
+        let c = FieldConsideration::new(
+            "test_route_cost",
+            FieldSource::OwnRouteCost,
+            LandmarkSource::TargetPosition,
+            25.0,
+            quadratic_unit(),
+        );
+        assert!((c.score(0.0) - 0.0).abs() < 1e-4);
+        assert!((c.score(0.5) - 0.25).abs() < 1e-4);
+        assert!((c.score(1.0) - 1.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn field_landmark_label_dispatches_per_variant() {
+        // Mirrors the SpatialConsideration::landmark_label test —
+        // Field reuses the same string surface so trace consumers
+        // need no schema bump.
+        let target = FieldConsideration::new(
+            "x",
+            FieldSource::OwnRouteCost,
+            LandmarkSource::TargetPosition,
+            10.0,
+            quadratic_unit(),
+        );
+        let anchor = FieldConsideration::new(
+            "y",
+            FieldSource::OwnRouteCost,
+            LandmarkSource::Anchor(LandmarkAnchor::NearestKitchen),
+            10.0,
+            quadratic_unit(),
+        );
+        assert_eq!(target.landmark_label(), "target_position");
+        assert_eq!(anchor.landmark_label(), "anchor");
+    }
+
+    #[test]
+    fn field_source_label_round_trip() {
+        let c = FieldConsideration::new(
+            "x",
+            FieldSource::OwnRouteCost,
+            LandmarkSource::TargetPosition,
+            10.0,
+            quadratic_unit(),
+        );
+        assert_eq!(c.source_label(), "own_route_cost");
+    }
+
+    #[test]
+    fn consideration_enum_name_dispatches_field_variant() {
+        let f = Consideration::Field(FieldConsideration::new(
+            "patrol_route_cost",
+            FieldSource::OwnRouteCost,
+            LandmarkSource::Anchor(LandmarkAnchor::TerritoryPerimeterAnchor),
+            25.0,
+            quadratic_unit(),
+        ));
+        assert_eq!(f.name(), "patrol_route_cost");
     }
 }

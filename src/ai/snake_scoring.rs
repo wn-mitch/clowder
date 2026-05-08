@@ -167,6 +167,7 @@ pub fn score_snake_dse_by_id(dse_id: &str, ctx: &SnakeScoringContext, inputs: &E
         target: None,
         target_position: None,
         target_alive: None,
+        field_cost: None,
     };
 
     evaluate_single(

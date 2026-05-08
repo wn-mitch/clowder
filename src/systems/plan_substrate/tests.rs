@@ -599,6 +599,7 @@ fn require_unreserved_filter_gates_non_owner_to_zero() {
         target: None,
         target_position: None,
         target_alive: None,
+        field_cost: None,
     };
     let fetch_self = |_: &str, _: Entity| 0.0;
     // owner_target rates higher quality; without the gate it would win.
@@ -700,6 +701,7 @@ fn require_unreserved_filter_passes_owner() {
         target: None,
         target_position: None,
         target_alive: None,
+        field_cost: None,
     };
     let fetch_self = |_: &str, _: Entity| 0.0;
     let fetch_target = |_: &str, _: Entity, _: Entity| 0.7;
@@ -785,6 +787,7 @@ fn require_unreserved_filter_inactive_when_dse_opts_out() {
         target: None,
         target_position: None,
         target_alive: None,
+        field_cost: None,
     };
     let fetch_self = |_: &str, _: Entity| 0.0;
     let fetch_target = |_: &str, _: Entity, _: Entity| 0.7;
@@ -906,6 +909,7 @@ fn require_unreserved_fires_contention_hook() {
         target: None,
         target_position: None,
         target_alive: None,
+        field_cost: None,
     };
     let fetch_self = |_: &str, _: Entity| 0.0;
     let fetch_target = |_: &str, _: Entity, _: Entity| 0.5;

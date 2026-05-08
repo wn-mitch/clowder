@@ -365,6 +365,22 @@ pub struct EvalCtx<'ctx> {
     /// per-target score is forced to 0.0 for any entity returning
     /// `false`.
     pub target_alive: Option<&'ctx dyn Fn(Entity) -> bool>,
+    /// Ticket 228 — per-cat scalar field accessor. Populated when the
+    /// caller has built a `RouteCostField` for this cat (replan-time
+    /// flood at `goap.rs` `evaluate_and_plan`); `None` everywhere
+    /// else. The closure returns `Some(cost)` for in-bounds, reached
+    /// landmarks and `None` for unreached / out-of-bounds / source
+    /// absent. The `Consideration::Field` evaluator collapses any
+    /// `None` to `MAX_COST_BUDGET` before normalization, so dormant
+    /// callers (no field built) get score ~0.0 under closer-is-better
+    /// curve shapes — same convention `SpatialConsideration` uses
+    /// for "out of range" landmarks.
+    pub field_cost: Option<
+        &'ctx dyn Fn(
+            super::considerations::FieldSource,
+            crate::components::physical::Position,
+        ) -> Option<u32>,
+    >,
 }
 
 // ---------------------------------------------------------------------------

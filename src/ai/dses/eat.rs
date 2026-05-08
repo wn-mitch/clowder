@@ -257,6 +257,7 @@ mod tests {
             target: None,
             target_position: None,
             target_alive: None,
+            field_cost: None,
         };
         let maslow = |_: u8| 1.0;
         let modifiers = ModifierPipeline::new();
@@ -319,6 +320,7 @@ mod tests {
             target: None,
             target_position: None,
             target_alive: None,
+            field_cost: None,
         };
         let intention = dse.emit(0.5, &ctx);
         assert!(intention.is_goal(), "expected Goal intention");
@@ -394,6 +396,7 @@ mod tests {
             target: None,
             target_position: None,
             target_alive: None,
+            field_cost: None,
         };
         let maslow = |_: u8| 1.0;
         let modifiers = ModifierPipeline::new();

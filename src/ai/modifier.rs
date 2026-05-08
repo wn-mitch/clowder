@@ -3401,6 +3401,7 @@ mod tests {
             target: None,
             target_position: None,
             target_alive: None,
+            field_cost: None,
         };
         (entity, ctx)
     }
@@ -5490,6 +5491,7 @@ mod tests {
             target: None,
             target_position: None,
             target_alive: None,
+            field_cost: None,
         };
         (entity, ctx)
     }
@@ -5586,6 +5588,7 @@ mod tests {
             target: None,
             target_position: None,
             target_alive: None,
+            field_cost: None,
         };
         (entity, ctx)
     }

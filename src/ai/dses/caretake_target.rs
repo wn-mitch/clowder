@@ -333,6 +333,7 @@ pub fn resolve_caretake_target(
         target: None,
         target_position: None,
         target_alive: None,
+        field_cost: None,
     };
 
     let scored = evaluate_target_taking(

@@ -485,6 +485,35 @@ fn score_target_consideration(
             // entity directly.
             m.score((ctx.has_marker)(m.marker, target))
         }
+        Consideration::Field(f) => {
+            // Ticket 228: route-cost field axis on a target-taking
+            // DSE. Resolves landmark exactly like Spatial above:
+            // `LandmarkSource::TargetPosition` reads the candidate's
+            // position; other variants dispatch through the EvalCtx
+            // closures.
+            let landmark_pos = match f.landmark {
+                LandmarkSource::TargetPosition => target_pos,
+                LandmarkSource::Tile(p) => p,
+                LandmarkSource::Entity(e) => match (ctx.entity_position)(e) {
+                    Some(p) => p,
+                    None => return 0.0,
+                },
+                LandmarkSource::Anchor(a) => match (ctx.anchor_position)(a) {
+                    Some(p) => p,
+                    None => return 0.0,
+                },
+            };
+            // `None` from field_cost (no field built — fox-side
+            // scoring; pre-flood test setups) collapses to
+            // MAX_COST_BUDGET, scoring ~0.0 under closer-is-better
+            // curves. Same convention Spatial uses for out-of-range.
+            let cost = ctx
+                .field_cost
+                .and_then(|cb| cb(f.source, landmark_pos))
+                .unwrap_or(crate::components::route_cost_field::MAX_COST_BUDGET);
+            let normalized = (cost as f32) / f.range;
+            f.score(normalized)
+        }
     }
 }
 
@@ -581,6 +610,7 @@ mod tests {
             target: None,
             target_position: None,
             target_alive: None,
+            field_cost: None,
         }
     }
 

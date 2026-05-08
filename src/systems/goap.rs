@@ -664,6 +664,7 @@ pub fn check_modifier_preemption(
             target: None,
             target_position: None,
             target_alive: None,
+            field_cost: None,
         };
 
         // Find the first acute modifier asking for behavioral

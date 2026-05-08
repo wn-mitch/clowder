@@ -287,6 +287,7 @@ mod tests {
             target: None,
             target_position: None,
             target_alive: None,
+            field_cost: None,
         };
         let maslow = |_: u8| 1.0;
         let modifiers = ModifierPipeline::new();
@@ -367,6 +368,7 @@ mod tests {
             target: None,
             target_position: None,
             target_alive: None,
+            field_cost: None,
         };
         let maslow = |_: u8| 1.0;
         let modifiers = ModifierPipeline::new();
