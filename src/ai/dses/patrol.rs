@@ -20,7 +20,8 @@ use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
 use crate::ai::considerations::{
-    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+    Consideration, FieldConsideration, FieldSource, LandmarkAnchor, LandmarkSource,
+    ScalarConsideration, SpatialConsideration,
 };
 use crate::ai::curves::{Curve, PostOp};
 use crate::ai::dse::{
@@ -95,22 +96,26 @@ impl PatrolDse {
         ];
         let mut weights = vec![1.0_f32, 1.0, 1.0, 1.0];
 
-        // 209: predator-exposure cost axis (path-c from 181). Reads
-        // `fox_scent_level` (already published by ctx_scalars from
-        // FoxScentMap::base_sample(cat_pos)). Curve `Composite{
-        // Logistic(6.0, 0.4), Invert}` — high scent → low axis →
-        // CP gate suppresses Patrol when the cat is in fox territory.
-        // Conditionally added at non-zero weight: CP semantics
-        // `(c · 0) = 0` would zero the product if added at weight 0,
-        // so the axis is only present when balance-tuning lifts the
-        // weight. The existing `FoxTerritorySuppression` modifier
-        // (`src/ai/modifier.rs`) prices cat-position fox-scent
-        // separately; this axis is reserved for a destination-aware
-        // refinement once the SpatialConsideration variant lands.
-        let fox_scent_weight = scoring.patrol_fox_scent_weight.clamp(0.0, 1.0);
-        if fox_scent_weight > 0.0 {
-            considerations.push(Consideration::Scalar(ScalarConsideration::new(
-                "fox_scent_level",
+        // 228: destination-aware refinement of 209's pattern. Reads
+        // route cost (cat perception of "how hard to reach the
+        // patrol perimeter") at TerritoryPerimeterAnchor. Curve
+        // `Composite{Logistic(6.0, 0.4), Invert}` — high route cost
+        // → low axis → CP gate suppresses Patrol in proportion to
+        // the *real* path cost (terrain + danger + per-cat caution),
+        // not just the cat's current cell. Conditionally added at
+        // non-zero weight: CP semantics `(c · 0) = 0` would zero the
+        // product if added at weight 0, so the axis is only present
+        // when balance-tuning lifts the weight. Replaces 209's
+        // `fox_scent_level` cat-position scalar (the v2 stopgap) per
+        // ticket 228 v3 reframe — the `patrol.rs:108` comment that
+        // reserved this slot lands here.
+        let route_cost_weight = scoring.patrol_route_cost_weight.clamp(0.0, 1.0);
+        if route_cost_weight > 0.0 {
+            considerations.push(Consideration::Field(FieldConsideration::new(
+                "patrol_route_cost",
+                FieldSource::OwnRouteCost,
+                LandmarkSource::Anchor(LandmarkAnchor::TerritoryPerimeterAnchor),
+                PATROL_PERIMETER_RANGE,
                 Curve::Composite {
                     inner: Box::new(Curve::Logistic {
                         steepness: 6.0,
@@ -119,7 +124,7 @@ impl PatrolDse {
                     post: PostOp::Invert,
                 },
             )));
-            weights.push(fox_scent_weight);
+            weights.push(route_cost_weight);
         }
 
         Self {
@@ -197,37 +202,37 @@ mod tests {
     }
 
     #[test]
-    fn patrol_fox_scent_dormant_at_default_zero() {
-        // 209: at default `patrol_fox_scent_weight = 0.0`, the
+    fn patrol_route_cost_dormant_at_default_zero() {
+        // 228: at default `patrol_route_cost_weight = 0.0`, the
         // conditional-add path skips the fifth axis. CP semantics
         // make a weight-0 axis multiplicatively zero the product,
         // so dormancy requires axis omission, not just zero weight.
         let s = ScoringConstants::default();
-        assert_eq!(s.patrol_fox_scent_weight, 0.0);
+        assert_eq!(s.patrol_route_cost_weight, 0.0);
         let dse = PatrolDse::new(&s);
         assert_eq!(dse.considerations().len(), 4);
         assert_eq!(dse.composition().weights.len(), 4);
-        // No `fox_scent_level` consideration at default weight.
+        // No `patrol_route_cost` Field consideration at default weight.
         assert!(!dse.considerations().iter().any(|c| match c {
-            Consideration::Scalar(s) => s.name == "fox_scent_level",
+            Consideration::Field(f) => f.name == "patrol_route_cost",
             _ => false,
         }));
     }
 
     #[test]
-    fn patrol_fox_scent_axis_added_when_weight_nonzero() {
+    fn patrol_route_cost_axis_added_when_weight_nonzero() {
         // Symmetric: when balance-tuning lifts the weight, the axis
         // appears as the fifth consideration with the configured
-        // weight. This is the substrate that 209 ships; tuning is
-        // a follow-on ticket.
+        // weight. This is the substrate that 228 ships; tuning is a
+        // follow-on ticket.
         let mut s = ScoringConstants::default();
-        s.patrol_fox_scent_weight = 0.3;
+        s.patrol_route_cost_weight = 0.3;
         let dse = PatrolDse::new(&s);
         assert_eq!(dse.considerations().len(), 5);
         assert_eq!(dse.composition().weights.len(), 5);
         assert!((dse.composition().weights[4] - 0.3).abs() < 1e-4);
         let has_axis = dse.considerations().iter().any(|c| match c {
-            Consideration::Scalar(s) => s.name == "fox_scent_level",
+            Consideration::Field(f) => f.name == "patrol_route_cost",
             _ => false,
         });
         assert!(has_axis);

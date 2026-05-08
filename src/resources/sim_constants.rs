@@ -1867,7 +1867,21 @@ pub struct ScoringConstants {
     /// dormant at 0.0; tuning is a follow-on ticket. Addresses the 181
     /// cascade by pricing predator-exposure into Patrol's L2 score.
     #[serde(default = "default_patrol_fox_scent_weight")]
+    #[deprecated(
+        note = "228: replaced by `patrol_route_cost_weight` (destination-aware Field axis). Kept dormant for one cycle for header schema compat; remove in the tuning follow-on."
+    )]
     pub patrol_fox_scent_weight: f32,
+    /// 228: weight on Patrol's `Consideration::Field` route-cost axis.
+    /// Reads `OwnRouteCost` at `TerritoryPerimeterAnchor` — the cat's
+    /// flooded path-cost to the patrol perimeter, including
+    /// terrain + boldness-weighted fox-scent + corruption. Curve
+    /// `Composite{Logistic(6.0, 0.4), Invert}` mirrors the dormant
+    /// 209 `patrol_fox_scent_weight` shape; high route cost → low
+    /// axis → CP gate suppresses Patrol when the *path to the
+    /// perimeter* is risky, not just when the cat's cell is risky.
+    /// Ships dormant at 0.0; tuning is a follow-on ticket.
+    #[serde(default = "default_patrol_route_cost_weight")]
+    pub patrol_route_cost_weight: f32,
     /// 223: Maximum additive cost contribution from fox-scent on a single
     /// tile during cat A* pathfinding. Cat path-cost overlay scales
     /// `FoxScentMap::get(x, y).clamp(0.0, 1.0) * fox_scent_path_cost_max`
@@ -1997,6 +2011,7 @@ pub struct ScoringConstants {
     pub corruption_smell_range: i32,
 }
 
+#[allow(deprecated)] // 228: patrol_fox_scent_weight retained for one-cycle header compat.
 impl Default for ScoringConstants {
     fn default() -> Self {
         Self {
@@ -2150,6 +2165,7 @@ impl Default for ScoringConstants {
             caretake_food_security_weight: default_caretake_food_security_weight(),
             groom_food_security_weight: default_groom_food_security_weight(),
             patrol_fox_scent_weight: default_patrol_fox_scent_weight(),
+            patrol_route_cost_weight: default_patrol_route_cost_weight(),
             fox_scent_path_cost_max: default_fox_scent_path_cost_max(),
             corruption_path_cost_max: default_corruption_path_cost_max(),
             route_cost_flood_budget: default_route_cost_flood_budget(),
@@ -3195,6 +3211,12 @@ fn default_groom_food_security_weight() -> f32 {
 /// 209: Patrol `fox_scent_at_position` cost-axis weight. Ships
 /// dormant at 0.0.
 fn default_patrol_fox_scent_weight() -> f32 {
+    0.0
+}
+
+/// 228: Patrol `Consideration::Field` route-cost axis weight. Ships
+/// dormant at 0.0.
+fn default_patrol_route_cost_weight() -> f32 {
     0.0
 }
 
