@@ -1871,6 +1871,15 @@ pub struct ScoringConstants {
         note = "228: replaced by `patrol_route_cost_weight` (destination-aware Field axis). Kept dormant for one cycle for header schema compat; remove in the tuning follow-on."
     )]
     pub patrol_fox_scent_weight: f32,
+    /// 228: weight on Hunt's `Consideration::Field` route-cost axis.
+    /// Reads `OwnRouteCost` at `NearestPreyAnchor` — the cat's
+    /// flooded path-cost to the nearest prey-scent peak. Curve
+    /// `Composite{Quadratic(2), Invert}` — sharper falloff than
+    /// Forage's Logistic shape because Hunt is the urgency-tier
+    /// action and a high-cost route should suppress it more
+    /// aggressively. Ships dormant at 0.0; tuning is a follow-on.
+    #[serde(default = "default_hunt_route_cost_weight")]
+    pub hunt_route_cost_weight: f32,
     /// 228: weight on Explore's `Consideration::Field` route-cost
     /// axis. Reads `OwnRouteCost` at `UnexploredFrontierCentroid`
     /// — the cat's flooded path-cost to the unexplored frontier.
@@ -2184,6 +2193,7 @@ impl Default for ScoringConstants {
             patrol_fox_scent_weight: default_patrol_fox_scent_weight(),
             patrol_route_cost_weight: default_patrol_route_cost_weight(),
             forage_route_cost_weight: default_forage_route_cost_weight(),
+            hunt_route_cost_weight: default_hunt_route_cost_weight(),
             explore_route_cost_weight: default_explore_route_cost_weight(),
             fox_scent_path_cost_max: default_fox_scent_path_cost_max(),
             corruption_path_cost_max: default_corruption_path_cost_max(),
@@ -3242,6 +3252,12 @@ fn default_patrol_route_cost_weight() -> f32 {
 /// 228: Forage `Consideration::Field` route-cost axis weight. Ships
 /// dormant at 0.0.
 fn default_forage_route_cost_weight() -> f32 {
+    0.0
+}
+
+/// 228: Hunt `Consideration::Field` route-cost axis weight. Ships
+/// dormant at 0.0.
+fn default_hunt_route_cost_weight() -> f32 {
     0.0
 }
 

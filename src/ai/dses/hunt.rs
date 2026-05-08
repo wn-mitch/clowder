@@ -20,13 +20,22 @@
 use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
-use crate::ai::considerations::{Consideration, ScalarConsideration};
+use crate::ai::considerations::{
+    Consideration, FieldConsideration, FieldSource, LandmarkAnchor, LandmarkSource,
+    ScalarConsideration,
+};
 use crate::ai::curves::{hangry, scarcity, Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
 use crate::components::markers;
 use crate::resources::sim_constants::ScoringConstants;
+
+/// Manhattan range over which Hunt's route-cost axis normalizes
+/// the cost-to-reach the nearest prey scent peak. 30 tiles ≈ a
+/// medium hunt circuit. Tiles farther (or unreachable) score the
+/// axis at zero and Hunt is suppressed proportionally.
+pub const HUNT_PREY_RANGE: f32 = 30.0;
 
 pub struct HuntDse {
     id: DseId,
@@ -59,7 +68,27 @@ impl HuntDse {
         // invariant. Stage 5 ships with weight 0.0 so the existing
         // four weights stay at their canonical 0.5/0.25/0.15/0.10.
         let saturation_weight = scoring.hunt_food_security_weight.clamp(0.0, 1.0);
-        let remainder = 1.0 - saturation_weight;
+        // 228: destination-aware route-cost axis. Reads OwnRouteCost
+        // at NearestPreyAnchor — the cat's flooded path-cost to the
+        // nearest prey-scent peak (terrain + boldness-weighted
+        // fox-scent + corruption). Curve `Composite{Quadratic(2),
+        // Invert}` — sharper falloff than Forage's Logistic shape
+        // because Hunt is the urgency-tier action and a high-cost
+        // route should suppress it more aggressively than a routine
+        // errand. Closer-is-better via Invert. Ships dormant at 0.0;
+        // tuning is a follow-on ticket.
+        let route_cost_weight = scoring.hunt_route_cost_weight.clamp(0.0, 1.0);
+        let route_cost_curve = Curve::Composite {
+            inner: Box::new(Curve::Quadratic {
+                exponent: 2.0,
+                divisor: 1.0,
+                shift: 0.0,
+            }),
+            post: PostOp::Invert,
+        };
+        let route_cost_remainder = 1.0 - route_cost_weight;
+        let remainder = (1.0 - saturation_weight) * route_cost_remainder;
+        let saturation_term = saturation_weight * route_cost_remainder;
         Self {
             id: DseId("hunt"),
             considerations: vec![
@@ -83,24 +112,27 @@ impl HuntDse {
                     "colony_food_security",
                     saturation_curve,
                 )),
+                Consideration::Field(FieldConsideration::new(
+                    "hunt_route_cost",
+                    FieldSource::OwnRouteCost,
+                    LandmarkSource::Anchor(LandmarkAnchor::NearestPreyAnchor),
+                    HUNT_PREY_RANGE,
+                    route_cost_curve,
+                )),
             ],
             // RtEO weights sum to 1.0. Hunger dominates so starving
             // cats converge on food-acquisition DSEs (peer-group
-            // anchor §3.3.2). Scarcity and boldness follow; prey_nearby
-            // held to 0.10 — it's an *opportunity* axis, not a gate,
-            // so when a cat with food available sees prey it shouldn't
-            // out-score `Eat`'s direct path. The binary 0/1 prey_nearby
-            // value otherwise dominates the sum disproportionately.
-            // The fifth axis (colony_food_security) ships at default-
-            // zero weight; the other four scale by `remainder` so the
-            // weight sum stays 1.0 even when balance-tuning lifts the
-            // saturation knob.
+            // anchor §3.3.2). Scarcity and boldness follow;
+            // prey_nearby held to 0.10. The saturation and
+            // route-cost axes scale the others by their respective
+            // remainders so the sum stays 1.0 at all weight values.
             composition: Composition::weighted_sum(vec![
                 0.5 * remainder,
                 0.25 * remainder,
                 0.15 * remainder,
                 0.10 * remainder,
-                saturation_weight,
+                saturation_term,
+                route_cost_weight,
             ]),
             // §4 batch 2: `.require(CanHunt)` gates on (Adult ∨ Young)
             // ∧ ¬InCombat ∧ forest nearby. Ticket 184 (2026-05-06)
@@ -165,10 +197,11 @@ mod tests {
     }
 
     #[test]
-    fn hunt_has_five_axes() {
+    fn hunt_has_six_axes() {
         // 176: colony_food_security saturation axis appended.
+        // 228: hunt_route_cost Field axis appended.
         let s = ScoringConstants::default();
-        assert_eq!(HuntDse::new(&s).considerations().len(), 5);
+        assert_eq!(HuntDse::new(&s).considerations().len(), 6);
     }
 
     #[test]
@@ -191,5 +224,35 @@ mod tests {
         let weights = &dse.composition().weights;
         assert!((weights[0] - 0.5).abs() < 1e-4);
         assert!((weights[4]).abs() < 1e-6);
+    }
+
+    #[test]
+    fn hunt_route_cost_dormant_at_default_zero() {
+        // 228: with default `hunt_route_cost_weight = 0.0`, the
+        // route-cost axis contributes zero. Consideration always
+        // present (WS mode tolerates weight-zero axes).
+        let s = ScoringConstants::default();
+        assert!((s.hunt_route_cost_weight).abs() < 1e-6);
+        let dse = HuntDse::new(&s);
+        let weights = &dse.composition().weights;
+        assert!((weights[5]).abs() < 1e-6);
+        let has_axis = dse.considerations().iter().any(|c| match c {
+            Consideration::Field(f) => f.name == "hunt_route_cost",
+            _ => false,
+        });
+        assert!(has_axis);
+    }
+
+    #[test]
+    fn hunt_route_cost_scales_others_when_weight_nonzero() {
+        let mut s = ScoringConstants::default();
+        s.hunt_route_cost_weight = 0.2;
+        let dse = HuntDse::new(&s);
+        let weights = &dse.composition().weights;
+        // Original 0.5 weight scales to 0.5 × 0.8 = 0.4.
+        assert!((weights[0] - 0.4).abs() < 1e-4);
+        assert!((weights[5] - 0.2).abs() < 1e-4);
+        let sum: f32 = weights.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-4);
     }
 }
