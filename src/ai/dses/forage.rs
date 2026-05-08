@@ -11,7 +11,8 @@ use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
 use crate::ai::considerations::{
-    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+    Consideration, FieldConsideration, FieldSource, LandmarkAnchor, LandmarkSource,
+    ScalarConsideration, SpatialConsideration,
 };
 use crate::ai::curves::{hangry, scarcity, Curve, PostOp};
 use crate::ai::dse::{
@@ -59,7 +60,25 @@ impl ForageDse {
             post: PostOp::Invert,
         };
         let saturation_weight = scoring.forage_food_security_weight.clamp(0.0, 1.0);
-        let remainder = 1.0 - saturation_weight;
+        // 228: destination-aware route-cost axis. Reads OwnRouteCost
+        // at NearestForageableCluster — the cat's flooded path cost
+        // to the forageable patch (terrain + boldness-weighted
+        // fox-scent + corruption). Curve `Composite{Logistic(8, 0.5),
+        // Invert}` mirrors the Spatial cluster_distance shape so
+        // dormant runs stay close to baseline; tuning the weight
+        // up makes Forage suppress when the route to forage is
+        // costly. Ships dormant at 0.0; tuning is a follow-on.
+        let route_cost_weight = scoring.forage_route_cost_weight.clamp(0.0, 1.0);
+        let route_cost_curve = Curve::Composite {
+            inner: Box::new(Curve::Logistic {
+                steepness: 8.0,
+                midpoint: 0.5,
+            }),
+            post: PostOp::Invert,
+        };
+        let route_cost_remainder = 1.0 - route_cost_weight;
+        let remainder = (1.0 - saturation_weight) * route_cost_remainder;
+        let saturation_term = saturation_weight * route_cost_remainder;
         Self {
             id: DseId("forage"),
             considerations: vec![
@@ -82,20 +101,27 @@ impl ForageDse {
                     "colony_food_security",
                     saturation_curve,
                 )),
+                Consideration::Field(FieldConsideration::new(
+                    "forage_route_cost",
+                    FieldSource::OwnRouteCost,
+                    LandmarkSource::Anchor(LandmarkAnchor::NearestForageableCluster),
+                    FORAGE_CLUSTER_RANGE,
+                    route_cost_curve,
+                )),
             ],
             // RtEO weights: diligence still dominates — the point of
             // Forage vs. Hunt is diligent non-bold cats choose it.
-            // Spatial axis pulls toward forageable terrain; original
-            // four weights renormalized ×remainder so the new fifth
-            // (colony_food_security) lands at `saturation_weight`.
-            // Stage 5 ships saturation_weight = 0.0 (default-zero), so
-            // the original weights stay at their canonical values.
+            // Spatial axis pulls toward forageable terrain; the
+            // saturation and route-cost axes scale the others by
+            // their remainders. Ships dormant (both extra weights at
+            // 0) so the original four weights stay canonical.
             composition: Composition::weighted_sum(vec![
                 0.24 * remainder,
                 0.20 * remainder,
                 0.36 * remainder,
                 0.20 * remainder,
-                saturation_weight,
+                saturation_term,
+                route_cost_weight,
             ]),
             // §4 batch 2: `.require(CanForage)` gates on ¬Kitten ∧
             // ¬Injured ∧ forageable terrain nearby. Retires the
@@ -174,13 +200,49 @@ mod tests {
     fn forage_saturation_dormant_at_default_zero() {
         // 176: with default `forage_food_security_weight = 0.0`, the
         // saturation axis contributes zero to the weighted sum. The
-        // other four axes retain their canonical RtEO weights.
+        // other axes retain their canonical RtEO weights.
         let s = ScoringConstants::default();
         assert!((s.forage_food_security_weight).abs() < 1e-6);
         let dse = ForageDse::new(&s);
         let weights = &dse.composition().weights;
         assert!((weights[0] - 0.24).abs() < 1e-4);
         assert!((weights[4]).abs() < 1e-6);
-        assert_eq!(dse.considerations().len(), 5);
+        // 228: route-cost axis added; six axes total at default.
+        assert_eq!(dse.considerations().len(), 6);
+    }
+
+    #[test]
+    fn forage_route_cost_dormant_at_default_zero() {
+        // 228: with default `forage_route_cost_weight = 0.0`, the
+        // route-cost axis contributes zero to the weighted sum but
+        // the consideration is always present (WS mode tolerates
+        // weight-zero axes; consistent shape avoids per-DSE
+        // conditional add).
+        let s = ScoringConstants::default();
+        assert!((s.forage_route_cost_weight).abs() < 1e-6);
+        let dse = ForageDse::new(&s);
+        let weights = &dse.composition().weights;
+        assert!((weights[5]).abs() < 1e-6);
+        let has_axis = dse.considerations().iter().any(|c| match c {
+            Consideration::Field(f) => f.name == "forage_route_cost",
+            _ => false,
+        });
+        assert!(has_axis);
+    }
+
+    #[test]
+    fn forage_route_cost_axis_scales_others_when_weight_nonzero() {
+        // Symmetric: when balance-tuning lifts the route-cost weight,
+        // the existing weights scale by (1 - route_cost_weight) to
+        // preserve RtEO sum=1.0.
+        let mut s = ScoringConstants::default();
+        s.forage_route_cost_weight = 0.25;
+        let dse = ForageDse::new(&s);
+        let weights = &dse.composition().weights;
+        // Original 0.24 weight scales to 0.24 × 0.75 = 0.18.
+        assert!((weights[0] - 0.18).abs() < 1e-4);
+        assert!((weights[5] - 0.25).abs() < 1e-4);
+        let sum: f32 = weights.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-4);
     }
 }
