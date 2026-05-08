@@ -1832,11 +1832,15 @@ pub struct ScoringConstants {
     #[serde(default = "default_forage_food_security_weight")]
     pub forage_food_security_weight: f32,
     /// 209: weight on the positive `colony_food_security` axis in
-    /// Mentor's WS composition. Ships dormant at 0.0; tuning is a
-    /// follow-on ticket. Mirrors Hunt/Forage's saturation pattern but
-    /// without `Invert` so high food security adds positive lift to
-    /// the higher-tier DSE rather than suppressing it. `(1-w)`
-    /// rebalance on the existing three axes preserves RtEO sum=1.0.
+    /// Mentor's WS composition. Tuned to 0.10 in ticket 210 — see
+    /// `docs/balance/210-mentor-food-security.md` for hypothesis +
+    /// observation (Mentor share flat, but cohesion canaries lifted
+    /// and food-economy collapsed via unbonded mating; structural
+    /// follow-on parked for later substrate work). Mirrors
+    /// Hunt/Forage's saturation pattern but without `Invert` so high
+    /// food security adds positive lift to the higher-tier DSE
+    /// rather than suppressing it. `(1-w)` rebalance on the existing
+    /// three axes preserves RtEO sum=1.0.
     #[serde(default = "default_mentor_food_security_weight")]
     pub mentor_food_security_weight: f32,
     /// 209: weight on the positive `colony_food_security` axis in
@@ -3121,10 +3125,10 @@ fn default_forage_food_security_weight() -> f32 {
 }
 
 /// 209: Mentor DSE positive-lift weight on the `colony_food_security`
-/// axis. Ships dormant at 0.0 — see
-/// `ScoringConstants::mentor_food_security_weight`.
+/// axis. Tuned to 0.10 in ticket 210 — see
+/// `docs/balance/210-mentor-food-security.md`.
 fn default_mentor_food_security_weight() -> f32 {
-    0.0
+    0.10
 }
 
 /// 209: Coordinate DSE positive-lift weight on the

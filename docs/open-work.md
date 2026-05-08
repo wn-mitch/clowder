@@ -17,8 +17,8 @@ _Last generated: 2026-05-07._
 | In progress | 6 |
 | Ready | 58 |
 | Parked | 7 |
-| Blocked | 22 |
-| **Open total** | **93** |
+| Blocked | 21 |
+| **Open total** | **92** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -115,7 +115,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[173](docs/open-work/tickets/173-crafting-split-capability-markers.md)** — IsHerbalist / IsSpiritualist / HasCorruptionNearby capability markers (155 follow-on) — _[ai-substrate] · parked 2026-05-05 · added 2026-05-05_
 - **[199](docs/open-work/tickets/199-pipeline-walk-skill.md)** — Hunt / production / consumption pipeline-walk skill (194 P4) — _[process-discipline] · parked 2026-05-06 · added 2026-05-06_
 
-## Blocked (22)
+## Blocked (21)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _blocked-by 007, 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _blocked-by 016 · added 2026-04-22_
@@ -132,7 +132,6 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[130](docs/open-work/tickets/130-trust-weighted-coordinator-momentum.md)** — Trust-weighted coordinator directive momentum — _[C] · blocked-by 126, 057 · added 2026-05-02_
 - **[140](docs/open-work/tickets/140-steering-and-pursuit-polish.md)** — Phase 3 — Steering, smooth pursuit / flee, pathfinder polish — _[substrate-migration] · blocked-by 139 · added 2026-05-02_
 - **[144](docs/open-work/tickets/144-intraspecies-conflict-fawn.md)** — IntraspeciesConflictResponseFawn — appeasement valence (belly-up, slow blink) — _[ai-substrate] · blocked-by 145 · added 2026-05-02_
-- **[210](docs/open-work/tickets/210-tune-mentor-food-security-weight.md)** — tune mentor_food_security_weight — _[balance] · blocked-by 209 · added 2026-05-07_
 - **[211](docs/open-work/tickets/211-tune-coordinate-food-security-weight.md)** — tune coordinate_food_security_weight — _[balance] · blocked-by 209 · added 2026-05-07_
 - **[212](docs/open-work/tickets/212-tune-caretake-food-security-weight.md)** — tune caretake_food_security_weight — _[balance] · blocked-by 209 · added 2026-05-07_
 - **[213](docs/open-work/tickets/213-tune-groom-food-security-weight.md)** — tune groom_food_security_weight — _[balance] · blocked-by 209 · added 2026-05-07_
@@ -145,13 +144,14 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (144)
+## Landed archive (145)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (79)
+### 2026-05 (80)
 
 - **[218](docs/open-work/landed/218-maslow-tier-rename.md)** — Rename Maslow `Level N` → `Tier N` to disambiguate from substrate `L1/L2/L3` _(2026-05-07)_
+- **[210](docs/open-work/landed/210-tune-mentor-food-security-weight.md)** — tune mentor_food_security_weight _(2026-05-07)_
 - **[209](docs/open-work/landed/209-positive-colony-food-security-axis-on-higher-tier-dses.md)** — Positive colony_food_security axis on higher-tier DSEs _(2026-05-07)_
 - **[207](docs/open-work/landed/207-influence-map-registry-walk.md)** — Phase 2D — InfluenceMap registry walk in emit_focal_trace _(2026-05-07)_
 - **[206](docs/open-work/landed/206-trace-emit-l1-map-coverage.md)** — trace_emit L1 walk skips five InfluenceMaps — Food / Garden / Construction / KittenCry / Herb _(2026-05-07)_

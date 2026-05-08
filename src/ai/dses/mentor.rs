@@ -158,17 +158,17 @@ mod tests {
     }
 
     #[test]
-    fn mentor_food_security_dormant_at_default_zero() {
-        // 209: at default weight 0.0, the (1-w) rebalance is identity:
-        // existing three weights stay at 0.4/0.4/0.2 and the new fifth
-        // axis carries 0.0. This test guards that invariant.
+    fn mentor_food_security_tuned_to_iter1_weight() {
+        // 210 iter-1: weight 0.10. The (1-w) rebalance scales the
+        // existing three weights to 0.36/0.36/0.18 and the new fourth
+        // axis carries 0.10, summing to 1.0.
         let scoring = default_scoring();
-        assert_eq!(scoring.mentor_food_security_weight, 0.0);
+        assert!((scoring.mentor_food_security_weight - 0.10).abs() < 1e-4);
         let weights = MentorDse::new(&scoring).composition().weights.clone();
         assert_eq!(weights.len(), 4);
-        assert!((weights[0] - 0.4).abs() < 1e-4);
-        assert!((weights[1] - 0.4).abs() < 1e-4);
-        assert!((weights[2] - 0.2).abs() < 1e-4);
-        assert!((weights[3] - 0.0).abs() < 1e-4);
+        assert!((weights[0] - 0.36).abs() < 1e-4);
+        assert!((weights[1] - 0.36).abs() < 1e-4);
+        assert!((weights[2] - 0.18).abs() < 1e-4);
+        assert!((weights[3] - 0.10).abs() < 1e-4);
     }
 }
