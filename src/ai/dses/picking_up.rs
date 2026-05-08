@@ -12,15 +12,31 @@
 //! canonical soak). When no ground food-Item exists, eligibility
 //! rejects every cat and PickingUp stays out of the L3 softmax pool.
 //!
-//! **Composition.** Single `colony_food_security` axis with an
-//! inverted Logistic curve: scavenge urgency rises sharply as the
-//! colony's food-security signal drops. `colony_food_security` is the
-//! `min(food_fraction, hunger_satisfaction)` composite from
-//! `scoring.rs:545`, so the inverse fires when *either* the colony
-//! stockpile is low *or* the cat's own hunger is unsatisfied — which
-//! is the right shape for "scavenge nearby carcass when food is
-//! short, ignore it when sated and stockpiled." Plausibility curve;
-//! balance follow-on tunes the Logistic params.
+//! **Composition.** Two axes via pure product (CompensatedProduct
+//! with `compensation_strength = 0`):
+//! - `colony_food_security` (existing): inverted Logistic — scavenge
+//!   urgency rises sharply as food-security drops.
+//! - `health_deficit` (231 R3b): Linear(slope=-1, intercept=1) — damps
+//!   to 1.0 at deficit=0 (full-HP cat ⇒ no suppression, parity with
+//!   pre-231 score) and to 0.0 at deficit=1.0 (zero-HP cat ⇒ PickUp
+//!   fully suppressed). Composition is multiplicative so the body
+//!   axis multiplies (damps) the food axis; this matches the
+//!   structural intent ("wounds reduce pickup viability") rather than
+//!   additive (which would lift the score on its own).
+//!
+//!   `health_deficit` (rather than the broader `body_distress_composite`)
+//!   was chosen so HUNGER doesn't suppress pickup — a hungry cat is
+//!   exactly when pickup is most useful. The dying-arc evidence
+//!   (Calcifer at HP=0.49, Cedar at HP=0.38) is wound-specific, not
+//!   hunger-driven; `health_deficit` directly captures it.
+//!
+//! Pre-231 the DSE scored from one Consideration only and ignored the
+//! cat's body state, leading to wounded cats picking PickUp over
+//! Sleep/Flee in the seed-42 dying-arc analysis (Calcifer at HP=0.49
+//! choosing PickUp 0.96 over Flee 0.95; Cedar at HP=0.38 choosing
+//! PickUp 0.99 over Sleep 1.08). Per substrate-over-override
+//! discipline, the fix is to *subscribe* the DSE to existing body-
+//! state perception rather than adding an eligibility filter.
 
 use bevy::prelude::*;
 
@@ -33,6 +49,7 @@ use crate::ai::dse::{
 use crate::components::markers;
 
 pub const SCAVENGE_INPUT: &str = "colony_food_security";
+pub const HEALTH_DEFICIT_INPUT: &str = "health_deficit";
 
 pub struct PickingUpDse {
     id: DseId,
@@ -53,13 +70,25 @@ impl PickingUpDse {
             }),
             post: PostOp::Invert,
         };
+        // 231 R3b: health-deficit damping. Linear(slope=-1, intercept=1)
+        // evaluates to 1.0 at deficit=0 (full HP → no suppression) and
+        // 0.0 at deficit=1.0 (zero HP → full suppression). Pure-product
+        // composition (strength=0) makes the damping multiplicative.
+        let health_damping = Curve::Linear {
+            slope: -1.0,
+            intercept: 1.0,
+        };
         Self {
             id: DseId("pick_up"),
-            considerations: vec![Consideration::Scalar(ScalarConsideration::new(
-                SCAVENGE_INPUT,
-                scavenge_urgency,
-            ))],
-            composition: Composition::weighted_sum(vec![1.0]),
+            considerations: vec![
+                Consideration::Scalar(ScalarConsideration::new(SCAVENGE_INPUT, scavenge_urgency)),
+                Consideration::Scalar(ScalarConsideration::new(
+                    HEALTH_DEFICIT_INPUT,
+                    health_damping,
+                )),
+            ],
+            composition: Composition::compensated_product(vec![1.0, 1.0])
+                .with_compensation(0.0),
             eligibility: EligibilityFilter::new()
                 .forbid(markers::Incapacitated::KEY)
                 .require(markers::HasGroundCarcass::KEY),
@@ -168,5 +197,29 @@ mod tests {
     #[test]
     fn picking_up_maslow_tier_is_one() {
         assert_eq!(PickingUpDse::new().maslow_tier(), 1);
+    }
+
+    /// 231 R3b: health-deficit axis is present at index 1 with the
+    /// damping Linear curve. At deficit=0 it evaluates to 1.0
+    /// (full-HP cat → no suppression, parity with pre-231 score).
+    #[test]
+    fn picking_up_health_deficit_axis_present_with_damping_linear() {
+        let dse = PickingUpDse::new();
+        match &dse.considerations()[1] {
+            Consideration::Scalar(sc) => {
+                assert_eq!(sc.name, HEALTH_DEFICIT_INPUT);
+                let healthy = sc.curve.evaluate(0.0);
+                let deficit_full = sc.curve.evaluate(1.0);
+                assert!(
+                    (healthy - 1.0).abs() < 1e-6,
+                    "damping curve must evaluate to 1.0 at deficit=0 (parity); got {healthy}"
+                );
+                assert!(
+                    deficit_full.abs() < 1e-6,
+                    "damping curve must evaluate to 0.0 at deficit=1.0 (full suppression); got {deficit_full}"
+                );
+            }
+            _ => panic!("expected ScalarConsideration"),
+        }
     }
 }

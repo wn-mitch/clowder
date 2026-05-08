@@ -44,6 +44,7 @@ pub mod route_cost_decision;
 pub mod runner;
 pub mod ward_placement;
 pub mod wildlife_fight;
+pub mod wounded_cat_no_pickup;
 
 use bevy_ecs::world::World;
 
@@ -125,6 +126,11 @@ pub const ALL: &[&Scenario] = &[
     &inventory_full_no_pickup::SCENARIO_FULL_CURIOS,
     &inventory_full_no_pickup::SCENARIO_FULL_HERBS,
     &inventory_full_no_pickup::SCENARIO_EMPTY_PICKUP,
+    // 231 R3b — wounded cat L2 score regression. Reproduces the
+    // dying-arc analysis: HP=0.49 + adjacent food → PickUp's L2
+    // final_score is multiplicatively damped by `health_deficit`
+    // (post-R3b) instead of scoring near 1.0 (pre-R3b).
+    &wounded_cat_no_pickup::SCENARIO,
 ];
 
 /// Look up a scenario by its `name` field.
