@@ -9,7 +9,7 @@ blocked-by: [209]
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [181-hunt-forage-saturation-tune.md]
-landed-at: pending
+landed-at: e10188a986bc
 landed-on: 2026-05-07
 ---
 
