@@ -35,6 +35,7 @@ pub mod fondness_kitten_imprint;
 pub mod grooming_other;
 pub mod hunt_acquisition;
 pub mod hunt_deposit_chain;
+pub mod inventory_full_no_pickup;
 pub mod kitten_cry;
 pub mod modifier_preempts_hunt;
 pub mod picking_up_scavenging;
@@ -117,6 +118,13 @@ pub const ALL: &[&Scenario] = &[
     // through the `Action::Flee → DispositionKind::Fleeing` route
     // closing the last anxiety-interrupt arm migration.
     &flee_commitment::SCENARIO,
+    // 231 — capacity-aware pickup pipeline. Three sister scenarios:
+    // full-of-curios + adjacent food drops the curio first then picks
+    // up; full-of-herbs validates the ItemSlot collapse; empty cat
+    // takes the substrate path with no DropItem prefix.
+    &inventory_full_no_pickup::SCENARIO_FULL_CURIOS,
+    &inventory_full_no_pickup::SCENARIO_FULL_HERBS,
+    &inventory_full_no_pickup::SCENARIO_EMPTY_PICKUP,
 ];
 
 /// Look up a scenario by its `name` field.

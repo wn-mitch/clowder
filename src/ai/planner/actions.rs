@@ -1755,4 +1755,74 @@ mod tests {
             "marker absent → Eating unreachable (HungerOk goal)"
         );
     }
+
+    /// Ticket 231 dual-branch composition: substrate path of
+    /// PickUpItemFromGround fires when `HasFreeSlot` is authored.
+    #[test]
+    fn picking_up_substrate_path_when_free_slot_marker_set() {
+        let start = PlannerState {
+            zone: PlannerZone::CarcassPile,
+            ..default_state()
+        };
+        let goal = GoalState {
+            predicates: vec![StatePredicate::TripsAtLeast(1)],
+        };
+        let distances = basic_distances();
+        let actions =
+            actions_for_disposition(DispositionKind::PickingUp, Action::PickUp, &distances);
+
+        // food_stocked_markers() sets HasFreeSlot for test_entity().
+        let plan = plan!(start, &actions, &goal, 8, 500)
+            .expect("substrate-path PickUp must be reachable when HasFreeSlot is set");
+        let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
+        assert!(kinds.contains(&GoapActionKind::PickUpItemFromGround));
+        assert!(
+            !kinds.contains(&GoapActionKind::DropItem),
+            "substrate path is cheaper (cost 1 vs 1+1=2); A* must NOT prepend DropItem when HasFreeSlot is true"
+        );
+    }
+
+    /// Ticket 231 dual-branch composition: plan path fires (and prepends
+    /// DropItem) when `HasFreeSlot` is absent — the cat is full and
+    /// must drop something to make room.
+    #[test]
+    fn picking_up_plan_path_prepends_drop_when_no_free_slot() {
+        let start = PlannerState {
+            zone: PlannerZone::CarcassPile,
+            ..default_state()
+        };
+        let goal = GoalState {
+            predicates: vec![StatePredicate::TripsAtLeast(1)],
+        };
+        let distances = basic_distances();
+        let actions =
+            actions_for_disposition(DispositionKind::PickingUp, Action::PickUp, &distances);
+
+        // empty_markers() does NOT set HasFreeSlot — substrate-path
+        // precondition fails, only plan-path remains expandable.
+        let plan = plan!(start, &actions, &goal, 8, 500, markers = empty_markers())
+            .expect("plan-path PickUp must compose [DropItem, PickUpItemFromGround]");
+        let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
+        assert!(
+            kinds.contains(&GoapActionKind::DropItem),
+            "plan-path must prepend DropItem when HasFreeSlot is absent; got {kinds:?}"
+        );
+        assert!(
+            kinds.contains(&GoapActionKind::PickUpItemFromGround),
+            "plan-path must still finish with PickUpItemFromGround; got {kinds:?}"
+        );
+        // Ordering: DropItem before PickUpItemFromGround.
+        let drop_idx = kinds
+            .iter()
+            .position(|k| *k == GoapActionKind::DropItem)
+            .unwrap();
+        let pickup_idx = kinds
+            .iter()
+            .position(|k| *k == GoapActionKind::PickUpItemFromGround)
+            .unwrap();
+        assert!(
+            drop_idx < pickup_idx,
+            "DropItem must come before PickUpItemFromGround; got {kinds:?}"
+        );
+    }
 }
