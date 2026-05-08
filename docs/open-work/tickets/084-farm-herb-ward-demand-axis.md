@@ -5,7 +5,7 @@ status: parked
 cluster: balance
 added: 2026-04-29
 parked: 2026-04-30
-blocked-by: [086]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [027-l2-pairing-activity.md, 084-farm-herb-ward-demand.md, 085-gardens-multiuse-build-gate.md]

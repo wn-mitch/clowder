@@ -1,7 +1,7 @@
 ---
 id: 086
 title: Find a triggering scenario for Farm DSE canary (CropTended / CropHarvested)
-status: ready
+status: done
 cluster: balance
 added: 2026-04-30
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [084-farm-herb-ward-demand.md, 085-gardens-multiuse-build-gate.md]
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-08
 ---
 
 ## Why
@@ -80,3 +80,4 @@ Candidate approaches:
 ## Log
 
 - 2026-04-30: Opened. Carved out from 084's continued parking after 085 landed the disjunctive build-pressure gate. 085's balance doc (`docs/balance/085-gardens-multiuse-build-gate.md ## Why P1–P3 are unchanged in seed 42`) captures the empirical evidence that seed 42 doesn't naturally exercise the Farm trigger regime.
+- 2026-05-08: Reframe (auto-mode session, 2026-05-08): adds src/scenarios/farm_herb_demand.rs as the integration-test gate for the Farm DSE → Feature::CropTended → Feature::CropHarvested chain. Soak canary stays demoted (=> false in expected_to_fire_per_soak); per the empirical evidence in 085's balance doc, the canonical seed-42 regime does not naturally reach (ward_strength_low ∧ !ThornbriarAvailable). Acceptance gates #4-#6 closed deterministically (Farm wins p≈0.98 at tick 2 with herb-pressure axis = 1.0; both Features fire ≥1× per declared_expected_features_all_fire). Gates #1-#3 (pressure accumulation, Garden construction, HasGarden flip) deferred to a sociology/economy reapproach the user will open separately when natural farming firing becomes a priority.

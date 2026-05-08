@@ -30,6 +30,7 @@ pub mod disposal_election;
 pub mod dying_arc_softmax;
 pub mod env;
 pub mod exploration_ranging;
+pub mod farm_herb_demand;
 pub mod farming_cycle;
 pub mod flee_commitment;
 pub mod fondness_kitten_imprint;
@@ -96,6 +97,13 @@ pub const ALL: &[&Scenario] = &[
     &exploration_ranging::SCENARIO,
     &ward_placement::SCENARIO,
     &farming_cycle::SCENARIO,
+    // 086 — Farm DSE herb-pressure axis (084) integration gate.
+    // Deterministic Thornbriar tend→harvest cycle that asserts both
+    // `Feature::CropTended` and `Feature::CropHarvested` fire. The
+    // soak canary stays demoted; this scenario is the structural-
+    // correctness surface. See module rustdoc for the empirical
+    // reframe (085 evidence, sociology/economy follow-on parked).
+    &farm_herb_demand::SCENARIO,
     // 158 — triage harness for the GroomedOther never-fired structural fix.
     &grooming_other::SCENARIO,
     // 178 — election-side scenarios for the lifted disposal DSEs.
