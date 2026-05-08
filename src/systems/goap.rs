@@ -5251,7 +5251,23 @@ fn dispatch_step_action(
         // on `transfer_item_inventory_to_inventory` keeps the source
         // untouched on `DestinationFull`, so no item is destroyed).
         GoapActionKind::DropItem => {
-            let outcome = crate::steps::disposition::resolve_drop_item(inventory, *pos, commands);
+            // Ticket 231: drop_priority is goal-aware, so thread the
+            // active disposition + the cat's hunger satiation +
+            // colony's construction-site presence so the resolver
+            // picks the lowest-priority slot for the cat's current
+            // state.
+            let has_construction_site = snaps.planner_markers.has(
+                crate::components::markers::HasConstructionSite::KEY,
+                cat_entity,
+            );
+            let outcome = crate::steps::disposition::resolve_drop_item(
+                inventory,
+                *pos,
+                plan.kind,
+                needs.hunger,
+                has_construction_site,
+                commands,
+            );
             outcome.record_if_witnessed(
                 narr.activation.as_deref_mut(),
                 crate::resources::system_activation::Feature::ItemDropped,
