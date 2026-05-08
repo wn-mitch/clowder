@@ -8,14 +8,14 @@
 > fresh. See `CLAUDE.md` §"Long-horizon coordination" for the request-time
 > checklist and maintenance rules.
 
-_Last generated: 2026-05-07._
+_Last generated: 2026-05-08._
 
 ## Summary
 
 | Status | Count |
 |---|---|
-| In progress | 6 |
-| Ready | 63 |
+| In progress | 7 |
+| Ready | 62 |
 | Parked | 8 |
 | Blocked | 21 |
 | **Open total** | **98** |
@@ -35,7 +35,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 | **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** Substrate-over-override | in-progress | 32 | 29 | 3 (0 / 1 / 0 / 2) | `▰▰▰▰▰▰▰▰▰▱` 91% |
 | **[095](docs/open-work/tickets/095-body-zones-epic.md)** Body zones | ready | 0 | — | — | _no roster_ |
 
-## In progress (6)
+## In progress (7)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
@@ -43,8 +43,9 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _added 2026-04-27_
 - **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** — Substrate-over-override — retire control-yanking hacks in favor of IAUS levers — _[substrate-over-override] · added 2026-04-30_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
+- **[228](docs/open-work/tickets/228-fox-territory-huntforagepatrol-decision-time-suppression.md)** — cat route-cost field as L1 perception + Field Consideration variant — _[pathfinder-risk-awareness] · added 2026-05-07_
 
-## Ready (63)
+## Ready (62)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -108,7 +109,6 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[225](docs/open-work/tickets/225-audit-patrol-l3-share-rise-under-additive-coordinator-dse-lift.md)** — audit Patrol L3 share rise under additive coordinator-DSE lift — _[ai-substrate] · added 2026-05-07_
 - **[226](docs/open-work/tickets/226-audit-groomother-share-vs-score-inversion-under-demographic-shift.md)** — audit GroomOther share-vs-score inversion under demographic shift — _[ai-substrate] · added 2026-05-07_
 - **[227](docs/open-work/tickets/227-coordinator-eligible-focal-cat-for-coordinate-frame-diff-parity.md)** — coordinator-eligible focal-cat for Coordinate frame-diff parity — _[process-discipline] · added 2026-05-07_
-- **[228](docs/open-work/tickets/228-fox-territory-huntforagepatrol-decision-time-suppression.md)** — cat route-cost field as L1 perception + Field Consideration variant — _[pathfinder-risk-awareness] · added 2026-05-07_
 
 ## Parked (8)
 

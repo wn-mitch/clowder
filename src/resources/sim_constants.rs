@@ -1888,6 +1888,16 @@ pub struct ScoringConstants {
     /// surfaces an asymmetry that doesn't reflect the fiction.
     #[serde(default = "default_corruption_path_cost_max")]
     pub corruption_path_cost_max: u32,
+    /// 228: Cap on the per-cat `flood_dijkstra` flood radius (cost
+    /// units, not tiles). Tiles whose tentative cost exceeds this
+    /// stay unreached at `MAX_COST_BUDGET`. Default `600` — terrain
+    /// max=4 + per-tile weighted-overlay max ≈ 18 ⇒ avg edge ~10;
+    /// 600 covers a ~30-tile flood radius for typical overlays. Lower
+    /// values shrink flood cost at the price of fewer destinations
+    /// being scored as reachable. Bounded above by
+    /// `route_cost_field::MAX_COST_BUDGET`.
+    #[serde(default = "default_route_cost_flood_budget")]
+    pub route_cost_flood_budget: u32,
     /// 209: weight on the `TensionDefusionGroomLift` modifier
     /// targeting GroomOther. Multiplicative lift when
     /// `colony_tension_recent` is elevated AND `HasGroomingCandidate`
@@ -2134,6 +2144,7 @@ impl Default for ScoringConstants {
             patrol_fox_scent_weight: default_patrol_fox_scent_weight(),
             fox_scent_path_cost_max: default_fox_scent_path_cost_max(),
             corruption_path_cost_max: default_corruption_path_cost_max(),
+            route_cost_flood_budget: default_route_cost_flood_budget(),
             tension_defusion_groom_weight: default_tension_defusion_groom_weight(),
             disposal_inventory_excess_slope: default_disposal_inventory_excess_slope(),
             disposal_inventory_excess_midpoint: default_disposal_inventory_excess_midpoint(),
@@ -3189,6 +3200,12 @@ fn default_fox_scent_path_cost_max() -> u32 {
 /// See `ScoringConstants::corruption_path_cost_max` for the rationale.
 fn default_corruption_path_cost_max() -> u32 {
     10
+}
+
+/// 228: Per-cat route-cost flood radius cap. See
+/// `ScoringConstants::route_cost_flood_budget`.
+fn default_route_cost_flood_budget() -> u32 {
+    600
 }
 
 /// 209: GroomOther `TensionDefusionGroomLift` modifier weight. Ships

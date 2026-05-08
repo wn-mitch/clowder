@@ -62,8 +62,12 @@ pub fn cat_path_weight_from_boldness(boldness: f32) -> f32 {
     (1.0 - boldness).clamp(0.1, 1.0)
 }
 
+/// Sum the per-overlay weighted contribution at `pos`, rounded to
+/// `u32`. Reused by `flood_dijkstra` (route-cost field, ticket 228)
+/// — keep the rounding semantics identical so a flood and an A*
+/// path through the same edge see the same edge cost.
 #[inline]
-fn sum_overlay_cost(overlays: &[WeightedOverlay<'_>], pos: Position) -> u32 {
+pub(crate) fn sum_overlay_cost(overlays: &[WeightedOverlay<'_>], pos: Position) -> u32 {
     overlays
         .iter()
         .map(|o| (o.inner.cost_at(pos) as f32 * o.weight).round() as u32)

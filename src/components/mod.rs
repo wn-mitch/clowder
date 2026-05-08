@@ -27,6 +27,7 @@ pub mod prey;
 pub mod recent_disposition_failures;
 pub mod recent_target_failures;
 pub mod reserved;
+pub mod route_cost_field;
 pub mod sensing;
 pub mod skills;
 pub mod task_chain;
@@ -75,6 +76,7 @@ pub use prey::{
 pub use recent_disposition_failures::RecentDispositionFailures;
 pub use recent_target_failures::RecentTargetFailures;
 pub use reserved::Reserved;
+pub use route_cost_field::{RouteCostField, MAX_COST_BUDGET};
 pub use sensing::{SensoryModifier, SensorySignature, SensorySpecies};
 pub use skills::{Corruption, MagicAffinity, Skills, Training};
 pub use task_chain::{FailurePolicy, Material, StepKind, StepStatus, TaskChain, TaskStep};

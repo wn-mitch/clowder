@@ -17,6 +17,7 @@ pub mod modifier;
 pub mod pairing;
 pub mod pathfinding;
 pub mod planner;
+pub mod route_cost;
 pub mod scoring;
 pub mod snake_planner;
 pub mod snake_scoring;
