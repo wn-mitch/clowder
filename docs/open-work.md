@@ -15,10 +15,10 @@ _Last generated: 2026-05-07._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 58 |
+| Ready | 59 |
 | Parked | 7 |
-| Blocked | 21 |
-| **Open total** | **92** |
+| Blocked | 23 |
+| **Open total** | **95** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -44,7 +44,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** — Substrate-over-override — retire control-yanking hacks in favor of IAUS levers — _[substrate-over-override] · added 2026-04-30_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 
-## Ready (58)
+## Ready (59)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -104,6 +104,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[205](docs/open-work/tickets/205-social-status-distress-perception-cost.md)** — social_status_distress perception cost — 25% per-tick slowdown from O(N) nearest-cat scan — _[ai-substrate] · added 2026-05-07_
 - **[208](docs/open-work/tickets/208-per-cat-action-overlay-for-the-windowed-ui.md)** — Per-cat Action overlay for the windowed UI — _added 2026-05-07_
 - **[217](docs/open-work/tickets/217-scenario-marker-snapshot-wiring-as-a-discipline-requirement.md)** — scenario marker-snapshot wiring as a discipline requirement — _[process-discipline] · added 2026-05-07_
+- **[219](docs/open-work/tickets/219-shared-recent-ambush-event-marker.md)** — shared recent-ambush event marker — _[ai-substrate] · added 2026-05-07_
 
 ## Parked (7)
 
@@ -115,7 +116,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[173](docs/open-work/tickets/173-crafting-split-capability-markers.md)** — IsHerbalist / IsSpiritualist / HasCorruptionNearby capability markers (155 follow-on) — _[ai-substrate] · parked 2026-05-05 · added 2026-05-05_
 - **[199](docs/open-work/tickets/199-pipeline-walk-skill.md)** — Hunt / production / consumption pipeline-walk skill (194 P4) — _[process-discipline] · parked 2026-05-06 · added 2026-05-06_
 
-## Blocked (21)
+## Blocked (23)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _blocked-by 007, 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _blocked-by 016 · added 2026-04-22_
@@ -138,6 +139,8 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[214](docs/open-work/tickets/214-tune-patrol-fox-scent-weight.md)** — tune patrol_fox_scent_weight — _[balance] · blocked-by 209 · added 2026-05-07_
 - **[215](docs/open-work/tickets/215-tune-tension-defusion-groom-weight.md)** — tune tension_defusion_groom_weight — _[balance] · blocked-by 209 · added 2026-05-07_
 - **[216](docs/open-work/tickets/216-mentor-coordinate-caretake-axis-ethology-audit.md)** — Mentor / Coordinate / Caretake axis ethology audit — _[ai-substrate] · blocked-by 209 · added 2026-05-07_
+- **[220](docs/open-work/tickets/220-ward-placement-targets-ambush-clusters.md)** — ward placement targets ambush clusters — _[ai-substrate] · blocked-by 219 · added 2026-05-07_
+- **[221](docs/open-work/tickets/221-caretake-gates-on-ambush-recency-at-kitten-tile.md)** — caretake gates on ambush-recency at kitten tile — _[ai-substrate] · blocked-by 219 · added 2026-05-07_
 
 ## Pre-existing (2)
 

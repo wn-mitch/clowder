@@ -1,0 +1,76 @@
+---
+id: 220
+title: ward placement targets ambush clusters
+status: blocked
+cluster: ai-substrate
+added: 2026-05-07
+parked: null
+blocked-by: [219]
+supersedes: []
+related-systems: [ai-substrate-refactor.md]
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+210's mechanism investigation showed ward placement is currently
+geometric perimeter spray rather than threat-targeted. The post-210
+soak placed 29 wards but 38 ShadowFox ambushes still landed — wards
+worked (267 `ShadowFoxAvoidedWard`, 45 `ShadowFoxBanished`) but were
+in the wrong tiles. Empirically, 60–70% of ambushes happened in
+2–3 hot-zone tile clusters near the colony center; wards were
+elsewhere.
+
+The fix is to anchor `herbcraft_ward_dse`'s spatial scoring on the
+`RecentAmbushMap` substrate (ticket 219). Wards placed at
+ambush-cluster centroids cover the empirical hot zones rather than
+the geometric perimeter.
+
+## Scope
+- Add `recent_ambush_at_position` axis to `herbcraft_ward_dse`
+  (spatial consideration, weight = `ward_ambush_anchor_weight`,
+  ships dormant at 0.0).
+- Curve: `Composite{Logistic(8.0, 0.5)}` — high recent-ambush
+  density → high score for placing a ward at this tile.
+- `(1-w)` rebalance on existing axes if the DSE is WeightedSum,
+  per the substrate convention. Otherwise scale per CompositionMode
+  rules.
+
+## Out of scope
+- The substrate `RecentAmbushMap` itself — that's ticket 219.
+- Tuning the weight from 0.0 → positive value — that's a follow-on
+  balance ticket after 219+220 land dormant.
+- Reactive ward removal / migration (move wards as hot zones shift)
+  — separate follow-on if the static placement still drifts.
+- Ward types other than the standard `Thornward` — start with the
+  current ward and generalize if soak data shows ward-type matters.
+
+## Current state
+209 already added an `extend the perimeter anchor with a
+recency-weighted variant reading CarcassScentMap` axis on
+`herbcraft_ward_dse`, weighted by `ward_recency_anchor_weight` —
+that uses CarcassScentMap (kill-site decay), not Ambush events.
+This ticket adds a *parallel* axis on RecentAmbushMap (event-decay
+on attempted ambushes, regardless of kill outcome).
+
+## Approach
+1. Wire `recent_ambush_at_position` axis into
+   `herbcraft_ward_dse::composition()` per the existing
+   `(1-w)`-rebalance pattern (or sum-based if CP).
+2. Constant `ward_ambush_anchor_weight` (default 0.0) in
+   `sim_constants.rs`.
+3. Same-commit reader: at least one trace record path that
+   exercises the new axis when `RecentAmbushMap` is non-empty.
+
+## Verification
+- `just check` (substrate-stub + influence-map lints)
+- `just test` (unit test asserting the new axis appears in DSE
+  composition with weight binding)
+- Soak inspection: `just soak-trace 42 Wren` post-tuning would
+  show `WardPlaced` events clustering on tiles with non-zero
+  `recent_ambush_at_position`.
+
+## Log
+- 2026-05-07: opened from 210 closeout, blocked on 219 (the
+  `RecentAmbushMap` substrate it consumes).

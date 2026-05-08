@@ -1,0 +1,85 @@
+---
+id: 221
+title: caretake gates on ambush-recency at kitten tile
+status: blocked
+cluster: ai-substrate
+added: 2026-05-07
+parked: null
+blocked-by: [219]
+supersedes: []
+related-systems: [ai-substrate-refactor.md]
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+210's mechanism investigation surfaced kitten vulnerability:
+Thistlekit-52 was ambushed 3 times in 2489 ticks at [43,19]/[42,20]
+before starving. Hazelkit-8 and Duskkit-52 starved at [35,26],
+adjacent to the [30-39, 20-29] ambush hot zone. Kittens currently
+have no positional defense — they sit wherever they spawned, even
+on tiles where colony-mates have been recently ambushed.
+
+The fix is for `caretake_dse` (and possibly the relocate-kitten
+step it sequences) to elevate score when a kitten is on a tile with
+non-zero `recent_ambush_at_position` (ticket 219). When a caretaker
+sees a kitten on a hot tile, they should pick the kitten up and
+move it to a colder tile — analogous to predator-displacement
+behavior in real social mammals (elephants, meerkats, hyenas).
+
+## Scope
+- New axis on `caretake_dse`: `kitten_at_recent_ambush_tile` —
+  reads `recent_ambush_at_position` sampled at the *kitten's*
+  position (not the caretaker's), via the target-taking DSE
+  pattern (`caretake_dse` is target-taking per 209's spec).
+- Curve `Composite{Logistic(8.0, 0.5)}` with weight =
+  `caretake_kitten_safety_weight`, ships dormant at 0.0.
+- Existing `kitten_distress` and other Caretake axes preserved
+  via `(1-w)` rebalance.
+
+## Out of scope
+- The relocation step itself — `caretake_dse` already sequences
+  pickup + travel + drop steps; this ticket only adjusts scoring
+  so the existing relocate path fires more often when the kitten
+  is on a hot tile.
+- Caretaker-side safety scoring (caretaker shouldn't enter a hot
+  zone to retrieve a kitten if they themselves are wounded) —
+  separate ticket if soak shows caretakers dying during relocate
+  attempts.
+- Kitten-self-flee behavior (kittens choose to flee a hot tile on
+  their own) — kittens currently have no agency at this layer;
+  caretaker-mediated relocation is the right level.
+
+## Current state
+209 added `KittenCryCaretakeLift` modifier on Caretake (existing
+substrate). This ticket adds a *position-aware* axis distinct from
+the cry-based modifier — caretake should fire even when a kitten
+*isn't* crying if the kitten's tile has been ambushed recently.
+
+## Approach
+1. Confirm `caretake_dse` is target-taking and reads target
+   position via the standard `target_pos` ScoringContext field.
+2. Add the new axis to its composition — sample `RecentAmbushMap`
+   at `target_pos` (kitten's tile, not caretaker's).
+3. Constant `caretake_kitten_safety_weight` (default 0.0) in
+   `sim_constants.rs`.
+4. Same-commit reader: trace record exercising the new axis when
+   a kitten is on a tile with non-zero `recent_ambush_at_position`.
+
+## Verification
+- `just check` (substrate-stub + influence-map lints)
+- `just test` — unit test asserting the new axis appears with
+  correct weight binding and target-resolved sampling.
+- Trace inspection: `just soak-trace 42 Wren` post-tuning would
+  show `caretake` evals on kitten targets where the
+  `kitten_at_recent_ambush_tile` axis input is non-zero.
+- 210's data point (Thistlekit-52 starved at [43,19] after 3
+  ambushes within 2489 ticks) is the regression test the eventual
+  tuned weight should fix: with this DSE active, a caretaker
+  should have relocated the kitten before the second or third
+  ambush.
+
+## Log
+- 2026-05-07: opened from 210 closeout, blocked on 219 (the
+  `RecentAmbushMap` substrate it consumes).
