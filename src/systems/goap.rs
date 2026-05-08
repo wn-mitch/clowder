@@ -4324,16 +4324,9 @@ fn dispatch_step_action(
                             .and_then(|p| p.last())
                             .is_some_and(|last| *last != target_pos)
                     {
-                        let (fox_overlay, corr_overlay) = cat_overlays_pair!();
-                        let w = crate::ai::pathfinding::cat_path_weight_from_boldness(
-                            personality.boldness,
-                        );
-                        let cat_overlays: [crate::ai::pathfinding::WeightedOverlay; 2] = [
-                            crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
-                            crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
-                        ];
+                        let path_plan = cat_path_plan!(target_pos);
                         plan.step_state[step_idx].cached_path =
-                            crate::ai::pathfinding::find_path(*pos, target_pos, &ec.map, &cat_overlays);
+                            path_plan.find_full_path(*pos, target_pos, &ec.map);
                     }
                     if let Some(ref mut path) = plan.step_state[step_idx].cached_path {
                         if let Some(next) = path.first().copied() {
@@ -4595,16 +4588,9 @@ fn dispatch_step_action(
             if let Some(ward_target) = plan.ward_placement_pos {
                 if pos.manhattan_distance(&ward_target) > 1 {
                     if plan.step_state[step_idx].cached_path.is_none() {
-                        let (fox_overlay, corr_overlay) = cat_overlays_pair!();
-                        let w = crate::ai::pathfinding::cat_path_weight_from_boldness(
-                            personality.boldness,
-                        );
-                        let cat_overlays: [crate::ai::pathfinding::WeightedOverlay; 2] = [
-                            crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
-                            crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
-                        ];
+                        let path_plan = cat_path_plan!(ward_target);
                         plan.step_state[step_idx].cached_path =
-                            crate::ai::pathfinding::find_path(*pos, ward_target, &ec.map, &cat_overlays);
+                            path_plan.find_full_path(*pos, ward_target, &ec.map);
                     }
                     if let Some(ref mut path) = plan.step_state[step_idx].cached_path {
                         if let Some(next) = path.first().copied() {
@@ -4731,12 +4717,8 @@ fn dispatch_step_action(
                 .target_entity
                 .map(|e| snaps.cat_positions.iter().any(|(ce, _)| *ce == e))
                 .unwrap_or(false);
-            let (fox_overlay, corr_overlay) = cat_overlays_pair!();
-            let w = crate::ai::pathfinding::cat_path_weight_from_boldness(personality.boldness);
-            let cat_overlays: [crate::ai::pathfinding::WeightedOverlay; 2] = [
-                crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
-                crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
-            ];
+            let target_pos = plan.step_state[step_idx].target_position.unwrap_or(*pos);
+            let path_plan = cat_path_plan!(target_pos);
             let (result, gratitude) = crate::steps::magic::resolve_apply_remedy(
                 remedy,
                 cat_entity,
@@ -4747,7 +4729,7 @@ fn dispatch_step_action(
                 pos,
                 skills,
                 &ec.map,
-                &cat_overlays,
+                &path_plan,
                 commands,
                 &mut narr.log,
                 ec.time.tick,
@@ -4839,16 +4821,9 @@ fn dispatch_step_action(
             if let Some(target) = plan.step_state[step_idx].target_position {
                 if pos.manhattan_distance(&target) > 0 {
                     if plan.step_state[step_idx].cached_path.is_none() {
-                        let (fox_overlay, corr_overlay) = cat_overlays_pair!();
-                        let w = crate::ai::pathfinding::cat_path_weight_from_boldness(
-                            personality.boldness,
-                        );
-                        let cat_overlays: [crate::ai::pathfinding::WeightedOverlay; 2] = [
-                            crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
-                            crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
-                        ];
+                        let path_plan = cat_path_plan!(target);
                         plan.step_state[step_idx].cached_path =
-                            crate::ai::pathfinding::find_path(*pos, target, &ec.map, &cat_overlays);
+                            path_plan.find_full_path(*pos, target, &ec.map);
                     }
                     if let Some(ref mut path) = plan.step_state[step_idx].cached_path {
                         if !path.is_empty() {
@@ -4948,16 +4923,9 @@ fn dispatch_step_action(
                 if walking {
                     let target = plan.step_state[step_idx].target_position.unwrap();
                     if plan.step_state[step_idx].cached_path.is_none() {
-                        let (fox_overlay, corr_overlay) = cat_overlays_pair!();
-                        let w = crate::ai::pathfinding::cat_path_weight_from_boldness(
-                            personality.boldness,
-                        );
-                        let cat_overlays: [crate::ai::pathfinding::WeightedOverlay; 2] = [
-                            crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
-                            crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
-                        ];
+                        let path_plan = cat_path_plan!(target);
                         plan.step_state[step_idx].cached_path =
-                            crate::ai::pathfinding::find_path(*pos, target, &ec.map, &cat_overlays);
+                            path_plan.find_full_path(*pos, target, &ec.map);
                     }
                     if let Some(ref mut path) = plan.step_state[step_idx].cached_path {
                         if !path.is_empty() {

@@ -921,7 +921,7 @@ pub fn resolve_magic_task_chains(
                     &mut pos,
                     &mut skills,
                     &map,
-                    &[],
+                    &crate::ai::route_cost::CatPathPlan::NoOverlay,
                     &mut commands,
                     &mut log,
                     time.tick,

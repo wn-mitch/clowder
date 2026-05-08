@@ -1,6 +1,6 @@
 use bevy_ecs::prelude::*;
 
-use crate::ai::pathfinding::find_path;
+use crate::ai::route_cost::CatPathPlan;
 use crate::components::magic::{RemedyEffect, RemedyKind};
 use crate::components::physical::Position;
 use crate::components::skills::Skills;
@@ -48,7 +48,7 @@ pub fn resolve_apply_remedy(
     pos: &mut Position,
     skills: &mut Skills,
     map: &TileMap,
-    overlays: &[crate::ai::pathfinding::WeightedOverlay<'_>],
+    path_plan: &CatPathPlan<'_>,
     commands: &mut Commands,
     log: &mut NarrativeLog,
     tick: u64,
@@ -58,7 +58,7 @@ pub fn resolve_apply_remedy(
     if let Some(target_pos) = target_position {
         if pos.manhattan_distance(&target_pos) > 1 {
             if cached_path.is_none() {
-                match find_path(*pos, target_pos, map, overlays) {
+                match path_plan.find_full_path(*pos, target_pos, map) {
                     Some(path) => *cached_path = Some(path),
                     None => return (StepResult::Fail("no path to patient".into()), None),
                 }
@@ -138,7 +138,7 @@ mod tests {
             &mut pos,
             &mut skills,
             &map,
-            &[],
+            &CatPathPlan::NoOverlay,
             &mut commands,
             &mut log,
             100,
@@ -176,7 +176,7 @@ mod tests {
             &mut pos,
             &mut skills,
             &map,
-            &[],
+            &CatPathPlan::NoOverlay,
             &mut commands,
             &mut log,
             100,
@@ -213,7 +213,7 @@ mod tests {
             &mut pos,
             &mut skills,
             &map,
-            &[],
+            &CatPathPlan::NoOverlay,
             &mut commands,
             &mut log,
             100,

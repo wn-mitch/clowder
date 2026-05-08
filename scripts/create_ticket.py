@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.10"
-# dependencies = []
+# dependencies = [
+#     "fastembed>=0.4",
+#     "numpy>=1.26",
+# ]
 # ///
 """
 Open a new Clowder open-work ticket from a template.
@@ -209,7 +212,32 @@ def main(argv: list[str]) -> int:
     if blocked_by_ids:
         print(f"  status: blocked  (blocked-by: {blocked_by_ids})")
     print(f"  next: open in your editor and fill out ## Why")
+
+    _print_related_suggestions(args.title)
+
     return 0
+
+
+def _print_related_suggestions(title: str) -> None:
+    """Embed the new ticket's title and print the top-K nearest existing
+    tickets so the author can decide which to formally cross-reference.
+
+    Fails soft: missing index, missing fastembed, model-load error —
+    all silenced. Ticket creation is the load-bearing operation; this
+    is a courtesy nudge, not a gate."""
+    try:
+        sys.path.insert(0, str(REPO_ROOT / "scripts" / "similar"))
+        from suggest import (                              # type: ignore[import-not-found]
+            render_suggestions_lines, suggest_related_tickets,
+        )
+    except ImportError:
+        return
+    try:
+        hits = suggest_related_tickets(title, top_k=5)
+    except Exception:
+        return
+    for line in render_suggestions_lines(hits):
+        print(line)
 
 
 if __name__ == "__main__":
