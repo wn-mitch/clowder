@@ -41,10 +41,10 @@ this file.
 | Phase | Spec section | State | Owner ticket(s) |
 |---|---|---|---|
 | Phase 1 | §11 instrumentation | ✅ landed | (cluster-A umbrella, retired 005) |
-| Phase 2 | §5 InfluenceMap substrate | ✅ landed (substrate); 🔄 catalog rollout | [006](006-cluster-b-shared-spatial-slow-state.md) |
+| Phase 2 | §5 InfluenceMap substrate | ✅ landed (substrate + Cluster B closeout); 🔄 §5.6.3 follow-ons | 006 ✅ landed (10989775), 061 ✅ landed; in flight: [062](062-prey-species-split-maps.md), [063](063-ward-strength-promotion.md), [064](064-carcass-scent-consumer-cutover.md) |
 | Phase 3a–3d | §2–§3 / §4 / §9 L2 substrate | ✅ landed | (retired 005) |
 | Phase 4 | §6 target-taking DSEs | ✅ landed | (retired 014) |
-| Phase 4 follow-ons | §4 / §6.5 residue | 🔄 in flight | [049](049-faction-overlay-markers.md), [050](050-marker-predicate-refinements.md), [051](051-fox-dse-eligibility-migration.md), 052 ✅ landed (acccdc7), [065](065-l2-10-7-self-state-fox-roster-sweep.md) |
+| Phase 4 follow-ons | §4 / §6.5 residue | 🔄 in flight | 049 ✅ landed (384bf25), 052 ✅ landed (acccdc7), 065 ✅ landed; in flight: [050](050-marker-predicate-refinements.md), [051](051-fox-dse-eligibility-migration.md) |
 | Phase 5 | scattered sites + silent-advance audit | ✅ landed | (retired 005) |
 | Phase 6a | §7 commitment gate | ✅ landed | (retired 005) |
 | Phase 6b | §7.7 aspiration reconsideration | 🔄 in flight | [053](053-death-event-grief-emission.md), [054](054-fate-event-vocabulary-expansion.md), [055](055-mood-drift-threshold-detection.md), [056](056-aspiration-compatibility-matrix.md), [057](057-coordinator-directive-intention-strategy-row.md), [058](058-tradition-unfiltered-loop-fix.md) |

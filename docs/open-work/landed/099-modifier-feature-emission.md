@@ -9,7 +9,7 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: pending
+landed-at: 2189f80d
 landed-on: 2026-05-08
 ---
 
@@ -115,4 +115,4 @@ matches the §3.5.1 modifier-pipeline aesthetic. Defer until unblocked.
   for ongoing canary visibility on the modifier, this ticket unblocks; if
   focal-trace inspection continues to suffice, this ticket can close as
   superseded. `blocked-by: [119]`.
-- 2026-05-08: 2026-05-08: Closed as superseded — gating condition not surfaced. The ticket parked 2026-05-01 with the contract "if focal-trace inspection continues to suffice [post-119], this ticket can close as superseded." 119 landed 2026-05-06 (CriticalHealth interrupt retirement); 108 landed 2026-05-07 (ThreatProximityAdrenaline activation + CriticalSafety retirement). Both relied on focal-trace `ModifierDelta` inspection (`src/ai/eval.rs:330`) plus bit-identical-soak comparison for verification — never reaching for the colony-wide `Feature::*Applied` emission this ticket was scoped to provide. Same retirement shape as 076 / 081 / 111 / 112: substrate-over-override doctrine includes "don't ship substrate for an absent problem." If a future modifier surfaces a need for always-on canary visibility (rather than per-cat focal-trace), re-open under a fresh ticket with the concrete signal that motivates it. `landed-at: pending` until the closeout commit lands.
+- 2026-05-08: Closed as superseded (`landed-at: 2189f80d`, bundled with 093 closeout) — gating condition not surfaced. The ticket parked 2026-05-01 with the contract "if focal-trace inspection continues to suffice [post-119], this ticket can close as superseded." 119 landed 2026-05-06 (CriticalHealth interrupt retirement); 108 landed 2026-05-07 (ThreatProximityAdrenaline activation + CriticalSafety retirement). Both relied on focal-trace `ModifierDelta` inspection (`src/ai/eval.rs:330`) plus bit-identical-soak comparison for verification — never reaching for the colony-wide `Feature::*Applied` emission this ticket was scoped to provide. Same retirement shape as 076 / 081 / 111 / 112: substrate-over-override doctrine includes "don't ship substrate for an absent problem." If a future modifier surfaces a need for always-on canary visibility (rather than per-cat focal-trace), re-open under a fresh ticket with the concrete signal that motivates it.
