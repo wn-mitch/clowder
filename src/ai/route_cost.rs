@@ -17,7 +17,9 @@
 //! Determinism: neighbor expansion order is fixed by `NEIGHBORS`;
 //! ties are broken by the order tiles enter the bucket.
 
-use crate::ai::pathfinding::{sum_overlay_cost, WeightedOverlay};
+use crate::ai::pathfinding::{
+    find_path, step_toward, sum_overlay_cost, CorruptionOverlay, FoxScentOverlay, WeightedOverlay,
+};
 use crate::components::physical::Position;
 use crate::components::route_cost_field::{RouteCostField, MAX_COST_BUDGET};
 use crate::resources::map::TileMap;
@@ -167,6 +169,116 @@ pub fn step_along_field(
         }
     }
     best.map(|(p, _)| p)
+}
+
+// ---------------------------------------------------------------------------
+// CatPathPlan — gradient-walk vs A* fallback dispatcher (commit 10)
+// ---------------------------------------------------------------------------
+
+/// Per-cat path-resolution dispatcher. Step resolvers (commit 11+)
+/// construct one of these per call, then call `next_step` /
+/// `find_full_path` against it. The `Field` arm walks the cached
+/// route-cost field's gradient (cheap, replan-cadence stale); the
+/// `AStarFallback` arm calls `find_path` with overlay slices
+/// (expensive, always-fresh) when the field is missing, stale, or
+/// doesn't reach the destination.
+///
+/// **Fallback observability** — callers should emit
+/// `Feature::RouteCostFieldFallback` whenever they construct an
+/// `AStarFallback` so the canary can detect chronic field-build or
+/// staleness bugs (`expected_to_fire_per_soak() == false`).
+pub enum CatPathPlan<'a> {
+    /// Walk the gradient of `field` toward the destination. Cheapest
+    /// path (no per-step search). Use when the field is fresh and
+    /// reaches the destination.
+    Field(&'a RouteCostField),
+    /// Fall back to A\* with overlay slices. Use when no field is
+    /// available, or when the field is stale / doesn't reach the
+    /// destination. Boldness factor `weight` is baked into both
+    /// overlay weights — same input shape as `find_path` callers
+    /// historically used.
+    AStarFallback {
+        fox: FoxScentOverlay<'a>,
+        corr: CorruptionOverlay<'a>,
+        weight: f32,
+    },
+}
+
+impl<'a> CatPathPlan<'a> {
+    /// True iff this plan's underlying field reaches `to` in
+    /// budget. `Field` arms with `cost_at(to) >= MAX_COST_BUDGET`
+    /// or older than `replan_window_ticks` should fall back to A\*
+    /// — `should_fall_back_at` answers the staleness/reach check
+    /// callers run before constructing the plan.
+    pub fn should_fall_back_at(
+        field: &RouteCostField,
+        to: Position,
+        current_tick: u64,
+        replan_window_ticks: u64,
+    ) -> bool {
+        if !field.is_reachable(to) {
+            return true;
+        }
+        // `origin_tick + replan_window < current_tick` ⇒ stale.
+        // Saturating to avoid underflow at very low tick counts.
+        current_tick.saturating_sub(field.origin_tick) > replan_window_ticks
+    }
+
+    /// One-step walk from `from` toward `to`. Returns `None` when
+    /// the cat is stuck (no passable neighbor) or already at `to`.
+    pub fn next_step(&self, from: Position, to: Position, map: &TileMap) -> Option<Position> {
+        match self {
+            CatPathPlan::Field(field) => step_along_field(from, to, field, map),
+            CatPathPlan::AStarFallback { fox, corr, weight } => {
+                let overlays = [
+                    WeightedOverlay::new(fox, *weight),
+                    WeightedOverlay::new(corr, *weight),
+                ];
+                step_toward(&from, &to, map, &overlays)
+            }
+        }
+    }
+
+    /// Full path from `from` to `to` as a `Vec<Position>` (excluding
+    /// `from`, ending at `to`). The `Field` arm reconstructs by
+    /// repeatedly calling `step_along_field`; the `AStarFallback`
+    /// arm calls `find_path` directly. Returns `None` if no path
+    /// exists.
+    pub fn find_full_path(
+        &self,
+        from: Position,
+        to: Position,
+        map: &TileMap,
+    ) -> Option<Vec<Position>> {
+        match self {
+            CatPathPlan::Field(field) => {
+                if from == to {
+                    return Some(Vec::new());
+                }
+                let mut path = Vec::new();
+                let mut cur = from;
+                while cur != to {
+                    let next = step_along_field(cur, to, field, map)?;
+                    if next == cur {
+                        return None; // stuck
+                    }
+                    path.push(next);
+                    cur = next;
+                    if path.len() > (map.width as usize) * (map.height as usize) {
+                        return None; // safety cap; field-walk shouldn't loop
+                    }
+                }
+                Some(path)
+            }
+            CatPathPlan::AStarFallback { fox, corr, weight } => {
+                let overlays = [
+                    WeightedOverlay::new(fox, *weight),
+                    WeightedOverlay::new(corr, *weight),
+                ];
+                find_path(from, to, map, &overlays)
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

@@ -327,6 +327,16 @@ pub enum Feature {
     /// ascending colony this should be near-zero; non-zero counts
     /// inform the post-soak `verdict` whether disposal is keeping up.
     OverflowToGround,
+    /// Ticket 228 — emitted when cat-side path resolution falls back
+    /// from per-cat `RouteCostField` gradient walking to A\* with
+    /// overlay slices. Fires whenever the field is missing
+    /// (pre-flood; despawned and respawned cats), stale (older than
+    /// the replan window), or doesn't reach the destination
+    /// (cost beyond `MAX_COST_BUDGET`). `expected_to_fire_per_soak()
+    /// => false` — a healthy soak should rarely hit this code path
+    /// since every replan rebuilds the field; chronic counts indicate
+    /// field-staleness or build-correctness bugs.
+    RouteCostFieldFallback,
 }
 
 impl Feature {
@@ -443,6 +453,7 @@ impl Feature {
         Feature::ItemTrashed,
         Feature::ItemHandedOff,
         Feature::OverflowToGround,
+        Feature::RouteCostFieldFallback,
     ];
 
     /// The valence of this feature.
@@ -546,6 +557,7 @@ impl Feature {
             // exist (items-are-real); only the colony's inventory
             // efficiency suffers.
             Feature::OverflowToGround => Negative,
+            Feature::RouteCostFieldFallback => Negative,
             Feature::DepositFailedNoStore => Negative,
             Feature::PosseCandidateExcludedStarving => Negative,
             Feature::KnowledgeForgotten => Negative,
@@ -760,6 +772,11 @@ impl Feature {
             Feature::ItemTrashed => false,
             Feature::ItemHandedOff => false,
             Feature::OverflowToGround => false,
+            // 228: should rarely fire in a healthy soak (every replan
+            // rebuilds the field). Chronic counts indicate field
+            // staleness or build-correctness bugs; the canary is the
+            // tripwire that surfaces them.
+            Feature::RouteCostFieldFallback => false,
             // Every other feature is expected to fire per soak.
             _ => true,
         }
@@ -878,6 +895,7 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::ItemTrashed => "ItemTrashed",
         Feature::ItemHandedOff => "ItemHandedOff",
         Feature::OverflowToGround => "OverflowToGround",
+        Feature::RouteCostFieldFallback => "RouteCostFieldFallback",
     }
 }
 
@@ -1111,8 +1129,10 @@ mod tests {
         // disposal-action surface (Drop / Trash / Handoff).
         // Ticket 118 added 1 Negative (ModifierPreemption — substrate-
         // driven plan preemption from acute-class lurch modifiers).
+        // Ticket 228 added 1 Negative (RouteCostFieldFallback — A*
+        // fallback observability for the per-cat route-cost field).
         assert_eq!(positive, 49);
-        assert_eq!(negative, 22);
+        assert_eq!(negative, 23);
         assert_eq!(neutral, 31);
     }
 
@@ -1183,7 +1203,7 @@ mod tests {
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),
-            22
+            23
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Neutral),
