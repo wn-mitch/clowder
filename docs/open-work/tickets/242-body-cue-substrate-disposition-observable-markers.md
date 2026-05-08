@@ -1,0 +1,61 @@
+---
+id: 242
+title: Body-cue substrate (Disposition → observable markers)
+status: blocked
+cluster: null
+added: 2026-05-08
+parked: null
+blocked-by: [126]
+supersedes: []
+related-systems: []
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+126 keeps `HeldIntention` actor-private and rules out direct
+`Disposition` reads as mind-reading. Sister DSEs need observable
+substrate to form intentions from cues; body-cue markers are the
+observable channel real cats use, and the many-to-one mapping
+(`HeadDownCurled` is emitted by Resting AND Mourning AND
+incapacitated injury) is what makes inference appropriately fallible
+— misreadings are substrate-native narrative texture, not a noise
+overlay. Substrate-over-override at the L1 surface: the body cue is
+the observable, the Disposition stays private.
+
+## Scope
+- Each `Disposition` (and select physical states) authors body-cue
+  ZST markers on the cat: `StalkingPosture` (Hunting low-stalk),
+  `HeadDownCurled` (Resting / Mourning / incapacitated),
+  `ArchedBack` (defensive), `TailLashing` (irritated/threatened),
+  `EarsBack` (alert/aggressive).
+- Author sites in the per-Disposition step resolvers / chain
+  builders so the marker fires on disposition entry and is removed
+  on exit (lifecycle mirrors `PairingActivity`'s pattern).
+- Documentation in `docs/systems/body-cues.md` mapping each
+  Disposition to its emitted body cues.
+
+## Out of scope
+- Sister-DSE consumers (those land in 243 / 245).
+- Audible cues (244).
+- Cross-cat reads of body cues — formalised in 243.
+
+## Current state
+Deferred subscope of 126. Opened on the C4 landing commit per the
+narrative-discipline framing in 126's revised §Perceivability.
+
+## Approach
+Mirror `PairingActivity`'s shape: per-cat marker authored by the
+Disposition's entry/exit hooks. The marker set is fixed at landing
+time; future tickets extend the vocabulary.
+
+## Verification
+- New body-cue markers appear in `MarkerSnapshot` snapshots when
+  cats hold their corresponding Dispositions.
+- Markers correctly clear on disposition transition.
+- Many-to-one mapping documented in `docs/systems/body-cues.md`.
+
+## Log
+- 2026-05-08: opened on 126's C4 landing commit per the actor-
+  private narrative-discipline framing.

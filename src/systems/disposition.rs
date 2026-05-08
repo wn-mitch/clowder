@@ -1075,6 +1075,10 @@ pub fn evaluate_dispositions(
         // rising-threat cats hit the floor and calm cats hit the
         // ceiling.
         let softmax_temperature = crate::ai::scoring::softmax_temperature(&ctx, sc);
+        // Ticket 126 — `_with_trace` now returns `SoftmaxOutcome`;
+        // the auxiliary `cat_presence_tick` path doesn't author
+        // `HeldIntention` (only `evaluate_and_plan` is the L2 author),
+        // so we project to `.chosen` for back-compat.
         let chosen = crate::ai::scoring::select_disposition_via_intention_softmax_with_trace(
             &scores,
             personality.independence,
@@ -1082,7 +1086,8 @@ pub fn evaluate_dispositions(
             softmax_temperature,
             &mut rng.rng,
             softmax_trace.as_mut(),
-        );
+        )
+        .chosen;
         if let (Some(capture), Some(trace)) = (focal_capture, softmax_trace) {
             capture.set_softmax(trace, side_effects.time.tick);
         }

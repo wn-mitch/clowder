@@ -2348,6 +2348,43 @@ pub fn select_disposition_via_intention_softmax(
         rng,
         None,
     )
+    .chosen
+}
+
+/// Ticket 126 — full outcome of one L3 softmax pick. The chosen
+/// disposition is the back-compat field; `chosen_action` records the
+/// specific Action variant that won (load-bearing for the
+/// `HeldIntention.held_action` field), and the score deltas let the
+/// L2 author derive a margin-weighted `commitment_strength` via
+/// `commitment_strength_from_margin`. Returned only by the
+/// `_with_trace` variant; the legacy
+/// `select_disposition_via_intention_softmax` projects to `.chosen`
+/// for callers that don't need the margin.
+#[derive(Debug, Clone, Copy)]
+pub struct SoftmaxOutcome {
+    pub chosen: DispositionKind,
+    /// The Action variant the softmax picked from the post-penalty
+    /// pool. `Action::Idle` only when the pool was empty (the
+    /// fallthrough Resting branch).
+    pub chosen_action: Action,
+    /// The chosen Action's score after the disposition-independence
+    /// penalty. `0.0` on the empty-pool fallthrough.
+    pub chosen_score: f32,
+    /// The next-highest score in the post-penalty pool (the score-
+    /// space "runner-up" — note this is by raw L2 score, not by
+    /// softmax probability, since
+    /// `commitment_strength_from_margin` operates on the score
+    /// margin). Equal to `chosen_score` when the pool had only one
+    /// surviving entry; `0.0` on the empty-pool fallthrough.
+    pub runner_up_score: f32,
+}
+
+impl SoftmaxOutcome {
+    /// Score margin (`chosen_score - runner_up_score`). Always >= 0
+    /// since the runner-up is by definition <= chosen.
+    pub fn margin(&self) -> f32 {
+        (self.chosen_score - self.runner_up_score).max(0.0)
+    }
 }
 
 /// §11.3 L3 softmax capture surface. When `sink` is `Some`, populates it
@@ -2365,7 +2402,7 @@ pub fn select_disposition_via_intention_softmax_with_trace(
     temperature: f32,
     rng: &mut impl Rng,
     mut sink: Option<&mut SoftmaxCapture>,
-) -> DispositionKind {
+) -> SoftmaxOutcome {
     // Build the filtered pool: drop Flee and Idle (handled outside the
     // disposition selection layer) and any zero-scoring actions (the legacy
     // `aggregate_to_dispositions` also drops zero-scoring dispositions).
@@ -2414,7 +2451,15 @@ pub fn select_disposition_via_intention_softmax_with_trace(
             sink.empty_pool = true;
             sink.pool_pre_penalty = pool_pre_penalty_snapshot;
         }
-        return DispositionKind::Resting;
+        return SoftmaxOutcome {
+            chosen: DispositionKind::Resting,
+            // Idle is the cleanest null marker — Resting's fallback
+            // chain feeds Idle when the pool empties; `held_action`
+            // stays consistent with what the cat would have rested on.
+            chosen_action: Action::Idle,
+            chosen_score: 0.0,
+            runner_up_score: 0.0,
+        };
     }
 
     // Softmax over the flat Intention pool. Runs the standard max-shift
@@ -2457,11 +2502,34 @@ pub fn select_disposition_via_intention_softmax_with_trace(
         sink.pool_pre_penalty = pool_pre_penalty_snapshot;
     }
 
+    // Compute the runner-up score in raw L2-score space (not softmax
+    // probability) for `commitment_strength_from_margin`. The
+    // runner-up is the second-highest score, regardless of whether
+    // the softmax actually sampled it. When the pool has only one
+    // surviving entry the runner-up equals the chosen score (margin
+    // = 0 → strength = 0).
+    let chosen_score = pool[chosen_idx].1;
+    let runner_up_score = pool
+        .iter()
+        .enumerate()
+        .filter_map(|(i, (_, s))| (i != chosen_idx).then_some(*s))
+        .fold(f32::NEG_INFINITY, f32::max);
+    let runner_up_score = if runner_up_score.is_finite() {
+        runner_up_score
+    } else {
+        chosen_score
+    };
+
     // 158: 1:1 mapping for every dispositioned action. The pre-158
     // `Action::Groom` umbrella required a side-channel `self_groom_won`
     // resolver; the sibling-Action split makes the L3 pick directly
     // determinative.
-    DispositionKind::from_action(chosen_action).unwrap_or(DispositionKind::Resting)
+    SoftmaxOutcome {
+        chosen: DispositionKind::from_action(chosen_action).unwrap_or(DispositionKind::Resting),
+        chosen_action,
+        chosen_score,
+        runner_up_score,
+    }
 }
 
 /// Captured snapshot of one softmax selection for §11.3 L3 replay.
@@ -4792,7 +4860,7 @@ mod tests {
         let scores = vec![(Action::Flee, 0.9), (Action::Idle, 0.3)];
         let mut rng = seeded_rng(2);
         let mut capture = SoftmaxCapture::default();
-        let chosen = select_disposition_via_intention_softmax_with_trace(
+        let outcome = select_disposition_via_intention_softmax_with_trace(
             &scores,
             0.0,
             0.0,
@@ -4801,9 +4869,12 @@ mod tests {
             Some(&mut capture),
         );
         assert_eq!(
-            chosen,
+            outcome.chosen,
             crate::components::disposition::DispositionKind::Resting
         );
+        assert_eq!(outcome.chosen_action, Action::Idle);
+        assert_eq!(outcome.chosen_score, 0.0);
+        assert_eq!(outcome.runner_up_score, 0.0);
         assert!(capture.empty_pool);
         assert!(capture.pool.is_empty());
         assert!(capture.probabilities.is_empty());
@@ -4837,7 +4908,7 @@ mod tests {
             &mut seeded_rng(99),
             None,
         );
-        assert_eq!(plain, traced);
+        assert_eq!(plain, traced.chosen);
     }
 
     // -------------------------------------------------------------------

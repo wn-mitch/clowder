@@ -454,6 +454,52 @@ pub fn record_drop(
     }
 }
 
+/// Ticket 126 — generalises `should_drop_pairing`'s `partner_invalid`
+/// arm. Returns `true` when a held intention's target is no longer a
+/// valid focus: the entity was despawned, is `Dead`, `Banished`, or
+/// `Incapacitated`. Trigger (4) of the §126 four-trigger
+/// reconsideration set.
+///
+/// Pure on `(target, world)`; the `World` parameter lets the helper
+/// do its own component lookups via `world.get::<T>()` so callers
+/// don't need to plumb a dedicated `Query`.
+///
+/// 126 ships the helper with no live writer (`HeldIntention.target`
+/// is always `None` in the C3 author site); the read-site lands so
+/// 127 (Joint-intention substrate) and 129 (Care DSEs) can consume
+/// it without re-touching `commitment.rs`.
+pub fn target_invalidates_intention(
+    target: Option<bevy_ecs::prelude::Entity>,
+    world: &bevy_ecs::world::World,
+) -> bool {
+    use bevy_ecs::prelude::Entity;
+    let Some(target): Option<Entity> = target else {
+        return false;
+    };
+    let Ok(entity_ref) = world.get_entity(target) else {
+        return true;
+    };
+    if entity_ref
+        .get::<crate::components::physical::Dead>()
+        .is_some()
+    {
+        return true;
+    }
+    if entity_ref
+        .get::<crate::components::markers::Banished>()
+        .is_some()
+    {
+        return true;
+    }
+    if entity_ref
+        .get::<crate::components::markers::Incapacitated>()
+        .is_some()
+    {
+        return true;
+    }
+    false
+}
+
 /// Which arm of the §7.2 strategy dispatch decided the drop.
 /// `Retained` is not represented because `record_drop` is only
 /// called when the gate says to drop. Focal-trace capture records

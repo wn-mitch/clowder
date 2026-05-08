@@ -47,6 +47,7 @@
 use bevy_ecs::prelude::*;
 
 use crate::ai::dse::Intention;
+use crate::ai::Action;
 
 /// Where this intention came from. Self-formed dispositions carry
 /// `SelfMotivated`; intentions adopted in response to a coordinator's
@@ -136,6 +137,17 @@ pub struct HeldIntention {
     /// `MomentumSummary.held_dse` instead.
     #[serde(skip)]
     pub intention: Intention,
+    /// The cat's held DSE encoded as an `Action`. Round-trips 1:1 to
+    /// the codebase's DSE id strings via
+    /// `crate::ai::modifier::dse_id_for_action`; the
+    /// `IntentionMomentum` modifier reads it through the
+    /// `INTENTION_HELD_ACTION_ORDINAL` scalar. Stored separately from
+    /// `intention` because `Intention::Activity { kind: ActivityKind }`
+    /// and `Intention::Goal { state: GoalState }` don't map cleanly
+    /// 1:1 to `Action` (e.g., `Resting` covers `Sleep` and `GroomSelf`,
+    /// and the held DSE within that disposition is what gets the
+    /// margin-weighted lift).
+    pub held_action: Action,
     /// The target entity (cat / building / tile-resident / wildlife)
     /// the intention is *toward*. `None` for self-state intentions
     /// (Rest, Idle, Wander). `Serialize`-skipped per `PairingActivity`
@@ -167,6 +179,7 @@ impl HeldIntention {
     /// Convenience constructor used by the L2 author site.
     pub fn new(
         intention: Intention,
+        held_action: Action,
         target: Option<Entity>,
         tick: u64,
         commitment_strength: f32,
@@ -175,6 +188,7 @@ impl HeldIntention {
     ) -> Self {
         Self {
             intention,
+            held_action,
             target,
             adopted_tick: tick,
             commitment_strength: commitment_strength.clamp(0.0, 1.0),
@@ -187,6 +201,39 @@ impl HeldIntention {
     /// Trigger (3) — hard expiry — in `resolve_goap_plans`.
     pub fn is_expired(&self, now: u64) -> bool {
         self.expiry_tick.is_some_and(|t| now >= t)
+    }
+
+    /// Linear-decay factor at `now`. Returns `1.0` at `adopted_tick`,
+    /// ramps down to `0.0` at the decay window's edge:
+    ///
+    /// - `Goal` intentions (no `expiry_tick`) use `decay_window_ticks`
+    ///   (the `intention_momentum_decay_ticks` constant from
+    ///   `DispositionConstants`).
+    /// - `Activity` intentions with `expiry_tick = Some(t)` use
+    ///   `t - adopted_tick` as the window — the lift fades to zero
+    ///   at the activity's natural termination.
+    ///
+    /// Returns `0.0` when `now < adopted_tick` (clock-skew defense)
+    /// or when the window has elapsed. The `IntentionMomentum`
+    /// scalar is `commitment_strength × intention_momentum_lift ×
+    /// decay_factor`, so a 0.0 here makes the modifier short-circuit.
+    pub fn decay_factor(&self, now: u64, decay_window_ticks: u64) -> f32 {
+        if now < self.adopted_tick {
+            return 0.0;
+        }
+        let window = self
+            .expiry_tick
+            .map(|t| t.saturating_sub(self.adopted_tick))
+            .filter(|w| *w > 0)
+            .unwrap_or(decay_window_ticks);
+        if window == 0 {
+            return 0.0;
+        }
+        let elapsed = now - self.adopted_tick;
+        if elapsed >= window {
+            return 0.0;
+        }
+        1.0 - (elapsed as f32 / window as f32)
     }
 }
 
@@ -264,6 +311,7 @@ mod tests {
                 termination: crate::ai::dse::Termination::UntilInterrupt,
                 strategy: crate::ai::dse::CommitmentStrategy::OpenMinded,
             },
+            held_action: Action::Idle,
             target: None,
             adopted_tick: 100,
             commitment_strength: 0.5,
@@ -282,6 +330,7 @@ mod tests {
                 termination: crate::ai::dse::Termination::Ticks(50),
                 strategy: crate::ai::dse::CommitmentStrategy::OpenMinded,
             },
+            held_action: Action::Idle,
             target: None,
             adopted_tick: 100,
             commitment_strength: 0.5,
@@ -291,5 +340,53 @@ mod tests {
         assert!(!h.is_expired(149));
         assert!(h.is_expired(150));
         assert!(h.is_expired(200));
+    }
+
+    #[test]
+    fn decay_factor_starts_at_one_and_ramps_to_zero() {
+        let h = HeldIntention {
+            intention: Intention::Activity {
+                kind: crate::ai::dse::ActivityKind::Idle,
+                termination: crate::ai::dse::Termination::UntilInterrupt,
+                strategy: crate::ai::dse::CommitmentStrategy::OpenMinded,
+            },
+            held_action: Action::Hunt,
+            target: None,
+            adopted_tick: 100,
+            commitment_strength: 1.0,
+            expiry_tick: None,
+            source: IntentionSource::SelfMotivated,
+        };
+        // Goal-shape window: uses passed-in decay_window_ticks.
+        assert!((h.decay_factor(100, 600) - 1.0).abs() < 1e-6);
+        assert!((h.decay_factor(400, 600) - 0.5).abs() < 1e-6);
+        assert!((h.decay_factor(700, 600) - 0.0).abs() < 1e-6);
+        assert!((h.decay_factor(700, 600) - 0.0).abs() < 1e-6);
+        // Clock-skew defense: now < adopted_tick → 0.0.
+        assert_eq!(h.decay_factor(99, 600), 0.0);
+    }
+
+    #[test]
+    fn decay_factor_uses_expiry_window_for_activity_with_expiry() {
+        // Activity intention with explicit expiry — decay window is
+        // (expiry - adopted), not the passed-in default.
+        let h = HeldIntention {
+            intention: Intention::Activity {
+                kind: crate::ai::dse::ActivityKind::Rest,
+                termination: crate::ai::dse::Termination::Ticks(200),
+                strategy: crate::ai::dse::CommitmentStrategy::OpenMinded,
+            },
+            held_action: Action::Sleep,
+            target: None,
+            adopted_tick: 100,
+            commitment_strength: 1.0,
+            expiry_tick: Some(300),
+            source: IntentionSource::SelfMotivated,
+        };
+        assert!((h.decay_factor(100, 600) - 1.0).abs() < 1e-6);
+        // 100 ticks elapsed of a 200-tick window → 0.5.
+        assert!((h.decay_factor(200, 600) - 0.5).abs() < 1e-6);
+        // At expiry → 0.0.
+        assert!((h.decay_factor(300, 600) - 0.0).abs() < 1e-6);
     }
 }

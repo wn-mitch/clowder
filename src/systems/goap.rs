@@ -258,6 +258,11 @@ pub struct PlanResources<'w> {
     /// §11 rich-trace capture sink. Same gating as `focal_target`.
     /// Uses interior-`Mutex` so `EvalInputs` holds a shared reference.
     pub focal_capture: Option<Res<'w, crate::resources::FocalScoreCapture>>,
+    /// Ticket 126 — `Feature::IntentionAdopted` writer for the L2
+    /// author site. `Option<ResMut>` because some test harnesses don't
+    /// register the resource; matches `NarrativeEmitter`'s pattern in
+    /// `resolve_goap_plans`.
+    pub activation: Option<ResMut<'w, SystemActivation>>,
 }
 
 /// Bundles magic resolver dependencies to keep resolve_goap_plans under 16 params.
@@ -501,6 +506,15 @@ pub struct ExecutorContext<'w, 's> {
     /// excludes every candidate.
     pub parent_hungry_kitten_q:
         bevy_ecs::prelude::Query<'w, 's, Has<crate::components::markers::IsParentOfHungryKitten>>,
+    /// Ticket 126 — read-only `HeldIntention` lookup for the preempt
+    /// trigger (3) check in `resolve_goap_plans`'s per-cat prologue.
+    /// Disjoint from the mutable `cats` query because `&HeldIntention`
+    /// is read-only.
+    pub held_intentions: bevy_ecs::prelude::Query<
+        'w,
+        's,
+        &'static crate::components::HeldIntention,
+    >,
     /// Ticket 027b §7.M — L2 PairingActivity Intention lookup. The
     /// `SocializeWith` step resolver reads this to pin the Intention
     /// partner at the top of `target_partner_bond` axis. Disjoint
@@ -1124,7 +1138,7 @@ pub fn evaluate_and_plan(
         ),
     >,
     world_state: WorldStateQueries,
-    res: PlanResources,
+    mut res: PlanResources,
     mating_fitness_params: crate::ai::mating::MatingFitnessParams,
     colony: super::ColonyContext<'_>,
     mut rng: ResMut<SimRng>,
@@ -2108,14 +2122,16 @@ pub fn evaluate_and_plan(
         // threat is high, and broadens to the ceiling when the cat is
         // calm.
         let softmax_temperature = crate::ai::scoring::softmax_temperature(&ctx, sc);
-        let chosen = crate::ai::scoring::select_disposition_via_intention_softmax_with_trace(
-            &scores,
-            personality.independence,
-            d.disposition_independence_penalty,
-            softmax_temperature,
-            &mut rng.rng,
-            softmax_trace.as_mut(),
-        );
+        let softmax_outcome =
+            crate::ai::scoring::select_disposition_via_intention_softmax_with_trace(
+                &scores,
+                personality.independence,
+                d.disposition_independence_penalty,
+                softmax_temperature,
+                &mut rng.rng,
+                softmax_trace.as_mut(),
+            );
+        let chosen = softmax_outcome.chosen;
         if let (Some(capture), Some(mut trace)) = (focal_capture, softmax_trace) {
             if let Some(snap) = pre_bonus_pool_snapshot {
                 trace.pre_bonus_pool = snap;
@@ -2383,6 +2399,47 @@ pub fn evaluate_and_plan(
                 completions: 0,
             });
 
+            // Ticket 126 — author the actor-private HeldIntention
+            // alongside the GoapPlan. Strength is the
+            // softmax-temperature-normalised margin between the
+            // chosen Action and the score-space runner-up. The
+            // IntentionMomentum modifier reads commitment_strength ×
+            // intention_momentum_lift × decay_factor through the
+            // scalar surface; ScoringContext construction in the next
+            // tick will populate those scalars from this Component.
+            let strategy =
+                crate::ai::commitment::strategy_for_disposition(chosen);
+            let held_intention = crate::ai::dse::Intention::Activity {
+                // 126: placeholder Intention shape — the held DSE's
+                // identity rides on `held_action` for the modifier's
+                // round-trip, and `source` records provenance. Future
+                // tickets (128 HTN, 127 joint-intentions) will refine
+                // the Intention contents from each DSE's emit().
+                kind: crate::ai::dse::ActivityKind::Idle,
+                termination: crate::ai::dse::Termination::UntilInterrupt,
+                strategy,
+            };
+            let commitment_strength =
+                crate::components::held_intention::commitment_strength_from_margin(
+                    softmax_outcome.margin(),
+                    softmax_temperature,
+                );
+            let held = crate::components::HeldIntention::new(
+                held_intention,
+                chosen_action,
+                None,
+                res.time.tick,
+                commitment_strength,
+                None,
+                crate::components::IntentionSource::SelfMotivated,
+            );
+            commands.entity(entity).insert(held);
+            if let Some(activation) = res.activation.as_deref_mut() {
+                activation.record(
+                    crate::resources::system_activation::Feature::IntentionAdopted,
+                );
+            }
+
             current.ticks_remaining = u64::MAX;
             commands.entity(entity).insert(plan);
         } else {
@@ -2612,7 +2669,17 @@ pub fn resolve_goap_plans(
     mut magic_params: MagicResolverParams,
     mut plan_writer: MessageWriter<PlanNarrative>,
 ) {
-    let mut plans_to_remove: Vec<Entity> = Vec::new();
+    // Ticket 126 — drops carry their lifecycle classification so the
+    // cleanup loop can fire `IntentionFulfilled` (achievement-driven)
+    // vs `IntentionAbandoned` (every other branch). Local enum kept
+    // out of `commitment.rs` so the activation surface stays tied to
+    // the per-cat loop's flow control.
+    #[derive(Debug, Clone, Copy)]
+    enum IntentionEnding {
+        Fulfilled,
+        Abandoned(crate::components::IntentionAbandonReason),
+    }
+    let mut plans_to_remove: Vec<(Entity, IntentionEnding)> = Vec::new();
 
     // Pre-collect building and herb data to avoid query conflicts with cats.
     let building_snapshot: Vec<(Entity, StructureType, Position, bool, bool)> = building_params
@@ -2953,8 +3020,82 @@ pub fn resolve_goap_plans(
             };
             crate::ai::commitment::record_drop(narr.activation.as_deref_mut(), strategy, branch);
             current.ticks_remaining = 0;
-            plans_to_remove.push(cat_entity);
+            // Ticket 126 — map §7.2 DropBranch onto the lifecycle.
+            let ending = match branch {
+                crate::ai::commitment::DropBranch::Achieved => IntentionEnding::Fulfilled,
+                crate::ai::commitment::DropBranch::ReplanCap => IntentionEnding::Abandoned(
+                    crate::components::IntentionAbandonReason::BecameImpossible,
+                ),
+                crate::ai::commitment::DropBranch::DroppedGoal => IntentionEnding::Abandoned(
+                    crate::components::IntentionAbandonReason::DesireDrift,
+                ),
+            };
+            plans_to_remove.push((cat_entity, ending));
             continue;
+        }
+
+        // Ticket 126 — Trigger (3) preempt. Reads the cat's held
+        // intention plus the cached `current.last_scores` (one-tick-
+        // stale; populated at the previous `evaluate_and_plan`). If a
+        // non-held DSE's score exceeds
+        // `held_score + commitment_strength × intention_momentum_lift
+        // + intention_preempt_margin`, drop the plan with
+        // `Preempted`.
+        //
+        // **Gated on `commitment_strength` being meaningful.** The
+        // first iteration's threshold (`commitment_strength × 0.10 +
+        // 0.05`) was a strict-less-than `oscillation_score_lift`'s
+        // 0.10 pad — and `last_scores` is stale (populated only on
+        // `evaluate_and_plan`-tick adoption), so a strength=0 cat
+        // would have its preempt-threshold static at `held_score +
+        // 0.05`, which any score-noise competitor exceeds → constant
+        // plan churn → 230× wall-clock slowdown observed on the
+        // first soak verification. The strict floor below replaces
+        // that: weak-commitment intentions don't defend via preempt,
+        // they fall through to the natural §7.2 drop. Tune via post-
+        // landing sensitivity sweep before promoting the floor down.
+        //
+        // Trigger (4) target_invalidates_intention is wired in
+        // `commitment.rs` but not consulted here in 126 because
+        // `HeldIntention.target` is always `None` at the C3 author
+        // site (target tracking lands with 127/129).
+        const PREEMPT_STRENGTH_FLOOR: f32 = 0.5;
+        if let Ok(held) = ec.held_intentions.get(cat_entity) {
+            if held.commitment_strength >= PREEMPT_STRENGTH_FLOOR {
+                let held_score = current
+                    .last_scores
+                    .iter()
+                    .find(|(a, _)| *a == held.held_action)
+                    .map(|(_, s)| *s)
+                    .unwrap_or(0.0);
+                let top_non_held = current
+                    .last_scores
+                    .iter()
+                    .filter(|(a, _)| *a != held.held_action)
+                    .map(|(_, s)| *s)
+                    .fold(f32::NEG_INFINITY, f32::max);
+                if top_non_held.is_finite() && held_score > 0.0 {
+                    let preempt_threshold = held_score
+                        + held.commitment_strength * d.intention_momentum_lift
+                        + d.intention_preempt_margin;
+                    if top_non_held > preempt_threshold {
+                        plan_writer.write(PlanNarrative {
+                            entity: cat_entity,
+                            kind: plan.kind,
+                            event: PlanEvent::Abandoned,
+                            completions: plan.trips_done,
+                        });
+                        current.ticks_remaining = 0;
+                        plans_to_remove.push((
+                            cat_entity,
+                            IntentionEnding::Abandoned(
+                                crate::components::IntentionAbandonReason::Preempted,
+                            ),
+                        ));
+                        continue;
+                    }
+                }
+            }
         }
 
         // ---- Plan exhausted: handle trip completion / replanning ----
@@ -3050,7 +3191,7 @@ pub fn resolve_goap_plans(
                     completions: plan.trips_done,
                 });
                 current.ticks_remaining = 0;
-                plans_to_remove.push(cat_entity);
+                plans_to_remove.push((cat_entity, IntentionEnding::Fulfilled));
             } else {
                 // Need more trips — replan from current state.
                 let planner_state = build_planner_state(
@@ -3102,7 +3243,18 @@ pub fn resolve_goap_plans(
                     // a new failure). 172 leaves this site untouched
                     // semantically.
                     current.ticks_remaining = 0;
-                    plans_to_remove.push(cat_entity);
+                    // Ticket 126 — trip-target met but next replan
+                    // failed. The `disposition_complete` predicate
+                    // wasn't true (we wouldn't be in this `else`
+                    // branch otherwise), so this is an abandon, not a
+                    // fulfilment. Use `BecameImpossible` to mirror the
+                    // §7.2 ReplanCap mapping.
+                    plans_to_remove.push((
+                        cat_entity,
+                        IntentionEnding::Abandoned(
+                            crate::components::IntentionAbandonReason::BecameImpossible,
+                        ),
+                    ));
                 }
             }
             continue;
@@ -3280,7 +3432,16 @@ pub fn resolve_goap_plans(
                             // verification: cats locked in Flee for
                             // 5000+ ticks → starvation deaths despite
                             // ample on-the-ground food.
-                            plans_to_remove.push(cat_entity);
+                            // Ticket 126 — Maslow-driven preempt is
+                            // the reconsideration trigger that drops
+                            // the held intention; classify as
+                            // `Preempted`.
+                            plans_to_remove.push((
+                                cat_entity,
+                                IntentionEnding::Abandoned(
+                                    crate::components::IntentionAbandonReason::Preempted,
+                                ),
+                            ));
 
                             plan_writer.write(PlanNarrative {
                                 entity: cat_entity,
@@ -3508,7 +3669,12 @@ pub fn resolve_goap_plans(
                             recent_failures.as_deref_mut(),
                             ec.time.tick,
                         );
-                        plans_to_remove.push(cat_entity);
+                        plans_to_remove.push((
+                            cat_entity,
+                            IntentionEnding::Abandoned(
+                                crate::components::IntentionAbandonReason::BecameImpossible,
+                            ),
+                        ));
                     }
                 } else {
                     // No plan possible — abandon.
@@ -3544,15 +3710,42 @@ pub fn resolve_goap_plans(
                         recent_failures.as_deref_mut(),
                         ec.time.tick,
                     );
-                    plans_to_remove.push(cat_entity);
+                    plans_to_remove.push((
+                        cat_entity,
+                        IntentionEnding::Abandoned(
+                            crate::components::IntentionAbandonReason::BecameImpossible,
+                        ),
+                    ));
                 }
             }
         }
     }
 
     // Remove completed/abandoned plans.
-    for entity in plans_to_remove {
+    // Ticket 126 — `HeldIntention` is removed alongside `GoapPlan`
+    // and the lifecycle Feature fires per the recorded ending. The
+    // `IntentionAbandoned` activation counter is unparameterised; the
+    // per-cause classification rides on the focal-cat trace's
+    // `L3Commitment.abandon_reason` field (populated above by
+    // `record_drop`'s callers when the §7.2 gate fired). Drop reasons
+    // outside the §7.2 gate (Preempted via the anxiety-flee branch,
+    // BecameImpossible via the abandon-plan branches) trace through
+    // the activation counter only.
+    for (entity, ending) in plans_to_remove {
         commands.entity(entity).remove::<GoapPlan>();
+        commands
+            .entity(entity)
+            .remove::<crate::components::HeldIntention>();
+        if let Some(activation) = narr.activation.as_deref_mut() {
+            match ending {
+                IntentionEnding::Fulfilled => {
+                    activation.record(Feature::IntentionFulfilled);
+                }
+                IntentionEnding::Abandoned(_reason) => {
+                    activation.record(Feature::IntentionAbandoned);
+                }
+            }
+        }
     }
 
     let d = &ec.constants.disposition;

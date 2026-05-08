@@ -1,0 +1,52 @@
+---
+id: 244
+title: Audible cue substrate (alarm calls, distress cries, hissing)
+status: blocked
+cluster: null
+added: 2026-05-08
+parked: null
+blocked-by: [126]
+supersedes: []
+related-systems: []
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+126's narrative-discipline framing names audible cues as a
+secondary observable channel; body cues (242) cover most cat-to-cat
+communication, but alarm calls and distress cries are needed for
+predator-warn cascades and kitten-distress responses that body cues
+alone can't carry across distance. Conversational meowing is out
+of scope by default — real cats meow primarily at humans, not at
+each other.
+
+## Scope
+- Event-based vocalizations: hissing, yowling, distress cries
+  (kittens), alarm calls (adults on predator sight).
+- Range-limited (audible radius); transient (per-event, not
+  persistent markers).
+- Existing `KittenCryMap` already prototypes the range-limited
+  perception pattern — extend or sibling.
+
+## Out of scope
+- Conversational meowing — Clowder-specific overlay if narrative
+  texture later wants ambient meowing.
+
+## Current state
+Blocked-by 126 (lifecycle observability primitive).
+
+## Approach
+Mirror `KittenCryMap`'s influence-map shape: emitter authors a
+per-tick decay overlay; perception range gated on species sensory
+attenuation.
+
+## Verification
+- New activation Features per vocalization (`AlarmCallEmitted`,
+  `DistressCryEmitted`, `HissingEmitted`).
+- Soak observability: predator-warn cascades fire when one cat
+  spots a fox and others within audible range respond.
+
+## Log
+- 2026-05-08: opened on 126's C4 landing commit.

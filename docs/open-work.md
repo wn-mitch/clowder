@@ -17,8 +17,8 @@ _Last generated: 2026-05-08._
 | In progress | 7 |
 | Ready | 66 |
 | Parked | 7 |
-| Blocked | 21 |
-| **Open total** | **101** |
+| Blocked | 25 |
+| **Open total** | **105** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -124,7 +124,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[199](docs/open-work/tickets/199-pipeline-walk-skill.md)** — Hunt / production / consumption pipeline-walk skill (194 P4) — _[process-discipline] · parked 2026-05-06 · added 2026-05-06_
 - **[214](docs/open-work/tickets/214-tune-patrol-fox-scent-weight.md)** — tune patrol_fox_scent_weight — _[balance] · parked 2026-05-07 · blocked-by 209 · added 2026-05-07_
 
-## Blocked (21)
+## Blocked (25)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _blocked-by 007, 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _blocked-by 016 · added 2026-04-22_
@@ -147,6 +147,10 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[216](docs/open-work/tickets/216-mentor-coordinate-caretake-axis-ethology-audit.md)** — Mentor / Coordinate / Caretake axis ethology audit — _[ai-substrate] · blocked-by 209 · added 2026-05-07_
 - **[220](docs/open-work/tickets/220-ward-placement-targets-ambush-clusters.md)** — ward placement targets ambush clusters — _[ai-substrate] · blocked-by 219 · added 2026-05-07_
 - **[221](docs/open-work/tickets/221-caretake-gates-on-ambush-recency-at-kitten-tile.md)** — caretake gates on ambush-recency at kitten tile — _[ai-substrate] · blocked-by 219 · added 2026-05-07_
+- **[242](docs/open-work/tickets/242-body-cue-substrate-disposition-observable-markers.md)** — Body-cue substrate (Disposition → observable markers) — _blocked-by 126 · added 2026-05-08_
+- **[243](docs/open-work/tickets/243-behavior-observation-l1-channel-target-side-body-cue-physical-marker-reads.md)** — Behavior-observation L1 channel (target-side body-cue + physical marker reads) — _blocked-by 242 · added 2026-05-08_
+- **[244](docs/open-work/tickets/244-audible-cue-substrate-alarm-calls-distress-cries-hissing.md)** — Audible cue substrate (alarm calls, distress cries, hissing) — _blocked-by 126 · added 2026-05-08_
+- **[245](docs/open-work/tickets/245-ambient-predatorprey-behavior-observation-enrichment.md)** — Ambient predator/prey behavior-observation enrichment — _blocked-by 243 · added 2026-05-08_
 
 ## Pre-existing (2)
 
