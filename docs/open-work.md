@@ -14,11 +14,11 @@ _Last generated: 2026-05-08._
 
 | Status | Count |
 |---|---|
-| In progress | 6 |
+| In progress | 7 |
 | Ready | 71 |
 | Parked | 7 |
-| Blocked | 20 |
-| **Open total** | **104** |
+| Blocked | 21 |
+| **Open total** | **106** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -35,7 +35,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 | **[093](docs/open-work/landed/093-substrate-over-override-epic.md)** Substrate-over-override | done | 30 | 30 | 0 (0 / 0 / 0 / 0) | `▰▰▰▰▰▰▰▰▰▰` 100% |
 | **[095](docs/open-work/tickets/095-body-zones-epic.md)** Body zones | ready | 0 | — | — | _no roster_ |
 
-## In progress (6)
+## In progress (7)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
@@ -43,6 +43,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _added 2026-04-27_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[229](docs/open-work/tickets/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose — _[tooling] · added 2026-05-08_
+- **[246](docs/open-work/tickets/246-wire-intentionmomentum-lift-via-scoringcontext-replace-strict-floor-preempt-patch.md)** — Wire IntentionMomentum lift via ScoringContext (replace strict-floor preempt patch) — _[C] · added 2026-05-08_
 
 ## Ready (71)
 
@@ -128,7 +129,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[199](docs/open-work/tickets/199-pipeline-walk-skill.md)** — Hunt / production / consumption pipeline-walk skill (194 P4) — _[process-discipline] · parked 2026-05-06 · added 2026-05-06_
 - **[214](docs/open-work/tickets/214-tune-patrol-fox-scent-weight.md)** — tune patrol_fox_scent_weight — _[balance] · parked 2026-05-07 · blocked-by 209 · added 2026-05-07_
 
-## Blocked (20)
+## Blocked (21)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _blocked-by 007, 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _blocked-by 016 · added 2026-04-22_
@@ -150,6 +151,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[221](docs/open-work/tickets/221-caretake-gates-on-ambush-recency-at-kitten-tile.md)** — caretake gates on ambush-recency at kitten tile — _[ai-substrate] · blocked-by 219 · added 2026-05-07_
 - **[243](docs/open-work/tickets/243-behavior-observation-l1-channel-target-side-body-cue-physical-marker-reads.md)** — Behavior-observation L1 channel (target-side body-cue + physical marker reads) — _blocked-by 242 · added 2026-05-08_
 - **[245](docs/open-work/tickets/245-ambient-predatorprey-behavior-observation-enrichment.md)** — Ambient predator/prey behavior-observation enrichment — _blocked-by 243 · added 2026-05-08_
+- **[247](docs/open-work/tickets/247-diagnose-intentionmomentum-floor-removal-pickup-lock-cliff.md)** — Diagnose IntentionMomentum + floor-removal PickUp-lock cliff — _blocked-by 246 · added 2026-05-08_
 
 ## Pre-existing (2)
 

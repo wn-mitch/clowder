@@ -237,6 +237,16 @@ pub struct WorldStateQueries<'w, 's> {
             Without<markers::Buried>,
         ),
     >,
+    /// Ticket 246 — read-only `HeldIntention` lookup at the L2 author
+    /// site (`evaluate_and_plan`'s `ScoringContext` construction). Feeds
+    /// the three `IntentionMomentum` scalars that ticket 126 left
+    /// dormant. Read-only and disjoint from the per-cat mutable
+    /// iteration query because `&HeldIntention` doesn't conflict with
+    /// the cats query's `&mut`-bound fields. Sister read-only query to
+    /// `ExecutorContext.held_intentions` (in `resolve_goap_plans`) —
+    /// both are read-only on the same archetype, permitted by Bevy's
+    /// borrow checker.
+    pub held_intentions: Query<'w, 's, &'static crate::components::HeldIntention>,
 }
 
 /// Bundles resources for evaluate_and_plan.
@@ -2056,12 +2066,35 @@ pub fn evaluate_and_plan(
             fated_rival_nearby: if rival_nearby { 1.0 } else { 0.0 },
             active_directive_action_ordinal,
             active_directive_bonus,
-            // Ticket 126 — IntentionMomentum scalars. C2 ships dormant
-            // (no live writer); C3 wires the L2 author site that
-            // populates from `Option<&HeldIntention>`.
-            intention_held_action_ordinal: 0.0,
-            intention_momentum_lift_factor: 0.0,
-            intention_source_ordinal: 0.0,
+            // Ticket 246 — IntentionMomentum scalars wired from
+            // `Option<&HeldIntention>`. The modifier short-circuits on
+            // `lift_factor <= 0.0` so the `None` arm (zeroes) is the
+            // dormant default; the `Some` arm populates from
+            // `commitment_strength × intention_momentum_lift × decay_factor`
+            // with the held action's ordinal and the source provenance
+            // (130's hook).
+            intention_held_action_ordinal: world_state
+                .held_intentions
+                .get(entity)
+                .ok()
+                .map(|h| (h.held_action as usize as f32) + 1.0)
+                .unwrap_or(0.0),
+            intention_momentum_lift_factor: world_state
+                .held_intentions
+                .get(entity)
+                .ok()
+                .map(|h| {
+                    h.commitment_strength
+                        * d.intention_momentum_lift
+                        * h.decay_factor(res.time.tick, d.intention_momentum_decay_ticks)
+                })
+                .unwrap_or(0.0),
+            intention_source_ordinal: world_state
+                .held_intentions
+                .get(entity)
+                .ok()
+                .map(|h| h.source.ordinal() as f32)
+                .unwrap_or(0.0),
         };
 
         let focal_cat = res.focal_target.as_deref().and_then(|t| t.entity);
@@ -3054,6 +3087,18 @@ pub fn resolve_goap_plans(
         // that: weak-commitment intentions don't defend via preempt,
         // they fall through to the natural §7.2 drop. Tune via post-
         // landing sensitivity sweep before promoting the floor down.
+        //
+        // **Ticket 246 attempted to retire this floor on the basis
+        // that the wired `IntentionMomentum` modifier would lift
+        // `held_score` in `last_scores` enough to keep
+        // `preempt_threshold` defensible without the floor. The
+        // verification soak collapsed (15× sim-throughput drop, cats
+        // locked in PickUp loops, 0 Stores built, 1172 Resting
+        // GoalUnreachable). The wiring (above, at the L2 author
+        // site) is preserved — `IntentionMomentum` now fires in the
+        // `check_modifier_preemption` orphan window — but the floor
+        // stays as a load-bearing hack until a follow-on ticket
+        // (TBD) diagnoses the colony-scale lock mechanism.**
         //
         // Trigger (4) target_invalidates_intention is wired in
         // `commitment.rs` but not consulted here in 126 because

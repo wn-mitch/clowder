@@ -132,4 +132,41 @@ mod tests {
             report.winner_counts()
         );
     }
+
+    // Ticket 246 — scenario-side coverage of the wiring at
+    // `goap.rs:2059-2087` was attempted here (commit-time draft asserted
+    // an `intention_momentum` modifier delta on Hunt's L2 row during the
+    // orphan-preempt re-election window). Withdrawn before landing —
+    // the scenario harness's focal trace cannot capture the wiring's
+    // load-bearing window:
+    //
+    //   1. `pre_resolve_focal` runs *after* the first `app.update()`,
+    //      so the very first FixedUpdate's L2 capture is empty. The
+    //      cat adopts Hunt and `commands.insert(HeldIntention)` on
+    //      that first tick.
+    //   2. By the second tick (loop iteration 1 — focal now resolved),
+    //      the cat is mid-plan. `check_modifier_preemption` strips
+    //      `GoapPlan`, leaving `HeldIntention(Hunt)` orphan-live.
+    //   3. On tick 3, `evaluate_and_plan` re-scores with the wired
+    //      modifier firing — verified by direct `eprintln!` debug
+    //      probes during 246's implementation: the scalar `factor`
+    //      ramps from `0.0992` down past `0.0950` over ~30 ticks
+    //      under canonical constants. *But* `update_capability_markers`
+    //      strips `CanHunt` after the cat's r_g_p movement leaves the
+    //      forest-nearby radius, so Hunt's eligibility filter rejects
+    //      it before the modifier pipeline even runs. The trace shows
+    //      Hunt as `eligible: false` with empty `modifier_deltas` for
+    //      every subsequent tick.
+    //
+    // The wiring is correct (the modifier IS called with non-zero
+    // lift on every other DSE during the orphan window, all
+    // short-circuiting on `dse_id_for_action(held) != dse_id`).
+    // Coverage shifts to:
+    //   - `src/ai/modifier.rs::tests` (5 modifier-side tests at the
+    //     `INTENTION_MOMENTUM_LIFT_FACTOR / INTENTION_HELD_ACTION_ORDINAL`
+    //     surface — short-circuits + pipeline stacking).
+    //   - The verification soak's `just frame-diff <pre-246> <post-246>`
+    //     (per the plan's §Verification step 3) — at colony scale, many
+    //     held DSEs stay eligible across orphan-preempt windows and
+    //     the modifier delta surfaces there.
 }

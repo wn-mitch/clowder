@@ -37,6 +37,7 @@ pub mod fondness_kitten_imprint;
 pub mod grooming_other;
 pub mod hunt_acquisition;
 pub mod hunt_deposit_chain;
+pub mod intention_momentum_pickup_lock;
 pub mod inventory_full_no_pickup;
 pub mod kitten_cry;
 pub mod lone_burial;
@@ -153,6 +154,11 @@ pub const ALL: &[&Scenario] = &[
     // mechanism is independently verified from the soak-side death-
     // rate dynamics.
     &lone_burial::SCENARIO,
+    // 246 — repro the colony-scale PickUp lock pattern at scenario
+    // scale. 3 cats clustered + 5 ground items + no Stores. If the
+    // wiring/floor-removal causes the lock, focal action distribution
+    // will show >70% PickUp.
+    &intention_momentum_pickup_lock::SCENARIO,
 ];
 
 /// Look up a scenario by its `name` field.
