@@ -48,6 +48,7 @@ pub fn resolve_apply_remedy(
     pos: &mut Position,
     skills: &mut Skills,
     map: &TileMap,
+    overlays: &[&dyn crate::ai::pathfinding::TileCostOverlay],
     commands: &mut Commands,
     log: &mut NarrativeLog,
     tick: u64,
@@ -57,7 +58,7 @@ pub fn resolve_apply_remedy(
     if let Some(target_pos) = target_position {
         if pos.manhattan_distance(&target_pos) > 1 {
             if cached_path.is_none() {
-                match find_path(*pos, target_pos, map, &[]) {
+                match find_path(*pos, target_pos, map, overlays) {
                     Some(path) => *cached_path = Some(path),
                     None => return (StepResult::Fail("no path to patient".into()), None),
                 }
@@ -137,6 +138,7 @@ mod tests {
             &mut pos,
             &mut skills,
             &map,
+            &[],
             &mut commands,
             &mut log,
             100,
@@ -174,6 +176,7 @@ mod tests {
             &mut pos,
             &mut skills,
             &map,
+            &[],
             &mut commands,
             &mut log,
             100,
@@ -210,6 +213,7 @@ mod tests {
             &mut pos,
             &mut skills,
             &map,
+            &[],
             &mut commands,
             &mut log,
             100,

@@ -57,6 +57,7 @@ pub fn resolve_tend(
         Without<crate::components::task_chain::TaskChain>,
     >,
     map: &TileMap,
+    overlays: &[&dyn crate::ai::pathfinding::TileCostOverlay],
 ) -> StepOutcome<bool> {
     let Some(target) = target_entity else {
         return StepOutcome::unwitnessed(StepResult::Fail("no target for Tend".into()));
@@ -68,7 +69,7 @@ pub fn resolve_tend(
 
     if pos.manhattan_distance(garden_pos) > 1 {
         if cached_path.is_none() {
-            *cached_path = find_path(*pos, *garden_pos, map, &[]);
+            *cached_path = find_path(*pos, *garden_pos, map, overlays);
         }
         if let Some(ref mut path) = cached_path {
             if !path.is_empty() {

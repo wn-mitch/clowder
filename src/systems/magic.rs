@@ -905,6 +905,12 @@ pub fn resolve_magic_task_chains(
                     .map(|e| alive_check.get(e).is_ok())
                     .unwrap_or(false);
                 let cached = &mut step.cached_path;
+                // Legacy chain magic path. Empty overlays — ticket 223
+                // wires fox-scent / corruption routing on the active
+                // GOAP path; this legacy path runs only when GOAP isn't
+                // executing the magic step. If it becomes load-bearing,
+                // thread FoxScentMap + ScoringConstants into this
+                // system and build cat_overlays here.
                 let (result, grat) = crate::steps::magic::resolve_apply_remedy(
                     remedy,
                     cat_entity,
@@ -915,6 +921,7 @@ pub fn resolve_magic_task_chains(
                     &mut pos,
                     &mut skills,
                     &map,
+                    &[],
                     &mut commands,
                     &mut log,
                     time.tick,

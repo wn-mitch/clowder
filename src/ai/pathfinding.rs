@@ -31,6 +31,73 @@ fn sum_overlay_cost(overlays: &[&dyn TileCostOverlay], pos: Position) -> u32 {
 }
 
 // ---------------------------------------------------------------------------
+// Cat-side overlay impls (ticket 223)
+// ---------------------------------------------------------------------------
+
+/// Routing cost overlay reading per-tile fox scent from
+/// [`FoxScentMap`]. Substrate, not search state (§4.7) — the cat senses
+/// scent in the environment it moves through.
+///
+/// Cost shape: `round(scent.clamp(0, 1) * max_cost)`. With default
+/// `max_cost = 8`, max-scent tiles add 8 to A* edge cost so a cat
+/// prefers a four-tile detour over crossing them.
+pub struct FoxScentOverlay<'a> {
+    map: &'a crate::resources::FoxScentMap,
+    max_cost: u32,
+}
+
+impl<'a> FoxScentOverlay<'a> {
+    pub fn new(
+        map: &'a crate::resources::FoxScentMap,
+        sc: &crate::resources::sim_constants::ScoringConstants,
+    ) -> Self {
+        Self {
+            map,
+            max_cost: sc.fox_scent_path_cost_max,
+        }
+    }
+}
+
+impl TileCostOverlay for FoxScentOverlay<'_> {
+    fn cost_at(&self, pos: Position) -> u32 {
+        let scent = self.map.get(pos.x, pos.y).clamp(0.0, 1.0);
+        (scent * self.max_cost as f32).round() as u32
+    }
+}
+
+/// Routing cost overlay reading per-tile corruption from
+/// [`TileMap`]. Substrate, not search state (§4.7).
+///
+/// Cost shape mirrors [`FoxScentOverlay`]:
+/// `round(corruption.clamp(0, 1) * max_cost)`. The lens is constructed
+/// inline at the call site (matching `CorruptionLens` in
+/// `src/systems/influence_map.rs`) — no persistent resource is needed
+/// since corruption lives on `Tile`, not in a dedicated map.
+pub struct CorruptionOverlay<'a> {
+    tile_map: &'a TileMap,
+    max_cost: u32,
+}
+
+impl<'a> CorruptionOverlay<'a> {
+    pub fn new(tile_map: &'a TileMap, sc: &crate::resources::sim_constants::ScoringConstants) -> Self {
+        Self {
+            tile_map,
+            max_cost: sc.corruption_path_cost_max,
+        }
+    }
+}
+
+impl TileCostOverlay for CorruptionOverlay<'_> {
+    fn cost_at(&self, pos: Position) -> u32 {
+        if !self.tile_map.in_bounds(pos.x, pos.y) {
+            return 0;
+        }
+        let corr = self.tile_map.get(pos.x, pos.y).corruption.clamp(0.0, 1.0);
+        (corr * self.max_cost as f32).round() as u32
+    }
+}
+
+// ---------------------------------------------------------------------------
 // A* pathfinding
 // ---------------------------------------------------------------------------
 

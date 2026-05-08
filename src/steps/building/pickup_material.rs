@@ -45,7 +45,7 @@ use crate::steps::{StepOutcome, StepResult};
 /// (prefunded), so no pickup ever happened and the Feature did not
 /// exist; this resolver brings physical-causality back to the
 /// founding build economy.
-#[allow(clippy::type_complexity)]
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn resolve_pickup_material(
     target_entity: Option<Entity>,
     cat_entity: Entity,
@@ -61,6 +61,7 @@ pub fn resolve_pickup_material(
         ),
     >,
     map: &TileMap,
+    overlays: &[&dyn crate::ai::pathfinding::TileCostOverlay],
 ) -> StepOutcome<bool> {
     let Some(target) = target_entity else {
         return StepOutcome::unwitnessed(StepResult::Fail("no target for PickupMaterial".into()));
@@ -88,7 +89,7 @@ pub fn resolve_pickup_material(
     // Walk to the pile if not adjacent yet.
     if pos.manhattan_distance(&item_pos) > 1 {
         if cached_path.is_none() {
-            *cached_path = find_path(*pos, item_pos, map, &[]);
+            *cached_path = find_path(*pos, item_pos, map, overlays);
         }
         if let Some(ref mut path) = cached_path {
             if !path.is_empty() {
@@ -177,6 +178,7 @@ mod tests {
             inventory,
             &mut items,
             &map,
+            &[],
         )
     }
 

@@ -155,11 +155,18 @@ pub fn resolve_task_chains(
         match &step.kind {
             StepKind::MoveTo => {
                 let cached = &mut step.cached_path;
+                // Legacy disposition-chain path. Passes empty overlays —
+                // ticket 223 wires cat-side fox-scent / corruption
+                // routing on the active GOAP path; if this legacy path
+                // is reinstated, plumb FoxScentMap + ScoringConstants
+                // through `resolve_task_chains` and build cat_overlays
+                // here.
                 let outcome = crate::steps::building::resolve_move_to(
                     &mut pos,
                     step_target_position,
                     cached,
                     &map,
+                    &[],
                     &cat_tile_counts,
                 );
                 apply(outcome.result, &mut chain);
@@ -190,6 +197,8 @@ pub fn resolve_task_chains(
 
             StepKind::Construct => {
                 let cached = &mut step.cached_path;
+                // Legacy disposition-chain path — see MoveTo above for
+                // the empty-overlay rationale (ticket 223).
                 let outcome = crate::steps::building::resolve_construct(
                     step_target_entity,
                     &mut pos,
@@ -199,6 +208,7 @@ pub fn resolve_task_chains(
                     &builders_per_site,
                     &mut buildings,
                     &map,
+                    &[],
                     &mut commands,
                     &mut colony_score,
                 );
@@ -212,6 +222,8 @@ pub fn resolve_task_chains(
 
             StepKind::Repair => {
                 let cached = &mut step.cached_path;
+                // Legacy disposition-chain path — see MoveTo above for
+                // the empty-overlay rationale (ticket 223).
                 let outcome = crate::steps::building::resolve_repair(
                     step_target_entity,
                     &mut pos,
@@ -220,6 +232,7 @@ pub fn resolve_task_chains(
                     workshop_bonus,
                     &mut buildings,
                     &map,
+                    &[],
                 );
                 outcome.record_if_witnessed(activation.as_deref_mut(), Feature::BuildingRepaired);
                 apply(outcome.result, &mut chain);
@@ -227,6 +240,8 @@ pub fn resolve_task_chains(
 
             StepKind::Tend => {
                 let cached = &mut step.cached_path;
+                // Legacy disposition-chain path — see MoveTo above for
+                // the empty-overlay rationale (ticket 223).
                 let outcome = crate::steps::building::resolve_tend(
                     step_target_entity,
                     &mut pos,
@@ -236,6 +251,7 @@ pub fn resolve_task_chains(
                     workshop_bonus,
                     &mut buildings,
                     &map,
+                    &[],
                 );
                 // Disposition-chain path is currently unscheduled (GOAP
                 // replaced it); if it's ever reinstated, wire the

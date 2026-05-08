@@ -63,6 +63,13 @@ pub struct PreyHuntParams<'w, 's> {
     /// source tiles rather than running point-to-point
     /// `cat_smells_prey_windaware` against each prey entity.
     pub prey_scent_map: Res<'w, crate::resources::PreyScentMap>,
+    /// Ticket 223 — fox scent map, read by cat A* path-cost overlays so
+    /// cats route around fox territory. Lives in `PreyHuntParams`
+    /// alongside `prey_scent_map` because both are wildlife-scent
+    /// substrates consumed by the same cat-side resolvers and because
+    /// `resolve_disposition_chains` is at Bevy's 16-param ceiling —
+    /// bundling here avoids a SystemParam refactor at the use sites.
+    pub fox_scent_map: Res<'w, crate::resources::FoxScentMap>,
 }
 
 #[derive(bevy_ecs::system::SystemParam)]
@@ -3556,6 +3563,24 @@ fn dispatch_step_action(
 ) -> crate::steps::StepResult {
     let d = &ec.constants.disposition;
 
+    // Ticket 223 — cat-side path-cost overlay constructor. Each match
+    // arm that calls `find_path` / a step resolver builds its own
+    // overlays at arm-scope so the immutable borrow on
+    // `prey_params.fox_scent_map` doesn't conflict with the
+    // `&mut prey_params` borrows in the SearchPrey / EngagePrey arms.
+    // Substrate, not search state (§4.7).
+    macro_rules! cat_overlays_pair {
+        () => {{
+            (
+                crate::ai::pathfinding::FoxScentOverlay::new(
+                    &prey_params.fox_scent_map,
+                    &ec.constants.scoring,
+                ),
+                crate::ai::pathfinding::CorruptionOverlay::new(&ec.map, &ec.constants.scoring),
+            )
+        }};
+    }
+
     // Ticket 074 — runtime guard for audit gap #4. Validate the
     // step's `target_entity` at entry so a plan that committed to a
     // since-dead/banished/incapacitated/despawned entity fails fast
@@ -3582,24 +3607,30 @@ fn dispatch_step_action(
     }
 
     match action_kind {
-        GoapActionKind::TravelTo(zone) => resolve_travel_to(
-            zone,
-            &mut plan.step_state[step_idx],
-            pos,
-            &ec.map,
-            &prey_params.exploration_map,
-            &snaps.cat_tile_counts,
-            &snaps.stores_positions,
-            &snaps.construction_positions,
-            &snaps.farm_positions,
-            &snaps.herb_positions,
-            &snaps.kitchen_positions,
-            &snaps.cat_positions,
-            &snaps.material_pile_positions,
-            &snaps.food_pile_positions,
-            cat_entity,
-            d,
-        ),
+        GoapActionKind::TravelTo(zone) => {
+            let (fox_overlay, corr_overlay) = cat_overlays_pair!();
+            let cat_overlays: [&dyn crate::ai::pathfinding::TileCostOverlay; 2] =
+                [&fox_overlay, &corr_overlay];
+            resolve_travel_to(
+                zone,
+                &mut plan.step_state[step_idx],
+                pos,
+                &ec.map,
+                &cat_overlays,
+                &prey_params.exploration_map,
+                &snaps.cat_tile_counts,
+                &snaps.stores_positions,
+                &snaps.construction_positions,
+                &snaps.farm_positions,
+                &snaps.herb_positions,
+                &snaps.kitchen_positions,
+                &snaps.cat_positions,
+                &snaps.material_pile_positions,
+                &snaps.food_pile_positions,
+                cat_entity,
+                d,
+            )
+        }
 
         GoapActionKind::SearchPrey => resolve_search_prey(
             &mut plan.step_state[step_idx],
@@ -3661,6 +3692,7 @@ fn dispatch_step_action(
                 prey_query,
                 prey_params,
                 &ec.map,
+                &ec.constants.scoring,
                 narr,
                 &ec.time,
                 rng,
@@ -4056,12 +4088,16 @@ fn dispatch_step_action(
                     &mut rng.rng,
                 );
             }
+            let (fox_overlay, corr_overlay) = cat_overlays_pair!();
+            let cat_overlays: [&dyn crate::ai::pathfinding::TileCostOverlay; 2] =
+                [&fox_overlay, &corr_overlay];
             crate::steps::disposition::resolve_patrol_to(
                 pos,
                 plan.step_state[step_idx].target_position,
                 &mut plan.step_state[step_idx].cached_path,
                 needs,
                 &ec.map,
+                &cat_overlays,
                 d,
                 &snaps.cat_tile_counts,
             )
@@ -4154,8 +4190,11 @@ fn dispatch_step_action(
                             .and_then(|p| p.last())
                             .is_some_and(|last| *last != target_pos)
                     {
+                        let (fox_overlay, corr_overlay) = cat_overlays_pair!();
+                        let cat_overlays: [&dyn crate::ai::pathfinding::TileCostOverlay; 2] =
+                            [&fox_overlay, &corr_overlay];
                         plan.step_state[step_idx].cached_path =
-                            crate::ai::pathfinding::find_path(*pos, target_pos, &ec.map, &[]);
+                            crate::ai::pathfinding::find_path(*pos, target_pos, &ec.map, &cat_overlays);
                     }
                     if let Some(ref mut path) = plan.step_state[step_idx].cached_path {
                         if let Some(next) = path.first().copied() {
@@ -4417,8 +4456,11 @@ fn dispatch_step_action(
             if let Some(ward_target) = plan.ward_placement_pos {
                 if pos.manhattan_distance(&ward_target) > 1 {
                     if plan.step_state[step_idx].cached_path.is_none() {
+                        let (fox_overlay, corr_overlay) = cat_overlays_pair!();
+                        let cat_overlays: [&dyn crate::ai::pathfinding::TileCostOverlay; 2] =
+                            [&fox_overlay, &corr_overlay];
                         plan.step_state[step_idx].cached_path =
-                            crate::ai::pathfinding::find_path(*pos, ward_target, &ec.map, &[]);
+                            crate::ai::pathfinding::find_path(*pos, ward_target, &ec.map, &cat_overlays);
                     }
                     if let Some(ref mut path) = plan.step_state[step_idx].cached_path {
                         if let Some(next) = path.first().copied() {
@@ -4545,6 +4587,9 @@ fn dispatch_step_action(
                 .target_entity
                 .map(|e| snaps.cat_positions.iter().any(|(ce, _)| *ce == e))
                 .unwrap_or(false);
+            let (fox_overlay, corr_overlay) = cat_overlays_pair!();
+            let cat_overlays: [&dyn crate::ai::pathfinding::TileCostOverlay; 2] =
+                [&fox_overlay, &corr_overlay];
             let (result, gratitude) = crate::steps::magic::resolve_apply_remedy(
                 remedy,
                 cat_entity,
@@ -4555,6 +4600,7 @@ fn dispatch_step_action(
                 pos,
                 skills,
                 &ec.map,
+                &cat_overlays,
                 commands,
                 &mut narr.log,
                 ec.time.tick,
@@ -4646,8 +4692,11 @@ fn dispatch_step_action(
             if let Some(target) = plan.step_state[step_idx].target_position {
                 if pos.manhattan_distance(&target) > 0 {
                     if plan.step_state[step_idx].cached_path.is_none() {
+                        let (fox_overlay, corr_overlay) = cat_overlays_pair!();
+                        let cat_overlays: [&dyn crate::ai::pathfinding::TileCostOverlay; 2] =
+                            [&fox_overlay, &corr_overlay];
                         plan.step_state[step_idx].cached_path =
-                            crate::ai::pathfinding::find_path(*pos, target, &ec.map, &[]);
+                            crate::ai::pathfinding::find_path(*pos, target, &ec.map, &cat_overlays);
                     }
                     if let Some(ref mut path) = plan.step_state[step_idx].cached_path {
                         if !path.is_empty() {
@@ -4747,8 +4796,11 @@ fn dispatch_step_action(
                 if walking {
                     let target = plan.step_state[step_idx].target_position.unwrap();
                     if plan.step_state[step_idx].cached_path.is_none() {
+                        let (fox_overlay, corr_overlay) = cat_overlays_pair!();
+                        let cat_overlays: [&dyn crate::ai::pathfinding::TileCostOverlay; 2] =
+                            [&fox_overlay, &corr_overlay];
                         plan.step_state[step_idx].cached_path =
-                            crate::ai::pathfinding::find_path(*pos, target, &ec.map, &[]);
+                            crate::ai::pathfinding::find_path(*pos, target, &ec.map, &cat_overlays);
                     }
                     if let Some(ref mut path) = plan.step_state[step_idx].cached_path {
                         if !path.is_empty() {
@@ -4803,6 +4855,9 @@ fn dispatch_step_action(
                     .min_by_key(|(_, cp)| pos.manhattan_distance(cp))
                     .map(|(e, _)| *e);
             }
+            let (fox_overlay, corr_overlay) = cat_overlays_pair!();
+            let cat_overlays: [&dyn crate::ai::pathfinding::TileCostOverlay; 2] =
+                [&fox_overlay, &corr_overlay];
             let outcome = crate::steps::building::resolve_construct(
                 plan.step_state[step_idx].target_entity,
                 pos,
@@ -4812,6 +4867,7 @@ fn dispatch_step_action(
                 &snaps.builders_per_site,
                 &mut building_params.buildings,
                 &ec.map,
+                &cat_overlays,
                 commands,
                 &mut building_params.colony_score,
             );
@@ -4846,6 +4902,9 @@ fn dispatch_step_action(
                     .min_by_key(|(_, _, gp, _, _)| pos.manhattan_distance(gp))
                     .map(|(e, _, _, _, _)| *e);
             }
+            let (fox_overlay, corr_overlay) = cat_overlays_pair!();
+            let cat_overlays: [&dyn crate::ai::pathfinding::TileCostOverlay; 2] =
+                [&fox_overlay, &corr_overlay];
             let outcome = crate::steps::building::resolve_tend(
                 plan.step_state[step_idx].target_entity,
                 pos,
@@ -4855,6 +4914,7 @@ fn dispatch_step_action(
                 snaps.workshop_bonus,
                 &mut building_params.buildings,
                 &ec.map,
+                &cat_overlays,
             );
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::CropTended);
             // Mastery iter 2 + purpose new-thread: each tend tick
@@ -4910,6 +4970,9 @@ fn dispatch_step_action(
             }
             let target = plan.step_state[step_idx].target_entity;
             let cached = &mut plan.step_state[step_idx].cached_path;
+            let (fox_overlay, corr_overlay) = cat_overlays_pair!();
+            let cat_overlays: [&dyn crate::ai::pathfinding::TileCostOverlay; 2] =
+                [&fox_overlay, &corr_overlay];
             let outcome = crate::steps::building::resolve_pickup_material(
                 target,
                 cat_entity,
@@ -4918,6 +4981,7 @@ fn dispatch_step_action(
                 inventory,
                 &mut building_params.material_items,
                 &ec.map,
+                &cat_overlays,
             );
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::MaterialPickedUp);
             outcome.result
@@ -5318,6 +5382,7 @@ fn resolve_travel_to(
     state: &mut StepExecutionState,
     pos: &mut Position,
     map: &TileMap,
+    overlays: &[&dyn crate::ai::pathfinding::TileCostOverlay],
     exploration_map: &ExplorationMap,
     cat_tile_counts: &HashMap<Position, u32>,
     stores_positions: &[Position],
@@ -5355,7 +5420,7 @@ fn resolve_travel_to(
 
     // Use cached A* path.
     if state.cached_path.is_none() {
-        state.cached_path = find_path(*pos, target, map, &[]);
+        state.cached_path = find_path(*pos, target, map, overlays);
     }
 
     if let Some(ref mut path) = state.cached_path {
@@ -5382,7 +5447,7 @@ fn resolve_travel_to(
     } else {
         // No path found — step toward target directly.
         let before = *pos;
-        if let Some(next) = step_toward(pos, &target, map, &[]) {
+        if let Some(next) = step_toward(pos, &target, map, overlays) {
             *pos = next;
         }
         if pos.manhattan_distance(&target) <= 1 {
@@ -5748,6 +5813,7 @@ fn resolve_engage_prey(
     prey_query: &mut Query<(Entity, &Position, &PreyConfig, &mut PreyState), With<PreyAnimal>>,
     prey_params: &mut PreyHuntParams,
     map: &TileMap,
+    scoring: &crate::resources::sim_constants::ScoringConstants,
     narr: &mut NarrativeEmitter<'_>,
     time: &TimeState,
     rng: &mut SimRng,
@@ -5801,6 +5867,18 @@ fn resolve_engage_prey(
     let catch_mod = prey_cfg.catch_difficulty;
     let item_kind = prey_cfg.item_kind;
     let species_name = prey_cfg.name;
+
+    // Ticket 223 — cat-side path-cost overlays for predation
+    // step_toward loops. Substrate, not search state (§4.7). Borrows
+    // `prey_params.fox_scent_map` for `cat_overlays`'s lifetime; the
+    // function mutates other (disjoint) prey_params fields like
+    // `kill_writer` and `exploration_map`, which Bevy SystemParam
+    // permits via per-field reborrow.
+    let fox_overlay =
+        crate::ai::pathfinding::FoxScentOverlay::new(&prey_params.fox_scent_map, scoring);
+    let corr_overlay = crate::ai::pathfinding::CorruptionOverlay::new(map, scoring);
+    let cat_overlays: [&dyn crate::ai::pathfinding::TileCostOverlay; 2] =
+        [&fox_overlay, &corr_overlay];
     let flee_strategy = prey_cfg.flee_strategy;
     let dist = pos.manhattan_distance(&prey_pos);
 
@@ -6077,7 +6155,7 @@ fn resolve_engage_prey(
             // === CHASE ===
             let mut moved = false;
             for _ in 0..d.chase_speed {
-                if let Some(next) = step_toward(pos, &prey_pos, map, &[]) {
+                if let Some(next) = step_toward(pos, &prey_pos, map, &cat_overlays) {
                     *pos = next;
                     moved = true;
                 }
@@ -6125,7 +6203,7 @@ fn resolve_engage_prey(
         } else {
             // === STALK ===
             let mut moved = false;
-            if let Some(next) = step_toward(pos, &prey_pos, map, &[]) {
+            if let Some(next) = step_toward(pos, &prey_pos, map, &cat_overlays) {
                 *pos = next;
                 moved = true;
             }
@@ -6178,7 +6256,7 @@ fn resolve_engage_prey(
         // === APPROACH ===
         let mut moved = false;
         for _ in 0..d.approach_speed {
-            if let Some(next) = step_toward(pos, &prey_pos, map, &[]) {
+            if let Some(next) = step_toward(pos, &prey_pos, map, &cat_overlays) {
                 *pos = next;
                 moved = true;
             }

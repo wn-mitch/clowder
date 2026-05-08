@@ -29,12 +29,14 @@ use crate::steps::{StepOutcome, StepResult};
 ///
 /// **Feature emission** — none. Patrol is ubiquitous and not
 /// tracked as a Positive Feature.
+#[allow(clippy::too_many_arguments)]
 pub fn resolve_patrol_to(
     pos: &mut Position,
     target_position: Option<Position>,
     cached_path: &mut Option<Vec<Position>>,
     needs: &mut Needs,
     map: &TileMap,
+    overlays: &[&dyn crate::ai::pathfinding::TileCostOverlay],
     d: &DispositionConstants,
     cat_tile_counts: &HashMap<Position, u32>,
 ) -> StepOutcome<()> {
@@ -47,7 +49,7 @@ pub fn resolve_patrol_to(
         return StepOutcome::bare(StepResult::Advance);
     }
     if cached_path.is_none() {
-        match find_path(*pos, target, map, &[]) {
+        match find_path(*pos, target, map, overlays) {
             Some(path) => *cached_path = Some(path),
             None => {
                 return StepOutcome::bare(StepResult::Fail("no path to patrol target".into()));

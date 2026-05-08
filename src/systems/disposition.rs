@@ -45,6 +45,13 @@ pub struct PreyHuntParams<'w, 's> {
     /// source tiles rather than running point-to-point
     /// `cat_smells_prey_windaware` against each prey entity.
     pub prey_scent_map: Res<'w, crate::resources::PreyScentMap>,
+    /// Ticket 223 — fox scent map, read by cat A* path-cost overlays so
+    /// cats route around fox territory. Lives in `PreyHuntParams`
+    /// alongside `prey_scent_map` because both are wildlife-scent
+    /// substrates consumed by the same cat-side resolvers and because
+    /// `resolve_disposition_chains` is at Bevy's 16-param ceiling —
+    /// bundling here avoids a SystemParam refactor at the use sites.
+    pub fox_scent_map: Res<'w, crate::resources::FoxScentMap>,
 }
 /// Bundled system params for narrative emission in `resolve_disposition_chains`.
 /// Groups NarrativeLog + optional TemplateRegistry + context resources to stay
@@ -3455,6 +3462,18 @@ fn dispatch_chain_step(
 ) {
     let d = &constants.disposition;
 
+    // Ticket 223 — cat-side path-cost overlays. Substrate, not search
+    // state (§4.7). Built once per dispatch and reused across the
+    // per-step branches below. Reads `prey_params.fox_scent_map` +
+    // tile corruption.
+    let fox_overlay = crate::ai::pathfinding::FoxScentOverlay::new(
+        &prey_params.fox_scent_map,
+        &constants.scoring,
+    );
+    let corr_overlay = crate::ai::pathfinding::CorruptionOverlay::new(map, &constants.scoring);
+    let cat_overlays: [&dyn crate::ai::pathfinding::TileCostOverlay; 2] =
+        [&fox_overlay, &corr_overlay];
+
     match step_kind {
         StepKind::HuntPrey { patrol_dir } => {
             let step = chain.current_mut().unwrap();
@@ -3691,7 +3710,7 @@ fn dispatch_chain_step(
                     if prey_is_fleeing {
                         // === CHASE === sprint burst.
                         for _ in 0..d.chase_speed {
-                            if let Some(next) = step_toward(pos, &prey_pos, map, &[]) {
+                            if let Some(next) = step_toward(pos, &prey_pos, map, &cat_overlays) {
                                 *pos = next;
                                 moved = true;
                             }
@@ -3700,7 +3719,7 @@ fn dispatch_chain_step(
                         // === STALK === Deliberate approach, 1 tile/tick.
                         // Cats are agile ambush predators — they close quickly
                         // while relying on stealth to avoid detection.
-                        if let Some(next) = step_toward(pos, &prey_pos, map, &[]) {
+                        if let Some(next) = step_toward(pos, &prey_pos, map, &cat_overlays) {
                             *pos = next;
                             moved = true;
                         }
@@ -3726,7 +3745,7 @@ fn dispatch_chain_step(
                     // === APPROACH === Trot toward scented prey.
                     let mut moved = false;
                     for _ in 0..d.approach_speed {
-                        if let Some(next) = step_toward(pos, &prey_pos, map, &[]) {
+                        if let Some(next) = step_toward(pos, &prey_pos, map, &cat_overlays) {
                             *pos = next;
                             moved = true;
                         }
@@ -4157,6 +4176,7 @@ fn dispatch_chain_step(
                 cached,
                 needs,
                 map,
+                &cat_overlays,
                 d,
                 &snaps.cat_tile_counts,
             );

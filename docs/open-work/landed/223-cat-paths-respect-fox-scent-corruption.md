@@ -1,7 +1,7 @@
 ---
 id: 223
 title: cat paths respect fox-scent + corruption
-status: ready
+status: done
 cluster: pathfinder-risk-awareness
 added: 2026-05-07
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-07
 ---
 
 ## Why
@@ -145,3 +145,4 @@ doesn't fold into path-cost.
 
 ## Log
 - 2026-05-07: opened from work-214 investigation. Blocked-by 222.
+- 2026-05-07: landed; opened follow-on 228 for the decision-time damp branch (path-cost overlay is route-time substrate; the retired damp branch was decision-time substrate — soak surfaced the gap, fixed under 228)

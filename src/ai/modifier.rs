@@ -39,10 +39,12 @@
 //!   known bug (`ai-substrate-refactor.md` §3.5.3 item 1) —
 //!   preserved here as a faithful port, tracked separately for a
 //!   balance-methodology-scoped fix.
-//! - [`FoxTerritorySuppression`] — multiplicative damp on Hunt /
-//!   Explore / Forage / Patrol / Wander when fox scent is above the
-//!   suppression threshold, plus an additive boost on `Flee`
-//!   proportional to the same suppression (spec §3.5.3 item 2).
+//! - [`FleeFoxScentBoost`] — additive boost on `Flee` proportional
+//!   to the fox-scent suppression term (spec §3.5.3 item 2). Ticket
+//!   223 retired the legacy multiplicative damp branch on Hunt /
+//!   Explore / Forage / Patrol / Wander; the cat A* path-cost overlay
+//!   (`crate::ai::pathfinding::FoxScentOverlay`) carries that signal
+//!   at the routing layer instead.
 //! - [`CorruptionTerritorySuppression`] — multiplicative damp on
 //!   Explore / Wander / Idle when the cat is standing on a corrupted
 //!   tile above the suppression threshold. Shape mirrors fox
@@ -769,50 +771,47 @@ impl ScoreModifier for Tradition {
 }
 
 // ---------------------------------------------------------------------------
-// FoxTerritorySuppression
+// FleeFoxScentBoost (ticket 223 — was FoxTerritorySuppression)
 // ---------------------------------------------------------------------------
 
-/// §3.5.1 Fox-territory suppression. Port of the retiring
-/// `scoring.rs:1009–1027` inline block.
+/// Additive Flee lift when fox scent crosses the territory threshold.
+///
+/// Ticket 223 retired the legacy multiplicative damping branch on
+/// Hunt / Explore / Forage / Patrol / Wander — that branch double-priced
+/// fox scent against the new cat A* path-cost overlay
+/// (`crate::ai::pathfinding::FoxScentOverlay`), which routes cats around
+/// fox territory at the substrate layer. The Flee additive boost
+/// survives because it is a *score* lift on a behavior-gate disposition,
+/// not a movement cost — it doesn't fold into the path-cost calculation,
+/// so the two read sites compose orthogonally.
 ///
 /// **Trigger:** `fox_scent_level > fox_scent_suppression_threshold`
 /// (default `0.3`).
 ///
-/// **Transform:** two shapes, keyed by DSE id:
-/// - **Hunt / Explore / Forage / Patrol / Wander** — multiplicative
-///   damp: `score *= (1 − suppression).max(0.0)` where
-///   `suppression = ((fox_scent − threshold) / (1 − threshold)) ×
-///   fox_scent_suppression_scale` (scale `0.8`).
-/// - **Flee** — additive boost: `score += suppression × 0.5` (spec
-///   §3.5.3 item 2). The secondary Flee boost is part of this
-///   modifier's transform, not a separate impl — keeps the
-///   "fox-scent response" as one registered pass.
+/// **Transform:** `score += suppression × flee_boost_scale` where
+/// `suppression = ((fox_scent − threshold) / (1 − threshold)) ×
+/// fox_scent_suppression_scale` (scale `0.8`) and `flee_boost_scale =
+/// 0.5` (spec §3.5.3 item 2).
 ///
-/// **Applies to:** Hunt / Explore / Forage / Patrol / Wander (damp) +
-/// Flee (boost).
+/// **Applies to:** `Flee` only.
 ///
-/// **Gate semantics:** the multiplicative damp is naturally safe on
-/// `score <= 0` (0 × anything = 0), so no short-circuit is needed on
-/// the damp DSEs. The Flee additive boost *is* a gated boost, but the
-/// inline block applied it unconditionally once the fox-scent
-/// threshold was exceeded — this port preserves that by not
-/// short-circuiting on Flee's `score <= 0`. Flee's outer gate
-/// (`has_threat_nearby || safety < flee_safety_threshold`) already
-/// keeps it out of scoring when the modifier wouldn't make sense.
-pub struct FoxTerritorySuppression {
+/// **Gate semantics:** Flee's outer gate
+/// (`has_threat_nearby || safety < flee_safety_threshold`) keeps the
+/// modifier out of scoring when the boost wouldn't make sense. The
+/// boost lifts unconditionally once the fox-scent threshold is
+/// exceeded — preserving the legacy behavior for the boost branch.
+pub struct FleeFoxScentBoost {
     threshold: f32,
     scale: f32,
     flee_boost_scale: f32,
 }
 
-impl FoxTerritorySuppression {
+impl FleeFoxScentBoost {
     /// `flee_boost_scale` is the spec's `0.5` coefficient on the Flee
     /// additive boost — hard-coded rather than promoted to
-    /// `ScoringConstants` because no other scoring site reads it and
-    /// the §3.5.3 discovery commentary calls out "already invisible
-    /// in §2.3's original matrix row; §3.5.1 now names it
-    /// explicitly." If balance work surfaces a reason to promote it,
-    /// add a dedicated `fox_scent_flee_boost_scale` constant.
+    /// `ScoringConstants` because no other scoring site reads it. If
+    /// balance work surfaces a reason to promote it, add a dedicated
+    /// `fox_scent_flee_boost_scale` constant.
     const FLEE_BOOST_SCALE: f32 = 0.5;
 
     pub fn new(sc: &ScoringConstants) -> Self {
@@ -833,7 +832,7 @@ impl FoxTerritorySuppression {
     }
 }
 
-impl ScoreModifier for FoxTerritorySuppression {
+impl ScoreModifier for FleeFoxScentBoost {
     fn apply(
         &self,
         dse_id: DseId,
@@ -841,12 +840,10 @@ impl ScoreModifier for FoxTerritorySuppression {
         ctx: &EvalCtx,
         fetch: &dyn Fn(&str, Entity) -> f32,
     ) -> f32 {
-        // Early-out on DSEs the modifier doesn't touch — avoids the
-        // fox-scent scalar fetch on every Eat / Sleep / Coordinate /
-        // etc. apply.
-        let is_damped = matches!(dse_id.0, HUNT | EXPLORE | FORAGE | PATROL | WANDER);
-        let is_flee = dse_id.0 == FLEE;
-        if !is_damped && !is_flee {
+        // Only Flee gets the additive lift — the legacy Hunt/Explore/
+        // Forage/Patrol/Wander damping branch retired with ticket 223
+        // (path-cost overlays carry that signal at the routing layer).
+        if dse_id.0 != FLEE {
             return score;
         }
 
@@ -856,15 +853,11 @@ impl ScoreModifier for FoxTerritorySuppression {
             return score;
         }
 
-        if is_flee {
-            score + suppression * self.flee_boost_scale
-        } else {
-            score * (1.0 - suppression).max(0.0)
-        }
+        score + suppression * self.flee_boost_scale
     }
 
     fn name(&self) -> &'static str {
-        "fox_territory_suppression"
+        "flee_fox_scent_boost"
     }
 }
 
@@ -3345,7 +3338,7 @@ pub fn default_modifier_pipeline(
     // before the multiplicative damps. The social Flight valence is
     // the substrate analog to 047 / 102 on the social axis.
     pipeline.push(Box::new(IntraspeciesConflictResponseFlight::new(sc)));
-    pipeline.push(Box::new(FoxTerritorySuppression::new(sc)));
+    pipeline.push(Box::new(FleeFoxScentBoost::new(sc)));
     pipeline.push(Box::new(CorruptionTerritorySuppression::new(sc)));
     // §3.5.1 ticket 094 — `StockpileSatiation` registers after the
     // existing multiplicative damps (Fox + Corruption). Order doesn't
@@ -3668,32 +3661,13 @@ mod tests {
     }
 
     #[test]
-    fn fox_suppression_damps_hunt_when_scent_above_threshold() {
-        // Threshold 0.3, scale 0.8, fox_scent 0.8 →
-        // suppression = (0.8 − 0.3) / (1 − 0.3) × 0.8 ≈ 0.5714.
-        // Hunt score 0.5 → 0.5 × (1 − 0.5714) ≈ 0.2143.
-        let modifier = FoxTerritorySuppression {
-            threshold: 0.3,
-            scale: 0.8,
-            flee_boost_scale: 0.5,
-        };
-        let (_, ctx) = test_ctx();
-        let fetch = |name: &str, _: Entity| match name {
-            FOX_SCENT_LEVEL => 0.8,
-            _ => 0.0,
-        };
-        let out = modifier.apply(DseId(HUNT), 0.5, &ctx, &fetch);
-        let expected = 0.5_f32 * (1.0_f32 - ((0.8 - 0.3) / (1.0 - 0.3)) * 0.8).max(0.0);
-        assert!(
-            (out - expected).abs() < 1e-6,
-            "got {out}, expected {expected}"
-        );
-    }
-
-    #[test]
-    fn fox_suppression_boosts_flee_additively() {
-        // §3.5.3 item 2: Flee gets an additive boost, not a damp.
-        let modifier = FoxTerritorySuppression {
+    fn flee_fox_scent_boost_additive() {
+        // §3.5.3 item 2: Flee gets an additive boost when fox-scent
+        // crosses the threshold. Ticket 223 retired the legacy
+        // multiplicative damp branch on Hunt/Explore/Forage/Patrol/
+        // Wander; the path-cost overlay carries that signal at the
+        // routing layer instead.
+        let modifier = FleeFoxScentBoost {
             threshold: 0.3,
             scale: 0.8,
             flee_boost_scale: 0.5,
@@ -3713,8 +3687,8 @@ mod tests {
     }
 
     #[test]
-    fn fox_suppression_skips_when_below_threshold() {
-        let modifier = FoxTerritorySuppression {
+    fn flee_fox_scent_boost_skips_when_below_threshold() {
+        let modifier = FleeFoxScentBoost {
             threshold: 0.3,
             scale: 0.8,
             flee_boost_scale: 0.5,
@@ -3724,17 +3698,18 @@ mod tests {
             FOX_SCENT_LEVEL => 0.1,
             _ => 0.0,
         };
-        for dse in [HUNT, EXPLORE, FORAGE, PATROL, WANDER, FLEE] {
-            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
-            assert!((out - 0.5).abs() < 1e-6, "dse {dse}: got {out}");
-        }
+        let out = modifier.apply(DseId(FLEE), 0.5, &ctx, &fetch);
+        assert!((out - 0.5).abs() < 1e-6, "got {out}");
     }
 
     #[test]
-    fn fox_suppression_skips_non_applicable_dses() {
-        // Eat, Fight, Socialize, etc. are not touched by fox-suppression
-        // even when scent is high — only the damped five + Flee.
-        let modifier = FoxTerritorySuppression {
+    fn flee_fox_scent_boost_skips_non_flee_dses() {
+        // Hunt, Explore, Forage, Patrol, Wander used to be damped by
+        // the legacy FoxTerritorySuppression branch; ticket 223 retired
+        // that branch (the path-cost overlay carries the signal).
+        // Eat, Fight, Socialize, etc. were never touched. All non-Flee
+        // DSEs are now no-ops on this modifier.
+        let modifier = FleeFoxScentBoost {
             threshold: 0.3,
             scale: 0.8,
             flee_boost_scale: 0.5,
@@ -3744,7 +3719,9 @@ mod tests {
             FOX_SCENT_LEVEL => 0.9,
             _ => 0.0,
         };
-        for dse in [EAT, SLEEP, SOCIALIZE, FIGHT, BUILD, IDLE] {
+        for dse in [
+            HUNT, EXPLORE, FORAGE, PATROL, WANDER, EAT, SLEEP, SOCIALIZE, FIGHT, BUILD, IDLE,
+        ] {
             let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
             assert!((out - 0.5).abs() < 1e-6, "dse {dse}: got {out}");
         }

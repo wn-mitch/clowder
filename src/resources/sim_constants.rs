@@ -1868,6 +1868,26 @@ pub struct ScoringConstants {
     /// cascade by pricing predator-exposure into Patrol's L2 score.
     #[serde(default = "default_patrol_fox_scent_weight")]
     pub patrol_fox_scent_weight: f32,
+    /// 223: Maximum additive cost contribution from fox-scent on a single
+    /// tile during cat A* pathfinding. Cat path-cost overlay scales
+    /// `FoxScentMap::get(x, y).clamp(0.0, 1.0) * fox_scent_path_cost_max`
+    /// (rounded). Default `8` — chosen so a cat avoids a single
+    /// max-scent tile in favor of a 4-grass-tile detour (cost 4 < 8),
+    /// while a long path through a corridor of fox-scent tiles is
+    /// still walkable when no detour exists. The buffer sits above
+    /// DenseForest's `movement_cost = 3` so cats prefer scented forest
+    /// only when no scent-free path exists.
+    #[serde(default = "default_fox_scent_path_cost_max")]
+    pub fox_scent_path_cost_max: u32,
+    /// 223: Maximum additive cost contribution from corruption on a
+    /// single tile during cat A* pathfinding. Symmetric shape to
+    /// `fox_scent_path_cost_max`. Default `10` — slightly higher because
+    /// corruption is rarer in healthy colony states and ecologically
+    /// more corrosive than fox scent (corruption persists; scent
+    /// decays). Tune alongside `fox_scent_path_cost_max` if balance
+    /// surfaces an asymmetry that doesn't reflect the fiction.
+    #[serde(default = "default_corruption_path_cost_max")]
+    pub corruption_path_cost_max: u32,
     /// 209: weight on the `TensionDefusionGroomLift` modifier
     /// targeting GroomOther. Multiplicative lift when
     /// `colony_tension_recent` is elevated AND `HasGroomingCandidate`
@@ -2112,6 +2132,8 @@ impl Default for ScoringConstants {
             caretake_food_security_weight: default_caretake_food_security_weight(),
             groom_food_security_weight: default_groom_food_security_weight(),
             patrol_fox_scent_weight: default_patrol_fox_scent_weight(),
+            fox_scent_path_cost_max: default_fox_scent_path_cost_max(),
+            corruption_path_cost_max: default_corruption_path_cost_max(),
             tension_defusion_groom_weight: default_tension_defusion_groom_weight(),
             disposal_inventory_excess_slope: default_disposal_inventory_excess_slope(),
             disposal_inventory_excess_midpoint: default_disposal_inventory_excess_midpoint(),
@@ -3154,6 +3176,19 @@ fn default_groom_food_security_weight() -> f32 {
 /// dormant at 0.0.
 fn default_patrol_fox_scent_weight() -> f32 {
     0.0
+}
+
+/// 223: Cat A* path-cost overlay max contribution from fox scent. See
+/// `ScoringConstants::fox_scent_path_cost_max` for the rationale on
+/// the value `8`.
+fn default_fox_scent_path_cost_max() -> u32 {
+    8
+}
+
+/// 223: Cat A* path-cost overlay max contribution from corruption.
+/// See `ScoringConstants::corruption_path_cost_max` for the rationale.
+fn default_corruption_path_cost_max() -> u32 {
+    10
 }
 
 /// 209: GroomOther `TensionDefusionGroomLift` modifier weight. Ships

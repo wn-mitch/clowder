@@ -1,11 +1,11 @@
 ---
 id: 224
 title: boldness-conditioned path risk
-status: blocked
+status: ready
 cluster: pathfinder-risk-awareness
 added: 2026-05-07
 parked: null
-blocked-by: [223]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
