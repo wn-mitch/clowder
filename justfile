@@ -83,6 +83,29 @@ test-logq:
 test-verdict:
     python3 tests/verdict/test_colony_score_drift.py -v
 
+# Ticket 229: similar.py chunkers + retrieval — pure-Python tests with
+# a deterministic fake embedder so the suite runs without downloading
+# the BGE-small model. Real-fastembed verification happens via
+# `just similar-build` + smoke queries.
+test-similar:
+    python3 tests/similar/test_chunkers.py -v
+    python3 tests/similar/test_retrieve.py -v
+
+# Semantic retrieval over Clowder prose (tickets, landed, balance,
+# system docs, DSE doc-comments). See `.claude/skills/similar/SKILL.md`.
+# Three input shapes auto-detected:
+#   just similar 189                          # ticket id (centroid query)
+#   just similar tickets/175.md               # repo-relative file path
+#   just similar "starvation cluster"         # free text
+similar *ARGS:
+    @uv run scripts/similar/similar.py {{ARGS}}
+
+# Build / refresh the embedding index used by `just similar`. Runs
+# incrementally by default — only re-embeds files whose mtime exceeds
+# the recorded one. Pass `--full` to force a from-scratch rebuild.
+similar-build *ARGS:
+    @uv run scripts/similar/index.py {{ARGS}}
+
 # Deep-soak with a focal-cat trace sidecar. Writes to
 # logs/tuned-<seed>/{events,narrative,trace-<focal>}.jsonl. Trace
 # records decompose per-tick L1/L2/L3 state for one focal cat per §11
