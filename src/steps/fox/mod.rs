@@ -27,7 +27,9 @@ pub fn step_toward(
         return true;
     }
     if cached_path.is_none() {
-        *cached_path = find_path(*pos, target, map);
+        // Fox side: no scent/corruption avoidance — foxes don't avoid their
+        // own scent and aren't sensitive to corruption in the same shape.
+        *cached_path = find_path(*pos, target, map, &[]);
     }
     if let Some(path) = cached_path {
         if !path.is_empty() {

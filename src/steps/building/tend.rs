@@ -68,7 +68,7 @@ pub fn resolve_tend(
 
     if pos.manhattan_distance(garden_pos) > 1 {
         if cached_path.is_none() {
-            *cached_path = find_path(*pos, *garden_pos, map);
+            *cached_path = find_path(*pos, *garden_pos, map, &[]);
         }
         if let Some(ref mut path) = cached_path {
             if !path.is_empty() {

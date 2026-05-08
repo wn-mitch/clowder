@@ -1,11 +1,11 @@
 ---
 id: 223
 title: cat paths respect fox-scent + corruption
-status: blocked
+status: ready
 cluster: pathfinder-risk-awareness
 added: 2026-05-07
 parked: null
-blocked-by: [222]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []

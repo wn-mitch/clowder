@@ -75,7 +75,7 @@ pub fn resolve_construct(
 
     if pos.manhattan_distance(building_pos) > 1 {
         if cached_path.is_none() {
-            *cached_path = find_path(*pos, *building_pos, map);
+            *cached_path = find_path(*pos, *building_pos, map, &[]);
         }
         if let Some(ref mut path) = cached_path {
             if !path.is_empty() {

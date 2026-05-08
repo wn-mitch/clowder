@@ -4155,7 +4155,7 @@ fn dispatch_step_action(
                             .is_some_and(|last| *last != target_pos)
                     {
                         plan.step_state[step_idx].cached_path =
-                            crate::ai::pathfinding::find_path(*pos, target_pos, &ec.map);
+                            crate::ai::pathfinding::find_path(*pos, target_pos, &ec.map, &[]);
                     }
                     if let Some(ref mut path) = plan.step_state[step_idx].cached_path {
                         if let Some(next) = path.first().copied() {
@@ -4418,7 +4418,7 @@ fn dispatch_step_action(
                 if pos.manhattan_distance(&ward_target) > 1 {
                     if plan.step_state[step_idx].cached_path.is_none() {
                         plan.step_state[step_idx].cached_path =
-                            crate::ai::pathfinding::find_path(*pos, ward_target, &ec.map);
+                            crate::ai::pathfinding::find_path(*pos, ward_target, &ec.map, &[]);
                     }
                     if let Some(ref mut path) = plan.step_state[step_idx].cached_path {
                         if let Some(next) = path.first().copied() {
@@ -4647,7 +4647,7 @@ fn dispatch_step_action(
                 if pos.manhattan_distance(&target) > 0 {
                     if plan.step_state[step_idx].cached_path.is_none() {
                         plan.step_state[step_idx].cached_path =
-                            crate::ai::pathfinding::find_path(*pos, target, &ec.map);
+                            crate::ai::pathfinding::find_path(*pos, target, &ec.map, &[]);
                     }
                     if let Some(ref mut path) = plan.step_state[step_idx].cached_path {
                         if !path.is_empty() {
@@ -4748,7 +4748,7 @@ fn dispatch_step_action(
                     let target = plan.step_state[step_idx].target_position.unwrap();
                     if plan.step_state[step_idx].cached_path.is_none() {
                         plan.step_state[step_idx].cached_path =
-                            crate::ai::pathfinding::find_path(*pos, target, &ec.map);
+                            crate::ai::pathfinding::find_path(*pos, target, &ec.map, &[]);
                     }
                     if let Some(ref mut path) = plan.step_state[step_idx].cached_path {
                         if !path.is_empty() {
@@ -5355,7 +5355,7 @@ fn resolve_travel_to(
 
     // Use cached A* path.
     if state.cached_path.is_none() {
-        state.cached_path = find_path(*pos, target, map);
+        state.cached_path = find_path(*pos, target, map, &[]);
     }
 
     if let Some(ref mut path) = state.cached_path {
@@ -5382,7 +5382,7 @@ fn resolve_travel_to(
     } else {
         // No path found — step toward target directly.
         let before = *pos;
-        if let Some(next) = step_toward(pos, &target, map) {
+        if let Some(next) = step_toward(pos, &target, map, &[]) {
             *pos = next;
         }
         if pos.manhattan_distance(&target) <= 1 {
@@ -6077,7 +6077,7 @@ fn resolve_engage_prey(
             // === CHASE ===
             let mut moved = false;
             for _ in 0..d.chase_speed {
-                if let Some(next) = step_toward(pos, &prey_pos, map) {
+                if let Some(next) = step_toward(pos, &prey_pos, map, &[]) {
                     *pos = next;
                     moved = true;
                 }
@@ -6125,7 +6125,7 @@ fn resolve_engage_prey(
         } else {
             // === STALK ===
             let mut moved = false;
-            if let Some(next) = step_toward(pos, &prey_pos, map) {
+            if let Some(next) = step_toward(pos, &prey_pos, map, &[]) {
                 *pos = next;
                 moved = true;
             }
@@ -6178,7 +6178,7 @@ fn resolve_engage_prey(
         // === APPROACH ===
         let mut moved = false;
         for _ in 0..d.approach_speed {
-            if let Some(next) = step_toward(pos, &prey_pos, map) {
+            if let Some(next) = step_toward(pos, &prey_pos, map, &[]) {
                 *pos = next;
                 moved = true;
             }

@@ -3691,7 +3691,7 @@ fn dispatch_chain_step(
                     if prey_is_fleeing {
                         // === CHASE === sprint burst.
                         for _ in 0..d.chase_speed {
-                            if let Some(next) = step_toward(pos, &prey_pos, map) {
+                            if let Some(next) = step_toward(pos, &prey_pos, map, &[]) {
                                 *pos = next;
                                 moved = true;
                             }
@@ -3700,7 +3700,7 @@ fn dispatch_chain_step(
                         // === STALK === Deliberate approach, 1 tile/tick.
                         // Cats are agile ambush predators — they close quickly
                         // while relying on stealth to avoid detection.
-                        if let Some(next) = step_toward(pos, &prey_pos, map) {
+                        if let Some(next) = step_toward(pos, &prey_pos, map, &[]) {
                             *pos = next;
                             moved = true;
                         }
@@ -3726,7 +3726,7 @@ fn dispatch_chain_step(
                     // === APPROACH === Trot toward scented prey.
                     let mut moved = false;
                     for _ in 0..d.approach_speed {
-                        if let Some(next) = step_toward(pos, &prey_pos, map) {
+                        if let Some(next) = step_toward(pos, &prey_pos, map, &[]) {
                             *pos = next;
                             moved = true;
                         }

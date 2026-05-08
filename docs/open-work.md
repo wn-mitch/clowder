@@ -17,8 +17,8 @@ _Last generated: 2026-05-07._
 | In progress | 6 |
 | Ready | 63 |
 | Parked | 8 |
-| Blocked | 23 |
-| **Open total** | **100** |
+| Blocked | 22 |
+| **Open total** | **99** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -105,7 +105,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[208](docs/open-work/tickets/208-per-cat-action-overlay-for-the-windowed-ui.md)** — Per-cat Action overlay for the windowed UI — _added 2026-05-07_
 - **[217](docs/open-work/tickets/217-scenario-marker-snapshot-wiring-as-a-discipline-requirement.md)** — scenario marker-snapshot wiring as a discipline requirement — _[process-discipline] · added 2026-05-07_
 - **[219](docs/open-work/tickets/219-shared-recent-ambush-event-marker.md)** — shared recent-ambush event marker — _[ai-substrate] · added 2026-05-07_
-- **[222](docs/open-work/tickets/222-pathfinder-cost-overlay-trait.md)** — pathfinder cost-overlay trait — _[pathfinder-risk-awareness] · added 2026-05-07_
+- **[223](docs/open-work/tickets/223-cat-paths-respect-fox-scent-corruption.md)** — cat paths respect fox-scent + corruption — _[pathfinder-risk-awareness] · added 2026-05-07_
 - **[225](docs/open-work/tickets/225-audit-patrol-l3-share-rise-under-additive-coordinator-dse-lift.md)** — audit Patrol L3 share rise under additive coordinator-DSE lift — _[ai-substrate] · added 2026-05-07_
 - **[226](docs/open-work/tickets/226-audit-groomother-share-vs-score-inversion-under-demographic-shift.md)** — audit GroomOther share-vs-score inversion under demographic shift — _[ai-substrate] · added 2026-05-07_
 - **[227](docs/open-work/tickets/227-coordinator-eligible-focal-cat-for-coordinate-frame-diff-parity.md)** — coordinator-eligible focal-cat for Coordinate frame-diff parity — _[process-discipline] · added 2026-05-07_
@@ -121,7 +121,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[199](docs/open-work/tickets/199-pipeline-walk-skill.md)** — Hunt / production / consumption pipeline-walk skill (194 P4) — _[process-discipline] · parked 2026-05-06 · added 2026-05-06_
 - **[214](docs/open-work/tickets/214-tune-patrol-fox-scent-weight.md)** — tune patrol_fox_scent_weight — _[balance] · parked 2026-05-07 · blocked-by 209 · added 2026-05-07_
 
-## Blocked (23)
+## Blocked (22)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _blocked-by 007, 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _blocked-by 016 · added 2026-04-22_
@@ -144,7 +144,6 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[216](docs/open-work/tickets/216-mentor-coordinate-caretake-axis-ethology-audit.md)** — Mentor / Coordinate / Caretake axis ethology audit — _[ai-substrate] · blocked-by 209 · added 2026-05-07_
 - **[220](docs/open-work/tickets/220-ward-placement-targets-ambush-clusters.md)** — ward placement targets ambush clusters — _[ai-substrate] · blocked-by 219 · added 2026-05-07_
 - **[221](docs/open-work/tickets/221-caretake-gates-on-ambush-recency-at-kitten-tile.md)** — caretake gates on ambush-recency at kitten tile — _[ai-substrate] · blocked-by 219 · added 2026-05-07_
-- **[223](docs/open-work/tickets/223-cat-paths-respect-fox-scent-corruption.md)** — cat paths respect fox-scent + corruption — _[pathfinder-risk-awareness] · blocked-by 222 · added 2026-05-07_
 - **[224](docs/open-work/tickets/224-boldness-conditioned-path-risk.md)** — boldness-conditioned path risk — _[pathfinder-risk-awareness] · blocked-by 223 · added 2026-05-07_
 
 ## Pre-existing (2)
@@ -152,12 +151,13 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (146)
+## Landed archive (147)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (81)
+### 2026-05 (82)
 
+- **[222](docs/open-work/landed/222-pathfinder-cost-overlay-trait.md)** — pathfinder cost-overlay trait _(2026-05-07)_
 - **[218](docs/open-work/landed/218-maslow-tier-rename.md)** — Rename Maslow `Level N` → `Tier N` to disambiguate from substrate `L1/L2/L3` _(2026-05-07)_
 - **[211](docs/open-work/landed/211-tune-coordinate-food-security-weight.md)** — tune coordinate_food_security_weight _(2026-05-07)_
 - **[210](docs/open-work/landed/210-tune-mentor-food-security-weight.md)** — tune mentor_food_security_weight _(2026-05-07)_

@@ -5,6 +5,32 @@ use crate::components::physical::Position;
 use crate::resources::map::TileMap;
 
 // ---------------------------------------------------------------------------
+// Tile-cost overlays (substrate, not search state — §4.7)
+// ---------------------------------------------------------------------------
+
+/// Per-tile additive cost contribution overlaid on terrain movement cost.
+///
+/// Implementors sense properties of the cat's environment (fox scent,
+/// corruption, etc.) and surface them as routing cost. Per the §4.7
+/// substrate-vs-search-state boundary in `docs/systems/ai-substrate-refactor.md`,
+/// these overlays are **substrate** — the cat perceives scent in the world
+/// it moves through — not search state.
+///
+/// **Admissibility constraint.** The Chebyshev heuristic in [`find_path`] is
+/// admissible iff every edge cost is non-negative. Implementors MUST return
+/// `cost_at >= 0` (`u32` enforces this at the type level — `cost_at` cannot
+/// produce a negative value). Any non-negative additive g-cost preserves
+/// `f(n) ≤ g(n) + h(n)` so optimality is preserved.
+pub trait TileCostOverlay: Send + Sync {
+    fn cost_at(&self, pos: Position) -> u32;
+}
+
+#[inline]
+fn sum_overlay_cost(overlays: &[&dyn TileCostOverlay], pos: Position) -> u32 {
+    overlays.iter().map(|o| o.cost_at(pos)).sum()
+}
+
+// ---------------------------------------------------------------------------
 // A* pathfinding
 // ---------------------------------------------------------------------------
 
@@ -61,9 +87,19 @@ fn heuristic(a: &Position, b: &Position) -> u32 {
 /// at `to`. Returns `None` if `to` is unreachable. Returns an empty `Vec`
 /// if `from == to`.
 ///
-/// Edge weights come from [`Terrain::movement_cost()`], so cats naturally
-/// prefer open terrain (Grass=1) over dense forest (3) or rock (4).
-pub fn find_path(from: Position, to: Position, map: &TileMap) -> Option<Vec<Position>> {
+/// Edge weights are `terrain.movement_cost() + sum(overlays)`, so cats
+/// naturally prefer open terrain (Grass=1) over dense forest (3) or rock (4)
+/// and additionally route around any non-zero overlay cost (e.g. fox scent,
+/// corruption — see [`TileCostOverlay`]).
+///
+/// The empty slice `&[]` collapses overlay cost to zero, restoring legacy
+/// terrain-only routing.
+pub fn find_path(
+    from: Position,
+    to: Position,
+    map: &TileMap,
+    overlays: &[&dyn TileCostOverlay],
+) -> Option<Vec<Position>> {
     if from == to {
         return Some(Vec::new());
     }
@@ -122,7 +158,8 @@ pub fn find_path(from: Position, to: Position, map: &TileMap) -> Option<Vec<Posi
             }
             let neighbor = Position::new(nx, ny);
             let ni = idx(&neighbor);
-            let tentative_g = current_g + terrain.movement_cost();
+            let overlay_cost = sum_overlay_cost(overlays, neighbor);
+            let tentative_g = current_g + terrain.movement_cost() + overlay_cost;
             if tentative_g < g_score[ni] {
                 g_score[ni] = tentative_g;
                 came_from[ni] = idx(&current.pos) as i32;
@@ -143,17 +180,33 @@ pub fn find_path(from: Position, to: Position, map: &TileMap) -> Option<Vec<Posi
 
 /// Move one tile closer to `to` using greedy directional preference.
 ///
-/// Tries, in order:
+/// Considers candidates in directional order:
 /// 1. Diagonal step (dx, dy)
 /// 2. Horizontal step (dx, 0)
 /// 3. Vertical step (0, dy)
+///
+/// At `overlays = &[]`, returns the **first passable** candidate in
+/// directional order — bit-for-bit the legacy semantics from before the
+/// `TileCostOverlay` substrate landed. This is the no-op-at-`&[]` invariant
+/// promised by ticket 222.
+///
+/// At non-empty overlays, evaluates `terrain.movement_cost() +
+/// sum(overlays)` per candidate and returns the **first** candidate with
+/// the lowest cost (strict `<` comparison so direction order wins on ties).
+/// **Do not relax this to `<=`** — that would silently invert tiebreak
+/// order and perturb every cat's path on every tick.
 ///
 /// Returns the next [`Position`] on success, or `None` if every candidate is
 /// out-of-bounds or impassable (the entity is stuck).
 ///
 /// This is intentionally simple — it is not A* and will get stuck in local
 /// minima (e.g. concave obstacles). That is acceptable for Phase 1.
-pub fn step_toward(from: &Position, to: &Position, map: &TileMap) -> Option<Position> {
+pub fn step_toward(
+    from: &Position,
+    to: &Position,
+    map: &TileMap,
+    overlays: &[&dyn TileCostOverlay],
+) -> Option<Position> {
     if from == to {
         return None;
     }
@@ -169,18 +222,43 @@ pub fn step_toward(from: &Position, to: &Position, map: &TileMap) -> Option<Posi
         (from.x, from.y + dy),
     ];
 
+    if overlays.is_empty() {
+        // Legacy: first passable candidate wins.
+        for (nx, ny) in candidates {
+            // Skip degenerate candidates that equal the current position
+            // (happens when dx or dy is 0).
+            if nx == from.x && ny == from.y {
+                continue;
+            }
+            if map.in_bounds(nx, ny) && map.get(nx, ny).terrain.is_passable() {
+                return Some(Position::new(nx, ny));
+            }
+        }
+        return None;
+    }
+
+    // Non-empty overlays: pick lowest-cost passable candidate.
+    let mut best: Option<(Position, u32)> = None;
     for (nx, ny) in candidates {
-        // Skip degenerate candidates that equal the current position
-        // (happens when dx or dy is 0).
         if nx == from.x && ny == from.y {
             continue;
         }
-        if map.in_bounds(nx, ny) && map.get(nx, ny).terrain.is_passable() {
-            return Some(Position::new(nx, ny));
+        if !map.in_bounds(nx, ny) {
+            continue;
+        }
+        let terrain = map.get(nx, ny).terrain;
+        if !terrain.is_passable() {
+            continue;
+        }
+        let candidate = Position::new(nx, ny);
+        let cost = terrain.movement_cost() + sum_overlay_cost(overlays, candidate);
+        // Strict `<` — first candidate in directional order wins on ties.
+        if best.as_ref().is_none_or(|&(_, c)| cost < c) {
+            best = Some((candidate, cost));
         }
     }
 
-    None
+    best.map(|(p, _)| p)
 }
 
 // ---------------------------------------------------------------------------
@@ -252,7 +330,7 @@ mod tests {
         let from = Position::new(0, 0);
         let to = Position::new(5, 5);
 
-        let next = step_toward(&from, &to, &map).expect("should move on open terrain");
+        let next = step_toward(&from, &to, &map, &[]).expect("should move on open terrain");
 
         // Must be strictly closer in Manhattan distance
         let before = from.manhattan_distance(&to);
@@ -275,7 +353,7 @@ mod tests {
         let from = Position::new(0, 0);
         let to = Position::new(3, 3);
 
-        let next = step_toward(&from, &to, &map).expect("should find a cardinal fallback");
+        let next = step_toward(&from, &to, &map, &[]).expect("should find a cardinal fallback");
 
         // Must not be the blocked diagonal
         assert_ne!(
@@ -305,7 +383,7 @@ mod tests {
         let from = Position::new(5, 5);
         let to = Position::new(5, 0);
 
-        let result = step_toward(&from, &to, &map);
+        let result = step_toward(&from, &to, &map, &[]);
         assert!(
             result.is_none(),
             "expected None when only vertical candidate is blocked on axis-aligned path, got {result:?}"
@@ -319,7 +397,7 @@ mod tests {
     #[test]
     fn find_path_open_terrain() {
         let map = open_map();
-        let path = find_path(Position::new(0, 0), Position::new(5, 5), &map)
+        let path = find_path(Position::new(0, 0), Position::new(5, 5), &map, &[])
             .expect("path should exist on open terrain");
         assert_eq!(*path.last().unwrap(), Position::new(5, 5));
         // Optimal diagonal path: 5 steps.
@@ -329,7 +407,7 @@ mod tests {
     #[test]
     fn find_path_same_position() {
         let map = open_map();
-        let path = find_path(Position::new(3, 3), Position::new(3, 3), &map)
+        let path = find_path(Position::new(3, 3), Position::new(3, 3), &map, &[])
             .expect("same-position path should return empty vec");
         assert!(path.is_empty());
     }
@@ -345,7 +423,7 @@ mod tests {
         let from = Position::new(4, 4);
         let to = Position::new(6, 4);
 
-        let path = find_path(from, to, &map).expect("should route around the wall");
+        let path = find_path(from, to, &map, &[]).expect("should route around the wall");
         assert_eq!(*path.last().unwrap(), to);
         // Path must not cross any water tile.
         for p in &path {
@@ -371,7 +449,7 @@ mod tests {
                 map.set(10 + dx, 10 + dy, Terrain::Water);
             }
         }
-        let result = find_path(Position::new(0, 0), Position::new(10, 10), &map);
+        let result = find_path(Position::new(0, 0), Position::new(10, 10), &map, &[]);
         assert!(result.is_none(), "path to surrounded tile should be None");
     }
 
@@ -386,7 +464,7 @@ mod tests {
         let from = Position::new(0, 2);
         let to = Position::new(9, 2);
 
-        let path = find_path(from, to, &map).expect("path should exist");
+        let path = find_path(from, to, &map, &[]).expect("path should exist");
         // Count how many DenseForest tiles the path crosses.
         let forest_tiles = path
             .iter()
@@ -403,8 +481,139 @@ mod tests {
     fn find_path_to_impassable_target_returns_none() {
         let mut map = open_map();
         map.set(10, 10, Terrain::Water);
-        let result = find_path(Position::new(0, 0), Position::new(10, 10), &map);
+        let result = find_path(Position::new(0, 0), Position::new(10, 10), &map, &[]);
         assert!(result.is_none(), "path to impassable target should be None");
+    }
+
+    // -----------------------------------------------------------------------
+    // TileCostOverlay tests (ticket 222 substrate)
+    // -----------------------------------------------------------------------
+
+    /// Test fixture: a sparse overlay that returns `cost` at one specific
+    /// tile and `0` everywhere else.
+    struct PointOverlay {
+        target: Position,
+        cost: u32,
+    }
+    impl TileCostOverlay for PointOverlay {
+        fn cost_at(&self, pos: Position) -> u32 {
+            if pos == self.target {
+                self.cost
+            } else {
+                0
+            }
+        }
+    }
+
+    /// A high-cost overlay on a single tile in the direct path forces
+    /// `find_path` to detour around it.
+    #[test]
+    fn find_path_overlay_forces_detour() {
+        let map = open_map();
+        let from = Position::new(0, 0);
+        let to = Position::new(4, 0);
+
+        // Direct optimal path on grass: through (1,0)..(3,0).
+        // Plant a 50-cost overlay on (2,0). The 1-tile detour up through
+        // (2,1) costs only ~1 extra grass step (cost 1) — vastly cheaper
+        // than 50, so the path must avoid (2,0).
+        let blocker = PointOverlay {
+            target: Position::new(2, 0),
+            cost: 50,
+        };
+        let overlays: [&dyn TileCostOverlay; 1] = [&blocker];
+
+        let path = find_path(from, to, &map, &overlays).expect("path should exist");
+        assert_eq!(*path.last().unwrap(), to);
+        assert!(
+            !path.iter().any(|p| *p == Position::new(2, 0)),
+            "path crossed the high-cost overlay tile (2,0): {path:?}"
+        );
+    }
+
+    /// Empty overlay slice produces the same path as the legacy terrain-only
+    /// pathfinder. Asserts the `&[]` short-circuit invariant.
+    #[test]
+    fn find_path_empty_overlay_matches_legacy() {
+        let mut map = open_map();
+        // Use the same wall scenario as `find_path_around_water_wall`.
+        for y in 0..9 {
+            map.set(5, y, Terrain::Water);
+        }
+        let from = Position::new(4, 4);
+        let to = Position::new(6, 4);
+
+        let path_a = find_path(from, to, &map, &[]).expect("path should exist");
+        // Construct an overlay that always returns 0 — should be
+        // indistinguishable from `&[]`.
+        struct ZeroOverlay;
+        impl TileCostOverlay for ZeroOverlay {
+            fn cost_at(&self, _pos: Position) -> u32 {
+                0
+            }
+        }
+        let zero = ZeroOverlay;
+        let overlays: [&dyn TileCostOverlay; 1] = [&zero];
+        let path_b = find_path(from, to, &map, &overlays).expect("path should exist");
+
+        assert_eq!(
+            path_a, path_b,
+            "empty overlay slice and zero-cost overlay should produce the same path"
+        );
+    }
+
+    /// At `&[]`, `step_toward` returns the first passable candidate in
+    /// directional order — diagonal first, even when the diagonal is on
+    /// expensive terrain (DenseForest=3) and the cardinal is on grass (1).
+    /// This is the no-op-at-`&[]` invariant: the substrate refactor must
+    /// not change fox movement (which always passes `&[]`) at terrain
+    /// boundaries.
+    #[test]
+    fn step_toward_empty_overlay_preserves_direction_order() {
+        let mut map = open_map();
+        // From (0,0) toward (2,2): diagonal candidate is (1,1), horizontal
+        // is (1,0). Make the diagonal expensive (DenseForest, cost 3) and
+        // the horizontal cheap (Grass, cost 1).
+        map.set(1, 1, Terrain::DenseForest);
+        // (1,0) stays as Grass.
+
+        let from = Position::new(0, 0);
+        let to = Position::new(2, 2);
+
+        let next = step_toward(&from, &to, &map, &[]).expect("should find a step");
+        assert_eq!(
+            next,
+            Position::new(1, 1),
+            "at &[] step_toward must pick the first passable candidate in \
+             directional order (diagonal first), not the cheaper cardinal — \
+             this preserves legacy fox-movement determinism. Got {next:?}"
+        );
+    }
+
+    /// At non-empty overlays, `step_toward` picks the lowest-cost passable
+    /// candidate, with strict-`<` so direction order wins on ties. With a
+    /// per-tile overlay that makes the diagonal expensive, the cardinal
+    /// becomes preferred.
+    #[test]
+    fn step_toward_overlay_prefers_cheaper_cardinal() {
+        let map = open_map();
+        let from = Position::new(0, 0);
+        let to = Position::new(2, 2);
+
+        // Plant a high overlay cost on the diagonal candidate (1,1).
+        let blocker = PointOverlay {
+            target: Position::new(1, 1),
+            cost: 10,
+        };
+        let overlays: [&dyn TileCostOverlay; 1] = [&blocker];
+
+        let next = step_toward(&from, &to, &map, &overlays).expect("should find a step");
+        assert_ne!(
+            next,
+            Position::new(1, 1),
+            "step_toward with a high overlay on the diagonal must pick a \
+             cardinal alternative, got {next:?}"
+        );
     }
 
     // -----------------------------------------------------------------------

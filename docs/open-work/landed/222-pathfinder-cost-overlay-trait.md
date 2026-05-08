@@ -1,7 +1,7 @@
 ---
 id: 222
 title: pathfinder cost-overlay trait
-status: ready
+status: done
 cluster: pathfinder-risk-awareness
 added: 2026-05-07
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-07
 ---
 
 ## Why

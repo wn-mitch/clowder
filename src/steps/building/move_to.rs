@@ -51,7 +51,7 @@ pub fn resolve_move_to(
         return StepOutcome::bare(StepResult::Advance);
     }
     if cached_path.is_none() {
-        match find_path(*pos, target, map) {
+        match find_path(*pos, target, map, &[]) {
             Some(path) => *cached_path = Some(path),
             None => return StepOutcome::bare(StepResult::Fail("no path to target".into())),
         }

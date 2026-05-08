@@ -57,7 +57,7 @@ pub fn resolve_apply_remedy(
     if let Some(target_pos) = target_position {
         if pos.manhattan_distance(&target_pos) > 1 {
             if cached_path.is_none() {
-                match find_path(*pos, target_pos, map) {
+                match find_path(*pos, target_pos, map, &[]) {
                     Some(path) => *cached_path = Some(path),
                     None => return (StepResult::Fail("no path to patient".into()), None),
                 }

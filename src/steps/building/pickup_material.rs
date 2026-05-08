@@ -88,7 +88,7 @@ pub fn resolve_pickup_material(
     // Walk to the pile if not adjacent yet.
     if pos.manhattan_distance(&item_pos) > 1 {
         if cached_path.is_none() {
-            *cached_path = find_path(*pos, item_pos, map);
+            *cached_path = find_path(*pos, item_pos, map, &[]);
         }
         if let Some(ref mut path) = cached_path {
             if !path.is_empty() {
