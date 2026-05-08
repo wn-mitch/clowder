@@ -2282,6 +2282,28 @@ pub struct DispositionConstants {
     pub guarding_exit_epsilon: f32,
     pub flee_distance: f32,
     pub flee_ticks: u64,
+    /// Ticket 230. How long the `HoldUntilSafe` step waits on a low-
+    /// route-cost tile (with non-elevated threat-derivative) before
+    /// committing the trip increment that closes the Fleeing
+    /// disposition. Set well above the post-228 thrash cadence
+    /// (1.21 ticks/plan) so the plan accumulates real commitment;
+    /// well below typical healthy plan-replan cadence so it doesn't
+    /// strand cats in safe corners. Read by
+    /// `src/steps/disposition/hold_until_safe.rs::resolve_hold_until_safe`.
+    pub flee_hold_ticks: u64,
+    /// Ticket 230. The `RouteCostField::cost_at(pos)` value below which
+    /// a tile is considered "safe enough" for `HoldUntilSafe` to count
+    /// hold ticks. Roughly 1/6 of `MAX_COST_BUDGET` (600); a flooded
+    /// tile at this cost is reachable via a low-overlay corridor (no
+    /// strong fox-scent or corruption pressure on the way). Read by
+    /// `resolve_hold_until_safe`.
+    pub route_cost_safe_threshold: u32,
+    /// Ticket 230. The `Needs.safety` value at or above which
+    /// `HoldUntilSafe` counts ticks. Composes with
+    /// `route_cost_safe_threshold`: a cat is "safe enough to hold"
+    /// only when both spatial cost is low AND the perception-side
+    /// safety scalar has caught up. Read by `resolve_hold_until_safe`.
+    pub flee_safety_need_threshold: f32,
     pub damaged_building_threshold: f32,
     pub ward_strength_low_threshold: f32,
     pub hunt_terrain_search_radius: i32,
@@ -3458,6 +3480,20 @@ impl Default for DispositionConstants {
             guarding_exit_epsilon: default_guarding_exit_epsilon(),
             flee_distance: 8.0,
             flee_ticks: 5,
+            // 230: Fleeing-disposition tunables. 30 ticks of hold ≈ 30
+            // sim-seconds at 1 tps; comfortable hysteresis without
+            // freezing the cat for an entire activity slice.
+            flee_hold_ticks: 30,
+            // 100 ≈ 1/6 of MAX_COST_BUDGET (600). A 30-tile flood at
+            // avg-edge ~3 (low-overlay terrain) reaches ~100 — so
+            // "cost ≤ 100" picks tiles that are walkable without
+            // crossing strong fox-scent or corruption pressure.
+            route_cost_safe_threshold: 100,
+            // 0.6 puts the safety scalar above its perceptual neutral
+            // (0.5 in the interoception module) and below the typical
+            // post-fight recovery plateau, so the hold step doesn't
+            // count ticks while the cat still feels actively pressed.
+            flee_safety_need_threshold: 0.6,
             damaged_building_threshold: 0.4,
             ward_strength_low_threshold: 0.3,
             hunt_terrain_search_radius: 15,

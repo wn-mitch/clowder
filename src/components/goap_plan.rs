@@ -326,6 +326,13 @@ impl GoapActionKind {
                 DispositionKind::Herbalism
                 | DispositionKind::Witchcraft
                 | DispositionKind::Cooking => chosen_action,
+                // 230: Fleeing's chain uses dedicated GoapActionKind
+                // variants (`PickFleeTarget` / `Flee` / `HoldUntilSafe`),
+                // not `TravelTo` — so this arm shouldn't be reachable in
+                // practice, but for type-system completeness map it to
+                // `Action::Flee` so any stray TravelTo leg under a
+                // `Fleeing` plan reports the umbrella label.
+                DispositionKind::Fleeing => Action::Flee,
                 _ => Action::Wander,
             },
             Self::SearchPrey | Self::EngagePrey | Self::DepositPrey => Action::Hunt,
@@ -366,6 +373,11 @@ impl GoapActionKind {
             Self::TrashItemAtMidden => Action::Trash,
             Self::HandoffItem => Action::Handoff,
             Self::PickUpItemFromGround => Action::PickUp,
+            // 230: Fleeing chain — each step reports `Action::Flee`
+            // so `CurrentAction` stays stable through the chain
+            // (mirrors how Hunting's `SearchPrey`/`EngagePrey`/
+            // `DepositPrey` all map to `Action::Hunt`).
+            Self::PickFleeTarget | Self::Flee | Self::HoldUntilSafe => Action::Flee,
         }
     }
 }

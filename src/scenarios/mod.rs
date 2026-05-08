@@ -30,6 +30,7 @@ pub mod disposal_election;
 pub mod env;
 pub mod exploration_ranging;
 pub mod farming_cycle;
+pub mod flee_commitment;
 pub mod fondness_kitten_imprint;
 pub mod grooming_other;
 pub mod hunt_acquisition;
@@ -110,6 +111,12 @@ pub const ALL: &[&Scenario] = &[
     // Lifts hunt_route_cost_weight to 1.0 locally; canonical soak
     // constants ship at 0.0 (substrate-dormant).
     &route_cost_decision::SCENARIO,
+    // 230 — substrate-aware Fleeing chain end-to-end smoke. Wounded
+    // cat with adjacent fox + saturated naive-projection corridor.
+    // Asserts `FleeTargetPicked` fires; the picker is reachable
+    // through the `Action::Flee → DispositionKind::Fleeing` route
+    // closing the last anxiety-interrupt arm migration.
+    &flee_commitment::SCENARIO,
 ];
 
 /// Look up a scenario by its `name` field.

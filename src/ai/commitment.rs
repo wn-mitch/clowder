@@ -233,6 +233,16 @@ pub fn strategy_for_disposition(kind: DispositionKind) -> CommitmentStrategy {
         DispositionKind::Trashing => SingleMinded,
         DispositionKind::Handing => SingleMinded,
         DispositionKind::PickingUp => SingleMinded,
+        // 230: Fleeing is goal-shaped (escape to a low-cost tile and
+        // hold until safe). SingleMinded composes with the disposition-
+        // aware modifier guard in `AcuteHealthAdrenalineFlee` and
+        // `ThreatProximityAdrenalineFlee`: once the cat commits to a
+        // Fleeing plan, those modifiers stop preempting (their
+        // `preempts_in_flight` returns `false` while `ctx.current_disposition
+        // == Some(Fleeing)`), so the plan accumulates commitment
+        // ticks instead of thrashing every tick the way the legacy
+        // anxiety-interrupt path did pre-230.
+        DispositionKind::Fleeing => SingleMinded,
     }
 }
 
@@ -710,6 +720,11 @@ mod tests {
         assert_eq!(strategy_for_disposition(Mating), SingleMinded);
         assert_eq!(strategy_for_disposition(Socializing), OpenMinded);
         assert_eq!(strategy_for_disposition(Exploring), OpenMinded);
+        // 230: Fleeing — substrate-aware retreat. SingleMinded
+        // composes with the disposition-tier early-skip in
+        // `try_preempt_with_modifier_lurch` so the cat accumulates
+        // hold ticks instead of thrashing.
+        assert_eq!(strategy_for_disposition(Fleeing), SingleMinded);
 
         // Exhaustive-enum guard — if a new DispositionKind variant is
         // added without a row here, the `DispositionKind::ALL` constant
@@ -741,6 +756,8 @@ mod tests {
             Trashing,
             Handing,
             PickingUp,
+            // 230: Fleeing — substrate-aware retreat (SingleMinded).
+            Fleeing,
         ];
         assert_eq!(
             covered.len(),

@@ -594,6 +594,12 @@ fn constituent_dses_for_ordinal(ordinal: f32) -> Option<&'static [&'static str]>
         19 => Some(&[TRASH]),
         20 => Some(&[HANDOFF]),
         21 => Some(&[PICK_UP]),
+        // 230: Fleeing → Flee. Single-constituent disposition; the
+        // adrenaline-class modifier lifts already target FLEE
+        // directly via `dse_id.0 == FLEE` matches in their `apply`
+        // arms, so the Patience / CommitmentTenure lifts continue to
+        // apply to Flee while the cat is committed.
+        22 => Some(&[FLEE]),
         _ => None,
     }
 }

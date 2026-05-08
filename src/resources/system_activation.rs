@@ -337,6 +337,23 @@ pub enum Feature {
     /// since every replan rebuilds the field; chronic counts indicate
     /// field-staleness or build-correctness bugs.
     RouteCostFieldFallback,
+    /// Ticket 230 — `PickFleeTarget` resolved a substrate-aware flee
+    /// destination against the cat's per-replan `RouteCostField`. Fires
+    /// once per Fleeing-disposition adoption (the first step in the
+    /// chain). `expected_to_fire_per_soak() => false`: cascade from
+    /// `AcuteHealthAdrenalineFlee` / `ThreatProximityAdrenalineFlee`
+    /// lifting Flee, which itself is rare on a healthy colony. Will
+    /// promote to `true` after the post-230 baseline shows it firing
+    /// reliably across seeds.
+    FleeTargetPicked,
+    /// Ticket 230 — `HoldUntilSafe` completed: the cat held a low-
+    /// `RouteCostField` tile with safety need above
+    /// `flee_safety_need_threshold` for `flee_hold_ticks`. Closes the
+    /// Fleeing trip, which is the canonical signal that the modifier-
+    /// driven thrash spiral is broken. `expected_to_fire_per_soak()
+    /// => false` initially (cascade from `FleeTargetPicked`); promote
+    /// after the soak baseline stabilizes.
+    FleeRecovered,
 }
 
 impl Feature {
@@ -454,6 +471,9 @@ impl Feature {
         Feature::ItemHandedOff,
         Feature::OverflowToGround,
         Feature::RouteCostFieldFallback,
+        // 230: Fleeing chain completion signals.
+        Feature::FleeTargetPicked,
+        Feature::FleeRecovered,
     ];
 
     /// The valence of this feature.
@@ -523,6 +543,13 @@ impl Feature {
             // healthy-colony activity; the never-fired canary catches a
             // dead hunting pipeline.
             Feature::HuntAttempted => Positive,
+
+            // 230: Fleeing chain completions. Both Positive — they
+            // signal the substrate-aware Fleeing path is firing
+            // (and, in the case of FleeRecovered, completing) instead
+            // of the legacy thrash loop.
+            Feature::FleeTargetPicked => Positive,
+            Feature::FleeRecovered => Positive,
 
             // 176: inventory-disposal completions are state-transition
             // signals — neither a colony win nor a loss, just "the cat
@@ -777,6 +804,14 @@ impl Feature {
             // staleness or build-correctness bugs; the canary is the
             // tripwire that surfaces them.
             Feature::RouteCostFieldFallback => false,
+            // 230: Fleeing chain Features. Cascade-from-rare-event:
+            // `AcuteHealthAdrenalineFlee` and
+            // `ThreatProximityAdrenalineFlee` should rarely lift Flee
+            // to win selection on a healthy colony, so the trip
+            // signals stay opt-in. Promote to `true` after the
+            // post-230 multi-seed baseline shows reliable firing.
+            Feature::FleeTargetPicked => false,
+            Feature::FleeRecovered => false,
             // Every other feature is expected to fire per soak.
             _ => true,
         }
@@ -896,6 +931,8 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::ItemHandedOff => "ItemHandedOff",
         Feature::OverflowToGround => "OverflowToGround",
         Feature::RouteCostFieldFallback => "RouteCostFieldFallback",
+        Feature::FleeTargetPicked => "FleeTargetPicked",
+        Feature::FleeRecovered => "FleeRecovered",
     }
 }
 
@@ -1131,7 +1168,9 @@ mod tests {
         // driven plan preemption from acute-class lurch modifiers).
         // Ticket 228 added 1 Negative (RouteCostFieldFallback — A*
         // fallback observability for the per-cat route-cost field).
-        assert_eq!(positive, 49);
+        // Ticket 230 added 2 Positive (FleeTargetPicked,
+        // FleeRecovered — Fleeing chain end-to-end signals).
+        assert_eq!(positive, 51);
         assert_eq!(negative, 23);
         assert_eq!(neutral, 31);
     }
@@ -1199,7 +1238,7 @@ mod tests {
     fn features_total_in_matches_category_counts() {
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            49
+            51
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),

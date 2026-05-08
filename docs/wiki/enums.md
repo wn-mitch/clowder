@@ -9,7 +9,7 @@
 | Enum | Variants | Source |
 |------|----------|--------|
 | [ItemKind](#itemkind) | 30 | `src/components/items.rs` |
-| [DispositionKind](#dispositionkind) | 21 | `src/components/disposition.rs` |
+| [DispositionKind](#dispositionkind) | 22 | `src/components/disposition.rs` |
 | [Weather](#weather) | 8 | `src/resources/weather.rs` |
 | [Terrain](#terrain) | 21 | `src/resources/map.rs` |
 | [StructureType](#structuretype) | 11 | `src/components/building.rs` |
@@ -104,6 +104,7 @@
 | `Trashing` |
 | `Handing` |
 | `PickingUp` |
+| `Fleeing` |
 
 ## Weather
 

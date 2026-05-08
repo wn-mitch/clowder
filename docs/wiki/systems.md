@@ -63,7 +63,7 @@ System modules with registered functions but no design doc:
 - **fox_goap**: sync_fox_needs, fox_evaluate_and_plan, fox_resolve_goap_plans, feed_cubs_at_dens, resolve_paired_confrontations
 - **fox_spatial**: update_store_awareness_markers, update_den_threat_markers, update_ward_detection_markers, update_cub_marker, update_cub_hunger_markers, update_juvenile_dispersal_markers, update_den_marker
 - **fulfillment**: decay_fulfillment, bond_proximity_social_warmth, update_body_condition
-- **goap**: check_modifier_preemption, check_anxiety_interrupts, evaluate_and_plan, resolve_goap_plans, emit_plan_narrative
+- **goap**: check_modifier_preemption, evaluate_and_plan, resolve_goap_plans, emit_plan_narrative
 - **growth**: update_life_stage_markers, update_parent_markers, tick_kitten_growth, kitten_mood_aura, update_kitten_cry_map
 - **incapacitation**: update_incapacitation
 - **interoception**: author_self_markers

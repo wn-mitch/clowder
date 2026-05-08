@@ -130,6 +130,30 @@ pub enum DispositionKind {
     /// real carcass entity at the kill site; the cat must plan
     /// `PickingUp` to retrieve it. Tier 1.
     PickingUp,
+    /// 230: substrate-aware retreat from a perceived threat.
+    ///
+    /// Plan template `[PickFleeTarget, Flee, HoldUntilSafe]`:
+    /// `PickFleeTarget` reads the cat's per-replan `RouteCostField`
+    /// (boldness-scaled fox-scent + corruption overlays) and writes
+    /// the lowest-cost passable tile within `flee_distance` to
+    /// `target_position`; the `Flee` umbrella delegates to the same
+    /// `cat_path_plan!` machinery `TravelTo` uses; `HoldUntilSafe`
+    /// then hysteresis-checks `route_cost_at_pos` and
+    /// `threat_proximity_derivative` for `flee_hold_ticks` before
+    /// `IncrementTrips`. Single-trip completion proxy.
+    ///
+    /// Closes the §4.7 substrate-over-override migration thread:
+    /// 106/107/108/119 retired the Starvation / Exhaustion /
+    /// CriticalHealth / CriticalSafety arms of the legacy
+    /// `check_anxiety_interrupts`; this carves the last remaining
+    /// `ThreatDetected` arm into a real Disposition with goal,
+    /// template, completion proxy, and substrate-aware target picker.
+    /// The naive vector-projection picker
+    /// (`disposition.rs::check_anxiety_interrupts:280-291` pre-230)
+    /// preempted plans 39,536× across the 100k-tick post-228 soak;
+    /// the modifier preempt guard now composes with the disposition's
+    /// commitment instead of firing every tick.
+    Fleeing,
 }
 
 impl DispositionKind {
@@ -171,6 +195,11 @@ impl DispositionKind {
             // act. Trashing/Handing/PickingUp involve travel + a single
             // transfer; Discarding is just the in-place drop.
             Self::Discarding | Self::Trashing | Self::Handing | Self::PickingUp => return 1,
+            // 230: Fleeing is single-trip — pick a flee target, travel
+            // there, hold until the threat scalar lapses. The hysteresis
+            // (`flee_hold_ticks`) lives inside `resolve_hold_until_safe`,
+            // not in the trip count.
+            Self::Fleeing => return 1,
             // 150 R5a: Eating completes on need threshold, not count.
             // Like Resting, target_completions returns MAX so the count-
             // based completion check never fires; the actual
@@ -185,7 +214,9 @@ impl DispositionKind {
     }
 
     /// Maps each action to the disposition that contains it.
-    /// Flee has no disposition — it's an anxiety interrupt.
+    /// `Idle` and `Hide` remain in the anxiety-interrupt class with
+    /// no parent disposition; `Flee` was promoted to its own
+    /// `Fleeing` disposition by ticket 230.
     ///
     /// 150 R5a: `Action::Eat` now maps to `DispositionKind::Eating`
     /// (not `Resting`). `Action::Sleep` still maps to `Resting`.
@@ -196,6 +227,9 @@ impl DispositionKind {
     /// new `Grooming` disposition (single-action template, mirrors
     /// 154's Mentoring split). The side-channel `self_groom_won`
     /// resolver retires with the split.
+    /// 230: `Action::Flee` was extracted from the `Idle | Flee | Hide`
+    /// anxiety-interrupt arm and now routes to `DispositionKind::Fleeing`,
+    /// closing the §4.7 substrate-over-override migration thread.
     pub fn from_action(action: Action) -> Option<Self> {
         match action {
             Action::Eat => Some(Self::Eating),
@@ -236,11 +270,18 @@ impl DispositionKind {
             Action::Trash => Some(Self::Trashing),
             Action::Handoff => Some(Self::Handing),
             Action::PickUp => Some(Self::PickingUp),
-            // Anxiety-interrupt class — actions without a parent
-            // disposition. `Flee` (047) drives retreat; `Hide` (104) is
-            // the "remain still and hope" sibling valence; `Idle` is
-            // the no-op fallback.
-            Action::Idle | Action::Flee | Action::Hide => None,
+            // 230: `Action::Flee` was promoted out of the anxiety-
+            // interrupt class into its own `Fleeing` disposition. The
+            // retired `check_anxiety_interrupts::ThreatDetected` arm
+            // (the last surviving anxiety-interrupt path; previously
+            // 280-291 in `src/systems/disposition.rs`) is replaced by
+            // a substrate-aware target picker + commitment proxy.
+            Action::Flee => Some(Self::Fleeing),
+            // Anxiety-interrupt class — `Hide` (104) is the
+            // "remain still and hope" sibling valence; `Idle` is
+            // the no-op fallback. Both stay headless until evidence
+            // justifies promoting them.
+            Action::Idle | Action::Hide => None,
         }
     }
 
@@ -292,6 +333,14 @@ impl DispositionKind {
             Self::Trashing => &[Action::Trash],
             Self::Handing => &[Action::Handoff],
             Self::PickingUp => &[Action::PickUp],
+            // 230: Fleeing owns the single `Action::Flee` umbrella that
+            // L2 modifiers (047 / 108) lift on health deficit and
+            // threat proximity. The plan template's `PickFleeTarget`
+            // and `HoldUntilSafe` steps are NOT first-class L3 actions
+            // (they don't appear in the disposition's softmax pool);
+            // they're internal chain steps emitted by
+            // `fleeing_actions()` and dispatched by the GOAP executor.
+            Self::Fleeing => &[Action::Flee],
         }
     }
 
@@ -312,6 +361,9 @@ impl DispositionKind {
     /// 176: inventory-disposal dispositions append at ordinals 17-20
     /// to keep upstream ordinals stable for saved soaks and ordinal-
     /// equality tests.
+    /// 230: `Fleeing` appends at ordinal 21 for the same reason —
+    /// promoting Flee out of the anxiety-interrupt class doesn't
+    /// renumber upstream ordinals.
     pub const ALL: &[Self] = &[
         Self::Resting,
         Self::Hunting,
@@ -334,6 +386,7 @@ impl DispositionKind {
         Self::Trashing,
         Self::Handing,
         Self::PickingUp,
+        Self::Fleeing,
     ];
 
     /// Human-readable label for the inspect panel.
@@ -360,6 +413,7 @@ impl DispositionKind {
             Self::Trashing => "Trashing",
             Self::Handing => "Handing",
             Self::PickingUp => "PickingUp",
+            Self::Fleeing => "Fleeing",
         }
     }
 
@@ -384,7 +438,11 @@ impl DispositionKind {
             | Self::Discarding
             | Self::Trashing
             | Self::Handing
-            | Self::PickingUp => 1,
+            | Self::PickingUp
+            // 230: Fleeing is acute survival — preempting higher tiers
+            // is the whole point of `AcuteHealthAdrenalineFlee` and
+            // `ThreatProximityAdrenalineFlee` lifting Flee.
+            | Self::Fleeing => 1,
             // 158: Grooming sits at tier 2 — above thermal self-care
             // (now `Action::GroomSelf` riding `Resting` at tier 1) and
             // below the affiliative-coordination tier the Socializing
@@ -426,6 +484,7 @@ impl DispositionKind {
             Self::Trashing => "carry a surplus item to the midden",
             Self::Handing => "hand a surplus item to a colony-mate",
             Self::PickingUp => "pick up a ground item",
+            Self::Fleeing => "flee to safer ground",
         }
     }
 }
@@ -649,8 +708,15 @@ mod tests {
             DispositionKind::from_action(Action::Hunt),
             Some(DispositionKind::Hunting)
         );
-        assert_eq!(DispositionKind::from_action(Action::Flee), None);
+        // 230: `Action::Flee` was promoted out of the
+        // anxiety-interrupt class into its own `Fleeing` disposition.
+        assert_eq!(
+            DispositionKind::from_action(Action::Flee),
+            Some(DispositionKind::Fleeing)
+        );
+        // Idle / Hide remain headless (anxiety-interrupt class).
         assert_eq!(DispositionKind::from_action(Action::Idle), None);
+        assert_eq!(DispositionKind::from_action(Action::Hide), None);
         assert_eq!(
             DispositionKind::from_action(Action::Build),
             Some(DispositionKind::Building)
@@ -724,10 +790,19 @@ mod tests {
         // ordinal stability invariant.
         // 176: inventory-disposal dispositions append at ordinals
         // 18-21 (Discarding, Trashing, Handing, PickingUp).
-        assert_eq!(DispositionKind::ALL.len(), 21);
+        // 230: `Fleeing` appends at ordinal 22 (closing the
+        // anxiety-interrupt-class migration). PickingUp is no longer
+        // last; assert its ordinal-21 position separately and pin
+        // Fleeing to the new tail.
+        assert_eq!(DispositionKind::ALL.len(), 22);
         assert_eq!(
             DispositionKind::ALL.last(),
-            Some(&DispositionKind::PickingUp),
+            Some(&DispositionKind::Fleeing),
+            "Fleeing must remain at ordinal-22 position"
+        );
+        assert_eq!(
+            DispositionKind::ALL[20],
+            DispositionKind::PickingUp,
             "PickingUp must remain at ordinal-21 position"
         );
         assert_eq!(

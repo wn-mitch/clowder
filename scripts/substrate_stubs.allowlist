@@ -16,4 +16,4 @@
 # Catalogue: docs/open-work/pre-existing/substrate-stub-catalogue.md
 
 HideEligible 170           # Hide-authoring system (extends ticket 104's Phase 1 dormancy)
-STUB:src/ai/planner/actions.rs:244:trashing 200    # Trashing routes through Wilds until PlannerZone::Midden lands (ticket 200)
+STUB:src/ai/planner/actions.rs:283:trashing 200    # Trashing routes through Wilds until PlannerZone::Midden lands (ticket 200) — line shifted by 230's fleeing_actions() insertion

@@ -161,10 +161,8 @@ graph TD
         wildlife_cleanup_wildlife --> narrative_generate_narrative
         goap_check_modifier_preemption["goap::check_modifier_preemption"]
         narrative_generate_narrative --> goap_check_modifier_preemption
-        goap_check_anxiety_interrupts["goap::check_anxiety_interrupts"]
-        goap_check_modifier_preemption --> goap_check_anxiety_interrupts
         buildings_update_colony_building_markers["buildings::update_colony_building_markers"]
-        goap_check_anxiety_interrupts --> buildings_update_colony_building_markers
+        goap_check_modifier_preemption --> buildings_update_colony_building_markers
         magic_update_herb_availability_markers["magic::update_herb_availability_markers"]
         buildings_update_colony_building_markers --> magic_update_herb_availability_markers
         magic_update_ward_coverage_markers["magic::update_ward_coverage_markers"]

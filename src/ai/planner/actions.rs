@@ -29,6 +29,45 @@ pub fn travel_actions(distances: &ZoneDistances) -> Vec<GoapActionDef> {
 // Per-disposition action sets
 // ---------------------------------------------------------------------------
 
+/// 230: Fleeing plan template — `[PickFleeTarget, Flee, HoldUntilSafe]`.
+///
+/// `PickFleeTarget` reads the per-replan `RouteCostField` to choose the
+/// lowest-cost passable tile within Chebyshev `flee_distance`; the
+/// `Flee` umbrella `cat_path_plan!`s to that tile; `HoldUntilSafe`
+/// hysteresis-waits `flee_hold_ticks` before incrementing trips.
+///
+/// The chain is ordered via the search-state predicate
+/// `FleeTargetPicked(bool)`. No `TravelTo` leg is needed — `Flee`
+/// itself does the travel via the same machinery `TravelTo` would.
+/// Costs are kept low (1/2/1) because Fleeing is a tier-1 acute-survival
+/// disposition that should outcompete anything but other tier-1 plans
+/// when the modifier ramp lifts it.
+pub fn fleeing_actions() -> Vec<GoapActionDef> {
+    vec![
+        GoapActionDef {
+            kind: GoapActionKind::PickFleeTarget,
+            cost: 1,
+            preconditions: vec![StatePredicate::FleeTargetPicked(false)],
+            effects: vec![StateEffect::SetFleeTargetPicked(true)],
+        },
+        GoapActionDef {
+            kind: GoapActionKind::Flee,
+            cost: 2,
+            preconditions: vec![StatePredicate::FleeTargetPicked(true)],
+            effects: vec![],
+        },
+        GoapActionDef {
+            kind: GoapActionKind::HoldUntilSafe,
+            cost: 1,
+            preconditions: vec![StatePredicate::FleeTargetPicked(true)],
+            effects: vec![
+                StateEffect::IncrementTrips,
+                StateEffect::SetFleeTargetPicked(false),
+            ],
+        },
+    ]
+}
+
 pub fn hunting_actions() -> Vec<GoapActionDef> {
     vec![
         // Ticket 091: SearchPrey/EngagePrey intentionally do NOT require
@@ -676,6 +715,8 @@ pub fn actions_for_disposition(
         DispositionKind::Trashing => trashing_actions(),
         DispositionKind::Handing => handing_actions(),
         DispositionKind::PickingUp => picking_up_actions(),
+        // 230: Fleeing plan template.
+        DispositionKind::Fleeing => fleeing_actions(),
     };
     actions.extend(domain_actions);
     actions
@@ -707,6 +748,7 @@ mod tests {
             prey_found: false,
             farm_tended: false,
             materials_delivered_this_plan: false,
+            flee_target_picked: false,
         }
     }
 

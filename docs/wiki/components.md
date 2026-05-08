@@ -2,7 +2,7 @@
 
 # Components
 
-148 component types derived from `#[derive(Component)]`.
+149 component types derived from `#[derive(Component)]`.
 
 ## `src/components/aspirations.rs`
 
@@ -917,6 +917,20 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 |-------|------|
 | `owner` | `Entity` |
 | `expires_tick` | `u64` |
+
+## `src/components/route_cost_field.rs`
+
+### RouteCostField (struct)
+
+> Per-cat scalar field: cost-to-reach every map tile from the cat's position at flood time, under overlay-aware edge weights.
+
+| Field | Type |
+|-------|------|
+| `costs` | `Vec<u32>` |
+| `width` | `u32` |
+| `height` | `u32` |
+| `origin` | `Position` |
+| `origin_tick` | `u64` |
 
 ## `src/components/sensing.rs`
 

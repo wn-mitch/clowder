@@ -1109,6 +1109,10 @@ fn active_disposition_ordinal(
         Some(DispositionKind::Trashing) => 19.0,
         Some(DispositionKind::Handing) => 20.0,
         Some(DispositionKind::PickingUp) => 21.0,
+        // 230: Fleeing appends at ordinal 22 — same append-only
+        // discipline; promoting Flee out of the anxiety-interrupt
+        // class doesn't renumber upstream ordinals.
+        Some(DispositionKind::Fleeing) => 22.0,
     }
 }
 

@@ -85,7 +85,13 @@ pub fn goal_for_disposition(
         | DispositionKind::Discarding
         | DispositionKind::Trashing
         | DispositionKind::Handing
-        | DispositionKind::PickingUp => GoalState {
+        | DispositionKind::PickingUp
+        // 230: Fleeing's chain `[PickFleeTarget, Flee, HoldUntilSafe]`
+        // single-trips on `HoldUntilSafe`'s `IncrementTrips` effect
+        // (after `flee_hold_ticks` of low-cost + non-positive threat-
+        // derivative hysteresis, enforced inside the resolver — no
+        // new `StatePredicate` required).
+        | DispositionKind::Fleeing => GoalState {
             predicates: vec![StatePredicate::TripsAtLeast(current_trips + 1)],
         },
     }
@@ -115,6 +121,7 @@ mod tests {
             prey_found: false,
             farm_tended: false,
             materials_delivered_this_plan: false,
+            flee_target_picked: false,
         }
     }
 
