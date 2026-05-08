@@ -1,7 +1,7 @@
 ---
 id: 228
 title: cat route-cost field as L1 perception + Field Consideration variant
-status: in-progress
+status: done
 cluster: pathfinder-risk-awareness
 added: 2026-05-07
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-08
 ---
 
 ## Why
@@ -328,3 +328,4 @@ actually want at decision time.
   object; cat-side A\* may retire in favor of gradient-descent path
   extraction from the field. Foxes keep A\*. WeightedOverlay
   partially retired on cat side.
+- 2026-05-08: Phase 6 step-resolver migration + Phase 7 microexperiment landed (commits 1-5 of this thread). All 17 cat-side find_path call sites migrated to CatPathPlan; cat_overlays_pair! shim retired; bold-vs-timid L1 substrate invariant test added. Substrate stays dormant: every *_route_cost_weight constant remains 0.0, soak result expected byte-identical pre/post. Soak verification deferred to follow-up session per session-handoff.

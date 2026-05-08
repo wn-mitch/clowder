@@ -14,11 +14,11 @@ _Last generated: 2026-05-08._
 
 | Status | Count |
 |---|---|
-| In progress | 8 |
-| Ready | 62 |
+| In progress | 7 |
+| Ready | 64 |
 | Parked | 8 |
 | Blocked | 21 |
-| **Open total** | **99** |
+| **Open total** | **100** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -35,7 +35,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 | **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** Substrate-over-override | in-progress | 32 | 29 | 3 (0 / 1 / 0 / 2) | `▰▰▰▰▰▰▰▰▰▱` 91% |
 | **[095](docs/open-work/tickets/095-body-zones-epic.md)** Body zones | ready | 0 | — | — | _no roster_ |
 
-## In progress (8)
+## In progress (7)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
@@ -43,10 +43,9 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _added 2026-04-27_
 - **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** — Substrate-over-override — retire control-yanking hacks in favor of IAUS levers — _[substrate-over-override] · added 2026-04-30_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
-- **[228](docs/open-work/tickets/228-fox-territory-huntforagepatrol-decision-time-suppression.md)** — cat route-cost field as L1 perception + Field Consideration variant — _[pathfinder-risk-awareness] · added 2026-05-07_
 - **[229](docs/open-work/tickets/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose — _[tooling] · added 2026-05-08_
 
-## Ready (62)
+## Ready (64)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -110,6 +109,8 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[225](docs/open-work/tickets/225-audit-patrol-l3-share-rise-under-additive-coordinator-dse-lift.md)** — audit Patrol L3 share rise under additive coordinator-DSE lift — _[ai-substrate] · added 2026-05-07_
 - **[226](docs/open-work/tickets/226-audit-groomother-share-vs-score-inversion-under-demographic-shift.md)** — audit GroomOther share-vs-score inversion under demographic shift — _[ai-substrate] · added 2026-05-07_
 - **[227](docs/open-work/tickets/227-coordinator-eligible-focal-cat-for-coordinate-frame-diff-parity.md)** — coordinator-eligible focal-cat for Coordinate frame-diff parity — _[process-discipline] · added 2026-05-07_
+- **[230](docs/open-work/tickets/230-carve-dispositionkindfleeing-substrate-aware-flee-picker-close-anxiety-interrupt-migration.md)** — Carve DispositionKind::Fleeing + substrate-aware flee picker (close anxiety-interrupt migration) — _[pathfinder-risk-awareness] · added 2026-05-08_
+- **[231](docs/open-work/tickets/231-gate-pickupitem-retrieverawfood-retrievefoodforkitten-plans-on-inventory-capacity.md)** — Gate PickupItem / RetrieveRawFood / RetrieveFoodForKitten plans on inventory capacity — _added 2026-05-08_
 
 ## Parked (8)
 
@@ -151,12 +152,13 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (149)
+## Landed archive (150)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (84)
+### 2026-05 (85)
 
+- **[228](docs/open-work/landed/228-fox-territory-huntforagepatrol-decision-time-suppression.md)** — cat route-cost field as L1 perception + Field Consideration variant _(2026-05-08)_
 - **[224](docs/open-work/landed/224-boldness-conditioned-path-risk.md)** — boldness-conditioned path risk _(2026-05-07)_
 - **[223](docs/open-work/landed/223-cat-paths-respect-fox-scent-corruption.md)** — cat paths respect fox-scent + corruption _(2026-05-07)_
 - **[222](docs/open-work/landed/222-pathfinder-cost-overlay-trait.md)** — pathfinder cost-overlay trait _(2026-05-07)_
