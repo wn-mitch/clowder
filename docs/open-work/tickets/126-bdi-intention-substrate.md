@@ -249,30 +249,69 @@ reconsideration set, evaluated cheaply each tick in
 The four triggers replace nothing today — they extend
 `should_drop_intention`'s call site to also fire on (3) and (4).
 
-### Perceivability — the no-director coordination primitive
+### Perceivability — actor-private commitment substrate
 
-`HeldIntention` is a `Component`, queryable by any other cat's DSE
-via standard Bevy queries. This is the load-bearing substrate-side
-property per §4.7: an intention is *not* per-A*-node search state,
-it is a fact about the world (this cat is committed to X) authored
-by exactly one system (the L2 evaluator) and read by many.
+**Revised in C1 of the implementation plan; see
+`/Users/will.mitchell/.claude/plans/work-126-drifting-widget.md`
+§Narrative discipline.** `HeldIntention` is a `Component`, but
+**actor-private by convention** — only the actor's own scoring
+pipeline + drop triggers read it. Sister DSEs **never** query other
+cats' `HeldIntention`. That would be mind-reading: cats observe
+each other through body cues (forthcoming §131 substrate), physical
+markers (`Injured`, `Pregnant`, `LowHealth`, `Mourning`), audible
+cues (§133), and spatial proximity — never internal state. The
+same rule applies to `Disposition`. A helper cat that wants to
+bring soup to an injured Resting Hazel authors its own
+`HeldIntention` from the observable conjunction
+`Hazel.Injured && Hazel.HeadDownCurled`, **not** from
+`Hazel.HeldIntention.intention == Goal { state: rest }` and **not**
+from `Hazel.Disposition::Resting`.
 
-Two consumer patterns this enables, both authored as future tickets
-not in this scope:
+Two narrative sources fall out of actor-private substrate, both
+load-bearing:
 
-- **Care DSEs.** A `Caretake_target` candidate query can include
-  cats whose `HeldIntention` is `Goal { state: rest, target:
-  None }` and who have `Injured`/`LowHealth` markers. The helper's
-  intention is an independent commitment authored from observable
-  state; no message-passing.
-- **Claim tokens.** `Reserved` (`src/components/reserved.rs`,
-  ticket 080) already prevents two cats targeting the same
-  *resource*. Extend the same pattern: when a cat adopts a
-  `HeldIntention` whose target is another cat (e.g.,
-  `Mentor(target=apprentice)`), insert a per-target soft-claim
-  surface that the runner-up's target picker can read. This stays
-  in 080's vocabulary; this ticket only commits the perceivability
-  contract that makes it possible.
+- **Misreadings as substrate-native, not added noise.** The
+  body-cue → Disposition mapping is many-to-one — `HeadDownCurled`
+  is emitted by Resting AND Mourning AND incapacitated injury. A
+  helper that observes `HeadDownCurled + Injured` cannot
+  distinguish "tired-from-wound" (bring soup) from "grieving"
+  (don't disturb). The misreading is the unavoidable consequence
+  of compressing internal state into a finite cue vocabulary —
+  that's the story engine.
+- **Unresolved conflicts.** Without claim-markers on targets, two
+  cats can independently form intentions toward the same target
+  and discover the conflict only at action time (two cats trying
+  to eat the same rat swat at each other). The existing `Reserved`
+  token (per-action, per-tick) is the deliberate floor — it filters
+  at eligibility but doesn't prevent micro-window collisions or
+  goal-granularity contention. Per-goal soft-claims would flatten
+  that texture; we don't add them.
+
+Both narrative sources are features, not bugs. A "tidier" substrate
+that pre-resolves the swat-at-the-rat moment or makes Disposition
+directly readable is exactly what we don't want.
+
+This rules out:
+
+- **Kind-markers on the actor** (e.g., `IntendsRest`,
+  `IntendsCare`). Mind-reading via L1.
+- **Claim tokens on the target** (e.g., `MentorshipClaimed`,
+  `CareClaimed`). Mind-reading via target-side substrate;
+  predicts another cat's plans before action.
+- **Cross-cat HeldIntention queries.** Sister DSEs never read
+  other cats' HeldIntention.
+- **Cross-cat `Disposition` queries.** Equally mind-reading;
+  sister DSEs read body-cue markers (after §131) and physical
+  markers, not the target's internal `Disposition`.
+
+Coordinator directives are the one exception, and they aren't
+mind-reading: when a coordinator issues a directive, the recipient
+*sees* the act of issuing it (visible communication). The
+recipient's own `HeldIntention` then records
+`source: CoordinatorDirective(coord)` as their internal
+acknowledgment of where the commitment came from. 081's compliance
+demotion reads source-tagged Features (footer aggregation), not
+other cats' HeldIntentions.
 
 ### Substrate vs search-state classification (§4.7)
 
@@ -284,10 +323,13 @@ not in this scope:
    (`evaluate_and_plan`) writes it from observable world state
    (winning DSE's score margin + emitted Intention).
 
-→ Substrate. Consumed via standard Bevy queries; never threaded
-through `MarkerSnapshot` (the snapshot is for ZST markers, not
-Components carrying payload). Goal/target identity is pattern-read
-directly by interested DSEs.
+→ Substrate. Consumed via standard Bevy queries by the actor's
+own scoring pipeline + drop triggers; never threaded through
+`MarkerSnapshot` (the snapshot is for ZST markers, not Components
+carrying payload). Per the §Perceivability revision above, sister
+DSEs do **not** read other cats' `HeldIntention` — the classifier
+is satisfied by single-system authorship (L2) plus single-actor
+readership (the actor's own scoring + drop pipelines).
 
 ### Lifecycle Features
 
@@ -384,40 +426,62 @@ generalization sits alongside, not replacing.
 
 ## Out of scope
 
+The narrative-discipline revision in C1 deferred the cross-cat
+machinery the original §Perceivability proposed; the per-CLAUDE.md
+"antipattern migration follow-ups are non-optional" rule means
+each deferred subscope opens as a sibling ticket on the C4 landing
+commit (titles are descriptive — IDs are allocated by
+`just open-ticket` at land time):
+
+- **Body-cue substrate (Disposition → observable markers).**
+  Each `Disposition` (and select physical states) authors body-
+  cue ZST markers on the cat: `StalkingPosture`, `HeadDownCurled`,
+  `ArchedBack`, `TailLashing`, `EarsBack`, etc. Substrate-over-
+  override at the L1 surface — the body cue is the observable,
+  the Disposition stays private. Many-to-one cue → Disposition
+  mapping is the misreading source. Blocked-by 126.
+- **Behavior-observation L1 channel.** A target-side query
+  pattern formalising how an actor's L2 reads another entity's
+  body-cue markers + physical markers + position. Today markers
+  are read via `MarkerSnapshot` for the actor's own state; this
+  ticket extends the pattern to *target* entities. Blocked-by the
+  body-cue ticket (preceding bullet).
+- **Audible cue substrate.** Event-based vocalizations: hissing,
+  yowling, distress cries, alarm calls. Range-limited; transient
+  per-event, not persistent markers. Conversational meowing is
+  out of scope by default — real cats meow primarily at humans,
+  not at each other. Blocked-by 126.
+- **Ambient predator/prey behavior-observation enrichment.**
+  Predator and prey DSEs read the target's body-cue + physical
+  markers via the behavior-observation channel — a ShadowFox with
+  `LimpingGait` is approachable; one with `StalkingPosture` is
+  fled. Blocked-by the body-cue + behavior-observation tickets.
+
+Other deferrals (unchanged from the original framing):
+
 - **HTN method composition over committed intentions.** That's
   cluster C4 and lands as ticket **128 — HTN method composition
-  over `HeldIntention.goal`**, blocked-by 126, `## Why`: "126
-  commits the goal-label vocabulary; HTN decomposition over those
-  labels is a strategist layer above BDI and an order of magnitude
-  larger than 126."
+  over `HeldIntention.goal`**, blocked-by 126.
 - **Versu-style joint intentions / co-commitment.** A
   `HeldIntention` is single-cat. Two-cat practices (courtship as a
   co-committed multi-stage structure) is C2 and lands as ticket
   **127 — Joint-intention substrate for two-cat practices**,
-  blocked-by 126, `## Why`: "126 lands per-cat perceivable
-  intentions; joint-commit semantics — both cats must hold
-  compatible intentions, drops cascade — needs the perceivability
-  primitive but is a separate vocabulary."
-- **Care DSE that reads other cats' `HeldIntention`.** The
-  perceivability primitive lands here; the consumer DSEs (helper
-  cooks soup for resting injured cat) land as ticket **129 — Care
-  DSEs over perceivable intentions**, blocked-by 126, `## Why`:
-  "126 makes intentions visible; the helper's own intention
-  adoption from observed need is the next layer up."
+  blocked-by 126 + the body-cue + behavior-observation tickets
+  (its consumers read body cues, not intentions).
+- **Care DSE that reads observable cues on other cats.** The
+  consumer DSEs (helper cooks soup for resting injured cat) land
+  as ticket **129 — Care DSEs over observable cues**, blocked-by
+  126 + the body-cue + behavior-observation tickets — Care reads
+  observed need (`Injured + HeadDownCurled`), not the target's
+  internal `HeldIntention`.
 - **Trust-weighted directive momentum + coordinator-quality
   effects.** This ticket lands the `IntentionSource` provenance
   field and a source-aware read-site on `IntentionMomentum`. The
-  actual trust axis (per-cat per-coordinator respect Component,
-  weighted multiplier on momentum for `CoordinatorDirective`
-  sources, compliance-rate aggregate footer line) spins out as
-  ticket **130 — Trust-weighted coordinator directive momentum**,
-  blocked-by 126 + 057 + 081, `## Why`: "126 commits provenance;
-  057 emits directive intentions; 081 demotes failing
-  coordinators. 130 is the axis that closes the loop — directive
-  lift scales with recipient trust, so high-trust coordinators'
-  orders override marginal scores while low-trust coordinators'
-  orders mostly fail to adopt. Enables observable good-vs-bad
-  coordinator effects without an out-of-fiction director."
+  actual trust axis spins out as ticket **130 — Trust-weighted
+  coordinator directive momentum**, blocked-by 126 + 057 + 081.
+  Stays unaffected by the narrative-discipline revision —
+  coordinator directives are visible communication, not
+  mind-reading.
 - **Subjective belief / mental models.** That's C3; the
   reconsideration trigger (4) "belief change invalidating the
   goal" uses ground-truth proxies (target dead/banished/

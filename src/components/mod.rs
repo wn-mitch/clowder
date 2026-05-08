@@ -11,6 +11,7 @@ pub mod fulfillment;
 pub mod goap_plan;
 pub mod grave;
 pub mod grooming;
+pub mod held_intention;
 pub mod hunting_priors;
 pub mod identity;
 pub mod item_transfer;
@@ -55,6 +56,9 @@ pub use goap_plan::{
 };
 pub use grave::Grave;
 pub use grooming::GroomingCondition;
+pub use held_intention::{
+    commitment_strength_from_margin, HeldIntention, IntentionAbandonReason, IntentionSource,
+};
 pub use identity::{Age, Appearance, Gender, LifeStage, Name, Orientation, Species};
 pub use items::{Item, ItemKind, ItemLocation};
 pub use kitten::KittenDependency;

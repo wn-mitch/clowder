@@ -516,6 +516,9 @@ pub fn record_commitment_decision(
             max_replans: plan.max_replans,
             branch,
             dropped,
+            // Ticket 126 — populated by C4's HeldIntention drop path;
+            // the legacy plan-only branches stay None.
+            abandon_reason: None,
         },
         tick,
     );

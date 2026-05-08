@@ -340,6 +340,12 @@ pub fn emit_focal_trace(world: &mut World) {
                 // acute-class modifier preempted the focal cat's plan
                 // this tick.
                 preempted: snapshot.momentum_preempted,
+                // Ticket 126 — populated by C3's L2 author site once
+                // HeldIntention is wired; legacy emission stays at
+                // `None` / 0.0 (omitted under skip_serializing_if).
+                held_dse: None,
+                runner_up_margin: 0.0,
+                decay_factor: 0.0,
             },
             chosen: snapshot.chosen,
             intention: IntentionSummary {
@@ -451,6 +457,11 @@ fn l3_commitment_record(row: &CommitmentCapture) -> TraceRecord {
         },
         branch: row.branch.to_string(),
         dropped: row.dropped,
+        // Ticket 126 — momentum + abandon_reason populated by C4's
+        // HeldIntention drop path; legacy plan-only branches emit
+        // `None` (omitted under skip_serializing_if for back-compat).
+        momentum: None,
+        abandon_reason: row.abandon_reason.map(str::to_string),
     }
 }
 

@@ -2772,6 +2772,35 @@ pub struct DispositionConstants {
     /// stack rather than dominate.
     #[serde(default = "default_oscillation_score_lift")]
     pub oscillation_score_lift: f32,
+    /// Ticket 126 — `IntentionMomentum` Modifier per-intention lift
+    /// scale. Magnitude on the held intention's underlying DSE is
+    /// `commitment_strength × intention_momentum_lift × decay_factor`.
+    /// Default 0.10 — matches `oscillation_score_lift` so the two
+    /// stack additively (anti-oscillation pad on the active
+    /// disposition + per-intention bonus on the held DSE). Combined
+    /// ceiling stays under `softmax_temperature × 4`, the threshold
+    /// above which softmax-over-Intentions becomes effectively argmax.
+    #[serde(default = "default_intention_momentum_lift")]
+    pub intention_momentum_lift: f32,
+    /// Ticket 126 — momentum decay window for `Goal`-shaped held
+    /// intentions. Lift ramps linearly from full at `adopted_tick` to
+    /// zero at `adopted_tick + intention_momentum_decay_ticks`.
+    /// `Activity` intentions use their own `Termination::Ticks(n)`
+    /// expiry instead. Default 600 ticks — three times the
+    /// `min_disposition_tenure_ticks` window so a high-strength
+    /// intention can outlast multiple oscillation cycles before its
+    /// bonus erodes.
+    #[serde(default = "default_intention_momentum_decay_ticks")]
+    pub intention_momentum_decay_ticks: u64,
+    /// Ticket 126 — preempt-margin floor for reconsideration trigger
+    /// (3): a non-held DSE must exceed
+    /// `held_score + commitment_strength × intention_momentum_lift +
+    /// intention_preempt_margin` to trigger a re-evaluation. The
+    /// "single-minded but not stupid" knob — small enough that a
+    /// genuine emergency clears it, large enough that score-jitter
+    /// can't. Default 0.05 (half of `oscillation_score_lift`).
+    #[serde(default = "default_intention_preempt_margin")]
+    pub intention_preempt_margin: f32,
 }
 
 fn default_true() -> bool {
@@ -2842,6 +2871,21 @@ fn default_min_disposition_tenure_ticks() -> u64 {
 /// constituent DSEs during the tenure window.
 fn default_oscillation_score_lift() -> f32 {
     0.10
+}
+
+/// Ticket 126 — per-intention lift scale for `IntentionMomentum`.
+fn default_intention_momentum_lift() -> f32 {
+    0.10
+}
+
+/// Ticket 126 — Goal-intention momentum decay window in ticks.
+fn default_intention_momentum_decay_ticks() -> u64 {
+    600
+}
+
+/// Ticket 126 — preempt-margin floor for reconsideration trigger (3).
+fn default_intention_preempt_margin() -> f32 {
+    0.05
 }
 
 fn default_cook_base_score() -> f32 {
@@ -3746,6 +3790,9 @@ impl Default for DispositionConstants {
             kitchen_cook_radius: default_kitchen_cook_radius(),
             min_disposition_tenure_ticks: default_min_disposition_tenure_ticks(),
             oscillation_score_lift: default_oscillation_score_lift(),
+            intention_momentum_lift: default_intention_momentum_lift(),
+            intention_momentum_decay_ticks: default_intention_momentum_decay_ticks(),
+            intention_preempt_margin: default_intention_preempt_margin(),
         }
     }
 }

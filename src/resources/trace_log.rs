@@ -226,6 +226,25 @@ pub struct MomentumSummary {
     pub commitment_strength: f32,
     pub margin_threshold: f32,
     pub preempted: bool,
+    /// Ticket 126 — DSE id of the cat's `HeldIntention` at the
+    /// emit-tick (the actor-private commitment substrate
+    /// `IntentionMomentum` lifts). `None` when no intention is held
+    /// or the field hasn't been populated yet (C2 ships the writer).
+    /// Distinct from `active_intention`, which is the displayed
+    /// label on the L2 winner — `held_dse` answers "what was the cat
+    /// already committed to before the softmax ran?".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub held_dse: Option<String>,
+    /// Ticket 126 — runner-up margin
+    /// (`chosen_score - runner_up_score`) recorded at adoption time.
+    /// 0.0 when no live writer has populated it.
+    #[serde(default)]
+    pub runner_up_margin: f32,
+    /// Ticket 126 — `IntentionMomentum` decay factor at the emit-tick
+    /// (1.0 at adoption, ramps linearly to 0.0 at expiry). 0.0 when
+    /// no intention is held or the field hasn't been populated yet.
+    #[serde(default)]
+    pub decay_factor: f32,
 }
 
 // ---------------------------------------------------------------------------
@@ -317,6 +336,17 @@ pub enum TraceRecord {
         branch: String,
         /// Output of the gate — `true` means the plan is being removed.
         dropped: bool,
+        /// Ticket 126 — momentum snapshot at gate evaluation. `None`
+        /// when the cat has no `HeldIntention` (gate ran on the
+        /// legacy `GoapPlan`-only path). C4 populates this on every
+        /// gate evaluation against an intention-holding cat.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        momentum: Option<MomentumSummary>,
+        /// Ticket 126 — `IntentionAbandonReason::as_str()` slug when
+        /// the gate fired a non-fulfilment drop. `None` for retained
+        /// decisions, fulfilment drops, and pre-126 records.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        abandon_reason: Option<String>,
     },
     /// Plan-failure branch fired — a plan was terminated by something
     /// other than `achievement_believed`. Distinct from `L3Commitment`
@@ -489,6 +519,9 @@ pub struct CommitmentCapture {
     pub max_replans: u32,
     pub branch: &'static str,
     pub dropped: bool,
+    /// Ticket 126 — `IntentionAbandonReason::as_str()` for non-
+    /// fulfilment drops; `None` otherwise. C4 populates.
+    pub abandon_reason: Option<&'static str>,
 }
 
 /// One plan-failure event (replan cap or anxiety interrupt).
@@ -597,6 +630,9 @@ mod tests {
                 commitment_strength: 0.6,
                 margin_threshold: 0.09,
                 preempted: false,
+                held_dse: None,
+                runner_up_margin: 0.0,
+                decay_factor: 0.0,
             },
             chosen: "Hunt".into(),
             intention: IntentionSummary {

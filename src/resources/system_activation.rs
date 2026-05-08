@@ -359,6 +359,29 @@ pub enum Feature {
     /// => false` initially (cascade from `FleeTargetPicked`); promote
     /// after the soak baseline stabilizes.
     FleeRecovered,
+
+    // --- Ticket 126 BDI intention lifecycle ---
+    /// Ticket 126 — L2 evaluator inserted a `HeldIntention` Component
+    /// alongside the cat's `GoapPlan` after the softmax winner was
+    /// selected. Positive — every adoption is one cat committing to a
+    /// goal-shaped intention with a margin-derived strength.
+    /// `expected_to_fire_per_soak() => true`: any seed-42 run with at
+    /// least one cat picking a non-Idle disposition produces ≥1.
+    IntentionAdopted,
+    /// Ticket 126 — held intention reached `achievement_believed`
+    /// (the §7.2 `DropBranch::Achieved` path) and was cleared.
+    /// Positive — every fulfilment is one closed goal cycle. The
+    /// `IntentionFulfilled / IntentionAdopted` ratio is the substrate
+    /// completion rate. `expected_to_fire_per_soak() => true`.
+    IntentionFulfilled,
+    /// Ticket 126 — held intention dropped on a non-fulfilment
+    /// trigger (preempted, became impossible, target invalid,
+    /// expired, or desire drift). Per-cause detail recorded against
+    /// the focal-cat trace's `L3Commitment.abandon_reason`; the
+    /// activation counter is unparameterised because drops are bursty
+    /// (matches `PairingDropped`'s precedent). `expected_to_fire_per_soak()
+    /// => false`.
+    IntentionAbandoned,
 }
 
 impl Feature {
@@ -481,6 +504,10 @@ impl Feature {
         // 230: Fleeing chain completion signals.
         Feature::FleeTargetPicked,
         Feature::FleeRecovered,
+        // 126: BDI intention lifecycle.
+        Feature::IntentionAdopted,
+        Feature::IntentionFulfilled,
+        Feature::IntentionAbandoned,
     ];
 
     /// The valence of this feature.
@@ -561,6 +588,15 @@ impl Feature {
             // of the legacy thrash loop.
             Feature::FleeTargetPicked => Positive,
             Feature::FleeRecovered => Positive,
+
+            // 126: BDI intention lifecycle. Adoption + fulfilment
+            // are colony-positive (cats are committing and closing
+            // goal cycles); abandon is Neutral (drops are state
+            // transitions, the per-cause classification lives on the
+            // trace not the activation counter).
+            Feature::IntentionAdopted => Positive,
+            Feature::IntentionFulfilled => Positive,
+            Feature::IntentionAbandoned => Neutral,
 
             // 176: inventory-disposal completions are state-transition
             // signals — neither a colony win nor a loss, just "the cat
@@ -823,6 +859,10 @@ impl Feature {
             // post-230 multi-seed baseline shows reliable firing.
             Feature::FleeTargetPicked => false,
             Feature::FleeRecovered => false,
+            // 126: BDI abandon is bursty (per `PairingDropped`'s
+            // precedent). Adoption + fulfilment fall through to the
+            // `_ => true` default and are canary-validated.
+            Feature::IntentionAbandoned => false,
             // Every other feature is expected to fire per soak.
             _ => true,
         }
@@ -945,6 +985,9 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::RouteCostFieldFallback => "RouteCostFieldFallback",
         Feature::FleeTargetPicked => "FleeTargetPicked",
         Feature::FleeRecovered => "FleeRecovered",
+        Feature::IntentionAdopted => "IntentionAdopted",
+        Feature::IntentionFulfilled => "IntentionFulfilled",
+        Feature::IntentionAbandoned => "IntentionAbandoned",
     }
 }
 
@@ -1184,9 +1227,12 @@ mod tests {
         // FleeRecovered — Fleeing chain end-to-end signals).
         // Ticket 035 added 1 Positive (BurialPerformed — burial
         // continuity-canary signal).
-        assert_eq!(positive, 52);
+        // Ticket 126 added 2 Positive (IntentionAdopted,
+        // IntentionFulfilled) + 1 Neutral (IntentionAbandoned) for
+        // the BDI intention substrate lifecycle.
+        assert_eq!(positive, 54);
         assert_eq!(negative, 23);
-        assert_eq!(neutral, 31);
+        assert_eq!(neutral, 32);
     }
 
     #[test]
@@ -1252,7 +1298,7 @@ mod tests {
     fn features_total_in_matches_category_counts() {
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            52
+            54
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),
@@ -1260,7 +1306,7 @@ mod tests {
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Neutral),
-            31
+            32
         );
     }
 
