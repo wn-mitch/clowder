@@ -85,6 +85,7 @@ pub(crate) fn sum_overlay_cost(overlays: &[WeightedOverlay<'_>], pos: Position) 
 /// Cost shape: `round(scent.clamp(0, 1) * max_cost)`. With default
 /// `max_cost = 8`, max-scent tiles add 8 to A* edge cost so a cat
 /// prefers a four-tile detour over crossing them.
+#[derive(Clone, Copy)]
 pub struct FoxScentOverlay<'a> {
     map: &'a crate::resources::FoxScentMap,
     max_cost: u32,
@@ -117,6 +118,7 @@ impl TileCostOverlay for FoxScentOverlay<'_> {
 /// inline at the call site (matching `CorruptionLens` in
 /// `src/systems/influence_map.rs`) — no persistent resource is needed
 /// since corruption lives on `Tile`, not in a dedicated map.
+#[derive(Clone, Copy)]
 pub struct CorruptionOverlay<'a> {
     tile_map: &'a TileMap,
     max_cost: u32,

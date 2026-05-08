@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::ai::pathfinding::{find_free_adjacent, find_path};
+use crate::ai::pathfinding::find_free_adjacent;
+use crate::ai::route_cost::CatPathPlan;
 use crate::components::physical::{Needs, Position};
 use crate::resources::map::TileMap;
 use crate::resources::sim_constants::DispositionConstants;
@@ -36,7 +37,7 @@ pub fn resolve_patrol_to(
     cached_path: &mut Option<Vec<Position>>,
     needs: &mut Needs,
     map: &TileMap,
-    overlays: &[crate::ai::pathfinding::WeightedOverlay<'_>],
+    path_plan: &CatPathPlan<'_>,
     d: &DispositionConstants,
     cat_tile_counts: &HashMap<Position, u32>,
 ) -> StepOutcome<()> {
@@ -49,7 +50,7 @@ pub fn resolve_patrol_to(
         return StepOutcome::bare(StepResult::Advance);
     }
     if cached_path.is_none() {
-        match find_path(*pos, target, map, overlays) {
+        match path_plan.find_full_path(*pos, target, map) {
             Some(path) => *cached_path = Some(path),
             None => {
                 return StepOutcome::bare(StepResult::Fail("no path to patrol target".into()));

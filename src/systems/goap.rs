@@ -3637,23 +3637,6 @@ fn dispatch_step_action(
 ) -> crate::steps::StepResult {
     let d = &ec.constants.disposition;
 
-    // Ticket 223 — legacy raw-overlay constructor. Kept as a
-    // backwards-compat shim during the 228 step-resolver migration:
-    // call sites that haven't yet rebuilt around `CatPathPlan` still
-    // reach for it. Will be deleted once every cat-side `find_path` /
-    // step resolver consumes `cat_path_plan!` directly.
-    macro_rules! cat_overlays_pair {
-        () => {{
-            (
-                crate::ai::pathfinding::FoxScentOverlay::new(
-                    &prey_params.fox_scent_map,
-                    &ec.constants.scoring,
-                ),
-                crate::ai::pathfinding::CorruptionOverlay::new(&ec.map, &ec.constants.scoring),
-            )
-        }};
-    }
-
     // Ticket 228 — cat-side path-plan constructor. Returns a
     // `CatPathPlan` per call: `Field(&route_cost_field)` when the
     // per-cat replan-time flood is fresh and reaches `$to`, otherwise
@@ -3662,8 +3645,8 @@ fn dispatch_step_action(
     // arm-scope construction is what unblocks the immutable borrow on
     // `prey_params.fox_scent_map` from conflicting with `&mut
     // prey_params` borrows in the SearchPrey / EngagePrey arms.
-    // Substrate, not search state (§4.7). Replaces the ticket-223
-    // `cat_overlays_pair!` macro that returned the raw overlays.
+    // Substrate, not search state (§4.7). Subsumes the retired
+    // ticket-223 `cat_overlays_pair!` macro.
     macro_rules! cat_path_plan {
         ($to:expr) => {{
             let __fox = crate::ai::pathfinding::FoxScentOverlay::new(
@@ -4219,19 +4202,20 @@ fn dispatch_step_action(
                     &mut rng.rng,
                 );
             }
-            let (fox_overlay, corr_overlay) = cat_overlays_pair!();
-            let w = crate::ai::pathfinding::cat_path_weight_from_boldness(personality.boldness);
-            let cat_overlays: [crate::ai::pathfinding::WeightedOverlay; 2] = [
-                crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
-                crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
-            ];
+            // Ticket 228 — patrol target is the heart of the 209/223/224
+            // ticket cluster (fox-territory suppression at decision time).
+            // Falling back to *pos as the staleness probe when the target
+            // hasn't been resolved yet keeps `should_fall_back_at` well-
+            // defined; the resolver itself fails fast on `None` target.
+            let target_pos = plan.step_state[step_idx].target_position.unwrap_or(*pos);
+            let path_plan = cat_path_plan!(target_pos);
             crate::steps::disposition::resolve_patrol_to(
                 pos,
                 plan.step_state[step_idx].target_position,
                 &mut plan.step_state[step_idx].cached_path,
                 needs,
                 &ec.map,
-                &cat_overlays,
+                &path_plan,
                 d,
                 &snaps.cat_tile_counts,
             )

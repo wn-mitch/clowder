@@ -4187,13 +4187,24 @@ fn dispatch_chain_step(
             let step = chain.current_mut().unwrap();
             let target = step.target_position;
             let cached = &mut step.cached_path;
+            // Ticket 228 — disposition-chain path is the legacy entry
+            // point for patrol; it doesn't yet plumb RouteCostField
+            // through `resolve_disposition_chains`, so always falls back
+            // to A* with the boldness-conditioned overlays. The fox /
+            // corr overlays are Copy (zero-cost shallow refs); duplicating
+            // them into the AStarFallback variant doesn't allocate.
+            let path_plan = crate::ai::route_cost::CatPathPlan::AStarFallback {
+                fox: fox_overlay,
+                corr: corr_overlay,
+                weight: w,
+            };
             let outcome = crate::steps::disposition::resolve_patrol_to(
                 pos,
                 target,
                 cached,
                 needs,
                 map,
-                &cat_overlays,
+                &path_plan,
                 d,
                 &snaps.cat_tile_counts,
             );
