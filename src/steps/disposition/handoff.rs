@@ -7,7 +7,7 @@
 use bevy_ecs::prelude::*;
 
 use crate::components::item_transfer::transfer_item_inventory_to_inventory;
-use crate::components::magic::{Inventory, ItemSlot};
+use crate::components::magic::Inventory;
 use crate::steps::{StepOutcome, StepResult};
 
 /// Witness emitted on a successful handoff. The caller applies any
@@ -23,18 +23,17 @@ pub struct HandoffOutcome {
 
 /// # GOAP step resolver: `HandoffItem`
 ///
-/// **Real-world effect** — moves one `ItemSlot::Item(...)` (or
-/// `ItemSlot::Herb(...)`) from the actor's inventory to the target
-/// cat's inventory. Both inventories are mutated in this resolver;
-/// the caller threads them in via the cat-pair query split.
+/// **Real-world effect** — moves one inventory slot from the actor's
+/// inventory to the target cat's inventory. Both inventories are
+/// mutated in this resolver; the caller threads them in via the cat-
+/// pair query split.
 ///
 /// **Plan-level preconditions** — emitted under
 /// `ZoneIs(SocialTarget)` by `handing_actions`. The L2 disposal DSE
 /// picks the recipient cat and threads it as `target_entity`.
 ///
 /// **Runtime preconditions** — `target_entity` must resolve to a cat
-/// with `Inventory` having room. The actor must hold at least one
-/// item-or-herb slot.
+/// with `Inventory` having room. The actor must hold at least one slot.
 ///
 /// **Witness** — `StepOutcome<Option<HandoffOutcome>>`. `Some(outcome)`
 /// on `Advance` carries the recipient entity. `None` on `Fail`.
@@ -46,11 +45,7 @@ pub fn resolve_handoff(
     recipient: Entity,
     recipient_inventory: &mut Inventory,
 ) -> StepOutcome<Option<HandoffOutcome>> {
-    let Some(slot_idx) = actor_inventory
-        .slots
-        .iter()
-        .position(|s| matches!(s, ItemSlot::Item(_, _) | ItemSlot::Herb(_)))
-    else {
+    let Some(slot_idx) = (!actor_inventory.slots.is_empty()).then_some(0) else {
         return StepOutcome::unwitnessed(StepResult::Fail(
             "handoff: no transferable slot in actor inventory".to_string(),
         ));

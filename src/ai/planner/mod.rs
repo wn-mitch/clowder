@@ -107,41 +107,29 @@ impl Carrying {
     /// consistent.
     pub fn from_inventory(inventory: &crate::components::magic::Inventory) -> Self {
         use crate::components::items::ItemKind;
-        use crate::components::magic::ItemSlot;
 
         if inventory
             .slots
             .iter()
-            .any(|s| matches!(s, ItemSlot::Item(k, _) if k.material().is_some()))
+            .any(|s| s.kind.material().is_some())
         {
             Carrying::BuildMaterials
-        } else if inventory
-            .slots
-            .iter()
-            .any(|s| matches!(s, ItemSlot::Item(k, _) if k.is_food()))
-        {
+        } else if inventory.slots.iter().any(|s| s.kind.is_food()) {
             if inventory.slots.iter().any(|s| {
                 matches!(
-                    s,
-                    ItemSlot::Item(
-                        ItemKind::RawMouse
-                            | ItemKind::RawRat
-                            | ItemKind::RawBird
-                            | ItemKind::RawFish
-                            | ItemKind::RawRabbit,
-                        _
-                    )
+                    s.kind,
+                    ItemKind::RawMouse
+                        | ItemKind::RawRat
+                        | ItemKind::RawBird
+                        | ItemKind::RawFish
+                        | ItemKind::RawRabbit
                 )
             }) {
                 Carrying::Prey
             } else {
                 Carrying::ForagedFood
             }
-        } else if inventory
-            .slots
-            .iter()
-            .any(|s| matches!(s, ItemSlot::Herb(_)))
-        {
+        } else if inventory.slots.iter().any(|s| s.kind.is_herb()) {
             Carrying::Herbs
         } else {
             Carrying::Nothing
@@ -173,6 +161,13 @@ pub struct PlannerState {
     /// `StatePredicate::HasMarker`. `Construct` accepts either branch
     /// (two action defs in `building_actions`).
     pub materials_delivered_this_plan: bool,
+    /// Search-state only (ticket 230): `true` iff a `PickFleeTarget`
+    /// step has been simulated earlier in *this* A* expansion.
+    /// `Flee` (umbrella travel) and `HoldUntilSafe` are gated on this
+    /// predicate so the chain stays ordered (pick → travel → hold).
+    /// Cleared by `HoldUntilSafe`'s `IncrementTrips` so the cat can
+    /// re-pick on a subsequent re-plan if a fresh threat appears.
+    pub flee_target_picked: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -252,6 +247,24 @@ pub enum GoapActionKind {
     /// item is gone (despawned, picked up by another cat) or the cat
     /// arrived too late.
     PickUpItemFromGround,
+    // 230: Fleeing chain.
+    /// Pick the lowest-cost passable tile within Chebyshev
+    /// `flee_distance` of the cat using the per-replan `RouteCostField`,
+    /// and write it into the GOAP step's `target_position` so the
+    /// downstream `Flee` umbrella can `cat_path_plan!` to it.
+    PickFleeTarget,
+    /// Umbrella `Action::Flee` — gradient-walk to the picked flee target
+    /// using the same `cat_path_plan!` machinery `TravelTo` uses
+    /// (`field` resolution when reachable; `A*` fallback otherwise).
+    /// Completion: cat's position equals the picked target tile.
+    Flee,
+    /// Wait `flee_hold_ticks` while the cat sits on a tile whose
+    /// `RouteCostField` cost is at most `route_cost_safe_threshold` and
+    /// `threat_proximity_derivative` is non-positive (threat moving away
+    /// or stationary). On counter exhaustion, increment trips. If the
+    /// cat is unsafe when the counter expires, `Fail` so the planner
+    /// re-picks against the now-refreshed `RouteCostField`.
+    HoldUntilSafe,
 }
 
 // ---------------------------------------------------------------------------
@@ -287,6 +300,10 @@ pub enum StatePredicate {
     /// covers prefunded sites, this branch covers in-plan delivery.
     MaterialsDeliveredThisPlan(bool),
     HasMarker(&'static str),
+    /// Ticket 230: search-state predicate. True iff the planner has
+    /// simulated a `PickFleeTarget` step earlier in this A* expansion.
+    /// Used by `Flee` and `HoldUntilSafe` to enforce chain ordering.
+    FleeTargetPicked(bool),
 }
 
 impl StatePredicate {
@@ -306,6 +323,7 @@ impl StatePredicate {
             Self::TripsAtLeast(n) => state.trips_done >= *n,
             Self::MaterialsDeliveredThisPlan(v) => state.materials_delivered_this_plan == *v,
             Self::HasMarker(name) => ctx.markers.has(name, ctx.entity),
+            Self::FleeTargetPicked(v) => state.flee_target_picked == *v,
         }
     }
 }
@@ -324,6 +342,10 @@ pub enum StateEffect {
     SetFarmTended(bool),
     IncrementTrips,
     SetMaterialsDeliveredThisPlan(bool),
+    /// Ticket 230: set the search-state `flee_target_picked` flag so
+    /// the chain ordering predicate `FleeTargetPicked(true)` evaluates
+    /// in subsequent A* expansions.
+    SetFleeTargetPicked(bool),
 }
 
 impl StateEffect {
@@ -340,6 +362,7 @@ impl StateEffect {
             Self::SetFarmTended(v) => state.farm_tended = *v,
             Self::IncrementTrips => state.trips_done += 1,
             Self::SetMaterialsDeliveredThisPlan(v) => state.materials_delivered_this_plan = *v,
+            Self::SetFleeTargetPicked(v) => state.flee_target_picked = *v,
         }
     }
 }
@@ -647,6 +670,7 @@ mod tests {
             prey_found: false,
             farm_tended: false,
             materials_delivered_this_plan: false,
+            flee_target_picked: false,
         }
     }
 

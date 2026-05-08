@@ -4,7 +4,7 @@
 //! and an `ItemKind` + `ItemModifiers`. They live in one of three
 //! places: a building's `StoredItems::items` Vec, a cat's
 //! `Inventory::slots` Vec (as a value-typed `(kind, modifiers)`
-//! `ItemSlot::Item(...)`), or on the ground. Moving an item between
+//! `ItemSlot { kind, modifiers }`), or on the ground. Moving an item between
 //! those locations is a *transfer*; the cardinal rule is that **no
 //! transfer may silently destroy the item**.
 //!
@@ -132,10 +132,9 @@ pub fn transfer_item_stores_to_inventory(
 /// `Err(DestinationFull)` branch is unreachable; for other building
 /// kinds it represents real overflow.
 ///
-/// Skips `ItemSlot::Herb(_)` and `ItemSlot::Remedy(_)` entries —
-/// callers should resolve these via the existing herb/remedy
-/// pathways. Returns `Err(DestinationFull)` for non-item slots so
-/// the caller can pick a different slot.
+/// Skips herb-kind slots — callers should resolve those via the
+/// existing herb/remedy pathways. Returns `Err(DestinationFull)` for
+/// herb slots so the caller can pick a different slot.
 pub fn transfer_item_inventory_to_stored(
     inventory: &mut Inventory,
     slot_idx: usize,
@@ -146,10 +145,9 @@ pub fn transfer_item_inventory_to_stored(
     commands: &mut Commands,
 ) -> Result<Entity, TransferError> {
     use crate::components::items::{Item, ItemLocation};
-    use crate::components::magic::ItemSlot;
 
     let (kind, modifiers) = match inventory.slots.get(slot_idx) {
-        Some(ItemSlot::Item(k, m)) => (*k, *m),
+        Some(slot) if !slot.kind.is_herb() => (slot.kind, slot.modifiers),
         _ => return Err(TransferError::DestinationFull),
     };
 
@@ -198,11 +196,10 @@ pub fn transfer_item_inventory_to_ground(
     commands: &mut Commands,
 ) -> Result<Entity, TransferError> {
     use crate::components::items::{Item, ItemLocation};
-    use crate::components::magic::ItemSlot;
 
     let (kind, modifiers) = match inventory.slots.get(slot_idx) {
-        Some(ItemSlot::Item(k, m)) => (*k, *m),
-        _ => return Err(TransferError::DestinationFull),
+        Some(slot) => (slot.kind, slot.modifiers),
+        None => return Err(TransferError::DestinationFull),
     };
 
     let item_entity = commands
@@ -227,15 +224,12 @@ pub fn transfer_item_inventory_to_inventory(
     slot_idx: usize,
     target: &mut Inventory,
 ) -> Result<(), TransferError> {
-    use crate::components::magic::ItemSlot;
-
     if target.is_full() {
         return Err(TransferError::DestinationFull);
     }
 
     let added = match source.slots.get(slot_idx) {
-        Some(ItemSlot::Item(kind, modifiers)) => target.add_item_with_modifiers(*kind, *modifiers),
-        Some(ItemSlot::Herb(kind)) => target.add_herb(*kind),
+        Some(slot) => target.add_item_with_modifiers(slot.kind, slot.modifiers),
         None => return Err(TransferError::DestinationFull),
     };
     if !added {

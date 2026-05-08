@@ -397,7 +397,7 @@ mod tests {
     #[test]
     fn healing_moss_sets_herbs_and_remedy() {
         let (mut world, mut schedule) = setup_inventory_markers();
-        let cat = spawn_cat_with_inventory(&mut world, vec![ItemSlot::Herb(HerbKind::HealingMoss)]);
+        let cat = spawn_cat_with_inventory(&mut world, vec![ItemSlot::herb(HerbKind::HealingMoss)]);
         schedule.run(&mut world);
         assert!(has_marker::<HasHerbsInInventory>(&world, cat));
         assert!(has_marker::<HasRemedyHerbs>(&world, cat));
@@ -407,7 +407,7 @@ mod tests {
     #[test]
     fn thornbriar_sets_herbs_and_ward() {
         let (mut world, mut schedule) = setup_inventory_markers();
-        let cat = spawn_cat_with_inventory(&mut world, vec![ItemSlot::Herb(HerbKind::Thornbriar)]);
+        let cat = spawn_cat_with_inventory(&mut world, vec![ItemSlot::herb(HerbKind::Thornbriar)]);
         schedule.run(&mut world);
         assert!(has_marker::<HasHerbsInInventory>(&world, cat));
         assert!(!has_marker::<HasRemedyHerbs>(&world, cat));
@@ -420,8 +420,8 @@ mod tests {
         let cat = spawn_cat_with_inventory(
             &mut world,
             vec![
-                ItemSlot::Herb(HerbKind::Thornbriar),
-                ItemSlot::Herb(HerbKind::HealingMoss),
+                ItemSlot::herb(HerbKind::Thornbriar),
+                ItemSlot::herb(HerbKind::HealingMoss),
             ],
         );
         schedule.run(&mut world);
@@ -433,7 +433,7 @@ mod tests {
     #[test]
     fn herb_removal_clears_markers() {
         let (mut world, mut schedule) = setup_inventory_markers();
-        let cat = spawn_cat_with_inventory(&mut world, vec![ItemSlot::Herb(HerbKind::HealingMoss)]);
+        let cat = spawn_cat_with_inventory(&mut world, vec![ItemSlot::herb(HerbKind::HealingMoss)]);
         schedule.run(&mut world);
         assert!(has_marker::<HasHerbsInInventory>(&world, cat));
 
@@ -453,7 +453,7 @@ mod tests {
         let cat = world
             .spawn((
                 Inventory {
-                    slots: vec![ItemSlot::Herb(HerbKind::HealingMoss)],
+                    slots: vec![ItemSlot::herb(HerbKind::HealingMoss)],
                 },
                 crate::components::physical::Dead {
                     tick: 0,
@@ -471,7 +471,7 @@ mod tests {
     #[test]
     fn inventory_markers_idempotent() {
         let (mut world, mut schedule) = setup_inventory_markers();
-        let cat = spawn_cat_with_inventory(&mut world, vec![ItemSlot::Herb(HerbKind::Thornbriar)]);
+        let cat = spawn_cat_with_inventory(&mut world, vec![ItemSlot::herb(HerbKind::Thornbriar)]);
         schedule.run(&mut world);
         assert!(has_marker::<HasWardHerbs>(&world, cat));
         // Run again — should not flap.

@@ -116,6 +116,21 @@ impl ItemKind {
         }
     }
 
+    /// Returns true if this item kind is a herb (mirrors `HerbKind` variants).
+    pub fn is_herb(self) -> bool {
+        matches!(
+            self,
+            Self::HerbHealingMoss
+                | Self::HerbMoonpetal
+                | Self::HerbCalmroot
+                | Self::HerbThornbriar
+                | Self::HerbDreamroot
+                | Self::HerbCatnip
+                | Self::HerbSlumbershade
+                | Self::HerbOracleOrchid
+        )
+    }
+
     /// Returns true if this item can be eaten.
     pub fn is_food(self) -> bool {
         matches!(

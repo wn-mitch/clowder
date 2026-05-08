@@ -1,4 +1,4 @@
-use crate::components::magic::{Inventory, ItemSlot};
+use crate::components::magic::Inventory;
 use crate::resources::sim_constants::DispositionConstants;
 use crate::resources::time::TimeScale;
 use crate::steps::{StepOutcome, StepResult};
@@ -18,8 +18,8 @@ use crate::steps::{StepOutcome, StepResult};
 /// inventory.
 ///
 /// **Runtime preconditions** — reads `Inventory::slots` for the first
-/// `ItemSlot::Item(kind, modifiers)` where `kind.is_food()` and
-/// `!modifiers.cooked`. If no such slot exists the outcome is
+/// slot whose `kind.is_food()` and `!modifiers.cooked`. If no such
+/// slot exists the outcome is
 /// `unwitnessed(Advance)` — the plan still advances (the planner's
 /// `CarryingIs(RawFood)` gate cannot distinguish cooked from raw, and
 /// idling the cat at the kitchen is worse than advancing and letting
@@ -40,11 +40,9 @@ pub fn resolve_cook(
         return StepOutcome::unwitnessed(StepResult::Continue);
     }
     for slot in inventory.slots.iter_mut() {
-        if let ItemSlot::Item(kind, modifiers) = slot {
-            if kind.is_food() && !modifiers.cooked {
-                modifiers.cooked = true;
-                return StepOutcome::witnessed(StepResult::Advance);
-            }
+        if slot.kind.is_food() && !slot.modifiers.cooked {
+            slot.modifiers.cooked = true;
+            return StepOutcome::witnessed(StepResult::Advance);
         }
     }
     StepOutcome::unwitnessed(StepResult::Advance)

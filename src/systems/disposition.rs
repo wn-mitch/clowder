@@ -204,168 +204,37 @@ use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::resources::time::{DayPhase, Season, TimeScale, TimeState};
 
 // ===========================================================================
-// check_anxiety_interrupts
+// check_anxiety_interrupts (retired in 230)
 // ===========================================================================
-
-/// Checks every tick whether a cat's disposition should be interrupted by
-/// critical need states or threats. Runs BEFORE disposition evaluation.
-#[allow(clippy::type_complexity, clippy::too_many_arguments)]
-pub fn check_anxiety_interrupts(
-    mut query: Query<
-        (
-            Entity,
-            &Needs,
-            &Personality,
-            &Position,
-            &Health,
-            &mut CurrentAction,
-            Option<&mut ActionHistory>,
-        ),
-        (With<Disposition>, Without<Dead>),
-    >,
-    dispositions: Query<&Disposition, Without<Dead>>,
-    wildlife: Query<&Position, With<WildAnimal>>,
-    time: Res<TimeState>,
-    map: Res<TileMap>,
-    constants: Res<SimConstants>,
-    mut commands: Commands,
-    mut activation: ResMut<SystemActivation>,
-) {
-    let d = &constants.disposition;
-    for (entity, needs, personality, pos, health, mut current, history) in &mut query {
-        let Ok(disposition) = dispositions.get(entity) else {
-            continue;
-        };
-
-        let interrupt = check_interrupt(
-            needs,
-            personality,
-            pos,
-            health,
-            disposition,
-            &wildlife,
-            d,
-            &constants.sensory.cat,
-        );
-        let Some(reason) = interrupt else { continue };
-
-        activation.record(Feature::AnxietyInterrupt);
-
-        // Don't interrupt cats actively hunting (even if Resting disposition).
-        if matches!(reason, InterruptReason::ThreatDetected { .. })
-            && current.action == Action::Hunt
-        {
-            continue;
-        }
-
-        // Record the interruption in action history.
-        if let Some(mut hist) = history {
-            hist.record(ActionRecord {
-                action: current.action,
-                disposition: Some(disposition.kind),
-                tick: time.tick,
-                outcome: ActionOutcome::Interrupted,
-            });
-        }
-
-        // Strip disposition and chain.
-        commands.entity(entity).remove::<Disposition>();
-        commands.entity(entity).remove::<TaskChain>();
-
-        // Ticket 108 — CriticalSafety arm retired; only ThreatDetected
-        // remains. Future interrupt variants would re-introduce a
-        // match here.
-        let InterruptReason::ThreatDetected { threat_pos } = reason;
-        // Immediate flee — don't wait for re-evaluation.
-        let dx = pos.x - threat_pos.x;
-        let dy = pos.y - threat_pos.y;
-        let len = ((dx * dx + dy * dy) as f32).sqrt().max(1.0);
-        let mut target = Position::new(
-            pos.x + (dx as f32 / len * d.flee_distance) as i32,
-            pos.y + (dy as f32 / len * d.flee_distance) as i32,
-        );
-        target.x = target.x.clamp(0, map.width - 1);
-        target.y = target.y.clamp(0, map.height - 1);
-        current.action = Action::Flee;
-        current.ticks_remaining = 0;
-        current.target_position = Some(target);
-        current.target_entity = None;
-    }
-}
-
-#[derive(Debug)]
-enum InterruptReason {
-    ThreatDetected { threat_pos: Position },
-}
-
-#[allow(clippy::too_many_arguments)]
-fn check_interrupt(
-    _needs: &Needs,
-    personality: &Personality,
-    pos: &Position,
-    _health: &Health,
-    disposition: &Disposition,
-    wildlife: &Query<&Position, With<WildAnimal>>,
-    d: &DispositionConstants,
-    cat_profile: &crate::systems::sensing::SensoryProfile,
-) -> Option<InterruptReason> {
-    // Tickets 106 + 107: the Starvation and Exhaustion arms used to live here,
-    // each gated by a Resting/Hunting/Foraging exemption wrapper. Both arms
-    // were vestigial in the post-091 regime — Phase 2 focal-trace soaks
-    // confirmed `interrupts_by_reason.{Starvation, Exhaustion} == 0` even
-    // under doubled need-decay, because the exemption wrapper structurally
-    // shielded cats during the only times they reached the threshold.
-    // Substrate replacements: `HungerUrgency` and `ExhaustionPressure`
-    // modifiers in `src/ai/modifier.rs`. The GOAP urgency arms at
-    // `goap.rs:615-637` are the actual food/sleep-routing drivers and
-    // remain in place.
-    //
-    // Ticket 119: the CriticalHealth arm used to live here — a flat
-    // `health.current / health.max < critical_health_threshold` (0.4
-    // by default) that fired unconditionally. Retired in favor of
-    // ticket 118's substrate-driven preempt path
-    // (`AcuteHealthAdrenalineFlee::preempts_in_flight`), which lifts
-    // Flee/Sleep on `health_deficit > 0.4` and drops the in-flight
-    // plan when the lift > 0.
-    //
-    // Ticket 108: the CriticalSafety arm used to live here — a flat
-    // `needs.safety < critical_safety_threshold` (0.15) gate. Retired
-    // in favor of the substrate-driven `ThreatProximityAdrenalineFlee`
-    // Modifier (`src/ai/modifier.rs`) reading the
-    // `threat_proximity_derivative` scalar — adrenaline lurches on
-    // **rising** threat proximity (change-detection), not on a
-    // steady-state low-safety level. The 118 preempt path drops
-    // in-flight plans when the modifier's lurch fires, replacing the
-    // `commands.entity(entity).remove::<Disposition>()` yank that the
-    // legacy interrupt performed.
-
-    // Guards are exempt from threat interrupts — they handle threats directly
-    // via guard_threat_detection_range.
-    if !matches!(disposition.kind, DispositionKind::Guarding) {
-        // Check for nearby wildlife threats. Phase 2 migration: the
-        // visual-only detection path now flows through the sensory
-        // model's sight channel. See `cat_sees_threat_at`.
-        let nearest_threat = wildlife
-            .iter()
-            .filter(|wp| crate::systems::sensing::cat_sees_threat_at(*pos, cat_profile, **wp))
-            .min_by_key(|wp| pos.manhattan_distance(wp));
-
-        if let Some(threat_pos) = nearest_threat {
-            let dist = pos.manhattan_distance(threat_pos) as f32;
-            let threat_urgency = 1.0 - (dist / d.threat_urgency_divisor);
-            // Bold cats resist fleeing: threshold scales with boldness.
-            let flee_threshold =
-                d.flee_threshold_base + personality.boldness * d.flee_threshold_boldness_scale;
-            if threat_urgency > flee_threshold {
-                return Some(InterruptReason::ThreatDetected {
-                    threat_pos: *threat_pos,
-                });
-            }
-        }
-    }
-
-    None
-}
+//
+// The pre-substrate `check_anxiety_interrupts` system used to live here,
+// rebuilt incrementally by tickets 106/107/108/119 as each anxiety arm
+// (Starvation / Exhaustion / CriticalHealth / CriticalSafety) was
+// retired in favor of substrate-driven modifiers
+// (`HungerUrgency`, `ExhaustionPressure`,
+// `AcuteHealthAdrenalineFlee`, `ThreatProximityAdrenalineFlee`).
+//
+// Ticket 230 retired the last surviving arm — `ThreatDetected` — by
+// promoting `Action::Flee` into a full `DispositionKind::Fleeing` with
+// goal predicate (`TripsAtLeast(current_trips + 1)`), plan template
+// (`[PickFleeTarget, Flee, HoldUntilSafe]`) at
+// `src/ai/planner/actions.rs::fleeing_actions`, completion proxy
+// (`SingleMinded`) at `src/ai/commitment.rs::strategy_for_disposition`,
+// substrate-aware target picker
+// (`src/steps/disposition/pick_flee_target.rs::resolve_pick_flee_target`)
+// reading the per-replan `RouteCostField`, and a hold-until-safe
+// resolver
+// (`src/steps/disposition/hold_until_safe.rs::resolve_hold_until_safe`)
+// that hysteresis-counts low-cost + safety-recovered ticks before
+// closing the trip.
+//
+// The naive vector projection that lived here pre-230
+// (`target = pos + (pos - threat) / |pos - threat| × flee_distance`)
+// was substrate-blind and fed back into the modifier preempt loop —
+// the post-228 soak measured 39,536 preempts across 100k ticks and
+// 6 adult / 2 kitten starvation deaths. The substrate-aware picker
+// + the disposition-tier early-skip in `try_preempt_with_modifier_lurch`
+// (added at goap.rs in this same ticket) close the loop.
 
 // ===========================================================================
 // evaluate_dispositions
@@ -1703,7 +1572,14 @@ pub fn disposition_to_chain(
             DispositionKind::Discarding
             | DispositionKind::Trashing
             | DispositionKind::Handing
-            | DispositionKind::PickingUp => None,
+            | DispositionKind::PickingUp
+            // 230: Fleeing ships GOAP-only — the legacy
+            // `disposition_to_chain` path was the
+            // `check_anxiety_interrupts::ThreatDetected` arm, which
+            // 230 retires. Returning None defers cleanly to the
+            // planner's `[PickFleeTarget, Flee, HoldUntilSafe]`
+            // template.
+            | DispositionKind::Fleeing => None,
         };
 
         if let Some((mut chain, action)) = chain {
@@ -3055,7 +2931,7 @@ pub fn resolve_disposition_chains(
                             );
                             for _ in 0..kills {
                                 if !inventory.is_full() {
-                                    inventory.slots.push(ItemSlot::Item(drop_item, den_mods));
+                                    inventory.slots.push(ItemSlot::new(drop_item, den_mods));
                                 } else {
                                     commands.spawn((
                                         crate::components::items::Item::with_modifiers(
@@ -3578,7 +3454,7 @@ fn dispatch_chain_step(
                         };
 
                         if !inventory.is_full() {
-                            inventory.slots.push(ItemSlot::Item(
+                            inventory.slots.push(ItemSlot::new(
                                 item_kind,
                                 crate::components::items::ItemModifiers::with_corruption(
                                     catch_corruption,
@@ -3901,11 +3777,7 @@ fn dispatch_chain_step(
 
                 if ticks > d.search_timeout_ticks {
                     // Multi-kill: if we already have food, head to stores.
-                    if inventory
-                        .slots
-                        .iter()
-                        .any(|s| matches!(s, ItemSlot::Item(k, _) if k.is_food()))
-                    {
+                    if inventory.slots.iter().any(|s| s.kind.is_food()) {
                         chain.advance();
                         chain.sync_targets(current);
                     } else {
@@ -3972,7 +3844,7 @@ fn dispatch_chain_step(
                         0.0
                     };
                     if !inventory.is_full() {
-                        inventory.slots.push(ItemSlot::Item(
+                        inventory.slots.push(ItemSlot::new(
                             item_kind,
                             crate::components::items::ItemModifiers::with_corruption(
                                 forage_corruption,
@@ -4377,35 +4249,6 @@ mod tests {
     use super::*;
     use bevy_ecs::system::SystemState;
 
-    fn make_world_with_no_wildlife() -> World {
-        World::new()
-    }
-
-    fn _make_world_with_wildlife_at(pos: Position) -> World {
-        let mut world = World::new();
-        world.spawn((
-            pos,
-            WildAnimal::new(crate::components::wildlife::WildSpecies::Fox),
-        ));
-        world
-    }
-
-    fn default_disposition(kind: DispositionKind) -> Disposition {
-        let chosen = kind
-            .constituent_actions()
-            .first()
-            .copied()
-            .unwrap_or(Action::Idle);
-        Disposition {
-            kind,
-            adopted_tick: 0,
-            disposition_started_tick: 0,
-            completions: 0,
-            target_completions: 3,
-            chosen_action: chosen,
-        }
-    }
-
     fn mid_personality() -> Personality {
         Personality {
             boldness: 0.5,
@@ -4434,71 +4277,20 @@ mod tests {
     // arm of `check_interrupt` is gone. Coverage moved to the
     // substrate-driven preempt path: `tests::preempts_in_flight_*` in
     // `src/ai/modifier.rs` and the `modifier_preempts_hunt` scenario.
-
-    #[test]
-    fn healthy_guarding_cat_not_interrupted() {
-        let mut world = make_world_with_no_wildlife();
-        let mut state: SystemState<Query<&Position, With<WildAnimal>>> =
-            SystemState::new(&mut world);
-        let wildlife = state.get(&world);
-
-        let needs = Needs::default();
-        let personality = mid_personality();
-        let pos = Position { x: 5, y: 5 };
-        let health = Health::default(); // 1.0
-        let disposition = default_disposition(DispositionKind::Guarding);
-        let d = SimConstants::default().disposition;
-
-        let result = check_interrupt(
-            &needs,
-            &personality,
-            &pos,
-            &health,
-            &disposition,
-            &wildlife,
-            &d,
-            &SimConstants::default().sensory.cat,
-        );
-        assert!(
-            result.is_none(),
-            "healthy guarding cat should not be interrupted, got {result:?}"
-        );
-    }
-
-    #[test]
-    fn health_just_above_threshold_no_interrupt() {
-        let mut world = make_world_with_no_wildlife();
-        let mut state: SystemState<Query<&Position, With<WildAnimal>>> =
-            SystemState::new(&mut world);
-        let wildlife = state.get(&world);
-
-        let needs = Needs::default();
-        let personality = mid_personality();
-        let pos = Position { x: 5, y: 5 };
-        let health = Health {
-            current: 0.5,
-            max: 1.0,
-            injuries: Vec::new(),
-            total_starvation_damage: 0.0,
-        };
-        let disposition = default_disposition(DispositionKind::Guarding);
-        let d = SimConstants::default().disposition;
-
-        let result = check_interrupt(
-            &needs,
-            &personality,
-            &pos,
-            &health,
-            &disposition,
-            &wildlife,
-            &d,
-            &SimConstants::default().sensory.cat,
-        );
-        assert!(
-            result.is_none(),
-            "cat at 50% HP (above 0.4 threshold) should not be interrupted, got {result:?}"
-        );
-    }
+    //
+    // Ticket 230 retired the entire `check_anxiety_interrupts` system
+    // (and its sole remaining `ThreatDetected` arm) by promoting
+    // `Action::Flee` into `DispositionKind::Fleeing`. The two
+    // remaining `check_interrupt` tests
+    // (`healthy_guarding_cat_not_interrupted` /
+    // `health_just_above_threshold_no_interrupt`) are removed with
+    // the helper. Coverage for the threat-detection arm now lives in
+    // (a) the modifier-side preempt loop's
+    // `Resting | Eating | Fleeing` early-skip in
+    // `try_preempt_with_modifier_lurch`; (b) the
+    // `pick_flee_target` resolver tests for substrate-aware target
+    // selection; and (c) the ticket-230 `flee_commitment` scenario
+    // for the end-to-end commit-cadence check.
 
     // -----------------------------------------------------------------------
     // build_crafting_chain hint test

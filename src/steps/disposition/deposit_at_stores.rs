@@ -2,7 +2,7 @@ use bevy_ecs::prelude::*;
 
 use crate::components::building::{StoredItems, StructureType};
 use crate::components::items::{Item, ItemKind, ItemLocation};
-use crate::components::magic::{Inventory, ItemSlot};
+use crate::components::magic::Inventory;
 use crate::components::physical::Position;
 use crate::components::skills::Skills;
 use crate::resources::sim_constants::DispositionConstants;
@@ -76,10 +76,8 @@ pub fn resolve_deposit_at_stores(
         let food_items: Vec<(ItemKind, crate::components::items::ItemModifiers)> = inventory
             .slots
             .iter()
-            .filter_map(|slot| match slot {
-                ItemSlot::Item(kind, mods) if kind.is_food() => Some((*kind, *mods)),
-                _ => None,
-            })
+            .filter(|slot| slot.kind.is_food())
+            .map(|slot| (slot.kind, slot.modifiers))
             .collect();
 
         if food_items.is_empty() {
@@ -91,9 +89,7 @@ pub fn resolve_deposit_at_stores(
             };
         }
 
-        inventory
-            .slots
-            .retain(|slot| !matches!(slot, ItemSlot::Item(k, _) if k.is_food()));
+        inventory.slots.retain(|slot| !slot.kind.is_food());
 
         let quality = (d.deposit_quality_base + skills.hunting * d.deposit_quality_skill_scale)
             .clamp(0.0, 1.0);
@@ -123,10 +119,7 @@ pub fn resolve_deposit_at_stores(
         .slots
         .iter()
         .enumerate()
-        .filter_map(|(i, slot)| match slot {
-            ItemSlot::Item(kind, _) if kind.is_food() => Some(i),
-            _ => None,
-        })
+        .filter_map(|(i, slot)| if slot.kind.is_food() { Some(i) } else { None })
         .collect();
     if let Ok(mut stored) = stores_query.get_mut(store_entity) {
         let quality = (d.deposit_quality_base + skills.hunting * d.deposit_quality_skill_scale)
@@ -137,14 +130,14 @@ pub fn resolve_deposit_at_stores(
         // mid-iteration).
         let mut deposited: Vec<usize> = Vec::with_capacity(food_slot_indices.len());
         for slot_idx in food_slot_indices {
-            let (kind, mods) = match &inventory.slots[slot_idx] {
-                ItemSlot::Item(k, m) => (*k, *m),
-                // The pre-collection filter only matched
-                // `ItemSlot::Item(food, _)`. If concurrent
-                // mutation changed the slot kind out from
-                // under us, skip silently.
-                _ => continue,
-            };
+            // The pre-collection filter only matched food slots; if
+            // concurrent mutation changed the kind out from under us,
+            // skip silently.
+            if !inventory.slots[slot_idx].kind.is_food() {
+                continue;
+            }
+            let slot = &inventory.slots[slot_idx];
+            let (kind, mods) = (slot.kind, slot.modifiers);
             let item_entity = commands
                 .spawn(Item::with_modifiers(
                     kind,

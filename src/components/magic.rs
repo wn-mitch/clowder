@@ -116,6 +116,35 @@ impl HerbKind {
             Self::OracleOrchid => 0.60,
         }
     }
+
+    pub fn to_item_kind(self) -> crate::components::items::ItemKind {
+        use crate::components::items::ItemKind;
+        match self {
+            Self::HealingMoss => ItemKind::HerbHealingMoss,
+            Self::Moonpetal => ItemKind::HerbMoonpetal,
+            Self::Calmroot => ItemKind::HerbCalmroot,
+            Self::Thornbriar => ItemKind::HerbThornbriar,
+            Self::Dreamroot => ItemKind::HerbDreamroot,
+            Self::Catnip => ItemKind::HerbCatnip,
+            Self::Slumbershade => ItemKind::HerbSlumbershade,
+            Self::OracleOrchid => ItemKind::HerbOracleOrchid,
+        }
+    }
+
+    pub fn from_item_kind(kind: crate::components::items::ItemKind) -> Option<Self> {
+        use crate::components::items::ItemKind;
+        Some(match kind {
+            ItemKind::HerbHealingMoss => Self::HealingMoss,
+            ItemKind::HerbMoonpetal => Self::Moonpetal,
+            ItemKind::HerbCalmroot => Self::Calmroot,
+            ItemKind::HerbThornbriar => Self::Thornbriar,
+            ItemKind::HerbDreamroot => Self::Dreamroot,
+            ItemKind::HerbCatnip => Self::Catnip,
+            ItemKind::HerbSlumbershade => Self::Slumbershade,
+            ItemKind::HerbOracleOrchid => Self::OracleOrchid,
+            _ => return None,
+        })
+    }
 }
 
 /// An herb entity in the world.
@@ -227,14 +256,32 @@ pub struct FlavorPlant {
 // Inventory
 // ---------------------------------------------------------------------------
 
-/// A slot in a cat's inventory — either a herb or a generic item.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum ItemSlot {
-    Herb(HerbKind),
-    Item(
-        crate::components::items::ItemKind,
-        crate::components::items::ItemModifiers,
-    ),
+/// A slot in a cat's inventory. The 5-slot pool is unified: any slot
+/// can hold any `ItemKind`, herbs included (the `ItemKind` enum has herb
+/// variants — `HerbHealingMoss` etc. — that map 1:1 to `HerbKind`).
+/// Ticket 231 collapsed the prior `enum ItemSlot { Herb, Item }` split,
+/// which created a representational asymmetry but no semantic difference
+/// (`Inventory::is_full()` was always variant-agnostic).
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ItemSlot {
+    pub kind: crate::components::items::ItemKind,
+    pub modifiers: crate::components::items::ItemModifiers,
+}
+
+impl ItemSlot {
+    pub fn new(
+        kind: crate::components::items::ItemKind,
+        modifiers: crate::components::items::ItemModifiers,
+    ) -> Self {
+        Self { kind, modifiers }
+    }
+
+    pub fn herb(kind: HerbKind) -> Self {
+        Self {
+            kind: kind.to_item_kind(),
+            modifiers: crate::components::items::ItemModifiers::default(),
+        }
+    }
 }
 
 /// A cat's carried inventory. Capacity-limited; holds both herbs and items.
@@ -253,18 +300,14 @@ impl Inventory {
     // --- Herb compatibility methods ---
 
     pub fn has_herb(&self, kind: HerbKind) -> bool {
-        self.slots
-            .iter()
-            .any(|s| matches!(s, ItemSlot::Herb(h) if *h == kind))
+        let target = kind.to_item_kind();
+        self.slots.iter().any(|s| s.kind == target)
     }
 
     /// Remove one instance of `kind` from inventory. Returns true if found.
     pub fn take_herb(&mut self, kind: HerbKind) -> bool {
-        if let Some(idx) = self
-            .slots
-            .iter()
-            .position(|s| matches!(s, ItemSlot::Herb(h) if *h == kind))
-        {
+        let target = kind.to_item_kind();
+        if let Some(idx) = self.slots.iter().position(|s| s.kind == target) {
             self.slots.swap_remove(idx);
             true
         } else {
@@ -277,21 +320,22 @@ impl Inventory {
         if self.is_full() {
             return false;
         }
-        self.slots.push(ItemSlot::Herb(kind));
+        self.slots.push(ItemSlot::herb(kind));
         true
     }
 
     /// Whether the inventory contains any herb at all.
     pub fn has_any_herb(&self) -> bool {
-        self.slots.iter().any(|s| matches!(s, ItemSlot::Herb(_)))
+        self.slots.iter().any(|s| s.kind.is_herb())
     }
 
     /// Whether the inventory has any herb usable for a remedy.
     pub fn has_remedy_herb(&self) -> bool {
+        use crate::components::items::ItemKind;
         self.slots.iter().any(|s| {
             matches!(
-                s,
-                ItemSlot::Herb(HerbKind::HealingMoss | HerbKind::Moonpetal | HerbKind::Calmroot)
+                s.kind,
+                ItemKind::HerbHealingMoss | ItemKind::HerbMoonpetal | ItemKind::HerbCalmroot
             )
         })
     }
@@ -303,11 +347,12 @@ impl Inventory {
 
     /// Return the first remedy kind that can be prepared from current herbs.
     pub fn first_remedy_kind(&self) -> Option<RemedyKind> {
+        use crate::components::items::ItemKind;
         for slot in &self.slots {
-            match slot {
-                ItemSlot::Herb(HerbKind::HealingMoss) => return Some(RemedyKind::HealingPoultice),
-                ItemSlot::Herb(HerbKind::Moonpetal) => return Some(RemedyKind::EnergyTonic),
-                ItemSlot::Herb(HerbKind::Calmroot) => return Some(RemedyKind::MoodTonic),
+            match slot.kind {
+                ItemKind::HerbHealingMoss => return Some(RemedyKind::HealingPoultice),
+                ItemKind::HerbMoonpetal => return Some(RemedyKind::EnergyTonic),
+                ItemKind::HerbCalmroot => return Some(RemedyKind::MoodTonic),
                 _ => {}
             }
         }
@@ -317,9 +362,7 @@ impl Inventory {
     // --- Item methods ---
 
     pub fn has_item(&self, kind: crate::components::items::ItemKind) -> bool {
-        self.slots
-            .iter()
-            .any(|s| matches!(s, ItemSlot::Item(i, _) if *i == kind))
+        self.slots.iter().any(|s| s.kind == kind)
     }
 
     /// Add an item with default (clean) modifiers. Returns false if inventory is full.
@@ -336,17 +379,13 @@ impl Inventory {
         if self.is_full() {
             return false;
         }
-        self.slots.push(ItemSlot::Item(kind, modifiers));
+        self.slots.push(ItemSlot::new(kind, modifiers));
         true
     }
 
     /// Remove one instance of `kind` from inventory. Returns true if found.
     pub fn take_item(&mut self, kind: crate::components::items::ItemKind) -> bool {
-        if let Some(idx) = self
-            .slots
-            .iter()
-            .position(|s| matches!(s, ItemSlot::Item(i, _) if *i == kind))
-        {
+        if let Some(idx) = self.slots.iter().position(|s| s.kind == kind) {
             self.slots.swap_remove(idx);
             true
         } else {
@@ -361,24 +400,16 @@ impl Inventory {
         crate::components::items::ItemKind,
         crate::components::items::ItemModifiers,
     )> {
-        let idx = self
-            .slots
-            .iter()
-            .position(|s| matches!(s, ItemSlot::Item(k, _) if k.is_food()))?;
-        match self.slots.remove(idx) {
-            ItemSlot::Item(kind, mods) => Some((kind, mods)),
-            _ => unreachable!(),
-        }
+        let idx = self.slots.iter().position(|s| s.kind.is_food())?;
+        let slot = self.slots.remove(idx);
+        Some((slot.kind, slot.modifiers))
     }
 
     /// Number of food slots currently held. Mirrors the predicate
     /// `take_food` uses (`ItemKind::is_food`); 178 reads this for the
     /// per-cat `inventory_excess` scoring axis.
     pub fn food_count(&self) -> usize {
-        self.slots
-            .iter()
-            .filter(|s| matches!(s, ItemSlot::Item(k, _) if k.is_food()))
-            .count()
+        self.slots.iter().filter(|s| s.kind.is_food()).count()
     }
 }
 

@@ -3,7 +3,7 @@ use bevy_ecs::prelude::*;
 use crate::components::building::ConstructionSite;
 use crate::components::building::CropState;
 use crate::components::building::Structure;
-use crate::components::magic::{Inventory, ItemSlot};
+use crate::components::magic::Inventory;
 use crate::components::physical::Position;
 use crate::components::task_chain::Material;
 use crate::steps::{StepOutcome, StepResult};
@@ -11,7 +11,7 @@ use crate::steps::{StepOutcome, StepResult};
 /// # GOAP step resolver: `Deliver` (`GoapActionKind::DeliverMaterials`)
 ///
 /// **Real-world effect** — consumes one carried unit of `material`
-/// from the cat's `Inventory` (removing the `ItemSlot::Item` and
+/// from the cat's `Inventory` (removing the slot and
 /// despawning the matching `Item` entity if `carried_item_entity`
 /// is supplied) and calls `site.deliver(material, 1)` on the
 /// targeted `ConstructionSite`. The single-unit-per-call shape
@@ -74,13 +74,10 @@ pub fn resolve_deliver(
     // Find the inventory slot carrying the requested material. Wood/Stone
     // are the only `ItemKind::material()` returns; the slot lookup uses
     // the same bridge.
-    let slot_idx = inventory.slots.iter().position(|s| {
-        matches!(
-            s,
-            ItemSlot::Item(kind, _)
-                if kind.material() == Some(material)
-        )
-    });
+    let slot_idx = inventory
+        .slots
+        .iter()
+        .position(|s| s.kind.material() == Some(material));
     let Some(slot_idx) = slot_idx else {
         return StepOutcome::unwitnessed(StepResult::Fail(
             "cat is not carrying the requested material".into(),

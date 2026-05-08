@@ -10,7 +10,7 @@ use bevy_ecs::prelude::*;
 
 use crate::components::building::{StoredItems, StructureType};
 use crate::components::item_transfer::transfer_item_inventory_to_stored;
-use crate::components::magic::{Inventory, ItemSlot};
+use crate::components::magic::Inventory;
 use crate::components::physical::Position;
 use crate::steps::{StepOutcome, StepResult};
 
@@ -43,7 +43,7 @@ pub struct TrashOutcome {
 /// target as a `StructureType::Midden` (177 wires this via the
 /// `snaps.midden_entities` snapshot) and threaded the resolved
 /// `&mut StoredItems` and midden `Position`. The cat's inventory
-/// must hold at least one `ItemSlot::Item(...)`; otherwise Fail.
+/// must hold at least one non-herb slot; otherwise Fail.
 ///
 /// **Witness** — `StepOutcome<Option<TrashOutcome>>`. `Some(outcome)`
 /// on `Advance` carries midden + item entities. `None` on `Fail`.
@@ -60,7 +60,7 @@ pub fn resolve_trash_at_midden(
     let Some(slot_idx) = inventory
         .slots
         .iter()
-        .position(|s| matches!(s, ItemSlot::Item(_, _)))
+        .position(|s| !s.kind.is_herb())
     else {
         return StepOutcome::unwitnessed(StepResult::Fail(
             "trash: no item-slot in inventory".to_string(),

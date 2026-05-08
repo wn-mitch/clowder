@@ -623,9 +623,20 @@ pub fn check_modifier_preemption(
         // Recovery dispositions are already self-care — preempting
         // them just oscillates. Mirrors the legacy CriticalHealth
         // interrupt's exemption.
+        //
+        // 230: `Fleeing` joins the exemption list. Once committed to
+        // a Fleeing plan, the cat is already responding to the
+        // adrenaline lurch — the modifier guard composes with the
+        // disposition's `SingleMinded` commitment proxy so the cat
+        // accumulates hold ticks instead of re-firing
+        // `PickFleeTarget` every tick. This was the entire shape of
+        // the post-228 thrash spiral: 39,536× preempts in 100k ticks
+        // because `AcuteHealthAdrenalineFlee::preempts_in_flight`
+        // returned `true` whenever `flee_lift > 0`, regardless of
+        // the in-flight plan.
         if matches!(
             plan.kind,
-            DispositionKind::Resting | DispositionKind::Eating
+            DispositionKind::Resting | DispositionKind::Eating | DispositionKind::Fleeing
         ) {
             continue;
         }
@@ -5135,10 +5146,7 @@ fn dispatch_step_action(
                     .min_by_key(|(_, cp)| pos.manhattan_distance(cp))
                     .map(|(e, _)| *e);
             }
-            let material_carried = inventory.slots.iter().find_map(|s| match s {
-                crate::components::magic::ItemSlot::Item(k, _) => k.material(),
-                _ => None,
-            });
+            let material_carried = inventory.slots.iter().find_map(|s| s.kind.material());
             match material_carried {
                 Some(material) => {
                     let outcome = crate::steps::building::resolve_deliver(
@@ -5363,13 +5371,7 @@ fn dispatch_step_action(
                     "handoff: no recipient on disposition (no kittens in colony)".to_string(),
                 );
             };
-            let has_transferable = inventory.slots.iter().any(|s| {
-                matches!(
-                    s,
-                    crate::components::magic::ItemSlot::Item(_, _)
-                        | crate::components::magic::ItemSlot::Herb(_)
-                )
-            });
+            let has_transferable = !inventory.slots.is_empty();
             if !has_transferable {
                 return crate::steps::StepResult::Fail(
                     "handoff: no transferable slot in actor inventory".to_string(),
@@ -5380,6 +5382,74 @@ fn dispatch_step_action(
                 recipient,
             });
             crate::steps::StepResult::Advance
+        }
+        // 230: Fleeing chain dispatch — `[PickFleeTarget, Flee, HoldUntilSafe]`.
+        // Concrete resolvers live under `src/steps/disposition/`. This
+        // arm threads the per-replan `RouteCostField` (the
+        // `route_cost_field` parameter, attached to the cat at line
+        // 1648-1698 by `evaluate_and_plan`) plus the nearest-threat
+        // position (from `ec.wildlife`) into the picker, and the
+        // current-tick safety need into the hold step.
+        GoapActionKind::PickFleeTarget => {
+            let threat_pos = ec
+                .wildlife
+                .iter()
+                .map(|(_, tp)| *tp)
+                .min_by_key(|tp| pos.manhattan_distance(tp));
+            let outcome = crate::steps::disposition::resolve_pick_flee_target(
+                *pos,
+                route_cost_field,
+                threat_pos,
+                d.flee_distance,
+                &ec.map,
+            );
+            if let Some(target) = outcome.witness {
+                plan.step_state[step_idx].target_position = Some(target);
+            }
+            outcome.record_if_witnessed(
+                narr.activation.as_deref_mut(),
+                crate::resources::system_activation::Feature::FleeTargetPicked,
+            );
+            outcome.result
+        }
+        GoapActionKind::Flee => {
+            // Umbrella travel leg — delegate to the same `cat_path_plan!`
+            // machinery `TravelTo` uses (gradient-walk on
+            // `RouteCostField`, A* fallback). The picked target lives
+            // on `plan.step_state[step_idx-1].target_position` via the
+            // standard `carry_target_forward` pipeline; when not yet
+            // propagated, fall back to the cat's current position (the
+            // macro's staleness probe — staying put is benign).
+            let _carried = crate::systems::plan_substrate::carry_target_forward(
+                &mut plan.step_state,
+                step_idx,
+                &ec.target_validity,
+                None,
+            );
+            let target_for_plan = plan.step_state[step_idx].target_position.unwrap_or(*pos);
+            let path_plan = cat_path_plan!(target_for_plan);
+            crate::steps::disposition::resolve_flee_travel(
+                pos,
+                target_for_plan,
+                &path_plan,
+                &ec.map,
+            )
+        }
+        GoapActionKind::HoldUntilSafe => {
+            let outcome = crate::steps::disposition::resolve_hold_until_safe(
+                ticks,
+                *pos,
+                route_cost_field,
+                needs.safety,
+                d.flee_hold_ticks,
+                d.route_cost_safe_threshold,
+                d.flee_safety_need_threshold,
+            );
+            outcome.record_if_witnessed(
+                narr.activation.as_deref_mut(),
+                crate::resources::system_activation::Feature::FleeRecovered,
+            );
+            outcome.result
         }
     }
 }
@@ -5679,7 +5749,7 @@ fn resolve_search_prey(
                     crate::components::items::ItemModifiers::with_corruption(den_corruption);
                 for _ in 0..kills {
                     if !inventory.is_full() {
-                        inventory.slots.push(ItemSlot::Item(drop_item, den_mods));
+                        inventory.slots.push(ItemSlot::new(drop_item, den_mods));
                     } else {
                         commands.spawn((
                             crate::components::items::Item::with_modifiers(
@@ -5879,7 +5949,7 @@ fn resolve_search_prey(
         if inventory
             .slots
             .iter()
-            .any(|s| matches!(s, ItemSlot::Item(k, _) if k.is_food()))
+            .any(|s| s.kind.is_food())
         {
             // Have food from earlier — advance to deposit.
             return crate::steps::StepResult::Advance;
@@ -6122,7 +6192,7 @@ fn resolve_engage_prey(
                 // Inventory has room — slot-push directly. Inventory
                 // slots are value-typed `(kind, modifiers)` so no
                 // entity is needed when the catch goes straight in.
-                inventory.slots.push(ItemSlot::Item(item_kind, modifiers));
+                inventory.slots.push(ItemSlot::new(item_kind, modifiers));
             } else {
                 // 176: inventory full and not self-eating. Pre-fix,
                 // this arm silently dropped the catch (the prey
@@ -6530,7 +6600,7 @@ fn resolve_forage_item(
                     act.record(crate::resources::system_activation::Feature::FoodEaten);
                 }
             } else if !inventory.is_full() {
-                inventory.slots.push(ItemSlot::Item(item_kind, modifiers));
+                inventory.slots.push(ItemSlot::new(item_kind, modifiers));
             } else {
                 // 176: inventory full. Pre-fix, this arm silently
                 // skipped — no item was ever spawned, the foraged
@@ -7003,6 +7073,10 @@ fn build_planner_state(
         prey_found: false,
         farm_tended: false,
         materials_delivered_this_plan: false,
+        // 230: `Fleeing` plans always start without a picked target;
+        // `PickFleeTarget` is the first step in `fleeing_actions()`,
+        // and `Flee` / `HoldUntilSafe` are gated on it.
+        flee_target_picked: false,
     }
 }
 

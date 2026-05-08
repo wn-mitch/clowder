@@ -247,7 +247,7 @@ mod tests {
         let mut inv = Inventory {
             slots: (0..Inventory::MAX_SLOTS)
                 .map(|_| {
-                    crate::components::magic::ItemSlot::Item(
+                    crate::components::magic::ItemSlot::new(
                         ItemKind::ShinyPebble,
                         crate::components::items::ItemModifiers::default(),
                     )
