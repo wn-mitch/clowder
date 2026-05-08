@@ -459,6 +459,15 @@ pub struct ScoringContext<'a> {
     /// Populated by the ScoringContext builders (`goap.rs`, `disposition.rs`)
     /// once per scoring tick. See [`CatAnchorPositions`] doc for details.
     pub cat_anchors: CatAnchorPositions,
+    /// Ticket 228 — per-cat route-cost field, flooded once per replan.
+    /// `Some(&field)` populated by `evaluate_and_plan` (replan path);
+    /// `None` everywhere else (modifier pipeline scoring path, fox/hawk
+    /// scoring, tests). The `Consideration::Field` evaluator reads
+    /// through `EvalCtx.field_cost` which closes over this field. When
+    /// `None`, the closure returns `None` and the consideration scores
+    /// ~0.0 under closer-is-better curves — same dormant behavior as
+    /// "out of range" Spatial landmarks.
+    pub route_cost_field: Option<&'a crate::components::RouteCostField>,
     // --- Disposition-failure cooldown signals: 1.0 = no recent failure
     // (no damp), 0.0 = just failed (full damp). One per failure-prone
     // `DispositionKind`. Read by `DispositionFailureCooldown` in
@@ -1225,6 +1234,23 @@ fn score_dse_by_id(dse_id: &str, ctx: &ScoringContext, inputs: &EvalInputs) -> f
     let needs_ref = ctx.needs;
     let maslow = |tier: u8| needs_ref.tier_suppression(tier);
 
+    // Ticket 228 — `Consideration::Field` evaluator dispatches
+    // through this closure. When the cat has no `RouteCostField`
+    // built (modifier-pipeline scoring path; pre-flood test setups)
+    // the closure returns `None` and the field consideration scores
+    // ~0.0 under closer-is-better curves.
+    let field_cost = |source: crate::ai::considerations::FieldSource,
+                      pos: Position|
+     -> Option<u32> {
+        let field = ctx.route_cost_field?;
+        match source {
+            crate::ai::considerations::FieldSource::OwnRouteCost => {
+                let c = field.cost_at(pos);
+                (c < crate::components::route_cost_field::MAX_COST_BUDGET).then_some(c)
+            }
+        }
+    };
+
     let eval_ctx = EvalCtx {
         cat: inputs.cat,
         tick: inputs.tick,
@@ -1235,7 +1261,7 @@ fn score_dse_by_id(dse_id: &str, ctx: &ScoringContext, inputs: &EvalInputs) -> f
         target: None,
         target_position: None,
         target_alive: None,
-        field_cost: None,
+        field_cost: Some(&field_cost),
     };
 
     let focal_active = inputs.focal_capture.is_some() && inputs.focal_cat == Some(inputs.cat);
@@ -2751,6 +2777,7 @@ mod tests {
             nearest_prey: None,
             wander_target: None,
             },
+            route_cost_field: None,
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,
             disposition_failure_signal_crafting: 1.0,
@@ -2943,6 +2970,7 @@ mod tests {
             nearest_prey: None,
             wander_target: None,
             },
+            route_cost_field: None,
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,
             disposition_failure_signal_crafting: 1.0,
@@ -3158,6 +3186,7 @@ mod tests {
             nearest_prey: None,
             wander_target: None,
             },
+            route_cost_field: None,
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,
             disposition_failure_signal_crafting: 1.0,
@@ -3437,6 +3466,7 @@ mod tests {
             nearest_prey: None,
             wander_target: None,
             },
+            route_cost_field: None,
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,
             disposition_failure_signal_crafting: 1.0,
@@ -3558,6 +3588,7 @@ mod tests {
             nearest_prey: None,
             wander_target: None,
             },
+            route_cost_field: None,
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,
             disposition_failure_signal_crafting: 1.0,
@@ -3698,6 +3729,7 @@ mod tests {
             nearest_prey: None,
             wander_target: None,
             },
+            route_cost_field: None,
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,
             disposition_failure_signal_crafting: 1.0,
@@ -4023,6 +4055,7 @@ mod tests {
             nearest_prey: None,
             wander_target: None,
             },
+            route_cost_field: None,
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,
             disposition_failure_signal_crafting: 1.0,
@@ -4145,6 +4178,7 @@ mod tests {
             nearest_prey: None,
             wander_target: None,
             },
+            route_cost_field: None,
             disposition_failure_signal_hunting: 1.0,
             disposition_failure_signal_foraging: 1.0,
             disposition_failure_signal_crafting: 1.0,

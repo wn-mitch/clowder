@@ -1645,6 +1645,58 @@ pub fn evaluate_and_plan(
                 (-1.0, 0.0)
             };
 
+        // Ticket 228 — per-cat route-cost field. Flooded once per
+        // replan with overlay-aware edge weights (terrain +
+        // boldness-conditioned fox-scent + corruption). The L2
+        // `Consideration::Field` evaluator reads this via
+        // `EvalCtx.field_cost`; step resolvers (commit 10+) read
+        // the inserted Component to walk the gradient.
+        let cat_route_cost_field = {
+            let fox_overlay =
+                crate::ai::pathfinding::FoxScentOverlay::new(&colony.fox_scent_map, sc);
+            let corr_overlay = crate::ai::pathfinding::CorruptionOverlay::new(&res.map, sc);
+            let w = crate::ai::pathfinding::cat_path_weight_from_boldness(personality.boldness);
+            let overlays = [
+                crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
+                crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
+            ];
+            crate::ai::route_cost::flood_dijkstra(
+                *pos,
+                &res.map,
+                &overlays,
+                sc.route_cost_flood_budget,
+                res.time.tick,
+            )
+        };
+
+        // Ticket 228 — replan-time anchor resolution for Hunt /
+        // Wander route-cost axes. Resolved here (not in
+        // CatAnchorPositions builder) so they share the same
+        // replan-cadence as the field flood.
+        let cat_nearest_prey = colony
+            .prey_scent_map
+            .highest_nearby(pos.x, pos.y, d.scent_search_radius)
+            .map(|(x, y)| Position::new(x, y));
+        let cat_wander_target = {
+            let radius = (8.0 + personality.curiosity.clamp(0.0, 1.0) * 12.0) as i32;
+            let recandidate = sc.wander_recandidate_ticks.max(1);
+            let seed = (res.time.tick / recandidate) ^ entity.to_bits();
+            let dx = (seed as i32).rem_euclid(2 * radius + 1) - radius;
+            let dy = ((seed >> 16) as i32).rem_euclid(2 * radius + 1) - radius;
+            let candidate = Position::new(pos.x + dx, pos.y + dy);
+            res.map
+                .in_bounds(candidate.x, candidate.y)
+                .then_some(candidate)
+        };
+
+        // Persist the field as a Component so step resolvers
+        // (commit 10+) can sample `cost_at` and walk the gradient
+        // in subsequent ticks. Re-inserted on every replan; stale
+        // fields are detected by `origin_tick` mismatch.
+        commands
+            .entity(entity)
+            .insert(cat_route_cost_field.clone());
+
         let ctx = ScoringContext {
             scoring: sc,
             disposition_constants: d,
@@ -1834,13 +1886,14 @@ pub fn evaluate_and_plan(
                     d.safe_rest_threat_suppression_radius,
                 ),
                 own_injury_site: crate::systems::interoception::own_injury_site(health),
-                // Ticket 228 — populated at replan-time alongside the
-                // RouteCostField build (commit 4). None here keeps
-                // Hunt/Wander route-cost axes dormant until the
-                // replan-time builder lands.
-                nearest_prey: None,
-                wander_target: None,
+                // Ticket 228 — populated by the replan-time anchor
+                // resolution above. Hunt's route-cost axis samples
+                // through `nearest_prey`; Wander's through
+                // `wander_target`.
+                nearest_prey: cat_nearest_prey,
+                wander_target: cat_wander_target,
             },
+            route_cost_field: Some(&cat_route_cost_field),
             disposition_failure_signal_hunting:
                 crate::systems::plan_substrate::disposition_recent_failure_age_normalized(
                     recent_disposition_failures.as_deref(),

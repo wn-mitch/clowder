@@ -1123,6 +1123,7 @@ pub fn evaluate_dispositions(
                 nearest_prey: None,
                 wander_target: None,
             },
+            route_cost_field: None,
             // No-damp signals: this path doesn't query
             // `RecentDispositionFailures`, so the modifier sees a
             // perpetual "no recent failure" signal here.

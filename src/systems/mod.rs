@@ -8,6 +8,11 @@ pub struct ColonyContext<'w> {
     pub priority: Option<Res<'w, crate::resources::colony_priority::ColonyPriority>>,
     pub exploration_map: Res<'w, crate::resources::ExplorationMap>,
     pub fox_scent_map: Res<'w, crate::resources::FoxScentMap>,
+    /// Ticket 228 — read by the replan-time `LandmarkAnchor::NearestPreyAnchor`
+    /// resolver in `evaluate_and_plan` to populate
+    /// `CatAnchorPositions.nearest_prey`. Read-only; the replan path
+    /// queries via `PreyScentMap::highest_nearby` once per cat.
+    pub prey_scent_map: Res<'w, crate::resources::PreyScentMap>,
     pub cat_presence_map: ResMut<'w, crate::resources::CatPresenceMap>,
     /// Hearing-channel kitten-cry broadcast (ticket 156). Sampled at
     /// each cat's position to populate `ScoringContext::kitten_cry_perceived`.
