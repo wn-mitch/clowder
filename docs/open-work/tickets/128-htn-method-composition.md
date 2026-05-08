@@ -1,11 +1,11 @@
 ---
 id: 128
 title: HTN method composition over `HeldIntention.goal`
-status: blocked
+status: ready
 cluster: C
 added: 2026-05-02
 parked: null
-blocked-by: [126]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, strategist-coordinator.md]
 related-balance: []

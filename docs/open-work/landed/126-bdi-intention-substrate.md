@@ -1,7 +1,7 @@
 ---
 id: 126
 title: BDI intention substrate — perceivable per-cat commitment with momentum
-status: in-progress
+status: done
 cluster: C
 added: 2026-05-02
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, scoring-layer-second-order.md, strategist-coordinator.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-08
 ---
 
 ## Why
@@ -575,3 +575,4 @@ softmax-over-Intentions never produces. Tune
 - 2026-05-02: opened from 007 cluster-C C1 expansion. Includes
   `IntentionSource` provenance to enable 057/081/130
   coordinator-directive composition.
+- 2026-05-08: C3+C4 landed; preempt-strength floor 0.5 patches the stale-last_scores + zero-strength perf cliff (2.75 → 0.38 adoptions/tick); 0 deaths, structures_built/seasons_survived match baseline; bonds_formed -23%, kittens_born -75% likely schedule-edge perturbation from new HeldIntention query in ExecutorContext + constants header drift (+3 new DispositionConstants knobs)

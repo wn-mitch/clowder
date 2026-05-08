@@ -1,11 +1,11 @@
 ---
 id: 127
 title: Joint-intention substrate for two-cat practices
-status: blocked
+status: ready
 cluster: C
 added: 2026-05-02
 parked: null
-blocked-by: [126]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, scoring-layer-second-order.md]
 related-balance: []

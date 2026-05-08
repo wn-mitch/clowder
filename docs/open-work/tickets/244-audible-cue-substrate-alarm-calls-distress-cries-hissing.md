@@ -1,11 +1,11 @@
 ---
 id: 244
 title: Audible cue substrate (alarm calls, distress cries, hissing)
-status: blocked
+status: ready
 cluster: null
 added: 2026-05-08
 parked: null
-blocked-by: [126]
+blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []

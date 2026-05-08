@@ -14,11 +14,11 @@ _Last generated: 2026-05-08._
 
 | Status | Count |
 |---|---|
-| In progress | 7 |
-| Ready | 66 |
+| In progress | 6 |
+| Ready | 71 |
 | Parked | 7 |
-| Blocked | 25 |
-| **Open total** | **105** |
+| Blocked | 20 |
+| **Open total** | **104** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -31,21 +31,20 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 
 | Epic | Status | Children | Done | Open (in-progress / ready / blocked / parked) | Progress |
 |---|---|---|---|---|---|
-| **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 21 | 1 | 20 (1 / 10 / 7 / 2) | `▱▱▱▱▱▱▱▱▱▱` 5% |
+| **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 21 | 2 | 19 (0 / 13 / 4 / 2) | `▰▱▱▱▱▱▱▱▱▱` 10% |
 | **[093](docs/open-work/landed/093-substrate-over-override-epic.md)** Substrate-over-override | done | 30 | 30 | 0 (0 / 0 / 0 / 0) | `▰▰▰▰▰▰▰▰▰▰` 100% |
 | **[095](docs/open-work/tickets/095-body-zones-epic.md)** Body zones | ready | 0 | — | — | _no roster_ |
 
-## In progress (7)
+## In progress (6)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
 - **[032](docs/open-work/tickets/032-starvation-cat-biology-realignment.md)** — Starvation rebalance — align with IRL cat biology, interesting not cutthroat — _added 2026-04-26_
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _added 2026-04-27_
-- **[126](docs/open-work/tickets/126-bdi-intention-substrate.md)** — BDI intention substrate — perceivable per-cat commitment with momentum — _[C] · added 2026-05-02_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[229](docs/open-work/tickets/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose — _[tooling] · added 2026-05-08_
 
-## Ready (66)
+## Ready (71)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -74,6 +73,9 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[115](docs/open-work/tickets/115-bond-weighted-social-recovery.md)** — Bond-weighted social recovery — fondness scales Needs.social inflow — _[emotional-fidelity] · added 2026-05-01_
 - **[120](docs/open-work/tickets/120-shadow-fox-spawn-vs-cat-presence-coupling.md)** — Characterize shadow-fox spawn-rate coupling to cat-presence (047 Phase 3 surfaced +93%) — _[ai-substrate] · added 2026-05-01_
 - **[124](docs/open-work/tickets/124-own-territory-center-anchor.md)** — `LandmarkAnchor::OwnTerritoryCenter` — third interoceptive self-anchor (territory bias) — _[ai-substrate] · added 2026-05-01_
+- **[127](docs/open-work/tickets/127-joint-intention-substrate.md)** — Joint-intention substrate for two-cat practices — _[C] · added 2026-05-02_
+- **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition over `HeldIntention.goal` — _[C] · added 2026-05-02_
+- **[129](docs/open-work/tickets/129-care-dses-perceivable-intentions.md)** — Care DSEs over perceivable intentions — _[C] · added 2026-05-02_
 - **[134](docs/open-work/tickets/134-phobia-modifier-family.md)** — Phobia modifier family — Crusader-Kings-style trait modifiers on urge response — _[ai-substrate] · added 2026-05-02_
 - **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[substrate-migration] · added 2026-05-02_
 - **[136](docs/open-work/tickets/136-wounded-ally-and-positional-dependents.md)** — WoundedAlly marker + positional dependent-proximity for escape_viability — _[ai-substrate] · added 2026-05-02_
@@ -113,6 +115,8 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[239](docs/open-work/tickets/239-grief-modeling-rest-at-grave-chain-lostbonds-grave-as-rest-target-via-existing-rest-target-picker.md)** — Grief modeling + rest-at-grave chain — LostBonds + grave-as-rest-target via existing rest-target picker — _added 2026-05-08_
 - **[240](docs/open-work/tickets/240-anti-corruption-from-graves-balance-pass-tune-grave-aura-strength-and-radius.md)** — Anti-corruption-from-graves balance pass — tune grave_aura strength and radius — _added 2026-05-08_
 - **[241](docs/open-work/tickets/241-burial-canary-structurally-hard-to-fire-post-230-death-rate-audit-canary-policy.md)** — Burial canary structurally hard to fire post-230 — death-rate audit + canary policy — _added 2026-05-08_
+- **[242](docs/open-work/tickets/242-body-cue-substrate-disposition-observable-markers.md)** — Body-cue substrate (Disposition → observable markers) — _added 2026-05-08_
+- **[244](docs/open-work/tickets/244-audible-cue-substrate-alarm-calls-distress-cries-hissing.md)** — Audible cue substrate (alarm calls, distress cries, hissing) — _added 2026-05-08_
 
 ## Parked (7)
 
@@ -124,7 +128,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[199](docs/open-work/tickets/199-pipeline-walk-skill.md)** — Hunt / production / consumption pipeline-walk skill (194 P4) — _[process-discipline] · parked 2026-05-06 · added 2026-05-06_
 - **[214](docs/open-work/tickets/214-tune-patrol-fox-scent-weight.md)** — tune patrol_fox_scent_weight — _[balance] · parked 2026-05-07 · blocked-by 209 · added 2026-05-07_
 
-## Blocked (25)
+## Blocked (20)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _blocked-by 007, 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _blocked-by 016 · added 2026-04-22_
@@ -135,10 +139,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[053](docs/open-work/tickets/053-death-event-grief-emission.md)** — §7.7.b death-event grief emission — relationship-classified survivors payload — _blocked-by 007 · added 2026-04-27_
 - **[055](docs/open-work/tickets/055-mood-drift-threshold-detection.md)** — §7.7.d mood drift-threshold detection — sustain-duration + arc-misalignment trigger — _blocked-by 056 · added 2026-04-27_
 - **[057](docs/open-work/tickets/057-coordinator-directive-intention-strategy-row.md)** — §7.3 coordinator-directive Intention strategy row — `SingleMinded` with override — _blocked-by 007 · added 2026-04-27_
-- **[127](docs/open-work/tickets/127-joint-intention-substrate.md)** — Joint-intention substrate for two-cat practices — _[C] · blocked-by 126 · added 2026-05-02_
-- **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition over `HeldIntention.goal` — _[C] · blocked-by 126 · added 2026-05-02_
-- **[129](docs/open-work/tickets/129-care-dses-perceivable-intentions.md)** — Care DSEs over perceivable intentions — _[C] · blocked-by 126 · added 2026-05-02_
-- **[130](docs/open-work/tickets/130-trust-weighted-coordinator-momentum.md)** — Trust-weighted coordinator directive momentum — _[C] · blocked-by 126, 057 · added 2026-05-02_
+- **[130](docs/open-work/tickets/130-trust-weighted-coordinator-momentum.md)** — Trust-weighted coordinator directive momentum — _[C] · blocked-by 057 · added 2026-05-02_
 - **[140](docs/open-work/tickets/140-steering-and-pursuit-polish.md)** — Phase 3 — Steering, smooth pursuit / flee, pathfinder polish — _[substrate-migration] · blocked-by 139 · added 2026-05-02_
 - **[144](docs/open-work/tickets/144-intraspecies-conflict-fawn.md)** — IntraspeciesConflictResponseFawn — appeasement valence (belly-up, slow blink) — _[ai-substrate] · blocked-by 145 · added 2026-05-02_
 - **[212](docs/open-work/tickets/212-tune-caretake-food-security-weight.md)** — tune caretake_food_security_weight — _[balance] · blocked-by 209 · added 2026-05-07_
@@ -147,9 +148,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[216](docs/open-work/tickets/216-mentor-coordinate-caretake-axis-ethology-audit.md)** — Mentor / Coordinate / Caretake axis ethology audit — _[ai-substrate] · blocked-by 209 · added 2026-05-07_
 - **[220](docs/open-work/tickets/220-ward-placement-targets-ambush-clusters.md)** — ward placement targets ambush clusters — _[ai-substrate] · blocked-by 219 · added 2026-05-07_
 - **[221](docs/open-work/tickets/221-caretake-gates-on-ambush-recency-at-kitten-tile.md)** — caretake gates on ambush-recency at kitten tile — _[ai-substrate] · blocked-by 219 · added 2026-05-07_
-- **[242](docs/open-work/tickets/242-body-cue-substrate-disposition-observable-markers.md)** — Body-cue substrate (Disposition → observable markers) — _blocked-by 126 · added 2026-05-08_
 - **[243](docs/open-work/tickets/243-behavior-observation-l1-channel-target-side-body-cue-physical-marker-reads.md)** — Behavior-observation L1 channel (target-side body-cue + physical marker reads) — _blocked-by 242 · added 2026-05-08_
-- **[244](docs/open-work/tickets/244-audible-cue-substrate-alarm-calls-distress-cries-hissing.md)** — Audible cue substrate (alarm calls, distress cries, hissing) — _blocked-by 126 · added 2026-05-08_
 - **[245](docs/open-work/tickets/245-ambient-predatorprey-behavior-observation-enrichment.md)** — Ambient predator/prey behavior-observation enrichment — _blocked-by 243 · added 2026-05-08_
 
 ## Pre-existing (2)
@@ -157,17 +156,18 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (159)
+## Landed archive (160)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (94)
+### 2026-05 (95)
 
 - **[232](docs/open-work/landed/232-body-state-coupled-l3-softmax-temperature-for-stake-aware-decision-sharpness.md)** — Body-state-coupled L3 softmax temperature for stake-aware decision sharpness _(2026-05-08)_
 - **[231](docs/open-work/landed/231-gate-pickupitem-retrieverawfood-retrievefoodforkitten-plans-on-inventory-capacity.md)** — Strengthen pickup-class substrate — capacity markers + body-state subscription _(2026-05-08)_
 - **[228](docs/open-work/landed/228-fox-territory-huntforagepatrol-decision-time-suppression.md)** — cat route-cost field as L1 perception + Field Consideration variant _(2026-05-08)_
 - **[204](docs/open-work/landed/204-kitten-starvation-cluster-post-119.md)** — Kitten-starvation cluster surfaced by 119 substrate activation — bonding/mating cascade vs adult-feeding bandwidth _(2026-05-08)_
 - **[157](docs/open-work/landed/157-burial-canary-dark.md)** — Burial continuity canary dark on post-154 soak — verify eligibility against new death distribution _(2026-05-08)_
+- **[126](docs/open-work/landed/126-bdi-intention-substrate.md)** — BDI intention substrate — perceivable per-cat commitment with momentum _(2026-05-08)_
 - **[099](docs/open-work/landed/099-modifier-feature-emission.md)** — Feature emission for §3.5.1 Modifiers — colony-wide canary surface for substrate-lift signals _(2026-05-08)_
 - **[093](docs/open-work/landed/093-substrate-over-override-epic.md)** — Substrate-over-override — retire control-yanking hacks in favor of IAUS levers _(2026-05-08)_
 - **[086](docs/open-work/landed/086-farm-canary-triggering-scenario.md)** — Find a triggering scenario for Farm DSE canary (CropTended / CropHarvested) _(2026-05-08)_
