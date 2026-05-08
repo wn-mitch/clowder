@@ -5012,12 +5012,18 @@ fn dispatch_step_action(
                     .min_by_key(|(_, cp)| pos.manhattan_distance(cp))
                     .map(|(e, _)| *e);
             }
-            let (fox_overlay, corr_overlay) = cat_overlays_pair!();
-            let w = crate::ai::pathfinding::cat_path_weight_from_boldness(personality.boldness);
-            let cat_overlays: [crate::ai::pathfinding::WeightedOverlay; 2] = [
-                crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
-                crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
-            ];
+            // Ticket 228 — destination for the cat_path_plan! reachability
+            // probe is the resolved site position (or the cat itself on
+            // the first dispatch tick before snapshot lookup). The
+            // `unwrap_or(*pos)` keeps the staleness check well-defined
+            // when the target hasn't been resolved yet.
+            let target_pos = plan
+                .step_state[step_idx]
+                .target_entity
+                .and_then(|e| snaps.construction_positions.iter().find(|(ce, _)| *ce == e))
+                .map(|(_, p)| *p)
+                .unwrap_or(*pos);
+            let path_plan = cat_path_plan!(target_pos);
             let outcome = crate::steps::building::resolve_construct(
                 plan.step_state[step_idx].target_entity,
                 pos,
@@ -5027,7 +5033,7 @@ fn dispatch_step_action(
                 &snaps.builders_per_site,
                 &mut building_params.buildings,
                 &ec.map,
-                &cat_overlays,
+                &path_plan,
                 commands,
                 &mut building_params.colony_score,
             );
@@ -5062,12 +5068,18 @@ fn dispatch_step_action(
                     .min_by_key(|(_, _, gp, _, _)| pos.manhattan_distance(gp))
                     .map(|(e, _, _, _, _)| *e);
             }
-            let (fox_overlay, corr_overlay) = cat_overlays_pair!();
-            let w = crate::ai::pathfinding::cat_path_weight_from_boldness(personality.boldness);
-            let cat_overlays: [crate::ai::pathfinding::WeightedOverlay; 2] = [
-                crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
-                crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
-            ];
+            let target_pos = plan
+                .step_state[step_idx]
+                .target_entity
+                .and_then(|e| {
+                    snaps
+                        .building_snapshot
+                        .iter()
+                        .find(|(be, _, _, _, _)| *be == e)
+                        .map(|(_, _, gp, _, _)| *gp)
+                })
+                .unwrap_or(*pos);
+            let path_plan = cat_path_plan!(target_pos);
             let outcome = crate::steps::building::resolve_tend(
                 plan.step_state[step_idx].target_entity,
                 pos,
@@ -5077,7 +5089,7 @@ fn dispatch_step_action(
                 snaps.workshop_bonus,
                 &mut building_params.buildings,
                 &ec.map,
-                &cat_overlays,
+                &path_plan,
             );
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::CropTended);
             // Mastery iter 2 + purpose new-thread: each tend tick
@@ -5133,12 +5145,16 @@ fn dispatch_step_action(
             }
             let target = plan.step_state[step_idx].target_entity;
             let cached = &mut plan.step_state[step_idx].cached_path;
-            let (fox_overlay, corr_overlay) = cat_overlays_pair!();
-            let w = crate::ai::pathfinding::cat_path_weight_from_boldness(personality.boldness);
-            let cat_overlays: [crate::ai::pathfinding::WeightedOverlay; 2] = [
-                crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
-                crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
-            ];
+            let target_pos = target
+                .and_then(|e| {
+                    snaps
+                        .material_pile_positions
+                        .iter()
+                        .find(|(me, _, _)| *me == e)
+                        .map(|(_, mp, _)| *mp)
+                })
+                .unwrap_or(*pos);
+            let path_plan = cat_path_plan!(target_pos);
             let outcome = crate::steps::building::resolve_pickup_material(
                 target,
                 cat_entity,
@@ -5147,7 +5163,7 @@ fn dispatch_step_action(
                 inventory,
                 &mut building_params.material_items,
                 &ec.map,
-                &cat_overlays,
+                &path_plan,
             );
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::MaterialPickedUp);
             outcome.result

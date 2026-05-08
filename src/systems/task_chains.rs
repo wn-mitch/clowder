@@ -200,7 +200,7 @@ pub fn resolve_task_chains(
             StepKind::Construct => {
                 let cached = &mut step.cached_path;
                 // Legacy disposition-chain path — see MoveTo above for
-                // the empty-overlay rationale (ticket 223).
+                // the no-overlay rationale (ticket 228 §CatPathPlan::NoOverlay).
                 let outcome = crate::steps::building::resolve_construct(
                     step_target_entity,
                     &mut pos,
@@ -210,7 +210,7 @@ pub fn resolve_task_chains(
                     &builders_per_site,
                     &mut buildings,
                     &map,
-                    &[],
+                    &crate::ai::route_cost::CatPathPlan::NoOverlay,
                     &mut commands,
                     &mut colony_score,
                 );
@@ -225,7 +225,7 @@ pub fn resolve_task_chains(
             StepKind::Repair => {
                 let cached = &mut step.cached_path;
                 // Legacy disposition-chain path — see MoveTo above for
-                // the empty-overlay rationale (ticket 223).
+                // the no-overlay rationale (ticket 228 §CatPathPlan::NoOverlay).
                 let outcome = crate::steps::building::resolve_repair(
                     step_target_entity,
                     &mut pos,
@@ -234,7 +234,7 @@ pub fn resolve_task_chains(
                     workshop_bonus,
                     &mut buildings,
                     &map,
-                    &[],
+                    &crate::ai::route_cost::CatPathPlan::NoOverlay,
                 );
                 outcome.record_if_witnessed(activation.as_deref_mut(), Feature::BuildingRepaired);
                 apply(outcome.result, &mut chain);
@@ -243,7 +243,7 @@ pub fn resolve_task_chains(
             StepKind::Tend => {
                 let cached = &mut step.cached_path;
                 // Legacy disposition-chain path — see MoveTo above for
-                // the empty-overlay rationale (ticket 223).
+                // the no-overlay rationale (ticket 228 §CatPathPlan::NoOverlay).
                 let outcome = crate::steps::building::resolve_tend(
                     step_target_entity,
                     &mut pos,
@@ -253,7 +253,7 @@ pub fn resolve_task_chains(
                     workshop_bonus,
                     &mut buildings,
                     &map,
-                    &[],
+                    &crate::ai::route_cost::CatPathPlan::NoOverlay,
                 );
                 // Disposition-chain path is currently unscheduled (GOAP
                 // replaced it); if it's ever reinstated, wire the

@@ -1,6 +1,6 @@
 use bevy_ecs::prelude::*;
 
-use crate::ai::pathfinding::find_path;
+use crate::ai::route_cost::CatPathPlan;
 use crate::components::building::Structure;
 use crate::components::goap_plan::GoapPlan;
 use crate::components::items::{BuildMaterialItem, Item, ItemLocation};
@@ -61,7 +61,7 @@ pub fn resolve_pickup_material(
         ),
     >,
     map: &TileMap,
-    overlays: &[crate::ai::pathfinding::WeightedOverlay<'_>],
+    path_plan: &CatPathPlan<'_>,
 ) -> StepOutcome<bool> {
     let Some(target) = target_entity else {
         return StepOutcome::unwitnessed(StepResult::Fail("no target for PickupMaterial".into()));
@@ -89,7 +89,7 @@ pub fn resolve_pickup_material(
     // Walk to the pile if not adjacent yet.
     if pos.manhattan_distance(&item_pos) > 1 {
         if cached_path.is_none() {
-            *cached_path = find_path(*pos, item_pos, map, overlays);
+            *cached_path = path_plan.find_full_path(*pos, item_pos, map);
         }
         if let Some(ref mut path) = cached_path {
             if !path.is_empty() {
@@ -178,7 +178,7 @@ mod tests {
             inventory,
             &mut items,
             &map,
-            &[],
+            &CatPathPlan::NoOverlay,
         )
     }
 

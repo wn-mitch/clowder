@@ -1,6 +1,6 @@
 use bevy_ecs::prelude::*;
 
-use crate::ai::pathfinding::find_path;
+use crate::ai::route_cost::CatPathPlan;
 use crate::components::building::{ConstructionSite, CropState, Structure};
 use crate::components::physical::Position;
 use crate::components::skills::Skills;
@@ -51,7 +51,7 @@ pub fn resolve_repair(
         Without<crate::components::task_chain::TaskChain>,
     >,
     map: &TileMap,
-    overlays: &[crate::ai::pathfinding::WeightedOverlay<'_>],
+    path_plan: &CatPathPlan<'_>,
 ) -> StepOutcome<bool> {
     let Some(target) = target_entity else {
         return StepOutcome::unwitnessed(StepResult::Fail("no target for Repair".into()));
@@ -63,7 +63,7 @@ pub fn resolve_repair(
 
     if pos.manhattan_distance(building_pos) > 1 {
         if cached_path.is_none() {
-            *cached_path = find_path(*pos, *building_pos, map, overlays);
+            *cached_path = path_plan.find_full_path(*pos, *building_pos, map);
         }
         if let Some(ref mut path) = cached_path {
             if !path.is_empty() {

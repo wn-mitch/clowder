@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use bevy_ecs::prelude::*;
 
-use crate::ai::pathfinding::find_path;
+use crate::ai::route_cost::CatPathPlan;
 use crate::components::building::{
     ConstructionSite, CropState, StoredItems, Structure, StructureType,
 };
@@ -62,7 +62,7 @@ pub fn resolve_construct(
         Without<crate::components::task_chain::TaskChain>,
     >,
     map: &TileMap,
-    overlays: &[crate::ai::pathfinding::WeightedOverlay<'_>],
+    path_plan: &CatPathPlan<'_>,
     commands: &mut Commands,
     colony_score: &mut Option<ResMut<ColonyScore>>,
 ) -> StepOutcome<()> {
@@ -76,7 +76,7 @@ pub fn resolve_construct(
 
     if pos.manhattan_distance(building_pos) > 1 {
         if cached_path.is_none() {
-            *cached_path = find_path(*pos, *building_pos, map, overlays);
+            *cached_path = path_plan.find_full_path(*pos, *building_pos, map);
         }
         if let Some(ref mut path) = cached_path {
             if !path.is_empty() {
