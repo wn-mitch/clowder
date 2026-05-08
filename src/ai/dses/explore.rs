@@ -15,7 +15,8 @@ use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
 use crate::ai::considerations::{
-    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+    Consideration, FieldConsideration, FieldSource, LandmarkAnchor, LandmarkSource,
+    ScalarConsideration, SpatialConsideration,
 };
 use crate::ai::curves::Curve;
 use crate::ai::dse::{
@@ -54,24 +55,50 @@ impl ExploreDse {
             slope: -1.0,
             intercept: 1.0,
         };
+        let mut considerations: Vec<Consideration> = vec![
+            Consideration::Scalar(ScalarConsideration::new(
+                CURIOSITY_INPUT,
+                Curve::Linear {
+                    slope: scoring.explore_curiosity_scale,
+                    intercept: 0.0,
+                },
+            )),
+            Consideration::Spatial(SpatialConsideration::new(
+                "explore_frontier_distance",
+                LandmarkSource::Anchor(LandmarkAnchor::UnexploredFrontierCentroid),
+                EXPLORE_FRONTIER_RANGE,
+                frontier_distance,
+            )),
+        ];
+        let mut weights = vec![1.0_f32, 1.0];
+
+        // 228: destination-aware route-cost axis on Explore. Reads
+        // OwnRouteCost at UnexploredFrontierCentroid — the cat's
+        // flooded path-cost to the frontier (terrain + boldness-
+        // weighted fox-scent + corruption). Linear(slope=-1,
+        // intercept=1) mirrors the existing frontier_distance curve
+        // shape, so dormant runs match baseline; tuning the weight
+        // up suppresses Explore when the route to the frontier is
+        // costly. Conditionally added at non-zero weight (CP semantics).
+        let route_cost_weight = scoring.explore_route_cost_weight.clamp(0.0, 1.0);
+        if route_cost_weight > 0.0 {
+            considerations.push(Consideration::Field(FieldConsideration::new(
+                "explore_route_cost",
+                FieldSource::OwnRouteCost,
+                LandmarkSource::Anchor(LandmarkAnchor::UnexploredFrontierCentroid),
+                EXPLORE_FRONTIER_RANGE,
+                Curve::Linear {
+                    slope: -1.0,
+                    intercept: 1.0,
+                },
+            )));
+            weights.push(route_cost_weight);
+        }
+
         Self {
             id: DseId("explore"),
-            considerations: vec![
-                Consideration::Scalar(ScalarConsideration::new(
-                    CURIOSITY_INPUT,
-                    Curve::Linear {
-                        slope: scoring.explore_curiosity_scale,
-                        intercept: 0.0,
-                    },
-                )),
-                Consideration::Spatial(SpatialConsideration::new(
-                    "explore_frontier_distance",
-                    LandmarkSource::Anchor(LandmarkAnchor::UnexploredFrontierCentroid),
-                    EXPLORE_FRONTIER_RANGE,
-                    frontier_distance,
-                )),
-            ],
-            composition: Composition::compensated_product(vec![1.0, 1.0]),
+            considerations,
+            composition: Composition::compensated_product(weights),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
             eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
         }
@@ -187,5 +214,36 @@ mod tests {
         } else {
             panic!("second consideration should be Spatial");
         }
+    }
+
+    #[test]
+    fn explore_route_cost_dormant_at_default_zero() {
+        // 228: at default `explore_route_cost_weight = 0.0`, the
+        // CP conditional-add path skips the third axis. CP semantics
+        // would zero the product if added at weight 0.
+        let s = default_scoring();
+        assert_eq!(s.explore_route_cost_weight, 0.0);
+        let dse = ExploreDse::new(&s);
+        assert_eq!(dse.considerations().len(), 2);
+        assert_eq!(dse.composition().weights.len(), 2);
+        assert!(!dse.considerations().iter().any(|c| match c {
+            Consideration::Field(f) => f.name == "explore_route_cost",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn explore_route_cost_axis_added_when_weight_nonzero() {
+        let mut s = default_scoring();
+        s.explore_route_cost_weight = 0.4;
+        let dse = ExploreDse::new(&s);
+        assert_eq!(dse.considerations().len(), 3);
+        assert_eq!(dse.composition().weights.len(), 3);
+        assert!((dse.composition().weights[2] - 0.4).abs() < 1e-4);
+        let has_axis = dse.considerations().iter().any(|c| match c {
+            Consideration::Field(f) => f.name == "explore_route_cost",
+            _ => false,
+        });
+        assert!(has_axis);
     }
 }

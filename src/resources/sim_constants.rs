@@ -1871,6 +1871,14 @@ pub struct ScoringConstants {
         note = "228: replaced by `patrol_route_cost_weight` (destination-aware Field axis). Kept dormant for one cycle for header schema compat; remove in the tuning follow-on."
     )]
     pub patrol_fox_scent_weight: f32,
+    /// 228: weight on Explore's `Consideration::Field` route-cost
+    /// axis. Reads `OwnRouteCost` at `UnexploredFrontierCentroid`
+    /// — the cat's flooded path-cost to the unexplored frontier.
+    /// Curve `Linear(slope=-1, intercept=1)` mirrors the existing
+    /// `explore_frontier_distance` Spatial axis. Ships dormant at
+    /// 0.0; tuning is a follow-on ticket.
+    #[serde(default = "default_explore_route_cost_weight")]
+    pub explore_route_cost_weight: f32,
     /// 228: weight on Forage's `Consideration::Field` route-cost
     /// axis. Reads `OwnRouteCost` at `NearestForageableCluster`
     /// — the cat's flooded path-cost to forageable terrain.
@@ -2176,6 +2184,7 @@ impl Default for ScoringConstants {
             patrol_fox_scent_weight: default_patrol_fox_scent_weight(),
             patrol_route_cost_weight: default_patrol_route_cost_weight(),
             forage_route_cost_weight: default_forage_route_cost_weight(),
+            explore_route_cost_weight: default_explore_route_cost_weight(),
             fox_scent_path_cost_max: default_fox_scent_path_cost_max(),
             corruption_path_cost_max: default_corruption_path_cost_max(),
             route_cost_flood_budget: default_route_cost_flood_budget(),
@@ -3233,6 +3242,12 @@ fn default_patrol_route_cost_weight() -> f32 {
 /// 228: Forage `Consideration::Field` route-cost axis weight. Ships
 /// dormant at 0.0.
 fn default_forage_route_cost_weight() -> f32 {
+    0.0
+}
+
+/// 228: Explore `Consideration::Field` route-cost axis weight. Ships
+/// dormant at 0.0.
+fn default_explore_route_cost_weight() -> f32 {
     0.0
 }
 
