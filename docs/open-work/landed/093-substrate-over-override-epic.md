@@ -1,7 +1,7 @@
 ---
 id: 093
 title: Substrate-over-override — retire control-yanking hacks in favor of IAUS levers
-status: in-progress
+status: done
 cluster: substrate-over-override
 added: 2026-04-30
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-08
 ---
 
 ## Why
@@ -88,7 +88,7 @@ The categories below are the surfaces where hack-shaped patterns live. Each row 
 
 | Location | Hack | Lever | Ticket |
 |---|---|---|---|
-| `src/ai/modifier.rs:526-583` Tradition | applies to every DSE regardless of action history | per-action keying or flat tile-familiarity ((a) or (b)) | **[058](058-tradition-unfiltered-loop-fix.md)** (parked 2026-04-30 — dormant in production with bonus = 0.0; design choice deferred to balance ticket) |
+| `src/ai/modifier.rs:526-583` Tradition | applies to every DSE regardless of action history | per-action keying or flat tile-familiarity ((a) or (b)) | **[058](058-tradition-unfiltered-loop-fix.md)** — de-rostered from 093 on epic closeout 2026-05-08 (parked 2026-04-30 indefinitely; dormant in production with `tradition_location_bonus = 0.0`; (a)-vs-(b) design choice is itself a balance question that only fires when someone activates the bonus, so it does not unblock from this epic — it unblocks from a future Tradition-activation balance ticket. Stays open in the index as a parked standalone ticket.) |
 
 ### 7. Coordinator-side override (parked) and last-resort modifier (retired)
 
@@ -144,7 +144,7 @@ The sequencing rule applied across the inventory:
 | ~~[027](../landed/027-mating-cadence-three-bug-cascade.md)~~ | done 2026-05-01 | multi-bug mating cascade (Bugs 1+2 landed; Bug 3 → 027b; closed on structural verification) |
 | ~~[027b](../landed/027b-l2-pairing-activity.md)~~ | done 2026-05-07 | L2 substrate retiring 027 Bug 3's bias-pin (Commit A + activation via 082/083; Commit B pin retired by 078; Commit C residue dropped per 027 closeout) |
 | ~~[047](../landed/047-critical-health-interrupt-treadmill.md)~~ | done 2026-05-01 | **prototypical case** — interrupt → continuous IAUS axes; phase 1 substrate shipped (acute-health-adrenaline + jerk curves), per-interrupt retirement carved out into 102-119 |
-| [058](058-tradition-unfiltered-loop-fix.md) | parked 2026-04-30 | over-broad modifier → per-action keyed history axis (deferred until balance ticket) |
+| (058 — de-rostered 2026-05-08) | de-rostered | see §6 Modifier over-breadth row for full rationale — parked indefinitely on a 0.0 dormant knob; (a)-vs-(b) is a balance question, not a substrate sequencing question; stays open in the global index as a standalone parked ticket. |
 | ~~[076](../landed/076-last-resort-promotion-modifier.md)~~ | retired 2026-05-01 | last-resort modifier reframed — 088 + 094 + 123 cover the post-failure-escalation surface in substrate-doctrine shapes; closed without implementation |
 | ~~[081](../landed/081-coordination-directive-failure-demotion.md)~~ | retired 2026-05-02 (`acb30b9d`) | colony-level failure memory — closed without implementation; no soak evidence of directive-loop pattern + framing tension between substrate-Why and override-Approach |
 | ~~[088](../landed/088-body-distress-modifier.md)~~ | done 2026-05-01 | **substrate prerequisite for 047** (landed; magnitude tuning deferred to 047). Note: stays active post-111 — composite distress lift carries load the kind-specific modifiers don't replicate |
@@ -153,7 +153,7 @@ The sequencing rule applied across the inventory:
 | ~~[096](../landed/096-materials-available-substrate-split.md)~~ | done 2026-05-01 (`f01a3205`) | hybrid `PlannerState.materials_available` split — completes 092's structural cure |
 | ~~[097](../landed/097-non-cat-planner-substrate-audit.md)~~ | done 2026-05-02 (`b6edd580`) | apply 092's structural cure to fox/hawk/snake planners |
 | ~~[098](../landed/098-search-state-vs-substrate-doctrine.md)~~ | done 2026-05-01 (`250d384d`) | substrate-vs-search-state boundary doctrine in `docs/systems/ai-substrate-refactor.md` |
-| [099](099-modifier-feature-emission.md) | parked (blocked-by 119) | substrate-quality follow-on from 088 — focal-trace inspection sufficed for 047 verification, no colony-wide canary need surfaced; next gating event is 119's land |
+| ~~[099](../landed/099-modifier-feature-emission.md)~~ | closed as superseded 2026-05-08 | substrate-quality follow-on from 088 — focal-trace `ModifierDelta` inspection continued to suffice across the entire 047 cluster (047 / 088 / 119 / 108), never reaching for the `Feature::*Applied` canary surface this ticket scoped. Same retirement shape as 076 / 081 / 111 / 112 — substrate-over-override doctrine includes "don't ship substrate for an absent problem." |
 | ~~[102](../landed/102-acute-health-adrenaline-fight-branch.md)~~ | done 2026-05-02 (`832f9ce1`) | 047 follow-on — AcuteHealthAdrenaline Fight branch valence (cornered/maternal-defense) |
 | ~~[103](../landed/103-escape-viability-scalar.md)~~ | done 2026-05-02 (`2216a44f`) | 047 follow-on — `escape_viability` perception scalar; first-class predicate for adrenaline-valence selection |
 | ~~[104](../landed/104-hide-freeze-dse.md)~~ | done 2026-05-02 (`2a68f595`) | 047 follow-on — Hide/Freeze DSE (predator-avoidance third valence) |
@@ -173,13 +173,14 @@ The sequencing rule applied across the inventory:
 | ~~[122](../landed/122-socialize-dse-iaus-vs-gate-still-goal-mismatch.md)~~ | done 2026-05-01 | Socialize IAUS election vs OpenMinded gate `still_goal` proxy mismatch — sibling carveout from 121; **IAUS-vs-gate-mismatch exemplar** |
 | ~~[123](../landed/123-recent-disposition-failures-cooldown.md)~~ | done 2026-05-01 | RecentDispositionFailures cooldown — per-cat failure-history substrate axis the planner lacks; sibling carveout from 121; **planner-veto-as-substrate-axis exemplar** |
 
-**Total open: 5** (1 in-progress, 2 ready, 0 blocked, 2 parked) — after 108's 2026-05-07 land + 109 Phase A activation (in same commit). Inherited regression from 119/108's substrate cluster opened as **[204](204-kitten-starvation-cluster-post-119.md)** — kitten-starvation cluster (2 starvations on seed-42, bit-identical between 119-verify and 108 soak; the new bonding/mating cascade producing kittens whose adults can't keep them fed under increased fox-spawn rate).
+**Total open on roster: 0** — epic retiring 2026-05-08. 099 closed as superseded; 058 de-rostered (stays open in the global index as a standalone parked ticket; substrate-over-override no longer drives its sequencing). 117 / 109 / 027b / 108 / 119 / 118 / 204 all landed in the 2026-05-06 → 2026-05-08 window.
 
 Status breakdown:
-- **In-progress (1):** 109 (Phase A activated 2026-05-07; Phase B sub-tickets 142/143/144/145 unblocked)
-- **Ready (1):** 117 (blocked-by 118 in frontmatter, status `ready`)
+- **In-progress (0):** —
+- **Ready (0):** —
 - **Blocked (0):** —
-- **Parked (2):** 058, 099 (blocked-by 119; 119 has now landed — re-evaluate)
+- **Parked (0):** —
+- **De-rostered (1):** 058 — see §6 row for the reason it doesn't unblock from this epic.
 
 **Canonical exemplars (landed)**:
 - **087** — interoceptive perception substrate (CriticalHealth interrupt → `pain_level` + `body_distress_composite` axes), landed 2026-04-30 at `fc4e1ab`.
@@ -200,17 +201,13 @@ See `docs/open-work/landed/2026-04.md` and per-file `landed/<NNN>-<slug>.md` for
 
 ## Current state
 
-Opened 2026-04-30. Inventory cataloged 11 child tickets initially. As of 2026-05-06 (post the 047-phase-2 cluster land + 081 retirement + 111 closeout-without-retirement + 112 supersession + 089/090/096/097/098 land): **8 open** (2 in-progress, 3 ready, 1 blocked, 2 parked) plus the canonical exemplars 087 / 091 / 092 / 094 / 121 / 122 / 123 / 047 / 047-phase-2-cluster / 111. Remaining work:
+Opened 2026-04-30. Retired 2026-05-08 with 30/32 children landed and 0 open on roster.
 
-1. **Finish in-flight Phase work on the inert modifiers (108/109).** Both shipped a registered modifier + scalar stub at 0.0 and now need their scalar implementations, perception coupling, and verification phases.
-   - **108** Phases 2–5: implement `threat_proximity_derivative` scalar (`max(0, threat_proximity_now - threat_proximity_prev_tick)`), `PrevSafetyDeficit` per-cat history slot + per-tick update system, lift activation, hypothesize, retire `InterruptReason::CriticalSafety` arm.
-   - **109** Phase A activation: implement `social_status_distress` scalar composition (status-differential + proximity factor + per-cat nearest-cat resolution).
-   - **109** Phase B sub-tickets (142 Freeze · 143 Fight · 144 Fawn · 145 Submit gesture DSE infrastructure) — tracked under 109, not direct 093 children.
-2. **Land 118** (modifier-lift vs plan-completion momentum) — the doctrine-shaped substrate that gates 117 + 119. No external deps.
-3. **Land 117** (social-warmth tradeoff characterization, blocked-by 118) — Phase 3 surfaced -96% on max; needs characterization once 118's plan-completion-momentum gating lands.
-4. **Land 119** (retire `CriticalHealth` interrupt, blocked-by 118) — the closing step of the 047 substrate-over-override chain. After 119 lands, 099 (Modifier feature emission) gating event re-evaluates: if removing the interrupt re-surfaces the need for ongoing canary visibility on the modifier, 099 unblocks; otherwise 099 closes as superseded.
-5. **058 (parked) — re-evaluate when the Tradition modifier gets activated for balance reasons.** Currently dormant at `tradition_location_bonus = 0.0`.
-6. **099 (parked, blocked-by 119) — re-evaluate after 119 lands.** If focal-trace inspection continues to suffice for verifying modifier deltas post-interrupt-retirement, 099 closes as superseded.
+The closing 2026-05-06 → 2026-05-08 wave landed the last load-bearing chain links: 118 (modifier-lift-vs-plan-completion momentum doctrine) + 119 (CriticalHealth interrupt retirement) + 117 (social-warmth tradeoff characterization) + 108 (ThreatProximityAdrenaline activation + CriticalSafety retirement) + 109 Phase A (IntraspeciesConflictResponseFlight activation) + 027b (L2 PairingActivity structural completion) + 204 (kitten-starvation cluster surfaced by 119's substrate activation). 099 closed as superseded — focal-trace `ModifierDelta` inspection continued to suffice across the entire cluster. 058 de-rostered — design choice (a)-vs-(b) is a balance question on a 0.0 dormant knob, not a substrate sequencing question; it stays open in the global index as a standalone parked ticket.
+
+Canonical landed set: **087** (perception substrate) · **091** (cautionary case — partial substrate adoption causes collapse) · **092** (structural cure for L2↔L3 feasibility-language drift via `HasMarker` + `MarkerSnapshot`-fed `PlannerState`) · **094** (natural-lever exemplar — `StockpileSatiation` damp on the food-acquisition class) · **121** (anchor-shape analogue of 092) · **122** (IAUS-vs-gate-mismatch exemplar) · **123** (planner-veto-as-substrate-axis exemplar) · **047** (prototypical case — interrupt → continuous IAUS axes) · **047 phase-2 cluster** (102/103/104/105/106/107/110 — kind-specific-modifier-disaggregation exemplar) · **111** (substrate-coverage-vs-load-bearing-job cautionary case — 088 stays active despite kind-specific axes covering its nominal surface) · **108 + 119** (atomic activate-and-retire — substrate axis lights up, interrupt arm deletes, single commit) · **163** (apply-bonus-pass migration into §3.5.1 modifier pipeline; locked-invariant test in `tests/scenarios.rs` permanent CI guard).
+
+Discipline doc `docs/systems/substrate-over-override.md` deferred — §Approach was already framed as "not blocking" and the lens is now well-precedented across 30+ landed tickets that anyone hunting prior art can grep `rg '## Substrate-over-override pattern' docs/open-work/landed/`. If a future ticket needs the doctrine codified into a single doc, write it then with current evidence rather than retrofitting now.
 
 ## Approach
 
@@ -222,12 +219,11 @@ Opened 2026-04-30. Inventory cataloged 11 child tickets initially. As of 2026-05
 
 ## Verification
 
-- Every child ticket on the roster carries the `## Substrate-over-override pattern` callout.
-- `rg '## Substrate-over-override pattern' docs/open-work/tickets/ | wc -l` matches open child count (currently 8).
-- `docs/open-work.md` Summary block reflects the new ticket.
-- Anyone asking "what hacks remain?" can answer from the Inventory by category table alone in under 60 seconds.
+- Every child ticket on the roster carried the `## Substrate-over-override pattern` callout (verifiable via `rg '## Substrate-over-override pattern' docs/open-work/landed/`).
+- `docs/open-work.md` Summary block reflects this closeout.
+- Anyone asking "what hacks remain?" can answer from the Inventory by category table alone in under 60 seconds — the table is a frozen artifact at retirement time, naming where each hack went.
 
-**When to retire this epic:** when every child ticket on the roster is landed or dropped, and the discipline doc at `docs/systems/substrate-over-override.md` exists and codifies the smell-test + sequencing rule. At that point, move this file to `docs/open-work/landed/YYYY-MM.md` as a `## Ticket 093 — Substrate-over-override program closeout` entry.
+**Retirement criterion (met 2026-05-08):** every child ticket on the roster is landed (30) or de-rostered (1: 058, parked indefinitely on a dormant knob — re-attaches to a future Tradition-activation balance ticket). Discipline-doc requirement de-scoped per closeout `## Log` rationale: 30+ landed tickets carrying the `Substrate-over-override pattern` callout serve as the corpus a future doc would distill, and §Approach already framed the doc as non-blocking.
 
 ## Related work
 
@@ -275,3 +271,4 @@ Opened 2026-04-30. Inventory cataloged 11 child tickets initially. As of 2026-05
 
 - 2026-05-07: **027b closed on structural completion.** Re-audit of the live tree against 027b's three-commit scope showed every load-bearing deliverable shipped under the 082/083/078 lineage: Commit A substrate (`PairingActivity` component, drop gate, `PairingConstants`, three Features) is live; the schedule edge at `src/plugins/simulation.rs:409` is registered (no longer commented out — that earlier framing was wrong as documented in the 2026-04-29 diagnosis correction); `Feature::PairingIntentionEmitted` is canary-promoted at `system_activation.rs:716–724`. Commit B's MacGyvered `bond_score` pin was retired and replaced with a first-class `target_pairing_intention` Consideration by 078; `scripts/check_iaus_coherence.sh` (079) now reports "no MacGyvered pins." Commit C is partial — the balance doc landed and was extended through 027's 2026-05-01 closeout, but the `PairingCapture` focal-trace observability and Fern+Reed integration test never landed and were explicitly dropped from scope (the multi-seed sweep against P1–P3 was reframed as informational by both 082 and 027 closeouts). Soak corroboration on `tuned-42-083`: `Starvation = 0` (was 3 pre-Wave-2), `PairingIntentionEmitted = 14651`, `ShadowFoxAmbush = 5 ≤ 10`, four pass continuity canaries. The 1:1 emit/drop ratio (14650 drops) flagged in the balance-doc Risks section is the only outstanding watch item; if it ever needs investigation, a focal-trace `PairingCapture` follow-on can land then. **Roster delta:** -027b (done). Total open **5 → 4** (1 in-progress: 109; 1 ready: 117; 0 blocked; 2 parked: 058, 099).
 - 2026-05-07: **108 + 109 Phase A landed (single commit; 118 / 119 already landed 2026-05-06 closing the `CriticalHealth` arc).** **108 (`ThreatProximityAdrenalineFlee` activation + `CriticalSafety` retirement):** Phase 2 plumbed the `threat_proximity_derivative` scalar via a new `PrevSafetyDeficit(pub f32)` Component (`src/components/prev_safety_deficit.rs`) inserted on cat spawn + a `update_prev_safety_deficit` writeback system registered `.after(evaluate_and_plan)` so next-tick scoring sees last-tick's value. Phase 3 promoted `default_threat_proximity_adrenaline_{flee,sleep}_lift` 0.0 → 0.60 / 0.50. Phase 4 deleted the `InterruptReason::CriticalSafety` variant + its body in `disposition.rs::check_interrupt`. Soak verdict bit-identical to 119-verify on macro outcomes — same kittens (Wrenkit-85, Wispkit-78) starve at same ticks; the rising-derivative path is rare enough on seed-42 that 108's lift fires occasionally but doesn't shift mortality. **109 Phase A (`IntraspeciesConflictResponseFlight` activation):** v1 signal selected as composite `(respect_diff + age_diff + bond_asymmetry) × proximity_factor` per user prompt (avoids any single proxy being load-bearing for Phase B sub-tickets 142/143/144). Five new `ScoringConstants` knobs (`social_perception_radius` + 3 weights + age normalization). New `social_status_distress: f32` field on `ScoringContext` populated at both production builders by `crate::systems::interoception::social_status_distress`; cross-cat lookups via fresh `age_query` + `needs_query` SystemParam fields on `WorldStateQueries` and `EvalDispositionSideEffects`. Lift `default_intraspecies_conflict_flight_lift` 0.0 → 0.30. 1920 lib tests pass; 5 new unit tests on the helper. **Inherited regression** observed on the 108 soak (same as 119-verify) — 2 kitten starvations + burial=0 canary collapse. Tracked under new ticket **204** (kitten-starvation cluster post-119); attribution is the 047-phase-2 cluster's substrate behavioral surface (more bonding, more births, adult-feeding bandwidth gap), not 108-specific. **Roster delta:** -108 (done), 109 in-progress → still in-progress (Phase A activated; Phase B sub-tickets 142/143/144/145 still open). Total open **8 → 5** (1 in-progress: 109; 2 ready: 027b, 117; 0 blocked; 2 parked: 058, 099). Phase B sub-tickets 142/143/144/145 not 093 children — they're under 109's roster.
+- 2026-05-08: 2026-05-08: **Program retired.** Closing 2026-05-06 → 2026-05-08 wave landed the last load-bearing chain links: **118** (modifier-lift-vs-plan-completion-momentum doctrine, 2026-05-06), **119** (CriticalHealth interrupt retirement, 2026-05-06 — closing step of the original 047 chain), **117** (social-warmth tradeoff characterization, 2026-05-07), **108** (ThreatProximityAdrenaline activation + CriticalSafety arm deletion in single commit, 2026-05-07), **109 Phase A** (IntraspeciesConflictResponseFlight activation, 2026-05-07), **027b** (L2 PairingActivity structural completion via 082/083/078 lineage, 2026-05-07), **204** (kitten-starvation cluster surfaced by 119's substrate activation, 2026-05-08). **099** closed as superseded — focal-trace `ModifierDelta` inspection continued to suffice across the entire 047 cluster (047 / 088 / 119 / 108), never reaching for the colony-wide `Feature::*Applied` canary surface 099 was scoped to provide. **058** de-rostered — design choice (a)-vs-(b) is a balance question on a dormant 0.0 knob, not a substrate sequencing question; stays open in the global index as a standalone parked ticket, re-attaches to a future Tradition-activation balance ticket if/when one opens. Discipline doc `docs/systems/substrate-over-override.md` de-scoped — 30+ landed tickets carrying `## Substrate-over-override pattern` callouts serve as the corpus a future doc would distill (`rg '## Substrate-over-override pattern' docs/open-work/landed/`); §Approach already framed the doc as non-blocking. The doctrine survives in the landed corpus + the canonical exemplar set (087 / 091 / 092 / 094 / 121 / 122 / 123 / 047 / 047-phase-2 cluster / 111 / 108+119 atomic activate-and-retire / 163 apply-bonus-pass migration). Roster delta: -099 (done as superseded), -058 (de-rostered). Total open 5 → 0 on roster (058 stays open in global index as parked). Epic moves to `docs/open-work/landed/093-substrate-over-override-epic.md`.

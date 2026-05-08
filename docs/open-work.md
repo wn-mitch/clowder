@@ -14,11 +14,11 @@ _Last generated: 2026-05-08._
 
 | Status | Count |
 |---|---|
-| In progress | 7 |
+| In progress | 6 |
 | Ready | 68 |
-| Parked | 8 |
+| Parked | 7 |
 | Blocked | 21 |
-| **Open total** | **104** |
+| **Open total** | **102** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -32,16 +32,15 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 | Epic | Status | Children | Done | Open (in-progress / ready / blocked / parked) | Progress |
 |---|---|---|---|---|---|
 | **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 16 | 4 | 12 (0 / 7 / 3 / 2) | `▰▰▱▱▱▱▱▱▱▱` 25% |
-| **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** Substrate-over-override | in-progress | 32 | 30 | 2 (0 / 0 / 0 / 2) | `▰▰▰▰▰▰▰▰▰▱` 94% |
+| **[093](docs/open-work/landed/093-substrate-over-override-epic.md)** Substrate-over-override | done | 30 | 30 | 0 (0 / 0 / 0 / 0) | `▰▰▰▰▰▰▰▰▰▰` 100% |
 | **[095](docs/open-work/tickets/095-body-zones-epic.md)** Body zones | ready | 0 | — | — | _no roster_ |
 
-## In progress (7)
+## In progress (6)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
 - **[032](docs/open-work/tickets/032-starvation-cat-biology-realignment.md)** — Starvation rebalance — align with IRL cat biology, interesting not cutthroat — _added 2026-04-26_
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _added 2026-04-27_
-- **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** — Substrate-over-override — retire control-yanking hacks in favor of IAUS levers — _[substrate-over-override] · added 2026-04-30_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[229](docs/open-work/tickets/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose — _[tooling] · added 2026-05-08_
 
@@ -116,13 +115,12 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[240](docs/open-work/tickets/240-anti-corruption-from-graves-balance-pass-tune-grave-aura-strength-and-radius.md)** — Anti-corruption-from-graves balance pass — tune grave_aura strength and radius — _added 2026-05-08_
 - **[241](docs/open-work/tickets/241-burial-canary-structurally-hard-to-fire-post-230-death-rate-audit-canary-policy.md)** — Burial canary structurally hard to fire post-230 — death-rate audit + canary policy — _added 2026-05-08_
 
-## Parked (8)
+## Parked (7)
 
 - **[015](docs/open-work/tickets/015-alloparenting-reframe-b.md)** — Alloparenting Reframe B — mama drops kitten at hearth near resting elder — _parked 2026-04-22 · added 2026-04-22_
 - **[058](docs/open-work/tickets/058-tradition-unfiltered-loop-fix.md)** — §3.5.3 item 1 Tradition modifier — fix unfiltered-loop port — _parked 2026-04-30 · added 2026-04-27_
 - **[059](docs/open-work/tickets/059-phase-7-substrate-cleanup.md)** — Phase 7 substrate cleanup — `ScoringContext` removal, §10 unblock map sweep, spec drift reconcile — _parked 2026-04-27 · added 2026-04-27_
 - **[084](docs/open-work/tickets/084-farm-herb-ward-demand-axis.md)** — Farm DSE — tie scoring to herb/ward stockpile demand so gardens stay productive under abundant food — _[balance] · parked 2026-04-30 · blocked-by 086 · added 2026-04-29_
-- **[099](docs/open-work/tickets/099-modifier-feature-emission.md)** — Feature emission for §3.5.1 Modifiers — colony-wide canary surface for substrate-lift signals — _[ai-substrate] · parked 2026-05-01 · added 2026-05-01_
 - **[173](docs/open-work/tickets/173-crafting-split-capability-markers.md)** — IsHerbalist / IsSpiritualist / HasCorruptionNearby capability markers (155 follow-on) — _[ai-substrate] · parked 2026-05-05 · added 2026-05-05_
 - **[199](docs/open-work/tickets/199-pipeline-walk-skill.md)** — Hunt / production / consumption pipeline-walk skill (194 P4) — _[process-discipline] · parked 2026-05-06 · added 2026-05-06_
 - **[214](docs/open-work/tickets/214-tune-patrol-fox-scent-weight.md)** — tune patrol_fox_scent_weight — _[balance] · parked 2026-05-07 · blocked-by 209 · added 2026-05-07_
@@ -156,17 +154,19 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (156)
+## Landed archive (158)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (91)
+### 2026-05 (93)
 
 - **[232](docs/open-work/landed/232-body-state-coupled-l3-softmax-temperature-for-stake-aware-decision-sharpness.md)** — Body-state-coupled L3 softmax temperature for stake-aware decision sharpness _(2026-05-08)_
 - **[231](docs/open-work/landed/231-gate-pickupitem-retrieverawfood-retrievefoodforkitten-plans-on-inventory-capacity.md)** — Strengthen pickup-class substrate — capacity markers + body-state subscription _(2026-05-08)_
 - **[228](docs/open-work/landed/228-fox-territory-huntforagepatrol-decision-time-suppression.md)** — cat route-cost field as L1 perception + Field Consideration variant _(2026-05-08)_
 - **[204](docs/open-work/landed/204-kitten-starvation-cluster-post-119.md)** — Kitten-starvation cluster surfaced by 119 substrate activation — bonding/mating cascade vs adult-feeding bandwidth _(2026-05-08)_
 - **[157](docs/open-work/landed/157-burial-canary-dark.md)** — Burial continuity canary dark on post-154 soak — verify eligibility against new death distribution _(2026-05-08)_
+- **[099](docs/open-work/landed/099-modifier-feature-emission.md)** — Feature emission for §3.5.1 Modifiers — colony-wide canary surface for substrate-lift signals _(2026-05-08)_
+- **[093](docs/open-work/landed/093-substrate-over-override-epic.md)** — Substrate-over-override — retire control-yanking hacks in favor of IAUS levers _(2026-05-08)_
 - **[037](docs/open-work/landed/037-grooming-fired-masks-silent-advance.md)** — GroomingFired event masks silent-advance — continuity canary lies when target picker returns None _(2026-05-08)_
 - **[035](docs/open-work/landed/035-burial-not-implemented.md)** — Burial — implement the §5 broaden-sideways capability so the continuity canary can pass _(2026-05-08)_
 - **[224](docs/open-work/landed/224-boldness-conditioned-path-risk.md)** — boldness-conditioned path risk _(2026-05-07)_
