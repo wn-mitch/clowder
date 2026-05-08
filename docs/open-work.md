@@ -108,7 +108,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[225](docs/open-work/tickets/225-audit-patrol-l3-share-rise-under-additive-coordinator-dse-lift.md)** — audit Patrol L3 share rise under additive coordinator-DSE lift — _[ai-substrate] · added 2026-05-07_
 - **[226](docs/open-work/tickets/226-audit-groomother-share-vs-score-inversion-under-demographic-shift.md)** — audit GroomOther share-vs-score inversion under demographic shift — _[ai-substrate] · added 2026-05-07_
 - **[227](docs/open-work/tickets/227-coordinator-eligible-focal-cat-for-coordinate-frame-diff-parity.md)** — coordinator-eligible focal-cat for Coordinate frame-diff parity — _[process-discipline] · added 2026-05-07_
-- **[228](docs/open-work/tickets/228-fox-territory-huntforagepatrol-decision-time-suppression.md)** — fox-territory hunt/forage/patrol decision-time suppression — _[pathfinder-risk-awareness] · added 2026-05-07_
+- **[228](docs/open-work/tickets/228-fox-territory-huntforagepatrol-decision-time-suppression.md)** — cat route-cost field as L1 perception + Field Consideration variant — _[pathfinder-risk-awareness] · added 2026-05-07_
 
 ## Parked (8)
 
