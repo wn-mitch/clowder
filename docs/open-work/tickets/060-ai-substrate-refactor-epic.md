@@ -60,7 +60,7 @@ substrate's vocabulary and were tracked alongside it:
 | Cluster | Spec | State | Owner |
 |---|---|---|---|
 | §7.M Mating | three-layer model | 🔄 in flight | [027](027-mating-cadence-three-bug-cascade.md) |
-| Cluster C | deliberation layer (BDI / Versu / belief / coordinator) | 🔄 ready | [007](007-cluster-c-deliberation-layer.md) |
+| Cluster C | deliberation layer (BDI / Versu / belief / coordinator) | 🔄 ready | [007](007-cluster-c-deliberation-layer.md) (narrative); **entry-point: [126](126-bdi-intention-substrate.md)** (BDI substrate); follow-ons [127](127-joint-intention-substrate.md) / [128](128-htn-method-composition.md) / [129](129-care-dses-perceivable-intentions.md) / [130](130-trust-weighted-coordinator-momentum.md) |
 | Cluster D | formalization (corruption CA, mood Markov, weather Markov) | 🔄 ready | [008](008-cluster-d-formalization-verification.md) |
 | Cluster E | world-gen pre-history fast-forward | 🔄 ready | [009](009-cluster-e-worldgen-richness.md) |
 
@@ -68,51 +68,59 @@ substrate's vocabulary and were tracked alongside it:
 
 | Ticket | Status | Spec home | One-line scope |
 |---|---|---|---|
-| [006](006-cluster-b-shared-spatial-slow-state.md) | ready | Cluster B / §5.6.3 | Influence-map catalog completion (8 absent rows) |
-| [007](007-cluster-c-deliberation-layer.md) | ready | Cluster C | Deliberation layer (BDI / Versu / belief / coordinator) |
+| [007](007-cluster-c-deliberation-layer.md) | ready | Cluster C | Deliberation layer narrative (BDI / Versu / belief / coordinator) |
 | [008](008-cluster-d-formalization-verification.md) | ready | Cluster D | Formalization vocabulary (CA / Markov / Markov) |
 | [009](009-cluster-e-worldgen-richness.md) | ready | Cluster E | Pre-sim history fast-forward |
 | [027](027-mating-cadence-three-bug-cascade.md) | in-progress | §7.M | Mating cascade — Bugs 1+2 landed, Bug 3 partial |
-| [049](049-faction-overlay-markers.md) | ready | §9.2 | Faction overlay markers (4 ZSTs) |
 | [050](050-marker-predicate-refinements.md) | ready | §4 | Marker predicate refinements (3 promotions) |
 | [051](051-fox-dse-eligibility-migration.md) | ready | §4 / fox | Fox DSE `.require()` / `.forbid()` cutover |
-| [065](065-l2-10-7-self-state-fox-roster-sweep.md) | ready | §L2.10.7 | Self-state DSE + fox disposition roster (succeeds 052) |
 | [053](053-death-event-grief-emission.md) | blocked-by 007 | §7.7.b | Death-event grief emission |
 | [054](054-fate-event-vocabulary-expansion.md) | ready | §7.7.c | Fate event vocabulary expansion |
 | [055](055-mood-drift-threshold-detection.md) | blocked-by 056 | §7.7.d | Mood drift detection |
 | [056](056-aspiration-compatibility-matrix.md) | ready | §7.7.1 | Aspiration compatibility matrix |
 | [057](057-coordinator-directive-intention-strategy-row.md) | blocked-by 007 | §7.3 | Coordinator-directive Intention strategy row |
-| [058](058-tradition-unfiltered-loop-fix.md) | ready | §3.5.3 | Tradition modifier unfiltered-loop fix |
+| [058](058-tradition-unfiltered-loop-fix.md) | parked | §3.5.3 | Tradition modifier unfiltered-loop fix |
 | [059](059-phase-7-substrate-cleanup.md) | parked | Phase 7 | `ScoringContext` removal + §10 unblock + spec drift |
+| [062](062-prey-species-split-maps.md) | ready | §5.6.3 #5 | Per-prey-species `PreyScentMap` split |
+| [063](063-ward-strength-promotion.md) | ready | §5.6.3 #3 | Ward-strength as first-class spatial axis |
+| [064](064-carcass-scent-consumer-cutover.md) | ready | §5.6.3 #6 | Carcass-scent consumer cutover (balance-affecting) |
+| [126](126-bdi-intention-substrate.md) | ready | Cluster C | **BDI intention substrate — Cluster C entry-point** |
+| [127](127-joint-intention-substrate.md) | blocked-by 126 | Cluster C | Joint-intention substrate for two-cat practices |
+| [128](128-htn-method-composition.md) | blocked-by 126 | Cluster C | HTN method composition over `HeldIntention.goal` |
+| [129](129-care-dses-perceivable-intentions.md) | blocked-by 126 | Cluster C | Care DSEs over perceivable intentions |
+| [130](130-trust-weighted-coordinator-momentum.md) | blocked-by 126, 057 | Cluster C | Trust-weighted coordinator directive momentum |
 
-**Total open: 16** (12 ready, 1 in-progress, 2 blocked, 1 parked).
+**Total open: 21** (10 ready, 1 in-progress, 8 blocked, 2 parked).
 
 ### Critical path
 
-The structural critical path is **052 ✅ → 065 → 006 → 059**:
+**The structural spine is complete.** What remained at 060's
+opening — `052 → 065 → 006 → 059` — has all landed except 059
+(parked cleanup). The substrate is in production:
 
-1. **052** ✅ landed 2026-04-28 (acccdc7). The `SpatialConsideration`
-   substrate is in production with `LandmarkSource::{TargetPosition,
-   Tile, Entity}`; all 9 cat target-taking DSEs cut over to it; the
-   four §6.5 deferred axes (`pursuit-cost`, `fertility-window` spatial,
-   `apprentice-receptivity` spatial-pairing, `remedy-match` caretaker-
-   distance) are unblocked. Cumulative drift across the entire
-   refactor's 6 commits: ~zero on every characteristic metric.
-2. **065** picks up the rest of §L2.10.7's roster — 12 cat self-state
-   DSEs + 9 fox dispositions. First production callers of
-   `LandmarkSource::Entity`; substrate decision needed for aggregate-
-   centroid landmarks (Explore frontier, PracticeMagic corruption
-   cluster, fox Hunting prey-belief centroid).
-3. **006** completes the §5.6.3 absent-map catalog. Producer maps
-   feed 065's centroid resolution paths and the influence-map
-   sampling sites that ScoringContext currently owns.
-4. **059** sweeps the residue: deletes `ScoringContext` /
-   `FoxScoringContext` after 065's last consumer is written,
-   reconciles spec-vs-code drift.
+1. **052** ✅ landed 2026-04-28 (acccdc7). `SpatialConsideration`
+   substrate with `LandmarkSource::{TargetPosition, Tile, Entity}`;
+   all 9 cat target-taking DSEs cut over.
+2. **065** ✅ landed. §L2.10.7 self-state DSE + fox disposition
+   roster sweep — first production callers of `LandmarkSource::Entity`,
+   aggregate-centroid resolution paths in place.
+3. **006** ✅ landed 2026-04-27 (10989775). Cluster-B closeout —
+   §5.6.3 producer-map catalog. Successors 062/063/064 (still open)
+   carry the per-row consumer cutovers; 061 ✅ landed.
+4. **059** 💤 parked. `ScoringContext` / `FoxScoringContext`
+   removal; spec-vs-code drift reconciliation. Unblocked but not
+   yet picked up.
 
-Other tickets parallelize off this spine. 027 is mating-specific
-and runs independently. Cluster B/C/D/E (006–009) are large epics
-themselves, gated only on the cluster-A landings.
+**What's the largest remaining spend?** Cluster C — 126 (BDI
+substrate) is the unblocked head; 127/128/129/130 unblock as 126
+lands. The §7.7 aspiration cluster (053–058) is partial, gated
+mostly on 007's narrative scope. The §5.6.3 follow-ons (062/063/064)
+and §4 follow-ons (050/051) are independent ready work.
+
+Other tickets parallelize off this. 027 is mating-specific and
+runs independently. Cluster C/D/E (007–009) are large epics
+themselves, with C now having a concrete implementation entry-point
+in 126.
 
 ## Out of scope
 
@@ -130,13 +138,23 @@ themselves, gated only on the cluster-A landings.
 
 ## Current state
 
-As of 2026-04-27 — substrate is structurally complete through
-Phase 6a. Phase 6b/6c/6d landed via separate ticket threads.
-Phase 7 cleanup is parked pending 065 (which now owns 052's
-remaining substrate consumers). The user's audit on 2026-04-27
-confirmed every spec section maps to either landed work or an
-open child ticket; founder-age regression (refactor pre-flight
-gate 2) was confirmed quietly resolved with no ticket needed.
+As of 2026-05-08 — the substrate spine (052/065/006) has
+structurally landed; only 059's cleanup pass remains, and it's
+parked with no blocker. Phase 6a/6b/6c/6d landed via separate
+ticket threads. The remaining shape of the program is
+*horizontal*, not *spinal*:
+
+- **§5.6.3 follow-ons** — 062/063/064 (061 ✅ landed)
+- **§4 follow-ons** — 050/051
+- **§7.7 aspiration** — partial: 054/056 ready; 053/055/057 blocked; 058 parked
+- **Cluster C (deliberation)** — entry-point 126 ready; 127/128/129/130 gated on it
+- **Adjacent epics** — 007 (C narrative), 008 (D), 009 (E) all ready; 027 (§7.M mating) in progress
+
+The unblocked set with the largest downstream payoff is **126**:
+it's the substrate everything else in Cluster C composes against,
+and it directly addresses the per-tick supply-chain failures
+(`scoring-layer-second-order.md` framing #1) that today's
+modifier-and-tenure stack only patches.
 
 For the per-section coverage map, see the audit plan at
 `/Users/will.mitchell/.claude/plans/trying-to-figure-out-luminous-charm.md`
@@ -194,3 +212,17 @@ retirement.
   `status: in-progress` because the program is, in fact, in
   progress — but body explicitly delegates work-tracking to
   children.
+- 2026-05-08: dashboard audit. Promoted four roster entries to
+  ✅ landed (006 cluster-B closeout 10989775; 049 §9.2 faction
+  overlay markers 384bf25; 061 herb-location producer scaffold;
+  065 §L2.10.7 self-state roster sweep). Flipped 058 ready →
+  parked to match its child file. Added six new roster entries
+  visible from the spine's landing — three §5.6.3 follow-ons
+  (062/063/064) and five Cluster-C children (126 ready entry-point
+  + 127/128/129/130 gated on 126; 130 also gated on 057).
+  Roster grew 16 → 21 (10 ready, 1 in-progress, 8 blocked, 2
+  parked). Critical-path section rewritten — the structural
+  spine is complete; remaining shape is horizontal. Cluster-C
+  cluster-table row points at 126 explicitly as the
+  implementation entry-point so future readers don't have to
+  re-derive it from 007's narrative body.

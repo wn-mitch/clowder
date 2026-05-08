@@ -1,0 +1,140 @@
+{
+  "label": "post-231-pre-burial",
+  "run_dir": "/Users/will.mitchell/clowder/logs/tuned-42-pre-035-validity-fix",
+  "events_path": "/Users/will.mitchell/clowder/logs/tuned-42-pre-035-validity-fix/events.jsonl",
+  "commit_hash_short": "5d98bea4",
+  "commit_dirty": true,
+  "seed": 42,
+  "duration_secs": 900,
+  "promoted_at": "2026-05-08T20:50:22Z",
+  "footer_snapshot": {
+    "_footer": true,
+    "anxiety_interrupt_total": 0,
+    "colony_score": {
+      "aggregate": 2202.115669931045,
+      "bonds_formed": 39,
+      "deaths_injury": 0,
+      "deaths_old_age": 0,
+      "deaths_starvation": 0,
+      "fulfillment": 0.19963525235652924,
+      "happiness": 0.7506838440895081,
+      "health": 0.80580073595047,
+      "kittens_born": 4,
+      "kittens_matured": 0,
+      "nourishment": 0.7401402592658997,
+      "peak_population": 12,
+      "seasons_survived": 5,
+      "shelter": 0.4166666567325592,
+      "structures_built": 6,
+      "welfare": 0.582585334777832
+    },
+    "continuity_tallies": {
+      "burial": 0,
+      "courtship": 4004,
+      "grooming": 1464,
+      "mentoring": 388,
+      "mythic-texture": 39,
+      "play": 7
+    },
+    "deaths_by_cause": {},
+    "interrupts_by_reason": {
+      "modifier_preemption(acute_health_adrenaline_flee)": 6906
+    },
+    "negative_events_total": 78457,
+    "neutral_features_active": 21,
+    "neutral_features_total": 31,
+    "never_fired_expected_positives": [
+      "BurialPerformed"
+    ],
+    "plan_failures_by_reason": {
+      "ApplyRemedy: no path to patient": 1,
+      "ApplyRemedy: no patient for remedy": 3,
+      "ApplyRemedy: patient no longer alive": 5,
+      "Construct: no target for Construct": 1,
+      "DropItem: drop: empty inventory": 38,
+      "EngagePrey: anxiety spooked prey": 19,
+      "EngagePrey: consumed catch in place": 15,
+      "EngagePrey: lost prey during approach": 850,
+      "EngagePrey: no prey target for engage": 71,
+      "EngagePrey: prey teleported": 126,
+      "EngagePrey: seeking another target": 312,
+      "EngagePrey: stuck while stalking": 121,
+      "EngagePrey: target invalid at step entry: Despawned": 29,
+      "EngageThreat: global step timeout": 1,
+      "EngageThreat: morale_break": 1,
+      "EngageThreat: target invalid at step entry: Despawned": 307,
+      "ForageItem: consumed forage in place": 21,
+      "ForageItem: nothing found while foraging": 852,
+      "GatherHerb: target invalid at step entry: Despawned": 2,
+      "HandoffItem: handoff: no recipient on disposition (no kittens in colony)": 2390,
+      "PickUpItemFromGround: pick_up: no target item on disposition": 6,
+      "PrepareRemedy: missing herb for remedy": 13,
+      "SearchPrey: no scent found": 9,
+      "SetWard: no thornbriar for ward": 3,
+      "TrashItemAtMidden: trash: no item-slot in inventory": 52,
+      "TravelTo(CarcassPile): no path and stuck": 143,
+      "TravelTo(HerbPatch): no path and stuck": 818
+    },
+    "planning_failures_by_disposition": {
+      "Foraging": 36,
+      "Guarding": 90,
+      "Hunting": 34
+    },
+    "planning_failures_by_reason": {
+      "Foraging:GoalUnreachable": 36,
+      "Guarding:GoalUnreachable": 90,
+      "Hunting:GoalUnreachable": 34
+    },
+    "positive_features_active": 34,
+    "positive_features_total": 52,
+    "shadow_fox_spawn_total": 26,
+    "shadow_foxes_avoided_ward_total": 2665,
+    "ward_avg_strength_final": 0.0,
+    "ward_count_final": 0,
+    "ward_siege_started_total": 417,
+    "wards_despawned_total": 56,
+    "wards_placed_total": 55,
+    "welfare_axes": {
+      "acceptance": {
+        "axis": "acceptance",
+        "max": 0.11866368353366852,
+        "mean": 0.019717475399374962,
+        "min": 0.0,
+        "n": 12,
+        "stdev": 0.04408985748887062
+      },
+      "mastery": {
+        "axis": "mastery",
+        "max": 1.0,
+        "mean": 0.5924505591392517,
+        "min": 0.0,
+        "n": 12,
+        "stdev": 0.41070228815078735
+      },
+      "purpose": {
+        "axis": "purpose",
+        "max": 0.9998118877410889,
+        "mean": 0.5465238690376282,
+        "min": 0.0,
+        "n": 12,
+        "stdev": 0.41527360677719116
+      },
+      "respect": {
+        "axis": "respect",
+        "max": 1.0,
+        "mean": 0.5890173316001892,
+        "min": 0.0,
+        "n": 12,
+        "stdev": 0.42909085750579834
+      },
+      "social_warmth": {
+        "axis": "social_warmth",
+        "max": 1.0,
+        "mean": 0.728807806968689,
+        "min": 0.0,
+        "n": 8,
+        "stdev": 0.42194271087646484
+      }
+    }
+  }
+}

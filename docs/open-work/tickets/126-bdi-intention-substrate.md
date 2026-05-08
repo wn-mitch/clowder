@@ -1,7 +1,7 @@
 ---
 id: 126
 title: BDI intention substrate — perceivable per-cat commitment with momentum
-status: ready
+status: in-progress
 cluster: C
 added: 2026-05-02
 parked: null
