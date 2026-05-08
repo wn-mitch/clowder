@@ -160,6 +160,25 @@ const THREAT_PROXIMITY_DERIVATIVE: &str = "threat_proximity_derivative";
 /// (default equal-weighted).
 const SOCIAL_STATUS_DISTRESS: &str = "social_status_distress";
 const ACTIVE_DISPOSITION_ORDINAL: &str = "active_disposition_ordinal";
+/// Ticket 126 — `IntentionMomentum` Modifier scalar. The cat's
+/// `HeldIntention.intention`'s underlying DSE encoded as an `Action`
+/// enum ordinal. Encoding is offset-by-one to mirror
+/// `active_disposition_ordinal`'s convention: `0.0` means "no held
+/// intention", otherwise `(Action as usize as f32) + 1.0`. The
+/// `IntentionMomentum` modifier decodes via [`action_for_ordinal`].
+pub const INTENTION_HELD_ACTION_ORDINAL: &str = "intention_held_action_ordinal";
+/// Ticket 126 — `IntentionMomentum` Modifier scalar. Pre-multiplied
+/// magnitude added to the held DSE's score when it matches `dse_id`:
+/// `commitment_strength × intention_momentum_lift × decay_factor`.
+/// `0.0` means no lift (no held intention, expired window, or zero
+/// strength).
+pub const INTENTION_MOMENTUM_LIFT_FACTOR: &str = "intention_momentum_lift_factor";
+/// Ticket 126 — `IntentionMomentum` Modifier scalar. Source ordinal
+/// reserved for ticket 130's trust-weighted lift. `0.0` =
+/// `IntentionSource::SelfMotivated`, `1.0` = `CoordinatorDirective`.
+/// Read in 126 only as a stub — 130 will multiply the lift by
+/// recipient trust when this is `1.0`.
+pub const INTENTION_SOURCE_ORDINAL: &str = "intention_source_ordinal";
 /// §075 — `CommitmentTenure` Modifier. Drift between this name and
 /// `plan_substrate::COMMITMENT_TENURE_INPUT` (the canonical
 /// `&'static str` the substrate publishes) becomes a build-time error
@@ -715,6 +734,201 @@ impl ScoreModifier for CommitmentTenure {
 
     fn name(&self) -> &'static str {
         "commitment_tenure"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// IntentionMomentum (ticket 126)
+// ---------------------------------------------------------------------------
+
+/// Maps an `Action` enum variant to its canonical DSE id string. Used
+/// by [`IntentionMomentum`] to round-trip through the f32 scalar
+/// surface: `HeldIntention` stores an `Action`, the scoring path
+/// publishes its discriminant + 1 as `INTENTION_HELD_ACTION_ORDINAL`,
+/// and the modifier decodes via [`action_for_ordinal`] + this helper
+/// before string-comparing against `dse_id.0`.
+///
+/// 1:1 mapping — every `Action` variant has exactly one DSE id (the
+/// 155 `Herbcraft` / `PracticeMagic` splits made each sub-mode its
+/// own `Action` so this stays clean). The matching test-only helper
+/// in `constituent_dses_for_ordinal_matches_disposition_kind_constituent_actions`
+/// is kept as the regression guard for the other direction
+/// (DispositionKind → Action list); both must stay aligned.
+pub const fn dse_id_for_action(action: crate::ai::Action) -> &'static str {
+    use crate::ai::Action;
+    match action {
+        Action::Eat => EAT,
+        Action::Sleep => SLEEP,
+        Action::Hunt => HUNT,
+        Action::Forage => FORAGE,
+        Action::Wander => WANDER,
+        Action::Idle => IDLE,
+        Action::Socialize => SOCIALIZE,
+        Action::GroomSelf => GROOM_SELF,
+        Action::GroomOther => GROOM_OTHER,
+        Action::Explore => EXPLORE,
+        Action::Flee => FLEE,
+        Action::Fight => FIGHT,
+        Action::Patrol => PATROL,
+        Action::Build => BUILD,
+        Action::Farm => FARM,
+        Action::HerbcraftGather => HERBCRAFT_GATHER,
+        Action::HerbcraftRemedy => HERBCRAFT_PREPARE,
+        Action::HerbcraftSetWard => HERBCRAFT_WARD,
+        Action::MagicScry => MAGIC_SCRY,
+        Action::MagicDurableWard => MAGIC_DURABLE_WARD,
+        Action::MagicCleanse => MAGIC_CLEANSE,
+        Action::MagicColonyCleanse => MAGIC_COLONY_CLEANSE,
+        Action::MagicHarvest => MAGIC_HARVEST,
+        Action::MagicCommune => MAGIC_COMMUNE,
+        Action::Coordinate => COORDINATE,
+        Action::Mentor => MENTOR,
+        Action::Mate => MATE,
+        Action::Caretake => CARETAKE,
+        Action::Cook => COOK,
+        Action::Hide => HIDE,
+        Action::Drop => DISCARD,
+        Action::Trash => TRASH,
+        Action::Handoff => HANDOFF,
+        Action::PickUp => PICK_UP,
+        Action::Bury => BURY,
+    }
+}
+
+/// Decodes an `INTENTION_HELD_ACTION_ORDINAL` scalar value (offset-by-
+/// one — `0.0` is the "no held intention" sentinel) back to an
+/// `Action`. Returns `None` for the sentinel and for out-of-range
+/// values (defensive — `as usize` cast on f32 outside `[0, 33]` is a
+/// drift signal, not a balance signal).
+pub fn action_for_ordinal(ord: f32) -> Option<crate::ai::Action> {
+    use crate::ai::Action;
+    if ord <= 0.0 {
+        return None;
+    }
+    // The encoding is `Action::* as usize as f32 + 1.0`; subtract the
+    // offset to recover the discriminant.
+    let idx = (ord - 1.0) as usize;
+    Some(match idx {
+        0 => Action::Eat,
+        1 => Action::Sleep,
+        2 => Action::Hunt,
+        3 => Action::Forage,
+        4 => Action::Wander,
+        5 => Action::Idle,
+        6 => Action::Socialize,
+        7 => Action::GroomSelf,
+        8 => Action::GroomOther,
+        9 => Action::Explore,
+        10 => Action::Flee,
+        11 => Action::Fight,
+        12 => Action::Patrol,
+        13 => Action::Build,
+        14 => Action::Farm,
+        15 => Action::HerbcraftGather,
+        16 => Action::HerbcraftRemedy,
+        17 => Action::HerbcraftSetWard,
+        18 => Action::MagicScry,
+        19 => Action::MagicDurableWard,
+        20 => Action::MagicCleanse,
+        21 => Action::MagicColonyCleanse,
+        22 => Action::MagicHarvest,
+        23 => Action::MagicCommune,
+        24 => Action::Coordinate,
+        25 => Action::Mentor,
+        26 => Action::Mate,
+        27 => Action::Caretake,
+        28 => Action::Cook,
+        29 => Action::Hide,
+        30 => Action::Drop,
+        31 => Action::Trash,
+        32 => Action::Handoff,
+        33 => Action::PickUp,
+        34 => Action::Bury,
+        _ => return None,
+    })
+}
+
+/// §3.5.1 ticket 126 — actor-private commitment lift. Stacks on
+/// `CommitmentTenure` (the flat anti-oscillation pad on the active
+/// disposition) by adding a margin-weighted lift on the cat's
+/// `HeldIntention`'s underlying DSE.
+///
+/// **Trigger:** `INTENTION_MOMENTUM_LIFT_FACTOR > 0.0` AND
+/// `dse_id` matches `INTENTION_HELD_ACTION_ORDINAL`'s decoded
+/// `Action`.
+///
+/// **Transform:** `score += lift_factor`. The lift factor is
+/// pre-multiplied at `ScoringContext` construction time:
+/// `commitment_strength × intention_momentum_lift × decay_factor`.
+/// All composition logic lives at the producer site, not in this
+/// modifier — the modifier is a pure scalar-keyed gate.
+///
+/// **Applies to:** dynamic per the cat's held intention. With no
+/// held intention (or expired-decay-window), the lift factor is 0.0
+/// and the modifier short-circuits.
+///
+/// **Stacking with CommitmentTenure:** both modifiers add to the
+/// active disposition's constituent DSEs while their conditions
+/// hold. CommitmentTenure caps at `oscillation_score_lift` (default
+/// 0.10) flat over the tenure window; IntentionMomentum starts at
+/// `intention_momentum_lift × commitment_strength` (max 0.10 ×
+/// 1.0 = 0.10) and ramps to zero at the decay edge. Combined max
+/// 0.20 — kept under the softmax-effectively-argmax threshold so
+/// strong commitment doesn't lock out preempt.
+///
+/// **Source-ordinal stub:** the modifier reads
+/// `INTENTION_SOURCE_ORDINAL` but doesn't yet apply a
+/// trust-weighted multiplier — that's ticket 130's hook. The read
+/// site exists in 126 so 130 can land without re-touching the
+/// modifier surface.
+///
+/// **Gated-boost contract:** `score <= 0.0` short-circuit preserves
+/// the §3.5.1 stance — the modifier never resurrects a Maslow-pre-
+/// gated DSE.
+pub struct IntentionMomentum;
+
+impl IntentionMomentum {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Default for IntentionMomentum {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ScoreModifier for IntentionMomentum {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        if score <= 0.0 {
+            return score;
+        }
+        let lift = fetch(INTENTION_MOMENTUM_LIFT_FACTOR, ctx.cat);
+        if lift <= 0.0 {
+            return score;
+        }
+        let ordinal = fetch(INTENTION_HELD_ACTION_ORDINAL, ctx.cat);
+        let Some(held_action) = action_for_ordinal(ordinal) else {
+            return score;
+        };
+        if dse_id_for_action(held_action) != dse_id.0 {
+            return score;
+        }
+        // 130 hook: multiply by recipient-coordinator trust when
+        // INTENTION_SOURCE_ORDINAL == 1.0. 126 is dormant on this axis.
+        let _source = fetch(INTENTION_SOURCE_ORDINAL, ctx.cat);
+        score + lift
+    }
+
+    fn name(&self) -> &'static str {
+        "intention_momentum"
     }
 }
 
@@ -3266,6 +3480,16 @@ pub fn default_modifier_pipeline(
     // which is why this helper takes `&SimConstants` rather than
     // `&ScoringConstants`.
     pipeline.push(Box::new(CommitmentTenure::new(constants)));
+    // §126 — `IntentionMomentum` registers immediately after
+    // `CommitmentTenure`. Both add to the active disposition's
+    // constituent DSEs; CommitmentTenure caps at the tenure window's
+    // flat lift, IntentionMomentum scales by per-intention strength
+    // and decays over the intention's lifetime. Adjacency keeps the
+    // two related additive lifts visually grouped in the modifier-
+    // pipeline trace. C2 ships dormant — until C3 wires the L2
+    // author, the lift factor scalar is always 0.0 and the modifier
+    // short-circuits.
+    pipeline.push(Box::new(IntentionMomentum::new()));
     pipeline.push(Box::new(Tradition::new()));
     // §3.5.1 ticket 088 — `BodyDistressPromotion` registers with the
     // additive bonuses before the multiplicative damps (Fox /
@@ -4006,6 +4230,137 @@ mod tests {
         }
     }
 
+    // -----------------------------------------------------------------------
+    // §3.5.1 / §126 IntentionMomentum
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn intention_momentum_dormant_when_no_held_intention() {
+        // Sentinel encoding: `INTENTION_HELD_ACTION_ORDINAL == 0.0`
+        // means no held intention. Modifier must be a no-op even
+        // when the lift factor is non-zero (a future producer bug
+        // shouldn't accidentally lift every DSE).
+        let modifier = IntentionMomentum::new();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            INTENTION_HELD_ACTION_ORDINAL => 0.0,
+            INTENTION_MOMENTUM_LIFT_FACTOR => 0.10,
+            INTENTION_SOURCE_ORDINAL => 0.0,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(HUNT), 0.5, &ctx, &fetch);
+        assert!((out - 0.5).abs() < 1e-6, "no held intention ⇒ no lift");
+    }
+
+    #[test]
+    fn intention_momentum_dormant_when_lift_factor_zero() {
+        // Inverse: held intention but the lift factor is 0.0 (e.g.
+        // decay window has fully elapsed, or commitment_strength = 0).
+        // Match still resolves but no lift is added.
+        let modifier = IntentionMomentum::new();
+        let (_, ctx) = test_ctx();
+        let hunt_ord = (crate::ai::Action::Hunt as usize as f32) + 1.0;
+        let fetch = |name: &str, _: Entity| match name {
+            INTENTION_HELD_ACTION_ORDINAL => hunt_ord,
+            INTENTION_MOMENTUM_LIFT_FACTOR => 0.0,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(HUNT), 0.5, &ctx, &fetch);
+        assert!((out - 0.5).abs() < 1e-6, "zero lift factor ⇒ no lift");
+    }
+
+    #[test]
+    fn intention_momentum_lifts_held_dse_only() {
+        // Held intention is Hunt. Hunt gets lifted; sibling DSEs do
+        // not, even if they're constituents of the same disposition.
+        let modifier = IntentionMomentum::new();
+        let (_, ctx) = test_ctx();
+        let hunt_ord = (crate::ai::Action::Hunt as usize as f32) + 1.0;
+        let fetch = |name: &str, _: Entity| match name {
+            INTENTION_HELD_ACTION_ORDINAL => hunt_ord,
+            INTENTION_MOMENTUM_LIFT_FACTOR => 0.075,
+            _ => 0.0,
+        };
+        let hunt_out = modifier.apply(DseId(HUNT), 0.5, &ctx, &fetch);
+        assert!(
+            (hunt_out - 0.575).abs() < 1e-6,
+            "held DSE lifted by exactly the factor; got {hunt_out}"
+        );
+        for dse in [FORAGE, EAT, SOCIALIZE, FIGHT, PATROL] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!((out - 0.5).abs() < 1e-6, "non-held {dse} unchanged");
+        }
+    }
+
+    #[test]
+    fn intention_momentum_does_not_resurrect_zero_score() {
+        // Gated-boost contract: a Maslow-suppressed DSE (score == 0)
+        // stays suppressed.
+        let modifier = IntentionMomentum::new();
+        let (_, ctx) = test_ctx();
+        let hunt_ord = (crate::ai::Action::Hunt as usize as f32) + 1.0;
+        let fetch = |name: &str, _: Entity| match name {
+            INTENTION_HELD_ACTION_ORDINAL => hunt_ord,
+            INTENTION_MOMENTUM_LIFT_FACTOR => 0.10,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(HUNT), 0.0, &ctx, &fetch);
+        assert_eq!(out, 0.0, "zero score stays zero");
+    }
+
+    #[test]
+    fn intention_momentum_stacks_with_commitment_tenure() {
+        // Both modifiers fire on a Hunt-held cat inside the tenure
+        // window; the cat sees the sum of both lifts.
+        use crate::ai::eval::ModifierPipeline;
+
+        let mut pipeline = ModifierPipeline::new();
+        pipeline.push(Box::new(CommitmentTenure { lift: 0.10 }));
+        pipeline.push(Box::new(IntentionMomentum::new()));
+
+        let (_, ctx) = test_ctx();
+        let hunt_ord = (crate::ai::Action::Hunt as usize as f32) + 1.0;
+        let fetch = |name: &str, _: Entity| match name {
+            ACTIVE_DISPOSITION_ORDINAL => 2.0,
+            COMMITMENT_TENURE_PROGRESS => 0.4,
+            INTENTION_HELD_ACTION_ORDINAL => hunt_ord,
+            INTENTION_MOMENTUM_LIFT_FACTOR => 0.05,
+            _ => 0.0,
+        };
+        let out = pipeline.apply(DseId(HUNT), 0.5, &ctx, &fetch);
+        assert!(
+            (out - 0.65).abs() < 1e-6,
+            "0.5 + tenure 0.10 + momentum 0.05 = 0.65; got {out}"
+        );
+    }
+
+    #[test]
+    fn action_ordinal_round_trips() {
+        // Encoding/decoding contract: `(Action as usize as f32) + 1.0`
+        // and `action_for_ordinal` are inverses for every variant.
+        // Defends against a future Action variant being added without
+        // an `action_for_ordinal` entry.
+        use crate::ai::Action;
+        let cases = [
+            Action::Eat,
+            Action::Hunt,
+            Action::Mate,
+            Action::Mentor,
+            Action::Bury,
+            Action::PickUp,
+        ];
+        for a in cases {
+            let ord = (a as usize as f32) + 1.0;
+            assert_eq!(action_for_ordinal(ord), Some(a));
+            // String round-trip via dse_id_for_action — the modifier's
+            // string-equality check sees the same value.
+            assert!(!dse_id_for_action(a).is_empty());
+        }
+        assert_eq!(action_for_ordinal(0.0), None);
+        assert_eq!(action_for_ordinal(-1.0), None);
+        assert_eq!(action_for_ordinal(999.0), None);
+    }
+
     #[test]
     fn commitment_tenure_breaks_disposition_oscillation_synthetic() {
         // §075 synthetic regression test. Setup: two dispositions tied
@@ -4073,7 +4428,8 @@ mod tests {
         let pipeline = default_modifier_pipeline(&constants);
         // 209: bumped 33 → 35 with `FoodSecurityGroomLift` +
         // `TensionDefusionGroomLift`.
-        assert_eq!(pipeline.len(), 35, "expected 35 registered modifiers");
+        // 126: bumped 35 → 36 with `IntentionMomentum`.
+        assert_eq!(pipeline.len(), 36, "expected 36 registered modifiers");
     }
 
     // -----------------------------------------------------------------------

@@ -2042,6 +2042,12 @@ pub fn evaluate_and_plan(
             fated_rival_nearby: if rival_nearby { 1.0 } else { 0.0 },
             active_directive_action_ordinal,
             active_directive_bonus,
+            // Ticket 126 — IntentionMomentum scalars. C2 ships dormant
+            // (no live writer); C3 wires the L2 author site that
+            // populates from `Option<&HeldIntention>`.
+            intention_held_action_ordinal: 0.0,
+            intention_momentum_lift_factor: 0.0,
+            intention_source_ordinal: 0.0,
         };
 
         let focal_cat = res.focal_target.as_deref().and_then(|t| t.entity);

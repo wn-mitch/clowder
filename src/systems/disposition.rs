@@ -1020,6 +1020,12 @@ pub fn evaluate_dispositions(
             fated_rival_nearby: if presence_rival_nearby { 1.0 } else { 0.0 },
             active_directive_action_ordinal: presence_directive_action_ordinal,
             active_directive_bonus: presence_directive_bonus,
+            // Ticket 126 — IntentionMomentum scalars. C2 ships dormant
+            // (no live writer); C3 wires the L2 author site that
+            // populates from `Option<&HeldIntention>`.
+            intention_held_action_ordinal: 0.0,
+            intention_momentum_lift_factor: 0.0,
+            intention_source_ordinal: 0.0,
         };
 
         // §11 trace plumbing — dormant except when running headless

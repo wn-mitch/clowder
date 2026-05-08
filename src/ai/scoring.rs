@@ -528,6 +528,30 @@ pub struct ScoringContext<'a> {
     /// weight × base × personality × relationships). Read by
     /// `ActiveDirectiveLift`.
     pub active_directive_bonus: f32,
+    /// Ticket 126 — `IntentionMomentum` Modifier scalar. The cat's
+    /// `HeldIntention` encoded as a stable `Action` enum ordinal —
+    /// 0.0 means "no held intention or expired"; otherwise
+    /// `(Action as usize as f32) + 1.0`. Mirrors the
+    /// `active_disposition_ordinal` encoding's offset-by-one trick so
+    /// 0.0 distinguishes None from Action::Eat (whose discriminant is
+    /// 0). The L2 author site (C3) populates from
+    /// `Option<&HeldIntention>`; until then the field stays 0.0 and
+    /// the modifier is a no-op.
+    pub intention_held_action_ordinal: f32,
+    /// Ticket 126 — `IntentionMomentum` Modifier lift factor. The full
+    /// pre-multiplied magnitude added to the held DSE's score:
+    /// `commitment_strength × intention_momentum_lift × decay_factor`.
+    /// 0.0 means "no lift" (no held intention, expired window, or
+    /// zero commitment_strength). Computed at `ScoringContext`
+    /// construction; the modifier reads via the scalar surface.
+    pub intention_momentum_lift_factor: f32,
+    /// Ticket 126 — `IntentionMomentum` Modifier source ordinal,
+    /// reserved for ticket 130's trust-weighted lift. 0.0 =
+    /// `IntentionSource::SelfMotivated`, 1.0 =
+    /// `CoordinatorDirective`. Read but unused in 126's modifier
+    /// implementation; 130 will multiply the lift by recipient trust
+    /// when the source is a coordinator directive.
+    pub intention_source_ordinal: f32,
 }
 
 /// Length of the per-action cascade-count array. Equals the number of
@@ -949,6 +973,22 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
         ctx.active_directive_action_ordinal,
     );
     m.insert("active_directive_bonus", ctx.active_directive_bonus);
+    // Ticket 126 — `IntentionMomentum` scalars. Until C3 wires the L2
+    // author the three fields stay 0.0 (or 0.0/0.0/0.0 — the modifier
+    // short-circuits on `lift_factor <= 0.0`). The keys match the
+    // `&'static str` constants the modifier reads.
+    m.insert(
+        crate::ai::modifier::INTENTION_HELD_ACTION_ORDINAL,
+        ctx.intention_held_action_ordinal,
+    );
+    m.insert(
+        crate::ai::modifier::INTENTION_MOMENTUM_LIFT_FACTOR,
+        ctx.intention_momentum_lift_factor,
+    );
+    m.insert(
+        crate::ai::modifier::INTENTION_SOURCE_ORDINAL,
+        ctx.intention_source_ordinal,
+    );
     m
 }
 
@@ -2850,6 +2890,9 @@ mod tests {
             fated_rival_nearby: 0.0,
             active_directive_action_ordinal: -1.0,
             active_directive_bonus: 0.0,
+            intention_held_action_ordinal: 0.0,
+            intention_momentum_lift_factor: 0.0,
+            intention_source_ordinal: 0.0,
         }
     }
 
@@ -3043,6 +3086,9 @@ mod tests {
             fated_rival_nearby: 0.0,
             active_directive_action_ordinal: -1.0,
             active_directive_bonus: 0.0,
+            intention_held_action_ordinal: 0.0,
+            intention_momentum_lift_factor: 0.0,
+            intention_source_ordinal: 0.0,
         };
         // §L2.10.7: this test sets `food_available: false`,
         // `has_functional_kitchen: false`, etc. on the context, but
@@ -3259,6 +3305,9 @@ mod tests {
             fated_rival_nearby: 0.0,
             active_directive_action_ordinal: -1.0,
             active_directive_bonus: 0.0,
+            intention_held_action_ordinal: 0.0,
+            intention_momentum_lift_factor: 0.0,
+            intention_source_ordinal: 0.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let socialize_score = scores
@@ -3539,6 +3588,9 @@ mod tests {
             fated_rival_nearby: 0.0,
             active_directive_action_ordinal: -1.0,
             active_directive_bonus: 0.0,
+            intention_held_action_ordinal: 0.0,
+            intention_momentum_lift_factor: 0.0,
+            intention_source_ordinal: 0.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let best = select_best_action(&scores);
@@ -3661,6 +3713,9 @@ mod tests {
             fated_rival_nearby: 0.0,
             active_directive_action_ordinal: -1.0,
             active_directive_bonus: 0.0,
+            intention_held_action_ordinal: 0.0,
+            intention_momentum_lift_factor: 0.0,
+            intention_source_ordinal: 0.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let fight_score = scores.iter().find(|(a, _)| *a == Action::Fight).unwrap().1;
@@ -3802,6 +3857,9 @@ mod tests {
             fated_rival_nearby: 0.0,
             active_directive_action_ordinal: -1.0,
             active_directive_bonus: 0.0,
+            intention_held_action_ordinal: 0.0,
+            intention_momentum_lift_factor: 0.0,
+            intention_source_ordinal: 0.0,
         };
         // Build a per-test MarkerSnapshot with Incapacitated set for
         // this cat (the cached shared snapshot only carries colony
@@ -4128,6 +4186,9 @@ mod tests {
             fated_rival_nearby: 0.0,
             active_directive_action_ordinal: -1.0,
             active_directive_bonus: 0.0,
+            intention_held_action_ordinal: 0.0,
+            intention_momentum_lift_factor: 0.0,
+            intention_source_ordinal: 0.0,
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let wander = scores.iter().find(|(a, _)| *a == Action::Wander).unwrap().1;
@@ -4251,6 +4312,9 @@ mod tests {
             fated_rival_nearby: 0.0,
             active_directive_action_ordinal: -1.0,
             active_directive_bonus: 0.0,
+            intention_held_action_ordinal: 0.0,
+            intention_momentum_lift_factor: 0.0,
+            intention_source_ordinal: 0.0,
         };
 
         let scores_full = score_actions(&base, &test_eval_inputs(), &mut rng_full).scores;
