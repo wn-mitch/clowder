@@ -117,6 +117,17 @@ similar-build *ARGS:
 similar-linkages *ARGS:
     @uv run scripts/similar/linkages.py {{ARGS}}
 
+# Bulk linkage curation across all open tickets — writes a top-level
+# report at `docs/open-work/_linkages.md` AND injects a `## Related
+# work` section into each open ticket whose candidates clear the
+# threshold. Re-runs are idempotent (the auto-marked block is
+# replaced, prose outside it is preserved).
+#   just similar-link-report                     # threshold 0.78, top-3 per ticket
+#   just similar-link-report --report-only       # navigation aid only, no per-ticket edits
+#   just similar-link-report --threshold 0.80    # tighter, fewer candidates
+similar-link-report *ARGS:
+    @uv run scripts/similar/link_report.py {{ARGS}}
+
 # Deep-soak with a focal-cat trace sidecar. Writes to
 # logs/tuned-<seed>/{events,narrative,trace-<focal>}.jsonl. Trace
 # records decompose per-tick L1/L2/L3 state for one focal cat per §11

@@ -38,6 +38,7 @@ pub mod kitten_cry;
 pub mod modifier_preempts_hunt;
 pub mod picking_up_scavenging;
 pub mod preset;
+pub mod route_cost_decision;
 pub mod runner;
 pub mod ward_placement;
 pub mod wildlife_fight;
@@ -105,6 +106,10 @@ pub const ALL: &[&Scenario] = &[
     // wounded cat is mid-Hunt and the AcuteHealthAdrenaline lurch
     // crosses its threshold.
     &modifier_preempts_hunt::SCENARIO,
+    // 228 — bold-vs-timid route-cost suppression microexperiment.
+    // Lifts hunt_route_cost_weight to 1.0 locally; canonical soak
+    // constants ship at 0.0 (substrate-dormant).
+    &route_cost_decision::SCENARIO,
 ];
 
 /// Look up a scenario by its `name` field.
