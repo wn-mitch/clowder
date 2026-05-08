@@ -15,119 +15,174 @@ landed-on: null
 
 ## Why
 
-223's soak surfaced a regression that 223's path-cost overlay alone can't
-close. With the legacy `FoxTerritorySuppression` damp branch retired,
-cats land in fox-scent corridors at *decision time* (Hunt/Forage/Patrol
-scores no longer suppressed near zero in fox territory) and then thrash
-when `acute_health_adrenaline_flee` preempts every plan tick after their
-hunger crashes. Three adult Starvation deaths clustered at adjacent
-tiles in the [33,21]–[31,22] fox corridor in the verification soak;
-0 courtship events; `MatingOccurred` / `CourtshipInteraction` /
-`PairingIntentionEmitted` never fired.
+223's soak surfaced a regression that 223's path-cost overlay alone
+can't close. With the legacy `FoxTerritorySuppression` damp branch
+retired, cats land in fox-scent corridors at *decision time*
+(Hunt/Forage/Patrol/Wander/Explore scores no longer suppressed in fox
+territory) and then thrash when `acute_health_adrenaline_flee` preempts
+every plan tick after their hunger crashes. Three adult Starvation
+deaths clustered at adjacent tiles in the [33,21]–[31,22] fox corridor
+in the verification soak; 0 courtship events; `MatingOccurred` /
+`CourtshipInteraction` / `PairingIntentionEmitted` never fired.
 
 The path-cost overlay (223) is *route-time* substrate — it gates which
-A* path the cat takes *given* a destination. The damp branch was
-*decision-time* substrate — it gates whether the cat picks a destination
-*in* fox territory at all. These compose orthogonally per §4.7
+A* path the cat takes *given* a destination. The retired damp branch
+was *decision-time* gating — it suppressed the L2 score that says "I
+want to Hunt here." These compose orthogonally per §4.7
 substrate-vs-search-state — both are substrate, but they answer
 different questions:
 
-- **Score-time gate** ("should I do this *here*?") — modifier suppresses
-  Hunt / Forage / Patrol / Wander / Explore when the cat's local fox
-  scent exceeds threshold, so the L3 softmax tilts toward Eat /
-  StockpileForage / Move-out-of-area.
+- **Score-time gate** ("should I do this *here*?") — at high local fox
+  scent, the L2 score for risky-territory dispositions tilts the L3
+  softmax toward Eat / StockpileForage / Move-out-of-area.
 - **Route-time gate** ("which route do I take?") — path-cost overlay
   raises A* edge cost on fox-scent tiles so paths to non-fox
   destinations route around the corridor. (Landed 223.)
 
-Removing the score-time gate without a replacement leaves cats with no
-reason not to hunt prey in fox territory; the path-cost overlay then
-just produces longer-but-still-traversable detour paths *into* the same
-risky corridor. Net effect: cats trapped in fox territory, starved.
+**Substrate over modifier.** The naive shape — re-add a
+`FoxTerritoryHuntSuppression` `ScoreModifier` that multiplicatively
+damps Hunt/Forage/Patrol/Wander/Explore — would re-introduce the exact
+override pattern the substrate refactor is retiring. Ticket 209 already
+lit the right shape: it wired `patrol_fox_scent_weight` into Patrol's
+CompensatedProduct as an L2 cost-axis reading `fox_scent_level` with
+`Composite{Logistic(6.0, 0.4), Invert}`. Ships dormant at 0.0; the
+score reflects "how risky is here" at decision time *naturally*, no
+post-CP modifier kicking in. This ticket extends that pattern from
+Patrol-only to its four DSE siblings.
 
 ## Scope
 
-- New `ScoreModifier` impl `FoxTerritoryHuntSuppression` (or similar
-  name; ship as a single-purpose modifier sibling to
-  `FleeFoxScentBoost`). Reads `FOX_SCENT_LEVEL` perception scalar.
-  Multiplicative damp on Hunt / Forage / Patrol / Wander / Explore
-  using the existing `fox_scent_suppression_threshold` and
-  `fox_scent_suppression_scale` constants from `ScoringConstants`.
-- Register in `default_modifier_pipeline` next to `FleeFoxScentBoost`
-  (matching the legacy `FoxTerritorySuppression` registration slot).
-- Tests: parallel the deleted `fox_suppression_damps_hunt_*` tests
-  from before 223. Plus a coverage test that asserts the modifier
-  pairs cleanly with `FleeFoxScentBoost` (boost on Flee + damp on
-  Hunt fire on the same tick without interaction).
+- Extend ticket 209's L2 cost-axis pattern (`src/ai/dses/patrol.rs:98–123`)
+  to **Hunt**, **Forage**, **Wander**, and **Explore**:
+  - Each DSE's CompensatedProduct gains a conditionally-added
+    `ScalarConsideration` reading `fox_scent_level` with the same
+    `Composite{Logistic(6.0, 0.4), Invert}` curve.
+  - Conditional add gate matches Patrol's: the axis is only present
+    when its weight `> 0.0` (CP semantics `c·0 = 0` would zero the
+    product if a 0-weight axis were always present).
+- New per-DSE constants in `ScoringConstants` (`src/resources/sim_constants.rs`),
+  paralleling `patrol_fox_scent_weight`:
+  - `hunt_fox_scent_weight: f32`
+  - `forage_fox_scent_weight: f32`
+  - `wander_fox_scent_weight: f32`
+  - `explore_fox_scent_weight: f32`
+  - All ship dormant at `0.0` with a `default_*_fox_scent_weight()`
+    function each. Tuning is a follow-on ticket per the 209 precedent.
+- Per-DSE unit tests mirroring patrol.rs's `dormant`/`active`
+  pattern: dormant default leaves CP unchanged; active weight adds
+  the consideration with the correct curve and weight.
 
 ## Out of scope
 
-- Personality-conditioned suppression (bold cats accept more risk at
-  decision time) — that's a parallel of ticket 224's path-weight
-  conditioning at the score layer; can land as a follow-on if the
-  symmetric shape proves desirable.
-- Re-introducing the combined `FoxTerritorySuppression` modifier
-  (boost+damp in one impl). Per option B in the 223 regression
-  investigation, two single-purpose modifiers compose more cleanly
-  with the substrate-over-override discipline than the legacy
-  combined shape.
+- **Re-adding `FoxTerritoryHuntSuppression` as a `ScoreModifier`.**
+  Explicitly the wrong layer per the substrate-over-override
+  discipline; this ticket exists to do the substrate-side fix
+  instead.
+- **Tuning the new weights to non-zero values.** Ships dormant; a
+  follow-on tuning ticket (analog of how 209 was opened then 211
+  tuned the Coordinate weight) lifts the weights once the substrate
+  is in place.
+- **Destination-aware fox-scent axis.** Patrol's existing axis reads
+  `fox_scent_level` (cat-position scalar). The line at
+  `patrol.rs:108` notes "this axis is reserved for a destination-aware
+  refinement once the SpatialConsideration variant lands." This
+  ticket matches the current cat-position shape; the destination-aware
+  lift is a separate follow-on after the SpatialConsideration variant
+  exists.
+- **Boldness conditioning of the L2 axis.** 224 conditions the
+  *path-weight* on boldness; conditioning the *L2 axis weight* on
+  boldness is a parallel-shape follow-on if balance work surfaces
+  the need (likely after these new weights are tuned).
 
 ## Current state
 
-- 223 landed the path-cost overlay (`FoxScentOverlay`,
-  `CorruptionOverlay`) + retired the legacy
-  `FoxTerritorySuppression` modifier (renamed to `FleeFoxScentBoost`,
-  Flee branch only).
-- This ticket lands the missing decision-time damp. After this lands,
-  the cluster's intent is fully expressed: cats avoid choosing
-  high-risk destinations AND route around fox scent on the way to
-  non-fox destinations.
+- 209 wired `patrol_fox_scent_weight` (Patrol L2 axis, dormant at
+  0.0). Reference impl: `src/ai/dses/patrol.rs:98–123`.
+- 222 landed `TileCostOverlay` substrate.
+- 223 landed cat-side path-cost overlays (`FoxScentOverlay`,
+  `CorruptionOverlay`) and retired the legacy
+  `FoxTerritorySuppression` modifier (renamed → `FleeFoxScentBoost`,
+  Flee additive branch only). 223's soak surfaced the
+  decision-time gap (3 adult Starvation, 0 courtship,
+  never-fired Mating in the [33,21]–[31,22] fox corridor).
+- 224 landed boldness-conditioned `WeightedOverlay` weights on the
+  path-cost layer. Boldness reads at L2 (Patrol/Hunt/Fight `boldness`
+  axis at `src/ai/scoring.rs:649`) and at the path layer
+  (`crate::ai::pathfinding::cat_path_weight_from_boldness`). This
+  ticket adds a *third* boldness-adjacent read site only if the
+  follow-on conditioning is desired (out of scope here).
+- After this ticket lands and weights are tuned, the cluster's
+  intent is fully expressed: cats avoid choosing high-risk
+  destinations (substrate L2 gate, this ticket) AND route around
+  fox scent en route to non-fox destinations (path-cost overlay,
+  223+224).
 
 ## Approach
 
-1. Mirror `FleeFoxScentBoost`'s shape:
-   ```rust
-   pub struct FoxTerritoryHuntSuppression {
-       threshold: f32,  // sc.fox_scent_suppression_threshold
-       scale: f32,      // sc.fox_scent_suppression_scale
-   }
-   ```
-   Reuse the existing `ScoringConstants` fields — no new constants.
-2. `apply` matches on `HUNT | EXPLORE | FORAGE | PATROL | WANDER`,
-   reads `FOX_SCENT_LEVEL`, computes the same suppression term
-   `((fox_scent − threshold) / (1 − threshold)) × scale`, returns
-   `score × (1 − suppression).max(0.0)`.
-3. Register in `default_modifier_pipeline` adjacent to
-   `FleeFoxScentBoost`. Order doesn't load-bear among the
-   multiplicative damps (each gated by a different DSE-id matrix and
-   a different scalar trigger).
-4. Tests in `src/ai/modifier.rs::tests`:
-   - `fox_hunt_suppression_damps_hunt_when_scent_above_threshold`
-     (mirrors deleted `fox_suppression_damps_hunt_*`).
-   - `fox_hunt_suppression_skips_when_below_threshold`.
-   - `fox_hunt_suppression_skips_non_applicable_dses` (verifies Eat,
-     Sleep, Mate, etc. are untouched).
-   - `flee_boost_and_hunt_damp_compose` — same fixture, both
-     modifiers run in pipeline; assert Flee gets +boost and Hunt
-     gets ×damp on the same tick.
+1. For each of Hunt, Forage, Wander, Explore (one DSE at a time so
+   each lands as a clean diff):
+   1. Locate the DSE's `*Dse::new` constructor.
+   2. Mirror `patrol.rs:98–123`:
+      ```rust
+      let fox_scent_weight = scoring.<dse>_fox_scent_weight.clamp(0.0, 1.0);
+      if fox_scent_weight > 0.0 {
+          considerations.push(Consideration::Scalar(ScalarConsideration::new(
+              "fox_scent_level",
+              Curve::Composite {
+                  inner: Box::new(Curve::Logistic {
+                      steepness: 6.0,
+                      midpoint: 0.4,
+                  }),
+                  post: PostOp::Invert,
+              },
+          )));
+          weights.push(fox_scent_weight);
+      }
+      ```
+      Use the *exact* same curve constants as Patrol — composing
+      well across the five DSEs requires shape parity. Per-DSE
+      *weight* differs; per-DSE *curve* does not.
+   3. Add `<dse>_fox_scent_weight` field to `ScoringConstants` with a
+      `default_<dse>_fox_scent_weight() -> f32 { 0.0 }` function and
+      `#[serde(default = "default_<dse>_fox_scent_weight")]` attribute,
+      matching `patrol_fox_scent_weight`'s shape.
+   4. Add the field to `ScoringConstants::default()` impl using the
+      default function.
+2. Tests per DSE (mirror `patrol.rs::tests`'s
+   `axis_dormant_at_default_weight` / `axis_active_at_nonzero_weight`):
+   - Dormant at default 0.0: CP composition contains exactly the
+     pre-axis considerations.
+   - Active at e.g. 0.3: CP composition contains the new
+     `fox_scent_level` ScalarConsideration with the correct
+     `Composite{Logistic{6.0, 0.4}, Invert}` curve and the assigned
+     weight.
+3. Document the decision-time vs route-time framing in each DSE's
+   doc comment near the new axis. The L2 axis decides *whether* to
+   pick that disposition in fox territory; the path-cost overlay
+   (223+224) decides *where* the route runs. Future readers must
+   not collapse them per the §4.7 boundary.
 
 ## Verification
 
-- `just check && just test` — all unit tests pass.
-- `just soak-trace 42 Wren` + `just verdict logs/tuned-42`.
-  Predictions:
-  - Adult Starvation deaths drop to 0 (the regression shape).
-  - Courtship events return to non-zero (a cluster of cats stuck in
-    fox-scent corridors blocks mating in 223 alone; restoring the
-    score-time gate frees them to leave the corridor).
-  - `MatingOccurred` / `CourtshipInteraction` /
-    `PairingIntentionEmitted` fire (currently silent post-223).
-  - ShadowFoxAmbush deaths trend at-or-below the post-223 level
-    (cats are more likely to avoid fox territory at decision time).
-- `just frame-diff` between post-223 and post-228 focal traces:
-  Hunt mean score should DROP in fox-scent buckets (matches
-  expectation); Eat / StockpileForage / Move scores should RISE in
-  the same buckets.
+- `just check && just test` — substrate ships dormant; existing
+  tests pass; new per-DSE dormant/active tests pass.
+- No soak required for the dormant ship — the L2 score paths are
+  unchanged at `weight = 0.0`. Tuning ticket follow-on does the
+  soak when it lifts the weights.
+- After tuning lifts at least one weight non-zero, soak predictions
+  should match the 223 regression analysis:
+  - Adult Starvation deaths drop to 0 (cats avoid hunting in fox
+    territory at decision time, so they don't get adrenaline-flee
+    locked).
+  - Courtship events return non-zero; `MatingOccurred` fires.
+  - ShadowFoxAmbush deaths trend at-or-below post-223 levels (cats
+    avoid fox territory at decision time).
+  - `just frame-diff` between post-223 and post-tuning focal traces:
+    Hunt / Forage mean scores DROP in fox-scent buckets ≥ 0.4; Eat
+    / StockpileForage / Move scores RISE in the same buckets.
+- Drift > ±10% on a characteristic metric requires a four-artifact
+  hypothesis at `docs/balance/<N>-fox-scent-decision-axes.md` per
+  CLAUDE.md balance discipline (in the tuning follow-on, not here).
 
 ## Log
 
@@ -137,3 +192,9 @@ risky corridor. Net effect: cats trapped in fox territory, starved.
   the case: 223's path-cost overlay is route-time substrate; the
   retired damp branch was decision-time substrate. They compose
   orthogonally; 223 alone leaves a gap at the decision layer.
+- 2026-05-07: reframed via substrate-over-modifier discussion. Original
+  draft proposed re-adding `FoxTerritoryHuntSuppression` as a
+  `ScoreModifier`; that's exactly the override pattern the substrate
+  refactor is retiring. Reframed scope to extend 209's L2 cost-axis
+  pattern from Patrol to its four siblings (Hunt/Forage/Wander/Explore),
+  shipping dormant at 0.0 with tuning as a separate follow-on.
