@@ -287,6 +287,24 @@ impl HasWardHerbs {
     pub const KEY: &str = "HasWardHerbs";
 }
 
+/// 231: per-cat marker indicating the cat has at least one empty
+/// inventory slot (`!Inventory::is_full()`). Authored by
+/// `items.rs::update_inventory_markers`.
+///
+/// Read on the substrate-path variant of the four pickup-class plan
+/// actions (`PickUpItemFromGround` / `RetrieveRawFood` /
+/// `RetrieveFoodForKitten` / `GatherHerb`). When absent, the planner's
+/// substrate path fails its precondition and only the plan-path
+/// variant (gated on `HasFreeSlotThisPlan(true)` after a DropItem-as-
+/// prefix step) remains expandable — A* composes
+/// `[DropItem, PickUp]` automatically when the cat is full. Mirrors
+/// the ticket-096 Construct dual-branch precedent.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasFreeSlot;
+impl HasFreeSlot {
+    pub const KEY: &str = "HasFreeSlot";
+}
+
 // ---------------------------------------------------------------------------
 // Colony singleton
 // ---------------------------------------------------------------------------

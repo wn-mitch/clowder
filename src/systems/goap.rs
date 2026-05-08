@@ -2145,6 +2145,16 @@ pub fn evaluate_and_plan(
             entity,
             materials_available_for(pos, &construction_pos, &construction_materials_complete),
         );
+        // Ticket 231: author the per-cat `HasFreeSlot` substrate marker
+        // from this cat's `Inventory`. Read by the substrate-path
+        // variant of the four pickup-class plan actions; the plan-path
+        // variant composes via DropItem-as-prefix
+        // (`HasFreeSlotThisPlan(true)`, search-state).
+        markers.set_entity(
+            markers::HasFreeSlot::KEY,
+            entity,
+            !inventory.is_full(),
+        );
         let planner_state = build_planner_state(
             pos,
             needs,
@@ -2667,7 +2677,7 @@ pub fn resolve_goap_plans(
     // (`MaterialsDeliveredThisPlan(true)`) covers the in-flight
     // haul→deliver→construct compose case where the marker still reads
     // false at plan entry.
-    for ((entity, _, _, pos, _, _, _, _, _), _) in &cats {
+    for ((entity, _, _, pos, _, _, inventory, _, _), _) in &cats {
         planner_markers.set_entity(
             markers::MaterialsAvailable::KEY,
             entity,
@@ -2676,6 +2686,14 @@ pub fn resolve_goap_plans(
                 &construction_positions,
                 &construction_materials_complete,
             ),
+        );
+        // Ticket 231: HasFreeSlot per-cat snapshot from `Inventory`.
+        // Read by the substrate-path variant of pickup-class plan
+        // actions; the plan-path variant uses HasFreeSlotThisPlan.
+        planner_markers.set_entity(
+            markers::HasFreeSlot::KEY,
+            entity,
+            !inventory.is_full(),
         );
     }
 

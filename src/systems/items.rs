@@ -4,7 +4,7 @@ use rand::Rng;
 use crate::components::building::{StoredItems, Structure, StructureType};
 use crate::components::items::{item_display_name, Item};
 use crate::components::magic::Inventory;
-use crate::components::markers::{HasHerbsInInventory, HasRemedyHerbs, HasWardHerbs};
+use crate::components::markers::{HasFreeSlot, HasHerbsInInventory, HasRemedyHerbs, HasWardHerbs};
 use crate::components::physical::Dead;
 use crate::resources::food::FoodStores;
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
@@ -15,14 +15,16 @@ use crate::resources::time::TimeState;
 // §4 per-cat inventory marker author
 // ---------------------------------------------------------------------------
 
-/// Author `HasHerbsInInventory`, `HasRemedyHerbs`, and `HasWardHerbs`
-/// markers on living cats based on their current inventory contents.
+/// Author `HasHerbsInInventory`, `HasRemedyHerbs`, `HasWardHerbs`,
+/// and (231) `HasFreeSlot` markers on living cats based on their
+/// current inventory contents.
 ///
 /// **Predicate fidelity.** The booleans authored here must match the inline
 /// `ScoringContext` field computations in `goap.rs` / `disposition.rs`:
 /// - `has_herbs_in_inventory` → `inventory.has_any_herb()`
 /// - `has_remedy_herbs` → `inventory.has_remedy_herb()`
 /// - `has_ward_herbs` → `inventory.has_ward_herb()`
+/// - `has_free_slot` → `!inventory.is_full()` (231)
 ///
 /// **Ordering.** Runs in Chain 2a before the GOAP/disposition scoring
 /// pipeline, so `MarkerSnapshot` population can read `Has<M>` booleans
@@ -37,14 +39,24 @@ pub fn update_inventory_markers(
             Has<HasHerbsInInventory>,
             Has<HasRemedyHerbs>,
             Has<HasWardHerbs>,
+            Has<HasFreeSlot>,
         ),
         Without<Dead>,
     >,
 ) {
-    for (entity, inventory, has_herbs_marker, has_remedy_marker, has_ward_marker) in cats.iter() {
+    for (
+        entity,
+        inventory,
+        has_herbs_marker,
+        has_remedy_marker,
+        has_ward_marker,
+        has_free_slot_marker,
+    ) in cats.iter()
+    {
         let has_herbs = inventory.has_any_herb();
         let has_remedy = inventory.has_remedy_herb();
         let has_ward = inventory.has_ward_herb();
+        let has_free_slot = !inventory.is_full();
 
         match (has_herbs, has_herbs_marker) {
             (true, false) => {
@@ -70,6 +82,15 @@ pub fn update_inventory_markers(
             }
             (false, true) => {
                 commands.entity(entity).remove::<HasWardHerbs>();
+            }
+            _ => {}
+        }
+        match (has_free_slot, has_free_slot_marker) {
+            (true, false) => {
+                commands.entity(entity).insert(HasFreeSlot);
+            }
+            (false, true) => {
+                commands.entity(entity).remove::<HasFreeSlot>();
             }
             _ => {}
         }
