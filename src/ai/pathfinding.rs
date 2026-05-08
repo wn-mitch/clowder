@@ -25,9 +25,49 @@ pub trait TileCostOverlay: Send + Sync {
     fn cost_at(&self, pos: Position) -> u32;
 }
 
+/// Per-overlay weight applied to [`TileCostOverlay::cost_at`] before
+/// summation. Ticket 224 — per-cat boldness conditions the threat-cost
+/// weight: bold cats use `weight ≈ 0.1` (still respect a 10% threat
+/// floor — no suicidal direct routes through fox dens), timid cats use
+/// `weight = 1.0` (full-weight detours).
+///
+/// Express `weight = 0.0` by **omitting** the overlay rather than
+/// passing a zero-weight one — avoids the `f32→u32` round footgun on
+/// small weights × small contributions.
+///
+/// Note on the boldness double-read: `Personality.boldness` reads at
+/// two layers in the AI substrate — the L2 axis on Patrol (and similar)
+/// in `src/ai/scoring.rs:649` decides *whether* the cat patrols; the
+/// path-cost weight here decides *where* the patrol routes. These are
+/// **complementary, not redundant** — the L2 axis gates the action; the
+/// path weight gates the route. Do not collapse in refactor.
+pub struct WeightedOverlay<'a> {
+    pub inner: &'a dyn TileCostOverlay,
+    pub weight: f32,
+}
+
+impl<'a> WeightedOverlay<'a> {
+    pub fn new(inner: &'a dyn TileCostOverlay, weight: f32) -> Self {
+        Self { inner, weight }
+    }
+}
+
+/// Convert per-cat boldness into the per-overlay weight used by the
+/// cat-side path-cost overlays. Bold cats (boldness=1.0) get weight 0.1;
+/// timid cats (boldness=0.0) get weight 1.0. The 0.1 floor preserves
+/// some threat-cost respect even at maximum boldness — bold cats route
+/// past fox scent rather than directly through fox dens.
 #[inline]
-fn sum_overlay_cost(overlays: &[&dyn TileCostOverlay], pos: Position) -> u32 {
-    overlays.iter().map(|o| o.cost_at(pos)).sum()
+pub fn cat_path_weight_from_boldness(boldness: f32) -> f32 {
+    (1.0 - boldness).clamp(0.1, 1.0)
+}
+
+#[inline]
+fn sum_overlay_cost(overlays: &[WeightedOverlay<'_>], pos: Position) -> u32 {
+    overlays
+        .iter()
+        .map(|o| (o.inner.cost_at(pos) as f32 * o.weight).round() as u32)
+        .sum()
 }
 
 // ---------------------------------------------------------------------------
@@ -165,7 +205,7 @@ pub fn find_path(
     from: Position,
     to: Position,
     map: &TileMap,
-    overlays: &[&dyn TileCostOverlay],
+    overlays: &[WeightedOverlay<'_>],
 ) -> Option<Vec<Position>> {
     if from == to {
         return Some(Vec::new());
@@ -272,7 +312,7 @@ pub fn step_toward(
     from: &Position,
     to: &Position,
     map: &TileMap,
-    overlays: &[&dyn TileCostOverlay],
+    overlays: &[WeightedOverlay<'_>],
 ) -> Option<Position> {
     if from == to {
         return None;
@@ -588,7 +628,7 @@ mod tests {
             target: Position::new(2, 0),
             cost: 50,
         };
-        let overlays: [&dyn TileCostOverlay; 1] = [&blocker];
+        let overlays: [WeightedOverlay; 1] = [WeightedOverlay::new(&blocker, 1.0)];
 
         let path = find_path(from, to, &map, &overlays).expect("path should exist");
         assert_eq!(*path.last().unwrap(), to);
@@ -620,7 +660,7 @@ mod tests {
             }
         }
         let zero = ZeroOverlay;
-        let overlays: [&dyn TileCostOverlay; 1] = [&zero];
+        let overlays: [WeightedOverlay; 1] = [WeightedOverlay::new(&zero, 1.0)];
         let path_b = find_path(from, to, &map, &overlays).expect("path should exist");
 
         assert_eq!(
@@ -672,7 +712,7 @@ mod tests {
             target: Position::new(1, 1),
             cost: 10,
         };
-        let overlays: [&dyn TileCostOverlay; 1] = [&blocker];
+        let overlays: [WeightedOverlay; 1] = [WeightedOverlay::new(&blocker, 1.0)];
 
         let next = step_toward(&from, &to, &map, &overlays).expect("should find a step");
         assert_ne!(

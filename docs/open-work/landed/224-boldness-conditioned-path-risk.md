@@ -1,7 +1,7 @@
 ---
 id: 224
 title: boldness-conditioned path risk
-status: ready
+status: done
 cluster: pathfinder-risk-awareness
 added: 2026-05-07
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-07
 ---
 
 ## Why
@@ -126,3 +126,4 @@ rather than uniformly cautious. Without it, the sim has cats but no
 
 ## Log
 - 2026-05-07: opened from work-214 investigation. Blocked-by 223.
+- 2026-05-07: landed without soak gate per user direction (next session continues into 225 with cleared context). 228 still pending — decision-time fox-territory damp will compose with this layer when it ships.

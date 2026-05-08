@@ -30,7 +30,7 @@ pub fn resolve_move_to(
     target_position: Option<Position>,
     cached_path: &mut Option<Vec<Position>>,
     map: &TileMap,
-    overlays: &[&dyn crate::ai::pathfinding::TileCostOverlay],
+    overlays: &[crate::ai::pathfinding::WeightedOverlay<'_>],
     cat_tile_counts: &HashMap<Position, u32>,
 ) -> StepOutcome<()> {
     let Some(target) = target_position else {

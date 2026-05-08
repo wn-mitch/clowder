@@ -62,7 +62,7 @@ pub fn resolve_construct(
         Without<crate::components::task_chain::TaskChain>,
     >,
     map: &TileMap,
-    overlays: &[&dyn crate::ai::pathfinding::TileCostOverlay],
+    overlays: &[crate::ai::pathfinding::WeightedOverlay<'_>],
     commands: &mut Commands,
     colony_score: &mut Option<ResMut<ColonyScore>>,
 ) -> StepOutcome<()> {

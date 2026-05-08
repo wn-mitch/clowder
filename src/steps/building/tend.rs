@@ -57,7 +57,7 @@ pub fn resolve_tend(
         Without<crate::components::task_chain::TaskChain>,
     >,
     map: &TileMap,
-    overlays: &[&dyn crate::ai::pathfinding::TileCostOverlay],
+    overlays: &[crate::ai::pathfinding::WeightedOverlay<'_>],
 ) -> StepOutcome<bool> {
     let Some(target) = target_entity else {
         return StepOutcome::unwitnessed(StepResult::Fail("no target for Tend".into()));

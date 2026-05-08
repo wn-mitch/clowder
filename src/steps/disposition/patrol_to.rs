@@ -36,7 +36,7 @@ pub fn resolve_patrol_to(
     cached_path: &mut Option<Vec<Position>>,
     needs: &mut Needs,
     map: &TileMap,
-    overlays: &[&dyn crate::ai::pathfinding::TileCostOverlay],
+    overlays: &[crate::ai::pathfinding::WeightedOverlay<'_>],
     d: &DispositionConstants,
     cat_tile_counts: &HashMap<Position, u32>,
 ) -> StepOutcome<()> {

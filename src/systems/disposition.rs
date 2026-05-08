@@ -3466,13 +3466,22 @@ fn dispatch_chain_step(
     // state (§4.7). Built once per dispatch and reused across the
     // per-step branches below. Reads `prey_params.fox_scent_map` +
     // tile corruption.
+    //
+    // Ticket 224 — per-cat boldness weight: bold cats route through
+    // higher threat cost (`weight ≈ 0.1`), timid cats detour with full
+    // weight. Complementary, NOT redundant, with the L2 boldness axis
+    // in `src/ai/scoring.rs:649` — that axis decides *whether* to
+    // patrol/hunt; this weight decides *where* the route runs.
     let fox_overlay = crate::ai::pathfinding::FoxScentOverlay::new(
         &prey_params.fox_scent_map,
         &constants.scoring,
     );
     let corr_overlay = crate::ai::pathfinding::CorruptionOverlay::new(map, &constants.scoring);
-    let cat_overlays: [&dyn crate::ai::pathfinding::TileCostOverlay; 2] =
-        [&fox_overlay, &corr_overlay];
+    let w = crate::ai::pathfinding::cat_path_weight_from_boldness(personality.boldness);
+    let cat_overlays: [crate::ai::pathfinding::WeightedOverlay; 2] = [
+        crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
+        crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
+    ];
 
     match step_kind {
         StepKind::HuntPrey { patrol_dir } => {

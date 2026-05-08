@@ -3609,8 +3609,11 @@ fn dispatch_step_action(
     match action_kind {
         GoapActionKind::TravelTo(zone) => {
             let (fox_overlay, corr_overlay) = cat_overlays_pair!();
-            let cat_overlays: [&dyn crate::ai::pathfinding::TileCostOverlay; 2] =
-                [&fox_overlay, &corr_overlay];
+            let w = crate::ai::pathfinding::cat_path_weight_from_boldness(personality.boldness);
+            let cat_overlays: [crate::ai::pathfinding::WeightedOverlay; 2] = [
+                crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
+                crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
+            ];
             resolve_travel_to(
                 zone,
                 &mut plan.step_state[step_idx],
@@ -4089,8 +4092,11 @@ fn dispatch_step_action(
                 );
             }
             let (fox_overlay, corr_overlay) = cat_overlays_pair!();
-            let cat_overlays: [&dyn crate::ai::pathfinding::TileCostOverlay; 2] =
-                [&fox_overlay, &corr_overlay];
+            let w = crate::ai::pathfinding::cat_path_weight_from_boldness(personality.boldness);
+            let cat_overlays: [crate::ai::pathfinding::WeightedOverlay; 2] = [
+                crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
+                crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
+            ];
             crate::steps::disposition::resolve_patrol_to(
                 pos,
                 plan.step_state[step_idx].target_position,
@@ -4191,8 +4197,13 @@ fn dispatch_step_action(
                             .is_some_and(|last| *last != target_pos)
                     {
                         let (fox_overlay, corr_overlay) = cat_overlays_pair!();
-                        let cat_overlays: [&dyn crate::ai::pathfinding::TileCostOverlay; 2] =
-                            [&fox_overlay, &corr_overlay];
+                        let w = crate::ai::pathfinding::cat_path_weight_from_boldness(
+                            personality.boldness,
+                        );
+                        let cat_overlays: [crate::ai::pathfinding::WeightedOverlay; 2] = [
+                            crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
+                            crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
+                        ];
                         plan.step_state[step_idx].cached_path =
                             crate::ai::pathfinding::find_path(*pos, target_pos, &ec.map, &cat_overlays);
                     }
@@ -4457,8 +4468,13 @@ fn dispatch_step_action(
                 if pos.manhattan_distance(&ward_target) > 1 {
                     if plan.step_state[step_idx].cached_path.is_none() {
                         let (fox_overlay, corr_overlay) = cat_overlays_pair!();
-                        let cat_overlays: [&dyn crate::ai::pathfinding::TileCostOverlay; 2] =
-                            [&fox_overlay, &corr_overlay];
+                        let w = crate::ai::pathfinding::cat_path_weight_from_boldness(
+                            personality.boldness,
+                        );
+                        let cat_overlays: [crate::ai::pathfinding::WeightedOverlay; 2] = [
+                            crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
+                            crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
+                        ];
                         plan.step_state[step_idx].cached_path =
                             crate::ai::pathfinding::find_path(*pos, ward_target, &ec.map, &cat_overlays);
                     }
@@ -4588,8 +4604,11 @@ fn dispatch_step_action(
                 .map(|e| snaps.cat_positions.iter().any(|(ce, _)| *ce == e))
                 .unwrap_or(false);
             let (fox_overlay, corr_overlay) = cat_overlays_pair!();
-            let cat_overlays: [&dyn crate::ai::pathfinding::TileCostOverlay; 2] =
-                [&fox_overlay, &corr_overlay];
+            let w = crate::ai::pathfinding::cat_path_weight_from_boldness(personality.boldness);
+            let cat_overlays: [crate::ai::pathfinding::WeightedOverlay; 2] = [
+                crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
+                crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
+            ];
             let (result, gratitude) = crate::steps::magic::resolve_apply_remedy(
                 remedy,
                 cat_entity,
@@ -4693,8 +4712,13 @@ fn dispatch_step_action(
                 if pos.manhattan_distance(&target) > 0 {
                     if plan.step_state[step_idx].cached_path.is_none() {
                         let (fox_overlay, corr_overlay) = cat_overlays_pair!();
-                        let cat_overlays: [&dyn crate::ai::pathfinding::TileCostOverlay; 2] =
-                            [&fox_overlay, &corr_overlay];
+                        let w = crate::ai::pathfinding::cat_path_weight_from_boldness(
+                            personality.boldness,
+                        );
+                        let cat_overlays: [crate::ai::pathfinding::WeightedOverlay; 2] = [
+                            crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
+                            crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
+                        ];
                         plan.step_state[step_idx].cached_path =
                             crate::ai::pathfinding::find_path(*pos, target, &ec.map, &cat_overlays);
                     }
@@ -4797,8 +4821,13 @@ fn dispatch_step_action(
                     let target = plan.step_state[step_idx].target_position.unwrap();
                     if plan.step_state[step_idx].cached_path.is_none() {
                         let (fox_overlay, corr_overlay) = cat_overlays_pair!();
-                        let cat_overlays: [&dyn crate::ai::pathfinding::TileCostOverlay; 2] =
-                            [&fox_overlay, &corr_overlay];
+                        let w = crate::ai::pathfinding::cat_path_weight_from_boldness(
+                            personality.boldness,
+                        );
+                        let cat_overlays: [crate::ai::pathfinding::WeightedOverlay; 2] = [
+                            crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
+                            crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
+                        ];
                         plan.step_state[step_idx].cached_path =
                             crate::ai::pathfinding::find_path(*pos, target, &ec.map, &cat_overlays);
                     }
@@ -4856,8 +4885,11 @@ fn dispatch_step_action(
                     .map(|(e, _)| *e);
             }
             let (fox_overlay, corr_overlay) = cat_overlays_pair!();
-            let cat_overlays: [&dyn crate::ai::pathfinding::TileCostOverlay; 2] =
-                [&fox_overlay, &corr_overlay];
+            let w = crate::ai::pathfinding::cat_path_weight_from_boldness(personality.boldness);
+            let cat_overlays: [crate::ai::pathfinding::WeightedOverlay; 2] = [
+                crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
+                crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
+            ];
             let outcome = crate::steps::building::resolve_construct(
                 plan.step_state[step_idx].target_entity,
                 pos,
@@ -4903,8 +4935,11 @@ fn dispatch_step_action(
                     .map(|(e, _, _, _, _)| *e);
             }
             let (fox_overlay, corr_overlay) = cat_overlays_pair!();
-            let cat_overlays: [&dyn crate::ai::pathfinding::TileCostOverlay; 2] =
-                [&fox_overlay, &corr_overlay];
+            let w = crate::ai::pathfinding::cat_path_weight_from_boldness(personality.boldness);
+            let cat_overlays: [crate::ai::pathfinding::WeightedOverlay; 2] = [
+                crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
+                crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
+            ];
             let outcome = crate::steps::building::resolve_tend(
                 plan.step_state[step_idx].target_entity,
                 pos,
@@ -4971,8 +5006,11 @@ fn dispatch_step_action(
             let target = plan.step_state[step_idx].target_entity;
             let cached = &mut plan.step_state[step_idx].cached_path;
             let (fox_overlay, corr_overlay) = cat_overlays_pair!();
-            let cat_overlays: [&dyn crate::ai::pathfinding::TileCostOverlay; 2] =
-                [&fox_overlay, &corr_overlay];
+            let w = crate::ai::pathfinding::cat_path_weight_from_boldness(personality.boldness);
+            let cat_overlays: [crate::ai::pathfinding::WeightedOverlay; 2] = [
+                crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
+                crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
+            ];
             let outcome = crate::steps::building::resolve_pickup_material(
                 target,
                 cat_entity,
@@ -5382,7 +5420,7 @@ fn resolve_travel_to(
     state: &mut StepExecutionState,
     pos: &mut Position,
     map: &TileMap,
-    overlays: &[&dyn crate::ai::pathfinding::TileCostOverlay],
+    overlays: &[crate::ai::pathfinding::WeightedOverlay<'_>],
     exploration_map: &ExplorationMap,
     cat_tile_counts: &HashMap<Position, u32>,
     stores_positions: &[Position],
@@ -5877,8 +5915,16 @@ fn resolve_engage_prey(
     let fox_overlay =
         crate::ai::pathfinding::FoxScentOverlay::new(&prey_params.fox_scent_map, scoring);
     let corr_overlay = crate::ai::pathfinding::CorruptionOverlay::new(map, scoring);
-    let cat_overlays: [&dyn crate::ai::pathfinding::TileCostOverlay; 2] =
-        [&fox_overlay, &corr_overlay];
+    // Ticket 224 — per-cat boldness weight on threat-cost overlays.
+    // Bold cats chase prey through fox territory more readily; timid
+    // cats detour. Complementary to the L2 boldness axis on Hunt
+    // (scoring.rs:649) — that axis decides *whether* to hunt; this
+    // weight decides *where* the chase route runs.
+    let w = crate::ai::pathfinding::cat_path_weight_from_boldness(personality.boldness);
+    let cat_overlays: [crate::ai::pathfinding::WeightedOverlay; 2] = [
+        crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
+        crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
+    ];
     let flee_strategy = prey_cfg.flee_strategy;
     let dist = pos.manhattan_distance(&prey_pos);
 

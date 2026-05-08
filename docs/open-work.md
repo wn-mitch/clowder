@@ -15,10 +15,10 @@ _Last generated: 2026-05-07._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 64 |
+| Ready | 63 |
 | Parked | 8 |
 | Blocked | 21 |
-| **Open total** | **99** |
+| **Open total** | **98** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -44,7 +44,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[093](docs/open-work/tickets/093-substrate-over-override-epic.md)** — Substrate-over-override — retire control-yanking hacks in favor of IAUS levers — _[substrate-over-override] · added 2026-04-30_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 
-## Ready (64)
+## Ready (63)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -105,7 +105,6 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[208](docs/open-work/tickets/208-per-cat-action-overlay-for-the-windowed-ui.md)** — Per-cat Action overlay for the windowed UI — _added 2026-05-07_
 - **[217](docs/open-work/tickets/217-scenario-marker-snapshot-wiring-as-a-discipline-requirement.md)** — scenario marker-snapshot wiring as a discipline requirement — _[process-discipline] · added 2026-05-07_
 - **[219](docs/open-work/tickets/219-shared-recent-ambush-event-marker.md)** — shared recent-ambush event marker — _[ai-substrate] · added 2026-05-07_
-- **[224](docs/open-work/tickets/224-boldness-conditioned-path-risk.md)** — boldness-conditioned path risk — _[pathfinder-risk-awareness] · added 2026-05-07_
 - **[225](docs/open-work/tickets/225-audit-patrol-l3-share-rise-under-additive-coordinator-dse-lift.md)** — audit Patrol L3 share rise under additive coordinator-DSE lift — _[ai-substrate] · added 2026-05-07_
 - **[226](docs/open-work/tickets/226-audit-groomother-share-vs-score-inversion-under-demographic-shift.md)** — audit GroomOther share-vs-score inversion under demographic shift — _[ai-substrate] · added 2026-05-07_
 - **[227](docs/open-work/tickets/227-coordinator-eligible-focal-cat-for-coordinate-frame-diff-parity.md)** — coordinator-eligible focal-cat for Coordinate frame-diff parity — _[process-discipline] · added 2026-05-07_
@@ -151,12 +150,13 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (148)
+## Landed archive (149)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (83)
+### 2026-05 (84)
 
+- **[224](docs/open-work/landed/224-boldness-conditioned-path-risk.md)** — boldness-conditioned path risk _(2026-05-07)_
 - **[223](docs/open-work/landed/223-cat-paths-respect-fox-scent-corruption.md)** — cat paths respect fox-scent + corruption _(2026-05-07)_
 - **[222](docs/open-work/landed/222-pathfinder-cost-overlay-trait.md)** — pathfinder cost-overlay trait _(2026-05-07)_
 - **[218](docs/open-work/landed/218-maslow-tier-rename.md)** — Rename Maslow `Level N` → `Tier N` to disambiguate from substrate `L1/L2/L3` _(2026-05-07)_

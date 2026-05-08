@@ -646,6 +646,13 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
     m.insert("ally_count", ctx.allies_fighting_threat as f32);
     // Personality coefficients flow through directly as `[0, 1]`
     // inputs to each DSE's Linear identity curve.
+    //
+    // Ticket 224 note: `boldness` reads at TWO substrate layers — here
+    // (L2 axis on Patrol/Hunt/Fight, decides *whether* to do it) and
+    // in `crate::ai::pathfinding::cat_path_weight_from_boldness`
+    // (path-cost weight, decides *where* to route once the action is
+    // chosen). Complementary, NOT redundant. Do not collapse in
+    // refactor.
     m.insert("boldness", ctx.personality.boldness.clamp(0.0, 1.0));
     m.insert("diligence", ctx.personality.diligence.clamp(0.0, 1.0));
     m.insert("sociability", ctx.personality.sociability.clamp(0.0, 1.0));

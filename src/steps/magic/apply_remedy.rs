@@ -48,7 +48,7 @@ pub fn resolve_apply_remedy(
     pos: &mut Position,
     skills: &mut Skills,
     map: &TileMap,
-    overlays: &[&dyn crate::ai::pathfinding::TileCostOverlay],
+    overlays: &[crate::ai::pathfinding::WeightedOverlay<'_>],
     commands: &mut Commands,
     log: &mut NarrativeLog,
     tick: u64,
