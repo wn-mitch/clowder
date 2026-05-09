@@ -22,6 +22,13 @@ simplified or stubbed during the marker port to keep the cutover
 behavior-neutral; this ticket promotes them to their truthful
 predicates so any balance impact is isolated to a single commit.
 
+Aligned with 249's TargetExistence-as-belief-proxy framing — these
+refinements move marker predicates from thin existence-checks toward
+belief-shaped sensing-attenuated predicates (the cat's integrated
+"do I have reason to think this is plannable?" judgment). See the
+§3.5.5 / §4.3 boundary documented by 249 in
+`docs/systems/ai-substrate-refactor.md`.
+
 ## Scope
 
 Three predicate refinements, all small:

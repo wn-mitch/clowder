@@ -1761,6 +1761,59 @@ sigmoid-lurch (acute distress, valence-split) vs. linear-ramp
 modifiers in the §3.5.1 catalog. Worked examples under tickets
 047 / 088 / 106 / 107 / 108 / 110.
 
+#### §3.5.5 `DispositionFailureCooldown` — the modifier-vs-marker boundary (ticket 249)
+
+`DispositionFailureCooldown` (added post-Phase-1 by ticket 123,
+`src/ai/modifier.rs::DispositionFailureCooldown`) is a §3.5
+post-scoring modifier that damps the score of a recently-failed
+disposition for `disposition_failure_cooldown_ticks` after a
+`make_plan → None` event. It currently covers seven dispositions
+(Hunting, Foraging, Crafting, Caretaking, Building, Mating,
+Mentoring) via a `signal_key` match arm.
+
+**It is NOT a §12.3 belief proxy.** The free-running per-disposition
+timer dampens scores via a side-channel; it does not update the
+cat's belief that the disposition is plannable. That makes its
+coverage decision load-bearing — extending it to additional
+dispositions whose failure mode is *epistemic* (no plannable target
+exists) grows typed-failure surface area without updating belief,
+making the eventual Talk-of-the-Town consolidation (§12.4 / cluster
+C3) harder.
+
+**Boundary against §4.3 TargetExistence markers:**
+
+- *Epistemic plan-failure* ("no Midden exists", "no eligible mate
+  exists", "no recipient available") → author a `TargetExistence`
+  marker per §4.3 above, gate the DSE's
+  `EligibilityFilter::require(...)` on it. The marker IS the cat's
+  integrated belief. Exemplars: `HasMidden` (gates Trashing, ticket
+  178), `HasGroundCarcass` (gates PickingUp, ticket 193),
+  `HasUnburiedCorpse` (gates Burying, ticket 035), `HasEligibleMate`
+  (gates Mating). **Important caveat:** if the DSE is also a
+  score-lift landing target for a §3.5 modifier (e.g., Sleep for
+  047's `AcuteHealthAdrenalineFlee`), an eligibility filter at the
+  DSE layer can starve the modifier's lift — the cliff fix belongs
+  at the plan-template / zone-resolution layer instead. See §4.3's
+  "Caveat from ticket 249's failed Sleep gate" for the precedent.
+- *Resource-state-aware failure* ("the colony has Stores, but the
+  Stores I just visited was empty / full") → cooldown stays as the
+  band-aid until ToT's per-resource belief revision lands.
+
+**Don't extend `signal_key`'s match arms** to cover Resting /
+Guarding / PickingUp / Discarding / Trashing / Handing / Socializing
+/ Exploring / Mating / Burying / Grooming / Coordinating. Those
+dispositions' epistemic failure modes belong on TargetExistence
+markers (the substrate-correct slot) — see §4.3's "factual vs
+aspirational" paragraph for which flavor each falls under.
+
+**`RecentDispositionFailures` is a temporary memory proxy** per
+§12.1's note that the substrate has no general memory→scoring
+coupling today. It joins `RecentTargetFailures`,
+`HuntingPriors::record_failed_search`, and any future per-event maps
+as one-off proxies that consolidate under ToT's unified `Memory`
+consumer (cluster C3). New failure-flavors should not be added in
+this shape.
+
 ### §3.6 Granularity (ch 13 pain-scale discipline)
 
 Today's `f32` scoring gives 2²³ ≈ 8M discrete levels. Ch 13
@@ -1868,6 +1921,67 @@ The vocabulary is **open**, not closed — see §5.6.9 for the extensibility
 contract that governs additions. The rows below enumerate current
 coverage; adding a marker later is writing one tick-system, not
 refactoring consumers.
+
+#### TargetExistence as belief proxy — factual vs aspirational (ticket 249)
+
+TargetExistence markers are the substrate's stand-in for the cat's
+"do I have reason to think this is plannable?" belief. Two flavors,
+distinguished by where the predicate sources from:
+
+- **Factual (this-frame, percept-attenuated)** — the cat's own
+  sight / scent / hearing / tremor channels are doing the work,
+  routed through §5.6's four-channel attenuation pipeline. Authored
+  per-cat in `sensing.rs::update_target_existence_markers` via
+  `observer_sees_at` / `observer_smells_at`. Examples: `PreyNearby`,
+  `CarcassNearby`, `HasHerbsNearby`, `HasSocialTarget`,
+  `HasUnburiedCorpse`, `HasGroundCarcass`, `HasThreatNearby`. If
+  sight is occluded or scent is upwind, the marker doesn't fire.
+- **Aspirational (colony-scoped, categorical)** — the cat doesn't
+  need line-of-sight; the marker encodes "the colony maintains a
+  thing of this kind, so I can route to one." Authored on the
+  `ColonyState` singleton via `update_colony_building_markers` /
+  ward-coverage / coordinator queues. Examples: `HasGarden`,
+  `HasConstructionSite`, `HasDamagedBuilding`, `HasMidden`,
+  `HasHandoffRecipient`, `WardStrengthLow`, `WardsUnderSiege`,
+  `IsCoordinatorWithDirectives`.
+
+**Categorical only — not resource-state-aware.** Aspirational
+markers answer *"does the colony have a Stores?"* (yes / no), not
+*"does that specific Stores have free deposit capacity right now?"*
+The latter requires per-resource belief revision (the cat's "I just
+opened the fridge and it was empty" experience updating belief about
+that specific Stores) and is explicitly deferred to Talk-of-the-Town
+per §12.4 / cluster C3. Until ToT lands, the
+`DispositionFailureCooldown` modifier (§3.5.1) covers that gap as a
+narrow band-aid; new aspirational markers MUST be authored at the
+categorical level only.
+
+**When to add a new TargetExistence marker.** A disposition's
+plan-failure mode is *epistemic* (no plannable target exists in the
+colony or in the cat's percept) → author a marker first, gate the
+DSE's `EligibilityFilter::require(...)` on it. Do NOT extend
+`DispositionFailureCooldown::signal_key`'s match arms to cover the
+disposition; modifier coverage is for the *resource-state-aware* gap
+above, not for missing belief proxies. `HasMidden` (gates Trashing,
+ticket 178), `HasGroundCarcass` (gates PickingUp, ticket 193),
+`HasUnburiedCorpse` (gates Burying, ticket 035), `HasEligibleMate`
+(gates Mating) are the exemplars.
+
+**Caveat from ticket 249's failed Sleep gate.** When the candidate
+DSE is *also* the landing target of a §3.5 score-lift modifier — Sleep
+is the in-pool partner for `AcuteHealthAdrenalineFlee` (047) because
+Flee is filtered from the disposition softmax — adding an
+`EligibilityFilter::require(...)` at the DSE layer can starve the
+modifier's lift, regressing 230's substrate-aware preempt-rate
+reduction. 249 attempted this on `SleepDse` and produced an 11×
+modifier-preempt regression vs the post-247 baseline; it was rolled
+back without landing. The cliff fix in cases where the DSE is a
+modifier-lift landing target belongs at the **plan-template /
+zone-resolution layer**, not at DSE eligibility — the disposition's
+score should remain available so the modifier can lift it; the
+planner's `replan_count` cap (§12.3 channel b) handles the
+not-actually-plannable case via §7.2 drop. See landed/249-... for the
+audit and the spawned follow-on tickets.
 
 #### Species (spawn-immutable)
 

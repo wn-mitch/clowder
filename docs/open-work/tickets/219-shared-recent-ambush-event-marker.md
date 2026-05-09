@@ -58,6 +58,40 @@ turns on `FoxScentMap` reading on Patrol; this ticket adds a
 *different* perception (event-anchored, not scent-anchored), and
 they compose.
 
+## Substrate posture (alignment with 249)
+
+`RecentAmbushMap` joins `RecentDispositionFailures`,
+`RecentTargetFailures`, and `HuntingPriors::record_failed_search`
+as a **typed-failure / typed-event memory substrate** — a per-flavor
+data structure with tick-decay, consumed by a specialized reader
+function, fed into `ScoringContext`. Per §12.1 of
+`docs/systems/ai-substrate-refactor.md`, the substrate has no
+general memory→scoring coupling today; each typed-failure
+component is a temporary proxy until Talk-of-the-Town's unified
+`Memory` consumer lands (cluster C3, ticket 007).
+
+This ticket ships `RecentAmbushMap` as designed — the colony-shared
+spatial event memory is genuinely orthogonal to the per-cat
+per-disposition cooldowns and serves a load-bearing perception
+need 210 documented (60–70% of ambushes cluster spatially). But
+authoring it is **adding a 4th typed-failure substrate**, and the
+closeout `## Log` line on land MUST cite the C3 consolidation path
+explicitly so future readers see the substrate as a temporary
+proxy, not a permanent fixture.
+
+When C3 lands, `RecentAmbushMap` should fold into the unified
+mental-model substrate as a `LocationModel.last_threat` facet
+(per 007's "Mental model facets" — *"For location mental models:
+**last_threat** (fox at this tile three days ago)"*) with
+proper evidence typology. Until then: the marker stands.
+
+249's reframe applies the same "don't grow new typed-failure surface
+area" doctrine to `DispositionFailureCooldown`'s match arms; the
+analogous question for 219 ("is `RecentAmbushMap` the right shape?")
+is answered "yes for now, with an explicit retirement path." See
+`src/ai/modifier.rs::DispositionFailureCooldown` rustdoc and §3.5.5
+for the boundary documentation.
+
 ## Approach
 1. Add `RecentAmbushMap` resource (grid-shaped, decaying float per
    tile) registered with `populate_influence_map_registry` per

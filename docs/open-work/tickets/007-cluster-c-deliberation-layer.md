@@ -182,6 +182,38 @@ but not on first encounter).
   `logs/events.jsonl`) for accuracy assertions and divergence
   diagnostics
 
+**Typed-failure-proxy consolidation candidates (surfaced by 249).**
+Per §12.1 of `docs/systems/ai-substrate-refactor.md`, the substrate
+has no general memory→scoring coupling today; per-failure-flavor /
+per-event-flavor typed components in tree are temporary proxies
+that consolidate under C3's unified `Memory` / mental-model
+substrate when this ticket lands. Catalog of current candidates:
+
+- `src/components/recent_disposition_failures.rs`
+  (`RecentDispositionFailures`) + `DispositionFailureCooldown`
+  modifier — per-cat per-disposition tick-stamped HashMap; consumed
+  by §3.5 modifier. Folds into per-cat
+  `MentalModel<DispositionKind>` with planning-failure facets +
+  evidence-typology decay.
+- `src/components/recent_target_failures.rs`
+  (`RecentTargetFailures`) + target-failure cooldown — per-cat
+  per-target Entity tick-stamped HashMap. Folds into per-cat
+  `MentalModel<Entity>` last-attempt facet.
+- `src/components/hunting_priors.rs`
+  (`HuntingPriors::record_catch / record_scent /
+  record_failed_search`) — per-cat spatial-tile decay over hunting
+  outcomes. Folds into per-cat `LocationModel.last_opportunity` +
+  `last_failed_search` facets.
+- `src/components/mental.rs` (`Memory` + `MemoryEntry`) — already
+  a §Touch points entry above; becomes the canonical container.
+- `RecentAmbushMap` (proposed in ticket 219; will land before C3
+  if 219 lands first) — colony-shared spatial event memory. Folds
+  into `LocationModel.last_threat` per the "For location mental
+  models" facet list above.
+- *(Add new typed-failure / typed-event components here as they
+  land. Each addition MUST cite this consolidation list in its
+  rationale §Log line so the C3 retirement path stays visible.)*
+
 **Preparation reading:**
 - **Ryan, Summerville, Mateas, Wardrip-Fruin (2017). "Simulating
   Character Knowledge Phenomena in Talk of the Town."** *Game AI
@@ -265,3 +297,4 @@ Not duplicated here; see sub-task 3 of #1.
 ## Log
 
 - 2026-04-27: dropped blocked-by 005 — cluster-A umbrella retired; A1 dependency satisfied by landed work. Status flipped blocked → ready.
+- 2026-05-09: 249 surfaced the typed-failure-proxy consolidation list under C3's §Touch points. The accumulating typed-failure / typed-event components in tree (`RecentDispositionFailures`, `RecentTargetFailures`, `HuntingPriors::record_failed_search`, plus `RecentAmbushMap` proposed in 219) are all temporary proxies for the unified mental-model substrate this ticket lands. New typed-failure surface area should not be added without an explicit retirement-under-C3 §Log entry in the originating ticket.

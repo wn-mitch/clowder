@@ -27,6 +27,8 @@ This is a coarse approximation of the original ticket spec, which called for "ki
 
 2. **`WoundedAlly` concept.** No marker today. Cats track `Injured` / `Incapacitated` markers on themselves, but there is no surface for "is there a hurt comrade nearby that I'd be abandoning by fleeing?"
 
+Aligned with 249's TargetExistence-as-belief-proxy framing — this ticket refines marker predicates to be belief-shaped (sensing-attenuated, not literal radius checks). See the §3.5.5 / §4.3 boundary documented by 249 in `docs/systems/ai-substrate-refactor.md`.
+
 ## Scope
 
 1. **`WoundedAlly` author** — colony or per-cat ZST authored when `Injured` || `Incapacitated` is present on a non-self cat within threat radius. Likely lives in `src/systems/sensing.rs` next to existing target-existence markers (`HasThreatNearby`, `HasSocialTarget`), or in a small new perception system.

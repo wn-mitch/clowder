@@ -267,3 +267,22 @@ worth investigating only if R4 turns out to dampen too much.
   no-RestingSpot → GoalUnreachable, not by the cooldown gap itself).
   If a future ticket revisits cooldown coverage, cite 247's H7 audit
   row.
+- 2026-05-09: **H7 closure attempt via 249 — closed without
+  landing.** 249 was opened the next day as the cooldown-coverage
+  follow-on despite Phase D's "not load-bearing" conclusion. The
+  in-session audit reframed it as a TargetExistence-marker fix
+  (author `ColonyHasStores`, gate `SleepDse.eligibility` on it).
+  Verification soak surfaced an 11× regression in
+  `acute_health_adrenaline_flee` modifier-preemption rate (4,228 →
+  32,902; baseline ~347/10kt → current ~3,830/10kt — back to pre-230
+  levels), because the DSE-eligibility gate starved the 047 modifier's
+  Sleep-lift landing target during cold-start, undoing 230's
+  substrate-aware preempt-rate reduction. 249 was rolled back without
+  landing; H7 remains `[verified-defect]` but not load-bearing per
+  Phase D, and the DSE-eligibility-vs-plan-template-gate distinction
+  is documented in §3.5.5 / §4.3 of
+  `docs/systems/ai-substrate-refactor.md` plus
+  `src/ai/modifier.rs::DispositionFailureCooldown` rustdoc (which
+  *did* land — independently true architectural understanding).
+  Three follow-on tickets opened from the audit; see the §Log of
+  closed-without-landing 249 for the IDs.

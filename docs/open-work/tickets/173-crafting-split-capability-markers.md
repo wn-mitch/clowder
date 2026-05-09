@@ -18,6 +18,15 @@ landed-on: null
 Ticket 155's plan called for three new L1 capability markers as
 Disposition-level eligibility gates:
 
+Aligned with 249's TargetExistence-as-belief-proxy framing — these
+capability markers fit the same substrate-correct slot 249 documented
+for `ColonyHasStores` / `HasMidden` / `HasGroundCarcass`. Each is a
+belief-shaped predicate (skill + personality threshold + percept
+composition), gating the DSE's `EligibilityFilter::require(...)`.
+See the §3.5.5 / §4.3 boundary documented by 249 in
+`docs/systems/ai-substrate-refactor.md`.
+
+
 - **`IsHerbalist`** — gates Herbalism. Composed from
   `personality.spirituality > threshold || herbcraft_skill >
   threshold || HasHerbsInInventory || HasHerbsNearby`. Authored in

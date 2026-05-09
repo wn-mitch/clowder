@@ -2635,7 +2635,7 @@ impl ScoreModifier for IntraspeciesConflictResponseFlight {
 
 /// §3.5.1 disposition-failure cooldown damp.
 ///
-/// **Trigger:** the DSE belongs to one of the seven failure-prone
+/// **Trigger:** the DSE belongs to one of the seven currently-covered
 /// dispositions (Hunting, Foraging, Crafting, Caretaking, Building,
 /// Mating, Mentoring) AND that disposition's failure signal `< 1.0`.
 ///
@@ -2656,13 +2656,73 @@ impl ScoreModifier for IntraspeciesConflictResponseFlight {
 /// - Mentoring: `mentor`
 ///
 /// Resting / Guarding / Socializing / Farming / Coordinating /
-/// Exploring are exempt — their step graphs don't share the
-/// `make_plan → None` retry pattern (different completion semantics
-/// or different planner-failure modes).
+/// Exploring are NOT covered. Per the §4.3 / §3.5 boundary documented
+/// in `docs/systems/ai-substrate-refactor.md`, those dispositions'
+/// epistemic failure modes (no plannable target) belong on
+/// **TargetExistence markers**, not on this modifier — see
+/// `markers::HasMidden` (gates Trashing), `markers::HasGroundCarcass`
+/// (gates PickingUp), `markers::HasUnburiedCorpse` (gates Burying),
+/// `markers::HasEligibleMate` (gates Mating) for the substrate-correct
+/// pattern.
 ///
 /// **Pipeline position:** prepended *before* every other modifier so
 /// additive bonuses (Pride / Independence / Patience / …) compose on
 /// already-damped scores when the cat is in cooldown.
+///
+/// # Substrate posture (ticket 249 audit)
+///
+/// `DispositionFailureCooldown` is a §3.5 post-scoring modifier; it is
+/// **NOT** one of the §12.3 belief proxies §7.2's reconsideration gate
+/// consumes (`achievement_believed`, `achievable_believed`,
+/// `still_goal`). It dampens scores via a free-running per-disposition
+/// timer rather than updating the cat's belief that the disposition is
+/// plannable. That makes it a side-channel, kept narrow and
+/// documented:
+///
+/// - **Substrate-correct sibling for "the cat shouldn't even
+///   consider this disposition":** §4.3 TargetExistence markers.
+///   When a disposition's failure mode is *epistemic* — the colony has
+///   no plannable target (no Midden, no recipient, no eligible mate,
+///   …) — author a TargetExistence marker on `ColonyState` (or per-cat
+///   where the percept is sensory) and add
+///   `EligibilityFilter::require(...)` on the DSE. `HasMidden` (gates
+///   Trashing), `HasGroundCarcass` (gates PickingUp),
+///   `HasUnburiedCorpse` (gates Burying), `HasEligibleMate` (gates
+///   Mating) are the exemplars. Do NOT extend `signal_key`'s match
+///   arms to cover new dispositions whose failure is epistemic; that
+///   grows typed-failure surface area without updating belief.
+///
+///   **Caveat from 249's failed gate attempt** (closed without
+///   landing): when the candidate DSE is *also* the landing target of
+///   a §3.5 score-lift modifier (Sleep is the landing target of 047's
+///   `AcuteHealthAdrenalineFlee`), an eligibility filter at the DSE
+///   layer can starve the modifier's lift, undoing 230's substrate-
+///   aware preempt-rate reduction. The cliff fix in those cases
+///   belongs at the plan-template / zone-resolution layer, not at DSE
+///   eligibility. See landed/249 for the audit + sibling-ticket
+///   thread on Sleep / RestingSpot zone resolution.
+///
+/// - **Surviving role:** the gap between *categorical* aspirational
+///   belief ("the colony has a Midden / Stores / etc.") and
+///   *resource-state-aware* belief ("that specific Stores has free
+///   capacity right now"). Resource-state-aware belief revision is
+///   the Talk-of-the-Town epic (§12.4 / cluster C3); until it lands,
+///   the cooldown damps for `disposition_failure_cooldown_ticks`
+///   after a `make_plan → None` event so the cat doesn't slam the
+///   planner with the same failing intent every tick when the
+///   categorical marker said yes but the run-time visit failed.
+///
+/// - **`RecentDispositionFailures` is a temporary memory proxy.**
+///   §12.1 of the substrate refactor names that the substrate has no
+///   general memory→scoring coupling today. The typed-failure-flavor
+///   components in tree (`RecentDispositionFailures`,
+///   `RecentTargetFailures`, `HuntingPriors::record_failed_search`,
+///   plus future per-event maps) are one-off proxies that consolidate
+///   under ToT's unified `Memory` consumer. New failure-flavors should
+///   not be added in this shape; new dispositions should reach for
+///   TargetExistence first, the cooldown last (and only when the
+///   resource-state-aware gap is genuinely load-bearing for that
+///   disposition).
 pub struct DispositionFailureCooldown;
 
 impl DispositionFailureCooldown {
