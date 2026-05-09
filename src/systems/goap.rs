@@ -2467,6 +2467,42 @@ pub fn evaluate_and_plan(
                 crate::components::IntentionSource::SelfMotivated,
             );
             commands.entity(entity).insert(held);
+            // Ticket 248 — surgically apply the IntentionMomentum
+            // modifier's lift to `current.last_scores[chosen_action]`.
+            // `score_actions` at the L2 author site (above) ran when
+            // the cat was `Without<HeldIntention>`, so the modifier's
+            // `lift_factor` scalar was 0.0 and the recorded held_score
+            // is un-lifted. The in-line trigger-3 preempt block
+            // (below; reads `current.last_scores[held_action]` on
+            // subsequent ticks) compares against
+            // `held_score + intention_preempt_margin`; without this
+            // write the threshold understates the held DSE's honest
+            // score by exactly the modifier's lift. (Trigger-3 still
+            // gates on the strength regime boundary to handle a
+            // separate softmax-low-margin oscillation; see the gate's
+            // doc-comment.) On the adoption tick `decay_factor == 1.0`,
+            // so the lift reduces to
+            // `commitment_strength × intention_momentum_lift`
+            // (mirroring `IntentionMomentum::apply` in
+            // `src/ai/modifier.rs:902-933`). Bevy's deferred command
+            // buffer means we can't re-run `score_actions` here to let
+            // the modifier produce the lift naturally — the inserted
+            // `HeldIntention` isn't visible to a query until the next
+            // flush — so the lift is written directly.
+            let intention_momentum_lift =
+                commitment_strength * d.intention_momentum_lift;
+            if intention_momentum_lift > 0.0 {
+                if let Some(entry) = current
+                    .last_scores
+                    .iter_mut()
+                    .find(|(a, _)| *a == chosen_action)
+                {
+                    entry.1 += intention_momentum_lift;
+                }
+                current.last_scores.sort_by(|a, b| {
+                    b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
+                });
+            }
             if let Some(activation) = res.activation.as_deref_mut() {
                 activation.record(
                     crate::resources::system_activation::Feature::IntentionAdopted,
@@ -3071,44 +3107,54 @@ pub fn resolve_goap_plans(
         // intention plus the cached `current.last_scores` (one-tick-
         // stale; populated at the previous `evaluate_and_plan`). If a
         // non-held DSE's score exceeds
-        // `held_score + commitment_strength × intention_momentum_lift
-        // + intention_preempt_margin`, drop the plan with
+        // `held_score + intention_preempt_margin`, drop the plan with
         // `Preempted`.
         //
-        // **Strength regime gate (ticket 247).** The formula's middle
-        // term, `commitment_strength × intention_momentum_lift`, is
-        // designed to compensate for the fact that `last_scores[held]`
-        // is captured BEFORE `HeldIntention` exists on fresh adoption
-        // (capture site at `evaluate_and_plan`'s tail; insertion at
-        // the L3 adoption site is one schedule edge later) — so the
-        // recorded `held_score` never sees the modifier's lift. The
-        // formula re-adds that lift. But for low `commitment_strength`
-        // (e.g. 0.1, lift 0.10 → compensation 0.01), the term
-        // collapses below the `intention_preempt_margin` noise floor
-        // (0.05). Below that boundary the held intention can't
-        // honestly defend itself; trigger-3 is skipped and the §7.2
-        // natural-drop path (Achieved / ReplanCap / DroppedGoal) is
-        // the correct fall-through. The boundary is tunable via
-        // `d.intention_preempt_strength_regime_boundary` (default
-        // 0.5).
+        // **Substrate-honest formula (ticket 248).** Pre-248 the
+        // formula carried a `commitment_strength × intention_momentum_lift`
+        // middle term to compensate for a timing defect: the L2 author
+        // site captured `last_scores` BEFORE inserting `HeldIntention`
+        // on fresh adoption, so the recorded `held_score` never saw the
+        // `IntentionMomentum` modifier's lift. 248 fixed the timing by
+        // surgically applying the lift to `last_scores[chosen_action]`
+        // at the L3 adoption site (above), so `held_score` here now
+        // reflects the modifier's lift directly. The middle term would
+        // double-count and is retired. Trigger-3 is now `held_score
+        // (lifted) + margin` — the honest "is the next-best DSE
+        // meaningfully better than the lifted held score" check.
         //
-        // **History (tickets 126 → 246 → 247).** 126 introduced this
-        // gate as a function-local `PREEMPT_STRENGTH_FLOOR = 0.5`
-        // after observing 230× wall-clock slowdown on a strength-0
-        // cat (held_score + 0.05 threshold, any noise crosses).
-        // 246 attempted to retire the gate on the basis that the
-        // wired `IntentionMomentum` modifier would lift
-        // `last_scores[held]` directly; the soak collapsed (5,580
-        // ticks vs 122,758 healthy, 99.5% PickUp/Drop lock, 0 Stores
-        // built, 1172 Resting GoalUnreachable). The diagnosis (247)
-        // identified the load-bearing capture-timing defect: the
-        // modifier fires only in the narrow `check_modifier_preemption`
-        // orphan window because `HeldIntention` is inserted AFTER
-        // `last_scores` is written. 247 reframes the gate as a
-        // named substrate-side branch with the rationale visible at
-        // the read site: setting the boundary to 0.0 still requires
-        // a fresh diagnosis ticket — the failure mode is not yet
-        // resolved, only correctly priced.
+        // **The strength regime gate is still load-bearing (ticket
+        // 248).** 248's verification soak with the gate at 0.0 still
+        // collapsed (5,000-tick PickUp lock; preserved at
+        // `logs/tuned-42-post-248-boundary-zero-collapsed/`), proving
+        // the gate addresses a separate failure mode from the lift-
+        // timing defect: **softmax-low-margin oscillation.** Low
+        // `commitment_strength` reflects a near-tie softmax pick,
+        // meaning the runner-up's `last_scores` entry is barely below
+        // `held_score`. Without the gate, trigger-3 fires next tick,
+        // §7.2 dual-removal clears the held intention, the re-election
+        // picks a similarly thin chosen_action, and the cycle locks.
+        // The gate at 0.5 says: "if the softmax was a close call,
+        // don't preempt — let the natural §7.2 path handle drops."
+        // See the field doc-comment on
+        // `DispositionConstants::intention_preempt_strength_regime_boundary`
+        // for the full rationale.
+        //
+        // **History (tickets 126 → 246 → 247 → 248).** 126 introduced
+        // a function-local `PREEMPT_STRENGTH_FLOOR = 0.5` gate after
+        // observing 230× wall-clock slowdown on a strength-0 cat. 246
+        // wired the `IntentionMomentum` modifier and tried to retire
+        // the floor; the soak collapsed (5,580 ticks vs 122,758
+        // healthy, 99.5% PickUp/Drop lock, 0 Stores built, 1172
+        // Resting GoalUnreachable). 247 diagnosed the timing defect
+        // and renamed the floor as a substrate-side branch
+        // (`intention_preempt_strength_regime_boundary`, default 0.5),
+        // pricing the failure mode without resolving it. 248 owns the
+        // substrate-correct fix at the L3 adoption site (above) —
+        // `held_score` now carries the lift directly, the middle
+        // compensation term is retired — but the gate stays at 0.5
+        // because retiring it re-introduces the lock under the
+        // softmax-low-margin dynamic above.
         //
         // Trigger (4) target_invalidates_intention is wired in
         // `commitment.rs` but not consulted here in 126 because
@@ -3129,9 +3175,11 @@ pub fn resolve_goap_plans(
                     .map(|(_, s)| *s)
                     .fold(f32::NEG_INFINITY, f32::max);
                 if top_non_held.is_finite() && held_score > 0.0 {
-                    let preempt_threshold = held_score
-                        + held.commitment_strength * d.intention_momentum_lift
-                        + d.intention_preempt_margin;
+                    // 248: middle term `commitment_strength ×
+                    // intention_momentum_lift` retired. `held_score`
+                    // now reflects the IntentionMomentum lift
+                    // directly via the L3 adoption-site write.
+                    let preempt_threshold = held_score + d.intention_preempt_margin;
                     if top_non_held > preempt_threshold {
                         plan_writer.write(PlanNarrative {
                             entity: cat_entity,

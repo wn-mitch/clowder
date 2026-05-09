@@ -2794,35 +2794,58 @@ pub struct DispositionConstants {
     pub intention_momentum_decay_ticks: u64,
     /// Ticket 126 — preempt-margin floor for reconsideration trigger
     /// (3): a non-held DSE must exceed
-    /// `held_score + commitment_strength × intention_momentum_lift +
-    /// intention_preempt_margin` to trigger a re-evaluation. The
-    /// "single-minded but not stupid" knob — small enough that a
-    /// genuine emergency clears it, large enough that score-jitter
-    /// can't. Default 0.05 (half of `oscillation_score_lift`).
+    /// `held_score + intention_preempt_margin` to trigger a re-
+    /// evaluation. `held_score` already reflects the
+    /// `IntentionMomentum` modifier's lift after ticket 248's L3
+    /// adoption-site write (`goap.rs::evaluate_and_plan` lifts
+    /// `last_scores[chosen_action]` in-place at adoption time, mirroring
+    /// `IntentionMomentum::apply` semantics). The "single-minded but
+    /// not stupid" knob — small enough that a genuine emergency
+    /// clears it, large enough that score-jitter can't. Default 0.05
+    /// (half of `oscillation_score_lift`).
     #[serde(default = "default_intention_preempt_margin")]
     pub intention_preempt_margin: f32,
-    /// Ticket 247 — strength regime boundary for reconsideration
-    /// trigger (3). The trigger-3 formula
-    /// `held_score + commitment_strength × intention_momentum_lift +
-    /// intention_preempt_margin` re-adds the modifier's lift to a
-    /// `last_scores[held]` snapshot that is captured BEFORE the
-    /// `HeldIntention` exists for fresh adoptions (capture at
-    /// `goap.rs::evaluate_and_plan` precedes insertion at the L3
-    /// adoption site by one schedule edge). Below this strength,
-    /// the formula's compensation term `commitment_strength ×
-    /// intention_momentum_lift` collapses into the
-    /// `intention_preempt_margin` noise floor — the held intention
-    /// cannot honestly defend itself. The §7.2 natural-drop path
-    /// (Achieved / ReplanCap / DroppedGoal) is the correct fall-
-    /// through; trigger-3 is skipped entirely for held intentions
-    /// at or below this strength. Default 0.5.
+    /// Ticket 247 / 248 — strength regime boundary for reconsideration
+    /// trigger (3); held intentions with `commitment_strength` strictly
+    /// below this value skip trigger-3 entirely. Default 0.5.
     ///
-    /// Ticket 246 attempted to retire this gate by setting it to
-    /// 0.0 and relying on the wired `IntentionMomentum` modifier;
-    /// the verification soak collapsed (5,580 ticks vs 122,758
-    /// healthy, 99.5% PickUp/Drop lock, 0 Stores built). Setting
-    /// this to 0.0 requires a fresh diagnosis ticket before re-
-    /// trying — see ticket 247's Log for the failure mechanism.
+    /// **Why the gate is still load-bearing after 248's substrate
+    /// fix.** 247 introduced this gate after 246's soak collapsed
+    /// when the function-local `PREEMPT_STRENGTH_FLOOR = 0.5` was
+    /// retired. The original framing was "the gate compensates for
+    /// the timing defect where `last_scores[held]` was captured
+    /// before `HeldIntention` existed, so the modifier's lift never
+    /// landed in the recorded `held_score`." 248 fixed that timing
+    /// defect by surgically applying the lift to
+    /// `last_scores[chosen_action]` at the L3 adoption site (see
+    /// `goap.rs::evaluate_and_plan`). The verification run with this
+    /// boundary at 0.0 STILL collapsed (5,000-tick PickUp lock,
+    /// preserved at `logs/tuned-42-post-248-boundary-zero-collapsed/`)
+    /// — proving the gate's true function is NOT compensating for
+    /// the missing lift, but protecting against a different
+    /// dynamic: **softmax-low-margin oscillations.** Low
+    /// `commitment_strength` reflects a near-tie softmax pick,
+    /// meaning the runner-up's actual score in `last_scores` is
+    /// barely below `held_score`. Without the gate, trigger-3 fires
+    /// the next tick (`top_non_held > held_score + margin`), §7.2
+    /// dual-removal clears the held intention, the re-election
+    /// picks (probably) the same chosen_action with similar low
+    /// margin, and the cycle repeats — locking colony-scale
+    /// behavior. The gate at 0.5 says: "if the softmax was a close
+    /// call, don't preempt — let the natural §7.2 path handle it."
+    ///
+    /// The middle compensation term is still retired (248), because
+    /// the lift is now honestly in `last_scores`. The gate stays at
+    /// 0.5 because it addresses a separate failure mode that
+    /// substrate honesty alone cannot resolve. A future ticket that
+    /// addresses softmax-low-margin oscillation directly (e.g., by
+    /// raising `commitment_strength_from_margin` floors, or by
+    /// elevating the L3 softmax temperature when margins thin)
+    /// could revisit retirement.
+    ///
+    /// Setting this below 0.5 risks reproducing the lock cliff;
+    /// only do so under a fresh diagnosis that names the new failure
+    /// mode being guarded against.
     #[serde(default = "default_intention_preempt_strength_regime_boundary")]
     pub intention_preempt_strength_regime_boundary: f32,
 }
@@ -2912,8 +2935,14 @@ fn default_intention_preempt_margin() -> f32 {
     0.05
 }
 
-/// Ticket 247 — strength regime boundary below which trigger-3 is
-/// skipped (modifier compensation collapses into margin noise).
+/// Ticket 247 / 248 — strength regime boundary below which trigger-3
+/// is skipped. 248 made the substrate honest (lift now lives in
+/// `last_scores`) and retired the redundant compensation term in
+/// the trigger-3 formula, but the gate is still load-bearing —
+/// addresses softmax-low-margin oscillation, a separate failure
+/// mode from the lift-timing defect. See field doc-comment for the
+/// full rationale and the preserved `boundary=0.0` collapse run at
+/// `logs/tuned-42-post-248-boundary-zero-collapsed/`.
 fn default_intention_preempt_strength_regime_boundary() -> f32 {
     0.5
 }

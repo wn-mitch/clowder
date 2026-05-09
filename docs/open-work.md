@@ -14,8 +14,8 @@ _Last generated: 2026-05-08._
 
 | Status | Count |
 |---|---|
-| In progress | 7 |
-| Ready | 71 |
+| In progress | 6 |
+| Ready | 72 |
 | Parked | 7 |
 | Blocked | 20 |
 | **Open total** | **105** |
@@ -35,7 +35,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 | **[093](docs/open-work/landed/093-substrate-over-override-epic.md)** Substrate-over-override | done | 30 | 30 | 0 (0 / 0 / 0 / 0) | `▰▰▰▰▰▰▰▰▰▰` 100% |
 | **[095](docs/open-work/tickets/095-body-zones-epic.md)** Body zones | ready | 0 | — | — | _no roster_ |
 
-## In progress (7)
+## In progress (6)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
@@ -43,9 +43,8 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _added 2026-04-27_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[229](docs/open-work/tickets/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose — _[tooling] · added 2026-05-08_
-- **[246](docs/open-work/tickets/246-wire-intentionmomentum-lift-via-scoringcontext-replace-strict-floor-preempt-patch.md)** — Wire IntentionMomentum lift via ScoringContext (replace strict-floor preempt patch) — _[C] · added 2026-05-08_
 
-## Ready (71)
+## Ready (72)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -118,6 +117,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[241](docs/open-work/tickets/241-burial-canary-structurally-hard-to-fire-post-230-death-rate-audit-canary-policy.md)** — Burial canary structurally hard to fire post-230 — death-rate audit + canary policy — _added 2026-05-08_
 - **[242](docs/open-work/tickets/242-body-cue-substrate-disposition-observable-markers.md)** — Body-cue substrate (Disposition → observable markers) — _added 2026-05-08_
 - **[244](docs/open-work/tickets/244-audible-cue-substrate-alarm-calls-distress-cries-hissing.md)** — Audible cue substrate (alarm calls, distress cries, hissing) — _added 2026-05-08_
+- **[249](docs/open-work/tickets/249-extend-dispositionfailurecooldown-coverage-to-restingguardingpickingup-et-al-r3-from-247.md)** — Extend DispositionFailureCooldown coverage to Resting/Guarding/PickingUp et al. (R3 from 247) — _added 2026-05-08_
 
 ## Parked (7)
 
@@ -157,13 +157,15 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (161)
+## Landed archive (163)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (96)
+### 2026-05 (98)
 
+- **[248](docs/open-work/landed/248-re-author-last-scores-after-heldintention-insertion-r5-from-247.md)** — Re-author last_scores after HeldIntention insertion (R5 from 247) _(2026-05-08)_
 - **[247](docs/open-work/landed/247-diagnose-intentionmomentum-floor-removal-pickup-lock-cliff.md)** — Diagnose IntentionMomentum + floor-removal PickUp-lock cliff _(2026-05-08)_
+- **[246](docs/open-work/landed/246-wire-intentionmomentum-lift-via-scoringcontext-replace-strict-floor-preempt-patch.md)** — Wire IntentionMomentum lift via ScoringContext (replace strict-floor preempt patch) _(2026-05-08)_
 - **[232](docs/open-work/landed/232-body-state-coupled-l3-softmax-temperature-for-stake-aware-decision-sharpness.md)** — Body-state-coupled L3 softmax temperature for stake-aware decision sharpness _(2026-05-08)_
 - **[231](docs/open-work/landed/231-gate-pickupitem-retrieverawfood-retrievefoodforkitten-plans-on-inventory-capacity.md)** — Strengthen pickup-class substrate — capacity markers + body-state subscription _(2026-05-08)_
 - **[228](docs/open-work/landed/228-fox-territory-huntforagepatrol-decision-time-suppression.md)** — cat route-cost field as L1 perception + Field Consideration variant _(2026-05-08)_
