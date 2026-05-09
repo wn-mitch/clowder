@@ -563,10 +563,6 @@ impl Feature {
             Feature::Socialized => Positive,
             Feature::GroomedOther => Positive,
             Feature::MentoredCat => Positive,
-            // 035: caring for the dead is a colony-positive continuity
-            // signal — same valence as the affiliative §Phase 5a peer
-            // features.
-            Feature::BurialPerformed => Positive,
             Feature::ThreatEngaged => Positive,
             Feature::MaterialsDelivered => Positive,
             Feature::MaterialPickedUp => Positive,
@@ -606,6 +602,15 @@ impl Feature {
             Feature::ItemDropped => Neutral,
             Feature::ItemTrashed => Neutral,
             Feature::ItemHandedOff => Neutral,
+            // 250: burial demoted from Positive to Neutral. Caring for
+            // the dead is conditional on death occurring; post-247 /
+            // 248 the substrate keeps colonies healthy enough that
+            // burial is genuinely rare. Treating zero burials as a
+            // never-fired-canary defect produced false `verdict: fail`
+            // results across post-246 / 247 / 248 baselines. Neutral
+            // valence + `expected_to_fire_per_soak() => false` (below)
+            // demotes the canary while preserving the footer tally.
+            Feature::BurialPerformed => Neutral,
 
             // --- Negative: adverse events, colony loss signals ---
             Feature::DeathStarvation => Negative,
@@ -863,6 +868,14 @@ impl Feature {
             // precedent). Adoption + fulfilment fall through to the
             // `_ => true` default and are canary-validated.
             Feature::IntentionAbandoned => false,
+            // 250: burial is conditional on death. Post-247 / 248 the
+            // substrate keeps colonies healthy enough that deaths
+            // (and therefore burials) are genuinely rare; treating
+            // zero burials as a never-fired-canary defect produced
+            // false `verdict: fail` results. Demoted alongside the
+            // valence change above. Footer tally still emits when
+            // burials happen.
+            Feature::BurialPerformed => false,
             // Every other feature is expected to fire per soak.
             _ => true,
         }
@@ -1226,13 +1239,16 @@ mod tests {
         // Ticket 230 added 2 Positive (FleeTargetPicked,
         // FleeRecovered — Fleeing chain end-to-end signals).
         // Ticket 035 added 1 Positive (BurialPerformed — burial
-        // continuity-canary signal).
+        // continuity-canary signal). Ticket 250 demoted it to
+        // Neutral after post-247 / 248 substrate stability made
+        // deaths (and therefore burials) genuinely rare in healthy
+        // colonies — net 0 to positive count, +1 to neutral.
         // Ticket 126 added 2 Positive (IntentionAdopted,
         // IntentionFulfilled) + 1 Neutral (IntentionAbandoned) for
         // the BDI intention substrate lifecycle.
-        assert_eq!(positive, 54);
+        assert_eq!(positive, 53);
         assert_eq!(negative, 23);
-        assert_eq!(neutral, 32);
+        assert_eq!(neutral, 33);
     }
 
     #[test]
@@ -1296,9 +1312,12 @@ mod tests {
 
     #[test]
     fn features_total_in_matches_category_counts() {
+        // Ticket 250: BurialPerformed demoted from Positive to Neutral
+        // (post-247 / 248 substrate makes deaths and burials genuinely
+        // rare in healthy colonies), shifting -1 positive / +1 neutral.
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            54
+            53
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),
@@ -1306,7 +1325,7 @@ mod tests {
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Neutral),
-            32
+            33
         );
     }
 
@@ -1397,6 +1416,15 @@ mod tests {
         assert!(!Feature::ShadowFoxBanished.expected_to_fire_per_soak());
         assert!(!Feature::FateAwakened.expected_to_fire_per_soak());
         assert!(!Feature::ScryCompleted.expected_to_fire_per_soak());
+        // 250: burial is conditional on death; post-247 / 248
+        // substrate keeps colonies healthy enough that deaths are
+        // genuinely rare. Demoted to neutral + exempted from the
+        // never-fired canary.
+        assert!(!Feature::BurialPerformed.expected_to_fire_per_soak());
+        assert_eq!(
+            Feature::BurialPerformed.category(),
+            FeatureCategory::Neutral
+        );
         // Cascade-exempt: silent strictly because their trunk is
         // silent. Promoting them to expected would multiply one
         // root-cause failure into N canary entries.

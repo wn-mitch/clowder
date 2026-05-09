@@ -125,7 +125,7 @@ Exemplars: `src/steps/disposition/cook.rs`, `src/steps/disposition/feed_kitten.r
 
 **Hard survival gates** (must pass on the canonical seed-42 deep-soak): `deaths_by_cause.Starvation == 0` · `deaths_by_cause.ShadowFoxAmbush <= 10` · footer line written · `never_fired_expected_positives == 0`.
 
-**Continuity canaries** (each ≥1 per soak; collapse means survival lock): `grooming` · `play` · `mentoring` · `burial` · `courtship` · `mythic-texture` (≥1 named event per sim year). Generational continuity tracked via `KittenMatured` in the activation block.
+**Continuity canaries** (each ≥1 per soak; collapse means survival lock): `grooming` · `play` · `mentoring` · `courtship` · `mythic-texture` (≥1 named event per sim year). Generational continuity tracked via `KittenMatured` in the activation block. Ticket 250 demoted `burial` from the canary set because post-247 / 248 substrate stability makes deaths (and therefore burials) genuinely rare in healthy colonies; the footer tally still records burials when they happen.
 
 **Drift > ±10% on a characteristic metric requires a hypothesis** `{ecological/perceptual fact} ⇒ {predicted direction + magnitude}` and four artifacts (hypothesis · prediction · observation · concordance — direction match + magnitude within ~2×). `just hypothesize <spec.yaml>` runs this end-to-end. Drift > ±30% needs additional scrutiny. Survival canaries are hard gates regardless. **A refactor that changes sim behavior is a balance change.** Doctrine: `docs/balance/*.md`.
 

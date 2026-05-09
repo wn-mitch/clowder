@@ -8,7 +8,7 @@
 > fresh. See `CLAUDE.md` §"Long-horizon coordination" for the request-time
 > checklist and maintenance rules.
 
-_Last generated: 2026-05-08._
+_Last generated: 2026-05-09._
 
 ## Summary
 
@@ -157,12 +157,13 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (163)
+## Landed archive (164)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (98)
+### 2026-05 (99)
 
+- **[250](docs/open-work/landed/250-demote-burialperformed-move-to-neutral-feature-and-remove-from-continuity-canary-set.md)** — Demote BurialPerformed — move to neutral feature and remove from continuity canary set _(2026-05-09)_
 - **[248](docs/open-work/landed/248-re-author-last-scores-after-heldintention-insertion-r5-from-247.md)** — Re-author last_scores after HeldIntention insertion (R5 from 247) _(2026-05-08)_
 - **[247](docs/open-work/landed/247-diagnose-intentionmomentum-floor-removal-pickup-lock-cliff.md)** — Diagnose IntentionMomentum + floor-removal PickUp-lock cliff _(2026-05-08)_
 - **[246](docs/open-work/landed/246-wire-intentionmomentum-lift-via-scoringcontext-replace-strict-floor-preempt-patch.md)** — Wire IntentionMomentum lift via ScoringContext (replace strict-floor preempt patch) _(2026-05-08)_

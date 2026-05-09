@@ -1,12 +1,19 @@
 #!/usr/bin/env bash
 # Runs the continuity-canary query against an events.jsonl footer.
-# Exits non-zero when any of the six canaries (grooming, play,
-# mentoring, burial, courtship, mythic-texture) fires zero times.
+# Exits non-zero when any of the five canaries (grooming, play,
+# mentoring, courtship, mythic-texture) fires zero times.
 #
 # Paired with `scripts/check_canaries.sh`: canaries gate survival
 # ("colony didn't starve"); continuity gates range ("colony showed
 # the behavioural repertoire the design promises"). Both are hard
 # gates wrapped by `just verdict`.
+#
+# Ticket 250: burial removed from the canary set (was the sixth
+# class). Post-247 / 248 the substrate keeps colonies healthy enough
+# that deaths (and therefore burials) are genuinely rare; treating
+# zero burials as a continuity defect produced false `verdict: fail`
+# results across baselines. Footer tallies still emit `burial` when
+# burials happen — the demotion is purely the gate.
 #
 # Source of truth for the canary set: docs/systems/ai-substrate-refactor.md
 # §11.3, propagated into refactor-plan.md Phase 1 deliverables.
@@ -32,9 +39,10 @@ echo "checking continuity canaries against: $LOGFILE"
 
 fail=0
 
-# Six canary classes. Order chosen to match the headless footer's
-# print order (CLAUDE.md "broaden sideways" list).
-for canary in grooming play mentoring burial courtship mythic-texture; do
+# Five canary classes (burial demoted in ticket 250). Order chosen
+# to match the headless footer's print order (CLAUDE.md "broaden
+# sideways" list).
+for canary in grooming play mentoring courtship mythic-texture; do
     count=$(echo "$tallies" | jq -r --arg k "$canary" '.[$k] // 0')
     count="${count:-0}"
     if [ "$count" -gt 0 ]; then
