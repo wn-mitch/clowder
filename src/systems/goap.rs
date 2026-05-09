@@ -3075,38 +3075,47 @@ pub fn resolve_goap_plans(
         // + intention_preempt_margin`, drop the plan with
         // `Preempted`.
         //
-        // **Gated on `commitment_strength` being meaningful.** The
-        // first iteration's threshold (`commitment_strength × 0.10 +
-        // 0.05`) was a strict-less-than `oscillation_score_lift`'s
-        // 0.10 pad — and `last_scores` is stale (populated only on
-        // `evaluate_and_plan`-tick adoption), so a strength=0 cat
-        // would have its preempt-threshold static at `held_score +
-        // 0.05`, which any score-noise competitor exceeds → constant
-        // plan churn → 230× wall-clock slowdown observed on the
-        // first soak verification. The strict floor below replaces
-        // that: weak-commitment intentions don't defend via preempt,
-        // they fall through to the natural §7.2 drop. Tune via post-
-        // landing sensitivity sweep before promoting the floor down.
+        // **Strength regime gate (ticket 247).** The formula's middle
+        // term, `commitment_strength × intention_momentum_lift`, is
+        // designed to compensate for the fact that `last_scores[held]`
+        // is captured BEFORE `HeldIntention` exists on fresh adoption
+        // (capture site at `evaluate_and_plan`'s tail; insertion at
+        // the L3 adoption site is one schedule edge later) — so the
+        // recorded `held_score` never sees the modifier's lift. The
+        // formula re-adds that lift. But for low `commitment_strength`
+        // (e.g. 0.1, lift 0.10 → compensation 0.01), the term
+        // collapses below the `intention_preempt_margin` noise floor
+        // (0.05). Below that boundary the held intention can't
+        // honestly defend itself; trigger-3 is skipped and the §7.2
+        // natural-drop path (Achieved / ReplanCap / DroppedGoal) is
+        // the correct fall-through. The boundary is tunable via
+        // `d.intention_preempt_strength_regime_boundary` (default
+        // 0.5).
         //
-        // **Ticket 246 attempted to retire this floor on the basis
-        // that the wired `IntentionMomentum` modifier would lift
-        // `held_score` in `last_scores` enough to keep
-        // `preempt_threshold` defensible without the floor. The
-        // verification soak collapsed (15× sim-throughput drop, cats
-        // locked in PickUp loops, 0 Stores built, 1172 Resting
-        // GoalUnreachable). The wiring (above, at the L2 author
-        // site) is preserved — `IntentionMomentum` now fires in the
-        // `check_modifier_preemption` orphan window — but the floor
-        // stays as a load-bearing hack until a follow-on ticket
-        // (TBD) diagnoses the colony-scale lock mechanism.**
+        // **History (tickets 126 → 246 → 247).** 126 introduced this
+        // gate as a function-local `PREEMPT_STRENGTH_FLOOR = 0.5`
+        // after observing 230× wall-clock slowdown on a strength-0
+        // cat (held_score + 0.05 threshold, any noise crosses).
+        // 246 attempted to retire the gate on the basis that the
+        // wired `IntentionMomentum` modifier would lift
+        // `last_scores[held]` directly; the soak collapsed (5,580
+        // ticks vs 122,758 healthy, 99.5% PickUp/Drop lock, 0 Stores
+        // built, 1172 Resting GoalUnreachable). The diagnosis (247)
+        // identified the load-bearing capture-timing defect: the
+        // modifier fires only in the narrow `check_modifier_preemption`
+        // orphan window because `HeldIntention` is inserted AFTER
+        // `last_scores` is written. 247 reframes the gate as a
+        // named substrate-side branch with the rationale visible at
+        // the read site: setting the boundary to 0.0 still requires
+        // a fresh diagnosis ticket — the failure mode is not yet
+        // resolved, only correctly priced.
         //
         // Trigger (4) target_invalidates_intention is wired in
         // `commitment.rs` but not consulted here in 126 because
         // `HeldIntention.target` is always `None` at the C3 author
         // site (target tracking lands with 127/129).
-        const PREEMPT_STRENGTH_FLOOR: f32 = 0.5;
         if let Ok(held) = ec.held_intentions.get(cat_entity) {
-            if held.commitment_strength >= PREEMPT_STRENGTH_FLOOR {
+            if held.commitment_strength >= d.intention_preempt_strength_regime_boundary {
                 let held_score = current
                     .last_scores
                     .iter()

@@ -2801,6 +2801,30 @@ pub struct DispositionConstants {
     /// can't. Default 0.05 (half of `oscillation_score_lift`).
     #[serde(default = "default_intention_preempt_margin")]
     pub intention_preempt_margin: f32,
+    /// Ticket 247 — strength regime boundary for reconsideration
+    /// trigger (3). The trigger-3 formula
+    /// `held_score + commitment_strength × intention_momentum_lift +
+    /// intention_preempt_margin` re-adds the modifier's lift to a
+    /// `last_scores[held]` snapshot that is captured BEFORE the
+    /// `HeldIntention` exists for fresh adoptions (capture at
+    /// `goap.rs::evaluate_and_plan` precedes insertion at the L3
+    /// adoption site by one schedule edge). Below this strength,
+    /// the formula's compensation term `commitment_strength ×
+    /// intention_momentum_lift` collapses into the
+    /// `intention_preempt_margin` noise floor — the held intention
+    /// cannot honestly defend itself. The §7.2 natural-drop path
+    /// (Achieved / ReplanCap / DroppedGoal) is the correct fall-
+    /// through; trigger-3 is skipped entirely for held intentions
+    /// at or below this strength. Default 0.5.
+    ///
+    /// Ticket 246 attempted to retire this gate by setting it to
+    /// 0.0 and relying on the wired `IntentionMomentum` modifier;
+    /// the verification soak collapsed (5,580 ticks vs 122,758
+    /// healthy, 99.5% PickUp/Drop lock, 0 Stores built). Setting
+    /// this to 0.0 requires a fresh diagnosis ticket before re-
+    /// trying — see ticket 247's Log for the failure mechanism.
+    #[serde(default = "default_intention_preempt_strength_regime_boundary")]
+    pub intention_preempt_strength_regime_boundary: f32,
 }
 
 fn default_true() -> bool {
@@ -2886,6 +2910,12 @@ fn default_intention_momentum_decay_ticks() -> u64 {
 /// Ticket 126 — preempt-margin floor for reconsideration trigger (3).
 fn default_intention_preempt_margin() -> f32 {
     0.05
+}
+
+/// Ticket 247 — strength regime boundary below which trigger-3 is
+/// skipped (modifier compensation collapses into margin noise).
+fn default_intention_preempt_strength_regime_boundary() -> f32 {
+    0.5
 }
 
 fn default_cook_base_score() -> f32 {
@@ -3793,6 +3823,8 @@ impl Default for DispositionConstants {
             intention_momentum_lift: default_intention_momentum_lift(),
             intention_momentum_decay_ticks: default_intention_momentum_decay_ticks(),
             intention_preempt_margin: default_intention_preempt_margin(),
+            intention_preempt_strength_regime_boundary:
+                default_intention_preempt_strength_regime_boundary(),
         }
     }
 }

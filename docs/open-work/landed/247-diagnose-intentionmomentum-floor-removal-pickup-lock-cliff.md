@@ -1,7 +1,7 @@
 ---
 id: 247
 title: Diagnose IntentionMomentum + floor-removal PickUp-lock cliff
-status: blocked
+status: done
 cluster: null
 added: 2026-05-08
 parked: null
@@ -9,8 +9,8 @@ blocked-by: [246]
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-08
 ---
 
 <!--
@@ -102,14 +102,14 @@ least one of the fix candidates below.
 
 | Layer | Component / file | Load-bearing fact | Status |
 |---|---|---|---|
-| L1 markers | `src/components/markers.rs::HasGroundCarcass` | Re-asserts each tick from ground food items; gates PickingUp eligibility | `[needs-promote]` |
-| L2 DSE scores | `src/ai/dses/picking_up.rs` (DSE) + `src/ai/modifier.rs::IntentionMomentum` (lift) | PickingUp scores high when ground items present + free slot; modifier lifts held DSE only in orphan-Held window | `[needs-promote]` |
-| L3 softmax | `src/systems/goap.rs::evaluate_and_plan` softmax + last_scores capture (line 2182) | `last_scores` written at end of e_a_p, BEFORE HeldIntention exists for new adoptions; reflects modifier lift only in orphan-Held re-elections | `[needs-promote]` |
-| Action→Disposition mapping | `src/components/disposition.rs::from_action` (line 287) | `Action::PickUp → DispositionKind::PickingUp` (1:1) | `[verified-correct]` |
-| Plan template | `src/ai/planner/actions.rs::picking_up_actions` (~line 1034) + `resting_actions` (line 149) + `goap.rs::build_zone_distances::RestingSpot` (line 7752) | RestingSpot zone = nearest Stores + (1, 0); resolves None if no Stores → Sleep step unreachable → Resting GoalUnreachable | `[needs-promote]` |
-| Completion proxy | `src/components/commitment.rs::strategy_for_disposition` (line 235) + `should_drop_intention` | PickingUp = SingleMinded; achievement_believed at trips_done >= 1 (one PickUp completes the plan); §7.2 drop removes both GoapPlan and HeldIntention via Commands at goap.rs:3766-3769 | `[needs-promote]` |
-| Trigger-3 preempt | `src/systems/goap.rs:3070-3132` | `preempt_threshold = held_score + commitment_strength × 0.10 + 0.05`. With floor: skipped if strength < 0.5. Without floor: fires for any HeldIntention; collapses to `held_score + 0.05` for low-strength → any noise crosses → constant churn | `[needs-promote]` |
-| Cooldown coverage | `src/ai/modifier.rs::DispositionFailureCooldown::signal_key` | Covers Hunt/Forage/Cook/Caretake/Build/Mate/Mentor. Does NOT cover Resting/Guarding/PickingUp/Discarding/Trashing/Handing/Socializing/Exploring/Mating/Burying — these can re-elect immediately after planning failure | `[needs-promote]` |
+| L1 markers | `src/components/markers.rs::HasGroundCarcass` (lines 500-504); writer at `src/systems/goap.rs:1291-1294`; reader at `src/ai/dses/picking_up.rs:93-94` | Re-asserts each tick from ground food items via colony-marker-author scan over Items with `location == OnGround` and `kind.is_food()`; gates PickingUp DSE via `require(HasGroundCarcass::KEY)` | `[verified-correct]` |
+| L2 DSE scores | `src/ai/dses/picking_up.rs:62-96` (DSE composition: inverted Logistic over `colony_food_security` + health-deficit Linear damping); `src/ai/modifier.rs:902-928` IntentionMomentum (short-circuits on `lift_factor <= 0.0`, gates on `dse_id_for_action(held_action)` match, adds `lift` to score) | PickingUp scores high when ground items present + free slot; modifier reads `intention_held_action_ordinal` + `intention_momentum_lift_factor` scalars and lifts the held DSE | `[verified-correct]` |
+| L3 softmax | `src/systems/goap.rs:2182` (`last_scores` capture) AND `src/systems/goap.rs:2469` (`HeldIntention` insertion at adoption branch) | `last_scores` is captured BEFORE `HeldIntention` is authored on fresh adoption — the recorded `held_score` never sees the modifier's lift. **The trigger-3 formula `held_score + commitment_strength × intention_momentum_lift + intention_preempt_margin` is designed to re-add the missing lift; for low `commitment_strength` the compensation collapses below margin noise, undefending the held intention.** | **`[verified-defect]`** |
+| Action→Disposition mapping | `src/components/disposition.rs:287` | `Action::PickUp => Some(Self::PickingUp)` (1:1) | `[verified-correct]` |
+| Plan template / RestingSpot zone | `src/systems/goap.rs:7766-7771` `RestingSpot` zone resolution via `.iter().min_by_key(...).map(...)` over `stores_positions` | When `stores_positions` is empty, `.map()` yields `None` → `RestingSpot` zone unresolved → `ZoneIs(RestingSpot)` precondition fails → Sleep step unreachable → `Resting:GoalUnreachable` (1172 occurrences in collapsed run footer) | `[verified-correct]` |
+| Completion proxy + §7.2 dual-removal | `src/ai/commitment.rs:235` (`PickingUp => SingleMinded`); drop trigger at `src/ai/commitment.rs:155-164` (SingleMinded drops on `achieved \|\| unachievable`); `src/systems/goap.rs:3779-3783` removes both `GoapPlan` and `HeldIntention` in same `plans_to_remove` iteration | PickingUp completes in 1 tick (`trips_done >= 1`), then §7.2 dual-removal clears HeldIntention alongside the plan — leaves the cat re-electing on the next tick with last_scores still un-lifted | `[verified-correct]` |
+| Trigger-3 preempt | `src/systems/goap.rs:3070-3144` (formula); `intention_momentum_lift = 0.10`, `intention_preempt_margin = 0.05` (header dump from collapsed run) | `preempt_threshold = held_score + commitment_strength × 0.10 + 0.05`. For `commitment_strength = 0.1`, compensation = 0.01 — far below the 0.05 margin floor. Pre-247 floor at 0.5 was equivalent to: "only run trigger-3 when commitment compensation ≥ margin." | `[verified-correct]` (floor's effect is correct; only the encoding was opaque) |
+| Cooldown coverage | `src/ai/modifier.rs:2673-2686` `DispositionFailureCooldown::signal_key` match arms | Covered: Hunt, Forage, Cook, HerbcraftGather, HerbcraftPrepare, HerbcraftWard, MagicScry, MagicDurableWard, MagicCleanse, MagicColonyCleanse, MagicHarvest, MagicCommune, Caretake, Build, Mate, Mentor. **Uncovered:** Resting, Guarding, PickingUp, Discarding, Trashing, Handing, Socializing, Exploring, Mating, Burying, Grooming, Coordinating. Resting=1172 + Guarding=526 GoalUnreachable in collapsed run footer concentrated in uncovered set. | **`[verified-defect]`** (Phase D follow-on; out of scope for 247) |
 
 ## Fix candidates
 
@@ -196,3 +196,74 @@ worth investigating only if R4 turns out to dampen too much.
   preserved above. Layer-walk rows are `[needs-promote]` — fresh
   queries required before any candidate is ranked. 246 left the floor
   in place; this ticket owns the substrate-correct retirement.
+- 2026-05-08: **Phase A diagnostic** on
+  `logs/tuned-42-post-246-floor-removed-collapsed/` confirmed the
+  ticket's runtime claims via skill surface (`just q run-summary`,
+  `actions`, `footer`, `anomalies`): final_tick=1,205,580 (5,580
+  simulated), 99.55% PickUp action distribution,
+  `planning_failures_by_disposition` Resting=1172 / Guarding=526 /
+  Hunting=75 / Foraging=70 (all `GoalUnreachable`), continuity
+  tallies all collapsed except grooming=3, 12 expected-positive
+  Features never fired. Header constants confirmed
+  `intention_momentum_lift=0.10`, `intention_preempt_margin=0.05`.
+  The collapsed run's trace-Mallow.jsonl is header-only (focal cat
+  emitted no L2/L3 records before collapse), so the bimodal
+  `commitment_strength` distribution couldn't be queried directly —
+  but the action-distribution + planning-failure breakdown is
+  conclusive evidence of low-strength PickUp adoptions churning at
+  ~2.5/tick. **Code-side promotion** of the layer-walk rows replaced
+  `[needs-promote]` with verified status (see audit table above):
+  H3 (`last_scores` capture at `goap.rs:2182` precedes `HeldIntention`
+  insertion at line 2469) and H7 (`DispositionFailureCooldown::signal_key`
+  match arms at `modifier.rs:2673-2686` omit Resting / Guarding /
+  PickingUp / Discarding / Trashing / Handing / Socializing /
+  Exploring / Mating / Burying / Grooming / Coordinating) are
+  `[verified-defect]`; H1, H2, H4, H5, H6, plus the trigger-3 row
+  itself, are `[verified-correct]`.
+- 2026-05-08: **Phase B (R4 implementation).** Replaced function-local
+  `const PREEMPT_STRENGTH_FLOOR: f32 = 0.5;` at `src/systems/goap.rs:3107`
+  with a read of `d.intention_preempt_strength_regime_boundary` (new
+  field on `DispositionConstants`, default 0.5). Added field +
+  default-fn + `Default` impl entry at `src/resources/sim_constants.rs`.
+  Updated trigger-3 rustdoc to reframe the gate as a *named substrate-
+  side branch* with the substrate-correctness rationale (modifier
+  compensation `commitment_strength × intention_momentum_lift`
+  collapses below `intention_preempt_margin` noise floor → §7.2
+  natural drop is the honest fall-through), keeping the 246-history
+  paragraph and naming this ticket. `just check` clean (cargo check,
+  clippy, step-contract, time-units, iaus-coherence, substrate-stubs,
+  items-are-real, InfluenceMap registry).
+- 2026-05-08: **Phase C verification.**
+  (1) `cargo test focal_does_not_lock_on_pickup` (regression guard) —
+  passes; scenario does not lock at scenario scale post-R4 (matches
+  pre-R4 behavior since the lock is colony-scale only).
+  (2) `just soak-trace 42 Mallow` followed by `just verdict logs/tuned-42
+  --baseline logs/tuned-42-post-246-floor-restored-33f326ad/events.jsonl`
+  — duration_drift_pct=1.9% (well under 20%), aggregate score
+  2193.89 vs 2196.15 baseline (-0.1%, band:pass), welfare +4.4%,
+  zero deaths from any cause, planning_failures
+  Resting=0 / Guarding=2 / Hunting=40 / Foraging=28 (vs collapsed
+  run's 1172 / 526 / 75 / 70 — cliff is gone), continuity tallies
+  courtship=3223 / grooming=1804 / mentoring=546 / play=14 /
+  mythic-texture=27 / burial=0 (only burial unchanged from baseline,
+  pre-existing condition), single never-fired Feature is
+  `BurialPerformed` (also pre-existing). The `verdict: fail` is
+  driven entirely by `burial=0`, which is identical in the post-246
+  floor-restored baseline → not introduced by R4.
+  (3) `just frame-diff logs/tuned-42-post-246-floor-restored-33f326ad/trace-Mallow.jsonl
+  logs/tuned-42/trace-Mallow.jsonl` — concordance: ok, no per-DSE
+  drift on tracked DSEs.
+  Conclusion: R4 preserves the floor's effect identically; the named
+  substrate-side branch is byte-equivalent to the function-local
+  constant in expected behavior. Floor retirement (boundary → 0.0)
+  remains gated on a future ticket per the rustdoc + sim_constants
+  doc-comment forward pointer.
+- 2026-05-08: **Phase D evaluation.** R3 follow-on (cooldown coverage
+  for Resting / Guarding / et al.) NOT opened. Post-R4 planning-failure
+  counts for Resting (=0) and Guarding (=2) match the post-246
+  floor-restored baseline; the cooldown gap remains `[verified-defect]`
+  but is not load-bearing once trigger-3 churn is resolved (the
+  Resting cascade in the collapsed run was driven by no-Stores →
+  no-RestingSpot → GoalUnreachable, not by the cooldown gap itself).
+  If a future ticket revisits cooldown coverage, cite 247's H7 audit
+  row.

@@ -17,8 +17,8 @@ _Last generated: 2026-05-08._
 | In progress | 7 |
 | Ready | 71 |
 | Parked | 7 |
-| Blocked | 21 |
-| **Open total** | **106** |
+| Blocked | 20 |
+| **Open total** | **105** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -129,7 +129,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[199](docs/open-work/tickets/199-pipeline-walk-skill.md)** — Hunt / production / consumption pipeline-walk skill (194 P4) — _[process-discipline] · parked 2026-05-06 · added 2026-05-06_
 - **[214](docs/open-work/tickets/214-tune-patrol-fox-scent-weight.md)** — tune patrol_fox_scent_weight — _[balance] · parked 2026-05-07 · blocked-by 209 · added 2026-05-07_
 
-## Blocked (21)
+## Blocked (20)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _blocked-by 007, 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _blocked-by 016 · added 2026-04-22_
@@ -151,19 +151,19 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[221](docs/open-work/tickets/221-caretake-gates-on-ambush-recency-at-kitten-tile.md)** — caretake gates on ambush-recency at kitten tile — _[ai-substrate] · blocked-by 219 · added 2026-05-07_
 - **[243](docs/open-work/tickets/243-behavior-observation-l1-channel-target-side-body-cue-physical-marker-reads.md)** — Behavior-observation L1 channel (target-side body-cue + physical marker reads) — _blocked-by 242 · added 2026-05-08_
 - **[245](docs/open-work/tickets/245-ambient-predatorprey-behavior-observation-enrichment.md)** — Ambient predator/prey behavior-observation enrichment — _blocked-by 243 · added 2026-05-08_
-- **[247](docs/open-work/tickets/247-diagnose-intentionmomentum-floor-removal-pickup-lock-cliff.md)** — Diagnose IntentionMomentum + floor-removal PickUp-lock cliff — _blocked-by 246 · added 2026-05-08_
 
 ## Pre-existing (2)
 
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (160)
+## Landed archive (161)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (95)
+### 2026-05 (96)
 
+- **[247](docs/open-work/landed/247-diagnose-intentionmomentum-floor-removal-pickup-lock-cliff.md)** — Diagnose IntentionMomentum + floor-removal PickUp-lock cliff _(2026-05-08)_
 - **[232](docs/open-work/landed/232-body-state-coupled-l3-softmax-temperature-for-stake-aware-decision-sharpness.md)** — Body-state-coupled L3 softmax temperature for stake-aware decision sharpness _(2026-05-08)_
 - **[231](docs/open-work/landed/231-gate-pickupitem-retrieverawfood-retrievefoodforkitten-plans-on-inventory-capacity.md)** — Strengthen pickup-class substrate — capacity markers + body-state subscription _(2026-05-08)_
 - **[228](docs/open-work/landed/228-fox-territory-huntforagepatrol-decision-time-suppression.md)** — cat route-cost field as L1 perception + Field Consideration variant _(2026-05-08)_
