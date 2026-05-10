@@ -49,9 +49,10 @@ fn passable(map: &TileMap, p: Position) -> bool {
 /// **Feature emission** — caller passes `Feature::FleeTargetPicked`
 /// (Positive) to `record_if_witnessed`. The Feature ships
 /// `expected_to_fire_per_soak() => false` (cascade from
-/// `AcuteHealthAdrenalineFlee` / `ThreatProximityAdrenalineFlee`
-/// lifting Flee, which is rare on a healthy colony). Promote after
-/// the post-230 multi-seed baseline.
+/// `ThreatProximityAdrenalineFlee` lifting Flee, which is rare on a
+/// healthy colony — pre-251 also `AcuteHealthAdrenalineFlee` lifted
+/// Flee on injury, but 251 retired that lift). Promote after the
+/// post-230 multi-seed baseline.
 pub fn resolve_pick_flee_target(
     self_pos: Position,
     route_cost_field: Option<&RouteCostField>,

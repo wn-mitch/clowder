@@ -346,10 +346,13 @@ pub enum Feature {
     /// destination against the cat's per-replan `RouteCostField`. Fires
     /// once per Fleeing-disposition adoption (the first step in the
     /// chain). `expected_to_fire_per_soak() => false`: cascade from
-    /// `AcuteHealthAdrenalineFlee` / `ThreatProximityAdrenalineFlee`
-    /// lifting Flee, which itself is rare on a healthy colony. Will
-    /// promote to `true` after the post-230 baseline shows it firing
-    /// reliably across seeds.
+    /// `ThreatProximityAdrenalineFlee` lifting Flee, which itself is
+    /// rare on a healthy colony. (Pre-251 also `AcuteHealthAdrenalineFlee`
+    /// lifted Flee on injury; 251 retired that lift — but Flee adoption
+    /// was already statistical-zero in seed-42 healthy soaks per the
+    /// 252 audit, so the retirement does not change Flee's adoption
+    /// rate.) Will promote to `true` after the post-230 baseline shows
+    /// it firing reliably across seeds.
     FleeTargetPicked,
     /// Ticket 230 — `HoldUntilSafe` completed: the cat held a low-
     /// `RouteCostField` tile with safety need above
@@ -857,11 +860,14 @@ impl Feature {
             // tripwire that surfaces them.
             Feature::RouteCostFieldFallback => false,
             // 230: Fleeing chain Features. Cascade-from-rare-event:
-            // `AcuteHealthAdrenalineFlee` and
             // `ThreatProximityAdrenalineFlee` should rarely lift Flee
             // to win selection on a healthy colony, so the trip
-            // signals stay opt-in. Promote to `true` after the
-            // post-230 multi-seed baseline shows reliable firing.
+            // signals stay opt-in. (Pre-251 also
+            // `AcuteHealthAdrenalineFlee` lifted Flee on injury — 251
+            // retired that lift but Flee adoption was already
+            // statistical-zero in seed-42 healthy soaks.) Promote to
+            // `true` after the post-230 multi-seed baseline shows
+            // reliable firing.
             Feature::FleeTargetPicked => false,
             Feature::FleeRecovered => false,
             // 126: BDI abandon is bursty (per `PairingDropped`'s

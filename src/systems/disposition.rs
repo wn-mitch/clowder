@@ -212,8 +212,10 @@ use crate::resources::time::{DayPhase, Season, TimeScale, TimeState};
 // rebuilt incrementally by tickets 106/107/108/119 as each anxiety arm
 // (Starvation / Exhaustion / CriticalHealth / CriticalSafety) was
 // retired in favor of substrate-driven modifiers
-// (`HungerUrgency`, `ExhaustionPressure`,
-// `AcuteHealthAdrenalineFlee`, `ThreatProximityAdrenalineFlee`).
+// (`HungerUrgency`, `ExhaustionPressure`, `ThreatProximityAdrenalineFlee`,
+// and the now-retired `AcuteHealthAdrenalineFlee` whose load moved
+// further into the substrate-proper Sleep `health_deficit` axis at
+// ticket 251).
 //
 // Ticket 230 retired the last surviving arm — `ThreatDetected` — by
 // promoting `Action::Flee` into a full `DispositionKind::Fleeing` with
@@ -4329,9 +4331,11 @@ mod tests {
 
     // Ticket 119 retired `critical_health_interrupts_guarding` and
     // `critical_health_interrupts_resting` — the legacy CriticalHealth
-    // arm of `check_interrupt` is gone. Coverage moved to the
-    // substrate-driven preempt path: `tests::preempts_in_flight_*` in
-    // `src/ai/modifier.rs` and the `modifier_preempts_hunt` scenario.
+    // arm of `check_interrupt` is gone. Coverage moved first to the
+    // substrate-driven preempt path (`AcuteHealthAdrenalineFlee` —
+    // retired by ticket 251), and now lives in the substrate-proper
+    // Sleep `health_deficit` Logistic axis (251) plus the still-active
+    // Fight (102) and Freeze (105) sibling lurch modifiers.
     //
     // Ticket 230 retired the entire `check_anxiety_interrupts` system
     // (and its sole remaining `ThreatDetected` arm) by promoting

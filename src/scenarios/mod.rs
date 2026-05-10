@@ -41,7 +41,6 @@ pub mod intention_momentum_pickup_lock;
 pub mod inventory_full_no_pickup;
 pub mod kitten_cry;
 pub mod lone_burial;
-pub mod modifier_preempts_hunt;
 pub mod picking_up_scavenging;
 pub mod preset;
 pub mod route_cost_decision;
@@ -115,11 +114,6 @@ pub const ALL: &[&Scenario] = &[
     // 193 — election-side scenario for the rerouted PickingUp plan
     // template (PlannerZone::CarcassPile).
     &picking_up_scavenging::SCENARIO,
-    // 118 — substrate-driven plan preemption for acute-class lurch
-    // modifiers. Asserts Feature::ModifierPreemption fires when a
-    // wounded cat is mid-Hunt and the AcuteHealthAdrenaline lurch
-    // crosses its threshold.
-    &modifier_preempts_hunt::SCENARIO,
     // 228 — bold-vs-timid route-cost suppression microexperiment.
     // Lifts hunt_route_cost_weight to 1.0 locally; canonical soak
     // constants ship at 0.0 (substrate-dormant).

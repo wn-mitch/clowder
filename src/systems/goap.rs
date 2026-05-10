@@ -690,9 +690,10 @@ pub fn check_modifier_preemption(
         // accumulates hold ticks instead of re-firing
         // `PickFleeTarget` every tick. This was the entire shape of
         // the post-228 thrash spiral: 39,536× preempts in 100k ticks
-        // because `AcuteHealthAdrenalineFlee::preempts_in_flight`
-        // returned `true` whenever `flee_lift > 0`, regardless of
-        // the in-flight plan.
+        // because the (since-retired-by-251)
+        // `AcuteHealthAdrenalineFlee::preempts_in_flight` returned
+        // `true` whenever `flee_lift > 0`, regardless of the
+        // in-flight plan.
         if matches!(
             plan.kind,
             DispositionKind::Resting | DispositionKind::Eating | DispositionKind::Fleeing
@@ -700,9 +701,10 @@ pub fn check_modifier_preemption(
             continue;
         }
 
-        // Minimal scalar fetch — only the trigger scalars the four
-        // acute-class lurch modifiers (047 / 102 / 105 / 108) consult
-        // in their `preempts_in_flight` predicates. Aligned with the
+        // Minimal scalar fetch — only the trigger scalars the three
+        // remaining acute-class lurch modifiers (102 / 105 / 108)
+        // consult in their `preempts_in_flight` predicates (post-251 —
+        // 047's `AcuteHealthAdrenalineFlee` was retired). Aligned with the
         // canonical `scoring::ctx_scalars` keys (single source of
         // truth). Ticket 108 — the `threat_proximity_derivative`
         // computation here mirrors the ScoringContext builder's

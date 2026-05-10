@@ -1,10 +1,12 @@
 //! Ticket 230 microexperiment — substrate-aware flee commitment.
 //!
 //! A wounded cat with a wildlife threat at adjacent range elects
-//! `Action::Flee` via the `AcuteHealthAdrenalineFlee` /
-//! `ThreatProximityAdrenalineFlee` modifier lifts; the new
-//! `DispositionKind::Fleeing` plan template
-//! `[PickFleeTarget, Flee, HoldUntilSafe]` then dispatches.
+//! `Action::Flee` via the `ThreatProximityAdrenalineFlee` modifier
+//! lift (post-251 — `AcuteHealthAdrenalineFlee` was retired with the
+//! load shifted to Sleep's `health_deficit` Logistic axis, so injury
+//! alone no longer lifts Flee). The new `DispositionKind::Fleeing`
+//! plan template `[PickFleeTarget, Flee, HoldUntilSafe]` then
+//! dispatches.
 //! `PickFleeTarget` reads the per-replan `RouteCostField` (boldness-
 //! scaled fox-scent overlay) and writes the lowest-cost passable tile
 //! within `flee_distance` to `target_position`. The umbrella `Flee`
@@ -23,9 +25,9 @@
 //!     thrash cadence was 1.21 ticks/plan; post-230 should be
 //!     ≥ flee_hold_ticks ticks/plan during the active flee window).
 //!
-//! The scenario itself reuses the `modifier_preempts_hunt` shape
-//! (wounded cat with health = 0.4 to saturate the AcuteHealth lurch)
-//! plus a fox at adjacent range to lift `ThreatProximityAdrenalineFlee`.
+//! Setup: a wounded cat (health = 0.4 — exercises the Sleep axis's
+//! Logistic urgency post-251) plus a fox at adjacent range to lift
+//! `ThreatProximityAdrenalineFlee`.
 
 use bevy_ecs::world::World;
 
@@ -78,12 +80,12 @@ fn setup(world: &mut World, seed: u64) {
         }
     }
 
-    // Spawn the focal cat — wounded enough to saturate the
-    // AcuteHealthAdrenalineFlee smoothstep (deficit ≥ 0.6 at
-    // health = 0.4 and threshold = 0.4 + width = 0.1). Bold so the
-    // boldness-scaled overlay weight in the per-cat RouteCostField
-    // flood is mild — the substrate-aware picker still has cheap
-    // tiles available within `flee_distance` Chebyshev.
+    // Spawn the focal cat — wounded enough to saturate Sleep's
+    // post-251 Logistic `health_deficit` axis (deficit ≥ 0.5 at
+    // health = 0.4 and midpoint = 0.4 + transition-width ≈ 0.1).
+    // Bold so the boldness-scaled overlay weight in the per-cat
+    // RouteCostField flood is mild — the substrate-aware picker
+    // still has cheap tiles available within `flee_distance` Chebyshev.
     let cat = spawn_cat(
         world,
         CatPreset::adult("Brave", FOCAL_START)
@@ -103,9 +105,8 @@ fn setup(world: &mut World, seed: u64) {
             .with_marker(MarkerKind::CanHunt),
     );
 
-    // Wound the cat to deficit 0.6 — same shape as
-    // `modifier_preempts_hunt` so the AcuteHealthAdrenalineFlee
-    // smoothstep saturates above the threshold.
+    // Wound the cat to deficit 0.6 so Sleep's post-251 Logistic
+    // `health_deficit` axis saturates above the midpoint.
     world.entity_mut(cat).insert(Health {
         current: 0.4,
         max: 1.0,

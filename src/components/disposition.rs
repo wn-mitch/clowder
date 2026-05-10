@@ -463,8 +463,11 @@ impl DispositionKind {
             | Self::Handing
             | Self::PickingUp
             // 230: Fleeing is acute survival — preempting higher tiers
-            // is the whole point of `AcuteHealthAdrenalineFlee` and
-            // `ThreatProximityAdrenalineFlee` lifting Flee.
+            // is the whole point of `ThreatProximityAdrenalineFlee`
+            // lifting Flee. (Pre-251 the now-retired
+            // `AcuteHealthAdrenalineFlee` also lifted Flee on injury;
+            // 251 retired that lift in favor of Sleep's substrate-side
+            // urgency axis.)
             | Self::Fleeing => 1,
             // 158: Grooming sits at tier 2 — above thermal self-care
             // (now `Action::GroomSelf` riding `Resting` at tier 1) and

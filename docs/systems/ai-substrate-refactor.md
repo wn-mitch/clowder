@@ -1759,7 +1759,10 @@ See `docs/systems/distress-modifiers.md` — codifies the
 sigmoid-lurch (acute distress, valence-split) vs. linear-ramp
 (sustained pressure, single-direction) curve doctrine for
 modifiers in the §3.5.1 catalog. Worked examples under tickets
-047 / 088 / 106 / 107 / 108 / 110.
+088 / 102 / 105 / 106 / 107 / 108 / 110. (Ticket 047's
+`AcuteHealthAdrenalineFlee` was a worked example of the
+sigmoid-lurch shape; retired by 251 — see §3.5.6 for the
+modifier-to-substrate migration.)
 
 #### §3.5.5 `DispositionFailureCooldown` — the modifier-vs-marker boundary (ticket 249)
 
@@ -1790,11 +1793,14 @@ C3) harder.
   178), `HasGroundCarcass` (gates PickingUp, ticket 193),
   `HasUnburiedCorpse` (gates Burying, ticket 035), `HasEligibleMate`
   (gates Mating). **Important caveat:** if the DSE is also a
-  score-lift landing target for a §3.5 modifier (e.g., Sleep for
-  047's `AcuteHealthAdrenalineFlee`), an eligibility filter at the
-  DSE layer can starve the modifier's lift — the cliff fix belongs
-  at the plan-template / zone-resolution layer instead. See §4.3's
-  "Caveat from ticket 249's failed Sleep gate" for the precedent.
+  score-lift landing target for a §3.5 modifier, an eligibility filter
+  at the DSE layer can starve the modifier's lift — the cliff fix
+  belongs at the plan-template / zone-resolution layer instead. (Pre-251
+  the canonical example was Sleep as 047 `AcuteHealthAdrenalineFlee`'s
+  in-pool landing target; 251 retired the modifier and moved the
+  urgency into Sleep's own `health_deficit` Logistic axis, narrowing
+  the caveat's scope.) See §4.3's "Caveat from ticket 249's failed
+  Sleep gate" for the precedent.
 - *Resource-state-aware failure* ("the colony has Stores, but the
   Stores I just visited was empty / full") → cooldown stays as the
   band-aid until ToT's per-resource belief revision lands.
@@ -1813,6 +1819,50 @@ coupling today. It joins `RecentTargetFailures`,
 as one-off proxies that consolidate under ToT's unified `Memory`
 consumer (cluster C3). New failure-flavors should not be added in
 this shape.
+
+#### §3.5.6 `AcuteHealthAdrenalineFlee` retirement — modifier-to-substrate migration (ticket 251)
+
+`AcuteHealthAdrenalineFlee` (ticket 047, promoted to non-zero lifts
+by 119) was the canonical sigmoid-lurch §3.5.4 modifier — `+0.50` on
+Sleep and `+0.60` on Flee when `health_deficit ≥ 0.4`, ramping over
+a `transition_width = 0.1` smoothstep. The modifier delivered its
+lift *outside* the WS [0, 1] envelope (post-composition additive
+shape), which is the architectural reason §3.5 exists: lifting a
+DSE's score past the WS ceiling that single-DSE composition can't
+reach internally.
+
+**Retirement shape (ticket 251).** Sleep's `health_deficit` axis was
+promoted from `Linear(slope=injury_rest_bonus=0.4)` to
+`Logistic(steepness=10, midpoint=0.4)` — preserving the modifier's
+onset shape (sigmoid lurch around midpoint=0.4 with transition-width
+~0.1) inside the WS envelope. The Flee branch of the modifier was
+deleted entirely (per ticket 252's audit, `FleeTargetPicked = 0` in
+seed-42 healthy soaks — Flee is filtered from the disposition
+softmax, so the +0.60 Flee lift was structurally inert). The retired
+modifier's preempt-rate reduction history (3,920 → 1,613 → 662 →
+347 → 0 per 10kt under tickets 230 / 232 / 246 / 251) terminates at
+this ticket.
+
+**Magnitude trade-off.** The modifier's pre-251 contribution at
+saturation was `+0.50` lift on top of WS-clamped Sleep (≈0.92 under
+acute injury); post-251 the substrate-side axis contributes
+`weight × Logistic(deficit)` ≈ 0.137 × 1.0 = 0.137 at saturation —
+a ~17% retention of the modifier's magnitude. The lost magnitude is
+not load-bearing for L3 ordering: post-232 body-state-coupled softmax
+sharpens decisions under injury (T_min ≈ 0.05), making the
+substrate's ≈0.92 score band decisive vs ≈0.4 competitors regardless
+of whether the modifier's lift pushes Sleep past the WS ceiling.
+Phase D verification soak validates this empirically.
+
+**Sibling modifiers retained.** `AcuteHealthAdrenalineFight` (102)
+and `AcuteHealthAdrenalineFreeze` (105) both share the
+`acute_health_adrenaline_threshold` constant (kept for them) but
+encode cross-DSE coupling (Fight suppresses Flee on the same tick;
+Freeze elevates Hide) that doesn't fit cleanly inside a single DSE's
+WS composition — the §3.5 post-scoring shape is the right home for
+those semantics. The §3.5 layer survives 251's retirement; the
+specific Flee valence retires because its load *can* fit inside
+Sleep's WS once the curve is sigmoid.
 
 ### §3.6 Granularity (ch 13 pain-scale discipline)
 
@@ -1968,20 +2018,22 @@ ticket 178), `HasGroundCarcass` (gates PickingUp, ticket 193),
 (gates Mating) are the exemplars.
 
 **Caveat from ticket 249's failed Sleep gate.** When the candidate
-DSE is *also* the landing target of a §3.5 score-lift modifier — Sleep
-is the in-pool partner for `AcuteHealthAdrenalineFlee` (047) because
-Flee is filtered from the disposition softmax — adding an
-`EligibilityFilter::require(...)` at the DSE layer can starve the
-modifier's lift, regressing 230's substrate-aware preempt-rate
-reduction. 249 attempted this on `SleepDse` and produced an 11×
-modifier-preempt regression vs the post-247 baseline; it was rolled
-back without landing. The cliff fix in cases where the DSE is a
-modifier-lift landing target belongs at the **plan-template /
-zone-resolution layer**, not at DSE eligibility — the disposition's
-score should remain available so the modifier can lift it; the
-planner's `replan_count` cap (§12.3 channel b) handles the
-not-actually-plannable case via §7.2 drop. See landed/249-... for the
-audit and the spawned follow-on tickets.
+DSE is *also* the landing target of a §3.5 score-lift modifier,
+adding an `EligibilityFilter::require(...)` at the DSE layer can
+starve the modifier's lift, regressing prior preempt-rate reductions.
+The canonical pre-251 example: Sleep was the in-pool partner for
+`AcuteHealthAdrenalineFlee` (047, retired by 251) because Flee is
+filtered from the disposition softmax. 249 attempted to gate
+`SleepDse` and produced an 11× modifier-preempt regression vs the
+post-247 baseline; it was rolled back without landing. The cliff fix
+in cases where the DSE is a modifier-lift landing target belongs at
+the **plan-template / zone-resolution layer**, not at DSE eligibility
+— the disposition's score should remain available so the modifier can
+lift it; the planner's `replan_count` cap (§12.3 channel b) handles
+the not-actually-plannable case via §7.2 drop. See landed/249-... for
+the audit and the spawned follow-on tickets (251 retired the
+canonical example modifier; 252 audits Flee adoption; 253 fixes the
+RestingSpot zone-resolution cliff at the right layer).
 
 #### Species (spawn-immutable)
 

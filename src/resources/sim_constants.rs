@@ -1467,42 +1467,20 @@ pub struct ScoringConstants {
     /// 047 retires its CriticalHealth interrupt branch.
     #[serde(default = "default_body_distress_promotion_lift")]
     pub body_distress_promotion_lift: f32,
-    /// Ticket 047 — `AcuteHealthAdrenalineFlee` Modifier threshold. The
-    /// `health_deficit` floor below which the lurch is a no-op. Set to
-    /// align with `disposition.critical_health_threshold` (0.4) so the
-    /// substrate engages whenever the legacy `CriticalHealth` interrupt
-    /// would have. Distinct from `body_distress_promotion_threshold`
-    /// (0.7, applied to the `max()`-composite scalar): this modifier
-    /// reads `health_deficit` directly so it fires on injury alone, even
-    /// when other axes are quiet — matching the predator-injury scenario
-    /// the legacy interrupt was built to catch.
+    /// Tickets 102 / 105 — `AcuteHealthAdrenaline{Fight, Freeze}` Modifier
+    /// threshold. The `health_deficit` floor below which the lurch is a
+    /// no-op. Set to align with `disposition.critical_health_threshold`
+    /// (0.4) so the substrate engages whenever the legacy `CriticalHealth`
+    /// interrupt would have. Distinct from `body_distress_promotion_threshold`
+    /// (0.7, applied to the `max()`-composite scalar): this threshold reads
+    /// `health_deficit` directly so the Fight / Freeze valences fire on
+    /// injury alone. The Flee valence (`AcuteHealthAdrenalineFlee`, ticket
+    /// 047) was retired by ticket 251 — its load moved into the Sleep DSE's
+    /// `health_deficit` axis (Logistic curve at this same midpoint), so
+    /// retiring the constant would break the still-active Fight + Freeze
+    /// valences but the threshold itself is preserved.
     #[serde(default = "default_acute_health_adrenaline_threshold")]
     pub acute_health_adrenaline_threshold: f32,
-    /// Ticket 047 — `AcuteHealthAdrenalineFlee` lift on the Flee DSE
-    /// when `health_deficit >= threshold + transition_width`. Ramps via
-    /// a narrow smoothstep (width 0.1) from threshold so the lift feels
-    /// like an adrenaline *lurch* rather than a gentle preference shift.
-    /// Default 0.60 — large enough that an injured cat's Flee score can
-    /// dominate other actions even when Flee's underlying score is low
-    /// (e.g. 0.06 + 0.60 = 0.66 puts Flee competitive with the typical
-    /// 0.55–0.70 Forage / Fight winners). Note: Flee is filtered from
-    /// the disposition softmax pool today (`scoring.rs`), so this lift
-    /// primarily intervenes via the Flee behavior-gate path; pair with
-    /// the Sleep lift below for the in-pool re-rank effect.
-    #[serde(default = "default_acute_health_adrenaline_flee_lift")]
-    pub acute_health_adrenaline_flee_lift: f32,
-    /// Ticket 047 — `AcuteHealthAdrenalineFlee` lift on the Sleep DSE,
-    /// the in-pool partner to the Flee lift. Adrenaline-driven retreat
-    /// to a safer position is mechanically expressed in Clowder as the
-    /// cat selecting Sleep (which routes to a den) rather than staying
-    /// in combat. Default 0.50 — smaller than Flee (escape is
-    /// preferred) but large enough to overtake mid-tier Forage / Hunt
-    /// scores in the disposition softmax. Composes additively with
-    /// 088's `BodyDistressPromotion` lift; under combined high
-    /// composite + acute health-deficit a cat sees up to ~0.70 lift on
-    /// Sleep (0.50 here + up to 0.20 from 088).
-    #[serde(default = "default_acute_health_adrenaline_sleep_lift")]
-    pub acute_health_adrenaline_sleep_lift: f32,
     /// Ticket 102 — `AcuteHealthAdrenalineFight` lift on the Fight DSE
     /// when `health_deficit` is high AND `escape_viability` is below
     /// `acute_health_adrenaline_fight_viability_threshold` (cornered cat,
@@ -2145,8 +2123,6 @@ impl Default for ScoringConstants {
             body_distress_promotion_threshold: default_body_distress_promotion_threshold(),
             body_distress_promotion_lift: default_body_distress_promotion_lift(),
             acute_health_adrenaline_threshold: default_acute_health_adrenaline_threshold(),
-            acute_health_adrenaline_flee_lift: default_acute_health_adrenaline_flee_lift(),
-            acute_health_adrenaline_sleep_lift: default_acute_health_adrenaline_sleep_lift(),
             acute_health_adrenaline_fight_lift: default_acute_health_adrenaline_fight_lift(),
             acute_health_adrenaline_fight_viability_threshold:
                 default_acute_health_adrenaline_fight_viability_threshold(),
@@ -3051,33 +3027,11 @@ fn default_sleep_health_deficit_steepness() -> f32 {
     10.0
 }
 
-/// Ticket 047 — `AcuteHealthAdrenalineFlee` threshold. Mirrors
-/// `disposition.critical_health_threshold = 0.4` so the substrate fires
-/// in the same regime the legacy interrupt did. Threshold is the
-/// `health_deficit` (= `1 - health.current/health.max`) value at which
-/// the smoothstep ramp begins.
+/// Tickets 102 / 105 — `AcuteHealthAdrenaline{Fight, Freeze}` threshold.
+/// Mirrors `disposition.critical_health_threshold = 0.4`. Originally
+/// shared by the Flee valence (ticket 047, retired by ticket 251).
 fn default_acute_health_adrenaline_threshold() -> f32 {
     0.4
-}
-
-/// Ticket 047 — `AcuteHealthAdrenalineFlee` Flee-DSE lurch magnitude.
-/// Promoted from 0.0 to 0.60 in ticket 119 alongside the legacy
-/// `CriticalHealth` interrupt retirement. With the substrate-driven
-/// preempt path live (ticket 118 `check_modifier_preemption`), the
-/// modifier is now the sole behavioral redirect for cats below the
-/// adrenaline threshold — an inert lift would leave wounded cats with
-/// no replacement for the legacy interrupt's force-Flee path.
-fn default_acute_health_adrenaline_flee_lift() -> f32 {
-    0.60
-}
-
-/// Ticket 047 — `AcuteHealthAdrenalineFlee` Sleep-DSE lurch magnitude.
-/// Promoted from 0.0 to 0.50 in ticket 119 (see Flee lift above).
-/// Sleep is the in-pool partner to Flee (Flee is filtered from the
-/// disposition softmax) — the Sleep lift flips the contest away from
-/// Guarding/Crafting under injury, routing the cat to a den.
-fn default_acute_health_adrenaline_sleep_lift() -> f32 {
-    0.50
 }
 
 /// Ticket 102 — `AcuteHealthAdrenalineFight` Fight-DSE lurch magnitude.
