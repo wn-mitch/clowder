@@ -1,7 +1,7 @@
 ---
 id: 254
 title: PickFleeTarget witness contract — rebind so substrate-aware Fleeing can pick a target post-252
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-10
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-10
 ---
 
 <!--
@@ -157,3 +157,4 @@ Soak (`just soak-trace 42`) must clear:
 - 2026-05-10: opened from 252's verification soak. Layer-walk
   promoted PickFleeTarget witness contract to `[verified-defect]`.
   Recommended R5 (extend) as the smallest surface change.
+- 2026-05-10: 2026-05-10: R5 extend implemented; pick_flee_target.rs minimizes effective_cost = cost - chebyshev_to_threat instead of (unreachable) cost < current_cost. flee_commitment scenario gate promoted to expected_features=[FleeTargetPicked]. 6/6 unit tests pass. seed-42 soak shows bit-for-bit identical footer to pre-fix cedar run (commit 12023b1c) — fix is inert in this seed because Flee never wins L3 softmax (Mocha boldness=0.9, health=0.26, safety=0.003 → Flee=-0.025). Substrate-side Flee scoring gap opened as ticket 271.

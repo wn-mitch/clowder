@@ -16,7 +16,9 @@
 //!
 //! Demonstrative invariants asserted at scenario completion:
 //!   - `Feature::FleeTargetPicked` fires ≥ 1× — the substrate-aware
-//!     picker is reachable end-to-end.
+//!     picker is reachable end-to-end (gated by `expected_features`
+//!     after 254 R5 rebound the witness contract from `cost <
+//!     current_cost` to effective-cost minimization).
 //!   - The `try_preempt_with_modifier_lurch` early-skip composes with
 //!     `Fleeing`: while the cat is in a Fleeing plan, the
 //!     adrenaline modifiers' `preempts_in_flight` signal is ignored,
@@ -44,20 +46,14 @@ pub static SCENARIO: Scenario = Scenario {
     default_focal: "Brave",
     default_ticks: 60,
     setup,
-    // 252: still triage-only. The L3 softmax filter at `scoring.rs:2411`
-    // (which excluded `Action::Flee` from the disposition pool pre-252)
-    // was lifted, so substrate-driven Fleeing now elects from softmax
-    // directly when `ThreatProximityAdrenalineFlee` lifts Flee score
-    // above its peers — `just scenario flee_commitment` shows this on
-    // the focal-cat's first tick. End-to-end gating remains deferred:
-    // 252 surfaced a second substrate-stub in `PickFleeTarget`
-    // (`src/steps/disposition/pick_flee_target.rs:102`) — the witness
-    // condition `cost < current_cost` is unreachable in production
-    // because `flood_dijkstra` (`src/ai/route_cost.rs:74`) sets
-    // `cost_at(origin) = 0` and the picker runs at the same position
-    // as the flood. A follow-on ticket addresses the witness contract;
-    // until then `Feature::FleeTargetPicked` cannot fire end-to-end.
-    expected_features: &[],
+    // 254 R5 closed the witness contract — `PickFleeTarget` now
+    // minimizes `effective_cost = field.cost_at(candidate) - chebyshev(candidate, threat)`
+    // instead of `cost < current_cost` (which was unreachable because
+    // `flood_dijkstra` hardcodes `cost_at(origin) = 0`). The picker
+    // emits whenever any reachable, passable, non-self tile exists in
+    // the disc, so `Feature::FleeTargetPicked` fires end-to-end on the
+    // focal cat's first Fleeing tick.
+    expected_features: &["FleeTargetPicked"],
 };
 
 pub const FOCAL_START: Position = Position { x: 20, y: 20 };
