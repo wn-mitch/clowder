@@ -440,6 +440,11 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     // Insert cat presence map resource.
     world.insert_resource(crate::resources::CatPresenceMap::default());
 
+    // 256 R5: cat patrol deterrent map. Cats deposit when patrolling;
+    // foxes read as routing cost in their A* via
+    // `CatPatrolDeterrentOverlay`.
+    world.insert_resource(crate::resources::CatPatrolDeterrentMap::default());
+
     // Insert ward coverage map resource (ticket 045 — substrate-refactor §5.6.3).
     world.insert_resource(crate::resources::WardCoverageMap::default());
 

@@ -300,6 +300,24 @@ impl InfluenceMap for crate::resources::CatPresenceMap {
     }
 }
 
+impl InfluenceMap for crate::resources::CatPatrolDeterrentMap {
+    fn metadata(&self) -> MapMetadata {
+        // 256 R5: patrol-presence as a deterrent gradient. Channel
+        // is Sight (foxes see active patrols, not infer them by
+        // scent). Faction Colony — the deterrent originates from
+        // colony cats.
+        MapMetadata {
+            name: "cat_patrol_deterrent",
+            channel: ChannelKind::Sight,
+            faction: Faction::Colony,
+        }
+    }
+
+    fn base_sample(&self, pos: Position) -> f32 {
+        self.get(pos.x, pos.y)
+    }
+}
+
 impl InfluenceMap for crate::resources::ExplorationMap {
     fn metadata(&self) -> MapMetadata {
         MapMetadata {

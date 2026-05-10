@@ -29,6 +29,13 @@ pub struct ColonyContext<'w> {
     /// `NearestPerimeterTile` lookups (perimeter is offset from
     /// colony center).
     pub colony_center: Res<'w, crate::resources::ColonyCenter>,
+    /// 256 R3 — ward-coverage influence map. The Patrol DSE's
+    /// `TerritoryPerimeterAnchor` resolves to a per-replan rotating
+    /// sector centroid over this map (with a fallback to
+    /// `colony_center + patrol_perimeter_offset` when no sector has
+    /// coverage yet). Read in both the disposition-pipeline scoring
+    /// path (`disposition.rs`) and the replan path (`goap.rs`).
+    pub ward_coverage_map: Res<'w, crate::resources::WardCoverageMap>,
 }
 
 pub mod actions;

@@ -119,7 +119,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[244](docs/open-work/tickets/244-audible-cue-substrate-alarm-calls-distress-cries-hissing.md)** — Audible cue substrate (alarm calls, distress cries, hissing) — _added 2026-05-08_
 - **[253](docs/open-work/tickets/253-restingspot-zone-resolution-as-belief-proxy-fall-through-to-ownsleepingspot-when-no-stores.md)** — RestingSpot zone resolution as belief proxy — fall through to OwnSleepingSpot when no Stores — _[ai-substrate] · added 2026-05-09_
 - **[254](docs/open-work/tickets/254-pickfleetarget-witness-contract-rebind-so-substrate-aware-fleeing-can-pick-a-target-post-252.md)** — PickFleeTarget witness contract — rebind so substrate-aware Fleeing can pick a target post-252 — _[ai-substrate] · added 2026-05-10_
-- **[256](docs/open-work/tickets/256-patrol-dse-recalibration-influence-map-driven-smart-pathing-wildlife-deterrent-affect-post-252-cascade-root-cause.md)** — Patrol DSE recalibration — influence-map-driven smart pathing + wildlife deterrent affect (post-252 cascade root cause) — _[ai-substrate] · added 2026-05-10_
+- **[257](docs/open-work/tickets/257-mate-election-crowded-out-by-patrol-in-post-256-regime.md)** — Mate election crowded out by Patrol in post-256 regime — _added 2026-05-10_
 
 ## Parked (8)
 
@@ -160,12 +160,13 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (167)
+## Landed archive (168)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (102)
+### 2026-05 (103)
 
+- **[256](docs/open-work/landed/256-patrol-dse-recalibration-influence-map-driven-smart-pathing-wildlife-deterrent-affect-post-252-cascade-root-cause.md)** — Patrol DSE recalibration — influence-map-driven smart pathing + wildlife deterrent affect (post-252 cascade root cause) _(2026-05-10)_
 - **[255](docs/open-work/landed/255-threatproximityadrenalineflee-flee-axis-calibration-audit-post-252-readable.md)** — ThreatProximityAdrenalineFlee Flee-axis calibration audit (post-252 readable) _(2026-05-10)_
 - **[252](docs/open-work/landed/252-fleeing-disposition-230-adoption-audit-why-fleetargetpicked-0-in-seed-42-healthy.md)** — Fleeing disposition (230) adoption audit — why FleeTargetPicked = 0 in seed-42 healthy _(2026-05-10)_
 - **[251](docs/open-work/landed/251-acutehealthadrenalineflee-retirement-substrate-over-modifier.md)** — AcuteHealthAdrenalineFlee retirement — substrate-over-modifier _(2026-05-09)_

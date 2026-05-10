@@ -1933,9 +1933,63 @@ pub struct ScoringConstants {
     /// 209 `patrol_fox_scent_weight` shape; high route cost → low
     /// axis → CP gate suppresses Patrol when the *path to the
     /// perimeter* is risky, not just when the cat's cell is risky.
-    /// Ships dormant at 0.0; tuning is a follow-on ticket.
+    /// 256 R4: activated (default 0.6) — was 0.0 in 228 pending the
+    /// L3 patrol-cascade root-cause fix. Pairs with
+    /// `patrol_path_fox_scent_weight` / `patrol_path_corruption_weight`
+    /// which over-weight the overlays for Guarding-disposed cats.
     #[serde(default = "default_patrol_route_cost_weight")]
     pub patrol_route_cost_weight: f32,
+    /// 256 R4: weight on the FoxScent overlay when constructing a
+    /// Guarding-disposed cat's `RouteCostField`. Replaces the
+    /// boldness-derived weight (which caps at 1.0 for the most timid
+    /// cat). Default `1.5` — guardian cats route around fox-scent
+    /// corridors more aggressively than the average pathing cat,
+    /// pricing the predator-exposure cost of patrol exposure into
+    /// the path geometry itself. Tune alongside `patrol_route_cost_weight`.
+    #[serde(default = "default_patrol_path_fox_scent_weight")]
+    pub patrol_path_fox_scent_weight: f32,
+    /// 256 R4: weight on the Corruption overlay when constructing a
+    /// Guarding-disposed cat's `RouteCostField`. Symmetric shape to
+    /// `patrol_path_fox_scent_weight`. Default `1.5` — guardian cats
+    /// avoid corruption corridors more aggressively than the average
+    /// pathing cat, since the patrol role is precisely about not
+    /// walking the colony into rot.
+    #[serde(default = "default_patrol_path_corruption_weight")]
+    pub patrol_path_corruption_weight: f32,
+    /// 256 R5: deposit per tick when a cat's current action is
+    /// `Action::Patrol`. Lays a deterrent gradient that foxes read as
+    /// routing cost via `CatPatrolDeterrentOverlay`. Default `0.05`
+    /// — a peak (1.0) bucket reaches saturation after ~20 ticks of
+    /// continuous patrol, balancing "patrols actually deter foxes"
+    /// against "single transient patrol step doesn't lock foxes out
+    /// of an ambush corridor for hours."
+    #[serde(default = "default_cat_patrol_deterrent_deposit_per_tick")]
+    pub cat_patrol_deterrent_deposit_per_tick: f32,
+    /// 256 R5: global decay rate for `CatPatrolDeterrentMap`,
+    /// expressed per in-game day. Default `0.5/day` — a peak bucket
+    /// fades to zero over ~2 in-game days, matching Patrol's
+    /// short-term coverage semantics (foxes test fresh patrols, not
+    /// stale ones from days prior). Faster decay than fox-scent's
+    /// 0.1/day because cat patrol is a *deterrent presence*, not a
+    /// territorial mark.
+    #[serde(default = "default_cat_patrol_deterrent_decay_rate")]
+    pub cat_patrol_deterrent_decay_rate: RatePerDay,
+    /// 256 R5: maximum additive cost contribution from cat patrol
+    /// deterrent on a single tile during fox A*. Default `6` — less
+    /// than `fox_scent_path_cost_max=8` so foxes detour around
+    /// patrols rather than refuse to move toward prey at all. Sits
+    /// above DenseForest's `movement_cost = 3` so foxes prefer
+    /// patrolled forest only when no patrol-free path exists.
+    #[serde(default = "default_cat_patrol_deterrent_path_cost_max")]
+    pub cat_patrol_deterrent_path_cost_max: u32,
+    /// 256 R5: scalar weight applied to the deterrent overlay in fox
+    /// pathfinding. Default `1.0` — full effect. Below 1.0 makes
+    /// foxes less averse to crossing patrols (e.g., desperate
+    /// hunger); above 1.0 makes them more averse. Pairs with the
+    /// `path_cost_max` constant: `effective_cost = round(deterrent *
+    /// path_cost_max * overlay_weight)`.
+    #[serde(default = "default_cat_patrol_deterrent_overlay_weight")]
+    pub cat_patrol_deterrent_overlay_weight: f32,
     /// 223: Maximum additive cost contribution from fox-scent on a single
     /// tile during cat A* pathfinding. Cat path-cost overlay scales
     /// `FoxScentMap::get(x, y).clamp(0.0, 1.0) * fox_scent_path_cost_max`
@@ -2231,6 +2285,14 @@ impl Default for ScoringConstants {
             groom_food_security_weight: default_groom_food_security_weight(),
             patrol_fox_scent_weight: default_patrol_fox_scent_weight(),
             patrol_route_cost_weight: default_patrol_route_cost_weight(),
+            patrol_path_fox_scent_weight: default_patrol_path_fox_scent_weight(),
+            patrol_path_corruption_weight: default_patrol_path_corruption_weight(),
+            cat_patrol_deterrent_deposit_per_tick:
+                default_cat_patrol_deterrent_deposit_per_tick(),
+            cat_patrol_deterrent_decay_rate: default_cat_patrol_deterrent_decay_rate(),
+            cat_patrol_deterrent_path_cost_max: default_cat_patrol_deterrent_path_cost_max(),
+            cat_patrol_deterrent_overlay_weight:
+                default_cat_patrol_deterrent_overlay_weight(),
             forage_route_cost_weight: default_forage_route_cost_weight(),
             hunt_route_cost_weight: default_hunt_route_cost_weight(),
             wander_route_cost_weight: default_wander_route_cost_weight(),
@@ -2367,11 +2429,32 @@ pub struct DispositionConstants {
     pub guard_threat_detection_range: i32,
     pub guard_patrol_radius: f32,
     /// §L2.10.7 perimeter offset (tiles) from colony center used as the
-    /// anchor for cat Patrol and HerbcraftWard spatial axes. Single
-    /// representative point along the outer ring; the cat orbits
-    /// toward it. 12 ≈ inner colony walk; further refinements could
-    /// pick a per-cat angle for spread.
+    /// fallback anchor for cat Patrol and HerbcraftWard spatial axes
+    /// when `WardCoverageMap` has no coverage (early-game, pre-ward).
+    /// 12 ≈ inner colony walk. Post-256 the live patrol anchor is the
+    /// per-replan ward-sector centroid; this offset only fires on the
+    /// fallback path.
     pub patrol_perimeter_offset: i32,
+    /// 256 R3: width of the sector grid overlaid on the
+    /// `WardCoverageMap` bucket grid for Patrol's per-replan anchor
+    /// rotation. With the standard 120×90 map and 5-tile buckets
+    /// (24×18 buckets), `4 × 3` sectors give 12 sectors of 30×30
+    /// tiles each. Larger sector grids → smaller sectors → tighter
+    /// patrol arcs but more rotation churn.
+    #[serde(default = "default_patrol_sector_grid_w")]
+    pub patrol_sector_grid_w: usize,
+    /// 256 R3: height of the sector grid overlaid on
+    /// `WardCoverageMap`. See `patrol_sector_grid_w`.
+    #[serde(default = "default_patrol_sector_grid_h")]
+    pub patrol_sector_grid_h: usize,
+    /// 256 R3: how many ticks each cat spends on a single patrol
+    /// sector before rotating to the next. The sector index advances
+    /// as `(tick / rotation_ticks + per_cat_offset) % num_sectors`.
+    /// Default `1000` ≈ ~1 sim hour per sector at the canonical
+    /// 1000-tick/hour cadence. The per-cat offset prevents synchronous
+    /// beat clustering across the colony.
+    #[serde(default = "default_patrol_sector_rotation_ticks")]
+    pub patrol_sector_rotation_ticks: u64,
     pub social_chain_target_range: i32,
     pub mentor_temperature_threshold: f32,
     pub groom_temperature_threshold: f32,
@@ -3420,10 +3503,64 @@ fn default_patrol_fox_scent_weight() -> f32 {
     0.0
 }
 
-/// 228: Patrol `Consideration::Field` route-cost axis weight. Ships
-/// dormant at 0.0.
+/// 228: Patrol `Consideration::Field` route-cost axis weight.
+/// 256 R4: bumped from 0.0 to 0.6 to activate the dormant gate so
+/// Patrol's L2 score is suppressed when the path to the perimeter
+/// is risky.
 fn default_patrol_route_cost_weight() -> f32 {
-    0.0
+    0.6
+}
+
+/// 256 R3: default width of the patrol-sector grid overlaid on
+/// `WardCoverageMap`.
+fn default_patrol_sector_grid_w() -> usize {
+    4
+}
+
+/// 256 R3: default height of the patrol-sector grid overlaid on
+/// `WardCoverageMap`.
+fn default_patrol_sector_grid_h() -> usize {
+    3
+}
+
+/// 256 R3: default ticks per patrol sector before rotation.
+fn default_patrol_sector_rotation_ticks() -> u64 {
+    1000
+}
+
+/// 256 R4: FoxScent overlay weight for Guarding-disposed cats'
+/// `RouteCostField` construction.
+fn default_patrol_path_fox_scent_weight() -> f32 {
+    1.5
+}
+
+/// 256 R4: Corruption overlay weight for Guarding-disposed cats'
+/// `RouteCostField` construction.
+fn default_patrol_path_corruption_weight() -> f32 {
+    1.5
+}
+
+/// 256 R5: per-tick patrol deterrent deposit when a cat's
+/// current_action is Action::Patrol.
+fn default_cat_patrol_deterrent_deposit_per_tick() -> f32 {
+    0.05
+}
+
+/// 256 R5: global decay rate for `CatPatrolDeterrentMap`, per
+/// in-game day. 0.5/day → ~2-day half-life.
+fn default_cat_patrol_deterrent_decay_rate() -> RatePerDay {
+    RatePerDay::new(0.5)
+}
+
+/// 256 R5: maximum cost contribution from cat patrol deterrent on
+/// a single tile during fox pathfinding.
+fn default_cat_patrol_deterrent_path_cost_max() -> u32 {
+    6
+}
+
+/// 256 R5: scalar weight on the deterrent overlay in fox A*.
+fn default_cat_patrol_deterrent_overlay_weight() -> f32 {
+    1.0
 }
 
 /// 228: Forage `Consideration::Field` route-cost axis weight. Ships
@@ -3666,6 +3803,9 @@ impl Default for DispositionConstants {
             guard_threat_detection_range: 10,
             guard_patrol_radius: 10.0,
             patrol_perimeter_offset: 12,
+            patrol_sector_grid_w: default_patrol_sector_grid_w(),
+            patrol_sector_grid_h: default_patrol_sector_grid_h(),
+            patrol_sector_rotation_ticks: default_patrol_sector_rotation_ticks(),
             social_chain_target_range: 15,
             mentor_temperature_threshold: 0.5,
             groom_temperature_threshold: 0.7,

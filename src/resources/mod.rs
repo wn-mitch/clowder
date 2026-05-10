@@ -1,5 +1,6 @@
 pub mod aspiration_registry;
 pub mod carcass_scent_map;
+pub mod cat_patrol_deterrent_map;
 pub mod cat_presence_map;
 pub mod colony_center;
 pub mod colony_hunting_map;
@@ -40,6 +41,7 @@ pub mod zodiac;
 
 pub use aspiration_registry::AspirationRegistry;
 pub use carcass_scent_map::CarcassScentMap;
+pub use cat_patrol_deterrent_map::CatPatrolDeterrentMap;
 pub use cat_presence_map::CatPresenceMap;
 pub use colony_center::ColonyCenter;
 pub use colony_hunting_map::ColonyHuntingMap;

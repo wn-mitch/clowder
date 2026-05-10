@@ -583,6 +583,10 @@ pub fn fox_resolve_goap_plans(
     confrontations: Query<Entity, With<ActiveConfrontation>>,
     map: Res<TileMap>,
     time: Res<TimeState>,
+    // 256 R5: read by fox A* via `CatPatrolDeterrentOverlay` so foxes
+    // detour around active patrols.
+    deterrent_map: Res<crate::resources::CatPatrolDeterrentMap>,
+    constants: Res<crate::resources::SimConstants>,
     mut activation: Option<ResMut<SystemActivation>>,
 ) {
     let store_positions: Vec<Position> = stores.iter().copied().collect();
@@ -655,7 +659,13 @@ pub fn fox_resolve_goap_plans(
                     };
                 }
                 let step_state = plan.current_state_mut().unwrap();
-                fox_steps::resolve_travel_to(&mut pos, step_state, &map)
+                fox_steps::resolve_travel_to(
+                    &mut pos,
+                    step_state,
+                    &map,
+                    &deterrent_map,
+                    &constants.scoring,
+                )
             }
 
             FoxGoapActionKind::SearchPrey => {

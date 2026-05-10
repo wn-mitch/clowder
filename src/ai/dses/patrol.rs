@@ -194,25 +194,45 @@ mod tests {
     }
 
     #[test]
-    fn patrol_has_four_considerations() {
-        // §L2.10.7: deficit + boldness + safety_upper_bound +
-        // perimeter_distance.
+    fn patrol_has_five_considerations_at_default() {
+        // §L2.10.7 + 256 R4: deficit + boldness + safety_upper_bound +
+        // perimeter_distance + (256) patrol_route_cost. The fifth axis
+        // is conditional on `patrol_route_cost_weight > 0`; ticket 256
+        // activates the gate (default 0.6).
         let s = ScoringConstants::default();
-        assert_eq!(PatrolDse::new(&s).considerations().len(), 4);
+        assert_eq!(PatrolDse::new(&s).considerations().len(), 5);
     }
 
     #[test]
-    fn patrol_route_cost_dormant_at_default_zero() {
-        // 228: at default `patrol_route_cost_weight = 0.0`, the
-        // conditional-add path skips the fifth axis. CP semantics
+    fn patrol_route_cost_active_at_default_post_256() {
+        // 256 R4: `patrol_route_cost_weight` activated (default 0.6)
+        // — was 0.0 in 228, dormant pending the L3 patrol-cascade
+        // root-cause fix. The fifth axis (`patrol_route_cost` Field
+        // consideration) now ships present at default; the L2
+        // composition gates Patrol's score on path tractability.
+        let s = ScoringConstants::default();
+        assert!(s.patrol_route_cost_weight > 0.0, "active post-256");
+        let dse = PatrolDse::new(&s);
+        assert_eq!(dse.considerations().len(), 5);
+        assert_eq!(dse.composition().weights.len(), 5);
+        let has_axis = dse.considerations().iter().any(|c| match c {
+            Consideration::Field(f) => f.name == "patrol_route_cost",
+            _ => false,
+        });
+        assert!(has_axis, "patrol_route_cost axis present at default");
+    }
+
+    #[test]
+    fn patrol_route_cost_dormant_when_weight_zeroed() {
+        // Symmetric: when a balance experiment zeroes the weight,
+        // the axis is omitted from the composition. CP semantics
         // make a weight-0 axis multiplicatively zero the product,
         // so dormancy requires axis omission, not just zero weight.
-        let s = ScoringConstants::default();
-        assert_eq!(s.patrol_route_cost_weight, 0.0);
+        let mut s = ScoringConstants::default();
+        s.patrol_route_cost_weight = 0.0;
         let dse = PatrolDse::new(&s);
         assert_eq!(dse.considerations().len(), 4);
         assert_eq!(dse.composition().weights.len(), 4);
-        // No `patrol_route_cost` Field consideration at default weight.
         assert!(!dse.considerations().iter().any(|c| match c {
             Consideration::Field(f) => f.name == "patrol_route_cost",
             _ => false,

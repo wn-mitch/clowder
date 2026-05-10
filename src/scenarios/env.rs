@@ -97,6 +97,8 @@ pub fn init_scenario_world_with(world: &mut World, seed: u64, cfg: ScenarioWorld
     world.insert_resource(crate::resources::PreyScentMap::default());
     world.insert_resource(crate::resources::CarcassScentMap::default());
     world.insert_resource(crate::resources::CatPresenceMap::default());
+    // 256 R5: cat patrol deterrent map (read by fox A* via overlay).
+    world.insert_resource(crate::resources::CatPatrolDeterrentMap::default());
     world.insert_resource(crate::resources::WardCoverageMap::default());
     // 035: grave-aura InfluenceMap; required by `update_grave_aura_map`
     // which is registered in the canonical schedule.

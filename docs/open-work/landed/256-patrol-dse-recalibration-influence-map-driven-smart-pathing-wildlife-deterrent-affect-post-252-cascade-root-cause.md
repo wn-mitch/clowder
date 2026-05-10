@@ -1,7 +1,7 @@
 ---
 id: 256
 title: Patrol DSE recalibration — influence-map-driven smart pathing + wildlife deterrent affect (post-252 cascade root cause)
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-10
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-10
 ---
 
 ## Why
@@ -175,3 +175,34 @@ focal-cat traces.
   Layer-walk pre-staged from 255's investigation. `flee_calibration`
   scenarios under `src/scenarios/flee_calibration.rs` will guard
   against Flee-substrate regression during the recalibration.
+- 2026-05-10: implementation landed. R3 `WardCoverageMap::sector_centroid`
+  + per-replan rotation; R4 `patrol_route_cost_weight` activated
+  (0.0→0.6) + per-disposition overlay weights for Guarding cats
+  (FoxScent/Corruption ×1.5); R5 new `CatPatrolDeterrentMap`
+  consumed by fox A* via `CatPatrolDeterrentOverlay`. Substrate
+  pieces verified independently via `src/scenarios/patrol_recalibration.rs`
+  (3 unit tests, 1 runnable scenario). 2043/2043 lib tests pass;
+  `just check` clean (`InfluenceMap registry: 14 impl(s), all registered`).
+  Verification soak `logs/tuned-42` (commit `12023b1c` dirty,
+  Cedar focal):
+  - **Cascade root cause fixed.** ShadowFoxAmbush deaths 3 (≤10
+    hard gate); 0 starvation deaths; all 5 continuity canaries
+    green (`grooming · play · mentoring · courtship · mythic-texture`);
+    courtship 0 → 1609; mythic-texture 0 → 37; play 0 → 14.
+  - **Patrol share modestly down.** 63.65% → 59.84% — substrate
+    redirected WHERE/HOW Patrol behaves but didn't reduce its
+    L2 floor.
+  - **Verdict fail driven by `MatingOccurred` never-fired.** Pre-
+    existing end-of-chain gap (post-252 baseline also had
+    `MatingOccurred = 0`); 256 is not a regression on this gate.
+    Per `feedback_chain_rare_events`, end-of-chain metrics
+    deserve structural verification rather than single-soak
+    gating. Opens 257 (`Mate election crowded out by Patrol in
+    post-256 regime`) blocked-by 256 for the courtship→mating
+    follow-on.
+- 2026-05-10: opens 257 — Mate election crowded out by Patrol in
+  post-256 regime. R6 (split `Guarding` into `Guarding` +
+  `EngageThreat`) deferred until 257's layer-walk reveals whether
+  mid-Patrol replans into combat-disposed plans are still the
+  dominant pattern (Cedar's pre-256 death pattern); if so, R6
+  becomes part of 257's structural-option menu.

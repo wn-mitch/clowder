@@ -1735,18 +1735,34 @@ pub fn evaluate_and_plan(
 
         // Ticket 228 — per-cat route-cost field. Flooded once per
         // replan with overlay-aware edge weights (terrain +
-        // boldness-conditioned fox-scent + corruption). The L2
-        // `Consideration::Field` evaluator reads this via
-        // `EvalCtx.field_cost`; step resolvers (commit 10+) read
-        // the inserted Component to walk the gradient.
+        // {boldness-conditioned | patrol-tuned} fox-scent +
+        // corruption). The L2 `Consideration::Field` evaluator reads
+        // this via `EvalCtx.field_cost`; step resolvers (commit 10+)
+        // read the inserted Component to walk the gradient.
+        //
+        // 256 R4 — Guarding-disposed cats (proxy: cats whose previous
+        // action was `Action::Patrol`) get patrol-tuned overlay
+        // weights instead of the boldness-derived weight Flee uses.
+        // Patrol cats avoid corruption and fox-scent corridors more
+        // aggressively because the patrol role is precisely about
+        // not walking the colony into rot or ambush corridors.
+        // The proxy carries a one-tick lag on first entry into
+        // Guarding (the field still gates Patrol's L2 score, just
+        // with non-patrol overlay weights for that one tick).
         let cat_route_cost_field = {
             let fox_overlay =
                 crate::ai::pathfinding::FoxScentOverlay::new(&colony.fox_scent_map, sc);
             let corr_overlay = crate::ai::pathfinding::CorruptionOverlay::new(&res.map, sc);
-            let w = crate::ai::pathfinding::cat_path_weight_from_boldness(personality.boldness);
+            let (fox_w, corr_w) = if current.action == Action::Patrol {
+                (sc.patrol_path_fox_scent_weight, sc.patrol_path_corruption_weight)
+            } else {
+                let w =
+                    crate::ai::pathfinding::cat_path_weight_from_boldness(personality.boldness);
+                (w, w)
+            };
             let overlays = [
-                crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
-                crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
+                crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, fox_w),
+                crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, corr_w),
             ];
             crate::ai::route_cost::flood_dijkstra(
                 *pos,
@@ -1949,19 +1965,38 @@ pub fn evaluate_and_plan(
                     .iter()
                     .map(|(_, _, p)| *p)
                     .min_by_key(|p| pos.manhattan_distance(p)),
-                // §L2.10.7 Patrol / HerbcraftWard anchor: a perimeter
-                // anchor offset from the colony center. Single-point
-                // approximation — the cat patrols toward this anchor
-                // along the colony's outer ring. Future refinement:
-                // multi-point perimeter sampling.
+                // §L2.10.7 HerbcraftWard anchor: a perimeter anchor
+                // offset from the colony center. (Distinct from the
+                // ticket-256 patrol anchor below; HerbcraftWard's
+                // anchor stays geometrically simple for now.)
                 nearest_perimeter_tile: Some(crate::components::physical::Position::new(
                     res.colony_center.0.x + d.patrol_perimeter_offset,
                     res.colony_center.0.y,
                 )),
-                territory_perimeter_anchor: Some(crate::components::physical::Position::new(
-                    res.colony_center.0.x + d.patrol_perimeter_offset,
-                    res.colony_center.0.y,
-                )),
+                // 256 R3: per-replan ward-sector centroid. The cat's
+                // patrol beat rotates through ward-protected sectors
+                // of the demesne; falls back to the legacy static
+                // offset when the WardCoverageMap has no coverage
+                // (early-game, pre-ward).
+                territory_perimeter_anchor: colony
+                    .ward_coverage_map
+                    .sector_centroid(
+                        crate::resources::ward_coverage_map::patrol_sector_id(
+                            res.time.tick,
+                            entity,
+                            d.patrol_sector_grid_w,
+                            d.patrol_sector_grid_h,
+                            d.patrol_sector_rotation_ticks,
+                        ),
+                        d.patrol_sector_grid_w,
+                        d.patrol_sector_grid_h,
+                    )
+                    .or_else(|| {
+                        Some(crate::components::physical::Position::new(
+                            res.colony_center.0.x + d.patrol_perimeter_offset,
+                            res.colony_center.0.y,
+                        ))
+                    }),
                 // §L2.10.7 Flee anchor: position of the nearest
                 // wildlife threat already scanned for allies_fighting.
                 nearest_threat: nearest_threat.map(|&(_, p)| p),

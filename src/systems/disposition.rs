@@ -964,16 +964,38 @@ pub fn evaluate_dispositions(
                     .iter()
                     .map(|(_, _, p)| *p)
                     .min_by_key(|p| pos.manhattan_distance(p)),
-                // §L2.10.7 Patrol / HerbcraftWard anchor — single
-                // perimeter point offset from colony center.
+                // §L2.10.7 HerbcraftWard anchor — single perimeter
+                // point offset from colony center. (Distinct from the
+                // ticket-256 patrol anchor below; HerbcraftWard's
+                // anchor stays geometrically simple for now.)
                 nearest_perimeter_tile: Some(crate::components::physical::Position::new(
                     colony.colony_center.0.x + d.patrol_perimeter_offset,
                     colony.colony_center.0.y,
                 )),
-                territory_perimeter_anchor: Some(crate::components::physical::Position::new(
-                    colony.colony_center.0.x + d.patrol_perimeter_offset,
-                    colony.colony_center.0.y,
-                )),
+                // 256 R3: per-replan ward-sector centroid. The cat's
+                // patrol beat rotates through ward-protected sectors
+                // of the demesne; falls back to the legacy static
+                // offset when the WardCoverageMap has no coverage
+                // (early-game, pre-ward).
+                territory_perimeter_anchor: colony
+                    .ward_coverage_map
+                    .sector_centroid(
+                        crate::resources::ward_coverage_map::patrol_sector_id(
+                            side_effects.time.tick,
+                            entity,
+                            d.patrol_sector_grid_w,
+                            d.patrol_sector_grid_h,
+                            d.patrol_sector_rotation_ticks,
+                        ),
+                        d.patrol_sector_grid_w,
+                        d.patrol_sector_grid_h,
+                    )
+                    .or_else(|| {
+                        Some(crate::components::physical::Position::new(
+                            colony.colony_center.0.x + d.patrol_perimeter_offset,
+                            colony.colony_center.0.y,
+                        ))
+                    }),
                 // §L2.10.7 Flee anchor: position of the nearest
                 // wildlife threat already scanned for allies_fighting.
                 nearest_threat: nearest_threat.map(|(_, p)| *p),
@@ -4493,6 +4515,32 @@ pub fn cat_presence_tick(
             Action::Patrol | Action::Fight | Action::Explore
         ) {
             presence_map.deposit(pos.x, pos.y, deposit);
+        }
+    }
+}
+
+/// 256 R5 — deposit cat patrol deterrent for patrolling cats and
+/// decay the deterrent map globally. Runs every tick.
+///
+/// Distinct from `cat_presence_tick`: that map deposits from any
+/// active cat (patrol / fight / explore) and reads as colony presence
+/// for ward placement. This map deposits *only* from
+/// `Action::Patrol` and reads as a routing-cost gradient for foxes
+/// (`CatPatrolDeterrentOverlay` in fox A*). Sleeping or foraging cats
+/// don't deter foxes — sustained patrol does.
+pub fn cat_patrol_deterrent_tick(
+    cats: Query<(&Position, &CurrentAction), Without<Dead>>,
+    mut deterrent_map: ResMut<crate::resources::CatPatrolDeterrentMap>,
+    constants: Res<SimConstants>,
+    time_scale: Res<TimeScale>,
+) {
+    let sc = &constants.scoring;
+    deterrent_map.decay_all(sc.cat_patrol_deterrent_decay_rate.per_tick(&time_scale));
+
+    let deposit = sc.cat_patrol_deterrent_deposit_per_tick;
+    for (pos, action) in &cats {
+        if action.action == Action::Patrol {
+            deterrent_map.deposit(pos.x, pos.y, deposit);
         }
     }
 }

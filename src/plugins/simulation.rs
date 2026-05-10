@@ -139,15 +139,17 @@ pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
     // and §4.7 of `docs/systems/ai-substrate-refactor.md` for the
     // substrate-vs-search-state boundary.
     use crate::resources::{
-        CarcassScentMap, CatPresenceMap, ConstructionSiteMap, ExplorationMap, FoodLocationMap,
-        FoxScentMap, GardenLocationMap, GraveAuraMap, HerbLocationMap, KittenCryMap, PreyScentMap,
-        TileMap, WardCoverageMap,
+        CarcassScentMap, CatPatrolDeterrentMap, CatPresenceMap, ConstructionSiteMap,
+        ExplorationMap, FoodLocationMap, FoxScentMap, GardenLocationMap, GraveAuraMap,
+        HerbLocationMap, KittenCryMap, PreyScentMap, TileMap, WardCoverageMap,
     };
 
     registry.register::<FoxScentMap>();
     registry.register::<PreyScentMap>();
     registry.register::<CarcassScentMap>();
     registry.register::<CatPresenceMap>();
+    // 256 R5: cat patrol deterrent — read by fox A* as routing cost.
+    registry.register::<CatPatrolDeterrentMap>();
     registry.register::<ExplorationMap>();
     registry.register::<WardCoverageMap>();
     registry.register::<FoodLocationMap>();
@@ -687,6 +689,13 @@ impl Plugin for SimulationPlugin {
             FixedUpdate,
             (
                 systems::disposition::cat_presence_tick.after(systems::goap::resolve_goap_plans),
+                // 256 R5 — runs alongside cat_presence_tick (both
+                // depend on resolve_goap_plans having set the cat's
+                // current_action for this tick). Fox AI in the same
+                // schedule (further down) consumes the deterrent
+                // map in its A* call.
+                systems::disposition::cat_patrol_deterrent_tick
+                    .after(systems::goap::resolve_goap_plans),
                 systems::personality_events::emit_personality_events,
                 systems::ai::emit_periodic_events,
                 systems::snapshot::emit_cat_snapshots.after(systems::goap::resolve_goap_plans),

@@ -42,6 +42,7 @@ pub mod intention_momentum_pickup_lock;
 pub mod inventory_full_no_pickup;
 pub mod kitten_cry;
 pub mod lone_burial;
+pub mod patrol_recalibration;
 pub mod picking_up_scavenging;
 pub mod preset;
 pub mod route_cost_decision;
@@ -162,6 +163,12 @@ pub const ALL: &[&Scenario] = &[
     // wiring/floor-removal causes the lock, focal action distribution
     // will show >70% PickUp.
     &intention_momentum_pickup_lock::SCENARIO,
+    // 256 — Patrol DSE substrate recalibration. Warded demesne + a
+    // sentinel + a distant fox. Demonstrates R3 (sector anchor),
+    // R4 (patrol-tuned overlay weights), and R5 (fox-side deterrent
+    // affect) firing in a small preloaded world. Unit tests in the
+    // module assert each substrate piece independently.
+    &patrol_recalibration::SCENARIO_WARDED_DEMESNE,
 ];
 
 /// Look up a scenario by its `name` field.

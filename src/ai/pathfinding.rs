@@ -143,6 +143,41 @@ impl TileCostOverlay for CorruptionOverlay<'_> {
     }
 }
 
+/// 256 R5 — routing cost overlay reading per-tile cat patrol presence
+/// from [`CatPatrolDeterrentMap`]. Read by *fox* A* (the symmetric
+/// counterpart to [`FoxScentOverlay`], which cats read). Foxes route
+/// around active patrols rather than charging straight through them.
+///
+/// Cost shape mirrors [`FoxScentOverlay`]:
+/// `round(deterrent.clamp(0, 1) * max_cost)`. With default
+/// `max_cost = 6`, max-deterrent tiles add 6 to fox A* edge cost,
+/// slightly less than fox-scent's 8 so foxes detour around patrols
+/// rather than refuse to move toward prey at all.
+#[derive(Clone, Copy)]
+pub struct CatPatrolDeterrentOverlay<'a> {
+    map: &'a crate::resources::CatPatrolDeterrentMap,
+    max_cost: u32,
+}
+
+impl<'a> CatPatrolDeterrentOverlay<'a> {
+    pub fn new(
+        map: &'a crate::resources::CatPatrolDeterrentMap,
+        sc: &crate::resources::sim_constants::ScoringConstants,
+    ) -> Self {
+        Self {
+            map,
+            max_cost: sc.cat_patrol_deterrent_path_cost_max,
+        }
+    }
+}
+
+impl TileCostOverlay for CatPatrolDeterrentOverlay<'_> {
+    fn cost_at(&self, pos: Position) -> u32 {
+        let v = self.map.get(pos.x, pos.y).clamp(0.0, 1.0);
+        (v * self.max_cost as f32).round() as u32
+    }
+}
+
 // ---------------------------------------------------------------------------
 // A* pathfinding
 // ---------------------------------------------------------------------------
