@@ -15,10 +15,10 @@ _Last generated: 2026-05-09._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 74 |
+| Ready | 73 |
 | Parked | 8 |
 | Blocked | 20 |
-| **Open total** | **108** |
+| **Open total** | **107** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -44,7 +44,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[229](docs/open-work/tickets/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose — _[tooling] · added 2026-05-08_
 
-## Ready (74)
+## Ready (73)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -117,7 +117,6 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[241](docs/open-work/tickets/241-burial-canary-structurally-hard-to-fire-post-230-death-rate-audit-canary-policy.md)** — Burial canary structurally hard to fire post-230 — death-rate audit + canary policy — _added 2026-05-08_
 - **[242](docs/open-work/tickets/242-body-cue-substrate-disposition-observable-markers.md)** — Body-cue substrate (Disposition → observable markers) — _added 2026-05-08_
 - **[244](docs/open-work/tickets/244-audible-cue-substrate-alarm-calls-distress-cries-hissing.md)** — Audible cue substrate (alarm calls, distress cries, hissing) — _added 2026-05-08_
-- **[251](docs/open-work/tickets/251-acutehealthadrenalineflee-retirement-substrate-over-modifier.md)** — AcuteHealthAdrenalineFlee retirement — substrate-over-modifier — _[ai-substrate] · added 2026-05-09_
 - **[252](docs/open-work/tickets/252-fleeing-disposition-230-adoption-audit-why-fleetargetpicked-0-in-seed-42-healthy.md)** — Fleeing disposition (230) adoption audit — why FleeTargetPicked = 0 in seed-42 healthy — _[ai-substrate] · added 2026-05-09_
 - **[253](docs/open-work/tickets/253-restingspot-zone-resolution-as-belief-proxy-fall-through-to-ownsleepingspot-when-no-stores.md)** — RestingSpot zone resolution as belief proxy — fall through to OwnSleepingSpot when no Stores — _[ai-substrate] · added 2026-05-09_
 
@@ -160,12 +159,13 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (164)
+## Landed archive (165)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (99)
+### 2026-05 (100)
 
+- **[251](docs/open-work/landed/251-acutehealthadrenalineflee-retirement-substrate-over-modifier.md)** — AcuteHealthAdrenalineFlee retirement — substrate-over-modifier _(2026-05-09)_
 - **[250](docs/open-work/landed/250-demote-burialperformed-move-to-neutral-feature-and-remove-from-continuity-canary-set.md)** — Demote BurialPerformed — move to neutral feature and remove from continuity canary set _(2026-05-09)_
 - **[248](docs/open-work/landed/248-re-author-last-scores-after-heldintention-insertion-r5-from-247.md)** — Re-author last_scores after HeldIntention insertion (R5 from 247) _(2026-05-08)_
 - **[247](docs/open-work/landed/247-diagnose-intentionmomentum-floor-removal-pickup-lock-cliff.md)** — Diagnose IntentionMomentum + floor-removal PickUp-lock cliff _(2026-05-08)_

@@ -1,7 +1,7 @@
 ---
 id: 251
 title: AcuteHealthAdrenalineFlee retirement — substrate-over-modifier
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-09
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-09
 ---
 
 ## Why
@@ -168,3 +168,4 @@ a post-scoring lift, and the modifier-preemption chain retires.
   ai-substrate. Plan-substrate exemplar: 119 (CriticalHealth
   retirement); this ticket follows the same shape one layer up
   (modifier → axis instead of interrupt → modifier).
+- 2026-05-09: Landed 2026-05-09. Verification soak vs post-247 baseline: acute_health_adrenaline_flee preempt rate 4228 → 0 (structural — modifier retired). InjuryHealed -2.3% per 10kt; deaths_total = 0; continuity canaries all up or unchanged; BurialPerformed even fired. The substrate-side Logistic curve on Sleep's `health_deficit` axis preserves the modifier's onset shape (sigmoid lurch around midpoint=0.4) within the WS [0,1] envelope; post-232 body-state-coupled softmax sharpness handles L3 ordering without the +0.50 modifier lift. Threshold constant retained for Fight (102) + Freeze (105) sibling modifiers.
