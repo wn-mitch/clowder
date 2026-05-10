@@ -15,10 +15,10 @@ _Last generated: 2026-05-10._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 77 |
+| Ready | 76 |
 | Parked | 9 |
 | Blocked | 29 |
-| **Open total** | **121** |
+| **Open total** | **120** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -44,7 +44,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[229](docs/open-work/tickets/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose — _[tooling] · added 2026-05-08_
 
-## Ready (77)
+## Ready (76)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -105,7 +105,6 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[225](docs/open-work/tickets/225-audit-patrol-l3-share-rise-under-additive-coordinator-dse-lift.md)** — audit Patrol L3 share rise under additive coordinator-DSE lift — _[ai-substrate] · added 2026-05-07_
 - **[226](docs/open-work/tickets/226-audit-groomother-share-vs-score-inversion-under-demographic-shift.md)** — audit GroomOther share-vs-score inversion under demographic shift — _[ai-substrate] · added 2026-05-07_
 - **[227](docs/open-work/tickets/227-coordinator-eligible-focal-cat-for-coordinate-frame-diff-parity.md)** — coordinator-eligible focal-cat for Coordinate frame-diff parity — _[process-discipline] · added 2026-05-07_
-- **[230](docs/open-work/tickets/230-carve-dispositionkindfleeing-substrate-aware-flee-picker-close-anxiety-interrupt-migration.md)** — Carve DispositionKind::Fleeing + substrate-aware flee picker (close anxiety-interrupt migration) — _[pathfinder-risk-awareness] · added 2026-05-08_
 - **[233](docs/open-work/tickets/233-subscribe-non-pickup-work-dses-hunt-forage-cook-wander-explore-to-body-state-perception.md)** — Subscribe non-pickup work DSEs (Hunt Forage Cook Wander Explore) to body-state perception — _added 2026-05-08_
 - **[234](docs/open-work/tickets/234-damage-recency-perception-scalar-couple-acutehealthadrenalineflee-to-felt-danger.md)** — Damage-recency perception scalar — couple AcuteHealthAdrenalineFlee to felt danger — _added 2026-05-08_
 - **[235](docs/open-work/tickets/235-smart-deposit-routing-for-clutter-clearance.md)** — Smart deposit routing for clutter clearance — _added 2026-05-08_
@@ -173,16 +172,17 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (169)
+## Landed archive (170)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (104)
+### 2026-05 (105)
 
 - **[256](docs/open-work/landed/256-patrol-dse-recalibration-influence-map-driven-smart-pathing-wildlife-deterrent-affect-post-252-cascade-root-cause.md)** — Patrol DSE recalibration — influence-map-driven smart pathing + wildlife deterrent affect (post-252 cascade root cause) _(2026-05-10)_
 - **[255](docs/open-work/landed/255-threatproximityadrenalineflee-flee-axis-calibration-audit-post-252-readable.md)** — ThreatProximityAdrenalineFlee Flee-axis calibration audit (post-252 readable) _(2026-05-10)_
 - **[254](docs/open-work/landed/254-pickfleetarget-witness-contract-rebind-so-substrate-aware-fleeing-can-pick-a-target-post-252.md)** — PickFleeTarget witness contract — rebind so substrate-aware Fleeing can pick a target post-252 _(2026-05-10)_
 - **[252](docs/open-work/landed/252-fleeing-disposition-230-adoption-audit-why-fleetargetpicked-0-in-seed-42-healthy.md)** — Fleeing disposition (230) adoption audit — why FleeTargetPicked = 0 in seed-42 healthy _(2026-05-10)_
+- **[230](docs/open-work/landed/230-carve-dispositionkindfleeing-substrate-aware-flee-picker-close-anxiety-interrupt-migration.md)** — Carve DispositionKind::Fleeing + substrate-aware flee picker (close anxiety-interrupt migration) _(2026-05-10)_
 - **[251](docs/open-work/landed/251-acutehealthadrenalineflee-retirement-substrate-over-modifier.md)** — AcuteHealthAdrenalineFlee retirement — substrate-over-modifier _(2026-05-09)_
 - **[250](docs/open-work/landed/250-demote-burialperformed-move-to-neutral-feature-and-remove-from-continuity-canary-set.md)** — Demote BurialPerformed — move to neutral feature and remove from continuity canary set _(2026-05-09)_
 - **[248](docs/open-work/landed/248-re-author-last-scores-after-heldintention-insertion-r5-from-247.md)** — Re-author last_scores after HeldIntention insertion (R5 from 247) _(2026-05-08)_

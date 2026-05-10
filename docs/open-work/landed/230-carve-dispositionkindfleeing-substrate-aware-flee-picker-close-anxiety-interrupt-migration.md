@@ -1,7 +1,7 @@
 ---
 id: 230
 title: Carve DispositionKind::Fleeing + substrate-aware flee picker (close anxiety-interrupt migration)
-status: ready
+status: done
 cluster: pathfinder-risk-awareness
 added: 2026-05-08
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: [203]
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 748c90d7
+landed-on: 2026-05-10
 ---
 
 ## Why
@@ -223,3 +223,4 @@ been retiring. R3 is the last-arm-out completion of that migration.
   the orthogonal threat-response (Hide vs Flee) that consumes the same
   substrate. Coordinate land order during impl; no hard supersession in
   either direction.
+- 2026-05-10: 2026-05-10: substrate-aware Fleeing now end-to-end. Implementation shipped in wip 7c93e70c (2026-05-08, parallel session); 251 retired AcuteHealthAdrenalineFlee (substrate-over-modifier, stronger than the original R3 modifier-guard plan); 252 lifted L3 softmax filter and audited why FleeTargetPicked=0; 254 R5 closed the picker witness contract (effective_cost = cost - chebyshev_to_threat). Hard gate Starvation==0 holds on current main; Feature::FleeTargetPicked fires end-to-end in flee_commitment scenario. Continuity canary 'interrupts_by_reason.modifier_preemption(acute_health_adrenaline_flee)' is moot post-251 (modifier no longer exists). Substrate-side Flee scoring gap (Mocha boldness=0.9 + health=0.26 + safety=0.003 yielding Flee=-0.025) opened as ticket 271 — balance follow-on, not a 230 regression (cedar pre-254 footer is bit-for-bit identical).
