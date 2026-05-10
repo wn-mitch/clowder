@@ -77,3 +77,8 @@ DSEs that ship the *capability* before any modifier lifts them.
 
 - 2026-05-02: Opened as DSE-infrastructure prerequisite for ticket
   144 (Fawn valence) alongside 109 Phase A landing.
+- 2026-05-10: Substrate consumer ticket 269 (Submit DSE — wire C3
+  Belief + ActionAffordance + revisit cross-species extension) opens
+  blocked-on this ticket. 269 layers Belief facets and `Affordance(Fawn,
+  perceiver, target)` reads onto this DSE's existing scoring shape;
+  also runs a cross-species audit. Land 145 first, 269 second.

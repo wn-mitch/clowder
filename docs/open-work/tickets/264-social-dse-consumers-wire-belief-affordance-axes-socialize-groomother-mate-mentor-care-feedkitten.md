@@ -1,0 +1,73 @@
+---
+id: 264
+title: Social DSE consumers wire belief + affordance axes (Socialize, GroomOther, Mate, Mentor, Care, FeedKitten)
+status: blocked
+cluster: C
+added: 2026-05-10
+parked: null
+blocked-by: [258, 261]
+supersedes: []
+related-systems: [ai-substrate-refactor.md]
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+Social DSEs (Socialize, GroomOther, Mate, Mentor, Care, FeedKitten) are already per-target — their target-selection layer reads `Relationships.fondness/familiarity/bond` to pick partners. C3's belief substrate (258) gives them honest per-target perception (`affiliation_history`, `perceived_injury_level`, `perceived_intent_clarity`) instead of direct read of the symmetric Relationships resource, and ActionAffordances (261) prices "would this approach succeed" per partner. This ticket wires the new substrates as additional considerations on the existing per-target social DSEs.
+
+The payoff: cats stop wasting actions on partners who are unreceptive (wrong fertility window, recently rebuffed, in too much distress to receive care), and cats prioritize partners whose belief facets indicate the action will land. The Mate supply-chain problem (named in ticket 126's Why) gets a downstream lever — Mate's per-target affordance reads "perceived receptivity" and skips low-receptivity partners that would otherwise oscillate scoring.
+
+## Scope
+
+For each of the 6 social DSEs (`socialize_target.rs`, `groom_other.rs` + `groom_other_target.rs`, `mate.rs`, `mentor.rs`, `care.rs`, `feed_kitten.rs`), add:
+
+- **Belief axis read**: per-target `MentalModel<Cat>(target).<facet>` reads as new considerations. Per-DSE facet picks per the ActionAffordances heuristic-input table (ticket 261's scope).
+- **Affordance axis read**: `Affordance(<DSE-action>, self, target)` from ticket 261's substrate as a multiplicative gate.
+- **Per-DSE consideration tunables** in `SimConstants` (lift weights, thresholds).
+
+## Out of scope
+
+- Changing the existing target-selection logic shape (still per-target consideration scoring; this ticket adds inputs, doesn't reframe the selection).
+- Talk of the Town gossip transmission (C2 / future ticket).
+- Versu-style multi-stage practices (C2 / future ticket).
+- Mate-specific supply-chain fixes (ticket 027's lineage owns; this ticket gives Mate a sharper input but doesn't redesign its drop-gate).
+
+## Current state
+
+- Blocked-by 258 (Belief substrate) + 261 (ActionAffordances substrate). Both in same cluster lifecycle.
+- All 6 social DSEs already per-target — `src/ai/dses/socialize_target.rs` is the canonical pattern.
+- `Relationships` resource (`src/components/relationships.rs:64–67`) currently provides per-pair fondness/familiarity/bond — symmetric, eagerly read. C3 supersedes this with asymmetric per-perceiver `MentalModel<Cat>.affiliation_history`. Migration path: this ticket switches the social DSE reads from `Relationships` to MentalModel; `Relationships` may persist as a back-compat layer or retire (decide during implementation).
+
+## Approach
+
+1. Land Socialize consumer first (lowest stakes; oscillation-safe).
+2. Land GroomOther consumer second (uses the same per-target scoring shape; Fawn DSE in sibling ticket reuses GroomOther's resolver, so ordering matters: this ticket lands first, then Fawn extends).
+3. Land Mate consumer third (highest leverage on the supply-chain problem; verify against ticket 027's Mate cadence canary).
+4. Land Mentor / Care / FeedKitten in any order.
+5. After each, run focal-cat trace + frame-diff against pre-substrate baseline.
+
+## Verification
+
+### Per-DSE scenario microexperiments
+
+- `socialize_picks_high_affiliation_partner` — two candidate partners, one with positive `affiliation_history` and one with negative; verify Socialize picks the positive one.
+- `groom_skips_high_hostility_target` — high `perceived_hostility` target; verify GroomOther affordance is low and DSE deprioritizes.
+- `mate_skips_low_receptivity_partner` — same fertility-window partner with high vs low perceived receptivity; verify Mate affordance picks the receptive one.
+- `care_targets_perceived_injury` — verify Care DSE reads `perceived_injury_level` (NOT raw HP) for target selection.
+
+### Soak gates
+
+- Mate cadence canary holds (ticket 027).
+- KittenMatured ≥ 1 / sim year (generational continuity).
+- All five continuity canaries hold (grooming, play, mentoring, courtship, mythic-texture).
+- `bonds_formed` per-soak stays in band (post-126 baseline of -23% noted in 126's Log; this ticket should not regress further).
+
+### Frame-diff
+
+`just frame-diff <pre-substrate-baseline> <post-this-ticket>` confirms drift on these 6 DSEs is concordant with the substrate-addition hypothesis (per-target scoring sharpens; per-DSE election distribution should tighten around higher-affordance targets).
+
+## Log
+
+- 2026-05-10: opened sibling-to-258. Wires Belief + Affordance into existing per-target social DSEs. Session plan: `~/.claude/plans/after-working-256-i-dreamy-fiddle.md`.

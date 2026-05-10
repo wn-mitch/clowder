@@ -15,10 +15,10 @@ _Last generated: 2026-05-10._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 74 |
-| Parked | 8 |
-| Blocked | 20 |
-| **Open total** | **108** |
+| Ready | 78 |
+| Parked | 9 |
+| Blocked | 29 |
+| **Open total** | **122** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -44,7 +44,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[229](docs/open-work/tickets/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose — _[tooling] · added 2026-05-08_
 
-## Ready (74)
+## Ready (78)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -120,8 +120,12 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[253](docs/open-work/tickets/253-restingspot-zone-resolution-as-belief-proxy-fall-through-to-ownsleepingspot-when-no-stores.md)** — RestingSpot zone resolution as belief proxy — fall through to OwnSleepingSpot when no Stores — _[ai-substrate] · added 2026-05-09_
 - **[254](docs/open-work/tickets/254-pickfleetarget-witness-contract-rebind-so-substrate-aware-fleeing-can-pick-a-target-post-252.md)** — PickFleeTarget witness contract — rebind so substrate-aware Fleeing can pick a target post-252 — _[ai-substrate] · added 2026-05-10_
 - **[257](docs/open-work/tickets/257-mate-election-crowded-out-by-patrol-in-post-256-regime.md)** — Mate election crowded out by Patrol in post-256 regime — _added 2026-05-10_
+- **[258](docs/open-work/tickets/258-c3-worked-design-subjective-belief-substrate-mental-models-facets-evidence-typology.md)** — C3 worked design — subjective belief substrate (mental models + facets + evidence typology) — _[C] · added 2026-05-10_
+- **[259](docs/open-work/tickets/259-l1-to-l3-activation-visualization-in-log-viewer.md)** — L1 to L3 activation visualization in log viewer — _added 2026-05-10_
+- **[260](docs/open-work/tickets/260-fox-scent-marking-signposts-territorial-boundaries-without-ward-keying.md)** — Fox scent-marking signposts — territorial boundaries without ward keying — _added 2026-05-10_
+- **[271](docs/open-work/tickets/271-restore-substrate-flee-score-lift-on-critical-health-active-threat-251-balance-follow-on.md)** — Restore substrate Flee score lift on critical-health + active-threat (251 balance follow-on) — _[ai-substrate] · added 2026-05-10_
 
-## Parked (8)
+## Parked (9)
 
 - **[015](docs/open-work/tickets/015-alloparenting-reframe-b.md)** — Alloparenting Reframe B — mama drops kitten at hearth near resting elder — _parked 2026-04-22 · added 2026-04-22_
 - **[058](docs/open-work/tickets/058-tradition-unfiltered-loop-fix.md)** — §3.5.3 item 1 Tradition modifier — fix unfiltered-loop port — _parked 2026-04-30 · added 2026-04-27_
@@ -129,10 +133,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[084](docs/open-work/tickets/084-farm-herb-ward-demand-axis.md)** — Farm DSE — tie scoring to herb/ward stockpile demand so gardens stay productive under abundant food — _[balance] · parked 2026-04-30 · added 2026-04-29_
 - **[173](docs/open-work/tickets/173-crafting-split-capability-markers.md)** — IsHerbalist / IsSpiritualist / HasCorruptionNearby capability markers (155 follow-on) — _[ai-substrate] · parked 2026-05-05 · added 2026-05-05_
 - **[199](docs/open-work/tickets/199-pipeline-walk-skill.md)** — Hunt / production / consumption pipeline-walk skill (194 P4) — _[process-discipline] · parked 2026-05-06 · added 2026-05-06_
+- **[212](docs/open-work/tickets/212-tune-caretake-food-security-weight.md)** — tune caretake_food_security_weight — _[balance] · parked 2026-05-10 · blocked-by 257 · added 2026-05-07_
 - **[214](docs/open-work/tickets/214-tune-patrol-fox-scent-weight.md)** — tune patrol_fox_scent_weight — _[balance] · parked 2026-05-07 · blocked-by 209 · added 2026-05-07_
 - **[249](docs/open-work/tickets/249-extend-dispositionfailurecooldown-coverage-to-restingguardingpickingup-et-al-r3-from-247.md)** — Extend DispositionFailureCooldown coverage to Resting/Guarding/PickingUp et al. (R3 from 247) — _parked 2026-05-09 · added 2026-05-08_
 
-## Blocked (20)
+## Blocked (29)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _blocked-by 007, 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _blocked-by 016 · added 2026-04-22_
@@ -146,7 +151,6 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[130](docs/open-work/tickets/130-trust-weighted-coordinator-momentum.md)** — Trust-weighted coordinator directive momentum — _[C] · blocked-by 057 · added 2026-05-02_
 - **[140](docs/open-work/tickets/140-steering-and-pursuit-polish.md)** — Phase 3 — Steering, smooth pursuit / flee, pathfinder polish — _[substrate-migration] · blocked-by 139 · added 2026-05-02_
 - **[144](docs/open-work/tickets/144-intraspecies-conflict-fawn.md)** — IntraspeciesConflictResponseFawn — appeasement valence (belly-up, slow blink) — _[ai-substrate] · blocked-by 145 · added 2026-05-02_
-- **[212](docs/open-work/tickets/212-tune-caretake-food-security-weight.md)** — tune caretake_food_security_weight — _[balance] · blocked-by 209 · added 2026-05-07_
 - **[213](docs/open-work/tickets/213-tune-groom-food-security-weight.md)** — tune groom_food_security_weight — _[balance] · blocked-by 209 · added 2026-05-07_
 - **[215](docs/open-work/tickets/215-tune-tension-defusion-groom-weight.md)** — tune tension_defusion_groom_weight — _[balance] · blocked-by 209 · added 2026-05-07_
 - **[216](docs/open-work/tickets/216-mentor-coordinate-caretake-axis-ethology-audit.md)** — Mentor / Coordinate / Caretake axis ethology audit — _[ai-substrate] · blocked-by 209 · added 2026-05-07_
@@ -154,6 +158,16 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[221](docs/open-work/tickets/221-caretake-gates-on-ambush-recency-at-kitten-tile.md)** — caretake gates on ambush-recency at kitten tile — _[ai-substrate] · blocked-by 219 · added 2026-05-07_
 - **[243](docs/open-work/tickets/243-behavior-observation-l1-channel-target-side-body-cue-physical-marker-reads.md)** — Behavior-observation L1 channel (target-side body-cue + physical marker reads) — _blocked-by 242 · added 2026-05-08_
 - **[245](docs/open-work/tickets/245-ambient-predatorprey-behavior-observation-enrichment.md)** — Ambient predator/prey behavior-observation enrichment — _blocked-by 243 · added 2026-05-08_
+- **[261](docs/open-work/tickets/261-actionaffordances-substrate-per-action-success-scalars-actionkind-enum-heuristic-estimators.md)** — ActionAffordances substrate — per-action success scalars + ActionKind enum + heuristic estimators — _[C] · blocked-by 258 · added 2026-05-10_
+- **[262](docs/open-work/tickets/262-audible-cue-range-falloff-modeling-distance-attenuation-for-alarm-calls-and-distress-cries.md)** — Audible-cue range falloff modeling — distance attenuation for alarm calls and distress cries — _blocked-by 244 · added 2026-05-10_
+- **[263](docs/open-work/tickets/263-256-cluster-dse-consumers-wire-belief-affordance-axes-flee-patrol-hunt-with-stalkchasepounce-sub-actions.md)** — 256-cluster DSE consumers wire belief + affordance axes (Flee, Patrol, Hunt with Stalk/Chase/Pounce sub-actions) — _[C] · blocked-by 258, 261 · added 2026-05-10_
+- **[264](docs/open-work/tickets/264-social-dse-consumers-wire-belief-affordance-axes-socialize-groomother-mate-mentor-care-feedkitten.md)** — Social DSE consumers wire belief + affordance axes (Socialize, GroomOther, Mate, Mentor, Care, FeedKitten) — _[C] · blocked-by 258, 261 · added 2026-05-10_
+- **[265](docs/open-work/tickets/265-wildlife-symmetric-dse-consumers-wire-belief-affordance-fox-hawk-snake-shadowfox.md)** — Wildlife symmetric DSE consumers wire belief + affordance (fox, hawk, snake, shadowfox) — _[C] · blocked-by 258, 261 · added 2026-05-10_
+- **[266](docs/open-work/tickets/266-prey-side-ai-bolt-and-scattergroup-dses-first-prey-ai-in-the-codebase.md)** — Prey-side AI — Bolt and ScatterGroup DSEs (first prey AI in the codebase) — _[C] · blocked-by 258, 261 · added 2026-05-10_
+- **[267](docs/open-work/tickets/267-conflict-low-dses-threaten-posture-hiss-escalation-rungs-cheap-pre-fight-signaling.md)** — Conflict-low DSEs — Threaten / Posture / Hiss escalation rungs (cheap pre-Fight signaling) — _[C] · blocked-by 258, 261 · added 2026-05-10_
+- **[268](docs/open-work/tickets/268-hide-dse-wire-c3-belief-actionaffordance-for-general-threat-response-door-slam-scenario.md)** — Hide DSE — wire C3 Belief + ActionAffordance for general threat-response (door-slam scenario) — _[C] · blocked-by 258, 261 · added 2026-05-10_
+- **[269](docs/open-work/tickets/269-submit-dse-wire-c3-belief-actionaffordance-revisit-cross-species-extension.md)** — Submit DSE — wire C3 Belief + ActionAffordance + revisit cross-species extension — _[C] · blocked-by 145, 258, 261 · added 2026-05-10_
+- **[270](docs/open-work/tickets/270-engagethreat-split-from-patrol-dse-256-r6-follow-on-with-belief-actionaffordance.md)** — EngageThreat split from Patrol DSE (256 R6 follow-on with Belief + ActionAffordance) — _[C] · blocked-by 261 · added 2026-05-10_
 
 ## Pre-existing (2)
 

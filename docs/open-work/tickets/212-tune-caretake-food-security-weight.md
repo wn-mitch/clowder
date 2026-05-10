@@ -1,11 +1,11 @@
 ---
 id: 212
 title: tune caretake_food_security_weight
-status: blocked
+status: parked
 cluster: balance
 added: 2026-05-07
-parked: null
-blocked-by: [209]
+parked: 2026-05-10
+blocked-by: [257]
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [181-hunt-forage-saturation-tune.md]
@@ -51,3 +51,4 @@ value. Single-seed soak + `just verdict`.
 <!-- linkages:end -->
 ## Log
 - 2026-05-07: opened from 209 closeout.
+- 2026-05-10: parked. Post-256 regime carries `MatingOccurred` in the baseline `never_fired_expected_positives` list (ticket 257 — Mate election crowded out by Patrol). With no new kittens past the founder population, Caretake's eligibility gate (`hungry_kitten_urgency > 0.0` at `src/ai/scoring.rs:1845`) rarely fires; tuning the food-security lift would produce a frame-diff null-by-eligibility-bottleneck. Resume after 257 (or its substrate-fix descendants) restores reliable kitten births. `blocked-by` repointed 209 → 257; 209 is landed but the real blocker for verifying Caretake tuning is the absence of hungry-kitten windows.

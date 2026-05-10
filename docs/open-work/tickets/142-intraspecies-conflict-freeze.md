@@ -65,3 +65,11 @@ Hide/Freeze DSE infrastructure from ticket 104.
   Phase A landing. 104 (Hide DSE) landed at 2a68f595 in the same
   Wave 1 batch; only 109's scalar composition work remains as
   blocker.
+- 2026-05-10: Cluster C C3 spinout cluster (258, 261) opens parallel
+  consumer ticket 268 (Hide DSE — wire C3 Belief + ActionAffordance
+  for general threat-response, door-slam scenario). 268 is
+  *complementary*, not superseding: 142 is the intraspecies-conflict
+  Modifier on Hide; 268 is the general-threat Belief+Affordance
+  consumer wiring on the same DSE. They compose — Hide's score
+  becomes (intraspecies-conflict Modifier from 142) + (general-threat
+  Belief axes from 268). Coordinate land order during impl.

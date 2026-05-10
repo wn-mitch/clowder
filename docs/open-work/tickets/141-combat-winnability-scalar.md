@@ -189,3 +189,14 @@ Five-phase playbook mirroring 103:
   this scalar is opponent-coupled physics. Single-axis discipline
   honored — personality / phobias / ambient combativeness compose at
   the modifier layer.
+- 2026-05-10: Superseded by ticket 261 (ActionAffordances substrate).
+  261 generalizes single-action perception scalars (this ticket + 103
+  `escape_viability`, landed) into a unified `(perceiver, target,
+  action_kind) → success_scalar` substrate covering ~22 action kinds.
+  This ticket's worked composition (dps-balance + ttk-ratio +
+  ally-factor) becomes the heuristic estimator for `Affordance(Fight,
+  perceiver, target)` inside 261. Two coexistence options for
+  implementation order: (a) land 141 first as the Fight estimator
+  implementation, then 261 wraps it in the substrate; (b) close 141 as
+  superseded and rebuild Fight estimator inside 261 from 141's design.
+  Decision deferred to 261's implementation phase.

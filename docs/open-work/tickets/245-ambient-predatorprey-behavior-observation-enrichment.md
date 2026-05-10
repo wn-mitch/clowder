@@ -51,3 +51,17 @@ DSE axes to read them via 243's channel.
 
 ## Log
 - 2026-05-08: opened on 126's C4 landing commit.
+- 2026-05-10: Substrate consumers downstream of this ticket open under
+  Cluster C C3 spinout (258 worked design). Affected consumer tickets:
+  263 (256-cluster DSE consumers wire Belief + Affordance into
+  Flee/Patrol/Hunt — uses this ticket's wildlife body-cue reads as
+  Belief integrator inputs), 265 (Wildlife symmetric DSE consumers
+  wire Belief + Affordance into fox/hawk/snake/shadowfox — same
+  substrate, predator-side), 266 (Prey-side AI Bolt + ScatterGroup —
+  reads Affordance(Chase) which depends on this ticket's enrichment),
+  268 (Hide DSE Belief + Affordance consumer — door-slam grounding
+  example arc reads body cues per this ticket), 269 (Submit DSE
+  Belief + Affordance consumer — cross-species audit benefits from
+  body-cue differentiation). This ticket remains blocked-on 243; once
+  it lands, the cluster-C consumers can integrate the wildlife
+  body-cue reads.

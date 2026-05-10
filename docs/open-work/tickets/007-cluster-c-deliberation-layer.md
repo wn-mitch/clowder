@@ -79,6 +79,8 @@ potentially simpler post-A4.
 
 ### C3. Subjective knowledge / belief distortion
 
+**Spun out as ticket 258 — see [`258-c3-worked-design-subjective-belief-substrate-mental-models-facets-evidence-typology.md`](258-c3-worked-design-subjective-belief-substrate-mental-models-facets-evidence-typology.md).** This cluster entry retained as a roadmap pointer; 258 carries the worked design (6-facet v1 list, Bayes-flavored EMA updates, `WitnessableEvent` message, species-prior table, wildlife-symmetric mental models, `MentalModel<EnvironmentalContext>` as fourth model family per the door-slam grounding example). 258 opened 2026-05-10 with sibling cluster tickets 261 (ActionAffordances substrate, novel beyond C3) + 263–270 (consumer DSE wiring across 256-cluster, social, wildlife, prey-side, conflict-low, Hide, Submit, EngageThreat). Mirrors the C1 → 126 spinout pattern.
+
 **Why it matters:** `src/systems/colony_knowledge.rs` models knowledge
 as **democratic consensus** — memories held by ≥`promotion_threshold`
 cats get promoted to `ColonyKnowledge.entries`; below that, they're
@@ -182,12 +184,12 @@ but not on first encounter).
   `logs/events.jsonl`) for accuracy assertions and divergence
   diagnostics
 
-**Typed-failure-proxy consolidation candidates (surfaced by 249).**
+**Typed-failure-proxy consolidation candidates (surfaced by 249; retirement venue: ticket 258 per 2026-05-10 spinout).**
 Per §12.1 of `docs/systems/ai-substrate-refactor.md`, the substrate
 has no general memory→scoring coupling today; per-failure-flavor /
 per-event-flavor typed components in tree are temporary proxies
 that consolidate under C3's unified `Memory` / mental-model
-substrate when this ticket lands. Catalog of current candidates:
+substrate when ticket 258 lands. Catalog of current candidates:
 
 - `src/components/recent_disposition_failures.rs`
   (`RecentDispositionFailures`) + `DispositionFailureCooldown`
@@ -298,3 +300,4 @@ Not duplicated here; see sub-task 3 of #1.
 
 - 2026-04-27: dropped blocked-by 005 — cluster-A umbrella retired; A1 dependency satisfied by landed work. Status flipped blocked → ready.
 - 2026-05-09: 249 surfaced the typed-failure-proxy consolidation list under C3's §Touch points. The accumulating typed-failure / typed-event components in tree (`RecentDispositionFailures`, `RecentTargetFailures`, `HuntingPriors::record_failed_search`, plus `RecentAmbushMap` proposed in 219) are all temporary proxies for the unified mental-model substrate this ticket lands. New typed-failure surface area should not be added without an explicit retirement-under-C3 §Log entry in the originating ticket.
+- 2026-05-10: C3 spun out as ticket 258. Mirrors C1 → 126 (2026-05-02). 258 carries the worked design + 9 sibling cluster tickets opened in same lifecycle (261 ActionAffordances substrate, 263 256-cluster consumers, 264 social consumers, 265 wildlife consumers, 266 prey-side AI, 267 conflict-low DSEs, 268 Hide consumer wiring, 269 Submit consumer wiring, 270 EngageThreat split per 256 R6). Plus 3 adjacent independent tickets (259 L1→L3 viz, 260 fox scent-marking signposts, 262 audible-cue range falloff). Session plan: `~/.claude/plans/after-working-256-i-dreamy-fiddle.md`. Retirement venue for the typed-failure-proxy consolidation candidates is now ticket 258.

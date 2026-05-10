@@ -210,3 +210,16 @@ been retiring. R3 is the last-arm-out completion of that migration.
   - `136` (ready) — WoundedAlly marker for escape_viability. Same input
     layer as 141; composes.
   - `138` (ready) — MovementBudget Phase 1. Substrate input to 140's steering.
+
+- 2026-05-10: Cluster C C3 spinout cluster (258, 261, 263, 268) opens
+  substrate consumers downstream of this ticket. 261 (ActionAffordances
+  substrate) generalizes per-action success scalars including
+  `Affordance(Flee, perceiver, target)` — composes naturally with this
+  ticket's substrate-aware flee picker (target selection physics) by
+  feeding the picker's success-scalar output into the substrate. 263
+  (256-cluster DSE consumers) wires Belief + Affordance into Flee DSE
+  scoring; if 230 lands first, 263's Flee axes layer on top of the
+  carved DispositionKind::Fleeing. 268 (Hide DSE consumer wiring) is
+  the orthogonal threat-response (Hide vs Flee) that consumes the same
+  substrate. Coordinate land order during impl; no hard supersession in
+  either direction.

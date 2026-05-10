@@ -60,3 +60,13 @@ gesture DSE — see ticket 145), not just a modifier on existing DSEs.
 
 - 2026-05-02: Opened as 109 Phase B Fawn sub-ticket alongside 109
   Phase A landing.
+- 2026-05-10: Cluster C C3 spinout cluster (258, 261) opens parallel
+  consumer ticket 269 (Submit DSE — wire C3 Belief + ActionAffordance
+  + revisit cross-species extension). 269 is *complementary*, not
+  superseding: 144 is the intraspecies-conflict Modifier lifting
+  Submit; 269 is the Belief+Affordance consumer wiring on the same
+  Submit DSE. 269 also includes a cross-species audit revisiting
+  144's "predators don't accept appeasement (ecologically incoherent)"
+  out-of-scope decision, in light of the C3 substrate's ability to
+  model honest cross-species perception. Decision outcome deferred to
+  269's audit phase; this ticket retains intraspecies-only scope.

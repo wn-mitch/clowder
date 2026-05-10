@@ -128,6 +128,20 @@ similar-linkages *ARGS:
 similar-link-report *ARGS:
     @uv run scripts/similar/link_report.py {{ARGS}}
 
+# Embedding-based ready-ticket recommender. Surfaces a top-K of
+# unblocked tickets adjacent to recent landings, current in-flight
+# work, the AI-substrate refactor, or an ad-hoc seed. Read-only over
+# the existing `logs/.embeddings/` index. See `.claude/skills/next/SKILL.md`.
+#   just next                                  # blend (momentum + wip + substrate)
+#   just next --mode momentum                  # last-N landed centroid only
+#   just next --mode wip                       # in-progress cohesion only
+#   just next --mode substrate                 # AI-refactor alignment only
+#   just next --mode seed --seed 256           # ticket-id seed
+#   just next --mode seed --seed "starvation"  # free-text seed
+#   just next --top 10 --text                  # widen + render text envelope
+next *ARGS:
+    @uv run scripts/similar/next.py {{ARGS}}
+
 # Deep-soak with a focal-cat trace sidecar. Writes to
 # logs/tuned-<seed>/{events,narrative,trace-<focal>}.jsonl. Trace
 # records decompose per-tick L1/L2/L3 state for one focal cat per §11
