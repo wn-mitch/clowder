@@ -2247,8 +2247,14 @@ pub fn aggregate_to_dispositions(action_scores: &[(Action, f32)]) -> Vec<(Dispos
         .collect();
 
     for &(action, score) in action_scores {
-        // Skip Flee and Idle — not dispositions.
-        if matches!(action, Action::Flee | Action::Idle) {
+        // Skip Idle — no-op, not a disposition.
+        //
+        // 252: `Action::Flee` was previously skipped here too, paired with
+        // the softmax-pool filter above. Now that the filter is lifted and
+        // `from_action(Action::Flee) => Some(DispositionKind::Fleeing)`
+        // (`disposition.rs:294`), Flee scores route into the Fleeing
+        // disposition's max accumulator like every other action.
+        if matches!(action, Action::Idle) {
             continue;
         }
 
@@ -2403,12 +2409,22 @@ pub fn select_disposition_via_intention_softmax_with_trace(
     rng: &mut impl Rng,
     mut sink: Option<&mut SoftmaxCapture>,
 ) -> SoftmaxOutcome {
-    // Build the filtered pool: drop Flee and Idle (handled outside the
-    // disposition selection layer) and any zero-scoring actions (the legacy
-    // `aggregate_to_dispositions` also drops zero-scoring dispositions).
+    // Build the filtered pool: drop Idle (no-op, not a disposition) and
+    // any zero-scoring actions (the legacy `aggregate_to_dispositions`
+    // also drops zero-scoring dispositions).
+    //
+    // 252: `Action::Flee` was previously filtered here as a substrate-stub
+    // artifact from when Flee was behavior-gate-only (Fight→Flee swap on
+    // low boldness). Tickets 108 (`ThreatProximityAdrenalineFlee` lifting
+    // Flee score on threat proximity) and 230 (`DispositionKind::Fleeing`
+    // plan template + boldness-scaled `RouteCostField` target picker)
+    // landed substrate writers without lifting this reader-side filter,
+    // making both writers dead code in cats. The lift restores the
+    // substrate-driven Flee election path so the threat substrate can
+    // compete on equal footing with every other Action.
     let mut pool: Vec<(Action, f32)> = scores
         .iter()
-        .filter(|(a, s)| !matches!(a, Action::Flee | Action::Idle) && *s > 0.0)
+        .filter(|(a, s)| !matches!(a, Action::Idle) && *s > 0.0)
         .copied()
         .collect();
 
@@ -4461,17 +4477,34 @@ mod tests {
     }
 
     #[test]
-    fn aggregate_excludes_flee_and_idle() {
+    fn aggregate_routes_flee_into_fleeing_and_excludes_idle() {
+        // 252: post-filter-lift contract — Action::Flee aggregates into
+        // DispositionKind::Fleeing (the singleton constituent of the
+        // substrate-aware retreat path); only Action::Idle is excluded
+        // as a no-op.
         let scores = vec![
             (Action::Flee, 3.0),
             (Action::Idle, 0.1),
             (Action::Hunt, 1.0),
         ];
         let disp = aggregate_to_dispositions(&scores);
-        assert!(disp.iter().all(|(k, _)| *k != DispositionKind::Resting
-            || !disp.iter().any(|(dk, _)| *dk == DispositionKind::Resting)));
-        // No disposition should have the Flee score
-        assert!(disp.iter().all(|(_, s)| *s <= 1.0));
+        let fleeing_score = disp
+            .iter()
+            .find(|(k, _)| *k == DispositionKind::Fleeing)
+            .map(|(_, s)| *s);
+        assert_eq!(
+            fleeing_score,
+            Some(3.0),
+            "Action::Flee score must aggregate into DispositionKind::Fleeing"
+        );
+        // Idle never produces a disposition entry (no from_action mapping
+        // and skipped at the loop head).
+        assert!(disp.iter().all(|(_, s)| *s > 0.0));
+        let hunting_score = disp
+            .iter()
+            .find(|(k, _)| *k == DispositionKind::Hunting)
+            .map(|(_, s)| *s);
+        assert_eq!(hunting_score, Some(1.0));
     }
 
     #[test]
@@ -4851,13 +4884,19 @@ mod tests {
 
     #[test]
     fn softmax_capture_flags_empty_pool_fallthrough() {
-        // When every action is Flee/Idle or zero-scoring the pool is
-        // empty and the softmax doesn't fire. The capture sink should
-        // still record the temperature + `empty_pool: true` so replay
-        // frames can distinguish "softmax ran" from "fallthrough to
+        // When every action is Idle or zero-scoring the pool is empty
+        // and the softmax doesn't fire. The capture sink should still
+        // record the temperature + `empty_pool: true` so replay frames
+        // can distinguish "softmax ran" from "fallthrough to
         // DispositionKind::Resting" unambiguously.
+        //
+        // 252: pre-252 this test used `Action::Flee` to fill the pool
+        // (since Flee was filtered alongside Idle and zero-scorers).
+        // Post-filter-lift Flee survives the filter and elects to
+        // Fleeing, so the empty-pool case now needs only Idle + a
+        // zero-scoring constituent to exercise the fallthrough.
         let sc = ScoringConstants::default();
-        let scores = vec![(Action::Flee, 0.9), (Action::Idle, 0.3)];
+        let scores = vec![(Action::Idle, 0.3), (Action::Hunt, 0.0)];
         let mut rng = seeded_rng(2);
         let mut capture = SoftmaxCapture::default();
         let outcome = select_disposition_via_intention_softmax_with_trace(

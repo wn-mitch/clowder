@@ -44,16 +44,19 @@ pub static SCENARIO: Scenario = Scenario {
     default_focal: "Brave",
     default_ticks: 60,
     setup,
-    // 230: end-to-end Fleeing election is balance-dependent — the
-    // L3 softmax has to lift `Action::Flee` over Explore / Idle on
-    // the focal-cat's first tick, which requires the
-    // adrenaline-class lifts to outweigh every other constituent
-    // DSE under the cat's perception state. The substrate-aware
-    // picker contract itself is covered by the unit tests in
-    // `src/steps/disposition/pick_flee_target.rs`. The scenario
-    // remains a useful triage harness (`just scenario flee_commitment`
-    // shows the per-tick winning DSE and L2 score table) but it
-    // doesn't gate the substrate landing.
+    // 252: still triage-only. The L3 softmax filter at `scoring.rs:2411`
+    // (which excluded `Action::Flee` from the disposition pool pre-252)
+    // was lifted, so substrate-driven Fleeing now elects from softmax
+    // directly when `ThreatProximityAdrenalineFlee` lifts Flee score
+    // above its peers — `just scenario flee_commitment` shows this on
+    // the focal-cat's first tick. End-to-end gating remains deferred:
+    // 252 surfaced a second substrate-stub in `PickFleeTarget`
+    // (`src/steps/disposition/pick_flee_target.rs:102`) — the witness
+    // condition `cost < current_cost` is unreachable in production
+    // because `flood_dijkstra` (`src/ai/route_cost.rs:74`) sets
+    // `cost_at(origin) = 0` and the picker runs at the same position
+    // as the flood. A follow-on ticket addresses the witness contract;
+    // until then `Feature::FleeTargetPicked` cannot fire end-to-end.
     expected_features: &[],
 };
 
@@ -122,14 +125,16 @@ fn setup(world: &mut World, seed: u64) {
     ));
 }
 
-// 230: no per-test fix-lock here. The Fleeing-chain L3 election is
-// balance-dependent (the cat has to actually pick `Action::Flee` at
-// the softmax pool to trigger the chain), and the per-DSE balance
-// surface ships substrate-dormant for adrenaline-class lifts in many
-// configurations. Substrate-aware target-picker contract coverage
+// 252: L3 election now reachable (the legacy `Action::Flee` filter
+// at `scoring.rs:2411` was lifted as a substrate-stub regression
+// fix). End-to-end gating defers until the PickFleeTarget witness
+// contract is rebound — the picker compares `cost < current_cost`
+// but `flood_dijkstra` always sets `cost_at(origin) = 0`, so the
+// picker can't witness on a fresh-flood plan. Tracked as a 252
+// follow-on ticket. Substrate-aware target-picker contract coverage
 // lives in `src/steps/disposition/pick_flee_target.rs`'s unit tests;
 // hold-until-safe contract coverage lives in
-// `src/steps/disposition/hold_until_safe.rs`. End-to-end commitment-
-// cadence verification happens at the soak level (the
-// 39,536× → < 4,000× preempt-rate target named in the ticket's
-// `## Verification` section).
+// `src/steps/disposition/hold_until_safe.rs`. End-to-end
+// commitment-cadence verification (the 39,536× → < 4,000×
+// preempt-rate target named in 230's `## Verification` section)
+// continues to live at the soak level.

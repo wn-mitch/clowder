@@ -2595,6 +2595,65 @@ two layers cleanly separated from the start: `MarkerSnapshot` for
 world-fact substrate (IAUS L2 eligibility), `*PlannerState` for
 plan-projection search state (GOAP A*). Nothing to migrate.
 
+#### §4.7.7 Action-keyed substrate stubs (2026-05-09 audit)
+
+[Ticket 252](../open-work/landed/252-fleeing-disposition-230-adoption-audit-why-fleetargetpicked-0-in-seed-42-healthy.md)
+audited why `Feature::FleeTargetPicked` cumulative = 0 in every
+seed-42 healthy soak. The pre-empirical layer-walk closed the audit
+in one pass: two substrate writers landed without the corresponding
+reader update.
+
+- **Writer 1:** `ThreatProximityAdrenalineFlee` (ticket 108,
+  `src/ai/modifier.rs:2334`) — lifts `Action::Flee` score on rising
+  threat-proximity derivative.
+- **Writer 2:** `DispositionKind::Fleeing` (ticket 230,
+  `src/components/disposition.rs:133`) — substrate-aware retreat
+  with plan template `[PickFleeTarget, Flee, HoldUntilSafe]` +
+  boldness-scaled `RouteCostField` target picker +
+  `HoldUntilSafe` hysteresis.
+- **Pre-existing reader, never lifted:** the L3 disposition softmax
+  filter at `src/ai/scoring.rs:2411` excluded `Action::Flee` from
+  the disposition pool with comment *"handled outside the
+  disposition selection layer"*. The "outside" path was the
+  behavior_gate Fight→Flee swap on low boldness — but that gate
+  (`scoring.rs:2183-2223`) is only called in tests; production has
+  no caller. So pre-252, `Action::Flee` had **no production
+  election path** in cats; both writers were dead code.
+
+252 lifted the filter (and the parallel skip in
+`aggregate_to_dispositions` at `scoring.rs:2249-2253`). Substrate-
+driven Flee now competes in the softmax pool on equal footing with
+every other Action; `just scenario flee_commitment` shows the
+focal-cat picking Flee at 98.89% probability when the modifier
+fires.
+
+**The substrate-stub linter doesn't catch action-keyed stubs.**
+`scripts/check_substrate_stubs.sh` enforces writer/reader pairing
+for every marker in `src/components/markers.rs` (precedent: ticket
+158). It does not currently scan `Action::*` variants for the same
+shape. The 252 regression is a precedent for extending the script's
+scope; the ticket out-of-scopes the linter extension itself.
+
+**Downstream substrate-stub discovery.** 252's verification surfaced
+a SECOND substrate-stub in the now-reachable Fleeing path:
+`PickFleeTarget` (`src/steps/disposition/pick_flee_target.rs:102`)
+witnesses on `cost < current_cost`, but `flood_dijkstra`
+(`src/ai/route_cost.rs:74`) sets `cost_at(origin) = 0` and the
+picker runs at the cat's flood-origin position. The witness
+condition is unreachable in production. Tracked as a 252 follow-on
+ticket — until the witness contract is rebound, the cat elects
+Fleeing at L3 but never picks an escape tile (the umbrella `Flee`
+step falls back to the cat's own position via
+`goap.rs:5993`).
+
+**Lesson.** The substrate-over-override pattern requires writers
+*and* their reader, landed together. When the reader is at a
+different layer than the writer (substrate writer in IAUS modifier,
+reader at L3 softmax filter), it's easy for one to land without the
+other. The marker substrate-stub linter (ticket 158) caught this for
+markers; an analogous discipline for action-keyed and disposition-
+keyed substrate would prevent the recurrence pattern.
+
 ---
 
 ## §5 Influence-map substrate

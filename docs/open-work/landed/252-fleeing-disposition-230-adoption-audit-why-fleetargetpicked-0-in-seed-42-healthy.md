@@ -1,7 +1,7 @@
 ---
 id: 252
 title: Fleeing disposition (230) adoption audit — why FleeTargetPicked = 0 in seed-42 healthy
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-09
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-10
 ---
 
 ## Why
@@ -138,3 +138,4 @@ regression, fix.
   baseline too). User flagged: *"are cats not fleeing using the
   fox aware path?"* — answer: no, they're not, regardless of
   249's fix. This ticket determines whether that's intended.
+- 2026-05-10: 2026-05-10: filter lift landed; verification soak tuned-42-post-252-fleeing-collapse FAILED (kittens_born 4→0; courtship 0; never_fired_expected_positives = MatingOccurred/CourtshipInteraction/PairingIntentionEmitted; HoldUntilSafe step-timeouts 71). Root: surfaced PickFleeTarget witness-contract bug. User chose to land regression and split fix. Follow-ons: 254 (picker witness fix) blocks-on 252; 255 (108 calibration audit) blocks-on 252.
