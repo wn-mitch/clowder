@@ -94,8 +94,8 @@ pub const ALLY_PROXIMITY_INPUT: &str = "ally_proximity";
 
 /// Candidate-pool range in Manhattan tiles. Matches the pre-refactor
 /// EngageThreat candidate pool (all wildlife in sensory range).
-/// Changing it would shift the candidate population and is a balance
-/// decision deferred to post-refactor per open-work #14.
+/// Changing it would shift the candidate population; range tuning
+/// is an open balance decision.
 pub const FIGHT_TARGET_RANGE: f32 = 10.0;
 
 /// Maximum `WildAnimal.threat_power` across species (ShadowFox = 0.18).

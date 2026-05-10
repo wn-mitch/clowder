@@ -1,16 +1,9 @@
-//! Headless-mode I/O plugin (ticket 030 step 2).
+//! Headless-mode I/O plugin (ticket 030).
 //!
 //! Owns every concern that distinguishes the headless run loop from the
 //! windowed App: CLI args as a resource, the three JSONL writers
 //! (events / narrative / optional focal trace), per-tick flush systems,
 //! the wall-time + wipeout tick-budget exit, and the end-of-sim footer.
-//!
-//! Phase C is *additive*. The plugin compiles and exports its public
-//! API but is not yet mounted by `run_headless` — phase D rewrites
-//! `run_headless` to build an `App` with `MinimalPlugins +
-//! SimulationPlugin + HeadlessIoPlugin` and a manual `app.update()`
-//! loop. Until that lands, the legacy `build_schedule` /
-//! `flush_*_entries` path in `src/main.rs` stays the active code path.
 //!
 //! The plugin assumes the host has already inserted [`HeadlessConfig`]
 //! before calling [`App::add_plugins`]; the plugin's `build()` reads
@@ -40,7 +33,7 @@ use crate::resources::{FocalScoreCapture, FocalTraceTarget};
 
 /// Headless CLI args, threaded into the App as a resource.
 ///
-/// The host (`run_headless` post-phase-D) parses argv, builds this
+/// The host (`run_headless` in `src/main.rs`) parses argv, builds this
 /// resource, and inserts it before adding [`HeadlessIoPlugin`]. The
 /// plugin reads it during `build()` to know which file paths to open
 /// and which optional trace sidecar to wire up.

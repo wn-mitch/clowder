@@ -1,8 +1,8 @@
 //! 178 `Discarding` DSE — drop a held food item on the ground when
 //! the colony's Stores are chronically full and the cat's own
 //! inventory is overstuffed. Sibling to Trashing (carry to Midden),
-//! Handing (give to peer — deferred to 188), and PickingUp (retrieve
-//! ground item — deferred to 185).
+//! Handing (give to peer — landed in 188), and PickingUp (retrieve
+//! ground item — landed in 185).
 //!
 //! **Composition.** Single `inventory_excess` axis through a Logistic
 //! curve (slope/midpoint sourced from

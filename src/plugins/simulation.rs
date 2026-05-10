@@ -705,9 +705,9 @@ impl Plugin for SimulationPlugin {
         // §11 trace emitter — headless-only in practice. Gated on
         // FocalTraceTarget + TraceLog resources; neither is inserted by
         // the interactive setup path, so this system never fires outside
-        // headless runs that pass --focal-cat. Registered here (not just
-        // in build_schedule) to satisfy the manual-mirror invariant in
-        // CLAUDE.md's Headless Mode section.
+        // headless runs that pass --focal-cat. Registered in
+        // SimulationPlugin rather than HeadlessIoPlugin so both the
+        // headless and windowed paths share the same system surface.
         app.add_systems(
             FixedUpdate,
             systems::trace_emit::emit_focal_trace

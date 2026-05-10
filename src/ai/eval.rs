@@ -854,11 +854,12 @@ pub fn evaluate_all_cat_dses(
 /// pick (even if every score is negative — the softmax normalization
 /// handles that via the standard max-shift trick).
 ///
-/// Order with §7.4's persistence bonus (not yet wired): softmax picks
-/// the *challenger* Intention from the freshly-scored candidate pool;
-/// the persistence bonus then applies to the currently-held Intention's
-/// score and gates preemption. Softmax runs first; persistence-bonus
-/// gating runs second. See §L2.10.6 in
+/// Order with §7.4's persistence bonus (wired in tickets 246 + 248):
+/// softmax picks the *challenger* Intention from the freshly-scored
+/// candidate pool; the persistence bonus (IntentionMomentum modifier
+/// lift + `held_score + intention_preempt_margin` gate in
+/// `goap.rs::resolve_goap_plans`) then gates preemption. Softmax runs
+/// first; persistence-bonus gating runs second. See §L2.10.6 in
 /// `docs/systems/ai-substrate-refactor.md`.
 pub fn select_intention_softmax<'a, R: rand::Rng + ?Sized>(
     pool: &'a [ScoredDse],

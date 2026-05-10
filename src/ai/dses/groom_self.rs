@@ -41,9 +41,10 @@ impl GroomSelfDse {
                     midpoint: 0.6,
                 },
             ))],
-            // n=1 CP with weight 1.0 — the affection axis lands when
-            // `needs.warmth` splits into thermal + affection (tracked
-            // as the §2.3 post-split substrate TODO).
+            // n=1 CP with weight 1.0 — the `social_warmth` affection
+            // axis (split from `needs.warmth` in ticket 012 into
+            // `Fulfillment.social_warmth`) is not yet wired here
+            // (tracked as the §2.3 post-split substrate TODO).
             composition: Composition::compensated_product(vec![1.0]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
             eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),

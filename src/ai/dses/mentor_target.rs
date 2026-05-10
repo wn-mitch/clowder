@@ -79,8 +79,8 @@ pub const TARGET_SKILL_GAP_INPUT: &str = "target_skill_gap";
 /// Candidate-pool range in Manhattan tiles. Matches `SOCIALIZE_TARGET_RANGE`
 /// / `MATE_TARGET_RANGE` (10) to preserve outer-gate semantics —
 /// mentors find apprentices in the same colony cluster as social
-/// partners. Changing it would shift the candidate population and is
-/// a balance decision deferred to post-refactor per open-work #14.
+/// partners. Changing it would shift the candidate population; range
+/// tuning is an open balance decision.
 pub const MENTOR_TARGET_RANGE: f32 = 10.0;
 
 /// §6.5.3 `Mentor` target-taking DSE factory.

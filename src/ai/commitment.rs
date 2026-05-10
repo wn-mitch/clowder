@@ -267,9 +267,10 @@ pub fn strategy_for_disposition(kind: DispositionKind) -> CommitmentStrategy {
 ///   `Mating` it's `trips_done >= 1`.
 /// - **`achievable_believed`** —
 ///   `plan.replan_count < plan.max_replans`. The elastic channel (DSE
-///   score retention) is deferred to §7.4 — wiring it here without the
-///   persistence bonus risks OpenMinded activities thrashing under
-///   noisy rescores, so we keep the hard-fail channel alone this phase.
+///   score retention) is still deferred — always-true today. Wiring it
+///   risks OpenMinded thrashing on noisy rescores; balance investigation
+///   is a §7.4 follow-on (persistence bonus, wired in 246, is a
+///   prerequisite but not the whole story).
 /// - **`still_goal`** — OpenMinded satiation proxy:
 ///   `Socializing` drops when `needs.social` climbs above
 ///   `resting_complete_temperature` (we reuse the need-completion

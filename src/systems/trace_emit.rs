@@ -18,18 +18,19 @@
 //!   from the §5.6.6 pipeline. Scent-from-on-demand and corruption
 //!   migrations in Phase 2B/2C extend the walk to those maps.
 //!
-//! - **L2** (Phase 1 shim) — one record per (focal cat × eligible
-//!   action × tick). The shim walks `CurrentAction::last_scores` (the
-//!   ranked, post-modifier score list already populated by
-//!   `goap::evaluate_and_plan`) and emits a minimal record with
-//!   `final_score` populated and `considerations`/`modifiers` empty.
-//!   Phase 3's Dse trait lets the emitter capture per-consideration
-//!   contributions.
+//! - **L2** — one record per (focal cat × eligible action × tick).
+//!   Phase A1.2 (A5) enriched the original shim: `final_score`,
+//!   `considerations`, and `modifiers` are all populated from live
+//!   at-source `_with_trace` variants on `evaluate_single` and
+//!   `ModifierPipeline::apply`. No schema slots are empty for the
+//!   Dse-eval path.
 //!
-//! - **L3** (Phase 1 shim) — one record per (focal cat × tick) with
-//!   the full ranked list, chosen action, and placeholder softmax /
-//!   momentum summaries. Phase 6 fills in real softmax probabilities
-//!   and the §7.4 persistence-bonus-aware momentum trace.
+//! - **L3** — one record per (focal cat × tick) with the full ranked
+//!   list, chosen action, and softmax probabilities (real since Phase
+//!   A1.2 via `select_disposition_via_intention_softmax`). The momentum
+//!   summary (`commitment_strength`, `margin_threshold`) still carries
+//!   Phase 1 placeholder values (0.0 defaults); the
+//!   §7.4 persistence-bonus-aware fill is a trace enrichment follow-on.
 //!
 //! Schema slots that don't have values yet — top-N losing axes
 //! (§7.W.6) and apophenia pairwise distance (§8.6) — are emitted as
