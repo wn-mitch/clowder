@@ -1,12 +1,15 @@
 //! `Sleep` — Rest-urgency peer (§3.3.2 anchor = 1.0). Cross-species
 //! peer of fox `Resting` through the Rest peer group.
 //!
-//! Per §2.3 + §3.1.1: `WeightedSum` of three axes — `energy_deficit`
+//! Per §2.3 + §3.1.1: `WeightedSum` of axes — `energy_deficit`
 //! via `sleep_dep()` (Logistic(10, 0.7) — the catalog's steepest
 //! aside from flee-or-fight, per §2.3 "micro-sleeps are involuntary
 //! past ~30%"), `day_phase` via `Piecewise` on
-//! `sleep_{dawn,day,dusk,night}_bonus`, `injury_rest` via
-//! `Linear(slope=injury_rest_bonus)` on health_deficit.
+//! `sleep_{dawn,day,dusk,night}_bonus`, `health_deficit` via
+//! `Logistic(steepness=sleep_health_deficit_steepness,
+//! midpoint=sleep_health_deficit_midpoint)` (ticket 251 — substrate-
+//! side replacement for the retired `AcuteHealthAdrenalineFlee` post-
+//! scoring lift).
 //!
 //! The WS composition preserves the design intent captured in the
 //! old inline comment at `scoring.rs:212–214`: *"Additive (not
@@ -19,6 +22,19 @@
 //! the Rest peer-group anchor. Cross-peer-group ordinals vs.
 //! starvation/fatal-threat hold because those groups also anchor
 //! at 1.0.
+//!
+//! **Acute-injury urgency.** Pre-251, the `health_deficit` axis was
+//! `Linear(slope=injury_rest_bonus=0.4)` and the
+//! `AcuteHealthAdrenalineFlee` post-scoring modifier (047 / 119) lifted
+//! the WS-clamped Sleep score by +0.5 above the [0, 1] envelope under
+//! `health_deficit ≥ 0.4`. Ticket 251 retires the modifier and replaces
+//! the Linear curve with a Logistic sigmoid at the same midpoint (0.4):
+//! the axis lurches from ≈0 to ≈1 within ~0.1 deficit units, encoding
+//! the acute-injury urgency directly in the substrate. The peak Sleep
+//! score under acute injury saturates at ~1.0 (vs ~1.42 post-modifier
+//! pre-251); post-232 body-state-coupled softmax (T_min ≈ 0.05) makes
+//! the substrate's ~0.92→1.0 score band decisive vs ~0.4 competitors,
+//! so the lost magnitude is not load-bearing for L3 ordering.
 
 use bevy::prelude::*;
 
@@ -78,12 +94,21 @@ impl SleepDse {
             (DUSK_KNOT, scoring.sleep_dusk_bonus),
             (NIGHT_KNOT, scoring.sleep_night_bonus),
         ]);
-        // Injury rest: old formula `(1 - health) * injury_rest_bonus`
-        // gated on `health < 1.0`. The gate is implicit here — at
-        // health=1, deficit=0, Linear output is 0.
-        let injury_curve = Curve::Linear {
-            slope: scoring.injury_rest_bonus,
-            intercept: 0.0,
+        // Ticket 251 — Logistic curve replaces the pre-251 Linear
+        // `slope=injury_rest_bonus` shape. At `health_deficit < midpoint
+        // - 0.1` the axis is near-zero (healthy-cat composition near-
+        // unchanged); above midpoint+0.1 the axis saturates to ~1.0,
+        // contributing axis_weight × 1.0 = 0.137 under acute injury (vs
+        // pre-251 contribution of 0.137 × 0.4 × 1.0 = 0.055 at full HP
+        // loss). The +0.082 substrate-side bump is small in absolute
+        // magnitude vs the retired modifier's +0.5 lift, but the
+        // sigmoid *shape* preserves the modifier's onset semantic
+        // (smoothstep transition-width ~0.1 around midpoint=0.4) and
+        // post-232 body-state-coupled softmax sharpness handles the
+        // L3 ordering without the modifier's amplitude.
+        let injury_curve = Curve::Logistic {
+            steepness: scoring.sleep_health_deficit_steepness,
+            midpoint: scoring.sleep_health_deficit_midpoint,
         };
 
         // §L2.10.7 row Sleep: Power-Invert curve over distance to
@@ -294,12 +319,72 @@ mod tests {
     }
 
     #[test]
-    fn injury_curve_zero_at_full_health() {
+    fn injury_curve_near_zero_at_full_health() {
+        // Ticket 251 — Logistic at deficit=0 with midpoint=0.4,
+        // steepness=10 evaluates to 1/(1+exp(4)) ≈ 0.018 — small enough
+        // that healthy-cat Sleep composition is near-unchanged from the
+        // pre-251 Linear semantic (which was exactly 0 at full health).
         let s = ScoringConstants::default();
         let dse = SleepDse::new(&s);
         let c = scalar_axis(&dse, HEALTH_DEFICIT_INPUT);
-        // health_deficit = 0 (full health) → Linear output = 0.
-        assert!((c.evaluate(0.0) - 0.0).abs() < 1e-4);
+        assert!(
+            c.evaluate(0.0) < 0.05,
+            "injury curve at full health must be <0.05, got {}",
+            c.evaluate(0.0)
+        );
+    }
+
+    #[test]
+    fn injury_curve_low_below_threshold() {
+        // Ticket 251 — at mild injury (deficit=0.3, below midpoint),
+        // Logistic output stays well under 0.5 — the cat does not
+        // sigmoid-lurch into Sleep until it crosses the inflection.
+        let s = ScoringConstants::default();
+        let dse = SleepDse::new(&s);
+        let c = scalar_axis(&dse, HEALTH_DEFICIT_INPUT);
+        assert!(
+            c.evaluate(0.3) < 0.30,
+            "injury curve at mild injury (deficit=0.3) must be <0.30, got {}",
+            c.evaluate(0.3)
+        );
+    }
+
+    #[test]
+    fn injury_curve_lurch_at_midpoint() {
+        // Ticket 251 — at the sigmoid inflection (deficit = midpoint),
+        // Logistic outputs exactly 0.5. Pins the smoothstep-equivalent
+        // half-way point of the lurch, matching the retired modifier's
+        // ramp midpoint.
+        let s = ScoringConstants::default();
+        let dse = SleepDse::new(&s);
+        let c = scalar_axis(&dse, HEALTH_DEFICIT_INPUT);
+        let v = c.evaluate(s.sleep_health_deficit_midpoint);
+        assert!(
+            (v - 0.5).abs() < 1e-3,
+            "injury curve at midpoint must be ≈0.5, got {v}"
+        );
+    }
+
+    #[test]
+    fn injury_curve_saturates_above_band() {
+        // Ticket 251 — above midpoint + ~0.1 (the Logistic transition
+        // band), the axis saturates to ≈1.0, matching the retired
+        // modifier's smoothstep ramp = 1.0 above transition band.
+        let s = ScoringConstants::default();
+        let dse = SleepDse::new(&s);
+        let c = scalar_axis(&dse, HEALTH_DEFICIT_INPUT);
+        // Deficit 0.55 — well above midpoint+0.1; axis saturates.
+        assert!(
+            c.evaluate(0.55) > 0.80,
+            "injury curve at deficit=0.55 must saturate (>0.80), got {}",
+            c.evaluate(0.55)
+        );
+        // Deficit 1.0 — full HP loss; axis ≈1.0.
+        assert!(
+            c.evaluate(1.0) > 0.99,
+            "injury curve at deficit=1.0 must be ≈1.0, got {}",
+            c.evaluate(1.0)
+        );
     }
 
     #[test]

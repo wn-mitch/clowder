@@ -1330,8 +1330,26 @@ pub struct ScoringConstants {
     pub sleep_dusk_bonus: f32,
     #[serde(default = "default_sleep_night_bonus")]
     pub sleep_night_bonus: f32,
-    /// Bonus to Sleep score when injured (scaled by injury severity).
-    pub injury_rest_bonus: f32,
+    /// Ticket 251 — Sleep DSE `health_deficit` axis Logistic midpoint.
+    /// HP-deficit at the sigmoid inflection — below this, the axis is
+    /// near-zero (healthy-cat composition near-unchanged); above this,
+    /// the axis ramps sharply toward 1.0 (acute-injury crisis lurch).
+    /// 0.4 mirrors the retired `acute_health_adrenaline_threshold` so
+    /// the substrate-side urgency fires in the same regime the post-
+    /// scoring modifier did. Replaces the pre-251 `injury_rest_bonus`
+    /// Linear-slope semantic — under the Logistic curve, the
+    /// `health_deficit` axis encodes acute-injury urgency directly,
+    /// retiring `AcuteHealthAdrenalineFlee`'s post-scoring lift.
+    #[serde(default = "default_sleep_health_deficit_midpoint")]
+    pub sleep_health_deficit_midpoint: f32,
+    /// Ticket 251 — Sleep DSE `health_deficit` axis Logistic steepness.
+    /// 10.0 matches `sleep_dep`'s involuntary-micro-sleep curve — the
+    /// catalog's steepest sigmoid aside from flee-or-fight. At this
+    /// steepness, the curve is ≈0 at midpoint−0.1 and ≈1 at
+    /// midpoint+0.1, preserving the retired modifier's smoothstep
+    /// transition-width (~0.1 in normalized HP-deficit units).
+    #[serde(default = "default_sleep_health_deficit_steepness")]
+    pub sleep_health_deficit_steepness: f32,
     // Fox disposition day-phase bonuses (crepuscular/nocturnal vulpine rhythm).
     // Applied in src/ai/fox_scoring.rs::score_fox_dispositions. Hunting peaks
     // Dusk→Night, Resting peaks Day, Patrolling mild-positive Dusk→Dawn.
@@ -2091,7 +2109,8 @@ impl Default for ScoringConstants {
             sleep_day_bonus: default_sleep_day_bonus(),
             sleep_dusk_bonus: default_sleep_dusk_bonus(),
             sleep_night_bonus: default_sleep_night_bonus(),
-            injury_rest_bonus: 0.4,
+            sleep_health_deficit_midpoint: default_sleep_health_deficit_midpoint(),
+            sleep_health_deficit_steepness: default_sleep_health_deficit_steepness(),
             fox_hunt_dawn_bonus: default_fox_hunt_dawn_bonus(),
             fox_hunt_day_bonus: default_fox_hunt_day_bonus(),
             fox_hunt_dusk_bonus: default_fox_hunt_dusk_bonus(),
@@ -3015,6 +3034,21 @@ fn default_max_additive_lift_per_dse() -> f32 {
 /// distress.
 fn default_body_distress_promotion_lift() -> f32 {
     0.20
+}
+
+/// Ticket 251 — Sleep DSE `health_deficit` axis Logistic midpoint.
+/// 0.4 mirrors the retired `acute_health_adrenaline_threshold` so the
+/// substrate-side axis fires in the same regime the post-scoring
+/// modifier did. Replaces the Linear `injury_rest_bonus` semantic from
+/// pre-251.
+fn default_sleep_health_deficit_midpoint() -> f32 {
+    0.4
+}
+
+/// Ticket 251 — Sleep DSE `health_deficit` axis Logistic steepness.
+/// 10.0 matches `sleep_dep`'s involuntary-micro-sleep curve.
+fn default_sleep_health_deficit_steepness() -> f32 {
+    10.0
 }
 
 /// Ticket 047 — `AcuteHealthAdrenalineFlee` threshold. Mirrors
