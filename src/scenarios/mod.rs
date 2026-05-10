@@ -32,6 +32,7 @@ pub mod env;
 pub mod exploration_ranging;
 pub mod farm_herb_demand;
 pub mod farming_cycle;
+pub mod flee_calibration;
 pub mod flee_commitment;
 pub mod fondness_kitten_imprint;
 pub mod grooming_other;
@@ -124,6 +125,14 @@ pub const ALL: &[&Scenario] = &[
     // through the `Action::Flee → DispositionKind::Fleeing` route
     // closing the last anxiety-interrupt arm migration.
     &flee_commitment::SCENARIO,
+    // 255 — `ThreatProximityAdrenalineFlee` Flee-axis calibration
+    // probe. Four variants across the (threat_proximity_derivative,
+    // escape_viability) corners + a Sleep-partner doctrine probe.
+    // L3-election-only; opts out of Feature gating.
+    &flee_calibration::SCENARIO_LOW_THREAT,
+    &flee_calibration::SCENARIO_OPEN_TERRAIN,
+    &flee_calibration::SCENARIO_CORNERED,
+    &flee_calibration::SCENARIO_SLEEP_PARTNER,
     // 231 — capacity-aware pickup pipeline. Three sister scenarios:
     // full-of-curios + adjacent food drops the curio first then picks
     // up; full-of-herbs validates the ItemSlot collapse; empty cat
