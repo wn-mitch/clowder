@@ -15,10 +15,10 @@ _Last generated: 2026-05-10._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 76 |
+| Ready | 75 |
 | Parked | 9 |
 | Blocked | 29 |
-| **Open total** | **120** |
+| **Open total** | **119** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -44,7 +44,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[229](docs/open-work/tickets/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose — _[tooling] · added 2026-05-08_
 
-## Ready (76)
+## Ready (75)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -58,7 +58,6 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[023](docs/open-work/tickets/023-shadowfox-distinct-motivations.md)** — Shadowfox motivations distinct from normal foxes — _added 2026-04-14_
 - **[034](docs/open-work/tickets/034-time-anchor-continuity-rebalance.md)** — Time-anchor continuity rebalance — restore play/grooming/mythic-texture under fixed prey-scent — _added 2026-04-26_
 - **[039](docs/open-work/tickets/039-foodcooked-still-silent-post-036.md)** — FoodCooked still silent after 036 — Cook chain execution failure downstream of CraftingHint::Cook — _added 2026-04-26_
-- **[040](docs/open-work/tickets/040-disposition-shift-courtship-grooming-regression.md)** — Disposition shift after 036 collapsed Courtship / Grooming / Mythic-texture continuity — _added 2026-04-26_
 - **[041](docs/open-work/tickets/041-founding-haul-balance-tuning.md)** — Founding wagon-dismantling haul — balance the early-game cost so cats don't starve while hauling — _added 2026-04-26_
 - **[050](docs/open-work/tickets/050-marker-predicate-refinements.md)** — §4 marker predicate refinements — species-attenuated threat, ward-near-fox truth, event-driven cubs/den — _added 2026-04-27_
 - **[051](docs/open-work/tickets/051-fox-dse-eligibility-migration.md)** — Fox DSE eligibility migration — `.require()`/`.forbid()` cutover for §4 fox markers — _added 2026-04-27_
@@ -172,17 +171,18 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (170)
+## Landed archive (171)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (105)
+### 2026-05 (106)
 
 - **[256](docs/open-work/landed/256-patrol-dse-recalibration-influence-map-driven-smart-pathing-wildlife-deterrent-affect-post-252-cascade-root-cause.md)** — Patrol DSE recalibration — influence-map-driven smart pathing + wildlife deterrent affect (post-252 cascade root cause) _(2026-05-10)_
 - **[255](docs/open-work/landed/255-threatproximityadrenalineflee-flee-axis-calibration-audit-post-252-readable.md)** — ThreatProximityAdrenalineFlee Flee-axis calibration audit (post-252 readable) _(2026-05-10)_
 - **[254](docs/open-work/landed/254-pickfleetarget-witness-contract-rebind-so-substrate-aware-fleeing-can-pick-a-target-post-252.md)** — PickFleeTarget witness contract — rebind so substrate-aware Fleeing can pick a target post-252 _(2026-05-10)_
 - **[252](docs/open-work/landed/252-fleeing-disposition-230-adoption-audit-why-fleetargetpicked-0-in-seed-42-healthy.md)** — Fleeing disposition (230) adoption audit — why FleeTargetPicked = 0 in seed-42 healthy _(2026-05-10)_
 - **[230](docs/open-work/landed/230-carve-dispositionkindfleeing-substrate-aware-flee-picker-close-anxiety-interrupt-migration.md)** — Carve DispositionKind::Fleeing + substrate-aware flee picker (close anxiety-interrupt migration) _(2026-05-10)_
+- **[040](docs/open-work/landed/040-disposition-shift-courtship-grooming-regression.md)** — Disposition shift after 036 collapsed Courtship / Grooming / Mythic-texture continuity _(2026-05-10)_
 - **[251](docs/open-work/landed/251-acutehealthadrenalineflee-retirement-substrate-over-modifier.md)** — AcuteHealthAdrenalineFlee retirement — substrate-over-modifier _(2026-05-09)_
 - **[250](docs/open-work/landed/250-demote-burialperformed-move-to-neutral-feature-and-remove-from-continuity-canary-set.md)** — Demote BurialPerformed — move to neutral feature and remove from continuity canary set _(2026-05-09)_
 - **[248](docs/open-work/landed/248-re-author-last-scores-after-heldintention-insertion-r5-from-247.md)** — Re-author last_scores after HeldIntention insertion (R5 from 247) _(2026-05-08)_

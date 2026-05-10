@@ -1,7 +1,7 @@
 ---
 id: 040
 title: Disposition shift after 036 collapsed Courtship / Grooming / Mythic-texture continuity
-status: ready
+status: done
 cluster: null
 added: 2026-04-26
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-10
 ---
 
 ## Why
@@ -80,3 +80,7 @@ Pre-036 baseline at `logs/tuned-42-a879f43-pre-cook-fix/`. Post-036 soak at `log
 - · **  1** (in-progress, —, score 0.89) — Explore dominance over targeted leisure
 
 <!-- linkages:end -->
+
+## Log
+
+- 2026-05-10: Closed transitively: post-256 logs/tuned-42 (commit c64fd2cc) shows courtship 1609 (vs pre-036 804), grooming 900 (vs 71), mythic-texture 36 (vs 48); all 5 continuity canaries green. Resolved by 146 + 256 substrate work; MatingOccurred residual owned by 257.
