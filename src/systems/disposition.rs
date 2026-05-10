@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use bevy_ecs::prelude::*;
+use bevy_ecs::system::SystemParam;
 use rand::Rng;
 
 use crate::ai::pathfinding::{find_free_adjacent, step_toward};
@@ -19,6 +20,7 @@ use crate::components::items::Item;
 use crate::components::magic::{Harvestable, Herb, Inventory, Ward};
 use crate::components::markers;
 use crate::components::mental::Memory;
+use crate::components::pairing::pairing_bias_for;
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Health, InjuryKind, Needs, Position};
 use crate::components::prey::{
@@ -2798,11 +2800,39 @@ struct MentorEffect {
     mentor_skills: Skills,
 }
 
+// ---------------------------------------------------------------------------
+// ChainStepReadContext — bundles the read-only Resources / queries
+// consumed by [`resolve_disposition_chains`]. Exists to keep the system's
+// top-level parameter count under Bevy's 16-tuple limit per CLAUDE.md
+// guidance after Ticket 257 added `pairing_q` for the Pairing Commit B
+// bias readers.
+// ---------------------------------------------------------------------------
+
+#[derive(SystemParam)]
+#[allow(clippy::type_complexity)]
+pub struct ChainStepReadContext<'w, 's> {
+    pub constants: Res<'w, SimConstants>,
+    /// 257 / Commit B — actor's PairingActivity for the bias readers in
+    /// Socialize/GroomOther/MentorCat. Disjoint from `cats` (which holds
+    /// `&mut TaskChain` etc) because `&PairingActivity` is read-only.
+    pub pairing_q: Query<
+        'w,
+        's,
+        (Entity, &'static crate::components::PairingActivity),
+        (Without<Dead>, Without<Structure>),
+    >,
+}
+
 /// Immutable pre-loop snapshots consumed by [`dispatch_chain_step`].
 struct ChainStepSnapshots {
     grooming: std::collections::HashMap<Entity, f32>,
     gender: std::collections::HashMap<Entity, Gender>,
     cat_tile_counts: std::collections::HashMap<Position, u32>,
+    /// 257 / Commit B — `PairingActivity.partner` per cat, when held.
+    /// Read by Socialize/GroomOther/MentorCat resolvers to amplify the
+    /// fondness/familiarity delta when the resolver target equals the
+    /// pairing partner.
+    pairing_partner: std::collections::HashMap<Entity, Entity>,
 }
 
 /// Mutable accumulators written by [`dispatch_chain_step`], consumed by the
@@ -2887,9 +2917,14 @@ pub fn resolve_disposition_chains(
     mut colony_map: ResMut<ColonyHuntingMap>,
     den_query: Query<(Entity, &PreyDen, &Position), Without<PreyAnimal>>,
     mut prey_params: PreyHuntParams,
-    constants: Res<SimConstants>,
     mut commands: Commands,
+    // 257 — bundle `constants` + `pairing_q` to stay under Bevy's
+    // 16-param limit. Constants is widely used; the new pairing query
+    // joined the system as part of Pairing Commit B.
+    read_ctx: ChainStepReadContext,
 ) {
+    let constants = &*read_ctx.constants;
+    let pairing_q = &read_ctx.pairing_q;
     let d = &constants.disposition;
 
     let mut accum = ChainStepAccumulators {
@@ -2922,6 +2957,13 @@ pub fn resolve_disposition_chains(
             }
             counts
         },
+        // 257 / Commit B — pre-loop snapshot of every cat's
+        // `PairingActivity.partner`. Empty when no cats hold the
+        // intention (the steady state pre-fix).
+        pairing_partner: pairing_q
+            .iter()
+            .map(|(e, pairing)| (e, pairing.partner))
+            .collect(),
     };
 
     for (
@@ -3178,7 +3220,7 @@ pub fn resolve_disposition_chains(
             &time,
             &mut rng,
             &mut colony_map,
-            &constants,
+            constants,
             &mut commands,
             &snaps,
             &mut accum,
@@ -4030,6 +4072,20 @@ fn dispatch_chain_step(
                 Some(f) => &mut **f,
                 None => &mut fallback_fulfillment,
             };
+            // 257 / Commit B — pairing-bias multiplier when the social
+            // target equals the actor's PairingActivity.partner. The
+            // helper returns `(1.0, false)` when no Intention is held
+            // or the target differs.
+            let (pairing_bias, amplified) = pairing_bias_for(
+                snaps.pairing_partner.get(&cat_entity).copied(),
+                target,
+                constants.pairing.bias_multiplier,
+            );
+            if amplified {
+                if let Some(act) = narr.activation.as_deref_mut() {
+                    act.record(Feature::PairingBiasApplied);
+                }
+            }
             let outcome = crate::steps::disposition::resolve_socialize(
                 ticks,
                 cat_entity,
@@ -4044,6 +4100,7 @@ fn dispatch_chain_step(
                 &constants.social,
                 d,
                 &constants.fulfillment,
+                pairing_bias,
             );
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::Socialized);
             apply_step_result(outcome.result, chain, current);
@@ -4057,6 +4114,16 @@ fn dispatch_chain_step(
                 Some(f) => &mut **f,
                 None => &mut fallback_fulfillment,
             };
+            let (pairing_bias, amplified) = pairing_bias_for(
+                snaps.pairing_partner.get(&cat_entity).copied(),
+                target,
+                constants.pairing.bias_multiplier,
+            );
+            if amplified {
+                if let Some(act) = narr.activation.as_deref_mut() {
+                    act.record(Feature::PairingBiasApplied);
+                }
+            }
             let outcome = crate::steps::disposition::resolve_groom_other(
                 ticks,
                 cat_entity,
@@ -4071,6 +4138,7 @@ fn dispatch_chain_step(
                 &constants.social,
                 d,
                 &constants.fulfillment,
+                pairing_bias,
             );
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::GroomedOther);
             if let Some(r) = outcome.witness {
@@ -4082,6 +4150,16 @@ fn dispatch_chain_step(
         StepKind::MentorCat => {
             let step = chain.current_mut().unwrap();
             let target = step.target_entity;
+            let (pairing_bias, amplified) = pairing_bias_for(
+                snaps.pairing_partner.get(&cat_entity).copied(),
+                target,
+                constants.pairing.bias_multiplier,
+            );
+            if amplified {
+                if let Some(act) = narr.activation.as_deref_mut() {
+                    act.record(Feature::PairingBiasApplied);
+                }
+            }
             let outcome = crate::steps::disposition::resolve_mentor_cat(
                 ticks,
                 cat_entity,
@@ -4091,6 +4169,7 @@ fn dispatch_chain_step(
                 relationships,
                 time.tick,
                 d,
+                pairing_bias,
             );
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::MentoredCat);
             let crate::steps::StepOutcome { result, witness } = outcome;

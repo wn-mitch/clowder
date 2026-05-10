@@ -248,17 +248,24 @@ pub enum Feature {
     /// `expected_to_fire_per_soak() => false` because drops are
     /// bursty (a healthy 15-min soak may have zero drops).
     PairingDropped,
-    /// Ticket 027b §7.M — a target-picker resolver picked the L2
-    /// Intention partner *and* would not have picked them without the
-    /// Intention's hard-1.0 pin (pre-pin bond_score < 1.0). Isolates
-    /// "L2 actually changed target selection" from "Pairing was held
-    /// but the cat would've picked them anyway". Stays
-    /// `expected_to_fire_per_soak() => false` because the observability
-    /// gate (picked target == Intention partner ∧ natural bond_score <
-    /// 1.0) is the load-bearing P3 prediction — the balance doc marks
-    /// it explicitly "untestable single-seed", validated only by the
-    /// multi-seed sweep tracked in ticket 082's closeout. Promote when
-    /// that sweep clears.
+    /// Ticket 027b §7.M / Ticket 257 Commit B — a Socialize /
+    /// GroomOther / MentorCat resolver was invoked with `target ==
+    /// PairingActivity.partner`, applying the
+    /// `pairing.bias_multiplier` to that tick's fondness +
+    /// familiarity deltas. This is the structural piece that closes
+    /// the Friends → Partners gap: paired interactions accrue
+    /// fondness/familiarity faster than diffuse interactions,
+    /// advancing the bond ladder under realistic encounter cadence.
+    ///
+    /// The original 027b doc-comment described this as a
+    /// target-selection signal calibrated for ticket 082's multi-seed
+    /// sweep ("untestable single-seed"). 257 reframes the Feature as
+    /// a per-amplification fire site: the 257 Commit B caller emits
+    /// it whenever the multiplier > 1.0, which is observable in any
+    /// single-seed soak that has at least one held PairingActivity
+    /// targeting at least one paired interaction. `expected_to_fire_per_soak()
+    /// => true` from 257 onward — its absence in the seed-42 soak is
+    /// a regression on the Pairing chain.
     PairingBiasApplied,
     /// Ticket 080 — `evaluate_target_taking` gated a candidate to 0.0
     /// because its `Reserved.owner` named a cat other than the scoring
@@ -807,15 +814,20 @@ impl Feature {
             Feature::KittenBorn => false,
             Feature::KittenFed => false,
             Feature::ItemRetrieved => false,
-            // Ticket 083 — L2 PairingActivity activated; the trunk
-            // `PairingIntentionEmitted` falls through to `_ => true`
-            // and is canary-validated. `PairingBiasApplied` stays
-            // exempt: its observability gate (picked target ==
-            // Intention partner ∧ natural bond_score < 1.0) is
-            // P3-load-bearing and explicitly "untestable single-seed"
-            // per `docs/balance/027-l2-pairing-activity.md`. Promote
-            // when ticket 082's multi-seed sweep clears it.
-            Feature::PairingBiasApplied => false,
+            // Ticket 257 Commit B — `PairingBiasApplied` promoted to
+            // canary-validated. The Feature now fires per
+            // amplification (resolver target == PairingActivity
+            // partner) rather than the original 027b
+            // target-selection-bias semantics, which made it
+            // "untestable single-seed" per the legacy comment. The
+            // new emission path is single-seed-observable: any soak
+            // where Pairing fires AND the paired actor socializes /
+            // grooms / mentors their partner emits ≥ 1. Its absence
+            // is a regression on the Pairing chain. The 027b
+            // multi-seed concern (was target-selection bias actually
+            // changing picks?) is parked under ticket 082's sweep —
+            // no longer canary-gated here.
+            // (Falls through to `_ => true` below.)
             // Ticket 083 — Farm-dormancy reconciliation. Wave 2
             // substrate hardening + L2 PairingActivity raise the
             // food economy (more efficient hunts and cooking, higher
@@ -1412,12 +1424,14 @@ mod tests {
         assert!(Feature::GroomedOther.expected_to_fire_per_soak());
         // Promoted by ticket 027 Bug 1 (courtship-drift emits per-tick).
         assert!(Feature::CourtshipInteraction.expected_to_fire_per_soak());
-        // Ticket 083 — L2 PairingActivity activated; the trunk emit
-        // is canary-validated. `PairingBiasApplied` stays exempt
-        // until ticket 082's multi-seed sweep validates the P3
-        // bias-readout prediction.
+        // Ticket 257 Commit B — both Pairing trunk Features are now
+        // canary-validated. `PairingBiasApplied` was promoted when
+        // its emission semantics shifted from the 027b
+        // target-selection signal (multi-seed-only per ticket 082) to
+        // the per-amplification fondness/familiarity bias signal
+        // (single-seed-observable on any healthy Pairing chain).
         assert!(Feature::PairingIntentionEmitted.expected_to_fire_per_soak());
-        assert!(!Feature::PairingBiasApplied.expected_to_fire_per_soak());
+        assert!(Feature::PairingBiasApplied.expected_to_fire_per_soak());
         // Rare-legend events must be exempted.
         assert!(!Feature::ShadowFoxBanished.expected_to_fire_per_soak());
         assert!(!Feature::FateAwakened.expected_to_fire_per_soak());

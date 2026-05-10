@@ -42,6 +42,7 @@ pub mod intention_momentum_pickup_lock;
 pub mod inventory_full_no_pickup;
 pub mod kitten_cry;
 pub mod lone_burial;
+pub mod mate_chain;
 pub mod patrol_recalibration;
 pub mod picking_up_scavenging;
 pub mod preset;
@@ -169,6 +170,13 @@ pub const ALL: &[&Scenario] = &[
     // affect) firing in a small preloaded world. Unit tests in the
     // module assert each substrate piece independently.
     &patrol_recalibration::SCENARIO_WARDED_DEMESNE,
+    // 257 — courtship → Partners-bond → Mate election → MatingOccurred
+    // chain. Two cats pre-loaded at `bond = Friends` with
+    // fondness/familiarity just above the Friends gate. Pre-fix the
+    // chain stalls at Friends; post-fix (Pairing Commit B + retuned
+    // emission_threshold) it advances to MatingOccurred within the
+    // tick budget.
+    &mate_chain::SCENARIO,
 ];
 
 /// Look up a scenario by its `name` field.

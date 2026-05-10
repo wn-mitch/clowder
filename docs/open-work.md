@@ -116,11 +116,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[242](docs/open-work/tickets/242-body-cue-substrate-disposition-observable-markers.md)** — Body-cue substrate (Disposition → observable markers) — _added 2026-05-08_
 - **[244](docs/open-work/tickets/244-audible-cue-substrate-alarm-calls-distress-cries-hissing.md)** — Audible cue substrate (alarm calls, distress cries, hissing) — _added 2026-05-08_
 - **[253](docs/open-work/tickets/253-restingspot-zone-resolution-as-belief-proxy-fall-through-to-ownsleepingspot-when-no-stores.md)** — RestingSpot zone resolution as belief proxy — fall through to OwnSleepingSpot when no Stores — _[ai-substrate] · added 2026-05-09_
-- **[257](docs/open-work/tickets/257-mate-election-crowded-out-by-patrol-in-post-256-regime.md)** — Mate election crowded out by Patrol in post-256 regime — _added 2026-05-10_
 - **[258](docs/open-work/tickets/258-c3-worked-design-subjective-belief-substrate-mental-models-facets-evidence-typology.md)** — C3 worked design — subjective belief substrate (mental models + facets + evidence typology) — _[C] · added 2026-05-10_
 - **[259](docs/open-work/tickets/259-l1-to-l3-activation-visualization-in-log-viewer.md)** — L1 to L3 activation visualization in log viewer — _added 2026-05-10_
 - **[260](docs/open-work/tickets/260-fox-scent-marking-signposts-territorial-boundaries-without-ward-keying.md)** — Fox scent-marking signposts — territorial boundaries without ward keying — _added 2026-05-10_
 - **[271](docs/open-work/tickets/271-restore-substrate-flee-score-lift-on-critical-health-active-threat-251-balance-follow-on.md)** — Restore substrate Flee score lift on critical-health + active-threat (251 balance follow-on) — _[ai-substrate] · added 2026-05-10_
+- **[272](docs/open-work/tickets/272-matingoccurred-still-gated-by-has-eligible-mate-breeding-floor-and-gate-post-257-follow-on.md)** — MatingOccurred still gated by has_eligible_mate() breeding-floor AND-gate (post-257 follow-on) — _added 2026-05-10_
 
 ## Parked (9)
 
@@ -130,7 +130,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[084](docs/open-work/tickets/084-farm-herb-ward-demand-axis.md)** — Farm DSE — tie scoring to herb/ward stockpile demand so gardens stay productive under abundant food — _[balance] · parked 2026-04-30 · added 2026-04-29_
 - **[173](docs/open-work/tickets/173-crafting-split-capability-markers.md)** — IsHerbalist / IsSpiritualist / HasCorruptionNearby capability markers (155 follow-on) — _[ai-substrate] · parked 2026-05-05 · added 2026-05-05_
 - **[199](docs/open-work/tickets/199-pipeline-walk-skill.md)** — Hunt / production / consumption pipeline-walk skill (194 P4) — _[process-discipline] · parked 2026-05-06 · added 2026-05-06_
-- **[212](docs/open-work/tickets/212-tune-caretake-food-security-weight.md)** — tune caretake_food_security_weight — _[balance] · parked 2026-05-10 · blocked-by 257 · added 2026-05-07_
+- **[212](docs/open-work/tickets/212-tune-caretake-food-security-weight.md)** — tune caretake_food_security_weight — _[balance] · parked 2026-05-10 · added 2026-05-07_
 - **[214](docs/open-work/tickets/214-tune-patrol-fox-scent-weight.md)** — tune patrol_fox_scent_weight — _[balance] · parked 2026-05-07 · blocked-by 209 · added 2026-05-07_
 - **[249](docs/open-work/tickets/249-extend-dispositionfailurecooldown-coverage-to-restingguardingpickingup-et-al-r3-from-247.md)** — Extend DispositionFailureCooldown coverage to Resting/Guarding/PickingUp et al. (R3 from 247) — _parked 2026-05-09 · added 2026-05-08_
 
@@ -171,12 +171,13 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (171)
+## Landed archive (172)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (106)
+### 2026-05 (107)
 
+- **[257](docs/open-work/landed/257-mate-election-crowded-out-by-patrol-in-post-256-regime.md)** — Mate election crowded out by Patrol in post-256 regime _(2026-05-10)_
 - **[256](docs/open-work/landed/256-patrol-dse-recalibration-influence-map-driven-smart-pathing-wildlife-deterrent-affect-post-252-cascade-root-cause.md)** — Patrol DSE recalibration — influence-map-driven smart pathing + wildlife deterrent affect (post-252 cascade root cause) _(2026-05-10)_
 - **[255](docs/open-work/landed/255-threatproximityadrenalineflee-flee-axis-calibration-audit-post-252-readable.md)** — ThreatProximityAdrenalineFlee Flee-axis calibration audit (post-252 readable) _(2026-05-10)_
 - **[254](docs/open-work/landed/254-pickfleetarget-witness-contract-rebind-so-substrate-aware-fleeing-can-pick-a-target-post-252.md)** — PickFleeTarget witness contract — rebind so substrate-aware Fleeing can pick a target post-252 _(2026-05-10)_

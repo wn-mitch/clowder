@@ -19,12 +19,20 @@
 //! `crate::plugins::simulation::SimulationPlugin::build` so the snapshot
 //! it builds is the same one [`MateDse`]'s eligibility marker reads.
 //!
-//! **Commit A scope.** This file lands the substrate only. No DSE
-//! consumes the Intention yet — the bias readers are wired in Commit B.
-//! `Feature::PairingIntentionEmitted` and `Feature::PairingDropped`
-//! both fire from this commit, but their `expected_to_fire_per_soak()`
-//! flags stay at `false` until Commit B promotes them once the bias
-//! mechanism is in place.
+//! **Commit A landed ticket 027b; Commit B landed ticket 257.**
+//! - Commit A authors `PairingActivity` and emits
+//!   `Feature::PairingIntentionEmitted` / `PairingDropped`.
+//! - Commit B (this section, landed 257) wires the bias readers in
+//!   the Socialize / GroomOther / MentorCat resolvers. When a paired
+//!   actor's resolver target equals its
+//!   `PairingActivity.partner`, the fondness + familiarity deltas are
+//!   multiplied by `pairing.bias_multiplier` and
+//!   `Feature::PairingBiasApplied` fires. This is the structural
+//!   piece that closes the Friends → Partners gap by giving paired
+//!   interactions stronger weight than diffuse interactions.
+//! - `PairingIntentionEmitted` is canary-validated; `PairingBiasApplied`
+//!   was promoted to canary-validated in 257 once its emission
+//!   semantics became single-seed-observable.
 
 use bevy_ecs::prelude::*;
 use std::collections::HashMap;

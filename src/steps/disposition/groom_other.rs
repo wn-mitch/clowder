@@ -55,7 +55,10 @@ pub struct GroomOutcome {
 /// still walking / timing out with no target.
 ///
 /// **Feature emission** — caller passes `Feature::GroomedOther`
-/// (Positive) to `record_if_witnessed`.
+/// (Positive) to `record_if_witnessed`. Ticket 257 / Commit B —
+/// caller separately emits `Feature::PairingBiasApplied` when
+/// `pairing_bias > 1.0` (i.e. the resolver target is the actor's
+/// PairingActivity partner).
 #[allow(clippy::too_many_arguments)]
 pub fn resolve_groom_other(
     ticks: u64,
@@ -71,6 +74,11 @@ pub fn resolve_groom_other(
     social: &SocialConstants,
     d: &DispositionConstants,
     fc: &FulfillmentConstants,
+    // Ticket 257 / Commit B — fondness + familiarity multiplier when
+    // the target is the actor's PairingActivity partner. `1.0` for the
+    // un-paired case. Caller emits `Feature::PairingBiasApplied` when
+    // > 1.0.
+    pairing_bias: f32,
 ) -> StepOutcome<Option<GroomOutcome>> {
     if let Some(target) = target_entity {
         let target_grooming = grooming_snapshot.get(&target).copied().unwrap_or(0.8);
@@ -81,9 +89,13 @@ pub fn resolve_groom_other(
         relationships.modify_fondness(
             cat_entity,
             target,
-            d.groom_other_fondness_per_tick * fondness_mod,
+            d.groom_other_fondness_per_tick * fondness_mod * pairing_bias,
         );
-        relationships.modify_familiarity(cat_entity, target, d.groom_other_familiarity_per_tick);
+        relationships.modify_familiarity(
+            cat_entity,
+            target,
+            d.groom_other_familiarity_per_tick * pairing_bias,
+        );
         relationships
             .get_or_insert(cat_entity, target)
             .last_interaction = tick;
@@ -173,6 +185,7 @@ mod tests {
             &social,
             &disp,
             &fc,
+            1.0,
         );
 
         assert!(matches!(outcome.result, StepResult::Advance));
@@ -208,6 +221,7 @@ mod tests {
             &social,
             &disp,
             &fc,
+            1.0,
         );
 
         assert!(
@@ -242,6 +256,7 @@ mod tests {
             &social,
             &disp,
             &fc,
+            1.0,
         );
 
         let groom = outcome

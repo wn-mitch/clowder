@@ -1,7 +1,7 @@
 ---
 id: 257
 title: Mate election crowded out by Patrol in post-256 regime
-status: ready
+status: done
 cluster: null
 added: 2026-05-10
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-10
 ---
 
 <!--
@@ -107,3 +107,4 @@ narrative-bound to one cat.
   blocked by 256's substrate work for separability. Layer-walk
   audit unwritten; Patrol's `safety_deficit` Logistic gate is
   the leading suspect for crowding out Mate.
+- 2026-05-10: 2026-05-10: reframed. Layer-walk disproved the ticket's original "Patrol crowds Mate via global safety_deficit" framing (Patrol's safety_deficit is cat-local; Mate elects 0/7455). Actual defect: PairingActivity Commit B (bias readers) was never wired per pairing.rs:22-27's own deferral note, so paired interactions advance the bond ladder no faster than diffuse ones; the chain stalled at Friends. Implementation: pairing_bias_for() helper in src/components/pairing.rs; bias readers in resolve_socialize/resolve_groom_other/resolve_mentor_cat amplify fondness+familiarity deltas 1.5× when target == PairingActivity.partner; Feature::PairingBiasApplied emits per amplification and is now canary-gated; pairing.emission_threshold 0.25→0.20 so fresh-Friends pairs actually emit Pairing intentions; ChainStepReadContext SystemParam bundles new pairing_q to stay under Bevy's 16-param limit. Verification soak logs/tuned-42 (commit 05b662c7 dirty, Mocha focal): Partners/Mates narratives present for the first time (Mocha+Cedar+Bramble @ ticks 1247100/1249950); bonds_formed 19→21; positive_features_active 33→34; survival-canary delta vs pre-fix is neutral (same 4 deaths). MatingOccurred remains in never_fired_expected_positives — the chain now stalls one layer downstream at has_eligible_mate()'s breeding-floor AND-gate (hunger>0.6 ∧ energy>0.5 ∧ mood>0.2 ∧ Partners ∧ photoperiod). Opened follow-on 272 owning that gate; references 032 (in-progress).

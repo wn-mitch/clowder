@@ -108,6 +108,45 @@ impl PairingActivity {
     }
 }
 
+/// Ticket 257 — Commit B bias-reader helper. Given an actor's optional
+/// `PairingActivity` and a resolver target, return the multiplier the
+/// resolver should apply to its fondness/familiarity delta.
+///
+/// The amplification fires only when the actor holds a `PairingActivity`
+/// AND its `partner` field equals the resolver's `target`. Any other
+/// case returns `1.0` (no amplification). This is the structural piece
+/// that closes the Friends → Partners gap: paired interactions accrue
+/// fondness/familiarity faster than diffuse interactions, advancing the
+/// bond ladder under realistic encounter cadence.
+///
+/// Returns `(multiplier, amplified)`: `amplified == true` exactly when
+/// the multiplier was the bias value (caller emits
+/// `Feature::PairingBiasApplied` in that case). Pre-Commit-B callers can
+/// pass `None` for `pairing` to request the no-op `(1.0, false)` path.
+pub fn pairing_bias_multiplier(
+    pairing: Option<&PairingActivity>,
+    target: Entity,
+    bias_multiplier: f32,
+) -> (f32, bool) {
+    pairing_bias_for(pairing.map(|p| p.partner), Some(target), bias_multiplier)
+}
+
+/// Snapshot-friendly variant of [`pairing_bias_multiplier`] that takes a
+/// pre-extracted `Option<Entity>` partner and an `Option<Entity>` target.
+/// `target == None` is the "resolver had no target this tick" case and
+/// produces `(1.0, false)` so callers can use the same helper on every
+/// branch without conditional logic.
+pub fn pairing_bias_for(
+    partner: Option<Entity>,
+    target: Option<Entity>,
+    bias_multiplier: f32,
+) -> (f32, bool) {
+    match (partner, target) {
+        (Some(p), Some(t)) if p == t => (bias_multiplier, true),
+        _ => (1.0, false),
+    }
+}
+
 /// Per-cat snapshot of every field `should_drop_pairing` reads.
 ///
 /// Built once in the author system's per-cat loop (a small struct
@@ -376,5 +415,46 @@ mod tests {
         p.fondness = 0.0;
         p.romantic = 0.6;
         assert_eq!(should_drop_pairing(&p, &config()), None);
+    }
+
+    // -----------------------------------------------------------------
+    // 257 / Commit B — `pairing_bias_multiplier` helper invariants.
+    // -----------------------------------------------------------------
+
+    fn entity(idx: u32) -> Entity {
+        let mut world = bevy_ecs::world::World::new();
+        // Reserve `idx - 1` placeholder entities so the returned id has
+        // the requested index. Cheap — only used in unit tests.
+        for _ in 0..idx.saturating_sub(1) {
+            world.spawn_empty();
+        }
+        world.spawn_empty().id()
+    }
+
+    #[test]
+    fn bias_multiplier_no_pairing_returns_one() {
+        let target = entity(1);
+        let (mult, amped) = pairing_bias_multiplier(None, target, 1.5);
+        assert_eq!(mult, 1.0);
+        assert!(!amped);
+    }
+
+    #[test]
+    fn bias_multiplier_partner_matches_target_amplifies() {
+        let partner = entity(7);
+        let pairing = PairingActivity::new(partner, 100);
+        let (mult, amped) = pairing_bias_multiplier(Some(&pairing), partner, 1.5);
+        assert_eq!(mult, 1.5);
+        assert!(amped);
+    }
+
+    #[test]
+    fn bias_multiplier_partner_differs_from_target_returns_one() {
+        let partner = entity(7);
+        let other = entity(8);
+        let pairing = PairingActivity::new(partner, 100);
+        let (mult, amped) = pairing_bias_multiplier(Some(&pairing), other, 1.5);
+        assert_eq!(mult, 1.0);
+        assert!(!amped);
     }
 }

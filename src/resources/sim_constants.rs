@@ -5377,10 +5377,30 @@ pub struct PairingConstants {
     /// colony, not require adjacency every tick.
     pub candidate_range: i32,
     /// Minimum pairing-quality score for a Friends-bonded peer to
-    /// trigger emission. Calibrated so a fresh-Friends peer at
-    /// `fondness ≈ 0.5, romantic ≈ 0.0`, `bond_score = 0.5` clears
-    /// (`0.40·0.5 + 0.40·0.0 + 0.20·0.5 = 0.30 ≥ 0.25`).
+    /// trigger emission. Ticket 257 — recalibrated 0.25 → 0.20 after
+    /// the post-256 verification soak observed `MatingOccurred` never
+    /// firing. The original 0.25 was calibrated against an idealized
+    /// fresh-Friends `fondness ≈ 0.5`; in practice the encounter
+    /// system produces fresh-Friends bonds with fondness barely above
+    /// the Friends gate's 0.3 (per `social.rs:297`). At fondness=0.31
+    /// plus romantic=0.0 plus bond_score=0.5 the score is 0.224
+    /// (= 0.40·0.31 + 0.40·0.0 + 0.20·0.5), which clears 0.20 but not
+    /// 0.25. Lowering the gate restores the chain Friends →
+    /// PairingActivity → Commit B bias → Partners → Mate.
     pub emission_threshold: f32,
+    /// Ticket 257 / Commit B — multiplier applied to fondness +
+    /// familiarity deltas when a paired actor's resolver target
+    /// matches its `PairingActivity.partner`. The structural job is
+    /// to close the fondness/familiarity gap from a Friends bond to a
+    /// Partners bond by giving paired interactions stronger weight
+    /// than diffuse interactions. Calibrated at 1.5×: enough to
+    /// promote Partners within ~5 sim days of held PairingActivity
+    /// (verified against the `mate_chain` scenario), small enough
+    /// that a single resolver tick doesn't slam fondness through
+    /// multiple bond-tier thresholds at once. Reach for tuning here
+    /// only if the chain still doesn't reach Partners under the
+    /// production encounter cadence.
+    pub bias_multiplier: f32,
     /// Drop-gate `DesireDrift` floor on the romantic axis. Both this
     /// and `fondness_floor` must be breached simultaneously for the
     /// branch to fire — Mates-bonded post-conception cooldown should
@@ -5399,7 +5419,8 @@ impl Default for PairingConstants {
     fn default() -> Self {
         Self {
             candidate_range: 25,
-            emission_threshold: 0.25,
+            emission_threshold: 0.20,
+            bias_multiplier: 1.5,
             romantic_floor: 0.05,
             fondness_floor: 0.30,
             quality_fondness_weight: 0.40,

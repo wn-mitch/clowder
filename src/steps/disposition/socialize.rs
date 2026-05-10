@@ -38,7 +38,10 @@ use crate::steps::{StepOutcome, StepResult};
 /// **Feature emission** — caller passes `Feature::Socialized`
 /// (Positive) to `record_if_witnessed`. Before §Phase 5a no
 /// Feature existed for Socialize — a blind spot that masked whether
-/// the social pipeline was producing any real interactions.
+/// the social pipeline was producing any real interactions. Ticket
+/// 257 / Commit B — caller separately emits
+/// `Feature::PairingBiasApplied` when `pairing_bias > 1.0` (i.e.
+/// the resolver target is the actor's PairingActivity partner).
 #[allow(clippy::too_many_arguments)]
 pub fn resolve_socialize(
     ticks: u64,
@@ -54,6 +57,12 @@ pub fn resolve_socialize(
     social: &SocialConstants,
     d: &DispositionConstants,
     fc: &FulfillmentConstants,
+    // Ticket 257 / Commit B — fondness + familiarity multiplier when
+    // the target is the actor's PairingActivity partner. `1.0` for the
+    // un-paired case (production callers pass `1.0` when no
+    // PairingActivity is held). Caller is responsible for emitting
+    // `Feature::PairingBiasApplied` when this is > 1.0.
+    pairing_bias: f32,
 ) -> StepOutcome<bool> {
     let witnessed = if let Some(target) = target_entity {
         let target_grooming = grooming_snapshot.get(&target).copied().unwrap_or(0.8);
@@ -64,9 +73,13 @@ pub fn resolve_socialize(
         relationships.modify_fondness(
             cat_entity,
             target,
-            d.socialize_fondness_per_tick * fondness_mod,
+            d.socialize_fondness_per_tick * fondness_mod * pairing_bias,
         );
-        relationships.modify_familiarity(cat_entity, target, d.socialize_familiarity_per_tick);
+        relationships.modify_familiarity(
+            cat_entity,
+            target,
+            d.socialize_familiarity_per_tick * pairing_bias,
+        );
         relationships
             .get_or_insert(cat_entity, target)
             .last_interaction = tick;
@@ -152,6 +165,7 @@ mod tests {
             &social,
             &disp,
             &fc,
+            1.0,
         );
 
         assert!(outcome.witness, "should be witnessed with a target");
@@ -193,6 +207,7 @@ mod tests {
             &social,
             &disp,
             &fc,
+            1.0,
         );
 
         assert!(!outcome.witness, "should not be witnessed without target");
@@ -231,12 +246,87 @@ mod tests {
             &social,
             &disp,
             &fc,
+            1.0,
         );
 
         assert!(
             fulfillment.social_warmth <= 1.0,
             "social_warmth must not exceed 1.0: got={}",
             fulfillment.social_warmth
+        );
+    }
+
+    /// 257 / Commit B — pairing_bias > 1.0 amplifies the fondness +
+    /// familiarity deltas relative to the un-biased control. Locks in
+    /// that the resolver actually consults the multiplier on the right
+    /// `modify_*` calls (and only those — `needs.social` is independent
+    /// of the partnership bias).
+    #[test]
+    fn socialize_with_pairing_bias_amplifies_fondness_and_familiarity() {
+        let (social, disp, fc) = test_constants();
+        let (mut rels_baseline, mut cm_a, mut pr_a, snap_a) = make_deps();
+        let (mut rels_biased, mut cm_b, mut pr_b, snap_b) = make_deps();
+        let mut needs_a = Needs::default();
+        let mut needs_b = Needs::default();
+        let mut full_a = Fulfillment::default();
+        let mut full_b = Fulfillment::default();
+
+        let mut world = World::new();
+        let cat = world.spawn_empty().id();
+        let target = world.spawn_empty().id();
+
+        let _ = resolve_socialize(
+            0,
+            cat,
+            Some(target),
+            &mut needs_a,
+            &mut full_a,
+            &mut pr_a,
+            &mut rels_baseline,
+            &mut cm_a,
+            &snap_a,
+            0,
+            &social,
+            &disp,
+            &fc,
+            1.0,
+        );
+        let _ = resolve_socialize(
+            0,
+            cat,
+            Some(target),
+            &mut needs_b,
+            &mut full_b,
+            &mut pr_b,
+            &mut rels_biased,
+            &mut cm_b,
+            &snap_b,
+            0,
+            &social,
+            &disp,
+            &fc,
+            1.5,
+        );
+
+        let baseline = rels_baseline.get(cat, target).expect("baseline row");
+        let biased = rels_biased.get(cat, target).expect("biased row");
+        assert!(
+            biased.fondness > baseline.fondness,
+            "pairing bias must amplify fondness: baseline={}, biased={}",
+            baseline.fondness,
+            biased.fondness,
+        );
+        assert!(
+            biased.familiarity > baseline.familiarity,
+            "pairing bias must amplify familiarity: baseline={}, biased={}",
+            baseline.familiarity,
+            biased.familiarity,
+        );
+        assert!(
+            (needs_a.social - needs_b.social).abs() < f32::EPSILON,
+            "pairing bias must NOT amplify needs.social: a={}, b={}",
+            needs_a.social,
+            needs_b.social,
         );
     }
 }

@@ -33,7 +33,10 @@ use crate::steps::{StepOutcome, StepResult};
 /// apply the cross-entity skill transfer.
 ///
 /// **Feature emission** — caller passes `Feature::MentoredCat`
-/// (Positive) to `record_if_witnessed`.
+/// (Positive) to `record_if_witnessed`. Ticket 257 / Commit B —
+/// caller separately emits `Feature::PairingBiasApplied` when
+/// `pairing_bias > 1.0` (i.e. the resolver target is the actor's
+/// PairingActivity partner).
 #[allow(clippy::too_many_arguments)]
 pub fn resolve_mentor_cat(
     ticks: u64,
@@ -44,13 +47,26 @@ pub fn resolve_mentor_cat(
     relationships: &mut Relationships,
     tick: u64,
     d: &DispositionConstants,
+    // Ticket 257 / Commit B — fondness + familiarity multiplier when
+    // the apprentice is the actor's PairingActivity partner. `1.0` for
+    // the un-paired case. Caller emits `Feature::PairingBiasApplied`
+    // when > 1.0.
+    pairing_bias: f32,
 ) -> StepOutcome<Option<(Entity, Skills)>> {
     if let Some(target) = target_entity {
         needs.mastery = (needs.mastery + d.mentor_mastery_per_tick).min(1.0);
         needs.social = (needs.social + d.mentor_social_per_tick).min(1.0);
         needs.respect = (needs.respect + d.mentor_respect_per_tick).min(1.0);
-        relationships.modify_fondness(cat_entity, target, d.mentor_fondness_per_tick);
-        relationships.modify_familiarity(cat_entity, target, d.mentor_familiarity_per_tick);
+        relationships.modify_fondness(
+            cat_entity,
+            target,
+            d.mentor_fondness_per_tick * pairing_bias,
+        );
+        relationships.modify_familiarity(
+            cat_entity,
+            target,
+            d.mentor_familiarity_per_tick * pairing_bias,
+        );
         relationships
             .get_or_insert(cat_entity, target)
             .last_interaction = tick;

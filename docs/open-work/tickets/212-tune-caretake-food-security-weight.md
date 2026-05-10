@@ -5,7 +5,7 @@ status: parked
 cluster: balance
 added: 2026-05-07
 parked: 2026-05-10
-blocked-by: [257]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [181-hunt-forage-saturation-tune.md]

@@ -4499,6 +4499,20 @@ fn dispatch_step_action(
                 Some(f) => &mut **f,
                 None => &mut fallback_fulfillment,
             };
+            // 257 / Commit B — pairing-bias multiplier when the social
+            // target equals the actor's PairingActivity.partner. The
+            // helper returns `(1.0, false)` when no Intention is held
+            // or the target differs.
+            let (pairing_bias, amplified) = crate::components::pairing::pairing_bias_for(
+                ec.pairing_q.get(cat_entity).ok().map(|p| p.partner),
+                plan.step_state[step_idx].target_entity,
+                ec.constants.pairing.bias_multiplier,
+            );
+            if amplified {
+                if let Some(act) = narr.activation.as_deref_mut() {
+                    act.record(Feature::PairingBiasApplied);
+                }
+            }
             let outcome = crate::steps::disposition::resolve_socialize(
                 ticks,
                 cat_entity,
@@ -4513,6 +4527,7 @@ fn dispatch_step_action(
                 &ec.constants.social,
                 d,
                 &ec.constants.fulfillment,
+                pairing_bias,
             );
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::Socialized);
             if matches!(outcome.result, crate::steps::StepResult::Advance) {
@@ -4580,6 +4595,16 @@ fn dispatch_step_action(
                 Some(f) => &mut **f,
                 None => &mut fallback_fulfillment,
             };
+            let (pairing_bias, amplified) = crate::components::pairing::pairing_bias_for(
+                ec.pairing_q.get(cat_entity).ok().map(|p| p.partner),
+                plan.step_state[step_idx].target_entity,
+                ec.constants.pairing.bias_multiplier,
+            );
+            if amplified {
+                if let Some(act) = narr.activation.as_deref_mut() {
+                    act.record(Feature::PairingBiasApplied);
+                }
+            }
             let outcome = crate::steps::disposition::resolve_groom_other(
                 ticks,
                 cat_entity,
@@ -4594,6 +4619,7 @@ fn dispatch_step_action(
                 &ec.constants.social,
                 d,
                 &ec.constants.fulfillment,
+                pairing_bias,
             );
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::GroomedOther);
             if let Some(r) = outcome.witness {
@@ -4652,6 +4678,16 @@ fn dispatch_step_action(
                         narr.activation.as_deref_mut(),
                     );
             }
+            let (pairing_bias, amplified) = crate::components::pairing::pairing_bias_for(
+                ec.pairing_q.get(cat_entity).ok().map(|p| p.partner),
+                plan.step_state[step_idx].target_entity,
+                ec.constants.pairing.bias_multiplier,
+            );
+            if amplified {
+                if let Some(act) = narr.activation.as_deref_mut() {
+                    act.record(Feature::PairingBiasApplied);
+                }
+            }
             let outcome = crate::steps::disposition::resolve_mentor_cat(
                 ticks,
                 cat_entity,
@@ -4661,6 +4697,7 @@ fn dispatch_step_action(
                 relationships,
                 ec.time.tick,
                 d,
+                pairing_bias,
             );
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::MentoredCat);
             let crate::steps::StepOutcome { result, witness } = outcome;
