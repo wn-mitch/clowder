@@ -13,6 +13,7 @@ pub mod grave;
 pub mod grooming;
 pub mod held_intention;
 pub mod hunting_priors;
+pub mod joint_intention;
 pub mod identity;
 pub mod item_transfer;
 pub mod items;
@@ -61,6 +62,11 @@ pub use held_intention::{
 };
 pub use identity::{Age, Appearance, Gender, LifeStage, Name, Orientation, Species};
 pub use items::{Item, ItemKind, ItemLocation};
+pub use joint_intention::{
+    is_practice_compatible, joint_bias_for, joint_bias_multiplier, next_stage, should_drop_joint,
+    JointDropBranch, JointIntention, JointIntentionDropConfig, JointIntentionProxies, PracticeKind,
+    PracticeRole, PracticeStage, StageAdvanceProxies,
+};
 pub use kitten::KittenDependency;
 pub use magic::{
     FlavorKind, FlavorPlant, GrowthStage, Harvestable, Herb, HerbKind, Inventory, ItemSlot,

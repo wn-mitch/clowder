@@ -423,6 +423,16 @@ impl Plugin for SimulationPlugin {
                             // demand so gardens stay productive when
                             // food is full but Thornbriar is short.
                             crate::ai::pairing::author_pairing_intentions,
+                            // Ticket 127 Commit A — lockstep mirror that
+                            // keeps `JointIntention { practice: Courtship,
+                            // .. }` in sync with `PairingActivity`. Runs
+                            // immediately after the PA author on the same
+                            // chain; `.chain()` inserts `apply_deferred`
+                            // between them so the mirror sees PA's
+                            // post-flush state. Commit B replaces this
+                            // with a real `author_joint_intentions` and
+                            // retires the PA author entirely.
+                            crate::ai::joint_intention::mirror_joint_intentions,
                             // §4 batch 2: capability markers — reads
                             // life-stage, injury, inventory markers
                             // authored above.

@@ -12,6 +12,7 @@ pub mod fox_planner;
 pub mod fox_scoring;
 pub mod hawk_planner;
 pub mod hawk_scoring;
+pub mod joint_intention;
 pub mod mating;
 pub mod modifier;
 pub mod pairing;

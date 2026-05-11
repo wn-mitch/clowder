@@ -2,6 +2,8 @@ use std::collections::BTreeMap;
 
 use bevy_ecs::prelude::*;
 
+use crate::components::joint_intention::PracticeKind;
+
 // ---------------------------------------------------------------------------
 // FeatureCategory — valence of a tracked feature
 // ---------------------------------------------------------------------------
@@ -267,6 +269,47 @@ pub enum Feature {
     /// => true` from 257 onward — its absence in the seed-42 soak is
     /// a regression on the Pairing chain.
     PairingBiasApplied,
+
+    // ---------- Ticket 127 — JointIntention (subsumes §7.M PairingActivity) ----------
+    /// `crate::ai::joint_intention::author_joint_intentions` inserted a
+    /// [`crate::components::JointIntention`] on an eligible cat for the
+    /// named practice. For Courtship this is the 1:1 successor to
+    /// `PairingIntentionEmitted` — same emission semantics, same canary
+    /// classification. `expected_to_fire_per_soak() => true` for
+    /// Courtship.
+    JointIntentionEmitted { practice: PracticeKind },
+    /// The author's drop gate fired on a held JointIntention. Neutral
+    /// — drops are normal state transitions, not an adverse signal
+    /// (mirrors `PairingDropped`). Stays
+    /// `expected_to_fire_per_soak() => false` (bursty).
+    JointIntentionDropped { practice: PracticeKind },
+    /// A practice-biased resolver was invoked with
+    /// `target == JointIntention.partner` AND
+    /// `joint.practice == bias-reader's practice filter`, applying the
+    /// practice's `bias_multiplier` to that tick's fondness +
+    /// familiarity deltas. Per-amplification fire site (single-seed
+    /// observable on any healthy chain). Successor to
+    /// `PairingBiasApplied`. `expected_to_fire_per_soak() => true` for
+    /// Courtship.
+    JointBiasApplied { practice: PracticeKind },
+    /// The author advanced the cat's `PracticeStage` to the next
+    /// observable stage in the practice's transition table (Courtship:
+    /// Approach → Courting → Mating → Bonded). Positive — stage
+    /// progression is the structural signal that the practice is
+    /// progressing rather than stalling. `expected_to_fire_per_soak()
+    /// => true` for Courtship (any healthy soak crosses
+    /// Approach → Courting in the seed-42 window).
+    JointStageAdvanced { practice: PracticeKind },
+    /// A paired cat's `PracticeStage` differed from its partner's at
+    /// the lower-Entity-index side of the pair this tick — the
+    /// substrate hook for "codified irony" (one cat believes they're
+    /// courting while the other is just being friendly). Counted once
+    /// per pair per tick. Neutral — mismatch windows are healthy
+    /// narrative texture, not a regression signal.
+    /// `expected_to_fire_per_soak() => false` — a perfectly-synced
+    /// healthy colony can have zero mismatch ticks.
+    JointStageMismatchTickAccrued { practice: PracticeKind },
+
     /// Ticket 080 — `evaluate_target_taking` gated a candidate to 0.0
     /// because its `Reserved.owner` named a cat other than the scoring
     /// cat. Neutral — observability of the resource-reservation
@@ -497,6 +540,23 @@ impl Feature {
         Feature::PairingIntentionEmitted,
         Feature::PairingDropped,
         Feature::PairingBiasApplied,
+        // Ticket 127 — JointIntention. Each parameterized variant is
+        // enumerated per-practice; for 127 only Courtship exists.
+        Feature::JointIntentionEmitted {
+            practice: PracticeKind::Courtship,
+        },
+        Feature::JointIntentionDropped {
+            practice: PracticeKind::Courtship,
+        },
+        Feature::JointBiasApplied {
+            practice: PracticeKind::Courtship,
+        },
+        Feature::JointStageAdvanced {
+            practice: PracticeKind::Courtship,
+        },
+        Feature::JointStageMismatchTickAccrued {
+            practice: PracticeKind::Courtship,
+        },
         // §sub-epic 071 — planning-substrate hardening
         Feature::ReservationContended,
         Feature::TargetCooldownApplied,
@@ -581,6 +641,10 @@ impl Feature {
             // §7.M L2 PairingActivity (ticket 027b)
             Feature::PairingIntentionEmitted => Positive,
             Feature::PairingBiasApplied => Positive,
+            // Ticket 127 — JointIntention positive valences.
+            Feature::JointIntentionEmitted { .. } => Positive,
+            Feature::JointBiasApplied { .. } => Positive,
+            Feature::JointStageAdvanced { .. } => Positive,
             // Ticket 104 — Hide/Freeze valence
             Feature::HideFreezeFired => Positive,
             // Ticket 149 — discrete hunt attempts (kill or lost) are
@@ -681,6 +745,12 @@ impl Feature {
             // §7.M L2 PairingActivity drop is a state transition,
             // not an adverse event.
             Feature::PairingDropped => Neutral,
+            // Ticket 127 — JointIntention neutral valences. Drops are
+            // bursty state transitions (mirrors PairingDropped). Stage
+            // mismatch is healthy narrative texture (codified irony),
+            // not a regression signal.
+            Feature::JointIntentionDropped { .. } => Neutral,
+            Feature::JointStageMismatchTickAccrued { .. } => Neutral,
             // Ticket 080 — reservation contention is observability
             // signal, not adverse.
             Feature::ReservationContended => Neutral,
@@ -886,6 +956,12 @@ impl Feature {
             // precedent). Adoption + fulfilment fall through to the
             // `_ => true` default and are canary-validated.
             Feature::IntentionAbandoned => false,
+            // Ticket 127 — JointIntention: drops are bursty (mirrors
+            // `PairingDropped`); stage mismatch is healthy-sometimes-
+            // zero. Both stay opt-out. Emitted / BiasApplied /
+            // StageAdvanced fall through to `_ => true`.
+            Feature::JointIntentionDropped { .. } => false,
+            Feature::JointStageMismatchTickAccrued { .. } => false,
             // 250: burial is conditional on death. Post-247 / 248 the
             // substrate keeps colonies healthy enough that deaths
             // (and therefore burials) are genuinely rare; treating
@@ -1005,6 +1081,24 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::PairingIntentionEmitted => "PairingIntentionEmitted",
         Feature::PairingDropped => "PairingDropped",
         Feature::PairingBiasApplied => "PairingBiasApplied",
+        // Ticket 127 — JointIntention. Display names embed the practice
+        // slug so the footer / canary output distinguishes per-practice
+        // counters when future practices land.
+        Feature::JointIntentionEmitted {
+            practice: PracticeKind::Courtship,
+        } => "JointIntentionEmitted_Courtship",
+        Feature::JointIntentionDropped {
+            practice: PracticeKind::Courtship,
+        } => "JointIntentionDropped_Courtship",
+        Feature::JointBiasApplied {
+            practice: PracticeKind::Courtship,
+        } => "JointBiasApplied_Courtship",
+        Feature::JointStageAdvanced {
+            practice: PracticeKind::Courtship,
+        } => "JointStageAdvanced_Courtship",
+        Feature::JointStageMismatchTickAccrued {
+            practice: PracticeKind::Courtship,
+        } => "JointStageMismatchTickAccrued_Courtship",
         Feature::ReservationContended => "ReservationContended",
         Feature::TargetCooldownApplied => "TargetCooldownApplied",
         Feature::HideFreezeFired => "HideFreezeFired",
@@ -1264,9 +1358,13 @@ mod tests {
         // Ticket 126 added 2 Positive (IntentionAdopted,
         // IntentionFulfilled) + 1 Neutral (IntentionAbandoned) for
         // the BDI intention substrate lifecycle.
-        assert_eq!(positive, 53);
+        // Ticket 127 Commit A added 3 Positive (JointIntentionEmitted,
+        // JointBiasApplied, JointStageAdvanced) + 2 Neutral
+        // (JointIntentionDropped, JointStageMismatchTickAccrued), all
+        // parameterized on PracticeKind (Courtship only in 127).
+        assert_eq!(positive, 56);
         assert_eq!(negative, 23);
-        assert_eq!(neutral, 33);
+        assert_eq!(neutral, 35);
     }
 
     #[test]
@@ -1333,9 +1431,12 @@ mod tests {
         // Ticket 250: BurialPerformed demoted from Positive to Neutral
         // (post-247 / 248 substrate makes deaths and burials genuinely
         // rare in healthy colonies), shifting -1 positive / +1 neutral.
+        // Ticket 127 Commit A: +3 Positive / +0 Negative / +2 Neutral
+        // for the JointIntention substrate (5 parameterized features,
+        // Courtship-only in 127).
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            53
+            56
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),
@@ -1343,7 +1444,7 @@ mod tests {
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Neutral),
-            33
+            35
         );
     }
 

@@ -45,6 +45,16 @@ pub struct SimConstants {
     pub influence_maps: InfluenceMapConstants,
     #[serde(default)]
     pub pairing: PairingConstants,
+    /// Ticket 127 — per-practice JointIntention knobs. For Courtship
+    /// these mirror `pairing` 1:1 plus a `stage_stall_ticks` field that
+    /// gates the novel `StageStalled` drop branch. The mirror is
+    /// load-bearing only during the 127 migration: Commit A authors
+    /// both PairingActivity and JointIntention from the same
+    /// constants; Commit B switches readers to `practices.courtship`;
+    /// Commit C deletes `pairing`. `#[serde(default)]` so old archive
+    /// headers (pre-127) deserialize without the new field.
+    #[serde(default)]
+    pub practices: PracticeConstants,
     #[serde(default)]
     pub planning_substrate: PlanningSubstrateConstants,
     /// Ticket 103 — `escape_viability` perception scalar tunables.
@@ -5428,6 +5438,82 @@ impl Default for PairingConstants {
             quality_fondness_weight: 0.40,
             quality_romantic_weight: 0.40,
             quality_bond_weight: 0.20,
+        }
+    }
+}
+
+// ---------- PracticeConstants (ticket 127) ----------
+
+/// Ticket 127 — per-practice JointIntention tuning. One block per
+/// practice; for 127 only Courtship exists. Each practice carries its
+/// own matchmaker / drop-gate / bias-multiplier shape — co-mentoring,
+/// joint cache-stocking, and play-bouts can compose against this
+/// taxonomy as follow-on tickets land.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct PracticeConstants {
+    /// Courtship practice — successor to `PairingConstants`. During the
+    /// 127 migration both blocks coexist (Commit A mirrors; Commit C
+    /// deletes `pairing`).
+    #[serde(default)]
+    pub courtship: CourtshipPracticeConstants,
+}
+
+/// Ticket 127 — Courtship-practice knobs. Mirrors `PairingConstants`
+/// 1:1 (so the migration is mechanical) plus `stage_stall_ticks` for
+/// the novel `StageStalled` drop branch. Doc-comments mirror
+/// `PairingConstants` for the carry-over fields.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CourtshipPracticeConstants {
+    /// Manhattan-distance candidate filter when scanning for an
+    /// emission target. Wider than `MATE_TARGET_RANGE = 10` because
+    /// joint practices are multi-season — a cat may pursue a partner
+    /// across the colony, not require adjacency every tick.
+    pub candidate_range: i32,
+    /// Minimum quality score for a Friends-bonded peer to trigger
+    /// emission. See `PairingConstants::emission_threshold` for the
+    /// 257-recalibration rationale.
+    pub emission_threshold: f32,
+    /// Multiplier applied to fondness + familiarity deltas when a
+    /// paired actor's resolver target matches its
+    /// `JointIntention.partner` AND `JointIntention.practice ==
+    /// Courtship`. See `PairingConstants::bias_multiplier` for the
+    /// 257-Commit-B calibration rationale.
+    pub bias_multiplier: f32,
+    /// `DesireDrift` floor on the romantic axis. Both this and
+    /// `fondness_floor` must be breached simultaneously for the branch
+    /// to fire.
+    pub romantic_floor: f32,
+    /// `DesireDrift` floor on the fondness axis.
+    pub fondness_floor: f32,
+    /// Per-axis weights of the courtship-quality scalar. Sum to 1.0.
+    pub quality_fondness_weight: f32,
+    pub quality_romantic_weight: f32,
+    pub quality_bond_weight: f32,
+    /// Ticket 127 — max ticks a cat may sit in a single
+    /// `PracticeStage` before `StageStalled` fires. Default 10_000 ≈
+    /// 10 sim-days at default constants (1000 ticks/day). Generous
+    /// enough to absorb temporary blockers (a Tom waiting out winter,
+    /// a Queen between estrus cycles) while still catching pairs that
+    /// never progress (compatibility predicates pass but the bond
+    /// never tips into Partners).
+    pub stage_stall_ticks: u64,
+}
+
+impl Default for CourtshipPracticeConstants {
+    fn default() -> Self {
+        // Mirror `PairingConstants::default()` for the carry-over
+        // fields so migration parity is mechanical.
+        let p = PairingConstants::default();
+        Self {
+            candidate_range: p.candidate_range,
+            emission_threshold: p.emission_threshold,
+            bias_multiplier: p.bias_multiplier,
+            romantic_floor: p.romantic_floor,
+            fondness_floor: p.fondness_floor,
+            quality_fondness_weight: p.quality_fondness_weight,
+            quality_romantic_weight: p.quality_romantic_weight,
+            quality_bond_weight: p.quality_bond_weight,
+            stage_stall_ticks: 10_000,
         }
     }
 }
