@@ -3732,12 +3732,31 @@ mod tests {
 
     #[test]
     fn bold_cat_fights_when_allies_present() {
+        // Ticket 271 — the pre-271 invariant ("raw Fight > raw Flee at
+        // boldness=0.9 with allies") was an artifact of the
+        // boldness-invert axis hard-zeroing the Flee CP base. Post-271
+        // the boldness-invert axis floors at 0.5, so a bold cat under
+        // even mild threat scores a non-trivial Flee raw — the
+        // behavioral doctrine ("bold healthy cats fight") now flows
+        // through the `behavior_gate_check` reckless override at the
+        // final-action layer rather than through L3 scoring.
+        //
+        // This test now asserts the post-271 mechanism explicitly:
+        //   1. Fight retains a meaningful raw score (allies still
+        //      lift Fight; the FightDse is untouched).
+        //   2. The reckless override would flip the cat's chosen action
+        //      from Flee → Fight at full health, preserving the
+        //      "bold cat fights" end-state.
+        // Boldness raised to 0.95 to clear the strict `>` boundary at
+        // `gate_reckless_flee_threshold = 0.9`; the corresponding
+        // wounded-cat case (override does NOT fire when health is low)
+        // is covered by `gate_reckless_flee_not_when_injured`.
         let sc = default_scoring();
         let mut needs = Needs::default();
         needs.safety = 0.3;
 
         let mut personality = default_personality();
-        personality.boldness = 0.9;
+        personality.boldness = 0.95;
 
         let mut rng = seeded_rng(31);
 
@@ -3849,19 +3868,24 @@ mod tests {
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let fight_score = scores.iter().find(|(a, _)| *a == Action::Fight).unwrap().1;
-        let flee_score = scores.iter().find(|(a, _)| *a == Action::Flee);
 
         assert!(
             fight_score > 0.3,
             "bold cat with allies should have meaningful fight score; got {fight_score}"
         );
-        // Bold cat shouldn't flee.
-        if let Some((_, fs)) = flee_score {
-            assert!(
-                fight_score > *fs,
-                "bold cat should prefer fight ({fight_score}) over flee ({fs})"
-            );
-        }
+
+        // Ticket 271 — the L3 raw scoring no longer guarantees Fight >
+        // Flee for bold cats; the reckless override is the load-bearing
+        // mechanism that flips Flee → Fight at the final-action layer.
+        // Assert the override fires for this profile (bold + healthy =
+        // reckless gate trips) and would NOT fire for the wounded
+        // counterpart (covered by `gate_reckless_flee_not_when_injured`).
+        let mut override_rng = seeded_rng(31);
+        assert_eq!(
+            behavior_gate_check(Action::Flee, &personality, false, 1.0, &mut override_rng, &sc),
+            Some(Action::Fight),
+            "reckless override must flip Flee → Fight for bold healthy cat",
+        );
     }
 
     #[test]

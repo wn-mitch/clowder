@@ -36,12 +36,28 @@
 //!
 //! ## Variants
 //!
-//! | Variant                         | derivative | viability | Expected L3 winner    |
-//! |---------------------------------|-----------:|----------:|-----------------------|
-//! | `flee_calibration_low_threat`   |       ~0.0 |      ~0.7 | NOT Flee              |
-//! | `flee_calibration_open_terrain` |       ~0.7 |      ~0.7 | Flee                  |
-//! | `flee_calibration_cornered`     |       ~0.7 |     <0.4  | Fight (102 suppresses)|
-//! | `flee_calibration_sleep_partner`|       ~0.7 |      ~0.7 | Sleep ≥ Flee (047)    |
+//! | Variant                              | derivative | viability | Expected L3 winner    |
+//! |--------------------------------------|-----------:|----------:|-----------------------|
+//! | `flee_calibration_low_threat`        |       ~0.0 |      ~0.7 | NOT Flee              |
+//! | `flee_calibration_open_terrain`      |       ~0.7 |      ~0.7 | Flee                  |
+//! | `flee_calibration_cornered`          |       ~0.7 |     <0.4  | Fight (102 suppresses)|
+//! | `flee_calibration_sleep_partner`     |       ~0.7 |      ~0.7 | Sleep ≥ Flee (047)    |
+//! | `flee_calibration_critical_cornered` |       ~1.0 |     <0.2  | Flee top-2 (post-271) |
+//!
+//! ### `flee_calibration_critical_cornered` (ticket 271)
+//!
+//! Bold-and-critically-wounded cat one tile from a predator in a corner.
+//! This is the **Mocha profile** from the post-254 verification soak
+//! (`logs/tuned-42`) — boldness=0.9, health=0.26, safety=0.003 —
+//! where Flee scored `−0.025`, ~0.56 below the L3 winner. The existing
+//! `cornered` variant probes a mid-bold mid-wounded cat where 102's
+//! `AcuteHealthAdrenalineFight` correctly lifts Fight; this variant
+//! probes the corner the substrate currently mishandles: a cat that
+//! is too critically wounded to fight and too bold for the
+//! boldness-invert axis to lift Flee. Pre-271 the boldness-invert
+//! axis hard-zeros at boldness=1.0, collapsing the CompensatedProduct
+//! geometric mean. The post-271 fix re-shapes that curve so Flee
+//! reaches top-2 of the L3 softmax pool on this profile.
 //!
 //! `escape_viability` defaults: `terrain_weight = 0.7`, `sprint_radius
 //! = 3` ⇒ open-terrain viability ≈ 0.7, cornered (3×3 grass patch in
@@ -302,6 +318,81 @@ fn setup_sleep_partner(world: &mut World, seed: u64) {
 
     world.spawn((
         THREAT_POS,
+        WildAnimal::new(crate::components::wildlife::WildSpecies::Fox),
+    ));
+}
+
+// ---------------------------------------------------------------------------
+// Variant 5 — bold + critically wounded + cornered (ticket 271). Flee
+// should reach top-2 L3 post-fix; pre-fix the boldness-invert axis
+// hard-zero collapses CP and Flee falls out of the pool.
+// ---------------------------------------------------------------------------
+
+pub static SCENARIO_CRITICAL_CORNERED: Scenario = Scenario {
+    name: "flee_calibration_critical_cornered",
+    default_focal: FOCAL_NAME,
+    default_ticks: 4,
+    setup: setup_critical_cornered,
+    expected_features: &[],
+};
+
+fn setup_critical_cornered(world: &mut World, seed: u64) {
+    init_scenario_world(world, seed);
+
+    // Same 3×3 walled patch as `cornered` — escape_viability ≈ 0.13,
+    // below the 0.4 default gate on `ThreatProximityAdrenalineFlee`.
+    // If 108's Flee-branch is gated out at this viability, the
+    // post-271 fix's CP-only repair has to carry the entire load on
+    // its own.
+    {
+        let mut map = world.resource_mut::<TileMap>();
+        for y in 0..40 {
+            for x in 0..40 {
+                let inside_corner = x <= 2 && y <= 2;
+                if !inside_corner {
+                    map.set(x, y, Terrain::Wall);
+                }
+            }
+        }
+    }
+
+    // Mocha profile — boldness=0.9, near-zero safety. The cat is
+    // bolder than `cornered`'s 0.5 baseline (so the boldness-invert
+    // CP axis collapses harder) AND has lower safety (so the
+    // safety_deficit axis saturates and threat_proximity_derivative
+    // ramps maximally on tick 1).
+    let cat = spawn_cat(
+        world,
+        CatPreset::adult(FOCAL_NAME, CORNERED_FOCAL)
+            .with_personality(|p| {
+                p.boldness = 0.9;
+                p.diligence = 0.5;
+                p.patience = 0.5;
+            })
+            .with_needs(|n| {
+                n.safety = 0.003;
+                n.hunger = 0.6;
+                n.energy = 0.7;
+            })
+            .with_marker(MarkerKind::Adult)
+            .with_marker(MarkerKind::CanHunt),
+    );
+
+    // Critical wound: health=0.26 ⇒ deficit=0.74 (saturates 251's
+    // Sleep Logistic AND lifts FleeDse's health axis to ~0.90 via
+    // Linear(slope=0.4, intercept=0.6) ⇒ 0.6 + 0.4·0.74 ≈ 0.896).
+    // 102's `AcuteHealthAdrenalineFight` gates on `health_deficit
+    // > 0.4`, which is true here — but its `fight_lift` defaults to
+    // 0.0 (inert at ship), so Fight isn't lifted on this profile.
+    world.entity_mut(cat).insert(Health {
+        current: 0.26,
+        max: 1.0,
+        injuries: Vec::new(),
+        total_starvation_damage: 0.0,
+    });
+
+    world.spawn((
+        CORNERED_THREAT,
         WildAnimal::new(crate::components::wildlife::WildSpecies::Fox),
     ));
 }

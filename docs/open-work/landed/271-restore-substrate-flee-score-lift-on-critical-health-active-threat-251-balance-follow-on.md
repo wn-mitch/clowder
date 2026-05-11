@@ -1,7 +1,7 @@
 ---
 id: 271
 title: Restore substrate Flee score lift on critical-health + active-threat (251 balance follow-on)
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-10
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-11
 ---
 
 ## Why
@@ -90,7 +90,7 @@ closes.
 | L2 DSE base score | `src/ai/dses/flee.rs:74-130` | `CompensatedProduct` of 4 axes [safety_deficit, **boldness_invert**, threat_distance, health_deficit] with weights [1,1,1,1]. Geometric mean. | `[verified-correct]` (running as designed) |
 | L2 DSE boldness axis | `src/ai/dses/flee.rs:75-82` | `Curve::Composite { Linear(slope=1, intercept=0), Invert }` — output range [0, 1]; bold cat (boldness=0.9) → axis = **0.1**; max-bold (boldness=1.0) → **0.0**. | `[verified-defect]` (hard zero collapses CP) |
 | L2 DSE health axis | `src/ai/dses/flee.rs:112-115` | `Curve::Linear(slope=0.4, intercept=0.6)` — health_deficit=0 → 0.6; health_deficit=1 → 1.0. Floor lift, not Logistic (Logistic was rejected at ticket 087 because healthy cats couldn't flee). | `[verified-correct]` (working as intended) |
-| L2 modifier (lift) | `src/ai/modifier.rs:2334-2417` `ThreatProximityAdrenalineFlee` | Adds `flee_lift` (≈0.6) to Flee when `threat_proximity_derivative` ramps and `escape_viability >= viability_threshold`. | `[verified-correct]` (modifier IS reaching Mocha — but additive on a near-zero CP base is still near-zero) |
+| L2 modifier (lift) | `src/ai/modifier.rs:2334-2417` `ThreatProximityAdrenalineFlee` | Adds `flee_lift` (≈0.6) to Flee when `threat_proximity_derivative` ramps and `escape_viability >= viability_threshold` (default 0.4). | `[verified-defect-when-cornered]` — the eligibility gate excludes cornered profiles. `flee_calibration_critical_cornered` scenario shows the modifier delta on Flee is `body_distress_promotion+0.027` only — the `+0.600` lift does NOT fire when escape_viability ≈ 0.13 (cornered 3×3 patch). The ticket's pre-promotion claim ("modifier IS reaching Mocha") was wrong; corrected post-scenario triage. |
 | L2 modifier (suppression) | `src/ai/modifier.rs:1417-1500` `AcuteHealthAdrenalineFight` | Suppresses Flee additively by `ramp(health_deficit) × fight_lift`, gated on `escape_viability < viability_threshold`. `fight_lift` defaults to **0.0** (inert at ship). | `[verified-correct]` (modifier is inert; doesn't cause the −0.025) |
 | Final score noise | `src/ai/scoring.rs:1620` | Adds `jitter(rng, s.jitter_range)` to every scored Action. | `[verified-correct]` (explains why Mocha's Flee = −0.025 instead of exactly 0) |
 
@@ -186,3 +186,23 @@ profiles where the current behavior is correct.
   CP-collapsing factor. Recommended R1 parameter tweak (slope=−0.5,
   intercept=1.0) as the smallest surface change; R3 structural
   (boldness as modifier) named as the follow-on if needed.
+- 2026-05-11: landed. **Phase 1 — scenario triage.** Added
+  `flee_calibration_critical_cornered` variant (Mocha profile) +
+  baseline-scanned all 6 scenarios pre/post. R1a (`slope=-0.5,
+  intercept=1.0`) lifted critical_cornered Flee CP raw from
+  **0.43 → 0.75 (+73%)**; R1c (`slope=-0.7`) was too sharp (Hunt
+  overtook Flee). Scenario discovered the audit gap: the
+  `ThreatProximityAdrenalineFlee` modifier was gated OUT at
+  escape_viability ≈ 0.13 for cornered profiles — the row's
+  `[verified-correct]` was wrong (corrected above). **Phase 2 — soak.**
+  `just soak-trace 42 Mocha` on R1a: Mocha **survived** (vs pre-271
+  ambush death); colony-level deaths_by_cause shifted
+  ShadowFoxAmbush 2→1, WildlifeCombat 1→0 (2 predator deaths saved).
+  Starvation=1 unchanged (pre-existing, not 271). **Test updates:**
+  2 FleeDse tests rewritten (boldness-curve invariant + bold-cat
+  doctrine moved from raw scoring to reckless-override mechanism in
+  `bold_cat_fights_when_allies_present`). **Follow-ons opened:**
+  R3 structural (boldness-as-modifier per
+  `feedback_single_axis_perception_scalars`) and viability-threshold
+  reduction (lower `threat_proximity_adrenaline_viability_threshold`
+  from 0.4 so the modifier reaches cornered cats).

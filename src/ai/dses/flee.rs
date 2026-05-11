@@ -72,12 +72,14 @@ impl FleeDse {
         // means the Logistic fires when deficit passes `threshold` —
         // semantically: "panic when safety drops to this level."
         let safety_curve = flee_or_fight(scoring.flee_safety_threshold);
-        let boldness_invert = Curve::Composite {
-            inner: Box::new(Curve::Linear {
-                slope: 1.0,
-                intercept: 0.0,
-            }),
-            post: PostOp::Invert,
+        // Ticket 271 R1a — was `Composite { Linear(slope=1, intercept=0), Invert }`
+        // which hard-zeros at boldness=1.0 and collapsed CP for the
+        // bold-injured-cornered Mocha profile. The pre-inverted Linear
+        // shape `slope=-0.5, intercept=1.0` floors at 0.5 for fully bold
+        // cats while preserving "less bold ⇒ flees more" monotonicity.
+        let boldness_invert = Curve::Linear {
+            slope: -0.5,
+            intercept: 1.0,
         };
 
         // §L2.10.7 row Flee: Power-Invert curve over distance to
@@ -220,7 +222,14 @@ mod tests {
     }
 
     #[test]
-    fn boldness_curve_inverts_input() {
+    fn boldness_curve_floors_at_half_for_fully_bold_cats() {
+        // Ticket 271 — was `Composite { Linear(slope=1, intercept=0), Invert }`
+        // which produced a hard-zero at boldness=1.0 and collapsed
+        // the CompensatedProduct geometric mean for bold-injured-
+        // cornered profiles (Mocha: post-254 verification soak).
+        // Pre-inverted Linear `slope=-0.5, intercept=1.0` preserves
+        // the "less bold ⇒ flees more" monotonicity while flooring
+        // at 0.5 so bold cats retain non-zero CP contribution.
         let s = ScoringConstants::default();
         let dse = FleeDse::new(&s);
         let c = dse
@@ -231,10 +240,9 @@ mod tests {
                 _ => None,
             })
             .expect("boldness axis must exist");
-        // Invert: (1 - x), clamped.
-        assert!((c.evaluate(0.0) - 1.0).abs() < 1e-4);
-        assert!((c.evaluate(1.0) - 0.0).abs() < 1e-4);
-        assert!((c.evaluate(0.5) - 0.5).abs() < 1e-4);
+        assert!((c.evaluate(0.0) - 1.0).abs() < 1e-4, "timid cat → 1.0");
+        assert!((c.evaluate(0.5) - 0.75).abs() < 1e-4, "mid-bold cat → 0.75");
+        assert!((c.evaluate(1.0) - 0.5).abs() < 1e-4, "fully bold cat → 0.5 (was 0.0 pre-271)");
     }
 
     #[test]
@@ -259,7 +267,17 @@ mod tests {
     }
 
     #[test]
-    fn bold_cat_produces_zero_flee_score() {
+    fn bold_cat_scores_flee_below_timid_cat_under_identical_threat() {
+        // Ticket 271 — replaces the pre-271 `bold_cat_produces_zero_flee_score`
+        // invariant. Pre-271, boldness=1.0 hard-zeroed the boldness-invert
+        // axis and collapsed CP to ~0, which produced the soak failure
+        // mode (bold-injured-cornered cats couldn't flee even when their
+        // safety/threat axes saturated). Post-271 the invariant is
+        // *relative*: a bold cat scores Flee LESS than a timid cat
+        // under identical conditions, but the bold cat's score is no
+        // longer collapsed to zero — leaving CP headroom for the
+        // health-deficit axis and modifier lifts to elevate Flee when
+        // genuinely needed.
         use crate::ai::eval::{evaluate_single, ModifierPipeline};
         use crate::components::physical::Position;
         let s = ScoringConstants::default();
@@ -267,10 +285,6 @@ mod tests {
         let entity = Entity::from_raw_u32(1).unwrap();
         let has_marker = |_: &str, _: Entity| false;
         let entity_position = |_: Entity| -> Option<Position> { None };
-        // §L2.10.7: place a threat at the cat's position so the
-        // spatial axis evaluates to ~1.0. Without the threat anchor,
-        // CP would gate the spatial axis to 0 and short-circuit the
-        // boldness check this test cares about.
         let anchor_position = |a: LandmarkAnchor| -> Option<Position> {
             match a {
                 LandmarkAnchor::NearestThreat => Some(Position::new(0, 0)),
@@ -291,18 +305,32 @@ mod tests {
         };
         let maslow = |_: u8| 1.0;
         let modifiers = ModifierPipeline::new();
-        // boldness = 1.0 → inverted = 0.0 → CP gate closes.
-        let fetch = |name: &str, _: Entity| match name {
+        let bold_fetch = |name: &str, _: Entity| match name {
             "safety_deficit" => 0.9,
             "boldness" => 1.0,
             _ => 0.0,
         };
-        let scored =
-            evaluate_single(&dse, entity, &ctx, &maslow, &modifiers, &fetch).expect("eligible");
+        let timid_fetch = |name: &str, _: Entity| match name {
+            "safety_deficit" => 0.9,
+            "boldness" => 0.0,
+            _ => 0.0,
+        };
+        let bold = evaluate_single(&dse, entity, &ctx, &maslow, &modifiers, &bold_fetch)
+            .expect("eligible");
+        let timid = evaluate_single(&dse, entity, &ctx, &maslow, &modifiers, &timid_fetch)
+            .expect("eligible");
         assert!(
-            scored.raw_score < 0.01,
-            "bold cat flees: {}",
-            scored.raw_score
+            bold.raw_score < timid.raw_score,
+            "bold cat must score Flee below timid cat: bold={}, timid={}",
+            bold.raw_score,
+            timid.raw_score,
+        );
+        // Post-271: bold cat retains non-zero CP contribution
+        // (floored at boldness-invert axis = 0.5).
+        assert!(
+            bold.raw_score > 0.4,
+            "bold cat must retain non-zero Flee score post-271: {}",
+            bold.raw_score,
         );
     }
 

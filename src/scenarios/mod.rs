@@ -135,6 +135,11 @@ pub const ALL: &[&Scenario] = &[
     &flee_calibration::SCENARIO_OPEN_TERRAIN,
     &flee_calibration::SCENARIO_CORNERED,
     &flee_calibration::SCENARIO_SLEEP_PARTNER,
+    // 271 — bold + critically wounded + cornered (Mocha profile from
+    // the post-254 verification soak). Pre-fix the boldness-invert
+    // axis hard-zero collapses CP and Flee falls out of L3. Post-fix
+    // Flee reaches top-2 of the softmax pool on this profile.
+    &flee_calibration::SCENARIO_CRITICAL_CORNERED,
     // 231 — capacity-aware pickup pipeline. Three sister scenarios:
     // full-of-curios + adjacent food drops the curio first then picks
     // up; full-of-herbs validates the ItemSlot collapse; empty cat
