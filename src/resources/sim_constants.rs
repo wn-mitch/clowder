@@ -2087,13 +2087,15 @@ pub struct ScoringConstants {
     /// Minimum hunger a cat (and its prospective partner) must have to be
     /// eligible to mate. Hungry cats breed hungry kittens.
     ///
-    /// Ticket 032 — colony-wide reproduction collapse traces partly to this
+    /// Ticket 032 — colony-wide reproduction collapse traced partly to this
     /// floor: at `0.6`, the AND-gate of (hunger > 0.6 ∧ energy > 0.5 ∧
-    /// mood > 0.2 ∧ partners-bond ∧ photoperiod) is rarely satisfied because
-    /// the colony lives in survival mode. Treatment override `0.4` for the
-    /// 032 hypothesize sweep (`docs/balance/hypotheses/032-3-breeding-floor.yaml`).
-    /// See `docs/balance/social-target-range.report.md` finding 2 — bond
-    /// progression is the deeper bottleneck, but the hunger gate amplifies it.
+    /// mood > 0.2 ∧ partners-bond ∧ photoperiod) was rarely satisfied because
+    /// the colony lives in survival mode. Landed `0.4` in ticket 272 — 032's
+    /// drafted treatment (`docs/balance/hypotheses/032-3-breeding-floor.yaml`)
+    /// validated against the post-257 substrate so the `MatingOccurred`
+    /// canary can close. See `docs/balance/social-target-range.report.md`
+    /// finding 2 — bond progression was the deeper bottleneck (fixed in 257),
+    /// the hunger gate was the residual amplifier.
     pub breeding_hunger_floor: f32,
     /// Minimum energy a cat (and its prospective partner) must have to be
     /// eligible to mate. Exhausted cats don't court.
@@ -2316,7 +2318,7 @@ impl Default for ScoringConstants {
             caretake_compassion_scale: 1.8,
             caretake_parent_bonus: 0.5,
             caretake_bond_compassion_boost_max: default_caretake_bond_compassion_boost_max(),
-            breeding_hunger_floor: 0.6,
+            breeding_hunger_floor: 0.4,
             breeding_energy_floor: 0.5,
             breeding_mood_floor: 0.2,
             mating_interest_threshold: 0.6,

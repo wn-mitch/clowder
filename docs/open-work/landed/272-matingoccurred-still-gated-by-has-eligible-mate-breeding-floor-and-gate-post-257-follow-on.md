@@ -1,7 +1,7 @@
 ---
 id: 272
 title: MatingOccurred still gated by has_eligible_mate() breeding-floor AND-gate (post-257 follow-on)
-status: ready
+status: done
 cluster: null
 added: 2026-05-10
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-10
 ---
 
 <!--
@@ -119,3 +119,4 @@ narrative-bound to one cat.
 
 ## Log
 - YYYY-MM-DD: opened.
+- 2026-05-10: 2026-05-10: landed lower of breeding_hunger_floor 0.6 → 0.4. Verified seed-42 soak-trace Mocha 900s (commit 3444d2d9 dirty): never_fired_expected_positives=[] (was [MatingOccurred]); kittens_born=2; courtship 1609 → 2251; bonds_formed 21 → 26; positive_features_active 34 → 38. Mocha (pre-272 ShadowFox death tick 1303610) survives in new trajectory. Wildlife/ShadowFox death set stable (Calcifer/Heron/Bramble died at identical ticks pre/post). Downstream: Dawnkit-28 starves tick 1321484 — kitten-survival pipeline is next bottleneck (187 ready, post-272 reproduction logged there). 032 Item 3 closes; items 1, 2, 5 remain.

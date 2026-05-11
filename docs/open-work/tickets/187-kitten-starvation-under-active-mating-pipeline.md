@@ -139,3 +139,20 @@ parameter tuning:
   starved (`Pebblekit-83`, `Ivykit-10`). `RetrieveFoodForKitten:
   inventory full` plan-fails dominate (2113×) — load-bearing
   signal but layer-walk needed to attribute structurally.
+- 2026-05-10: **post-272 reproduction.** Ticket 272 lowered
+  `breeding_hunger_floor` 0.6 → 0.4, re-unlocking the mating
+  pipeline (which had regressed between 184 and 272 as upstream
+  substrate work churned). The same kitten-starvation pattern
+  re-appears in `logs/tuned-42` (commit `3444d2d9`-dirty):
+  `MatingOccurred` fires, `kittens_born = 2`, `Dawnkit-28`
+  starves at tick 1321484 (lived 16,784 ticks from birth at
+  1304700). 187 stays the home for the structural fix — the
+  layer-walk audit + structural-revision menu in this ticket
+  already describes the work. Note: the post-272 run's top
+  plan failures are dominated by `HandoffItem: handoff: no
+  recipient on disposition (no kittens in colony)` (816×)
+  because most of the soak is kitten-less; the
+  `RetrieveFoodForKitten: inventory full` signal from the
+  post-184 reproduction may or may not still be the dominant
+  failure mode in the post-272 trajectory — re-confirm with
+  `/logq` on the parent of Dawnkit-28 near the death tick.

@@ -15,10 +15,10 @@ _Last generated: 2026-05-10._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 75 |
+| Ready | 74 |
 | Parked | 9 |
 | Blocked | 29 |
-| **Open total** | **119** |
+| **Open total** | **118** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -44,7 +44,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[229](docs/open-work/tickets/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose — _[tooling] · added 2026-05-08_
 
-## Ready (75)
+## Ready (74)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -120,7 +120,6 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[259](docs/open-work/tickets/259-l1-to-l3-activation-visualization-in-log-viewer.md)** — L1 to L3 activation visualization in log viewer — _added 2026-05-10_
 - **[260](docs/open-work/tickets/260-fox-scent-marking-signposts-territorial-boundaries-without-ward-keying.md)** — Fox scent-marking signposts — territorial boundaries without ward keying — _added 2026-05-10_
 - **[271](docs/open-work/tickets/271-restore-substrate-flee-score-lift-on-critical-health-active-threat-251-balance-follow-on.md)** — Restore substrate Flee score lift on critical-health + active-threat (251 balance follow-on) — _[ai-substrate] · added 2026-05-10_
-- **[272](docs/open-work/tickets/272-matingoccurred-still-gated-by-has-eligible-mate-breeding-floor-and-gate-post-257-follow-on.md)** — MatingOccurred still gated by has_eligible_mate() breeding-floor AND-gate (post-257 follow-on) — _added 2026-05-10_
 
 ## Parked (9)
 
@@ -171,12 +170,13 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (172)
+## Landed archive (173)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (107)
+### 2026-05 (108)
 
+- **[272](docs/open-work/landed/272-matingoccurred-still-gated-by-has-eligible-mate-breeding-floor-and-gate-post-257-follow-on.md)** — MatingOccurred still gated by has_eligible_mate() breeding-floor AND-gate (post-257 follow-on) _(2026-05-10)_
 - **[257](docs/open-work/landed/257-mate-election-crowded-out-by-patrol-in-post-256-regime.md)** — Mate election crowded out by Patrol in post-256 regime _(2026-05-10)_
 - **[256](docs/open-work/landed/256-patrol-dse-recalibration-influence-map-driven-smart-pathing-wildlife-deterrent-affect-post-252-cascade-root-cause.md)** — Patrol DSE recalibration — influence-map-driven smart pathing + wildlife deterrent affect (post-252 cascade root cause) _(2026-05-10)_
 - **[255](docs/open-work/landed/255-threatproximityadrenalineflee-flee-axis-calibration-audit-post-252-readable.md)** — ThreatProximityAdrenalineFlee Flee-axis calibration audit (post-252 readable) _(2026-05-10)_
