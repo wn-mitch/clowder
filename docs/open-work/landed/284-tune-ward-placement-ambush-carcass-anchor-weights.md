@@ -1,7 +1,7 @@
 ---
 id: 284
 title: tune ward placement ambush + carcass anchor weights
-status: ready
+status: done
 cluster: balance
 added: 2026-05-11
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-11
 ---
 
 ## Why
@@ -139,3 +139,4 @@ methodology picks the actual landing values.
   been opened in 220's landing commit per the
   "antipattern-migration follow-ups are non-optional"
   CLAUDE.md rule.
+- 2026-05-11: first-light soak (logs/tuned-42, commit 81e555db dirty): wards visibly cluster on (29,23-24) and (37-39, 20-23) ambush hotzones; 27 Ambush events (vs 37 post-210 reference, -27%); macro counters identical to current.json baseline (magnitude flat); 5 continuity canaries hold; Starvation==1 hard-gate breach is baseline carryover not 284-induced; magnitude-tightening follow-on opened as 285

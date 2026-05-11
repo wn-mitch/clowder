@@ -1747,12 +1747,14 @@ mod tests {
         );
     }
 
-    /// 220 dormancy invariant: with both anchor weights at their default
-    /// 0.0, depositing the new substrate signals has zero effect on the
+    /// 220 dormancy invariant: with both anchor weights forced to 0.0,
+    /// depositing the new substrate signals has zero effect on the
     /// chosen placement — the formula must be byte-identical to the
-    /// pre-220 baseline so seed-42 soak traces match.
+    /// pre-220 baseline. (Originally an at-default test; 284 activated
+    /// the substrate at 0.5 / 0.3, so the regression guard now forces
+    /// the weights explicitly rather than relying on the default.)
     #[test]
-    fn ward_placement_dormant_at_default_weights() {
+    fn ward_placement_dormant_when_weights_forced_to_zero() {
         let structures = vec![Position::new(60, 45)];
         let wards = vec![(Position::new(60, 45), 6.0)];
 
@@ -1784,9 +1786,10 @@ mod tests {
             carcass_scent: &cs_b,
         };
 
-        let constants = crate::resources::SimConstants::default();
-        assert_eq!(constants.scoring.ward_ambush_anchor_weight, 0.0);
-        assert_eq!(constants.scoring.ward_recency_anchor_weight, 0.0);
+        // Force weights to 0.0 explicitly — the default is 0.5 / 0.3 post-284.
+        let mut constants = crate::resources::SimConstants::default();
+        constants.scoring.ward_ambush_anchor_weight = 0.0;
+        constants.scoring.ward_recency_anchor_weight = 0.0;
 
         // Identical RNG seeds → identical jitter → byte-identical scores
         // → byte-identical placement when the lift terms are zero.

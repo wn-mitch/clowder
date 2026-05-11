@@ -1968,11 +1968,13 @@ pub struct ScoringConstants {
     /// `Logistic(steepness=8.0, midpoint=0.5)` applied to the per-tile
     /// ambush memory sample; the result adds into the placement scorer's
     /// `max(fox_scent, corruption)` threat axis, then re-clamps to 1.0.
-    /// At 0.0 (default) the formula is byte-identical to the pre-220
-    /// baseline. Tuning above 0.0 biases new wards toward tiles where
-    /// ShadowFox ambushes have actually struck (closing the 210-soak
-    /// gap where fox-scent perimeters drew wards away from the empirical
-    /// hot zones). Ships dormant; tuning is a follow-on ticket.
+    /// Forcing 0.0 returns the formula to byte-identical pre-220
+    /// behavior (regression-guarded by
+    /// `ward_placement_dormant_when_weights_forced_to_zero`). 284
+    /// activated the substrate at 0.5 as a first-light landing —
+    /// biases new wards toward tiles where ShadowFox ambushes have
+    /// actually struck, closing the 210-soak gap where fox-scent
+    /// perimeters drew wards away from the empirical hot zones.
     #[serde(default = "default_ward_ambush_anchor_weight")]
     pub ward_ambush_anchor_weight: f32,
     /// 220: weight on the `CarcassScentMap` lift to ward-placement's
@@ -1981,8 +1983,10 @@ pub struct ScoringConstants {
     /// additively combined into the threat axis. Restores the
     /// recency-anchor consumer originally scoped in 209 §Scope (line
     /// 74) but trimmed from the actual landing; the `CarcassScentMap`
-    /// substrate itself is already in place from Phase 2C. Ships
-    /// dormant at 0.0; tuning is a follow-on ticket.
+    /// substrate itself is already in place from Phase 2C. 284
+    /// activated at 0.3 as a first-light landing — carcass scent
+    /// persists longer than the event-decay ambush map, so the
+    /// smaller weight avoids chronic-corpse drag toward old kill-sites.
     #[serde(default = "default_ward_recency_anchor_weight")]
     pub ward_recency_anchor_weight: f32,
     /// 256 R5: deposit per tick when a cat's current action is
@@ -3537,17 +3541,24 @@ fn default_patrol_fox_scent_weight() -> f32 {
 }
 
 /// 220: weight on the `RecentAmbushMap` lift in
-/// `compute_ward_placement()`. Ships dormant at 0.0; tuning is a
-/// follow-on balance ticket.
+/// `compute_ward_placement()`. 284 lifted from the 220-dormant 0.0
+/// to 0.5 as a first-light activation — strong enough to dominate
+/// `fox_scent.max(corruption)` when an ambush cluster is present,
+/// but not so strong it overrides cat_presence / distance_cost.
+/// Tighter magnitude tuning is deferred to a follow-on.
 fn default_ward_ambush_anchor_weight() -> f32 {
-    0.0
+    0.5
 }
 
 /// 220: weight on the `CarcassScentMap` lift in
 /// `compute_ward_placement()`. Restores the consumer originally
-/// scoped in 209 §Scope line 74. Ships dormant at 0.0.
+/// scoped in 209 §Scope line 74. 284 lifted from 0.0 to 0.3 as a
+/// first-light activation — carcass scent persists longer than
+/// the event-decay ambush map, so the smaller weight avoids
+/// chronic-corpse drag toward old kill-sites. Tighter magnitude
+/// tuning is deferred to a follow-on.
 fn default_ward_recency_anchor_weight() -> f32 {
-    0.0
+    0.3
 }
 
 /// 228: Patrol `Consideration::Field` route-cost axis weight.
