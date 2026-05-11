@@ -1920,6 +1920,7 @@ pub fn evaluate_and_plan(
                 0.5,
             ),
             fox_scent_level: colony.fox_scent_map.get(pos.x, pos.y),
+            recent_ambush_at_position: colony.recent_ambush_map.get(pos.x, pos.y),
             // 209: per-cat proxy for colony-tension. `(1 - safety)` is
             // the cat's current threat-deficit; consumed by the
             // `TensionDefusionGroomLift` modifier (dormant at 0.0).

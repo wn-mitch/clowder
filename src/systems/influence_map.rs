@@ -286,6 +286,29 @@ impl InfluenceMap for crate::resources::CarcassScentMap {
     }
 }
 
+impl InfluenceMap for crate::resources::RecentAmbushMap {
+    fn metadata(&self) -> MapMetadata {
+        MapMetadata {
+            // 219: colony-shared spatial memory of recent ambush
+            // events. Event-typed not species-typed — today only
+            // ShadowFoxes feed it, but the substrate generalizes to
+            // Hawks / Snakes without metadata churn. Tagged
+            // Sight × Neutral matching CarcassScentMap / CorruptionLens
+            // — no faction allegiance, no scent channel (the event
+            // is a memory of hostile presence, not a fresh trail).
+            // Folds into `Memory.LocationModel.last_threat` when
+            // ToT cluster C3 (ticket 007) lands.
+            name: "recent_ambush",
+            channel: ChannelKind::Sight,
+            faction: Faction::Neutral,
+        }
+    }
+
+    fn base_sample(&self, pos: Position) -> f32 {
+        self.get(pos.x, pos.y)
+    }
+}
+
 impl InfluenceMap for crate::resources::CatPresenceMap {
     fn metadata(&self) -> MapMetadata {
         MapMetadata {
@@ -723,6 +746,22 @@ mod tests {
             map.marks[i] = 0.42;
         }
         assert!((map.base_sample(pos) - 0.42).abs() < 1e-6);
+    }
+
+    #[test]
+    fn recent_ambush_map_implements_influence_map() {
+        use crate::resources::RecentAmbushMap;
+        let mut map = RecentAmbushMap::default_map();
+        let md = map.metadata();
+        assert_eq!(md.name, "recent_ambush");
+        assert_eq!(md.channel, ChannelKind::Sight);
+        assert!(matches!(md.faction, Faction::Neutral));
+
+        // Sample agrees with direct .get() and surfaces a deposit.
+        let pos = Position::new(10, 10);
+        assert_eq!(map.base_sample(pos), map.get(pos.x, pos.y));
+        map.deposit(10, 10, 1.0);
+        assert!((map.base_sample(pos) - 1.0).abs() < 1e-6);
     }
 
     #[test]

@@ -1,11 +1,11 @@
 ---
 id: 220
 title: ward placement targets ambush clusters
-status: blocked
+status: ready
 cluster: ai-substrate
 added: 2026-05-07
 parked: null
-blocked-by: [219]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []

@@ -96,6 +96,8 @@ pub fn init_scenario_world_with(world: &mut World, seed: u64, cfg: ScenarioWorld
     world.insert_resource(crate::resources::FoxScentMap::default());
     world.insert_resource(crate::resources::PreyScentMap::default());
     world.insert_resource(crate::resources::CarcassScentMap::default());
+    // 219: colony-shared recent-ambush event memory.
+    world.insert_resource(crate::resources::RecentAmbushMap::default());
     world.insert_resource(crate::resources::CatPresenceMap::default());
     // 256 R5: cat patrol deterrent map (read by fox A* via overlay).
     world.insert_resource(crate::resources::CatPatrolDeterrentMap::default());

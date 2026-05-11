@@ -1,11 +1,11 @@
 ---
 id: 221
 title: caretake gates on ambush-recency at kitten tile
-status: blocked
+status: ready
 cluster: ai-substrate
 added: 2026-05-07
 parked: null
-blocked-by: [219]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []

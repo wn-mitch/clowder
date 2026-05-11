@@ -15,10 +15,10 @@ _Last generated: 2026-05-11._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 81 |
+| Ready | 82 |
 | Parked | 10 |
-| Blocked | 29 |
-| **Open total** | **126** |
+| Blocked | 27 |
+| **Open total** | **125** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -44,7 +44,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[229](docs/open-work/tickets/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose — _[tooling] · added 2026-05-08_
 
-## Ready (81)
+## Ready (82)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -99,7 +99,8 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[205](docs/open-work/tickets/205-social-status-distress-perception-cost.md)** — social_status_distress perception cost — 25% per-tick slowdown from O(N) nearest-cat scan — _[ai-substrate] · added 2026-05-07_
 - **[208](docs/open-work/tickets/208-per-cat-action-overlay-for-the-windowed-ui.md)** — Per-cat Action overlay for the windowed UI — _added 2026-05-07_
 - **[217](docs/open-work/tickets/217-scenario-marker-snapshot-wiring-as-a-discipline-requirement.md)** — scenario marker-snapshot wiring as a discipline requirement — _[process-discipline] · added 2026-05-07_
-- **[219](docs/open-work/tickets/219-shared-recent-ambush-event-marker.md)** — shared recent-ambush event marker — _[ai-substrate] · added 2026-05-07_
+- **[220](docs/open-work/tickets/220-ward-placement-targets-ambush-clusters.md)** — ward placement targets ambush clusters — _[ai-substrate] · added 2026-05-07_
+- **[221](docs/open-work/tickets/221-caretake-gates-on-ambush-recency-at-kitten-tile.md)** — caretake gates on ambush-recency at kitten tile — _[ai-substrate] · added 2026-05-07_
 - **[225](docs/open-work/tickets/225-audit-patrol-l3-share-rise-under-additive-coordinator-dse-lift.md)** — audit Patrol L3 share rise under additive coordinator-DSE lift — _[ai-substrate] · added 2026-05-07_
 - **[226](docs/open-work/tickets/226-audit-groomother-share-vs-score-inversion-under-demographic-shift.md)** — audit GroomOther share-vs-score inversion under demographic shift — _[ai-substrate] · added 2026-05-07_
 - **[227](docs/open-work/tickets/227-coordinator-eligible-focal-cat-for-coordinate-frame-diff-parity.md)** — coordinator-eligible focal-cat for Coordinate frame-diff parity — _[process-discipline] · added 2026-05-07_
@@ -141,7 +142,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[249](docs/open-work/tickets/249-extend-dispositionfailurecooldown-coverage-to-restingguardingpickingup-et-al-r3-from-247.md)** — Extend DispositionFailureCooldown coverage to Resting/Guarding/PickingUp et al. (R3 from 247) — _parked 2026-05-09 · added 2026-05-08_
 - **[273](docs/open-work/tickets/273-caretake-plans-complete-but-kittenfed-never-fires-kitten-starvation-chronic.md)** — Caretake plans complete but KittenFed never fires — kitten starvation chronic — _parked 2026-05-11 · added 2026-05-11_
 
-## Blocked (29)
+## Blocked (27)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _blocked-by 007, 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _blocked-by 016 · added 2026-04-22_
@@ -158,8 +159,6 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[213](docs/open-work/tickets/213-tune-groom-food-security-weight.md)** — tune groom_food_security_weight — _[balance] · blocked-by 209 · added 2026-05-07_
 - **[215](docs/open-work/tickets/215-tune-tension-defusion-groom-weight.md)** — tune tension_defusion_groom_weight — _[balance] · blocked-by 209 · added 2026-05-07_
 - **[216](docs/open-work/tickets/216-mentor-coordinate-caretake-axis-ethology-audit.md)** — Mentor / Coordinate / Caretake axis ethology audit — _[ai-substrate] · blocked-by 209 · added 2026-05-07_
-- **[220](docs/open-work/tickets/220-ward-placement-targets-ambush-clusters.md)** — ward placement targets ambush clusters — _[ai-substrate] · blocked-by 219 · added 2026-05-07_
-- **[221](docs/open-work/tickets/221-caretake-gates-on-ambush-recency-at-kitten-tile.md)** — caretake gates on ambush-recency at kitten tile — _[ai-substrate] · blocked-by 219 · added 2026-05-07_
 - **[243](docs/open-work/tickets/243-behavior-observation-l1-channel-target-side-body-cue-physical-marker-reads.md)** — Behavior-observation L1 channel (target-side body-cue + physical marker reads) — _blocked-by 242 · added 2026-05-08_
 - **[245](docs/open-work/tickets/245-ambient-predatorprey-behavior-observation-enrichment.md)** — Ambient predator/prey behavior-observation enrichment — _blocked-by 243 · added 2026-05-08_
 - **[261](docs/open-work/tickets/261-actionaffordances-substrate-per-action-success-scalars-actionkind-enum-heuristic-estimators.md)** — ActionAffordances substrate — per-action success scalars + ActionKind enum + heuristic estimators — _[C] · blocked-by 258 · added 2026-05-10_
@@ -178,14 +177,15 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (176)
+## Landed archive (177)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (111)
+### 2026-05 (112)
 
 - **[282](docs/open-work/landed/282-temporal-integration-doctrine-for-perception-signals-decay-stale-accumulate-sustained.md)** — Temporal-integration doctrine for perception signals — decay stale, accumulate sustained _(2026-05-11)_
 - **[281](docs/open-work/landed/281-rebaseline-currentjson-against-post-127-soak.md)** — Rebaseline current.json against post-127 soak _(2026-05-11)_
+- **[219](docs/open-work/landed/219-shared-recent-ambush-event-marker.md)** — shared recent-ambush event marker _(2026-05-11)_
 - **[127](docs/open-work/landed/127-joint-intention-substrate.md)** — Joint-intention substrate for two-cat practices _(2026-05-11)_
 - **[272](docs/open-work/landed/272-matingoccurred-still-gated-by-has-eligible-mate-breeding-floor-and-gate-post-257-follow-on.md)** — MatingOccurred still gated by has_eligible_mate() breeding-floor AND-gate (post-257 follow-on) _(2026-05-10)_
 - **[257](docs/open-work/landed/257-mate-election-crowded-out-by-patrol-in-post-256-regime.md)** — Mate election crowded out by Patrol in post-256 regime _(2026-05-10)_

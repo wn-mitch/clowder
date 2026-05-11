@@ -437,6 +437,12 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     // §5.6.3 row #6).
     world.insert_resource(crate::resources::CarcassScentMap::default());
 
+    // 219: colony-shared recent-ambush event memory. Deposits happen
+    // inline in `predator_stalk_cats`; exponential decay runs each
+    // tick via `update_recent_ambush_map`. Dormant in scoring at
+    // land (no DSE consumes it yet) but trace-visible.
+    world.insert_resource(crate::resources::RecentAmbushMap::default());
+
     // Insert cat presence map resource.
     world.insert_resource(crate::resources::CatPresenceMap::default());
 

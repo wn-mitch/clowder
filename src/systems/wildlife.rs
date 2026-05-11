@@ -852,6 +852,7 @@ pub fn predator_stalk_cats(
     mut event_log: Option<ResMut<crate::resources::event_log::EventLog>>,
     time: Res<TimeState>,
     mut activation: ResMut<SystemActivation>,
+    mut recent_ambush_map: ResMut<crate::resources::RecentAmbushMap>,
 ) {
     let c = &constants.wildlife;
     let ward_multiplier = constants.magic.shadow_fox_ward_repel_multiplier;
@@ -1005,6 +1006,14 @@ pub fn predator_stalk_cats(
                                     },
                                 );
                             }
+
+                            // 219: stamp the ambush onto the colony-shared
+                            // event-memory map at the predator's tile. The
+                            // map decays exponentially each tick via
+                            // `update_recent_ambush_map`; future tickets 220
+                            // (ward-placement) and 221 (caretake-relocate)
+                            // consume the resulting hotspot signal.
+                            recent_ambush_map.deposit(wl_pos.x, wl_pos.y, 1.0);
 
                             mood.modifiers.push_back(
                                 MoodModifier::new(
@@ -2407,6 +2416,17 @@ pub fn fox_scent_tick(
             _ => {}
         }
     }
+}
+
+/// 219: per-tick exponential decay for `RecentAmbushMap`. Deposits
+/// happen inline in `predator_stalk_cats` at the same site as
+/// `EventLog::Ambush` emission; this system only owns the decay so
+/// the map fades when ambushes stop firing in a region.
+pub fn update_recent_ambush_map(
+    mut map: ResMut<crate::resources::RecentAmbushMap>,
+    constants: Res<SimConstants>,
+) {
+    map.decay_all(constants.wildlife.recent_ambush_half_life_ticks);
 }
 
 // ---------------------------------------------------------------------------

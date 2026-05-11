@@ -1,7 +1,7 @@
 ---
 id: 219
 title: shared recent-ambush event marker
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-07
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-11
 ---
 
 ## Why
@@ -128,3 +128,4 @@ for the boundary documentation.
 <!-- linkages:end -->
 ## Log
 - 2026-05-07: opened from 210 closeout.
+- 2026-05-11: 2026-05-11: landed. RecentAmbushMap is a typed-failure proxy joining RecentDispositionFailures / RecentTargetFailures / HuntingPriors::record_failed_search; per §12.1 of ai-substrate-refactor.md, folds into the unified Memory.LocationModel.last_threat facet when ToT cluster C3 (ticket 007) lands. Ships dormant — registered in InfluenceMapRegistry, deposited inline in predator_stalk_cats, decayed exponentially via update_recent_ambush_map (half_life=5000 ticks). No DSE consumes the scalar yet; tickets 220 (ward-placement) and 221 (caretake-relocate) will. Soak-trace 42 Wren verified: 109k non-zero L1 samples across 122k ticks of activity, max 1.0, decay shape correct. Zero behavioral drift vs baseline (every footer field delta_pct=0.0).

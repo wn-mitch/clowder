@@ -141,12 +141,16 @@ pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
     use crate::resources::{
         CarcassScentMap, CatPatrolDeterrentMap, CatPresenceMap, ConstructionSiteMap,
         ExplorationMap, FoodLocationMap, FoxScentMap, GardenLocationMap, GraveAuraMap,
-        HerbLocationMap, KittenCryMap, PreyScentMap, TileMap, WardCoverageMap,
+        HerbLocationMap, KittenCryMap, PreyScentMap, RecentAmbushMap, TileMap, WardCoverageMap,
     };
 
     registry.register::<FoxScentMap>();
     registry.register::<PreyScentMap>();
     registry.register::<CarcassScentMap>();
+    // 219: colony-shared recent-ambush event memory. Dormant in
+    // scoring at land (no DSE reads it yet); registered so its samples
+    // surface in `trace-*.jsonl` for soak-trace verification.
+    registry.register::<RecentAmbushMap>();
     registry.register::<CatPresenceMap>();
     // 256 R5: cat patrol deterrent — read by fox A* as routing cost.
     registry.register::<CatPatrolDeterrentMap>();
@@ -333,6 +337,7 @@ impl Plugin for SimulationPlugin {
                         systems::fox_goap::resolve_paired_confrontations,
                         systems::wildlife::fox_ai_decision,
                         systems::wildlife::fox_scent_tick,
+                        systems::wildlife::update_recent_ambush_map,
                         systems::wildlife::predator_hunt_prey,
                         systems::wildlife::carcass_decay,
                         systems::wildlife::carcass_scent_tick,

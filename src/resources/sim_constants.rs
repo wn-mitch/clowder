@@ -4100,6 +4100,15 @@ pub struct WildlifeConstants {
     pub ambush_witness_range: i32,
     /// Safety drain applied to cats who witness a nearby ambush.
     pub ambush_witness_safety_drain: f32,
+    /// 219: half-life (in ticks) of `RecentAmbushMap` per-tile values.
+    /// Each tick the map multiplies all tiles by
+    /// `0.5.powf(1.0 / recent_ambush_half_life_ticks)`. Default 5000
+    /// ticks (~one in-game day at default scale) keeps clusters of
+    /// 2–3 ambushes/2k ticks documented in 210 closeout visible at
+    /// non-trivial intensity for the downstream ward-placement /
+    /// caretake-relocate consumers (tickets 220 / 221).
+    #[serde(default = "default_recent_ambush_half_life_ticks")]
+    pub recent_ambush_half_life_ticks: u32,
 }
 
 impl Default for WildlifeConstants {
@@ -4147,8 +4156,13 @@ impl Default for WildlifeConstants {
             ambush_cooldown_ticks: 100,
             ambush_witness_range: 12,
             ambush_witness_safety_drain: 0.08,
+            recent_ambush_half_life_ticks: default_recent_ambush_half_life_ticks(),
         }
     }
+}
+
+fn default_recent_ambush_half_life_ticks() -> u32 {
+    5000
 }
 
 fn default_carcass_scent_deposit_per_tick() -> f32 {

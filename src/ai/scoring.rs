@@ -422,6 +422,17 @@ pub struct ScoringContext<'a> {
     /// Fox scent intensity at the cat's current position (0.0–1.0).
     /// High values indicate deep fox territory.
     pub fox_scent_level: f32,
+    /// 219: colony-shared recent-ambush event memory at the cat's
+    /// current position (0.0–1.0). Exponential decay (~5k-tick
+    /// half-life) over deposits at ambush sites. Dormant at land —
+    /// no DSE consumes it yet; tickets 220 (ward-placement) and 221
+    /// (caretake-relocate) will. Exposed in `ctx_scalars` so it
+    /// surfaces in `trace-*.jsonl` for soak-trace verification.
+    /// Joins `RecentDispositionFailures` / `RecentTargetFailures` /
+    /// `HuntingPriors::record_failed_search` as a typed-failure proxy
+    /// that folds into the unified `Memory.LocationModel.last_threat`
+    /// facet when ToT cluster C3 (ticket 007) lands.
+    pub recent_ambush_at_position: f32,
     /// 209: Colony-tension proxy — currently `(1 - needs.safety)` of
     /// the cat being scored. Consumed by `TensionDefusionGroomLift`
     /// modifier as the "is the colony stressed enough that
@@ -855,6 +866,13 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
         ctx.tradition_location_bonus.max(0.0),
     );
     m.insert("fox_scent_level", ctx.fox_scent_level.clamp(0.0, 1.0));
+    // 219: colony-shared recent-ambush event memory. Dormant in
+    // scoring (no DSE reads this entry yet) but emitted here so it
+    // shows up in trace-*.jsonl L2 capture for verification.
+    m.insert(
+        "recent_ambush_at_position",
+        ctx.recent_ambush_at_position.clamp(0.0, 1.0),
+    );
     m.insert(
         "colony_tension_recent",
         ctx.colony_tension_recent.clamp(0.0, 1.0),
@@ -2929,6 +2947,7 @@ mod tests {
             threat_proximity_derivative: 0.0,
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
+            recent_ambush_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3125,6 +3144,7 @@ mod tests {
             threat_proximity_derivative: 0.0,
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
+            recent_ambush_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3344,6 +3364,7 @@ mod tests {
             threat_proximity_derivative: 0.0,
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
+            recent_ambush_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3627,6 +3648,7 @@ mod tests {
             threat_proximity_derivative: 0.0,
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
+            recent_ambush_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3752,6 +3774,7 @@ mod tests {
             threat_proximity_derivative: 0.0,
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
+            recent_ambush_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3896,6 +3919,7 @@ mod tests {
             threat_proximity_derivative: 0.0,
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
+            recent_ambush_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -4225,6 +4249,7 @@ mod tests {
             threat_proximity_derivative: 0.0,
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
+            recent_ambush_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -4351,6 +4376,7 @@ mod tests {
             threat_proximity_derivative: 0.0,
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
+            recent_ambush_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,

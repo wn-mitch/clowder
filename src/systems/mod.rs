@@ -8,6 +8,12 @@ pub struct ColonyContext<'w> {
     pub priority: Option<Res<'w, crate::resources::colony_priority::ColonyPriority>>,
     pub exploration_map: Res<'w, crate::resources::ExplorationMap>,
     pub fox_scent_map: Res<'w, crate::resources::FoxScentMap>,
+    /// 219: colony-shared spatial memory of recent ambush events.
+    /// Read at ScoringContext build time in `disposition.rs` and
+    /// `goap.rs` to populate `recent_ambush_at_position`. Dormant in
+    /// scoring at land (no DSE consumes it yet) but trace-visible via
+    /// `ctx_scalars` so soak-trace verification can see the substrate.
+    pub recent_ambush_map: Res<'w, crate::resources::RecentAmbushMap>,
     /// Ticket 228 — read by the replan-time `LandmarkAnchor::NearestPreyAnchor`
     /// resolver in `evaluate_and_plan` to populate
     /// `CatAnchorPositions.nearest_prey`. Read-only; the replan path

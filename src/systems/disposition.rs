@@ -932,6 +932,7 @@ pub fn evaluate_dispositions(
                 0.5,
             ),
             fox_scent_level: colony.fox_scent_map.get(pos.x, pos.y),
+            recent_ambush_at_position: colony.recent_ambush_map.get(pos.x, pos.y),
             // 209: per-cat proxy for colony-tension; see goap.rs
             // construction site for rationale.
             colony_tension_recent: (1.0 - needs.safety).clamp(0.0, 1.0),
