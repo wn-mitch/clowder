@@ -3,6 +3,7 @@
 pub mod ai;
 pub mod components;
 pub mod events;
+pub mod messages;
 pub mod resources;
 pub mod species;
 pub mod steps;

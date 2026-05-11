@@ -54,6 +54,7 @@ pub struct ColonyContext<'w> {
 pub mod actions;
 pub mod ai;
 pub mod aspirations;
+pub mod belief_integrator;
 pub mod buildings;
 pub mod colony_knowledge;
 pub mod colony_score;

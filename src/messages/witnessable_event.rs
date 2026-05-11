@@ -1,0 +1,130 @@
+//! `WitnessableEvent` — perceivable side-effects broadcast by action resolvers
+//! and consumed by `belief_integrator` (ticket 258 C3 substrate).
+//!
+//! Each variant describes an event that happened in the world. The message is
+//! broadcast; the integrator system determines which cats are witnesses by
+//! checking sensing range against `position`, and updates per-witness mental
+//! models accordingly. This matches the `PreyKilled { kind, position }`
+//! precedent — `witness` is not a field of the event, it's a property of
+//! consumption.
+
+use bevy_ecs::prelude::*;
+
+use crate::components::disposition::DispositionKind;
+use crate::components::physical::Position;
+use crate::components::prey::PreyKind;
+
+/// Observable simulation events that update per-cat mental models.
+///
+/// Ticket 258 v1 wires `Observation` evidence updates from these messages.
+/// Other evidence kinds (`Transference`, `Confabulation`, `Declaration`,
+/// `Mutation`) are scaffolded in [`EvidenceKind`](crate::components::beliefs::EvidenceKind)
+/// but not yet emitted; consumer tickets wire their emit paths.
+#[derive(bevy_ecs::prelude::Message, Debug, Clone)]
+pub enum WitnessableEvent {
+    /// A cat attacked another cat. Updates witnesses' beliefs about both
+    /// participants — actor's violence capability lifts, target's perceived
+    /// injury level lifts, location's recency-of-threat-cue maxes.
+    Attack {
+        actor: Entity,
+        target: Entity,
+        position: Position,
+        /// Severity of the blow in `[0.0, 1.0]`. Drives EMA observed-value.
+        severity: f32,
+        tick: u64,
+    },
+    /// A cat groomed another cat. Witnesses' affiliation-history facet for
+    /// the actor lifts (positive social signal).
+    Groom {
+        actor: Entity,
+        target: Entity,
+        position: Position,
+        tick: u64,
+    },
+    /// A cat completed a mating interaction. Strongest positive affiliation
+    /// signal in the substrate.
+    Mate {
+        actor: Entity,
+        target: Entity,
+        position: Position,
+        tick: u64,
+    },
+    /// A cat fed or cared for a kitten. Affiliation-history positive.
+    Care {
+        caregiver: Entity,
+        kitten: Entity,
+        position: Position,
+        tick: u64,
+    },
+    /// A cat fled from a threat. Witnesses learn the fleer's predictability
+    /// and the threat's perceived-violence-capability; the location's
+    /// recency-of-threat-cue lifts.
+    FleeFrom {
+        fleer: Entity,
+        threat: Entity,
+        position: Position,
+        tick: u64,
+    },
+    /// A cat completed a hunt attempt. `success = true` lifts the hunter's
+    /// perceived-violence-capability and predictability; failure dampens both.
+    Hunt {
+        hunter: Entity,
+        prey_kind: PreyKind,
+        position: Position,
+        success: bool,
+        tick: u64,
+    },
+    /// A cat showed an observable startle response. Consumed by the
+    /// conspecific-as-sensor evidence subtype (decision 16 in ticket 258):
+    /// the relay's reaction is evidence about a *different* subject (the
+    /// environmental context), with credibility weighted by the relay's
+    /// state at the cue.
+    ///
+    /// **Not yet emitted in v1** — depends on body-cue substrate (ticket
+    /// 242). Variant exists so consumer wiring (the door-slam scenario in
+    /// 242's exit criteria) can land without re-shaping the message enum.
+    ConspecificStartle {
+        startled: Entity,
+        position: Position,
+        relay_state: RelayState,
+        tick: u64,
+    },
+    /// An ambient environmental shock (door slam, thunderclap, etc.) heard
+    /// within `range` of `position`. Lifts witnesses' here-now
+    /// recency-of-threat-cue.
+    ///
+    /// **Not yet emitted in v1** — needs a weather/world-event hook. Variant
+    /// exists so consumer wiring can land in a later ticket.
+    AmbientShock {
+        position: Position,
+        intensity: f32,
+        range: f32,
+        tick: u64,
+    },
+    /// A cat's own plan failed to materialize for a given disposition
+    /// (`evaluate_and_plan` couldn't produce a chain). Self-observation:
+    /// the witness IS the cat. Lowers the cat's own
+    /// `ContextBeliefs[DispositionExecution(kind)].predictability` —
+    /// the EMA-based successor to `RecentDispositionFailures` (ticket
+    /// 258 proxy retirement).
+    SelfPlanFailed {
+        cat: Entity,
+        disposition: DispositionKind,
+        position: Position,
+        tick: u64,
+    },
+}
+
+/// Behavioral state of a relay cat at the moment of a startle cue. Drives
+/// the credibility weight when the integrator treats a relay's reaction as
+/// evidence about a separate subject (conspecific-as-sensor, ticket 258
+/// decision 16). A scaredy-cat who startles while sleeping is a
+/// low-credibility relay; a stoic cat who startles while alert is a
+/// high-credibility relay.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum RelayState {
+    Sleeping,
+    Resting,
+    Alert,
+    Engaged,
+}

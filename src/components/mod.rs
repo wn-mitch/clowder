@@ -1,4 +1,5 @@
 pub mod aspirations;
+pub mod beliefs;
 pub mod building;
 pub mod coordination;
 pub mod disposition;
@@ -40,6 +41,11 @@ pub mod zone;
 pub use aspirations::{
     ActiveAspiration, AspirationChain, AspirationDomain, Aspirations, AspirationsInitialized,
     Milestone, MilestoneCondition, Preference, Preferences,
+};
+pub use beliefs::{
+    bucket_position as bucket_location_position, CandidateFacet, CatBeliefs, ContextBeliefs,
+    EnvironmentalContextKey, EvidenceKind, Facet, FacetSlot, LocationBeliefs, LocationKey,
+    MentalModel, PredatorBeliefs,
 };
 pub use building::{ConstructionSite, CropState, GateState, StoredItems, Structure, StructureType};
 pub use coordination::{

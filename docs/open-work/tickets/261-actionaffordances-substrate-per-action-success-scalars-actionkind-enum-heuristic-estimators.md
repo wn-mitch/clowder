@@ -1,11 +1,11 @@
 ---
 id: 261
 title: ActionAffordances substrate — per-action success scalars + ActionKind enum + heuristic estimators
-status: blocked
+status: ready
 cluster: C
 added: 2026-05-10
 parked: null
-blocked-by: [258]
+blocked-by: []
 supersedes: [141]
 related-systems: [ai-substrate-refactor.md]
 related-balance: []

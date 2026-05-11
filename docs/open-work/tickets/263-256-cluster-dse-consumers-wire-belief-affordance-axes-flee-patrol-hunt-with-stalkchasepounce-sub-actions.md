@@ -5,7 +5,7 @@ status: blocked
 cluster: C
 added: 2026-05-10
 parked: null
-blocked-by: [258, 261]
+blocked-by: [261]
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []

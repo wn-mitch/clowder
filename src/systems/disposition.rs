@@ -72,6 +72,16 @@ pub struct NarrativeEmitter<'w> {
     /// the `Approach → Courting` stage advance.
     pub joint_interaction:
         bevy_ecs::message::MessageWriter<'w, crate::ai::joint_intention::JointInteractionObserved>,
+    /// 258 — C3 belief substrate. Resolvers emit observable side-effects
+    /// here; `belief_integrator` consumes the messages and updates each
+    /// in-range witness's mental models via EMA. Bundled into
+    /// `NarrativeEmitter` (rather than its own SystemParam) because emit
+    /// sites are co-located with the `record_if_witnessed` Feature calls
+    /// and `joint_interaction` MessageWriter that already live here.
+    pub witnessable: bevy_ecs::message::MessageWriter<
+        'w,
+        crate::messages::witnessable_event::WitnessableEvent,
+    >,
 }
 /// §4.3 marker queries for snapshot population. Bundled to avoid
 /// hitting Bevy's 16-parameter system limit. Future marker batches

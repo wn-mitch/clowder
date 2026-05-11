@@ -113,6 +113,17 @@ pub fn spawn_cat_from_blueprint(
                 // lazy-insert path in `update_prev_safety_deficit`.
                 crate::components::PrevSafetyDeficit::default(),
             ),
+            // 258 — C3 subjective belief substrate. Four per-cat mental-
+            // model Components seeded empty; `belief_integrator`
+            // populates them on first `WitnessableEvent` for a given
+            // subject (or first `Implant`-evidence first-encounter for
+            // predators).
+            (
+                crate::components::CatBeliefs::default(),
+                crate::components::LocationBeliefs::default(),
+                crate::components::PredatorBeliefs::default(),
+                crate::components::ContextBeliefs::default(),
+            ),
         ))
         .id()
 }

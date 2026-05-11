@@ -57,6 +57,11 @@ pub struct SimConstants {
     /// Ticket 103 — `escape_viability` perception scalar tunables.
     #[serde(default)]
     pub escape_viability: EscapeViabilityConstants,
+    /// Ticket 258 — C3 subjective belief substrate tunables. Per-facet
+    /// EMA rates and decay-to-prior rates, species-violence priors for
+    /// `<Predator>` initialization, and the passive-decay stagger period.
+    #[serde(default)]
+    pub beliefs: BeliefsConstants,
 }
 
 // ---------- NeedsConstants ----------
@@ -5608,6 +5613,112 @@ impl Default for EscapeViabilityConstants {
             terrain_weight: default_escape_viability_terrain_weight(),
             dependent_weight: default_escape_viability_dependent_weight(),
             dependent_penalty: default_escape_viability_dependent_penalty(),
+        }
+    }
+}
+
+// ---------- BeliefsConstants (ticket 258) ----------
+
+/// Per-facet EMA + decay tunables for the C3 belief substrate.
+///
+/// EMA update math (pass A, on evidence): `value ← value + lr × (observed − value)`.
+/// Passive decay (pass B, every `BeliefsConstants::decay_stagger_period`
+/// ticks): `value ← value + decay_rate_to_prior × (prior − value)`.
+/// `strength` rises by `strength_per_observation` on pass A (clamped to 1.0)
+/// and decays linearly by `strength_decay_per_tick × period` on pass B.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct BeliefAxisTunables {
+    pub learning_rate: f32,
+    pub decay_rate_to_prior: f32,
+    pub strength_per_observation: f32,
+    pub strength_decay_per_tick: f32,
+}
+
+impl BeliefAxisTunables {
+    /// Tunables for "fast-timescale" facets (recency-of-threat-cue,
+    /// perceived-injury-level, perceived-intent-clarity). Tuned for
+    /// O(seconds) salience and O(minutes) decay-to-prior.
+    pub fn fast() -> Self {
+        Self {
+            learning_rate: 0.3,
+            decay_rate_to_prior: 0.001,
+            strength_per_observation: 0.3,
+            strength_decay_per_tick: 0.0005,
+        }
+    }
+    /// Tunables for "slow-timescale" facets
+    /// (perceived-violence-capability, affiliation-history, predictability).
+    /// Reputation-flavored — many observations to shift, slow drift back.
+    pub fn slow() -> Self {
+        Self {
+            learning_rate: 0.1,
+            decay_rate_to_prior: 0.0001,
+            strength_per_observation: 0.1,
+            strength_decay_per_tick: 0.00005,
+        }
+    }
+}
+
+/// Cat-perceived violence-capability priors per predator/cat species. Seeds
+/// `<Predator>` and `<Cat>` mental models on first encounter via the
+/// `Implant` evidence kind. Range `[0.0, 1.0]` — higher means "I instinctually
+/// expect this species to be dangerous to me".
+///
+/// Wildlife-side reciprocal priors live in a future ticket when wildlife
+/// AI gains its own mental-model substrate (sibling 265).
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct SpeciesViolencePriors {
+    /// Cats don't inherently expect violence from other cats.
+    pub cat: f32,
+    /// Foxes attack cats opportunistically.
+    pub fox: f32,
+    /// Raptors are a hard-counter threat to cats outside cover.
+    pub hawk: f32,
+    /// Snake bites are harmful but snakes typically flee first.
+    pub snake: f32,
+    /// Apex threat — instilled at world-gen for narrative weight.
+    pub shadow_fox: f32,
+}
+
+impl Default for SpeciesViolencePriors {
+    fn default() -> Self {
+        Self {
+            cat: 0.0,
+            fox: 0.5,
+            hawk: 0.6,
+            snake: 0.4,
+            shadow_fox: 0.95,
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct BeliefsConstants {
+    pub perceived_injury_level: BeliefAxisTunables,
+    pub perceived_intent_clarity: BeliefAxisTunables,
+    pub recency_of_threat_cue: BeliefAxisTunables,
+    pub perceived_violence_capability: BeliefAxisTunables,
+    pub affiliation_history: BeliefAxisTunables,
+    pub predictability: BeliefAxisTunables,
+    pub species_violence_priors: SpeciesViolencePriors,
+    /// Passive-decay pass runs every Nth tick, with per-cat phase staggered
+    /// by `entity.index() % period`. Default 20 — amortizes cost; missing
+    /// 19 ticks of decay at `decay_rate_to_prior ≈ 0.001` is ~2% error,
+    /// well under observation threshold.
+    pub decay_stagger_period: u64,
+}
+
+impl Default for BeliefsConstants {
+    fn default() -> Self {
+        Self {
+            perceived_injury_level: BeliefAxisTunables::fast(),
+            perceived_intent_clarity: BeliefAxisTunables::fast(),
+            recency_of_threat_cue: BeliefAxisTunables::fast(),
+            perceived_violence_capability: BeliefAxisTunables::slow(),
+            affiliation_history: BeliefAxisTunables::slow(),
+            predictability: BeliefAxisTunables::slow(),
+            species_violence_priors: SpeciesViolencePriors::default(),
+            decay_stagger_period: 20,
         }
     }
 }

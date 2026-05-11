@@ -238,6 +238,10 @@ impl Plugin for SimulationPlugin {
         // `JointIntention { Courtship }.partner`. Consumed by
         // `author_joint_intentions` to bump `last_interaction_tick`.
         app.add_message::<crate::ai::joint_intention::JointInteractionObserved>();
+        // 258 — observable side-effects consumed by `belief_integrator` to
+        // update per-cat mental models. Action resolvers emit variants at
+        // completion; the integrator finds witnesses by sensing-range query.
+        app.add_message::<crate::messages::witnessable_event::WitnessableEvent>();
 
         // L2 substrate resources (§9 faction + §L2.10). FactionRelations
         // is a constant lookup — fine to insert at build time.
@@ -538,6 +542,12 @@ impl Plugin for SimulationPlugin {
                         systems::mood::mood_contagion,
                         systems::mood::bond_proximity_mood,
                         systems::memory::decay_memories,
+                        // 258 — C3 belief substrate integrator. Pass A
+                        // consumes WitnessableEvent messages → EMA updates
+                        // on per-cat mental models; pass B implants species
+                        // priors for nearby predators and decays facets
+                        // toward priors on each cat's stagger tick.
+                        systems::belief_integrator::integrate_beliefs,
                         systems::coordination::evaluate_coordinators,
                         systems::coordination::assess_colony_needs,
                         systems::coordination::dispatch_urgent_directives,

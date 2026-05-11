@@ -1,7 +1,7 @@
 ---
 id: 258
 title: C3 worked design — subjective belief substrate (mental models + facets + evidence typology)
-status: ready
+status: done
 cluster: C
 added: 2026-05-10
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, collective-memory.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-11
 ---
 
 ## Why
@@ -196,3 +196,4 @@ After scaffolding lands without consumers, sweep should produce **null behaviora
 ## Log
 
 - 2026-05-10: opened from 007 cluster-C C3 expansion. Mirrors how 126 spun out C1. Session plan: `~/.claude/plans/after-working-256-i-dreamy-fiddle.md`. Sibling cluster tickets opened in same lifecycle: 261 (ActionAffordances), 263–267 (consumers + new DSEs: 256-cluster, social, wildlife, prey-side, conflict-low), 268–270 (Hide consumer, Submit consumer, EngageThreat split). Adjacent independent tickets opened in same batch: 259 (L1→L3 viz), 260 (fox scent-marking signposts), 262 (audible-cue range falloff). Reframes during opening: original "Freeze DSE (new)" became 268 (consumer-wiring on existing 104 Hide DSE); original "Fawn DSE (new)" became 269 (consumer-wiring on in-flight 145 Submit DSE) — pillar-2 substrate-over-hacks doctrine.
+- 2026-05-11: Landed 2026-05-11. Scaffolding: src/components/beliefs.rs (4 newtype Components + MentalModel + Facet + EvidenceKind + LocationKey/EnvironmentalContextKey); src/messages/witnessable_event.rs (8 v1 variants); src/systems/belief_integrator.rs (Pass A Observation EMA + Pass B Implant + Forgetting decay, staggered); SimConstants::beliefs (per-facet lr+decay + 5x5 SpeciesViolencePriors). Wiring: WitnessableEvent::Groom from goap.rs grooming-completion site; WitnessableEvent::SelfPlanFailed dual-emit from goap.rs make_plan→None site (RDF write retained for IAUS cooldown). Verification: two seed-42 deep-soaks (scaffolding-only, dual-emit) both report verdict:pass with 0.0% drift across every footer field. 17 belief unit tests pass; just check clean. Follow-ons opened: 290 (RDF reader cutover, four-artifact balance change), 291 (ColonyKnowledge restructure), 292-294 (RecentTargetFailures / HuntingPriors / RecentAmbushMap retirements), 295 (Attack/Mate/Care/FleeFrom/Hunt emit sites). 007 cluster-C C3 pointer was already updated at ticket-open time.

@@ -86,6 +86,13 @@ pub struct NarrativeEmitter<'w> {
     /// gates the `Approach → Courting` stage advance.
     pub joint_interaction:
         bevy_ecs::message::MessageWriter<'w, crate::ai::joint_intention::JointInteractionObserved>,
+    /// 258 — C3 belief substrate. Resolvers emit observable side-effects
+    /// here; `belief_integrator` consumes the messages and updates each
+    /// in-range witness's mental models via EMA.
+    pub witnessable: bevy_ecs::message::MessageWriter<
+        'w,
+        crate::messages::witnessable_event::WitnessableEvent,
+    >,
 }
 
 /// Bundles world-state queries for evaluate_and_plan to stay under 16 params.
@@ -280,6 +287,14 @@ pub struct PlanResources<'w> {
     /// register the resource; matches `NarrativeEmitter`'s pattern in
     /// `resolve_goap_plans`.
     pub activation: Option<ResMut<'w, SystemActivation>>,
+    /// 258 — `WitnessableEvent` emit from the
+    /// `make_plan → None` site. Bundled here rather than as a separate
+    /// SystemParam to keep `evaluate_and_plan` under Bevy's 16-param
+    /// ceiling.
+    pub witnessable: bevy_ecs::message::MessageWriter<
+        'w,
+        crate::messages::witnessable_event::WitnessableEvent,
+    >,
 }
 
 /// Bundles magic resolver dependencies to keep resolve_goap_plans under 16 params.
@@ -2587,6 +2602,18 @@ pub fn evaluate_and_plan(
                 fresh.record(chosen, res.time.tick);
                 commands.entity(entity).insert(fresh);
             }
+            // 258 — dual-emit. `belief_integrator` consumes this to
+            // populate ContextBeliefs[DispositionExecution(chosen)].
+            // The RDF write above stays load-bearing for the IAUS
+            // cooldown until the reader migrates (follow-on ticket).
+            res.witnessable.write(
+                crate::messages::witnessable_event::WitnessableEvent::SelfPlanFailed {
+                    cat: entity,
+                    disposition: chosen,
+                    position: *pos,
+                    tick: res.time.tick,
+                },
+            );
             if let Some(ref mut log) = event_log {
                 // Ticket 091: surface the silent `make_plan → None`
                 // path. Pre-091 this branch emitted nothing — the
@@ -4798,6 +4825,19 @@ fn dispatch_step_action(
             );
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::GroomedOther);
             if let Some(r) = outcome.witness {
+                // 258 — observable side-effect for the belief substrate.
+                // `belief_integrator` updates witnesses' affiliation_history
+                // facet on the actor. Emitted only on the witnessed-Advance
+                // branch so a stalled GroomOther step doesn't spuriously
+                // signal a completed grooming.
+                narr.witnessable.write(
+                    crate::messages::witnessable_event::WitnessableEvent::Groom {
+                        actor: cat_entity,
+                        target: r.target,
+                        position: *pos,
+                        tick: ec.time.tick,
+                    },
+                );
                 accum.grooming_restorations.push(r);
             }
             if matches!(outcome.result, crate::steps::StepResult::Advance) {
