@@ -183,6 +183,16 @@ pub struct WardPlacementSignals<'w> {
     pub fox_scent: Res<'w, crate::resources::FoxScentMap>,
     pub cat_presence: Res<'w, crate::resources::CatPresenceMap>,
     pub ward_coverage: Res<'w, crate::resources::WardCoverageMap>,
+    /// 220: recent-ambush event memory (from ticket 219). Read at
+    /// each candidate tile to bias placement toward empirical hot zones
+    /// rather than the geometric perimeter. Weight gated by
+    /// `ScoringConstants::ward_ambush_anchor_weight` — ships at 0.0,
+    /// so the read is performed but has no scoring effect at land.
+    pub recent_ambush: Res<'w, crate::resources::RecentAmbushMap>,
+    /// 220: kill-site scent (Phase 2C substrate). Same dormant-at-land
+    /// posture as `recent_ambush`; weight gated by
+    /// `ScoringConstants::ward_recency_anchor_weight`.
+    pub carcass_scent: Res<'w, crate::resources::CarcassScentMap>,
 }
 
 // ---------------------------------------------------------------------------
@@ -481,12 +491,15 @@ pub fn assess_colony_needs(
                 cat_presence: &placement_signals.cat_presence,
                 ward_coverage: &placement_signals.ward_coverage,
                 tile_map: &placement_signals.tile_map,
+                recent_ambush: &placement_signals.recent_ambush,
+                carcass_scent: &placement_signals.carcass_scent,
             };
             let ward_pos = compute_ward_placement(
                 &building_positions,
                 &ward_data,
                 colony_center.0,
                 &placement_maps,
+                &constants,
                 &mut local_rng,
             );
             queue.directives.push(Directive {
@@ -1321,6 +1334,13 @@ pub(crate) struct PlacementMaps<'a> {
     pub cat_presence: &'a crate::resources::CatPresenceMap,
     pub ward_coverage: &'a crate::resources::WardCoverageMap,
     pub tile_map: &'a crate::resources::map::TileMap,
+    /// 220: ambush-event memory (substrate from ticket 219). Sampled at
+    /// each candidate tile in `compute_ward_placement` and lifted into
+    /// the threat term, gated by `ward_ambush_anchor_weight`.
+    pub recent_ambush: &'a crate::resources::RecentAmbushMap,
+    /// 220: kill-site scent (Phase 2C substrate). Same dormant-at-land
+    /// posture as `recent_ambush`; gated by `ward_recency_anchor_weight`.
+    pub carcass_scent: &'a crate::resources::CarcassScentMap,
 }
 
 impl<'a> PlacementMaps<'a> {
@@ -1337,9 +1357,18 @@ impl<'a> PlacementMaps<'a> {
 /// candidate tiles across the whole map.
 ///
 /// Per-tile score:
-/// - `unaddressed_threat = max(fox_scent, corruption) - ward_coverage`,
-///   clamped to `[0, 1]`. High = SFs walked here recently or corruption
-///   is creeping, AND existing wards aren't already covering the tile.
+/// - `unaddressed_threat = (max(fox_scent, corruption) + ambush_lift +
+///   carcass_lift - ward_coverage).clamp(0, 1)`. High = SFs walked
+///   here recently OR corruption is creeping OR (when weights are
+///   tuned up) ambush events / kill-site scent are concentrated here,
+///   AND existing wards aren't already covering the tile.
+/// - `ambush_lift = w_ambush × logistic_8_05(recent_ambush)` — sigmoid
+///   lift gated by `ward_ambush_anchor_weight` (ticket 220, default
+///   0.0). At 0.0 the lift is exactly zero and the formula is
+///   byte-identical to the pre-220 baseline.
+/// - `carcass_lift = w_carcass × logistic_8_05(carcass_scent)` — same
+///   shape over the kill-site map, gated by `ward_recency_anchor_weight`
+///   (restores 209 §Scope line 74, also dormant by default).
 /// - `cat_value = cat_presence` — modest bonus for tiles where cats
 ///   actually live (a ward covering nobody is wasted).
 /// - `distance_cost = DIST_PENALTY_PER_TILE × manhattan(anchor, candidate)`
@@ -1363,6 +1392,7 @@ pub(crate) fn compute_ward_placement(
     ward_positions: &[(Position, f32)],
     colony_center: Position,
     maps: &PlacementMaps<'_>,
+    constants: &SimConstants,
     rng: &mut impl rand::Rng,
 ) -> Position {
     let anchor = if building_positions.is_empty() {
@@ -1421,13 +1451,38 @@ pub(crate) fn compute_ward_placement(
     let mut best_pos = candidates[0];
     let mut best_score = f32::NEG_INFINITY;
 
+    // 220: dormancy invariant — both weights default to 0.0, so the
+    // lifts evaluate to exactly 0.0 and the formula reduces to the
+    // pre-220 baseline. Clamp defensively in case a balance experiment
+    // overshoots [0, 1].
+    let w_ambush = constants.scoring.ward_ambush_anchor_weight.clamp(0.0, 1.0);
+    let w_carcass = constants
+        .scoring
+        .ward_recency_anchor_weight
+        .clamp(0.0, 1.0);
+
     for candidate in &candidates {
         let fox_scent = maps.fox_scent.get(candidate.x, candidate.y);
         let corruption = maps.corruption_at(candidate.x, candidate.y);
         let coverage = maps.ward_coverage.get(candidate.x, candidate.y);
         let cat_value = maps.cat_presence.get(candidate.x, candidate.y);
 
-        let threat = fox_scent.max(corruption);
+        // 220 lift terms. Skip the sigmoid evaluation entirely when the
+        // weight is zero so dormant runs incur no extra arithmetic.
+        let ambush_lift = if w_ambush > 0.0 {
+            w_ambush
+                * logistic_threat_lift(maps.recent_ambush.get(candidate.x, candidate.y))
+        } else {
+            0.0
+        };
+        let carcass_lift = if w_carcass > 0.0 {
+            w_carcass
+                * logistic_threat_lift(maps.carcass_scent.get(candidate.x, candidate.y))
+        } else {
+            0.0
+        };
+
+        let threat = (fox_scent.max(corruption) + ambush_lift + carcass_lift).min(1.0);
         let unaddressed_threat = (threat - coverage).clamp(0.0, 1.0);
 
         let dist = anchor.manhattan_distance(candidate) as f32;
@@ -1444,6 +1499,17 @@ pub(crate) fn compute_ward_placement(
         }
     }
     best_pos
+}
+
+/// 220: shared sigmoid for the ward-placement threat lifts. Matches the
+/// `Composite{Logistic(8.0, 0.5)}` curve named in ticket 220 §Scope so
+/// the placement scorer and any future DSE consumers share one shape.
+/// Input is expected in [0, 1]; output is in (~0, ~1) with the
+/// inflection at 0.5.
+fn logistic_threat_lift(x: f32) -> f32 {
+    let k: f32 = 8.0;
+    let m: f32 = 0.5;
+    1.0 / (1.0 + (-k * (x - m)).exp())
 }
 
 // ---------------------------------------------------------------------------
@@ -1524,12 +1590,16 @@ mod tests {
         crate::resources::CatPresenceMap,
         crate::resources::WardCoverageMap,
         crate::resources::map::TileMap,
+        crate::resources::RecentAmbushMap,
+        crate::resources::CarcassScentMap,
     ) {
         (
             crate::resources::FoxScentMap::default(),
             crate::resources::CatPresenceMap::default(),
             crate::resources::WardCoverageMap::default(),
             crate::resources::map::TileMap::new(120, 90, crate::resources::Terrain::Grass),
+            crate::resources::RecentAmbushMap::default(),
+            crate::resources::CarcassScentMap::default(),
         )
     }
 
@@ -1540,15 +1610,25 @@ mod tests {
         // colony core" behavior across the influence-map rewrite.
         let structures = vec![Position::new(10, 10), Position::new(14, 10)];
         let wards: Vec<(Position, f32)> = vec![];
-        let (fs, cp, wc, tm) = empty_placement_maps();
+        let (fs, cp, wc, tm, ra, cs) = empty_placement_maps();
         let maps = PlacementMaps {
             fox_scent: &fs,
             cat_presence: &cp,
             ward_coverage: &wc,
             tile_map: &tm,
+            recent_ambush: &ra,
+            carcass_scent: &cs,
         };
+        let constants = crate::resources::SimConstants::default();
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
-        let pos = compute_ward_placement(&structures, &wards, Position::new(0, 0), &maps, &mut rng);
+        let pos = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(0, 0),
+            &maps,
+            &constants,
+            &mut rng,
+        );
         assert_eq!(pos, Position::new(12, 10));
     }
 
@@ -1561,17 +1641,26 @@ mod tests {
         // is dominated by the saturated threat signal (1.0).
         let structures = vec![Position::new(60, 45)];
         let wards = vec![(Position::new(60, 45), 6.0)];
-        let (mut fs, cp, wc, tm) = empty_placement_maps();
+        let (mut fs, cp, wc, tm, ra, cs) = empty_placement_maps();
         fs.deposit(67, 45, 1.0);
         let maps = PlacementMaps {
             fox_scent: &fs,
             cat_presence: &cp,
             ward_coverage: &wc,
             tile_map: &tm,
+            recent_ambush: &ra,
+            carcass_scent: &cs,
         };
+        let constants = crate::resources::SimConstants::default();
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(7);
-        let pos =
-            compute_ward_placement(&structures, &wards, Position::new(60, 45), &maps, &mut rng);
+        let pos = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(60, 45),
+            &maps,
+            &constants,
+            &mut rng,
+        );
         let dx = (pos.x - 67).abs();
         let dy = (pos.y - 45).abs();
         assert!(
@@ -1594,7 +1683,7 @@ mod tests {
         // saturation cancels the fox_scent contribution.
         let structures = vec![Position::new(60, 45)];
         let wards = vec![(Position::new(60, 45), 6.0)];
-        let (mut fs, cp, mut wc, tm) = empty_placement_maps();
+        let (mut fs, cp, mut wc, tm, ra, cs) = empty_placement_maps();
         fs.deposit(67, 45, 1.0);
         wc.stamp_ward(60, 45, 1.0, 9.0);
         let maps = PlacementMaps {
@@ -1602,10 +1691,19 @@ mod tests {
             cat_presence: &cp,
             ward_coverage: &wc,
             tile_map: &tm,
+            recent_ambush: &ra,
+            carcass_scent: &cs,
         };
+        let constants = crate::resources::SimConstants::default();
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(99);
-        let pos =
-            compute_ward_placement(&structures, &wards, Position::new(60, 45), &maps, &mut rng);
+        let pos = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(60, 45),
+            &maps,
+            &constants,
+            &mut rng,
+        );
         assert!(
             pos.manhattan_distance(&Position::new(60, 45)) > 3,
             "placement {pos:?} violates Manhattan-3 hard-exclusion",
@@ -1619,7 +1717,7 @@ mod tests {
         // costs 0.30 score, exceeding the noise from jitter (max 0.05).
         let structures = vec![Position::new(60, 45)];
         let wards = vec![(Position::new(60, 45), 6.0)];
-        let (mut fs, cp, wc, tm) = empty_placement_maps();
+        let (mut fs, cp, wc, tm, ra, cs) = empty_placement_maps();
         fs.deposit(67, 45, 1.0); // 7 tiles from anchor
         fs.deposit(67, 85, 1.0); // 47 tiles from anchor — much farther
         let maps = PlacementMaps {
@@ -1627,16 +1725,182 @@ mod tests {
             cat_presence: &cp,
             ward_coverage: &wc,
             tile_map: &tm,
+            recent_ambush: &ra,
+            carcass_scent: &cs,
         };
+        let constants = crate::resources::SimConstants::default();
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(11);
-        let pos =
-            compute_ward_placement(&structures, &wards, Position::new(60, 45), &maps, &mut rng);
+        let pos = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(60, 45),
+            &maps,
+            &constants,
+            &mut rng,
+        );
         let dist_near = pos.manhattan_distance(&Position::new(67, 45));
         let dist_far = pos.manhattan_distance(&Position::new(67, 85));
         assert!(
             dist_near < dist_far,
             "expected placement closer to the nearer peak; got pos={pos:?} \
              dist_near={dist_near} dist_far={dist_far}",
+        );
+    }
+
+    /// 220 dormancy invariant: with both anchor weights at their default
+    /// 0.0, depositing the new substrate signals has zero effect on the
+    /// chosen placement — the formula must be byte-identical to the
+    /// pre-220 baseline so seed-42 soak traces match.
+    #[test]
+    fn ward_placement_dormant_at_default_weights() {
+        let structures = vec![Position::new(60, 45)];
+        let wards = vec![(Position::new(60, 45), 6.0)];
+
+        // Baseline: no ambush / no carcass deposits.
+        let (mut fs_a, cp_a, wc_a, tm_a, ra_a, cs_a) = empty_placement_maps();
+        fs_a.deposit(67, 45, 1.0);
+        let maps_a = PlacementMaps {
+            fox_scent: &fs_a,
+            cat_presence: &cp_a,
+            ward_coverage: &wc_a,
+            tile_map: &tm_a,
+            recent_ambush: &ra_a,
+            carcass_scent: &cs_a,
+        };
+
+        // Treatment: identical fox-scent peak but with strong ambush +
+        // carcass-scent deposits at a *different* hot zone. If dormancy
+        // holds, the placement should not move toward the new hot zone.
+        let (mut fs_b, cp_b, wc_b, tm_b, mut ra_b, mut cs_b) = empty_placement_maps();
+        fs_b.deposit(67, 45, 1.0);
+        ra_b.deposit(40, 70, 1.0);
+        cs_b.deposit(40, 70, 1.0);
+        let maps_b = PlacementMaps {
+            fox_scent: &fs_b,
+            cat_presence: &cp_b,
+            ward_coverage: &wc_b,
+            tile_map: &tm_b,
+            recent_ambush: &ra_b,
+            carcass_scent: &cs_b,
+        };
+
+        let constants = crate::resources::SimConstants::default();
+        assert_eq!(constants.scoring.ward_ambush_anchor_weight, 0.0);
+        assert_eq!(constants.scoring.ward_recency_anchor_weight, 0.0);
+
+        // Identical RNG seeds → identical jitter → byte-identical scores
+        // → byte-identical placement when the lift terms are zero.
+        let mut rng_a = rand_chacha::ChaCha8Rng::seed_from_u64(220);
+        let mut rng_b = rand_chacha::ChaCha8Rng::seed_from_u64(220);
+        let pos_a = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(60, 45),
+            &maps_a,
+            &constants,
+            &mut rng_a,
+        );
+        let pos_b = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(60, 45),
+            &maps_b,
+            &constants,
+            &mut rng_b,
+        );
+        assert_eq!(
+            pos_a, pos_b,
+            "dormancy invariant violated: depositing ambush/carcass signals \
+             changed the chosen placement with default (zero) weights",
+        );
+    }
+
+    /// 220 lift behavior: when `ward_ambush_anchor_weight` is tuned up,
+    /// a recent-ambush hot zone outscores a same-magnitude fox-scent
+    /// signal at an equidistant tile, pulling placement toward the
+    /// empirical ambush cluster.
+    #[test]
+    fn ward_placement_shifts_to_ambush_hotspot_when_tuned() {
+        let structures = vec![Position::new(60, 45)];
+        let wards = vec![(Position::new(60, 45), 6.0)];
+        let (mut fs, cp, wc, tm, mut ra, cs) = empty_placement_maps();
+        // Equidistant rival signals from the anchor at (60, 45):
+        // fox-scent at (60, 38), ambush at (60, 52) — both 7 tiles away.
+        fs.deposit(60, 38, 1.0);
+        ra.deposit(60, 52, 1.0);
+        let maps = PlacementMaps {
+            fox_scent: &fs,
+            cat_presence: &cp,
+            ward_coverage: &wc,
+            tile_map: &tm,
+            recent_ambush: &ra,
+            carcass_scent: &cs,
+        };
+        // Tuned-on weight (test-local). The clamp at 1.0 in the threat
+        // term means the lift's contribution is bounded; we want a value
+        // large enough to dominate the equal-distance jitter band.
+        let mut constants = crate::resources::SimConstants::default();
+        constants.scoring.ward_ambush_anchor_weight = 1.0;
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(220);
+        let pos = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(60, 45),
+            &maps,
+            &constants,
+            &mut rng,
+        );
+        // The ambush hotspot is +y from the anchor; the fox-scent peak
+        // is -y. The +0.5 baseline of the logistic at zero input means
+        // even untouched tiles get *some* lift, so the test asserts a
+        // directional preference rather than an exact tile match.
+        assert!(
+            pos.y >= 45,
+            "expected placement biased toward ambush hotspot at (60, 52); \
+             got {pos:?}",
+        );
+    }
+
+    /// 220 lift behavior: same shape as the ambush test, but for the
+    /// kill-site signal — restores the 209 §Scope line 74 consumer.
+    /// Note: `CarcassScentMap` uses `bucket_size=3` (Phase 2C, matches
+    /// `PreyScentMap`) while the candidate grid steps by 5. The
+    /// deposit position is chosen so a candidate tile lands inside the
+    /// deposit's 3-tile bucket.
+    #[test]
+    fn ward_placement_shifts_to_carcass_hotspot_when_tuned() {
+        let structures = vec![Position::new(60, 45)];
+        let wards = vec![(Position::new(60, 45), 6.0)];
+        let (mut fs, cp, wc, tm, ra, mut cs) = empty_placement_maps();
+        // Fox-scent peak at (60, 38) — 7 tiles from anchor.
+        fs.deposit(60, 38, 1.0);
+        // Carcass at (60, 50) — 5 tiles from anchor; bucket(20, 16) at
+        // bucket_size=3 covers world y in [48, 50], and the candidate
+        // grid hits y=50 exactly so the read is non-zero.
+        cs.deposit(60, 50, 1.0);
+        let maps = PlacementMaps {
+            fox_scent: &fs,
+            cat_presence: &cp,
+            ward_coverage: &wc,
+            tile_map: &tm,
+            recent_ambush: &ra,
+            carcass_scent: &cs,
+        };
+        let mut constants = crate::resources::SimConstants::default();
+        constants.scoring.ward_recency_anchor_weight = 1.0;
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(220);
+        let pos = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(60, 45),
+            &maps,
+            &constants,
+            &mut rng,
+        );
+        assert!(
+            pos.y >= 45,
+            "expected placement biased toward carcass hotspot at (60, 52); \
+             got {pos:?}",
         );
     }
 
@@ -1865,6 +2129,8 @@ mod tests {
         world.insert_resource(crate::resources::FoxScentMap::default());
         world.insert_resource(crate::resources::CatPresenceMap::default());
         world.insert_resource(crate::resources::WardCoverageMap::default());
+        world.insert_resource(crate::resources::RecentAmbushMap::default());
+        world.insert_resource(crate::resources::CarcassScentMap::default());
         world.insert_resource(crate::resources::map::TileMap::new(
             50,
             50,
@@ -1914,6 +2180,8 @@ mod tests {
         world.insert_resource(crate::resources::FoxScentMap::default());
         world.insert_resource(crate::resources::CatPresenceMap::default());
         world.insert_resource(crate::resources::WardCoverageMap::default());
+        world.insert_resource(crate::resources::RecentAmbushMap::default());
+        world.insert_resource(crate::resources::CarcassScentMap::default());
         world.insert_resource(crate::resources::map::TileMap::new(
             50,
             50,

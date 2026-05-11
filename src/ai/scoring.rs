@@ -433,6 +433,17 @@ pub struct ScoringContext<'a> {
     /// that folds into the unified `Memory.LocationModel.last_threat`
     /// facet when ToT cluster C3 (ticket 007) lands.
     pub recent_ambush_at_position: f32,
+    /// 220: per-tile `CarcassScentMap` sample at the cat's current
+    /// position (0.0–1.0). The Phase 2C substrate deposits scent each
+    /// tick from actionable carcass entities (`!cleansed || !harvested`)
+    /// and decays globally; high values mark recent kill-sites. Restores
+    /// the perception scalar originally scoped in 209 §Scope line 55
+    /// but trimmed from the actual landing. Dormant in DSE scoring —
+    /// no DSE consumes it yet; emitted in `ctx_scalars` so it surfaces
+    /// in `trace-*.jsonl`. The single current consumer is
+    /// `compute_ward_placement()`, which reads the map directly (not
+    /// via this scalar) to score candidate placement tiles.
+    pub carcass_scent_at_position: f32,
     /// 209: Colony-tension proxy — currently `(1 - needs.safety)` of
     /// the cat being scored. Consumed by `TensionDefusionGroomLift`
     /// modifier as the "is the colony stressed enough that
@@ -872,6 +883,13 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
     m.insert(
         "recent_ambush_at_position",
         ctx.recent_ambush_at_position.clamp(0.0, 1.0),
+    );
+    // 220: per-tile carcass-scent sample. Dormant in DSE scoring;
+    // emitted for trace observability. The placement consumer in
+    // `compute_ward_placement` reads `CarcassScentMap` directly.
+    m.insert(
+        "carcass_scent_at_position",
+        ctx.carcass_scent_at_position.clamp(0.0, 1.0),
     );
     m.insert(
         "colony_tension_recent",
@@ -2948,6 +2966,7 @@ mod tests {
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
             recent_ambush_at_position: 0.0,
+            carcass_scent_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3145,6 +3164,7 @@ mod tests {
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
             recent_ambush_at_position: 0.0,
+            carcass_scent_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3365,6 +3385,7 @@ mod tests {
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
             recent_ambush_at_position: 0.0,
+            carcass_scent_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3649,6 +3670,7 @@ mod tests {
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
             recent_ambush_at_position: 0.0,
+            carcass_scent_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3775,6 +3797,7 @@ mod tests {
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
             recent_ambush_at_position: 0.0,
+            carcass_scent_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3920,6 +3943,7 @@ mod tests {
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
             recent_ambush_at_position: 0.0,
+            carcass_scent_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -4250,6 +4274,7 @@ mod tests {
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
             recent_ambush_at_position: 0.0,
+            carcass_scent_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -4377,6 +4402,7 @@ mod tests {
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
             recent_ambush_at_position: 0.0,
+            carcass_scent_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,

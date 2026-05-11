@@ -14,6 +14,13 @@ pub struct ColonyContext<'w> {
     /// scoring at land (no DSE consumes it yet) but trace-visible via
     /// `ctx_scalars` so soak-trace verification can see the substrate.
     pub recent_ambush_map: Res<'w, crate::resources::RecentAmbushMap>,
+    /// 220: per-tile carcass-scent sample. Read at ScoringContext build
+    /// time to populate `carcass_scent_at_position`. Substrate is
+    /// Phase 2C; this entry restores the perception-scalar consumer
+    /// originally scoped in 209 §Scope line 55 (trimmed from the actual
+    /// landing). Dormant in DSE scoring; the placement-side consumer
+    /// reads `CarcassScentMap` directly from `PlacementMaps`.
+    pub carcass_scent_map: Res<'w, crate::resources::CarcassScentMap>,
     /// Ticket 228 — read by the replan-time `LandmarkAnchor::NearestPreyAnchor`
     /// resolver in `evaluate_and_plan` to populate
     /// `CatAnchorPositions.nearest_prey`. Read-only; the replan path

@@ -1963,6 +1963,28 @@ pub struct ScoringConstants {
     /// walking the colony into rot.
     #[serde(default = "default_patrol_path_corruption_weight")]
     pub patrol_path_corruption_weight: f32,
+    /// 220: weight on the `RecentAmbushMap` lift to ward-placement's
+    /// threat term in `compute_ward_placement()`. Curve
+    /// `Logistic(steepness=8.0, midpoint=0.5)` applied to the per-tile
+    /// ambush memory sample; the result adds into the placement scorer's
+    /// `max(fox_scent, corruption)` threat axis, then re-clamps to 1.0.
+    /// At 0.0 (default) the formula is byte-identical to the pre-220
+    /// baseline. Tuning above 0.0 biases new wards toward tiles where
+    /// ShadowFox ambushes have actually struck (closing the 210-soak
+    /// gap where fox-scent perimeters drew wards away from the empirical
+    /// hot zones). Ships dormant; tuning is a follow-on ticket.
+    #[serde(default = "default_ward_ambush_anchor_weight")]
+    pub ward_ambush_anchor_weight: f32,
+    /// 220: weight on the `CarcassScentMap` lift to ward-placement's
+    /// threat term. Symmetric shape to `ward_ambush_anchor_weight` —
+    /// `Logistic(8.0, 0.5)` over the per-tile carcass-scent sample,
+    /// additively combined into the threat axis. Restores the
+    /// recency-anchor consumer originally scoped in 209 §Scope (line
+    /// 74) but trimmed from the actual landing; the `CarcassScentMap`
+    /// substrate itself is already in place from Phase 2C. Ships
+    /// dormant at 0.0; tuning is a follow-on ticket.
+    #[serde(default = "default_ward_recency_anchor_weight")]
+    pub ward_recency_anchor_weight: f32,
     /// 256 R5: deposit per tick when a cat's current action is
     /// `Action::Patrol`. Lays a deterrent gradient that foxes read as
     /// routing cost via `CatPatrolDeterrentOverlay`. Default `0.05`
@@ -2296,6 +2318,8 @@ impl Default for ScoringConstants {
             patrol_route_cost_weight: default_patrol_route_cost_weight(),
             patrol_path_fox_scent_weight: default_patrol_path_fox_scent_weight(),
             patrol_path_corruption_weight: default_patrol_path_corruption_weight(),
+            ward_ambush_anchor_weight: default_ward_ambush_anchor_weight(),
+            ward_recency_anchor_weight: default_ward_recency_anchor_weight(),
             cat_patrol_deterrent_deposit_per_tick:
                 default_cat_patrol_deterrent_deposit_per_tick(),
             cat_patrol_deterrent_decay_rate: default_cat_patrol_deterrent_decay_rate(),
@@ -3509,6 +3533,20 @@ fn default_groom_food_security_weight() -> f32 {
 /// 209: Patrol `fox_scent_at_position` cost-axis weight. Ships
 /// dormant at 0.0.
 fn default_patrol_fox_scent_weight() -> f32 {
+    0.0
+}
+
+/// 220: weight on the `RecentAmbushMap` lift in
+/// `compute_ward_placement()`. Ships dormant at 0.0; tuning is a
+/// follow-on balance ticket.
+fn default_ward_ambush_anchor_weight() -> f32 {
+    0.0
+}
+
+/// 220: weight on the `CarcassScentMap` lift in
+/// `compute_ward_placement()`. Restores the consumer originally
+/// scoped in 209 §Scope line 74. Ships dormant at 0.0.
+fn default_ward_recency_anchor_weight() -> f32 {
     0.0
 }
 
@@ -5605,6 +5643,18 @@ mod tests {
         // Re-serialize and compare strings to confirm full fidelity
         let json2 = serde_json::to_string_pretty(&deserialized).expect("re-serialize");
         assert_eq!(json, json2);
+    }
+
+    /// 220: substrate consumers must ship dormant — both ward-placement
+    /// anchor weights default to 0.0 so `compute_ward_placement` is
+    /// byte-identical to its pre-220 form on a seed-42 soak. Flipping
+    /// either above zero is a balance-affecting change and must go
+    /// through a dedicated tuning ticket.
+    #[test]
+    fn ward_anchor_weights_ship_dormant() {
+        let defaults = SimConstants::default();
+        assert_eq!(defaults.scoring.ward_ambush_anchor_weight, 0.0);
+        assert_eq!(defaults.scoring.ward_recency_anchor_weight, 0.0);
     }
 
     #[test]

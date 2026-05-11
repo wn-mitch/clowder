@@ -190,6 +190,17 @@ pub struct ChainResources<'w> {
     /// Ward-coverage influence map — sampled by `compute_ward_placement`
     /// for anti-clustering (skip tiles already covered by other wards).
     pub ward_coverage_map: Res<'w, crate::resources::WardCoverageMap>,
+    /// 220: recent-ambush event memory consumed by
+    /// `compute_ward_placement` (gated by `ward_ambush_anchor_weight`,
+    /// dormant at land). Carried here so the legacy
+    /// `disposition_to_chain` path stays type-correct even though it is
+    /// unscheduled (ticket 027b).
+    pub recent_ambush_map: Res<'w, crate::resources::RecentAmbushMap>,
+    /// 220: kill-site scent (Phase 2C substrate) consumed by
+    /// `compute_ward_placement` (gated by `ward_recency_anchor_weight`,
+    /// dormant at land). Carried for the same reason as
+    /// `recent_ambush_map`.
+    pub carcass_scent_map: Res<'w, crate::resources::CarcassScentMap>,
     /// Mutable ledger of frustrated action desires — chain builders record
     /// misses here so the coordinator's BuildPressure can respond.
     pub unmet_demand: ResMut<'w, crate::resources::UnmetDemand>,
@@ -933,6 +944,7 @@ pub fn evaluate_dispositions(
             ),
             fox_scent_level: colony.fox_scent_map.get(pos.x, pos.y),
             recent_ambush_at_position: colony.recent_ambush_map.get(pos.x, pos.y),
+            carcass_scent_at_position: colony.carcass_scent_map.get(pos.x, pos.y),
             // 209: per-cat proxy for colony-tension; see goap.rs
             // construction site for rationale.
             colony_tension_recent: (1.0 - needs.safety).clamp(0.0, 1.0),
@@ -1569,6 +1581,8 @@ pub fn disposition_to_chain(
                     cat_presence: &res.cat_presence_map,
                     ward_coverage: &res.ward_coverage_map,
                     tile_map: &res.map,
+                    recent_ambush: &res.recent_ambush_map,
+                    carcass_scent: &res.carcass_scent_map,
                 };
                 build_crafting_chain(
                     pos,
@@ -1587,6 +1601,7 @@ pub fn disposition_to_chain(
                     &placement_maps,
                     ward_strength_low,
                     d,
+                    &constants,
                     &mut rng.rng,
                     disposition.chosen_action,
                 )
@@ -2260,6 +2275,7 @@ fn build_crafting_chain(
     placement_maps: &crate::systems::coordination::PlacementMaps<'_>,
     ward_strength_low: bool,
     d: &DispositionConstants,
+    constants: &SimConstants,
     rng: &mut impl Rng,
     chosen_action: Action,
 ) -> Option<(TaskChain, Action)> {
@@ -2281,6 +2297,7 @@ fn build_crafting_chain(
             &ward_data,
             center,
             placement_maps,
+            constants,
             rng,
         ))
     } else {
@@ -4578,18 +4595,22 @@ mod tests {
         let injured_cats = vec![(injured_entity, Position { x: 4, y: 4 })];
 
         let map = TileMap::new(10, 10, Terrain::Grass);
-        let d = SimConstants::default().disposition;
+        let constants = SimConstants::default();
         let mut rng = ChaCha8Rng::seed_from_u64(99);
         let _unmet_demand = crate::resources::UnmetDemand::default();
 
         let fox_scent_map = crate::resources::FoxScentMap::default();
         let cat_presence_map = crate::resources::CatPresenceMap::default();
         let ward_coverage_map = crate::resources::WardCoverageMap::default();
+        let recent_ambush_map = crate::resources::RecentAmbushMap::default();
+        let carcass_scent_map = crate::resources::CarcassScentMap::default();
         let placement_maps = crate::systems::coordination::PlacementMaps {
             fox_scent: &fox_scent_map,
             cat_presence: &cat_presence_map,
             ward_coverage: &ward_coverage_map,
             tile_map: &map,
+            recent_ambush: &recent_ambush_map,
+            carcass_scent: &carcass_scent_map,
         };
         let result = build_crafting_chain(
             &pos,
@@ -4607,7 +4628,8 @@ mod tests {
             &map,
             &placement_maps,
             false,
-            &d,
+            &constants.disposition,
+            &constants,
             &mut rng,
             Action::HerbcraftRemedy,
         );
