@@ -1,7 +1,7 @@
 ---
 id: 282
 title: Temporal-integration doctrine for perception signals — decay stale, accumulate sustained
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-11
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-11
 ---
 
 ## Why
@@ -118,3 +118,4 @@ Doctrine ticket — no behavior change to test. Done when:
   that each need temporal integration with slightly different
   shapes; this ticket lands the shared rubric so the instance
   tickets cite a common rule instead of re-deriving it.
+- 2026-05-11: 2026-05-11: landed. Doctrine lives at docs/systems/ai-substrate-refactor.md §4.5.1; covers both temporal integration (219/234/244/283) and spatial range-summation (243).

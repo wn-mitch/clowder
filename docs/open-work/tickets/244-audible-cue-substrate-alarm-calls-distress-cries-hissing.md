@@ -7,7 +7,7 @@ added: 2026-05-08
 parked: null
 blocked-by: []
 supersedes: []
-related-systems: []
+related-systems: [ai-substrate-refactor.md]
 related-balance: []
 landed-at: null
 landed-on: null

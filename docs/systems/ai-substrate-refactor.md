@@ -104,6 +104,7 @@
 - [§4.3 Marker catalog](#43-marker-catalog)
 - [§4.4 Crosswalk: ScoringContext → markers](#44-crosswalk-scoringcontext--markers)
 - [§4.5 Scalar carve-out](#45-scalar-carve-out)
+- [§4.5.1 Temporal and spatial integration of perception scalars](#451-temporal-and-spatial-integration-of-perception-scalars)
 - [§4.6 Authoring-system roster](#46-authoring-system-roster)
 - [§4.7 Substrate vs search-state](#47-substrate-vs-search-state)
 
@@ -2346,6 +2347,92 @@ as resource, not entity-attached).
 | `local_threat_level` | `f32` | Fox-threat-memory sample. |
 | `local_exploration_coverage` | `f32` | Fox-exploration-map sample. |
 | `ticks_since_patrol` | `u64` | Patrol-pressure accumulator. |
+
+### §4.5.1 Temporal and spatial integration of perception scalars
+
+**Statement.** A perception scalar in §4.5 encodes a *judgment about
+world state*, not a *count of recent events*. When the underlying
+ground truth is itself instantaneous (own hunger, own energy, colony
+food stockpile, own health), point-sample reads are correct. When the
+ground truth is the *time-integral* of point events (recent threats,
+recent damage, sustained distress) or the *spatial-integral* of
+distributed live state (cries audible across tiles, body cues across a
+group), the scalar must integrate. Picking the wrong authoring mode
+gives you a permanent baseline that never clears (point-sample over
+events) or a hair-trigger that fires on first contact (point-sample
+over distributed state) — both starve the IAUS softmax economy of the
+gradient it needs to pick a non-trivial response.
+
+**The point-sample antipattern.** `memory_proximity_sums()`
+(`src/ai/scoring.rs:1928`) computes `ThreatSeen` weight as
+`(1 - dist / radius) * entry.strength` with `entry.strength` never
+decayed — point-sampling events as if they were live state. A single
+fox encounter raises the cat's safety deficit permanently. Patrol
+absorbs L3 bandwidth in response (`project_l3_patrol_absorption_cascade`,
+2026-05-07); the elevated Patrol DSE exposes cats to fresh ambushes;
+the ambush wave thins the labour pool; starvation cascades 24k ticks
+later. Ticket **256** patched the symptom at the pathing layer
+(`RouteCostField` overlay on `resolve_patrol_to`) because the
+perception-substrate fix had no doctrine to cite. Tickets **219** and
+**283** fix it at this layer — the home of the actual defect.
+
+**The four authoring modes.** Pick by the ground-truth question:
+
+| Mode | Ground truth | Math sketch | Default authoring side |
+|---|---|---|---|
+| **point-sample** | instantaneous state | `read(world, now)` | wherever the state lives (own component, colony resource) |
+| **decay-integrated** | recent events (stale fades) | `s_{t+1} = s_t · e^{-Δt/τ} + Σ events_t` | **source-side** (one author, all readers see the same integrated value) |
+| **accumulate-integrated** | sustained source (ramps with duration) | `s_{t+1} = clamp(s_t + k·active_t − k'·(1−active_t), 0, 1)` | **source-side** for shared signals; per-cat for individual fatigue |
+| **range-summed** | distributed live state across tiles / entities | `Σ_{e ∈ range} attenuation(d(cat, e)) · live(e)` | **perceiver-side** (each cat's range varies; live state is read where the perceiver is) |
+
+Decay and accumulate are dual along the temporal axis; range-sum is a
+separate (spatial) axis that composes with either. The kitten-cry map
+in ticket **244** is the worked example of *both axes*: spatial range-
+sum across audible tiles **and** temporal accumulate so a cry sustained
+for N ticks scores higher than a first-tick cry.
+
+**Authoring-side guidance.** Prefer **source-side integration** for
+colony-shared signals — one author maintains the integrated state, all
+readers see the same value, and there is no per-cat read-time work.
+Fox scent, recent-ambush map, kitten-cry map all fit this mode. Use
+**perceiver-side integration** only when the signal is genuinely
+per-cat (episodic memory, individual fatigue) or when different
+consumers need different timescales over the same source events. The
+fox-scent split in ticket **283** is the second case: same `Ambush`-
+style emission events, two co-deposited channels with different
+half-lives (slow territorial + fast recent-presence), each readable as
+a separate scalar in `ScoringContext`.
+
+**Channel checklist** — current detection scalars and their target
+authoring mode. Each row's ticket carries the implementation;
+ticket **282** is the rubric they cite.
+
+| Channel | Today (file:line) | Today's mode | Target mode | Timescale | Authoring side | Ticket |
+|---|---|---|---|---|---|---|
+| Recent ambush memory | `src/ai/scoring.rs:1928` `memory_proximity_sums()` | point-sample of events (no decay) | decay-integrated | ~5k-tick half-life | source-side (shared map) | **219** |
+| Damage recency | *(absent — no scalar today)* | n/a | decay-integrated | ~200-tick linear decay | source-side, per-cat (damage-event authored) | **234** |
+| Body-cue observation | *(absent — proposed L1 channel)* | n/a | range-summed | live (no temporal axis) | perceiver-side (reads target-side markers in range) | **243** (blocked-by 242) |
+| Audible cues (kitten cry, alarm calls, distress) | `src/systems/growth.rs:162` `KittenCryMap` rebuild-per-tick | range-summed point-sample of source-active state | range-summed **AND** accumulate-integrated | onset ramps over ~N ticks of sustained source; decays on source-inactive | source-side (emitter paints decay disc per tick) | **244** |
+| Fox scent — territorial | `src/systems/wildlife.rs:2383` `fox_scent_tick()`; `src/resources/sim_constants.rs:4240-4247` `scent_decay_rate` | decay-integrated, 10-day half-life | unchanged (correct for territorial-mark consumers) | ~10 in-game days | source-side | already correct |
+| Fox scent — recent presence | *(absent — split out of the same source events)* | n/a | decay-integrated | ~12-hour half-life (`RatePerDay::new(2.0)`) | source-side (co-deposited by `fox_scent_tick`) | **283** |
+
+**Counter-examples — point-sample IS correct.** Some §4.5 scalars
+intentionally read live state because the state IS the ground truth.
+Own `hunger_urgency`, own `energy_deficit`, `health`, colony
+`food_fraction` — there is no meaningful "stale hunger" that should
+decay separately from the current Needs value. Magic affinity / skill
+scalars (§4.5 cat-scalar table) are spawn-immutable or slow-changing
+attributes; point-sample is correct. `pending_directive_count` reflects
+live queue depth; point-sample is correct.
+
+**Cross-refs.** §4.5 (catalog of which scalars stay sampled) · §4.7
+(substrate vs search-state — temporal-integration sits *inside* the
+substrate-marker classifier as a sub-decision once a scalar is on the
+substrate side) · §5.3 (influence-map decay primitives — the existing
+mechanism most decay-integrated channels ride on) · §3.5.4
+(`distress-modifiers.md` — lurch vs pressure — a *distinct* axis: this
+doctrine decides what the scalar *means*; lurch/pressure decides how
+the modifier *shapes* the lift over that scalar).
 
 ### §4.6 Authoring-system roster
 
