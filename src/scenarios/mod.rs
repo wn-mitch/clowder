@@ -36,6 +36,7 @@ pub mod flee_calibration;
 pub mod flee_commitment;
 pub mod fondness_kitten_imprint;
 pub mod grooming_other;
+pub mod guarding_morale_break_releases;
 pub mod hunt_acquisition;
 pub mod hunt_deposit_chain;
 pub mod intention_momentum_pickup_lock;
@@ -182,6 +183,11 @@ pub const ALL: &[&Scenario] = &[
     // emission_threshold) it advances to MatingOccurred within the
     // tick budget.
     &mate_chain::SCENARIO,
+    // 288 — wounded cat in a Guarding plan reaches EngageThreat,
+    // resolver returns Fail("morale_break"). Post-fix the GOAP
+    // dispatcher releases the commitment so L3 re-elects instead of
+    // replanning inside Guarding.
+    &guarding_morale_break_releases::SCENARIO,
 ];
 
 /// Look up a scenario by its `name` field.

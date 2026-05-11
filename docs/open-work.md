@@ -128,7 +128,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[285](docs/open-work/tickets/285-tune-ward-anchor-weights-magnitude-iteration.md)** — tune ward anchor weights — magnitude iteration — _[balance] · added 2026-05-11_
 - **[286](docs/open-work/tickets/286-lower-threatproximityadrenalineflee-viability-threshold-so-cornered-cats-receive-flee-lift.md)** — Lower ThreatProximityAdrenalineFlee viability threshold so cornered cats receive flee_lift — _[ai-substrate] · added 2026-05-11_
 - **[287](docs/open-work/tickets/287-move-boldness-out-of-fleedse-cp-axes-onto-a-boldnessfleemodulation-modifier-271-r3-structural-follow-on.md)** — Move boldness out of FleeDse CP axes onto a BoldnessFleeModulation modifier (271 R3 structural follow-on) — _[ai-substrate] · added 2026-05-11_
-- **[288](docs/open-work/tickets/288-engagethreat-morale-break-must-release-the-guarding-commitment-so-wounded-cats-can-drop-to-flee.md)** — EngageThreat morale_break must release the Guarding commitment so wounded cats can drop to Flee — _[ai-substrate] · added 2026-05-11_
+- **[289](docs/open-work/tickets/289-engagethreat-retry-cooldown-after-morale-break-suppress-immediate-guarding-re-election-under-active-fight-directive.md)** — EngageThreat retry cooldown after morale_break — suppress immediate Guarding re-election under active Fight directive — _added 2026-05-11_
 
 ## Parked (10)
 
@@ -178,12 +178,13 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (181)
+## Landed archive (182)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (116)
+### 2026-05 (117)
 
+- **[288](docs/open-work/landed/288-engagethreat-morale-break-must-release-the-guarding-commitment-so-wounded-cats-can-drop-to-flee.md)** — EngageThreat morale_break must release the Guarding commitment so wounded cats can drop to Flee _(2026-05-11)_
 - **[284](docs/open-work/landed/284-tune-ward-placement-ambush-carcass-anchor-weights.md)** — tune ward placement ambush + carcass anchor weights _(2026-05-11)_
 - **[282](docs/open-work/landed/282-temporal-integration-doctrine-for-perception-signals-decay-stale-accumulate-sustained.md)** — Temporal-integration doctrine for perception signals — decay stale, accumulate sustained _(2026-05-11)_
 - **[281](docs/open-work/landed/281-rebaseline-currentjson-against-post-127-soak.md)** — Rebaseline current.json against post-127 soak _(2026-05-11)_

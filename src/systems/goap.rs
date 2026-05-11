@@ -3138,9 +3138,16 @@ pub fn resolve_goap_plans(
             crate::ai::commitment::record_drop(narr.activation.as_deref_mut(), strategy, branch);
             current.ticks_remaining = 0;
             // Ticket 126 — map §7.2 DropBranch onto the lifecycle.
+            // 288 — MoraleBreak is not produced by the §7.2 belief-proxy
+            // gate (it's emitted only by the step-fail dispatcher
+            // below), so it cannot reach this arm. Treat as unreachable
+            // and fall through with an explicit guard so the compiler
+            // keeps the §7.2 path honest if MoraleBreak ever gets
+            // wired here.
             let ending = match branch {
                 crate::ai::commitment::DropBranch::Achieved => IntentionEnding::Fulfilled,
-                crate::ai::commitment::DropBranch::ReplanCap => IntentionEnding::Abandoned(
+                crate::ai::commitment::DropBranch::ReplanCap
+                | crate::ai::commitment::DropBranch::MoraleBreak => IntentionEnding::Abandoned(
                     crate::components::IntentionAbandonReason::BecameImpossible,
                 ),
                 crate::ai::commitment::DropBranch::DroppedGoal => IntentionEnding::Abandoned(
@@ -3639,6 +3646,100 @@ pub fn resolve_goap_plans(
                             temperature: needs.temperature,
                         },
                     );
+                }
+
+                // Ticket 288 — `morale_break` rebinds to commitment
+                // release. The substrate's own signal that the cat has
+                // lost the will to engage; consequence is "drop the
+                // disposition so L3 can re-elect", not "stay inside
+                // disposition and replan". Without this branch, a
+                // wounded Guarding cat replans inside Guarding to
+                // `[TravelTo(PatrolZone), Survey]` and walks back into
+                // ambush range (Cedar's death pattern, post-271 soak).
+                //
+                // No `record_step_failure` call (morale_break is state,
+                // not topology — a different cat or the same cat post-
+                // heal can engage successfully) and no `failed_action`
+                // / `failed_target` passed into `abandon_plan` (no
+                // RecentTargetFailures cooldown — see ticket 288 risks).
+                //
+                // This block mirrors the ReplanCap abandon path below
+                // (record_drop + focal capture + PlanNarrative +
+                // history + abandon_plan + plans_to_remove); the two
+                // share a TODO to extract a `release_commitment`
+                // helper alongside the NoPlanPossible path that already
+                // duplicates the same gesture.
+                if fail_reason == "morale_break" {
+                    let strategy = crate::ai::commitment::strategy_for_disposition(plan.kind);
+                    crate::ai::commitment::record_drop(
+                        narr.activation.as_deref_mut(),
+                        strategy,
+                        crate::ai::commitment::DropBranch::MoraleBreak,
+                    );
+                    if ec_is_focal(&ec, cat_entity) {
+                        let proxies = crate::ai::commitment::proxies_for_plan(
+                            &plan,
+                            &needs,
+                            &ec.constants.disposition,
+                            unexplored_nearby,
+                        );
+                        crate::ai::commitment::record_commitment_decision(
+                            ec.focal_capture.as_deref(),
+                            ec.time.tick,
+                            &plan,
+                            strategy,
+                            proxies,
+                            true,
+                            crate::ai::commitment::DropBranch::MoraleBreak.as_str(),
+                        );
+                        if let Some(capture) = ec.focal_capture.as_deref() {
+                            let step_name = plan
+                                .current()
+                                .map(|s| format!("{:?}", s.action))
+                                .unwrap_or_else(|| "none".into());
+                            capture.push_plan_failure(
+                                crate::resources::trace_log::PlanFailureCapture {
+                                    reason: "morale_break",
+                                    disposition: format!("{:?}", plan.kind),
+                                    detail: serde_json::json!({
+                                        "step": step_name,
+                                        "step_index": plan.current_step,
+                                    }),
+                                },
+                                ec.time.tick,
+                            );
+                        }
+                    }
+                    plan_writer.write(PlanNarrative {
+                        entity: cat_entity,
+                        kind: plan.kind,
+                        event: PlanEvent::Abandoned,
+                        completions: plan.trips_done,
+                    });
+                    if let Some(mut hist) = history {
+                        hist.record(ActionRecord {
+                            action: current.action,
+                            disposition: Some(plan.kind),
+                            tick: ec.time.tick,
+                            outcome: ActionOutcome::Failure,
+                        });
+                    }
+                    let _abandoned = crate::systems::plan_substrate::abandon_plan(
+                        &mut current,
+                        &mut plan,
+                        crate::components::AbandonReason::MoraleBreak,
+                        None,
+                        None,
+                        recent_failures.as_deref_mut(),
+                        ec.time.tick,
+                    );
+                    plans_to_remove.push((
+                        cat_entity,
+                        IntentionEnding::Abandoned(
+                            crate::components::IntentionAbandonReason::BecameImpossible,
+                        ),
+                    ));
+                    continue;
                 }
 
                 // Record the failed action so replanning can exclude it.

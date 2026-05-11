@@ -69,6 +69,11 @@ pub enum AbandonReason {
     /// route through this variant today but the API accepts it for
     /// future use by 075/076.
     External,
+    /// Ticket 288 — step resolver emitted `Fail("morale_break")`. The
+    /// substrate's own signal that the cat cannot engage; the consequence
+    /// is commitment release (not in-disposition replan) so L3 can
+    /// re-elect on the next tick.
+    MoraleBreak,
 }
 
 /// Snapshot of cross-plan memory the caller may want to preserve after

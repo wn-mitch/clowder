@@ -232,6 +232,16 @@ pub enum Feature {
     /// as a distinct Feature lets canaries catch planner collapse
     /// separately from legitimate completion.
     CommitmentDropReplanCap,
+    /// Ticket 288 — `morale_break` consumed by the GOAP step-fail
+    /// dispatcher. The cat's EngageThreat step refused to continue
+    /// (HP below `fight_bail_health_threshold`) and the dispatcher
+    /// released the disposition commitment so L3 can re-elect on the
+    /// next tick — rather than the legacy in-disposition replan path
+    /// that left wounded Guarding cats marching toward ambushes.
+    /// Neutral; rare-event class (depends on a wounded cat reaching
+    /// EngageThreat) so `expected_to_fire_per_soak() => false` until
+    /// post-fix baseline shows reliable firing.
+    CommitmentDropMoraleBreak,
     // ---------- Ticket 127 — JointIntention (subsumes §7.M PairingActivity) ----------
     /// `crate::ai::joint_intention::author_joint_intentions` inserted a
     /// [`crate::components::JointIntention`] on an eligible cat for the
@@ -498,6 +508,8 @@ impl Feature {
         Feature::CommitmentDropSingleMinded,
         Feature::CommitmentDropOpenMinded,
         Feature::CommitmentDropReplanCap,
+        // Ticket 288 — morale_break rebind to commitment release.
+        Feature::CommitmentDropMoraleBreak,
         // Ticket 127 — JointIntention (subsumes §7.M L2 PairingActivity
         // from ticket 027b). Each parameterized variant is
         // enumerated per-practice; for 127 only Courtship exists.
@@ -699,6 +711,7 @@ impl Feature {
             Feature::CommitmentDropSingleMinded => Neutral,
             Feature::CommitmentDropOpenMinded => Neutral,
             Feature::CommitmentDropReplanCap => Neutral,
+            Feature::CommitmentDropMoraleBreak => Neutral,
             // §7.M L2 PairingActivity drop is a state transition,
             // not an adverse event.
             // Ticket 127 — JointIntention neutral valences. Drops are
@@ -913,6 +926,11 @@ impl Feature {
             // valence change above. Footer tally still emits when
             // burials happen.
             Feature::BurialPerformed => false,
+            // 288: morale_break-driven commitment release. Rare-event
+            // class (requires a wounded cat to reach EngageThreat with
+            // HP below `fight_bail_health_threshold`). Promote to
+            // `true` after the post-288 baseline shows reliable firing.
+            Feature::CommitmentDropMoraleBreak => false,
             // Every other feature is expected to fire per soak.
             _ => true,
         }
@@ -1021,6 +1039,7 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::CommitmentDropSingleMinded => "CommitmentDropSingleMinded",
         Feature::CommitmentDropOpenMinded => "CommitmentDropOpenMinded",
         Feature::CommitmentDropReplanCap => "CommitmentDropReplanCap",
+        Feature::CommitmentDropMoraleBreak => "CommitmentDropMoraleBreak",
         // Ticket 127 — JointIntention. Display names embed the practice
         // slug so the footer / canary output distinguishes per-practice
         // counters when future practices land.
@@ -1305,9 +1324,11 @@ mod tests {
         // Commit C deleted the 3 PA Features (2 Positive
         // PairingIntentionEmitted/PairingBiasApplied + 1 Neutral
         // PairingDropped), net -2 Positive / -1 Neutral.
+        // Ticket 288 added 1 Neutral (CommitmentDropMoraleBreak — the
+        // morale_break-driven commitment release counter).
         assert_eq!(positive, 54);
         assert_eq!(negative, 23);
-        assert_eq!(neutral, 34);
+        assert_eq!(neutral, 35);
     }
 
     #[test]
@@ -1379,6 +1400,7 @@ mod tests {
         // Courtship-only in 127). Commit C: -2 Positive / -1 Neutral
         // for the PA Feature deletions (PairingIntentionEmitted /
         // PairingBiasApplied / PairingDropped).
+        // Ticket 288: +1 Neutral (CommitmentDropMoraleBreak).
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
             54
@@ -1389,7 +1411,7 @@ mod tests {
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Neutral),
-            34
+            35
         );
     }
 

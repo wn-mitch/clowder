@@ -1,7 +1,7 @@
 ---
 id: 288
 title: EngageThreat morale_break must release the Guarding commitment so wounded cats can drop to Flee
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-11
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-11
 ---
 
 <!--
@@ -176,3 +176,4 @@ release. Wins because:
   commitment release) recommended; R4 (split GuardingRetreat) and
   R5 (extend plan template) considered and named in the audit
   trail.
+- 2026-05-11: 2026-05-11: landed. Opened 289 (EngageThreat retry cooldown after morale_break — thrash suppression) as follow-on blocked-by 288 per 288's named risk.

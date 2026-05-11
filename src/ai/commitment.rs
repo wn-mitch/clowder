@@ -446,6 +446,11 @@ pub fn record_drop(
     // from legitimate completion under the same strategy.
     match branch {
         DropBranch::ReplanCap => a.record(Feature::CommitmentDropReplanCap),
+        // 288: morale_break-driven release gets its own counter so
+        // canaries can separate "cat lost will to engage" from planner
+        // collapse and from achievement-driven drops under the same
+        // strategy.
+        DropBranch::MoraleBreak => a.record(Feature::CommitmentDropMoraleBreak),
         DropBranch::Achieved | DropBranch::DroppedGoal => match strategy {
             CommitmentStrategy::Blind => a.record(Feature::CommitmentDropBlind),
             CommitmentStrategy::SingleMinded => a.record(Feature::CommitmentDropSingleMinded),
@@ -515,6 +520,14 @@ pub enum DropBranch {
     ReplanCap,
     /// `still_goal == false` (desire drift); only under `OpenMinded`.
     DroppedGoal,
+    /// Ticket 288 — step resolver emitted `Fail("morale_break")`. The
+    /// substrate signal "this cat has lost the will to engage" is
+    /// rebound from in-disposition replan to commitment release so L3
+    /// can re-elect on the next tick. Fires regardless of strategy
+    /// (Guarding is Blind today; the morale_break path bypasses the
+    /// achievement-belief gate entirely because the signal is the
+    /// commitment-release authority).
+    MoraleBreak,
 }
 
 impl DropBranch {
@@ -524,6 +537,7 @@ impl DropBranch {
             Self::Achieved => "achieved",
             Self::ReplanCap => "unachievable",
             Self::DroppedGoal => "dropped_goal",
+            Self::MoraleBreak => "morale_break",
         }
     }
 }
