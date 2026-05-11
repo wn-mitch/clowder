@@ -1,132 +1,158 @@
 ---
 id: 273
 title: Caretake plans complete but KittenFed never fires — kitten starvation chronic
-status: ready
+status: parked
 cluster: null
 added: 2026-05-11
-parked: null
+parked: 2026-05-11
 blocked-by: []
 supersedes: []
-related-systems: []
+related-systems: [ai-substrate-refactor.md]
 related-balance: []
 landed-at: null
 landed-on: null
 ---
 
 <!--
-Bugfix-shape ticket. Use this template (rather than `_template.md`) when the
-work is a fix to observed defective behavior. The "Bugfix discipline" section
-of CLAUDE.md REQUIRES at least one structural-revision candidate per fix-shape
-decision tree — the slots below force that to be drafted, named, and considered.
+Bugfix-shape ticket. Original premise was empirically wrong (see
+"Audit findings" below). Re-framed as the downstream surface of a
+perception-accuracy ratchet; parked behind upstream detection work.
 -->
 
 ## Why
 
-Every recent seed-42 deep-soak ends with exactly one kitten born and that
-kitten starving to death over ~21 sim-days while the colony's `Feature::
-KittenFed` event count stays at **0**. Surfaced during 127-Commit-C
-verification (`logs/tuned-42`, commit `e60159bc`): Mocha gave birth to
-Maplekit-92 at tick 1278320, the kitten received zero `KittenFed` events
-across its 20898-tick lifespan, and starved at tick 1299298. The exact
-same failure mode appears in the pre-127 baseline (`logs/tuned-42-pre-127`,
-commit `3444d2d9`): Dawnkit-28 born to Mocha, never fed, starved at tick
-1321484. Hard-gate violation: `deaths_by_cause.Starvation == 1` (must be
-0). The continuity canary stays green because deaths/burial were demoted
-from the canary set in ticket 250 — but kitten starvation is a separate
-welfare line item that's been chronically broken without canary coverage.
+Every recent seed-42 deep-soak ends with one kitten born and that
+kitten starving to death. The ORIGINAL framing of this ticket
+asserted `Feature::KittenFed` "stays at 0" for the starved kitten and
+proposed a Caretake-plan completion defect as the cause. A 2026-05-11
+audit (`.claude/plans/let-s-work-273-dig-enchanted-wirth.md`) ran the
+numbers and found that framing is wrong. KittenFed fired **3 times**
+for Maplekit-92 in `logs/tuned-42` (delta-verified in SystemActivation:
++2 at tick 1282500, +1 at tick 1292600). The pre-127 baseline shows 9
+KittenFed events. The kitten-care substrate fires correctly — just
+rarely. The actual cause is upstream: cat perception of the threat
+environment misaligns with ground truth in ways that keep Patrol
+elevated, crowding Caretake out of the L3 softmax. Caretake selection
+share during the kitten's lifespan was 0.24% vs Patrol's 50.6%.
 
-`Feature::KittenFed` is cascade-exempt from `expected_to_fire_per_soak()`
-(per `system_activation.rs:884-887`, the cascade-from-trunk demotion that
-keeps one root-cause failure from multiplying into N canary entries). The
-trunk it cascades from is `MatingOccurred` — and in current soaks Mating
-*does* fire (≥1 birth per soak). So the cascade-exemption no longer
-masks: the chain `MatingOccurred → KittenBorn → KittenFed` breaks
-between birth and feeding, but `KittenFed`'s status as cascade-exempt
-hides it from the never-fired-canary surface.
+## Audit findings (2026-05-11)
 
-## Hot context
+The audit walked every perception scalar that feeds Patrol vs
+Caretake scoring and compared each to ground-truth world state.
+Six gaps surfaced; four share the same shape (point-in-time
+perception of signals that should integrate over time):
 
-- Run dir: `logs/tuned-42` (127-Commit-C, commit `e60159bc`, headless
-  release 15-min).
-- Footer gate violation: `deaths_by_cause.Starvation: 1`, `kittens_born: 1`
-  in 127-C and `2` in pre-127 (the kitten that's born starves either way).
-- Caretake disposition plans **do** get created (3 in 127-C, 9 in pre-127)
-  with the canonical `[TravelTo(Stores), RetrieveFoodForKitten, FeedKitten]`
-  shape. None complete — no `KittenFed` events, no `PlanStepFailed`
-  records for these three cats during the kitten lifespan window.
-- Pre-127 had **816** `PlanStepFailed: HandoffItem` events with reason
-  `"no kittens in colony"` — that's the **Handing** disposition (not
-  Caretake) failing to find a recipient when a kitten existed. 127-C had
-  17 — fewer attempts, not better resolution. Suggests the recipient-
-  filter sees the kitten inconsistently.
-- Kitten-care substrate is intact (verified to compile + author):
-  `KittenCryMap` (Hearing channel), `CaretakeDse` (reads
-  `kitten_cry_perceived`), `KittenCryCaretakeLift` modifier, alloparenting
-  compassion-weighted Reframe A in `scoring.rs:407-700`, `FeedKitten`
-  step in `goap_plan.rs:366`, `RetrieveAnyFoodFromStores` plan-template
-  preceding `FeedKitten`. No witness/emission obviously broken on read.
+1. **`memory_threat_seen_proximity_sum` has no temporal decay**
+   (`src/ai/scoring.rs:1928`, `memory_proximity_sums()`). `ThreatSeen`
+   events stay at their original strength forever in per-cat memory.
+   Cedar carries 18 banishments at full strength through the whole
+   run; safety-deficit perception is permanently elevated regardless
+   of actual current threat. **This is the load-bearing inaccuracy.**
+2. **Fox scent decays at a 10-day half-life intentionally for
+   territorial-mark semantics** (`src/resources/sim_constants.rs:4240-4247`),
+   but Patrol-class consumers need a faster signal. Ticket 228/256
+   resolved by severing Patrol's read; cleaner fix is to split the
+   construct — opened as **ticket 283**.
+3. **`kitten_cry_perceived` has two discontinuities**:
+   - Spatial: single-bucket sample, not range-summed (cats one tile
+     outside the cry disc hear nothing) — addressed by 243/244.
+   - Temporal: `KittenCryMap.clear()` per tick (`src/systems/growth.rs:162`),
+     no onset/offset smoothing, no duration weighting. A 1-tick
+     cessation immediately silences perceived urgency; sustained
+     crying doesn't compound. Possibly in 243/244's scope; if not,
+     follow-on needed.
+4. **No `damage_recency` scalar** — cats can't distinguish "just got
+   hit" from "old wound". Ticket 234.
+5. **No colony-shared ambush history** — only per-cat ThreatSeen
+   memory exists; cats outside hearing range never learn. Ticket 219.
+6. **Non-pickup work DSEs ignore body-state perception** — ticket 233.
 
-Open-time signals captured here so the next session doesn't re-discover.
-Remove this section once layer-walk rows are promoted.
-
-## Hot context (auto-prefilled from /ticket-from-session; remove once picked up)
-<!-- Failing run dir, footer gate violations, commit hash, recent edits, and
-     any conflicting signals. Preserves open-time signal so a fresh session
-     doesn't re-discover. Section is optional — present only when the ticket
-     was opened via `/ticket-from-session`. Delete this whole section once
-     the layer-walk rows have been promoted to [verified-*] and the fix
-     direction is settled. -->
+The audit also names the **temporal-integration doctrine** that ties
+gaps 1, 3, 4, 5 together: perception scalars driving safety/urgency
+DSEs must integrate over time, not sample point events. Opened as
+**ticket 282** (design-doctrine note for `docs/systems/`).
 
 ## Current architecture (layer-walk audit)
 
-Walk every layer of the AI pipeline relevant to the defect. Tag each
-load-bearing fact `[verified-correct]` (you read the code or a recent run
-and it matches the assumption), `[suspect]` (you haven't verified, or it
-looks wrong), or `[needs-promote]` (auto-prefilled by `/ticket-from-session`
-from a hypothesis the Plan agent couldn't promote — the next session
-promotes via a fresh query before any candidate that depends on the row).
-A row tagged `[suspect]` or `[needs-promote]` MUST be addressed by at
-least one of the fix candidates below.
+Promoted via the 2026-05-11 audit. Substrate is functional;
+inaccuracy is in the perception layer, not the kitten-care pipeline.
 
 | Layer | Component / file | Load-bearing fact | Status |
 |---|---|---|---|
-| L1 markers | `src/ai/markers/...` |  | `[verified-correct]` / `[suspect]` |
-| L2 DSE scores | `src/ai/dses/...` |  |  |
-| L3 softmax | `src/ai/scoring.rs` |  |  |
-| Action→Disposition mapping | `src/components/disposition.rs::from_action` / `constituent_actions` |  |  |
-| Plan template | `src/ai/planner/...` (or `goap_plan.rs`) |  |  |
-| Completion proxy | `src/components/commitment.rs` |  |  |
-| Resolver | `src/steps/...` |  |  |
+| L1 markers (kitten) | `src/components/markers.rs::IsParentOfHungryKitten`, `src/systems/growth.rs:175` | Marker authors correctly; hunger threshold 0.5 fires the cry painting | `[verified-correct]` |
+| L1 perception (cry) | `src/resources/kitten_cry_map.rs`, `src/systems/growth.rs:152` | Re-stamped per tick, sense-range disc; cats sample at exact tile | `[verified-discontinuous]` — spatial (single-bucket) AND temporal (no onset/offset smoothing) |
+| L1 perception (threat memory) | `src/ai/scoring.rs:1928` | `ThreatSeen` events summed within memory_nearby_radius, no decay on strength | `[verified-stale]` — strength persists indefinitely |
+| L1 perception (fox scent) | `src/systems/wildlife.rs:2383`, `src/resources/sim_constants.rs:4240-4247` | 10-day half-life — correct for territorial-mark consumers, wrong for Patrol | `[verified-stale-for-consumer]` — see ticket 283 |
+| L1 perception (damage recency) | n/a | Scalar absent; `AcuteHealthAdrenalineFlee` reads steady-state health_deficit | `[verified-absent]` — see ticket 234 |
+| L1 perception (recent ambush map) | n/a | Colony-wide decaying ambush map absent | `[verified-absent]` — see ticket 219 |
+| L2 DSE (Caretake) | `src/ai/dses/caretake.rs:66-92` | 3-axis WeightedSum: kitten_urgency 0.45 + caretake_compassion 0.30 + is_parent_of_hungry_kitten 0.25. Cry lift at modifier layer, not DSE axis | `[verified-correct]` — eligibility intact (alloparenting allowed, no parent-only filter) |
+| L2 DSE (Patrol) | `src/ai/dses/patrol.rs` | Reads `safety_deficit` (logistic), `boldness`, perimeter distance, conditional route_cost. **Does not** read any threat-presence scalar | `[verified-correct]` — safety-deficit-driven by design (228/256), but inputs are polluted by stale-memory ratchet above |
+| L3 softmax | `src/ai/scoring.rs` (softmax composition) | Caretake 0.24% vs Patrol 50.6% share during kitten lifespan | `[verified-correct]` — softmax behaves correctly given the scores it receives |
+| Action→Disposition | `src/components/disposition.rs:248-346` | `Action::Caretake → DispositionKind::Caretaking`; reverse `Caretaking → [Caretake]` | `[verified-correct]` |
+| Plan template | `src/systems/disposition.rs:2757-2775` (`build_caretaking_chain`) | Chain: MoveTo(Store) → RetrieveAnyFoodFromStores → MoveTo(kitten) → FeedKitten | `[verified-correct]` |
+| Completion proxy | `src/ai/dses/caretake.rs:117-122` | `GoalState{label:"kitten_fed", achieved: |_,_| false}` — completion via plan completion, not goal achievement | `[verified-correct]` (by design) |
+| Resolver | `src/steps/disposition/feed_kitten.rs` | Requires ticks≥10 + target.is_some() + inventory.take_food().is_some(); emits `Feature::KittenFed` on witness | `[verified-correct]` — fired 3 times for Maplekit-92 |
 
-## Fix candidates
+## Findings + Disposition
 
-**Parameter-level options** (resolver patch, predicate flip, scoring tweak,
-marker threshold, etc.):
-- R1 — …
-- R2 — …
+**Findings:** Substrate works. KittenFed fires (3 times in tuned-42,
+9 in pre-127 baseline). Insufficient *frequency* of feeding is the
+defect surface; the cause is upstream perception inaccuracy that
+keeps Patrol high (and Caretake low) regardless of actual threat
+state. Adults DO get into range — Cedar reached the kitten's exact
+tile (45,18) at tick 1280600; Mocha got within 1 tile at 1296300.
+Range and perception path are not the failure. Softmax priority is.
 
-**Structural options** (at least one MUST be drafted, even if it doesn't win):
-- R<N> (**split**) — give the action its own `DispositionKind` / DSE / Marker
-  variant. Name the new variant and what moves into it.
-- R<N+1> (**extend**) — keep the umbrella, branch the plan template /
-  completion proxy on entry conditions so the umbrella varies by trigger.
-- R<N+2> (**rebind**) — change the Action → Disposition mapping without
-  inventing a new variant.
-- R<N+3> (**retire**) — delete the variant if the layer-walk showed no
-  load-bearing job. (Often N/A; include only if applicable.)
+**Disposition: park.** This ticket is downstream of the perception-
+temporal-integration ratchet. Caretake-specific parameter tuning
+(raising base score, lift weight) would just shift the L3 cliff
+without solving the upstream cause and is the wrong lever per memory
+`feedback_park_demographic_dependent_tuning`. The right work is the
+detection-layer tickets:
 
-## Recommended direction
-Which candidate (or combination) ships, and why the structural candidate did
-or did not win. If a parameter-level option wins, briefly note why the
-structural alternative was rejected — that's the audit trail.
+- **Ticket 282** (newly opened) — temporal-integration doctrine
+- **Ticket 283** (newly opened) — fox-scent split (gap #2)
+- Ticket 219 — RecentAmbushMap with decay (gap #5)
+- Ticket 234 — damage_recency (gap #4)
+- Tickets 243/244 — audible cue substrate; scope-check for
+  temporal-discontinuity sub-gap (gap #3)
+- Ticket 233 — body-state subscription (gap #6)
+- Also: add per-cat decay to `ThreatSeen` event strength (gap #1).
+  May warrant its own ticket; could fold into 219's scope.
+
+`blocked-by` is left empty: multiple potential unblockers, informal
+parking. Reassess once any one of 219/234/243/244/283 lands.
+
+## Verification (when unparked)
+
+1. `just soak-trace 42 Cedar` AFTER one or more of the upstream
+   tickets lands (Cedar is the saturating threat-memory cat).
+2. Compare against tuned-42:
+   - `memory_threat_seen_proximity_sum` trajectory during the
+     1278400–1299298 window
+   - Patrol L3 share for Cedar across the run
+   - Caretake action count during kitten lifespan
+3. Hypothesis: with memory decay + recent-fox-presence channel,
+   Cedar's memory-threat sum during a 6k-tick lull falls by >50%,
+   Patrol share drops below 40%, and Caretake fires ≥5× during a
+   kitten lifespan.
+4. `just frame-diff <baseline> <new>` to attribute the L3 shift to
+   specific DSEs.
 
 ## Out of scope
-- What this ticket explicitly does NOT cover. Spin out follow-on tickets here.
 
-## Verification
-Hard-gate / canary the fix should restore. Soak seed + verdict expected.
-Focal-cat replay (`just soak-trace <seed> <cat>`) if the defect was
-narrative-bound to one cat.
+- Caretake-specific parameter tuning (rejected — see Disposition).
+- The cry-substrate authoring side (243/244's scope).
+- Memory-system mechanics (per-cat episodic memory has its own
+  ticket lineage — see 207 / 258).
 
 ## Log
-- YYYY-MM-DD: opened.
+- 2026-05-11: opened.
+- 2026-05-11: parked. Perception-accuracy audit reframed the
+  ticket — original premise (KittenFed never fires) is empirically
+  wrong; actual count was 3 in tuned-42, 9 in pre-127. Real cause
+  is the perception-temporal-integration ratchet driving Patrol
+  share to 50.6% and crowding out Caretake (0.24%). Opened ticket
+  282 (doctrine) and ticket 283 (fox-scent split) as the first
+  two pieces of upstream work. Audit lives at
+  `.claude/plans/let-s-work-273-dig-enchanted-wirth.md`.

@@ -15,10 +15,10 @@ _Last generated: 2026-05-11._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 82 |
-| Parked | 9 |
+| Ready | 83 |
+| Parked | 10 |
 | Blocked | 29 |
-| **Open total** | **126** |
+| **Open total** | **128** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -44,7 +44,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[229](docs/open-work/tickets/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose — _[tooling] · added 2026-05-08_
 
-## Ready (82)
+## Ready (83)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -119,7 +119,6 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[259](docs/open-work/tickets/259-l1-to-l3-activation-visualization-in-log-viewer.md)** — L1 to L3 activation visualization in log viewer — _added 2026-05-10_
 - **[260](docs/open-work/tickets/260-fox-scent-marking-signposts-territorial-boundaries-without-ward-keying.md)** — Fox scent-marking signposts — territorial boundaries without ward keying — _added 2026-05-10_
 - **[271](docs/open-work/tickets/271-restore-substrate-flee-score-lift-on-critical-health-active-threat-251-balance-follow-on.md)** — Restore substrate Flee score lift on critical-health + active-threat (251 balance follow-on) — _[ai-substrate] · added 2026-05-10_
-- **[273](docs/open-work/tickets/273-caretake-plans-complete-but-kittenfed-never-fires-kitten-starvation-chronic.md)** — Caretake plans complete but KittenFed never fires — kitten starvation chronic — _added 2026-05-11_
 - **[274](docs/open-work/tickets/274-co-mentoring-practice-on-jointintention-substrate.md)** — Co-mentoring practice on JointIntention substrate — _added 2026-05-11_
 - **[275](docs/open-work/tickets/275-joint-cache-stocking-practice-on-jointintention-substrate.md)** — Joint cache-stocking practice on JointIntention substrate — _added 2026-05-11_
 - **[276](docs/open-work/tickets/276-play-bout-practice-on-jointintention-substrate-play-continuity-canary-host.md)** — Play-bout practice on JointIntention substrate (play continuity canary host) — _added 2026-05-11_
@@ -128,8 +127,10 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[279](docs/open-work/tickets/279-body-cue-driven-joint-adoption-compose-127-with-242-243.md)** — Body-cue-driven joint adoption (compose 127 with 242 + 243) — _added 2026-05-11_
 - **[280](docs/open-work/tickets/280-mental-model-of-partner-jointintention-compose-127-with-258-c3-mental-models.md)** — Mental model of partner JointIntention (compose 127 with 258 C3 mental models) — _added 2026-05-11_
 - **[281](docs/open-work/tickets/281-rebaseline-currentjson-against-post-127-soak.md)** — Rebaseline current.json against post-127 soak — _added 2026-05-11_
+- **[282](docs/open-work/tickets/282-temporal-integration-doctrine-for-perception-signals-decay-stale-accumulate-sustained.md)** — Temporal-integration doctrine for perception signals — decay stale, accumulate sustained — _[ai-substrate] · added 2026-05-11_
+- **[283](docs/open-work/tickets/283-split-fox-scent-perception-into-territorial-mark-and-recent-presence-channels.md)** — Split fox-scent perception into territorial-mark and recent-presence channels — _[ai-substrate] · added 2026-05-11_
 
-## Parked (9)
+## Parked (10)
 
 - **[015](docs/open-work/tickets/015-alloparenting-reframe-b.md)** — Alloparenting Reframe B — mama drops kitten at hearth near resting elder — _parked 2026-04-22 · added 2026-04-22_
 - **[058](docs/open-work/tickets/058-tradition-unfiltered-loop-fix.md)** — §3.5.3 item 1 Tradition modifier — fix unfiltered-loop port — _parked 2026-04-30 · added 2026-04-27_
@@ -140,6 +141,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[212](docs/open-work/tickets/212-tune-caretake-food-security-weight.md)** — tune caretake_food_security_weight — _[balance] · parked 2026-05-10 · added 2026-05-07_
 - **[214](docs/open-work/tickets/214-tune-patrol-fox-scent-weight.md)** — tune patrol_fox_scent_weight — _[balance] · parked 2026-05-07 · blocked-by 209 · added 2026-05-07_
 - **[249](docs/open-work/tickets/249-extend-dispositionfailurecooldown-coverage-to-restingguardingpickingup-et-al-r3-from-247.md)** — Extend DispositionFailureCooldown coverage to Resting/Guarding/PickingUp et al. (R3 from 247) — _parked 2026-05-09 · added 2026-05-08_
+- **[273](docs/open-work/tickets/273-caretake-plans-complete-but-kittenfed-never-fires-kitten-starvation-chronic.md)** — Caretake plans complete but KittenFed never fires — kitten starvation chronic — _parked 2026-05-11 · added 2026-05-11_
 
 ## Blocked (29)
 
