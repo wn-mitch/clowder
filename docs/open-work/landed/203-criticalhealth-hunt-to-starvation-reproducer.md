@@ -9,7 +9,7 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, needs.md]
 related-balance: [047-acute-health-adrenaline.md]
-landed-at: pending
+landed-at: 440ae357ec17
 landed-on: 2026-05-11
 ---
 
