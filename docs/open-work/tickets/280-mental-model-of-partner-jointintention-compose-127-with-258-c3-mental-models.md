@@ -1,11 +1,11 @@
 ---
 id: 280
 title: Mental model of partner JointIntention (compose 127 with 258 C3 mental models)
-status: blocked
+status: ready
 cluster: null
 added: 2026-05-11
 parked: null
-blocked-by: [127]
+blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []

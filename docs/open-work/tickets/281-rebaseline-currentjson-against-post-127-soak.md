@@ -1,11 +1,11 @@
 ---
 id: 281
 title: Rebaseline current.json against post-127 soak
-status: blocked
+status: ready
 cluster: null
 added: 2026-05-11
 parked: null
-blocked-by: [127]
+blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []

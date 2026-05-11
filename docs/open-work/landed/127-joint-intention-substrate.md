@@ -1,7 +1,7 @@
 ---
 id: 127
 title: Joint-intention substrate for two-cat practices
-status: in-progress
+status: done
 cluster: C
 added: 2026-05-02
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, scoring-layer-second-order.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-11
 ---
 
 ## Why
@@ -538,3 +538,4 @@ Three conditions on the canonical seed-42 deep-soak via
   (measurable via `JointStageMismatchTickAccrued`). `blocked-by:
   []` confirmed — joint practices are mutually-authored, not
   cue-derived, so 242 / 243 are NOT prerequisites.
+- 2026-05-11: Landed 2026-05-11 across 3 commits (A: substrate alongside PA, B: switch readers + stage progression + cascade, C: delete PA + open follow-ons 273-281). Verdict fail traced to (a) pre-existing chronic kitten starvation per ticket 273 and (b) baseline drift since SimConstants shape changed; re-baseline tracked by 281.

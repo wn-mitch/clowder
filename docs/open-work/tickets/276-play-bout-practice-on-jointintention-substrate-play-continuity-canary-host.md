@@ -1,11 +1,11 @@
 ---
 id: 276
 title: Play-bout practice on JointIntention substrate (play continuity canary host)
-status: blocked
+status: ready
 cluster: null
 added: 2026-05-11
 parked: null
-blocked-by: [127]
+blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []

@@ -1,11 +1,11 @@
 ---
 id: 275
 title: Joint cache-stocking practice on JointIntention substrate
-status: blocked
+status: ready
 cluster: null
 added: 2026-05-11
 parked: null
-blocked-by: [127]
+blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []

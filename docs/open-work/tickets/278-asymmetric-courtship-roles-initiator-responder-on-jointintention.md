@@ -1,11 +1,11 @@
 ---
 id: 278
 title: Asymmetric Courtship roles (Initiator / Responder) on JointIntention
-status: blocked
+status: ready
 cluster: null
 added: 2026-05-11
 parked: null
-blocked-by: [127]
+blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
