@@ -55,10 +55,11 @@ pub struct GroomOutcome {
 /// still walking / timing out with no target.
 ///
 /// **Feature emission** — caller passes `Feature::GroomedOther`
-/// (Positive) to `record_if_witnessed`. Ticket 257 / Commit B —
-/// caller separately emits `Feature::PairingBiasApplied` when
+/// (Positive) to `record_if_witnessed`. Ticket 257 Commit B / 127 —
+/// caller separately emits
+/// `Feature::JointBiasApplied { practice: Courtship }` when
 /// `pairing_bias > 1.0` (i.e. the resolver target is the actor's
-/// PairingActivity partner).
+/// `JointIntention { practice: Courtship, .. }.partner`).
 #[allow(clippy::too_many_arguments)]
 pub fn resolve_groom_other(
     ticks: u64,
@@ -74,10 +75,11 @@ pub fn resolve_groom_other(
     social: &SocialConstants,
     d: &DispositionConstants,
     fc: &FulfillmentConstants,
-    // Ticket 257 / Commit B — fondness + familiarity multiplier when
-    // the target is the actor's PairingActivity partner. `1.0` for the
-    // un-paired case. Caller emits `Feature::PairingBiasApplied` when
-    // > 1.0.
+    // Ticket 257 Commit B / 127 — fondness + familiarity multiplier
+    // when the target is the actor's
+    // `JointIntention { Courtship }.partner`. `1.0` for the un-paired
+    // case. Caller emits `Feature::JointBiasApplied { Courtship }`
+    // when > 1.0.
     pairing_bias: f32,
 ) -> StepOutcome<Option<GroomOutcome>> {
     if let Some(target) = target_entity {

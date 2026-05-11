@@ -49,14 +49,14 @@
 //! its own (only `romantic` accumulates passively). The original
 //! four weights renormalized by ×0.8 to make room.
 //!
-//! **Pairing-intention axis** (ticket 078, backport of 027b's
-//! `bond_score` pin). When the cat holds a `PairingActivity`
-//! Intention, the candidate matching `pairing.partner` scores 1.0 on
-//! this axis; everyone else scores 0.0. Replaces the post-IAUS pin
-//! that 027b Commit B installed inline in `bond_score` — the
-//! Intention partner's lift now flows through the score economy with
-//! full traceability instead of branching on a special case in the
-//! resolver body. See `docs/open-work/tickets/071-planning-substrate-hardening.md`
+//! **Joint-intention axis** (ticket 078 / 127). When the cat holds a
+//! `JointIntention { practice: Courtship, partner, .. }` (the
+//! 127 successor to `PairingActivity`), the candidate matching
+//! `partner` scores 1.0 on this axis; everyone else scores 0.0.
+//! Replaces the post-IAUS pin that 027b Commit B installed inline in
+//! `bond_score` — the Intention partner's lift now flows through the
+//! score economy with full traceability instead of branching on a
+//! special case in the resolver body. See `docs/open-work/tickets/071-planning-substrate-hardening.md`
 //! ("machined gears" doctrine) for the broader sub-epic. The five
 //! pre-078 weights are scaled by `0.90` to make room for the new
 //! axis at weight `0.10`; non-Intention picks rank identically (a
@@ -77,6 +77,7 @@ use crate::ai::planner::GoapActionKind;
 use crate::ai::target_dse::{
     evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,
 };
+use crate::components::joint_intention::PracticeKind;
 use crate::components::physical::Position;
 use crate::components::RecentTargetFailures;
 use crate::resources::relationships::{BondType, Relationships};
@@ -124,9 +125,10 @@ pub fn socialize_target_dse() -> TargetTakingDse {
     let species_cliff = Curve::Piecewise {
         knots: vec![(0.0, 0.0), (0.499, 0.0), (0.5, 1.0), (1.0, 1.0)],
     };
-    // Ticket 078 — `target_pairing_intention` is a binary 0/1 sensor
-    // (`1.0` iff the candidate is the cat's `PairingActivity`
-    // partner). A Cliff at 0.5 promotes the Intention partner to a
+    // Ticket 078 / 127 — `target_pairing_intention` is a binary 0/1
+    // sensor (`1.0` iff the candidate is the cat's
+    // `JointIntention { practice: Courtship, .. }` partner). A Cliff
+    // at 0.5 promotes the Intention partner to a
     // full-axis-1.0 contribution and zeros every non-partner. Same
     // shape idiom as `species_cliff`.
     let intention_cliff = Curve::Piecewise {
@@ -231,7 +233,7 @@ fn socialize_intention(_target: Entity) -> Intention {
 /// outscores a Friends-bonded one.
 ///
 /// Ticket 078 — the post-IAUS pin that 027b Commit B installed here
-/// (returning 1.0 when `pairing_partner == Some(target)`) was
+/// (returning 1.0 when `joint_partner == Some(target)`) was
 /// backported to the dedicated `target_pairing_intention` axis on
 /// `socialize_target_dse`. This function is now a pure tier→scalar
 /// map again, with no knowledge of the Intention layer; the
@@ -277,23 +279,24 @@ pub fn resolve_socialize_target(
     tick: u64,
     focal_hook: Option<FocalTargetHook<'_>>,
     // Sensor input for the `target_pairing_intention` IAUS axis
-    // (ticket 078). `Some(p)` when the cat holds a `PairingActivity`
-    // Intention with partner `p`; `None` for cats without an
-    // Intention. Read by the per-target fetcher to produce a binary
-    // 0/1 input that the cliff curve in `socialize_target_dse`
-    // promotes into a flat 0.10 lift on the IAUS pick. Replaces
-    // 027b Commit B's post-IAUS bond pin — the lift now flows
-    // through the score economy with full traceability.
-    pairing_partner: Option<Entity>,
+    // (ticket 078; renamed in 127). `Some(p)` when the cat holds a
+    // `JointIntention { practice: Courtship, partner: p, .. }`;
+    // `None` otherwise. The caller is responsible for pre-filtering
+    // by practice when building the snapshot (single source of truth
+    // for the Courtship-vs-other-practices distinction). Read by the
+    // per-target fetcher to produce a binary 0/1 input that the cliff
+    // curve in `socialize_target_dse` promotes into a flat 0.10 lift
+    // on the IAUS pick.
+    joint_partner: Option<Entity>,
     // Ticket 073 — per-cat recently-failed target memory. `None` for
     // cats without the component (lazy-inserted on first failure);
     // when `Some`, the `TARGET_RECENT_FAILURE_INPUT` axis penalizes
     // recently-failed candidates via the cooldown curve.
     recent: Option<&RecentTargetFailures>,
     cooldown_ticks: u64,
-    // Activation tracker for `Feature::PairingBiasApplied` and
+    // Activation tracker for `Feature::JointBiasApplied { Courtship }` and
     // `Feature::TargetCooldownApplied`. Fires when the IAUS pick ==
-    // `pairing_partner` AND the underlying bond score was < 1.0
+    // `joint_partner` AND the underlying bond score was < 1.0
     // (post-078, the `target_pairing_intention` axis was load-bearing);
     // or when at least one candidate's cooldown signal was < 1.0.
     // Pass `None` from dead-code disposition.rs paths and from tests
@@ -393,12 +396,10 @@ pub fn resolve_socialize_target(
                 }
                 signal
             }
-            // Ticket 078 — `target_pairing_intention` sensor:
-            // `1.0` iff `target` is the cat's `PairingActivity`
-            // partner; `0.0` otherwise. Backports 027b's `bond_score`
-            // pin from a post-IAUS branch into a first-class IAUS
-            // axis with a cliff curve.
-            PAIRING_INTENTION_INPUT if pairing_partner == Some(target) => 1.0,
+            // Ticket 078 / 127 — `target_pairing_intention` sensor:
+            // `1.0` iff `target` is the cat's
+            // `JointIntention { Courtship }.partner`; `0.0` otherwise.
+            PAIRING_INTENTION_INPUT if joint_partner == Some(target) => 1.0,
             _ => 0.0,
         }
     };
@@ -454,9 +455,11 @@ pub fn resolve_socialize_target(
         // bond score (now pure post-078) is < 1.0 (Friends-bonded or
         // unbonded; Partners/Mates get 1.0 with or without the Intention
         // lift). This is the same observability gate as the pre-078 pin.
-        if let (Some(picked), Some(partner)) = (scored.winning_target, pairing_partner) {
+        if let (Some(picked), Some(partner)) = (scored.winning_target, joint_partner) {
             if picked == partner && bond_score(relationships, cat, partner) < 1.0 {
-                act.record(Feature::PairingBiasApplied);
+                act.record(Feature::JointBiasApplied {
+                    practice: PracticeKind::Courtship,
+                });
             }
         }
         // Ticket 073 — fire `TargetCooldownApplied` once per resolver
@@ -663,7 +666,7 @@ mod tests {
         // Ticket 078 — backport of 027b's `bond_score` pin. The
         // `target_pairing_intention` axis (cliff at 0.5, weight 0.10)
         // adds a flat 0.10 lift to the IAUS score of the cat's
-        // `PairingActivity` partner. With Friends-bonded fondness/
+        // `JointIntention { Courtship }` partner. With Friends-bonded fondness/
         // novelty held equal between two candidates, the Intention
         // partner wins where the bond axis alone would have tied.
         //
@@ -730,7 +733,7 @@ mod tests {
     #[test]
     fn pairing_intention_axis_matches_legacy_pin_lift_on_friends_partner() {
         // Ticket 078 — regression-on-purpose. The pre-078 pin
-        // returned `1.0` from `bond_score` when `pairing_partner ==
+        // returned `1.0` from `bond_score` when `joint_partner ==
         // Some(target)`, regardless of bond tier. For a Friends-
         // bonded Intention partner the pin's load-bearing lift was
         // exactly `partner_bond_weight × (1.0 - 0.5) = 0.20 × 0.5

@@ -20,7 +20,7 @@ use crate::components::items::Item;
 use crate::components::magic::{Harvestable, Herb, Inventory, Ward};
 use crate::components::markers;
 use crate::components::mental::Memory;
-use crate::components::pairing::pairing_bias_for;
+use crate::components::joint_intention::{joint_bias_for, PracticeKind};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Health, InjuryKind, Needs, Position};
 use crate::components::prey::{
@@ -65,6 +65,13 @@ pub struct NarrativeEmitter<'w> {
     pub config: Res<'w, crate::resources::time::SimConfig>,
     pub weather: Res<'w, crate::resources::weather::WeatherState>,
     pub activation: Option<ResMut<'w, SystemActivation>>,
+    /// Ticket 127 — bias-reader call sites emit
+    /// `JointInteractionObserved` here when an amplification fires.
+    /// `author_joint_intentions` consumes the batch on the following
+    /// tick to bump `JointIntention.last_interaction_tick`, gating
+    /// the `Approach → Courting` stage advance.
+    pub joint_interaction:
+        bevy_ecs::message::MessageWriter<'w, crate::ai::joint_intention::JointInteractionObserved>,
 }
 /// §4.3 marker queries for snapshot population. Bundled to avoid
 /// hitting Bevy's 16-parameter system limit. Future marker batches
@@ -112,16 +119,17 @@ pub struct MarkerQueries<'w, 's> {
         ),
     >,
     /// Ticket 027 Bug 2 — eligibility marker for `MateDse` paired
-    /// with ticket 103 — `Has<PairingActivity>` for the
-    /// dependent-presence half of `escape_viability`. Bundling lets
-    /// the disposition populator answer "does this cat have an
-    /// active pair-bond?" without threading a separate query.
+    /// with ticket 103 — `Has<JointIntention>` (127 successor to
+    /// `Has<PairingActivity>`) for the dependent-presence half of
+    /// `escape_viability`. Bundling lets the disposition populator
+    /// answer "does this cat have an active joint practice?" without
+    /// threading a separate query.
     pub mate_eligibility: Query<
         'w,
         's,
         (
             Has<markers::HasEligibleMate>,
-            Has<crate::components::PairingActivity>,
+            Has<crate::components::JointIntention>,
         ),
     >,
     /// Ticket 014 Mentoring batch — Mentor / Apprentice / HasMentoringTarget.
@@ -2812,13 +2820,15 @@ struct MentorEffect {
 #[allow(clippy::type_complexity)]
 pub struct ChainStepReadContext<'w, 's> {
     pub constants: Res<'w, SimConstants>,
-    /// 257 / Commit B — actor's PairingActivity for the bias readers in
-    /// Socialize/GroomOther/MentorCat. Disjoint from `cats` (which holds
-    /// `&mut TaskChain` etc) because `&PairingActivity` is read-only.
-    pub pairing_q: Query<
+    /// 257 / 127 — actor's JointIntention (any practice; bias readers
+    /// filter to Courtship at snapshot-construction time) for the bias
+    /// readers in Socialize/GroomOther/MentorCat. Disjoint from `cats`
+    /// (which holds `&mut TaskChain` etc) because `&JointIntention` is
+    /// read-only.
+    pub joint_q: Query<
         'w,
         's,
-        (Entity, &'static crate::components::PairingActivity),
+        (Entity, &'static crate::components::JointIntention),
         (Without<Dead>, Without<Structure>),
     >,
 }
@@ -2828,11 +2838,14 @@ struct ChainStepSnapshots {
     grooming: std::collections::HashMap<Entity, f32>,
     gender: std::collections::HashMap<Entity, Gender>,
     cat_tile_counts: std::collections::HashMap<Position, u32>,
-    /// 257 / Commit B — `PairingActivity.partner` per cat, when held.
-    /// Read by Socialize/GroomOther/MentorCat resolvers to amplify the
-    /// fondness/familiarity delta when the resolver target equals the
-    /// pairing partner.
-    pairing_partner: std::collections::HashMap<Entity, Entity>,
+    /// 257 / 127 — `JointIntention { Courtship }.partner` per cat,
+    /// when held. Pre-filtered to the Courtship practice during
+    /// snapshot construction so the bias-reader call sites stay
+    /// practice-agnostic (matches the prior `pairing_partner` shape).
+    /// Read by Socialize/GroomOther/MentorCat resolvers to amplify
+    /// the fondness/familiarity delta when the resolver target equals
+    /// the joint-practice partner.
+    joint_partner: std::collections::HashMap<Entity, Entity>,
 }
 
 /// Mutable accumulators written by [`dispatch_chain_step`], consumed by the
@@ -2918,13 +2931,14 @@ pub fn resolve_disposition_chains(
     den_query: Query<(Entity, &PreyDen, &Position), Without<PreyAnimal>>,
     mut prey_params: PreyHuntParams,
     mut commands: Commands,
-    // 257 — bundle `constants` + `pairing_q` to stay under Bevy's
-    // 16-param limit. Constants is widely used; the new pairing query
-    // joined the system as part of Pairing Commit B.
+    // 257 / 127 — bundle `constants` + `joint_q` to stay under Bevy's
+    // 16-param limit. The new joint-intention query joined the system
+    // as part of Pairing Commit B and was generalized to JointIntention
+    // in ticket 127.
     read_ctx: ChainStepReadContext,
 ) {
     let constants = &*read_ctx.constants;
-    let pairing_q = &read_ctx.pairing_q;
+    let joint_q = &read_ctx.joint_q;
     let d = &constants.disposition;
 
     let mut accum = ChainStepAccumulators {
@@ -2957,12 +2971,15 @@ pub fn resolve_disposition_chains(
             }
             counts
         },
-        // 257 / Commit B — pre-loop snapshot of every cat's
-        // `PairingActivity.partner`. Empty when no cats hold the
-        // intention (the steady state pre-fix).
-        pairing_partner: pairing_q
+        // 257 / 127 — pre-loop snapshot of every cat's
+        // `JointIntention { Courtship }.partner`. Pre-filtered by
+        // practice == Courtship so the call sites stay practice-
+        // agnostic. Empty when no cats hold a Courtship JI.
+        joint_partner: joint_q
             .iter()
-            .map(|(e, pairing)| (e, pairing.partner))
+            .filter_map(|(e, joint)| {
+                (joint.practice == PracticeKind::Courtship).then_some((e, joint.partner))
+            })
             .collect(),
     };
 
@@ -4073,17 +4090,32 @@ fn dispatch_chain_step(
                 None => &mut fallback_fulfillment,
             };
             // 257 / Commit B — pairing-bias multiplier when the social
-            // target equals the actor's PairingActivity.partner. The
+            // target equals the actor's JointIntention.partner. The
             // helper returns `(1.0, false)` when no Intention is held
             // or the target differs.
-            let (pairing_bias, amplified) = pairing_bias_for(
-                snaps.pairing_partner.get(&cat_entity).copied(),
+            let (pairing_bias, amplified) = joint_bias_for(
+                snaps.joint_partner.get(&cat_entity).copied(),
                 target,
-                constants.pairing.bias_multiplier,
+                constants.practices.courtship.bias_multiplier,
             );
             if amplified {
                 if let Some(act) = narr.activation.as_deref_mut() {
-                    act.record(Feature::PairingBiasApplied);
+                    act.record(Feature::JointBiasApplied {
+                        practice: PracticeKind::Courtship,
+                    });
+                }
+                // Ticket 127 — emit JointInteractionObserved so the
+                // author can bump last_interaction_tick → unlocks
+                // Approach→Courting stage advance.
+                if let Some(partner) = target {
+                    narr.joint_interaction.write(
+                        crate::ai::joint_intention::JointInteractionObserved {
+                            entity: cat_entity,
+                            partner,
+                            practice: PracticeKind::Courtship,
+                            tick: time.tick,
+                        },
+                    );
                 }
             }
             let outcome = crate::steps::disposition::resolve_socialize(
@@ -4114,14 +4146,29 @@ fn dispatch_chain_step(
                 Some(f) => &mut **f,
                 None => &mut fallback_fulfillment,
             };
-            let (pairing_bias, amplified) = pairing_bias_for(
-                snaps.pairing_partner.get(&cat_entity).copied(),
+            let (pairing_bias, amplified) = joint_bias_for(
+                snaps.joint_partner.get(&cat_entity).copied(),
                 target,
-                constants.pairing.bias_multiplier,
+                constants.practices.courtship.bias_multiplier,
             );
             if amplified {
                 if let Some(act) = narr.activation.as_deref_mut() {
-                    act.record(Feature::PairingBiasApplied);
+                    act.record(Feature::JointBiasApplied {
+                        practice: PracticeKind::Courtship,
+                    });
+                }
+                // Ticket 127 — emit JointInteractionObserved so the
+                // author can bump last_interaction_tick → unlocks
+                // Approach→Courting stage advance.
+                if let Some(partner) = target {
+                    narr.joint_interaction.write(
+                        crate::ai::joint_intention::JointInteractionObserved {
+                            entity: cat_entity,
+                            partner,
+                            practice: PracticeKind::Courtship,
+                            tick: time.tick,
+                        },
+                    );
                 }
             }
             let outcome = crate::steps::disposition::resolve_groom_other(
@@ -4150,14 +4197,29 @@ fn dispatch_chain_step(
         StepKind::MentorCat => {
             let step = chain.current_mut().unwrap();
             let target = step.target_entity;
-            let (pairing_bias, amplified) = pairing_bias_for(
-                snaps.pairing_partner.get(&cat_entity).copied(),
+            let (pairing_bias, amplified) = joint_bias_for(
+                snaps.joint_partner.get(&cat_entity).copied(),
                 target,
-                constants.pairing.bias_multiplier,
+                constants.practices.courtship.bias_multiplier,
             );
             if amplified {
                 if let Some(act) = narr.activation.as_deref_mut() {
-                    act.record(Feature::PairingBiasApplied);
+                    act.record(Feature::JointBiasApplied {
+                        practice: PracticeKind::Courtship,
+                    });
+                }
+                // Ticket 127 — emit JointInteractionObserved so the
+                // author can bump last_interaction_tick → unlocks
+                // Approach→Courting stage advance.
+                if let Some(partner) = target {
+                    narr.joint_interaction.write(
+                        crate::ai::joint_intention::JointInteractionObserved {
+                            entity: cat_entity,
+                            partner,
+                            practice: PracticeKind::Courtship,
+                            tick: time.tick,
+                        },
+                    );
                 }
             }
             let outcome = crate::steps::disposition::resolve_mentor_cat(

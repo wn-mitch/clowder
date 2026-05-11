@@ -330,35 +330,34 @@ pub fn joint_bias_multiplier(
     practice: PracticeKind,
     bias_multiplier: f32,
 ) -> (f32, bool) {
-    joint_bias_for(
-        joint.map(|j| (j.partner, j.practice)),
-        Some(target),
-        practice,
-        bias_multiplier,
-    )
+    let partner = joint.and_then(|j| (j.practice == practice).then_some(j.partner));
+    joint_bias_for(partner, Some(target), bias_multiplier)
 }
 
 /// Snapshot-friendly variant of [`joint_bias_multiplier`]. Takes a
-/// pre-extracted `Option<(Entity, PracticeKind)>` snapshot and an
+/// pre-extracted `Option<Entity>` partner snapshot and an
 /// `Option<Entity>` target.
 ///
 /// Used from chain-step contexts where `&mut Commands` and
 /// `Query<&JointIntention>` conflict in the same system. Callers build
-/// a `HashMap<Entity, (Entity, PracticeKind)>` snapshot during a query
-/// pass, then pass per-cat lookups into this function. `target == None`
-/// is the "resolver had no target this tick" case and produces
-/// `(1.0, false)` so callers can use the same helper on every branch
-/// without conditional logic.
+/// a `HashMap<Entity, Entity>` snapshot during a query pass — the
+/// **query itself filters by practice** (e.g.,
+/// `Query<&JointIntention>` filtered on `.practice == Courtship`), so
+/// the snapshot only contains partners for the relevant practice. This
+/// keeps the call-site signature identical to the prior
+/// `pairing_bias_for` and pushes the practice filter to one place
+/// (snapshot construction).
+///
+/// `target == None` is the "resolver had no target this tick" case
+/// and produces `(1.0, false)` so callers can use the same helper on
+/// every branch without conditional logic.
 pub fn joint_bias_for(
-    joint_snapshot: Option<(Entity, PracticeKind)>,
+    partner: Option<Entity>,
     target: Option<Entity>,
-    practice: PracticeKind,
     bias_multiplier: f32,
 ) -> (f32, bool) {
-    match (joint_snapshot, target) {
-        (Some((partner, kind)), Some(t)) if partner == t && kind == practice => {
-            (bias_multiplier, true)
-        }
+    match (partner, target) {
+        (Some(p), Some(t)) if p == t => (bias_multiplier, true),
         _ => (1.0, false),
     }
 }
@@ -936,12 +935,7 @@ mod tests {
     #[test]
     fn bias_multiplier_target_none_returns_one() {
         let partner = entity(7);
-        let (mult, amped) = joint_bias_for(
-            Some((partner, PracticeKind::Courtship)),
-            None,
-            PracticeKind::Courtship,
-            1.5,
-        );
+        let (mult, amped) = joint_bias_for(Some(partner), None, 1.5);
         assert_eq!(mult, 1.0);
         assert!(!amped);
     }

@@ -39,9 +39,10 @@ use crate::steps::{StepOutcome, StepResult};
 /// (Positive) to `record_if_witnessed`. Before §Phase 5a no
 /// Feature existed for Socialize — a blind spot that masked whether
 /// the social pipeline was producing any real interactions. Ticket
-/// 257 / Commit B — caller separately emits
-/// `Feature::PairingBiasApplied` when `pairing_bias > 1.0` (i.e.
-/// the resolver target is the actor's PairingActivity partner).
+/// 257 Commit B / 127 — caller separately emits
+/// `Feature::JointBiasApplied { practice: Courtship }` when
+/// `pairing_bias > 1.0` (i.e. the resolver target is the actor's
+/// `JointIntention { practice: Courtship, .. }.partner`).
 #[allow(clippy::too_many_arguments)]
 pub fn resolve_socialize(
     ticks: u64,
@@ -57,11 +58,12 @@ pub fn resolve_socialize(
     social: &SocialConstants,
     d: &DispositionConstants,
     fc: &FulfillmentConstants,
-    // Ticket 257 / Commit B — fondness + familiarity multiplier when
-    // the target is the actor's PairingActivity partner. `1.0` for the
-    // un-paired case (production callers pass `1.0` when no
-    // PairingActivity is held). Caller is responsible for emitting
-    // `Feature::PairingBiasApplied` when this is > 1.0.
+    // Ticket 257 Commit B / 127 — fondness + familiarity multiplier
+    // when the target is the actor's
+    // `JointIntention { practice: Courtship, .. }.partner`. `1.0` for
+    // the un-paired case (production callers pass `1.0` when no
+    // matching JI is held). Caller emits
+    // `Feature::JointBiasApplied { Courtship }` when this is > 1.0.
     pairing_bias: f32,
 ) -> StepOutcome<bool> {
     let witnessed = if let Some(target) = target_entity {

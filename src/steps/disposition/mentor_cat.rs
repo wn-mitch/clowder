@@ -33,10 +33,11 @@ use crate::steps::{StepOutcome, StepResult};
 /// apply the cross-entity skill transfer.
 ///
 /// **Feature emission** — caller passes `Feature::MentoredCat`
-/// (Positive) to `record_if_witnessed`. Ticket 257 / Commit B —
-/// caller separately emits `Feature::PairingBiasApplied` when
+/// (Positive) to `record_if_witnessed`. Ticket 257 Commit B / 127 —
+/// caller separately emits
+/// `Feature::JointBiasApplied { practice: Courtship }` when
 /// `pairing_bias > 1.0` (i.e. the resolver target is the actor's
-/// PairingActivity partner).
+/// `JointIntention { practice: Courtship, .. }.partner`).
 #[allow(clippy::too_many_arguments)]
 pub fn resolve_mentor_cat(
     ticks: u64,
@@ -47,9 +48,10 @@ pub fn resolve_mentor_cat(
     relationships: &mut Relationships,
     tick: u64,
     d: &DispositionConstants,
-    // Ticket 257 / Commit B — fondness + familiarity multiplier when
-    // the apprentice is the actor's PairingActivity partner. `1.0` for
-    // the un-paired case. Caller emits `Feature::PairingBiasApplied`
+    // Ticket 257 Commit B / 127 — fondness + familiarity multiplier
+    // when the apprentice is the actor's
+    // `JointIntention { Courtship }.partner`. `1.0` for the un-paired
+    // case. Caller emits `Feature::JointBiasApplied { Courtship }`
     // when > 1.0.
     pairing_bias: f32,
 ) -> StepOutcome<Option<(Entity, Skills)>> {

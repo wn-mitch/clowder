@@ -79,6 +79,13 @@ pub struct NarrativeEmitter<'w> {
     pub config: Res<'w, crate::resources::time::SimConfig>,
     pub weather: Res<'w, crate::resources::weather::WeatherState>,
     pub activation: Option<ResMut<'w, SystemActivation>>,
+    /// Ticket 127 — bias-reader call sites emit
+    /// `JointInteractionObserved` here when an amplification fires.
+    /// `author_joint_intentions` consumes the batch on the following
+    /// tick to bump `JointIntention.last_interaction_tick`, which
+    /// gates the `Approach → Courting` stage advance.
+    pub joint_interaction:
+        bevy_ecs::message::MessageWriter<'w, crate::ai::joint_intention::JointInteractionObserved>,
 }
 
 /// Bundles world-state queries for evaluate_and_plan to stay under 16 params.
@@ -525,15 +532,16 @@ pub struct ExecutorContext<'w, 's> {
         's,
         &'static crate::components::HeldIntention,
     >,
-    /// Ticket 027b §7.M — L2 PairingActivity Intention lookup. The
-    /// `SocializeWith` step resolver reads this to pin the Intention
-    /// partner at the top of `target_partner_bond` axis. Disjoint
-    /// from the mutable `cats` query in `resolve_goap_plans` because
-    /// `&PairingActivity` is read-only.
-    pub pairing_q: bevy_ecs::prelude::Query<
+    /// Ticket 127 — L2 JointIntention lookup (successor to
+    /// `PairingActivity`). The `SocializeWith` step resolver reads
+    /// this to pin the Intention partner at the top of the
+    /// `target_partner_bond` axis. Disjoint from the mutable `cats`
+    /// query in `resolve_goap_plans` because `&JointIntention` is
+    /// read-only.
+    pub joint_q: bevy_ecs::prelude::Query<
         'w,
         's,
-        &'static crate::components::PairingActivity,
+        &'static crate::components::JointIntention,
         Without<Dead>,
     >,
     /// 035 — Dead-and-not-Buried colony cat snapshot (Entity, Position,
@@ -1185,13 +1193,14 @@ pub fn evaluate_and_plan(
     )>,
     // Ticket 027 Bug 2 — HasEligibleMate authored by
     // `mating::update_mate_eligibility_markers`, paired with ticket
-    // 103 — `Has<PairingActivity>` for the dependent-presence half of
+    // 103 — `Has<JointIntention>` (any practice; 127 successor to
+    // `Has<PairingActivity>`) for the dependent-presence half of
     // `escape_viability`. Bundling both in one query keeps the
-    // mate/pairing state colocated and stays under the SystemParam
-    // count budget.
+    // mate/joint-practice state colocated and stays under the
+    // SystemParam count budget.
     mate_eligibility_q: Query<(
         Has<markers::HasEligibleMate>,
-        Has<crate::components::PairingActivity>,
+        Has<crate::components::JointIntention>,
     )>,
     // Ticket 014 Mentoring batch — Mentor / Apprentice / HasMentoringTarget
     // authored by `aspirations::update_training_markers` and
@@ -4465,13 +4474,22 @@ fn dispatch_step_action(
                     None
                 };
                 let stance_overlays = |e: Entity| ec.stance_overlays_of(e);
-                // Ticket 027b §7.M — look up the L2 PairingActivity
-                // partner so `socialize_target::bond_score` can pin
-                // the Intention partner at 1.0 regardless of bond
-                // tier. Falls back to `None` for cats without an
-                // Intention (the steady-state for non-reproductive
-                // or partnerless cats).
-                let pairing_partner = ec.pairing_q.get(cat_entity).ok().map(|p| p.partner);
+                // Ticket 027b §7.M / 127 — look up the L2
+                // JointIntention partner (Courtship practice) so
+                // `socialize_target::bond_score` can pin the Intention
+                // partner at 1.0 regardless of bond tier. Filtered on
+                // `practice == Courtship` so the snapshot is single-
+                // source-of-truth for the Courtship-vs-other-practices
+                // distinction. Falls back to `None` for cats without
+                // a Courtship JI.
+                let joint_partner = ec
+                    .joint_q
+                    .get(cat_entity)
+                    .ok()
+                    .filter(|j| {
+                        j.practice == crate::components::joint_intention::PracticeKind::Courtship
+                    })
+                    .map(|j| j.partner);
                 plan.step_state[step_idx].target_entity =
                     crate::ai::dses::socialize_target::resolve_socialize_target(
                         &ec.dse_registry,
@@ -4483,7 +4501,7 @@ fn dispatch_step_action(
                         &stance_overlays,
                         ec.time.tick,
                         focal_hook,
-                        pairing_partner,
+                        joint_partner,
                         recent_failures,
                         ec.constants
                             .planning_substrate
@@ -4503,14 +4521,41 @@ fn dispatch_step_action(
             // target equals the actor's PairingActivity.partner. The
             // helper returns `(1.0, false)` when no Intention is held
             // or the target differs.
-            let (pairing_bias, amplified) = crate::components::pairing::pairing_bias_for(
-                ec.pairing_q.get(cat_entity).ok().map(|p| p.partner),
+            // Ticket 127 — switched from PairingActivity to
+            // JointIntention { practice: Courtship }. Snapshot is
+            // pre-filtered to Courtship at the .filter() call so the
+            // single-practice pattern stays trivially identical to
+            // the prior pairing_bias_for shape.
+            let (pairing_bias, amplified) = crate::components::joint_intention::joint_bias_for(
+                ec.joint_q
+                    .get(cat_entity)
+                    .ok()
+                    .filter(|j| {
+                        j.practice == crate::components::joint_intention::PracticeKind::Courtship
+                    })
+                    .map(|j| j.partner),
                 plan.step_state[step_idx].target_entity,
-                ec.constants.pairing.bias_multiplier,
+                ec.constants.practices.courtship.bias_multiplier,
             );
             if amplified {
                 if let Some(act) = narr.activation.as_deref_mut() {
-                    act.record(Feature::PairingBiasApplied);
+                    act.record(Feature::JointBiasApplied {
+                        practice: crate::components::joint_intention::PracticeKind::Courtship,
+                    });
+                }
+                // Ticket 127 — feed `last_interaction_tick` so the
+                // Approach→Courting stage advance fires once any
+                // paired-resolver interaction has occurred.
+                if let Some(partner) = plan.step_state[step_idx].target_entity {
+                    narr.joint_interaction.write(
+                        crate::ai::joint_intention::JointInteractionObserved {
+                            entity: cat_entity,
+                            partner,
+                            practice:
+                                crate::components::joint_intention::PracticeKind::Courtship,
+                            tick: ec.time.tick,
+                        },
+                    );
                 }
             }
             let outcome = crate::steps::disposition::resolve_socialize(
@@ -4595,14 +4640,41 @@ fn dispatch_step_action(
                 Some(f) => &mut **f,
                 None => &mut fallback_fulfillment,
             };
-            let (pairing_bias, amplified) = crate::components::pairing::pairing_bias_for(
-                ec.pairing_q.get(cat_entity).ok().map(|p| p.partner),
+            // Ticket 127 — switched from PairingActivity to
+            // JointIntention { practice: Courtship }. Snapshot is
+            // pre-filtered to Courtship at the .filter() call so the
+            // single-practice pattern stays trivially identical to
+            // the prior pairing_bias_for shape.
+            let (pairing_bias, amplified) = crate::components::joint_intention::joint_bias_for(
+                ec.joint_q
+                    .get(cat_entity)
+                    .ok()
+                    .filter(|j| {
+                        j.practice == crate::components::joint_intention::PracticeKind::Courtship
+                    })
+                    .map(|j| j.partner),
                 plan.step_state[step_idx].target_entity,
-                ec.constants.pairing.bias_multiplier,
+                ec.constants.practices.courtship.bias_multiplier,
             );
             if amplified {
                 if let Some(act) = narr.activation.as_deref_mut() {
-                    act.record(Feature::PairingBiasApplied);
+                    act.record(Feature::JointBiasApplied {
+                        practice: crate::components::joint_intention::PracticeKind::Courtship,
+                    });
+                }
+                // Ticket 127 — feed `last_interaction_tick` so the
+                // Approach→Courting stage advance fires once any
+                // paired-resolver interaction has occurred.
+                if let Some(partner) = plan.step_state[step_idx].target_entity {
+                    narr.joint_interaction.write(
+                        crate::ai::joint_intention::JointInteractionObserved {
+                            entity: cat_entity,
+                            partner,
+                            practice:
+                                crate::components::joint_intention::PracticeKind::Courtship,
+                            tick: ec.time.tick,
+                        },
+                    );
                 }
             }
             let outcome = crate::steps::disposition::resolve_groom_other(
@@ -4678,14 +4750,41 @@ fn dispatch_step_action(
                         narr.activation.as_deref_mut(),
                     );
             }
-            let (pairing_bias, amplified) = crate::components::pairing::pairing_bias_for(
-                ec.pairing_q.get(cat_entity).ok().map(|p| p.partner),
+            // Ticket 127 — switched from PairingActivity to
+            // JointIntention { practice: Courtship }. Snapshot is
+            // pre-filtered to Courtship at the .filter() call so the
+            // single-practice pattern stays trivially identical to
+            // the prior pairing_bias_for shape.
+            let (pairing_bias, amplified) = crate::components::joint_intention::joint_bias_for(
+                ec.joint_q
+                    .get(cat_entity)
+                    .ok()
+                    .filter(|j| {
+                        j.practice == crate::components::joint_intention::PracticeKind::Courtship
+                    })
+                    .map(|j| j.partner),
                 plan.step_state[step_idx].target_entity,
-                ec.constants.pairing.bias_multiplier,
+                ec.constants.practices.courtship.bias_multiplier,
             );
             if amplified {
                 if let Some(act) = narr.activation.as_deref_mut() {
-                    act.record(Feature::PairingBiasApplied);
+                    act.record(Feature::JointBiasApplied {
+                        practice: crate::components::joint_intention::PracticeKind::Courtship,
+                    });
+                }
+                // Ticket 127 — feed `last_interaction_tick` so the
+                // Approach→Courting stage advance fires once any
+                // paired-resolver interaction has occurred.
+                if let Some(partner) = plan.step_state[step_idx].target_entity {
+                    narr.joint_interaction.write(
+                        crate::ai::joint_intention::JointInteractionObserved {
+                            entity: cat_entity,
+                            partner,
+                            practice:
+                                crate::components::joint_intention::PracticeKind::Courtship,
+                            tick: ec.time.tick,
+                        },
+                    );
                 }
             }
             let outcome = crate::steps::disposition::resolve_mentor_cat(

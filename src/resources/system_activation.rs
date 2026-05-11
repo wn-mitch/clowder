@@ -962,6 +962,13 @@ impl Feature {
             // StageAdvanced fall through to `_ => true`.
             Feature::JointIntentionDropped { .. } => false,
             Feature::JointStageMismatchTickAccrued { .. } => false,
+            // Ticket 127 Commit B — `PairingBiasApplied` no longer
+            // fires (readers emit `JointBiasApplied { Courtship }`
+            // instead). The successor Feature carries the canary
+            // until PA is retired entirely in Commit C. Demoted here
+            // to keep the never-fired canary green during the
+            // 127 migration.
+            Feature::PairingBiasApplied => false,
             // 250: burial is conditional on death. Post-247 / 248 the
             // substrate keeps colonies healthy enough that deaths
             // (and therefore burials) are genuinely rare; treating
@@ -1525,14 +1532,49 @@ mod tests {
         assert!(Feature::GroomedOther.expected_to_fire_per_soak());
         // Promoted by ticket 027 Bug 1 (courtship-drift emits per-tick).
         assert!(Feature::CourtshipInteraction.expected_to_fire_per_soak());
-        // Ticket 257 Commit B — both Pairing trunk Features are now
-        // canary-validated. `PairingBiasApplied` was promoted when
-        // its emission semantics shifted from the 027b
-        // target-selection signal (multi-seed-only per ticket 082) to
-        // the per-amplification fondness/familiarity bias signal
-        // (single-seed-observable on any healthy Pairing chain).
+        // Ticket 257 Commit B / 127 — PairingIntentionEmitted is
+        // still authored by the upstream PA author during the 127
+        // migration. PairingBiasApplied was demoted in 127 Commit B
+        // when bias readers switched to emit
+        // `JointBiasApplied { Courtship }`; the successor carries the
+        // canary now.
         assert!(Feature::PairingIntentionEmitted.expected_to_fire_per_soak());
-        assert!(Feature::PairingBiasApplied.expected_to_fire_per_soak());
+        assert!(!Feature::PairingBiasApplied.expected_to_fire_per_soak());
+        // Ticket 127 — JointIntention canary classifications: the
+        // three Positive variants carry the per-practice fire-rate
+        // expectation (PracticeKind::Courtship in 127); the two
+        // Neutral variants (drop + mismatch) are bursty / healthy-
+        // sometimes-zero respectively.
+        assert!(
+            Feature::JointIntentionEmitted {
+                practice: PracticeKind::Courtship,
+            }
+            .expected_to_fire_per_soak()
+        );
+        assert!(
+            Feature::JointBiasApplied {
+                practice: PracticeKind::Courtship,
+            }
+            .expected_to_fire_per_soak()
+        );
+        assert!(
+            Feature::JointStageAdvanced {
+                practice: PracticeKind::Courtship,
+            }
+            .expected_to_fire_per_soak()
+        );
+        assert!(
+            !Feature::JointIntentionDropped {
+                practice: PracticeKind::Courtship,
+            }
+            .expected_to_fire_per_soak()
+        );
+        assert!(
+            !Feature::JointStageMismatchTickAccrued {
+                practice: PracticeKind::Courtship,
+            }
+            .expected_to_fire_per_soak()
+        );
         // Rare-legend events must be exempted.
         assert!(!Feature::ShadowFoxBanished.expected_to_fire_per_soak());
         assert!(!Feature::FateAwakened.expected_to_fire_per_soak());
