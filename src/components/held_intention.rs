@@ -1,9 +1,12 @@
 //! Ticket 126 — actor-private BDI intention substrate.
 //!
 //! `HeldIntention` is a per-cat Component that records the goal-shaped
-//! commitment the cat currently holds. Generalises `PairingActivity`'s
-//! shape (one specific partner) into "the goal-shaped commitment I
-//! currently hold." Authored by the L2 evaluator
+//! commitment the cat currently holds. Generalises the prior
+//! `PairingActivity` shape (one specific partner) into "the
+//! goal-shaped commitment I currently hold." Ticket 127 retired
+//! `PairingActivity` in favor of `JointIntention { practice: Courtship,
+//! .. }` (mutually-public substrate) — `HeldIntention` remains the
+//! actor-private counterpart. Authored by the L2 evaluator
 //! (`evaluate_and_plan` in `src/systems/goap.rs`) on the softmax
 //! winner; cleared by `resolve_goap_plans` on any drop trigger.
 //!
@@ -35,14 +38,16 @@
 //! Consumed via standard Bevy queries by the actor's own scoring
 //! pipeline + drop triggers.
 //!
-//! # Coexistence with `PairingActivity`
+//! # Coexistence with `JointIntention`
 //!
-//! A cat in a Pairing disposition holds **both** `HeldIntention` and
-//! `PairingActivity`. `PairingActivity` carries §7.M-specific state
-//! (`last_interaction_tick`, the §7.M drop-branch vocabulary);
-//! `HeldIntention` is the generic substrate. Drop gates run
-//! independently. A future cleanup ticket may collapse them; not in
-//! scope here.
+//! A cat in a joint practice (e.g., Courtship) holds **both**
+//! `HeldIntention` and `JointIntention { practice, .. }`. JointIntention
+//! is *mutually-public substrate* (ticket 127) — it carries the
+//! practice-state observable to both partners (stage, partner,
+//! tick markers, drop-branch vocabulary). HeldIntention is the
+//! *actor-private* counterpart (commitment strength, source, expiry).
+//! Drop gates run independently. The two substrate categories are
+//! intentional and load-bearing per ticket 127's §Semantic category.
 
 use bevy_ecs::prelude::*;
 
@@ -125,7 +130,7 @@ impl IntentionAbandonReason {
 ///
 /// Only `Serialize` is derived (not `Deserialize`): `target: Option<Entity>`
 /// has no `Default` and the component is runtime state — no save/load
-/// path round-trips it. Mirrors `PairingActivity`'s precedent.
+/// path round-trips it. Mirrors `JointIntention`'s precedent.
 #[derive(Component, Debug, Clone, serde::Serialize)]
 pub struct HeldIntention {
     /// What the cat is committed to. Reuses the existing `Intention`
@@ -150,7 +155,7 @@ pub struct HeldIntention {
     pub held_action: Action,
     /// The target entity (cat / building / tile-resident / wildlife)
     /// the intention is *toward*. `None` for self-state intentions
-    /// (Rest, Idle, Wander). `Serialize`-skipped per `PairingActivity`
+    /// (Rest, Idle, Wander). `Serialize`-skipped per `JointIntention`
     /// — `Entity` has no `Default`.
     #[serde(skip)]
     pub target: Option<Entity>,

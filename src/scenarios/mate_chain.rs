@@ -10,23 +10,25 @@
 //! friends" lines but **zero** "have become partners". Bonds form readily
 //! at the Friends tier and stall there.
 //!
-//! **Why it stalls:** `src/ai/pairing.rs:22-27` explicitly notes that the
-//! L2 PairingActivity substrate ships in two halves — Commit A authors
-//! the Intention; Commit B (the *bias readers* that amplify
-//! fondness/familiarity growth between paired partners) was deferred and
-//! never wired. Without the bias amplification, paired partners advance
-//! the bond ladder no faster than any other Friends pair, the
-//! `partners_fondness_threshold = 0.55` gate sits above the
+//! **Why it stalled:** the L2 PairingActivity substrate originally
+//! shipped in two halves — Commit A authored the Intention; Commit B
+//! (the *bias readers* that amplify fondness/familiarity growth between
+//! paired partners) was deferred and never wired until ticket 257.
+//! Without the bias amplification, paired partners advanced the bond
+//! ladder no faster than any other Friends pair, the
+//! `partners_fondness_threshold = 0.55` gate sat above the
 //! encounter-driven fondness ceiling, and the chain
 //! Friends → Partners → `HasEligibleMate` → Mate election → `MateWith`
-//! resolver → `MatingOccurred` never reaches its end.
+//! resolver → `MatingOccurred` never reached its end. Ticket 127
+//! subsumed PairingActivity into `JointIntention { practice: Courtship,
+//! .. }` while preserving the bias-amplification contract.
 //!
 //! **What this scenario locks down:** a deterministic two-cat fixture
 //! pre-loaded at `bond = Friends` with fondness/familiarity just above
 //! the Friends gate (the realistic encounter-driven shape — *not* the
-//! `pairing.emission_threshold` doc's idealized `fondness ≈ 0.5`). After
-//! Commit B lands and `pairing.emission_threshold` is recalibrated, this
-//! scenario asserts the chain advances end-to-end within ~5 sim days
+//! `practices.courtship.emission_threshold` doc's idealized
+//! `fondness ≈ 0.5`). The scenario asserts the chain advances
+//! end-to-end within ~5 sim days
 //! (≈ 5 × `ticks_per_day_phase` × 5 phases ≈ 5,000 ticks at default
 //! constants).
 //!
@@ -114,7 +116,7 @@ fn setup(world: &mut World, seed: u64) {
     // `familiarity > 0.4` per `social.rs:297-298`), romantic at zero, and
     // `BondType::Friends`. This is the shape the soak produces in
     // practice — explicitly **not** the idealized `fondness ≈ 0.5` the
-    // current `pairing.emission_threshold = 0.25` doc-comment was
+    // current `practices.courtship.emission_threshold = 0.25` doc-comment was
     // calibrated against. The mismatch is part of the defect; the
     // scenario locks the realistic shape into the regression suite so
     // future tuning doesn't accidentally re-introduce the gap.

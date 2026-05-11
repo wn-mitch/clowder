@@ -15,7 +15,6 @@ pub mod hawk_scoring;
 pub mod joint_intention;
 pub mod mating;
 pub mod modifier;
-pub mod pairing;
 pub mod pathfinding;
 pub mod planner;
 pub mod route_cost;

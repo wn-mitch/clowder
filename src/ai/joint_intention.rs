@@ -54,15 +54,16 @@ use crate::components::joint_intention::{
     next_stage, should_drop_joint, JointIntention, JointIntentionDropConfig,
     JointIntentionProxies, PracticeKind, PracticeStage, StageAdvanceProxies,
 };
-use crate::components::pairing::PairingActivity;
 use crate::components::physical::Dead;
 use crate::components::pregnancy::Pregnant;
 use crate::components::identity::{LifeStage, Orientation};
-use crate::ai::mating::MatingFitnessParams;
-use crate::resources::relationships::Relationships;
-use crate::resources::sim_constants::SimConstants;
+use crate::ai::mating::{MatingFitness, MatingFitnessParams};
+use crate::components::physical::Position;
+use crate::resources::relationships::{BondType, Relationships};
+use crate::resources::sim_constants::{CourtshipPracticeConstants, SimConstants};
 use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::resources::time::{SimConfig, TimeState};
+use crate::systems::social::are_orientation_compatible;
 use std::collections::HashMap;
 
 /// Ticket 127 — Bias-reader call sites emit this when their resolver
@@ -101,9 +102,13 @@ pub fn author_joint_intentions(
     // stage advance. Disjoint from `Without<JointIntention>` query below
     // via marker disjointness.
     mut joints: Query<(Entity, &mut JointIntention), Without<Dead>>,
-    // Cats with PairingActivity but lacking JointIntention — Pass 3
-    // mirror path. Disjoint from `joints` query via `Without`.
-    needs_emit: Query<(Entity, &PairingActivity), (Without<JointIntention>, Without<Dead>)>,
+    // Eligible cats lacking a JointIntention — Pass 3 matchmaker
+    // candidates. Carries position for range filter.
+    needs_emit: Query<(Entity, &Position), (Without<JointIntention>, Without<Dead>)>,
+    // All-cat positions for matchmaker peer scan (includes JI-holding
+    // cats so the matchmaker can re-pair after a drop+rematch on the
+    // same tick).
+    all_positions: Query<(Entity, &Position), Without<Dead>>,
     // Partner-validity probe used by `PartnerInvalid` branch.
     invalidity: Query<(
         Has<Dead>,
@@ -298,18 +303,145 @@ pub fn author_joint_intentions(
     }
 
     // -----------------------------------------------------------------
-    // Pass 3: mirror PA emission for cats lacking JI.
+    // Pass 3: matchmaker — emit JointIntention for eligible cats
+    // lacking one. Replaces the Commit B PA-mirror with a real
+    // matchmaker now that Commit C deletes `author_pairing_intentions`.
+    //
+    // Matchmaker: scan within `candidate_range`; orientation-compatible
+    // + reproductive + Friends-or-better bonded peers; quality score
+    // > `emission_threshold`; tie-break by stable Entity::index() asc.
+    // Mirrors the prior PA matchmaker 1:1 so migration parity is
+    // mechanical — the only behavioral lift comes from the substrate
+    // adding stage progression and partner-cascade, not from the
+    // emission predicate changing.
     // -----------------------------------------------------------------
-    for (entity, pairing) in needs_emit.iter() {
+    let practice_constants = &constants.practices.courtship;
+    let positions: Vec<(Entity, Position)> =
+        all_positions.iter().map(|(e, p)| (e, *p)).collect();
+
+    for (entity, position) in needs_emit.iter() {
+        let Some(self_fit) = fitness.get(&entity).copied() else {
+            continue;
+        };
+        if !is_reproductive_for_courtship(&self_fit) {
+            continue;
+        }
+        let Some(partner) = pick_courtship_partner(
+            entity,
+            position,
+            self_fit,
+            &positions,
+            &fitness,
+            &relationships,
+            practice_constants,
+        ) else {
+            continue;
+        };
+
         commands.entity(entity).insert(JointIntention::new(
             PracticeKind::Courtship,
-            pairing.partner,
-            pairing.adopted_tick,
+            partner,
+            now_tick,
         ));
         activation.record(Feature::JointIntentionEmitted {
             practice: PracticeKind::Courtship,
         });
     }
+}
+
+// ---------------------------------------------------------------------------
+// Courtship matchmaker helpers (moved from `crate::ai::pairing` in 127 Commit C)
+// ---------------------------------------------------------------------------
+
+/// L1-equivalent reproductive-eligibility predicate for Courtship.
+/// Mirrors the prior `crate::ai::pairing::is_reproductive` 1:1.
+fn is_reproductive_for_courtship(f: &MatingFitness) -> bool {
+    matches!(
+        f.stage,
+        crate::components::identity::LifeStage::Adult
+            | crate::components::identity::LifeStage::Elder
+    ) && f.orientation != crate::components::identity::Orientation::Asexual
+        && !f.is_pregnant
+}
+
+/// Map a bond tier to a graduated scalar for the courtship-quality
+/// score. Mirrors `socialize_target::bond_score`'s vocabulary so the
+/// L2 emission decision uses the same scale the bias readers do.
+fn bond_tier_score(bond: Option<BondType>) -> f32 {
+    match bond {
+        Some(BondType::Mates | BondType::Partners) => 1.0,
+        Some(BondType::Friends) => 0.5,
+        None => 0.0,
+    }
+}
+
+/// Pick the best Courtship partner for `self_entity` from within
+/// `candidate_range`. Returns `None` when no candidate clears
+/// `emission_threshold`. Stable tie-break via `Entity::index()` asc.
+///
+/// Moved from `crate::ai::pairing::pick_partner` in 127 Commit C.
+/// Future practices declare their own matchmaker via per-practice
+/// dispatch.
+fn pick_courtship_partner(
+    self_entity: Entity,
+    self_position: &Position,
+    self_fit: MatingFitness,
+    positions: &[(Entity, Position)],
+    fitness: &HashMap<Entity, MatingFitness>,
+    relationships: &Relationships,
+    practice_constants: &CourtshipPracticeConstants,
+) -> Option<Entity> {
+    let range = practice_constants.candidate_range;
+    let weights = (
+        practice_constants.quality_fondness_weight,
+        practice_constants.quality_romantic_weight,
+        practice_constants.quality_bond_weight,
+    );
+
+    let mut best: Option<(Entity, f32)> = None;
+    for (other, other_pos) in positions.iter() {
+        if *other == self_entity {
+            continue;
+        }
+        let manhattan =
+            (self_position.x - other_pos.x).abs() + (self_position.y - other_pos.y).abs();
+        if manhattan > range {
+            continue;
+        }
+        let Some(other_fit) = fitness.get(other) else {
+            continue;
+        };
+        if !is_reproductive_for_courtship(other_fit) {
+            continue;
+        }
+        if !are_orientation_compatible(
+            self_fit.gender,
+            self_fit.orientation,
+            other_fit.gender,
+            other_fit.orientation,
+        ) {
+            continue;
+        }
+        let Some(rel) = relationships.get(self_entity, *other) else {
+            continue;
+        };
+        let bond_score = bond_tier_score(rel.bond);
+        if bond_score == 0.0 {
+            continue;
+        }
+        let fondness = rel.fondness.max(0.0);
+        let romantic = rel.romantic.max(0.0);
+        let score = weights.0 * fondness + weights.1 * romantic + weights.2 * bond_score;
+        if score < practice_constants.emission_threshold {
+            continue;
+        }
+        let candidate = (*other, score);
+        match best {
+            Some((_, best_score)) if best_score >= score => {}
+            _ => best = Some(candidate),
+        }
+    }
+    best.map(|(e, _)| e)
 }
 
 /// Inline practice-compatibility recheck. Mirrors the eligibility
@@ -414,15 +546,9 @@ mod tests {
         world
     }
 
-    fn run_pairing_then_author(world: &mut World) {
+    fn run_author(world: &mut World) {
         let mut schedule = Schedule::default();
-        schedule.add_systems(
-            (
-                crate::ai::pairing::author_pairing_intentions,
-                author_joint_intentions,
-            )
-                .chain(),
-        );
+        schedule.add_systems(author_joint_intentions);
         schedule.run(world);
     }
 
@@ -449,16 +575,16 @@ mod tests {
     }
 
     #[test]
-    fn author_inserts_joint_intention_for_each_pairing_activity() {
+    fn author_emits_joint_intention_for_compatible_paired_adults() {
         let mut world = author_world();
         let (a, b) = make_paired_cats(&mut world);
 
-        run_pairing_then_author(&mut world);
+        run_author(&mut world);
 
         for (entity, expected_partner) in [(a, b), (b, a)] {
             let ji = world
                 .get::<JointIntention>(entity)
-                .expect("JI authored alongside PA");
+                .expect("JI authored by Commit C in-tree matchmaker");
             assert_eq!(ji.partner, expected_partner);
             assert_eq!(ji.practice, PracticeKind::Courtship);
             assert_eq!(ji.stage, PracticeStage::CourtshipApproach);
@@ -472,6 +598,7 @@ mod tests {
                 })
                 .copied(),
             Some(2),
+            "symmetric pair → both cats emit one JI each"
         );
     }
 
@@ -479,7 +606,7 @@ mod tests {
     fn stage_advances_approach_to_courting_after_interaction() {
         let mut world = author_world();
         let (a, b) = make_paired_cats(&mut world);
-        run_pairing_then_author(&mut world);
+        run_author(&mut world);
         // Sanity — both at Approach.
         assert_eq!(
             world.get::<JointIntention>(a).unwrap().stage,
@@ -500,7 +627,7 @@ mod tests {
 
         // Advance time so the author sees the message + bumps the tick.
         world.resource_mut::<TimeState>().tick = later;
-        run_pairing_then_author(&mut world);
+        run_author(&mut world);
 
         let ji_a = world.get::<JointIntention>(a).unwrap();
         assert_eq!(ji_a.last_interaction_tick, later);
@@ -528,20 +655,20 @@ mod tests {
         // §Exit criterion 3 — drop cascade works within 1 tick.
         let mut world = author_world();
         let (a, b) = make_paired_cats(&mut world);
-        run_pairing_then_author(&mut world);
+        run_author(&mut world);
         assert!(world.get::<JointIntention>(a).is_some());
         assert!(world.get::<JointIntention>(b).is_some());
 
         // Force-remove a's JI (simulating a desire-drift drop on a).
-        // The mirror sees b still has JI pointing at a (snapshot stale)
-        // on tick T; on tick T+1, b's drop gate fires PartnerLeftPractice.
+        // Also drop the relationship bond so the matchmaker can't
+        // re-emit JI for a or b in the same tick's Pass 3.
         world.entity_mut(a).remove::<JointIntention>();
-        // Also remove a's PA so the author doesn't re-emit JI for a on
-        // tick T+1's Pass 3.
-        world.entity_mut(a).remove::<PairingActivity>();
+        let mut rels = world.resource_mut::<Relationships>();
+        rels.get_or_insert(a, b).bond = None;
 
-        // Tick T+1 — snapshot now reflects a's removal; b drops.
-        run_pairing_then_author(&mut world);
+        // Tick T+1 — partner snapshot reflects a's removal; b's drop
+        // gate fires PartnerLeftPractice.
+        run_author(&mut world);
 
         assert!(
             world.get::<JointIntention>(b).is_none(),

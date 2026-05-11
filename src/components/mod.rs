@@ -21,7 +21,6 @@ pub mod kitten;
 pub mod magic;
 pub mod markers;
 pub mod mental;
-pub mod pairing;
 pub mod personality;
 pub mod physical;
 pub mod pregnancy;
@@ -73,7 +72,6 @@ pub use magic::{
     MisfireEffect, RemedyEffect, RemedyKind, Seasonal, Ward, WardKind,
 };
 pub use mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier};
-pub use pairing::{PairingActivity, PairingDropBranch, PairingDropConfig, PairingProxies};
 pub use personality::Personality;
 pub use physical::{
     Dead, Health, Injury, InjuryKind, InjurySource, Needs, Position, PreviousPosition,

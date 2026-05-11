@@ -173,14 +173,14 @@ pub fn should_drop_intention(strategy: CommitmentStrategy, proxies: BeliefProxie
 /// the matching strategy; this function is the single source of truth.
 ///
 /// **Mating L-levels.** The spec's §7.3 splits Mating into three rows
-/// (L1 ReproduceAspiration — OpenMinded; L2 PairingActivity —
-/// OpenMinded; L3 MateWithGoal — SingleMinded). Today Clowder only has
-/// `DispositionKind::Mating` (the L3 goal-event layer); L1 and L2 live
-/// in the aspiration catalog and target-taking activity layer
-/// respectively (Phase 6b / §7.M). This table returns the L3
-/// `SingleMinded` for `Mating` since that's what the current layer
+/// (L1 ReproduceAspiration — OpenMinded; L2 JointIntention { Courtship }
+/// — OpenMinded; L3 MateWithGoal — SingleMinded). Today Clowder only
+/// has `DispositionKind::Mating` (the L3 goal-event layer); L1 and L2
+/// live in the aspiration catalog and the JointIntention substrate
+/// (ticket 127 successor to PairingActivity). This table returns the
+/// L3 `SingleMinded` for `Mating` since that's what the current layer
 /// represents. L1/L2 strategies are carried inline on the emitting
-/// aspiration DSE and pairing-activity Intention, not here.
+/// aspiration DSE and joint-intention substrate, not here.
 ///
 /// **Coordinator-directive row.** §7.3's footer commits
 /// `SingleMinded` with a coordinator-cancel override; the row currently

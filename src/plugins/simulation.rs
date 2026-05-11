@@ -410,31 +410,18 @@ impl Plugin for SimulationPlugin {
                             // marker, so the DSE returns 0.0 for cats
                             // whose gate is closed.
                             crate::ai::mating::update_mate_eligibility_markers,
+                            // Ticket 127 — JointIntention author with
+                            // matchmaker + drop predicate + stage
+                            // progression + cascade detection +
+                            // mismatch tracking. Subsumes the prior
                             // §7.M L2 PairingActivity author (tickets
-                            // 027b / 082 / 083). Activated post-Wave-2
-                            // substrate hardening: starvation cascade
-                            // gone (Starvation = 0 on seed-42 soak).
-                            // The earlier "Bevy topological-sort
-                            // reshuffle" framing was wrong — chain 2a
-                            // is `.chain()`-wrapped, source order is
-                            // enforced. Adding the system shifts the
-                            // food economy slightly (pair-socializing
-                            // bias lifts cooperation, more efficient
-                            // hunts) which raises median food_fraction
-                            // and correctly silences Farm via its
-                            // CompensatedProduct gate. Farm dormancy
-                            // under abundant food is intended; ticket
-                            // 084 tracks tying Farm to herb/ward
-                            // demand so gardens stay productive when
-                            // food is full but Thornbriar is short.
-                            crate::ai::pairing::author_pairing_intentions,
-                            // Ticket 127 Commit B — full JointIntention
-                            // author with stage progression + cascade
-                            // detection + mismatch tracking. Runs
-                            // immediately after the PA author on the same
-                            // chain; `.chain()` inserts `apply_deferred`
-                            // between them so Pass 3 sees PA's post-flush
-                            // state. Commit C retires the PA author.
+                            // 027b / 082 / 083 / 257). The substrate
+                            // shift was activated post-Wave-2 hardening
+                            // and post-272 mating-cadence stabilization
+                            // so the food-economy lift (pair-socializing
+                            // bias raising median food_fraction) stays
+                            // in band; Farm dormancy under abundant
+                            // food remains intended per ticket 084.
                             crate::ai::joint_intention::author_joint_intentions,
                             // §4 batch 2: capability markers — reads
                             // life-stage, injury, inventory markers

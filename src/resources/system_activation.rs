@@ -232,44 +232,6 @@ pub enum Feature {
     /// as a distinct Feature lets canaries catch planner collapse
     /// separately from legitimate completion.
     CommitmentDropReplanCap,
-    /// Ticket 027b §7.M — `crate::ai::pairing::author_pairing_intentions`
-    /// inserted a [`crate::components::PairingActivity`] Intention on
-    /// a cat with a Friends-or-better orientation-compatible peer in
-    /// range. Positive — every PairingIntentionEmitted is a step
-    /// toward closing the structural Friends → Partners gap that
-    /// stalled mating cadence in the seed-42 baseline. Promoted to
-    /// `expected_to_fire_per_soak() => true` in ticket 083 when the
-    /// L2 schedule edge activated; the canary now validates the
-    /// Pairing trunk fires on a healthy soak.
-    PairingIntentionEmitted,
-    /// Ticket 027b §7.M — the L2 drop gate fired on a held Intention
-    /// (partner died/banished/incapacitated, bond lost, life-stage
-    /// transitioned, season cycled out, or both relationship axes
-    /// collapsed below their floors). Neutral — drops are normal
-    /// state transitions, not an adverse signal. Stays
-    /// `expected_to_fire_per_soak() => false` because drops are
-    /// bursty (a healthy 15-min soak may have zero drops).
-    PairingDropped,
-    /// Ticket 027b §7.M / Ticket 257 Commit B — a Socialize /
-    /// GroomOther / MentorCat resolver was invoked with `target ==
-    /// PairingActivity.partner`, applying the
-    /// `pairing.bias_multiplier` to that tick's fondness +
-    /// familiarity deltas. This is the structural piece that closes
-    /// the Friends → Partners gap: paired interactions accrue
-    /// fondness/familiarity faster than diffuse interactions,
-    /// advancing the bond ladder under realistic encounter cadence.
-    ///
-    /// The original 027b doc-comment described this as a
-    /// target-selection signal calibrated for ticket 082's multi-seed
-    /// sweep ("untestable single-seed"). 257 reframes the Feature as
-    /// a per-amplification fire site: the 257 Commit B caller emits
-    /// it whenever the multiplier > 1.0, which is observable in any
-    /// single-seed soak that has at least one held PairingActivity
-    /// targeting at least one paired interaction. `expected_to_fire_per_soak()
-    /// => true` from 257 onward — its absence in the seed-42 soak is
-    /// a regression on the Pairing chain.
-    PairingBiasApplied,
-
     // ---------- Ticket 127 — JointIntention (subsumes §7.M PairingActivity) ----------
     /// `crate::ai::joint_intention::author_joint_intentions` inserted a
     /// [`crate::components::JointIntention`] on an eligible cat for the
@@ -536,11 +498,8 @@ impl Feature {
         Feature::CommitmentDropSingleMinded,
         Feature::CommitmentDropOpenMinded,
         Feature::CommitmentDropReplanCap,
-        // §7.M L2 PairingActivity (ticket 027b)
-        Feature::PairingIntentionEmitted,
-        Feature::PairingDropped,
-        Feature::PairingBiasApplied,
-        // Ticket 127 — JointIntention. Each parameterized variant is
+        // Ticket 127 — JointIntention (subsumes §7.M L2 PairingActivity
+        // from ticket 027b). Each parameterized variant is
         // enumerated per-practice; for 127 only Courtship exists.
         Feature::JointIntentionEmitted {
             practice: PracticeKind::Courtship,
@@ -638,10 +597,8 @@ impl Feature {
             Feature::MaterialPickedUp => Positive,
             Feature::BuildingRepaired => Positive,
             Feature::CourtshipInteraction => Positive,
-            // §7.M L2 PairingActivity (ticket 027b)
-            Feature::PairingIntentionEmitted => Positive,
-            Feature::PairingBiasApplied => Positive,
-            // Ticket 127 — JointIntention positive valences.
+            // Ticket 127 — JointIntention positive valences (subsumes
+            // §7.M L2 PairingActivity from ticket 027b).
             Feature::JointIntentionEmitted { .. } => Positive,
             Feature::JointBiasApplied { .. } => Positive,
             Feature::JointStageAdvanced { .. } => Positive,
@@ -744,11 +701,11 @@ impl Feature {
             Feature::CommitmentDropReplanCap => Neutral,
             // §7.M L2 PairingActivity drop is a state transition,
             // not an adverse event.
-            Feature::PairingDropped => Neutral,
             // Ticket 127 — JointIntention neutral valences. Drops are
-            // bursty state transitions (mirrors PairingDropped). Stage
-            // mismatch is healthy narrative texture (codified irony),
-            // not a regression signal.
+            // bursty state transitions (mirrors the prior
+            // PairingDropped which 127 subsumes). Stage mismatch is
+            // healthy narrative texture (codified irony), not a
+            // regression signal.
             Feature::JointIntentionDropped { .. } => Neutral,
             Feature::JointStageMismatchTickAccrued { .. } => Neutral,
             // Ticket 080 — reservation contention is observability
@@ -884,20 +841,6 @@ impl Feature {
             Feature::KittenBorn => false,
             Feature::KittenFed => false,
             Feature::ItemRetrieved => false,
-            // Ticket 257 Commit B — `PairingBiasApplied` promoted to
-            // canary-validated. The Feature now fires per
-            // amplification (resolver target == PairingActivity
-            // partner) rather than the original 027b
-            // target-selection-bias semantics, which made it
-            // "untestable single-seed" per the legacy comment. The
-            // new emission path is single-seed-observable: any soak
-            // where Pairing fires AND the paired actor socializes /
-            // grooms / mentors their partner emits ≥ 1. Its absence
-            // is a regression on the Pairing chain. The 027b
-            // multi-seed concern (was target-selection bias actually
-            // changing picks?) is parked under ticket 082's sweep —
-            // no longer canary-gated here.
-            // (Falls through to `_ => true` below.)
             // Ticket 083 — Farm-dormancy reconciliation. Wave 2
             // substrate hardening + L2 PairingActivity raise the
             // food economy (more efficient hunts and cooking, higher
@@ -962,13 +905,6 @@ impl Feature {
             // StageAdvanced fall through to `_ => true`.
             Feature::JointIntentionDropped { .. } => false,
             Feature::JointStageMismatchTickAccrued { .. } => false,
-            // Ticket 127 Commit B — `PairingBiasApplied` no longer
-            // fires (readers emit `JointBiasApplied { Courtship }`
-            // instead). The successor Feature carries the canary
-            // until PA is retired entirely in Commit C. Demoted here
-            // to keep the never-fired canary green during the
-            // 127 migration.
-            Feature::PairingBiasApplied => false,
             // 250: burial is conditional on death. Post-247 / 248 the
             // substrate keeps colonies healthy enough that deaths
             // (and therefore burials) are genuinely rare; treating
@@ -1085,9 +1021,6 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::CommitmentDropSingleMinded => "CommitmentDropSingleMinded",
         Feature::CommitmentDropOpenMinded => "CommitmentDropOpenMinded",
         Feature::CommitmentDropReplanCap => "CommitmentDropReplanCap",
-        Feature::PairingIntentionEmitted => "PairingIntentionEmitted",
-        Feature::PairingDropped => "PairingDropped",
-        Feature::PairingBiasApplied => "PairingBiasApplied",
         // Ticket 127 — JointIntention. Display names embed the practice
         // slug so the footer / canary output distinguishes per-practice
         // counters when future practices land.
@@ -1369,9 +1302,12 @@ mod tests {
         // JointBiasApplied, JointStageAdvanced) + 2 Neutral
         // (JointIntentionDropped, JointStageMismatchTickAccrued), all
         // parameterized on PracticeKind (Courtship only in 127).
-        assert_eq!(positive, 56);
+        // Commit C deleted the 3 PA Features (2 Positive
+        // PairingIntentionEmitted/PairingBiasApplied + 1 Neutral
+        // PairingDropped), net -2 Positive / -1 Neutral.
+        assert_eq!(positive, 54);
         assert_eq!(negative, 23);
-        assert_eq!(neutral, 35);
+        assert_eq!(neutral, 34);
     }
 
     #[test]
@@ -1440,10 +1376,12 @@ mod tests {
         // rare in healthy colonies), shifting -1 positive / +1 neutral.
         // Ticket 127 Commit A: +3 Positive / +0 Negative / +2 Neutral
         // for the JointIntention substrate (5 parameterized features,
-        // Courtship-only in 127).
+        // Courtship-only in 127). Commit C: -2 Positive / -1 Neutral
+        // for the PA Feature deletions (PairingIntentionEmitted /
+        // PairingBiasApplied / PairingDropped).
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            56
+            54
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),
@@ -1451,7 +1389,7 @@ mod tests {
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Neutral),
-            35
+            34
         );
     }
 
@@ -1532,14 +1470,6 @@ mod tests {
         assert!(Feature::GroomedOther.expected_to_fire_per_soak());
         // Promoted by ticket 027 Bug 1 (courtship-drift emits per-tick).
         assert!(Feature::CourtshipInteraction.expected_to_fire_per_soak());
-        // Ticket 257 Commit B / 127 — PairingIntentionEmitted is
-        // still authored by the upstream PA author during the 127
-        // migration. PairingBiasApplied was demoted in 127 Commit B
-        // when bias readers switched to emit
-        // `JointBiasApplied { Courtship }`; the successor carries the
-        // canary now.
-        assert!(Feature::PairingIntentionEmitted.expected_to_fire_per_soak());
-        assert!(!Feature::PairingBiasApplied.expected_to_fire_per_soak());
         // Ticket 127 — JointIntention canary classifications: the
         // three Positive variants carry the per-practice fire-rate
         // expectation (PracticeKind::Courtship in 127); the two

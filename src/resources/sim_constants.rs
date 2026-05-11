@@ -43,16 +43,13 @@ pub struct SimConstants {
     pub fulfillment: FulfillmentConstants,
     #[serde(default)]
     pub influence_maps: InfluenceMapConstants,
-    #[serde(default)]
-    pub pairing: PairingConstants,
     /// Ticket 127 — per-practice JointIntention knobs. For Courtship
-    /// these mirror `pairing` 1:1 plus a `stage_stall_ticks` field that
-    /// gates the novel `StageStalled` drop branch. The mirror is
-    /// load-bearing only during the 127 migration: Commit A authors
-    /// both PairingActivity and JointIntention from the same
-    /// constants; Commit B switches readers to `practices.courtship`;
-    /// Commit C deletes `pairing`. `#[serde(default)]` so old archive
-    /// headers (pre-127) deserialize without the new field.
+    /// these subsume the prior `PairingConstants` (deleted in Commit C)
+    /// plus a `stage_stall_ticks` field gating the novel `StageStalled`
+    /// drop branch. `#[serde(default)]` so old archive headers
+    /// (pre-127) deserialize without the new field; the unknown
+    /// `pairing` field in old headers is silently dropped by serde's
+    /// default leniency.
     #[serde(default)]
     pub practices: PracticeConstants,
     #[serde(default)]
@@ -5374,74 +5371,6 @@ fn deep_merge(target: &mut serde_json::Value, patch: &serde_json::Value) {
     }
 }
 
-// ---------- PairingConstants (§7.M L2 PairingActivity) ----------
-
-/// Knobs for the §7.M L2 PairingActivity Intention layer. Read by
-/// `crate::ai::pairing::author_pairing_intentions` (Commit A) and by
-/// the bias readers in `socialize_target` / `groom_other_target` /
-/// `scoring` (Commit B). Calibrated against the seed-42 noise band
-/// observed in `logs/baseline-2026-04-25/`.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct PairingConstants {
-    /// Manhattan-distance candidate filter when scanning for an
-    /// emission target. Wider than `MATE_TARGET_RANGE = 10` because
-    /// L2 is multi-season — a cat may pursue a partner across the
-    /// colony, not require adjacency every tick.
-    pub candidate_range: i32,
-    /// Minimum pairing-quality score for a Friends-bonded peer to
-    /// trigger emission. Ticket 257 — recalibrated 0.25 → 0.20 after
-    /// the post-256 verification soak observed `MatingOccurred` never
-    /// firing. The original 0.25 was calibrated against an idealized
-    /// fresh-Friends `fondness ≈ 0.5`; in practice the encounter
-    /// system produces fresh-Friends bonds with fondness barely above
-    /// the Friends gate's 0.3 (per `social.rs:297`). At fondness=0.31
-    /// plus romantic=0.0 plus bond_score=0.5 the score is 0.224
-    /// (= 0.40·0.31 + 0.40·0.0 + 0.20·0.5), which clears 0.20 but not
-    /// 0.25. Lowering the gate restores the chain Friends →
-    /// PairingActivity → Commit B bias → Partners → Mate.
-    pub emission_threshold: f32,
-    /// Ticket 257 / Commit B — multiplier applied to fondness +
-    /// familiarity deltas when a paired actor's resolver target
-    /// matches its `PairingActivity.partner`. The structural job is
-    /// to close the fondness/familiarity gap from a Friends bond to a
-    /// Partners bond by giving paired interactions stronger weight
-    /// than diffuse interactions. Calibrated at 1.5×: enough to
-    /// promote Partners within ~5 sim days of held PairingActivity
-    /// (verified against the `mate_chain` scenario), small enough
-    /// that a single resolver tick doesn't slam fondness through
-    /// multiple bond-tier thresholds at once. Reach for tuning here
-    /// only if the chain still doesn't reach Partners under the
-    /// production encounter cadence.
-    pub bias_multiplier: f32,
-    /// Drop-gate `DesireDrift` floor on the romantic axis. Both this
-    /// and `fondness_floor` must be breached simultaneously for the
-    /// branch to fire — Mates-bonded post-conception cooldown should
-    /// not drop on romantic alone.
-    pub romantic_floor: f32,
-    /// Drop-gate `DesireDrift` floor on the fondness axis (see
-    /// `romantic_floor`).
-    pub fondness_floor: f32,
-    /// Per-axis weights of the pairing-quality scalar. Sum to 1.0.
-    pub quality_fondness_weight: f32,
-    pub quality_romantic_weight: f32,
-    pub quality_bond_weight: f32,
-}
-
-impl Default for PairingConstants {
-    fn default() -> Self {
-        Self {
-            candidate_range: 25,
-            emission_threshold: 0.20,
-            bias_multiplier: 1.5,
-            romantic_floor: 0.05,
-            fondness_floor: 0.30,
-            quality_fondness_weight: 0.40,
-            quality_romantic_weight: 0.40,
-            quality_bond_weight: 0.20,
-        }
-    }
-}
-
 // ---------- PracticeConstants (ticket 127) ----------
 
 /// Ticket 127 — per-practice JointIntention tuning. One block per
@@ -5501,18 +5430,20 @@ pub struct CourtshipPracticeConstants {
 
 impl Default for CourtshipPracticeConstants {
     fn default() -> Self {
-        // Mirror `PairingConstants::default()` for the carry-over
-        // fields so migration parity is mechanical.
-        let p = PairingConstants::default();
+        // Carry-over defaults from the prior `PairingConstants`
+        // (deleted in 127 Commit C). Migration parity is mechanical —
+        // these values are the post-272 calibration referenced in
+        // `logs/baselines/current.json` and the seed-42 mating-chain
+        // verdict gate.
         Self {
-            candidate_range: p.candidate_range,
-            emission_threshold: p.emission_threshold,
-            bias_multiplier: p.bias_multiplier,
-            romantic_floor: p.romantic_floor,
-            fondness_floor: p.fondness_floor,
-            quality_fondness_weight: p.quality_fondness_weight,
-            quality_romantic_weight: p.quality_romantic_weight,
-            quality_bond_weight: p.quality_bond_weight,
+            candidate_range: 25,
+            emission_threshold: 0.20,
+            bias_multiplier: 1.5,
+            romantic_floor: 0.05,
+            fondness_floor: 0.30,
+            quality_fondness_weight: 0.40,
+            quality_romantic_weight: 0.40,
+            quality_bond_weight: 0.20,
             stage_stall_ticks: 10_000,
         }
     }
