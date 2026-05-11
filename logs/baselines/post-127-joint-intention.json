@@ -1,0 +1,134 @@
+{
+  "label": "post-127-joint-intention",
+  "run_dir": "/Users/will.mitchell/clowder/logs/tuned-42",
+  "events_path": "/Users/will.mitchell/clowder/logs/tuned-42/events.jsonl",
+  "commit_hash_short": "4bcae2de",
+  "commit_dirty": true,
+  "seed": 42,
+  "duration_secs": 900,
+  "promoted_at": "2026-05-11T16:00:39Z",
+  "footer_snapshot": {
+    "_footer": true,
+    "anxiety_interrupt_total": 0,
+    "colony_score": {
+      "aggregate": 1977.4860230492343,
+      "bonds_formed": 22,
+      "deaths_injury": 3,
+      "deaths_old_age": 0,
+      "deaths_starvation": 1,
+      "fulfillment": 0.0,
+      "happiness": 0.7023120522499084,
+      "health": 0.8101991415023804,
+      "kittens_born": 1,
+      "kittens_matured": 0,
+      "nourishment": 0.6890252828598022,
+      "peak_population": 8,
+      "seasons_survived": 6,
+      "shelter": 0.0,
+      "structures_built": 7,
+      "welfare": 0.44030728936195374
+    },
+    "continuity_tallies": {
+      "burial": 0,
+      "courtship": 2487,
+      "grooming": 896,
+      "mentoring": 215,
+      "mythic-texture": 35,
+      "play": 14
+    },
+    "deaths_by_cause": {
+      "ShadowFoxAmbush": 2,
+      "Starvation": 1,
+      "WildlifeCombat": 1
+    },
+    "interrupts_by_reason": {},
+    "negative_events_total": 19650,
+    "neutral_features_active": 23,
+    "neutral_features_total": 34,
+    "never_fired_expected_positives": [],
+    "plan_failures_by_reason": {
+      "EngagePrey: anxiety spooked prey": 5,
+      "EngagePrey: consumed catch in place": 17,
+      "EngagePrey: lost prey during approach": 530,
+      "EngagePrey: no prey target for engage": 9,
+      "EngagePrey: prey teleported": 33,
+      "EngagePrey: seeking another target": 162,
+      "EngagePrey: stuck while stalking": 138,
+      "EngagePrey: target invalid at step entry: Despawned": 11,
+      "EngageThreat: global step timeout": 8,
+      "EngageThreat: morale_break": 17,
+      "EngageThreat: target invalid at step entry: Despawned": 23,
+      "ForageItem: consumed forage in place": 44,
+      "ForageItem: nothing found while foraging": 989,
+      "GatherHerb: target invalid at step entry: Despawned": 1,
+      "HandoffItem: handoff: no recipient on disposition (no kittens in colony)": 17,
+      "HoldUntilSafe: global step timeout": 68,
+      "PickUpItemFromGround: pick_up: no target item on disposition": 1,
+      "PrepareRemedy: missing herb for remedy": 2,
+      "SearchPrey: no scent found": 3,
+      "SetWard: no thornbriar for ward": 3,
+      "TravelTo(HerbPatch): no path and stuck": 213
+    },
+    "planning_failures_by_disposition": {
+      "Foraging": 27,
+      "Guarding": 6,
+      "Hunting": 35
+    },
+    "planning_failures_by_reason": {
+      "Foraging:GoalUnreachable": 27,
+      "Guarding:GoalUnreachable": 6,
+      "Hunting:GoalUnreachable": 35
+    },
+    "positive_features_active": 39,
+    "positive_features_total": 54,
+    "shadow_fox_spawn_total": 18,
+    "shadow_foxes_avoided_ward_total": 2,
+    "ward_avg_strength_final": 0.0,
+    "ward_count_final": 0,
+    "ward_siege_started_total": 0,
+    "wards_despawned_total": 16,
+    "wards_placed_total": 16,
+    "welfare_axes": {
+      "acceptance": {
+        "axis": "acceptance",
+        "max": 0.0,
+        "mean": 0.0,
+        "min": 0.0,
+        "n": 5,
+        "stdev": 0.0
+      },
+      "mastery": {
+        "axis": "mastery",
+        "max": 0.9998594522476196,
+        "mean": 0.9961296319961548,
+        "min": 0.9892842769622803,
+        "n": 5,
+        "stdev": 0.0037829317152500153
+      },
+      "purpose": {
+        "axis": "purpose",
+        "max": 0.9999445676803589,
+        "mean": 0.9980524778366089,
+        "min": 0.993475079536438,
+        "n": 5,
+        "stdev": 0.002455304842442274
+      },
+      "respect": {
+        "axis": "respect",
+        "max": 0.9998089671134949,
+        "mean": 0.9901673197746277,
+        "min": 0.9634303450584412,
+        "n": 5,
+        "stdev": 0.013926881365478039
+      },
+      "social_warmth": {
+        "axis": "social_warmth",
+        "max": 0.9805331230163574,
+        "mean": 0.8745665550231934,
+        "min": 0.8109555244445801,
+        "n": 5,
+        "stdev": 0.06706105917692184
+      }
+    }
+  }
+}

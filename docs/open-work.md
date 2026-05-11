@@ -15,10 +15,10 @@ _Last generated: 2026-05-11._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 83 |
+| Ready | 82 |
 | Parked | 10 |
 | Blocked | 29 |
-| **Open total** | **128** |
+| **Open total** | **127** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -44,7 +44,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[229](docs/open-work/tickets/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose — _[tooling] · added 2026-05-08_
 
-## Ready (83)
+## Ready (82)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -126,7 +126,6 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[278](docs/open-work/tickets/278-asymmetric-courtship-roles-initiator-responder-on-jointintention.md)** — Asymmetric Courtship roles (Initiator / Responder) on JointIntention — _added 2026-05-11_
 - **[279](docs/open-work/tickets/279-body-cue-driven-joint-adoption-compose-127-with-242-243.md)** — Body-cue-driven joint adoption (compose 127 with 242 + 243) — _added 2026-05-11_
 - **[280](docs/open-work/tickets/280-mental-model-of-partner-jointintention-compose-127-with-258-c3-mental-models.md)** — Mental model of partner JointIntention (compose 127 with 258 C3 mental models) — _added 2026-05-11_
-- **[281](docs/open-work/tickets/281-rebaseline-currentjson-against-post-127-soak.md)** — Rebaseline current.json against post-127 soak — _added 2026-05-11_
 - **[282](docs/open-work/tickets/282-temporal-integration-doctrine-for-perception-signals-decay-stale-accumulate-sustained.md)** — Temporal-integration doctrine for perception signals — decay stale, accumulate sustained — _[ai-substrate] · added 2026-05-11_
 - **[283](docs/open-work/tickets/283-split-fox-scent-perception-into-territorial-mark-and-recent-presence-channels.md)** — Split fox-scent perception into territorial-mark and recent-presence channels — _[ai-substrate] · added 2026-05-11_
 
@@ -180,12 +179,13 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (174)
+## Landed archive (175)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (109)
+### 2026-05 (110)
 
+- **[281](docs/open-work/landed/281-rebaseline-currentjson-against-post-127-soak.md)** — Rebaseline current.json against post-127 soak _(2026-05-11)_
 - **[127](docs/open-work/landed/127-joint-intention-substrate.md)** — Joint-intention substrate for two-cat practices _(2026-05-11)_
 - **[272](docs/open-work/landed/272-matingoccurred-still-gated-by-has-eligible-mate-breeding-floor-and-gate-post-257-follow-on.md)** — MatingOccurred still gated by has_eligible_mate() breeding-floor AND-gate (post-257 follow-on) _(2026-05-10)_
 - **[257](docs/open-work/landed/257-mate-election-crowded-out-by-patrol-in-post-256-regime.md)** — Mate election crowded out by Patrol in post-256 regime _(2026-05-10)_
