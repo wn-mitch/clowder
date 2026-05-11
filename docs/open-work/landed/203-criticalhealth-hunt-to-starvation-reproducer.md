@@ -1,7 +1,7 @@
 ---
 id: 203
 title: CriticalHealth interrupt drives hunt-to-starvation plan churn — concrete reproducer for ticket 119
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-06
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, needs.md]
 related-balance: [047-acute-health-adrenaline.md]
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-11
 ---
 
 <!--
@@ -145,3 +145,4 @@ Pass criteria when 119 lands. Re-run `just soak 42` post-119 and verify:
   action distribution dominated by Hunt). 193's PickingUp cascade had
   previously masked this by killing cats via injury before slow-onset
   starvation could surface. Blocked on 119 (which itself blocks on 118).
+- 2026-05-11: verified against logs/tuned-42 (commit 81e555db). Footer interrupts_by_reason_top=[], anxiety_interrupt_total=0 (the 29,089 CriticalHealth treadmill is gone); deaths_by_cause.Starvation=1 (PASS, target ≤1); no cat at 9k+ plans/10kt. The lone Starvation (Maplekit-92 @ tick 1,299,298, 210 total events across 20,898 ticks — no plan-churn signature) is a separate kitten-care mechanism owned by ticket 273, not a 203 regression.
