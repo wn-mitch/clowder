@@ -56,37 +56,13 @@ fn drop_priority(
 
     let goal = match disposition {
         // Going to acquire food; current food less critical.
-        DispositionKind::Hunting | DispositionKind::Foraging => {
-            if kind.is_food() {
-                -0.20
-            } else {
-                0.0
-            }
-        }
+        DispositionKind::Hunting | DispositionKind::Foraging if kind.is_food() => -0.20,
         // Going to use materials.
-        DispositionKind::Building => {
-            if matches!(kind, ItemKind::Wood | ItemKind::Stone) {
-                0.40
-            } else {
-                0.0
-            }
-        }
+        DispositionKind::Building if matches!(kind, ItemKind::Wood | ItemKind::Stone) => 0.40,
         // Going to feed dependents.
-        DispositionKind::Caretaking => {
-            if kind.is_food() {
-                0.40
-            } else {
-                0.0
-            }
-        }
+        DispositionKind::Caretaking if kind.is_food() => 0.40,
         // Going to use herbs.
-        DispositionKind::Herbalism => {
-            if kind.is_herb() {
-                0.40
-            } else {
-                0.0
-            }
-        }
+        DispositionKind::Herbalism if kind.is_herb() => 0.40,
         _ => 0.0,
     };
 

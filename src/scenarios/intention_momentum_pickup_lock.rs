@@ -107,11 +107,7 @@ mod tests {
         let counts = report.winner_counts();
         let total_winners: usize = counts.values().sum();
         let pickup_wins = counts.get("PickUp").copied().unwrap_or(0);
-        let pct = if total_winners > 0 {
-            (pickup_wins * 100) / total_winners
-        } else {
-            0
-        };
+        let pct = (pickup_wins * 100).checked_div(total_winners).unwrap_or(0);
         assert!(
             pct < 70,
             "Focal cat locked on PickUp ({pickup_wins}/{total_winners} = {pct}%); \
