@@ -193,13 +193,15 @@ fi
 
 echo "[aggregate] generating REPORT.md..." >&2
 python3 "$REPO_ROOT/scripts/baseline_report.py" --baseline-dir "$OUT_BASE" \
-    --output "$REPORT_DIR/REPORT.md" 2> "$REPORT_DIR/baseline_report.log" \
+    --output "$REPORT_DIR/REPORT.md" \
+    --json-sidecar "$REPORT_DIR/REPORT.json" \
+    2> "$REPORT_DIR/baseline_report.log" \
     || echo "[aggregate] WARN: baseline_report.py exited non-zero; partial REPORT.md may exist" >&2
 
 # --- phase e: baseline pack JSON ------------------------------------------
 
 echo "[aggregate] composing baseline pack JSON..." >&2
-python3 - "$OUT_BASE" "$LABEL" "$REPORT_DIR/sweep_stats.json" "$REPORT_DIR/baseline_pack.json" <<'PY'
+python3 - "$OUT_BASE" "$LABEL" "$REPORT_DIR/sweep_stats.json" "$REPORT_DIR/REPORT.json" "$REPORT_DIR/baseline_pack.json" <<'PY'
 """Compose a small baseline pack ready for `just promote` consumption.
 
 Reads the sweep_stats.json envelope (per-metric mean/stdev/p50/p95 across
@@ -214,7 +216,8 @@ from pathlib import Path
 base = Path(sys.argv[1])
 label = sys.argv[2]
 sweep_stats_path = Path(sys.argv[3])
-out_path = Path(sys.argv[4])
+report_sidecar_path = Path(sys.argv[4])
+out_path = Path(sys.argv[5])
 
 # Pull a sample run's header to capture commit_hash + the SimConstants
 # bundle that the campaign was run against. Picks the first sweep run.
@@ -242,6 +245,13 @@ if sweep_stats_path.exists():
     except ValueError:
         pass
 
+report_sidecar: dict = {}
+if report_sidecar_path.exists():
+    try:
+        report_sidecar = json.loads(report_sidecar_path.read_text())
+    except ValueError:
+        pass
+
 pack = {
     "label": label,
     "kind": "balance-pass",
@@ -250,9 +260,16 @@ pack = {
     "commit_dirty": (sample_header or {}).get("commit_dirty"),
     "start_tick": (sample_header or {}).get("start_tick"),
     "constants": (sample_header or {}).get("constants"),
-    "per_metric": sweep_stats.get("per_metric"),
-    "n_runs": sweep_stats.get("n_runs"),
+    # sweep_stats.py writes the per-metric envelope under "metrics"; the
+    # pack field keeps its established "per_metric" name for downstream
+    # readers but now actually populates.
+    "per_metric": sweep_stats.get("metrics") or [],
+    "n_runs": sweep_stats.get("n"),
     "sweep_dir": str(base / "sweep"),
+    # Tier A signals from baseline_report.py's JSON sidecar. Each key is
+    # null when the underlying source isn't present (e.g. no trace
+    # sidecars → per_dse_l2 is []).
+    "per_dse_l2": report_sidecar.get("per_dse_l2") or [],
 }
 
 with out_path.open("w") as f:

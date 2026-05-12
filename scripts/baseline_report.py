@@ -13,7 +13,9 @@ emits a structured markdown summary across the 10 plan sections:
   5. Need-cascade timeseries at quartile checkpoints
   6. DSE-score landscape (per focal trace: top DSEs by mean L3 final score
      and eligibility-rate)
-  7. Plan-churn metrics (per disposition kind)
+  7. Plan-step failure reasons (from `PlanStepFailed` events in events.jsonl;
+     the prior implementation read a `L3PlanFailure` trace layer that is no
+     longer emitted)
   8. Commitment-gate firings (per branch, per disposition)
   9. Fog/storm deltas vs. seed-42 baseline rep
  10. Deferred-balance baselines (the four blocked metrics)
@@ -137,6 +139,12 @@ class RunSummary:
     deaths_total: int = 0
     deaths_by_cause: dict[str, int] = field(default_factory=dict)
     activation_positive: dict[str, int] = field(default_factory=dict)
+    # PlanStepFailed events: per-run total + per-reason counter. Populated
+    # in summarize_run by walking events.jsonl. The L3PlanFailure trace
+    # layer §7 originally read no longer exists in current trace emit;
+    # this is the canonical source of plan-failure data.
+    plan_step_failed_total: int = 0
+    plan_step_failed_by_reason: dict[str, int] = field(default_factory=dict)
 
 
 def summarize_run(label: str, kind: str, seed: int, rep_or_focal: str,
@@ -179,9 +187,12 @@ def summarize_run(label: str, kind: str, seed: int, rep_or_focal: str,
             else:
                 summary.continuity[cls] = 0
 
-    # Walk the file once for ColonySnapshot final + activation tallies + peak pop.
+    # Walk the file once for ColonySnapshot final + activation tallies + peak pop
+    # + PlanStepFailed reason histogram.
     population = []
     activations: dict[str, int] = {}
+    psf_total = 0
+    psf_by_reason: dict[str, int] = {}
     for ev in read_jsonl_streaming(events):
         t = ev.get("type")
         if t == "ColonyScore":
@@ -196,6 +207,12 @@ def summarize_run(label: str, kind: str, seed: int, rep_or_focal: str,
             for k, v in pos.items():
                 if isinstance(v, int):
                     activations[k] = max(activations.get(k, 0), v)
+        elif t == "PlanStepFailed":
+            psf_total += 1
+            reason = ev.get("reason") or "?"
+            psf_by_reason[reason] = psf_by_reason.get(reason, 0) + 1
+    summary.plan_step_failed_total = psf_total
+    summary.plan_step_failed_by_reason = psf_by_reason
     if population:
         summary.population_final = population[-1]
         if summary.population_peak is None:
@@ -217,7 +234,6 @@ class TraceAggregate:
     total_l2_ticks: int = 0
     chosen_counter: dict[str, int] = field(default_factory=dict)             # winning DSE → count
     commitment_branches: dict[str, dict[str, int]] = field(default_factory=dict)  # disposition → {branch: count}
-    plan_failures: dict[str, int] = field(default_factory=dict)              # reason → count
 
 
 def summarize_trace(trace_path: Path, label: str, focal: str, seed: int) -> TraceAggregate:
@@ -246,9 +262,6 @@ def summarize_trace(trace_path: Path, label: str, focal: str, seed: int) -> Trac
             branch = rec.get("branch") or "?"
             agg.commitment_branches.setdefault(disp, {}).setdefault(branch, 0)
             agg.commitment_branches[disp][branch] += 1
-        elif layer == "L3PlanFailure":
-            reason = rec.get("reason") or "?"
-            agg.plan_failures[reason] = agg.plan_failures.get(reason, 0) + 1
     return agg
 
 
@@ -479,11 +492,58 @@ def section_needs(runs: list[RunSummary]) -> str:
     return "".join(out)
 
 
+def cross_focal_dse_envelope(traces: list[TraceAggregate]) -> list[dict]:
+    """Aggregate L2 final_score samples across every focal trace, per DSE.
+
+    Returns one row per DSE, with mean / stdev / p50 / p95 over the pooled
+    score sample. `n_focals` is the number of distinct focal traces that
+    saw the DSE at least once — useful for spotting DSEs that fire on one
+    focal and not others. Marker-gated DSEs naturally have low n_focals.
+    """
+    pooled: dict[str, list[float]] = {}
+    seen_on: dict[str, set[tuple[int, str]]] = {}
+    for tr in traces:
+        for dse, scores in tr.dse_scores.items():
+            pooled.setdefault(dse, []).extend(scores)
+            seen_on.setdefault(dse, set()).add((tr.seed, tr.focal))
+    rows = []
+    for dse, scores in pooled.items():
+        s = stats_or_na(scores)
+        rows.append({
+            "dse": dse,
+            "mean": s["mean"],
+            "stdev": s["stdev"],
+            "p50": s["p50"],
+            "p95": s["p95"],
+            "n_samples": s["n"],
+            "n_focals": len(seen_on[dse]),
+        })
+    rows.sort(key=lambda r: -(r["mean"] or 0.0))
+    return rows
+
+
 def section_dse_landscape(traces: list[TraceAggregate]) -> str:
     out = ["\n## 6. DSE-score landscape\n"]
     if not traces:
         out.append("_No focal traces found._\n")
         return "".join(out)
+
+    # Cross-focal aggregate first — load-bearing for frame-diff style
+    # readouts (per 210/211 food-security threads & 181 iter-2 post-mortem).
+    envelope = cross_focal_dse_envelope(traces)
+    if envelope:
+        out.append("\n### Cross-focal envelope\n\n")
+        out.append(f"Pooled L2 `final_score` samples across {len(traces)} focal trace(s); top 15 DSEs by mean.\n\n")
+        out.append("| DSE | mean | stdev | p50 | p95 | samples | focals |\n")
+        out.append("|---|---:|---:|---:|---:|---:|---:|\n")
+        for row in envelope[:15]:
+            out.append(
+                f"| {row['dse']} | {fmt(row['mean'], 3)} | {fmt(row['stdev'], 3)} | "
+                f"{fmt(row['p50'], 3)} | {fmt(row['p95'], 3)} | "
+                f"{row['n_samples']} | {row['n_focals']} |\n"
+            )
+
+    # Per-focal tables (unchanged shape).
     for tr in traces:
         out.append(f"\n### Focal: seed {tr.seed} / {tr.focal}\n\n")
         if not tr.dse_scores:
@@ -505,23 +565,28 @@ def section_dse_landscape(traces: list[TraceAggregate]) -> str:
     return "".join(out)
 
 
-def section_plan_churn(traces: list[TraceAggregate]) -> str:
-    out = ["\n## 7. Plan-churn metrics\n"]
-    if not traces:
-        out.append("_No focal traces found._\n")
+def section_plan_failures(runs: list[RunSummary]) -> str:
+    out = ["\n## 7. Plan-step failure reasons\n"]
+    sweep_runs = [r for r in runs if r.kind == "sweep"]
+    if not sweep_runs:
+        out.append("_No sweep runs found._\n")
         return "".join(out)
-    out.append("Plan-churn observable directly via L3PlanFailure / L3Commitment trace records (proxies for replan_count and drop branches).\n\n")
-    out.append("| focal | total plan-failures | dominant failure reason | failure-reason breakdown |\n")
+    # Sourced from `PlanStepFailed` events in events.jsonl (not the dead
+    # `L3PlanFailure` trace layer the prior implementation read). Healthy-
+    # colony.md:76-82 — drift in this distribution signals step-resolver
+    # behavior changes.
+    out.append("\nSourced from `PlanStepFailed` events. Per-run total + dominant reason.\n\n")
+    out.append("| run | total | dominant reason | top reasons |\n")
     out.append("|---|---:|---|---|\n")
-    for tr in traces:
-        total = sum(tr.plan_failures.values())
+    for r in sweep_runs:
+        total = r.plan_step_failed_total
         if total == 0:
-            out.append(f"| {tr.label} | 0 | — | — |\n")
+            out.append(f"| {r.label} | 0 | — | — |\n")
             continue
-        sorted_reasons = sorted(tr.plan_failures.items(), key=lambda kv: -kv[1])
+        sorted_reasons = sorted(r.plan_step_failed_by_reason.items(), key=lambda kv: -kv[1])
         top = sorted_reasons[0][0]
         breakdown = ", ".join(f"{k}={v}" for k, v in sorted_reasons[:5])
-        out.append(f"| {tr.label} | {total} | {top} | {breakdown} |\n")
+        out.append(f"| {r.label} | {total} | {top} | {breakdown} |\n")
     return "".join(out)
 
 
@@ -612,6 +677,9 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--baseline-dir", required=True, help="logs/baseline-<LABEL> directory.")
     p.add_argument("--output", default=None, help="REPORT.md output path (default: <baseline-dir>/REPORT.md).")
+    p.add_argument("--json-sidecar", default=None,
+                   help="Machine-readable sidecar path (default: <output>.json). "
+                        "Consumed by balance_pass_aggregate.sh's baseline-pack composer.")
     return p.parse_args()
 
 
@@ -661,13 +729,26 @@ def main() -> int:
         section_population(runs),
         section_needs(runs),
         section_dse_landscape(traces),
-        section_plan_churn(traces),
+        section_plan_failures(runs),
         section_commitment_gate(traces),
         section_conditional_deltas(runs),
         section_deferred_balance(runs),
     ]
     out_path.write_text("".join(sections))
     print(f"[report] wrote {out_path}", file=sys.stderr)
+
+    # JSON sidecar — machine-readable counterpart for the pack composer.
+    # Later commits in this PR add more keys (cascade_signatures,
+    # plan_failure_top10, death_timing, defense_cadence, …).
+    sidecar_path = Path(args.json_sidecar) if args.json_sidecar else out_path.with_suffix(out_path.suffix + ".json")
+    sidecar = {
+        "label": base.name,
+        "n_runs": len(runs),
+        "n_focals": len(traces),
+        "per_dse_l2": cross_focal_dse_envelope(traces),
+    }
+    sidecar_path.write_text(json.dumps(sidecar, indent=2) + "\n")
+    print(f"[report] wrote {sidecar_path}", file=sys.stderr)
     return 0
 
 
