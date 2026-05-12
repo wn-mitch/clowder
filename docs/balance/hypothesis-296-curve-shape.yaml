@@ -1,0 +1,61 @@
+# Ticket 296 — ward-placement Logistic curve shape, primary spec.
+#
+# 285 (iter-2 in docs/balance/284-ward-anchor-tuning.md) ran three-seed
+# triangulation of the symmetric `(0.5, 0.3) → (0.7, 0.4)` anchor-weight
+# scale-up and produced byte-identical or near-byte-identical ward
+# placements across seeds 42, 99, 7 — despite the
+# `shadow_foxes_avoided_ward_total` counter spanning 2 → 78 across those
+# topologies. The architectural read: at the hardcoded
+# `Logistic(steepness=8.0, midpoint=0.5)`, the per-tile threat-axis lift
+# saturates near 1.0 on any hot tile at anchor weights ≥ ~0.3, so weight
+# magnitude past saturation produces no ordering change.
+#
+# This spec tests the curve-shape lever. Softer steepness (k=4.0 vs 8.0)
+# restores per-tile gradient: at k=4, the lift values at x=(0.3, 0.5,
+# 0.7, 0.9) are (0.31, 0.50, 0.69, 0.83), versus (0.17, 0.50, 0.83,
+# 0.96) at k=8 — finer discrimination among the hot-tile band that 285
+# showed was getting flattened. Anchor weights stay at 284's first-light
+# (0.5, 0.3); only the curve changes.
+#
+# Iteration policy (per the plan):
+# - concordant in-band → land at (4.0, 0.5).
+# - wrong-direction on seed-42 alone → check seed-99 + seed-7 spec
+#   outputs before drawing a conclusion (per 285's three-seed
+#   discipline; seed-42's saturated metric is topology-bound, not
+#   curve-bound).
+# - wrong-direction across all three seeds → soften further to (2.0,
+#   0.5), then try midpoint shift to (4.0, 0.3).
+# - continuity-canary regression > 10% on any seed → stop; this curve
+#   is buying placement quality at the cost of behavioral health.
+#
+# Companion specs:
+# - hypothesis-296-curve-shape-seed99.yaml
+# - hypothesis-296-curve-shape-seed7.yaml
+
+hypothesis: |
+  At the post-284 anchor weights (0.5, 0.3), the per-tile Logistic lift
+  saturates near 1.0 on hot tiles at the hardcoded steepness=8.0, so
+  placement output is byte-identical across ±40% weight scaling
+  (285 iter-2). Softening steepness to 4.0 restores per-tile gradient
+  among the hot-tile band, allowing the anchor weights to bias placement
+  toward the highest-threat-density tiles. On seed-42 (topology-saturated
+  at counter=2) the metric may stay flat, but seed-99 (counter=20, has
+  headroom) should lift as the placement scorer can now discriminate
+  among hot tiles more finely.
+constants_patch:
+  scoring:
+    ward_placement_logistic_steepness: 4.0
+    ward_placement_logistic_midpoint: 0.5
+prediction:
+  metric: shadow_foxes_avoided_ward_total
+  direction: increase
+  # Seed-42 prediction is wide because the baseline value is 2 and the
+  # topology is saturating — the curve change may or may not move
+  # placement onto a tile that overlaps fox patrols. The load-bearing
+  # seeds for this spec are 99 (counter=20) and 7 (counter=78) where
+  # the metric has clean headroom and the curve shape is the binding
+  # constraint per 285's architectural read.
+  rough_magnitude_pct: [0, 200]
+seeds: [42]
+reps: 1
+duration: 900

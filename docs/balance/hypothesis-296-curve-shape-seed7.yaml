@@ -1,0 +1,27 @@
+# Ticket 296 — curve-shape, seed-7 retry.
+#
+# Seed-7 has the highest baseline shadow_foxes_avoided_ward_total (78)
+# at the post-284 weights / pre-296 curve, suggesting the topology
+# naturally maximizes overlap. Curve change can move this either
+# direction: softer slope could either (a) push placement onto an even
+# better cluster (lift) or (b) reshuffle placements off the lucky
+# overlap (drop). This seed serves as the "is the gain seed-specific?"
+# falsifier — if both seed-99 and seed-7 lift, the curve change is
+# robust; if seed-7 drops while seed-99 lifts, the lever is too sharp.
+
+hypothesis: |
+  At seed-7, baseline curve+weights happen to land placement on a
+  high-overlap tile cluster (avoided counter = 78). Softening curve to
+  k=4 should either preserve or modestly lift the count by letting the
+  scorer pick the very best of several overlapping hot tiles.
+constants_patch:
+  scoring:
+    ward_placement_logistic_steepness: 4.0
+    ward_placement_logistic_midpoint: 0.5
+prediction:
+  metric: shadow_foxes_avoided_ward_total
+  direction: increase
+  rough_magnitude_pct: [-10, 50]
+seeds: [7]
+reps: 1
+duration: 900

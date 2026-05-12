@@ -1,0 +1,28 @@
+# Ticket 296 — curve-shape, seed-99 retry.
+#
+# Seed-99 is the load-bearing seed for this spec: at the post-284
+# weights (0.5, 0.3) and pre-296 curve (8.0, 0.5), the baseline
+# shadow_foxes_avoided_ward_total reads 20 (per 285 iter-2 seed-99
+# triangulation). The metric has clean headroom and the seed's
+# ward-placement / fox-spawn geometry overlaps cleanly. If curve
+# softening helps, this is where it'll show up first.
+#
+# Iteration policy: see hypothesis-296-curve-shape.yaml.
+
+hypothesis: |
+  At seed-99, baseline placement geometry overlaps fox patrols enough
+  to land 20 avoided-fox events at the saturated (k=8) curve. Softening
+  to k=4 restores per-tile gradient among hot tiles, so the scorer can
+  pick the *best* of several overlapping candidates. Predicted lift to
+  ≥24 (+20%) or higher.
+constants_patch:
+  scoring:
+    ward_placement_logistic_steepness: 4.0
+    ward_placement_logistic_midpoint: 0.5
+prediction:
+  metric: shadow_foxes_avoided_ward_total
+  direction: increase
+  rough_magnitude_pct: [10, 100]
+seeds: [99]
+reps: 1
+duration: 900

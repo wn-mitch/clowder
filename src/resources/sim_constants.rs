@@ -1994,6 +1994,27 @@ pub struct ScoringConstants {
     /// smaller weight avoids chronic-corpse drag toward old kill-sites.
     #[serde(default = "default_ward_recency_anchor_weight")]
     pub ward_recency_anchor_weight: f32,
+    /// 296: steepness `k` of the Logistic curve `L(x) = 1/(1+exp(-k(x-m)))`
+    /// applied to each per-tile threat-axis lift in
+    /// `compute_ward_placement()` (ambush, carcass, fox-intercept). Promoted
+    /// from the previously-hardcoded `8.0` after 285's three-seed
+    /// triangulation showed that at `k=8.0, m=0.5` the curve saturates
+    /// near 1.0 on any hot tile at anchor weights ≥ ~0.3, making weight
+    /// magnitude architecturally inert in that regime
+    /// (`docs/balance/284-ward-anchor-tuning.md` iter-2). Softer
+    /// steepness restores per-tile gradient that the anchor weights can
+    /// then bias. Default `8.0` preserves pre-296 behavior; 296's
+    /// hypothesize sweep tunes from there.
+    #[serde(default = "default_ward_placement_logistic_steepness")]
+    pub ward_placement_logistic_steepness: f32,
+    /// 296: midpoint `m` of the Logistic curve `L(x) = 1/(1+exp(-k(x-m)))`
+    /// applied to each per-tile threat-axis lift in
+    /// `compute_ward_placement()`. Sibling of
+    /// `ward_placement_logistic_steepness` — shifts the inflection point
+    /// along the [0, 1] threat axis. Default `0.5` preserves pre-296
+    /// behavior.
+    #[serde(default = "default_ward_placement_logistic_midpoint")]
+    pub ward_placement_logistic_midpoint: f32,
     /// 256 R5: deposit per tick when a cat's current action is
     /// `Action::Patrol`. Lays a deterrent gradient that foxes read as
     /// routing cost via `CatPatrolDeterrentOverlay`. Default `0.05`
@@ -2329,6 +2350,8 @@ impl Default for ScoringConstants {
             patrol_path_corruption_weight: default_patrol_path_corruption_weight(),
             ward_ambush_anchor_weight: default_ward_ambush_anchor_weight(),
             ward_recency_anchor_weight: default_ward_recency_anchor_weight(),
+            ward_placement_logistic_steepness: default_ward_placement_logistic_steepness(),
+            ward_placement_logistic_midpoint: default_ward_placement_logistic_midpoint(),
             cat_patrol_deterrent_deposit_per_tick:
                 default_cat_patrol_deterrent_deposit_per_tick(),
             cat_patrol_deterrent_decay_rate: default_cat_patrol_deterrent_decay_rate(),
@@ -3564,6 +3587,20 @@ fn default_ward_ambush_anchor_weight() -> f32 {
 /// tuning is deferred to a follow-on.
 fn default_ward_recency_anchor_weight() -> f32 {
     0.3
+}
+
+/// 296: steepness `k` of the Logistic curve applied to per-tile
+/// threat-axis lifts in `compute_ward_placement()`. Default `8.0`
+/// preserves pre-296 behavior (hardcoded value before promotion).
+fn default_ward_placement_logistic_steepness() -> f32 {
+    8.0
+}
+
+/// 296: midpoint `m` of the Logistic curve applied to per-tile
+/// threat-axis lifts in `compute_ward_placement()`. Default `0.5`
+/// preserves pre-296 behavior (hardcoded value before promotion).
+fn default_ward_placement_logistic_midpoint() -> f32 {
+    0.5
 }
 
 /// 228: Patrol `Consideration::Field` route-cost axis weight.
@@ -5767,16 +5804,22 @@ mod tests {
         assert_eq!(json, json2);
     }
 
-    /// 220: substrate consumers must ship dormant — both ward-placement
-    /// anchor weights default to 0.0 so `compute_ward_placement` is
-    /// byte-identical to its pre-220 form on a seed-42 soak. Flipping
-    /// either above zero is a balance-affecting change and must go
-    /// through a dedicated tuning ticket.
+    /// 284 (first-light) + 296 (curve-shape extraction): ward-placement
+    /// scoring constants ship at their documented first-light / pre-296
+    /// values so `compute_ward_placement` reproduces the post-284
+    /// behavior. Flipping any of these is a balance-affecting change
+    /// and must go through a dedicated tuning ticket. The 296 fields
+    /// are a value-extraction refactor — their defaults must preserve
+    /// the previously-hardcoded `(8.0, 0.5)` Logistic curve.
     #[test]
-    fn ward_anchor_weights_ship_dormant() {
+    fn ward_placement_scoring_constants_ship_at_documented_defaults() {
         let defaults = SimConstants::default();
-        assert_eq!(defaults.scoring.ward_ambush_anchor_weight, 0.0);
-        assert_eq!(defaults.scoring.ward_recency_anchor_weight, 0.0);
+        // 284 first-light values.
+        assert_eq!(defaults.scoring.ward_ambush_anchor_weight, 0.5);
+        assert_eq!(defaults.scoring.ward_recency_anchor_weight, 0.3);
+        // 296 curve-extraction defaults preserve pre-296 hardcoded curve.
+        assert_eq!(defaults.scoring.ward_placement_logistic_steepness, 8.0);
+        assert_eq!(defaults.scoring.ward_placement_logistic_midpoint, 0.5);
     }
 
     #[test]

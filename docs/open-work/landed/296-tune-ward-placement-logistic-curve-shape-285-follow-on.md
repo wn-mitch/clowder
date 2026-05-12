@@ -1,7 +1,7 @@
 ---
 id: 296
 title: tune ward placement Logistic curve shape (285 follow-on)
-status: ready
+status: done
 cluster: balance
 added: 2026-05-12
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [284-ward-anchor-tuning.md]
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-12
 ---
 
 ## Why
@@ -42,3 +42,4 @@ landed-on: null
 
 ## Log
 - 2026-05-12: opened as the curve-shape follow-on to 285. Architectural read in 284 iter-2 §"Seed-99 + seed-7 retries" identifies the Logistic curve as the binding constraint after three-seed triangulation.
+- 2026-05-12: Findings-only: three-seed curve-shape sweep (42/99/7) at (k=8.0, m=0.5) → (k=4.0, m=0.5) produced byte-identical placement output on every seed (wrong-direction at 0% delta). Combined with 285's magnitude finding, both magnitude AND curve shape have now been independently ruled out as binding levers at current anchor weights. Logistic-lifted ambush/carcass terms are not rank-changing inputs — the argmax among threat-saturated tiles is dominated by cat_value + distance_cost + jitter. Constants extracted to SimConstants (defaults preserve pre-296); 297's substrate axis remains plausible because halo extends into low-fox_scent tiles where the existing inputs don't saturate. iter-3 appended to docs/balance/284-ward-anchor-tuning.md.

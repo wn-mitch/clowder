@@ -1460,6 +1460,10 @@ pub(crate) fn compute_ward_placement(
         .scoring
         .ward_recency_anchor_weight
         .clamp(0.0, 1.0);
+    // 296: Logistic curve params, promoted from hardcoded (8.0, 0.5).
+    // Defaults preserve byte-identical pre-296 behavior.
+    let curve_k = constants.scoring.ward_placement_logistic_steepness;
+    let curve_m = constants.scoring.ward_placement_logistic_midpoint;
 
     for candidate in &candidates {
         let fox_scent = maps.fox_scent.get(candidate.x, candidate.y);
@@ -1471,13 +1475,21 @@ pub(crate) fn compute_ward_placement(
         // weight is zero so dormant runs incur no extra arithmetic.
         let ambush_lift = if w_ambush > 0.0 {
             w_ambush
-                * logistic_threat_lift(maps.recent_ambush.get(candidate.x, candidate.y))
+                * logistic_threat_lift(
+                    maps.recent_ambush.get(candidate.x, candidate.y),
+                    curve_k,
+                    curve_m,
+                )
         } else {
             0.0
         };
         let carcass_lift = if w_carcass > 0.0 {
             w_carcass
-                * logistic_threat_lift(maps.carcass_scent.get(candidate.x, candidate.y))
+                * logistic_threat_lift(
+                    maps.carcass_scent.get(candidate.x, candidate.y),
+                    curve_k,
+                    curve_m,
+                )
         } else {
             0.0
         };
@@ -1502,13 +1514,18 @@ pub(crate) fn compute_ward_placement(
 }
 
 /// 220: shared sigmoid for the ward-placement threat lifts. Matches the
-/// `Composite{Logistic(8.0, 0.5)}` curve named in ticket 220 §Scope so
-/// the placement scorer and any future DSE consumers share one shape.
+/// `Composite{Logistic(k, m)}` curve named in ticket 220 §Scope so the
+/// placement scorer and any future DSE consumers share one shape.
 /// Input is expected in [0, 1]; output is in (~0, ~1) with the
-/// inflection at 0.5.
-fn logistic_threat_lift(x: f32) -> f32 {
-    let k: f32 = 8.0;
-    let m: f32 = 0.5;
+/// inflection at `m`.
+///
+/// 296: curve parameters `k` (steepness) and `m` (midpoint) promoted
+/// from the previously-hardcoded `(8.0, 0.5)` to
+/// `SimConstants::scoring::ward_placement_logistic_{steepness,midpoint}`.
+/// Default values preserve pre-296 behavior; 296's hypothesize sweep
+/// tunes from there. See `docs/balance/284-ward-anchor-tuning.md`
+/// iter-2 for the saturation finding that motivated the promotion.
+fn logistic_threat_lift(x: f32, k: f32, m: f32) -> f32 {
     1.0 / (1.0 + (-k * (x - m)).exp())
 }
 
@@ -1601,6 +1618,33 @@ mod tests {
             crate::resources::RecentAmbushMap::default(),
             crate::resources::CarcassScentMap::default(),
         )
+    }
+
+    /// 296 regression guard: at the post-extraction default params
+    /// `(k=8.0, m=0.5)`, the promoted helper must reproduce the
+    /// hardcoded pre-296 curve to within `f32::EPSILON`. Catches
+    /// accidental value drift during the constants promotion and
+    /// during any future refactor of the helper body.
+    #[test]
+    fn logistic_threat_lift_at_defaults_matches_pre_296_curve() {
+        // Hardcoded reference matching coordination.rs at commit 4bcae2de
+        // (pre-296): `let k = 8.0; let m = 0.5; 1.0 / (1.0 + (-k * (x - m)).exp())`.
+        fn pre_296_reference(x: f32) -> f32 {
+            let k: f32 = 8.0;
+            let m: f32 = 0.5;
+            1.0 / (1.0 + (-k * (x - m)).exp())
+        }
+        for n in 0..=100 {
+            let x = n as f32 / 100.0;
+            let promoted = logistic_threat_lift(x, 8.0, 0.5);
+            let reference = pre_296_reference(x);
+            assert!(
+                (promoted - reference).abs() <= f32::EPSILON,
+                "logistic_threat_lift({x}, 8.0, 0.5) = {promoted}, \
+                 pre-296 reference = {reference}, drift = {}",
+                (promoted - reference).abs()
+            );
+        }
     }
 
     #[test]

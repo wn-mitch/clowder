@@ -15,10 +15,10 @@ _Last generated: 2026-05-12._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 89 |
+| Ready | 88 |
 | Parked | 10 |
 | Blocked | 26 |
-| **Open total** | **131** |
+| **Open total** | **130** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -44,7 +44,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[229](docs/open-work/tickets/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose — _[tooling] · added 2026-05-08_
 
-## Ready (89)
+## Ready (88)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -133,7 +133,6 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[293](docs/open-work/tickets/293-huntingpriors-retirement-per-location-belief-moves-to-locationbeliefsperceived-violence-capability-colony-absorption-rebuild-258-follow-on.md)** — HuntingPriors retirement — per-location belief moves to LocationBeliefs.perceived_violence_capability + colony absorption rebuild (258 follow-on) — _[C] · added 2026-05-11_
 - **[294](docs/open-work/tickets/294-recentambushmap-retirement-colony-resource-moves-to-per-cat-locationbeliefsrecency-of-threat-cue-258-follow-on.md)** — RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on) — _[C] · added 2026-05-11_
 - **[295](docs/open-work/tickets/295-witnessableevent-emit-sites-wire-attack-mate-care-fleefrom-hunt-from-action-resolvers-258-follow-on.md)** — WitnessableEvent emit sites — wire Attack / Mate / Care / FleeFrom / Hunt from action resolvers (258 follow-on) — _[C] · added 2026-05-11_
-- **[296](docs/open-work/tickets/296-tune-ward-placement-logistic-curve-shape-285-follow-on.md)** — tune ward placement Logistic curve shape (285 follow-on) — _[balance] · added 2026-05-12_
 - **[297](docs/open-work/tickets/297-ward-placement-needs-fox-patrol-topology-perception-axis-285-follow-on.md)** — ward placement needs fox-patrol-topology perception axis (285 follow-on) — _[ai-substrate] · added 2026-05-12_
 
 ## Parked (10)
@@ -183,12 +182,13 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (185)
+## Landed archive (186)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (120)
+### 2026-05 (121)
 
+- **[296](docs/open-work/landed/296-tune-ward-placement-logistic-curve-shape-285-follow-on.md)** — tune ward placement Logistic curve shape (285 follow-on) _(2026-05-12)_
 - **[285](docs/open-work/landed/285-tune-ward-anchor-weights-magnitude-iteration.md)** — tune ward anchor weights — magnitude iteration _(2026-05-12)_
 - **[288](docs/open-work/landed/288-engagethreat-morale-break-must-release-the-guarding-commitment-so-wounded-cats-can-drop-to-flee.md)** — EngageThreat morale_break must release the Guarding commitment so wounded cats can drop to Flee _(2026-05-11)_
 - **[284](docs/open-work/landed/284-tune-ward-placement-ambush-carcass-anchor-weights.md)** — tune ward placement ambush + carcass anchor weights _(2026-05-11)_

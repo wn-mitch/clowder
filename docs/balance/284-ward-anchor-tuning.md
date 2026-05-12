@@ -313,3 +313,123 @@ These two tickets address the architectural findings in increasing depth: 296 is
 - Not a multi-seed concordance check. Single seed (42) only.
 - Not a Welch's t / Cohen's d analysis. No effect-size band claims.
 - Not the final landing values for these weights. They are the *first* landing values.
+
+---
+
+# iter-3 — curve-shape path closed; ambush + carcass lifts are architecturally inert at current weights
+
+**Date:** 2026-05-12
+**Ticket:** [296](../open-work/landed/296-tune-ward-placement-logistic-curve-shape-285-follow-on.md)
+**Methodology:** four-artifact `just hypothesize`, single-seed × 1-rep × 900s × release, run across three seeds (42, 99, 7) per 285's triangulation discipline.
+**Specs:**
+- `docs/balance/hypothesis-296-curve-shape.yaml` — primary seed-42, symmetric softening to `(k=4.0, m=0.5)`.
+- `docs/balance/hypothesis-296-curve-shape-seed99.yaml` — load-bearing retry (counter has headroom at 20).
+- `docs/balance/hypothesis-296-curve-shape-seed7.yaml` — falsifier (counter at 78, lucky overlap geometry).
+**Hypothesize output dirs:**
+- `logs/hypothesize-at-the-post-284-anchor-weights-0-5-0-3-the-per-tile-logistic/`
+- `logs/hypothesize-at-seed-99-baseline-placement-geometry-overlaps-fox-patrols-/`
+- `logs/hypothesize-at-seed-7-baseline-curve-weights-happen-to-land-placement-on/`
+
+## Hypothesis (iter-3)
+
+iter-2's three-seed result showed `(0.5, 0.3) → (0.7, 0.4)` weight magnitude is byte-identical-inert across seeds 42, 99, 7. The architectural read named the **Logistic curve shape** (steepness=8.0, midpoint=0.5) as the binding constraint: at k=8 the per-tile lift saturates near 1.0 on hot tiles, so weight magnitude past saturation produces no ordering change.
+
+iter-3 promoted the hardcoded curve params to `SimConstants` fields (`ward_placement_logistic_steepness`, `ward_placement_logistic_midpoint`) and ran the four-artifact loop on the symmetric softening `(k=8.0, m=0.5) → (k=4.0, m=0.5)`. Predicted: softer slope restores per-tile gradient among the hot-tile band, allowing the anchor weights to bias placement toward the highest-threat-density tiles. Seed-99 was the load-bearing seed (counter=20, has headroom); seed-42 was acknowledged-saturated-topology; seed-7 was the falsifier.
+
+## Methodology
+
+`just hypothesize <spec>` four-artifact loop, single-seed × 1-rep × 900s × release. Constants extraction landed in the preceding Phase 1.1 commit (defaults preserve pre-296 byte-identical behavior; the lift helper signature changed from `logistic_threat_lift(x)` to `logistic_threat_lift(x, k, m)` with `(8.0, 0.5)` read from `SimConstants` at call time). Baseline within each spec is the unpatched defaults; treatment is `(k=4.0, m=0.5)`.
+
+Constants extraction is a value-extraction refactor with a regression guard:
+```rust
+#[test]
+fn logistic_threat_lift_at_defaults_matches_pre_296_curve() {
+    // Asserts the promoted helper at (k=8.0, m=0.5) reproduces the
+    // pre-296 hardcoded curve to within f32::EPSILON across a
+    // 101-point sweep of inputs in [0.0, 1.0].
+}
+```
+
+## Constants landed
+
+**None on defaults.** The extraction itself landed (Phase 1.1 commit):
+```rust
+default_ward_placement_logistic_steepness() -> f32  { 8.0 }   // preserves pre-296
+default_ward_placement_logistic_midpoint()  -> f32  { 0.5 }   // preserves pre-296
+```
+
+The extraction is value-add for 297 (which reads the same params for its third Logistic-lift) and for any future tuning. Default values remain at the pre-296 hardcoded `(8.0, 0.5)`.
+
+## Observation
+
+### Three-seed summary — byte-identical placement across the curve change
+
+| Seed | Counter baseline → treatment | Wards baseline → treatment | Continuity drift |
+|---|---|---|---|
+| **42** | **2 → 2** | 14 → 14 | identical |
+| **99** | **20 → 20** | 9 → 9 | grooming +0.5%, courtship +0.5%, otherwise identical |
+| **7** | **78 → 78** | 11 → 11 | grooming −0.5%, mentoring −0.2%, otherwise identical |
+
+Concordance verdict (per spec): **wrong-direction at delta=0%** on all three seeds. Effect size 0.0, p=1.0 (no variance in the metric across the change).
+
+Welch's t / Cohen's d not run — the data are pre-test invariant (a 0% change cannot have an effect size). The continuity drifts are well within ±1% noise and far from CLAUDE.md's >±10% threshold for hypothesis-grade attention.
+
+### The footers are functionally identical
+
+Seed-42 baseline `(k=8.0, m=0.5)` vs treatment `(k=4.0, m=0.5)` — every footer field including continuity tallies matches exactly:
+```
+{shadow_foxes_avoided_ward_total: 2, wards_placed_total: 14, deaths_by_cause: {ShadowFoxAmbush: 2},
+ continuity_tallies: {burial:0, courtship:3478, grooming:1177, mentoring:230, mythic-texture:43, play:14}}
+```
+Seeds 99 and 7 show similarly tight invariance (continuity tallies drift by ≤0.5%, every counter exact).
+
+### Why curve shape is also inert — sharpening the 285 architectural read
+
+285 iter-2 identified Logistic saturation as the binding constraint. iter-3 confirms but **strengthens** the finding: even at `k=4.0` (a meaningfully softer curve where saturation is half as aggressive — the lift at x=0.9 drops from 0.96 to 0.83), placement output is byte-identical. The architectural read sharpens:
+
+- At the current anchor weights, the **Logistic-lifted ambush/carcass terms are not rank-changing inputs** to `compute_ward_placement`'s argmax. Hot tiles already saturate the base `fox_scent.max(corruption)` term at or near 1.0; the lift terms add to an already-maxed-out base and re-clamp at 1.0. The `+ 0.3 * cat_value` term then becomes the actual differentiator among the threat-saturated tile set, with `distance_cost` and `jitter` as tiebreaks.
+- This means **neither weight magnitude (285) NOR curve shape (296) is the binding lever** for moving `shadow_foxes_avoided_ward_total` on these three topologies. The substrate is doing real work — it ANCHORS placement on ambush/carcass tiles within the threat-saturated band — but the argmax decision among that band is dominated by other terms.
+
+### Spatial topology corroboration
+
+Post-hoc position scan on all six runs (baseline + treatment × 3 seeds): ward placements are byte-identical between baseline and treatment within each seed. The `(k=8.0, m=0.5) → (k=4.0, m=0.5)` change does not move which tiles win the argmax on any seed.
+
+## Concordance
+
+| Artifact | Seed-42 | Seed-99 | Seed-7 |
+|---|---|---|---|
+| **Hypothesis** | Softening curve to k=4 restores per-tile gradient, allowing anchor weights to bias placement. | Same hypothesis; seed-99 is load-bearing (counter has headroom). | Same hypothesis; seed-7 is falsifier (counter near ceiling). |
+| **Prediction** | `shadow_foxes_avoided_ward_total` Δ ∈ [0, +200]% (wide; topology-saturated). | Δ ∈ [+10, +100]%. | Δ ∈ [−10, +50]%. |
+| **Observation** | Δ = 0% (2 → 2). Byte-identical footer. | Δ = 0% (20 → 20). Byte-identical placement. | Δ = 0% (78 → 78). Byte-identical placement. |
+| **Concordance** | **wrong-direction** (Δ=0% outside [0, +200] band's interior). | **wrong-direction**. | **wrong-direction**. |
+
+### Hard-gate readout (treatment soaks, seed-42)
+
+- `deaths_by_cause.Starvation == 0` → **PASS** (0).
+- `deaths_by_cause.ShadowFoxAmbush <= 10` → PASS (2).
+- `never_fired_expected_positives == 0` → not verified (sweep footers, not verification soaks).
+- Five continuity canaries each ≥ 1 → PASS (grooming 1177, play 14, mentoring 230, courtship 3478, mythic-texture 43).
+- Continuity drift vs baseline → clean (essentially zero across all five canaries on all three seeds).
+
+## Decision
+
+**Findings-only landing. Keep constants extracted; defaults stay at (8.0, 0.5).** No tuned values shipping. Across three seeds at independent topologies, the `(k=8.0, m=0.5) → (k=4.0, m=0.5)` curve change produces byte-identical placement output. Combined with 285 iter-2's magnitude finding, **two distinct levers (weight magnitude AND curve shape) have now been independently ruled out** as binding constraints for `shadow_foxes_avoided_ward_total` at the current anchor weights.
+
+The constants extraction itself ships and stays — it's value-add for two things:
+1. **297** reads the same `ward_placement_logistic_steepness/midpoint` for its third Logistic-lift term over `FoxSpawnVicinityMap`. The unified surface means future curve tuning applies to all three anchors symmetrically.
+2. Future joint-anchor-weight re-tuning tickets can now sweep curve shape alongside weights without value-extraction friction.
+
+### Two findings drive any follow-on work, ranked by structural depth
+
+1. **Logistic-lifted ambush/carcass terms are not rank-changing inputs.** The substrate fires (RecentAmbushMap and CarcassScentMap populate correctly, the scorer reads them, the lift terms add to threat), but the argmax among threat-saturated tiles is dominated by `cat_value` + `distance_cost` + jitter, not by the lift differential. Any movement-of-the-metric work needs to either (a) prevent threat saturation in the first place by adding orthogonal-axis inputs to tiles the existing inputs DON'T light up, or (b) re-architect how the threat axis composes its inputs.
+2. **297's `FoxSpawnVicinityMap` axis is structurally well-positioned to address (1a).** The halo around corruption sources extends into tiles where `fox_scent.max(corruption)` is LOW (uncorrupted neighbors of high-corruption tiles). On those tiles the new axis's lift is the *first* non-zero threat contribution — not an addition to an already-saturated base. The 296 finding sharpens the prior that 297 might move the metric where 285 and 296 didn't.
+
+**Follow-on tickets:** none opened in this landing — 297 was already opened in 285's landing and carries the orthogonal-axis surface. The 285-tree of follow-ons remains unchanged.
+
+## What iter-3 is NOT
+
+- Not a refutation of the curve-extraction itself. The src/ refactor lands (regression-guarded) regardless of whether the sweep found a winning shape.
+- Not a claim that the Logistic curve is the wrong tool everywhere — only that *at the current anchor weights*, the curve shape is not the binding lever for this metric.
+- Not a multi-rep sweep. Single rep per seed; per-seed Welch's t can't run without replicates. The byte-identical observation across three independent seeds is the load-bearing evidence.
+- Not a justification to escalate to `(k=2.0, m=0.5)` or to midpoint shifts. The byte-identical placement output indicates the argmax tile is determined by non-Logistic-lifted score components — softer curves or shifted midpoints would compose the same way.
+
