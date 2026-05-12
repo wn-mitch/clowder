@@ -1,0 +1,48 @@
+# Ticket 285 — asymmetric scent-isolation side-experiment.
+#
+# Companion to hypothesis-285-ward-anchor-magnitude.yaml. Where that
+# spec asks "does symmetric scale-up of both weights lift macro
+# counters?", this spec asks the orthogonal structural question:
+# "does `ward_recency_anchor_weight` contribute anything beyond what
+# `ward_ambush_anchor_weight` already captures?"
+#
+# By forcing `recency` to 0.0 and lifting `ambush` to 1.0 (the
+# Logistic saturation point), the placement scorer reads ONLY the
+# RecentAmbushMap. If `shadow_foxes_avoided_ward_total` lifts
+# comparably to the symmetric-grid winner, carcass scent contributes
+# nothing the ambush map didn't already encode and should be
+# considered for retirement. If it lifts noticeably less, carcass
+# scent is load-bearing as a ground-truth anchor distinct from
+# event-decay memory.
+#
+# This run does NOT land its constants. The treatment is purely
+# informational — the result feeds into 284 iter-2's Decision section
+# as evidence, and (if asymmetric beats symmetric) motivates a
+# follow-on ticket on the `ward_recency_anchor_weight` retirement
+# question. The symmetric magnitude path supplies the landed values.
+
+hypothesis: |
+  Forcing `ward_recency_anchor_weight` to 0.0 and lifting
+  `ward_ambush_anchor_weight` to 1.0 (Logistic saturation) isolates
+  whether the `CarcassScentMap` lift contributes anything to ward
+  efficacy beyond what `RecentAmbushMap` already encodes. If the
+  asymmetric lift moves `shadow_foxes_avoided_ward_total` comparably
+  to or better than the symmetric scale-up, the carcass-scent axis is
+  redundant and a candidate for retirement. If the asymmetric lift
+  moves the metric noticeably less, carcass scent is a load-bearing
+  ground-truth anchor distinct from event-decay ambush memory.
+constants_patch:
+  scoring:
+    ward_ambush_anchor_weight: 1.0
+    ward_recency_anchor_weight: 0.0
+prediction:
+  metric: shadow_foxes_avoided_ward_total
+  direction: increase
+  # Same band as the symmetric spec — the prediction is comparable
+  # magnitude (any lift means substrate is doing work). The
+  # interesting comparison is not concordant-vs-not but
+  # asymmetric-vs-symmetric delta.
+  rough_magnitude_pct: [50, 300]
+seeds: [42]
+reps: 1
+duration: 900

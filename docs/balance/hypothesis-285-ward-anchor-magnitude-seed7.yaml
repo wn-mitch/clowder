@@ -1,0 +1,37 @@
+# Ticket 285 — magnitude path, seed-7 triangulation.
+#
+# Seed-42 and seed-99 retries both produced wrong-direction at
+# delta=0% with the same (0.5, 0.3) → (0.7, 0.4) symmetric scale-up.
+# Seed-99 was particularly diagnostic: 10× higher absolute counter
+# value (20 vs 2) and yet byte-identical ward placements, proving
+# Logistic saturation is the binding constraint, not topology.
+#
+# Seed-7 is the third leg of triangulation: if the placement output
+# is again byte-identical or near-identical, the Logistic-saturation
+# architectural read is locked. If seed-7 produces a measurably
+# different placement under the same weight change, the magnitude
+# lever has more reach than seeds 42/99 suggested and the Decision
+# in 284-ward-anchor-tuning.md iter-2 needs revisiting.
+
+hypothesis: |
+  Seed-7 triangulation of 285's magnitude path. After seed-42 and
+  seed-99 both produced wrong-direction at delta=0% from the
+  (0.5, 0.3) → (0.7, 0.4) symmetric scale-up — with seed-99
+  exhibiting byte-identical ward placement between baseline and
+  treatment — the Logistic curve (steepness=8.0, midpoint=0.5) is
+  the suspect binding constraint. Seed-7 is the third leg: if the
+  metric is again unchanged and placements are again unchanged or
+  near-unchanged, the saturation finding generalizes across three
+  topologies and the magnitude lever is confirmed architecturally
+  inert.
+constants_patch:
+  scoring:
+    ward_ambush_anchor_weight: 0.7
+    ward_recency_anchor_weight: 0.4
+prediction:
+  metric: shadow_foxes_avoided_ward_total
+  direction: increase
+  rough_magnitude_pct: [50, 300]
+seeds: [7]
+reps: 1
+duration: 900

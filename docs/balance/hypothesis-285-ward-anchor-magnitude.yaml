@@ -1,0 +1,51 @@
+# Ticket 285 — ward anchor weights, symmetric magnitude iteration.
+#
+# 284 activated `ward_ambush_anchor_weight=0.5` and
+# `ward_recency_anchor_weight=0.3` off the 220-dormant 0.0. The
+# substrate fires (post-soak ward placements visibly cluster on the
+# empirical ambush corridor) but macro outcome counters were
+# magnitude-flat: `shadow_foxes_avoided_ward_total`,
+# `shadow_fox_spawn_total`, and every `deaths_by_cause` field landed
+# identical to the current.json baseline on seed-42.
+#
+# This spec carries the magnitude-tightening burden 284 deferred. The
+# treatment patch below scales both weights by ~40% to test whether a
+# modest symmetric lift moves the macro counters. Single seed × 1 rep
+# per the user's session call — the prior is binary (does scaling lift
+# `shadow_foxes_avoided_ward_total` at all?), not effect-size-grade.
+#
+# Iteration policy (per the plan):
+# - concordant in-band → land at (0.7, 0.4).
+# - off-magnitude-low → edit to (0.9, 0.5) and re-run.
+# - off-magnitude-high → land at (0.7, 0.4) anyway if survival/continuity hold.
+# - wrong-direction → stop; magnitude is not the right lever.
+# - drift → run `just sweep-stats --vs` before iterating.
+#
+# Companion spec: hypothesis-285-ward-anchor-scent-isolation.yaml
+# (asymmetric `(1.0, 0.0)` for the carcass-scent-isolation question).
+
+hypothesis: |
+  284's first-light `(0.5, 0.3)` weights redirect ward placement onto
+  the empirical ambush corridor but leave macro-outcome counters
+  (`shadow_foxes_avoided_ward_total`, ShadowFoxAmbush deaths)
+  magnitude-flat. Scaling both weights symmetrically to `(0.7, 0.4)`
+  should sharpen the placement scorer's preference for ambush- and
+  carcass-anchored tiles enough that fox patrols meaningfully
+  intersect more ward perimeters, lifting
+  `shadow_foxes_avoided_ward_total` above the post-284 baseline of 2.
+constants_patch:
+  scoring:
+    ward_ambush_anchor_weight: 0.7
+    ward_recency_anchor_weight: 0.4
+prediction:
+  metric: shadow_foxes_avoided_ward_total
+  direction: increase
+  # Wide band because the post-284 baseline value is 2 (very low) —
+  # any concrete lift is a large percentage delta. A doubling lands at
+  # 4 (+100%); a tripling at 6 (+200%). Concordance below 50% would
+  # mean the symmetric scale-up barely moved the needle, signalling
+  # the curve shape is the binding constraint rather than the weights.
+  rough_magnitude_pct: [50, 300]
+seeds: [42]
+reps: 1
+duration: 900

@@ -1,7 +1,7 @@
 ---
 id: 285
 title: tune ward anchor weights — magnitude iteration
-status: ready
+status: done
 cluster: balance
 added: 2026-05-11
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [284-ward-anchor-tuning.md]
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-12
 ---
 
 ## Why
@@ -91,3 +91,4 @@ post-284 footer, not against this older snapshot.
 - 2026-05-11: opened as the magnitude-tightening follow-on to 284's
   first-light landing. 284's writeup ends with "macro counters
   magnitude-flat at 0.5/0.3" — that's this ticket's starting evidence.
+- 2026-05-12: iter-2 four-artifact methodology across seeds 42/99/7; three-seed evidence locks Logistic-saturation finding; follow-ons 296 (curve shape) and 297 (perception axis) opened in same commit

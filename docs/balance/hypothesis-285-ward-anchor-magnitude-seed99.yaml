@@ -1,0 +1,40 @@
+# Ticket 285 — magnitude path, seed-99 retry.
+#
+# The seed-42 magnitude run produced wrong-direction at delta=0% — but
+# the post-hoc spatial scan revealed why: on seed-42, fox spawn sites
+# (corruption tiles) cluster at south/east (24-114, 42-83) while ward
+# placement clusters at the cat-side upper-left (29-42, 10-36). Only
+# ~2 fox patrols per soak traverse the ward zone at all, so the
+# avoidance counter is geometrically saturated low regardless of
+# anchor weight magnitude.
+#
+# Seed-99 picks a different corruption-tile geometry. If the
+# avoidance counter moves with the same (0.7, 0.4) treatment under
+# different fox-spawn topology, the seed-42 negative result was a
+# per-seed artifact, not architectural — and the substrate is doing
+# what it was designed to do, just below the visibility threshold on
+# the specific seed we tested. If the counter is still flat at
+# seed-99, the architectural reframing in 284-ward-anchor-tuning.md
+# iter-2 (ambush memory ≠ fox-patrol topology) holds and the next
+# move is a structural one.
+
+hypothesis: |
+  Seed-99 retry of 285's magnitude path. The (0.5, 0.3) → (0.7, 0.4)
+  symmetric scale-up should lift `shadow_foxes_avoided_ward_total`
+  above the seed-99 baseline if (and only if) the seed-42 saturation
+  was a topology artifact rather than a substrate-magnitude limit.
+  Fox spawn sites cluster on corruption tiles which vary by seed; if
+  seed-99 happens to spawn foxes nearer the placement scorer's
+  ambush-memory hot spots, the avoidance counter has the geometric
+  headroom to move.
+constants_patch:
+  scoring:
+    ward_ambush_anchor_weight: 0.7
+    ward_recency_anchor_weight: 0.4
+prediction:
+  metric: shadow_foxes_avoided_ward_total
+  direction: increase
+  rough_magnitude_pct: [50, 300]
+seeds: [99]
+reps: 1
+duration: 900
