@@ -39,7 +39,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "logq"))
 
 from envelope import Envelope, emit                    # noqa: E402  type: ignore[import-not-found]
-from retrieve import Index, load_index                 # noqa: E402
+from retrieve import Index, load_index, weighted_centroid_from_rows                 # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -180,11 +180,11 @@ def build_ticket_views(idx: Index) -> list[TicketView]:
         refs = _parse_references(body, all_ids, exclude=tid)
         blocked_by, supersedes = _parse_frontmatter_links(body, all_ids, exclude=tid)
 
-        # Centroid: mean of this ticket's chunk vectors, re-normalized.
+        # Section-weighted centroid (see retrieve.SECTION_WEIGHTS) so
+        # tickets are characterized by their intent (Why / Scope /
+        # Approach) rather than smudged by process boilerplate.
         vec_rows = [r for r, _ in rows]
-        centroid = idx.vectors[np.array(vec_rows, dtype=np.int64)].mean(axis=0)
-        norm = np.linalg.norm(centroid) or 1.0
-        centroid = centroid / norm
+        centroid = weighted_centroid_from_rows(idx, vec_rows)
 
         views.append(TicketView(
             ticket_id=tid,

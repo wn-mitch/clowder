@@ -165,6 +165,81 @@ def top_k(
     return [(int(i), float(sims[i])) for i in sorted_part if sims[i] > -np.inf]
 
 
+# Section weights for `weighted_centroid_from_rows`. Intent-bearing
+# sections (Why / Scope / Approach) get heavier weight; process
+# boilerplate (Verification / Log / Out of scope) gets downweighted so
+# it doesn't smudge tickets toward one another in the embedding mean.
+# Unknown / non-ticket sections (e.g. spec sections like "§4 Markers",
+# or chunker tags like "_preamble" / "_full") fall through to
+# `DEFAULT_SECTION_WEIGHT`, preserving prior behavior for those sources.
+#
+# Empirical justification: at 2026-05-11, with the prior
+# unweighted-mean centroid, `just next` top-5 spans collapsed to a
+# 0.004 cosine range — narrower than the documented near-tie threshold
+# of 0.005. Swapping to this weighted construction widens the spread
+# ~3× and meaningfully changes the top-K composition (the new picks
+# surface tickets whose Why/Scope are distinctively on-topic but whose
+# Log / Verification sections were dragging the centroid toward the
+# corpus mean).
+SECTION_WEIGHTS = {
+    "why": 3.0,
+    "scope": 2.0,
+    "approach": 1.5,
+    "current state": 1.0,
+    "out of scope": 0.5,
+    "verification": 0.5,
+    "log": 0.3,
+}
+DEFAULT_SECTION_WEIGHT = 1.0
+
+
+def section_weight(section: str | None) -> float:
+    """Look up the centroid weight for a chunk's section label.
+
+    Section labels in the index are case-sensitive and may carry a
+    `:partN` suffix (the chunker splits long sections). The suffix is
+    stripped before lookup so `Why:part2` matches `why`. Matching is
+    by prefix on the lowercased head so headings like `Approach
+    (sketch)` still resolve to the canonical `approach` weight.
+    """
+    if not section:
+        return DEFAULT_SECTION_WEIGHT
+    head = section.split(":", 1)[0].strip().lower()
+    for prefix, w in SECTION_WEIGHTS.items():
+        if head.startswith(prefix):
+            return w
+    return DEFAULT_SECTION_WEIGHT
+
+
+def weighted_centroid_from_rows(idx: Index, rows: list[int]) -> np.ndarray:
+    """Compute a section-weighted, L2-normalized centroid for the given
+    chunk rows. Use this in preference to the bare mean wherever a
+    "ticket vector" is being constructed — see `SECTION_WEIGHTS` for
+    rationale.
+
+    Falls back to a degenerate-safe unit-vector copy when the row set
+    is empty or when all weights round to zero. Non-ticket chunks
+    (sources whose sections don't match the ticket template) get the
+    default weight of 1.0, so behavior is unchanged for spec / system
+    docs.
+    """
+    if not rows:
+        return np.zeros(idx.dim, dtype=np.float32)
+    row_arr = np.array(rows, dtype=np.int64)
+    sub = idx.vectors[row_arr]
+    weights = np.array(
+        [section_weight(idx.chunks[i].get("section")) for i in rows],
+        dtype=np.float32,
+    )
+    total = float(weights.sum())
+    if total <= 0:
+        weighted = sub.mean(axis=0)
+    else:
+        weighted = (sub * weights.reshape(-1, 1)).sum(axis=0) / total
+    norm = float(np.linalg.norm(weighted))
+    return (weighted / norm) if norm else weighted
+
+
 def chunks_by_ticket_id(idx: Index, ticket_id: int | str) -> list[int]:
     """Return chunk-row indices belonging to a given ticket id (across
     both tickets/ and landed/). Used when the user passes a bare

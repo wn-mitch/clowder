@@ -148,6 +148,7 @@ just next --include-blocked
 
 ## Caveats
 
+- **Ticket vectors are section-weighted.** Each ticket's centroid is a weighted mean over its chunks (`Why` 3.0, `Scope` 2.0, `Approach` 1.5, `Current state` 1.0, `Out of scope` / `Verification` 0.5, `Log` 0.3, everything else 1.0). Pre-2026-05-11 the centroid was an unweighted mean, which collapsed top-K spreads below the tiebreak threshold — boilerplate sections smudged tickets toward each other. See `scripts/similar/retrieve.py::SECTION_WEIGHTS`.
 - **Tiebreaks are intentional but small.** When two candidates score within 0.005 (cosine), the candidate matching the dominant cluster of the highest-weighted query component gets a +0.0025 nudge. This keeps the list themed when scores are flat. Larger differences are never overridden.
 - **Source exclusion is symmetric.** A ticket that contributed to the query vector is excluded from the candidate set. So `--mode wip` excludes in-progress tickets from the output (you wouldn't recommend yourself), and `--mode seed --seed 256` excludes 256 itself.
 - **`landed_on` is a string sort.** Recent landings are ranked by `YYYY-MM-DD` lexicographic order — works correctly for ISO dates but fails silently if a ticket's frontmatter has a non-ISO `landed-on` value. None observed at time of writing.

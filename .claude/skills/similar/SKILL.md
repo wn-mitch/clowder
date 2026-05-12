@@ -117,6 +117,7 @@ just similar 189 --rebuild
 
 ## Caveats
 
+- **Ticket centroids are section-weighted.** For ticket-id and file-path queries, the centroid is a weighted mean (`Why` 3.0, `Scope` 2.0, `Approach` 1.5, `Current state` 1.0, `Out of scope` / `Verification` 0.5, `Log` 0.3, everything else 1.0). Pre-2026-05-11 the centroid was an unweighted mean, which let process boilerplate smudge ticket vectors toward the corpus mean. See `scripts/similar/retrieve.py::SECTION_WEIGHTS`. Free-text queries are unaffected.
 - **First-invocation cost.** First `just similar-build` downloads the embedding model (~33MB for `bge-small-en-v1.5`). Cached in `~/.cache/fastembed/` thereafter; subsequent invocations are instant.
 - **Build runtime.** Full corpus rebuild on CPU-only ONNX is ~100 seconds for ~2.7k chunks. `just similar-build` checkpoints every 10 files, so a kill mid-build leaves a resumable partial index — re-running picks up where it left off based on per-file mtime tracking.
 - **Identifier-only queries underdeliver.** A bare symbol like `cat_presence` retrieves prose tickets that mention the term but doesn't reach DSE doc-comments by symbol alone. Embed the concept, not just the symbol: `'cat_presence congregation marker influence map'` will reach the registry walk and influence-map systems doc, where the symbol is documented in prose. We tested a code-aware embedder (`jinaai/jina-embeddings-v2-base-code`) and it scored worse on every comparison query — see `scripts/similar/embed.py` rationale block.

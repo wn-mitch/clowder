@@ -45,6 +45,7 @@ from embed import EMBEDDER_NAME, embed_batch                              # noqa
 from envelope import Envelope, emit                                       # noqa: E402  type: ignore[import-not-found]
 from retrieve import (                                                    # noqa: E402
     Index, chunks_by_ticket_id, load_index, stale_files, top_k,
+    weighted_centroid_from_rows,
 )
 
 
@@ -172,7 +173,7 @@ def _resolve_query(
     if raw.isdigit():
         rows = chunks_by_ticket_id(idx, raw)
         if rows:
-            centroid = _centroid(idx.vectors, rows)
+            centroid = weighted_centroid_from_rows(idx, rows)
             exclude = {idx.chunks[r]["chunk_id"] for r in rows}
             return centroid, "ticket_id", exclude, None
         # Fall through to free-text — maybe the ticket isn't indexed yet.
@@ -192,7 +193,7 @@ def _resolve_query(
         if m:
             rows = chunks_by_ticket_id(idx, m)
             if rows:
-                centroid = _centroid(idx.vectors, rows)
+                centroid = weighted_centroid_from_rows(idx, rows)
                 exclude = {idx.chunks[r]["chunk_id"] for r in rows}
                 return centroid, "ticket_id", exclude, (
                     f"resolved filename `{raw}` → ticket {m}"
@@ -215,7 +216,7 @@ def _resolve_file_path(
         i for i, c in enumerate(idx.chunks) if c["source_path"] == rel
     ]
     if matching_rows:
-        centroid = _centroid(idx.vectors, matching_rows)
+        centroid = weighted_centroid_from_rows(idx, matching_rows)
         exclude = {idx.chunks[r]["chunk_id"] for r in matching_rows}
         return centroid, "file_path", exclude, None
 
@@ -259,15 +260,6 @@ def _embed_free_text(text: str) -> np.ndarray:
     """Embed a single free-text string and return a 1-D unit vector."""
     arr = embed_batch([text])
     return arr[0]
-
-
-def _centroid(vectors: np.ndarray, rows: list[int]) -> np.ndarray:
-    """Mean of selected rows, re-normalized. Used to build a single
-    query vector from multiple chunks belonging to the same source."""
-    sub = vectors[np.array(rows, dtype=np.int64)]
-    mean = sub.mean(axis=0)
-    norm = np.linalg.norm(mean)
-    return mean / norm if norm else mean
 
 
 # ── result + narrative shaping ──────────────────────────────────────────────

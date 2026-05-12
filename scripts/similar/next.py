@@ -44,7 +44,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "logq"))
 from chunkers import discover_corpus_files                                # noqa: E402
 from embed import EMBEDDER_NAME, embed_batch                              # noqa: E402
 from envelope import Envelope, emit                                       # noqa: E402  type: ignore[import-not-found]
-from retrieve import Index, load_index, stale_files                       # noqa: E402
+from retrieve import (                                                    # noqa: E402
+    Index, load_index, stale_files, weighted_centroid_from_rows,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -246,10 +248,12 @@ def _build_ticket_views(idx: Index) -> list[TicketView]:
     for key, rows in rows_by_key.items():
         source_kind, ticket_id = key
         md = meta_by_key[key]
-        sub = idx.vectors[np.array(rows, dtype=np.int64)]
-        mean = sub.mean(axis=0)
-        norm = float(np.linalg.norm(mean))
-        centroid = (mean / norm) if norm else mean
+        # Section-weighted centroid: intent-bearing sections (Why,
+        # Scope, Approach) dominate the ticket vector. Boilerplate
+        # sections (Log, Verification, Out of scope) get downweighted
+        # so they don't smudge tickets toward each other. See
+        # `retrieve.SECTION_WEIGHTS` for the table and rationale.
+        centroid = weighted_centroid_from_rows(idx, rows)
         cluster_raw = md.get("cluster")
         cluster = (
             cluster_raw
@@ -437,10 +441,8 @@ def _average_centroids(sources: list[TicketView]) -> np.ndarray:
 
 
 def _centroid_from_rows(idx: Index, rows: list[int]) -> np.ndarray:
-    sub = idx.vectors[np.array(rows, dtype=np.int64)]
-    mean = sub.mean(axis=0)
-    norm = float(np.linalg.norm(mean))
-    return (mean / norm) if norm else mean
+    # Section-weighted; see `retrieve.weighted_centroid_from_rows`.
+    return weighted_centroid_from_rows(idx, rows)
 
 
 def _dominant_cluster(sources: list[TicketView]) -> str | None:
