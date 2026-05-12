@@ -48,6 +48,12 @@ fn setup_world() -> (World, Schedule) {
     bevy_ecs::message::MessageRegistry::register_message::<
         clowder::components::goap_plan::PlanNarrative,
     >(&mut world);
+    bevy_ecs::message::MessageRegistry::register_message::<
+        clowder::ai::joint_intention::JointInteractionObserved,
+    >(&mut world);
+    bevy_ecs::message::MessageRegistry::register_message::<
+        clowder::messages::witnessable_event::WitnessableEvent,
+    >(&mut world);
     let mut schedule = Schedule::default();
     schedule.add_systems(resolve_disposition_chains);
     (world, schedule)
