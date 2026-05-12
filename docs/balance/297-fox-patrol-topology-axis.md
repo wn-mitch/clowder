@@ -112,3 +112,118 @@ Ship `0.5` as first-light default for `ward_fox_intercept_anchor_weight`. The su
 ## Iteration history
 
 - **iter-1 (2026-05-12):** Landed `0.5` on first-light criteria. Spatial check showed seed-42 placement byte-identical to dormant; macro counters identical; continuity canaries pass; layer-fires verified by unit test. iter-2 carries four-artifact magnitude validation across 42 / 99 / 7.
+- **iter-2 (2026-05-12):** Ran four-artifact `just hypothesize` on the `0.0 → 0.5` activation across seeds 42, 99, 7. All three runs **wrong-direction at delta=0%, placement byte-identical between baseline and treatment.** Joins 285 (magnitude inert) and 296 (curve-shape inert) as the **third independent threat-axis lever ruled out.** Substrate ships first-light-activated at `0.5` (layer fires, no continuity regression, slight positive continuity drift), but the metric movement awaits architectural work outside the threat-axis-additive composition. See iter-2 below.
+
+---
+
+# iter-2 — four-artifact validation; three-seed structural inertness confirmed
+
+**Date:** 2026-05-12
+**Ticket:** [297](../open-work/tickets/297-ward-placement-needs-fox-patrol-topology-perception-axis-285-follow-on.md)
+**Methodology:** four-artifact `just hypothesize`, single-seed × 1-rep × 900s × release, run in parallel across three seeds (42, 99, 7) per 285's triangulation discipline. Hypothesize machinery applies `constants_patch` as a runtime override (no source-tree dirty state between baseline and treatment).
+**Specs:**
+- `docs/balance/hypothesis-297-fox-intercept-axis-activation.yaml` — primary seed-42.
+- `docs/balance/hypothesis-297-fox-intercept-axis-activation-seed99.yaml` — load-bearing (counter has headroom at 20).
+- `docs/balance/hypothesis-297-fox-intercept-axis-activation-seed7.yaml` — falsifier (counter at 78).
+**Hypothesize output dirs:**
+- `logs/hypothesize-at-post-284-anchor-weights-0-5-0-3-and-pre-296-tune-curve-8-/`
+- `logs/hypothesize-on-seed-99-the-existing-inputs-already-produce-a-counter-of-/`
+- `logs/hypothesize-on-seed-7-the-baseline-counter-of-78-reflects-a-topology-whe/`
+
+## Hypothesis (iter-2)
+
+iter-1's first-light landed the substrate at `w=0.5` and showed seed-42 placement byte-identical to dormant. iter-2 predicted the new axis would move the metric on seeds 99 and 7 where the geometries overlap (counter has headroom on 99, lucky overlap on 7). Pre-registered concordance call: pass if seed-42 lifts ≥6 AND seeds-99/7 hold within ±30%.
+
+## Methodology
+
+Three independent `just hypothesize` invocations, one per seed, run in parallel (each sweep baseline=current defaults + treatment=defaults+patch=0.5). The `0.0 → 0.5` direction is achieved by setting the source default to 0.0 in a temporary commit (later abandoned), so hypothesize's baseline reads as dormant and treatment as activated. Working-copy purity preserved via the abandon-after-validation pattern.
+
+## Constants landed
+
+**None changed.** `default_ward_fox_intercept_anchor_weight()` ships at `0.5` from iter-1's first-light activation. iter-2 validated the activation against the metric prediction but found the metric does not move at any seed.
+
+## Observation
+
+### Three-seed summary — byte-identical placement on every seed
+
+| Seed | Counter B → T | Wards placed B → T | Deaths.ShadowFoxAmbush B → T | Placement byte-identical? |
+|---|---|---|---|---|
+| **42** | **2 → 2** | 14 → 14 | 2 → 2 | yes (7 unique sites, exact multiplicities match) |
+| **99** | **20 → 20** | 9 → 9 | 2 → 2 | yes |
+| **7** | **78 → 78** | 11 → 11 | 3 → 3 | yes |
+
+Concordance verdict per spec: **wrong-direction at delta=0%** on every seed. Effect size 0.0, p=1.0 (no variance in the metric across the change).
+
+### Continuity tallies — small positive drift across all seeds (treatment side)
+
+vs the baseline within each spec:
+
+| Seed | Canary | Baseline (w=0.0) | Treatment (w=0.5) | Δ |
+|---|---|---|---|---|
+| 42 | courtship | 3148 | 3346 | +6.3% |
+| 42 | grooming | 1122 | 1152 | +2.7% |
+| 99 | courtship | 3944 | 4175 | +5.9% |
+| 99 | grooming | 1048 | 1130 | +7.8% |
+| 7 | courtship | 1887 | 1887 | 0% |
+| 7 | grooming | 838 | 881 | +5.1% |
+
+All deltas in the positive direction, max +7.8% (within the >±10% threshold). **The new axis at 0.5 does not regress continuity** on any seed — the iter-1 soak-trace's apparent -16% courtship drift was the soak-vs-soak-trace methodology confounder, confirmed now by the clean hypothesize comparison.
+
+### Spatial topology corroboration — placement byte-identical at every seed
+
+Post-hoc position scans on all six runs (baseline + treatment × 3 seeds): ward placements are byte-identical between baseline and treatment within each seed. The `0.0 → 0.5` change does not move which tiles win the argmax on any seed.
+
+### Sharpening the architectural read
+
+285 (iter-2) ruled out **anchor-weight magnitude** as a placement lever — `(0.5, 0.3) → (0.7, 0.4)` produced byte-identical placement on all three seeds.
+
+296 (iter-3) ruled out **Logistic curve shape** as a placement lever — `(k=8.0, m=0.5) → (k=4.0, m=0.5)` produced byte-identical placement on all three seeds.
+
+297 (iter-2) rules out **adding a new orthogonal axis to the threat-side input set** as a placement lever — adding a third Logistic-lift over `fox_spawn_vicinity` halo, weighted at the same magnitude as the ambush anchor, produces byte-identical placement on all three seeds.
+
+**The architectural conclusion sharpens:** the placement scorer's argmax is determined by the non-threat terms (`+ 0.3 * cat_value`, `- distance_cost`, jitter) once any single threat-side input saturates on a sufficient number of tiles. The threat-axis composition `(fox_scent.max(corruption) + L(ambush) + L(carcass) + L(fox_intercept)).min(1.0)` is **rank-preserving for the argmax in this regime** regardless of which inputs are tuned. To move `shadow_foxes_avoided_ward_total`, the architecture has to change at a different layer than the threat-axis inputs.
+
+Candidate structural levers for follow-on work:
+- **The `+ 0.3 * cat_value` coefficient.** At its current weight, `cat_value` is the tiebreak among threat-saturated tiles. Lowering it would let threat differentiation propagate to argmax. Risk: wards drift away from cat clusters (placement quality regression).
+- **The `distance_cost` term** (currently `0.005 / tile` from anchor). Tightening it would prevent placement from reaching corruption-zone tiles outside the anchor's local Manhattan ring. Loosening it would let placement reach more distant high-threat tiles.
+- **The candidate-generation step** (currently every 5 tiles). Finer sampling might surface intermediate tiles the coarse grid misses.
+- **The placement decision semantics.** Argmax over additive sum may not be the right composition; an arrest-the-worst-violator approach (place wards by descending threat residual after coverage) could move the metric differently.
+
+These are out of scope for 297 — ticket 297's surface was the orthogonal-axis addition. iter-2 confirms the substrate is wired and the layer fires, while documenting that further metric movement requires work at a layer 297 explicitly excluded.
+
+## Concordance
+
+| Artifact | Seed-42 | Seed-99 | Seed-7 |
+|---|---|---|---|
+| **Hypothesis** | New axis at 0.5 lifts placement onto corruption-vicinity tiles, raising avoided counter. | Same; seed-99 is load-bearing. | Same; seed-7 is falsifier. |
+| **Prediction** | `shadow_foxes_avoided_ward_total` Δ ∈ [+200, +1500]%. | Δ ∈ [−30, +50]%. | Δ ∈ [−20, +30]%. |
+| **Observation** | Δ = 0% (2 → 2). Byte-identical placement. | Δ = 0% (20 → 20). Byte-identical placement. | Δ = 0% (78 → 78). Byte-identical placement. |
+| **Concordance** | **wrong-direction** (Δ=0% below the +200% floor). | **wrong-direction** (Δ=0% below the +10% floor). | Δ=0% inside [−20, +30], **direction call** is "unchanged" → **wrong-direction** vs predicted "increase." |
+
+### Hard-gate readout (treatment soaks, three seeds)
+
+- `deaths_by_cause.Starvation == 0` → PASS (0 on all three seeds).
+- `deaths_by_cause.ShadowFoxAmbush <= 10` → PASS (2, 2, 3 respectively).
+- `never_fired_expected_positives == 0` → PASS (`[]` on all three).
+- Five continuity canaries each ≥ 1 → PASS on all three.
+- Constants-drift-vs-baseline → clean.
+- Verdict exit: **pass** on all three.
+
+## Decision
+
+**Ship `0.5` as the first-light default. Land as findings-only on the magnitude prediction.** The substrate is wired, the layer fires, no continuity regression, no metric movement. The default value lands at `0.5` because iter-1 established first-light activation criteria pass; the metric prediction not moving is a documented architectural finding, not a reason to revert the activation.
+
+Three findings drive any follow-on work, ranked by structural depth:
+
+1. **Threat-axis composition is rank-preserving in this regime.** Three independent inputs (magnitude, curve shape, new orthogonal axis) tested over six unique constant changes across three seeds — none moved the placement argmax. The argmax is determined by non-threat score terms (`cat_value`, `distance_cost`, jitter) once any threat input saturates. Any future placement-tuning ticket needs to surface a structural change at a different layer.
+2. **The new axis does what it's designed to.** Unit tests verify the inline `compute_fox_spawn_vicinity` helper produces correct halo values around corruption sources. The threat contribution composes correctly in the Logistic lift. The architectural inertness is a downstream-argmax-saturation effect, not a substrate bug.
+3. **Continuity tally drift is methodology-sensitive.** iter-1 soak-trace showed -16% on courtship; iter-2 hypothesize sweep shows +6% on the same canary. The soak vs soak-trace methodology produces ~10% per-tick RNG drift on continuity tallies even when placement and macro outcomes are byte-identical. Future first-light validations should use hypothesize-grade comparison (or sib-by-sib soak vs soak) for continuity-drift assessment.
+
+**No follow-on ticket opened.** The "non-threat-axis layer needs structural work" finding is too open-ended to convert into a single ticket without further investigation. 298 (joint anchor-weight re-tune after 296+297) is no longer attractive given the architectural inertness across three independent levers.
+
+## What iter-2 is NOT
+
+- Not a refutation of the substrate's correctness. Unit tests verify the helper computes correct halo values. The architectural inertness is downstream of the helper, in the placement-scorer argmax.
+- Not a multi-rep sweep. Single rep per seed; per-seed Welch's t can't run. The byte-identical observation across three independent seeds is the load-bearing evidence.
+- Not a claim that the axis is useless. The substrate is wired and ready; if future structural work on the placement scorer (cat_value coefficient, candidate-generation step, decision semantics) opens up rank-changing dynamics, the fox-spawn-vicinity axis is in place to participate.
+- Not a justification to escalate the weight further. Three threat-axis levers have now been independently ruled out; escalating w_fox_intercept past 0.5 would just produce more saturation. The lever is elsewhere.

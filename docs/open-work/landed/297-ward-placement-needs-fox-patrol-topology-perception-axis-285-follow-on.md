@@ -1,7 +1,7 @@
 ---
 id: 297
 title: ward placement needs fox-patrol-topology perception axis (285 follow-on)
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-12
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [284-ward-anchor-tuning.md]
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-12
 ---
 
 ## Why
@@ -43,3 +43,4 @@ This is a §4 marker / §6 target-taking design, not a parameter tune. Walk `doc
 
 ## Log
 - 2026-05-12: opened as the perception-axis follow-on to 285. The orthogonal-axis discipline (CLAUDE.md Design pillar 3) drives the framing — see also memory `feedback_single_axis_perception_scalars` and `project_l3_patrol_absorption_cascade` for prior precedents where adding orthogonal axes fixed substrate-vs-outcome gaps.
+- 2026-05-12: First-light succeeds (layer fires per unit tests; continuity canaries hold per clean hypothesize-comparison; small positive continuity drift across all three seeds). Three-seed four-artifact sweep at (0.0→0.5) produced byte-identical placement on seeds 42/99/7 — joins 285 (magnitude inert) and 296 (curve shape inert) as the third independent threat-axis lever ruled out. Architectural conclusion sharpens: placement argmax is determined by non-threat terms (cat_value/distance_cost/jitter) once threat saturates. Future placement-metric movement requires structural change at a layer outside the threat-axis-additive composition (cat_value coefficient, distance_cost, candidate-generation step, or decision semantics).
