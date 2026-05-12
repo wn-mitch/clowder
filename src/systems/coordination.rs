@@ -1369,6 +1369,19 @@ impl<'a> PlacementMaps<'a> {
 /// - `carcass_lift = w_carcass × logistic_8_05(carcass_scent)` — same
 ///   shape over the kill-site map, gated by `ward_recency_anchor_weight`
 ///   (restores 209 §Scope line 74, also dormant by default).
+/// - `fox_intercept_lift = w_fox_intercept × logistic_k_m(fox_spawn_vicinity)`
+///   — 297's third anchor (predictive, not echo): the
+///   the helper scans `TileMap.corruption` in a Manhattan-radius
+///   neighborhood and lights up tiles near every high-corruption
+///   spawn-eligible tile (a halo around fox-spawn sources), so this
+///   lift biases placement toward the regions fox patrols traverse on
+///   their way to the colony. Curve params are shared with
+///   ambush/carcass (post-296 these are
+///   `SimConstants::scoring::ward_placement_logistic_*`). Gated by
+///   `ward_fox_intercept_anchor_weight` (default 0.0 — dormant at land).
+///   Inline computation (not a populated Resource) avoids a
+///   schedule-edge perturbation of seed-42 (ticket 061 precedent at
+///   `simulation.rs:314-326`).
 /// - `cat_value = cat_presence` — modest bonus for tiles where cats
 ///   actually live (a ward covering nobody is wasted).
 /// - `distance_cost = DIST_PENALTY_PER_TILE × manhattan(anchor, candidate)`
@@ -1454,16 +1467,29 @@ pub(crate) fn compute_ward_placement(
     // 220: dormancy invariant — both weights default to 0.0, so the
     // lifts evaluate to exactly 0.0 and the formula reduces to the
     // pre-220 baseline. Clamp defensively in case a balance experiment
-    // overshoots [0, 1].
+    // overshoots [0, 1]. 284 lifted ambush/carcass off dormancy to
+    // (0.5, 0.3); 297 adds the fox-intercept weight (default 0.0,
+    // dormant at land).
     let w_ambush = constants.scoring.ward_ambush_anchor_weight.clamp(0.0, 1.0);
     let w_carcass = constants
         .scoring
         .ward_recency_anchor_weight
         .clamp(0.0, 1.0);
+    let w_fox_intercept = constants
+        .scoring
+        .ward_fox_intercept_anchor_weight
+        .clamp(0.0, 1.0);
     // 296: Logistic curve params, promoted from hardcoded (8.0, 0.5).
     // Defaults preserve byte-identical pre-296 behavior.
     let curve_k = constants.scoring.ward_placement_logistic_steepness;
     let curve_m = constants.scoring.ward_placement_logistic_midpoint;
+    // 297: kernel constants for the inline fox-spawn-vicinity computation.
+    // Reads `TileMap.corruption` directly per candidate, not via a
+    // populated Resource — adding a per-tick populator to the wildlife
+    // chain perturbs seed-42 (ticket 061 precedent: `simulation.rs:314-326`).
+    let fox_intercept_radius_tiles =
+        constants.scoring.fox_intercept_kernel_radius_tiles as i32;
+    let corruption_threshold = constants.magic.shadow_fox_corruption_threshold;
 
     for candidate in &candidates {
         let fox_scent = maps.fox_scent.get(candidate.x, candidate.y);
@@ -1493,8 +1519,28 @@ pub(crate) fn compute_ward_placement(
         } else {
             0.0
         };
+        // 297: fox-spawn-vicinity lift. Predictive (not echo) substrate:
+        // the halo lights up tiles NEAR corruption sources (uncorrupted
+        // neighbors), not corruption tiles themselves — exactly the
+        // regions where `fox_scent.max(corruption)` is LOW but fox
+        // patrols traverse. Composes with `+ 0.3 * cat_value` to peak
+        // placement at the cats↔corruption boundary. Computed inline
+        // from `TileMap.corruption` to avoid the populator-system
+        // schedule-edge perturbation (ticket 061 precedent).
+        let fox_intercept_lift = if w_fox_intercept > 0.0 {
+            let vicinity = compute_fox_spawn_vicinity(
+                *candidate,
+                maps.tile_map,
+                fox_intercept_radius_tiles,
+                corruption_threshold,
+            );
+            w_fox_intercept * logistic_threat_lift(vicinity, curve_k, curve_m)
+        } else {
+            0.0
+        };
 
-        let threat = (fox_scent.max(corruption) + ambush_lift + carcass_lift).min(1.0);
+        let threat = (fox_scent.max(corruption) + ambush_lift + carcass_lift + fox_intercept_lift)
+            .min(1.0);
         let unaddressed_threat = (threat - coverage).clamp(0.0, 1.0);
 
         let dist = anchor.manhattan_distance(candidate) as f32;
@@ -1527,6 +1573,65 @@ pub(crate) fn compute_ward_placement(
 /// iter-2 for the saturation finding that motivated the promotion.
 fn logistic_threat_lift(x: f32, k: f32, m: f32) -> f32 {
     1.0 / (1.0 + (-k * (x - m)).exp())
+}
+
+/// 297: compute the fox-spawn-vicinity halo value at a candidate tile.
+///
+/// Scans the Manhattan neighborhood of `candidate` within
+/// `radius_tiles`, and for each tile where `corruption >= threshold`
+/// (a ShadowFox spawn-eligible tile per
+/// `spawn_shadow_fox_from_corruption`) accumulates a linear falloff
+/// `max(0, 1 - manhattan / radius_tiles)`. Returns the maximum
+/// contribution across nearby spawn-eligible tiles, clamped to 1.0.
+///
+/// Max-not-sum because the halo expresses "this tile is near A
+/// spawn source" rather than "near many spawn sources" — multiple
+/// nearby corruption tiles shouldn't multiplicatively over-anchor
+/// the candidate. The Logistic-lift downstream is monotonic, so
+/// max-aggregation is the natural fit.
+///
+/// Cost: O(radius²) per candidate. At radius=20 tiles, that's ~800
+/// lookups per candidate × ~430 candidates ≈ 350k lookups per
+/// `compute_ward_placement` call. The scorer runs every ~20 ticks
+/// per coordinator, gated by `ward_strength_low && thornbriar_available`,
+/// so the soak-wide cost is negligible.
+///
+/// Computed inline (not via a populated `Res<FoxSpawnVicinityMap>`)
+/// because the populator system would have to be scheduled, and any
+/// schedule-edge near the wildlife chain perturbs seed-42 (ticket
+/// 061 precedent at `simulation.rs:314-326`). Inline computation
+/// avoids the schedule edge entirely.
+fn compute_fox_spawn_vicinity(
+    candidate: Position,
+    tile_map: &crate::resources::map::TileMap,
+    radius_tiles: i32,
+    corruption_threshold: f32,
+) -> f32 {
+    if radius_tiles <= 0 {
+        return 0.0;
+    }
+    let radius_f = radius_tiles as f32;
+    let mut best: f32 = 0.0;
+    for dy in -radius_tiles..=radius_tiles {
+        let y = candidate.y + dy;
+        for dx in -radius_tiles..=radius_tiles {
+            let manhattan = dx.unsigned_abs() + dy.unsigned_abs();
+            if manhattan as i32 > radius_tiles {
+                continue;
+            }
+            let x = candidate.x + dx;
+            if !tile_map.in_bounds(x, y) {
+                continue;
+            }
+            if tile_map.get(x, y).corruption >= corruption_threshold {
+                let falloff = (1.0 - manhattan as f32 / radius_f).max(0.0);
+                if falloff > best {
+                    best = falloff;
+                }
+            }
+        }
+    }
+    best.min(1.0)
 }
 
 // ---------------------------------------------------------------------------
@@ -1948,6 +2053,126 @@ mod tests {
             pos.y >= 45,
             "expected placement biased toward carcass hotspot at (60, 52); \
              got {pos:?}",
+        );
+    }
+
+    /// 297 lift behavior: with NO competing fox-scent / ambush / carcass
+    /// signals, a corruption tile lifts placement into its halo. The
+    /// halo extends `fox_spawn_vicinity_kernel_radius_buckets * 5`
+    /// world tiles from each corruption source, falling off linearly
+    /// with Manhattan distance. Placement should land within the halo,
+    /// not at the corruption tile itself (which has high corruption =
+    /// already-high base threat) and not far outside the halo.
+    #[test]
+    fn ward_placement_shifts_to_fox_intercept_hotspot_when_tuned() {
+        let structures = vec![Position::new(30, 20)];
+        let wards = vec![(Position::new(30, 20), 6.0)];
+        let (fs, cp, wc, mut tm, ra, cs) = empty_placement_maps();
+        // Single corruption source at (60, 60). No other threat
+        // signals — fox_scent, ambush, carcass all empty. The
+        // anchor at (30, 20) is far from corruption (manhattan 70),
+        // so the fox-intercept lift is the only positive threat signal.
+        tm.get_mut(60, 60).corruption = 1.0;
+        let maps = PlacementMaps {
+            fox_scent: &fs,
+            cat_presence: &cp,
+            ward_coverage: &wc,
+            tile_map: &tm,
+            recent_ambush: &ra,
+            carcass_scent: &cs,
+        };
+        let mut constants = crate::resources::SimConstants::default();
+        constants.scoring.ward_fox_intercept_anchor_weight = 1.0;
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(297);
+        let pos = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(30, 20),
+            &maps,
+            &constants,
+            &mut rng,
+        );
+        // Placement should land in the fox-intercept halo around the
+        // corruption tile. The halo radius is 20 world tiles (default
+        // kernel_radius_buckets=4 × 5 tiles/bucket). The anchor is at
+        // (30, 20), corruption at (60, 60), distance ~70. Placement
+        // should be much closer to (60, 60) than to the anchor — the
+        // saturated lift (0.96+) inside the halo dominates the
+        // distance_cost penalty of 0.005/tile.
+        let manhattan_to_corruption = pos.manhattan_distance(&Position::new(60, 60));
+        assert!(
+            manhattan_to_corruption <= 25,
+            "expected placement inside fox-intercept halo around (60, 60), \
+             distance ≤ ~25 tiles; got {pos:?} at distance {manhattan_to_corruption}",
+        );
+    }
+
+    /// 297 dormancy invariant: with `ward_fox_intercept_anchor_weight`
+    /// forced to 0.0, a corruption tile in the vicinity has no effect
+    /// on placement — byte-identical to pre-297 behavior. Combined
+    /// with the existing zero-weight dormancy test, this guards the
+    /// "lift short-circuits at weight=0" contract.
+    #[test]
+    fn ward_placement_dormant_when_fox_intercept_weight_zero() {
+        let structures = vec![Position::new(60, 45)];
+        let wards = vec![(Position::new(60, 45), 6.0)];
+
+        // Baseline: no corruption tile.
+        let (mut fs_a, cp_a, wc_a, tm_a, ra_a, cs_a) = empty_placement_maps();
+        fs_a.deposit(67, 45, 1.0);
+        let maps_a = PlacementMaps {
+            fox_scent: &fs_a,
+            cat_presence: &cp_a,
+            ward_coverage: &wc_a,
+            tile_map: &tm_a,
+            recent_ambush: &ra_a,
+            carcass_scent: &cs_a,
+        };
+
+        // Treatment: same fox-scent peak + a corruption tile at a
+        // different location. If the weight is zero, placement must
+        // not move.
+        let (mut fs_b, cp_b, wc_b, mut tm_b, ra_b, cs_b) = empty_placement_maps();
+        fs_b.deposit(67, 45, 1.0);
+        tm_b.get_mut(40, 70).corruption = 1.0;
+        let maps_b = PlacementMaps {
+            fox_scent: &fs_b,
+            cat_presence: &cp_b,
+            ward_coverage: &wc_b,
+            tile_map: &tm_b,
+            recent_ambush: &ra_b,
+            carcass_scent: &cs_b,
+        };
+
+        // Force ALL anchor weights to zero so this test isolates the
+        // new axis.
+        let mut constants = crate::resources::SimConstants::default();
+        constants.scoring.ward_ambush_anchor_weight = 0.0;
+        constants.scoring.ward_recency_anchor_weight = 0.0;
+        constants.scoring.ward_fox_intercept_anchor_weight = 0.0;
+
+        let mut rng_a = rand_chacha::ChaCha8Rng::seed_from_u64(297);
+        let mut rng_b = rand_chacha::ChaCha8Rng::seed_from_u64(297);
+        let pos_a = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(60, 45),
+            &maps_a,
+            &constants,
+            &mut rng_a,
+        );
+        let pos_b = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(60, 45),
+            &maps_b,
+            &constants,
+            &mut rng_b,
+        );
+        assert_eq!(
+            pos_a, pos_b,
+            "297 dormancy invariant violated: depositing corruption \
+             changed placement with weight forced to 0.0",
         );
     }
 

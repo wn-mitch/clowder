@@ -2015,6 +2015,33 @@ pub struct ScoringConstants {
     /// behavior.
     #[serde(default = "default_ward_placement_logistic_midpoint")]
     pub ward_placement_logistic_midpoint: f32,
+    /// 297: weight on the `FoxSpawnVicinityMap` lift to ward-placement's
+    /// threat term. Curve `Logistic(steepness, midpoint)` (shared with
+    /// the ambush + carcass anchors, 296) applied to the per-tile
+    /// vicinity sample; the result adds into the placement scorer's
+    /// `max(fox_scent, corruption)` threat axis, then re-clamps to 1.0.
+    /// Forcing 0.0 returns the formula to byte-identical pre-297
+    /// behavior (regression-guarded by
+    /// `ward_placement_dormant_when_weights_forced_to_zero`). Ships
+    /// dormant; first-light activation per
+    /// `feedback_dormant_substrate_activation_soak_first` lifts to
+    /// match `ward_ambush_anchor_weight` (default 0.5). Closes 285's
+    /// architectural gap: existing inputs encode where cats got hurt;
+    /// this axis encodes where fox patrols enter the colony (halo
+    /// around corruption-tile spawn sources).
+    #[serde(default = "default_ward_fox_intercept_anchor_weight")]
+    pub ward_fox_intercept_anchor_weight: f32,
+    /// 297: kernel radius in world tiles for the inline fox-spawn-vicinity
+    /// computation in `compute_ward_placement`. For each candidate tile,
+    /// the scorer scans tiles within this Manhattan radius for ShadowFox
+    /// spawn-eligible corruption (≥ `shadow_fox_corruption_threshold`).
+    /// Default `20` — large enough to cover the approach corridor a fox
+    /// walks from a corruption tile before reaching cat territory, small
+    /// enough that the per-candidate scan cost (~800 tile lookups) stays
+    /// cheap. Computed inline (not via a populated Resource) to avoid
+    /// schedule-edge perturbation of seed-42 (ticket 061 precedent).
+    #[serde(default = "default_fox_intercept_kernel_radius_tiles")]
+    pub fox_intercept_kernel_radius_tiles: u32,
     /// 256 R5: deposit per tick when a cat's current action is
     /// `Action::Patrol`. Lays a deterrent gradient that foxes read as
     /// routing cost via `CatPatrolDeterrentOverlay`. Default `0.05`
@@ -2352,6 +2379,8 @@ impl Default for ScoringConstants {
             ward_recency_anchor_weight: default_ward_recency_anchor_weight(),
             ward_placement_logistic_steepness: default_ward_placement_logistic_steepness(),
             ward_placement_logistic_midpoint: default_ward_placement_logistic_midpoint(),
+            ward_fox_intercept_anchor_weight: default_ward_fox_intercept_anchor_weight(),
+            fox_intercept_kernel_radius_tiles: default_fox_intercept_kernel_radius_tiles(),
             cat_patrol_deterrent_deposit_per_tick:
                 default_cat_patrol_deterrent_deposit_per_tick(),
             cat_patrol_deterrent_decay_rate: default_cat_patrol_deterrent_decay_rate(),
@@ -3601,6 +3630,25 @@ fn default_ward_placement_logistic_steepness() -> f32 {
 /// preserves pre-296 behavior (hardcoded value before promotion).
 fn default_ward_placement_logistic_midpoint() -> f32 {
     0.5
+}
+
+/// 297: weight on the inline fox-spawn-vicinity lift in
+/// `compute_ward_placement()`. First-light activation per ticket 297
+/// lifts to 0.5 (matching the ambush anchor's first-light magnitude
+/// from 284). The Logistic-lift short-circuits when this weight is
+/// 0.0, so the inline `compute_fox_spawn_vicinity` scan is skipped
+/// entirely at dormancy — placement output is byte-identical to
+/// pre-297 in that regime.
+fn default_ward_fox_intercept_anchor_weight() -> f32 {
+    0.5
+}
+
+/// 297: kernel radius in world tiles for the inline fox-spawn-vicinity
+/// computation in `compute_ward_placement`. Default `20` tiles — large
+/// enough for a fox-approach corridor, small enough to keep the per-call
+/// scan cost (~800 tile lookups per candidate) cheap.
+fn default_fox_intercept_kernel_radius_tiles() -> u32 {
+    20
 }
 
 /// 228: Patrol `Consideration::Field` route-cost axis weight.
@@ -5820,6 +5868,10 @@ mod tests {
         // 296 curve-extraction defaults preserve pre-296 hardcoded curve.
         assert_eq!(defaults.scoring.ward_placement_logistic_steepness, 8.0);
         assert_eq!(defaults.scoring.ward_placement_logistic_midpoint, 0.5);
+        // 297 first-light activation: fox-intercept axis lifted to 0.5.
+        // Mirrors the ambush anchor's first-light value from 284.
+        assert_eq!(defaults.scoring.ward_fox_intercept_anchor_weight, 0.5);
+        assert_eq!(defaults.scoring.fox_intercept_kernel_radius_tiles, 20);
     }
 
     #[test]

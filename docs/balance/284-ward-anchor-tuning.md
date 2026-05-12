@@ -433,3 +433,96 @@ The constants extraction itself ships and stays — it's value-add for two thing
 - Not a multi-rep sweep. Single rep per seed; per-seed Welch's t can't run without replicates. The byte-identical observation across three independent seeds is the load-bearing evidence.
 - Not a justification to escalate to `(k=2.0, m=0.5)` or to midpoint shifts. The byte-identical placement output indicates the argmax tile is determined by non-Logistic-lifted score components — softer curves or shifted midpoints would compose the same way.
 
+---
+
+## Cross-seed observation — medium balance pass at `4d09ad6` (2026-05-12)
+
+Not an iteration of the 284 tuning hypothesis — this is the empirical cross-seed measurement that frames the next move. A 19-seed × 900s GHA balance pass on `4d09ad6` (post-285, pre-296) gives the first multi-seed readout of the L3 patrol-absorption cascade rate at the current weights.
+
+### What the run measured
+
+| | mean | stdev | min | max | zero-runs | per-run survival fails |
+|---|---:|---:|---:|---:|---:|---|
+| ShadowFox ambushes | 2.42 | — | 0 | 9 | n/a | 4 |
+| `wards_placed_total` | 14.05 | 8.99 | 1 | 33 | 0/19 | — |
+| Starvation deaths | 0.00 | — | 0 | 0 | n/a | 0 |
+| population peak | 9.16 | 1.64 | 8 | 14 | n/a | — |
+| population final | — | — | 1 | 14 | n/a | — |
+
+**4/19 seeds (21%) collapse to final = 1** matching the patrol-absorption signature: peak ≈ 8 → ShadowFox 6–9 → final = 1.
+
+| Seed | peak → final | ShadowFox | total deaths |
+|---:|---|---:|---:|
+| 99 | 8 → 5 | 2 | 3 |
+| 682780385 | 8 → 6 | 1 | 2 |
+| 1592377564 | 8 → 5 | 3 | 3 |
+| 1924966790 | 8 → 1 | 6 | 8 |
+| 250890349 | 9 → 1 | 9 | 10 |
+| 895132244 | 8 → 1 | 4 | 8 |
+| 7 | 8 → 1 | 7 | 9 |
+
+(verdict.py marks the first four as `fail` on survival-canary; the last three pass the `<= 10 ShadowFoxAmbush` gate technically but match the same trajectory shape.)
+
+The hard survival gate (`ShadowFoxAmbush <= 10`) holds across the full envelope, but the cascade is alive on roughly a quarter of seeds.
+
+### Why the rate is 21% — substrate audit
+
+Three-agent code archaeology on Patrol DSE, ShadowFox AI, and ward/territory substrate establishes the cascade is **substrate-internal**, not a perception feedback loop. The tug-of-war is asymmetric; most asymmetries run against the cats:
+
+| direction | mechanic | status |
+|---|---|---|
+| cats sense fox locally | (was `fox_scent_level` → Patrol) | retired by 228, intentionally |
+| cats sense fox colony-wide | `ColonyKnowledgeLift` → Patrol bonus | live, hearsay-grade |
+| cats deposit claim | `CatPresenceMap` (patrol-only) | live |
+| cats place repellent | Ward placement (284 weights, 285 magnitude, 296 shape — all inert here) | live but argmax-saturated |
+| Fox avoids cat presence | reads `CatPresenceMap` | live |
+| ShadowFox avoids cat presence | doesn't read it | gap |
+| Fox repelled by wards | 5% siege / reverse near ward | live |
+| ShadowFox repelled by wards | `WardNearbyFox` placeholder = false | gap (ticket 014) |
+| ShadowFox seek cat density | spawn is corruption-only | gap (ticket 120, parked) |
+| boundary is computable | overlapping decay fields, no edge | by design — emergent contact zone |
+
+Patrol's L2 composition (`src/ai/dses/patrol.rs:97`) reads only `safety_deficit ⊗ boldness ⊗ patrol_perimeter_distance ⊗ patrol_route_cost`. None of those is a fox-presence input — 228 retired `fox_scent_level` under the substrate-over-hacks discipline. With Hunt/Forage saturated and Patrol carrying near-open eligibility (forbid only `Incapacitated`), freed softmax mass flows to Patrol; the cat walks toward `TerritoryPerimeterAnchor` (a geometric anchor derived from cat positions, not fox positions); at the perimeter, fox line-of-sight detection at 8-tile radius (`wildlife.rs:920`) fires; stalk → adjacent ambush damage. The cat brings itself to the encounter; the fox does not seek the cat.
+
+### Why curve / weight tuning can't close the gap on its own
+
+The 285 + 296 findings — magnitude and curve shape both architecturally inert at current anchor weights — combine with this audit to give a clean reading: **ward placement is operating at the wrong layer for this cascade**. Even a perfectly-shaped Logistic on a perfectly-weighted ambush anchor only re-ranks placement among threat-saturated tiles. The cat that dies isn't dying because the ward landed in the wrong place; it's dying because the cat went to the perimeter blind to where the fox was, and the substrate has no observation channel for "the fox is over there" before line-of-sight contact closes the loop.
+
+### The real gap is at the belief layer, not the perception layer
+
+Re-introducing a raw fox-presence axis to Patrol's L2 would be exactly the hack pattern 228 retired. The correct home for "this cat knows location L has fox-danger" is the 258 belief substrate (`LocationBeliefs[bucket].recency_of_threat_cue` / `perceived_violence_capability`, updated through `belief_integrator` from `WitnessableEvent` emit sites, with `SpeciesViolencePriors` carrying the "foxes are dangerous" prior).
+
+Reading the 290-295 follow-on cluster against this audit:
+
+- **294 (RecentAmbushMap retirement)** routes ambush recency through per-cat `LocationBeliefs.recency_of_threat_cue` via `WitnessableEvent::PredatorAmbush`. After 294 lands, ambush *memory* is a proper per-cat decaying belief field — but 294 retires the colony Resource without wiring Patrol.
+- **293 (HuntingPriors retirement)** adds `prey_yield` as a `LocationBeliefs` facet — the symmetric positive side.
+
+**The deeper gap exposed by the ShadowFox audit**: even with 294 landed, the cat's belief about ShadowFox locations only updates *at the moment of ambush* (the only `WitnessableEvent` that fires for ShadowFox). A cat cannot form a useful prior over "fox-danger here" before the dangerous encounter because:
+
+1. ShadowFox emits no scent (regular Fox does via `fox_scent_tick` at `wildlife.rs:2392`; ShadowFox emits *corruption* only).
+2. There is no `WitnessableEvent::PredatorSighted` that fires when a cat enters LoS of a stalking ShadowFox without being ambushed — observation only flows from `PredatorAmbush` (too late).
+3. ShadowFox-derived corruption increment (0.001/tick) has no `WitnessableEvent` converting "I smell something wrong here" into a `LocationBeliefs` update.
+
+In Bayes-flavored terms: the cat has the prior (SpeciesViolencePriors) but the observation channel is missing for ShadowFox specifically. Without observations the prior never collapses into a usable location-belief except retroactively, at the moment of harm.
+
+### Where this leaves 297 and beyond
+
+**297 sits on the right thread for ward placement.** The audit confirms 297's premise: existing axes echo *past* fox activity (ambush memory, carcass scent) and place wards where the colony already got hurt. Adding `FoxSpawnVicinityMap` as a third Logistic-lifted axis means ward placement reads a *predictive* signal — tiles adjacent to corruption sources where future fox patrols enter — and lights up tiles whose `fox_scent.max(corruption)` base is LOW. That avoids the saturation ceiling 285+296 identified.
+
+**But 297 is a ward-placement fix, not a Patrol-perception fix.** Even after 297 ships, a patrolling cat still walks to the geometric perimeter blind to where foxes are. The candidate follow-on cluster, belief-layer-native, is:
+
+- **Observation channels for ShadowFox.** Either (A1) ShadowFox deposits its own scent variant — emit channel that feeds `belief_integrator` — or (A2) a new `WitnessableEvent::PredatorSighted { predator, observer, position, tick }` fires when a cat enters LoS of a stalking ShadowFox without being ambushed. Per-cat by witness range, matching 294's `PredatorAmbush` shape.
+- **Patrol reads `LocationBeliefs.recency_of_threat_cue`.** After 294 lands and the observation channels exist, wire Patrol's L2 to consult the cat's per-location threat belief — biasing perimeter anchor selection *away from* believed-dangerous zones rather than toward fox-active tiles. Substrate-over-hacks shape: Patrol reads a belief, not a raw spatial proxy.
+
+These compose: A populates the belief; B consumes it. Neither is opened yet — surfaced here as the structural follow-on cluster that would close the 21% cascade rate on the cat side, complementing 297's ward-side fix.
+
+### Continuity-canary calibration (footnote)
+
+Comparing the 19-seed envelope from this run against the three prior single-seed baselines on seed 42 (`post-127`, `post-231`, `post-296`) for the play / mythic-texture canaries:
+
+| canary | seed-42 baselines (range) | 19-seed envelope (mean ± σ, range) | zero-runs |
+|---|---:|---:|---:|
+| play | 7–14 | 5.42 ± 6.35, [0, 22] | 6/19 |
+| mythic-texture | 35–43 | 13.89 ± 14.09, [0, 45] | 5/19 |
+
+Seed 42 lives on the high end of both envelopes. The CLAUDE.md "≥ 1 per soak" continuity gate is calibrated against the single-seed seed-42 shape and does not hold as an every-seed invariant at 900s — ~30% of seeds drop play or mythic-texture to 0 inside the soak window. This is **not a regression** (the substrate fires when given the right colony state), but the verdict aggregator currently flags `play=0` and `mythic-texture=0` as per-run failures, so 7 of 11 non-`pass` verdicts in the 19-seed sweep are this calibration mismatch rather than colony-health signal. Worth knowing when reading future balance-pass tallies; the policy question (per-run gate vs envelope-level "≥ k% of seeds must fire") is downstream of this thread.

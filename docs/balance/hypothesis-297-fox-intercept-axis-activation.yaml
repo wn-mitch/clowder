@@ -1,0 +1,61 @@
+# Ticket 297 — fox-spawn-vicinity axis activation, primary spec (seed-42).
+#
+# 297 lands the substrate dormant: `FoxSpawnVicinityMap` populator runs
+# every tick depositing a Manhattan-radius kernel around every tile
+# with `corruption >= shadow_fox_corruption_threshold`. `compute_ward_placement`
+# reads the per-tile signal as a third Logistic-lift term gated by
+# `ward_fox_intercept_anchor_weight` (default 0.0 — dormant).
+#
+# This spec activates the weight at 0.5 (mirroring `ward_ambush_anchor_weight`'s
+# 284 first-light value) and tests whether the new axis moves the metric
+# where 285 (magnitude) and 296 (curve shape) couldn't. The architectural
+# read from 296's three-seed inertness: the existing inputs encode
+# threat on already-corruption-saturated tiles, leaving the argmax
+# determined by `cat_value + distance_cost + jitter`. The new axis
+# extends threat INTO low-corruption tiles (uncorrupted neighbors of
+# corruption sources via the radial kernel), so its lift is the FIRST
+# non-zero threat contribution on those tiles — not an addition to an
+# already-saturated base.
+#
+# Iteration policy:
+# - concordant lift on seed-42 (counter 2 → ≥6) → first-light succeeds,
+#   land at default=0.5.
+# - wrong-direction on seed-42 alone → check seed-99/seed-7 sister specs
+#   before drawing a conclusion (per 285's three-seed discipline).
+# - wrong-direction across all three seeds → land 297 findings-only
+#   (substrate is wired but third lift inert at this weight); open 298
+#   for either weight escalation or compose-with-296-curve work.
+# - any continuity-canary regression > 10% on any seed → stop; new axis
+#   is buying placement at the cost of behavioral health.
+#
+# Companion specs:
+# - hypothesis-297-fox-intercept-axis-activation-seed99.yaml
+# - hypothesis-297-fox-intercept-axis-activation-seed7.yaml
+
+hypothesis: |
+  At post-284 anchor weights (0.5, 0.3) and pre-296-tune curve (8.0, 0.5),
+  the new `FoxSpawnVicinityMap` halo lights up tiles in a Manhattan-radius
+  ring around every high-corruption spawn-eligible tile. Activating
+  `ward_fox_intercept_anchor_weight=0.5` adds a third Logistic-lift to
+  `compute_ward_placement`'s threat axis. Because the halo extends into
+  LOW-`fox_scent.max(corruption)` tiles, the lift contributes the FIRST
+  non-zero threat to those tiles — composing with the existing
+  `+ 0.3 * cat_value` term to peak placement at the cats↔corruption
+  boundary. On seed-42 (counter saturated at 2 because cat-side ambush
+  memory and fox-spawn topology don't overlap), this should shift wards
+  toward y > 30 (the seed's south/east corruption band) and lift
+  `shadow_foxes_avoided_ward_total` materially.
+constants_patch:
+  scoring:
+    ward_fox_intercept_anchor_weight: 0.5
+prediction:
+  metric: shadow_foxes_avoided_ward_total
+  direction: increase
+  # Seed-42 baseline is 2 (topology-saturated). Lift to ≥6 = +200% is
+  # the concordance floor — any lower means the new axis didn't actually
+  # shift placement onto patrol-overlap tiles. Wider upper band because
+  # there's no per-seed ceiling reference.
+  rough_magnitude_pct: [200, 1500]
+seeds: [42]
+reps: 1
+duration: 900

@@ -1,0 +1,27 @@
+# Ticket 297 — fox-spawn-vicinity axis activation, seed-7.
+#
+# Seed-7 baseline at default weights produces 78 avoided foxes (near ceiling).
+# The new axis can either preserve, modestly lift, or — if the lift pulls
+# wards off the lucky cluster — drop. Acts as falsifier: a drop on seed-7
+# combined with a rise on seed-42 would indicate the new axis is making
+# topology-dependent tradeoffs.
+#
+# Iteration policy: see hypothesis-297-fox-intercept-axis-activation.yaml.
+
+hypothesis: |
+  On seed-7 the baseline counter of 78 reflects a topology where ward
+  placement naturally lands on high-overlap tiles. The new predictive
+  axis should preserve this outcome — the halo it activates extends
+  into corruption-adjacent regions, but the existing fox_scent/corruption
+  inputs already cover those for this seed's geometry. Drop here would
+  indicate the new axis is over-eager.
+constants_patch:
+  scoring:
+    ward_fox_intercept_anchor_weight: 0.5
+prediction:
+  metric: shadow_foxes_avoided_ward_total
+  direction: increase
+  rough_magnitude_pct: [-20, 30]
+seeds: [7]
+reps: 1
+duration: 900

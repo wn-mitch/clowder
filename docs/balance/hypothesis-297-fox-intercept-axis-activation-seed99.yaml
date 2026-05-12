@@ -1,0 +1,27 @@
+# Ticket 297 — fox-spawn-vicinity axis activation, seed-99.
+#
+# Seed-99 baseline at default weights produces 20 avoided foxes (geometry
+# happens to overlap). The new axis composes with the existing inputs
+# — should produce stable lift (within ±30% of baseline) or modest gain
+# from finer boundary targeting. A drop would signal the new axis is
+# pulling wards AWAY from the seed's lucky placement, which would be a
+# concerning structural side-effect.
+#
+# Iteration policy: see hypothesis-297-fox-intercept-axis-activation.yaml.
+
+hypothesis: |
+  On seed-99 the existing inputs already produce a counter of 20 (geometry
+  naturally overlaps fox patrol routes). Adding the predictive halo
+  axis should preserve or modestly lift the count — the new term composes
+  symmetrically with the existing two and shouldn't displace already-good
+  placements.
+constants_patch:
+  scoring:
+    ward_fox_intercept_anchor_weight: 0.5
+prediction:
+  metric: shadow_foxes_avoided_ward_total
+  direction: increase
+  rough_magnitude_pct: [-30, 50]
+seeds: [99]
+reps: 1
+duration: 900
