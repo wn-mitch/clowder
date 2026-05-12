@@ -9,7 +9,7 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, collective-memory.md]
 related-balance: []
-landed-at: pending
+landed-at: c3bce3500e6e
 landed-on: 2026-05-11
 ---
 
