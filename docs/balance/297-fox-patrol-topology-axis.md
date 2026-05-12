@@ -227,3 +227,9 @@ Three findings drive any follow-on work, ranked by structural depth:
 - Not a multi-rep sweep. Single rep per seed; per-seed Welch's t can't run. The byte-identical observation across three independent seeds is the load-bearing evidence.
 - Not a claim that the axis is useless. The substrate is wired and ready; if future structural work on the placement scorer (cat_value coefficient, candidate-generation step, decision semantics) opens up rank-changing dynamics, the fox-spawn-vicinity axis is in place to participate.
 - Not a justification to escalate the weight further. Three threat-axis levers have now been independently ruled out; escalating w_fox_intercept past 0.5 would just produce more saturation. The lever is elsewhere.
+
+---
+
+## iter-3 follow-on — candidate-step ruled out (cross-link to ticket 300)
+
+**Date:** 2026-05-12. Ticket [300](../open-work/landed/300-refine-ward-placement-candidate-generation-step-285296297-architectural-follow-on.md) promoted `CANDIDATE_STEP` to `SimConstants::scoring::ward_placement_candidate_step` and ran `just hypothesize` on seed-42 with treatment step=2. Result: byte-identical `WardPlaced` set (16/16), 0.0% delta on `shadow_foxes_avoided_ward_total`. The candidate-generation step is the **fourth threat-axis-adjacent lever ruled out** after 285 / 296 / 297. Architectural reading from 300: recorded `WardPlaced.location` values are dominated by Path B (cat's current position at self-picked `HerbcraftSetWard`), not by the coordinator's grid-scored target — so CANDIDATE_STEP can only ever shift the directive-driven subset of placements. The remaining open levers from iter-2's list narrow to `cat_value` (298), distance-cost (299), decision semantics (301), and the newly-surfaced Path-A-vs-Path-B selection itself. Full data: `docs/balance/300-ward-candidate-step.md`.

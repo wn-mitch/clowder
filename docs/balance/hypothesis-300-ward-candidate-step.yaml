@@ -1,0 +1,77 @@
+# Ticket 300 — ward-placement candidate-step sweep, primary spec (seed-42).
+#
+# Across the 285+296+297 sequence, six independent threat-axis constant
+# changes on three seeds (42, 99, 7) produced byte-identical WardPlaced
+# argmax — every position is a multiple of 5 because CANDIDATE_STEP=5
+# hardcodes the search grid (now promoted to
+# `SimConstants::scoring::ward_placement_candidate_step`, ticket 300).
+# This spec halves the step to 2 to test whether the multiple-of-5
+# placement-grid is the constraint behind the seven-tile argmax
+# invariance.
+#
+# Framing nuance: `FoxScentMap::get(x, y)` and sibling influence-map
+# reads return per-bucket values without interpolation
+# (`src/resources/fox_scent_map.rs:54-59`). Within a bucket the
+# threat-axis terms are FLAT. The only sub-bucket signal in
+# `compute_ward_placement` is the per-tile distance-to-anchor penalty
+# (`DIST_PENALTY_PER_TILE = 0.005`), which is monotonic in Manhattan
+# distance — so any within-bucket argmax shift will systematically pull
+# the optimum toward the anchor. Coverage-deduction from existing wards
+# is also flat per bucket (it reads the same influence maps).
+#
+# Iteration policy:
+# - argmax shifts onto at least one non-multiple-of-5 tile on seed-42
+#   AND counter moves materially → grid was binding; triangulate seeds
+#   99 and 7 in iter-2.
+# - argmax shifts but counter does not move materially → grid was
+#   binding for the search but the new tile produces equivalent
+#   downstream behavior (also informative; iter-2 optional).
+# - argmax stays byte-identical to baseline → grid was NOT the
+#   constraint; this is the fourth threat-axis-adjacent lever ruled out
+#   after 285 / 296 / 297. The lever lives in `cat_value` (298),
+#   `distance_cost` (299), or decision semantics (301).
+# - any continuity-canary regression > 10% on any seed → stop;
+#   placement is buying something at the cost of behavioral health.
+
+hypothesis: |
+  Halving `ward_placement_candidate_step` from 5 to 2 lets the scorer
+  evaluate intermediate tiles that the prior coarse grid skipped. Within
+  a bucket the threat-axis terms are flat (per-bucket influence-map
+  reads with no interpolation), so any within-bucket argmax shift is
+  driven by the distance-to-anchor penalty (0.005/tile) systematically
+  pulling the optimum toward the anchor.
+
+  Pre-soak inspection of the post-297-first-light baseline showed that
+  the seven recorded `WardPlaced` positions all have at least one
+  coordinate `≢ 0 (mod 5)` — they cannot be scorer-grid outputs.
+  Tracing the code path: when a cat picks `Action::HerbcraftSetWard`
+  without an active `DirectiveKind::SetWard` directive (the self-picked
+  path), `plan.ward_placement_pos` is `None` and `resolve_set_ward`
+  records `location = cat.position`, not the scorer's target. The
+  CANDIDATE_STEP grid therefore only constrains the directive-driven
+  subset of placements, not the recorded position set as a whole.
+
+  Either outcome is load-bearing evidence: movement on
+  `shadow_foxes_avoided_ward_total` outside the `[0, 10]` band, or a
+  diff in the WardPlaced position set between baseline and treatment,
+  means the grid was binding for some placement subset. No movement on
+  either signal means the grid is non-binding for downstream behavior,
+  and the lever lives in `cat_value` (298), distance-cost (299),
+  decision semantics (301), or — newly surfaced — the Path-A-vs-Path-B
+  ratio itself.
+constants_patch:
+  scoring:
+    ward_placement_candidate_step: 2
+prediction:
+  metric: shadow_foxes_avoided_ward_total
+  direction: unchanged
+  # Pre-registered as exploratory. `unchanged` band of [0, 10] encodes
+  # the null hypothesis "grid is not the binding constraint." Any |Δ|
+  # outside the band — in either direction — falsifies the null and
+  # promotes "grid was binding" as the read. Wider 10% tolerance
+  # (vs e.g. 5%) gives one-bin slack for the noise floor at seed-42's
+  # counter saturation of 2.
+  rough_magnitude_pct: [0, 10]
+seeds: [42]
+reps: 1
+duration: 900

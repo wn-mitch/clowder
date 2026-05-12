@@ -2015,6 +2015,20 @@ pub struct ScoringConstants {
     /// behavior.
     #[serde(default = "default_ward_placement_logistic_midpoint")]
     pub ward_placement_logistic_midpoint: f32,
+    /// 300: stride (in tiles) of the coarse-grid candidate generation in
+    /// `compute_ward_placement()`. The scorer enumerates candidates at
+    /// `(x, y)` where `x % step == 0` and `y % step == 0`, so the chosen
+    /// argmax can only ever land on a multiple-of-`step` tile. Promoted
+    /// from the previously-hardcoded `5` because every `WardPlaced`
+    /// position across 285+296+297 sat at multiples of 5 by construction
+    /// — finer-grained sampling tests whether the placement-grid was the
+    /// binding constraint. Within a bucket, threat-axis terms are flat
+    /// (per-bucket influence maps with no interpolation); the only
+    /// sub-bucket signal is the per-tile distance-to-anchor penalty,
+    /// which pulls the optimum toward the anchor. Default `5` preserves
+    /// pre-300 behavior.
+    #[serde(default = "default_ward_placement_candidate_step")]
+    pub ward_placement_candidate_step: i32,
     /// 297: weight on the `FoxSpawnVicinityMap` lift to ward-placement's
     /// threat term. Curve `Logistic(steepness, midpoint)` (shared with
     /// the ambush + carcass anchors, 296) applied to the per-tile
@@ -2379,6 +2393,7 @@ impl Default for ScoringConstants {
             ward_recency_anchor_weight: default_ward_recency_anchor_weight(),
             ward_placement_logistic_steepness: default_ward_placement_logistic_steepness(),
             ward_placement_logistic_midpoint: default_ward_placement_logistic_midpoint(),
+            ward_placement_candidate_step: default_ward_placement_candidate_step(),
             ward_fox_intercept_anchor_weight: default_ward_fox_intercept_anchor_weight(),
             fox_intercept_kernel_radius_tiles: default_fox_intercept_kernel_radius_tiles(),
             cat_patrol_deterrent_deposit_per_tick:
@@ -3630,6 +3645,17 @@ fn default_ward_placement_logistic_steepness() -> f32 {
 /// preserves pre-296 behavior (hardcoded value before promotion).
 fn default_ward_placement_logistic_midpoint() -> f32 {
     0.5
+}
+
+/// 300: stride (in tiles) of the coarse-grid candidate generation in
+/// `compute_ward_placement()`. Default `5` preserves pre-300 behavior
+/// (hardcoded value before promotion); the bucket-size alignment with
+/// the influence maps was the original justification but the maps
+/// return per-bucket values without interpolation, so finer strides
+/// only resolve sub-bucket variation from the distance-to-anchor
+/// penalty.
+fn default_ward_placement_candidate_step() -> i32 {
+    5
 }
 
 /// 297: weight on the inline fox-spawn-vicinity lift in
@@ -5872,6 +5898,10 @@ mod tests {
         // Mirrors the ambush anchor's first-light value from 284.
         assert_eq!(defaults.scoring.ward_fox_intercept_anchor_weight, 0.5);
         assert_eq!(defaults.scoring.fox_intercept_kernel_radius_tiles, 20);
+        // 300 promotion: candidate-step default preserves the pre-300
+        // hardcoded `5` value. Changing this default is a balance change
+        // (modifies `compute_ward_placement`'s search grid resolution).
+        assert_eq!(defaults.scoring.ward_placement_candidate_step, 5);
     }
 
     #[test]

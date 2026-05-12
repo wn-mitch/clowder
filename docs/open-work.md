@@ -15,10 +15,10 @@ _Last generated: 2026-05-12._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 87 |
+| Ready | 90 |
 | Parked | 10 |
 | Blocked | 26 |
-| **Open total** | **129** |
+| **Open total** | **132** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -44,7 +44,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[229](docs/open-work/tickets/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose — _[tooling] · added 2026-05-08_
 
-## Ready (87)
+## Ready (90)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -133,6 +133,9 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[293](docs/open-work/tickets/293-huntingpriors-retirement-per-location-belief-moves-to-locationbeliefsperceived-violence-capability-colony-absorption-rebuild-258-follow-on.md)** — HuntingPriors retirement — per-location belief moves to LocationBeliefs.perceived_violence_capability + colony absorption rebuild (258 follow-on) — _[C] · added 2026-05-11_
 - **[294](docs/open-work/tickets/294-recentambushmap-retirement-colony-resource-moves-to-per-cat-locationbeliefsrecency-of-threat-cue-258-follow-on.md)** — RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on) — _[C] · added 2026-05-11_
 - **[295](docs/open-work/tickets/295-witnessableevent-emit-sites-wire-attack-mate-care-fleefrom-hunt-from-action-resolvers-258-follow-on.md)** — WitnessableEvent emit sites — wire Attack / Mate / Care / FleeFrom / Hunt from action resolvers (258 follow-on) — _[C] · added 2026-05-11_
+- **[298](docs/open-work/tickets/298-tune-ward-placement-cat-value-coefficient-285296297-architectural-follow-on.md)** — tune ward placement cat_value coefficient (285+296+297 architectural follow-on) — _[balance] · added 2026-05-12_
+- **[299](docs/open-work/tickets/299-tune-ward-placement-distance-cost-penalty-285296297-architectural-follow-on.md)** — tune ward placement distance_cost penalty (285+296+297 architectural follow-on) — _[balance] · added 2026-05-12_
+- **[301](docs/open-work/tickets/301-evolve-ward-placement-decision-semantics-beyond-single-shot-argmax-285296297-architectural-follow-on.md)** — evolve ward placement decision semantics beyond single-shot argmax (285+296+297 architectural follow-on) — _[ai-substrate] · added 2026-05-12_
 
 ## Parked (10)
 
@@ -181,12 +184,13 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (187)
+## Landed archive (188)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (122)
+### 2026-05 (123)
 
+- **[300](docs/open-work/landed/300-refine-ward-placement-candidate-generation-step-285296297-architectural-follow-on.md)** — refine ward placement candidate-generation step (285+296+297 architectural follow-on) _(2026-05-12)_
 - **[297](docs/open-work/landed/297-ward-placement-needs-fox-patrol-topology-perception-axis-285-follow-on.md)** — ward placement needs fox-patrol-topology perception axis (285 follow-on) _(2026-05-12)_
 - **[296](docs/open-work/landed/296-tune-ward-placement-logistic-curve-shape-285-follow-on.md)** — tune ward placement Logistic curve shape (285 follow-on) _(2026-05-12)_
 - **[285](docs/open-work/landed/285-tune-ward-anchor-weights-magnitude-iteration.md)** — tune ward anchor weights — magnitude iteration _(2026-05-12)_

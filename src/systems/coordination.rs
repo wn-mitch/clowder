@@ -1428,10 +1428,15 @@ pub(crate) fn compute_ward_placement(
         return anchor;
     }
 
-    // Coarse-grid candidate generation across the whole map (every 5
-    // tiles, matching the bucket size of the influence maps). For the
-    // default 120×90 map this yields ~430 candidates; cheap to score.
-    const CANDIDATE_STEP: i32 = 5;
+    // Coarse-grid candidate generation across the whole map. The stride
+    // is `constants.scoring.ward_placement_candidate_step` (default 5,
+    // promoted from a hardcoded constant in 300). At default the search
+    // grid aligns with the influence-map bucket size; finer strides
+    // resolve sub-bucket variation from the distance-to-anchor penalty
+    // only, since the influence maps return per-bucket values without
+    // interpolation. For the default 120×90 map and step=5 this yields
+    // ~430 candidates; cheap to score.
+    let candidate_step = constants.scoring.ward_placement_candidate_step.max(1) as usize;
     const HARD_EXCLUDE_MANHATTAN: i32 = 3;
     /// Travel-cost penalty per Manhattan tile from the anchor. Tuned so
     /// a 100-tile detour costs 0.5 score — a saturated threat far away
@@ -1442,8 +1447,8 @@ pub(crate) fn compute_ward_placement(
     let map_w = maps.tile_map.width;
     let map_h = maps.tile_map.height;
     let mut candidates: Vec<Position> = Vec::new();
-    for cy in (0..map_h).step_by(CANDIDATE_STEP as usize) {
-        for cx in (0..map_w).step_by(CANDIDATE_STEP as usize) {
+    for cy in (0..map_h).step_by(candidate_step) {
+        for cx in (0..map_w).step_by(candidate_step) {
             let candidate = Position::new(cx, cy);
             if ward_positions
                 .iter()
