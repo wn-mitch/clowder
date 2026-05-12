@@ -208,15 +208,20 @@ if [[ -n "$VS_BASELINE" ]]; then
     done
 fi
 
-VS_SIDECAR_ARG=()
-[[ -n "$VS_SIDECAR" ]] && VS_SIDECAR_ARG=(--vs-sidecar "$VS_SIDECAR")
-
-python3 "$REPO_ROOT/scripts/baseline_report.py" --baseline-dir "$OUT_BASE" \
-    --output "$REPORT_DIR/REPORT.md" \
-    --json-sidecar "$REPORT_DIR/REPORT.json" \
-    "${VS_SIDECAR_ARG[@]}" \
-    2> "$REPORT_DIR/baseline_report.log" \
-    || echo "[aggregate] WARN: baseline_report.py exited non-zero; partial REPORT.md may exist" >&2
+if [[ -n "$VS_SIDECAR" ]]; then
+    python3 "$REPO_ROOT/scripts/baseline_report.py" --baseline-dir "$OUT_BASE" \
+        --output "$REPORT_DIR/REPORT.md" \
+        --json-sidecar "$REPORT_DIR/REPORT.json" \
+        --vs-sidecar "$VS_SIDECAR" \
+        2> "$REPORT_DIR/baseline_report.log" \
+        || echo "[aggregate] WARN: baseline_report.py exited non-zero; partial REPORT.md may exist" >&2
+else
+    python3 "$REPO_ROOT/scripts/baseline_report.py" --baseline-dir "$OUT_BASE" \
+        --output "$REPORT_DIR/REPORT.md" \
+        --json-sidecar "$REPORT_DIR/REPORT.json" \
+        2> "$REPORT_DIR/baseline_report.log" \
+        || echo "[aggregate] WARN: baseline_report.py exited non-zero; partial REPORT.md may exist" >&2
+fi
 
 # --- phase e: baseline pack JSON ------------------------------------------
 
@@ -292,6 +297,8 @@ pack = {
     "per_dse_l2": report_sidecar.get("per_dse_l2") or [],
     "cascade_signatures": report_sidecar.get("cascade_signatures") or {},
     "plan_failure_top10": report_sidecar.get("plan_failure_top10") or [],
+    "death_timing": report_sidecar.get("death_timing") or [],
+    "defense_cadence": report_sidecar.get("defense_cadence") or [],
 }
 
 with out_path.open("w") as f:

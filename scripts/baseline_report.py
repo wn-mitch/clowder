@@ -147,6 +147,15 @@ class RunSummary:
     # this is the canonical source of plan-failure data.
     plan_step_failed_total: int = 0
     plan_step_failed_by_reason: dict[str, int] = field(default_factory=dict)
+    # Death timing (A4) — populated from walked Death events.
+    first_death_tick: int | None = None
+    first_starvation_tick: int | None = None
+    first_ambush_tick: int | None = None
+    death_cluster_window_max: int = 0
+    deaths_per_quartile: list[int] = field(default_factory=list)  # [Q1,Q2,Q3,Q4]
+    # Defense cadence (A5) — per-quartile counter delta for ward + predator
+    # SystemActivation features.
+    defense_cadence: dict[str, list[int]] = field(default_factory=dict)  # feature → [Q1,Q2,Q3,Q4]
 
 
 def summarize_run(label: str, kind: str, seed: int, rep_or_focal: str,
@@ -190,13 +199,23 @@ def summarize_run(label: str, kind: str, seed: int, rep_or_focal: str,
                 summary.continuity[cls] = 0
 
     # Walk the file once for ColonySnapshot final + activation tallies + peak pop
-    # + PlanStepFailed reason histogram.
+    # + PlanStepFailed reason histogram + Death timing + defense-cadence samples.
     population = []
     activations: dict[str, int] = {}
     psf_total = 0
     psf_by_reason: dict[str, int] = {}
+    death_ticks: list[tuple[int, str, str]] = []         # [(tick, cause, injury_source)]
+    # SystemActivation captures cumulative-counter samples for ward + predator
+    # features the defense-cadence section (A5) buckets per quartile.
+    cadence_samples: dict[str, list[tuple[int, int]]] = {f: [] for f in DEFENSE_FEATURES}
+    tick_min: int | None = None
+    tick_max: int | None = None
     for ev in read_jsonl_streaming(events):
         t = ev.get("type")
+        tick = ev.get("tick") if isinstance(ev.get("tick"), int) else None
+        if tick is not None:
+            tick_min = tick if tick_min is None else min(tick_min, tick)
+            tick_max = tick if tick_max is None else max(tick_max, tick)
         if t == "ColonyScore":
             living = ev.get("living_cats")
             peak = ev.get("peak_population")
@@ -206,13 +225,25 @@ def summarize_run(label: str, kind: str, seed: int, rep_or_focal: str,
                 summary.population_peak = max(summary.population_peak or 0, peak)
         elif t == "SystemActivation":
             pos = ev.get("positive") or {}
+            neg = ev.get("negative") or {}
             for k, v in pos.items():
                 if isinstance(v, int):
                     activations[k] = max(activations.get(k, 0), v)
+            if tick is not None:
+                for feature in DEFENSE_FEATURES:
+                    v = pos.get(feature)
+                    if v is None:
+                        v = neg.get(feature)
+                    if isinstance(v, int):
+                        cadence_samples[feature].append((tick, v))
         elif t == "PlanStepFailed":
             psf_total += 1
             reason = ev.get("reason") or "?"
             psf_by_reason[reason] = psf_by_reason.get(reason, 0) + 1
+        elif t == "Death" and tick is not None:
+            cause = ev.get("cause") or "?"
+            injury_source = ev.get("injury_source") or ""
+            death_ticks.append((tick, cause, injury_source))
     summary.plan_step_failed_total = psf_total
     summary.plan_step_failed_by_reason = psf_by_reason
     if population:
@@ -220,7 +251,118 @@ def summarize_run(label: str, kind: str, seed: int, rep_or_focal: str,
         if summary.population_peak is None:
             summary.population_peak = max(population)
     summary.activation_positive = activations
+
+    # Death timing post-processing (A4).
+    if death_ticks:
+        death_ticks.sort()
+        summary.first_death_tick = death_ticks[0][0]
+        for tick, cause, source in death_ticks:
+            if summary.first_starvation_tick is None and cause == "Starvation":
+                summary.first_starvation_tick = tick
+            if summary.first_ambush_tick is None and (
+                cause == "ShadowFoxAmbush" or source == "ShadowFoxAmbush"
+            ):
+                summary.first_ambush_tick = tick
+        summary.death_cluster_window_max = max_count_in_window(
+            [t for t, _, _ in death_ticks], DEATH_CLUSTER_WINDOW_TICKS
+        )
+        if tick_min is not None and tick_max is not None and tick_max > tick_min:
+            summary.deaths_per_quartile = bucket_by_quartile(
+                [t for t, _, _ in death_ticks], tick_min, tick_max
+            )
+
+    # Defense cadence post-processing (A5). For each tracked feature, find
+    # the LAST cumulative counter value emitted within each quartile and
+    # subtract the previous quartile's last value to get the delta.
+    if tick_min is not None and tick_max is not None and tick_max > tick_min:
+        for feature, samples in cadence_samples.items():
+            if not samples:
+                continue
+            summary.defense_cadence[feature] = quartile_counter_deltas(
+                samples, tick_min, tick_max
+            )
     return summary
+
+
+# --- A4/A5 helpers --------------------------------------------------------
+
+
+# SystemActivation feature names the §2 defense-cadence sub-section tracks.
+# Each appears as a cumulative counter on every SystemActivation emit (110ish
+# samples per ~1M-tick run). Some live in `positive`, some in `negative`;
+# summarize_run probes both maps.
+DEFENSE_FEATURES = [
+    "WardPlaced",            # positive
+    "WardDespawned",         # negative
+    "WardSiegeStarted",      # negative
+    "ShadowFoxSpawn",        # negative
+    "ShadowFoxAvoidedWard",  # positive
+]
+
+DEATH_CLUSTER_WINDOW_TICKS = 5000
+
+
+def max_count_in_window(ticks: list[int], window: int) -> int:
+    """Largest count of items within any sliding `window`-wide tick range.
+
+    Linear two-pointer scan over a pre-sorted tick list.
+    """
+    if not ticks:
+        return 0
+    ticks_sorted = sorted(ticks)
+    best = 1
+    left = 0
+    for right in range(len(ticks_sorted)):
+        while ticks_sorted[right] - ticks_sorted[left] > window:
+            left += 1
+        best = max(best, right - left + 1)
+    return best
+
+
+def bucket_by_quartile(ticks: list[int], tick_min: int, tick_max: int) -> list[int]:
+    """Return [Q1, Q2, Q3, Q4] counts of ticks within each tick-range quartile.
+
+    Data-driven bucketing matches §5's need-quartile shape — runs start at
+    Time<Fixed>'s ~1.2M-tick warmup so quartile-of-tick-range is the only
+    portable bucketing.
+    """
+    span = max(tick_max - tick_min, 1)
+    buckets = [0, 0, 0, 0]
+    for t in ticks:
+        frac = (t - tick_min) / span
+        q = min(3, int(frac * 4))
+        buckets[q] += 1
+    return buckets
+
+
+def quartile_counter_deltas(samples: list[tuple[int, int]],
+                            tick_min: int, tick_max: int) -> list[int]:
+    """For a cumulative-counter timeseries, return per-quartile increments.
+
+    `samples` is [(tick, cumulative_value), …]; assumes monotonic but does
+    not require it. The last value within each quartile minus the previous
+    quartile's last value yields the per-quartile increment.
+    """
+    if not samples:
+        return [0, 0, 0, 0]
+    samples_sorted = sorted(samples)
+    span = max(tick_max - tick_min, 1)
+    last_by_q: list[int | None] = [None, None, None, None]
+    for tick, value in samples_sorted:
+        frac = (tick - tick_min) / span
+        q = min(3, int(frac * 4))
+        last_by_q[q] = value
+    # Carry forward into empty quartiles (treat them as "no change since
+    # last seen value").
+    prev = 0
+    deltas = []
+    for v in last_by_q:
+        if v is None:
+            deltas.append(0)
+        else:
+            deltas.append(v - prev)
+            prev = v
+    return deltas
 
 
 # --- trace analysis (focal-cat L3 / L2) -----------------------------------
@@ -375,6 +517,50 @@ def section_survival_canaries(runs: list[RunSummary]) -> str:
             f"{peak} → {final} | "
             f"{r.deaths_total} |\n"
         )
+
+    # A4 death timing sub-section — distinguishes slow attrition from
+    # catastrophic clustering. Headline counts hide the difference (181's
+    # ambush cascade was specifically a cluster ~24k ticks after the L3
+    # shift; total deaths alone would not have flagged it).
+    runs_with_deaths = [r for r in sweep_runs if r.first_death_tick is not None]
+    if runs_with_deaths:
+        out.append("\n**Death timing:**\n\n")
+        out.append(
+            "| run | first death | first starvation | first ambush | "
+            f"cluster max (any {DEATH_CLUSTER_WINDOW_TICKS}-tick window) | "
+            "Q1 / Q2 / Q3 / Q4 |\n"
+        )
+        out.append("|---|---:|---:|---:|---:|---|\n")
+        for r in sweep_runs:
+            quartiles = "/".join(str(v) for v in r.deaths_per_quartile) if r.deaths_per_quartile else "—"
+            out.append(
+                f"| {r.label} | "
+                f"{r.first_death_tick if r.first_death_tick is not None else '—'} | "
+                f"{r.first_starvation_tick if r.first_starvation_tick is not None else '—'} | "
+                f"{r.first_ambush_tick if r.first_ambush_tick is not None else '—'} | "
+                f"{r.death_cluster_window_max or '—'} | "
+                f"{quartiles} |\n"
+            )
+
+    # A5 defense cadence — per-quartile delta on the cumulative ward +
+    # predator counters. Totals can be byte-identical between treatments
+    # while cadence-within-run differs (284/285 ward-anchor tuning).
+    runs_with_cadence = [r for r in sweep_runs if r.defense_cadence]
+    if runs_with_cadence:
+        out.append("\n**Defense cadence (per-quartile counter deltas):**\n\n")
+        out.append("| run | feature | Q1 | Q2 | Q3 | Q4 | total |\n")
+        out.append("|---|---|---:|---:|---:|---:|---:|\n")
+        for r in runs_with_cadence:
+            for feature in DEFENSE_FEATURES:
+                deltas = r.defense_cadence.get(feature)
+                if not deltas:
+                    continue
+                total = sum(deltas)
+                out.append(
+                    f"| {r.label} | {feature} | "
+                    f"{deltas[0]} | {deltas[1]} | {deltas[2]} | {deltas[3]} | "
+                    f"{total} |\n"
+                )
     return "".join(out)
 
 
@@ -1007,6 +1193,22 @@ def main() -> int:
         "cascade_signatures": cascade,
         "plan_failure_top10": plan_top10,
         "plan_failure_reason_diff": reason_diff,
+        "death_timing": [
+            {
+                "run": r.label,
+                "seed": r.seed,
+                "first_death_tick": r.first_death_tick,
+                "first_starvation_tick": r.first_starvation_tick,
+                "first_ambush_tick": r.first_ambush_tick,
+                "death_cluster_window_max": r.death_cluster_window_max,
+                "deaths_per_quartile": r.deaths_per_quartile,
+            }
+            for r in runs if r.kind == "sweep"
+        ],
+        "defense_cadence": [
+            {"run": r.label, "seed": r.seed, "per_feature": r.defense_cadence}
+            for r in runs if r.kind == "sweep" and r.defense_cadence
+        ],
     }
     sidecar_path.write_text(json.dumps(sidecar, indent=2) + "\n")
     print(f"[report] wrote {sidecar_path}", file=sys.stderr)
