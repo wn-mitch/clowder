@@ -679,7 +679,60 @@ def section_dse_landscape(traces: list[TraceAggregate]) -> str:
     return "".join(out)
 
 
-def section_plan_failures(runs: list[RunSummary]) -> str:
+def plan_failure_top10(runs: list[RunSummary]) -> list[dict]:
+    """Cross-seed envelope of `PlanStepFailed.reason` counts.
+
+    Pools every sweep run's reason histogram, then ranks the top 10 by
+    mean count per run. Each row carries mean / stdev / min / max +
+    zero-run count so balance work can spot reasons that fire only on a
+    minority of seeds (high stdev relative to mean = seed-sensitive
+    failure mode).
+    """
+    sweep_runs = [r for r in runs if r.kind == "sweep"]
+    if not sweep_runs:
+        return []
+    all_reasons = set()
+    for r in sweep_runs:
+        all_reasons.update(r.plan_step_failed_by_reason)
+    rows = []
+    for reason in all_reasons:
+        vals = [r.plan_step_failed_by_reason.get(reason, 0) for r in sweep_runs]
+        s = stats_or_na([float(v) for v in vals])
+        zero = sum(1 for v in vals if v == 0)
+        rows.append({
+            "reason": reason,
+            "mean": s["mean"],
+            "stdev": s["stdev"],
+            "min": s["min"],
+            "max": s["max"],
+            "zero_runs": zero,
+            "n_runs": len(sweep_runs),
+        })
+    rows.sort(key=lambda r: -(r["mean"] or 0.0))
+    return rows[:10]
+
+
+def plan_failure_reason_diff(current: list[dict],
+                             baseline_sidecar: dict | None) -> dict:
+    """When a sidecar is supplied, classify each current top-10 reason as
+    `new` (absent from baseline), `dropped` (in baseline but not current),
+    or `shared`. Returns {"new": [...], "dropped": [...], "shared": [...]}.
+    """
+    if not baseline_sidecar:
+        return {}
+    base_top = baseline_sidecar.get("plan_failure_top10") or []
+    current_names = {r["reason"] for r in current}
+    base_names = {r["reason"] for r in base_top}
+    return {
+        "new": sorted(current_names - base_names),
+        "dropped": sorted(base_names - current_names),
+        "shared": sorted(current_names & base_names),
+    }
+
+
+def section_plan_failures(runs: list[RunSummary],
+                          top10: list[dict],
+                          reason_diff: dict | None) -> str:
     out = ["\n## 7. Plan-step failure reasons\n"]
     sweep_runs = [r for r in runs if r.kind == "sweep"]
     if not sweep_runs:
@@ -689,7 +742,8 @@ def section_plan_failures(runs: list[RunSummary]) -> str:
     # `L3PlanFailure` trace layer the prior implementation read). Healthy-
     # colony.md:76-82 — drift in this distribution signals step-resolver
     # behavior changes.
-    out.append("\nSourced from `PlanStepFailed` events. Per-run total + dominant reason.\n\n")
+    out.append("\nSourced from `PlanStepFailed` events.\n\n")
+    out.append("### Per-run table\n\n")
     out.append("| run | total | dominant reason | top reasons |\n")
     out.append("|---|---:|---|---|\n")
     for r in sweep_runs:
@@ -701,6 +755,31 @@ def section_plan_failures(runs: list[RunSummary]) -> str:
         top = sorted_reasons[0][0]
         breakdown = ", ".join(f"{k}={v}" for k, v in sorted_reasons[:5])
         out.append(f"| {r.label} | {total} | {top} | {breakdown} |\n")
+
+    if top10:
+        out.append("\n### Cross-seed envelope (top 10 reasons)\n\n")
+        out.append("| reason | mean | stdev | min | max | zero-runs |\n")
+        out.append("|---|---:|---:|---:|---:|---:|\n")
+        for row in top10:
+            out.append(
+                f"| {row['reason']} | {fmt(row['mean'], 1)} | {fmt(row['stdev'], 1)} | "
+                f"{fmt(row['min'], 0)} | {fmt(row['max'], 0)} | "
+                f"{row['zero_runs']}/{row['n_runs']} |\n"
+            )
+
+    if reason_diff:
+        new = reason_diff.get("new") or []
+        dropped = reason_diff.get("dropped") or []
+        if new or dropped:
+            out.append("\n### Reason-set diff vs baseline\n\n")
+            if new:
+                out.append(f"**New reasons** ({len(new)}): {', '.join(f'`{r}`' for r in new)}\n\n")
+            if dropped:
+                out.append(f"**Dropped reasons** ({len(dropped)}): {', '.join(f'`{r}`' for r in dropped)}\n\n")
+            out.append(
+                "_Per healthy-colony.md: new failure reasons appearing or old ones disappearing "
+                "entirely signal step-resolver behavior changes._\n"
+            )
     return "".join(out)
 
 
@@ -893,6 +972,8 @@ def main() -> int:
             print(f"[report] note: --vs-sidecar {vs_path} missing or empty; rendering absolute values", file=sys.stderr)
 
     cascade = compute_cascade_signatures(traces, baseline_sidecar)
+    plan_top10 = plan_failure_top10(runs)
+    reason_diff = plan_failure_reason_diff(plan_top10, baseline_sidecar)
 
     sections = [
         f"# Baseline dataset report — `{base.name}`\n",
@@ -904,7 +985,7 @@ def main() -> int:
         section_population(runs),
         section_needs(runs),
         section_dse_landscape(traces),
-        section_plan_failures(runs),
+        section_plan_failures(runs, plan_top10, reason_diff),
         section_commitment_gate(traces),
         section_conditional_deltas(runs),
         section_deferred_balance(runs),
@@ -924,6 +1005,8 @@ def main() -> int:
         "per_dse_l2": cross_focal_dse_envelope(traces),
         "per_focal_meta": per_focal_meta(traces),
         "cascade_signatures": cascade,
+        "plan_failure_top10": plan_top10,
+        "plan_failure_reason_diff": reason_diff,
     }
     sidecar_path.write_text(json.dumps(sidecar, indent=2) + "\n")
     print(f"[report] wrote {sidecar_path}", file=sys.stderr)

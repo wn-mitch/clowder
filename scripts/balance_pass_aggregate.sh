@@ -291,6 +291,7 @@ pack = {
     # sidecars → per_dse_l2 is []).
     "per_dse_l2": report_sidecar.get("per_dse_l2") or [],
     "cascade_signatures": report_sidecar.get("cascade_signatures") or {},
+    "plan_failure_top10": report_sidecar.get("plan_failure_top10") or [],
 }
 
 with out_path.open("w") as f:
