@@ -1,0 +1,75 @@
+# Ticket 298 — `ward_placement_cat_value_weight` bold-probe (0.4), seed-42 primary.
+#
+# 285 (anchor magnitude), 296 (Logistic curve shape), 297 (third
+# threat-axis input) and 300 (candidate-step grid) each tested a distinct
+# lever against ward-placement argmax and each came back **byte-identical**
+# between baseline and treatment across seeds 42/99/7. The iter-2
+# architectural conclusion in
+# `docs/balance/297-fox-patrol-topology-axis.md` is that the threat-axis
+# composition is rank-preserving for the argmax once any threat-side input
+# saturates a sufficient number of tiles. That leaves the argmax determined
+# by the non-threat terms in the scoring formula at
+# `src/systems/coordination.rs:1557`:
+#
+#     score = unaddressed_threat + W * cat_value - distance_cost + jitter
+#
+# This is the **first non-threat-axis lever**: probe `W=0.4` (the boldest
+# non-baseline value the ticket scopes, +33% over the 0.3 default) against
+# the post-297 substrate-dormant baseline. If 0.4 doesn't move placement,
+# the lower probes (0.2, 0.1) won't either — start at the top of the
+# scope.
+#
+# Iteration policy (per ticket 298 plan + 285 precedent):
+# - Concordant lift + non-byte-identical placement on seed-42 → run sister
+#   seed-99/seed-7 yamls; if all three concord, land at 0.4.
+# - Byte-identical placement on seed-42 → run sister seeds anyway. If all
+#   three are byte-identical at 0.4, the non-threat-axis lever is *also*
+#   rank-preserving; land 298 findings-only and open the structural-option
+#   follow-on (split cat_value into density vs. movement-intensity).
+# - Wrong-direction at 0.4 → write 0.1 and 0.2 sibling yamls (descending
+#   probe) to map the response curve before drawing a conclusion.
+# - Any continuity-canary regression > 10% on any seed → stop; coefficient
+#   is buying placement at the cost of behavioral health.
+#
+# Companion specs:
+# - hypothesis-298-cat-value-coefficient-seed99.yaml
+# - hypothesis-298-cat-value-coefficient-seed7.yaml
+
+hypothesis: |
+  At post-297 substrate-dormant weights and the post-300 candidate-step
+  grid, ward placement on seed-42 sits at `shadow_foxes_avoided_ward_total = 2`
+  because the threat axis saturates on a large fraction of high-corruption
+  tiles and the argmax tiebreak collapses onto `0.3 * cat_value -
+  distance_cost + jitter`. Lifting `ward_placement_cat_value_weight` from
+  0.3 to 0.4 (+33%) increases the cat_value term's share of the residual
+  budget by ~10% relative to distance_cost across typical anchor distances
+  (10-50 tiles). If the cat-presence map distinguishes residential cluster
+  tiles from threat-saturated outskirts — the load-bearing premise — this
+  should shift wards toward cluster tiles and bump
+  `shadow_foxes_avoided_ward_total` materially. **Caveat from ticket 300**:
+  recorded `WardPlaced.location` values are dominated by Path B (cat's
+  current position at self-picked `HerbcraftSetWard`), not by the
+  coordinator's grid-scored target — so `ward_placement_cat_value_weight`
+  only affects the **directive-driven subset** (Path A) of placements.
+  This caps expected magnitude below what a pure-scorer regime would
+  predict. The falsifier is byte-identical placement: if the argmax holds
+  despite the coefficient bump (even on the Path-A subset), every linear
+  term in the scoring formula is rank-preserving and no parameter tune
+  on this formula can move the argmax — the next ticket needs a
+  structural change to the formula itself.
+constants_patch:
+  scoring:
+    ward_placement_cat_value_weight: 0.4
+prediction:
+  metric: shadow_foxes_avoided_ward_total
+  direction: increase
+  # Seed-42 baseline is 2 (topology-saturated, same as 297's pre-axis
+  # baseline). A doubling lands at 4 (+100%); a tripling at 6 (+200%). The
+  # 50% floor catches "the coefficient moved placement onto better tiles
+  # but only marginally"; anything below floor and the cat_value term is
+  # also rank-preserving. Wide upper band because there's no per-seed
+  # ceiling reference for this lever.
+  rough_magnitude_pct: [50, 300]
+seeds: [42]
+reps: 1
+duration: 900

@@ -1,0 +1,32 @@
+# Ticket 298 — `ward_placement_cat_value_weight` bold-probe (0.4), seed-99.
+#
+# Seed-99 baseline at default 0.3 produces `shadow_foxes_avoided_ward_total = 20`
+# (geometry naturally overlaps fox patrol routes — same as the 297 baseline
+# table). Lifting the cat_value coefficient should preserve or modestly bump
+# this number IF the cat-presence map's residential clusters compose with
+# the seed's lucky placement geometry; a drop would mean the coefficient is
+# pulling wards AWAY from the lucky tiles, which is a load-bearing
+# falsifier signal (cluster tiles ≠ patrol-overlap tiles on this seed).
+#
+# Iteration policy: see hypothesis-298-cat-value-coefficient.yaml.
+
+hypothesis: |
+  On seed-99 the existing inputs already produce a counter of 20 because
+  the seed's cat clusters and fox-patrol corridors happen to overlap.
+  Raising `ward_placement_cat_value_weight` from 0.3 to 0.4 should preserve
+  or modestly lift the count — the coefficient bumps cluster-tile scores
+  symmetrically relative to outskirts and shouldn't displace already-good
+  placements. A drop indicates cluster tiles are spatially distinct from
+  the seed's lucky overlap region, which (combined with seed-42's result)
+  would tell us cat_value is not a load-bearing tiebreak signal for
+  patrol-intercept either.
+constants_patch:
+  scoring:
+    ward_placement_cat_value_weight: 0.4
+prediction:
+  metric: shadow_foxes_avoided_ward_total
+  direction: increase
+  rough_magnitude_pct: [-30, 50]
+seeds: [99]
+reps: 1
+duration: 900

@@ -1,0 +1,30 @@
+# Ticket 298 — `ward_placement_cat_value_weight` bold-probe (0.4), seed-7.
+#
+# Seed-7 baseline at default 0.3 produces `shadow_foxes_avoided_ward_total = 78`
+# (massive natural overlap — the 297 baseline table). Larger ceiling than
+# seed-99 (20) and seed-42 (2), so the absolute-magnitude band needs to be
+# tighter percentage-wise — small percentage shifts here translate to many
+# wards. A drop would be the strongest falsifier of the three seeds: it
+# would mean the coefficient is pulling wards off the cluster-rich
+# overlap region.
+#
+# Iteration policy: see hypothesis-298-cat-value-coefficient.yaml.
+
+hypothesis: |
+  On seed-7 the existing inputs produce a counter of 78 because the
+  seed's cat clusters and fox-patrol corridors heavily overlap. Raising
+  `ward_placement_cat_value_weight` from 0.3 to 0.4 should preserve or
+  modestly lift the count if cluster tiles overlap with the lucky region.
+  A drop would tell us the coefficient is buying cluster placement at the
+  cost of patrol-intercept coverage — falsifying the hypothesis that
+  cat_value is the right tiebreak signal.
+constants_patch:
+  scoring:
+    ward_placement_cat_value_weight: 0.4
+prediction:
+  metric: shadow_foxes_avoided_ward_total
+  direction: increase
+  rough_magnitude_pct: [-20, 30]
+seeds: [7]
+reps: 1
+duration: 900

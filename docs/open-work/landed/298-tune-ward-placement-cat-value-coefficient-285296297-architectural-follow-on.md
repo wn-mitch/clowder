@@ -1,7 +1,7 @@
 ---
 id: 298
 title: tune ward placement cat_value coefficient (285+296+297 architectural follow-on)
-status: ready
+status: done
 cluster: balance
 added: 2026-05-12
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [284-ward-anchor-tuning.md, 297-fox-patrol-topology-axis.md]
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-12
 ---
 
 ## Why
@@ -66,3 +66,4 @@ This ticket targets the `0.3 * cat_value` coefficient — the load-bearing argma
 
 ## Log
 - 2026-05-12: opened as the first of four follow-on tickets from 297's iter-2 architectural finding (`docs/balance/297-fox-patrol-topology-axis.md`). Three threat-axis levers (285 magnitude / 296 curve shape / 297 orthogonal axis) ruled out across six constant changes × three seeds; this ticket is lever #1 of the four non-threat-axis candidates named in 297 iter-2.
+- 2026-05-12: 2026-05-12: iter-1 ran W=0.4 across seeds 42/99/7. First non-byte-identical lever in 285→298 sequence — seed-42 drops 2 wards at metric-irrelevant tile, seed-99 byte-identical, seed-7 adds 2 wards at fox-intercept tile (+5.1% metric). Magnitude too modest to ship 0.4; substrate-no-op promotion lands so knob is tunable. Opened ticket 303 for structural follow-on (CatResidenceMap split).

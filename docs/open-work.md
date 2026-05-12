@@ -133,10 +133,10 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[293](docs/open-work/tickets/293-huntingpriors-retirement-per-location-belief-moves-to-locationbeliefsperceived-violence-capability-colony-absorption-rebuild-258-follow-on.md)** — HuntingPriors retirement — per-location belief moves to LocationBeliefs.perceived_violence_capability + colony absorption rebuild (258 follow-on) — _[C] · added 2026-05-11_
 - **[294](docs/open-work/tickets/294-recentambushmap-retirement-colony-resource-moves-to-per-cat-locationbeliefsrecency-of-threat-cue-258-follow-on.md)** — RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on) — _[C] · added 2026-05-11_
 - **[295](docs/open-work/tickets/295-witnessableevent-emit-sites-wire-attack-mate-care-fleefrom-hunt-from-action-resolvers-258-follow-on.md)** — WitnessableEvent emit sites — wire Attack / Mate / Care / FleeFrom / Hunt from action resolvers (258 follow-on) — _[C] · added 2026-05-11_
-- **[298](docs/open-work/tickets/298-tune-ward-placement-cat-value-coefficient-285296297-architectural-follow-on.md)** — tune ward placement cat_value coefficient (285+296+297 architectural follow-on) — _[balance] · added 2026-05-12_
 - **[299](docs/open-work/tickets/299-tune-ward-placement-distance-cost-penalty-285296297-architectural-follow-on.md)** — tune ward placement distance_cost penalty (285+296+297 architectural follow-on) — _[balance] · added 2026-05-12_
 - **[301](docs/open-work/tickets/301-evolve-ward-placement-decision-semantics-beyond-single-shot-argmax-285296297-architectural-follow-on.md)** — evolve ward placement decision semantics beyond single-shot argmax (285+296+297 architectural follow-on) — _[ai-substrate] · added 2026-05-12_
 - **[302](docs/open-work/tickets/302-investigate-just-soak-vs-just-sweep-non-determinism-on-identical-seedbinary.md)** — investigate just soak vs just sweep non-determinism on identical seed/binary — _[process-discipline] · added 2026-05-12_
+- **[303](docs/open-work/tickets/303-split-cat-value-into-movement-intensity-and-residence-axes-298-structural-follow-on.md)** — split cat_value into movement-intensity and residence axes (298 structural follow-on) — _[balance] · added 2026-05-12_
 
 ## Parked (10)
 
@@ -185,13 +185,14 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (188)
+## Landed archive (189)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (123)
+### 2026-05 (124)
 
 - **[300](docs/open-work/landed/300-refine-ward-placement-candidate-generation-step-285296297-architectural-follow-on.md)** — refine ward placement candidate-generation step (285+296+297 architectural follow-on) _(2026-05-12)_
+- **[298](docs/open-work/landed/298-tune-ward-placement-cat-value-coefficient-285296297-architectural-follow-on.md)** — tune ward placement cat_value coefficient (285+296+297 architectural follow-on) _(2026-05-12)_
 - **[297](docs/open-work/landed/297-ward-placement-needs-fox-patrol-topology-perception-axis-285-follow-on.md)** — ward placement needs fox-patrol-topology perception axis (285 follow-on) _(2026-05-12)_
 - **[296](docs/open-work/landed/296-tune-ward-placement-logistic-curve-shape-285-follow-on.md)** — tune ward placement Logistic curve shape (285 follow-on) _(2026-05-12)_
 - **[285](docs/open-work/landed/285-tune-ward-anchor-weights-magnitude-iteration.md)** — tune ward anchor weights — magnitude iteration _(2026-05-12)_
