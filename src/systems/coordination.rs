@@ -1390,8 +1390,10 @@ impl<'a> PlacementMaps<'a> {
 ///   100-tile detour subtracts 0.5 from the score, so a fully-saturated
 ///   threat tile far away still beats a half-strength threat nearby
 ///   only by a meaningful margin.
-/// - `score = unaddressed_threat + 0.3 × cat_value − distance_cost`
-///   plus small jitter for tie-breaking.
+/// - `score = unaddressed_threat + W_cat × cat_value − distance_cost`
+///   plus small jitter for tie-breaking. `W_cat` is gated by
+///   `ward_placement_cat_value_weight` (ticket 298, default 0.3 —
+///   preserves byte-identical pre-298 behavior).
 ///
 /// Candidates are a coarse map-wide grid (every 5 tiles, bucket-aligned
 /// with the influence maps), with hard exclusion of tiles within
@@ -1484,6 +1486,11 @@ pub(crate) fn compute_ward_placement(
         .scoring
         .ward_fox_intercept_anchor_weight
         .clamp(0.0, 1.0);
+    // 298: cat_value tiebreak coefficient, promoted from hardcoded 0.3.
+    // Default preserves byte-identical pre-298 behavior. Not clamped —
+    // it's a scalar coefficient on a [0, 1] presence value, not a
+    // weight whose saturation needs disciplining.
+    let w_cat_value = constants.scoring.ward_placement_cat_value_weight;
     // 296: Logistic curve params, promoted from hardcoded (8.0, 0.5).
     // Defaults preserve byte-identical pre-296 behavior.
     let curve_k = constants.scoring.ward_placement_logistic_steepness;
@@ -1528,7 +1535,7 @@ pub(crate) fn compute_ward_placement(
         // the halo lights up tiles NEAR corruption sources (uncorrupted
         // neighbors), not corruption tiles themselves — exactly the
         // regions where `fox_scent.max(corruption)` is LOW but fox
-        // patrols traverse. Composes with `+ 0.3 * cat_value` to peak
+        // patrols traverse. Composes with `+ w_cat_value * cat_value` to peak
         // placement at the cats↔corruption boundary. Computed inline
         // from `TileMap.corruption` to avoid the populator-system
         // schedule-edge perturbation (ticket 061 precedent).
@@ -1554,7 +1561,7 @@ pub(crate) fn compute_ward_placement(
         // Small jitter ([0, 0.05)) breaks ties deterministically without
         // overwhelming the influence-map signal.
         let jitter = rng.random_range(0.0_f32..0.05);
-        let score = unaddressed_threat + 0.3 * cat_value - distance_cost + jitter;
+        let score = unaddressed_threat + w_cat_value * cat_value - distance_cost + jitter;
 
         if score > best_score {
             best_score = score;

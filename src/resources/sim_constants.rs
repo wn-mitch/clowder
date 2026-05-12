@@ -2056,6 +2056,24 @@ pub struct ScoringConstants {
     /// schedule-edge perturbation of seed-42 (ticket 061 precedent).
     #[serde(default = "default_fox_intercept_kernel_radius_tiles")]
     pub fox_intercept_kernel_radius_tiles: u32,
+    /// 298: weight on the `CatPresenceMap` lift to ward-placement's
+    /// argmax tiebreak among threat-saturated tiles. The `0.3` default
+    /// preserves ticket 045's first-light reasoning ("modest weight
+    /// keeps placement biased toward where cats actually live") and
+    /// the formula at `src/systems/coordination.rs:1557`:
+    ///
+    /// ```text
+    /// score = unaddressed_threat + W * cat_value - distance_cost + jitter
+    /// ```
+    ///
+    /// Tuning this weight is the first non-threat-axis lever after
+    /// 285/296/297 established that threat-axis inputs are
+    /// rank-preserving for the argmax once any threat-side input
+    /// saturates a sufficient number of tiles
+    /// (`docs/balance/297-fox-patrol-topology-axis.md` iter-2). See
+    /// `docs/balance/298-ward-placement-cat-value-coefficient.md`.
+    #[serde(default = "default_ward_placement_cat_value_weight")]
+    pub ward_placement_cat_value_weight: f32,
     /// 256 R5: deposit per tick when a cat's current action is
     /// `Action::Patrol`. Lays a deterrent gradient that foxes read as
     /// routing cost via `CatPatrolDeterrentOverlay`. Default `0.05`
@@ -2396,6 +2414,7 @@ impl Default for ScoringConstants {
             ward_placement_candidate_step: default_ward_placement_candidate_step(),
             ward_fox_intercept_anchor_weight: default_ward_fox_intercept_anchor_weight(),
             fox_intercept_kernel_radius_tiles: default_fox_intercept_kernel_radius_tiles(),
+            ward_placement_cat_value_weight: default_ward_placement_cat_value_weight(),
             cat_patrol_deterrent_deposit_per_tick:
                 default_cat_patrol_deterrent_deposit_per_tick(),
             cat_patrol_deterrent_decay_rate: default_cat_patrol_deterrent_decay_rate(),
@@ -3675,6 +3694,13 @@ fn default_ward_fox_intercept_anchor_weight() -> f32 {
 /// scan cost (~800 tile lookups per candidate) cheap.
 fn default_fox_intercept_kernel_radius_tiles() -> u32 {
     20
+}
+
+/// 298: weight on the `CatPresenceMap` lift to ward-placement's
+/// argmax tiebreak. Default `0.3` preserves ticket 045's first-light
+/// value (hardcoded as a literal until 298's promotion).
+fn default_ward_placement_cat_value_weight() -> f32 {
+    0.3
 }
 
 /// 228: Patrol `Consideration::Field` route-cost axis weight.
@@ -5902,6 +5928,10 @@ mod tests {
         // hardcoded `5` value. Changing this default is a balance change
         // (modifies `compute_ward_placement`'s search grid resolution).
         assert_eq!(defaults.scoring.ward_placement_candidate_step, 5);
+        // 298 promotion: cat_value tiebreak coefficient default preserves
+        // the pre-298 hardcoded `0.3` value. First non-threat-axis lever
+        // tested after 285/296/297 ruled out the threat-axis ones.
+        assert_eq!(defaults.scoring.ward_placement_cat_value_weight, 0.3);
     }
 
     #[test]
