@@ -170,7 +170,10 @@ jobs:
       - name: Runtime dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq libasound2 libudev1 zstd
+          # ubuntu-latest is noble (24.04): libasound2 was renamed to
+          # libasound2t64. Try the new name first, fall back to the old.
+          sudo apt-get install -y -qq libasound2t64 libudev1 zstd \
+            || sudo apt-get install -y -qq libasound2 libudev1 zstd
       - uses: actions/download-artifact@v4
         with:
           name: binary-${{ needs.preflight.outputs.label }}
@@ -226,7 +229,10 @@ jobs:
       - name: Runtime dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq libasound2 libudev1 zstd
+          # ubuntu-latest is noble (24.04): libasound2 was renamed to
+          # libasound2t64. Try the new name first, fall back to the old.
+          sudo apt-get install -y -qq libasound2t64 libudev1 zstd \
+            || sudo apt-get install -y -qq libasound2 libudev1 zstd
       - uses: actions/download-artifact@v4
         with:
           name: binary-${{ needs.preflight.outputs.label }}
@@ -277,7 +283,10 @@ jobs:
       - name: Runtime dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq libasound2 libudev1 zstd
+          # ubuntu-latest is noble (24.04): libasound2 was renamed to
+          # libasound2t64. Try the new name first, fall back to the old.
+          sudo apt-get install -y -qq libasound2t64 libudev1 zstd \
+            || sudo apt-get install -y -qq libasound2 libudev1 zstd
       - uses: actions/download-artifact@v4
         with:
           name: binary-${{ needs.preflight.outputs.label }}
@@ -323,7 +332,10 @@ jobs:
       - name: Runtime dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq libasound2 libudev1 zstd
+          # ubuntu-latest is noble (24.04): libasound2 was renamed to
+          # libasound2t64. Try the new name first, fall back to the old.
+          sudo apt-get install -y -qq libasound2t64 libudev1 zstd \
+            || sudo apt-get install -y -qq libasound2 libudev1 zstd
       - uses: actions/download-artifact@v4
         with:
           name: binary-${{ needs.preflight.outputs.label }}
