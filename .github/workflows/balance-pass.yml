@@ -1,0 +1,431 @@
+name: Balance Pass
+
+# Parallel soak campaign for a pre-alpha balance pass. See
+# docs/diagnostics/balance-pass.md for the design rationale (or, until
+# that doc exists, the plan file at
+# /Users/will.mitchell/.claude/plans/we-re-getting-close-to-twinkly-curry.md).
+#
+# This workflow is manual-trigger only. Storage during the campaign peaks
+# around 10GB (1-day retention on heavy artifacts); the cleanup job
+# purges intermediates as soon as the aggregate report is published.
+#
+# Trigger via the Actions UI or `gh workflow run`:
+#   gh workflow run balance-pass.yml -F confirm_storage=true \
+#     -F sweep_seeds=5 -F enable_trace=false -F enable_conditional=false \
+#     -F enable_long_soak=false              # smoke test
+#   gh workflow run balance-pass.yml -F confirm_storage=true   # full campaign
+
+on:
+  workflow_dispatch:
+    inputs:
+      label:
+        description: 'Campaign id (default: pre-alpha-YYYYMMDD)'
+        required: false
+        default: ''
+        type: string
+      sweep_seeds:
+        description: 'Sweep size (1-200 seeds)'
+        required: false
+        default: '100'
+        type: string
+      enable_trace:
+        description: 'Include focal-cat traces (5 seeds × 2 focals)'
+        required: false
+        default: true
+        type: boolean
+      enable_conditional:
+        description: 'Include conditional weather (5 seeds × 4 weathers)'
+        required: false
+        default: true
+        type: boolean
+      enable_long_soak:
+        description: 'Include long-duration runs (5 seeds × 2700s)'
+        required: false
+        default: true
+        type: boolean
+      vs_baseline:
+        description: 'Comparison baseline sweep dir (e.g. logs/sweep-baseline-5b). Empty = skip drift report.'
+        required: false
+        default: ''
+        type: string
+      confirm_storage:
+        description: 'I acknowledge ~10GB peak artifact storage during this campaign (auto-cleaned after aggregate)'
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: balance-pass-${{ github.event.inputs.label || 'auto' }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: read
+  actions: write  # needed by the cleanup job to delete artifacts
+
+jobs:
+  # ---------------------------------------------------------------------
+  # preflight: validate inputs, resolve label, generate seed lists
+  # ---------------------------------------------------------------------
+  preflight:
+    name: Preflight
+    runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.label.outputs.label }}
+      sweep_seeds: ${{ steps.seeds.outputs.sweep_seeds }}
+    steps:
+      - name: Guardrail — confirm_storage must be checked
+        if: ${{ inputs.confirm_storage != true }}
+        run: |
+          echo "::error::confirm_storage must be true to start a campaign."
+          echo "Re-run with the storage acknowledgement checked."
+          exit 1
+      - uses: actions/checkout@v4
+      - name: Resolve label
+        id: label
+        run: |
+          set -euo pipefail
+          if [ -n "${{ inputs.label }}" ]; then
+            label="${{ inputs.label }}"
+          else
+            label="pre-alpha-$(date -u +%Y%m%d)"
+          fi
+          # Sanitise: label is used in artifact names which forbid slashes etc.
+          if ! [[ "$label" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "::error::label must match [A-Za-z0-9._-]+, got '$label'"
+            exit 64
+          fi
+          echo "label=$label" >> "$GITHUB_OUTPUT"
+          echo "campaign label: $label" >&2
+      - name: Generate sweep seed list
+        id: seeds
+        run: |
+          set -euo pipefail
+          n="${{ inputs.sweep_seeds }}"
+          if ! [[ "$n" =~ ^[0-9]+$ ]] || [ "$n" -lt 1 ] || [ "$n" -gt 200 ]; then
+            echo "::error::sweep_seeds must be an integer in [1, 200], got '$n'"
+            exit 64
+          fi
+          seeds=$(python3 scripts/balance_pass_seed_list.py "$n")
+          echo "sweep_seeds=$seeds" >> "$GITHUB_OUTPUT"
+          echo "sweep seed count: $n" >&2
+
+  # ---------------------------------------------------------------------
+  # build: one Linux release binary that every soak job downloads
+  # ---------------------------------------------------------------------
+  build:
+    name: Build release binary
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: balance-pass
+      - name: System dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            libasound2-dev libudev-dev pkg-config \
+            libwayland-dev libxkbcommon-dev \
+            zstd
+      - name: cargo check
+        run: cargo check --all-targets
+      - name: cargo clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: cargo build --release
+        run: cargo build --release
+      - name: Verify binary
+        run: |
+          test -x target/release/clowder
+          target/release/clowder --help 2>&1 | head -20 || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ needs.preflight.outputs.label }}
+          path: target/release/clowder
+          retention-days: 1
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------
+  # sweep: matrix-parallel 900s soaks, one per seed
+  # ---------------------------------------------------------------------
+  sweep:
+    name: 'Sweep · seed ${{ matrix.seed }}'
+    needs: [preflight, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        seed: ${{ fromJson(needs.preflight.outputs.sweep_seeds) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Runtime dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libasound2 libudev1 zstd
+      - uses: actions/download-artifact@v4
+        with:
+          name: binary-${{ needs.preflight.outputs.label }}
+          path: bin
+      - name: Run 900s soak
+        run: |
+          set -euo pipefail
+          chmod +x bin/clowder
+          mkdir -p run
+          ./bin/clowder --headless --seed ${{ matrix.seed }} --duration 900 \
+            --log run/narrative.jsonl \
+            --event-log run/events.jsonl
+      - name: Extract footer + compress events
+        run: |
+          set -euo pipefail
+          python3 scripts/balance_pass_extract_footer.py run/events.jsonl run/footer.json
+          # zstd -19 keeps decompression cheap on the aggregator; -T0 uses all cores.
+          zstd -19 -T0 -q --rm run/events.jsonl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sweep-${{ needs.preflight.outputs.label }}-${{ matrix.seed }}
+          path: run/
+          retention-days: 1
+          if-no-files-found: error
+          compression-level: 0  # events.jsonl already zstd-compressed
+
+  # ---------------------------------------------------------------------
+  # trace: 5 seeds × 2 focal cats; produces L1/L2/L3 trace sidecars
+  # ---------------------------------------------------------------------
+  trace:
+    name: 'Trace · seed ${{ matrix.seed }} focal ${{ matrix.focal }}'
+    needs: [preflight, build]
+    if: ${{ inputs.enable_trace == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        include:
+          - { seed: 42, focal: Simba }
+          - { seed: 42, focal: Mocha }
+          - { seed: 99, focal: Simba }
+          - { seed: 99, focal: Mocha }
+          - { seed: 7, focal: Simba }
+          - { seed: 7, focal: Mocha }
+          - { seed: 2025, focal: Simba }
+          - { seed: 2025, focal: Mocha }
+          - { seed: 314, focal: Simba }
+          - { seed: 314, focal: Mocha }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Runtime dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libasound2 libudev1 zstd
+      - uses: actions/download-artifact@v4
+        with:
+          name: binary-${{ needs.preflight.outputs.label }}
+          path: bin
+      - name: Run 900s trace soak
+        run: |
+          set -euo pipefail
+          chmod +x bin/clowder
+          mkdir -p run
+          ./bin/clowder --headless --seed ${{ matrix.seed }} --duration 900 \
+            --focal-cat ${{ matrix.focal }} \
+            --log run/narrative.jsonl \
+            --event-log run/events.jsonl \
+            --trace-log run/trace-${{ matrix.focal }}.jsonl
+      - name: Extract footer + compress events + trace
+        run: |
+          set -euo pipefail
+          python3 scripts/balance_pass_extract_footer.py run/events.jsonl run/footer.json
+          zstd -19 -T0 -q --rm run/events.jsonl
+          if [ -f run/trace-${{ matrix.focal }}.jsonl ]; then
+            zstd -19 -T0 -q --rm run/trace-${{ matrix.focal }}.jsonl
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trace-${{ needs.preflight.outputs.label }}-${{ matrix.seed }}-${{ matrix.focal }}
+          path: run/
+          retention-days: 1
+          if-no-files-found: error
+          compression-level: 0
+
+  # ---------------------------------------------------------------------
+  # conditional: 5 seeds × 4 forced weather variants
+  # ---------------------------------------------------------------------
+  conditional:
+    name: 'Conditional · seed ${{ matrix.seed }} weather ${{ matrix.weather }}'
+    needs: [preflight, build]
+    if: ${{ inputs.enable_conditional == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        seed: [42, 99, 7, 2025, 314]
+        weather: [clear, fog, storm, heavy-rain]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Runtime dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libasound2 libudev1 zstd
+      - uses: actions/download-artifact@v4
+        with:
+          name: binary-${{ needs.preflight.outputs.label }}
+          path: bin
+      - name: Run 900s forced-weather soak
+        run: |
+          set -euo pipefail
+          chmod +x bin/clowder
+          mkdir -p run
+          ./bin/clowder --headless --seed ${{ matrix.seed }} --duration 900 \
+            --force-weather ${{ matrix.weather }} \
+            --log run/narrative.jsonl \
+            --event-log run/events.jsonl
+      - name: Extract footer + compress events
+        run: |
+          set -euo pipefail
+          python3 scripts/balance_pass_extract_footer.py run/events.jsonl run/footer.json
+          zstd -19 -T0 -q --rm run/events.jsonl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: conditional-${{ needs.preflight.outputs.label }}-${{ matrix.seed }}-${{ matrix.weather }}
+          path: run/
+          retention-days: 1
+          if-no-files-found: error
+          compression-level: 0
+
+  # ---------------------------------------------------------------------
+  # long-soak: 5 seeds × 2700s, surfaces late-game collapse modes
+  # ---------------------------------------------------------------------
+  long-soak:
+    name: 'Long soak · seed ${{ matrix.seed }} (2700s)'
+    needs: [preflight, build]
+    if: ${{ inputs.enable_long_soak == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        seed: [42, 99, 7, 2025, 314]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Runtime dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libasound2 libudev1 zstd
+      - uses: actions/download-artifact@v4
+        with:
+          name: binary-${{ needs.preflight.outputs.label }}
+          path: bin
+      - name: Run 2700s soak
+        run: |
+          set -euo pipefail
+          chmod +x bin/clowder
+          mkdir -p run
+          ./bin/clowder --headless --seed ${{ matrix.seed }} --duration 2700 \
+            --log run/narrative.jsonl \
+            --event-log run/events.jsonl
+      - name: Extract footer + compress events
+        run: |
+          set -euo pipefail
+          python3 scripts/balance_pass_extract_footer.py run/events.jsonl run/footer.json
+          zstd -19 -T0 -q --rm run/events.jsonl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: long-soak-${{ needs.preflight.outputs.label }}-${{ matrix.seed }}
+          path: run/
+          retention-days: 1
+          if-no-files-found: error
+          compression-level: 0
+
+  # ---------------------------------------------------------------------
+  # aggregate: download everything, generate REPORT.md + baseline pack
+  # ---------------------------------------------------------------------
+  aggregate:
+    name: Aggregate
+    needs: [preflight, sweep, trace, conditional, long-soak]
+    if: always() && needs.preflight.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      report_path: ${{ steps.bundle.outputs.path }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: System dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zstd python3 python3-pip
+          pip install --quiet --break-system-packages scipy
+      - name: Download all matrix artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: downloaded
+          pattern: '*-${{ needs.preflight.outputs.label }}-*'
+      - name: Show what we downloaded
+        run: |
+          ls -la downloaded/ 2>/dev/null || echo "no downloaded dir"
+          find downloaded -mindepth 1 -maxdepth 2 | head -50
+      - name: Aggregate
+        run: |
+          set -uo pipefail
+          extra=""
+          if [ -n "${{ inputs.vs_baseline }}" ]; then
+            extra="--vs ${{ inputs.vs_baseline }}"
+          fi
+          # `set +e` because the aggregator can produce partial reports
+          # even when some matrix cells failed; we still want the bundle.
+          bash scripts/balance_pass_aggregate.sh downloaded "${{ needs.preflight.outputs.label }}" $extra
+      - name: Bundle path
+        id: bundle
+        run: |
+          echo "path=logs/balance-pass-${{ needs.preflight.outputs.label }}" >> "$GITHUB_OUTPUT"
+      - name: Upload final report bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-${{ needs.preflight.outputs.label }}
+          path: logs/balance-pass-${{ needs.preflight.outputs.label }}/
+          retention-days: 90
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------
+  # cleanup: purge heavy intermediates so storage drops to ~10MB
+  # Runs `if: always()` so storage gets reclaimed even on aggregate failure.
+  # ---------------------------------------------------------------------
+  cleanup:
+    name: Cleanup intermediates
+    needs: [preflight, aggregate]
+    if: always() && needs.preflight.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Delete sweep/trace/conditional/long-soak/binary artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LABEL: ${{ needs.preflight.outputs.label }}
+          RUN_ID: ${{ github.run_id }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          echo "Listing artifacts for run $RUN_ID..."
+          artifacts=$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" --paginate \
+            --jq ".artifacts[] | select(.name | test(\"^(sweep|trace|conditional|long-soak|binary)-${LABEL}\")) | \"\(.id)\t\(.name)\"")
+          if [ -z "$artifacts" ]; then
+            echo "no intermediate artifacts to delete"
+            exit 0
+          fi
+          echo "$artifacts" | while IFS=$'\t' read -r id name; do
+            echo "  delete: $name (id=$id)"
+            gh api -X DELETE "repos/$REPO/actions/artifacts/$id" || echo "    failed (continuing)"
+          done
+          echo "cleanup done"
