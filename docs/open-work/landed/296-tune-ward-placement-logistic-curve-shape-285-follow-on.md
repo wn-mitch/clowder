@@ -9,7 +9,7 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [284-ward-anchor-tuning.md]
-landed-at: pending
+landed-at: aa2a14104d19
 landed-on: 2026-05-12
 ---
 
