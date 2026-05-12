@@ -192,9 +192,29 @@ fi
 # --- phase d: baseline_report.py REPORT.md --------------------------------
 
 echo "[aggregate] generating REPORT.md..." >&2
+
+# If --vs <baseline-sweep-dir> was supplied, look for a sibling REPORT.json
+# (produced by a prior balance-pass aggregator run that promoted that
+# sweep). If found, baseline_report.py can compute cross-run deltas such
+# as the §11 cascade-signature detector.
+VS_SIDECAR=""
+if [[ -n "$VS_BASELINE" ]]; then
+    for cand in "$VS_BASELINE/REPORT.json" "$VS_BASELINE/../REPORT.json" "$VS_BASELINE/../REPORT.md.json"; do
+        if [[ -s "$cand" ]]; then
+            VS_SIDECAR="$cand"
+            echo "[aggregate] found baseline sidecar: $VS_SIDECAR" >&2
+            break
+        fi
+    done
+fi
+
+VS_SIDECAR_ARG=()
+[[ -n "$VS_SIDECAR" ]] && VS_SIDECAR_ARG=(--vs-sidecar "$VS_SIDECAR")
+
 python3 "$REPO_ROOT/scripts/baseline_report.py" --baseline-dir "$OUT_BASE" \
     --output "$REPORT_DIR/REPORT.md" \
     --json-sidecar "$REPORT_DIR/REPORT.json" \
+    "${VS_SIDECAR_ARG[@]}" \
     2> "$REPORT_DIR/baseline_report.log" \
     || echo "[aggregate] WARN: baseline_report.py exited non-zero; partial REPORT.md may exist" >&2
 
@@ -270,6 +290,7 @@ pack = {
     # null when the underlying source isn't present (e.g. no trace
     # sidecars → per_dse_l2 is []).
     "per_dse_l2": report_sidecar.get("per_dse_l2") or [],
+    "cascade_signatures": report_sidecar.get("cascade_signatures") or {},
 }
 
 with out_path.open("w") as f:

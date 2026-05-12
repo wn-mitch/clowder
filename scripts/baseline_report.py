@@ -19,6 +19,8 @@ emits a structured markdown summary across the 10 plan sections:
   8. Commitment-gate firings (per branch, per disposition)
   9. Fog/storm deltas vs. seed-42 baseline rep
  10. Deferred-balance baselines (the four blocked metrics)
+ 11. Cascade signatures (181-iter-2 Patrol absorption detector; deltas
+     against a prior sidecar via `--vs-sidecar`)
 
 Designed to be tolerant: missing data emits a row note rather than crashing.
 This is by design — the orchestrator runs collect-everything and may
@@ -492,6 +494,118 @@ def section_needs(runs: list[RunSummary]) -> str:
     return "".join(out)
 
 
+def per_focal_meta(traces: list[TraceAggregate]) -> list[dict]:
+    """One row per focal trace: enough state for cross-run cascade-signature
+    comparison without re-reading the trace sidecars.
+
+    The cascade detector (181 iter-2 anti-regression) wants two scalars per
+    focal: (1) the fraction of L3-chosen ticks that picked the Guarding
+    disposition — proxy for "Patrol share" since Patrol is the dominant
+    Action in Guarding — and (2) the mean of the `patrol` DSE's L2
+    final_score. Both can be absent: marker-gated DSEs and dispositions
+    do not fire on every focal.
+    """
+    rows = []
+    for tr in traces:
+        total_l3 = sum(tr.chosen_counter.values())
+        guarding_picks = tr.chosen_counter.get("Guarding", 0)
+        patrol_scores = tr.dse_scores.get("patrol") or []
+        rows.append({
+            "seed": tr.seed,
+            "focal": tr.focal,
+            "total_l3_picks": total_l3,
+            "guarding_picks": guarding_picks,
+            "guarding_share_pct": (100.0 * guarding_picks / total_l3) if total_l3 else None,
+            "patrol_n_samples": len(patrol_scores),
+            "patrol_mean_l2": statistics.fmean(patrol_scores) if patrol_scores else None,
+        })
+    return rows
+
+
+def compute_cascade_signatures(traces: list[TraceAggregate],
+                               baseline_sidecar: dict | None) -> dict:
+    """Detect the 181-iter-2 Patrol absorption cascade against a baseline.
+
+    Signature shape (per-seed aggregate across all focals of that seed):
+      - share_delta_pp ≥ +0.5pp on Guarding-disposition picks AND
+      - mean_delta_pct ≤ −5% on `patrol` DSE L2 final_score
+    Per the 211-coordinate-food-security thread: share-pp climbing while
+    per-cat score falls is the softmax-mass-redistribution signature that
+    181 iter-2 cited as the predator-exposure cascade root cause.
+
+    Without a baseline sidecar, renders absolute values per seed and skips
+    the flag column.
+    """
+    current_per_focal = per_focal_meta(traces)
+    by_seed: dict[int, list[dict]] = {}
+    for row in current_per_focal:
+        by_seed.setdefault(row["seed"], []).append(row)
+
+    baseline_by_seed: dict[int, list[dict]] = {}
+    if baseline_sidecar:
+        for row in baseline_sidecar.get("per_focal_meta") or []:
+            baseline_by_seed.setdefault(row["seed"], []).append(row)
+
+    per_seed: list[dict] = []
+    flagged = 0
+    for seed in sorted(by_seed):
+        focals = by_seed[seed]
+        # Pooled share across all focals for this seed (totals-weighted).
+        total_l3 = sum(f["total_l3_picks"] for f in focals)
+        guarding_picks = sum(f["guarding_picks"] for f in focals)
+        guarding_share_pct = (100.0 * guarding_picks / total_l3) if total_l3 else None
+        # Patrol mean pooled across all samples (sample-weighted).
+        all_patrol = []
+        for f in focals:
+            if f["patrol_mean_l2"] is not None and f["patrol_n_samples"] > 0:
+                all_patrol.extend([f["patrol_mean_l2"]] * f["patrol_n_samples"])
+        patrol_mean_l2 = statistics.fmean(all_patrol) if all_patrol else None
+
+        # Baseline lookup.
+        base_focals = baseline_by_seed.get(seed) or []
+        base_total = sum(f.get("total_l3_picks", 0) for f in base_focals)
+        base_guarding = sum(f.get("guarding_picks", 0) for f in base_focals)
+        base_share = (100.0 * base_guarding / base_total) if base_total else None
+        base_patrol_samples = []
+        for f in base_focals:
+            if f.get("patrol_mean_l2") is not None and f.get("patrol_n_samples", 0) > 0:
+                base_patrol_samples.extend([f["patrol_mean_l2"]] * f["patrol_n_samples"])
+        base_patrol_mean = statistics.fmean(base_patrol_samples) if base_patrol_samples else None
+
+        share_delta_pp = None
+        if guarding_share_pct is not None and base_share is not None:
+            share_delta_pp = guarding_share_pct - base_share
+        mean_delta_pct = None
+        if patrol_mean_l2 is not None and base_patrol_mean not in (None, 0):
+            mean_delta_pct = 100.0 * (patrol_mean_l2 - base_patrol_mean) / base_patrol_mean
+        flag = (
+            share_delta_pp is not None and share_delta_pp >= 0.5
+            and mean_delta_pct is not None and mean_delta_pct <= -5.0
+        )
+        if flag:
+            flagged += 1
+        per_seed.append({
+            "seed": seed,
+            "n_focals": len(focals),
+            "guarding_share_pct": guarding_share_pct,
+            "patrol_mean_l2": patrol_mean_l2,
+            "baseline_guarding_share_pct": base_share,
+            "baseline_patrol_mean_l2": base_patrol_mean,
+            "share_delta_pp": share_delta_pp,
+            "mean_delta_pct": mean_delta_pct,
+            "flag": flag,
+        })
+
+    return {
+        "patrol_181": {
+            "per_seed": per_seed,
+            "flagged_seeds": flagged,
+            "total_seeds": len(per_seed),
+            "has_baseline": baseline_sidecar is not None,
+        }
+    }
+
+
 def cross_focal_dse_envelope(traces: list[TraceAggregate]) -> list[dict]:
     """Aggregate L2 final_score samples across every focal trace, per DSE.
 
@@ -649,6 +763,48 @@ def section_conditional_deltas(runs: list[RunSummary]) -> str:
     return "".join(out)
 
 
+def section_cascade_signatures(cascade: dict) -> str:
+    out = ["\n## 11. Cascade signatures\n"]
+    p181 = cascade.get("patrol_181") or {}
+    rows = p181.get("per_seed") or []
+    if not rows:
+        out.append("_No trace data — cascade detector requires focal traces._\n")
+        return "".join(out)
+    has_baseline = bool(p181.get("has_baseline"))
+    if has_baseline:
+        out.append(
+            "\n**181 iter-2 detector** — Patrol absorbs freed L3 bandwidth: "
+            "Guarding-disposition share ↑ while `patrol` DSE per-cat L2 ↓. "
+            "Flag fires when share Δ ≥ +0.5pp AND mean Δ ≤ −5%.\n\n"
+        )
+        out.append("| seed | focals | Guarding share | baseline | Δ pp | `patrol` mean | baseline | Δ % | flag |\n")
+        out.append("|---:|---:|---:|---:|---:|---:|---:|---:|:---:|\n")
+        for r in rows:
+            out.append(
+                f"| {r['seed']} | {r['n_focals']} | "
+                f"{fmt(r['guarding_share_pct'], 2)}% | {fmt(r['baseline_guarding_share_pct'], 2)}% | "
+                f"{fmt(r['share_delta_pp'], 2)} | "
+                f"{fmt(r['patrol_mean_l2'], 3)} | {fmt(r['baseline_patrol_mean_l2'], 3)} | "
+                f"{fmt(r['mean_delta_pct'], 1)}% | "
+                f"{'⚠️' if r['flag'] else '·'} |\n"
+            )
+        out.append(f"\n**Cross-seed:** {p181['flagged_seeds']}/{p181['total_seeds']} seeds tripped the flag.\n")
+    else:
+        out.append(
+            "\n_No baseline sidecar supplied — rendering absolute Guarding-share + `patrol` mean per seed. "
+            "Cascade flags fire only when `--vs-sidecar` is passed._\n\n"
+        )
+        out.append("| seed | focals | Guarding share | `patrol` mean L2 |\n")
+        out.append("|---:|---:|---:|---:|\n")
+        for r in rows:
+            out.append(
+                f"| {r['seed']} | {r['n_focals']} | "
+                f"{fmt(r['guarding_share_pct'], 2)}% | "
+                f"{fmt(r['patrol_mean_l2'], 3)} |\n"
+            )
+    return "".join(out)
+
+
 def section_deferred_balance(runs: list[RunSummary]) -> str:
     out = ["\n## 10. Deferred-balance baselines\n"]
     sweep_runs = [r for r in runs if r.kind == "sweep" and r.footer_written]
@@ -680,6 +836,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--json-sidecar", default=None,
                    help="Machine-readable sidecar path (default: <output>.json). "
                         "Consumed by balance_pass_aggregate.sh's baseline-pack composer.")
+    p.add_argument("--vs-sidecar", default=None,
+                   help="Path to a previously-generated REPORT.json (the sidecar). "
+                        "Enables cross-run delta computations such as the cascade-signature "
+                        "detector in §11. Missing or empty file is treated as no baseline.")
     return p.parse_args()
 
 
@@ -719,6 +879,21 @@ def main() -> int:
         except (ValueError, OSError):
             rosters_block = "\n_rosters.json present but unreadable._\n"
 
+    # Load the comparison sidecar once (used by §11 cascade signatures
+    # and any future cross-run delta sections).
+    baseline_sidecar: dict | None = None
+    if args.vs_sidecar:
+        vs_path = Path(args.vs_sidecar)
+        if vs_path.exists() and vs_path.stat().st_size > 0:
+            try:
+                baseline_sidecar = json.loads(vs_path.read_text())
+            except ValueError:
+                print(f"[report] WARN: --vs-sidecar {vs_path} is not valid JSON; ignored", file=sys.stderr)
+        else:
+            print(f"[report] note: --vs-sidecar {vs_path} missing or empty; rendering absolute values", file=sys.stderr)
+
+    cascade = compute_cascade_signatures(traces, baseline_sidecar)
+
     sections = [
         f"# Baseline dataset report — `{base.name}`\n",
         f"\nGenerated from {len(runs)} runs (sweep + trace + conditional). {len(traces)} focal traces.\n",
@@ -733,19 +908,22 @@ def main() -> int:
         section_commitment_gate(traces),
         section_conditional_deltas(runs),
         section_deferred_balance(runs),
+        section_cascade_signatures(cascade),
     ]
     out_path.write_text("".join(sections))
     print(f"[report] wrote {out_path}", file=sys.stderr)
 
     # JSON sidecar — machine-readable counterpart for the pack composer.
-    # Later commits in this PR add more keys (cascade_signatures,
-    # plan_failure_top10, death_timing, defense_cadence, …).
+    # Later commits in this PR add more keys (plan_failure_top10,
+    # death_timing, defense_cadence, …).
     sidecar_path = Path(args.json_sidecar) if args.json_sidecar else out_path.with_suffix(out_path.suffix + ".json")
     sidecar = {
         "label": base.name,
         "n_runs": len(runs),
         "n_focals": len(traces),
         "per_dse_l2": cross_focal_dse_envelope(traces),
+        "per_focal_meta": per_focal_meta(traces),
+        "cascade_signatures": cascade,
     }
     sidecar_path.write_text(json.dumps(sidecar, indent=2) + "\n")
     print(f"[report] wrote {sidecar_path}", file=sys.stderr)
