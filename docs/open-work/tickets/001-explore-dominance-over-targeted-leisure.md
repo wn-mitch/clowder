@@ -129,3 +129,16 @@ before it's scoped.
 - ✓ landed ** 65** (done, —, score 0.93) — §L2.10.7 SpatialConsideration roster sweep (cat self-state DSEs + fox dispositi…
 
 <!-- linkages:end -->
+
+## Log
+
+- 2026-05-11: Current canonical baseline `post-127-joint-intention`
+  (commit `4bcae2de`, seed 42) footer shows `play: 14` (Phase 0: 348;
+  Phase 1: 109). The 2026-04-24 four-fix landing (passive exploration
+  stamp, slower decay, decoupled perception radius, `still_goal` wired
+  to familiarity) did not restore play; either the dispersion loop is
+  not fully closed, or `PlayFired` (emitted from
+  `src/systems/personality_events.rs:320`, not a DSE) is gated by
+  something orthogonal to Explore scoring. Sub-2 verdict still pending.
+  Folded in via 034 closure (which was opened against the stale
+  Phase-0 vs Phase-1 framing).

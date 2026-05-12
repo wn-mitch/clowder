@@ -1,7 +1,7 @@
 ---
 id: 034
 title: Time-anchor continuity rebalance — restore play/grooming/mythic-texture under fixed prey-scent
-status: ready
+status: superseded
 cluster: null
 added: 2026-04-26
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [time-anchor.md]
 related-balance: [time-anchor-iteration-1.md]
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-11
 ---
 
 ## Why
@@ -85,3 +85,14 @@ or fork to `time-anchor-iteration-2.md`).
 ## Log
 
 - 2026-04-26: Ticket opened as a follow-on to 033 Phase 1.
+- 2026-05-11: Closed as superseded. The Phase-0 vs Phase-1 framing the
+  ticket reasons against has been overtaken by intervening landings:
+  040 (Cook-routing cascade fix), 154 (extract Mentoring from
+  Socializing), 158 (extract Grooming from Socializing), 256 (Patrol
+  DSE recalibration). Current canonical baseline
+  `post-127-joint-intention` (commit `4bcae2de`, seed 42) shows
+  `grooming: 896` (40× recovery, 20× Phase-0 overshoot) and
+  `mythic-texture: 35` (≈Phase 0). The remaining play question
+  (current: `play: 14`, worse than Phase 1's 109) is the live thesis
+  of ticket **001** sub-2 ("Explore dominance over targeted leisure")
+  — observation appended there instead of opening a parallel front.

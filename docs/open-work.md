@@ -15,10 +15,10 @@ _Last generated: 2026-05-11._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 89 |
+| Ready | 88 |
 | Parked | 10 |
 | Blocked | 26 |
-| **Open total** | **131** |
+| **Open total** | **130** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -44,7 +44,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[229](docs/open-work/tickets/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose — _[tooling] · added 2026-05-08_
 
-## Ready (89)
+## Ready (88)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _added 2026-04-20_
@@ -56,7 +56,6 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** — Crafting — items, recipes, stations — _added 2026-04-22_
 - **[020](docs/open-work/tickets/020-namedlandmark-substrate.md)** — NamedLandmark substrate (cross-consumer naming) — _added 2026-04-22_
 - **[023](docs/open-work/tickets/023-shadowfox-distinct-motivations.md)** — Shadowfox motivations distinct from normal foxes — _added 2026-04-14_
-- **[034](docs/open-work/tickets/034-time-anchor-continuity-rebalance.md)** — Time-anchor continuity rebalance — restore play/grooming/mythic-texture under fixed prey-scent — _added 2026-04-26_
 - **[039](docs/open-work/tickets/039-foodcooked-still-silent-post-036.md)** — FoodCooked still silent after 036 — Cook chain execution failure downstream of CraftingHint::Cook — _added 2026-04-26_
 - **[041](docs/open-work/tickets/041-founding-haul-balance-tuning.md)** — Founding wagon-dismantling haul — balance the early-game cost so cats don't starve while hauling — _added 2026-04-26_
 - **[050](docs/open-work/tickets/050-marker-predicate-refinements.md)** — §4 marker predicate refinements — species-attenuated threat, ward-near-fox truth, event-driven cubs/den — _added 2026-04-27_
@@ -183,11 +182,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (183)
+## Landed archive (184)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (118)
+### 2026-05 (119)
 
 - **[288](docs/open-work/landed/288-engagethreat-morale-break-must-release-the-guarding-commitment-so-wounded-cats-can-drop-to-flee.md)** — EngageThreat morale_break must release the Guarding commitment so wounded cats can drop to Flee _(2026-05-11)_
 - **[284](docs/open-work/landed/284-tune-ward-placement-ambush-carcass-anchor-weights.md)** — tune ward placement ambush + carcass anchor weights _(2026-05-11)_
@@ -199,6 +198,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[219](docs/open-work/landed/219-shared-recent-ambush-event-marker.md)** — shared recent-ambush event marker _(2026-05-11)_
 - **[203](docs/open-work/landed/203-criticalhealth-hunt-to-starvation-reproducer.md)** — CriticalHealth interrupt drives hunt-to-starvation plan churn — concrete reproducer for ticket 119 _(2026-05-11)_
 - **[127](docs/open-work/landed/127-joint-intention-substrate.md)** — Joint-intention substrate for two-cat practices _(2026-05-11)_
+- **[034](docs/open-work/landed/034-time-anchor-continuity-rebalance.md)** — Time-anchor continuity rebalance — restore play/grooming/mythic-texture under fixed prey-scent _(2026-05-11)_
 - **[272](docs/open-work/landed/272-matingoccurred-still-gated-by-has-eligible-mate-breeding-floor-and-gate-post-257-follow-on.md)** — MatingOccurred still gated by has_eligible_mate() breeding-floor AND-gate (post-257 follow-on) _(2026-05-10)_
 - **[257](docs/open-work/landed/257-mate-election-crowded-out-by-patrol-in-post-256-regime.md)** — Mate election crowded out by Patrol in post-256 regime _(2026-05-10)_
 - **[256](docs/open-work/landed/256-patrol-dse-recalibration-influence-map-driven-smart-pathing-wildlife-deterrent-affect-post-252-cascade-root-cause.md)** — Patrol DSE recalibration — influence-map-driven smart pathing + wildlife deterrent affect (post-252 cascade root cause) _(2026-05-10)_
