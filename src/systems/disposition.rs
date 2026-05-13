@@ -4412,6 +4412,17 @@ fn dispatch_chain_step(
                 }
             }
             if let Some((gestator, litter_size)) = outcome.witness {
+                // 295 — observable side-effect for the belief substrate;
+                // mirrors the goap.rs MateWith emit. See goap.rs:5290
+                // for the canonical witness-shape commentary.
+                narr.witnessable.write(
+                    crate::messages::witnessable_event::WitnessableEvent::Mate {
+                        actor: cat_entity,
+                        target: gestator,
+                        position: *pos,
+                        tick: time.tick,
+                    },
+                );
                 // §7.M.7.4: Pregnant lands on the gestation-capable
                 // partner, not the initiator. `partner` on the
                 // `Pregnant` struct is the other mate — so if the

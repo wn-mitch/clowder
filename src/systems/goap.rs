@@ -5288,6 +5288,20 @@ fn dispatch_step_action(
                 }
             }
             if let Some((gestator, litter_size)) = outcome.witness {
+                // 295 — observable side-effect for the belief substrate.
+                // `belief_integrator` updates witnesses' affiliation_history
+                // facet on the actor when they observe a successful mating.
+                // Emitted only when conception happened (witness is Some) —
+                // Tom×Tom encounters skip this and only fire the
+                // CourtshipInteraction Feature above.
+                narr.witnessable.write(
+                    crate::messages::witnessable_event::WitnessableEvent::Mate {
+                        actor: cat_entity,
+                        target: gestator,
+                        position: *pos,
+                        tick: ec.time.tick,
+                    },
+                );
                 // §7.M.7.4: Pregnant lands on the gestation-capable
                 // partner. `partner` on the Pregnant struct is the
                 // other mate — so if the initiator is the gestator,

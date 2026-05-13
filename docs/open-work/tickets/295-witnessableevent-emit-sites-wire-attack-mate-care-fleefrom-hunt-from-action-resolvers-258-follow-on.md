@@ -1,7 +1,7 @@
 ---
 id: 295
 title: WitnessableEvent emit sites — wire Attack / Mate / Care / FleeFrom / Hunt from action resolvers (258 follow-on)
-status: ready
+status: in-progress
 cluster: C
 added: 2026-05-11
 parked: null
