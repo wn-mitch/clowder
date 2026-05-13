@@ -4451,6 +4451,17 @@ fn dispatch_chain_step(
                 crate::steps::disposition::resolve_feed_kitten(ticks, target, needs, inventory);
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::KittenFed);
             if let Some(kitten_entity) = outcome.witness {
+                // 295 — observable side-effect for the belief substrate;
+                // mirrors the goap.rs FeedKitten emit. See goap.rs:5391
+                // for canonical commentary.
+                narr.witnessable.write(
+                    crate::messages::witnessable_event::WitnessableEvent::Care {
+                        caregiver: cat_entity,
+                        kitten: kitten_entity,
+                        position: *pos,
+                        tick: time.tick,
+                    },
+                );
                 accum.kitten_feedings.push(kitten_entity);
             }
             apply_step_result(outcome.result, chain, current);

@@ -5389,6 +5389,18 @@ fn dispatch_step_action(
             );
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::KittenFed);
             if let Some(kitten_entity) = outcome.witness {
+                // 295 — observable side-effect for the belief substrate.
+                // `belief_integrator` updates witnesses' affiliation_history
+                // facet on the caregiver when they observe a successful
+                // KittenFed step.
+                narr.witnessable.write(
+                    crate::messages::witnessable_event::WitnessableEvent::Care {
+                        caregiver: cat_entity,
+                        kitten: kitten_entity,
+                        position: *pos,
+                        tick: ec.time.tick,
+                    },
+                );
                 accum.kitten_feedings.push(kitten_entity);
             }
             outcome.result
