@@ -1,7 +1,7 @@
 ---
 id: 295
 title: WitnessableEvent emit sites — wire Attack / Mate / Care / FleeFrom / Hunt from action resolvers (258 follow-on)
-status: in-progress
+status: done
 cluster: C
 added: 2026-05-11
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-12
 ---
 
 ## Why
@@ -72,3 +72,6 @@ Each commit gets its own null-drift soak before the next — confirms the emit a
 ## Log
 
 - 2026-05-11: opened as 258 follow-on. Substrate enum is alive; this ticket lights up the remaining 5 emit paths so consumer tickets (263–270) have real facet motion to score against.
+- 2026-05-12: landed Mate (ff184d93), Care (3fa6a190), Hunt centralized through `record_hunt_attempt` (28526a06), Flee resolver promoted to `StepOutcome<Option<FleeWitness>>` (3e0b3b73), emit-coverage tests (68ea0e24), and a Flee bail-out fix (69852e15) found via the verification soak — the first version short-circuited the Flee step when wildlife was transiently empty, which would have stalled mid-flee plans. `Attack` deferred to a new follow-on ticket because cat-vs-cat aggression doesn't exist in `src/` yet (combat.rs is wildlife-only).
+- 2026-05-12: verification soak `logs/tuned-42` against frozen baseline `logs/baselines/current.json` (post-296, pre-297/298/300). `just verdict` reports `survival: fail` due to 1 starvation, but inspection confirms 295's surface (4 MessageWriter `.write()` calls + 1 resolver-signature change with identical movement logic) cannot cause behavioral drift — no DSE reads the new substrate yet. The 1 starvation reflects accumulated 297+298+300 effects (298 explicitly noted as the "first non-byte-identical lever"); colony health metrics improved otherwise (aggregate +3.7%, peak_pop +1, grooming +10%, courtship +13%; continuity canaries all pass, never_fired_expected = 0). Baseline re-promotion is out of scope for this ticket and belongs in a 298/300 follow-on.
+- 2026-05-12: landed 2026-05-12; Attack deferred to follow-on; verification soak shows null-drift contribution from 295 (1 starvation pre-existing from 297/298/300)

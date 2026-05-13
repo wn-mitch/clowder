@@ -14,11 +14,11 @@ _Last generated: 2026-05-12._
 
 | Status | Count |
 |---|---|
-| In progress | 7 |
+| In progress | 6 |
 | Ready | 90 |
 | Parked | 10 |
 | Blocked | 26 |
-| **Open total** | **133** |
+| **Open total** | **132** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -35,7 +35,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 | **[093](docs/open-work/landed/093-substrate-over-override-epic.md)** Substrate-over-override | done | 30 | 30 | 0 (0 / 0 / 0 / 0) | `▰▰▰▰▰▰▰▰▰▰` 100% |
 | **[095](docs/open-work/tickets/095-body-zones-epic.md)** Body zones | ready | 0 | — | — | _no roster_ |
 
-## In progress (7)
+## In progress (6)
 
 - **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _parked 2026-04-21 · added 2026-04-20_
 - **[025](docs/open-work/tickets/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains — _added 2026-04-24_
@@ -43,7 +43,6 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _added 2026-04-27_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[229](docs/open-work/tickets/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose — _[tooling] · added 2026-05-08_
-- **[295](docs/open-work/tickets/295-witnessableevent-emit-sites-wire-attack-mate-care-fleefrom-hunt-from-action-resolvers-258-follow-on.md)** — WitnessableEvent emit sites — wire Attack / Mate / Care / FleeFrom / Hunt from action resolvers (258 follow-on) — _[C] · added 2026-05-11_
 
 ## Ready (90)
 
@@ -185,16 +184,17 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (189)
+## Landed archive (190)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (124)
+### 2026-05 (125)
 
 - **[300](docs/open-work/landed/300-refine-ward-placement-candidate-generation-step-285296297-architectural-follow-on.md)** — refine ward placement candidate-generation step (285+296+297 architectural follow-on) _(2026-05-12)_
 - **[298](docs/open-work/landed/298-tune-ward-placement-cat-value-coefficient-285296297-architectural-follow-on.md)** — tune ward placement cat_value coefficient (285+296+297 architectural follow-on) _(2026-05-12)_
 - **[297](docs/open-work/landed/297-ward-placement-needs-fox-patrol-topology-perception-axis-285-follow-on.md)** — ward placement needs fox-patrol-topology perception axis (285 follow-on) _(2026-05-12)_
 - **[296](docs/open-work/landed/296-tune-ward-placement-logistic-curve-shape-285-follow-on.md)** — tune ward placement Logistic curve shape (285 follow-on) _(2026-05-12)_
+- **[295](docs/open-work/landed/295-witnessableevent-emit-sites-wire-attack-mate-care-fleefrom-hunt-from-action-resolvers-258-follow-on.md)** — WitnessableEvent emit sites — wire Attack / Mate / Care / FleeFrom / Hunt from action resolvers (258 follow-on) _(2026-05-12)_
 - **[285](docs/open-work/landed/285-tune-ward-anchor-weights-magnitude-iteration.md)** — tune ward anchor weights — magnitude iteration _(2026-05-12)_
 - **[288](docs/open-work/landed/288-engagethreat-morale-break-must-release-the-guarding-commitment-so-wounded-cats-can-drop-to-flee.md)** — EngageThreat morale_break must release the Guarding commitment so wounded cats can drop to Flee _(2026-05-11)_
 - **[284](docs/open-work/landed/284-tune-ward-placement-ambush-carcass-anchor-weights.md)** — tune ward placement ambush + carcass anchor weights _(2026-05-11)_

@@ -10,8 +10,11 @@
 
 Picks a small ranked list of ready tickets that are semantically
 adjacent to recent landings, current in-flight work, the
-substrate-refactor epic, or an ad-hoc seed. Reads the existing index
-at `logs/.embeddings/` — never rebuilds, never writes.
+substrate-refactor epic, or an ad-hoc seed. Reads the index at
+`logs/.embeddings/` and, by default, transparently refreshes it
+when stale (incremental rebuild via `scripts/similar/index.py`,
+typically <3s). Pass `--no-auto-rebuild` to preserve strict
+read-only behavior and fall back to a stderr stale-warning.
 
 Five modes:
 
@@ -31,6 +34,7 @@ of the query vector are excluded from the candidate set, so e.g.
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -98,7 +102,16 @@ def main() -> int:
 
     paths_now = discover_corpus_files(REPO_ROOT)
     stale = stale_files(REPO_ROOT, idx, paths_now)
+    if stale and not args.no_auto_rebuild:
+        if _try_rebuild_index(REPO_ROOT, len(stale)):
+            idx = load_index(REPO_ROOT)
+            paths_now = discover_corpus_files(REPO_ROOT)
+            stale = stale_files(REPO_ROOT, idx, paths_now)
     if stale:
+        # Either auto-rebuild was disabled, or the rebuild ran but
+        # didn't clear every stale entry (e.g. a corpus file was
+        # touched mid-flight). Surface the residual count so callers
+        # know rankings may be slightly behind disk.
         print(
             f"WARN: index stale ({len(stale)} files changed) — "
             f"run `just similar-build` to refresh",
@@ -221,7 +234,51 @@ def _parse_args() -> argparse.Namespace:
         "--text", action="store_true",
         help="Emit text envelope instead of JSON.",
     )
+    parser.add_argument(
+        "--no-auto-rebuild", action="store_true",
+        help=("Skip the auto-rebuild that fires when the index is stale; "
+              "emit the stale WARN and proceed with current index."),
+    )
     return parser.parse_args()
+
+
+# ── auto-rebuild ────────────────────────────────────────────────────────────
+
+def _try_rebuild_index(repo_root: Path, n_stale: int) -> bool:
+    """Spawn `scripts/similar/index.py` to refresh the embedding index.
+
+    The child runs incrementally (mtime-keyed), so the common case is
+    a handful of files re-embedded in a couple of seconds. Stdout from
+    the child is redirected to stderr so the parent's JSON envelope on
+    stdout stays clean; the child's own stderr passes through.
+
+    Returns True on success; False if the rebuild fails for any
+    reason — caller then falls back to the stale-WARN path so the
+    recommender still produces a result on the still-valid (but
+    behind-disk) index.
+    """
+    print(
+        f"index stale ({n_stale} files changed) — rebuilding incrementally...",
+        file=sys.stderr,
+    )
+    index_script = Path(__file__).resolve().parent / "index.py"
+    try:
+        # `sys.executable` reuses the active interpreter so we don't
+        # pay `uv run`'s startup tax twice; PEP 723 deps declared on
+        # both scripts are already provisioned in this process's env.
+        subprocess.run(
+            [sys.executable, str(index_script)],
+            check=True, stdout=sys.stderr, stderr=sys.stderr,
+            cwd=repo_root,
+        )
+        return True
+    except (subprocess.CalledProcessError, OSError) as e:
+        print(
+            f"WARN: auto-rebuild failed ({e}); proceeding with stale index. "
+            f"Run `just similar-build` manually to investigate.",
+            file=sys.stderr,
+        )
+        return False
 
 
 # ── ticket views ────────────────────────────────────────────────────────────

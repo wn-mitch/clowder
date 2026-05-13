@@ -5,7 +5,7 @@ description: Embedding-based ready-ticket recommender (`just next`) — top-K un
 
 # `just next` — embedding-based ticket recommender
 
-`just next` returns a top-K of **ready, unblocked tickets** ranked against a configurable query vector composed from the existing `logs/.embeddings/` index. Read-only — never rebuilds, never writes. Designed to answer "what's the natural next thing to pick up given everything I've been doing" without re-doing a categorical browse of the index.
+`just next` returns a top-K of **ready, unblocked tickets** ranked against a configurable query vector composed from the `logs/.embeddings/` index. The index auto-refreshes when stale (incremental rebuild via `scripts/similar/index.py`, typically <3s); pass `--no-auto-rebuild` for strict read-only behavior with a stderr stale-warning instead. Designed to answer "what's the natural next thing to pick up given everything I've been doing" without re-doing a categorical browse of the index.
 
 ```bash
 just next                              # blend (momentum + wip + substrate)
@@ -140,11 +140,16 @@ just next --w-momentum 0.2 --w-substrate 0.5
 
 # Include status: blocked candidates (default: ready only).
 just next --include-blocked
+
+# Strict read-only — skip the auto-rebuild and warn on stale index.
+just next --no-auto-rebuild
 ```
 
 ## Index lifecycle
 
-`just next` reads the same `logs/.embeddings/` index that `just similar` and `just similar-linkages` use. It does not rebuild or refresh — if the index is stale, it prints `WARN: index stale (N files changed) — run 'just similar-build' to refresh` to stderr and proceeds. Run `just similar-build` after landings or large ticket edits if the staleness affects ranking quality.
+`just next` reads the same `logs/.embeddings/` index that `just similar` and `just similar-linkages` use. By default, if the index is stale, it spawns `scripts/similar/index.py` to refresh it before ranking (incremental, mtime-keyed; child stdout is routed to stderr so the JSON envelope stays clean) and re-loads. The auto-rebuild's progress prints `index stale (N files changed) — rebuilding incrementally...` plus the child's own progress lines to stderr. If the rebuild fails (subprocess error, missing dep), the recommender falls back to the stale-WARN path and ranks against the still-valid index rather than aborting.
+
+Pass `--no-auto-rebuild` to skip the rebuild and reproduce the older read-only behavior: stale-WARN to stderr, then proceed against the existing index. Useful for callers that want strict determinism or want to defer rebuild cost to a later `just similar-build` invocation.
 
 ## Caveats
 

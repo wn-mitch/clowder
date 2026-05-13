@@ -130,8 +130,10 @@ similar-link-report *ARGS:
 
 # Embedding-based ready-ticket recommender. Surfaces a top-K of
 # unblocked tickets adjacent to recent landings, current in-flight
-# work, the AI-substrate refactor, or an ad-hoc seed. Read-only over
-# the existing `logs/.embeddings/` index. See `.claude/skills/next/SKILL.md`.
+# work, the AI-substrate refactor, or an ad-hoc seed. Reads
+# `logs/.embeddings/` and auto-rebuilds the index when stale (cheap
+# incremental refresh); pass `--no-auto-rebuild` to preserve strict
+# read-only behavior. See `.claude/skills/next/SKILL.md`.
 #   just next                                  # blend (momentum + wip + substrate)
 #   just next --mode momentum                  # last-N landed centroid only
 #   just next --mode wip                       # in-progress cohesion only
@@ -139,6 +141,7 @@ similar-link-report *ARGS:
 #   just next --mode seed --seed 256           # ticket-id seed
 #   just next --mode seed --seed "starvation"  # free-text seed
 #   just next --top 10 --text                  # widen + render text envelope
+#   just next --no-auto-rebuild                # skip stale-index auto-rebuild
 next *ARGS:
     @uv run scripts/similar/next.py {{ARGS}}
 
