@@ -10,7 +10,7 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: [301-ward-placement-decision-semantics.md]
-landed-at: pending
+landed-at: a04b27e44047
 landed-on: 2026-05-13
 ---
 
