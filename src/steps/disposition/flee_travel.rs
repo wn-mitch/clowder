@@ -50,13 +50,16 @@ pub struct FleeWitness {
 /// progress and surfaces it as a plan failure.
 ///
 /// **Witness** — `StepOutcome<Option<FleeWitness>>`. `Some` when the
-/// cat reached the flee target this tick (the same condition that
-/// returns `StepResult::Advance`); `None` while still walking. The
-/// witness carries the `threat` Entity passed by the caller —
-/// `belief_integrator` reads this to update the witness's
-/// `MentalModel<Cat>.predictability` (on the fleer) and
-/// `MentalModel<Predator>.perceived_violence_capability` (on the
-/// threat).
+/// cat reached the flee target this tick AND the caller passed a
+/// `Some(threat)` to attribute the flee to. `None` while still walking
+/// OR if no threat entity was available at the caller (e.g. wildlife
+/// transiently empty mid-flee — the cat still completes the step, but
+/// there is no observably-correct threat to record for the belief
+/// substrate, so the emit is skipped). The witness carries the
+/// `threat` Entity passed by the caller — `belief_integrator` reads
+/// this to update the witness's `MentalModel<Cat>.predictability`
+/// (on the fleer) and `MentalModel<Predator>.perceived_violence_capability`
+/// (on the threat).
 ///
 /// **Feature emission** — none directly. The umbrella's contribution
 /// to the Fleeing chain's activation surface is still mediated by the
@@ -67,26 +70,36 @@ pub struct FleeWitness {
 pub fn resolve_flee_travel(
     pos: &mut Position,
     target: Position,
-    threat: Entity,
+    threat: Option<Entity>,
     path_plan: &CatPathPlan<'_>,
     map: &TileMap,
 ) -> StepOutcome<Option<FleeWitness>> {
-    if *pos == target {
-        return StepOutcome::witnessed_with(StepResult::Advance, FleeWitness { threat });
-    }
-    if pos.manhattan_distance(&target) <= 1 {
+    let reached = if *pos == target {
+        true
+    } else if pos.manhattan_distance(&target) <= 1 {
         *pos = target;
-        return StepOutcome::witnessed_with(StepResult::Advance, FleeWitness { threat });
-    }
-    if let Some(next) = path_plan.next_step(*pos, target, map) {
-        *pos = next;
-    }
-    if *pos == target || pos.manhattan_distance(&target) <= 1 {
-        StepOutcome::witnessed_with(StepResult::Advance, FleeWitness { threat })
+        true
     } else {
-        StepOutcome {
+        if let Some(next) = path_plan.next_step(*pos, target, map) {
+            *pos = next;
+        }
+        *pos == target || pos.manhattan_distance(&target) <= 1
+    };
+    if !reached {
+        return StepOutcome {
             result: StepResult::Continue,
             witness: None,
-        }
+        };
+    }
+    // Reached this tick. Carry a witness only if the caller named a
+    // threat — without one there is no FleeFrom event to emit, and the
+    // belief integrator has nothing to attribute the predictability /
+    // violence_capability updates to.
+    match threat {
+        Some(t) => StepOutcome::witnessed_with(StepResult::Advance, FleeWitness { threat: t }),
+        None => StepOutcome {
+            result: StepResult::Advance,
+            witness: None,
+        },
     }
 }

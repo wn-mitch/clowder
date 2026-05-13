@@ -6337,17 +6337,16 @@ fn dispatch_step_action(
             // differ between Pick and Flee ticks if a closer predator
             // approached — the witness records what the cat is *currently*
             // fleeing from, which is the observably-correct threat for
-            // any onlooker. When no wildlife exists at all, skip the
-            // resolver and stall (Continue) — there is no flee semantics
-            // without a threat.
+            // any onlooker. When wildlife is transiently empty, the cat
+            // still walks toward its picked flee target (the resolver
+            // doesn't gate on `threat` for movement); the FleeFrom emit
+            // is simply skipped for that tick since there's no threat
+            // entity to attribute the witness to.
             let threat = ec
                 .wildlife
                 .iter()
                 .min_by_key(|(_, tp)| pos.manhattan_distance(tp))
                 .map(|(e, _)| e);
-            let Some(threat) = threat else {
-                return crate::steps::StepResult::Continue;
-            };
             let outcome = crate::steps::disposition::resolve_flee_travel(
                 pos,
                 target_for_plan,
@@ -6360,8 +6359,9 @@ fn dispatch_step_action(
                 // `belief_integrator` reads FleeFrom to update predictability
                 // on the fleer (this cat) and perceived_violence_capability
                 // on the threat. Fires on the Advance branch (cat reached
-                // flee target); a still-walking Continue is not yet a
-                // completed flee episode.
+                // flee target) AND when a threat was nameable; a
+                // still-walking Continue or a threat-less Advance produces
+                // no witness.
                 narr.witnessable.write(
                     crate::messages::witnessable_event::WitnessableEvent::FleeFrom {
                         fleer: cat_entity,
