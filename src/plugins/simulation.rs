@@ -396,6 +396,14 @@ impl Plugin for SimulationPlugin {
                 (
                     systems::items::prune_stored_items,
                     systems::items::sync_food_stores,
+                    // 308 — ground-truth colony reserves aggregator
+                    // (thornbriar / remedy-herb counts across cat
+                    // inventories + Stores buildings). Sibling to
+                    // sync_food_stores; runs each tick so downstream
+                    // observability and balance canaries can compare
+                    // ground truth against per-cat
+                    // ColonyReservesBelief.
+                    systems::items::sync_colony_reserves,
                     systems::prey::update_den_pressure,
                     systems::prey::apply_den_raids,
                     systems::prey::orphan_prey_adopt_or_found,
@@ -562,12 +570,25 @@ impl Plugin for SimulationPlugin {
                         systems::mood::mood_contagion,
                         systems::mood::bond_proximity_mood,
                         systems::memory::decay_memories,
+                        // 308 — broadcast each cat's inventory snapshot
+                        // on its stagger tick. Writes
+                        // `WitnessableEvent::InventoryObserved` so
+                        // `integrate_beliefs` Pass A can consume the
+                        // event in the same tick (writer → reader
+                        // within-tick is valid when writer is chained
+                        // before reader).
+                        systems::belief_integrator::gossip_inventory_observations,
                         // 258 — C3 belief substrate integrator. Pass A
                         // consumes WitnessableEvent messages → EMA updates
                         // on per-cat mental models; pass B implants species
                         // priors for nearby predators and decays facets
                         // toward priors on each cat's stagger tick.
                         systems::belief_integrator::integrate_beliefs,
+                        // 308 — author per-cat `HasLowWardReserve` from
+                        // the just-updated `ColonyReservesBelief`. Runs
+                        // after `integrate_beliefs` so the marker
+                        // reflects same-tick belief state.
+                        systems::items::update_low_ward_reserve_markers,
                         systems::coordination::evaluate_coordinators,
                         systems::coordination::assess_colony_needs,
                         systems::coordination::dispatch_urgent_directives,

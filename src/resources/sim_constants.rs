@@ -6085,6 +6085,21 @@ pub struct BeliefsConstants {
     /// 19 ticks of decay at `decay_rate_to_prior ≈ 0.001` is ~2% error,
     /// well under observation threshold.
     pub decay_stagger_period: u64,
+    /// 308: `HasLowWardReserve` marker fires when the cat's belief estimate
+    /// of colony thornbriar count is `<= threshold`. Default `2` — gives a
+    /// few ticks of anticipatory lead before SetWard would fail outright.
+    pub low_ward_reserve_threshold: u32,
+    /// 308: `strength` bump applied to a `ReserveBelief` on each observation
+    /// (`ReserveDeposited` / `ReserveConsumed` / `InventoryObserved`).
+    /// Clamped to 1.0. Mirrors `BeliefAxisTunables::strength_per_observation`
+    /// shape; tuned faster than slow-belief axes because reserve state
+    /// changes on a per-action cadence.
+    pub reserve_strength_per_observation: f32,
+    /// 308: per-stagger strength drain on `ReserveBelief` entries. When
+    /// strength falls to `<= EPSILON`, the entry is dropped from the
+    /// cat's `ColonyReservesBelief.reserves` map. Mirrors
+    /// `BeliefAxisTunables::strength_decay_per_tick × period`.
+    pub reserve_decay_per_stagger: f32,
 }
 
 impl Default for BeliefsConstants {
@@ -6098,6 +6113,9 @@ impl Default for BeliefsConstants {
             predictability: BeliefAxisTunables::slow(),
             species_violence_priors: SpeciesViolencePriors::default(),
             decay_stagger_period: 20,
+            low_ward_reserve_threshold: 2,
+            reserve_strength_per_observation: 0.3,
+            reserve_decay_per_stagger: 0.05,
         }
     }
 }

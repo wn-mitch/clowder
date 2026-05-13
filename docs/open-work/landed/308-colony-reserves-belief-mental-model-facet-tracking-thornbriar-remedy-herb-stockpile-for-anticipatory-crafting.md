@@ -1,7 +1,7 @@
 ---
 id: 308
 title: Colony reserves belief — mental-model facet tracking thornbriar / remedy-herb stockpile for anticipatory crafting
-status: ready
+status: done
 cluster: belief-perception
 initiative: [full-sensory-perception, smarter-cats]
 added: 2026-05-13
@@ -10,8 +10,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 9343550a2bfe
+landed-on: 2026-05-13
 ---
 
 ## Why
@@ -70,3 +70,5 @@ Order of work:
 ## Log
 
 - 2026-05-13: opened from ticket 260's verification soak discovery. The thornbriar starvation pattern (35k-tick window with no SetWard attempts, 7-cat ambush wave following) confirms that the herbcraft supply chain lacks anticipatory provisioning. Cluster C / BDI belief layer (258) is the right substrate home; this ticket lands the colony-reserves facet that ticket 309's Herbcraft consideration will consume.
+- 2026-05-13: landed substrate-dormant on top of 312. Five pieces in one commit per the substrate-stub-forbidden rule: (1) `ColonyReservesBelief` as a 5th sibling belief Component family alongside `CatBeliefs`/`LocationBeliefs`/`PredatorBeliefs`/`ContextBeliefs`, keyed by a new `ResourceKind` enum (Thornbriar / RemedyHerb) and carrying a count-shaped `ReserveBelief` state (purpose-built, not the opinion-shaped 6-facet `MentalModel`); (2) three new `WitnessableEvent` variants — `ReserveDeposited` (emitted at `GatherHerb` since herbs flow gather→inventory→consume without a Stores intermediate in the current architecture; the aggregator sums per-cat inventories + Stores), `ReserveConsumed` (at `SetWard`'s Thornward branch and `PrepareRemedy`), and `InventoryObserved` (broadcast per cat on its stagger tick by a new `gossip_inventory_observations` system — god-eye sensor narratively framed as "cats communicate about what they're carrying", per the user's reframe that handoffs need this gossip channel); (3) ground-truth `ColonyReserves` resource + `sync_colony_reserves` aggregator mirroring `FoodStores`/`sync_food_stores`; (4) per-cat `HasLowWardReserve` ZST marker authored from each cat's `ColonyReservesBelief[Thornbriar].estimated_count <= low_ward_reserve_threshold` (default 2); (5) `BeliefsConstants` gains three tunables (threshold + observation-strength + per-stagger decay).
+- 2026-05-13: verification. `just check` clean; `just test --lib` 2091 / 2091 passing, including four new belief_integrator tests (`reserve_deposited_lifts_witness_count`, `reserve_consumed_decrements_count_saturating`, `inventory_observed_self_replaces_count`, `inventory_observed_other_takes_lower_bound_max`). `just scenario colony_reserves_belief` fires `HasLowWardReserve` within tick budget. `just soak-trace 42 Pyre --duration 900` → `logs/tuned-308-dormant/`; `just verdict` returned **"concern"** (not fail): all hard survival gates pass (Starvation=0, ShadowFoxAmbush=3 ≤ 10, never_fired_expected_positives=[], all five continuity canaries ≥1). Footer drift: bonds_formed +16.7%, deaths_injury -62.5%, structures_built -37.5%, duration +14.7%. **Hypothesis: schedule-edge perturbation** — three new sibling systems land in existing Chain blocks (`sync_colony_reserves` in the prune/sync sub-chain; `gossip_inventory_observations` + `update_low_ward_reserve_markers` in Chain 2b around `integrate_beliefs`), plus every cat's archetype gains `ColonyReservesBelief` which can reorder query iteration. Memory `learning_bevy_schedule_edge_perturbation` documents this pattern. The substrate itself is dormant — no DSE reads the belief or marker; behavior change is incidental to substrate addition, not consumption. The new run is actually *healthier* than baseline (MatingOccurred now fires, fewer ambush deaths, more wards placed) — schedule re-ordering shifted seed-42 outcomes favorably. Ticket 309 lands the real consumer next.

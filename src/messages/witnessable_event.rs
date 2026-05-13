@@ -11,6 +11,7 @@
 use bevy_ecs::prelude::*;
 
 use crate::components::disposition::DispositionKind;
+use crate::components::magic::ResourceKind;
 use crate::components::physical::Position;
 use crate::components::prey::PreyKind;
 
@@ -111,6 +112,44 @@ pub enum WitnessableEvent {
         cat: Entity,
         disposition: DispositionKind,
         position: Position,
+        tick: u64,
+    },
+    /// A cat dropped a reserve-kind herb (thornbriar / remedy-herb) into a
+    /// Stores building. Updates witnesses' `ColonyReservesBelief` for the
+    /// matching `ResourceKind` — the depositor's contribution is authoritative
+    /// (self-witness); nearby cats integrate it as additive evidence.
+    ///
+    /// Ticket 308.
+    ReserveDeposited {
+        actor: Entity,
+        kind: ResourceKind,
+        position: Position,
+        tick: u64,
+    },
+    /// A cat consumed a reserve-kind herb during a magic resolver
+    /// (`resolve_set_ward` Thornward branch, `resolve_prepare_remedy`).
+    /// Updates witnesses' `ColonyReservesBelief` — symmetric decrement to
+    /// `ReserveDeposited`.
+    ///
+    /// Ticket 308.
+    ReserveConsumed {
+        actor: Entity,
+        kind: ResourceKind,
+        position: Position,
+        tick: u64,
+    },
+    /// A per-cat "what I'm currently carrying" snapshot, broadcast on each
+    /// cat's stagger tick by `gossip_inventory_observations`. Narrative
+    /// framing: cats communicate about what they hold. Implementation:
+    /// god-eye sensor — every witness within range adopts the actor's
+    /// declared inventory as additive lower-bound evidence about the
+    /// colony pool. The actor's self-update is authoritative.
+    ///
+    /// Ticket 308.
+    InventoryObserved {
+        actor: Entity,
+        position: Position,
+        inventory: Vec<(ResourceKind, u32)>,
         tick: u64,
     },
 }

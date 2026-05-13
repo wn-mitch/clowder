@@ -5453,6 +5453,13 @@ fn dispatch_step_action(
                     .min_by_key(|(_, hp, _)| pos.manhattan_distance(hp))
                     .map(|(e, _, _)| *e);
             }
+            // 308: capture the target herb kind BEFORE the resolver runs —
+            // the resolver despawns the herb on Advance, so the kind lookup
+            // has to happen first. Used to classify the ReserveDeposited
+            // emit by ResourceKind on success.
+            let gathered_kind = plan.step_state[step_idx].target_entity.and_then(|e| {
+                magic_params.herb_query.get(e).ok().map(|(_, h, _)| h.kind)
+            });
             let result = crate::steps::magic::resolve_gather_herb(
                 ticks,
                 plan.step_state[step_idx].target_entity,
@@ -5466,6 +5473,20 @@ fn dispatch_step_action(
             if matches!(result, crate::steps::StepResult::Advance) {
                 if let Some(ref mut act) = narr.activation {
                     act.record(Feature::GatherHerbCompleted);
+                }
+                if let Some(kind) = gathered_kind {
+                    if let Some(resource) =
+                        crate::components::magic::ResourceKind::from_herb_kind(kind)
+                    {
+                        narr.witnessable.write(
+                            crate::messages::witnessable_event::WitnessableEvent::ReserveDeposited {
+                                actor: cat_entity,
+                                kind: resource,
+                                position: *pos,
+                                tick: ec.time.tick,
+                            },
+                        );
+                    }
                 }
             }
             result
@@ -5526,6 +5547,18 @@ fn dispatch_step_action(
                         if let Some(ref mut act) = narr.activation {
                             act.record(Feature::WardPlaced);
                         }
+                        // 308: emit ReserveConsumed only for thornward —
+                        // DurableWard doesn't consume thornbriar.
+                        if ward_kind == crate::components::magic::WardKind::Thornward {
+                            narr.witnessable.write(
+                                crate::messages::witnessable_event::WitnessableEvent::ReserveConsumed {
+                                    actor: cat_entity,
+                                    kind: crate::components::magic::ResourceKind::Thornbriar,
+                                    position: ward_target,
+                                    tick: ec.time.tick,
+                                },
+                            );
+                        }
                         // Mastery iter 2 + purpose new-thread: SetWard
                         // is a high-cadence skilled colony-positive
                         // action. STUB — see ticket 016 Phase 5.
@@ -5572,6 +5605,16 @@ fn dispatch_step_action(
                     if let Some(ref mut act) = narr.activation {
                         act.record(Feature::WardPlaced);
                     }
+                    if ward_kind == crate::components::magic::WardKind::Thornward {
+                        narr.witnessable.write(
+                            crate::messages::witnessable_event::WitnessableEvent::ReserveConsumed {
+                                actor: cat_entity,
+                                kind: crate::components::magic::ResourceKind::Thornbriar,
+                                position: *pos,
+                                tick: ec.time.tick,
+                            },
+                        );
+                    }
                     let d = &ec.constants.disposition;
                     needs.mastery = (needs.mastery + d.mastery_per_magic_success).min(1.0);
                     needs.purpose = (needs.purpose + d.purpose_per_ward_set).min(1.0);
@@ -5587,7 +5630,7 @@ fn dispatch_step_action(
             let at_workshop = snaps.building_snapshot.iter().any(|(_, kind, p, _, _)| {
                 *kind == StructureType::Stores && pos.manhattan_distance(p) <= 1
             });
-            crate::steps::magic::resolve_prepare_remedy(
+            let result = crate::steps::magic::resolve_prepare_remedy(
                 ticks,
                 remedy,
                 at_workshop,
@@ -5595,7 +5638,18 @@ fn dispatch_step_action(
                 skills,
                 &ec.constants.magic,
                 &ec.time_scale,
-            )
+            );
+            if matches!(result, crate::steps::StepResult::Advance) {
+                narr.witnessable.write(
+                    crate::messages::witnessable_event::WitnessableEvent::ReserveConsumed {
+                        actor: cat_entity,
+                        kind: crate::components::magic::ResourceKind::RemedyHerb,
+                        position: *pos,
+                        tick: ec.time.tick,
+                    },
+                );
+            }
+            result
         }
 
         GoapActionKind::ApplyRemedy => {

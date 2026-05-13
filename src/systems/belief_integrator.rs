@@ -22,9 +22,10 @@
 use bevy_ecs::prelude::*;
 
 use crate::components::beliefs::{
-    bucket_position, CatBeliefs, ContextBeliefs, EnvironmentalContextKey, EvidenceKind, Facet,
-    LocationBeliefs, MentalModel, PredatorBeliefs,
+    bucket_position, CatBeliefs, ColonyReservesBelief, ContextBeliefs, EnvironmentalContextKey,
+    EvidenceKind, Facet, LocationBeliefs, MentalModel, PredatorBeliefs, ReserveBelief,
 };
+use crate::components::magic::{Inventory, ResourceKind};
 use crate::components::physical::{Dead, Position};
 use crate::components::wildlife::{WildAnimal, WildSpecies};
 use crate::messages::witnessable_event::WitnessableEvent;
@@ -60,6 +61,7 @@ pub fn integrate_beliefs(
             &mut LocationBeliefs,
             &mut PredatorBeliefs,
             &mut ContextBeliefs,
+            &mut ColonyReservesBelief,
         ),
         Without<Dead>,
     >,
@@ -71,7 +73,7 @@ pub fn integrate_beliefs(
     // ---- Pass A — Observation -----------------------------------------
     for ev in events.read() {
         let pos = event_position(ev);
-        for (witness_ent, witness_pos, mut cats, mut locs, mut preds, mut contexts) in
+        for (witness_ent, witness_pos, mut cats, mut locs, mut preds, mut contexts, mut reserves) in
             witnesses.iter_mut()
         {
             if !within_range(witness_pos, &pos) {
@@ -86,6 +88,7 @@ pub fn integrate_beliefs(
                 &mut locs,
                 &mut preds,
                 &mut contexts,
+                &mut reserves,
             );
         }
     }
@@ -94,7 +97,7 @@ pub fn integrate_beliefs(
     let period = cfg.decay_stagger_period.max(1);
     let priors = &cfg.species_violence_priors;
     let tick_phase = tick % period;
-    for (witness_ent, witness_pos, mut cats, mut locs, mut preds, mut contexts) in
+    for (witness_ent, witness_pos, mut cats, mut locs, mut preds, mut contexts, mut reserves) in
         witnesses.iter_mut()
     {
         if (witness_ent.index_u32() as u64) % period != tick_phase {
@@ -122,6 +125,56 @@ pub fn integrate_beliefs(
         decay_models(&mut locs.models, tick, cfg, period);
         decay_models(&mut preds.models, tick, cfg, period);
         decay_models(&mut contexts.models, tick, cfg, period);
+        decay_reserves(&mut reserves.reserves, cfg);
+    }
+}
+
+/// 308: per-cat stagger broadcast of the cat's current inventory contents.
+/// Narrative framing: "cats gossip about what they're carrying." Implementation:
+/// god-eye sensor that emits one `WitnessableEvent::InventoryObserved` per cat
+/// per stagger phase tick, integrated by `integrate_beliefs`'s Pass A on the
+/// same tick (we schedule this before `integrate_beliefs` in `SimulationPlugin`).
+///
+/// Self-observation is authoritative; nearby cats integrate the snapshot as
+/// additive lower-bound evidence about the colony reserves pool.
+pub fn gossip_inventory_observations(
+    time: Res<TimeState>,
+    constants: Res<SimConstants>,
+    mut events: MessageWriter<WitnessableEvent>,
+    cats: Query<(Entity, &Position, &Inventory), Without<Dead>>,
+) {
+    let tick = time.tick;
+    let period = constants.beliefs.decay_stagger_period.max(1);
+    let tick_phase = tick % period;
+    for (entity, pos, inventory) in cats.iter() {
+        if (entity.index_u32() as u64) % period != tick_phase {
+            continue;
+        }
+        let mut thornbriar = 0u32;
+        let mut remedy = 0u32;
+        for slot in &inventory.slots {
+            match ResourceKind::from_item_kind(slot.kind) {
+                Some(ResourceKind::Thornbriar) => thornbriar += 1,
+                Some(ResourceKind::RemedyHerb) => remedy += 1,
+                None => {}
+            }
+        }
+        if thornbriar == 0 && remedy == 0 {
+            continue;
+        }
+        let mut payload = Vec::with_capacity(2);
+        if thornbriar > 0 {
+            payload.push((ResourceKind::Thornbriar, thornbriar));
+        }
+        if remedy > 0 {
+            payload.push((ResourceKind::RemedyHerb, remedy));
+        }
+        events.write(WitnessableEvent::InventoryObserved {
+            actor: entity,
+            position: *pos,
+            inventory: payload,
+            tick,
+        });
     }
 }
 
@@ -135,7 +188,10 @@ fn event_position(ev: &WitnessableEvent) -> Position {
         | WitnessableEvent::Hunt { position, .. }
         | WitnessableEvent::ConspecificStartle { position, .. }
         | WitnessableEvent::AmbientShock { position, .. }
-        | WitnessableEvent::SelfPlanFailed { position, .. } => *position,
+        | WitnessableEvent::SelfPlanFailed { position, .. }
+        | WitnessableEvent::ReserveDeposited { position, .. }
+        | WitnessableEvent::ReserveConsumed { position, .. }
+        | WitnessableEvent::InventoryObserved { position, .. } => *position,
     }
 }
 
@@ -162,6 +218,7 @@ fn apply_observation(
     locs: &mut LocationBeliefs,
     _preds: &mut PredatorBeliefs,
     contexts: &mut ContextBeliefs,
+    reserves: &mut ColonyReservesBelief,
 ) {
     match ev {
         WitnessableEvent::Attack {
@@ -370,7 +427,59 @@ fn apply_observation(
             model.last_updated_tick = tick;
             model.evidence_count = model.evidence_count.saturating_add(1);
         }
+
+        WitnessableEvent::ReserveDeposited { kind, .. } => {
+            let entry = reserves.reserves.entry(*kind).or_default();
+            entry.estimated_count = entry.estimated_count.saturating_add(1);
+            bump_reserve_strength(entry, cfg, tick);
+        }
+
+        WitnessableEvent::ReserveConsumed { kind, .. } => {
+            let entry = reserves.reserves.entry(*kind).or_default();
+            entry.estimated_count = entry.estimated_count.saturating_sub(1);
+            bump_reserve_strength(entry, cfg, tick);
+        }
+
+        WitnessableEvent::InventoryObserved {
+            actor, inventory, ..
+        } => {
+            let is_self = *actor == witness;
+            for (kind, count) in inventory {
+                let entry = reserves.reserves.entry(*kind).or_default();
+                if is_self {
+                    // Authoritative replacement — the cat directly knows
+                    // what they're holding right now.
+                    entry.estimated_count = *count;
+                } else {
+                    // Additive lower-bound — "I see Mocha is holding 2
+                    // thornbriar, so the colony pool is at least 2."
+                    entry.estimated_count = entry.estimated_count.max(*count);
+                }
+                bump_reserve_strength(entry, cfg, tick);
+            }
+        }
     }
+}
+
+fn bump_reserve_strength(entry: &mut ReserveBelief, cfg: &BeliefsConstants, tick: u64) {
+    entry.strength = (entry.strength + cfg.reserve_strength_per_observation).min(1.0);
+    entry.last_source = EvidenceKind::Observation;
+    entry.last_updated_tick = tick;
+}
+
+fn decay_reserves(
+    map: &mut std::collections::HashMap<ResourceKind, ReserveBelief>,
+    cfg: &BeliefsConstants,
+) {
+    map.retain(|_kind, rb| {
+        rb.strength = (rb.strength - cfg.reserve_decay_per_stagger).max(0.0);
+        if rb.strength <= f32::EPSILON {
+            rb.last_source = EvidenceKind::Forgetting;
+            false
+        } else {
+            true
+        }
+    });
 }
 
 fn relay_credibility(state: crate::messages::witnessable_event::RelayState) -> f32 {
@@ -437,7 +546,7 @@ mod tests {
     use super::*;
 
     use crate::components::beliefs::{
-        CatBeliefs, ContextBeliefs, LocationBeliefs, PredatorBeliefs,
+        CatBeliefs, ColonyReservesBelief, ContextBeliefs, LocationBeliefs, PredatorBeliefs,
     };
     use crate::components::physical::{Health, Needs, Position};
     use crate::components::wildlife::WildAnimal;
@@ -469,6 +578,7 @@ mod tests {
                 LocationBeliefs::default(),
                 PredatorBeliefs::default(),
                 ContextBeliefs::default(),
+                ColonyReservesBelief::default(),
             ))
             .id()
     }
@@ -722,5 +832,135 @@ mod tests {
         }
         // If the entry was removed, decay also achieved its goal
         // (strength hit zero → Forgetting).
+    }
+
+    // ---------------------------------------------------------------------
+    // 308 — ColonyReservesBelief integrator coverage
+    // ---------------------------------------------------------------------
+
+    #[test]
+    fn reserve_deposited_lifts_witness_count() {
+        let (mut world, mut schedule) = test_world(100);
+        let actor = spawn_cat(&mut world, Position::new(10, 10));
+        let witness = spawn_cat(&mut world, Position::new(11, 10));
+
+        world.write_message(WitnessableEvent::ReserveDeposited {
+            actor,
+            kind: ResourceKind::Thornbriar,
+            position: Position::new(10, 10),
+            tick: 100,
+        });
+        schedule.run(&mut world);
+
+        for (label, ent) in [("actor", actor), ("witness", witness)] {
+            let belief = world
+                .get::<ColonyReservesBelief>(ent)
+                .expect("cat has ColonyReservesBelief");
+            let entry = belief
+                .reserves
+                .get(&ResourceKind::Thornbriar)
+                .unwrap_or_else(|| panic!("{label} should hold a Thornbriar reserve belief"));
+            assert_eq!(entry.estimated_count, 1, "{label} count should bump to 1");
+            assert!(entry.strength > 0.0, "{label} strength should lift");
+        }
+    }
+
+    #[test]
+    fn reserve_consumed_decrements_count_saturating() {
+        let (mut world, mut schedule) = test_world(100);
+        let actor = spawn_cat(&mut world, Position::new(10, 10));
+        // Pre-seed a belief at count=2 so the decrement has somewhere to go.
+        {
+            let mut belief = world.get_mut::<ColonyReservesBelief>(actor).unwrap();
+            belief.reserves.insert(
+                ResourceKind::Thornbriar,
+                crate::components::beliefs::ReserveBelief {
+                    estimated_count: 2,
+                    strength: 1.0,
+                    last_source: EvidenceKind::Observation,
+                    last_updated_tick: 90,
+                },
+            );
+        }
+        world.write_message(WitnessableEvent::ReserveConsumed {
+            actor,
+            kind: ResourceKind::Thornbriar,
+            position: Position::new(10, 10),
+            tick: 100,
+        });
+        schedule.run(&mut world);
+
+        let belief = world.get::<ColonyReservesBelief>(actor).unwrap();
+        let entry = belief.reserves.get(&ResourceKind::Thornbriar).unwrap();
+        assert_eq!(entry.estimated_count, 1);
+    }
+
+    #[test]
+    fn inventory_observed_self_replaces_count() {
+        let (mut world, mut schedule) = test_world(100);
+        let actor = spawn_cat(&mut world, Position::new(10, 10));
+        // Pre-seed a stale belief that overestimates.
+        {
+            let mut belief = world.get_mut::<ColonyReservesBelief>(actor).unwrap();
+            belief.reserves.insert(
+                ResourceKind::Thornbriar,
+                crate::components::beliefs::ReserveBelief {
+                    estimated_count: 5,
+                    strength: 1.0,
+                    last_source: EvidenceKind::Observation,
+                    last_updated_tick: 90,
+                },
+            );
+        }
+        // Self-observation: I'm holding only 2.
+        world.write_message(WitnessableEvent::InventoryObserved {
+            actor,
+            position: Position::new(10, 10),
+            inventory: vec![(ResourceKind::Thornbriar, 2)],
+            tick: 100,
+        });
+        schedule.run(&mut world);
+
+        let belief = world.get::<ColonyReservesBelief>(actor).unwrap();
+        let entry = belief.reserves.get(&ResourceKind::Thornbriar).unwrap();
+        assert_eq!(
+            entry.estimated_count, 2,
+            "self-observation is authoritative — should replace the stale 5 with 2"
+        );
+    }
+
+    #[test]
+    fn inventory_observed_other_takes_lower_bound_max() {
+        let (mut world, mut schedule) = test_world(100);
+        let actor = spawn_cat(&mut world, Position::new(10, 10));
+        let witness = spawn_cat(&mut world, Position::new(11, 10));
+        // Witness already believes the colony has 3 thornbriar.
+        {
+            let mut belief = world.get_mut::<ColonyReservesBelief>(witness).unwrap();
+            belief.reserves.insert(
+                ResourceKind::Thornbriar,
+                crate::components::beliefs::ReserveBelief {
+                    estimated_count: 3,
+                    strength: 1.0,
+                    last_source: EvidenceKind::Observation,
+                    last_updated_tick: 90,
+                },
+            );
+        }
+        // Actor announces holding 2.
+        world.write_message(WitnessableEvent::InventoryObserved {
+            actor,
+            position: Position::new(10, 10),
+            inventory: vec![(ResourceKind::Thornbriar, 2)],
+            tick: 100,
+        });
+        schedule.run(&mut world);
+
+        let belief = world.get::<ColonyReservesBelief>(witness).unwrap();
+        let entry = belief.reserves.get(&ResourceKind::Thornbriar).unwrap();
+        assert_eq!(
+            entry.estimated_count, 3,
+            "additive lower-bound: max(existing 3, witnessed 2) = 3"
+        );
     }
 }

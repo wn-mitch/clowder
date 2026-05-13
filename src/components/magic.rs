@@ -147,6 +147,49 @@ impl HerbKind {
     }
 }
 
+/// Resource category tracked by the `ColonyReserves` aggregator and per-cat
+/// `ColonyReservesBelief` substrate (ticket 308). Distinct from `HerbKind`:
+/// `RemedyHerb` collapses the three remedy ingredients (`HealingMoss` /
+/// `Moonpetal` / `Calmroot`) into a single bucket because the supply-chain
+/// signal cats anticipate is "do we have remedy material at all," not which
+/// specific remedy. Mirror of `inventory.has_remedy_herb()` classification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum ResourceKind {
+    /// Ward material. Consumed by `resolve_set_ward` (Thornward branch).
+    Thornbriar,
+    /// Aggregate of HealingMoss / Moonpetal / Calmroot. Consumed by
+    /// `resolve_prepare_remedy`.
+    RemedyHerb,
+}
+
+impl ResourceKind {
+    /// Classify a herb kind into the coarser `ResourceKind` reserve bucket,
+    /// or `None` if the herb is not tracked by the reserves substrate.
+    pub fn from_herb_kind(kind: HerbKind) -> Option<Self> {
+        match kind {
+            HerbKind::Thornbriar => Some(Self::Thornbriar),
+            HerbKind::HealingMoss | HerbKind::Moonpetal | HerbKind::Calmroot => {
+                Some(Self::RemedyHerb)
+            }
+            _ => None,
+        }
+    }
+
+    /// Classify a world `ItemKind` into a reserve bucket. Used by the
+    /// `ColonyReserves` aggregator when summing herbs across cat inventories
+    /// and Stores building contents.
+    pub fn from_item_kind(kind: crate::components::items::ItemKind) -> Option<Self> {
+        use crate::components::items::ItemKind;
+        match kind {
+            ItemKind::HerbThornbriar => Some(Self::Thornbriar),
+            ItemKind::HerbHealingMoss | ItemKind::HerbMoonpetal | ItemKind::HerbCalmroot => {
+                Some(Self::RemedyHerb)
+            }
+            _ => None,
+        }
+    }
+}
+
 /// An herb entity in the world.
 #[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Herb {

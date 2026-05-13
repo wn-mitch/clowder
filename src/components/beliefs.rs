@@ -20,6 +20,7 @@ use bevy_ecs::prelude::*;
 use std::collections::HashMap;
 
 use crate::components::disposition::DispositionKind;
+use crate::components::magic::ResourceKind;
 
 // ---------------------------------------------------------------------------
 // Keying types
@@ -217,6 +218,41 @@ pub struct PredatorBeliefs {
 #[derive(Component, Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct ContextBeliefs {
     pub models: HashMap<EnvironmentalContextKey, MentalModel>,
+}
+
+// ---------------------------------------------------------------------------
+// ColonyReservesBelief (ticket 308)
+// ---------------------------------------------------------------------------
+
+/// A per-cat subjective estimate of how many of a given reserve resource the
+/// colony currently holds. Distinct shape from [`MentalModel`] because the
+/// underlying observable is a count, not a `[0.0, 1.0]` EMA opinion — rounding
+/// a `f32` EMA back to "low / mid / high" buckets buries information that the
+/// downstream Herbcraft consideration (ticket 309) needs.
+///
+/// Updated by `belief_integrator::apply_observation` from three new
+/// `WitnessableEvent` variants: `ReserveDeposited` increments, `ReserveConsumed`
+/// decrements, and `InventoryObserved` (broadcast by
+/// `gossip_inventory_observations` on each cat's stagger tick) refreshes the
+/// count from the observed actor's inventory snapshot.
+///
+/// `strength` rises on observation (clamped to 1.0) and decays toward 0 in
+/// Pass B's forgetting sweep. Zero-strength entries are dropped — the cat has
+/// forgotten the reserve state for that resource.
+#[derive(Debug, Clone, Copy, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ReserveBelief {
+    pub estimated_count: u32,
+    pub strength: f32,
+    pub last_source: EvidenceKind,
+    pub last_updated_tick: u64,
+}
+
+/// Per-cat mental models of colony-wide reserve stockpiles. Keyed on
+/// [`ResourceKind`]; fully serializable. Authored by `belief_integrator`
+/// (ticket 308); the consumer is the Herbcraft DSE consideration in ticket 309.
+#[derive(Component, Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct ColonyReservesBelief {
+    pub reserves: HashMap<ResourceKind, ReserveBelief>,
 }
 
 // ---------------------------------------------------------------------------

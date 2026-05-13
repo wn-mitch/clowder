@@ -123,6 +123,12 @@ pub fn spawn_cat_from_blueprint(
                 crate::components::LocationBeliefs::default(),
                 crate::components::PredatorBeliefs::default(),
                 crate::components::ContextBeliefs::default(),
+                // 308 — per-cat subjective belief about colony-wide
+                // reserve stockpile counts (thornbriar / remedy-herb).
+                // Authored by belief_integrator from three new
+                // WitnessableEvent variants; dormant at land (consumer
+                // is ticket 309).
+                crate::components::beliefs::ColonyReservesBelief::default(),
             ),
         ))
         .id()
@@ -394,6 +400,7 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     world.insert_resource(crate::resources::CorruptionLandmarks::default());
     world.insert_resource(crate::resources::ColonyLandmarks::default());
     world.insert_resource(FoodStores::default());
+    world.insert_resource(crate::resources::ColonyReserves::default());
     world.insert_resource(crate::systems::wildlife::DetectionCooldowns::default());
     world.insert_resource(crate::resources::SystemActivation::default());
     world.insert_resource(constants);

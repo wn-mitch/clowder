@@ -1,12 +1,12 @@
 ---
 id: 309
 title: Herbcraft DSE reserve-deficit consideration — anticipatory ward / remedy crafting from ColonyReservesBelief
-status: blocked
+status: ready
 cluster: items-crafting
 initiative: []
 added: 2026-05-13
 parked: null
-blocked-by: [308]
+blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []

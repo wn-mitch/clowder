@@ -82,6 +82,7 @@ pub fn init_scenario_world_with(world: &mut World, seed: u64, cfg: ScenarioWorld
     world.insert_resource(crate::resources::CorruptionLandmarks::default());
     world.insert_resource(crate::resources::ColonyLandmarks::default());
     world.insert_resource(FoodStores::default());
+    world.insert_resource(crate::resources::ColonyReserves::default());
     world.insert_resource(crate::systems::wildlife::DetectionCooldowns::default());
     world.insert_resource(crate::resources::SystemActivation::default());
     world.insert_resource(constants);

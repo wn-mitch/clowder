@@ -788,6 +788,9 @@ pub fn resolve_magic_task_chains(
     mut commands: Commands,
     constants: Res<SimConstants>,
     mut activation: ResMut<SystemActivation>,
+    mut witnessable: bevy_ecs::message::MessageWriter<
+        crate::messages::witnessable_event::WitnessableEvent,
+    >,
 ) {
     let m = &constants.magic;
     // Collect workshop positions for speed bonus detection.
@@ -870,34 +873,59 @@ pub fn resolve_magic_task_chains(
 
         match step.kind.clone() {
             StepKind::GatherHerb => {
-                apply(
-                    crate::steps::magic::resolve_gather_herb(
-                        ticks,
-                        step_target_entity,
-                        &mut inventory,
-                        &mut skills,
-                        &herb_entities,
-                        &mut commands,
-                        m,
-                        &time_scale,
-                    ),
-                    &mut chain,
+                // 308: capture herb kind before the resolver despawns the entity.
+                let gathered_kind = step_target_entity
+                    .and_then(|e| herb_entities.get(e).ok().map(|(_, h, _)| h.kind));
+                let result = crate::steps::magic::resolve_gather_herb(
+                    ticks,
+                    step_target_entity,
+                    &mut inventory,
+                    &mut skills,
+                    &herb_entities,
+                    &mut commands,
+                    m,
+                    &time_scale,
                 );
+                if matches!(result, StepResult::Advance) {
+                    if let Some(kind) = gathered_kind {
+                        if let Some(resource) =
+                            crate::components::magic::ResourceKind::from_herb_kind(kind)
+                        {
+                            witnessable.write(
+                                crate::messages::witnessable_event::WitnessableEvent::ReserveDeposited {
+                                    actor: cat_entity,
+                                    kind: resource,
+                                    position: *pos,
+                                    tick: time.tick,
+                                },
+                            );
+                        }
+                    }
+                }
+                apply(result, &mut chain);
             }
 
             StepKind::PrepareRemedy { remedy } => {
-                apply(
-                    crate::steps::magic::resolve_prepare_remedy(
-                        ticks,
-                        remedy,
-                        at_workshop,
-                        &mut inventory,
-                        &mut skills,
-                        m,
-                        &time_scale,
-                    ),
-                    &mut chain,
+                let result = crate::steps::magic::resolve_prepare_remedy(
+                    ticks,
+                    remedy,
+                    at_workshop,
+                    &mut inventory,
+                    &mut skills,
+                    m,
+                    &time_scale,
                 );
+                if matches!(result, StepResult::Advance) {
+                    witnessable.write(
+                        crate::messages::witnessable_event::WitnessableEvent::ReserveConsumed {
+                            actor: cat_entity,
+                            kind: crate::components::magic::ResourceKind::RemedyHerb,
+                            position: *pos,
+                            tick: time.tick,
+                        },
+                    );
+                }
+                apply(result, &mut chain);
             }
 
             StepKind::ApplyRemedy { remedy } => {
@@ -934,37 +962,47 @@ pub fn resolve_magic_task_chains(
             }
 
             StepKind::SetWard { kind } => {
-                apply(
-                    crate::steps::magic::resolve_set_ward(
-                        ticks,
-                        kind,
-                        &name.0,
-                        &mut inventory,
-                        magic_aff,
-                        &mut skills,
-                        &mut mood,
-                        &mut corruption,
-                        &mut health,
-                        &pos,
-                        &mut rng.rng,
-                        &mut commands,
-                        &mut log,
-                        None,
-                        time.tick,
-                        m,
-                        &constants.combat,
-                        &time_scale,
-                        // 301: Legacy disposition-pipeline path
-                        // (unscheduled per ticket 027b). `event_log:
-                        // None` means no `WardPlaced` event is emitted
-                        // from here, so `via_directive` is value-
-                        // immaterial; pass `false` as the natural
-                        // default (this path has no coordinator
-                        // directive plumbing).
-                        false,
-                    ),
-                    &mut chain,
+                let result = crate::steps::magic::resolve_set_ward(
+                    ticks,
+                    kind,
+                    &name.0,
+                    &mut inventory,
+                    magic_aff,
+                    &mut skills,
+                    &mut mood,
+                    &mut corruption,
+                    &mut health,
+                    &pos,
+                    &mut rng.rng,
+                    &mut commands,
+                    &mut log,
+                    None,
+                    time.tick,
+                    m,
+                    &constants.combat,
+                    &time_scale,
+                    // 301: Legacy disposition-pipeline path
+                    // (unscheduled per ticket 027b). `event_log:
+                    // None` means no `WardPlaced` event is emitted
+                    // from here, so `via_directive` is value-
+                    // immaterial; pass `false` as the natural
+                    // default (this path has no coordinator
+                    // directive plumbing).
+                    false,
                 );
+                if matches!(result, StepResult::Advance)
+                    && kind == crate::components::magic::WardKind::Thornward
+                {
+                    witnessable.write(
+                        crate::messages::witnessable_event::WitnessableEvent::ReserveConsumed {
+                            actor: cat_entity,
+                            kind: crate::components::magic::ResourceKind::Thornbriar,
+                            position: *pos,
+                            tick: time.tick,
+                        },
+                    );
+                }
+                apply(result, &mut chain);
             }
 
             StepKind::Scry => {

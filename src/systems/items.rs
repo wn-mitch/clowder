@@ -1,14 +1,19 @@
 use bevy_ecs::prelude::*;
 use rand::Rng;
 
+use crate::components::beliefs::ColonyReservesBelief;
 use crate::components::building::{StoredItems, Structure, StructureType};
 use crate::components::items::{item_display_name, Item};
-use crate::components::magic::Inventory;
-use crate::components::markers::{HasFreeSlot, HasHerbsInInventory, HasRemedyHerbs, HasWardHerbs};
+use crate::components::magic::{Inventory, ResourceKind};
+use crate::components::markers::{
+    HasFreeSlot, HasHerbsInInventory, HasLowWardReserve, HasRemedyHerbs, HasWardHerbs,
+};
 use crate::components::physical::Dead;
+use crate::resources::colony_reserves::ColonyReserves;
 use crate::resources::food::FoodStores;
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::rng::SimRng;
+use crate::resources::sim_constants::SimConstants;
 use crate::resources::time::TimeState;
 
 // ---------------------------------------------------------------------------
@@ -177,6 +182,85 @@ pub fn sync_food_stores(
 
     food.current = total_food_count as f32;
     food.capacity = total_capacity;
+}
+
+/// Recalculate `ColonyReserves` from actual herb items across cat inventories
+/// and Stores buildings (ticket 308).
+///
+/// Ground truth for downstream observability and the per-cat
+/// `ColonyReservesBelief` substrate. Mirrors `sync_food_stores`'s query shape.
+pub fn sync_colony_reserves(
+    mut reserves: ResMut<ColonyReserves>,
+    cats: Query<&Inventory, Without<Dead>>,
+    stores_query: Query<(&Structure, &StoredItems)>,
+    items_query: Query<
+        &Item,
+        bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
+    >,
+) {
+    let mut thornbriar = 0u32;
+    let mut remedy = 0u32;
+
+    for inventory in cats.iter() {
+        for slot in &inventory.slots {
+            match ResourceKind::from_item_kind(slot.kind) {
+                Some(ResourceKind::Thornbriar) => thornbriar += 1,
+                Some(ResourceKind::RemedyHerb) => remedy += 1,
+                None => {}
+            }
+        }
+    }
+
+    for (structure, stored) in stores_query.iter() {
+        if structure.kind == StructureType::Stores {
+            for &item_entity in &stored.items {
+                if let Ok(item) = items_query.get(item_entity) {
+                    match ResourceKind::from_item_kind(item.kind) {
+                        Some(ResourceKind::Thornbriar) => thornbriar += 1,
+                        Some(ResourceKind::RemedyHerb) => remedy += 1,
+                        None => {}
+                    }
+                }
+            }
+        }
+    }
+
+    reserves.thornbriar_count = thornbriar;
+    reserves.remedy_herb_count = remedy;
+}
+
+/// Author the per-cat `HasLowWardReserve` marker from each cat's subjective
+/// `ColonyReservesBelief` for `ResourceKind::Thornbriar` (ticket 308).
+///
+/// The marker fires iff the cat has any belief about thornbriar reserves
+/// (entry exists with `strength > epsilon`) AND that belief's
+/// `estimated_count <= low_ward_reserve_threshold`. Cats without belief data
+/// (e.g. isolated or freshly spawned) don't fire the marker — substrate-honest:
+/// you can't anticipate scarcity you haven't perceived.
+///
+/// Reader for this marker lands in ticket 309 (Herbcraft DSE consideration).
+/// Allowlisted in `scripts/substrate_stubs.allowlist` until 309 lands.
+pub fn update_low_ward_reserve_markers(
+    mut commands: Commands,
+    constants: Res<SimConstants>,
+    cats: Query<(Entity, &ColonyReservesBelief, Has<HasLowWardReserve>), Without<Dead>>,
+) {
+    let threshold = constants.beliefs.low_ward_reserve_threshold;
+    for (entity, belief, has_marker) in cats.iter() {
+        let should_have = belief
+            .reserves
+            .get(&ResourceKind::Thornbriar)
+            .is_some_and(|rb| rb.strength > f32::EPSILON && rb.estimated_count <= threshold);
+        match (should_have, has_marker) {
+            (true, false) => {
+                commands.entity(entity).insert(HasLowWardReserve);
+            }
+            (false, true) => {
+                commands.entity(entity).remove::<HasLowWardReserve>();
+            }
+            _ => {}
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

@@ -301,6 +301,21 @@ impl HasWardHerbs {
     pub const KEY: &str = "HasWardHerbs";
 }
 
+/// Per-cat: this cat *believes* the colony's thornbriar reserve is at or
+/// below `BeliefsConstants::low_ward_reserve_threshold`. Authored from
+/// `ColonyReservesBelief` (not raw colony state) — reflects subjective
+/// anticipation, so cats with no belief evidence don't fire the marker.
+///
+/// Writer: `items.rs::update_low_ward_reserve_markers` (ticket 308).
+/// Reader: Herbcraft DSE consideration (ticket 309, blocks 308).
+/// Allowlisted in `scripts/substrate_stubs.allowlist` with ticket 309
+/// until the reader lands.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasLowWardReserve;
+impl HasLowWardReserve {
+    pub const KEY: &str = "HasLowWardReserve";
+}
+
 /// 231: per-cat marker indicating the cat has at least one empty
 /// inventory slot (`!Inventory::is_full()`). Authored by
 /// `items.rs::update_inventory_markers`.

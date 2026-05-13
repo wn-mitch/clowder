@@ -26,6 +26,7 @@
 //! invariant in tests via stdout-diff.
 
 pub mod chokepoint_defense_isthmus;
+pub mod colony_reserves_belief;
 pub mod disposal_dispatch;
 pub mod disposal_election;
 pub mod dying_arc_softmax;
@@ -206,6 +207,11 @@ pub const ALL: &[&Scenario] = &[
     // ward selection corks the isthmus rather than painting the
     // landmass; this fixture lands GREEN under FO-1 defaults.
     &chokepoint_defense_isthmus::SCENARIO,
+    // 308 — ColonyReservesBelief substrate first-light. Priestess
+    // burns the colony's only thornbriar; witnesses pick up the
+    // resulting low-reserve state via stagger-tick InventoryObserved
+    // broadcasts; `HasLowWardReserve` marker fires.
+    &colony_reserves_belief::SCENARIO,
 ];
 
 /// Look up a scenario by its `name` field.
