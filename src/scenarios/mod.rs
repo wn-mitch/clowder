@@ -25,6 +25,7 @@
 //! scenario runs are byte-deterministic per seed. The runner asserts this
 //! invariant in tests via stdout-diff.
 
+pub mod chokepoint_defense_isthmus;
 pub mod disposal_dispatch;
 pub mod disposal_election;
 pub mod dying_arc_softmax;
@@ -198,6 +199,13 @@ pub const ALL: &[&Scenario] = &[
     // they prove the magic + scent channels fire independently.
     &fox_cat_scent_avoidance::SCENARIO,
     &fox_ward_only_avoidance::SCENARIO,
+    // 311 (301 FO-1) — chokepoint isthmus fixture. Narrow-isthmus map
+    // exercising the ward supply chain end-to-end: pre-loaded inventory
+    // → `WardPlaced`, mature Garden → `CropHarvested`, wild patches →
+    // `GatherHerbCompleted`. FO-2 adds the location assertion that
+    // ward selection corks the isthmus rather than painting the
+    // landmass; this fixture lands GREEN under FO-1 defaults.
+    &chokepoint_defense_isthmus::SCENARIO,
 ];
 
 /// Look up a scenario by its `name` field.

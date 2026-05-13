@@ -1,12 +1,12 @@
 ---
 id: 312
 title: fox-approach-corridor perception axis for ward placement (301 FO-2)
-status: blocked
+status: ready
 cluster: belief-perception
 initiative: []
 added: 2026-05-13
 parked: null
-blocked-by: [311]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [301-ward-placement-decision-semantics.md, 297-fox-patrol-topology-axis.md]
