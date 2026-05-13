@@ -2454,6 +2454,41 @@ pub fn update_recent_ambush_map(
     map.decay_all(constants.wildlife.recent_ambush_half_life_ticks);
 }
 
+/// 312: per-tick decay + deposit for `FoxApproachCorridorMap`.
+/// Mirrors `fox_scent_tick`'s shape (per-tick reader of `FoxState +
+/// FoxAiPhase + Position`, decay first then deposits). Deposits
+/// only fire when the fox is in `FoxAiPhase::PatrolTerritory` —
+/// actively patrolling and (per `fox_movement`) advancing into a
+/// new tile. `Resting`, `ScentMarking`, `DenGuarding`, and stalking
+/// phases are excluded so stationary or pinned foxes don't paint
+/// the corridor map.
+///
+/// The substrate is dormant in scoring at land
+/// (`ward_fox_approach_corridor_weight = 0.0`), but the populator
+/// still runs every tick so the trace emitter has live samples once
+/// the weight is lifted at first-light. Cubs are skipped because
+/// they don't patrol.
+pub fn update_fox_approach_corridor_map(
+    foxes: Query<(&FoxState, &FoxAiPhase, &Position)>,
+    mut corridor: ResMut<crate::resources::FoxApproachCorridorMap>,
+    constants: Res<SimConstants>,
+) {
+    corridor.decay_all(constants.wildlife.fox_approach_corridor_half_life_ticks);
+
+    let deposit = constants.wildlife.fox_approach_corridor_deposit_per_tick;
+    if deposit <= 0.0 {
+        return;
+    }
+    for (fox, phase, pos) in &foxes {
+        if fox.life_stage == FoxLifeStage::Cub {
+            continue;
+        }
+        if matches!(phase, FoxAiPhase::PatrolTerritory { .. }) {
+            corridor.deposit(pos.x, pos.y, deposit);
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

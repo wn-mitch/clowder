@@ -286,6 +286,27 @@ impl InfluenceMap for crate::resources::CarcassScentMap {
     }
 }
 
+impl InfluenceMap for crate::resources::FoxApproachCorridorMap {
+    fn metadata(&self) -> MapMetadata {
+        MapMetadata {
+            // 312: per-tile traffic accumulator over observed ShadowFox
+            // patrol movement. Tagged Sight × Neutral matching
+            // RecentAmbushMap — the substrate is faction-agnostic
+            // perception (the *colony* reads where foxes traverse), not
+            // a species-aligned scent channel. ShadowFox-only feed
+            // today; generalizes to other patrolling predators
+            // without metadata churn.
+            name: "fox_approach_corridor",
+            channel: ChannelKind::Sight,
+            faction: Faction::Neutral,
+        }
+    }
+
+    fn base_sample(&self, pos: Position) -> f32 {
+        self.get(pos.x, pos.y)
+    }
+}
+
 impl InfluenceMap for crate::resources::RecentAmbushMap {
     fn metadata(&self) -> MapMetadata {
         MapMetadata {

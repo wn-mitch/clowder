@@ -211,6 +211,13 @@ pub struct ChainResources<'w> {
     /// dormant at land). Carried for the same reason as
     /// `recent_ambush_map`.
     pub carcass_scent_map: Res<'w, crate::resources::CarcassScentMap>,
+    /// 312: fox-approach corridor traffic consumed by
+    /// `compute_ward_placement` (gated by
+    /// `ward_fox_approach_corridor_weight`, dormant at land).
+    /// Threaded through the legacy `disposition_to_chain` path for
+    /// type-correctness even though the path is unscheduled (ticket
+    /// 027b).
+    pub fox_approach_corridor_map: Res<'w, crate::resources::FoxApproachCorridorMap>,
     /// Mutable ledger of frustrated action desires — chain builders record
     /// misses here so the coordinator's BuildPressure can respond.
     pub unmet_demand: ResMut<'w, crate::resources::UnmetDemand>,
@@ -1596,6 +1603,7 @@ pub fn disposition_to_chain(
                     tile_map: &res.map,
                     recent_ambush: &res.recent_ambush_map,
                     carcass_scent: &res.carcass_scent_map,
+                    fox_approach_corridor: &res.fox_approach_corridor_map,
                 };
                 build_crafting_chain(
                     pos,
@@ -4660,6 +4668,7 @@ mod tests {
         let ward_coverage_map = crate::resources::WardCoverageMap::default();
         let recent_ambush_map = crate::resources::RecentAmbushMap::default();
         let carcass_scent_map = crate::resources::CarcassScentMap::default();
+        let fox_approach_corridor_map = crate::resources::FoxApproachCorridorMap::default();
         let placement_maps = crate::systems::coordination::PlacementMaps {
             fox_scent: &fox_scent_map,
             cat_scent: &cat_scent_map,
@@ -4667,6 +4676,7 @@ mod tests {
             tile_map: &map,
             recent_ambush: &recent_ambush_map,
             carcass_scent: &carcass_scent_map,
+            fox_approach_corridor: &fox_approach_corridor_map,
         };
         let result = build_crafting_chain(
             &pos,

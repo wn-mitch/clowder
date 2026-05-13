@@ -1,12 +1,12 @@
 ---
 id: 313
 title: re-examine cat_value and distance_cost in ward-placement scoring (301 FO-3)
-status: blocked
+status: ready
 cluster: ai-substrate
 initiative: []
 added: 2026-05-13
 parked: null
-blocked-by: [312]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [301-ward-placement-decision-semantics.md, 297-fox-patrol-topology-axis.md, 298-ward-placement-cat-value-coefficient.md]

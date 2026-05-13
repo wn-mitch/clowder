@@ -193,6 +193,12 @@ pub struct WardPlacementSignals<'w> {
     /// posture as `recent_ambush`; weight gated by
     /// `ScoringConstants::ward_recency_anchor_weight`.
     pub carcass_scent: Res<'w, crate::resources::CarcassScentMap>,
+    /// 312: fox-approach corridor traffic. Populated by
+    /// `update_fox_approach_corridor_map` reading patrolling-fox
+    /// positions each tick; sampled by `compute_ward_placement` as
+    /// the multiplicative-outside topological-criticality lift.
+    /// Dormant at land (`ward_fox_approach_corridor_weight = 0.0`).
+    pub fox_approach_corridor: Res<'w, crate::resources::FoxApproachCorridorMap>,
     /// 301: coordinator-stamped ward-placement intent. Populated by
     /// `compute_ward_placement` when
     /// `ward_placement_semantics == DescendingResidual`. At default
@@ -502,6 +508,7 @@ pub fn assess_colony_needs(
                 tile_map: &placement_signals.tile_map,
                 recent_ambush: &placement_signals.recent_ambush,
                 carcass_scent: &placement_signals.carcass_scent,
+                fox_approach_corridor: &placement_signals.fox_approach_corridor,
             };
             let ward_pos = compute_ward_placement(
                 &building_positions,
@@ -1351,6 +1358,14 @@ pub(crate) struct PlacementMaps<'a> {
     /// 220: kill-site scent (Phase 2C substrate). Same dormant-at-land
     /// posture as `recent_ambush`; gated by `ward_recency_anchor_weight`.
     pub carcass_scent: &'a crate::resources::CarcassScentMap,
+    /// 312: fox-approach corridor traffic. Populated by
+    /// `update_fox_approach_corridor_map` each tick from
+    /// `FoxAiPhase::PatrolTerritory` deposits. Sampled in
+    /// `compute_ward_placement` to produce a multiplicative-outside
+    /// lift that escapes the 297 iter-2 saturation ceiling. Gated by
+    /// `ward_fox_approach_corridor_weight` (default 0.0, dormant at
+    /// land).
+    pub fox_approach_corridor: &'a crate::resources::FoxApproachCorridorMap,
 }
 
 impl<'a> PlacementMaps<'a> {
@@ -1500,6 +1515,17 @@ pub(crate) fn compute_ward_placement(
         .scoring
         .ward_fox_intercept_anchor_weight
         .clamp(0.0, 1.0);
+    // 312: corridor weight composes **multiplicatively outside** the
+    // saturating threat sum (see CandidateScore::score). Not clamped
+    // to [0, 1] — the multiplier `(1 + w * L)` is intentionally
+    // allowed to climb above 2.0 when both `w` and the corridor
+    // sample saturate, which is the escape-the-ceiling property that
+    // distinguishes this lift from the inside-the-sum siblings.
+    // (Negative values would invert the threat axis; guard at zero.)
+    let w_corridor = constants
+        .scoring
+        .ward_fox_approach_corridor_weight
+        .max(0.0);
     // 298: cat_value tiebreak coefficient, promoted from hardcoded 0.3.
     // Default preserves byte-identical pre-298 behavior. Not clamped —
     // it's a scalar coefficient on a [0, 1] presence value, not a
@@ -1579,6 +1605,21 @@ pub(crate) fn compute_ward_placement(
         let threat = (fox_scent.max(corruption) + ambush_lift + carcass_lift + fox_intercept_lift)
             .min(1.0);
 
+        // 312: corridor traffic, sampled per candidate and stored as a
+        // pre-computed multiplier on `unaddressed_threat`. Short-circuit
+        // the sigmoid when the weight is zero so dormant runs do exactly
+        // zero extra arithmetic (matches the 297 inline-lift pattern).
+        let corridor_lift = if w_corridor > 0.0 {
+            w_corridor
+                * logistic_threat_lift(
+                    maps.fox_approach_corridor.get(candidate.x, candidate.y),
+                    curve_k,
+                    curve_m,
+                )
+        } else {
+            0.0
+        };
+
         let dist = anchor.manhattan_distance(candidate) as f32;
         let distance_cost = DIST_PENALTY_PER_TILE * dist;
 
@@ -1593,6 +1634,7 @@ pub(crate) fn compute_ward_placement(
             cat_value,
             distance_cost,
             jitter,
+            corridor_lift,
         });
     }
 
@@ -1658,17 +1700,39 @@ struct CandidateScore {
     distance_cost: f32,
     /// `rng.random_range(0.0..0.05)` — drawn once per candidate.
     jitter: f32,
+    /// 312: `w_corridor * L(corridor_sample)` — the
+    /// multiplicative-outside lift applied as
+    /// `unaddressed_threat * (1 + corridor_lift)` in `score()`.
+    /// Zero at default (`ward_fox_approach_corridor_weight = 0.0`)
+    /// AND when the candidate sits on an unvisited tile, in either
+    /// case preserving byte-identical pre-312 behavior.
+    corridor_lift: f32,
 }
 
 impl CandidateScore {
     /// Score formula identical to pre-301's inline expression, with
     /// `virtual_coverage` summed into `real_coverage` before the
     /// `(threat - coverage).clamp(0.0, 1.0)` step. At
-    /// `virtual_coverage == 0.0` this is bit-identical to pre-301.
+    /// `virtual_coverage == 0.0` AND `corridor_lift == 0.0` this is
+    /// bit-identical to pre-301.
+    ///
+    /// 312: the `(1.0 + corridor_lift)` factor scales
+    /// `unaddressed_threat` multiplicatively OUTSIDE the saturating
+    /// `(threat - coverage).clamp(0, 1)` step. This is the
+    /// architectural escape from the 297 iter-2 rank-preservation
+    /// ceiling: once any inside-the-sum threat input saturates,
+    /// additional inside-the-sum lifts are rank-preserving for the
+    /// argmax. Multiplying outside lets a high-corridor tile score
+    /// *above* 1.0 on the threat axis, breaking the ceiling on the
+    /// specific tiles that earn the topological-criticality lift.
+    /// See `docs/balance/297-fox-patrol-topology-axis.md` iter-2.
     fn score(&self, virtual_coverage: f32, w_cat_value: f32) -> f32 {
         let effective_coverage = self.real_coverage + virtual_coverage;
         let unaddressed_threat = (self.threat - effective_coverage).clamp(0.0, 1.0);
-        unaddressed_threat + w_cat_value * self.cat_value - self.distance_cost + self.jitter
+        unaddressed_threat * (1.0 + self.corridor_lift)
+            + w_cat_value * self.cat_value
+            - self.distance_cost
+            + self.jitter
     }
 }
 
@@ -1916,6 +1980,7 @@ mod tests {
         crate::resources::map::TileMap,
         crate::resources::RecentAmbushMap,
         crate::resources::CarcassScentMap,
+        crate::resources::FoxApproachCorridorMap,
     ) {
         (
             crate::resources::FoxScentMap::default(),
@@ -1924,6 +1989,7 @@ mod tests {
             crate::resources::map::TileMap::new(120, 90, crate::resources::Terrain::Grass),
             crate::resources::RecentAmbushMap::default(),
             crate::resources::CarcassScentMap::default(),
+            crate::resources::FoxApproachCorridorMap::default(),
         )
     }
 
@@ -1966,7 +2032,7 @@ mod tests {
     fn descending_residual_k1_matches_single_shot_argmax() {
         let structures = vec![Position::new(60, 45)];
         let wards = vec![(Position::new(60, 45), 6.0)];
-        let (mut fs, cp, wc, tm, ra, cs) = empty_placement_maps();
+        let (mut fs, cp, wc, tm, ra, cs, fac) = empty_placement_maps();
         // Saturate one hot tile so the threat term clamps and the
         // argmax decision lives in the cat_value/distance/jitter
         // domain — the regime 297 iter-2 named as load-bearing.
@@ -1978,6 +2044,7 @@ mod tests {
             tile_map: &tm,
             recent_ambush: &ra,
             carcass_scent: &cs,
+            fox_approach_corridor: &fac,
         };
         let mut argmax_constants = crate::resources::SimConstants::default();
         argmax_constants.scoring.ward_placement_semantics =
@@ -2030,7 +2097,7 @@ mod tests {
     fn descending_residual_spreads_picks_across_disjoint_clusters() {
         let structures = vec![Position::new(60, 45)];
         let wards = vec![(Position::new(60, 45), 6.0)];
-        let (mut fs, cp, wc, tm, ra, cs) = empty_placement_maps();
+        let (mut fs, cp, wc, tm, ra, cs, fac) = empty_placement_maps();
         // Two disjoint saturated clusters, both far enough from the
         // existing ward at (60, 45) to escape the Manhattan-3 hard
         // exclusion. Picks should split across them.
@@ -2043,6 +2110,7 @@ mod tests {
             tile_map: &tm,
             recent_ambush: &ra,
             carcass_scent: &cs,
+            fox_approach_corridor: &fac,
         };
         let mut k1_constants = crate::resources::SimConstants::default();
         k1_constants.scoring.ward_placement_semantics =
@@ -2096,7 +2164,7 @@ mod tests {
         // colony core" behavior across the influence-map rewrite.
         let structures = vec![Position::new(10, 10), Position::new(14, 10)];
         let wards: Vec<(Position, f32)> = vec![];
-        let (fs, cp, wc, tm, ra, cs) = empty_placement_maps();
+        let (fs, cp, wc, tm, ra, cs, fac) = empty_placement_maps();
         let maps = PlacementMaps {
             fox_scent: &fs,
             cat_scent: &cp,
@@ -2104,6 +2172,7 @@ mod tests {
             tile_map: &tm,
             recent_ambush: &ra,
             carcass_scent: &cs,
+            fox_approach_corridor: &fac,
         };
         let constants = crate::resources::SimConstants::default();
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
@@ -2128,7 +2197,7 @@ mod tests {
         // is dominated by the saturated threat signal (1.0).
         let structures = vec![Position::new(60, 45)];
         let wards = vec![(Position::new(60, 45), 6.0)];
-        let (mut fs, cp, wc, tm, ra, cs) = empty_placement_maps();
+        let (mut fs, cp, wc, tm, ra, cs, fac) = empty_placement_maps();
         fs.deposit(67, 45, 1.0);
         let maps = PlacementMaps {
             fox_scent: &fs,
@@ -2137,6 +2206,7 @@ mod tests {
             tile_map: &tm,
             recent_ambush: &ra,
             carcass_scent: &cs,
+            fox_approach_corridor: &fac,
         };
         let constants = crate::resources::SimConstants::default();
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(7);
@@ -2171,7 +2241,7 @@ mod tests {
         // saturation cancels the fox_scent contribution.
         let structures = vec![Position::new(60, 45)];
         let wards = vec![(Position::new(60, 45), 6.0)];
-        let (mut fs, cp, mut wc, tm, ra, cs) = empty_placement_maps();
+        let (mut fs, cp, mut wc, tm, ra, cs, fac) = empty_placement_maps();
         fs.deposit(67, 45, 1.0);
         wc.stamp_ward(60, 45, 1.0, 9.0);
         let maps = PlacementMaps {
@@ -2181,6 +2251,7 @@ mod tests {
             tile_map: &tm,
             recent_ambush: &ra,
             carcass_scent: &cs,
+            fox_approach_corridor: &fac,
         };
         let constants = crate::resources::SimConstants::default();
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(99);
@@ -2206,7 +2277,7 @@ mod tests {
         // costs 0.30 score, exceeding the noise from jitter (max 0.05).
         let structures = vec![Position::new(60, 45)];
         let wards = vec![(Position::new(60, 45), 6.0)];
-        let (mut fs, cp, wc, tm, ra, cs) = empty_placement_maps();
+        let (mut fs, cp, wc, tm, ra, cs, fac) = empty_placement_maps();
         fs.deposit(67, 45, 1.0); // 7 tiles from anchor
         fs.deposit(67, 85, 1.0); // 47 tiles from anchor — much farther
         let maps = PlacementMaps {
@@ -2216,6 +2287,7 @@ mod tests {
             tile_map: &tm,
             recent_ambush: &ra,
             carcass_scent: &cs,
+            fox_approach_corridor: &fac,
         };
         let constants = crate::resources::SimConstants::default();
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(11);
@@ -2249,7 +2321,7 @@ mod tests {
         let wards = vec![(Position::new(60, 45), 6.0)];
 
         // Baseline: no ambush / no carcass deposits.
-        let (mut fs_a, cp_a, wc_a, tm_a, ra_a, cs_a) = empty_placement_maps();
+        let (mut fs_a, cp_a, wc_a, tm_a, ra_a, cs_a, fac_a) = empty_placement_maps();
         fs_a.deposit(67, 45, 1.0);
         let maps_a = PlacementMaps {
             fox_scent: &fs_a,
@@ -2258,12 +2330,13 @@ mod tests {
             tile_map: &tm_a,
             recent_ambush: &ra_a,
             carcass_scent: &cs_a,
+            fox_approach_corridor: &fac_a,
         };
 
         // Treatment: identical fox-scent peak but with strong ambush +
         // carcass-scent deposits at a *different* hot zone. If dormancy
         // holds, the placement should not move toward the new hot zone.
-        let (mut fs_b, cp_b, wc_b, tm_b, mut ra_b, mut cs_b) = empty_placement_maps();
+        let (mut fs_b, cp_b, wc_b, tm_b, mut ra_b, mut cs_b, fac_b) = empty_placement_maps();
         fs_b.deposit(67, 45, 1.0);
         ra_b.deposit(40, 70, 1.0);
         cs_b.deposit(40, 70, 1.0);
@@ -2274,6 +2347,7 @@ mod tests {
             tile_map: &tm_b,
             recent_ambush: &ra_b,
             carcass_scent: &cs_b,
+            fox_approach_corridor: &fac_b,
         };
 
         // Force weights to 0.0 explicitly — the default is 0.5 / 0.3 post-284.
@@ -2318,7 +2392,7 @@ mod tests {
     fn ward_placement_shifts_to_ambush_hotspot_when_tuned() {
         let structures = vec![Position::new(60, 45)];
         let wards = vec![(Position::new(60, 45), 6.0)];
-        let (mut fs, cp, wc, tm, mut ra, cs) = empty_placement_maps();
+        let (mut fs, cp, wc, tm, mut ra, cs, fac) = empty_placement_maps();
         // Equidistant rival signals from the anchor at (60, 45):
         // fox-scent at (60, 38), ambush at (60, 52) — both 7 tiles away.
         fs.deposit(60, 38, 1.0);
@@ -2330,6 +2404,7 @@ mod tests {
             tile_map: &tm,
             recent_ambush: &ra,
             carcass_scent: &cs,
+            fox_approach_corridor: &fac,
         };
         // Tuned-on weight (test-local). The clamp at 1.0 in the threat
         // term means the lift's contribution is bounded; we want a value
@@ -2367,7 +2442,7 @@ mod tests {
     fn ward_placement_shifts_to_carcass_hotspot_when_tuned() {
         let structures = vec![Position::new(60, 45)];
         let wards = vec![(Position::new(60, 45), 6.0)];
-        let (mut fs, cp, wc, tm, ra, mut cs) = empty_placement_maps();
+        let (mut fs, cp, wc, tm, ra, mut cs, fac) = empty_placement_maps();
         // Fox-scent peak at (60, 38) — 7 tiles from anchor.
         fs.deposit(60, 38, 1.0);
         // Carcass at (60, 50) — 5 tiles from anchor; bucket(20, 16) at
@@ -2381,6 +2456,7 @@ mod tests {
             tile_map: &tm,
             recent_ambush: &ra,
             carcass_scent: &cs,
+            fox_approach_corridor: &fac,
         };
         let mut constants = crate::resources::SimConstants::default();
         constants.scoring.ward_recency_anchor_weight = 1.0;
@@ -2412,7 +2488,7 @@ mod tests {
     fn ward_placement_shifts_to_fox_intercept_hotspot_when_tuned() {
         let structures = vec![Position::new(30, 20)];
         let wards = vec![(Position::new(30, 20), 6.0)];
-        let (fs, cp, wc, mut tm, ra, cs) = empty_placement_maps();
+        let (fs, cp, wc, mut tm, ra, cs, fac) = empty_placement_maps();
         // Single corruption source at (60, 60). No other threat
         // signals — fox_scent, ambush, carcass all empty. The
         // anchor at (30, 20) is far from corruption (manhattan 70),
@@ -2425,6 +2501,7 @@ mod tests {
             tile_map: &tm,
             recent_ambush: &ra,
             carcass_scent: &cs,
+            fox_approach_corridor: &fac,
         };
         let mut constants = crate::resources::SimConstants::default();
         constants.scoring.ward_fox_intercept_anchor_weight = 1.0;
@@ -2464,7 +2541,7 @@ mod tests {
         let wards = vec![(Position::new(60, 45), 6.0)];
 
         // Baseline: no corruption tile.
-        let (mut fs_a, cp_a, wc_a, tm_a, ra_a, cs_a) = empty_placement_maps();
+        let (mut fs_a, cp_a, wc_a, tm_a, ra_a, cs_a, fac_a) = empty_placement_maps();
         fs_a.deposit(67, 45, 1.0);
         let maps_a = PlacementMaps {
             fox_scent: &fs_a,
@@ -2473,12 +2550,13 @@ mod tests {
             tile_map: &tm_a,
             recent_ambush: &ra_a,
             carcass_scent: &cs_a,
+            fox_approach_corridor: &fac_a,
         };
 
         // Treatment: same fox-scent peak + a corruption tile at a
         // different location. If the weight is zero, placement must
         // not move.
-        let (mut fs_b, cp_b, wc_b, mut tm_b, ra_b, cs_b) = empty_placement_maps();
+        let (mut fs_b, cp_b, wc_b, mut tm_b, ra_b, cs_b, fac_b) = empty_placement_maps();
         fs_b.deposit(67, 45, 1.0);
         tm_b.get_mut(40, 70).corruption = 1.0;
         let maps_b = PlacementMaps {
@@ -2488,6 +2566,7 @@ mod tests {
             tile_map: &tm_b,
             recent_ambush: &ra_b,
             carcass_scent: &cs_b,
+            fox_approach_corridor: &fac_b,
         };
 
         // Force ALL anchor weights to zero so this test isolates the
@@ -2521,6 +2600,147 @@ mod tests {
             pos_a, pos_b,
             "297 dormancy invariant violated: depositing corruption \
              changed placement with weight forced to 0.0",
+        );
+    }
+
+    /// 312 dormancy invariant: with `ward_fox_approach_corridor_weight`
+    /// forced to 0.0, depositing fox-traffic into the corridor map at a
+    /// different hot zone than the fox-scent peak must NOT shift
+    /// placement — byte-identical to pre-312 behavior.
+    #[test]
+    fn corridor_axis_dormant_when_weight_is_zero() {
+        let structures = vec![Position::new(60, 45)];
+        let wards = vec![(Position::new(60, 45), 6.0)];
+
+        // Baseline: empty corridor map.
+        let (mut fs_a, cp_a, wc_a, tm_a, ra_a, cs_a, fac_a) = empty_placement_maps();
+        fs_a.deposit(67, 45, 1.0);
+        let maps_a = PlacementMaps {
+            fox_scent: &fs_a,
+            cat_scent: &cp_a,
+            ward_coverage: &wc_a,
+            tile_map: &tm_a,
+            recent_ambush: &ra_a,
+            carcass_scent: &cs_a,
+            fox_approach_corridor: &fac_a,
+        };
+
+        // Treatment: same fox-scent peak + heavy corridor deposit at a
+        // different location. With zero weight, placement must not move.
+        let (mut fs_b, cp_b, wc_b, tm_b, ra_b, cs_b, mut fac_b) = empty_placement_maps();
+        fs_b.deposit(67, 45, 1.0);
+        fac_b.deposit(40, 70, 1.0);
+        let maps_b = PlacementMaps {
+            fox_scent: &fs_b,
+            cat_scent: &cp_b,
+            ward_coverage: &wc_b,
+            tile_map: &tm_b,
+            recent_ambush: &ra_b,
+            carcass_scent: &cs_b,
+            fox_approach_corridor: &fac_b,
+        };
+
+        // Force ALL anchor weights to zero so this test isolates the
+        // corridor axis.
+        let mut constants = crate::resources::SimConstants::default();
+        constants.scoring.ward_ambush_anchor_weight = 0.0;
+        constants.scoring.ward_recency_anchor_weight = 0.0;
+        constants.scoring.ward_fox_intercept_anchor_weight = 0.0;
+        constants.scoring.ward_fox_approach_corridor_weight = 0.0;
+
+        let mut rng_a = rand_chacha::ChaCha8Rng::seed_from_u64(312);
+        let mut rng_b = rand_chacha::ChaCha8Rng::seed_from_u64(312);
+        let pos_a = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(60, 45),
+            &maps_a,
+            &constants,
+            &mut rng_a,
+            None,
+        );
+        let pos_b = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(60, 45),
+            &maps_b,
+            &constants,
+            &mut rng_b,
+            None,
+        );
+        assert_eq!(
+            pos_a, pos_b,
+            "312 dormancy invariant violated: corridor deposits shifted \
+             placement with weight forced to 0.0",
+        );
+    }
+
+    /// 312 lift behavior: with the corridor weight tuned ON, a candidate
+    /// tile that sits on a high-traffic corridor outscores an equivalent
+    /// no-corridor tile at the same threat level and same distance from
+    /// the anchor. This is the architectural escape from the 297 iter-2
+    /// rank-preservation ceiling: even with both candidates' threat
+    /// terms saturated at 1.0, the multiplicative-outside lift expands
+    /// the corridor tile's effective score *above* the ceiling.
+    #[test]
+    fn corridor_axis_lifts_score_on_high_traffic_tile() {
+        let structures = vec![Position::new(60, 45)];
+        let wards = vec![(Position::new(60, 45), 6.0)];
+        let (mut fs, cp, wc, tm, ra, cs, mut fac) = empty_placement_maps();
+        // Two equidistant rival signals from the anchor at (60, 45) —
+        // each gets the same `fox_scent` saturation, so without the
+        // corridor axis the argmax decision lives in the
+        // cat_value/distance/jitter domain (the 297 iter-2 regime).
+        fs.deposit(60, 38, 1.0); // y -7 from anchor
+        fs.deposit(60, 52, 1.0); // y +7 from anchor
+        // Add corridor traffic ONLY at the +y rival. `FoxApproachCorridorMap`
+        // is per-tile (bucket_size = 1) — deposit across the +y
+        // candidate's neighborhood so candidate (60, 50) reads the
+        // saturated signal. Without this neighborhood the single-tile
+        // deposit at (60, 52) wouldn't align with any candidate
+        // (placement candidates step by 5).
+        for y in 50..=54 {
+            for x in 58..=62 {
+                fac.deposit(x, y, 1.0);
+            }
+        }
+        let maps = PlacementMaps {
+            fox_scent: &fs,
+            cat_scent: &cp,
+            ward_coverage: &wc,
+            tile_map: &tm,
+            recent_ambush: &ra,
+            carcass_scent: &cs,
+            fox_approach_corridor: &fac,
+        };
+
+        // Tune corridor weight ON, hold every other anchor at default
+        // dormancy so the corridor axis is the only post-saturation
+        // tiebreaker (besides cat_value/distance/jitter).
+        let mut constants = crate::resources::SimConstants::default();
+        constants.scoring.ward_ambush_anchor_weight = 0.0;
+        constants.scoring.ward_recency_anchor_weight = 0.0;
+        constants.scoring.ward_fox_intercept_anchor_weight = 0.0;
+        constants.scoring.ward_fox_approach_corridor_weight = 1.0;
+
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(312);
+        let pos = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(60, 45),
+            &maps,
+            &constants,
+            &mut rng,
+            None,
+        );
+        // The corridor hotspot is +y. Placement must bias that way to
+        // demonstrate the multiplicative-outside lift escaped the
+        // ceiling — without it, the symmetric fox-scent peaks would
+        // decide on jitter alone.
+        assert!(
+            pos.y >= 45,
+            "312: expected placement biased toward corridor hotspot at +y; \
+             got {pos:?}",
         );
     }
 
@@ -2752,6 +2972,7 @@ mod tests {
         world.insert_resource(crate::resources::WardIntentMap::default());
         world.insert_resource(crate::resources::RecentAmbushMap::default());
         world.insert_resource(crate::resources::CarcassScentMap::default());
+        world.insert_resource(crate::resources::FoxApproachCorridorMap::default());
         world.insert_resource(crate::resources::map::TileMap::new(
             50,
             50,
@@ -2804,6 +3025,7 @@ mod tests {
         world.insert_resource(crate::resources::WardIntentMap::default());
         world.insert_resource(crate::resources::RecentAmbushMap::default());
         world.insert_resource(crate::resources::CarcassScentMap::default());
+        world.insert_resource(crate::resources::FoxApproachCorridorMap::default());
         world.insert_resource(crate::resources::map::TileMap::new(
             50,
             50,

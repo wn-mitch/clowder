@@ -2148,6 +2148,31 @@ pub struct ScoringConstants {
     /// field is allocated but never read.
     #[serde(default = "default_ward_intent_decay_per_wake")]
     pub ward_intent_decay_per_wake: f32,
+    /// 312: weight on the `FoxApproachCorridorMap` lift in
+    /// `compute_ward_placement()`. Composes **multiplicatively
+    /// outside** the saturating threat sum:
+    ///
+    /// ```text
+    /// score = unaddressed_threat * (1.0 + w_corridor * L(corridor))
+    ///       + w_cat_value * cat_value - distance_cost + jitter
+    /// ```
+    ///
+    /// At `0.0` (the default) the `(1.0 + 0.0 * L(x)) = 1.0` factor
+    /// preserves byte-identical pre-312 behavior. Above 0.0, tiles
+    /// with high observed fox traffic lift the threat term **past
+    /// the [0, 1] saturation ceiling** — escaping the
+    /// rank-preservation pathology that
+    /// `docs/balance/297-fox-patrol-topology-axis.md` iter-2 ruled
+    /// in (additive lifts inside `.min(1.0)` are rank-preserving for
+    /// argmax once any threat input saturates).
+    ///
+    /// FO-1 scenario (`chokepoint_defense_isthmus`) activates at
+    /// `0.3` to assert the isthmus-corked outcome; three-seed
+    /// `just hypothesize` validates the same weight against
+    /// `shadow_foxes_avoided_ward_total` direction match.
+    /// First-light global activation is FO-3 (separate ticket).
+    #[serde(default = "default_ward_fox_approach_corridor_weight")]
+    pub ward_fox_approach_corridor_weight: f32,
     /// 256 R5: deposit per tick when a cat's current action is
     /// `Action::Patrol`. Lays a deterrent gradient that foxes read as
     /// routing cost via `CatPatrolDeterrentOverlay`. Default `0.05`
@@ -2493,6 +2518,7 @@ impl Default for ScoringConstants {
             ward_placement_residual_rounds: default_ward_placement_residual_rounds(),
             ward_intent_dse_weight: default_ward_intent_dse_weight(),
             ward_intent_decay_per_wake: default_ward_intent_decay_per_wake(),
+            ward_fox_approach_corridor_weight: default_ward_fox_approach_corridor_weight(),
             cat_patrol_deterrent_deposit_per_tick:
                 default_cat_patrol_deterrent_deposit_per_tick(),
             cat_patrol_deterrent_decay_rate: default_cat_patrol_deterrent_decay_rate(),
@@ -3811,6 +3837,17 @@ fn default_ward_intent_decay_per_wake() -> f32 {
     0.5
 }
 
+/// 312: weight on the fox-approach-corridor lift in
+/// `compute_ward_placement()`. Ships dormant at `0.0` per the 220 /
+/// 297 / 301 first-light pattern: the substrate lands wired but
+/// inert so the global-default soak stays byte-identical to
+/// pre-312. The FO-1 isthmus scenario activates at fixture-level
+/// `0.3`; three-seed `just hypothesize` validates the same weight.
+/// First-light *global* activation is FO-3 (separate ticket).
+fn default_ward_fox_approach_corridor_weight() -> f32 {
+    0.0
+}
+
 /// 228: Patrol `Consideration::Field` route-cost axis weight.
 /// 256 R4: bumped from 0.0 to 0.6 to activate the dormant gate so
 /// Patrol's L2 score is suppressed when the path to the perimeter
@@ -4420,6 +4457,29 @@ pub struct WildlifeConstants {
     /// caretake-relocate consumers (tickets 220 / 221).
     #[serde(default = "default_recent_ambush_half_life_ticks")]
     pub recent_ambush_half_life_ticks: u32,
+    /// 312: deposit per tick when a patrolling ShadowFox advances
+    /// through a tile. Lays a corridor-traffic gradient sampled by
+    /// `compute_ward_placement` to recognize topological criticality
+    /// (the tiles foxes actually traverse to reach cats). Default
+    /// `0.05` — a peak (1.0) bucket reaches saturation after ~20
+    /// passes, mirroring `cat_patrol_deterrent_deposit_per_tick`.
+    /// Only deposits during `FoxAiPhase::PatrolTerritory` (active
+    /// patrol movement); skips `Resting` / `ScentMarking` /
+    /// `Confronting` so stationary or den-pinned foxes don't paint
+    /// the corridor map.
+    #[serde(default = "default_fox_approach_corridor_deposit_per_tick")]
+    pub fox_approach_corridor_deposit_per_tick: f32,
+    /// 312: half-life (in ticks) of `FoxApproachCorridorMap` per-tile
+    /// values. Same exponential-decay shape as
+    /// `recent_ambush_half_life_ticks` but slower — default 20_000
+    /// ticks (~4 in-game days) reflects that corridors are stable
+    /// terrain features (fox patrol routes persist across many
+    /// ambush events). Slower-than-ambush decay keeps the substrate
+    /// visible on routes that see traffic every few days but no
+    /// ambush event, which is exactly the topological-criticality
+    /// signal the ward placement scorer needs.
+    #[serde(default = "default_fox_approach_corridor_half_life_ticks")]
+    pub fox_approach_corridor_half_life_ticks: u32,
 }
 
 impl Default for WildlifeConstants {
@@ -4469,12 +4529,24 @@ impl Default for WildlifeConstants {
             ambush_witness_range: 12,
             ambush_witness_safety_drain: 0.08,
             recent_ambush_half_life_ticks: default_recent_ambush_half_life_ticks(),
+            fox_approach_corridor_deposit_per_tick:
+                default_fox_approach_corridor_deposit_per_tick(),
+            fox_approach_corridor_half_life_ticks:
+                default_fox_approach_corridor_half_life_ticks(),
         }
     }
 }
 
 fn default_recent_ambush_half_life_ticks() -> u32 {
     5000
+}
+
+fn default_fox_approach_corridor_deposit_per_tick() -> f32 {
+    0.05
+}
+
+fn default_fox_approach_corridor_half_life_ticks() -> u32 {
+    20_000
 }
 
 /// 260: `WardCoverageMap` intensity above which shadow foxes flip

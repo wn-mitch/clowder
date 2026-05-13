@@ -1,0 +1,30 @@
+# Ticket 312 — fox-approach-corridor axis activation, seed-7.
+#
+# Companion to hypothesis-312-fox-approach-corridor-axis-activation.yaml.
+# Three-seed validation per 285 / 297's iteration discipline.
+#
+# Seed-7's baseline `shadow_foxes_avoided_ward_total` tends to sit near
+# ceiling (78 at post-284 weights per 297-seed-7's findings). On this
+# seed the lift is more likely to preserve than to increase; a drop
+# would indicate the new axis is over-eager, pulling wards off lucky
+# clusters.
+#
+# Iteration policy: see hypothesis-312-fox-approach-corridor-axis-activation.yaml.
+
+hypothesis: |
+  On seed-7 the post-297 baseline sits near a topology-favorable
+  ceiling. Activating the corridor axis should preserve the outcome —
+  the multiplicative lift only shifts placement onto tiles already
+  scoring near argmax, and on this seed those tiles overlap heavily
+  with the existing inputs' targets. A drop would falsify the
+  "preservation" claim and indicate the axis is over-eager.
+constants_patch:
+  scoring:
+    ward_fox_approach_corridor_weight: 0.3
+prediction:
+  metric: shadow_foxes_avoided_ward_total
+  direction: increase
+  rough_magnitude_pct: [-20, 30]
+seeds: [7]
+reps: 1
+duration: 900

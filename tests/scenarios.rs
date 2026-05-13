@@ -150,3 +150,4 @@ fn pre_bonus_equals_pre_penalty_across_all_scenarios() {
         }
     }
 }
+

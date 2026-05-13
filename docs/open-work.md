@@ -17,8 +17,8 @@ _Last generated: 2026-05-13._
 | In progress | 6 |
 | Ready | 93 |
 | Parked | 10 |
-| Blocked | 30 |
-| **Open total** | **139** |
+| Blocked | 29 |
+| **Open total** | **138** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -40,9 +40,9 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 ### Next-recommended (from `just next`)
 
-- **[312](docs/open-work/tickets/312-fox-approach-corridor-perception-axis-for-ward-placement-301-fo-2.md)** — fox-approach-corridor perception axis for ward placement (301 FO-2) — _[belief-perception] · score 0.94_
-- **[303](docs/open-work/tickets/303-split-cat-value-into-movement-intensity-and-residence-axes-298-structural-follow-on.md)** — split cat_value into movement-intensity and residence axes (298 structural follow-on) — _[buildings-zones] · score 0.93_
-- **[007](docs/open-work/tickets/007-cluster-c-deliberation-layer.md)** — Deliberation-layer (Cluster C) — _[ai-substrate] · score 0.92_
+- **[313](docs/open-work/tickets/313-re-examine-cat-value-and-distance-cost-in-ward-placement-scoring-301-fo-3.md)** — re-examine cat_value and distance_cost in ward-placement scoring (301 FO-3) — _[ai-substrate] · score 0.94_
+- **[007](docs/open-work/tickets/007-cluster-c-deliberation-layer.md)** — Deliberation-layer (Cluster C) — _[ai-substrate] · score 0.93_
+- **[303](docs/open-work/tickets/303-split-cat-value-into-movement-intensity-and-residence-axes-298-structural-follow-on.md)** — split cat_value into movement-intensity and residence axes (298 structural follow-on) — _[buildings-zones] · score 0.92_
 - **[261](docs/open-work/tickets/261-actionaffordances-substrate-per-action-success-scalars-actionkind-enum-heuristic-estimators.md)** — ActionAffordances substrate — per-action success scalars + ActionKind enum + heuristic estimators — _[ai-substrate] · score 0.91_
 - **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.91_
 
@@ -69,7 +69,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (25 ready, 5 blocked)
+### ai-substrate (26 ready, 4 blocked)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _[ai-substrate] · added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
@@ -96,8 +96,9 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[286](docs/open-work/tickets/286-lower-threatproximityadrenalineflee-viability-threshold-so-cornered-cats-receive-flee-lift.md)** — Lower ThreatProximityAdrenalineFlee viability threshold so cornered cats receive flee_lift — _[ai-substrate] · added 2026-05-11_
 - **[291](docs/open-work/tickets/291-colonyknowledge-restructure-promotion-via-mental-model-agreement-replaces-carrier-count-threshold-258-follow-on.md)** — ColonyKnowledge restructure — promotion-via-mental-model-agreement replaces carrier-count threshold (258 follow-on) — _[ai-substrate] · added 2026-05-11_
 - **[293](docs/open-work/tickets/293-huntingpriors-retirement-per-location-belief-moves-to-locationbeliefsperceived-violence-capability-colony-absorption-rebuild-258-follow-on.md)** — HuntingPriors retirement — per-location belief moves to LocationBeliefs.perceived_violence_capability + colony absorption rebuild (258 follow-on) — _[ai-substrate] · added 2026-05-11_
+- **[313](docs/open-work/tickets/313-re-examine-cat-value-and-distance-cost-in-ward-placement-scoring-301-fo-3.md)** — re-examine cat_value and distance_cost in ward-placement scoring (301 FO-3) — _[ai-substrate] · added 2026-05-13_
 
-### belief-perception (17 ready, 2 blocked)
+### belief-perception (16 ready, 2 blocked)
 
 - **[020](docs/open-work/tickets/020-namedlandmark-substrate.md)** — NamedLandmark substrate (cross-consumer naming) — _[belief-perception] · added 2026-04-22_
 - **[062](docs/open-work/tickets/062-prey-species-split-maps.md)** — Prey-species split — per-species scent maps (§5.6.3 row #5) — _[belief-perception] · added 2026-04-27_
@@ -115,7 +116,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[294](docs/open-work/tickets/294-recentambushmap-retirement-colony-resource-moves-to-per-cat-locationbeliefsrecency-of-threat-cue-258-follow-on.md)** — RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on) — _[belief-perception] · added 2026-05-11_
 - **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · added 2026-05-12_
 - **[308](docs/open-work/tickets/308-colony-reserves-belief-mental-model-facet-tracking-thornbriar-remedy-herb-stockpile-for-anticipatory-crafting.md)** — Colony reserves belief — mental-model facet tracking thornbriar / remedy-herb stockpile for anticipatory crafting — _[belief-perception] · added 2026-05-13_
-- **[312](docs/open-work/tickets/312-fox-approach-corridor-perception-axis-for-ward-placement-301-fo-2.md)** — fox-approach-corridor perception axis for ward placement (301 FO-2) — _[belief-perception] · added 2026-05-13_
 
 ### social-coordination (9 ready, 5 blocked)
 
@@ -368,7 +368,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[305](docs/open-work/tickets/305-corpus-projection-layer-split-cluster-into-clusterinitiative-render-two-axis-gate-open-time.md)** — Corpus projection layer — split cluster into cluster+initiative, render two-axis, gate open-time — _[process-discipline] · added 2026-05-13_
 - **[308](docs/open-work/tickets/308-colony-reserves-belief-mental-model-facet-tracking-thornbriar-remedy-herb-stockpile-for-anticipatory-crafting.md)** — Colony reserves belief — mental-model facet tracking thornbriar / remedy-herb stockpile for anticipatory crafting — _[belief-perception] · added 2026-05-13_
 - **[310](docs/open-work/tickets/310-shadowfox-goal-directed-behavior-den-satiation-drive-ambush-memory-replace-random-walk-pinball.md)** — ShadowFox goal-directed behavior — den + satiation drive + ambush memory replace random-walk pinball — _[wildlife] · added 2026-05-13_
-- **[312](docs/open-work/tickets/312-fox-approach-corridor-perception-axis-for-ward-placement-301-fo-2.md)** — fox-approach-corridor perception axis for ward placement (301 FO-2) — _[belief-perception] · added 2026-05-13_
+- **[313](docs/open-work/tickets/313-re-examine-cat-value-and-distance-cost-in-ward-placement-scoring-301-fo-3.md)** — re-examine cat_value and distance_cost in ward-placement scoring (301 FO-3) — _[ai-substrate] · added 2026-05-13_
 
 ## Parked (10)
 
@@ -383,7 +383,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[249](docs/open-work/tickets/249-extend-dispositionfailurecooldown-coverage-to-restingguardingpickingup-et-al-r3-from-247.md)** — Extend DispositionFailureCooldown coverage to Resting/Guarding/PickingUp et al. (R3 from 247) — _[ai-substrate] · parked 2026-05-09 · added 2026-05-08_
 - **[273](docs/open-work/tickets/273-caretake-plans-complete-but-kittenfed-never-fires-kitten-starvation-chronic.md)** — Caretake plans complete but KittenFed never fires — kitten starvation chronic — _[life-cycle] · parked 2026-05-11 · added 2026-05-11_
 
-## Blocked (30)
+## Blocked (29)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _[magic-mythic] · blocked-by 007, 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _[items-crafting] · blocked-by 016 · added 2026-04-22_
@@ -414,19 +414,19 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[306](docs/open-work/tickets/306-corpus-tagging-pass-backfill-clusterinitiative-across-active-and-landed-tickets.md)** — Corpus tagging pass — backfill cluster+initiative across active and landed tickets — _[process-discipline] · blocked-by 305 · added 2026-05-13_
 - **[307](docs/open-work/tickets/307-clusterinitiative-filter-recipes-epic-rollup-lint-for-open-work-index.md)** — Cluster/initiative filter recipes + epic-rollup lint for open-work index — _[process-discipline] · blocked-by 305 · added 2026-05-13_
 - **[309](docs/open-work/tickets/309-herbcraft-dse-reserve-deficit-consideration-anticipatory-ward-remedy-crafting-from-colonyreservesbelief.md)** — Herbcraft DSE reserve-deficit consideration — anticipatory ward / remedy crafting from ColonyReservesBelief — _[items-crafting] · blocked-by 308 · added 2026-05-13_
-- **[313](docs/open-work/tickets/313-re-examine-cat-value-and-distance-cost-in-ward-placement-scoring-301-fo-3.md)** — re-examine cat_value and distance_cost in ward-placement scoring (301 FO-3) — _[ai-substrate] · blocked-by 312 · added 2026-05-13_
 
 ## Pre-existing (2)
 
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (193)
+## Landed archive (194)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (128)
+### 2026-05 (129)
 
+- **[312](docs/open-work/landed/312-fox-approach-corridor-perception-axis-for-ward-placement-301-fo-2.md)** — fox-approach-corridor perception axis for ward placement (301 FO-2) _(2026-05-13)_
 - **[311](docs/open-work/landed/311-scenario-fixture-chokepoint-isthmus-ward-corking-test-301-fo-1.md)** — scenario fixture — chokepoint isthmus ward-corking test (301 FO-1) _(2026-05-13)_
 - **[301](docs/open-work/landed/301-evolve-ward-placement-decision-semantics-beyond-single-shot-argmax-285296297-architectural-follow-on.md)** — evolve ward placement decision semantics beyond single-shot argmax (285+296+297 architectural follow-on) _(2026-05-13)_
 - **[260](docs/open-work/landed/260-fox-scent-marking-signposts-territorial-boundaries-without-ward-keying.md)** — Fox scent-marking signposts — territorial boundaries without ward keying _(2026-05-13)_

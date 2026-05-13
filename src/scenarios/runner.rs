@@ -118,6 +118,13 @@ pub struct ScenarioReport {
     /// without re-importing the enum). Empty map means SystemActivation
     /// recorded nothing; missing key means the Feature didn't fire.
     pub feature_counts: std::collections::BTreeMap<String, u64>,
+    /// 312: positions of every `WardPlaced` event in `EventLog` at
+    /// end-of-run. Reading the EventLog (not just `SystemActivation`'s
+    /// count) lets ward-placement scenarios assert *where* the ward
+    /// landed, not just *that* it did. Used by the FO-1
+    /// chokepoint-isthmus scenario to assert the corridor-corked
+    /// outcome at fixture-level corridor weight.
+    pub final_ward_placements: Vec<(i32, i32)>,
 }
 
 impl ScenarioReport {
@@ -226,6 +233,24 @@ pub fn run(
         }
     };
 
+    // 312: extract WardPlaced locations from EventLog for the FO-1
+    // chokepoint-corked assertion.
+    let final_ward_placements: Vec<(i32, i32)> = {
+        use crate::resources::event_log::{EventKind, EventLog};
+        let world = app.world();
+        match world.get_resource::<EventLog>() {
+            Some(log) => log
+                .entries
+                .iter()
+                .filter_map(|e| match &e.kind {
+                    EventKind::WardPlaced { location, .. } => Some(*location),
+                    _ => None,
+                })
+                .collect(),
+            None => Vec::new(),
+        }
+    };
+
     ScenarioReport {
         scenario_name: scenario.name,
         focal,
@@ -237,6 +262,7 @@ pub fn run(
         final_prey_count,
         final_ground_item_count,
         feature_counts,
+        final_ward_placements,
     }
 }
 

@@ -122,3 +122,37 @@ The 301 ticket commit opens FO-1 / FO-2 / FO-3 with `--blocked-by` chain. FO-4 o
 - Not a multi-rep sweep. Single seed (42) with single dormancy + single first-light run. Seeds 99 and 7 may show different Path A dynamics; the anti-concordance on seed-42 is sufficient to halt the activation here.
 - Not a claim that selection-rule changes are useless. The wiring stays, dormant. Once FO-2's topology-aware threat axis lands and FO-3 re-balances the non-threat biases, the descending-residual flag can be re-tested — *with* the score function pointing at the right tiles. This is the inverse of the 297 framing: the lever is "what we score," not "how we pick among scores."
 - Not a justification to retire the implementation. The substrate-no-op land carries minimal cost (one new resource, one new enum, one new event field, four new constants) and provides infrastructure FO-2 / FO-3 will repurpose.
+
+## Iter-2: 312 — fox-approach-corridor perception axis (FO-2 landing)
+
+**Date:** 2026-05-13
+**Substrate landed:** `FoxApproachCorridorMap` populated by patrolling-fox movement; `ward_fox_approach_corridor_weight` scoring constant gating a **multiplicative-outside** lift in `compute_ward_placement`.
+
+### Architectural choice
+
+Composition (a) from the ticket's two-option menu: the corridor lift sits **outside** the saturating `(threat - coverage).clamp(0, 1)` step, expressed as `unaddressed_threat * (1.0 + w_corridor * L(corridor))`. Composition (b) — adding a fifth additive lift inside the `.min(1.0)` sum — was ruled out by direct reference to 297 iter-2: additive lifts inside the saturating sum are rank-preserving for argmax once any threat input saturates. Multiplicative-outside lets a high-corridor tile's effective score exceed the [0, 1] ceiling on the threat axis, breaking the rank-preservation pathology that motivated FO-2.
+
+At `w_corridor = 0.0` (the default), the factor `(1 + 0 * L) = 1.0` makes the formula bit-identical to the post-301 baseline. The byte-identity invariant is pinned by `coordination::tests::corridor_axis_dormant_when_weight_is_zero` and the existing `ward_placement_dormant_when_weights_forced_to_zero` test.
+
+### The scenario-level acceptance
+
+`scenarios::chokepoint_defense_isthmus::tests::corridor_corks_isthmus` exercises the scorer against the FO-1 isthmus geometry with pre-deposited fox traffic and `ward_fox_approach_corridor_weight = 0.3`. The argmax lands in the 5-tile band `x ∈ [28, 32]` centered on the isthmus, where it would otherwise prefer the cat-cluster interior. The control (`dormant_corridor_does_not_cork_isthmus`) confirms that without the substrate signal at all, the scorer does not cork the corridor — proving the corked outcome is driven by the axis, not by topology side effects.
+
+End-to-end Path A emission (`Feature::WardPlaced` actually firing through the directive → dispatch → L3 election → set-ward chain in the scenario harness) is **not** asserted at this ticket. The chain involves coordinator selection cadence, urgent dispatch thresholds, and Herbalism sub-action priority — dynamics outside 312's scope. The unit-test-level scorer assertion plus the soak-scale hypothesize sweep are the architectural validation.
+
+### Soak validation
+
+Three-seed hypothesize sweep at `w_corridor = 0.3`:
+
+- [`hypothesis-312-fox-approach-corridor-axis-activation.yaml`](hypothesis-312-fox-approach-corridor-axis-activation.yaml) — primary spec, seed 42, predicts ≥ +20% lift in `shadow_foxes_avoided_ward_total`.
+- [`hypothesis-312-fox-approach-corridor-axis-activation-seed99.yaml`](hypothesis-312-fox-approach-corridor-axis-activation-seed99.yaml) — companion, seed 99.
+- [`hypothesis-312-fox-approach-corridor-axis-activation-seed7.yaml`](hypothesis-312-fox-approach-corridor-axis-activation-seed7.yaml) — companion, seed 7.
+
+The corridor map is populated by `update_fox_approach_corridor_map` reading `FoxAiPhase::PatrolTerritory` deposits each tick, slow-decay at `fox_approach_corridor_half_life_ticks = 20_000` (4× slower than ambush memory because corridors are stable terrain features, not transient event echoes). The system is scheduled inside the existing wildlife `.chain()` block alongside `fox_scent_tick` to avoid a new schedule-edge (ticket 061 precedent).
+
+### What 312 doesn't do
+
+- Does NOT re-examine `cat_value` / `distance_cost` (FO-3).
+- Does NOT migrate the signal into the 258 belief layer (FO-4, blocked by 263–270 belief-DSE consumers).
+- Does NOT lift the global default off dormancy. The substrate ships wired but inert; the three-seed hypothesize sweep is the gate before a global activation ticket (FO-3 territory or a follow-on).
+- Does NOT bias cat-side A* pathfinding. The corridor map is a ward-placement signal only; cats route via their existing `RouteCostField` substrate untouched.

@@ -98,6 +98,10 @@ pub fn init_scenario_world_with(world: &mut World, seed: u64, cfg: ScenarioWorld
     world.insert_resource(crate::resources::CarcassScentMap::default());
     // 219: colony-shared recent-ambush event memory.
     world.insert_resource(crate::resources::RecentAmbushMap::default());
+    // 312: fox-approach corridor map. Dormant at default
+    // `SimConstants` (scorer weight 0.0). Activated by the FO-1
+    // chokepoint scenario via a per-fixture `SimConstants` override.
+    world.insert_resource(crate::resources::FoxApproachCorridorMap::default());
     world.insert_resource(crate::resources::CatScentMap::default());
     // 256 R5: cat patrol deterrent map (read by fox A* via overlay).
     world.insert_resource(crate::resources::CatPatrolDeterrentMap::default());

@@ -454,6 +454,15 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     // land (no DSE consumes it yet) but trace-visible.
     world.insert_resource(crate::resources::RecentAmbushMap::default());
 
+    // 312: fox-approach corridor map (perception axis for ward placement).
+    // Populated by `update_fox_approach_corridor_map` reading
+    // ShadowFox `Position` + `FoxAiPhase` each tick; exponential decay
+    // runs in the same system. Dormant in scoring at land — the
+    // `ward_fox_approach_corridor_weight` weight defaults to 0.0 so
+    // `compute_ward_placement` short-circuits the lift. FO-1 scenario
+    // (`chokepoint_defense_isthmus`) activates it at fixture level.
+    world.insert_resource(crate::resources::FoxApproachCorridorMap::default());
+
     // Insert cat scent map resource.
     world.insert_resource(crate::resources::CatScentMap::default());
 

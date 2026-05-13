@@ -1,0 +1,79 @@
+# Ticket 312 — fox-approach-corridor axis activation, primary spec (seed-42).
+#
+# 312 lands a new perception substrate (`FoxApproachCorridorMap`) populated
+# by `update_fox_approach_corridor_map` reading patrolling-fox positions
+# each tick, plus a new lift inside `compute_ward_placement` composed
+# **multiplicatively outside** the saturating threat sum:
+#
+#   score = unaddressed_threat * (1.0 + w_corridor * L(corridor))
+#         + w_cat_value * cat_value - distance_cost + jitter
+#
+# This escapes the 297 iter-2 rank-preservation ceiling that ruled out
+# additive-inside-the-sum lifts as movers of the argmax once any threat
+# input saturates. The corridor signal is topological: it tracks tiles
+# foxes actually traverse to reach cats, distinct from fox_scent
+# (decays in days), recent_ambush (event echo at attack site), and the
+# inline fox-spawn-vicinity halo (corruption-source-derived, not
+# movement-observed).
+#
+# Substrate ships dormant (`ward_fox_approach_corridor_weight = 0.0`);
+# the FO-1 isthmus scenario activates at fixture-level 0.3 and the
+# scorer-side unit test (`scenarios::chokepoint_defense_isthmus::tests::
+# corridor_corks_isthmus`) pins the architectural claim. This spec is
+# the soak-scale validation that the substrate works under whole-colony
+# dynamics, where fox movement, the populator, the decay, the scorer,
+# and the directive chain all interact.
+#
+# Iteration policy:
+# - concordant lift on seed-42 (`shadow_foxes_avoided_ward_total`
+#   ≥ +20% from the dormancy baseline) → first-light succeeds, ship
+#   findings; FO-3 opens to consider lifting the global default.
+# - wrong-direction on seed-42 alone → check seed-99 / seed-7 sister
+#   specs before drawing a conclusion (mirrors 297's three-seed
+#   discipline). Topology-dependent shifts are expected — the
+#   architectural escape may pull wards onto corridor tiles that this
+#   seed's fox patrols don't actually traverse, producing no lift
+#   without indicating a substrate defect.
+# - wrong-direction across all three seeds → land 312 findings-only;
+#   open follow-up for either weight tuning or composing with 296
+#   curve parameters.
+# - any continuity-canary regression > 10% on any seed → stop; new
+#   axis is buying placement at the cost of behavioral health.
+# - any survival-gate violation (Starvation > 0, ShadowFoxAmbush > 10)
+#   → stop; topology shift broke colony viability.
+#
+# Companion specs:
+# - hypothesis-312-fox-approach-corridor-axis-activation-seed99.yaml
+# - hypothesis-312-fox-approach-corridor-axis-activation-seed7.yaml
+
+hypothesis: |
+  At post-297 anchor weights (ambush 0.5, carcass 0.3, fox-intercept 0.5)
+  and post-298 cat-value tiebreak (0.3), the new `FoxApproachCorridorMap`
+  populates each tick from patrolling-fox positions. Activating
+  `ward_fox_approach_corridor_weight = 0.3` introduces a
+  multiplicative-outside lift composed as
+  `unaddressed_threat * (1.0 + 0.3 * L(corridor))`. Because the lift
+  sits OUTSIDE the saturating `(threat - coverage).clamp(0, 1)` step,
+  tiles with both saturated threat AND high corridor traffic score
+  *above* the 1.0 ceiling — the architectural escape from the 297
+  iter-2 rank-preservation pathology. On seed-42 the lift should pull
+  Path A ward placement onto fox-approach corridors that the existing
+  inputs identify as threat-saturated but not topologically critical,
+  materially lifting `shadow_foxes_avoided_ward_total` from the post-297
+  baseline.
+constants_patch:
+  scoring:
+    ward_fox_approach_corridor_weight: 0.3
+prediction:
+  metric: shadow_foxes_avoided_ward_total
+  direction: increase
+  # The ticket's acceptance is a ≥ +20% lift on seed-42 over the
+  # dormancy baseline. Wider upper band because the multiplicative
+  # composition's effect varies sharply with how many tiles see
+  # both saturated threat and high corridor traffic — that overlap
+  # is topology-dependent and could land anywhere from modest to
+  # large depending on the seed's fox patrol routes.
+  rough_magnitude_pct: [20, 300]
+seeds: [42]
+reps: 1
+duration: 900

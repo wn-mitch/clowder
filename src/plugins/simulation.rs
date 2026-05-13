@@ -140,9 +140,9 @@ pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
     // substrate-vs-search-state boundary.
     use crate::resources::{
         CarcassScentMap, CatPatrolDeterrentMap, CatScentMap, ConstructionSiteMap,
-        ExplorationMap, FoodLocationMap, FoxScentMap, GardenLocationMap, GraveAuraMap,
-        HerbLocationMap, KittenCryMap, PreyScentMap, RecentAmbushMap, TileMap, WardCoverageMap,
-        WardIntentMap,
+        ExplorationMap, FoodLocationMap, FoxApproachCorridorMap, FoxScentMap,
+        GardenLocationMap, GraveAuraMap, HerbLocationMap, KittenCryMap, PreyScentMap,
+        RecentAmbushMap, TileMap, WardCoverageMap, WardIntentMap,
     };
 
     registry.register::<FoxScentMap>();
@@ -152,6 +152,11 @@ pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
     // scoring at land (no DSE reads it yet); registered so its samples
     // surface in `trace-*.jsonl` for soak-trace verification.
     registry.register::<RecentAmbushMap>();
+    // 312: fox-approach corridor traffic map. Dormant in scoring at
+    // land (`ward_fox_approach_corridor_weight = 0.0`); registered so
+    // its samples surface in `trace-*.jsonl` for soak-trace
+    // verification at first-light activation.
+    registry.register::<FoxApproachCorridorMap>();
     registry.register::<CatScentMap>();
     // 256 R5: cat patrol deterrent — read by fox A* as routing cost.
     registry.register::<CatPatrolDeterrentMap>();
@@ -348,6 +353,14 @@ impl Plugin for SimulationPlugin {
                         systems::fox_goap::resolve_paired_confrontations,
                         systems::wildlife::fox_ai_decision,
                         systems::wildlife::fox_scent_tick,
+                        // 312: corridor-traffic populator + decay,
+                        // scheduled alongside `fox_scent_tick` inside
+                        // the existing wildlife `.chain()` block to
+                        // avoid creating a new top-level schedule edge
+                        // (ticket 061 precedent — adding an unordered
+                        // sibling perturbs Bevy's topological sort and
+                        // collapsed Hunting/Foraging on seed-42).
+                        systems::wildlife::update_fox_approach_corridor_map,
                         systems::wildlife::update_recent_ambush_map,
                         systems::wildlife::predator_hunt_prey,
                         systems::wildlife::carcass_decay,
