@@ -29,7 +29,7 @@ use crate::components::mental::Memory;
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Health, InjuryKind, Needs, Position};
 use crate::components::prey::{
-    DenRaided, PreyAnimal, PreyConfig, PreyDen, PreyDensity, PreyKilled, PreyState,
+    DenRaided, PreyAnimal, PreyConfig, PreyDen, PreyDensity, PreyKilled, PreyKind, PreyState,
 };
 use crate::components::skills::{Corruption, MagicAffinity, Skills};
 use crate::components::wildlife::WildAnimal;
@@ -6877,12 +6877,24 @@ fn resolve_search_prey(
 /// record is witness-gated by virtue of being on the terminal path:
 /// `StepResult::Continue` returns never call this, and the `Continue` →
 /// `Continue` → ... → `Advance|Fail` chain is exactly one attempt.
+// 295: extended to centralize WitnessableEvent::Hunt emission. The
+// substrate's hunt success-flag derives directly from `HuntOutcome` —
+// Killed* → success=true, LostDuring* → success=false, Abandoned → no
+// emit (the cat never engaged or the target vanished, so there's no
+// witness-relevant hunt event to report). Centralizing here means all
+// 8 call sites in `resolve_engage_prey` route their belief-substrate
+// signal through one place.
 #[allow(clippy::too_many_arguments)]
 fn record_hunt_attempt(
     event_log: Option<&mut EventLog>,
     activation: Option<&mut crate::resources::system_activation::SystemActivation>,
+    witnessable: Option<
+        &mut bevy_ecs::message::MessageWriter<crate::messages::witnessable_event::WitnessableEvent>,
+    >,
     cat_name: &str,
+    cat_entity: Entity,
     species: &str,
+    prey_kind: PreyKind,
     prey_pos: Position,
     outcome: HuntOutcome,
     time_tick: u64,
@@ -6908,6 +6920,24 @@ fn record_hunt_attempt(
     }
     if let Some(act) = activation {
         act.record(crate::resources::system_activation::Feature::HuntAttempted);
+    }
+    if let Some(w) = witnessable {
+        let success = match outcome {
+            HuntOutcome::Killed | HuntOutcome::KilledAndReplanned | HuntOutcome::KilledAndConsumed => Some(true),
+            HuntOutcome::LostDuringApproach
+            | HuntOutcome::LostDuringStalk
+            | HuntOutcome::LostDuringChase => Some(false),
+            HuntOutcome::Abandoned => None,
+        };
+        if let Some(success) = success {
+            w.write(crate::messages::witnessable_event::WitnessableEvent::Hunt {
+                hunter: cat_entity,
+                prey_kind,
+                position: prey_pos,
+                success,
+                tick: time_tick,
+            });
+        }
     }
 }
 
@@ -6962,8 +6992,13 @@ fn resolve_engage_prey(
             record_hunt_attempt(
                 event_log.as_deref_mut(),
                 narr.activation.as_deref_mut(),
+                // 295: Abandoned never emits a Hunt witnessable event,
+                // so the `PreyKind::Mouse` placeholder below is dead.
+                Some(&mut narr.witnessable),
                 &name.0,
+                cat_entity,
                 "unknown",
+                PreyKind::Mouse,
                 Position::new(0, 0),
                 HuntOutcome::Abandoned,
                 time.tick,
@@ -6981,6 +7016,12 @@ fn resolve_engage_prey(
     let catch_mod = prey_cfg.catch_difficulty;
     let item_kind = prey_cfg.item_kind;
     let species_name = prey_cfg.name;
+    // 295: capture `kind` up-front for the same reason `species_name`
+    // is — `record_hunt_attempt` is called from multiple branches that
+    // share their `prey_query` borrow with `prey_query.get_mut` calls,
+    // and keeping `prey_cfg.kind` accesses live across those mutable
+    // borrows trips NLL. PreyKind is Copy, so this is a no-cost capture.
+    let prey_kind = prey_cfg.kind;
 
     // Ticket 223 — cat-side path-cost overlays for predation
     // step_toward loops. Substrate, not search state (§4.7). Borrows
@@ -7017,8 +7058,11 @@ fn resolve_engage_prey(
         record_hunt_attempt(
             event_log.as_deref_mut(),
             narr.activation.as_deref_mut(),
+            Some(&mut narr.witnessable),
             &name.0,
+            cat_entity,
             species_name,
+            prey_kind,
             prey_pos,
             HuntOutcome::Abandoned,
             time.tick,
@@ -7183,8 +7227,11 @@ fn resolve_engage_prey(
                 record_hunt_attempt(
                     event_log.as_deref_mut(),
                     narr.activation.as_deref_mut(),
+                    Some(&mut narr.witnessable),
                     &name.0,
+                    cat_entity,
                     species_name,
+                    prey_kind,
                     prey_pos,
                     HuntOutcome::KilledAndConsumed,
                     time.tick,
@@ -7198,8 +7245,11 @@ fn resolve_engage_prey(
                 record_hunt_attempt(
                     event_log.as_deref_mut(),
                     narr.activation.as_deref_mut(),
+                    Some(&mut narr.witnessable),
                     &name.0,
+                    cat_entity,
                     species_name,
+                    prey_kind,
                     prey_pos,
                     HuntOutcome::Killed,
                     time.tick,
@@ -7214,8 +7264,11 @@ fn resolve_engage_prey(
                 record_hunt_attempt(
                     event_log.as_deref_mut(),
                     narr.activation.as_deref_mut(),
+                    Some(&mut narr.witnessable),
                     &name.0,
+                    cat_entity,
                     species_name,
+                    prey_kind,
                     prey_pos,
                     HuntOutcome::KilledAndReplanned,
                     time.tick,
@@ -7260,8 +7313,11 @@ fn resolve_engage_prey(
                 record_hunt_attempt(
                     event_log.as_deref_mut(),
                     narr.activation.as_deref_mut(),
+                    Some(&mut narr.witnessable),
                     &name.0,
+                    cat_entity,
                     species_name,
+                    prey_kind,
                     prey_pos,
                     HuntOutcome::LostDuringChase,
                     time.tick,
@@ -7291,8 +7347,11 @@ fn resolve_engage_prey(
                 record_hunt_attempt(
                     event_log.as_deref_mut(),
                     narr.activation.as_deref_mut(),
+                    Some(&mut narr.witnessable),
                     &name.0,
+                    cat_entity,
                     species_name,
+                    prey_kind,
                     prey_pos,
                     HuntOutcome::LostDuringChase,
                     time.tick,
@@ -7311,8 +7370,11 @@ fn resolve_engage_prey(
                 record_hunt_attempt(
                     event_log.as_deref_mut(),
                     narr.activation.as_deref_mut(),
+                    Some(&mut narr.witnessable),
                     &name.0,
+                    cat_entity,
                     species_name,
+                    prey_kind,
                     prey_pos,
                     HuntOutcome::LostDuringChase,
                     time.tick,
@@ -7342,8 +7404,11 @@ fn resolve_engage_prey(
                 record_hunt_attempt(
                     event_log.as_deref_mut(),
                     narr.activation.as_deref_mut(),
+                    Some(&mut narr.witnessable),
                     &name.0,
+                    cat_entity,
                     species_name,
+                    prey_kind,
                     prey_pos,
                     HuntOutcome::LostDuringStalk,
                     time.tick,
@@ -7362,8 +7427,11 @@ fn resolve_engage_prey(
                 record_hunt_attempt(
                     event_log.as_deref_mut(),
                     narr.activation.as_deref_mut(),
+                    Some(&mut narr.witnessable),
                     &name.0,
+                    cat_entity,
                     species_name,
+                    prey_kind,
                     prey_pos,
                     HuntOutcome::LostDuringStalk,
                     time.tick,
@@ -7397,8 +7465,11 @@ fn resolve_engage_prey(
             record_hunt_attempt(
                 event_log.as_deref_mut(),
                 narr.activation.as_deref_mut(),
+                Some(&mut narr.witnessable),
                 &name.0,
+                cat_entity,
                 species_name,
+                prey_kind,
                 prey_pos,
                 HuntOutcome::LostDuringApproach,
                 time.tick,

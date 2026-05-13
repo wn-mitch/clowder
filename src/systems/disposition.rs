@@ -3603,6 +3603,19 @@ fn dispatch_chain_step(
                             kind: prey_cfg.kind,
                             position: prey_pos,
                         });
+                        // 295: observable side-effect for the belief substrate.
+                        // Legacy disposition path doesn't track miss-outcomes, so
+                        // only success=true fires here — goap.rs centralizes both
+                        // success and failure paths through record_hunt_attempt.
+                        narr.witnessable.write(
+                            crate::messages::witnessable_event::WitnessableEvent::Hunt {
+                                hunter: cat_entity,
+                                prey_kind: prey_cfg.kind,
+                                position: prey_pos,
+                                success: true,
+                                tick: time.tick,
+                            },
+                        );
 
                         {
                             let terrain = if map.in_bounds(pos.x, pos.y) {

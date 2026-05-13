@@ -73,7 +73,7 @@ pub struct FoxDenRow {
 ///
 /// Cross-reference ticket 037: this event is emitted at outcome resolution,
 /// not on `StepResult::Advance` — witness-gated by construction.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum HuntOutcome {
     /// Successful pounce; inventory had space; advance to deposit step.
