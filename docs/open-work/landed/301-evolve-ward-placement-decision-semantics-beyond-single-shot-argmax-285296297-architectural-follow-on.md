@@ -10,7 +10,7 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [284-ward-anchor-tuning.md, 297-fox-patrol-topology-axis.md]
-landed-at: pending
+landed-at: 5a2893faca1d
 landed-on: 2026-05-13
 ---
 
