@@ -9,7 +9,7 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, refactor-plan.md, scoring-layer-second-order.md, strategist-coordinator.md]
 related-balance: []
-landed-at: pending
+landed-at: 0b072423c606
 landed-on: 2026-05-13
 ---
 
