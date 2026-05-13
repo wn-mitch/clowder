@@ -6332,12 +6332,46 @@ fn dispatch_step_action(
             );
             let target_for_plan = plan.step_state[step_idx].target_position.unwrap_or(*pos);
             let path_plan = cat_path_plan!(target_for_plan);
-            crate::steps::disposition::resolve_flee_travel(
+            // 295: source the threat Entity from the same nearest-wildlife
+            // scan PickFleeTarget uses (line 6298-6302). The threat may
+            // differ between Pick and Flee ticks if a closer predator
+            // approached — the witness records what the cat is *currently*
+            // fleeing from, which is the observably-correct threat for
+            // any onlooker. When no wildlife exists at all, skip the
+            // resolver and stall (Continue) — there is no flee semantics
+            // without a threat.
+            let threat = ec
+                .wildlife
+                .iter()
+                .min_by_key(|(_, tp)| pos.manhattan_distance(tp))
+                .map(|(e, _)| e);
+            let Some(threat) = threat else {
+                return crate::steps::StepResult::Continue;
+            };
+            let outcome = crate::steps::disposition::resolve_flee_travel(
                 pos,
                 target_for_plan,
+                threat,
                 &path_plan,
                 &ec.map,
-            )
+            );
+            if let Some(w) = outcome.witness {
+                // 295 — observable side-effect for the belief substrate.
+                // `belief_integrator` reads FleeFrom to update predictability
+                // on the fleer (this cat) and perceived_violence_capability
+                // on the threat. Fires on the Advance branch (cat reached
+                // flee target); a still-walking Continue is not yet a
+                // completed flee episode.
+                narr.witnessable.write(
+                    crate::messages::witnessable_event::WitnessableEvent::FleeFrom {
+                        fleer: cat_entity,
+                        threat: w.threat,
+                        position: *pos,
+                        tick: ec.time.tick,
+                    },
+                );
+            }
+            outcome.result
         }
         GoapActionKind::HoldUntilSafe => {
             let outcome = crate::steps::disposition::resolve_hold_until_safe(

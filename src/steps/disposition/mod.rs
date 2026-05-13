@@ -33,7 +33,7 @@ pub use drop::{resolve_drop_item, DropOutcome};
 pub use eat_at_stores::resolve_eat_at_stores;
 pub use feed_kitten::resolve_feed_kitten;
 pub use fight_threat::resolve_fight_threat;
-pub use flee_travel::resolve_flee_travel;
+pub use flee_travel::{resolve_flee_travel, FleeWitness};
 pub use groom_other::{resolve_groom_other, GroomOutcome};
 pub use handoff::{resolve_handoff, HandoffOutcome};
 pub use hide::resolve_hide;
