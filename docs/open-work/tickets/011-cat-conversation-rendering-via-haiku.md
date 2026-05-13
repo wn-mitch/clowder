@@ -6,7 +6,7 @@ cluster: magic-mythic
 initiative: [mythic-texture]
 added: 2026-04-21
 parked: null
-blocked-by: [007, 010]
+blocked-by: [010]
 supersedes: []
 related-systems: []
 related-balance: []
@@ -61,3 +61,4 @@ is the mitigation.
 ## Log
 
 - 2026-04-27: dropped blocked-by 005 — cluster-A umbrella retired; A1 + A3 dependencies satisfied by landed work. Still blocked on 007 (cluster C / C3 belief modeling) and 010 (post-death biographies presenter).
+- 2026-05-13: dropped blocked-by 007 — cluster-C container retired; C3 belief modeling satisfied by landed 258 (worked design + mental-model facets). Still blocked on 010 only.

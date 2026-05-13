@@ -1,7 +1,7 @@
 ---
 id: 007
 title: Deliberation-layer (Cluster C)
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-04-20
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, refactor-plan.md, scoring-layer-second-order.md, strategist-coordinator.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-13
 ---
 
 **Why this is a cluster:** C1–C4 all sit *above* the per-tick scoring
@@ -270,6 +270,10 @@ diagnostic lines in `logs/events.jsonl`.
 
 ### C4. Strategist-coordinator task board
 
+**Spun out as ticket 128 — see [`128-htn-method-composition.md`](128-htn-method-composition.md).** This cluster entry retained as a roadmap pointer; 128 carries the worked design (HTN method composition over `HeldIntention.goal` — `Method` registry keyed on goal label, method-failure backtracking with `record_if_witnessed`-routed Feature emissions, alignment with `docs/systems/strategist-coordinator.md`). Mirrors the C1 → 126 (2026-05-02) and C3 → 258 (2026-05-10) spinout pattern.
+
+Cluster role: C4 is the HTN-style hierarchical planning layer sitting *above* BDI intentions (C1), practices (C2), and belief modeling (C3). 128's eventual landing unblocks ticket 057 (§7.3 coordinator-directive `SingleMinded` strategy row).
+
 Existing entry: **this file, `#1 sub-3`** and design doc
 `docs/systems/strategist-coordinator.md`. **Recontextualize under this
 cluster** — it's the HTN-style hierarchical planning layer, sitting
@@ -301,3 +305,4 @@ Not duplicated here; see sub-task 3 of #1.
 - 2026-04-27: dropped blocked-by 005 — cluster-A umbrella retired; A1 dependency satisfied by landed work. Status flipped blocked → ready.
 - 2026-05-09: 249 surfaced the typed-failure-proxy consolidation list under C3's §Touch points. The accumulating typed-failure / typed-event components in tree (`RecentDispositionFailures`, `RecentTargetFailures`, `HuntingPriors::record_failed_search`, plus `RecentAmbushMap` proposed in 219) are all temporary proxies for the unified mental-model substrate this ticket lands. New typed-failure surface area should not be added without an explicit retirement-under-C3 §Log entry in the originating ticket.
 - 2026-05-10: C3 spun out as ticket 258. Mirrors C1 → 126 (2026-05-02). 258 carries the worked design + 9 sibling cluster tickets opened in same lifecycle (261 ActionAffordances substrate, 263 256-cluster consumers, 264 social consumers, 265 wildlife consumers, 266 prey-side AI, 267 conflict-low DSEs, 268 Hide consumer wiring, 269 Submit consumer wiring, 270 EngageThreat split per 256 R6). Plus 3 adjacent independent tickets (259 L1→L3 viz, 260 fox scent-marking signposts, 262 audible-cue range falloff). Session plan: `~/.claude/plans/after-working-256-i-dreamy-fiddle.md`. Retirement venue for the typed-failure-proxy consolidation candidates is now ticket 258.
+- 2026-05-13: Cluster C is fully tracked by independent tickets: C1→126 (landed 2026-05-08), C2→127 (landed 2026-05-11) + consumers 274–280 active, C3→258 (landed 2026-05-11), C4→128 (ready). 57 blocked-by repointed [007]→[128] in the same commit; 53 and 11 auto-unblock as their C3 dependency is satisfied by landed 258. The §C4 entry now carries the 128 spinout pointer mirroring §C1/§C3.

@@ -1,12 +1,12 @@
 ---
 id: 053
 title: §7.7.b death-event grief emission — relationship-classified survivors payload
-status: blocked
+status: ready
 cluster: life-cycle
 initiative: [welfare-fidelity]
 added: 2026-04-27
 parked: null
-blocked-by: [007]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
@@ -70,3 +70,7 @@ stays blocked.
 - 2026-04-27: opened from ticket 013 retirement (spec-follow-on debts
   umbrella decomposition). Original sub-task 13.2 in spec
   `docs/systems/ai-substrate-refactor.md` §7.7.b.
+- 2026-05-13: dropped blocked-by 007 — cluster-C container retired; C3
+  belief modeling / relationship-typology dependency satisfied by
+  landed 258 (worked design + mental-model facets). Status promoted
+  blocked → ready by `just land 007`.
